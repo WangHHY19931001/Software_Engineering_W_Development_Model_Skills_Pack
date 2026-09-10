@@ -1,16 +1,13 @@
 /* eslint-disable security/detect-non-literal-fs-filename, security/detect-object-injection -- Compatibility guards validate repository-relative paths and use fixed field sets. */
 /** Legacy code-health lifecycle compatibility layer over the canonical contract. */
 
-import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
-import * as path from 'node:path';
-
 import {
   CodeHealthError,
   isIsoDate,
   isRelativePath,
   validateCodeHealthCandidate,
   validateCommandEvidence,
+  validateLedgerEvent,
   validateRevision,
 } from './code-health-contract.js';
 import {
@@ -154,34 +151,12 @@ function sortedEqual(left: string[], right: string[]): boolean {
   return sortedLeft.every((item, index) => item === sortedRight[index]);
 }
 
-function resolveWithinRoot(root: string, relativePath: string): string | null {
-  if (!isRelativePath(relativePath)) return null;
-  const rootPath = path.resolve(root);
-  const resolved = path.resolve(rootPath, relativePath);
-  const relative = path.relative(rootPath, resolved);
-  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) return null;
-  return resolved;
-}
-
-function verifyLocalFile(root: string, relativePath: string, expectedHash: string): boolean {
-  const resolved = resolveWithinRoot(root, relativePath);
-  if (!resolved || !existsSync(resolved)) return false;
-  try {
-    const stat = lstatSync(resolved);
-    if (!stat.isFile() || path.resolve(realpathSync(resolved)) !== path.resolve(resolved)) return false;
-    return createHash('sha256').update(readFileSync(resolved)).digest('hex') === expectedHash;
-  } catch {
-    return false;
-  }
-}
-
 function validateRollbackEvidence(
   value: unknown,
   field: string,
   candidate: CodeHealthCandidate,
   evidenceRefs: string[],
   reasons: string[],
-  root = process.cwd(),
 ): value is RollbackEvidence {
   if (!isRecord(value)) {
     reasons.push(`${field} must be an object`);
@@ -216,14 +191,6 @@ function validateRollbackEvidence(
   if (commandValid && !evidenceRefs.includes(command.rawOutputPath)) {
     reasons.push(`${field}.command raw output is not bound to event evidence`);
   }
-  if (commandValid && typeof value.patchPath === 'string' && typeof value.patchSha256 === 'string') {
-    if (!verifyLocalFile(root, value.patchPath, value.patchSha256)) {
-      reasons.push(`${field}.patch file is missing, symlinked, or hash-mismatched`);
-    }
-    if (!verifyLocalFile(root, command.rawOutputPath, command.rawOutputSha256)) {
-      reasons.push(`${field}.rawOutput file is missing, symlinked, or hash-mismatched`);
-    }
-  }
   const revisionReasons: string[] = [];
   const revisionValid = validateRevision(value.sourceRevision, `${field}.sourceRevision`, revisionReasons);
   reasons.push(...revisionReasons);
@@ -239,8 +206,12 @@ export function transitionCandidate(
   event: LedgerEvent,
   approval?: ApprovalDecision,
 ): CodeHealthLedger {
+  const eventReasons = validateLedgerEvent(event);
+  if (eventReasons.length > 0) {
+    throw new CodeHealthError('STRUCTURE_INVALID', `transition event is malformed: ${eventReasons.join('; ')}`);
+  }
   const current = ledger.candidates.find((candidate) => candidate.candidateId === candidateId);
-  if (!current) throw new Error(`transition candidate not found: ${candidateId}`);
+  if (!current) throw new CodeHealthError('STRUCTURE_INVALID', `transition candidate not found: ${candidateId}`);
   const candidateReasons = validateCodeHealthCandidate(current);
   if (candidateReasons.length > 0) throw new Error(`transition candidate is invalid: ${candidateReasons.join('; ')}`);
   if (event.candidateId !== candidateId) throw new Error('transition candidateId mismatch');

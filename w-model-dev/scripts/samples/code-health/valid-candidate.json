@@ -91,6 +91,24 @@
     "symbols": ["unusedFunction"],
     "scopeHash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
   },
+  "evidenceBinding": {
+    "candidate": {
+      "candidateId": "CHG-P1-20260907-001",
+      "phase": "P1",
+      "action": "delete-code",
+      "files": ["src/unused.ts"],
+      "symbols": ["unusedFunction"],
+      "scopeHash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    "revision": {
+      "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "analyzedAt": "2026-09-07T00:00:00.000Z"
+    },
+    "rawOutputPath": ".w-model/code-health/raw/node-version.log",
+    "rawOutputSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
   "evidenceRef": "evidence/CHG-P1-20260907-001.json",
   "archive": {
     "state": "not_archived",

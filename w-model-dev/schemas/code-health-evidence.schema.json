@@ -8,6 +8,7 @@
   "required": [
     "evidenceId",
     "candidateId",
+    "evidenceBinding",
     "revision",
     "staticReferences",
     "dynamicScenarios",
@@ -24,6 +25,10 @@
       "description": "Candidate identifier bound to this evidence package.",
       "type": "string",
       "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+    },
+    "evidenceBinding": {
+      "description": "Mandatory candidate, revision, raw-output path, and raw-output hash binding.",
+      "$ref": "#/definitions/evidenceBinding"
     },
     "revision": {
       "description": "Repository revision analyzed by the evidence package.",
@@ -83,6 +88,57 @@
       "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
     },
     "sha1": { "description": "Lowercase Git SHA-1 digest.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256": { "description": "Lowercase SHA-256 digest.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "evidenceBinding": {
+      "description": "Mandatory lifecycle evidence binding.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate", "revision", "rawOutputPath", "rawOutputSha256"],
+      "properties": {
+        "candidate": { "description": "Exact candidate selector.", "$ref": "#/definitions/candidateSelector" },
+        "revision": { "description": "Revision bound to evidence.", "$ref": "#/definitions/revision" },
+        "rawOutputPath": {
+          "description": "Repository-relative raw output path.",
+          "$ref": "#/definitions/relativePath"
+        },
+        "rawOutputSha256": { "description": "Raw output SHA-256.", "$ref": "#/definitions/sha256" }
+      }
+    },
+    "candidateSelector": {
+      "description": "Exact candidate and scope selector.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidateId", "phase", "action", "files", "symbols", "scopeHash"],
+      "properties": {
+        "candidateId": {
+          "description": "Candidate identity.",
+          "type": "string",
+          "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+        },
+        "phase": { "description": "Candidate phase.", "enum": ["P1", "P2", "P3", "P4"] },
+        "action": {
+          "description": "Candidate action.",
+          "enum": ["delete-code", "add-test", "delete-test", "abstract"]
+        },
+        "files": {
+          "description": "Exact candidate files.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/relativePath" }
+        },
+        "symbols": {
+          "description": "Exact candidate symbols.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "scopeHash": {
+          "description": "Exact candidate scope hash.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
     "sha256": { "description": "Lowercase SHA-256 digest.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "revision": {
       "description": "Source-bound repository revision identity.",

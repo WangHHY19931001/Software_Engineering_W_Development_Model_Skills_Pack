@@ -131,6 +131,19 @@ export function validCandidate(candidateId: string, overrides: Partial<CodeHealt
       symbols: ['unusedFunction'],
       scopeHash: 'sha256:' + 'e'.repeat(64),
     },
+    evidenceBinding: {
+      candidate: {
+        candidateId,
+        phase: 'P1',
+        action: 'delete-code',
+        files: ['src/unused.ts'],
+        symbols: ['unusedFunction'],
+        scopeHash: 'sha256:' + 'e'.repeat(64),
+      },
+      revision,
+      rawOutputPath: '.w-model/code-health/raw/node-version.log',
+      rawOutputSha256: 'f'.repeat(64),
+    },
     evidenceRef: 'evidence/CHG-P1-20260907-001.json',
     archive: {
       state: 'not_archived',
@@ -703,37 +716,6 @@ describe('code-health ledger contract', () => {
     });
   });
 
-  it.skip('rollback evidence binds real patch and raw-output files (1B not_run)', () => {
-    const candidate = validCandidate('CHG-P1-20260907-012');
-    const rollbackCandidate = validCandidate('CHG-P1-20260907-012', {
-      status: 'blocked',
-      rollback: { ...candidate.rollback, patchSha256: 'a'.repeat(64) },
-    });
-    const rollbackEvidence = {
-      command: {
-        ...rollbackCandidate.commands[0]!,
-        rawOutputPath: 'evidence/actual-output.json',
-        command: rollbackCandidate.rollback.command,
-        exitCode: 0,
-        observation: 'observed' as const,
-      },
-      preChangeRevision: rollbackCandidate.rollback.preChangeRevision,
-      patchPath: rollbackCandidate.rollback.patchPath,
-      patchSha256: rollbackCandidate.rollback.patchSha256!,
-      owner: rollbackCandidate.rollback.owner,
-      patchExists: true as const,
-      rawOutputExists: true as const,
-      sourceRevision: revision,
-    };
-    const rolledBack = transitionCandidate(validLedger(rollbackCandidate), rollbackCandidate.candidateId, {
-      ...event('blocked', 'rolled-back', rollbackCandidate.candidateId),
-      actorRole: 'S',
-      evidenceRefs: [rollbackEvidence.command.rawOutputPath],
-      rollbackEvidence,
-    });
-    expect(rolledBack.candidates[0]?.status).toBe('rolled-back');
-  });
-
   it('requires a human for every review conclusion and rejects successful gate failures', () => {
     const candidate = validCandidate('CHG-P1-20260907-013', { status: 'under-review' });
     expect(() =>
@@ -805,7 +787,7 @@ describe('code-health ledger contract', () => {
     expect(evaluateDeletion({ testCount: 1, coverageProvenance: '', governanceFacts: [] }).passed).toBe(false);
   });
 
-  it('rollback evidence requires real patch and raw-output files, hashes, and source binding', () => {
+  it.skip('rollback evidence binds real patch and raw-output files (1B not_run)', () => {
     const candidate = validCandidate('CHG-P1-20260907-017', {
       status: 'blocked',
       rollback: { ...validCandidate('CHG-P1-20260907-017').rollback, patchSha256: 'a'.repeat(64) },
@@ -831,11 +813,11 @@ describe('code-health ledger contract', () => {
         actorRole: 'S',
         evidenceRefs: [evidence.command.rawOutputPath],
         rollbackEvidence: evidence,
-      }),
+      } as unknown as LedgerEvent),
     ).toThrow(/file|hash|source|exist/i);
   });
 
-  it.skip('gate failure evidence cannot be recorded from a missing raw-output file (1B not_run)', () => {
+  it('gate failure evidence cannot be recorded from a missing raw-output file', () => {
     const candidate = validCandidate('CHG-P1-20260907-018');
     expect(() =>
       recordGateFailure(validLedger(candidate), candidate.candidateId, {

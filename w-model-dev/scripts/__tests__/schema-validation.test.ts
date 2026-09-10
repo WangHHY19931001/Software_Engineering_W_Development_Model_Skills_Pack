@@ -367,6 +367,24 @@ describe('JSON Schema 前置校验（validateBySchema）', () => {
         symbols: ['unusedFunction'],
         scopeHash: `sha256:${'f'.repeat(64)}`,
       },
+      evidenceBinding: {
+        candidate: {
+          candidateId: 'CHG-P1-20260907-001',
+          phase: 'P1',
+          action: 'delete-code',
+          files: ['src/unused.ts'],
+          symbols: ['unusedFunction'],
+          scopeHash: `sha256:${'f'.repeat(64)}`,
+        },
+        revision: {
+          commitSha: 'a'.repeat(40),
+          treeSha: 'b'.repeat(40),
+          sourceBundleSha256: 'c'.repeat(64),
+          analyzedAt: '2026-09-07T00:00:00.000Z',
+        },
+        rawOutputPath: '.w-model/code-health/raw/command-001.txt',
+        rawOutputSha256: 'd'.repeat(64),
+      },
       evidenceRef: 'evidence/CHG-P1-20260907-001.json',
       archive: {
         state: 'not_archived',
@@ -419,6 +437,77 @@ describe('JSON Schema 前置校验（validateBySchema）', () => {
       const result = validateBySchema(schemaName, await loadJson(codeHealthSamplesDir, file));
       expect(result.valid, `${file} should be rejected`).toBe(false);
     }
+  });
+
+  it('code-health ledger event schema rejects typed event shape drift', async () => {
+    const valid = (await loadJson(codeHealthSamplesDir, 'valid-ledger-event.json')) as Record<string, unknown>;
+    expect(validateBySchema('code-health-ledger-event', valid).valid).toBe(true);
+    const commandEvidence = {
+      command: 'npm run check:gate',
+      cwd: '.',
+      environment: { NODE_ENV: 'test' },
+      platform: 'win32',
+      toolVersions: { node: '20.0.0' },
+      startedAt: '2026-09-07T00:04:00.000Z',
+      endedAt: '2026-09-07T00:04:01.000Z',
+      exitCode: 7,
+      observation: 'observed',
+      rawOutputPath: 'evidence/raw/gate.txt',
+      rawOutputSha256: 'd'.repeat(64),
+    };
+    const gateFailureEvidence = {
+      ...commandEvidence,
+      candidateId: 'CHG-P1-20260907-001',
+      scopeHash: `sha256:${'e'.repeat(64)}`,
+      failureKind: 'gate',
+    };
+    const gateFailureEvent = { ...valid, eventKind: 'gate-failure', to: 'blocked', gateFailureEvidence };
+    expect(validateBySchema('code-health-ledger-event', gateFailureEvent).valid).toBe(true);
+    expect(validateBySchema('code-health-ledger-event', { ...valid, unknownTopLevel: true }).valid).toBe(false);
+    expect(
+      validateBySchema('code-health-ledger-event', {
+        ...gateFailureEvent,
+        gateFailureEvidence: { ...gateFailureEvidence, unknownNested: true },
+      }).valid,
+    ).toBe(false);
+    expect(
+      validateBySchema('code-health-ledger-event', {
+        ...gateFailureEvent,
+        gateFailureEvidence: { ...gateFailureEvidence, failureKind: 'bogus' },
+      }).valid,
+    ).toBe(false);
+    expect(
+      validateBySchema('code-health-ledger-event', {
+        ...valid,
+        eventKind: 'archive',
+        from: 'verified',
+        to: 'archived',
+        archiveEvidence: {
+          manifestRef: 'archive/CHG-P1-20260907-001.json',
+          manifestSha256: 'c'.repeat(64),
+          verificationLevel: 'source-verified',
+          sourceRevision: valid.revision,
+          redactionStatus: 'clean',
+        },
+      }).valid,
+    ).toBe(false);
+    const rollbackEvidence: Record<string, unknown> = {
+      command: commandEvidence,
+      preChangeRevision: 'a'.repeat(40),
+      patchPath: 'evidence/rollback.patch',
+      patchSha256: 'b'.repeat(64),
+      owner: 'S-agent',
+      patchExists: true,
+      rawOutputExists: true,
+      sourceRevision: valid.revision,
+    };
+    const rollbackEvent = { ...valid, eventKind: 'rollback', from: 'blocked', to: 'rolled-back', rollbackEvidence };
+    expect(validateBySchema('code-health-ledger-event', rollbackEvent).valid).toBe(true);
+    const missingSourceRevision = { ...rollbackEvidence };
+    delete missingSourceRevision.sourceRevision;
+    expect(
+      validateBySchema('code-health-ledger-event', { ...rollbackEvent, rollbackEvidence: missingSourceRevision }).valid,
+    ).toBe(false);
   });
 
   it('未注册的 schema 返回明确错误，gate-log 使用独立 schema 拒绝无效结构', () => {

@@ -202,6 +202,7 @@ export interface CodeHealthCandidate {
   };
   signatures: SignatureRecord[];
   changeScope: { files: string[]; symbols: string[]; scopeHash: string };
+  evidenceBinding: EvidenceBinding;
   evidenceRef: string;
   archive: {
     state: 'not_archived' | 'archived';
@@ -462,6 +463,7 @@ export interface AbstractionProposal {
 export interface CodeHealthEvidence {
   evidenceId: string;
   candidateId: string;
+  evidenceBinding: EvidenceBinding;
   revision: RevisionIdentity;
   staticReferences: StaticReference[];
   dynamicScenarios: DynamicTraceScenario[];
@@ -650,6 +652,21 @@ const PHASES: readonly CodeHealthPhase[] = ['P1', 'P2', 'P3', 'P4'];
 const OBSERVATIONS: readonly EvidenceObservationStatus[] = ['observed', 'not_run', 'unavailable', 'unverified'];
 const REVIEW_DECISIONS: readonly ReviewDecision[] = ['approve', 'reject', 'defer', 'block', 'rollback'];
 const HUMAN_DECISIONS = ['approve', 'reject', 'defer'] as const;
+const LEDGER_EVENT_KINDS: readonly LedgerEventKind[] = [
+  'discovery',
+  'evidence',
+  'review',
+  'approval',
+  'implementation',
+  'verification',
+  'gate-failure',
+  'root-cause',
+  'root-cause-review',
+  'root-cause-gate',
+  'rework',
+  'rollback',
+  'archive',
+];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -727,6 +744,133 @@ export function validateRevision(value: unknown, field: string, reasons: string[
     reasons.push(`${field}.sourceBundleSha256 is invalid`);
   if (!isIsoDate(value.analyzedAt)) reasons.push(`${field}.analyzedAt is invalid`);
   return reasons.length === 0;
+}
+
+export function validateCandidateSelector(
+  value: unknown,
+  field: string,
+  reasons: string[],
+): value is CandidateSelector {
+  if (!isRecord(value)) {
+    reasons.push(`${field} must be an object`);
+    return false;
+  }
+  hasOnlyKeys(value, ['candidateId', 'phase', 'action', 'files', 'symbols', 'scopeHash'], field, reasons);
+  if (typeof value.candidateId !== 'string' || !ID_PATTERN.test(value.candidateId))
+    reasons.push(`${field}.candidateId is invalid`);
+  if (!PHASES.includes(value.phase as CodeHealthPhase)) reasons.push(`${field}.phase is invalid`);
+  if (!ACTIONS.includes(value.action as CodeHealthAction)) reasons.push(`${field}.action is invalid`);
+  if (!isStringArray(value.files, false) || value.files.some((item) => !isRelativePath(item)))
+    reasons.push(`${field}.files must be non-empty repository-relative paths`);
+  if (!isStringArray(value.symbols, false)) reasons.push(`${field}.symbols must be a non-empty string array`);
+  if (typeof value.scopeHash !== 'string' || !SHA256_PATTERN.test(value.scopeHash))
+    reasons.push(`${field}.scopeHash is invalid`);
+  return reasons.length === 0;
+}
+
+export function validateEvidenceBinding(
+  value: unknown,
+  field: string,
+  reasons: string[],
+  expectedCandidate?: CandidateSelector,
+  expectedRevision?: RevisionIdentity,
+): value is EvidenceBinding {
+  if (!isRecord(value)) {
+    reasons.push(`${field} is required`);
+    return false;
+  }
+  hasOnlyKeys(value, ['candidate', 'revision', 'rawOutputPath', 'rawOutputSha256'], field, reasons);
+  const selectorReasons: string[] = [];
+  const selectorValid = validateCandidateSelector(value.candidate, `${field}.candidate`, selectorReasons);
+  reasons.push(...selectorReasons);
+  const revisionReasons: string[] = [];
+  const revisionValid = validateRevision(value.revision, `${field}.revision`, revisionReasons);
+  reasons.push(...revisionReasons);
+  if (!isRelativePath(value.rawOutputPath)) reasons.push(`${field}.rawOutputPath must be repository-relative`);
+  if (typeof value.rawOutputSha256 !== 'string' || !HEX64_PATTERN.test(value.rawOutputSha256))
+    reasons.push(`${field}.rawOutputSha256 is invalid`);
+  if (selectorValid && expectedCandidate && isRecord(value.candidate)) {
+    if (value.candidate.candidateId !== expectedCandidate.candidateId) reasons.push(`${field}.candidateId mismatch`);
+    if (value.candidate.scopeHash !== expectedCandidate.scopeHash) reasons.push(`${field}.scopeHash mismatch`);
+  }
+  if (revisionValid && expectedRevision && !sameRevisionIdentity(value.revision as RevisionIdentity, expectedRevision))
+    reasons.push(`${field}.revision mismatch`);
+  return reasons.length === 0;
+}
+
+function sameRevisionIdentity(left: RevisionIdentity, right: RevisionIdentity): boolean {
+  return (
+    left.commitSha === right.commitSha &&
+    left.treeSha === right.treeSha &&
+    left.sourceBundleSha256 === right.sourceBundleSha256
+  );
+}
+
+export function validateRollbackEvidenceRecord(
+  value: unknown,
+  field: string,
+  reasons: string[],
+): value is RollbackEvidence {
+  if (!isRecord(value)) {
+    reasons.push(`${field} must be an object`);
+    return false;
+  }
+  const localReasons: string[] = [];
+  hasOnlyKeys(
+    value,
+    [
+      'command',
+      'preChangeRevision',
+      'patchPath',
+      'patchSha256',
+      'owner',
+      'patchExists',
+      'rawOutputExists',
+      'sourceRevision',
+    ],
+    field,
+    localReasons,
+  );
+  validateCommandEvidence(value.command, `${field}.command`, localReasons);
+  if (typeof value.preChangeRevision !== 'string' || !SHA40_PATTERN.test(value.preChangeRevision))
+    localReasons.push(`${field}.preChangeRevision is invalid`);
+  if (!isRelativePath(value.patchPath)) localReasons.push(`${field}.patchPath must be repository-relative`);
+  if (typeof value.patchSha256 !== 'string' || !HEX64_PATTERN.test(value.patchSha256))
+    localReasons.push(`${field}.patchSha256 is invalid`);
+  if (typeof value.owner !== 'string' || value.owner.length === 0) localReasons.push(`${field}.owner is required`);
+  if (value.patchExists !== true) localReasons.push(`${field}.patchExists must be true`);
+  if (value.rawOutputExists !== true) localReasons.push(`${field}.rawOutputExists must be true`);
+  validateRevision(value.sourceRevision, `${field}.sourceRevision`, localReasons);
+  reasons.push(...localReasons);
+  return localReasons.length === 0;
+}
+
+export function validateArchiveTransitionEvidence(
+  value: unknown,
+  field: string,
+  reasons: string[],
+): value is ArchiveTransitionEvidence {
+  if (!isRecord(value)) {
+    reasons.push(`${field} must be an object`);
+    return false;
+  }
+  const localReasons: string[] = [];
+  hasOnlyKeys(
+    value,
+    ['manifestRef', 'manifestSha256', 'verificationLevel', 'sourceRevision', 'redactionStatus'],
+    field,
+    localReasons,
+  );
+  if (!isRelativePath(value.manifestRef)) localReasons.push(`${field}.manifestRef must be repository-relative`);
+  if (typeof value.manifestSha256 !== 'string' || !HEX64_PATTERN.test(value.manifestSha256))
+    localReasons.push(`${field}.manifestSha256 is invalid`);
+  if (value.verificationLevel !== 'package-only' && value.verificationLevel !== 'source-bound') {
+    localReasons.push(`${field}.verificationLevel is invalid`);
+  }
+  validateRevision(value.sourceRevision, `${field}.sourceRevision`, localReasons);
+  if (value.redactionStatus !== 'clean') localReasons.push(`${field}.redactionStatus must be clean`);
+  reasons.push(...localReasons);
+  return localReasons.length === 0;
 }
 
 function validateCoverage(value: unknown, field: string, reasons: string[]): boolean {
@@ -837,6 +981,96 @@ export function validateCommandEvidence(value: unknown, field: string, reasons: 
   return reasons.length === 0;
 }
 
+export function validateLedgerEvent(value: unknown, field = 'event'): string[] {
+  const reasons: string[] = [];
+  if (!isRecord(value)) return [`${field} must be an object`];
+  hasOnlyKeys(
+    value,
+    [
+      'eventId',
+      'eventKind',
+      'candidateId',
+      'from',
+      'to',
+      'actorRole',
+      'at',
+      'previousRevision',
+      'revision',
+      'scopeHash',
+      'evidenceRefs',
+      'signatureRef',
+      'gateFailureEvidence',
+      'rollbackEvidence',
+      'archiveEvidence',
+    ],
+    field,
+    reasons,
+  );
+  if (typeof value.eventId !== 'string' || value.eventId.length === 0) reasons.push(`${field}.eventId is required`);
+  if (!LEDGER_EVENT_KINDS.includes(value.eventKind as LedgerEventKind)) reasons.push(`${field}.eventKind is invalid`);
+  if (typeof value.candidateId !== 'string' || !ID_PATTERN.test(value.candidateId))
+    reasons.push(`${field}.candidateId is invalid`);
+  if (value.from !== null && !STATUSES.includes(value.from as CodeHealthStatus))
+    reasons.push(`${field}.from is invalid`);
+  if (!STATUSES.includes(value.to as CodeHealthStatus)) reasons.push(`${field}.to is invalid`);
+  if (!['O', 'A', 'S', 'V', 'G', 'R', 'human'].includes(value.actorRole as string))
+    reasons.push(`${field}.actorRole is invalid`);
+  if (!isIsoDate(value.at)) reasons.push(`${field}.at is invalid`);
+  if (value.previousRevision !== undefined)
+    validateRevision(value.previousRevision, `${field}.previousRevision`, reasons);
+  validateRevision(value.revision, `${field}.revision`, reasons);
+  if (typeof value.scopeHash !== 'string' || !SHA256_PATTERN.test(value.scopeHash))
+    reasons.push(`${field}.scopeHash is invalid`);
+  if (!isStringArray(value.evidenceRefs, false) || value.evidenceRefs.some((item) => !isRelativePath(item)))
+    reasons.push(`${field}.evidenceRefs must be non-empty repository-relative paths`);
+  if (!isRelativePath(value.signatureRef)) reasons.push(`${field}.signatureRef must be repository-relative`);
+  if (value.eventKind === 'implementation') {
+    if (value.to !== 'implemented') reasons.push(`${field}.implementation must target implemented`);
+    if (value.previousRevision === undefined) reasons.push(`${field}.implementation requires previousRevision`);
+  } else if (value.previousRevision !== undefined) {
+    reasons.push(`${field}.previousRevision is only valid for implementation events`);
+  }
+  if (value.eventKind === 'gate-failure' && value.to !== 'blocked')
+    reasons.push(`${field}.gate-failure must target blocked`);
+  if (value.eventKind === 'gate-failure' && value.gateFailureEvidence === undefined)
+    reasons.push(`${field}.gate-failure requires gateFailureEvidence`);
+  if (value.eventKind === 'archive' && value.to !== 'archived') reasons.push(`${field}.archive must target archived`);
+  if (value.to === 'blocked' && value.gateFailureEvidence === undefined)
+    reasons.push(`${field}.blocked transition requires gateFailureEvidence`);
+  if ((value.to === 'archived' || value.eventKind === 'archive') && value.archiveEvidence === undefined) {
+    reasons.push(`${field}.archive transition requires archiveEvidence`);
+  }
+  if (value.to === 'rolled-back' && value.rollbackEvidence === undefined)
+    reasons.push(`${field}.rollback transition requires rollbackEvidence`);
+  if (value.rollbackEvidence !== undefined)
+    validateRollbackEvidenceRecord(value.rollbackEvidence, `${field}.rollbackEvidence`, reasons);
+  if (value.archiveEvidence !== undefined)
+    validateArchiveTransitionEvidence(value.archiveEvidence, `${field}.archiveEvidence`, reasons);
+  if (value.gateFailureEvidence !== undefined) {
+    if (!isRecord(value.gateFailureEvidence)) reasons.push(`${field}.gateFailureEvidence must be an object`);
+    else {
+      const gateFailure = { ...value.gateFailureEvidence };
+      delete gateFailure.candidateId;
+      delete gateFailure.scopeHash;
+      delete gateFailure.failureKind;
+      validateCommandEvidence(gateFailure, `${field}.gateFailureEvidence`, reasons);
+      if (
+        typeof value.gateFailureEvidence.candidateId !== 'string' ||
+        !ID_PATTERN.test(value.gateFailureEvidence.candidateId)
+      )
+        reasons.push(`${field}.gateFailureEvidence.candidateId is invalid`);
+      if (
+        typeof value.gateFailureEvidence.scopeHash !== 'string' ||
+        !SHA256_PATTERN.test(value.gateFailureEvidence.scopeHash)
+      )
+        reasons.push(`${field}.gateFailureEvidence.scopeHash is invalid`);
+      if (!['test', 'gate', 'command'].includes(value.gateFailureEvidence.failureKind as string))
+        reasons.push(`${field}.gateFailureEvidence.failureKind is invalid`);
+    }
+  }
+  return reasons;
+}
+
 export function validateCodeHealthCandidate(candidate: unknown): string[] {
   const reasons: string[] = [];
   if (!isRecord(candidate)) return ['candidate must be an object'];
@@ -862,6 +1096,7 @@ export function validateCodeHealthCandidate(candidate: unknown): string[] {
       'review',
       'signatures',
       'changeScope',
+      'evidenceBinding',
       'evidenceRef',
       'archive',
     ],
@@ -1087,6 +1322,24 @@ export function validateCodeHealthCandidate(candidate: unknown): string[] {
       reasons.push('changeScope.scopeHash is invalid');
   }
   if (!isRelativePath(candidate.evidenceRef)) reasons.push('evidenceRef must be repository-relative');
+  const candidateSelector: CandidateSelector = {
+    candidateId: typeof candidate.candidateId === 'string' ? candidate.candidateId : '',
+    phase: candidate.phase as CodeHealthPhase,
+    action: candidate.action as CodeHealthAction,
+    files: Array.isArray(candidate.files) ? (candidate.files as string[]) : [],
+    symbols: Array.isArray(candidate.symbols) ? (candidate.symbols as string[]) : [],
+    scopeHash:
+      isRecord(candidate.changeScope) && typeof candidate.changeScope.scopeHash === 'string'
+        ? candidate.changeScope.scopeHash
+        : '',
+  };
+  validateEvidenceBinding(
+    candidate.evidenceBinding,
+    'candidate.evidenceBinding',
+    reasons,
+    candidateSelector,
+    candidate.revision as RevisionIdentity,
+  );
 
   if (!isRecord(candidate.archive)) reasons.push('archive is required');
   else {
