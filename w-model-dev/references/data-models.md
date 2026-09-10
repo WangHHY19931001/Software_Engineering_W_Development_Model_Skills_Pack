@@ -35,7 +35,7 @@
 | 爬坡报告      | HarnessImprovementReport                                                                     | 「爬坡循环改进报告模型」节                             |
 | TLA+ manifest | tla-manifest.json（TlaManifest/TlaSpec/TlaCheckRound）                                       | 「TLA+ manifest 模型」节                               |
 | BDD 模型      | BddManifest / BddStateMachine / BddFeature                                                   | 「BDD 数据模型」节                                     |
-| JSON Schema   | 25 份 schema（含 change-scope / codegraph-query / evidence-manifest / evidence-provenance）+ structural-first + [schema] 前缀 | 「JSON Schema 强约束」节                               |
+| JSON Schema   | 34 份 schema（含 change-scope / codegraph-query / evidence-manifest / evidence-provenance 与 9 份 code-health 契约）+ structural-first + [schema] 前缀 | 「JSON Schema 强约束」节                               |
 
 **按场景只读 §X**：
 
@@ -961,7 +961,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 > schema 文件统一存放于 `w-model-dev/schemas/*.schema.json`，由 `scripts/infrastructure/schema-loader.ts` 自动加载并按文件 basename（去 `.schema.json` 后缀）注册。
 > 各 `*-logic.ts` 在校验函数入口调用 `validateBySchema(name, data)`，失败时以 `[schema]` 前缀返回错误，不再触达业务规则校验。
 
-### Schema 清单（25 份）
+### Schema 清单（34 份）
 
 | Schema 名（注册键）    | 文件                               | 目标类型                   | 关键约束                                                                                                                                                                           | 对应 logic.ts                                                            |
 | ---------------------- | ---------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
@@ -990,6 +990,15 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 | `iceberg-sweep`        | `iceberg-sweep.schema.json`        | IcebergSweepReport         | additionalProperties:false；reportId/phase/triggerType/icebergRound/线索来源/newFindings/sweepCoverage/summary/passed                                                              | iceberg-sweep-logic.ts                                                   |
 | `evidence-manifest`    | `evidence-manifest.schema.json`    | EvidenceManifest           | additionalProperties:false；脱敏导出文件的相对路径、SHA-256 与生成元数据                                                                                                           | evidence-export-logic.ts                                                 |
 | `evidence-provenance`  | `evidence-provenance.schema.json`  | EvidenceSourceProvenance   | additionalProperties:false；source evidence 文件清单、五类测量（含 codegraph-queries）、当前 HEAD 与 source bundle SHA-256；producer 必须由 `wm-verify-evidence-source` 生成并写入 | evidence-provenance-logic.ts                                             |
+| `code-health-campaign` | `code-health-campaign.schema.json` | CodeHealthCampaign         | additionalProperties:false；campaign 绑定 candidates / evidence 索引、revision 与环境、append-only ledger 策略                                                                    | state-write-logic.ts（经 lib/state-schema-registry.ts）                  |
+| `code-health-candidate` | `code-health-candidate.schema.json` | CodeHealthCandidate       | additionalProperties:false；完整 candidate 包；discovery 只停留在 candidate，不作为 approval 结论                                                                                  | state-write-logic.ts（经 lib/state-schema-registry.ts）                  |
+| `code-health-evidence` | `code-health-evidence.schema.json` | CodeHealthEvidence         | additionalProperties:false；单个 candidate 的 source-bound 证据包（code-health-contract.ts 运行时镜像，含审计环境 parity）                                                        | state-write-logic.ts（经 lib/state-schema-registry.ts）                  |
+| `code-health-approval` | `code-health-approval.schema.json` | CodeHealthApproval         | additionalProperties:false；人类 checkpoint 决策绑定单个 candidate 及其精确批准范围                                                                                                | state-write-logic.ts（经 lib/state-schema-registry.ts）                  |
+| `code-health-archive`  | `code-health-archive.schema.json`  | CodeHealthArchiveBoundary  | oneOf 两形态（archiveManifest / archiveRecord，均 additionalProperties:false）；Task 1D 冻结边界契约，Task 1 不产出 archive manifest、不进入 archived                              | state-write-logic.ts（经 lib/state-schema-registry.ts）                  |
+| `code-health-gap`      | `code-health-gap.schema.json`      | CodeHealthGap              | additionalProperties:false；Phase 2 测试缺口矩阵行：可执行 scenario + 证据绑定的风险                                                                                               | state-write-logic.ts（经 lib/state-schema-registry.ts）                  |
+| `code-health-test-inventory` | `code-health-test-inventory.schema.json` | CodeHealthTestInventory | additionalProperties:false；Phase 3 测试清单与受保护删除证明（protected governance facts + 真实 pre/post 结果）                                                                    | state-write-logic.ts（经 lib/state-schema-registry.ts）                  |
+| `code-health-duplicate-cluster` | `code-health-duplicate-cluster.schema.json` | CodeHealthDuplicateCluster | additionalProperties:false；Phase 4 结构重复簇与受保护抽象证明                                                                                                              | state-write-logic.ts（经 lib/state-schema-registry.ts）                  |
+| `code-health-ledger-event` | `code-health-ledger-event.schema.json` | CodeHealthLedgerEvent   | additionalProperties:false；append-only candidate 生命周期转移，绑定 source-bound evidence 与签名引用                                                                              | code-health-ledger-logic.ts / state-write-logic.ts（经 lib/state-schema-registry.ts） |
 
 ### 设计原则
 
