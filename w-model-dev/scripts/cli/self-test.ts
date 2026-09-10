@@ -90,11 +90,21 @@ import {
 import type {
   ApprovalDecision,
   CodeHealthCandidate,
+  CodeHealthLedger,
+  CommandEvidence,
   FalsePositiveContext,
+  GapDiscoveryInput,
+  GapRow,
   Phase1CandidateLead,
   RevisionIdentity,
 } from '../logic/code-health-contract.js';
-import { applyApproved, executeRollback } from '../logic/code-health-ledger-logic.js';
+import { findGaps } from '../logic/code-health-gap-logic.js';
+import {
+  applyApproved,
+  executeRollback,
+  validateGapMatrix,
+  validateRedGreenEvidence,
+} from '../logic/code-health-ledger-logic.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
@@ -2516,6 +2526,77 @@ const CODE_HEALTH_APPLY_CASES: CodeHealthApplyCase[] = [
   },
 ];
 
+// -------------------- Phase 2 七维度 gap matrix（发现 / 矩阵 / RED-GREEN） --------------------
+
+interface CodeHealthGapFixture {
+  kind: 'discovery' | 'matrix' | 'red-green';
+  ledger?: CodeHealthLedger;
+  discovery?: GapDiscoveryInput;
+  rows?: GapRow[];
+  gap?: GapRow;
+  results?: CommandEvidence[];
+}
+
+interface CodeHealthGapCase {
+  file: string;
+  expectedPassed: boolean;
+  /** 仅 discovery 用例：期望发现的维度数（缺维度时由 findGaps fail-closed，取不到行）。 */
+  expectedKindCount?: number;
+  expectedReasonPatterns?: RegExp[];
+  description: string;
+}
+
+const CODE_HEALTH_GAP_CASES: CodeHealthGapCase[] = [
+  {
+    file: 'valid-gap.json',
+    expectedPassed: true,
+    expectedKindCount: 7,
+    description: '七维度 discovery 生成完整 matrix 并通过 validateGapMatrix（coverage 仅信号）',
+  },
+  {
+    file: 'missing-security.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/security/i],
+    description: '缺 security 维度 → findGaps fail-closed，coverage 不能替代该维度',
+  },
+  {
+    file: 'missing-platform.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/platform/i],
+    description: '缺 platform 维度 → findGaps fail-closed',
+  },
+  {
+    file: 'coverage-only.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/coverage|missing|seven/i],
+    description: 'coverageSignal.lines=1 且缺维度 → 100% coverage 不授权跳过任何维度',
+  },
+  {
+    file: 'red-not-fail.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/redEvidence|RED/i],
+    description: 'implemented gap 的 redEvidence exitCode=0 → validateGapMatrix 拒绝非失败 RED',
+  },
+  {
+    file: 'green-weakening.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/same assertion|weakened|assertionHash/i],
+    description: 'GREEN 的 assertionHash 与 RED 不同（削弱/改写断言）→ validateRedGreenEvidence 拒绝',
+  },
+  {
+    file: 'infrastructure-red.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/unrelated|infrastructure/i],
+    description: 'RED 因无关基础设施原因失败（模块缺失/语法错误）→ 不计为 RED',
+  },
+  {
+    file: 'unknown-command.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/RED evidence required/i],
+    description: 'RED 命令不存在（observation=unavailable, exitCode=null）→ 不计为 RED',
+  },
+];
+
 // ==================== 测试执行器 ====================
 
 interface CaseResult {
@@ -3896,6 +3977,51 @@ async function runCodeHealthApplyCases(samplesDir: string): Promise<CaseResult[]
   return results;
 }
 
+/** Phase 2 gap matrix: discovery, matrix, and RED/GREEN evidence must all stay fail-closed. */
+async function runCodeHealthGapCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_HEALTH_GAP_CASES) {
+    const abs = path.join(samplesDir, 'code-health/phase2', c.file);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs is a self-test-registered fixture beneath samples/
+    const fixture = parseJsonSafe<CodeHealthGapFixture>(await fs.readFile(abs, 'utf-8'));
+    const details: string[] = [];
+    let reasons: string[] = [];
+    try {
+      if (fixture.kind === 'discovery') {
+        const matrix = findGaps(fixture.discovery as GapDiscoveryInput);
+        if (matrix.coverageAuthorization !== false) {
+          details.push('  - coverageAuthorization 必须恒为 false（coverage 仅信号）');
+        }
+        if (c.expectedKindCount !== undefined) {
+          const kinds = new Set(matrix.rows.map((row) => row.kind));
+          if (kinds.size !== c.expectedKindCount) {
+            details.push(`  - 期望发现 ${c.expectedKindCount} 个维度，实际 ${kinds.size}（${[...kinds].join(', ')}）`);
+          }
+        }
+        reasons = validateGapMatrix({ rows: matrix.rows }, fixture.ledger as CodeHealthLedger);
+      } else if (fixture.kind === 'matrix') {
+        reasons = validateGapMatrix({ rows: fixture.rows }, fixture.ledger as CodeHealthLedger);
+      } else {
+        reasons = validateRedGreenEvidence(fixture.gap as GapRow, fixture.results as CommandEvidence[]);
+      }
+    } catch (error) {
+      reasons = [error instanceof Error ? error.message : String(error)];
+    }
+    const passed = c.expectedPassed ? reasons.length === 0 : reasons.length > 0;
+    if (!passed) details.push(`  - 期望 valid=${c.expectedPassed}，实际 reasons=${JSON.stringify(reasons)}`);
+    if (!c.expectedPassed && c.expectedReasonPatterns) {
+      details.push(...matchReasonPatterns(reasons, c.expectedReasonPatterns));
+    }
+    results.push({
+      name: `code-health/phase2/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 // -------------------- Metadata（版本号双写一致性） --------------------
 
 async function runMetadataCheck(skillRoot: string): Promise<CaseResult[]> {
@@ -3957,6 +4083,7 @@ async function main(): Promise<void> {
   console.log(`CodeHealth Phase1 Guard 用例: ${CODE_HEALTH_PHASE1_GUARD_CASES.length}`);
   console.log(`CodeHealth Phase1 动态用例: ${CODE_HEALTH_PHASE1_DYNAMIC_CASES.length}`);
   console.log(`CodeHealth Apply 用例: ${CODE_HEALTH_APPLY_CASES.length}`);
+  console.log(`CodeHealth Gap 用例: ${CODE_HEALTH_GAP_CASES.length}`);
   console.log(`BDD 用例       : ${BDD_CASES.length}`);
   console.log(`Coverage 用例  : ${COVERAGE_CASES.length}`);
   console.log(`Exemption 用例 : ${EXEMPTION_CASES.length}`);
@@ -4056,6 +4183,7 @@ async function main(): Promise<void> {
   ]);
   const codeHealthResults = await runCodeHealthCases(samplesDir);
   const codeHealthApplyResults = await runCodeHealthApplyCases(samplesDir);
+  const codeHealthGapResults = await runCodeHealthGapCases(samplesDir);
   const all = [
     ...verifierResults,
     ...gateResults,
@@ -4097,6 +4225,7 @@ async function main(): Promise<void> {
     ...codeHealthPhase1GuardResults,
     ...codeHealthPhase1DynamicResults,
     ...codeHealthApplyResults,
+    ...codeHealthGapResults,
   ];
 
   const passedCount = all.filter((r) => r.passed).length;

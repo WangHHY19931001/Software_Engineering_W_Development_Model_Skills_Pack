@@ -1169,7 +1169,8 @@ describe('code-health ledger contract', () => {
     const candidate = validCandidate('CHG-P1-20260907-016', { status: 'under-review' });
     const expectedLedger = validLedger(candidate);
     const expectedErrors = /not implemented|fail.closed|requires/i;
-    expect(() => findGaps({} as GapDiscoveryInput)).toThrow(expectedErrors);
+    // Phase 2 gap discovery is real now: an input missing dimensions fails closed instead of being a stub.
+    expect(() => findGaps({} as GapDiscoveryInput)).toThrow(/seven dimensions|requires|missing/i);
     expect(validateGapMatrix({}, expectedLedger)).not.toEqual([]);
     // Phase 1 pure implementations are real now: an empty inventory is an empty report, a malformed dynamic
     // trace fails closed on its hash, and a guard closure reports the unexercised scenario.
@@ -1217,8 +1218,9 @@ describe('code-health ledger contract', () => {
         scenarios: [],
       }),
     ).resolves.toMatchObject({ exitCode: 0 });
+    // Phase 2 TDD harness is real now and requires a gap identity plus an exact argv; it never runs implicitly.
     await expect(runTddHarness({ gap: {} as never, testCommand: [], implementation: null })).rejects.toThrow(
-      expectedErrors,
+      /gap|argv|requires/i,
     );
     // Valid, exactly-scoped human approval resolves to a controlled patch proposal; nothing is applied.
     await expect(

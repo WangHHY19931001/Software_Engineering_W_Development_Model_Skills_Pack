@@ -2,6 +2,7 @@
 /** Legacy code-health lifecycle compatibility layer over the canonical contract. */
 
 import { createTask1ArchiveBoundary } from '../lib/code-health-archive-boundary.js';
+import { TDD_FAILURE_CLASS_KEY, runTddHarness } from '../lib/code-health-tdd-harness.js';
 
 import {
   CodeHealthError,
@@ -13,12 +14,8 @@ import {
   validateLedgerEvent,
   validateRevision,
 } from './code-health-contract.js';
-import {
-  clusterDuplicates,
-  findGaps,
-  proveTestRemoval as proveTestRemovalBoundary,
-  runTddHarness,
-} from './code-health-phase-boundaries.js';
+import { findGaps } from './code-health-gap-logic.js';
+import { clusterDuplicates, proveTestRemoval as proveTestRemovalBoundary } from './code-health-phase-boundaries.js';
 import { buildStaticInventory, checkFalsePositiveGuards, mergeDynamicTrace } from './code-health-phase1-logic.js';
 import type {
   ApprovalDecision,
@@ -1299,15 +1296,65 @@ function notImplemented(reason: string): CodeHealthError {
  */
 export { buildStaticInventory, checkFalsePositiveGuards, mergeDynamicTrace };
 
-export function validateRedGreenEvidence(_gap: GapRow, results: CommandEvidence[]): string[] {
+/** Structural view of a harness-produced RED/GREEN result bound to one gap and one assertion. */
+interface TddHarnessBinding {
+  gapId: string;
+  assertionHash: string;
+}
+
+function tddHarnessBinding(result: CommandEvidence): TddHarnessBinding | null {
+  const candidate = result as Partial<TddHarnessBinding>;
+  if (typeof candidate.gapId === 'string' && typeof candidate.assertionHash === 'string') {
+    return { gapId: candidate.gapId, assertionHash: candidate.assertionHash };
+  }
+  return null;
+}
+
+/**
+ * Strict RED/GREEN validation. Presence is not enough: a harness-bound result must belong to the same
+ * gap, RED and GREEN must share one assertion hash (so a weakened or deleted assertion cannot produce a
+ * matching GREEN), the two evidence records must be distinguishable, and RED must be a real assertion
+ * failure — an unrelated failure (module missing, syntax error, unavailable command) is rejected and can
+ * never count as RED. Assertions are strictly stronger than the Task 1 presence-only contract, so no
+ * existing caller can pass by weakening.
+ */
+export function validateRedGreenEvidence(gap: GapRow, results: CommandEvidence[]): string[] {
   if (!Array.isArray(results)) return ['RED/GREEN results are required'];
+  if (!isRecord(gap) || typeof gap.gapId !== 'string') return ['RED/GREEN validation requires the owning gap'];
   const reasons: string[] = [];
-  const red = results.some(
-    (result) => result.observation === 'observed' && result.exitCode !== null && result.exitCode !== 0,
-  );
-  const green = results.some((result) => result.observation === 'observed' && result.exitCode === 0);
-  if (!red) reasons.push('RED evidence required');
-  if (!green) reasons.push('GREEN evidence required');
+  const observed = results.filter((result) => result.observation === 'observed' && typeof result.exitCode === 'number');
+  const reds = observed.filter((result) => (result.exitCode as number) !== 0);
+  const greens = observed.filter((result) => result.exitCode === 0);
+  if (reds.length === 0) reasons.push('RED evidence required');
+  if (greens.length === 0) reasons.push('GREEN evidence required');
+
+  const bound = results
+    .map((result) => tddHarnessBinding(result))
+    .filter((binding): binding is TddHarnessBinding => binding !== null);
+  for (const binding of bound) {
+    if (binding.gapId !== gap.gapId) {
+      reasons.push(`RED/GREEN evidence gapId ${binding.gapId} is not bound to gap ${gap.gapId}`);
+    }
+    if (typeof gap.assertionHash === 'string' && binding.assertionHash !== gap.assertionHash) {
+      reasons.push('RED/GREEN assertionHash does not match the recorded gap assertion');
+    }
+  }
+  const assertionHashes = new Set(bound.map((binding) => binding.assertionHash));
+  if (bound.length > 1 && assertionHashes.size > 1) {
+    reasons.push('RED and GREEN were not produced by the same assertion (the assertion was changed or weakened)');
+  }
+  const rawOutputHashes = results.map((result) => result.rawOutputSha256).filter((hash) => typeof hash === 'string');
+  if (results.length > 1 && new Set(rawOutputHashes).size < results.length) {
+    reasons.push('RED and GREEN evidence is not distinguishable');
+  }
+  for (const red of reds) {
+    const failureClass = red.toolVersions?.[TDD_FAILURE_CLASS_KEY];
+    if (failureClass !== undefined && failureClass !== 'assertion') {
+      reasons.push(
+        `RED failed for an unrelated reason (${failureClass}); only a real assertion failure can count as RED`,
+      );
+    }
+  }
   return reasons;
 }
 

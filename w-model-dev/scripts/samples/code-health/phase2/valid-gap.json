@@ -1,0 +1,199 @@
+{
+  "kind": "discovery",
+  "ledger": {
+    "baseline": {
+      "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "analyzedAt": "2026-09-07T00:00:00.000Z"
+    },
+    "candidates": [
+      {
+        "candidateId": "CHG-P2-20260907-001",
+        "phase": "P2",
+        "action": "add-test",
+        "status": "discovered",
+        "files": ["src/token.ts"],
+        "symbols": ["validateToken"],
+        "revision": {
+          "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "analyzedAt": "2026-09-07T00:00:00.000Z"
+        }
+      }
+    ],
+    "events": []
+  },
+  "discovery": {
+    "requirements": [
+      {
+        "gapId": "GAP-CHG-P2-20260907-001-requirement",
+        "candidateId": "CHG-P2-20260907-001",
+        "testLevels": ["unit", "integration"],
+        "existingTestIds": ["test-token-happy-path"],
+        "missingScenario": "the documented token expiry requirement has no executable acceptance scenario",
+        "evidenceSources": ["evidence/phase2-gaps.json"],
+        "risk": {
+          "severity": "medium",
+          "behavior": "medium",
+          "security": "low",
+          "concurrency": "none",
+          "platform": "low",
+          "lifecycle": "low",
+          "governance": "medium",
+          "rationale": "An undocumented expiry path can drift from the requirement without any failing test."
+        },
+        "priority": "medium",
+        "owner": "S-requirements",
+        "rtmIds": ["REQ-TOKEN-001"],
+        "coverageSignal": { "statements": 0.9, "branches": 0.5, "functions": 0.8, "lines": 0.9 }
+      }
+    ],
+    "publicContracts": [
+      {
+        "gapId": "GAP-CHG-P2-20260907-001-public-contract",
+        "candidateId": "CHG-P2-20260907-001",
+        "testLevels": ["integration"],
+        "existingTestIds": [],
+        "missingScenario": "the exported validateToken contract has no test for its documented return shape",
+        "evidenceSources": ["evidence/phase2-gaps.json"],
+        "risk": {
+          "severity": "high",
+          "behavior": "high",
+          "security": "medium",
+          "concurrency": "none",
+          "platform": "low",
+          "lifecycle": "low",
+          "governance": "medium",
+          "rationale": "A public contract change without a shape test can silently break every consumer."
+        },
+        "priority": "high",
+        "owner": "S-contracts",
+        "rtmIds": ["REQ-API-004"],
+        "coverageSignal": { "statements": 0.9, "branches": 0.5, "functions": 0.8, "lines": 0.9 }
+      }
+    ],
+    "branches": [
+      {
+        "gapId": "GAP-CHG-P2-20260907-001-branch",
+        "candidateId": "CHG-P2-20260907-001",
+        "testLevels": ["unit"],
+        "existingTestIds": ["test-token-happy-path"],
+        "missingScenario": "the empty-claims early return branch is never executed by a test",
+        "evidenceSources": ["evidence/phase2-gaps.json"],
+        "risk": {
+          "severity": "medium",
+          "behavior": "medium",
+          "security": "low",
+          "concurrency": "none",
+          "platform": "none",
+          "lifecycle": "low",
+          "governance": "low",
+          "rationale": "An unexecuted early return can hide a wrong default."
+        },
+        "priority": "medium",
+        "owner": "S-branches",
+        "rtmIds": ["REQ-TOKEN-002"],
+        "coverageSignal": { "statements": 0.9, "branches": 0.5, "functions": 0.8, "lines": 0.9 }
+      }
+    ],
+    "errors": [
+      {
+        "gapId": "GAP-CHG-P2-20260907-001-error",
+        "candidateId": "CHG-P2-20260907-001",
+        "testLevels": ["unit"],
+        "existingTestIds": [],
+        "missingScenario": "the malformed token error path is not asserted to reject with a typed error",
+        "evidenceSources": ["evidence/phase2-gaps.json"],
+        "risk": {
+          "severity": "high",
+          "behavior": "medium",
+          "security": "high",
+          "concurrency": "none",
+          "platform": "low",
+          "lifecycle": "low",
+          "governance": "medium",
+          "rationale": "An untyped rejection can leak parser details to callers."
+        },
+        "priority": "high",
+        "owner": "S-errors",
+        "rtmIds": ["REQ-ERR-003"],
+        "coverageSignal": { "statements": 0.9, "branches": 0.5, "functions": 0.8, "lines": 0.9 }
+      }
+    ],
+    "securityProperties": [
+      {
+        "gapId": "GAP-CHG-P2-20260907-001-security",
+        "candidateId": "CHG-P2-20260907-001",
+        "testLevels": ["integration", "system"],
+        "existingTestIds": ["test-token-happy-path"],
+        "missingScenario": "the invalid-signature rejection path is never exercised with a forged token",
+        "evidenceSources": ["evidence/phase2-gaps.json"],
+        "risk": {
+          "severity": "critical",
+          "behavior": "high",
+          "security": "high",
+          "concurrency": "none",
+          "platform": "low",
+          "lifecycle": "low",
+          "governance": "high",
+          "rationale": "An untested signature check is an authorization boundary without proof."
+        },
+        "priority": "critical",
+        "owner": "S-security",
+        "rtmIds": ["REQ-SEC-001"],
+        "coverageSignal": { "statements": 0.9, "branches": 0.5, "functions": 0.8, "lines": 0.9 }
+      }
+    ],
+    "concurrencyProperties": [
+      {
+        "gapId": "GAP-CHG-P2-20260907-001-concurrency",
+        "candidateId": "CHG-P2-20260907-001",
+        "testLevels": ["integration"],
+        "existingTestIds": [],
+        "missingScenario": "concurrent token refreshes have no interleaving test for the rotating cache",
+        "evidenceSources": ["evidence/phase2-gaps.json"],
+        "risk": {
+          "severity": "high",
+          "behavior": "high",
+          "security": "medium",
+          "concurrency": "high",
+          "platform": "low",
+          "lifecycle": "medium",
+          "governance": "medium",
+          "rationale": "An untested interleaving can return a stale token under load."
+        },
+        "priority": "high",
+        "owner": "S-concurrency",
+        "rtmIds": ["REQ-CONC-002"],
+        "coverageSignal": { "statements": 0.9, "branches": 0.5, "functions": 0.8, "lines": 0.9 }
+      }
+    ],
+    "platforms": [
+      {
+        "gapId": "GAP-CHG-P2-20260907-001-platform",
+        "candidateId": "CHG-P2-20260907-001",
+        "testLevels": ["system"],
+        "existingTestIds": [],
+        "missingScenario": "the Windows path normalization branch has no platform-conditional test",
+        "evidenceSources": ["evidence/phase2-gaps.json"],
+        "risk": {
+          "severity": "medium",
+          "behavior": "medium",
+          "security": "low",
+          "concurrency": "none",
+          "platform": "high",
+          "lifecycle": "low",
+          "governance": "medium",
+          "rationale": "An untested platform branch silently diverges between Windows and Linux."
+        },
+        "priority": "medium",
+        "owner": "S-platform",
+        "rtmIds": ["REQ-PLAT-005"],
+        "coverageSignal": { "statements": 0.9, "branches": 0.5, "functions": 0.8, "lines": 0.9 }
+      }
+    ],
+    "coverageSignal": { "lines": 0.98 }
+  }
+}

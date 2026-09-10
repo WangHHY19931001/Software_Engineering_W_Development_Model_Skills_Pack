@@ -1,0 +1,37 @@
+{
+  "kind": "discovery",
+  "ledger": {
+    "baseline": {
+      "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "analyzedAt": "2026-09-07T00:00:00.000Z"
+    },
+    "candidates": [
+      {
+        "candidateId": "CHG-P2-20260907-001",
+        "phase": "P2",
+        "action": "add-test",
+        "status": "discovered",
+        "files": ["src/token.ts"],
+        "symbols": ["validateToken"],
+        "revision": {
+          "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "analyzedAt": "2026-09-07T00:00:00.000Z"
+        }
+      }
+    ],
+    "events": []
+  },
+  "discovery": {
+    "requirements": [],
+    "publicContracts": [],
+    "branches": [],
+    "errors": [],
+    "securityProperties": [],
+    "concurrencyProperties": [],
+    "coverageSignal": { "lines": 0.5 }
+  }
+}
