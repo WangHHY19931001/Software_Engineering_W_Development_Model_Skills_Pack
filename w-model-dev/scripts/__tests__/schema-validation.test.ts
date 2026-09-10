@@ -402,6 +402,27 @@ describe('JSON Schema 前置校验（validateBySchema）', () => {
     );
   });
 
+  it('code-health archive schema freezes the Task 1D ArchiveManifest boundary', async () => {
+    const manifest = (await loadJson(codeHealthSamplesDir, 'valid-archive.json')) as Record<string, unknown>;
+    expect(validateBySchema('code-health-archive', manifest).valid).toBe(true);
+    expect(validateBySchema('code-health-archive', { ...manifest, verificationLevel: 'source-bound' }).valid).toBe(
+      true,
+    );
+    expect(validateBySchema('code-health-archive', { ...manifest, verificationLevel: 'source-verified' }).valid).toBe(
+      false,
+    );
+    const scope = manifest.scope as Record<string, unknown>;
+    expect(validateBySchema('code-health-archive', { ...manifest, scope: { ...scope, unknown: true } }).valid).toBe(
+      false,
+    );
+    const files = manifest.files as Array<Record<string, unknown>>;
+    expect(
+      validateBySchema('code-health-archive', { ...manifest, files: [{ ...files[0], kind: 'archive' }] }).valid,
+    ).toBe(false);
+    // A manifest must never be able to declare an archived terminal record.
+    expect(validateBySchema('code-health-archive', { ...manifest, status: 'archived' }).valid).toBe(false);
+  });
+
   it('code-health valid fixtures satisfy each of the nine registered contracts', async () => {
     const cases = [
       ['code-health-campaign', 'valid-campaign.json'],

@@ -123,7 +123,7 @@
       "$ref": "#/definitions/rollbackEvidence"
     },
     "archiveEvidence": {
-      "description": "Source-bound archive transition summary for the verified-to-archived transition.",
+      "description": "Archive transition summary recorded only after a real Task 8 archive verification; Task 1 never produces it.",
       "$ref": "#/definitions/archiveEvidence"
     }
   },
@@ -379,7 +379,7 @@
       }
     },
     "archiveEvidence": {
-      "description": "Source-bound archive transition summary: manifest reference and digest, verification level, source revision, and clean redaction.",
+      "description": "Archive transition summary recorded only after a real Task 8 archive verification: manifest reference and digest, the verification level actually performed, source revision, and clean redaction.",
       "type": "object",
       "additionalProperties": false,
       "required": ["manifestRef", "manifestSha256", "verificationLevel", "sourceRevision", "redactionStatus"],
@@ -390,7 +390,7 @@
         },
         "manifestSha256": { "description": "Archive manifest SHA-256.", "$ref": "#/definitions/sha256" },
         "verificationLevel": {
-          "description": "Archive verification level; package-only cannot be upgraded implicitly.",
+          "description": "Verification level actually performed. package-only proves package self-consistency only and can never be upgraded to source-bound; source-bound requires an explicit source project.",
           "enum": ["package-only", "source-bound"]
         },
         "sourceRevision": {

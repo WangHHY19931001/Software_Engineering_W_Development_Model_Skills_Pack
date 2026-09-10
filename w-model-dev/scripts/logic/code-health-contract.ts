@@ -643,13 +643,17 @@ export interface ArchiveManifest {
   createdAt: string;
 }
 
-export interface ArchiveResult {
-  exitCode: 0 | 1 | 2;
-  path: string;
-  manifest: ArchiveManifest | null;
+/**
+ * Typed fail-closed result of every Task 1D archive boundary entry point. `NOT_IMPLEMENTED` means the real
+ * archive producer/consumer/verifier belongs to Task 8; it is never a pass and never carries a manifest.
+ */
+export interface ArchiveBoundaryResult {
+  ok: false;
+  errorCode: 'NOT_IMPLEMENTED';
+  manifest: null;
   verificationLevel: 'package-only' | 'source-bound';
-  errorCode?: ErrorCode;
-  reason?: string;
+  createdPaths: [];
+  reason: string;
 }
 
 export interface ArchiveProduceInput {
@@ -674,18 +678,6 @@ export interface EvalDiffInput {
   changedBehavior: boolean;
   prompts: unknown[];
   mappings: unknown;
-}
-export interface VerifyArchiveOptions {
-  root?: string;
-  sourceProject?: string;
-  expectedRevision?: RevisionIdentity;
-}
-export interface ArchiveCampaignOptions {
-  root?: string;
-  outputDir?: string;
-  sourceProject?: string;
-  approval?: ApprovalDecision;
-  verificationLevel?: 'package-only' | 'source-bound';
 }
 
 const ID_PATTERN = /^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$/;

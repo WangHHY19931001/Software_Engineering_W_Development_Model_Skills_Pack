@@ -1,118 +1,19 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/code-health-archive.schema.json",
-  "title": "CodeHealthArchive",
-  "description": "Terminal archive index retaining source-bound review, gate, signature, diff, rollback, and redaction evidence.",
+  "title": "CodeHealthArchiveBoundary",
+  "description": "Task 1D archive boundary schema: the frozen ArchiveManifest contract that Task 8 must produce and consume, plus the terminal archive index record retained for the state registry. Task 1 never creates an archive manifest, never verifies package-only/source-bound packages, and never enters archived.",
   "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "archiveId",
-    "candidateId",
-    "status",
-    "ledgerEventRef",
-    "diffPath",
-    "diffSha256",
-    "rollback",
-    "manifestPath",
-    "contentHash",
-    "reviewRefs",
-    "gateRefs",
-    "signatureRefs",
-    "redaction",
-    "retention",
-    "verificationLevel",
-    "sourceRevision",
-    "archivedAt"
-  ],
-  "properties": {
-    "archiveId": { "description": "Stable archive record identifier.", "type": "string", "minLength": 1 },
-    "candidateId": {
-      "description": "Candidate identifier represented by this terminal archive record.",
-      "type": "string",
-      "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+  "oneOf": [
+    {
+      "description": "Frozen Task 1D ArchiveManifest consumed by the Task 8 archive producer, consumer, and verifier.",
+      "$ref": "#/definitions/archiveManifest"
     },
-    "status": {
-      "description": "Terminal candidate state captured by the archive.",
-      "enum": ["archived", "deferred", "rejected", "blocked", "rolled-back"]
-    },
-    "ledgerEventRef": {
-      "description": "Repository-relative ledger event reference proving the terminal transition.",
-      "$ref": "#/definitions/relativePath"
-    },
-    "diffPath": {
-      "description": "Repository-relative diff or patch path, or null when no code change occurred.",
-      "type": ["string", "null"],
-      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
-    },
-    "diffSha256": {
-      "description": "SHA-256 of the retained diff or null when no diff exists.",
-      "type": ["string", "null"],
-      "pattern": "^[0-9a-f]{64}$"
-    },
-    "rollback": {
-      "description": "Direct executable rollback procedure retained with the archive.",
-      "$ref": "#/definitions/rollback"
-    },
-    "manifestPath": {
-      "description": "Repository-relative archive manifest path.",
-      "$ref": "#/definitions/relativePath"
-    },
-    "contentHash": {
-      "description": "SHA-256 digest of the complete redacted archive content.",
-      "$ref": "#/definitions/sha256"
-    },
-    "reviewRefs": {
-      "description": "Repository-relative references to independent review outputs.",
-      "type": "array",
-      "minItems": 1,
-      "items": { "description": "One review reference.", "$ref": "#/definitions/relativePath" }
-    },
-    "gateRefs": {
-      "description": "Repository-relative references to real gate outputs.",
-      "type": "array",
-      "minItems": 1,
-      "items": { "description": "One gate output reference.", "$ref": "#/definitions/relativePath" }
-    },
-    "signatureRefs": {
-      "description": "Repository-relative role signature and human decision references.",
-      "type": "array",
-      "minItems": 1,
-      "items": { "description": "One signature reference.", "$ref": "#/definitions/relativePath" }
-    },
-    "redaction": {
-      "description": "Final archive redaction decision; unsafe artifacts are blocked.",
-      "$ref": "#/definitions/redaction"
-    },
-    "retention": {
-      "description": "Controlled archive retention location and expiry.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["location", "until"],
-      "properties": {
-        "location": { "description": "Repository-relative retention location.", "$ref": "#/definitions/relativePath" },
-        "until": {
-          "description": "UTC retention expiry timestamp.",
-          "type": "string",
-          "format": "date-time",
-          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
-        }
-      }
-    },
-    "verificationLevel": {
-      "description": "Whether archive verification is package-only or source-bound.",
-      "enum": ["package-only", "source-bound"]
-    },
-    "sourceRevision": {
-      "description": "Source revision bound to the archived evidence.",
-      "$ref": "#/definitions/revision"
-    },
-    "archivedAt": {
-      "description": "UTC time at which this terminal archive record was created.",
-      "type": "string",
-      "format": "date-time",
-      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    {
+      "description": "Terminal archive index record written only by the Task 8 archive consumer.",
+      "$ref": "#/definitions/archiveRecord"
     }
-  },
+  ],
   "definitions": {
     "relativePath": {
       "description": "Safe repository-relative POSIX path without absolute paths, backslashes, parent traversal, or empty segments.",
@@ -160,38 +61,303 @@
       }
     },
     "redaction": {
-      "description": "Final redaction status and reasons.",
+      "description": "Redaction status and reasons; a blocked archive is never a successful archive.",
       "type": "object",
       "additionalProperties": false,
       "required": ["status", "reasons"],
       "properties": {
-        "status": { "description": "Whether the archive is safe to export.", "enum": ["clean", "blocked"] },
+        "status": { "description": "Whether the archive content is safe to export.", "enum": ["clean", "blocked"] },
         "reasons": {
           "description": "Redaction actions or blocking reasons.",
           "type": "array",
           "items": { "description": "One redaction reason.", "type": "string" }
         }
       }
-    }
-  },
-  "allOf": [
-    {
-      "description": "An archived terminal record requires clean redaction.",
-      "if": { "type": "object", "properties": { "status": { "const": "archived" } }, "required": ["status"] },
-      "then": {
-        "type": "object",
-        "properties": {
-          "redaction": {
-            "description": "Archived redaction status.",
-            "type": "object",
-            "properties": { "status": { "description": "Archived artifacts must be clean.", "const": "clean" } }
-          },
-          "verificationLevel": {
-            "description": "Archive verification level.",
-            "enum": ["package-only", "source-bound"]
-          }
+    },
+    "candidateSelector": {
+      "description": "Exact candidate and scope selector frozen into the archive manifest.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidateId", "phase", "action", "files", "symbols", "scopeHash"],
+      "properties": {
+        "candidateId": {
+          "description": "Candidate identity.",
+          "type": "string",
+          "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+        },
+        "phase": { "description": "Candidate phase.", "enum": ["P1", "P2", "P3", "P4"] },
+        "action": {
+          "description": "Candidate action.",
+          "enum": ["delete-code", "add-test", "delete-test", "abstract"]
+        },
+        "files": {
+          "description": "Exact candidate files.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One candidate file.", "$ref": "#/definitions/relativePath" }
+        },
+        "symbols": {
+          "description": "Exact candidate symbols.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One candidate symbol.", "type": "string", "minLength": 1 }
+        },
+        "scopeHash": {
+          "description": "Exact candidate scope hash.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
         }
       }
+    },
+    "archiveFile": {
+      "description": "One declared archive file with its repository-relative path, kind, and content digest.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "sha256"],
+      "properties": {
+        "path": { "description": "Repository-relative archive file path.", "$ref": "#/definitions/relativePath" },
+        "kind": {
+          "description": "Archive artifact kind retained for lifecycle evidence.",
+          "enum": ["ledger", "candidate", "evidence", "approval", "review", "gate", "rollback"]
+        },
+        "sha256": { "description": "File content SHA-256 digest.", "$ref": "#/definitions/sha256" }
+      }
+    },
+    "producerMetadata": {
+      "description": "Deterministic producer identity and version that created the manifest.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["producerId", "producerVersion"],
+      "properties": {
+        "producerId": { "description": "Producer identity.", "type": "string", "minLength": 1 },
+        "producerVersion": { "description": "Producer version.", "type": "string", "minLength": 1 }
+      }
+    },
+    "archiveManifest": {
+      "description": "Frozen Task 1D ArchiveManifest: an evidence-preserving declaration, not a file-name list. Task 8 producers must fill every field deterministically and consumers must recompute and verify each one.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "archiveId",
+        "candidateId",
+        "scope",
+        "contentHash",
+        "files",
+        "sourceRevision",
+        "approvalRef",
+        "reviewRefs",
+        "gateRefs",
+        "humanSignatureRef",
+        "redaction",
+        "verificationLevel",
+        "rollbackRef",
+        "producerMetadata",
+        "createdAt"
+      ],
+      "properties": {
+        "archiveId": { "description": "Stable archive manifest identifier.", "type": "string", "minLength": 1 },
+        "candidateId": {
+          "description": "Candidate represented by this archive manifest.",
+          "type": "string",
+          "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+        },
+        "scope": {
+          "description": "Exact approved candidate scope bound into the manifest.",
+          "$ref": "#/definitions/candidateSelector"
+        },
+        "contentHash": {
+          "description": "SHA-256 digest over the complete deterministic manifest content.",
+          "$ref": "#/definitions/sha256"
+        },
+        "files": {
+          "description": "Non-empty declared archive file list with kind and digest for each entry.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One declared archive file.", "$ref": "#/definitions/archiveFile" }
+        },
+        "sourceRevision": {
+          "description": "Source revision shared by candidate, ledger, and archived evidence.",
+          "$ref": "#/definitions/revision"
+        },
+        "approvalRef": {
+          "description": "Repository-relative human approval reference.",
+          "$ref": "#/definitions/relativePath"
+        },
+        "reviewRefs": {
+          "description": "Non-empty repository-relative independent review references.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One review reference.", "$ref": "#/definitions/relativePath" }
+        },
+        "gateRefs": {
+          "description": "Non-empty repository-relative gate result references.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One gate reference.", "$ref": "#/definitions/relativePath" }
+        },
+        "humanSignatureRef": {
+          "description": "Repository-relative human approval signature reference.",
+          "$ref": "#/definitions/relativePath"
+        },
+        "redaction": {
+          "description": "Redaction decision recorded for the archived content.",
+          "$ref": "#/definitions/redaction"
+        },
+        "verificationLevel": {
+          "description": "Frozen verification level. package-only only proves package self-consistency and can never be described as source verified; source-bound additionally requires an explicit source project.",
+          "enum": ["package-only", "source-bound"]
+        },
+        "rollbackRef": {
+          "description": "Repository-relative rollback evidence reference.",
+          "$ref": "#/definitions/relativePath"
+        },
+        "producerMetadata": {
+          "description": "Producer identity and version that created this manifest.",
+          "$ref": "#/definitions/producerMetadata"
+        },
+        "createdAt": {
+          "description": "UTC time at which the manifest was created.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        }
+      }
+    },
+    "archiveRecord": {
+      "description": "Terminal archive index record written only after a real Task 8 archive consumer verification.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "archiveId",
+        "candidateId",
+        "status",
+        "ledgerEventRef",
+        "diffPath",
+        "diffSha256",
+        "rollback",
+        "manifestPath",
+        "contentHash",
+        "reviewRefs",
+        "gateRefs",
+        "signatureRefs",
+        "redaction",
+        "retention",
+        "verificationLevel",
+        "sourceRevision",
+        "archivedAt"
+      ],
+      "properties": {
+        "archiveId": { "description": "Stable archive record identifier.", "type": "string", "minLength": 1 },
+        "candidateId": {
+          "description": "Candidate identifier represented by this terminal archive record.",
+          "type": "string",
+          "pattern": "^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$"
+        },
+        "status": {
+          "description": "Terminal candidate state captured by the archive.",
+          "enum": ["archived", "deferred", "rejected", "blocked", "rolled-back"]
+        },
+        "ledgerEventRef": {
+          "description": "Repository-relative ledger event reference proving the terminal transition.",
+          "$ref": "#/definitions/relativePath"
+        },
+        "diffPath": {
+          "description": "Repository-relative diff or patch path, or null when no code change occurred.",
+          "type": ["string", "null"],
+          "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
+        },
+        "diffSha256": {
+          "description": "SHA-256 of the retained diff or null when no diff exists.",
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "rollback": {
+          "description": "Direct executable rollback procedure retained with the archive.",
+          "$ref": "#/definitions/rollback"
+        },
+        "manifestPath": {
+          "description": "Repository-relative archive manifest path.",
+          "$ref": "#/definitions/relativePath"
+        },
+        "contentHash": {
+          "description": "SHA-256 digest of the complete redacted archive content.",
+          "$ref": "#/definitions/sha256"
+        },
+        "reviewRefs": {
+          "description": "Repository-relative references to independent review outputs.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One review reference.", "$ref": "#/definitions/relativePath" }
+        },
+        "gateRefs": {
+          "description": "Repository-relative references to real gate outputs.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One gate output reference.", "$ref": "#/definitions/relativePath" }
+        },
+        "signatureRefs": {
+          "description": "Repository-relative role signature and human decision references.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "description": "One signature reference.", "$ref": "#/definitions/relativePath" }
+        },
+        "redaction": {
+          "description": "Final archive redaction decision; unsafe artifacts are blocked.",
+          "$ref": "#/definitions/redaction"
+        },
+        "retention": {
+          "description": "Controlled archive retention location and expiry.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["location", "until"],
+          "properties": {
+            "location": {
+              "description": "Repository-relative retention location.",
+              "$ref": "#/definitions/relativePath"
+            },
+            "until": {
+              "description": "UTC retention expiry timestamp.",
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            }
+          }
+        },
+        "verificationLevel": {
+          "description": "Whether archive verification is package-only or source-bound.",
+          "enum": ["package-only", "source-bound"]
+        },
+        "sourceRevision": {
+          "description": "Source revision bound to the archived evidence.",
+          "$ref": "#/definitions/revision"
+        },
+        "archivedAt": {
+          "description": "UTC time at which this terminal archive record was created.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        }
+      },
+      "allOf": [
+        {
+          "description": "An archived terminal record requires clean redaction.",
+          "if": { "type": "object", "properties": { "status": { "const": "archived" } }, "required": ["status"] },
+          "then": {
+            "type": "object",
+            "properties": {
+              "redaction": {
+                "description": "Archived redaction status.",
+                "type": "object",
+                "properties": { "status": { "description": "Archived artifacts must be clean.", "const": "clean" } }
+              },
+              "verificationLevel": {
+                "description": "Archive verification level.",
+                "enum": ["package-only", "source-bound"]
+              }
+            }
+          }
+        }
+      ]
     }
-  ]
+  }
 }

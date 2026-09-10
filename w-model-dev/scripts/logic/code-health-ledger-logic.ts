@@ -1,6 +1,8 @@
 /* eslint-disable security/detect-non-literal-fs-filename, security/detect-object-injection -- Compatibility guards validate repository-relative paths and use fixed field sets. */
 /** Legacy code-health lifecycle compatibility layer over the canonical contract. */
 
+import { createTask1ArchiveBoundary } from '../lib/code-health-archive-boundary.js';
+
 import {
   CodeHealthError,
   isIsoDate,
@@ -19,8 +21,6 @@ import {
 } from './code-health-phase-boundaries.js';
 import type {
   ApprovalDecision,
-  ArchiveCampaignOptions,
-  ArchiveResult,
   ApplyApprovedInput,
   ApplyResult,
   CodeHealthCandidate,
@@ -49,7 +49,6 @@ import type {
   StaticInventoryReport,
   TestRecord,
   TestRemovalProofInput,
-  VerifyArchiveOptions,
 } from './code-health-contract.js';
 
 export { CodeHealthError, validateCodeHealthCandidate };
@@ -61,11 +60,10 @@ export function proveTestRemoval(input: TestRemovalProofInput): string[] {
 export type {
   AbstractionProposal,
   ApprovalDecision,
-  ArchiveCampaignOptions,
+  ArchiveBoundaryResult,
   ArchiveConsumeInput,
   ArchiveManifest,
   ArchiveProduceInput,
-  ArchiveResult,
   ArchiveTransitionEvidence,
   ArchiveVerifyInput,
   ApplyApprovedInput,
@@ -116,7 +114,6 @@ export type {
   TestRemovalProofInput,
   TddHarnessInput,
   TddHarnessResult,
-  VerifyArchiveOptions,
 } from './code-health-contract.js';
 
 const HEX64_PATTERN = /^[0-9a-f]{64}$/;
@@ -584,7 +581,10 @@ function appendEvent(
         'archive transition requires complete source-bound archive evidence',
       );
     }
-    throw new CodeHealthError('NOT_IMPLEMENTED', 'archive transition producer is reserved for the Task 1D boundary');
+    throw new CodeHealthError(
+      'NOT_IMPLEMENTED',
+      'archive transition is not implemented in Task 1; the real archive producer belongs to Task 8',
+    );
   }
   const candidates = ledger.candidates.map((candidate) => {
     if (candidate.candidateId !== candidateId) return candidate;
@@ -1426,16 +1426,47 @@ export function proveAbstraction(cluster: unknown, proposal: unknown): string[] 
   throw notImplemented('abstraction proof is not implemented in Task 1A');
 }
 
+/**
+ * Compatibility facade for the removed archive campaign entry point. It contains no archive logic of its own:
+ * it routes through the single Task 1D boundary factory and surfaces the same typed `NOT_IMPLEMENTED` failure,
+ * so no second, half-implemented archive producer can be observed by existing callers.
+ */
 export async function archiveCampaign(
-  _campaign: CodeHealthLedger,
-  _options: ArchiveCampaignOptions = {},
-): Promise<ArchiveResult> {
-  throw notImplemented('archive producer is reserved for the Task 1D boundary');
+  campaign: CodeHealthLedger,
+  options: { approval?: ApprovalDecision; verificationLevel?: 'package-only' | 'source-bound' } = {},
+): Promise<never> {
+  const candidates = Array.isArray(campaign?.candidates) ? campaign.candidates : [];
+  const candidate = options.approval
+    ? candidates.find((entry) => entry.candidateId === options.approval?.candidateId)
+    : undefined;
+  const result = await createTask1ArchiveBoundary().producer.produce({
+    candidate: candidate as CodeHealthCandidate,
+    ledger: campaign,
+    approval: options.approval as ApprovalDecision,
+    verificationLevel: options.verificationLevel ?? 'package-only',
+  });
+  throw new CodeHealthError(result.errorCode, result.reason);
 }
 
+/**
+ * Compatibility facade for the removed archive verification entry point. It delegates to the Task 1D boundary
+ * verifier and surfaces the same typed `NOT_IMPLEMENTED` failure without reading or hashing anything.
+ */
 export async function verifyArchive(
-  _archivePath: string,
-  _options: VerifyArchiveOptions = {},
-): Promise<{ ok: boolean; verificationLevel: 'package-only' | 'source-bound' }> {
-  throw notImplemented('archive consumer is reserved for the Task 1D boundary');
+  manifestPath: string,
+  options: {
+    packageRoot?: string;
+    sourceProject?: string;
+    expectedRevision?: RevisionIdentity;
+    verificationLevel?: 'package-only' | 'source-bound';
+  } = {},
+): Promise<never> {
+  const result = await createTask1ArchiveBoundary().verifier.verify({
+    manifestPath,
+    packageRoot: options.packageRoot ?? '.',
+    verificationLevel: options.verificationLevel ?? 'package-only',
+    sourceProject: options.sourceProject,
+    expectedRevision: options.expectedRevision,
+  });
+  throw new CodeHealthError(result.errorCode, result.reason);
 }
