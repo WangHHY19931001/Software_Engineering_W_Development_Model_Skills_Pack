@@ -16,7 +16,20 @@
         "id": "observed-trace",
         "environment": "current-host",
         "reached": true,
-        "observation": "observed"
+        "observation": "observed",
+        "command": {
+          "command": "node",
+          "cwd": ".",
+          "environment": {},
+          "platform": "win32",
+          "toolVersions": {},
+          "startedAt": "2026-09-07T00:00:00.000Z",
+          "endedAt": "2026-09-07T00:00:01.000Z",
+          "exitCode": 0,
+          "observation": "observed",
+          "rawOutputPath": ".w-model/code-health/phase1/raw/observed-trace.log",
+          "rawOutputSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
       }
     ],
     "guardViolations": [],

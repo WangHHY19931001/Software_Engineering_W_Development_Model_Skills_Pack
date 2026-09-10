@@ -11,8 +11,8 @@
  *
  * Unknown flags (including `--delete` / `--apply`) are input errors: exit 2 with the existing
  * structured `ERROR_JSON` contract. Phase 1 is read-only over source: it writes only the external
- * report and exclusive raw outputs beneath the gitignored `.w-model/` evidence root, so
- * `changedFiles` is always empty.
+ * report and exclusive raw outputs beneath the gitignored `.w-model/` evidence root. `changedFiles`
+ * is the honest before/after `git status` delta, and a non-empty delta is a loud read-only violation.
  *
  * Exit codes:
  *   0  every candidate passed `validateCodeHealthCandidate`
@@ -20,12 +20,12 @@
  *   2  input error (unknown/duplicate flag, missing flag, unreadable scenario file)
  */
 
-/* eslint-disable security/detect-non-literal-fs-filename, security/detect-object-injection -- Repository-relative source paths are resolved beneath the explicit root and validated by resolveControlledRelativePath; flag-name/value maps and parsed scenario records are allowlisted by schema fields. */
-
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 import type {
   CandidateSelector,
@@ -58,6 +58,9 @@ import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { runMain } from '../lib/run-main.js';
 
 const DEFAULT_RAW_OUTPUT_ROOT = '.w-model/code-health/phase1/raw';
+const GIT_STATUS_TIMEOUT_MS = 30_000;
+const GIT_STATUS_MAX_BUFFER_BYTES = 16 * 1024 * 1024;
+const execFileAsync = promisify(execFile);
 
 export interface Phase1RunInput {
   root: string;
@@ -67,6 +70,12 @@ export interface Phase1RunInput {
   shell?: string;
   rawOutputDir?: string;
   now?: () => Date;
+  /**
+   * Injected read-only worktree comparison scoped to the analyzed target paths (default:
+   * `git status --porcelain -z -- <targets>`). Returns the changed/untracked repository-relative
+   * paths, or `null` when the worktree cannot be verified.
+   */
+  readChangedFiles?: (root: string, paths: readonly string[]) => Promise<string[] | null>;
 }
 
 /** The full read-only report that Phase 1 persists; the pure contract result is a projection of it. */
@@ -92,13 +101,90 @@ function sourceDigest(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
+/** Minimal audited Git environment: no `GIT_DIR`/`GIT_WORK_TREE` redirect can reach the child. */
+function gitEnvironment(): NodeJS.ProcessEnv {
+  const passthroughKeys = [
+    'PATH',
+    'PATHEXT',
+    'SYSTEMROOT',
+    'SYSTEMDRIVE',
+    'WINDIR',
+    'COMSPEC',
+    'TEMP',
+    'TMP',
+    'HOME',
+    'USERPROFILE',
+    'HOMEDRIVE',
+    'HOMEPATH',
+    'APPDATA',
+    'LOCALAPPDATA',
+    'PROGRAMDATA',
+    'LANG',
+    'LC_ALL',
+    'TERM',
+  ] as const;
+  return Object.fromEntries([
+    ['GIT_CONFIG_NOSYSTEM', '1'],
+    ['GIT_CONFIG_GLOBAL', process.platform === 'win32' ? 'NUL' : '/dev/null'],
+    ['GIT_TERMINAL_PROMPT', '0'],
+    ['GIT_OPTIONAL_LOCKS', '0'],
+    ['GIT_PAGER', 'cat'],
+    ...passthroughKeys.flatMap((key) => {
+      // eslint-disable-next-line security/detect-object-injection -- key is a literal member of the passthrough allowlist above.
+      const value = process.env[key];
+      return typeof value === 'string' && value.length > 0 ? [[key, value] as const] : [];
+    }),
+  ]);
+}
+
+/** Parse `git status --porcelain=v1 -z` into sorted repository-relative paths. */
+function parseWorktreeStatus(stdout: string): string[] {
+  const paths = new Set<string>();
+  for (const entry of stdout.split('\u0000')) {
+    if (entry.length <= 3 || !/^[ MADRCU?!]{2} /.test(entry)) continue;
+    const file = entry.slice(3).replace(/\\/g, '/');
+    if (file.length > 0) paths.add(file);
+  }
+  return [...paths].sort();
+}
+
+/**
+ * Default read-only worktree comparison, scoped to the analyzed target paths so concurrent work on
+ * unrelated files cannot be misattributed. `null` means Git could not report the worktree, so the
+ * read-only invariant is unverifiable and the caller fails loudly instead of asserting an empty diff.
+ */
+async function readWorktreeChanges(root: string, paths: readonly string[]): Promise<string[] | null> {
+  const scoped = [...new Set(paths.map((file) => file.replace(/\\/g, '/')))].filter((file) => file.length > 0);
+  if (scoped.length === 0) return [];
+  try {
+    const { stdout } = await execFileAsync(
+      'git',
+      ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...scoped],
+      {
+        cwd: root,
+        env: gitEnvironment(),
+        shell: false,
+        windowsHide: true,
+        timeout: GIT_STATUS_TIMEOUT_MS,
+        maxBuffer: GIT_STATUS_MAX_BUFFER_BYTES,
+        encoding: 'utf8',
+      },
+    );
+    return parseWorktreeStatus(String(stdout));
+  } catch {
+    return null;
+  }
+}
+
 /** Read one controlled repository-relative source file; any unsafe or unreadable path is `unavailable`. */
 async function readControlledSource(root: string, relativePath: string): Promise<string | undefined> {
   const resolution = resolveControlledRelativePath(root, relativePath);
   if (!resolution.ok || !resolution.absolutePath) return undefined;
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- resolution.absolutePath is bounded by resolveControlledRelativePath.
     const entry = await fs.lstat(resolution.absolutePath);
     if (entry.isSymbolicLink() || !entry.isFile()) return undefined;
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- resolution.absolutePath is bounded by resolveControlledRelativePath.
     return await fs.readFile(resolution.absolutePath, 'utf8');
   } catch {
     return undefined;
@@ -137,7 +223,12 @@ function makeCandidate(
     scopeHash,
   };
   const evidence = commands[0]!;
-  const emptyCoverage = { statements: null, branches: null, functions: null, lines: null };
+  const emptyCoverage = {
+    statements: null,
+    branches: null,
+    functions: null,
+    lines: null,
+  };
   const impact = {
     rtmBefore: [],
     rtmAfter: [],
@@ -175,8 +266,16 @@ function makeCandidate(
       governance: 'low',
       rationale: 'phase 1 records discovery evidence only and makes no deletion decision',
     },
-    rtmImpact: { ...impact, coverageBefore: { ...emptyCoverage }, coverageAfter: { ...emptyCoverage } },
-    coverageImpact: { ...impact, coverageBefore: { ...emptyCoverage }, coverageAfter: { ...emptyCoverage } },
+    rtmImpact: {
+      ...impact,
+      coverageBefore: { ...emptyCoverage },
+      coverageAfter: { ...emptyCoverage },
+    },
+    coverageImpact: {
+      ...impact,
+      coverageBefore: { ...emptyCoverage },
+      coverageAfter: { ...emptyCoverage },
+    },
     rollback: {
       preChangeRevision: revision.commitSha,
       command: 'git apply -R <rollback.patch>',
@@ -199,13 +298,20 @@ function makeCandidate(
       rawOutputSha256: evidence.rawOutputSha256,
     },
     evidenceRef: `.w-model/code-health/phase1/evidence/${candidateId}.json`,
-    archive: { state: 'not_archived', manifestPath: null, contentHash: null, redactionStatus: 'not_reviewed' },
+    archive: {
+      state: 'not_archived',
+      manifestPath: null,
+      contentHash: null,
+      redactionStatus: 'not_reviewed',
+    },
   };
 }
 
 async function writeReportFile(output: string, report: Phase1ReportFile): Promise<void> {
   const absolute = path.resolve(output);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- `output` is the explicit external report path supplied by the caller.
   await fs.mkdir(path.dirname(absolute), { recursive: true });
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- `output` is the explicit external report path supplied by the caller.
   await fs.writeFile(absolute, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 }
 
@@ -221,13 +327,25 @@ export async function runPhase1(input: Phase1RunInput): Promise<Phase1RunResult>
   const revisionProvider = createCodeHealthGitRevisionProvider();
   const revision = await revisionProvider.current(repositoryRoot);
   if (!revision) {
+    // Nothing was read or written on this path, so an empty change set is the honest value.
     return {
       exitCode: 2,
-      report: { candidates: [], commands: [], unexercisedScenarios: input.scenarios.map((scenario) => scenario.id) },
+      report: {
+        candidates: [],
+        commands: [],
+        unexercisedScenarios: input.scenarios.map((scenario) => scenario.id),
+      },
       changedFiles: [],
     };
   }
-  const evidenceStore = createCodeHealthEvidenceStore({ repositoryRoot, rawOutputRoot: rawOutputDir });
+  const targets = [...new Set(input.scenarios.flatMap((scenario) => scenario.targets ?? []))];
+  const readChangedFiles = input.readChangedFiles ?? readWorktreeChanges;
+  const beforeChanges = await readChangedFiles(repositoryRoot, targets);
+  const beforeChangedSet = new Set(beforeChanges ?? []);
+  const evidenceStore = createCodeHealthEvidenceStore({
+    repositoryRoot,
+    rawOutputRoot: rawOutputDir,
+  });
   const runner = createCodeHealthCommandRunner({
     repositoryRoot,
     rawOutputDir,
@@ -291,15 +409,19 @@ export async function runPhase1(input: Phase1RunInput): Promise<Phase1RunResult>
     if (scenario.required === true && evidence.observation !== 'observed') requiredEnvironmentUnavailable = true;
   }
 
-  const targets = [...new Set(input.scenarios.flatMap((scenario) => scenario.targets ?? []))];
   const sourceText: Record<string, string> = {};
   const unreadable: string[] = [];
   for (const target of targets) {
     const source = await readControlledSource(repositoryRoot, target);
     if (source === undefined) unreadable.push(target);
+    // eslint-disable-next-line security/detect-object-injection -- target is a repository-relative path from the injected target list.
     else sourceText[target] = source;
   }
-  const staticReport = buildStaticInventory({ files: targets, sourceText, revision });
+  const staticReport = buildStaticInventory({
+    files: targets,
+    sourceText,
+    revision,
+  });
   for (const file of unreadable) {
     if (!staticReport.unknowns.includes(file)) staticReport.unknowns.push(file);
   }
@@ -340,6 +462,20 @@ export async function runPhase1(input: Phase1RunInput): Promise<Phase1RunResult>
     candidates.push(candidate);
   }
 
+  // Read-only invariant: compare the analyzed targets before and after the run. Pre-existing dirt
+  // appears in both snapshots and is not misattributed; any target the tool itself changed appears
+  // only after. The comparison is scoped to targets so concurrent work on other files cannot leak in.
+  const afterChanges = await readChangedFiles(repositoryRoot, targets);
+  const changedFiles =
+    beforeChanges === null || afterChanges === null
+      ? []
+      : afterChanges.filter((file) => !beforeChangedSet.has(file)).sort();
+  if (beforeChanges === null || afterChanges === null) {
+    validationViolations.push('read-only invariant could not be verified: worktree change comparison unavailable');
+  } else if (changedFiles.length > 0) {
+    validationViolations.push(`read-only invariant violated: phase 1 changed ${changedFiles.join(', ')}`);
+  }
+
   const report: Phase1ReportFile = {
     schemaVersion: '1.0',
     reportId: `P1-${sourceDigest(Buffer.from(JSON.stringify(targets))).slice(0, 12)}`,
@@ -362,7 +498,7 @@ export async function runPhase1(input: Phase1RunInput): Promise<Phase1RunResult>
   return {
     exitCode: validationViolations.length === 0 ? 0 : 1,
     report: { candidates, commands, unexercisedScenarios },
-    changedFiles: [],
+    changedFiles,
   };
 }
 
@@ -375,6 +511,7 @@ class Phase1ArgumentError extends Error {}
 function parsePhase1Args(argv: readonly string[]): Partial<Record<(typeof VALUE_FLAGS)[number], string>> {
   const values: Partial<Record<(typeof VALUE_FLAGS)[number], string>> = {};
   for (let index = 0; index < argv.length; index += 1) {
+    // eslint-disable-next-line security/detect-object-injection -- index is a loop counter over the argv array.
     const argument = argv[index]!;
     if (!argument.startsWith('--')) {
       throw new Phase1ArgumentError(`unexpected positional argument: ${argument}`);
@@ -395,7 +532,9 @@ function parsePhase1Args(argv: readonly string[]): Partial<Record<(typeof VALUE_
       value = next;
       index += 1;
     }
+    // eslint-disable-next-line security/detect-object-injection -- name is validated against VALUE_FLAGS above.
     if (values[name] !== undefined) throw new Phase1ArgumentError(`duplicate flag: --${name}`);
+    // eslint-disable-next-line security/detect-object-injection -- name is validated against VALUE_FLAGS above.
     values[name] = value;
   }
   return values;
@@ -440,7 +579,10 @@ async function main(): Promise<void> {
     });
     return;
   }
-  const missing = (['root', 'output', 'scenario'] as const).filter((flag) => parsed[flag] === undefined);
+  const missing: string[] = [];
+  if (parsed.root === undefined) missing.push('root');
+  if (parsed.output === undefined) missing.push('output');
+  if (parsed.scenario === undefined) missing.push('scenario');
   if (missing.length > 0) {
     exitWithError({
       category: 'ARG_INVALID',

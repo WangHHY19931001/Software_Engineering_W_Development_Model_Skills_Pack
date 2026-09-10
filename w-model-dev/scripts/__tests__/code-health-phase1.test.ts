@@ -8,17 +8,26 @@
  * schema/template/RTM/generated inputs, and test-only helpers.
  */
 
+import { execFile } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import type { RevisionIdentity } from '../logic/code-health-contract.js';
+import type {
+  CommandEvidence,
+  FalsePositiveContext,
+  Phase1CandidateLead,
+  RevisionIdentity,
+  StaticReference,
+} from '../logic/code-health-contract.js';
 import {
   buildStaticInventory,
   checkFalsePositiveGuards,
+  deriveFalsePositiveContext,
   mergeDynamicTrace,
   type Phase1Scenario,
 } from '../logic/code-health-phase1-logic.js';
@@ -34,6 +43,82 @@ const revision: RevisionIdentity = {
   analyzedAt: '2026-09-07T00:00:00.000Z',
 };
 const hash = 'd'.repeat(64);
+
+const emptyContext: FalsePositiveContext = {
+  dynamicImports: [],
+  reflection: [],
+  platforms: [],
+  schemas: [],
+  templates: [],
+  rtmIds: [],
+  testHelpers: [],
+  generatedReferences: [],
+  externalContracts: [],
+};
+
+function observedCommand(
+  exitCode: number | null,
+  observation: CommandEvidence['observation'] = 'observed',
+): CommandEvidence {
+  return {
+    command: 'node',
+    cwd: '.',
+    environment: {},
+    platform: 'win32',
+    toolVersions: {},
+    startedAt: '2026-09-07T00:00:00.000Z',
+    endedAt: '2026-09-07T00:00:01.000Z',
+    exitCode,
+    observation,
+    rawOutputPath: '.w-model/code-health/phase1/raw/probe.log',
+    rawOutputSha256: 'e'.repeat(64),
+  };
+}
+
+/** Minimal Git fixture environment mirroring the audit boundary in code-health-evidence.test.ts. */
+const GIT_ENV = {
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
+  GIT_TERMINAL_PROMPT: '0',
+  GIT_AUTHOR_NAME: 'code-health-p1',
+  GIT_AUTHOR_EMAIL: 'code-health-p1@example.test',
+  GIT_COMMITTER_NAME: 'code-health-p1',
+  GIT_COMMITTER_EMAIL: 'code-health-p1@example.test',
+  PATH: process.env.PATH,
+  PATHEXT: process.env.PATHEXT,
+  SYSTEMROOT: process.env.SYSTEMROOT,
+  SYSTEMDRIVE: process.env.SYSTEMDRIVE,
+  WINDIR: process.env.WINDIR,
+  COMSPEC: process.env.COMSPEC,
+  TEMP: process.env.TEMP,
+  TMP: process.env.TMP,
+  USERPROFILE: process.env.USERPROFILE,
+} as NodeJS.ProcessEnv;
+
+const execFileAsync = promisify(execFile);
+const createdRoots: string[] = [];
+
+async function git(root: string, args: string[]): Promise<string> {
+  const { stdout } = await execFileAsync('git', args, {
+    cwd: root,
+    env: GIT_ENV,
+    shell: false,
+    windowsHide: true,
+  });
+  return stdout;
+}
+
+async function createTempGitRoot(): Promise<string> {
+  const root = await fs.mkdtemp(path.join(tmpdir(), 'code-health-p1-changes-'));
+  createdRoots.push(root);
+  await git(root, ['init', '--quiet']);
+  await fs.mkdir(path.join(root, 'src'), { recursive: true });
+  await fs.writeFile(path.join(root, '.gitignore'), '.w-model/\n');
+  await fs.writeFile(path.join(root, 'src', 'unused.ts'), 'export const unusedFunction = 1;\n');
+  await git(root, ['add', '--all']);
+  await git(root, ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'initial']);
+  return root;
+}
 
 /** Fixture sources covering every false-positive mechanism the phase 1 guard must respect. */
 const fixtureSources: Record<string, string> = {
@@ -149,6 +234,7 @@ const scenarioMatrix: Phase1Scenario[] = [
 
 afterAll(async () => {
   await fs.rm(tempReport, { force: true });
+  await Promise.all(createdRoots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true, maxRetries: 3 })));
 });
 
 describe('code-health phase 1 discovery', () => {
@@ -178,7 +264,14 @@ describe('code-health phase 1 discovery', () => {
     });
     const lead = mergeDynamicTrace(staticReport, {
       revision,
-      scenarios: [{ id: 'smoke-win', environment: 'win32-git-bash', reached: false, observation: 'unavailable' }],
+      scenarios: [
+        {
+          id: 'smoke-win',
+          environment: 'win32-git-bash',
+          reached: false,
+          observation: 'unavailable',
+        },
+      ],
       rawTraceSha256: hash,
     });
     expect(
@@ -198,11 +291,242 @@ describe('code-health phase 1 discovery', () => {
   });
 
   it('命令入口默认只读，报告包含候选 ID、revision、environment、commands、exit codes、hashes 和未执行场景', async () => {
-    const result = await runPhase1({ root: repoRoot, output: tempReport, scenarios: scenarioMatrix });
+    const result = await runPhase1({
+      root: repoRoot,
+      output: tempReport,
+      scenarios: scenarioMatrix,
+    });
     expect(result.exitCode).toBe(0);
     expect(result.report.candidates.every((c) => c.status === 'discovered')).toBe(true);
     expect(result.report.commands.every((c) => c.observation !== 'unverified')).toBe(true);
     expect(result.report.unexercisedScenarios.length).toBeGreaterThan(0);
     expect(result.changedFiles).toEqual([]);
+  });
+
+  it('静态 inventory 逐信号发现：decorator/DI、filesystem、config handler、path/EOL、shell、schema/template/migration/graph ID、matcher、test doubles', async () => {
+    const signalsPath = path.resolve(here, '../samples/code-health/phase1/static/signals.json');
+    const raw = await fs.readFile(signalsPath, 'utf8');
+    const signals = JSON.parse(raw) as {
+      revision: RevisionIdentity;
+      files: string[];
+      sourceText: Record<string, string>;
+    };
+    const report = buildStaticInventory({
+      files: signals.files,
+      sourceText: signals.sourceText,
+      revision: signals.revision,
+    });
+    const has = (kind: StaticReference['kind'], symbol: string): boolean =>
+      report.references.some((reference) => reference.kind === kind && reference.symbol === symbol);
+
+    // dynamic import()
+    expect(has('dynamic-import', './plugin.js')).toBe(true);
+    // plugin registry / DI / decorator metadata
+    expect(has('reflection', 'injectable')).toBe(true);
+    expect(has('reflection', 'getMetadata')).toBe(true);
+    expect(has('reflection', 'design:paramtypes')).toBe(true);
+    // string-to-symbol
+    expect(has('string-symbol', 'PluginRegistry')).toBe(true);
+    // filesystem discovery (readdirSync)
+    expect(has('dynamic-import', 'readdirSync')).toBe(true);
+    // config-selected handler: computed member access + environment lookup
+    expect(has('reflection', 'computed-member-access')).toBe(true);
+    expect(has('shell-platform', 'process.env')).toBe(true);
+    // process.platform / env / executable
+    expect(has('shell-platform', 'process.platform')).toBe(true);
+    expect(has('shell-platform', 'process.execPath')).toBe(true);
+    // path separator / line ending
+    expect(has('shell-platform', 'path')).toBe(true);
+    expect(has('shell-platform', 'os')).toBe(true);
+    // Shell/PowerShell literals
+    expect(has('shell-platform', 'powershell')).toBe(true);
+    expect(has('shell-platform', 'bash')).toBe(true);
+    // schema field / template placeholder / serialized field
+    expect(has('schema', 'schema.json')).toBe(true);
+    expect(has('template', 'projectName')).toBe(true);
+    expect(has('template', 'serializedField')).toBe(true);
+    // migration
+    expect(has('generated-input', 'migration')).toBe(true);
+    // RTM IDs and non-REQ/RTM graph IDs
+    expect(has('rtm', 'REQ-1')).toBe(true);
+    expect(has('rtm', 'GRAPH-NODE-1')).toBe(true);
+    // test-only helper file and custom matcher registration
+    expect(has('test-helper', 'tests/setup.ts')).toBe(true);
+    expect(has('test-helper', 'expect.extend')).toBe(true);
+    // mock adapter / fake clock / sample builder references
+    expect(has('import', './mock-adapter.js')).toBe(true);
+    expect(has('import', './fake-clock.js')).toBe(true);
+    expect(has('import', './sample-builder.js')).toBe(true);
+
+    // A config-selected handler is a statically unresolved mechanism and must keep the lead non-candidate.
+    const context = deriveFalsePositiveContext(report, ['win32']);
+    const leads = mergeDynamicTrace(report, {
+      revision: signals.revision,
+      scenarios: [
+        {
+          id: 'signals-smoke',
+          environment: 'current',
+          reached: true,
+          observation: 'observed',
+          command: observedCommand(0),
+        },
+      ],
+      rawTraceSha256: hash,
+    });
+    const violations = checkFalsePositiveGuards(leads[0]!, context);
+    expect(violations.some((violation) => violation.startsWith('unresolved-mechanism:'))).toBe(true);
+    // runPhase1 applies guard violations by demoting any would-be candidate to unknown.
+    const guarded = leads[0]!;
+    if (violations.length > 0 && guarded.classification === 'candidate') guarded.classification = 'unknown';
+    expect(guarded.classification).not.toBe('candidate');
+  });
+
+  it('observed 但缺 command evidence 的场景不得判为 exercised（provenance 强制）', () => {
+    const staticReport = buildStaticInventory({
+      files: ['src/lonely.ts'],
+      sourceText: { 'src/lonely.ts': 'export const lonely = 1;\n' },
+      revision,
+    });
+    const leads = mergeDynamicTrace(staticReport, {
+      revision,
+      scenarios: [
+        {
+          id: 'observed-no-command',
+          environment: 'current',
+          reached: true,
+          observation: 'observed',
+        },
+      ],
+      rawTraceSha256: hash,
+    });
+    const lead = leads[0]!;
+    const violations = checkFalsePositiveGuards(lead, emptyContext);
+    expect(lead.classification).not.toBe('candidate');
+    expect(violations.length).toBeGreaterThan(0);
+  });
+
+  it('lead 声称 observed+reached 但 dynamicScenarios 缺 command 时 guard 必须告警', () => {
+    const lead = {
+      candidateId: 'CHG-P1-20260907-002',
+      classification: 'candidate',
+      files: ['src/lonely.ts'],
+      symbols: ['lonely'],
+      staticReferences: [],
+      dynamicScenarios: [
+        {
+          id: 'observed-no-command',
+          environment: 'current',
+          reached: true,
+          observation: 'observed',
+        },
+      ],
+      guardViolations: [],
+      status: 'discovered',
+    } as unknown as Phase1CandidateLead;
+    expect(checkFalsePositiveGuards(lead, emptyContext).length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['exitCode=null', observedCommand(null)],
+    ['command observation=unverified', observedCommand(0, 'unverified')],
+  ])('command evidence %s 不算 exercised', (_label, command) => {
+    const staticReport = buildStaticInventory({
+      files: ['src/lonely.ts'],
+      sourceText: { 'src/lonely.ts': 'export const lonely = 1;\n' },
+      revision,
+    });
+    const leads = mergeDynamicTrace(staticReport, {
+      revision,
+      scenarios: [
+        {
+          id: 'fake-observed',
+          environment: 'current',
+          reached: true,
+          observation: 'observed',
+          command,
+        },
+      ],
+      rawTraceSha256: hash,
+    });
+    const lead = leads[0]!;
+    const violations = checkFalsePositiveGuards(lead, emptyContext);
+    expect(lead.classification).not.toBe('candidate');
+    expect(violations.length).toBeGreaterThan(0);
+  });
+
+  it('真实 observed + 数字 exitCode 且无其他误报机制时 lead 才可为 candidate', () => {
+    const staticReport = buildStaticInventory({
+      files: ['src/lonely.ts'],
+      sourceText: { 'src/lonely.ts': 'export const lonely = 1;\n' },
+      revision,
+    });
+    const leads = mergeDynamicTrace(staticReport, {
+      revision,
+      scenarios: [
+        {
+          id: 'verified',
+          environment: 'current',
+          reached: true,
+          observation: 'observed',
+          command: observedCommand(0),
+        },
+      ],
+      rawTraceSha256: hash,
+    });
+    expect(leads[0]!.classification).toBe('candidate');
+    expect(checkFalsePositiveGuards(leads[0]!, emptyContext)).toEqual([]);
+  });
+
+  it('changedFiles 来自前后 worktree 差分：预存在的工作树改动不被误报', async () => {
+    const root = await createTempGitRoot();
+    await fs.writeFile(path.join(root, 'src', 'unused.ts'), 'export const unusedFunction = 2;\n');
+    const output = path.join(tmpdir(), `code-health-p1-changes-${process.pid}.json`);
+    try {
+      const result = await runPhase1({
+        root,
+        output,
+        scenarios: [
+          {
+            id: 'smoke',
+            environment: 'local',
+            command: 'node',
+            args: ['--version'],
+            cwd: '.',
+            targets: ['src/unused.ts'],
+          },
+        ],
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.changedFiles).toEqual([]);
+    } finally {
+      await fs.rm(output, { force: true });
+    }
+  });
+
+  it('read-only invariant 在工具改动工作树时非空并失败', async () => {
+    const root = await createTempGitRoot();
+    const output = path.join(tmpdir(), `code-health-p1-leak-${process.pid}.json`);
+    let call = 0;
+    try {
+      const result = await runPhase1({
+        root,
+        output,
+        scenarios: [
+          {
+            id: 'smoke',
+            environment: 'local',
+            command: 'node',
+            args: ['--version'],
+            cwd: '.',
+            targets: ['src/unused.ts'],
+          },
+        ],
+        readChangedFiles: async (_root, _paths) => (call++ === 0 ? [] : ['src/unused.ts']),
+      });
+      expect(result.changedFiles).toEqual(['src/unused.ts']);
+      expect(result.exitCode).toBe(1);
+    } finally {
+      await fs.rm(output, { force: true });
+    }
   });
 });

@@ -75,6 +75,13 @@ export interface Phase1Scenario {
 }
 
 const CODE_FILE_PATTERN = /\.(?:ts|tsx|js|jsx|mjs|cjs|mts|cts)$/i;
+/**
+ * Requirement-graph node/edge identifiers (for example `GRAPH-NODE-1`) are traceability IDs just like
+ * `REQ-*` / `RTM*`; they are recorded as `rtm` references so the schema/template/RTM family covers
+ * every graph ID the brief lists (not only REQ/RTM prefixes).
+ */
+const GRAPH_ID_PATTERN = /^GRAPH[-_][A-Za-z0-9_-]*[A-Za-z0-9]$/;
+const GRAPH_ID_SOURCE = '\\bGRAPH[-_][A-Za-z0-9_-]*[A-Za-z0-9]\\b';
 const TEST_HELPER_PATTERN =
   /(^|\/)(?:tests?|__tests__|__mocks__|fixtures?)\/|(^|\/)(?:setup|mock|fake|sample-builder|test-utils)[^/]*\.(?:ts|js|mjs|cjs)$/i;
 const SHELL_NAMES = new Set(['powershell', 'pwsh', 'bash', 'sh', 'zsh', 'cmd.exe', 'cmd']);
@@ -235,6 +242,12 @@ function objectName(expression: ts.Expression): string | undefined {
   return undefined;
 }
 
+/** Resolve a decorator expression (`@injectable()`, `@Inject()`, `@ns.Decorator`) to its stable name. */
+function decoratorName(expression: ts.Expression): string {
+  if (ts.isCallExpression(expression)) return propertyName(expression.expression) ?? 'decorator';
+  return propertyName(expression) ?? 'decorator';
+}
+
 function collectTypeScriptReferences(
   file: string,
   source: string,
@@ -299,6 +312,9 @@ function collectTypeScriptReferences(
           }
         } else if (callee === 'function' || callee === 'eval') {
           add('reflection', callee, file, lineOf(sourceFile, node));
+        } else if (callee === 'extend' && owner === 'expect') {
+          // A custom Vitest/Jest matcher is a test-only reachability mechanism, not production code.
+          add('test-helper', 'expect.extend', file, lineOf(sourceFile, node));
         }
       }
       const argument = node.arguments[0];
@@ -313,7 +329,7 @@ function collectTypeScriptReferences(
     }
     if (ts.canHaveDecorators(node)) {
       for (const decorator of ts.getDecorators(node) ?? []) {
-        const name = propertyName(decorator.expression) ?? 'decorator';
+        const name = decoratorName(decorator.expression);
         add('reflection', name, file, lineOf(sourceFile, node));
       }
     }
@@ -331,7 +347,7 @@ function collectTypeScriptReferences(
     }
     if (ts.isStringLiteral(node)) {
       const value = node.text;
-      if (/^REQ-\d+/.test(value) || /^RTM[-_]/.test(value)) {
+      if (/^REQ-\d+/.test(value) || /^RTM[-_]/.test(value) || GRAPH_ID_PATTERN.test(value)) {
         add('rtm', value, file, lineOf(sourceFile, node));
       } else if (SHELL_NAMES.has(value)) {
         add('shell-platform', value, file, lineOf(sourceFile, node));
@@ -379,6 +395,9 @@ function collectNonTypeScriptReferences(
     for (const match of line.matchAll(/\bREQ-\d+\b/g)) {
       add('rtm', match[0], file, lineNumber);
     }
+    for (const match of line.matchAll(new RegExp(GRAPH_ID_SOURCE, 'g'))) {
+      add('rtm', match[0], file, lineNumber);
+    }
     if (/migration/i.test(line)) add('generated-input', 'migration', file, lineNumber);
   }
   if (exportedBy.has(file)) add('string-symbol', file, file, 1);
@@ -392,9 +411,17 @@ function collectReferences(
 ): StaticReference[] {
   const collected: Array<Omit<StaticReference, 'sourceHash'>> = [];
   const sourceHash = sha256Hex(source);
-  const collector: ReferenceCollector = { add: (reference) => collected.push(reference) };
+  const collector: ReferenceCollector = {
+    add: (reference) => collected.push(reference),
+  };
   if (isTestHelperPath(file)) {
-    collector.add({ path: file, symbol: file, consumer: file, kind: 'test-helper', line: 1 });
+    collector.add({
+      path: file,
+      symbol: file,
+      consumer: file,
+      kind: 'test-helper',
+      line: 1,
+    });
   }
   if (isCodeFilePath(file)) {
     collectTypeScriptReferences(file, source, files, exportedBy, collector);
@@ -436,7 +463,14 @@ export function buildStaticInventory(input: StaticInventoryInput): StaticInvento
     references.push(...collectReferences(file, source, files, exportedBy));
   }
   const categories = unique(references.map((reference) => CATEGORY_BY_KIND[reference.kind])).sort();
-  return { revision: input.revision, files, references, categories, unknowns, commands: [] };
+  return {
+    revision: input.revision,
+    files,
+    references,
+    categories,
+    unknowns,
+    commands: [],
+  };
 }
 
 function candidateSymbols(file: string, references: readonly StaticReference[]): string[] {
@@ -454,8 +488,26 @@ function nextCandidateId(revision: RevisionIdentity, index: number): string {
   return `CHG-P1-${date}-${String(index + 1).padStart(3, '0')}`;
 }
 
+/**
+ * A scenario is exercised only when it carries a genuine runner product: a real numeric exit code
+ * (`null`/`undefined` is never an observed result) whose own observation is `observed`, plus
+ * `reached === true` and an `observed` scenario observation. Caller-supplied strings cannot make a
+ * scenario count as exercised.
+ */
 function scenarioExercised(scenario: DynamicTraceInputScenario): boolean {
-  return scenario.command !== undefined && scenario.observation === 'observed' && scenario.reached === true;
+  const command = scenario.command;
+  return (
+    command !== undefined &&
+    command.observation === 'observed' &&
+    typeof command.exitCode === 'number' &&
+    scenario.observation === 'observed' &&
+    scenario.reached === true
+  );
+}
+
+/** True only for a command evidence record that is a real observed runner result. */
+function commandIsObserved(command: CommandEvidence | undefined): boolean {
+  return command !== undefined && command.observation === 'observed' && typeof command.exitCode === 'number';
 }
 
 /**
@@ -560,8 +612,13 @@ export function checkFalsePositiveGuards(lead: Phase1CandidateLead, context: Fal
     violations.push('unresolved-mechanism: dynamic import or reflection cannot be resolved statically');
   }
   for (const scenario of lead.dynamicScenarios) {
-    if (scenario.observation !== 'observed' || scenario.reached !== true) {
-      violations.push(`unexercised-scenario: ${scenario.id} (${scenario.observation}) is not deadness evidence`);
+    const claimsExercised = scenario.observation === 'observed' && scenario.reached === true;
+    const command = scenario.command as CommandEvidence | undefined;
+    if (!claimsExercised || !commandIsObserved(command)) {
+      violations.push(
+        `unexercised-scenario: ${scenario.id} (${scenario.observation}) is not deadness evidence; ` +
+          `no verified runner command evidence (observed numeric exit code) was recorded`,
+      );
     }
   }
   if (lead.dynamicScenarios.length === 0) {
@@ -605,7 +662,11 @@ export interface ScenarioApplicability {
 
 export function classifyScenario(scenario: Phase1Scenario, currentPlatform: string): ScenarioApplicability {
   if (scenario.supported === false) {
-    return { applicable: false, observation: 'not_run', reason: 'environment is declared unsupported by the campaign' };
+    return {
+      applicable: false,
+      observation: 'not_run',
+      reason: 'environment is declared unsupported by the campaign',
+    };
   }
   if (scenario.platform !== undefined && scenario.platform !== currentPlatform) {
     return {
@@ -614,7 +675,11 @@ export function classifyScenario(scenario: Phase1Scenario, currentPlatform: stri
       reason: `platform ${scenario.platform} is not available on ${currentPlatform}`,
     };
   }
-  return { applicable: true, observation: 'unavailable', reason: 'applicable on the current host' };
+  return {
+    applicable: true,
+    observation: 'unavailable',
+    reason: 'applicable on the current host',
+  };
 }
 
 /** Environment matrix row for one declared scenario. */

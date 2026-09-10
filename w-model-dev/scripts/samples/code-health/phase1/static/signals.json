@@ -1,0 +1,52 @@
+{
+  "revision": {
+    "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "analyzedAt": "2026-09-07T00:00:00.000Z"
+  },
+  "files": ["src/plugin.ts", "src/signals.ts", "schema.json", "template.md", "tests/setup.ts"],
+  "expectedCategories": [
+    "ast-reference",
+    "dynamic-import",
+    "reflection",
+    "shell-platform",
+    "schema-template-rtm",
+    "test-only-helper"
+  ],
+  "expectedReferences": [
+    { "kind": "import", "symbol": "./plugin-types.js", "path": "src/plugin.ts" },
+    { "kind": "reflection", "symbol": "injectable", "path": "src/plugin.ts" },
+    { "kind": "reflection", "symbol": "getMetadata", "path": "src/plugin.ts" },
+    { "kind": "reflection", "symbol": "design:paramtypes", "path": "src/plugin.ts" },
+    { "kind": "string-symbol", "symbol": "PluginRegistry", "path": "src/plugin.ts" },
+    { "kind": "dynamic-import", "symbol": "./plugin.js", "path": "src/signals.ts" },
+    { "kind": "dynamic-import", "symbol": "readdirSync", "path": "src/signals.ts" },
+    { "kind": "reflection", "symbol": "computed-member-access", "path": "src/signals.ts" },
+    { "kind": "shell-platform", "symbol": "process.platform", "path": "src/signals.ts" },
+    { "kind": "shell-platform", "symbol": "process.env", "path": "src/signals.ts" },
+    { "kind": "shell-platform", "symbol": "process.execPath", "path": "src/signals.ts" },
+    { "kind": "shell-platform", "symbol": "path", "path": "src/signals.ts" },
+    { "kind": "shell-platform", "symbol": "os", "path": "src/signals.ts" },
+    { "kind": "shell-platform", "symbol": "powershell", "path": "src/signals.ts" },
+    { "kind": "shell-platform", "symbol": "bash", "path": "src/signals.ts" },
+    { "kind": "schema", "symbol": "schema.json", "path": "schema.json" },
+    { "kind": "template", "symbol": "projectName", "path": "template.md" },
+    { "kind": "template", "symbol": "serializedField", "path": "template.md" },
+    { "kind": "generated-input", "symbol": "migration", "path": "template.md" },
+    { "kind": "rtm", "symbol": "REQ-1", "path": "template.md" },
+    { "kind": "rtm", "symbol": "GRAPH-NODE-1", "path": "template.md" },
+    { "kind": "test-helper", "symbol": "tests/setup.ts", "path": "tests/setup.ts" },
+    { "kind": "test-helper", "symbol": "expect.extend", "path": "tests/setup.ts" },
+    { "kind": "import", "symbol": "./sample-builder.js", "path": "tests/setup.ts" },
+    { "kind": "import", "symbol": "./mock-adapter.js", "path": "tests/setup.ts" },
+    { "kind": "import", "symbol": "./fake-clock.js", "path": "tests/setup.ts" }
+  ],
+  "sourceText": {
+    "src/plugin.ts": "import type { Plugin } from './plugin-types.js';\n\n@injectable()\nexport class PluginRegistry {\n  private readonly plugins = new Map<string, Plugin>();\n}\n\nexport const registry = new PluginRegistry();\nregistry.register('PluginRegistry', registry);\nconst paramTypes = Reflect.getMetadata('design:paramtypes', PluginRegistry);\nvoid paramTypes;\n",
+    "src/signals.ts": "import { registry } from './plugin.js';\n\nexport async function main(): Promise<void> {\n  const platform = process.platform;\n  const env = process.env;\n  const exe = process.execPath;\n  const sep = require(\"path\").sep;\n  const eol = require(\"os\").EOL;\n  const shell = platform === \"win32\" ? \"powershell\" : \"bash\";\n  const discovered = readdirSync('plugins');\n  const plugin = await import('./plugin.js');\n  const handlers: Record<string, () => void> = { audit: auditHandler };\n  const selected = handlers[process.env.HANDLER ?? 'audit'];\n  const graphNode = 'GRAPH-NODE-1';\n  void [registry, env, exe, sep, eol, shell, discovered, plugin, selected, graphNode];\n}\n",
+    "schema.json": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"title\": \"REQ-1 retry schema\",\n  \"type\": \"object\",\n  \"properties\": {\n    \"serializedField\": { \"type\": \"string\" }\n  }\n}\n",
+    "template.md": "# {{projectName}}\n\nSerialized field: {{serializedField}}\nMigration: {{fromVersion}} -> {{toVersion}}\nRequirement: REQ-1\nGraph: GRAPH-NODE-1\n",
+    "tests/setup.ts": "import { expect } from 'vitest';\nimport { buildSample } from './sample-builder.js';\nimport { MockAdapter } from './mock-adapter.js';\nimport { FakeClock } from './fake-clock.js';\n\nexpect.extend({\n  toBeWithinRange(received: number, floor: number, ceiling: number): boolean {\n    return received >= floor && received <= ceiling;\n  },\n});\n\nexport const clock = new FakeClock();\nexport const adapter = new MockAdapter();\nexport const sample = buildSample('user');\n"
+  }
+}

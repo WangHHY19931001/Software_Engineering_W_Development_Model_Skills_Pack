@@ -2396,6 +2396,7 @@ interface CodeHealthPhase1Fixture {
   files: string[];
   sourceText: Record<string, string>;
   expectedCategories?: string[];
+  expectedReferences?: Array<{ kind: string; symbol: string; path: string }>;
   expectedUnavailable?: string[];
   context?: FalsePositiveContext;
   lead?: Phase1CandidateLead;
@@ -2407,6 +2408,20 @@ const CODE_HEALTH_PHASE1_STATIC_CASES: CodeHealthPhase1StaticCase[] = [
     expectedBlocked: false,
     expectedCategories: ['dynamic-import', 'reflection', 'shell-platform', 'schema-template-rtm', 'test-only-helper'],
     description: '静态 inventory 覆盖动态 import/reflection/shell/schema-template-RTM/test helper',
+  },
+  {
+    file: 'signals.json',
+    expectedBlocked: false,
+    expectedCategories: [
+      'ast-reference',
+      'dynamic-import',
+      'reflection',
+      'shell-platform',
+      'schema-template-rtm',
+      'test-only-helper',
+    ],
+    description:
+      '静态 inventory 逐信号覆盖：decorator/DI metadata、filesystem discovery、config handler、path/EOL、shell literal、schema/template/migration/graph ID、custom matcher、test double import',
   },
   {
     file: 'blocked.json',
@@ -3680,6 +3695,17 @@ async function runCodeHealthPhase1StaticCases(samplesDir: string): Promise<CaseR
     for (const category of c.expectedCategories ?? []) {
       if (!report.categories.includes(category)) {
         details.push(`  - 缺 category ${category}（实际 ${report.categories.join(',')}）`);
+      }
+    }
+    for (const expected of fixture.expectedReferences ?? []) {
+      const found = report.references.some(
+        (reference) =>
+          reference.kind === expected.kind &&
+          reference.symbol === expected.symbol &&
+          reference.path === expected.path,
+      );
+      if (!found) {
+        details.push(`  - 缺 reference ${expected.kind}:${expected.symbol}@${expected.path}`);
       }
     }
     for (const unavailable of fixture.expectedUnavailable ?? []) {
