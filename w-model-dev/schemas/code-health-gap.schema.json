@@ -56,7 +56,7 @@
         "description": "One repository-relative evidence source or stable identifier.",
         "type": "string",
         "minLength": 1,
-        "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+        "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
       }
     },
     "risk": {
@@ -189,7 +189,7 @@
         "cwd": {
           "description": "Repository-relative working directory.",
           "type": "string",
-          "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+          "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
         },
         "environment": {
           "description": "Redacted environment map.",
@@ -202,8 +202,18 @@
           "type": "object",
           "additionalProperties": { "description": "Observed tool version.", "type": "string" }
         },
-        "startedAt": { "description": "UTC command start timestamp.", "type": "string", "format": "date-time" },
-        "endedAt": { "description": "UTC command end timestamp.", "type": "string", "format": "date-time" },
+        "startedAt": {
+          "description": "UTC command start timestamp.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
+        "endedAt": {
+          "description": "UTC command end timestamp.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
         "exitCode": {
           "description": "Real process exit code, or null when no process result exists.",
           "type": ["integer", "null"]
@@ -215,7 +225,7 @@
         "rawOutputPath": {
           "description": "Controlled repository-relative raw output path.",
           "type": "string",
-          "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+          "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
         },
         "rawOutputSha256": { "description": "SHA-256 of the raw command output.", "$ref": "#/definitions/sha256" }
       },

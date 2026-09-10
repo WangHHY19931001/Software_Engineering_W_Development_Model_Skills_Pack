@@ -146,7 +146,7 @@
     "relativePath": {
       "description": "Safe repository-relative POSIX path or identifier without absolute or parent traversal segments.",
       "type": "string",
-      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
     },
     "sha1": { "description": "Lowercase Git SHA-1.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "sha256": { "description": "Lowercase SHA-256 digest.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
@@ -159,7 +159,12 @@
         "commitSha": { "description": "Commit SHA-1.", "$ref": "#/definitions/sha1" },
         "treeSha": { "description": "Tree SHA-1.", "$ref": "#/definitions/sha1" },
         "sourceBundleSha256": { "description": "Analyzed source bundle SHA-256.", "$ref": "#/definitions/sha256" },
-        "analyzedAt": { "description": "UTC analysis time.", "type": "string", "format": "date-time" }
+        "analyzedAt": {
+          "description": "UTC analysis time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        }
       }
     },
     "command": {
@@ -201,8 +206,18 @@
           "type": "object",
           "additionalProperties": { "description": "Tool version string.", "type": "string" }
         },
-        "startedAt": { "description": "UTC command start time.", "type": "string", "format": "date-time" },
-        "endedAt": { "description": "UTC command end time.", "type": "string", "format": "date-time" },
+        "startedAt": {
+          "description": "UTC command start time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
+        "endedAt": {
+          "description": "UTC command end time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
         "exitCode": {
           "description": "Observed non-negative process exit code, or null when no process result exists.",
           "type": ["integer", "null"],
@@ -426,7 +441,12 @@
           "type": "string",
           "$ref": "#/definitions/relativePath"
         },
-        "signedAt": { "description": "UTC signature time.", "type": "string", "format": "date-time" }
+        "signedAt": {
+          "description": "UTC signature time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        }
       }
     },
     "changeScope": {
@@ -507,7 +527,6 @@
         }
       }
     },
-    "sha256": { "description": "Lowercase SHA-256 digest.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "archive": {
       "description": "Candidate archive metadata.",
       "type": "object",
@@ -517,7 +536,10 @@
         "state": { "description": "Whether this candidate has been archived.", "enum": ["not_archived", "archived"] },
         "manifestPath": {
           "description": "Repository-relative archive manifest path or null.",
-          "type": ["string", "null"]
+          "anyOf": [
+            { "description": "Repository-relative archive manifest path.", "$ref": "#/definitions/relativePath" },
+            { "description": "No archive manifest before archiving.", "type": "null" }
+          ]
         },
         "contentHash": {
           "description": "Archive content SHA-256 or null before archive.",

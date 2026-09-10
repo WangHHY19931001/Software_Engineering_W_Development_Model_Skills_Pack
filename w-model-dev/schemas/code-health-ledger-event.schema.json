@@ -81,7 +81,12 @@
       "description": "Role responsible for recording the transition.",
       "enum": ["O", "A", "S", "V", "G", "R", "human"]
     },
-    "at": { "description": "UTC transition timestamp.", "type": "string", "format": "date-time" },
+    "at": {
+      "description": "UTC transition timestamp.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+    },
     "previousRevision": {
       "description": "Candidate revision before an implementation event; required only for implementation.",
       "$ref": "#/definitions/revision"
@@ -100,14 +105,14 @@
         "description": "One evidence reference.",
         "type": "string",
         "minLength": 1,
-        "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+        "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
       }
     },
     "signatureRef": {
       "description": "Repository-relative signature or provenance reference.",
       "type": "string",
       "minLength": 1,
-      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
     },
     "gateFailureEvidence": {
       "description": "Observed non-zero gate or command failure with explicit candidate and scope binding.",
@@ -126,7 +131,19 @@
     "relativePath": {
       "description": "Safe repository-relative POSIX path without absolute paths, backslashes, parent traversal, or empty segments.",
       "type": "string",
-      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
+    },
+    "auditedEnvironment": {
+      "description": "Audited redacted environment map whose key names cannot carry credential-bearing identifiers.",
+      "type": "object",
+      "propertyNames": {
+        "description": "Environment key name that must not match a credential-bearing identifier.",
+        "not": {
+          "description": "Case-insensitive credential key pattern matching the canonical runtime environment audit.",
+          "pattern": "[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii][_-]?[Kk][Ee][Yy]|[Aa][Cc][Cc][Ee][Ss][Ss][_-]?[Kk][Ee][Yy]|[Pp][Rr][Ii][Vv][Aa][Tt][Ee][_-]?[Kk][Ee][Yy]|[Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]"
+        }
+      },
+      "additionalProperties": { "description": "Redacted environment value.", "type": "string" }
     },
     "sha256": {
       "description": "Lowercase SHA-256 digest.",
@@ -145,7 +162,12 @@
           "description": "SHA-256 of the analyzed source bundle.",
           "$ref": "#/definitions/sha256"
         },
-        "analyzedAt": { "description": "UTC analysis timestamp.", "type": "string", "format": "date-time" }
+        "analyzedAt": {
+          "description": "UTC analysis timestamp.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        }
       }
     },
     "commandEvidence": {
@@ -174,9 +196,8 @@
         },
         "cwd": { "description": "Repository-relative working directory.", "$ref": "#/definitions/relativePath" },
         "environment": {
-          "description": "Audited redacted environment map.",
-          "type": "object",
-          "additionalProperties": { "description": "Redacted environment value.", "type": "string" }
+          "description": "Audited redacted environment map that cannot carry credential-bearing key names.",
+          "$ref": "#/definitions/auditedEnvironment"
         },
         "platform": { "description": "Observed platform.", "type": "string", "minLength": 1 },
         "toolVersions": {
@@ -184,8 +205,18 @@
           "type": "object",
           "additionalProperties": { "description": "Tool version.", "type": "string" }
         },
-        "startedAt": { "description": "UTC command start time.", "type": "string", "format": "date-time" },
-        "endedAt": { "description": "UTC command end time.", "type": "string", "format": "date-time" },
+        "startedAt": {
+          "description": "UTC command start time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
+        "endedAt": {
+          "description": "UTC command end time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
         "exitCode": {
           "description": "Real non-negative process exit code, or null when no process result exists.",
           "type": ["integer", "null"],
@@ -246,9 +277,8 @@
         },
         "cwd": { "description": "Repository-relative working directory.", "$ref": "#/definitions/relativePath" },
         "environment": {
-          "description": "Audited redacted environment map.",
-          "type": "object",
-          "additionalProperties": { "description": "Redacted environment value.", "type": "string" }
+          "description": "Audited redacted environment map that cannot carry credential-bearing key names.",
+          "$ref": "#/definitions/auditedEnvironment"
         },
         "platform": { "description": "Observed platform.", "type": "string", "minLength": 1 },
         "toolVersions": {
@@ -256,8 +286,18 @@
           "type": "object",
           "additionalProperties": { "description": "Tool version.", "type": "string" }
         },
-        "startedAt": { "description": "UTC command start time.", "type": "string", "format": "date-time" },
-        "endedAt": { "description": "UTC command end time.", "type": "string", "format": "date-time" },
+        "startedAt": {
+          "description": "UTC command start time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
+        "endedAt": {
+          "description": "UTC command end time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
         "exitCode": {
           "description": "Real non-negative process exit code, or null when no process result exists.",
           "type": ["integer", "null"],

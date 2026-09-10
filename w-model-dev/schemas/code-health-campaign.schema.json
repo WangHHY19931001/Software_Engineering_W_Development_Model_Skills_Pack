@@ -25,7 +25,8 @@
     "createdAt": {
       "description": "UTC time at which the campaign manifest was created.",
       "type": "string",
-      "format": "date-time"
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
     },
     "baseline": {
       "description": "Source revision against which campaign evidence is interpreted.",
@@ -51,22 +52,22 @@
     "ledgerPath": {
       "description": "Repository-relative JSONL path for append-only ledger events.",
       "type": "string",
-      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
     },
     "evidencePath": {
       "description": "Repository-relative JSONL path for evidence records.",
       "type": "string",
-      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
     },
     "approvalPath": {
       "description": "Repository-relative JSONL path for human approval records.",
       "type": "string",
-      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
     },
     "archivePath": {
       "description": "Repository-relative JSONL path for terminal archive records.",
       "type": "string",
-      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
     },
     "appendOnly": { "description": "Whether ledger and index records are append-only.", "const": true },
     "redaction": { "description": "Campaign-level redaction status and rules.", "$ref": "#/definitions/redaction" }
@@ -88,7 +89,8 @@
         "analyzedAt": {
           "description": "UTC time at which this revision was analyzed.",
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
         }
       }
     },

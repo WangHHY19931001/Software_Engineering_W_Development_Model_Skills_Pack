@@ -229,6 +229,92 @@ describe('code-health canonical contract', () => {
       expect(validateLedgerEvent(event), name).not.toEqual([]);
     }
   });
+
+  it('Schema 与 runtime parity 覆盖严格 ISO 时间、相对路径和敏感 environment 键', async () => {
+    const candidate = (await loadFixture('valid-candidate.json')) as Record<string, unknown>;
+    const event = (await loadFixture('valid-ledger-event.json')) as Record<string, unknown>;
+    const candidateRevision = candidate.revision as Record<string, unknown>;
+    const candidateAgreement = (value: unknown): [boolean, boolean] => [
+      validateBySchema('code-health-candidate', value).valid,
+      validateCodeHealthCandidate(value).length === 0,
+    ];
+    const eventAgreement = (value: unknown): [boolean, boolean] => [
+      validateBySchema('code-health-ledger-event', value).valid,
+      validateLedgerEvent(value).length === 0,
+    ];
+
+    expect(candidateAgreement(candidate)).toEqual([true, true]);
+    for (const analyzedAt of ['2026-09-07T00:00:00Z', '2026-09-07T00:00:00+00:00', '2026-09-07T00:00:00.000+00:00']) {
+      expect(candidateAgreement({ ...candidate, revision: { ...candidateRevision, analyzedAt } }), analyzedAt).toEqual([
+        false,
+        false,
+      ]);
+    }
+    for (const invalidPath of [
+      '../outside.ts',
+      '/absolute.ts',
+      'C:/drive.ts',
+      'src//dup.ts',
+      'src/dir/',
+      'src\\win.ts',
+    ]) {
+      expect(candidateAgreement({ ...candidate, files: [invalidPath] }), invalidPath).toEqual([false, false]);
+    }
+    expect(candidateAgreement({ ...candidate, files: ['src/unused.ts'] })).toEqual([true, true]);
+    const archive = candidate.archive as Record<string, unknown>;
+    expect(candidateAgreement({ ...candidate, archive: { ...archive, manifestPath: null } })).toEqual([true, true]);
+    expect(candidateAgreement({ ...candidate, archive: { ...archive, manifestPath: '../outside.json' } })).toEqual([
+      false,
+      false,
+    ]);
+
+    expect(eventAgreement(event)).toEqual([true, true]);
+    expect(eventAgreement({ ...event, at: '2026-09-07T00:00:00Z' })).toEqual([false, false]);
+    expect(eventAgreement({ ...event, evidenceRefs: ['evidence//dup.json'] })).toEqual([false, false]);
+    expect(eventAgreement({ ...event, signatureRef: '/absolute/signature.json' })).toEqual([false, false]);
+    expect(eventAgreement({ ...event, signatureRef: 'C:/drive/signature.json' })).toEqual([false, false]);
+
+    const failureCommand = {
+      command: 'npm run check:gate',
+      cwd: '.',
+      environment: { NODE_ENV: 'test' },
+      platform: 'win32',
+      toolVersions: { node: '20.0.0' },
+      startedAt: '2026-09-07T00:04:00.000Z',
+      endedAt: '2026-09-07T00:04:01.000Z',
+      exitCode: 7,
+      observation: 'observed',
+      rawOutputPath: 'evidence/raw/gate.txt',
+      rawOutputSha256: 'd'.repeat(64),
+    };
+    const gateFailure = {
+      ...failureCommand,
+      candidateId: 'CHG-P1-20260907-001',
+      scopeHash: `sha256:${'e'.repeat(64)}`,
+      failureKind: 'gate',
+    };
+    const gateFailureEvent = {
+      ...event,
+      eventKind: 'gate-failure',
+      from: 'discovered',
+      to: 'blocked',
+      actorRole: 'G',
+      gateFailureEvidence: gateFailure,
+    };
+    expect(eventAgreement(gateFailureEvent)).toEqual([true, true]);
+    expect(
+      eventAgreement({
+        ...gateFailureEvent,
+        gateFailureEvidence: { ...gateFailure, environment: { NODE_ENV: 'test' } },
+      }),
+    ).toEqual([true, true]);
+    for (const environment of [{ API_TOKEN: 'redacted' }, { Authorization: 'redacted' }, { 'api-key': 'redacted' }]) {
+      expect(
+        eventAgreement({ ...gateFailureEvent, gateFailureEvidence: { ...gateFailure, environment } }),
+        JSON.stringify(environment),
+      ).toEqual([false, false]);
+    }
+  });
 });
 
 export type ContractFixture = CodeHealthCandidate;

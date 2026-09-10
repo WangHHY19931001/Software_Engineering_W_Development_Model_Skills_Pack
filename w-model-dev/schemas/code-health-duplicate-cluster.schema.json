@@ -52,7 +52,7 @@
     "relativePath": {
       "description": "Safe repository-relative POSIX path without absolute paths, backslashes, parent traversal, or empty segments.",
       "type": "string",
-      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
     },
     "sha1": { "description": "Lowercase Git SHA-1 digest.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "implementation": {

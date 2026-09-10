@@ -42,7 +42,7 @@
     "diffPath": {
       "description": "Repository-relative diff or patch path, or null when no code change occurred.",
       "type": ["string", "null"],
-      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
     },
     "diffSha256": {
       "description": "SHA-256 of the retained diff or null when no diff exists.",
@@ -90,7 +90,12 @@
       "required": ["location", "until"],
       "properties": {
         "location": { "description": "Repository-relative retention location.", "$ref": "#/definitions/relativePath" },
-        "until": { "description": "UTC retention expiry timestamp.", "type": "string", "format": "date-time" }
+        "until": {
+          "description": "UTC retention expiry timestamp.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        }
       }
     },
     "verificationLevel": {
@@ -104,14 +109,15 @@
     "archivedAt": {
       "description": "UTC time at which this terminal archive record was created.",
       "type": "string",
-      "format": "date-time"
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
     }
   },
   "definitions": {
     "relativePath": {
       "description": "Safe repository-relative POSIX path without absolute paths, backslashes, parent traversal, or empty segments.",
       "type": "string",
-      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
     },
     "sha256": { "description": "Lowercase SHA-256 digest.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "sha1": { "description": "Lowercase Git SHA-1 digest.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
@@ -124,7 +130,12 @@
         "commitSha": { "description": "Commit SHA-1.", "$ref": "#/definitions/sha1" },
         "treeSha": { "description": "Tree SHA-1.", "$ref": "#/definitions/sha1" },
         "sourceBundleSha256": { "description": "Source bundle SHA-256.", "$ref": "#/definitions/sha256" },
-        "analyzedAt": { "description": "UTC analysis time.", "type": "string", "format": "date-time" }
+        "analyzedAt": {
+          "description": "UTC analysis time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        }
       }
     },
     "rollback": {

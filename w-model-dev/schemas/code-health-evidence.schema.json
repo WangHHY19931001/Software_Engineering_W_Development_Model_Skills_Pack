@@ -85,7 +85,7 @@
     "relativePath": {
       "description": "Repository-relative POSIX path without absolute paths, backslashes, parent traversal, or empty segments.",
       "type": "string",
-      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
     },
     "sha1": { "description": "Lowercase Git SHA-1 digest.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "sha256": { "description": "Lowercase SHA-256 digest.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
@@ -139,7 +139,6 @@
         }
       }
     },
-    "sha256": { "description": "Lowercase SHA-256 digest.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "revision": {
       "description": "Source-bound repository revision identity.",
       "type": "object",
@@ -155,7 +154,8 @@
         "analyzedAt": {
           "description": "UTC time at which the revision was analyzed.",
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
         }
       }
     },
@@ -241,8 +241,18 @@
           "type": "object",
           "additionalProperties": { "description": "Observed tool version.", "type": "string" }
         },
-        "startedAt": { "description": "UTC command start time.", "type": "string", "format": "date-time" },
-        "endedAt": { "description": "UTC command end time.", "type": "string", "format": "date-time" },
+        "startedAt": {
+          "description": "UTC command start time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
+        "endedAt": {
+          "description": "UTC command end time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
         "exitCode": {
           "description": "Real process exit code, or null when no process result exists.",
           "type": ["integer", "null"]

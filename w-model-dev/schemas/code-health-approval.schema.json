@@ -59,7 +59,8 @@
     "decidedAt": {
       "description": "UTC timestamp of the human checkpoint decision.",
       "type": "string",
-      "format": "date-time"
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
     },
     "signatureRef": {
       "description": "Repository-relative signature or provenance reference for the human decision.",
@@ -84,13 +85,18 @@
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         },
-        "analyzedAt": { "description": "UTC analysis time.", "type": "string", "format": "date-time" }
+        "analyzedAt": {
+          "description": "UTC analysis time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        }
       }
     },
     "relativePath": {
       "description": "Safe repository-relative POSIX path without absolute paths, backslashes, parent traversal, or empty segments.",
       "type": "string",
-      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
     }
   }
 }

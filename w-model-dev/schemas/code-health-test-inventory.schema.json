@@ -67,7 +67,7 @@
     "relativePath": {
       "description": "Safe repository-relative POSIX path without absolute paths, backslashes, parent traversal, or empty segments.",
       "type": "string",
-      "pattern": "^(?!/)(?![A-Za-z]:[\\\\])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//).+$"
+      "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
     },
     "sha1": { "description": "Lowercase Git SHA-1 digest.", "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "sha256": { "description": "Lowercase SHA-256 digest.", "type": "string", "pattern": "^[0-9a-f]{64}$" },
@@ -80,7 +80,12 @@
         "commitSha": { "description": "Commit SHA-1.", "$ref": "#/definitions/sha1" },
         "treeSha": { "description": "Tree SHA-1.", "$ref": "#/definitions/sha1" },
         "sourceBundleSha256": { "description": "Source bundle SHA-256.", "$ref": "#/definitions/sha256" },
-        "analyzedAt": { "description": "UTC analysis time.", "type": "string", "format": "date-time" }
+        "analyzedAt": {
+          "description": "UTC analysis time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        }
       }
     },
     "testRecord": {
@@ -112,8 +117,18 @@
           "type": "string",
           "minLength": 1
         },
-        "createdAt": { "description": "UTC creation timestamp.", "type": "string", "format": "date-time" },
-        "lastChangedAt": { "description": "UTC last-change timestamp.", "type": "string", "format": "date-time" },
+        "createdAt": {
+          "description": "UTC creation timestamp.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
+        "lastChangedAt": {
+          "description": "UTC last-change timestamp.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
         "level": { "description": "Executable test level.", "enum": ["unit", "integration", "system", "acceptance"] },
         "setup": { "description": "Setup and fixture contract.", "type": "string", "minLength": 1 },
         "stimulus": { "description": "Input or event stimulus.", "type": "string", "minLength": 1 },
@@ -200,8 +215,18 @@
           "type": "object",
           "additionalProperties": { "description": "Tool version.", "type": "string" }
         },
-        "startedAt": { "description": "UTC command start time.", "type": "string", "format": "date-time" },
-        "endedAt": { "description": "UTC command end time.", "type": "string", "format": "date-time" },
+        "startedAt": {
+          "description": "UTC command start time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
+        "endedAt": {
+          "description": "UTC command end time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
         "exitCode": {
           "description": "Real exit code, or null when no process result exists.",
           "type": ["integer", "null"]
@@ -271,7 +296,12 @@
         "path": { "description": "Repository-relative coverage artifact path.", "$ref": "#/definitions/relativePath" },
         "sha256": { "description": "Coverage artifact SHA-256.", "$ref": "#/definitions/sha256" },
         "revision": { "description": "Revision measured by the coverage artifact.", "$ref": "#/definitions/sha1" },
-        "measuredAt": { "description": "UTC coverage measurement time.", "type": "string", "format": "date-time" },
+        "measuredAt": {
+          "description": "UTC coverage measurement time.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
         "signalOnly": { "description": "Fixed guard that coverage is a signal only.", "const": true }
       }
     },
