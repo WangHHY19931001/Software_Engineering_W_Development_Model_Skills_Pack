@@ -20,8 +20,16 @@ const REGISTERED_STATE_SCHEMAS: readonly RegisteredStateSchema[] = [
   { relativePath: '.w-model/code-health/approvals.jsonl', schemaName: 'code-health-approval', format: 'jsonl' },
   { relativePath: '.w-model/code-health/archive.jsonl', schemaName: 'code-health-archive', format: 'jsonl' },
   { relativePath: '.w-model/code-health/gaps.jsonl', schemaName: 'code-health-gap', format: 'jsonl' },
-  { relativePath: '.w-model/code-health/test-inventory.jsonl', schemaName: 'code-health-test-inventory', format: 'jsonl' },
-  { relativePath: '.w-model/code-health/duplicate-clusters.jsonl', schemaName: 'code-health-duplicate-cluster', format: 'jsonl' },
+  {
+    relativePath: '.w-model/code-health/test-inventory.jsonl',
+    schemaName: 'code-health-test-inventory',
+    format: 'jsonl',
+  },
+  {
+    relativePath: '.w-model/code-health/duplicate-clusters.jsonl',
+    schemaName: 'code-health-duplicate-cluster',
+    format: 'jsonl',
+  },
   { relativePath: '.w-model/code-health/ledger.jsonl', schemaName: 'code-health-ledger-event', format: 'jsonl' },
 ];
 
