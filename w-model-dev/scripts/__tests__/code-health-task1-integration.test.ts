@@ -231,15 +231,21 @@ function addedStatusLines(before: string, after: string): string[] {
     .filter((line) => line.length > 0 && !baseline.has(line));
 }
 
+/** `git diff --name-only` entries that were not present in the start snapshot. */
+function addedDiffNames(before: string[], after: string[]): string[] {
+  const baseline = new Set(before);
+  return after.filter((entry) => !baseline.has(entry));
+}
+
 /** The current repository root must not receive any new tracked/untracked artifact from this test. */
-async function expectRepositoryRootUnpolluted(before: string): Promise<void> {
+async function expectRepositoryRootUnpolluted(before: string, beforeDiff: string[]): Promise<void> {
   const after = await gitStatusPorcelain(repoRoot);
   const added = addedStatusLines(before, after).filter((line) => !line.includes(SIBLING_TEST_TRANSIENT));
   expect(added).toEqual([]);
   expect(after).not.toContain('.w-model/');
   expect(after).not.toContain('coverage/');
   expect(after).not.toContain('.zcode/');
-  expect(await gitDiffNames(repoRoot)).toEqual([]);
+  expect(addedDiffNames(beforeDiff, await gitDiffNames(repoRoot))).toEqual([]);
 }
 
 /* ------------------------------------------------------------------ fixture builders */
@@ -1980,6 +1986,7 @@ const negativeCases: readonly NegativeCase[] = [
 describe('code-health task1 isolated git integration', () => {
   it('真实 Git command→raw evidence→FileVerifier→candidate→V→human→S implemented→G/V verified 链路通过', async () => {
     const repoStatusBefore = await gitStatusPorcelain(repoRoot);
+    const repoDiffBefore = await gitDiffNames(repoRoot);
     const chain = await runRealApprovedChain();
     const { boundaries, selector, initialRevision, implementedRevision, approval, verifiedLedger } = chain;
 
@@ -2056,11 +2063,12 @@ describe('code-health task1 isolated git integration', () => {
     expect(await fs.stat(path.join(boundaries.root, 'archive')).catch(() => null)).toBeNull();
 
     expect(await gitStatusPorcelain(boundaries.root)).toBe('');
-    await expectRepositoryRootUnpolluted(repoStatusBefore);
+    await expectRepositoryRootUnpolluted(repoStatusBefore, repoDiffBefore);
   });
 
   it('applyApproved 和所有 archive boundary 结果为 NOT_IMPLEMENTED，并保持 clean worktree', async () => {
     const repoStatusBefore = await gitStatusPorcelain(repoRoot);
+    const repoDiffBefore = await gitDiffNames(repoRoot);
     const project = await createIsolatedProject();
     const boundaries = createProjectBoundaries(project.root);
     const selector = makeSelector('CHG-P1-20260907-211', ['src/candidate.ts'], ['candidate']);
@@ -2220,23 +2228,25 @@ describe('code-health task1 isolated git integration', () => {
     expect(await listRelativePaths(project.root, (relativePath) => relativePath.endsWith('.patch'))).toEqual([]);
     expect(await exists(path.join(project.root, 'archive'))).toBe(false);
     for (const candidate of verifiedLedger.candidates) expect(candidate.archive.state).toBe('not_archived');
-    await expectRepositoryRootUnpolluted(repoStatusBefore);
+    await expectRepositoryRootUnpolluted(repoStatusBefore, repoDiffBefore);
   });
 
   it('negative matrix worktree-clean：正向完成后临时项目与仓库根目录 status 均为空', async () => {
     const repoStatusBefore = await gitStatusPorcelain(repoRoot);
+    const repoDiffBefore = await gitDiffNames(repoRoot);
     const chain = await runRealApprovedChain();
     expect(await gitStatusPorcelain(chain.boundaries.root)).toBe('');
     expect(await gitDiffNames(chain.boundaries.root)).toEqual([]);
     expect(await gitHeadNames(chain.boundaries.root)).toEqual(['src/candidate.ts']);
     expect(chain.verifiedLedger.candidates.every((entry) => entry.archive.state === 'not_archived')).toBe(true);
     expect(await exists(path.join(chain.boundaries.root, 'archive'))).toBe(false);
-    await expectRepositoryRootUnpolluted(repoStatusBefore);
+    await expectRepositoryRootUnpolluted(repoStatusBefore, repoDiffBefore);
   });
 
   it('negative matrix command-nonzero：真实 exit 7 只记录为 blocked 失败链，不能当作 pass', async () => {
     const context = await createNegativeContext({ caseId: 'command-nonzero', targetStatus: 'under-review' });
     const repoStatusBefore = await gitStatusPorcelain(repoRoot);
+    const repoDiffBefore = await gitDiffNames(repoRoot);
     const before = structuredClone(context.ledger);
     const failing = await context.runner.run(process.execPath, ['-e', 'process.exit(7)'], {
       cwd: context.root,
@@ -2289,7 +2299,7 @@ describe('code-health task1 isolated git integration', () => {
     );
     expect(refused.code).toBe('TRANSITION_INVALID');
     expect(await exists(path.join(context.root, 'archive'))).toBe(false);
-    await expectRepositoryRootUnpolluted(repoStatusBefore);
+    await expectRepositoryRootUnpolluted(repoStatusBefore, repoDiffBefore);
   });
 
   for (const testCase of negativeCases) {
@@ -2300,6 +2310,7 @@ describe('code-health task1 isolated git integration', () => {
         ...(testCase.symlinks === true ? { symlinks: true } : {}),
       });
       const repoStatusBefore = await gitStatusPorcelain(repoRoot);
+      const repoDiffBefore = await gitDiffNames(repoRoot);
       const ledgerBefore = structuredClone(context.ledger);
       const headBefore = await gitHead(context.root);
       const statusBefore = await gitStatusPorcelain(context.root);
@@ -2345,7 +2356,7 @@ describe('code-health task1 isolated git integration', () => {
       if (testCase.id === 'utf8-invalid' || testCase.id === 'revision-commit' || testCase.id === 'revision-tree') {
         expect(await rawOutputNames(context.root)).toEqual(rawOutputsBefore);
       }
-      await expectRepositoryRootUnpolluted(repoStatusBefore);
+      await expectRepositoryRootUnpolluted(repoStatusBefore, repoDiffBefore);
     });
   }
 });
