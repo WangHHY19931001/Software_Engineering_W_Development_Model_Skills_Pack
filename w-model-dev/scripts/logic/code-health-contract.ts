@@ -217,6 +217,10 @@ export type LedgerEventKind =
   | 'rollback'
   | 'archive';
 
+/** Failure-chain event kinds that keep a blocked candidate blocked until R→V→G complete. */
+export const ROOT_CAUSE_CHAIN_EVENT_KINDS = ['root-cause', 'root-cause-review', 'root-cause-gate'] as const;
+export type RootCauseChainEventKind = (typeof ROOT_CAUSE_CHAIN_EVENT_KINDS)[number];
+
 export interface LedgerEvent {
   eventId: string;
   eventKind: LedgerEventKind;
@@ -1198,12 +1202,16 @@ export function validateLedgerEvent(value: unknown, field = 'event'): string[] {
   } else if (value.previousRevision !== undefined) {
     reasons.push(`${field}.previousRevision is only valid for implementation events`);
   }
+  const rootCauseChainKind = (ROOT_CAUSE_CHAIN_EVENT_KINDS as readonly string[]).includes(value.eventKind as string);
   if (value.eventKind === 'gate-failure' && value.to !== 'blocked')
     reasons.push(`${field}.gate-failure must target blocked`);
   if (value.eventKind === 'gate-failure' && value.gateFailureEvidence === undefined)
     reasons.push(`${field}.gate-failure requires gateFailureEvidence`);
   if (value.eventKind === 'archive' && value.to !== 'archived') reasons.push(`${field}.archive must target archived`);
-  if (value.to === 'blocked' && value.gateFailureEvidence === undefined)
+  if (rootCauseChainKind && value.to !== 'blocked')
+    reasons.push(`${field}.${String(value.eventKind)} must target blocked`);
+  if (value.eventKind === 'rework' && value.to !== 'evidenced') reasons.push(`${field}.rework must target evidenced`);
+  if (value.to === 'blocked' && !rootCauseChainKind && value.gateFailureEvidence === undefined)
     reasons.push(`${field}.blocked transition requires gateFailureEvidence`);
   if ((value.to === 'archived' || value.eventKind === 'archive') && value.archiveEvidence === undefined) {
     reasons.push(`${field}.archive transition requires archiveEvidence`);

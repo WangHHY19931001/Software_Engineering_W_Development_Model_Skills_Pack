@@ -9,16 +9,20 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
-import type {
-  CandidateSelector,
-  EvidenceBinding,
-  EvidenceVerificationContext,
-  FileVerificationContext,
-  RevisionIdentity,
+import {
+  validateCommandEvidence,
+  type CandidateSelector,
+  type EvidenceBinding,
+  type EvidenceVerificationContext,
+  type FileVerificationContext,
+  type GapRow,
+  type RevisionIdentity,
 } from '../logic/code-health-contract.js';
 import {
+  appendReworkEvent,
+  appendRootCauseEvent,
   applyApproved,
   buildStaticInventory,
   canArchiveCandidate,
@@ -30,20 +34,27 @@ import {
   executeRollback,
   findGaps,
   mergeDynamicTrace,
+  nextRequiredRoles,
   proveAbstraction,
   proveTestRemoval,
   recordGateFailure,
+  recordVerifiedGateFailure,
+  replayCandidate,
   runPhase1,
   runTddHarness,
   transitionCandidate,
+  transitionCandidateVerified,
   validateApprovalScope,
   validateCodeHealthCandidate,
   validateGapMatrix,
+  validateGapRow,
+  type ApprovalDecision,
   type CodeHealthCandidate,
   type CodeHealthLedger,
+  type CodeHealthStatus,
   type GapDiscoveryInput,
+  type GateFailureEvidence,
   type LedgerEvent,
-  type ApprovalDecision,
 } from '../logic/code-health-ledger-logic.js';
 import { createCodeHealthCommandRunner } from '../lib/code-health-command.js';
 import { createCodeHealthEvidenceStore } from '../lib/code-health-evidence-store.js';
@@ -231,13 +242,38 @@ export function validApproval(candidate: CodeHealthCandidate): ApprovalDecision 
 const execFileAsync = promisify(execFile);
 const gitRevisionProvider = createCodeHealthGitRevisionProvider();
 const fileVerifier = createCodeHealthFileVerifier();
+
+/**
+ * Canonical Git environment shared with `code-health-evidence.test.ts`: no system or user Git config and
+ * no prompt, so `git archive` source-bundle bytes are identical across machines regardless of
+ * `core.autocrlf`. Reusing the 1B recipe keeps this fixture's `revision.sourceBundleSha256` comparable.
+ */
 const GIT_ENV = {
-  ...process.env,
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
+  GIT_TERMINAL_PROMPT: '0',
   GIT_AUTHOR_NAME: 'code-health-ledger',
   GIT_AUTHOR_EMAIL: 'code-health-ledger@example.test',
   GIT_COMMITTER_NAME: 'code-health-ledger',
   GIT_COMMITTER_EMAIL: 'code-health-ledger@example.test',
-};
+  PATH: process.env.PATH,
+  PATHEXT: process.env.PATHEXT,
+  SYSTEMROOT: process.env.SYSTEMROOT,
+  SYSTEMDRIVE: process.env.SYSTEMDRIVE,
+  WINDIR: process.env.WINDIR,
+  COMSPEC: process.env.COMSPEC,
+  TEMP: process.env.TEMP,
+  TMP: process.env.TMP,
+  USERPROFILE: process.env.USERPROFILE,
+} as NodeJS.ProcessEnv;
+
+const createdTestRoots: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(
+    createdTestRoots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true, maxRetries: 3 })),
+  );
+});
 
 export function sha256Hex(bytes: Buffer | string): string {
   return createHash('sha256').update(bytes).digest('hex');
@@ -251,12 +287,18 @@ async function git(root: string, args: string[]): Promise<string> {
 /** Real isolated Git repository used by the 1B authenticity assertions. */
 async function createTempGitRepository(): Promise<string> {
   const root = await fs.mkdtemp(path.join(tmpdir(), 'code-health-ledger-1b-'));
+  createdTestRoots.push(root);
   await git(root, ['init', '--quiet']);
   await fs.mkdir(path.join(root, 'src'), { recursive: true });
   await fs.writeFile(path.join(root, 'src', 'unused.ts'), 'export const unusedFunction = 1;\n');
   await git(root, ['add', '--all']);
   await git(root, ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'initial']);
   return root;
+}
+
+/** Real worktree status of an isolated repository, used to prove `applyApproved` writes nothing. */
+async function gitStatus(root: string): Promise<string> {
+  return git(root, ['status', '--porcelain', '--untracked-files=all']);
 }
 
 async function repositoryRevision(root: string): Promise<RevisionIdentity> {
@@ -305,6 +347,211 @@ async function createRepositoryRunner(rawOutputDir: string, extra: { now?: () =>
     evidenceStore,
     revision,
     binding: (candidateId: string) => commandBinding(candidateId, revision),
+  };
+}
+
+const firstId = 'CHG-P1-20260907-101';
+const secondId = 'CHG-P1-20260907-102';
+const scopeHash = 'sha256:' + 'e'.repeat(64);
+
+/** Two-candidate ledger: only the addressed candidate may ever be touched. */
+function ledgerWithTwoCandidates(firstStatus: CodeHealthStatus = 'discovered'): CodeHealthLedger {
+  const first = validCandidate(firstId, { status: firstStatus });
+  const second = validCandidate(secondId, { status: 'discovered' });
+  const ledger = validLedger(first);
+  ledger.candidates = [first, second];
+  return ledger;
+}
+
+function eventKindFor(to: CodeHealthStatus): LedgerEvent['eventKind'] {
+  if (to === 'blocked') return 'gate-failure';
+  if (to === 'evidenced') return 'evidence';
+  if (to === 'under-review') return 'review';
+  if (to === 'approved') return 'approval';
+  if (to === 'implemented') return 'implementation';
+  if (to === 'verified') return 'verification';
+  if (to === 'archived') return 'archive';
+  if (to === 'rejected' || to === 'deferred') return 'review';
+  if (to === 'rolled-back') return 'rollback';
+  return 'discovery';
+}
+
+function candidateEvent(
+  candidateId: string,
+  from: CodeHealthStatus | null,
+  to: CodeHealthStatus,
+  overrides: Partial<LedgerEvent> = {},
+): LedgerEvent {
+  const at = overrides.at ?? '2026-09-07T00:02:00.000Z';
+  return {
+    eventId: `EV-${candidateId}-${String(from)}-${to}-${at}`,
+    eventKind: eventKindFor(to),
+    candidateId,
+    from,
+    to,
+    actorRole: 'A',
+    at,
+    revision,
+    scopeHash,
+    evidenceRefs: ['evidence/one.json'],
+    signatureRef: 'evidence/signature-a.json',
+    ...overrides,
+  };
+}
+
+function evidencedEvent(candidateId: string): LedgerEvent {
+  return candidateEvent(candidateId, 'discovered', 'evidenced', { actorRole: 'A' });
+}
+
+function reviewEvent(candidateId: string, at = '2026-09-07T00:05:00.000Z'): LedgerEvent {
+  return candidateEvent(candidateId, 'evidenced', 'under-review', { actorRole: 'V', at });
+}
+
+function eventWithRole(to: CodeHealthStatus, actorRole: LedgerEvent['actorRole']): LedgerEvent {
+  return candidateEvent(firstId, 'under-review', to, { actorRole, at: '2026-09-07T00:10:00.000Z' });
+}
+
+function eventFor(candidateId: string): LedgerEvent {
+  return candidateEvent(candidateId, 'under-review', 'approved', {
+    actorRole: 'human',
+    at: '2026-09-07T00:11:00.000Z',
+  });
+}
+
+function eventWithOlderTimestamp(): LedgerEvent {
+  return candidateEvent(firstId, 'under-review', 'approved', { actorRole: 'human', at: '2026-09-07T00:01:00.000Z' });
+}
+
+/**
+ * 1C gate-failure fixture: a real raw output on disk, verified through the 1B EvidenceStore against the
+ * candidate/scope/revision binding before the reducer is allowed to consume the structural evidence.
+ */
+async function realGateFailureFixture(): Promise<{
+  ledger: CodeHealthLedger;
+  realGateFailureEvidence: GateFailureEvidence;
+  revision: RevisionIdentity;
+}> {
+  const root = await createTempGitRepository();
+  const candidateRevision = await repositoryRevision(root);
+  const rawBytes = Buffer.from('gate failure raw output\n');
+  await fs.mkdir(path.join(root, 'evidence'), { recursive: true });
+  await fs.writeFile(path.join(root, 'evidence', 'gate-failure.log'), rawBytes);
+  const rawOutputSha256 = sha256Hex(rawBytes);
+  const evidenceStore = createCodeHealthEvidenceStore({ repositoryRoot: root, rawOutputRoot: 'evidence' });
+  const realGateFailureEvidence: GateFailureEvidence = {
+    command: JSON.stringify({ command: 'node', args: ['--version'] }),
+    cwd: '.',
+    environment: { NODE_ENV: 'test' },
+    platform: process.platform,
+    toolVersions: { node: process.version },
+    startedAt: '2026-09-07T00:02:00.000Z',
+    endedAt: '2026-09-07T00:02:05.000Z',
+    exitCode: 7,
+    observation: 'observed',
+    rawOutputPath: 'evidence/gate-failure.log',
+    rawOutputSha256,
+    candidateId: firstId,
+    scopeHash,
+    failureKind: 'gate',
+  };
+  const binding: EvidenceBinding = {
+    candidate: {
+      candidateId: firstId,
+      phase: 'P1',
+      action: 'delete-code',
+      files: ['src/unused.ts'],
+      symbols: ['unusedFunction'],
+      scopeHash,
+    },
+    revision: candidateRevision,
+    rawOutputPath: 'evidence/gate-failure.log',
+    rawOutputSha256,
+  };
+  await evidenceStore.verify(
+    {
+      evidenceId: 'EVD-GATE-FAIL-REAL-001',
+      candidateId: firstId,
+      scopeHash,
+      relativePath: 'evidence/gate-failure.log',
+      sha256: rawOutputSha256,
+      revision: candidateRevision,
+      observation: 'observed',
+    },
+    binding,
+  );
+  const template = validCandidate(firstId, { status: 'discovered' });
+  const candidate = validCandidate(firstId, {
+    status: 'discovered',
+    revision: candidateRevision,
+    evidenceBinding: { ...template.evidenceBinding, revision: candidateRevision },
+  });
+  const ledger = validLedger(candidate);
+  ledger.baseline = candidateRevision;
+  return { ledger, realGateFailureEvidence, revision: candidateRevision };
+}
+
+function rootCauseChainEvent(
+  eventKind: 'root-cause' | 'root-cause-review' | 'root-cause-gate',
+  actorRole: 'R' | 'V' | 'G',
+  candidateRevision: RevisionIdentity,
+  at: string,
+): LedgerEvent {
+  return {
+    eventId: `EV-${firstId}-${eventKind}`,
+    eventKind,
+    candidateId: firstId,
+    from: 'blocked',
+    to: 'blocked',
+    actorRole,
+    at,
+    revision: candidateRevision,
+    scopeHash,
+    evidenceRefs: [`evidence/${eventKind}.json`],
+    signatureRef: `evidence/signature-${actorRole.toLowerCase()}.json`,
+  };
+}
+
+function reworkEvent(candidateRevision: RevisionIdentity, at: string): LedgerEvent {
+  return {
+    eventId: `EV-${firstId}-rework`,
+    eventKind: 'rework',
+    candidateId: firstId,
+    from: 'blocked',
+    to: 'evidenced',
+    actorRole: 'S',
+    at,
+    revision: candidateRevision,
+    scopeHash,
+    evidenceRefs: ['evidence/rework.json'],
+    signatureRef: 'evidence/signature-s.json',
+  };
+}
+
+function validGapRow(candidateId: string): GapRow {
+  return {
+    gapId: `GAP-${candidateId}-001`,
+    candidateId,
+    kind: 'security',
+    testLevels: ['unit'],
+    existingTestIds: [],
+    missingScenario: 'invalid token is rejected without exposing secret material',
+    evidenceSources: ['evidence/gap.json'],
+    risk: {
+      severity: 'high',
+      behavior: 'medium',
+      security: 'high',
+      concurrency: 'none',
+      platform: 'low',
+      lifecycle: 'low',
+      governance: 'medium',
+      rationale: 'An untested rejection path can expose an authorization boundary.',
+    },
+    priority: 'high',
+    owner: 'S-agent',
+    rtmIds: ['REQ-SEC-001'],
+    coverageSignal: { statements: 0.9, branches: 0.5, functions: 0.8, lines: 0.9 },
+    coverageIsSignalOnly: true,
+    status: 'discovered',
   };
 }
 
@@ -821,7 +1068,15 @@ describe('code-health ledger contract', () => {
 
   it('uses structured gate-failure evidence and does not infer evidence from reference names', () => {
     const candidate = validCandidate('CHG-P1-20260907-011');
-    const evidence = { ...candidate.commands[0]!, rawOutputPath: 'evidence/actual-output.json', exitCode: 3 };
+    const evidence: GateFailureEvidence = {
+      ...candidate.commands[0]!,
+      rawOutputPath: 'evidence/actual-output.json',
+      exitCode: 3,
+      observation: 'observed',
+      candidateId: candidate.candidateId,
+      scopeHash: candidate.changeScope.scopeHash,
+      failureKind: 'gate',
+    };
     const next = recordGateFailure(validLedger(candidate), candidate.candidateId, evidence);
     expect(next.candidates[0]?.status).toBe('blocked');
     expect(next.events[0]?.gateFailureEvidence).toMatchObject({
@@ -845,6 +1100,9 @@ describe('code-health ledger contract', () => {
         ...candidate.commands[0]!,
         exitCode: 0,
         observation: 'observed',
+        candidateId: 'CHG-P1-20260907-014',
+        scopeHash: candidate.changeScope.scopeHash,
+        failureKind: 'gate',
       }),
     ).toThrow(/failure|non-zero|exit/i);
   });
@@ -874,10 +1132,9 @@ describe('code-health ledger contract', () => {
   it('exports every planned cross-task API with fail-closed behavior instead of false success', async () => {
     const candidate = validCandidate('CHG-P1-20260907-016', { status: 'under-review' });
     const expectedLedger = validLedger(candidate);
-    void expectedLedger;
     const expectedErrors = /not implemented|fail.closed|requires/i;
     expect(() => findGaps({} as GapDiscoveryInput)).toThrow(expectedErrors);
-    expect(() => validateGapMatrix({})).not.toEqual([]);
+    expect(validateGapMatrix({}, expectedLedger)).not.toEqual([]);
     expect(() => buildStaticInventory({ files: [], sourceText: new Map(), revision })).toThrow(expectedErrors);
     expect(() => mergeDynamicTrace({} as never, {} as never)).toThrow(expectedErrors);
     expect(() => checkFalsePositiveGuards({} as never, {} as never)).toThrow(expectedErrors);
@@ -889,6 +1146,7 @@ describe('code-health ledger contract', () => {
     await expect(runTddHarness({ gap: {} as never, testCommand: [], implementation: null })).rejects.toThrow(
       expectedErrors,
     );
+    // Valid, exactly-scoped human approval resolves to a typed Task 1 non-implementation; nothing is applied.
     await expect(
       applyApproved({
         approval: validApproval(candidate),
@@ -897,7 +1155,14 @@ describe('code-health ledger contract', () => {
         repositoryRoot: '.',
         currentRevision: revision,
       }),
-    ).rejects.toThrow(expectedErrors);
+    ).resolves.toEqual({
+      applied: false,
+      errorCode: 'NOT_IMPLEMENTED',
+      patchPath: null,
+      appliedFiles: [],
+      unrelatedFiles: [],
+      rollback: null,
+    });
     await expect(executeRollback(candidate.rollback)).resolves.toBe(false);
     expect(evaluateDeletion({ testCount: 1, coverageProvenance: '', governanceFacts: [] }).passed).toBe(false);
   });
@@ -970,7 +1235,7 @@ describe('code-health ledger contract', () => {
         expectedSha256: rawOutputSha256,
       }),
     ).resolves.toMatchObject({ ok: true, code: null });
-    const rolledBack = await transitionCandidate(
+    const rolledBack = await transitionCandidateVerified(
       validLedger(candidate),
       candidate.candidateId,
       rollbackEventWith(rollbackEvidence),
@@ -994,7 +1259,7 @@ describe('code-health ledger contract', () => {
     const tamperedLedger = validLedger(tamperedCandidate);
     const tamperedBefore = structuredClone(tamperedLedger);
     await expect(
-      transitionCandidate(
+      transitionCandidateVerified(
         tamperedLedger,
         candidate.candidateId,
         rollbackEventWith({ ...rollbackEvidence, patchSha256: 'a'.repeat(64) }),
@@ -1009,7 +1274,13 @@ describe('code-health ledger contract', () => {
       command: { ...rollbackEvidence.command, rawOutputPath: 'evidence/missing-rollback.log' },
     };
     await expect(
-      transitionCandidate(ledger, candidate.candidateId, rollbackEventWith(missingRawOutput), undefined, context),
+      transitionCandidateVerified(
+        ledger,
+        candidate.candidateId,
+        rollbackEventWith(missingRawOutput),
+        undefined,
+        context,
+      ),
     ).rejects.toMatchObject({ code: 'EVIDENCE_INVALID' });
     expect(ledger).toEqual(before);
 
@@ -1023,7 +1294,7 @@ describe('code-health ledger contract', () => {
       rollback: { ...candidate.rollback, patchPath: 'evidence/rollback-link.patch' },
     });
     await expect(
-      transitionCandidate(
+      transitionCandidateVerified(
         validLedger(symlinkCandidate),
         symlinkCandidate.candidateId,
         rollbackEventWith({ ...rollbackEvidence, patchPath: 'evidence/rollback-link.patch' }),
@@ -1073,7 +1344,7 @@ describe('code-health ledger contract', () => {
         rawOutputSha256,
       },
     };
-    const recorded = await recordGateFailure(
+    const recorded = await recordVerifiedGateFailure(
       validLedger(realCandidate),
       realCandidate.candidateId,
       { ...realCandidate.commands[0]!, exitCode: 7, observation: 'observed' },
@@ -1103,7 +1374,7 @@ describe('code-health ledger contract', () => {
       },
     };
     await expect(
-      recordGateFailure(
+      recordVerifiedGateFailure(
         ledger,
         missingCandidate.candidateId,
         {
@@ -1116,7 +1387,7 @@ describe('code-health ledger contract', () => {
       ),
     ).rejects.toMatchObject({ code: 'EVIDENCE_INVALID' });
     await expect(
-      recordGateFailure(
+      recordVerifiedGateFailure(
         ledger,
         missingCandidate.candidateId,
         {
@@ -1133,26 +1404,29 @@ describe('code-health ledger contract', () => {
 
   it('gap validator rejects invalid identity, priority, status, risk, and coverage signal', () => {
     expect(
-      validateGapMatrix({
-        rows: [
-          {
-            gapId: 'GAP-1',
-            candidateId: 'CHG-P0-00000000-000',
-            kind: 'security',
-            testLevels: ['unit'],
-            existingTestIds: [],
-            missingScenario: 'auth bypass',
-            evidenceSources: ['evidence/gap.json'],
-            risk: null,
-            priority: 'urgent',
-            owner: 'S-agent',
-            rtmIds: ['REQ-1'],
-            coverageSignal: null,
-            coverageIsSignalOnly: true,
-            status: 'bogus',
-          },
-        ],
-      }),
+      validateGapMatrix(
+        {
+          rows: [
+            {
+              gapId: 'GAP-1',
+              candidateId: 'CHG-P0-00000000-000',
+              kind: 'security',
+              testLevels: ['unit'],
+              existingTestIds: [],
+              missingScenario: 'auth bypass',
+              evidenceSources: ['evidence/gap.json'],
+              risk: null,
+              priority: 'urgent',
+              owner: 'S-agent',
+              rtmIds: ['REQ-1'],
+              coverageSignal: null,
+              coverageIsSignalOnly: true,
+              status: 'bogus',
+            },
+          ],
+        },
+        validLedger(validCandidate('CHG-P1-20260907-001', { status: 'under-review' })),
+      ),
     ).toEqual(expect.arrayContaining([expect.stringMatching(/candidateId|priority|status|risk|coverage/i)]));
   });
 
@@ -1207,5 +1481,353 @@ describe('code-health ledger contract', () => {
         code: 'NOT_IMPLEMENTED',
       }),
     );
+  });
+});
+
+describe('code-health candidate lifecycle reducer (1C)', () => {
+  it('reducer 只更新目标 candidate，events append-only 且可重放', () => {
+    const ledger = ledgerWithTwoCandidates();
+    const next = transitionCandidate(ledger, firstId, evidencedEvent(firstId));
+    expect(next.candidates.find((c) => c.candidateId === secondId)?.status).toBe('discovered');
+    expect(next.events).toHaveLength(1);
+    expect(replayCandidate(next, firstId).status).toBe('evidenced');
+    expect(() =>
+      transitionCandidate(next, firstId, { ...evidencedEvent(firstId), eventId: next.events[0]!.eventId }),
+    ).toThrowError(expect.objectContaining({ code: 'STRUCTURE_INVALID' }));
+    // Append-only: the previous ledger is never mutated, never rewritten, and never trimmed.
+    expect(ledger.events).toHaveLength(0);
+    expect(ledger.candidates[0]?.status).toBe('discovered');
+    expect(next).not.toBe(ledger);
+  });
+
+  it('状态、角色、candidate identity、revision、scope 和事件时间不匹配均拒绝且 ledger 深相等不变', () => {
+    const ledger = ledgerWithTwoCandidates('under-review');
+    ledger.events = [reviewEvent(firstId)];
+    const before = structuredClone(ledger);
+    expect(() => transitionCandidate(ledger, firstId, eventWithRole('approved', 'A'))).toThrow(/human|role/i);
+    expect(() => transitionCandidate(ledger, secondId, eventFor(firstId))).toThrow(/candidate|scope/i);
+    expect(() =>
+      transitionCandidate(ledger, firstId, { ...evidencedEvent(firstId), scopeHash: 'sha256:' + 'f'.repeat(64) }),
+    ).toThrow(/scope/i);
+    expect(() =>
+      transitionCandidate(ledger, firstId, {
+        ...evidencedEvent(firstId),
+        revision: { ...revision, commitSha: 'b'.repeat(40) },
+      }),
+    ).toThrow(/revision/i);
+    expect(() => transitionCandidate(ledger, firstId, eventWithOlderTimestamp())).toThrow(/timestamp|monotonic/i);
+    expect(ledger).toEqual(before);
+  });
+
+  it('gate failure 必须是已验证 observed non-zero evidence，并把 nextRequiredRoles 固定为 R→V→G→S', async () => {
+    const { ledger, realGateFailureEvidence } = await realGateFailureFixture();
+    const blocked = recordGateFailure(ledger, firstId, realGateFailureEvidence);
+    expect(blocked.candidates.find((c) => c.candidateId === firstId)?.status).toBe('blocked');
+    expect(nextRequiredRoles(blocked, firstId)).toEqual(['R', 'V', 'G', 'S']);
+    expect(() => recordGateFailure(ledger, firstId, { ...realGateFailureEvidence, exitCode: 0 })).toThrowError(
+      expect.objectContaining({ code: 'EVIDENCE_INVALID' }),
+    );
+    expect(() =>
+      recordGateFailure(ledger, firstId, { ...realGateFailureEvidence, observation: 'not_run', exitCode: null }),
+    ).toThrowError(expect.objectContaining({ code: 'EVIDENCE_INVALID' }));
+    // A refused gate-failure call is atomic: the previous ledger keeps its status and history.
+    expect(ledger.candidates[0]?.status).toBe('discovered');
+    expect(ledger.events).toEqual([]);
+  });
+
+  it('没有完整 R→V→G 就不能由 S 返工，成功事件不能覆盖 blocked', async () => {
+    const { ledger, realGateFailureEvidence, revision: candidateRevision } = await realGateFailureFixture();
+    const blocked = recordGateFailure(ledger, firstId, realGateFailureEvidence);
+    const validRootCauseEvent = rootCauseChainEvent('root-cause', 'R', candidateRevision, '2026-09-07T00:03:00.000Z');
+    const sReworkEvent = reworkEvent(candidateRevision, '2026-09-07T00:04:00.000Z');
+    expect(() => appendReworkEvent(blocked, firstId, sReworkEvent)).toThrow(/R|root|review|gate/i);
+    const afterR = appendRootCauseEvent(blocked, firstId, validRootCauseEvent);
+    expect(nextRequiredRoles(afterR, firstId)).toEqual(['V', 'G', 'S']);
+    expect(() => appendReworkEvent(afterR, firstId, sReworkEvent)).toThrow(/V|G/i);
+    expect(() =>
+      transitionCandidate(
+        blocked,
+        firstId,
+        candidateEvent(firstId, 'blocked', 'approved', {
+          actorRole: 'human',
+          at: '2026-09-07T00:04:00.000Z',
+          revision: candidateRevision,
+        }),
+      ),
+    ).toThrow(/blocked|transition|allow/i);
+    expect(afterR.candidates.find((c) => c.candidateId === firstId)?.status).toBe('blocked');
+  });
+
+  it('GapRow 严格拒绝未知枚举、缺 risk、错误 candidate、空 evidence、coverage 非 signal-only 和未知字段', () => {
+    const ledger = ledgerWithTwoCandidates('under-review');
+    const validGap = validGapRow(firstId);
+    const errors = validateGapMatrix(
+      {
+        rows: [
+          {
+            ...validGap,
+            kind: 'bogus',
+            priority: 'urgent',
+            status: 'verified',
+            unknown: true,
+            risk: null,
+            coverageIsSignalOnly: false,
+          },
+        ],
+      },
+      ledger,
+    );
+    expect(errors).toEqual(
+      expect.arrayContaining([expect.stringMatching(/kind|priority|status|risk|coverage|unknown|candidate/i)]),
+    );
+    expect(validateGapMatrix({ rows: [validGap, validGap] }, ledger)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/duplicate|gapId/i)]),
+    );
+    expect(validateGapMatrix({ rows: [{ ...validGap, evidenceSources: [] }] }, ledger)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/evidence/i)]),
+    );
+    expect(validateGapMatrix({ rows: [{ ...validGap, candidateId: 'CHG-P1-20260907-999' }] }, ledger)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/candidate/i)]),
+    );
+    expect(validateGapMatrix({ rows: [validGap] }, ledger)).toEqual([]);
+  });
+
+  it('approval 只能匹配 human exact scope/revision，applyApproved 返回 NOT_IMPLEMENTED 且不写工作树', async () => {
+    const tempRoot = await createTempGitRepository();
+    const candidate = validCandidate(firstId, { status: 'under-review' });
+    const approval = validApproval(candidate);
+    const headBefore = await git(tempRoot, ['rev-parse', 'HEAD']);
+    const before = await gitStatus(tempRoot);
+    const result = await applyApproved({
+      candidate,
+      approval,
+      mode: 'dry-run',
+      repositoryRoot: tempRoot,
+      currentRevision: candidate.revision,
+    });
+    expect(result).toMatchObject({ applied: false, errorCode: 'NOT_IMPLEMENTED', patchPath: null });
+    expect(result).toEqual({
+      applied: false,
+      errorCode: 'NOT_IMPLEMENTED',
+      patchPath: null,
+      appliedFiles: [],
+      unrelatedFiles: [],
+      rollback: null,
+    });
+    expect(await gitStatus(tempRoot)).toEqual(before);
+    await expect(
+      applyApproved({
+        candidate,
+        approval: { ...approval, actor: 'S-agent' },
+        mode: 'patch',
+        repositoryRoot: tempRoot,
+        currentRevision: candidate.revision,
+      }),
+    ).rejects.toMatchObject({ code: 'EVIDENCE_INVALID' });
+    await expect(
+      applyApproved({
+        candidate,
+        approval: { ...approval, approvedFiles: ['src/outside.ts'] },
+        mode: 'commit',
+        repositoryRoot: tempRoot,
+        currentRevision: candidate.revision,
+      }),
+    ).rejects.toMatchObject({ code: 'SCOPE_MISMATCH' });
+    expect(await gitStatus(tempRoot)).toEqual(before);
+    expect(await git(tempRoot, ['rev-parse', 'HEAD'])).toBe(headBefore);
+  });
+
+  it('角色约束只允许 A/S evidence、V review、human approval、S implementation、V/G verification，R/O 不得代签', () => {
+    const underReview = ledgerWithTwoCandidates('under-review');
+    for (const role of ['R', 'O', 'V', 'S', 'A'] as const) {
+      expect(() => transitionCandidate(underReview, firstId, eventWithRole('approved', role))).toThrowError(
+        expect.objectContaining({ code: 'ROLE_FORBIDDEN' }),
+      );
+    }
+    const approved = ledgerWithTwoCandidates('approved');
+    expect(() =>
+      transitionCandidate(
+        approved,
+        firstId,
+        candidateEvent(firstId, 'approved', 'implemented', {
+          eventKind: 'implementation',
+          actorRole: 'V',
+          previousRevision: revision,
+          at: '2026-09-07T00:06:00.000Z',
+        }),
+      ),
+    ).toThrowError(expect.objectContaining({ code: 'ROLE_FORBIDDEN' }));
+    const implemented = transitionCandidate(
+      approved,
+      firstId,
+      candidateEvent(firstId, 'approved', 'implemented', {
+        eventKind: 'implementation',
+        actorRole: 'S',
+        previousRevision: revision,
+        at: '2026-09-07T00:06:00.000Z',
+      }),
+    );
+    expect(implemented.candidates.find((c) => c.candidateId === firstId)?.status).toBe('implemented');
+    expect(() =>
+      transitionCandidate(
+        implemented,
+        firstId,
+        candidateEvent(firstId, 'implemented', 'verified', {
+          eventKind: 'verification',
+          actorRole: 'S',
+          at: '2026-09-07T00:07:00.000Z',
+        }),
+      ),
+    ).toThrowError(expect.objectContaining({ code: 'ROLE_FORBIDDEN' }));
+    const verified = transitionCandidate(
+      implemented,
+      firstId,
+      candidateEvent(firstId, 'implemented', 'verified', {
+        eventKind: 'verification',
+        actorRole: 'V',
+        at: '2026-09-07T00:07:00.000Z',
+      }),
+    );
+    expect(verified.candidates.find((c) => c.candidateId === firstId)?.status).toBe('verified');
+  });
+
+  it('replayCandidate 对嵌入状态不一致、事件重排和重复 eventId fail-closed', () => {
+    const next = transitionCandidate(ledgerWithTwoCandidates(), firstId, evidencedEvent(firstId));
+    const tampered = structuredClone(next);
+    tampered.candidates[0]!.status = 'verified';
+    expect(() => replayCandidate(tampered, firstId)).toThrowError(
+      expect.objectContaining({ code: 'STRUCTURE_INVALID' }),
+    );
+
+    const second = transitionCandidate(next, firstId, reviewEvent(firstId));
+    const reordered = structuredClone(second);
+    reordered.events = [reordered.events[1]!, reordered.events[0]!];
+    expect(() => replayCandidate(reordered, firstId)).toThrowError(
+      expect.objectContaining({ code: 'STRUCTURE_INVALID' }),
+    );
+
+    const duplicated = structuredClone(next);
+    duplicated.events = [duplicated.events[0]!, structuredClone(duplicated.events[0]!)];
+    expect(() => replayCandidate(duplicated, firstId)).toThrowError(
+      expect.objectContaining({ code: 'STRUCTURE_INVALID' }),
+    );
+    expect(second.events).toHaveLength(2);
+    expect(replayCandidate(second, firstId).status).toBe('under-review');
+  });
+
+  it('root-cause 链必须按 R→V→G 顺序推进，完成前 S 不得 rework', async () => {
+    const { ledger, realGateFailureEvidence, revision: candidateRevision } = await realGateFailureFixture();
+    const blocked = recordGateFailure(ledger, firstId, realGateFailureEvidence);
+    const validRootCauseEvent = rootCauseChainEvent('root-cause', 'R', candidateRevision, '2026-09-07T00:03:00.000Z');
+    const rootCauseReview = rootCauseChainEvent(
+      'root-cause-review',
+      'V',
+      candidateRevision,
+      '2026-09-07T00:03:30.000Z',
+    );
+    const rootCauseGate = rootCauseChainEvent('root-cause-gate', 'G', candidateRevision, '2026-09-07T00:03:45.000Z');
+    expect(() => appendRootCauseEvent(blocked, firstId, rootCauseReview)).toThrow(/R|order|required/i);
+    expect(() => appendRootCauseEvent(blocked, firstId, { ...validRootCauseEvent, actorRole: 'V' })).toThrowError(
+      expect.objectContaining({ code: 'ROLE_FORBIDDEN' }),
+    );
+    expect(() =>
+      appendRootCauseEvent(blocked, firstId, reworkEvent(candidateRevision, '2026-09-07T00:03:10.000Z')),
+    ).toThrow(/root-cause/i);
+    const afterR = appendRootCauseEvent(blocked, firstId, validRootCauseEvent);
+    const afterV = appendRootCauseEvent(afterR, firstId, rootCauseReview);
+    expect(nextRequiredRoles(afterV, firstId)).toEqual(['G', 'S']);
+    const afterG = appendRootCauseEvent(afterV, firstId, rootCauseGate);
+    expect(nextRequiredRoles(afterG, firstId)).toEqual(['S']);
+    const reworked = appendReworkEvent(afterG, firstId, reworkEvent(candidateRevision, '2026-09-07T00:04:00.000Z'));
+    expect(reworked.candidates.find((c) => c.candidateId === firstId)?.status).toBe('evidenced');
+    expect(nextRequiredRoles(reworked, firstId)).toEqual([]);
+    expect(replayCandidate(reworked, firstId).status).toBe('evidenced');
+    // R never fixes and never signs for S.
+    expect(() =>
+      appendReworkEvent(afterG, firstId, {
+        ...reworkEvent(candidateRevision, '2026-09-07T00:04:00.000Z'),
+        actorRole: 'R',
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'ROLE_FORBIDDEN' }));
+  });
+
+  it('GapRow 拒绝未知嵌套字段、空 RTM、未绑定 revision 和越权 status', () => {
+    const ledger = ledgerWithTwoCandidates('discovered');
+    const validGap = validGapRow(firstId);
+    expect(validateGapRow(validGap, ledger, new Set())).toEqual([]);
+    expect(validateGapRow({ ...validGap, risk: { ...validGap.risk, unknownNested: true } }, ledger, new Set())).toEqual(
+      expect.arrayContaining([expect.stringMatching(/risk|unknown/i)]),
+    );
+    expect(validateGapRow({ ...validGap, rtmIds: [] }, ledger, new Set())).toEqual(
+      expect.arrayContaining([expect.stringMatching(/rtm/i)]),
+    );
+    expect(validateGapRow({ ...validGap, testLevels: [] }, ledger, new Set())).toEqual(
+      expect.arrayContaining([expect.stringMatching(/testLevels/i)]),
+    );
+    expect(validateGapRow({ ...validGap, coverageIsSignalOnly: false }, ledger, new Set())).toEqual(
+      expect.arrayContaining([expect.stringMatching(/coverage/i)]),
+    );
+    expect(validateGapRow({ ...validGap, status: 'verified' }, ledger, new Set())).toEqual(
+      expect.arrayContaining([expect.stringMatching(/status|candidate/i)]),
+    );
+    const staleLedger = ledgerWithTwoCandidates('discovered');
+    staleLedger.baseline = { ...revision, commitSha: 'b'.repeat(40) };
+    expect(validateGapRow(validGap, staleLedger, new Set())).toEqual(
+      expect.arrayContaining([expect.stringMatching(/revision/i)]),
+    );
+    expect(validateGapRow(validGap, ledger, new Set([validGap.gapId]))).toEqual(
+      expect.arrayContaining([expect.stringMatching(/duplicate|gapId/i)]),
+    );
+  });
+
+  it('approval 拒绝 V/S/G/O actor、stale revision、空 signatureRef 与扩大 symbols 的 scope', async () => {
+    const candidate = validCandidate(firstId, { status: 'under-review' });
+    const approval = validApproval(candidate);
+    for (const actor of ['V-agent', 'S-agent', 'G-agent', 'O-agent', 'automation-bot']) {
+      expect(validateApprovalScope(candidate, { ...approval, actor })).toEqual(
+        expect.arrayContaining([expect.stringMatching(/human|actor/i)]),
+      );
+    }
+    expect(
+      validateApprovalScope(candidate, { ...approval, revision: { ...revision, treeSha: 'c'.repeat(40) } }),
+    ).toEqual(expect.arrayContaining([expect.stringMatching(/revision/i)]));
+    expect(validateApprovalScope(candidate, { ...approval, signatureRef: '' })).toEqual(
+      expect.arrayContaining([expect.stringMatching(/signature/i)]),
+    );
+    expect(
+      validateApprovalScope(candidate, { ...approval, approvedSymbols: [...approval.approvedSymbols, 'extra'] }),
+    ).toEqual(expect.arrayContaining([expect.stringMatching(/scope|symbols/i)]));
+    await expect(
+      applyApproved({
+        candidate,
+        approval: { ...approval, revision: { ...revision, commitSha: 'b'.repeat(40) } },
+        mode: 'dry-run',
+        repositoryRoot: '.',
+        currentRevision: revision,
+      }),
+    ).rejects.toMatchObject({ code: 'REVISION_MISMATCH' });
+  });
+
+  it('gate failure evidence 接受 argv JSON 命令，但拒绝携带 shell 控制符的实参（M6 裁定）', () => {
+    const candidate = validCandidate(firstId, { status: 'discovered' });
+    const reasons: string[] = [];
+    const argvJson = {
+      ...candidate.commands[0]!,
+      command: JSON.stringify({ command: 'node', args: ['--version'] }),
+    };
+    expect(validateCommandEvidence(argvJson, 'commands[0]', reasons)).toBe(true);
+    expect(reasons).toEqual([]);
+    const unsafe = { ...argvJson, command: JSON.stringify({ command: 'node', args: ['a && rm -rf b'] }) };
+    expect(validateCommandEvidence(unsafe, 'commands[0]', [])).toBe(false);
+    expect(() =>
+      recordGateFailure(ledgerWithTwoCandidates(), firstId, {
+        ...unsafe,
+        exitCode: 7,
+        observation: 'observed',
+        candidateId: firstId,
+        scopeHash,
+        failureKind: 'gate',
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'EVIDENCE_INVALID' }));
   });
 });

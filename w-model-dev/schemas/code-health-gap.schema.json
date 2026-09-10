@@ -22,7 +22,12 @@
     "status"
   ],
   "properties": {
-    "gapId": { "description": "Stable never-reused gap identifier.", "type": "string", "minLength": 1 },
+    "gapId": {
+      "description": "Stable never-reused gap identifier with a GAP- prefix.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^GAP-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
     "candidateId": {
       "description": "Candidate identifier owning this gap.",
       "type": "string",

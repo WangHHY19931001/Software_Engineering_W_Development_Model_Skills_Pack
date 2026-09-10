@@ -439,8 +439,17 @@
       }
     },
     {
-      "description": "A blocked transition requires structured gate failure evidence.",
-      "if": { "properties": { "to": { "const": "blocked" } }, "required": ["to"] },
+      "description": "A blocked transition requires structured gate failure evidence unless it is a root-cause chain event that keeps the candidate blocked.",
+      "if": {
+        "description": "Blocked target that is not a root-cause chain event.",
+        "properties": { "to": { "const": "blocked" } },
+        "required": ["to"],
+        "not": {
+          "description": "Root-cause chain event kinds that stay blocked without a new gate failure.",
+          "properties": { "eventKind": { "enum": ["root-cause", "root-cause-review", "root-cause-gate"] } },
+          "required": ["eventKind"]
+        }
+      },
       "then": {
         "type": "object",
         "properties": {
@@ -450,6 +459,34 @@
           }
         },
         "required": ["gateFailureEvidence"]
+      }
+    },
+    {
+      "description": "A root-cause chain event must keep the candidate blocked.",
+      "if": {
+        "description": "One of the three root-cause chain event kinds.",
+        "properties": { "eventKind": { "enum": ["root-cause", "root-cause-review", "root-cause-gate"] } },
+        "required": ["eventKind"]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "to": { "description": "Root-cause chain events target the blocked state.", "const": "blocked" }
+        }
+      }
+    },
+    {
+      "description": "A rework event must return the candidate to the evidenced state.",
+      "if": {
+        "description": "Rework event kind.",
+        "properties": { "eventKind": { "const": "rework" } },
+        "required": ["eventKind"]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "to": { "description": "Rework targets the evidenced state.", "const": "evidenced" }
+        }
       }
     },
     {

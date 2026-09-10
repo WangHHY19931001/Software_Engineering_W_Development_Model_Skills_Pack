@@ -510,6 +510,43 @@ describe('JSON Schema 前置校验（validateBySchema）', () => {
     ).toBe(false);
   });
 
+  it('code-health chain-event、gap identity 与 human actor schema parity', async () => {
+    const valid = (await loadJson(codeHealthSamplesDir, 'valid-ledger-event.json')) as Record<string, unknown>;
+    const rootCause = {
+      ...valid,
+      eventId: 'EV-CHG-P1-20260907-001-root-cause',
+      eventKind: 'root-cause',
+      from: 'blocked',
+      to: 'blocked',
+      actorRole: 'R',
+      evidenceRefs: ['evidence/root-cause-report.json'],
+      signatureRef: 'evidence/signature-r.json',
+    };
+    // A root-cause chain event stays blocked without a new gate-failure evidence record.
+    expect(validateBySchema('code-health-ledger-event', rootCause).valid).toBe(true);
+    // Any other blocked transition still requires structured gate-failure evidence.
+    expect(validateBySchema('code-health-ledger-event', { ...valid, from: 'discovered', to: 'blocked' }).valid).toBe(
+      false,
+    );
+    // Chain kinds must stay blocked and rework must return to evidenced.
+    expect(validateBySchema('code-health-ledger-event', { ...rootCause, to: 'evidenced' }).valid).toBe(false);
+    expect(
+      validateBySchema('code-health-ledger-event', { ...valid, eventKind: 'rework', from: 'blocked', to: 'blocked' })
+        .valid,
+    ).toBe(false);
+
+    // Gap identifiers keep the runtime GAP- identity pattern.
+    const gap = (await loadJson(codeHealthSamplesDir, 'valid-gap.json')) as Record<string, unknown>;
+    expect(validateBySchema('code-health-gap', gap).valid).toBe(true);
+    expect(validateBySchema('code-health-gap', { ...gap, gapId: '1' }).valid).toBe(false);
+
+    // Role or agent identities cannot produce a human approval.
+    const approval = (await loadJson(codeHealthSamplesDir, 'valid-approval.json')) as Record<string, unknown>;
+    expect(validateBySchema('code-health-approval', approval).valid).toBe(true);
+    expect(validateBySchema('code-health-approval', { ...approval, actor: 'S-agent' }).valid).toBe(false);
+    expect(validateBySchema('code-health-approval', { ...approval, actor: 'V-agent' }).valid).toBe(false);
+  });
+
   it('未注册的 schema 返回明确错误，gate-log 使用独立 schema 拒绝无效结构', () => {
     const result = validateBySchema('nonexistent-schema', {});
     expect(result.valid).toBe(false);

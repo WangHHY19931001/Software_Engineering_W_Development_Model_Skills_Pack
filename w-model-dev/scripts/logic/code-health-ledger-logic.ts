@@ -5,6 +5,7 @@ import {
   CodeHealthError,
   isIsoDate,
   isRelativePath,
+  ROOT_CAUSE_CHAIN_EVENT_KINDS,
   validateCodeHealthCandidate,
   validateCommandEvidence,
   validateLedgerEvent,
@@ -36,7 +37,9 @@ import type {
   FalsePositiveContext,
   FileVerificationContext,
   GapRow,
+  GateFailureEvidence,
   LedgerEvent,
+  LedgerEventKind,
   Phase1CandidateLead,
   Phase1RunResult,
   ProtectedTestClass,
@@ -117,6 +120,13 @@ export type {
 } from './code-health-contract.js';
 
 const HEX64_PATTERN = /^[0-9a-f]{64}$/;
+const CANDIDATE_ID_PATTERN = /^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$/;
+const GATE_FAILURE_KINDS: readonly GateFailureEvidence['failureKind'][] = ['test', 'gate', 'command'];
+
+/**
+ * Fixed lifecycle graph. `blocked` may only return to `evidenced` through a complete R→V→G chain with an
+ * S rework event (enforced separately), or terminate in `rolled-back` with real rollback evidence.
+ */
 const NORMAL_TRANSITIONS: Readonly<Record<CodeHealthStatus, readonly CodeHealthStatus[]>> = {
   discovered: ['evidenced', 'blocked'],
   evidenced: ['under-review', 'blocked'],
@@ -127,9 +137,51 @@ const NORMAL_TRANSITIONS: Readonly<Record<CodeHealthStatus, readonly CodeHealthS
   archived: [],
   rejected: [],
   deferred: [],
-  blocked: ['rolled-back'],
+  blocked: ['evidenced', 'rolled-back'],
   'rolled-back': [],
 };
+
+/** Authorized recorder role per target state. R never fixes or signs for S; O never records a transition. */
+const TRANSITION_ROLES: Readonly<Record<CodeHealthStatus, readonly LedgerEvent['actorRole'][]>> = {
+  discovered: ['A'],
+  evidenced: ['A', 'S'],
+  'under-review': ['V'],
+  approved: ['human'],
+  implemented: ['S'],
+  verified: ['V', 'G'],
+  archived: ['G', 'human'],
+  rejected: ['human'],
+  deferred: ['human'],
+  blocked: ['G', 'V', 'R', 'human'],
+  'rolled-back': ['S', 'human'],
+};
+
+const CHAIN_ROLE_BY_KIND: Readonly<Record<string, LedgerEvent['actorRole']>> = {
+  'root-cause': 'R',
+  'root-cause-review': 'V',
+  'root-cause-gate': 'G',
+};
+
+/** Human decision each human-only target state requires from the matching ApprovalDecision. */
+const HUMAN_DECISION_BY_TARGET: Readonly<Partial<Record<CodeHealthStatus, ApprovalDecision['decision']>>> = {
+  approved: 'approve',
+  rejected: 'reject',
+  deferred: 'defer',
+};
+
+const APPROVAL_KEYS = [
+  'candidateId',
+  'decision',
+  'approvedAction',
+  'approvedFiles',
+  'approvedSymbols',
+  'scopeHash',
+  'rationale',
+  'actor',
+  'decidedAt',
+  'signatureRef',
+  'revision',
+] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -154,7 +206,12 @@ function sortedEqual(left: string[], right: string[]): boolean {
   return sortedLeft.every((item, index) => item === sortedRight[index]);
 }
 
-function validateRollbackEvidence(
+/**
+ * Structural rollback check inside the pure reducer: every declared value must match the candidate rollback
+ * plan and the event evidence refs. Real file/hash/symlink authenticity is proven by the injected 1B
+ * boundary in `transitionCandidateVerified` before this reducer ever runs.
+ */
+function validateRollbackTransitionEvidence(
   value: unknown,
   field: string,
   candidate: CodeHealthCandidate,
@@ -170,7 +227,7 @@ function validateRollbackEvidence(
   const command = value.command as CommandEvidence;
   reasons.push(...commandReasons);
   if (!commandValid || command.observation !== 'observed' || command.exitCode !== 0) {
-    reasons.push(`${field}.command must be an observed zero-exit result`);
+    reasons.push(`${field}.command must be an observed zero-exit rollback result`);
   }
   if (commandValid && command.command !== candidate.rollback.command) {
     reasons.push(`${field}.command does not match candidate rollback command`);
@@ -224,103 +281,257 @@ async function verifyDeclaredFile(
   }
 }
 
+/** Resolve one ledger candidate or fail closed with a typed structural error. */
+function requireCandidate(ledger: CodeHealthLedger, candidateId: string): CodeHealthCandidate {
+  const candidate = ledger.candidates.find((entry) => entry.candidateId === candidateId);
+  if (!candidate) {
+    throw new CodeHealthError('STRUCTURE_INVALID', `lifecycle candidate not found: ${candidateId}`);
+  }
+  return candidate;
+}
+
+function candidateEvents(ledger: CodeHealthLedger, candidateId: string): LedgerEvent[] {
+  return ledger.events.filter((event) => event.candidateId === candidateId);
+}
+
+function hasOnlyProperties(
+  value: Record<string, unknown>,
+  keys: readonly string[],
+  field: string,
+  reasons: string[],
+): void {
+  const allowed = new Set(keys);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) reasons.push(`${field} has unknown property: ${key}`);
+  }
+}
+
+function isRootCauseChainKind(kind: unknown): boolean {
+  return (ROOT_CAUSE_CHAIN_EVENT_KINDS as readonly string[]).includes(kind as string);
+}
+
+export interface ReplayedCandidateState {
+  candidateId: string;
+  status: CodeHealthStatus;
+  eventCount: number;
+}
+
 /**
- * 1B injected-authenticity entry point: the sync reducer runs unchanged and the declared rollback
- * patch and raw output are then proven to exist as regular non-symlink files with matching hashes.
+ * Recompute one candidate status from its append-only events: event IDs must be unique across the whole
+ * ledger, per-candidate timestamps strictly increase, and the chain must be contiguous. The materialized
+ * candidate status must equal the replay result, otherwise the ledger is rejected as inconsistent.
  */
-async function transitionCandidateVerified(
-  ledger: CodeHealthLedger,
-  candidateId: string,
-  event: LedgerEvent,
-  approval: ApprovalDecision | undefined,
-  verification: FileVerificationContext,
-): Promise<CodeHealthLedger> {
-  const next = transitionCandidateRecord(ledger, candidateId, event, approval);
-  if (event.to !== 'rolled-back' || !event.rollbackEvidence) return next;
-  await verifyDeclaredFile(
-    verification,
-    event.rollbackEvidence.patchPath,
-    event.rollbackEvidence.patchSha256,
-    'rollback patch',
-  );
-  await verifyDeclaredFile(
-    verification,
-    event.rollbackEvidence.command.rawOutputPath,
-    event.rollbackEvidence.command.rawOutputSha256,
-    'rollback raw output',
-  );
-  return next;
+export function replayCandidate(ledger: CodeHealthLedger, candidateId: string): ReplayedCandidateState {
+  const candidate = requireCandidate(ledger, candidateId);
+  const seenEventIds = new Set<string>();
+  for (const event of ledger.events) {
+    if (seenEventIds.has(event.eventId)) {
+      throw new CodeHealthError('STRUCTURE_INVALID', `duplicate ledger eventId: ${event.eventId}`);
+    }
+    seenEventIds.add(event.eventId);
+  }
+  const events = candidateEvents(ledger, candidateId);
+  if (events.length === 0) return { candidateId, status: candidate.status, eventCount: 0 };
+  const first = events[0]!;
+  let status: CodeHealthStatus = first.from ?? 'discovered';
+  events.forEach((event, index) => {
+    if (index > 0) {
+      const previous = events[index - 1]!;
+      if (Date.parse(event.at) <= Date.parse(previous.at)) {
+        throw new CodeHealthError('STRUCTURE_INVALID', 'candidate event timestamps must increase strictly');
+      }
+      if (event.from !== previous.to) {
+        throw new CodeHealthError('STRUCTURE_INVALID', 'candidate event history is not a contiguous chain');
+      }
+    }
+    if (event.from !== null && event.from !== status) {
+      throw new CodeHealthError('STRUCTURE_INVALID', 'candidate event history does not start from its recorded state');
+    }
+    status = event.to;
+  });
+  if (status !== candidate.status) {
+    throw new CodeHealthError(
+      'STRUCTURE_INVALID',
+      `embedded candidate status ${candidate.status} does not match the replayed history ${status}`,
+    );
+  }
+  return { candidateId, status, eventCount: events.length };
 }
 
-export function transitionCandidate(
-  ledger: CodeHealthLedger,
-  candidateId: string,
-  event: LedgerEvent,
-  approval?: ApprovalDecision,
-): CodeHealthLedger;
-export function transitionCandidate(
-  ledger: CodeHealthLedger,
-  candidateId: string,
-  event: LedgerEvent,
-  approval: ApprovalDecision | undefined,
-  verification: FileVerificationContext,
-): Promise<CodeHealthLedger>;
-export function transitionCandidate(
-  ledger: CodeHealthLedger,
-  candidateId: string,
-  event: LedgerEvent,
-  approval?: ApprovalDecision,
-  verification?: FileVerificationContext,
-): CodeHealthLedger | Promise<CodeHealthLedger> {
-  if (!verification) return transitionCandidateRecord(ledger, candidateId, event, approval);
-  return transitionCandidateVerified(ledger, candidateId, event, approval, verification);
+function nextEventId(ledger: CodeHealthLedger, prefix: string): string {
+  let index = ledger.events.length + 1;
+  while (ledger.events.some((event) => event.eventId === `${prefix}-${index}`)) index += 1;
+  return `${prefix}-${index}`;
 }
 
-function transitionCandidateRecord(
+/** Validate one gate failure against the addressed candidate and the canonical command contract. */
+function requireGateFailureEvidence(value: unknown, candidate: CodeHealthCandidate): GateFailureEvidence {
+  if (!isRecord(value)) {
+    throw new CodeHealthError('EVIDENCE_INVALID', 'gate failure evidence must be an object');
+  }
+  const commandEvidence = { ...value };
+  delete commandEvidence.candidateId;
+  delete commandEvidence.scopeHash;
+  delete commandEvidence.failureKind;
+  const commandReasons: string[] = [];
+  validateCommandEvidence(commandEvidence, 'gateFailureEvidence', commandReasons);
+  if (commandReasons.length > 0) {
+    throw new CodeHealthError('EVIDENCE_INVALID', `gate failure evidence is malformed: ${commandReasons.join('; ')}`);
+  }
+  if (typeof value.candidateId !== 'string' || !CANDIDATE_ID_PATTERN.test(value.candidateId)) {
+    throw new CodeHealthError('EVIDENCE_INVALID', 'gate failure evidence requires the bound candidate identity');
+  }
+  if (value.candidateId !== candidate.candidateId) {
+    throw new CodeHealthError('EVIDENCE_INVALID', 'gate failure candidate identity does not match the candidate');
+  }
+  if (typeof value.scopeHash !== 'string' || value.scopeHash !== candidate.changeScope.scopeHash) {
+    throw new CodeHealthError('SCOPE_MISMATCH', 'gate failure scope does not match the candidate scope');
+  }
+  if (!GATE_FAILURE_KINDS.includes(value.failureKind as GateFailureEvidence['failureKind'])) {
+    throw new CodeHealthError('EVIDENCE_INVALID', 'gate failure kind must be test, gate, or command');
+  }
+  if (
+    value.observation !== 'observed' ||
+    typeof value.exitCode !== 'number' ||
+    !Number.isInteger(value.exitCode) ||
+    value.exitCode === 0
+  ) {
+    throw new CodeHealthError(
+      'EVIDENCE_INVALID',
+      'gate failure must be an observed command failure with a real non-zero exit code',
+    );
+  }
+  return value as unknown as GateFailureEvidence;
+}
+
+interface AppendEventOptions {
+  /** Root-cause chain events keep the candidate blocked and are exempt from the normal transition graph. */
+  rootCauseChain?: boolean;
+}
+
+/**
+ * Pure reducer core: validate one event, then return a new ledger with the event appended and only the
+ * addressed candidate updated. Every check is fail-closed and the previous ledger is never mutated.
+ */
+function appendEvent(
   ledger: CodeHealthLedger,
   candidateId: string,
   event: LedgerEvent,
   approval?: ApprovalDecision,
+  options: AppendEventOptions = {},
 ): CodeHealthLedger {
   const eventReasons = validateLedgerEvent(event);
   if (eventReasons.length > 0) {
     throw new CodeHealthError('STRUCTURE_INVALID', `transition event is malformed: ${eventReasons.join('; ')}`);
   }
-  const current = ledger.candidates.find((candidate) => candidate.candidateId === candidateId);
-  if (!current) throw new CodeHealthError('STRUCTURE_INVALID', `transition candidate not found: ${candidateId}`);
+  const current = requireCandidate(ledger, candidateId);
   const candidateReasons = validateCodeHealthCandidate(current);
-  if (candidateReasons.length > 0) throw new Error(`transition candidate is invalid: ${candidateReasons.join('; ')}`);
-  if (event.candidateId !== candidateId) throw new Error('transition candidateId mismatch');
-  if (event.from !== current.status) {
-    throw new Error(`transition from ${String(event.from)} does not match ${current.status}`);
+  if (candidateReasons.length > 0) {
+    throw new CodeHealthError('STRUCTURE_INVALID', `transition candidate is invalid: ${candidateReasons.join('; ')}`);
   }
-  if (!sameRevision(event.revision, current.revision)) throw new Error('transition revision is stale');
+  if (event.candidateId !== candidateId) {
+    throw new CodeHealthError(
+      'STRUCTURE_INVALID',
+      `event candidateId ${event.candidateId} does not match the addressed candidate ${candidateId}`,
+    );
+  }
   if (ledger.events.some((existing) => existing.eventId === event.eventId)) {
-    throw new Error(`transition eventId already exists: ${event.eventId}`);
+    throw new CodeHealthError('STRUCTURE_INVALID', `transition eventId already exists: ${event.eventId}`);
   }
-  const previousEvent = ledger.events.at(-1);
-  if (previousEvent && Date.parse(event.at) <= Date.parse(previousEvent.at)) {
-    throw new Error('transition timestamp must be monotonic');
+  if (event.scopeHash !== current.changeScope.scopeHash) {
+    throw new CodeHealthError('SCOPE_MISMATCH', 'event scopeHash does not match the candidate scope');
   }
-  if (!isIsoDate(event.at) || event.evidenceRefs.length === 0 || event.signatureRef.length === 0) {
-    throw new Error('transition evidence is incomplete');
+  if (!sameRevision(event.revision, current.revision)) {
+    throw new CodeHealthError('REVISION_MISMATCH', 'event revision is stale for the candidate revision');
   }
-  if (!NORMAL_TRANSITIONS[current.status].includes(event.to)) {
-    throw new Error(`transition ${current.status} -> ${event.to} is not allowed`);
-  }
-  if (event.to === 'archived') {
-    if (!event.archiveEvidence) {
-      throw new Error('archive transition requires complete archive evidence');
+  if (event.eventKind === 'implementation') {
+    if (!event.previousRevision || !sameRevision(event.previousRevision, current.revision)) {
+      throw new CodeHealthError(
+        'REVISION_MISMATCH',
+        'implementation previousRevision does not match the candidate revision',
+      );
     }
-    throw new CodeHealthError('NOT_IMPLEMENTED', 'archive transition producer is reserved for the Task 1D boundary');
+  } else if (event.previousRevision !== undefined) {
+    throw new CodeHealthError('STRUCTURE_INVALID', 'previousRevision is only valid for implementation events');
+  }
+  replayCandidate(ledger, candidateId);
+  const chain = options.rootCauseChain === true;
+  if (chain) {
+    if (event.from !== current.status || event.to !== current.status) {
+      throw new CodeHealthError('TRANSITION_INVALID', 'root-cause chain events keep the candidate blocked');
+    }
+  } else {
+    if (event.from === null) {
+      if (
+        event.to !== 'discovered' ||
+        current.status !== 'discovered' ||
+        candidateEvents(ledger, candidateId).length > 0
+      ) {
+        throw new CodeHealthError(
+          'TRANSITION_INVALID',
+          'an initial discovery event is only valid for a discovered candidate without history',
+        );
+      }
+    } else if (event.from !== current.status) {
+      throw new CodeHealthError(
+        'TRANSITION_INVALID',
+        `transition from ${String(event.from)} does not match ${current.status}`,
+      );
+    }
+    if (!NORMAL_TRANSITIONS[current.status].includes(event.to)) {
+      throw new CodeHealthError('TRANSITION_INVALID', `transition ${current.status} -> ${event.to} is not allowed`);
+    }
+    if (event.eventKind === 'rework') {
+      requireCompleteReworkChain(ledger, candidateId);
+    } else if (current.status === 'blocked' && event.to === 'evidenced') {
+      throw new CodeHealthError(
+        'TRANSITION_INVALID',
+        'blocked candidates may only return to evidenced through a rework event after the complete R→V→G chain',
+      );
+    }
+  }
+  const previousEvent = candidateEvents(ledger, candidateId).at(-1);
+  if (previousEvent && Date.parse(event.at) <= Date.parse(previousEvent.at)) {
+    throw new CodeHealthError('STRUCTURE_INVALID', 'transition timestamp must be strictly monotonic per candidate');
+  }
+  const authorizedRoles = TRANSITION_ROLES[event.to];
+  if (!authorizedRoles.includes(event.actorRole)) {
+    throw new CodeHealthError(
+      'ROLE_FORBIDDEN',
+      `transition to ${event.to} requires an authorized role (${authorizedRoles.join(', ')}); actor ${event.actorRole} cannot record it`,
+    );
+  }
+  const humanDecision = HUMAN_DECISION_BY_TARGET[event.to];
+  if (humanDecision) {
+    if (!approval || approval.decision !== humanDecision) {
+      throw new CodeHealthError(
+        'EVIDENCE_INVALID',
+        `transition to ${event.to} requires a matching human ${humanDecision} ApprovalDecision`,
+      );
+    }
+    const approvalReasons = validateApprovalScope(current, approval);
+    if (approvalReasons.length > 0) {
+      throw new CodeHealthError('EVIDENCE_INVALID', `transition approval is invalid: ${approvalReasons.join('; ')}`);
+    }
+  } else if (approval !== undefined) {
+    throw new CodeHealthError(
+      'EVIDENCE_INVALID',
+      'an ApprovalDecision is only valid for a human approval, rejection, or deferral transition',
+    );
+  }
+  if (event.to === 'blocked' && !chain) {
+    if (event.eventKind !== 'gate-failure') {
+      throw new CodeHealthError('TRANSITION_INVALID', 'only a structured gate-failure event may block a candidate');
+    }
+    const gateFailure = requireGateFailureEvidence(event.gateFailureEvidence, current);
+    if (!event.evidenceRefs.includes(gateFailure.rawOutputPath)) {
+      throw new CodeHealthError('EVIDENCE_INVALID', 'gate failure raw output must be bound to the event evidence refs');
+    }
   }
   if (event.to === 'rolled-back') {
-    if (event.actorRole !== 'S' && event.actorRole !== 'human') {
-      throw new Error('rollback transition requires S or human authorization');
-    }
     const rollbackReasons: string[] = [];
     if (
-      !validateRollbackEvidence(
+      !validateRollbackTransitionEvidence(
         event.rollbackEvidence,
         'transition rollback',
         current,
@@ -328,104 +539,151 @@ function transitionCandidateRecord(
         rollbackReasons,
       )
     ) {
-      throw new Error(rollbackReasons.join('; ') || 'transition rollback evidence is incomplete');
+      throw new CodeHealthError(
+        'EVIDENCE_INVALID',
+        rollbackReasons.join('; ') || 'rollback transition evidence is incomplete',
+      );
     }
   }
-  const roleForTransition: Partial<Record<CodeHealthStatus, LedgerEvent['actorRole'][]>> = {
-    evidenced: ['A', 'S'],
-    'under-review': ['V'],
-    approved: ['human'],
-    implemented: ['S'],
-    verified: ['V', 'G'],
-    rejected: ['human'],
-    deferred: ['human'],
-    blocked: ['G', 'V', 'S', 'R', 'human'],
-  };
-  if (roleForTransition[event.to] && !roleForTransition[event.to]!.includes(event.actorRole)) {
-    throw new Error(`transition ${event.to} requires an authorized human role`);
+  if (event.to === 'archived') {
+    if (event.eventKind !== 'archive') {
+      throw new CodeHealthError('TRANSITION_INVALID', 'only an archive event may archive a candidate');
+    }
+    if (!event.archiveEvidence) {
+      throw new CodeHealthError(
+        'STRUCTURE_INVALID',
+        'archive transition requires complete source-bound archive evidence',
+      );
+    }
+    throw new CodeHealthError('NOT_IMPLEMENTED', 'archive transition producer is reserved for the Task 1D boundary');
   }
-  if (event.to === 'approved') {
-    if (event.actorRole !== 'human') throw new Error('transition approval requires a human actor');
-    if (!approval || validateApprovalScope(current, approval).length > 0 || approval.decision !== 'approve') {
-      throw new Error('transition approval requires a matching human ApprovalDecision');
-    }
-  }
-  if (event.to === 'blocked') {
-    if (!event.gateFailureEvidence || event.gateFailureEvidence.candidateId !== candidateId) {
-      throw new Error('blocked transition requires structured gate failure evidence bound to candidate');
-    }
-    if (event.gateFailureEvidence.scopeHash !== current.changeScope.scopeHash) {
-      throw new Error('gate failure evidence scope does not match candidate');
-    }
-    const commandEvidence: CommandEvidence = {
-      command: event.gateFailureEvidence.command,
-      cwd: event.gateFailureEvidence.cwd,
-      environment: event.gateFailureEvidence.environment,
-      platform: event.gateFailureEvidence.platform,
-      toolVersions: event.gateFailureEvidence.toolVersions,
-      startedAt: event.gateFailureEvidence.startedAt,
-      endedAt: event.gateFailureEvidence.endedAt,
-      exitCode: event.gateFailureEvidence.exitCode,
-      observation: event.gateFailureEvidence.observation,
-      rawOutputPath: event.gateFailureEvidence.rawOutputPath,
-      rawOutputSha256: event.gateFailureEvidence.rawOutputSha256,
-    };
-    const gateReasons: string[] = [];
-    if (!validateCommandEvidence(commandEvidence, 'gateFailureEvidence', gateReasons)) {
-      throw new Error(gateReasons.join('; '));
-    }
-    if (
-      event.gateFailureEvidence.observation !== 'observed' ||
-      event.gateFailureEvidence.exitCode === null ||
-      event.gateFailureEvidence.exitCode === 0
-    ) {
-      throw new Error('blocked transition requires an observed non-zero gate failure');
-    }
-    if (event.gateFailureEvidence.rawOutputPath !== event.evidenceRefs[0]) {
-      throw new Error('gate failure evidence raw output must be bound to event evidence');
-    }
-  }
-
   const candidates = ledger.candidates.map((candidate) =>
     candidate.candidateId === candidateId ? { ...candidate, status: event.to } : candidate,
   );
   return { ...ledger, candidates, events: [...ledger.events, event] };
 }
 
-export function validateApprovalScope(candidate: CodeHealthCandidate, approval: ApprovalDecision): string[] {
-  const reasons: string[] = [];
-  if (!isRecord(approval)) return ['approval must be an object'];
-  if (approval.candidateId !== candidate.candidateId) reasons.push('approval candidateId does not match candidate');
-  if (approval.approvedAction !== candidate.action) reasons.push('approval action does not match candidate');
-  if (!sortedEqual(approval.approvedFiles, candidate.changeScope.files)) {
-    reasons.push('approval files expand or shrink candidate scope');
+function requireCompleteReworkChain(ledger: CodeHealthLedger, candidateId: string): void {
+  const required = nextRequiredRoles(ledger, candidateId);
+  if (required.length !== 1 || required[0] !== 'S') {
+    throw new CodeHealthError(
+      'TRANSITION_INVALID',
+      `rework requires the complete root-cause (R), review (V), and gate (G) chain; still required: ${required.join(', ')}`,
+    );
   }
-  if (!sortedEqual(approval.approvedSymbols, candidate.changeScope.symbols)) {
-    reasons.push('approval symbols expand or shrink candidate scope');
+}
+
+/** Pure append-only lifecycle reducer: consumes only events whose evidence was authenticated upstream. */
+export function transitionCandidate(
+  ledger: CodeHealthLedger,
+  candidateId: string,
+  event: LedgerEvent,
+  approval?: ApprovalDecision,
+): CodeHealthLedger {
+  return appendEvent(ledger, candidateId, event, approval);
+}
+
+/**
+ * 1B-authenticated rollback entry point: the declared rollback patch and raw output are proven to exist as
+ * regular non-symlink files with matching hashes through the injected FileVerifier before the pure reducer
+ * appends the rolled-back event. No repository check is repeated inside the reducer.
+ */
+export async function transitionCandidateVerified(
+  ledger: CodeHealthLedger,
+  candidateId: string,
+  event: LedgerEvent,
+  approval: ApprovalDecision | undefined,
+  verification: FileVerificationContext,
+): Promise<CodeHealthLedger> {
+  if (event.to === 'rolled-back' && event.rollbackEvidence) {
+    await verifyDeclaredFile(
+      verification,
+      event.rollbackEvidence.patchPath,
+      event.rollbackEvidence.patchSha256,
+      'rollback patch',
+    );
+    await verifyDeclaredFile(
+      verification,
+      event.rollbackEvidence.command.rawOutputPath,
+      event.rollbackEvidence.command.rawOutputSha256,
+      'rollback raw output',
+    );
   }
-  if (approval.scopeHash !== candidate.changeScope.scopeHash)
-    reasons.push('approval scopeHash does not match candidate');
-  if (!sameRevision(approval.revision, candidate.revision)) reasons.push('approval revision is stale');
-  if (!['approve', 'reject', 'defer'].includes(approval.decision)) reasons.push('approval decision is invalid');
+  return appendEvent(ledger, candidateId, event, approval);
+}
+
+interface ApprovalScopeCheck {
+  scope: string[];
+  evidence: string[];
+  revision: string[];
+}
+
+/** Human actor identity: agent, bot, automation, system, or single-letter role identities never qualify. */
+function isHumanApprovalActor(value: unknown): value is string {
+  if (typeof value !== 'string' || value.trim() === '') return false;
+  const normalized = value.toLowerCase();
+  if (/(?:^|[-_\s])(?:agent|bot|automation|system|orchestrator|robot)(?:$|[-_\s])/.test(normalized)) return false;
+  if (/(?:^|[-_\s])[oasvgr](?:$|[-_\s])/.test(normalized)) return false;
+  return true;
+}
+
+/**
+ * Precise approval comparison: identity, action, files, symbols, scope hash, revision, human actor,
+ * decision, timestamp, and signature ref must all match the candidate exactly.
+ */
+function checkApprovalScope(candidate: CodeHealthCandidate, approval: unknown): ApprovalScopeCheck {
+  const result: ApprovalScopeCheck = { scope: [], evidence: [], revision: [] };
+  if (!isRecord(approval)) {
+    result.evidence.push('approval must be an object');
+    return result;
+  }
+  hasOnlyProperties(approval, APPROVAL_KEYS, 'approval', result.evidence);
+  if (approval.candidateId !== candidate.candidateId)
+    result.scope.push('approval candidateId does not match candidate');
+  if (approval.approvedAction !== candidate.action) result.scope.push('approval action does not match candidate');
+  const approvedFiles = Array.isArray(approval.approvedFiles) ? (approval.approvedFiles as string[]) : null;
+  if (!approvedFiles || !sortedEqual(approvedFiles, candidate.changeScope.files)) {
+    result.scope.push('approval files expand or shrink candidate scope');
+  }
+  const approvedSymbols = Array.isArray(approval.approvedSymbols) ? (approval.approvedSymbols as string[]) : null;
+  if (!approvedSymbols || !sortedEqual(approvedSymbols, candidate.changeScope.symbols)) {
+    result.scope.push('approval symbols expand or shrink candidate scope');
+  }
+  if (approval.scopeHash !== candidate.changeScope.scopeHash) {
+    result.scope.push('approval scopeHash does not match candidate');
+  }
+  if (
+    !isRecord(approval.revision) ||
+    !sameRevision(approval.revision as unknown as RevisionIdentity, candidate.revision)
+  ) {
+    result.revision.push('approval revision is stale for the candidate revision');
+  }
+  if (!['approve', 'reject', 'defer'].includes(approval.decision as string)) {
+    result.evidence.push('approval decision is invalid');
+  }
   if (
     approval.decision === 'approve' &&
     !['under-review', 'approved', 'implemented', 'verified'].includes(candidate.status)
   ) {
-    reasons.push('candidate must be under-review or in an approved lifecycle state before approval');
+    result.evidence.push('candidate must be under-review or in an approved lifecycle state before approval');
   }
-  if (typeof approval.rationale !== 'string' || approval.rationale.length === 0) {
-    reasons.push('approval rationale is required');
+  if (typeof approval.rationale !== 'string' || approval.rationale.length < 20) {
+    result.evidence.push('approval rationale must be specific and at least 20 characters');
   }
-  if (
-    typeof approval.actor !== 'string' ||
-    approval.actor.length === 0 ||
-    approval.actor.toLowerCase().includes('agent')
-  ) {
-    reasons.push('approval actor must identify a human decision maker');
+  if (!isHumanApprovalActor(approval.actor)) {
+    result.evidence.push(
+      'approval actor must identify a human decision maker; role or agent identities cannot approve',
+    );
   }
-  if (!isIsoDate(approval.decidedAt)) reasons.push('approval decidedAt is invalid');
-  if (!isRelativePath(approval.signatureRef)) reasons.push('approval signatureRef is required');
-  return reasons;
+  if (!isIsoDate(approval.decidedAt)) result.evidence.push('approval decidedAt is invalid');
+  if (!isRelativePath(approval.signatureRef)) result.evidence.push('approval signatureRef is required');
+  return result;
+}
+
+/** Full approval scope comparison, flattened for callers that only need blocking reasons. */
+export function validateApprovalScope(candidate: CodeHealthCandidate, approval: ApprovalDecision): string[] {
+  const check = checkApprovalScope(candidate, approval);
+  return [...check.scope, ...check.evidence, ...check.revision];
 }
 
 export function canArchiveCandidate(
@@ -493,22 +751,67 @@ export function canArchiveCandidate(
   return [...new Set(reasons)];
 }
 
+export function recordGateFailure(
+  ledger: CodeHealthLedger,
+  candidateId: string,
+  evidence: GateFailureEvidence,
+): CodeHealthLedger;
+export function recordGateFailure(ledger: CodeHealthLedger, evidence: CommandEvidence): never;
 /**
- * 1B injected-authenticity entry point: gate-failure evidence must resolve to a real stored raw output
- * that is bound to the candidate, scope, revision, path, and hash before the reducer records it.
+ * Pure append-only gate-failure reducer. It consumes only evidence whose candidate/scope binding was
+ * already authenticated by the 1B EvidenceStore boundary (`recordVerifiedGateFailure`); it never reads the
+ * filesystem itself. Any refused call leaves the previous ledger, candidate status, and events untouched.
  */
-async function verifyGateFailureEvidence(
+export function recordGateFailure(
+  ledger: CodeHealthLedger,
+  candidateIdOrEvidence: string | CommandEvidence,
+  evidence?: GateFailureEvidence,
+): CodeHealthLedger {
+  if (typeof candidateIdOrEvidence !== 'string' || evidence === undefined) {
+    throw new CodeHealthError(
+      'EVIDENCE_INVALID',
+      'gate failure requires an explicit candidate identity and already-verified candidate-scoped evidence',
+    );
+  }
+  const candidateId = candidateIdOrEvidence;
+  const candidate = requireCandidate(ledger, candidateId);
+  const gateFailure = requireGateFailureEvidence(evidence, candidate);
+  const event: LedgerEvent = {
+    eventId: nextEventId(ledger, `EV-GATE-FAIL-${candidateId}`),
+    eventKind: 'gate-failure',
+    candidateId,
+    from: candidate.status,
+    to: 'blocked',
+    actorRole: 'G',
+    at: gateFailure.endedAt,
+    revision: candidate.revision,
+    scopeHash: candidate.changeScope.scopeHash,
+    evidenceRefs: [gateFailure.rawOutputPath],
+    signatureRef: 'evidence/signature-gate-failure.json',
+    gateFailureEvidence: gateFailure,
+  };
+  return appendEvent(ledger, candidateId, event);
+}
+
+/**
+ * 1B-authenticated gate-failure entry point: the raw output is verified through the injected EvidenceStore
+ * against the candidate/scope/revision binding before the pure reducer appends the blocked event.
+ */
+export async function recordVerifiedGateFailure(
   ledger: CodeHealthLedger,
   candidateId: string,
   evidence: CommandEvidence,
   verification: EvidenceVerificationContext,
-): Promise<void> {
-  const candidate = ledger.candidates.find((entry) => entry.candidateId === candidateId);
-  if (!candidate) {
-    throw new CodeHealthError('STRUCTURE_INVALID', `gate failure candidate identity not found: ${candidateId}`);
+): Promise<CodeHealthLedger> {
+  const candidate = requireCandidate(ledger, candidateId);
+  if (!isRelativePath(evidence?.rawOutputPath) || typeof evidence.rawOutputSha256 !== 'string') {
+    throw new CodeHealthError(
+      'EVIDENCE_INVALID',
+      'verified gate failure requires a repository-relative raw output path and hash',
+    );
   }
   const ref: EvidenceRef = {
-    evidenceId: `EVD-GATE-FAIL-${candidateId}-${evidence.rawOutputSha256.slice(0, 16)}`,
+    evidenceId: `EVD-GATE-FAIL-${candidateId}-${ledger.events.length + 1}`,
     candidateId,
     scopeHash: candidate.changeScope.scopeHash,
     relativePath: evidence.rawOutputPath,
@@ -517,73 +820,93 @@ async function verifyGateFailureEvidence(
     observation: evidence.observation,
   };
   await verification.evidenceStore.verify(ref, verification.binding);
-}
-
-export function recordGateFailure(
-  ledger: CodeHealthLedger,
-  candidateId: string,
-  evidence: CommandEvidence,
-): CodeHealthLedger;
-export function recordGateFailure(ledger: CodeHealthLedger, evidence: CommandEvidence): never;
-export function recordGateFailure(
-  ledger: CodeHealthLedger,
-  candidateId: string,
-  evidence: CommandEvidence,
-  verification: EvidenceVerificationContext,
-): Promise<CodeHealthLedger>;
-export function recordGateFailure(
-  ledger: CodeHealthLedger,
-  candidateIdOrEvidence: string | CommandEvidence,
-  evidence?: CommandEvidence,
-  verification?: EvidenceVerificationContext,
-): CodeHealthLedger | Promise<CodeHealthLedger> {
-  if (typeof candidateIdOrEvidence !== 'string' || !evidence) {
-    throw new Error('gate failure requires explicit candidate identity and evidence');
-  }
-  const candidateId = candidateIdOrEvidence;
-  if (!verification) return recordGateFailureRecord(ledger, candidateId, evidence);
-  return verifyGateFailureEvidence(ledger, candidateId, evidence, verification).then(() =>
-    recordGateFailureRecord(ledger, candidateId, evidence),
-  );
-}
-
-function recordGateFailureRecord(
-  ledger: CodeHealthLedger,
-  candidateId: string,
-  evidence: CommandEvidence,
-): CodeHealthLedger {
-  const candidate = ledger.candidates.find((entry) => entry.candidateId === candidateId);
-  if (!candidate) throw new Error(`gate failure candidate identity not found: ${candidateId}`);
-  if (!isRelativePath(evidence.rawOutputPath)) {
-    throw new Error('gate failure evidence raw output path is unsafe');
-  }
-  const event: LedgerEvent = {
-    eventId: `EV-GATE-FAIL-${candidate.candidateId}-${ledger.events.length + 1}`,
-    eventKind: 'gate-failure',
-    candidateId: candidate.candidateId,
-    from: candidate.status,
-    to: 'blocked',
-    actorRole: 'G',
-    at: evidence.endedAt,
-    revision: candidate.revision,
+  const gateFailure: GateFailureEvidence = {
+    ...evidence,
+    candidateId,
     scopeHash: candidate.changeScope.scopeHash,
-    evidenceRefs: [evidence.rawOutputPath],
-    signatureRef: 'evidence/signature-gate-failure.json',
-    gateFailureEvidence: {
-      ...evidence,
-      candidateId: candidate.candidateId,
-      scopeHash: candidate.changeScope.scopeHash,
-      failureKind: 'gate',
-    },
+    failureKind: 'gate',
   };
-  return transitionCandidateRecord(ledger, candidate.candidateId, event);
+  return recordGateFailure(ledger, candidateId, gateFailure);
 }
 
-export function nextRequiredRoles(ledger: CodeHealthLedger): Array<'R' | 'V' | 'G' | 'S'> {
-  const blocked =
-    ledger.candidates.some((candidate) => candidate.status === 'blocked') ||
-    ledger.events.some((event) => event.to === 'blocked');
-  return blocked ? ['R', 'V', 'G', 'S'] : [];
+/**
+ * Roles still required, in fixed order, before a blocked candidate may be reworked: R root cause, V review,
+ * G gate, then S rework. A candidate that is not blocked requires no failure-chain roles.
+ */
+export function nextRequiredRoles(ledger: CodeHealthLedger, candidateId: string): Array<'R' | 'V' | 'G' | 'S'> {
+  const candidate = requireCandidate(ledger, candidateId);
+  if (candidate.status !== 'blocked') return [];
+  const events = candidateEvents(ledger, candidateId);
+  let blockedIndex = -1;
+  for (const [index, event] of events.entries()) {
+    if (event.to === 'blocked' && !isRootCauseChainKind(event.eventKind)) blockedIndex = index;
+  }
+  if (blockedIndex < 0) return [];
+  const chain = events.slice(blockedIndex + 1);
+  const signed = (kind: LedgerEventKind, role: LedgerEvent['actorRole']): boolean =>
+    chain.some((event) => event.eventKind === kind && event.actorRole === role);
+  if (!signed('root-cause', 'R')) return ['R', 'V', 'G', 'S'];
+  if (!signed('root-cause-review', 'V')) return ['V', 'G', 'S'];
+  if (!signed('root-cause-gate', 'G')) return ['G', 'S'];
+  return ['S'];
+}
+
+/**
+ * Append one RootCauseReport chain event (R report, V review, G gate) while the candidate is blocked. The
+ * order is fixed and cannot be skipped: each call must supply the next required role.
+ */
+export function appendRootCauseEvent(
+  ledger: CodeHealthLedger,
+  candidateId: string,
+  event: LedgerEvent,
+): CodeHealthLedger {
+  const candidate = requireCandidate(ledger, candidateId);
+  if (candidate.status !== 'blocked') {
+    throw new CodeHealthError(
+      'TRANSITION_INVALID',
+      'root-cause chain events are only valid while the candidate is blocked',
+    );
+  }
+  if (!isRootCauseChainKind(event?.eventKind)) {
+    throw new CodeHealthError('STRUCTURE_INVALID', 'appendRootCauseEvent only accepts root-cause chain events');
+  }
+  const expectedRole = CHAIN_ROLE_BY_KIND[event.eventKind as string];
+  if (event.actorRole !== expectedRole) {
+    throw new CodeHealthError(
+      'ROLE_FORBIDDEN',
+      `root-cause event ${event.eventKind} requires the ${String(expectedRole)} role`,
+    );
+  }
+  const required = nextRequiredRoles(ledger, candidateId);
+  if (required[0] !== expectedRole) {
+    throw new CodeHealthError(
+      'TRANSITION_INVALID',
+      `root-cause chain is out of order: the next required role is ${required[0] ?? 'none'}`,
+    );
+  }
+  if (event.from !== 'blocked' || event.to !== 'blocked') {
+    throw new CodeHealthError('TRANSITION_INVALID', 'root-cause chain events must keep the candidate blocked');
+  }
+  return appendEvent(ledger, candidateId, event, undefined, { rootCauseChain: true });
+}
+
+/** Append the S rework event that returns a blocked candidate to evidenced after the complete R→V→G chain. */
+export function appendReworkEvent(ledger: CodeHealthLedger, candidateId: string, event: LedgerEvent): CodeHealthLedger {
+  const candidate = requireCandidate(ledger, candidateId);
+  if (event?.eventKind !== 'rework') {
+    throw new CodeHealthError('STRUCTURE_INVALID', 'appendReworkEvent only accepts rework events');
+  }
+  if (candidate.status !== 'blocked') {
+    throw new CodeHealthError('TRANSITION_INVALID', 'rework requires a blocked candidate');
+  }
+  if (event.actorRole !== 'S') {
+    throw new CodeHealthError('ROLE_FORBIDDEN', 'rework requires the S role');
+  }
+  if (event.to !== 'evidenced') {
+    throw new CodeHealthError('TRANSITION_INVALID', 'rework must return the candidate to evidenced');
+  }
+  requireCompleteReworkChain(ledger, candidateId);
+  return appendEvent(ledger, candidateId, event);
 }
 
 export function validateEvalDiff(input: EvalDiffInput): string[] {
@@ -599,18 +922,82 @@ const GAP_STATUSES = ['discovered', 'approved', 'implemented', 'verified', 'bloc
 const GAP_TEST_LEVELS = ['unit', 'integration', 'system', 'acceptance'] as const;
 const GAP_ID_PATTERN = /^GAP-[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const GAP_CANDIDATE_ID_PATTERN = /^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$/;
+const GAP_ROW_KEYS = [
+  'gapId',
+  'candidateId',
+  'kind',
+  'testLevels',
+  'existingTestIds',
+  'missingScenario',
+  'evidenceSources',
+  'risk',
+  'priority',
+  'owner',
+  'rtmIds',
+  'coverageSignal',
+  'coverageIsSignalOnly',
+  'status',
+  'redEvidence',
+  'greenEvidence',
+  'assertionHash',
+  'implementationHash',
+] as const;
+const GAP_REQUIRED_KEYS = [
+  'gapId',
+  'candidateId',
+  'kind',
+  'testLevels',
+  'existingTestIds',
+  'missingScenario',
+  'evidenceSources',
+  'risk',
+  'priority',
+  'owner',
+  'rtmIds',
+  'coverageSignal',
+  'coverageIsSignalOnly',
+  'status',
+] as const;
+const RISK_KEYS = [
+  'severity',
+  'behavior',
+  'security',
+  'concurrency',
+  'platform',
+  'lifecycle',
+  'governance',
+  'rationale',
+] as const;
+const RISK_ENUMS: Readonly<Record<string, readonly string[]>> = {
+  severity: ['low', 'medium', 'high', 'critical'],
+  behavior: ['none', 'low', 'medium', 'high', 'unknown'],
+  security: ['none', 'low', 'medium', 'high', 'unknown'],
+  concurrency: ['none', 'low', 'medium', 'high', 'unknown'],
+  platform: ['none', 'low', 'medium', 'high', 'unknown'],
+  lifecycle: ['none', 'low', 'medium', 'high', 'unknown'],
+  governance: ['none', 'low', 'medium', 'high', 'unknown'],
+};
+const COVERAGE_KEYS = ['statements', 'branches', 'functions', 'lines'] as const;
+
+/** Highest gap status a candidate lifecycle state may carry; a gap can never run ahead of its candidate. */
+function gapStatusAllowedForCandidate(status: CodeHealthStatus): readonly GapRow['status'][] {
+  if (status === 'implemented' || status === 'verified' || status === 'archived') {
+    return ['discovered', 'approved', 'implemented', 'verified', 'blocked'];
+  }
+  if (status === 'under-review' || status === 'approved' || status === 'deferred') {
+    return ['discovered', 'approved', 'blocked'];
+  }
+  return ['discovered', 'blocked'];
+}
 
 function validateGapCoverage(value: unknown, field: string, reasons: string[]): void {
   if (!isRecord(value)) {
     reasons.push(`${field} is required`);
     return;
   }
-  const allowedKeys = new Set(['statements', 'branches', 'functions', 'lines']);
-  for (const key of Object.keys(value)) {
-    if (!allowedKeys.has(key)) reasons.push(`${field} has unknown property: ${key}`);
-  }
-  for (const metric of ['statements', 'branches', 'functions', 'lines']) {
-    if (!(metric in value)) {
+  hasOnlyProperties(value, COVERAGE_KEYS, field, reasons);
+  for (const metric of COVERAGE_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(value, metric)) {
       reasons.push(`${field}.${metric} is required`);
       continue;
     }
@@ -629,29 +1016,8 @@ function validateGapRisk(value: unknown, field: string, reasons: string[]): void
     reasons.push(`${field} is required`);
     return;
   }
-  const allowedKeys = new Set([
-    'severity',
-    'behavior',
-    'security',
-    'concurrency',
-    'platform',
-    'lifecycle',
-    'governance',
-    'rationale',
-  ]);
-  for (const key of Object.keys(value)) {
-    if (!allowedKeys.has(key)) reasons.push(`${field} has unknown property: ${key}`);
-  }
-  const riskEnums: Record<string, readonly string[]> = {
-    severity: ['low', 'medium', 'high', 'critical'],
-    behavior: ['none', 'low', 'medium', 'high', 'unknown'],
-    security: ['none', 'low', 'medium', 'high', 'unknown'],
-    concurrency: ['none', 'low', 'medium', 'high', 'unknown'],
-    platform: ['none', 'low', 'medium', 'high', 'unknown'],
-    lifecycle: ['none', 'low', 'medium', 'high', 'unknown'],
-    governance: ['none', 'low', 'medium', 'high', 'unknown'],
-  };
-  for (const [key, allowed] of Object.entries(riskEnums)) {
+  hasOnlyProperties(value, RISK_KEYS, field, reasons);
+  for (const [key, allowed] of Object.entries(RISK_ENUMS)) {
     if (typeof value[key] !== 'string' || !allowed.includes(value[key] as string)) {
       reasons.push(`${field}.${key} is invalid`);
     }
@@ -665,91 +1031,116 @@ function isBoundedGapText(value: unknown): value is string {
   return (
     typeof value === 'string' &&
     value.trim() !== '' &&
-    !/^(?:unknown|tbd|todo|n\/a|none|not[ -]?provided)$/i.test(value.trim())
+    !/^(?:unknown|tbd|todo|n\/a|none|not[ -]?provided|pending|later)$/i.test(value.trim())
   );
 }
 
-export function validateGapMatrix(matrix: unknown): string[] {
+function validateGapEvidenceCommand(value: unknown, field: string, expected: 'red' | 'green', reasons: string[]): void {
+  const commandReasons: string[] = [];
+  validateCommandEvidence(value, field, commandReasons);
+  if (commandReasons.length > 0) {
+    reasons.push(...commandReasons);
+    return;
+  }
+  const command = value as CommandEvidence;
+  if (expected === 'red') {
+    if (command.observation !== 'observed' || command.exitCode === null || command.exitCode === 0) {
+      reasons.push(`${field} must be an observed non-zero RED result`);
+    }
+  } else if (command.observation !== 'observed' || command.exitCode !== 0) {
+    reasons.push(`${field} must be an observed zero-exit GREEN result`);
+  }
+}
+
+/**
+ * Strict GapRow validation against the owning ledger: frozen enums, complete risk profile, non-empty
+ * evidence/RTM bindings, signal-only coverage, lifecycle-consistent status, ledger-bound revision, and no
+ * unknown nested fields. Any reason blocks the whole row.
+ */
+export function validateGapRow(row: unknown, ledger: CodeHealthLedger, seenGapIds: ReadonlySet<string>): string[] {
+  const reasons: string[] = [];
+  if (!isRecord(row)) return ['gap row must be an object'];
+  if (!isRecord(ledger) || !Array.isArray(ledger.candidates)) return ['gap row requires the ledger candidates'];
+  hasOnlyProperties(row, GAP_ROW_KEYS, 'gap row', reasons);
+  for (const key of GAP_REQUIRED_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(row, key)) reasons.push(`gap row requires ${key}`);
+  }
+  if (typeof row.gapId !== 'string' || !GAP_ID_PATTERN.test(row.gapId)) {
+    reasons.push('gapId is invalid');
+  } else if (seenGapIds.has(row.gapId)) {
+    reasons.push(`duplicate gapId: ${row.gapId}`);
+  }
+  if (typeof row.candidateId !== 'string' || !GAP_CANDIDATE_ID_PATTERN.test(row.candidateId)) {
+    reasons.push('candidateId is invalid');
+  }
+  const candidate =
+    typeof row.candidateId === 'string'
+      ? ledger.candidates.find((entry) => entry.candidateId === row.candidateId)
+      : undefined;
+  if (!candidate) {
+    reasons.push('gap candidateId does not reference a candidate in the ledger');
+  } else if (!sameRevision(candidate.revision, ledger.baseline)) {
+    reasons.push('gap candidate revision is not bound to the ledger baseline revision');
+  }
+  if (!GAP_KINDS.includes(row.kind as (typeof GAP_KINDS)[number])) reasons.push('kind is invalid');
+  if (
+    !isStringArray(row.testLevels, false) ||
+    row.testLevels.some((level) => !GAP_TEST_LEVELS.includes(level as (typeof GAP_TEST_LEVELS)[number]))
+  ) {
+    reasons.push('testLevels is invalid');
+  }
+  if (!isStringArray(row.existingTestIds)) reasons.push('existingTestIds must be a string array');
+  if (!isBoundedGapText(row.missingScenario)) reasons.push('missingScenario is required and must be specific');
+  if (!isStringArray(row.evidenceSources, false)) {
+    reasons.push('evidenceSources is required');
+  } else if (row.evidenceSources.some((source) => !isRelativePath(source))) {
+    reasons.push('evidenceSources must be repository-relative');
+  }
+  validateGapRisk(row.risk, 'risk', reasons);
+  if (!GAP_PRIORITIES.includes(row.priority as (typeof GAP_PRIORITIES)[number])) reasons.push('priority is invalid');
+  if (!isBoundedGapText(row.owner)) reasons.push('owner is required and must be specific');
+  if (!isStringArray(row.rtmIds, false)) reasons.push('rtmIds is required');
+  validateGapCoverage(row.coverageSignal, 'coverageSignal', reasons);
+  if (row.coverageIsSignalOnly !== true) reasons.push('coverageIsSignalOnly must be true');
+  if (!GAP_STATUSES.includes(row.status as (typeof GAP_STATUSES)[number])) {
+    reasons.push('status is invalid');
+  } else if (candidate && !gapStatusAllowedForCandidate(candidate.status).includes(row.status as GapRow['status'])) {
+    reasons.push(`status ${String(row.status)} is ahead of the candidate lifecycle state ${candidate.status}`);
+  }
+  if (row.redEvidence !== undefined) validateGapEvidenceCommand(row.redEvidence, 'redEvidence', 'red', reasons);
+  if (row.greenEvidence !== undefined) validateGapEvidenceCommand(row.greenEvidence, 'greenEvidence', 'green', reasons);
+  if (
+    row.assertionHash !== undefined &&
+    (typeof row.assertionHash !== 'string' || !HEX64_PATTERN.test(row.assertionHash))
+  ) {
+    reasons.push('assertionHash is invalid');
+  }
+  if (
+    row.implementationHash !== undefined &&
+    row.implementationHash !== null &&
+    (typeof row.implementationHash !== 'string' || !HEX64_PATTERN.test(row.implementationHash))
+  ) {
+    reasons.push('implementationHash is invalid');
+  }
+  if (row.status === 'implemented' || row.status === 'verified') {
+    for (const key of ['redEvidence', 'greenEvidence', 'assertionHash'] as const) {
+      if (row[key] === undefined) reasons.push(`${row.status} gap requires ${key}`);
+    }
+  }
+  return reasons;
+}
+
+/** Validate a whole gap matrix; duplicate gap IDs, unknown rows, and cross-candidate references all block. */
+export function validateGapMatrix(matrix: unknown, ledger: CodeHealthLedger): string[] {
   if (!isRecord(matrix)) return ['gap matrix requires an object'];
   if (!Array.isArray(matrix.rows)) return ['gap matrix rows are required'];
   const reasons: string[] = [];
+  hasOnlyProperties(matrix, ['rows'], 'gap matrix', reasons);
+  const seenGapIds = new Set<string>();
   matrix.rows.forEach((row, index) => {
-    const field = `rows[${index}]`;
-    if (!isRecord(row)) {
-      reasons.push(`${field} must be an object`);
-      return;
-    }
-    const allowedKeys = new Set([
-      'gapId',
-      'candidateId',
-      'kind',
-      'testLevels',
-      'existingTestIds',
-      'missingScenario',
-      'evidenceSources',
-      'risk',
-      'priority',
-      'owner',
-      'rtmIds',
-      'coverageSignal',
-      'coverageIsSignalOnly',
-      'status',
-      'redEvidence',
-      'greenEvidence',
-      'assertionHash',
-      'implementationHash',
-    ]);
-    for (const key of Object.keys(row)) {
-      if (!allowedKeys.has(key)) reasons.push(`${field} has unknown property: ${key}`);
-    }
-    const required = [
-      'gapId',
-      'candidateId',
-      'kind',
-      'testLevels',
-      'existingTestIds',
-      'missingScenario',
-      'evidenceSources',
-      'risk',
-      'priority',
-      'owner',
-      'rtmIds',
-      'coverageSignal',
-      'coverageIsSignalOnly',
-      'status',
-    ];
-    for (const key of required) {
-      if (!(key in row)) reasons.push(`${field} requires ${key}`);
-    }
-    if (typeof row.gapId !== 'string' || !GAP_ID_PATTERN.test(row.gapId)) reasons.push(`${field}.gapId is invalid`);
-    if (typeof row.candidateId !== 'string' || !GAP_CANDIDATE_ID_PATTERN.test(row.candidateId)) {
-      reasons.push(`${field}.candidateId is invalid`);
-    }
-    if (!GAP_KINDS.includes(row.kind as (typeof GAP_KINDS)[number])) reasons.push(`${field}.kind is invalid`);
-    if (
-      !isStringArray(row.testLevels, false) ||
-      row.testLevels.some((level) => !GAP_TEST_LEVELS.includes(level as (typeof GAP_TEST_LEVELS)[number]))
-    ) {
-      reasons.push(`${field}.testLevels is invalid`);
-    }
-    if (!isStringArray(row.existingTestIds)) reasons.push(`${field}.existingTestIds must be a string array`);
-    if (!isBoundedGapText(row.missingScenario))
-      reasons.push(`${field}.missingScenario is required and must be specific`);
-    if (!isStringArray(row.evidenceSources, false)) reasons.push(`${field}.evidenceSources is required`);
-    else if (row.evidenceSources.some((source) => !isRelativePath(source))) {
-      reasons.push(`${field}.evidenceSources must be repository-relative`);
-    }
-    validateGapRisk(row.risk, `${field}.risk`, reasons);
-    if (!GAP_PRIORITIES.includes(row.priority as (typeof GAP_PRIORITIES)[number])) {
-      reasons.push(`${field}.priority is invalid`);
-    }
-    if (!isBoundedGapText(row.owner)) reasons.push(`${field}.owner is required and must be specific`);
-    if (!isStringArray(row.rtmIds, false)) reasons.push(`${field}.rtmIds is required`);
-    if (row.coverageIsSignalOnly !== true) reasons.push(`${field}.coverageIsSignalOnly must be true`);
-    validateGapCoverage(row.coverageSignal, `${field}.coverageSignal`, reasons);
-    if (!GAP_STATUSES.includes(row.status as (typeof GAP_STATUSES)[number])) {
-      reasons.push(`${field}.status is invalid`);
-    }
+    const rowReasons = validateGapRow(row, ledger, seenGapIds);
+    if (isRecord(row) && typeof row.gapId === 'string') seenGapIds.add(row.gapId);
+    reasons.push(...rowReasons.map((reason) => `rows[${index}] ${reason}`));
   });
   return reasons;
 }
@@ -800,17 +1191,80 @@ export function validateRedGreenEvidence(_gap: GapRow, results: CommandEvidence[
   return reasons;
 }
 
+/**
+ * Task 1 approved-application boundary: validate the candidate, the human exact-scope approval, the
+ * repository root, the mode, and the current revision, then return a typed NOT_IMPLEMENTED result. It never
+ * touches the filesystem, Git, patches, commits, or the ledger, and `dry-run` cannot skip any validation.
+ */
 export function applyApproved(input: ApplyApprovedInput): Promise<ApplyResult> {
-  if (!isRecord(input) || !isRecord(input.approval) || !isRecord(input.candidate)) {
-    return Promise.reject(new CodeHealthError('ARG_INVALID', 'approved application requires candidate and approval'));
+  if (!isRecord(input)) {
+    return Promise.reject(new CodeHealthError('ARG_INVALID', 'approved application requires an input object'));
   }
-  const scopeReasons = validateApprovalScope(input.candidate, input.approval);
-  if (scopeReasons.length > 0) {
+  const { candidate, approval, mode, repositoryRoot, currentRevision } = input;
+  if (!isRecord(candidate) || !isRecord(approval)) {
     return Promise.reject(
-      new CodeHealthError('SCOPE_MISMATCH', `approved application scope is invalid: ${scopeReasons.join('; ')}`),
+      new CodeHealthError('EVIDENCE_INVALID', 'approved application requires a candidate and an approval decision'),
     );
   }
-  return Promise.reject(notImplemented('approved application is not implemented in Task 1A'));
+  if (typeof repositoryRoot !== 'string' || repositoryRoot.length === 0) {
+    return Promise.reject(
+      new CodeHealthError('EVIDENCE_INVALID', 'approved application requires an explicit repository root'),
+    );
+  }
+  if (mode !== 'dry-run' && mode !== 'patch' && mode !== 'commit') {
+    return Promise.reject(
+      new CodeHealthError('EVIDENCE_INVALID', 'approved application mode must be dry-run, patch, or commit'),
+    );
+  }
+  const candidateReasons = validateCodeHealthCandidate(candidate);
+  if (candidateReasons.length > 0) {
+    return Promise.reject(
+      new CodeHealthError(
+        'EVIDENCE_INVALID',
+        `approved application candidate is invalid: ${candidateReasons.join('; ')}`,
+      ),
+    );
+  }
+  const approvalCheck = checkApprovalScope(candidate, approval);
+  if (approvalCheck.revision.length > 0) {
+    return Promise.reject(
+      new CodeHealthError(
+        'REVISION_MISMATCH',
+        `approved application revision is stale: ${approvalCheck.revision.join('; ')}`,
+      ),
+    );
+  }
+  if (approvalCheck.evidence.length > 0) {
+    return Promise.reject(
+      new CodeHealthError(
+        'EVIDENCE_INVALID',
+        `approved application approval is invalid: ${approvalCheck.evidence.join('; ')}`,
+      ),
+    );
+  }
+  if (approvalCheck.scope.length > 0) {
+    return Promise.reject(
+      new CodeHealthError('SCOPE_MISMATCH', `approved application scope is invalid: ${approvalCheck.scope.join('; ')}`),
+    );
+  }
+  if (approval.decision !== 'approve') {
+    return Promise.reject(
+      new CodeHealthError('EVIDENCE_INVALID', 'approved application requires a human approve decision'),
+    );
+  }
+  if (!isRecord(currentRevision) || !sameRevision(currentRevision as unknown as RevisionIdentity, candidate.revision)) {
+    return Promise.reject(
+      new CodeHealthError('REVISION_MISMATCH', 'approved application current revision does not match the candidate'),
+    );
+  }
+  return Promise.resolve({
+    applied: false,
+    errorCode: 'NOT_IMPLEMENTED',
+    patchPath: null,
+    appliedFiles: [],
+    unrelatedFiles: [],
+    rollback: null,
+  });
 }
 
 export async function executeRollback(_rollback: RollbackPlan): Promise<boolean> {
