@@ -2175,6 +2175,63 @@ describe('code-health final review fix (I-1/I-2)', () => {
     ).toEqual([]);
   });
 
+  it('I-1b: GapRow 拒绝带标点/包裹的占位语义，含 token 的具体文本仍通过', () => {
+    const ledger = ledgerWithTwoCandidates('discovered');
+    const validGap = validGapRow(firstId);
+    expect(validateGapRow(validGap, ledger, new Set())).toEqual([]);
+    // Edge-wrapped or punctuated placeholders must be rejected for both fields.
+    const wrappedPlaceholders = [
+      '待补。',
+      '（待补）',
+      '（ 待补 ）',
+      '"以后处理"',
+      '「待定」',
+      '[待定]',
+      '暂无。',
+      ' 暂无 ',
+      '　待办　',
+      'later.',
+      '(TBD)',
+      'N/A.',
+      'unknown！',
+      '"待补充"',
+    ];
+    for (const placeholder of wrappedPlaceholders) {
+      expect(validateGapRow({ ...validGap, missingScenario: placeholder }, ledger, new Set())).toEqual([
+        'missingScenario is required and must be specific',
+      ]);
+      expect(validateGapRow({ ...validGap, owner: placeholder }, ledger, new Set())).toEqual([
+        'owner is required and must be specific',
+      ]);
+    }
+    // Bounded text that merely mentions a placeholder token keeps passing.
+    expect(
+      validateGapRow(
+        {
+          ...validGap,
+          missingScenario: '无风险不等于已验证',
+          owner: '待补工作已在前一阶段完成',
+        },
+        ledger,
+        new Set(),
+      ),
+    ).toEqual([]);
+    expect(
+      validateGapRow(
+        {
+          ...validGap,
+          missingScenario: '未知的输入 token 被拒绝',
+          owner: 'None of the existing tests cover this path',
+        },
+        ledger,
+        new Set(),
+      ),
+    ).toEqual([]);
+    expect(
+      validateGapRow({ ...validGap, owner: 'TODO is mentioned but the text is specific' }, ledger, new Set()),
+    ).toEqual([]);
+  });
+
   it('I-2: gap 不得领先 candidate：implemented candidate 只允许到 implemented，verified gap 仅限 verified/archived candidate', () => {
     const implementedLedger = ledgerWithTwoCandidates('implemented');
     expect(validateGapRow(validGapRow(firstId), implementedLedger, new Set())).toEqual([]);

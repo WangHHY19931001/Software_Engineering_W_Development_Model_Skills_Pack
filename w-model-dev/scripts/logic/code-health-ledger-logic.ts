@@ -1112,8 +1112,69 @@ function validateGapRisk(value: unknown, field: string, reasons: string[]): void
 const GAP_TEXT_PLACEHOLDER_PATTERN =
   /^(?:unknown|tbd|todo|n\/a|none|not[ -]?provided|pending|later|待补|待补充|以后处理|待定|后续处理|待办|稍后|暂缓|未知|未提供|暂无|无)$/i;
 
+/**
+ * Wrapper characters and sentence punctuation that may enclose or terminate a placeholder without making it
+ * specific: paired brackets/quotes (ASCII, full-width, CJK) and terminal punctuation. Only the edges of the
+ * trimmed value are stripped so interior content, including interior placeholder tokens, is never rewritten.
+ */
+const GAP_TEXT_EDGE_CHARACTERS: ReadonlySet<string> = new Set([
+  '（',
+  '）',
+  '(',
+  ')',
+  '[',
+  ']',
+  '［',
+  '］',
+  '【',
+  '】',
+  '<',
+  '>',
+  '《',
+  '》',
+  '"',
+  "'",
+  '\u201c',
+  '\u201d',
+  '\u2018',
+  '\u2019',
+  '「',
+  '」',
+  '『',
+  '』',
+  '。',
+  '．',
+  '.',
+  '、',
+  ',',
+  '，',
+  ';',
+  '；',
+  ':',
+  '：',
+  '!',
+  '！',
+  '?',
+  '？',
+  '~',
+  '～',
+]);
+
+/** Normalize gap text by trimming and stripping leading/trailing wrapper/punctuation characters only. */
+function normalizeGapText(value: string): string {
+  const isEdgeCharacter = (character: string): boolean =>
+    GAP_TEXT_EDGE_CHARACTERS.has(character) || /\s/.test(character);
+  let start = 0;
+  let end = value.length;
+  while (start < end && isEdgeCharacter(value[start]!)) start += 1;
+  while (end > start && isEdgeCharacter(value[end - 1]!)) end -= 1;
+  return value.slice(start, end);
+}
+
 function isBoundedGapText(value: unknown): value is string {
-  return typeof value === 'string' && value.trim() !== '' && !GAP_TEXT_PLACEHOLDER_PATTERN.test(value.trim());
+  if (typeof value !== 'string') return false;
+  const normalized = normalizeGapText(value);
+  return normalized !== '' && !GAP_TEXT_PLACEHOLDER_PATTERN.test(normalized);
 }
 
 function validateGapEvidenceCommand(value: unknown, field: string, expected: 'red' | 'green', reasons: string[]): void {
