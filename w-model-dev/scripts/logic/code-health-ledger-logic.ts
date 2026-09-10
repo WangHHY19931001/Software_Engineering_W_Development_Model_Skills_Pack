@@ -19,6 +19,7 @@ import {
   proveTestRemoval as proveTestRemovalBoundary,
   runTddHarness,
 } from './code-health-phase-boundaries.js';
+import { buildStaticInventory, checkFalsePositiveGuards, mergeDynamicTrace } from './code-health-phase1-logic.js';
 import type {
   ApprovalDecision,
   ApplyApprovedInput,
@@ -29,24 +30,18 @@ import type {
   CommandEvidence,
   DeletionEvaluation,
   DeletionFacts,
-  DynamicTraceReport,
-  DynamicTraceScenario,
   EvalDiffInput,
   EvidenceRef,
   EvidenceVerificationContext,
-  FalsePositiveContext,
   FileVerificationContext,
   GapRow,
   GateFailureEvidence,
   LedgerEvent,
   LedgerEventKind,
-  Phase1CandidateLead,
-  Phase1RunResult,
   ProtectedTestClass,
   RevisionIdentity,
   RollbackEvidence,
   RollbackPlan,
-  StaticInventoryReport,
   TestRecord,
   TestRemovalProofInput,
 } from './code-health-contract.js';
@@ -1296,35 +1291,13 @@ function notImplemented(reason: string): CodeHealthError {
   return new CodeHealthError('NOT_IMPLEMENTED', reason);
 }
 
-export function buildStaticInventory(input: {
-  files: string[];
-  sourceText: Map<string, string>;
-  revision: RevisionIdentity;
-}): StaticInventoryReport {
-  if (!isRecord(input) || !Array.isArray(input.files) || input.files.length === 0) {
-    throw notImplemented('static inventory requires Phase 1 implementation');
-  }
-  throw notImplemented('static inventory is not implemented in Task 1A');
-}
-
-export function mergeDynamicTrace(
-  _staticReport: StaticInventoryReport,
-  _trace: DynamicTraceReport,
-): Phase1CandidateLead[] {
-  throw notImplemented('dynamic trace merge is not implemented in Task 1A');
-}
-
-export function checkFalsePositiveGuards(_lead: Phase1CandidateLead, _context: FalsePositiveContext): string[] {
-  throw notImplemented('false-positive analysis is not implemented in Task 1A');
-}
-
-export function runPhase1(_input: {
-  root: string;
-  output: string;
-  scenarios: DynamicTraceScenario[];
-}): Promise<Phase1RunResult> {
-  return Promise.reject(notImplemented('Phase 1 runner is not implemented in Task 1A'));
-}
+/**
+ * Phase 1 discovery surface (R8 closure). The real pure implementations live in
+ * `logic/code-health-phase1-logic.ts`; this legacy module re-exports them so existing consumers keep one
+ * import path. `runPhase1` (the IO orchestrator) lives in `cli/code-health-phase1.ts` and is intentionally
+ * not re-exported here: `logic/` must never depend on `cli/`.
+ */
+export { buildStaticInventory, checkFalsePositiveGuards, mergeDynamicTrace };
 
 export function validateRedGreenEvidence(_gap: GapRow, results: CommandEvidence[]): string[] {
   if (!Array.isArray(results)) return ['RED/GREEN results are required'];
@@ -1338,19 +1311,33 @@ export function validateRedGreenEvidence(_gap: GapRow, results: CommandEvidence[
   return reasons;
 }
 
+const APPLY_PATCH_RELATIVE_ROOT = '.w-model/code-health/apply';
+const SHA40_PATTERN = /^[0-9a-f]{40}$/;
+
+/** Controlled repository-relative patch path for one approved candidate. */
+export function codeHealthApplyPatchPath(candidateId: string): string {
+  return `${APPLY_PATCH_RELATIVE_ROOT}/${candidateId}.patch`;
+}
+
 /**
- * Task 1 approved-application boundary: validate the candidate, the human exact-scope approval, the
- * repository root, the mode, and the current revision, then return a typed NOT_IMPLEMENTED result. It never
- * touches the filesystem, Git, patches, commits, or the ledger, and `dry-run` cannot skip any validation.
+ * Real approved-application plan. It validates the candidate, the exact human approval scope, the mode, and
+ * the current revision, then returns a `patch-proposal` carrying one controlled patch path and an executable
+ * rollback plan. It never touches the filesystem, Git, or the ledger: the IO executor in
+ * `cli/code-health-apply.ts` writes the patch and, for `commit`, applies it and promotes the result to
+ * `ApplyCommitResult` only after a real scope read-back. Missing / non-human / scope / revision approval
+ * failures carry the `HUMAN_APPROVAL_REQUIRED` guard token.
  */
 export function applyApproved(input: ApplyApprovedInput): Promise<ApplyResult> {
   if (!isRecord(input)) {
     return Promise.reject(new CodeHealthError('ARG_INVALID', 'approved application requires an input object'));
   }
   const { candidate, approval, mode, repositoryRoot, currentRevision } = input;
-  if (!isRecord(candidate) || !isRecord(approval)) {
+  if (mode !== 'dry-run' && mode !== 'patch' && mode !== 'commit') {
     return Promise.reject(
-      new CodeHealthError('EVIDENCE_INVALID', 'approved application requires a candidate and an approval decision'),
+      new CodeHealthError(
+        'ARG_INVALID',
+        `approved application mode must be dry-run, patch, or commit; received ${String(mode)}`,
+      ),
     );
   }
   if (typeof repositoryRoot !== 'string' || repositoryRoot.length === 0) {
@@ -1358,10 +1345,8 @@ export function applyApproved(input: ApplyApprovedInput): Promise<ApplyResult> {
       new CodeHealthError('EVIDENCE_INVALID', 'approved application requires an explicit repository root'),
     );
   }
-  if (mode !== 'dry-run' && mode !== 'patch' && mode !== 'commit') {
-    return Promise.reject(
-      new CodeHealthError('EVIDENCE_INVALID', 'approved application mode must be dry-run, patch, or commit'),
-    );
+  if (!isRecord(candidate)) {
+    return Promise.reject(new CodeHealthError('EVIDENCE_INVALID', 'approved application requires a candidate object'));
   }
   const candidateReasons = validateCodeHealthCandidate(candidate);
   if (candidateReasons.length > 0) {
@@ -1372,12 +1357,17 @@ export function applyApproved(input: ApplyApprovedInput): Promise<ApplyResult> {
       ),
     );
   }
+  if (!isRecord(approval)) {
+    return Promise.reject(
+      new CodeHealthError('ROLE_FORBIDDEN', 'HUMAN_APPROVAL_REQUIRED: a human ApprovalDecision is required'),
+    );
+  }
   const approvalCheck = checkApprovalScope(candidate, approval);
   if (approvalCheck.revision.length > 0) {
     return Promise.reject(
       new CodeHealthError(
         'REVISION_MISMATCH',
-        `approved application revision is stale: ${approvalCheck.revision.join('; ')}`,
+        `HUMAN_APPROVAL_REQUIRED: approval revision is stale for the candidate (${approvalCheck.revision.join('; ')})`,
       ),
     );
   }
@@ -1385,18 +1375,21 @@ export function applyApproved(input: ApplyApprovedInput): Promise<ApplyResult> {
     return Promise.reject(
       new CodeHealthError(
         'EVIDENCE_INVALID',
-        `approved application approval is invalid: ${approvalCheck.evidence.join('; ')}`,
+        `HUMAN_APPROVAL_REQUIRED: approval is not a valid human decision (${approvalCheck.evidence.join('; ')})`,
       ),
     );
   }
   if (approvalCheck.scope.length > 0) {
     return Promise.reject(
-      new CodeHealthError('SCOPE_MISMATCH', `approved application scope is invalid: ${approvalCheck.scope.join('; ')}`),
+      new CodeHealthError(
+        'SCOPE_MISMATCH',
+        `HUMAN_APPROVAL_REQUIRED: approval scope does not match the candidate (${approvalCheck.scope.join('; ')})`,
+      ),
     );
   }
   if (approval.decision !== 'approve') {
     return Promise.reject(
-      new CodeHealthError('EVIDENCE_INVALID', 'approved application requires a human approve decision'),
+      new CodeHealthError('EVIDENCE_INVALID', 'HUMAN_APPROVAL_REQUIRED: the approval decision must be approve'),
     );
   }
   if (!isRecord(currentRevision) || !sameRevision(currentRevision as unknown as RevisionIdentity, candidate.revision)) {
@@ -1404,18 +1397,47 @@ export function applyApproved(input: ApplyApprovedInput): Promise<ApplyResult> {
       new CodeHealthError('REVISION_MISMATCH', 'approved application current revision does not match the candidate'),
     );
   }
+  const patchPath = codeHealthApplyPatchPath(candidate.candidateId);
+  const rollback: RollbackPlan = {
+    preChangeRevision: candidate.revision.commitSha,
+    command: `git apply -R ${patchPath}`,
+    patchPath,
+    owner: 'code-health-apply',
+    executable: true,
+  };
   return Promise.resolve({
+    kind: 'patch-proposal',
     applied: false,
-    errorCode: 'NOT_IMPLEMENTED',
-    patchPath: null,
+    errorCode: null,
+    mode,
+    patchPath,
     appliedFiles: [],
     unrelatedFiles: [],
-    rollback: null,
+    rollback,
   });
 }
 
-export async function executeRollback(_rollback: RollbackPlan): Promise<boolean> {
-  return false;
+/**
+ * Real rollback executability gate. The plan must be explicitly executable, carry a safe exact revert
+ * command, a controlled repository-relative patch path, a real pre-change revision, and an optional valid
+ * patch hash. A non-executable or malformed plan can never report success; the IO executor runs the recorded
+ * exact command via argv (never a shell string).
+ */
+export async function executeRollback(rollback: RollbackPlan): Promise<boolean> {
+  if (!isRecord(rollback) || rollback.executable !== true) return false;
+  if (typeof rollback.preChangeRevision !== 'string' || !SHA40_PATTERN.test(rollback.preChangeRevision)) return false;
+  if (typeof rollback.owner !== 'string' || rollback.owner.length === 0) return false;
+  if (typeof rollback.command !== 'string' || rollback.command.length === 0 || /[;&|<>\r\n]/.test(rollback.command)) {
+    return false;
+  }
+  if (!isRelativePath(rollback.patchPath)) return false;
+  if (
+    rollback.patchSha256 !== undefined &&
+    (typeof rollback.patchSha256 !== 'string' || !HEX64_PATTERN.test(rollback.patchSha256))
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export function evaluateDeletion(facts: DeletionFacts): DeletionEvaluation {

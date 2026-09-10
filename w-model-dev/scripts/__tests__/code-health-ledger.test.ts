@@ -41,7 +41,6 @@ import {
   recordGateFailure,
   recordVerifiedGateFailure,
   replayCandidate,
-  runPhase1,
   runTddHarness,
   transitionCandidate,
   transitionCandidateVerified,
@@ -53,10 +52,13 @@ import {
   type CodeHealthCandidate,
   type CodeHealthLedger,
   type CodeHealthStatus,
+  type FalsePositiveContext,
   type GapDiscoveryInput,
   type GateFailureEvidence,
   type LedgerEvent,
+  type Phase1CandidateLead,
 } from '../logic/code-health-ledger-logic.js';
+import { runPhase1 } from '../cli/code-health-phase1.js';
 import { createCodeHealthCommandRunner } from '../lib/code-health-command.js';
 import { createCodeHealthEvidenceStore } from '../lib/code-health-evidence-store.js';
 import { createCodeHealthFileVerifier } from '../lib/code-health-file-verifier.js';
@@ -1169,18 +1171,56 @@ describe('code-health ledger contract', () => {
     const expectedErrors = /not implemented|fail.closed|requires/i;
     expect(() => findGaps({} as GapDiscoveryInput)).toThrow(expectedErrors);
     expect(validateGapMatrix({}, expectedLedger)).not.toEqual([]);
-    expect(() => buildStaticInventory({ files: [], sourceText: new Map(), revision })).toThrow(expectedErrors);
-    expect(() => mergeDynamicTrace({} as never, {} as never)).toThrow(expectedErrors);
-    expect(() => checkFalsePositiveGuards({} as never, {} as never)).toThrow(expectedErrors);
+    // Phase 1 pure implementations are real now: an empty inventory is an empty report, a malformed dynamic
+    // trace fails closed on its hash, and a guard closure reports the unexercised scenario.
+    expect(buildStaticInventory({ files: [], sourceText: {}, revision })).toMatchObject({
+      files: [],
+      references: [],
+      unknowns: [],
+      categories: [],
+      commands: [],
+    });
+    expect(() => mergeDynamicTrace({} as never, {} as never)).toThrow(/sha256/i);
+    const emptyContext: FalsePositiveContext = {
+      dynamicImports: [],
+      reflection: [],
+      platforms: [],
+      schemas: [],
+      templates: [],
+      rtmIds: [],
+      testHelpers: [],
+      generatedReferences: [],
+      externalContracts: [],
+    };
+    const guardLead: Phase1CandidateLead = {
+      candidateId: 'CHG-P1-20260907-016',
+      classification: 'candidate',
+      files: ['src/unused.ts'],
+      symbols: ['unusedFunction'],
+      staticReferences: [],
+      dynamicScenarios: [],
+      guardViolations: [],
+      status: 'discovered',
+    };
+    expect(checkFalsePositiveGuards(guardLead, emptyContext)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/unexercised-scenario/i)]),
+    );
     expect(() => classifyProtectedTest({} as never)).toThrow(expectedErrors);
     expect(() => proveTestRemoval({} as never)).toThrow(expectedErrors);
     expect(() => clusterDuplicates({} as never)).toThrow(expectedErrors);
     expect(() => proveAbstraction({} as never, {} as never)).toThrow(expectedErrors);
-    await expect(runPhase1({ root: '.', output: 'report.json', scenarios: [] })).rejects.toThrow(expectedErrors);
+    const phase1Root = await createTempGitRepository();
+    await expect(
+      runPhase1({
+        root: phase1Root,
+        output: path.join(tmpdir(), 'code-health-phase1-ledger-report.json'),
+        scenarios: [],
+      }),
+    ).resolves.toMatchObject({ exitCode: 0 });
     await expect(runTddHarness({ gap: {} as never, testCommand: [], implementation: null })).rejects.toThrow(
       expectedErrors,
     );
-    // Valid, exactly-scoped human approval resolves to a typed Task 1 non-implementation; nothing is applied.
+    // Valid, exactly-scoped human approval resolves to a controlled patch proposal; nothing is applied.
     await expect(
       applyApproved({
         approval: validApproval(candidate),
@@ -1189,15 +1229,16 @@ describe('code-health ledger contract', () => {
         repositoryRoot: '.',
         currentRevision: revision,
       }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
+      kind: 'patch-proposal',
       applied: false,
-      errorCode: 'NOT_IMPLEMENTED',
-      patchPath: null,
+      errorCode: null,
+      patchPath: expect.stringMatching(/\.patch$/),
       appliedFiles: [],
       unrelatedFiles: [],
-      rollback: null,
     });
-    await expect(executeRollback(candidate.rollback)).resolves.toBe(false);
+    // The generated rollback plan is real and executable; a non-executable plan is rejected above.
+    await expect(executeRollback(candidate.rollback)).resolves.toBe(true);
     expect(evaluateDeletion({ testCount: 1, coverageProvenance: '', governanceFacts: [] }).passed).toBe(false);
   });
 
@@ -1626,7 +1667,7 @@ describe('code-health candidate lifecycle reducer (1C)', () => {
     expect(validateGapMatrix({ rows: [validGap] }, ledger)).toEqual([]);
   });
 
-  it('approval 只能匹配 human exact scope/revision，applyApproved 返回 NOT_IMPLEMENTED 且不写工作树', async () => {
+  it('approval 只能匹配 human exact scope/revision，applyApproved 返回受控 proposal 且不写工作树', async () => {
     const tempRoot = await createTempGitRepository();
     const candidate = validCandidate(firstId, { status: 'under-review' });
     const approval = validApproval(candidate);
@@ -1639,15 +1680,16 @@ describe('code-health candidate lifecycle reducer (1C)', () => {
       repositoryRoot: tempRoot,
       currentRevision: candidate.revision,
     });
-    expect(result).toMatchObject({ applied: false, errorCode: 'NOT_IMPLEMENTED', patchPath: null });
-    expect(result).toEqual({
+    expect(result).toMatchObject({
+      kind: 'patch-proposal',
       applied: false,
-      errorCode: 'NOT_IMPLEMENTED',
-      patchPath: null,
+      errorCode: null,
+      mode: 'dry-run',
+      patchPath: expect.stringMatching(/\.patch$/),
       appliedFiles: [],
       unrelatedFiles: [],
-      rollback: null,
     });
+    expect(result.rollback?.executable).toBe(true);
     expect(await gitStatus(tempRoot)).toEqual(before);
     await expect(
       applyApproved({

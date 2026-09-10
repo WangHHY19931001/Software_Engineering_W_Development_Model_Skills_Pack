@@ -87,7 +87,14 @@ import {
   mergeDynamicTrace,
   type Phase1Scenario,
 } from '../logic/code-health-phase1-logic.js';
-import type { FalsePositiveContext, Phase1CandidateLead, RevisionIdentity } from '../logic/code-health-contract.js';
+import type {
+  ApprovalDecision,
+  CodeHealthCandidate,
+  FalsePositiveContext,
+  Phase1CandidateLead,
+  RevisionIdentity,
+} from '../logic/code-health-contract.js';
+import { applyApproved, executeRollback } from '../logic/code-health-ledger-logic.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
@@ -2472,6 +2479,43 @@ const CODE_HEALTH_PHASE1_DYNAMIC_CASES: CodeHealthPhase1DynamicCase[] = [
   },
 ];
 
+// -------------------- Phase 1 候选审查与删除执行器（apply 四态） --------------------
+
+interface CodeHealthApplyFixture {
+  mode: 'dry-run' | 'patch' | 'commit';
+  candidate: CodeHealthCandidate;
+  approval: ApprovalDecision | null;
+}
+
+interface CodeHealthApplyCase {
+  file: string;
+  expected: 'approval-required' | 'scope-mismatch' | 'patch-proposal' | 'rollback-failure';
+  description: string;
+}
+
+const CODE_HEALTH_APPLY_CASES: CodeHealthApplyCase[] = [
+  {
+    file: 'approval-required.json',
+    expected: 'approval-required',
+    description: '无人类 approval artifact → HUMAN_APPROVAL_REQUIRED，绝不删除',
+  },
+  {
+    file: 'scope-mismatch.json',
+    expected: 'scope-mismatch',
+    description: 'approval 扩大 files scope → SCOPE_MISMATCH，未知文件 fail-closed',
+  },
+  {
+    file: 'valid-patch.json',
+    expected: 'patch-proposal',
+    description: 'exact human scope/revision → 受控 .patch proposal + executable rollback plan，不写工作树',
+  },
+  {
+    file: 'rollback-failure.json',
+    expected: 'rollback-failure',
+    description: 'candidate rollback plan executable=false → executeRollback 返回 false，绝不声称成功',
+  },
+];
+
 // ==================== 测试执行器 ====================
 
 interface CaseResult {
@@ -3700,9 +3744,7 @@ async function runCodeHealthPhase1StaticCases(samplesDir: string): Promise<CaseR
     for (const expected of fixture.expectedReferences ?? []) {
       const found = report.references.some(
         (reference) =>
-          reference.kind === expected.kind &&
-          reference.symbol === expected.symbol &&
-          reference.path === expected.path,
+          reference.kind === expected.kind && reference.symbol === expected.symbol && reference.path === expected.path,
       );
       if (!found) {
         details.push(`  - 缺 reference ${expected.kind}:${expected.symbol}@${expected.path}`);
@@ -3801,6 +3843,59 @@ async function runCodeHealthPhase1DynamicCases(samplesDir: string): Promise<Case
   return results;
 }
 
+/** Phase 1 candidate review + deletion executor: the four apply states must stay fail-closed. */
+async function runCodeHealthApplyCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_HEALTH_APPLY_CASES) {
+    const abs = path.join(samplesDir, 'code-health/apply', c.file);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs is a self-test-registered fixture beneath samples/
+    const fixture = parseJsonSafe<CodeHealthApplyFixture>(await fs.readFile(abs, 'utf-8'));
+    const details: string[] = [];
+    let result: Awaited<ReturnType<typeof applyApproved>> | null = null;
+    try {
+      result = await applyApproved({
+        candidate: fixture.candidate,
+        approval: fixture.approval as ApprovalDecision,
+        mode: fixture.mode,
+        repositoryRoot: '.',
+        currentRevision: fixture.candidate.revision,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (c.expected === 'approval-required') {
+        if (!/HUMAN_APPROVAL_REQUIRED/.test(message))
+          details.push(`  - 期望 HUMAN_APPROVAL_REQUIRED，实际：${message}`);
+      } else if (c.expected === 'scope-mismatch') {
+        if (!/SCOPE_MISMATCH|scope/i.test(message)) details.push(`  - 期望 scope fail-closed，实际：${message}`);
+      } else {
+        details.push(`  - 不期望抛错：${message}`);
+      }
+    }
+    if (result !== null) {
+      if (c.expected === 'approval-required' || c.expected === 'scope-mismatch') {
+        details.push(`  - 期望 fail-closed 拒绝，实际返回 ${result.kind}`);
+      } else if (result.kind !== 'patch-proposal') {
+        details.push(`  - 期望受控 proposal，实际 ${result.kind}`);
+      } else {
+        if (!/\.patch$/.test(result.patchPath)) details.push(`  - patchPath 不受控：${result.patchPath}`);
+        if (result.applied !== false) details.push('  - proposal 不得声称 applied');
+        if (result.rollback?.executable !== true) details.push('  - rollback plan 必须 executable');
+      }
+    }
+    if (c.expected === 'rollback-failure') {
+      const executable = await executeRollback(fixture.candidate.rollback);
+      if (executable !== false) details.push('  - 非可执行 rollback plan 误报成功');
+    }
+    results.push({
+      name: `code-health/apply/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 // -------------------- Metadata（版本号双写一致性） --------------------
 
 async function runMetadataCheck(skillRoot: string): Promise<CaseResult[]> {
@@ -3861,6 +3956,7 @@ async function main(): Promise<void> {
   console.log(`CodeHealth Phase1 静态用例: ${CODE_HEALTH_PHASE1_STATIC_CASES.length}`);
   console.log(`CodeHealth Phase1 Guard 用例: ${CODE_HEALTH_PHASE1_GUARD_CASES.length}`);
   console.log(`CodeHealth Phase1 动态用例: ${CODE_HEALTH_PHASE1_DYNAMIC_CASES.length}`);
+  console.log(`CodeHealth Apply 用例: ${CODE_HEALTH_APPLY_CASES.length}`);
   console.log(`BDD 用例       : ${BDD_CASES.length}`);
   console.log(`Coverage 用例  : ${COVERAGE_CASES.length}`);
   console.log(`Exemption 用例 : ${EXEMPTION_CASES.length}`);
@@ -3959,6 +4055,7 @@ async function main(): Promise<void> {
     runCodeHealthPhase1DynamicCases(samplesDir),
   ]);
   const codeHealthResults = await runCodeHealthCases(samplesDir);
+  const codeHealthApplyResults = await runCodeHealthApplyCases(samplesDir);
   const all = [
     ...verifierResults,
     ...gateResults,
@@ -3999,6 +4096,7 @@ async function main(): Promise<void> {
     ...codeHealthPhase1StaticResults,
     ...codeHealthPhase1GuardResults,
     ...codeHealthPhase1DynamicResults,
+    ...codeHealthApplyResults,
   ];
 
   const passedCount = all.filter((r) => r.passed).length;

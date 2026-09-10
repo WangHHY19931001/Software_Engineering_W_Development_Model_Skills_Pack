@@ -602,6 +602,7 @@ export interface ApplyApprovedInput {
 }
 
 export interface ApplyResultNotImplemented {
+  kind: 'not-implemented';
   applied: false;
   errorCode: 'NOT_IMPLEMENTED';
   patchPath: null;
@@ -610,7 +611,50 @@ export interface ApplyResultNotImplemented {
   rollback: null;
 }
 
-export type ApplyResult = ApplyResultNotImplemented;
+export type ApplyMode = 'dry-run' | 'patch' | 'commit';
+
+/**
+ * Real, non-applying apply outcome: the exact approved scope resolved to one controlled patch path and an
+ * executable rollback plan. `commit` plans are also represented here; the IO executor promotes them to
+ * `ApplyCommitResult` only after the real patch/commit succeeded and the scope was read back.
+ */
+export interface ApplyProposalResult {
+  kind: 'patch-proposal';
+  applied: false;
+  errorCode: null;
+  mode: ApplyMode;
+  patchPath: string;
+  appliedFiles: [];
+  unrelatedFiles: [];
+  rollback: RollbackPlan;
+}
+
+/** A real commit that touched exactly `appliedFiles` (equal to the approved change scope). */
+export interface ApplyCommitResult {
+  kind: 'applied';
+  applied: true;
+  errorCode: null;
+  mode: 'commit';
+  patchPath: string;
+  appliedFiles: string[];
+  unrelatedFiles: [];
+  rollback: RollbackPlan;
+}
+
+/** Fail-closed application result: nothing was applied and no success may be claimed. */
+export interface ApplyBlockedResult {
+  kind: 'blocked';
+  applied: false;
+  errorCode: ErrorCode;
+  mode: ApplyMode;
+  patchPath: string | null;
+  appliedFiles: [];
+  unrelatedFiles: [];
+  rollback: RollbackPlan | null;
+  reason: string;
+}
+
+export type ApplyResult = ApplyResultNotImplemented | ApplyProposalResult | ApplyCommitResult | ApplyBlockedResult;
 export interface DeletionFacts {
   testCount: number;
   coverageProvenance: string;

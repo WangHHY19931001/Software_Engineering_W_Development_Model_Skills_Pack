@@ -18,7 +18,8 @@
  *     convention (runtime evidence is not committed), which is what keeps `git status --porcelain` empty
  *     while real raw outputs and symlink fixtures exist on disk.
  *
- * Boundary: `applyApproved` and the archive producer/consumer/verifier stay typed `NOT_IMPLEMENTED`.
+ * Boundary: `applyApproved` resolves a real exact-scope patch proposal (it never writes without the
+ * human-approved IO executor), while the archive producer/consumer/verifier stay typed `NOT_IMPLEMENTED`.
  * A green 1E run proves the Task 1 contract/evidence/lifecycle integration, never Task 8 archive.
  */
 
@@ -1916,30 +1917,25 @@ const negativeCases: readonly NegativeCase[] = [
     },
   },
   {
-    id: 'apply-not-implemented',
+    id: 'apply-approval-scope-guard',
     targetStatus: 'approved',
-    codes: ['NOT_IMPLEMENTED'],
+    codes: ['SCOPE_MISMATCH'],
     act: async (context) => {
       const candidate = requireDefined(
         context.ledger.candidates.find((entry) => entry.candidateId === context.candidateId),
         'approved candidate',
       );
-      const result = await applyApproved({
-        candidate,
-        approval: context.approval,
-        mode: 'patch',
-        repositoryRoot: context.root,
-        currentRevision: context.revision,
-      });
-      expect(result).toEqual({
-        applied: false,
-        errorCode: 'NOT_IMPLEMENTED',
-        patchPath: null,
-        appliedFiles: [],
-        unrelatedFiles: [],
-        rollback: null,
-      });
-      return { code: result.errorCode, messages: [] };
+      const outcome = await captureTyped(() =>
+        applyApproved({
+          candidate,
+          approval: { ...context.approval, approvedFiles: [...context.selector.files, 'src/extra.ts'] },
+          mode: 'commit',
+          repositoryRoot: context.root,
+          currentRevision: context.revision,
+        }),
+      );
+      expect(outcome.code).toBe('SCOPE_MISMATCH');
+      return outcome;
     },
   },
   {
@@ -2066,7 +2062,7 @@ describe('code-health task1 isolated git integration', () => {
     await expectRepositoryRootUnpolluted(repoStatusBefore, repoDiffBefore);
   });
 
-  it('applyApproved 和所有 archive boundary 结果为 NOT_IMPLEMENTED，并保持 clean worktree', async () => {
+  it('applyApproved 生成精确 scope 的 patch proposal，archive boundary 保持 NOT_IMPLEMENTED 且 clean worktree', async () => {
     const repoStatusBefore = await gitStatusPorcelain(repoRoot);
     const repoDiffBefore = await gitDiffNames(repoRoot);
     const project = await createIsolatedProject();
@@ -2127,7 +2123,8 @@ describe('code-health task1 isolated git integration', () => {
       'approved candidate',
     );
 
-    // Task 1 must be able to validate a real exact-scope approval and still refuse to apply anything.
+    // Task 3 resolves a real exact-scope approval into a controlled patch proposal; the pure planner never
+    // writes and the IO executor is the only delete path (never exercised here).
     const apply = await applyApproved({
       candidate: approvedCandidateFixture,
       approval,
@@ -2135,14 +2132,16 @@ describe('code-health task1 isolated git integration', () => {
       repositoryRoot: project.root,
       currentRevision: project.initialRevision,
     });
-    expect(apply).toEqual({
+    expect(apply).toMatchObject({
+      kind: 'patch-proposal',
       applied: false,
-      errorCode: 'NOT_IMPLEMENTED',
-      patchPath: null,
+      errorCode: null,
+      mode: 'patch',
+      patchPath: expect.stringMatching(/\.patch$/),
       appliedFiles: [],
       unrelatedFiles: [],
-      rollback: null,
     });
+    expect(apply.rollback?.executable).toBe(true);
 
     const implementedRevision = await commitImplementedState(project.root);
     const implementedCommands: ChainCommands = {
