@@ -1,5 +1,36 @@
 {
   "kind": "red-green",
+  "ledger": {
+    "baseline": {
+      "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "analyzedAt": "2026-09-07T00:00:00.000Z"
+    },
+    "candidates": [
+      {
+        "candidateId": "CHG-P2-20260907-001",
+        "phase": "P2",
+        "action": "add-test",
+        "status": "verified",
+        "files": ["src/token.ts"],
+        "symbols": ["validateToken"],
+        "tests": ["probe.mjs"],
+        "revision": {
+          "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "analyzedAt": "2026-09-07T00:00:00.000Z"
+        },
+        "changeScope": {
+          "files": ["src/token.mjs"],
+          "symbols": ["validateToken"],
+          "scopeHash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      }
+    ],
+    "events": []
+  },
   "gap": {
     "gapId": "GAP-CHG-P2-20260907-001-security-red-green",
     "candidateId": "CHG-P2-20260907-001",

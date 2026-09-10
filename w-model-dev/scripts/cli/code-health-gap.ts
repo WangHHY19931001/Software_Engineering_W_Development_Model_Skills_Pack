@@ -139,8 +139,14 @@ async function main(): Promise<void> {
   let rows: GapRow[] = [];
   try {
     if (document.kind === 'red-green' && isRecord(document.gap) && Array.isArray(document.results)) {
+      // G-1: the ledger (campaign authority) — not the fixture's self-declared scope — anchors the
+      // candidate; the validator cross-checks the harness declaration against this record.
       reasons.push(
-        ...validateRedGreenEvidence(document.gap as unknown as GapRow, document.results as CommandEvidence[]),
+        ...validateRedGreenEvidence(
+          document.gap as unknown as GapRow,
+          document.results as CommandEvidence[],
+          (ledger ?? {}) as unknown as CodeHealthLedger,
+        ),
       );
     } else {
       rows = resolveRows(document);

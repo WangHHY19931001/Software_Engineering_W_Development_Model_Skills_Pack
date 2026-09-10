@@ -2590,6 +2590,18 @@ const CODE_HEALTH_GAP_CASES: CodeHealthGapCase[] = [
     description: '矩阵行 red/green 证据未绑定到该行 gapId → 拒绝跨 gap 拼装',
   },
   {
+    file: 'forged-scope-declaration.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/ledger|scope|test artifact|candidate/i],
+    description: '矩阵行伪造 implementationArtifact/声明 → 与 ledger candidate scope/tests 不一致被拒',
+  },
+  {
+    file: 'forged-scope-redgreen.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/ledger|scope|test artifact|candidate/i],
+    description: 'red-green 伪造声明（断言当实现、真实实现当测试）→ 与 ledger 记录不一致被 CLI 拒绝',
+  },
+  {
     file: 'green-weakening.json',
     expectedPassed: false,
     expectedReasonPatterns: [/same assertion|weakened|assertionHash/i],
@@ -4014,7 +4026,11 @@ async function runCodeHealthGapCases(samplesDir: string): Promise<CaseResult[]> 
       } else if (fixture.kind === 'matrix') {
         reasons = validateGapMatrix({ rows: fixture.rows }, fixture.ledger as CodeHealthLedger);
       } else {
-        reasons = validateRedGreenEvidence(fixture.gap as GapRow, fixture.results as CommandEvidence[]);
+        reasons = validateRedGreenEvidence(
+          fixture.gap as GapRow,
+          fixture.results as CommandEvidence[],
+          fixture.ledger as CodeHealthLedger,
+        );
       }
     } catch (error) {
       reasons = [error instanceof Error ? error.message : String(error)];

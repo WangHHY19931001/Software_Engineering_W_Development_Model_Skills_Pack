@@ -7,17 +7,28 @@
  * and a mandatory per-run `EvidenceBinding`. The pure Phase 2 matrix logic stays in
  * `logic/code-health-gap-logic.ts`.
  *
- * `assertionHash` is derived from a fully declared and anchored artifact set, never from caller trust:
- *   - the implementation artifact must be inside the owning candidate's approved `changeScope.files`
- *     (R-A: it cannot be the probe/assertion module), must not be an argv entry, and must not appear in
- *     the declared test artifacts (R-B disjointness);
- *   - the declared test artifacts must be non-empty, repository-relative, and exist;
+ * `assertionHash` is derived from a fully declared and anchored artifact set:
+ *   - the implementation artifact must be inside the ledger-recorded candidate's approved
+ *     `changeScope.files` (G-1/G-2: the implementation/test split comes from the candidate record, not
+ *     from caller labels), must not be a ledger-declared `tests` file, must not be an argv entry, and
+ *     must not appear in the declared test artifacts;
+ *   - the declared test artifacts must be non-empty, repository-relative, exist, and each must be a
+ *     ledger-declared candidate test;
  *   - every statically resolvable local module reachable from the argv entry points must be classified
- *     as a test artifact or the implementation artifact (R-C closure completeness);
+ *     as a ledger-declared test artifact or the implementation artifact (R-C closure completeness);
  *   - every local module file in the test entry points' own directory must be declared or be the
  *     implementation, which closes non-literal dynamic imports (R-D);
+ *   - every artifact/test file is resolved with the shared canonical-root containment semantics and
+ *     rejected as `SECURITY_BLOCKED` when it is a symlink, a root escape, or a hardlink (`nlink > 1`)
+ *     (G-3);
  *   - `testArtifacts` / `implementationArtifact` are recorded on every result so RED and GREEN symmetry
  *     is enforced by `validateRedGreenEvidence` (R-E).
+ *
+ * Honest residual (G-4): this harness enforces STRUCTURAL CONSISTENCY of the declarations against the
+ * ledger record it is given. It is not, and cannot be, unforgeable on its own — a caller that supplies a
+ * forged ledger record is out of scope. The ledger, the G gate, and the role signature chain are the
+ * authority. A cross-directory non-literal dynamic specifier is an explicit, recorded acceptance
+ * limitation (same-directory non-literal specifiers are closed by R-D).
  *
  * The result also carries `toolVersions[codeHealthTddFailureClass]`, the real failure classification
  * derived from the raw child output. An unrelated failure (module missing, syntax error, command not
@@ -41,7 +52,11 @@ import type {
 
 import { createCodeHealthCommandRunner } from './code-health-command.js';
 import { CodeHealthError } from './code-health-error.js';
-import { resolveControlledRelativePath } from './code-health-file-verifier.js';
+import {
+  createCodeHealthFileVerifier,
+  resolveControlledRelativePath,
+  resolveControlledRoot,
+} from './code-health-file-verifier.js';
 
 /** `toolVersions` key carrying the real failure classification of one harness run. */
 export const TDD_FAILURE_CLASS_KEY = 'codeHealthTddFailureClass';
@@ -174,6 +189,50 @@ function requireRepositoryRelativePaths(root: string, value: unknown, field: str
   return [...new Set(normalized)];
 }
 
+const fileVerifier = createCodeHealthFileVerifier();
+
+/**
+ * Canonical artifact policy (G-3): every artifact/test file is resolved through the shared
+ * `code-health-file-verifier` boundary — explicit repository root, no symlinked components or target,
+ * no root escape — and additionally rejected when it is a hardlink (`nlink > 1`). Content is consumed
+ * through the verified canonical path.
+ */
+async function assertCanonicalRegularFile(root: string, relative: string, field: string): Promise<void> {
+  const rootResolution = await resolveControlledRoot(root);
+  if (!rootResolution.ok || !rootResolution.canonicalRoot) {
+    throw new CodeHealthError(
+      rootResolution.code === 'SECURITY_BLOCKED' ? 'SECURITY_BLOCKED' : 'STRUCTURE_INVALID',
+      `TDD harness ${field} repository root is not a controlled directory`,
+    );
+  }
+  const canonicalTarget = path.resolve(rootResolution.canonicalRoot, ...relative.split('/'));
+  let bytes: Buffer;
+  try {
+    bytes = await fs.readFile(canonicalTarget);
+  } catch {
+    throw new CodeHealthError('EVIDENCE_INVALID', `TDD harness ${field} is missing or unreadable: ${relative}`);
+  }
+  const actualSha256 = createHash('sha256').update(bytes).digest('hex');
+  const verified = await fileVerifier.verifyRegularNonSymlinkFile({
+    root,
+    relativePath: relative,
+    expectedSha256: actualSha256,
+  });
+  if (!verified.ok) {
+    throw new CodeHealthError(
+      verified.code === 'SECURITY_BLOCKED' ? 'SECURITY_BLOCKED' : (verified.code ?? 'EVIDENCE_INVALID'),
+      `TDD harness ${field} failed canonical verification: ${verified.reason ?? 'unknown reason'}`,
+    );
+  }
+  const entry = await fs.lstat(canonicalTarget);
+  if (entry.nlink > 1) {
+    throw new CodeHealthError(
+      'SECURITY_BLOCKED',
+      `TDD harness ${field} must not be a hardlinked file (nlink>1): ${relative}`,
+    );
+  }
+}
+
 async function resolveLocalModule(root: string, fromRelative: string, specifier: string): Promise<string | null> {
   const baseDirectory = path.posix.dirname(fromRelative);
   const joined = path.posix.normalize(path.posix.join(baseDirectory, specifier));
@@ -224,8 +283,10 @@ interface ResolvedHarnessArtifacts {
 }
 
 /**
- * Resolve and structurally validate the anchored artifact set (R-A..R-D). Every failure is a typed
- * `ARG_INVALID`; no rule depends on the caller being honest beyond providing the owning candidate.
+ * Resolve and structurally validate the anchored artifact set. The implementation/test split is derived
+ * from the ledger-recorded candidate (`changeScope.files` = approved implementation scope,
+ * `tests` = ledger-declared test files), not from caller labels. Every failure is a typed error; the
+ * canonical artifact policy (G-3) rejects symlinks, escapes, and hardlinks.
  */
 async function resolveHarnessArtifacts(root: string, input: TddHarnessInput): Promise<ResolvedHarnessArtifacts> {
   const implementationRaw = input.implementation;
@@ -239,40 +300,44 @@ async function resolveHarnessArtifacts(root: string, input: TddHarnessInput): Pr
   if (!resolveControlledRelativePath(root, implementation).ok) {
     throw new CodeHealthError('ARG_INVALID', 'TDD harness implementation artifact must be repository-relative');
   }
-  if ((await resolveRegularFile(root, implementation)) === null) {
-    throw new CodeHealthError(
-      'ARG_INVALID',
-      `TDD harness implementation artifact must exist as a regular file: ${implementation}`,
-    );
-  }
 
   const candidate = input.candidate;
   if (!isRecord(candidate) || candidate.candidateId !== input.gap.candidateId) {
     throw new CodeHealthError(
       'ARG_INVALID',
-      'TDD harness requires the owning candidate whose candidateId matches the gap',
+      'TDD harness requires the ledger-recorded candidate whose candidateId matches the gap',
     );
   }
   const changeScope = isRecord(candidate.changeScope) ? candidate.changeScope : null;
   if (changeScope === null) {
-    throw new CodeHealthError('ARG_INVALID', 'TDD harness requires the candidate approved changeScope.files');
+    throw new CodeHealthError('ARG_INVALID', 'TDD harness requires the ledger candidate approved changeScope.files');
   }
-  const approvedScope = requireRepositoryRelativePaths(root, changeScope.files, 'candidate approved changeScope.files');
+  const approvedScope = requireRepositoryRelativePaths(root, changeScope.files, 'ledger candidate changeScope.files');
+  const candidateTests = requireRepositoryRelativePaths(root, candidate.tests, 'ledger candidate tests');
+
   if (!approvedScope.includes(implementation)) {
     throw new CodeHealthError(
       'ARG_INVALID',
-      `TDD harness implementation artifact is not in the candidate approved scope: ${implementation}`,
+      `TDD harness implementation artifact is not in the ledger candidate approved scope: ${implementation}`,
     );
   }
+  if (candidateTests.includes(implementation)) {
+    throw new CodeHealthError(
+      'ARG_INVALID',
+      'TDD harness implementation artifact must not be a ledger-declared test file',
+    );
+  }
+  await assertCanonicalRegularFile(root, implementation, 'implementation artifact');
 
   const testArtifacts = requireRepositoryRelativePaths(root, input.testArtifacts, 'testArtifacts');
   for (const artifact of testArtifacts) {
-    if ((await resolveRegularFile(root, artifact)) === null) {
+    if (!candidateTests.includes(artifact)) {
       throw new CodeHealthError(
         'ARG_INVALID',
-        `TDD harness testArtifacts entry must exist as a regular file: ${artifact}`,
+        `TDD harness testArtifacts entry must be a ledger-declared candidate test: ${artifact}`,
       );
     }
+    await assertCanonicalRegularFile(root, artifact, 'test artifact');
   }
   if (testArtifacts.includes(implementation)) {
     throw new CodeHealthError(
@@ -285,7 +350,21 @@ async function resolveHarnessArtifacts(root: string, input: TddHarnessInput): Pr
   for (const argument of input.testCommand) {
     if (argument.startsWith('-')) continue;
     const relative = normalizeRelative(argument);
-    if ((await resolveRegularFile(root, relative)) !== null) entryFiles.push(relative);
+    const resolution = resolveControlledRelativePath(root, relative);
+    if (!resolution.ok || !resolution.absolutePath) continue;
+    let entry: Awaited<ReturnType<typeof fs.lstat>> | null;
+    try {
+      entry = await fs.lstat(resolution.absolutePath);
+    } catch {
+      entry = null;
+    }
+    if (entry === null) continue;
+    if (entry.isSymbolicLink()) {
+      throw new CodeHealthError('SECURITY_BLOCKED', `TDD harness argv test file must not be a symlink: ${relative}`);
+    }
+    if (!entry.isFile()) continue;
+    await assertCanonicalRegularFile(root, relative, 'argv test file');
+    entryFiles.push(relative);
   }
   if (entryFiles.length === 0) {
     throw new CodeHealthError('ARG_INVALID', 'TDD harness test command must reference at least one existing test file');
@@ -302,11 +381,18 @@ async function resolveHarnessArtifacts(root: string, input: TddHarnessInput): Pr
         `TDD harness closure member ${member} is neither a declared test artifact nor the implementation artifact`,
       );
     }
+    if (member !== implementation && !candidateTests.includes(member)) {
+      throw new CodeHealthError(
+        'ARG_INVALID',
+        `TDD harness closure member ${member} is not a ledger-declared candidate test`,
+      );
+    }
+    if (member !== implementation) await assertCanonicalRegularFile(root, member, 'closure member');
   }
 
   // R-D: any local module in a test entry point's own directory that is neither declared nor the
   // implementation artifact is a violation. This closes non-literal dynamic imports, which the static
-  // closure above cannot see.
+  // closure above cannot see. Symlinked local modules are rejected outright (G-3).
   for (const entry of entryFiles) {
     const directory = path.posix.dirname(entry);
     const absoluteDirectory = directory === '.' ? root : path.resolve(root, directory);
@@ -317,14 +403,19 @@ async function resolveHarnessArtifacts(root: string, input: TddHarnessInput): Pr
       continue;
     }
     for (const dirent of entries) {
-      if (!dirent.isFile() || !isModuleFile(dirent.name)) continue;
+      if (!isModuleFile(dirent.name)) continue;
       const relative = directory === '.' ? dirent.name : `${directory}/${dirent.name}`;
+      if (dirent.isSymbolicLink()) {
+        throw new CodeHealthError('SECURITY_BLOCKED', `TDD harness local module must not be a symlink: ${relative}`);
+      }
+      if (!dirent.isFile()) continue;
       if (relative !== implementation && !testArtifacts.includes(relative)) {
         throw new CodeHealthError(
           'ARG_INVALID',
           `TDD harness local module ${relative} in the test entry directory is neither a declared test artifact nor the implementation artifact`,
         );
       }
+      await assertCanonicalRegularFile(root, relative, 'entry-directory module');
     }
   }
 

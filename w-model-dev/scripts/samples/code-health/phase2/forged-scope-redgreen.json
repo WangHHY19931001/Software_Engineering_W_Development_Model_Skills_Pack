@@ -32,7 +32,7 @@
     "events": []
   },
   "gap": {
-    "gapId": "GAP-CHG-P2-20260907-001-security-infrastructure",
+    "gapId": "GAP-CHG-P2-20260907-001-security-forged-scope",
     "candidateId": "CHG-P2-20260907-001",
     "kind": "security",
     "testLevels": ["integration"],
@@ -59,25 +59,25 @@
   },
   "results": [
     {
-      "command": "node probe.mjs",
+      "command": "node runner.mjs",
       "cwd": ".",
       "environment": {},
       "platform": "win32",
-      "toolVersions": { "node": "20.0.0", "codeHealthTddFailureClass": "infrastructure" },
+      "toolVersions": { "node": "20.0.0", "codeHealthTddFailureClass": "assertion" },
       "startedAt": "2026-09-07T00:01:00.000Z",
       "endedAt": "2026-09-07T00:01:01.000Z",
       "exitCode": 1,
       "observation": "observed",
       "rawOutputPath": ".w-model/code-health/tdd/red.log",
       "rawOutputSha256": "1111111111111111111111111111111111111111111111111111111111111111",
-      "gapId": "GAP-CHG-P2-20260907-001-security-infrastructure",
+      "gapId": "GAP-CHG-P2-20260907-001-security-forged-scope",
       "assertionHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "implementationHash": null,
-      "testArtifacts": ["probe.mjs"],
-      "implementationArtifact": "src/token.mjs"
+      "implementationHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "testArtifacts": ["src/token.mjs"],
+      "implementationArtifact": "assertion.mjs"
     },
     {
-      "command": "node probe.mjs",
+      "command": "node runner.mjs",
       "cwd": ".",
       "environment": {},
       "platform": "win32",
@@ -88,11 +88,11 @@
       "observation": "observed",
       "rawOutputPath": ".w-model/code-health/tdd/green.log",
       "rawOutputSha256": "2222222222222222222222222222222222222222222222222222222222222222",
-      "gapId": "GAP-CHG-P2-20260907-001-security-infrastructure",
+      "gapId": "GAP-CHG-P2-20260907-001-security-forged-scope",
       "assertionHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "implementationHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "testArtifacts": ["probe.mjs"],
-      "implementationArtifact": "src/token.mjs"
+      "implementationHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "testArtifacts": ["src/token.mjs"],
+      "implementationArtifact": "assertion.mjs"
     }
   ]
 }

@@ -1302,6 +1302,15 @@ export function validateGapRow(row: unknown, ledger: CodeHealthLedger, seenGapId
         reasons.push('greenEvidence assertionHash does not match the gap assertionHash');
       }
     }
+    // G-1/G-2: any declared artifact set must be consistent with the LEDGER candidate record.
+    for (const [field, evidence] of [
+      ['redEvidence', row.redEvidence],
+      ['greenEvidence', row.greenEvidence],
+    ] as const) {
+      const declaration = tddArtifactDeclarations(evidence as CommandEvidence);
+      if (declaration === null) continue;
+      reasons.push(...validateDeclarationAgainstCandidate(declaration, candidate, field));
+    }
   }
   if (
     row.assertionHash !== undefined &&
@@ -1388,16 +1397,71 @@ function tddArtifactDeclarations(result: CommandEvidence): TddArtifactDeclaratio
 }
 
 /**
- * Strict RED/GREEN validation. Presence is not enough: every observed result must be harness-bound to
- * the owning gap and declare the artifact set it was produced with; RED and GREEN must declare identical
- * test artifacts and the same implementation artifact (R-E symmetry), share one assertion hash (so a
- * weakened or deleted assertion cannot produce a matching GREEN), remain disjoint, be distinguishable,
- * and RED must carry the mandatory real assertion-failure classification — unrelated failures (module
- * missing, syntax error, unavailable command) and unclassified hand-authored rows are rejected.
+ * Structural consistency of one declared artifact set against the ledger-recorded candidate: the
+ * implementation artifact must be in the ledger-approved `changeScope.files`, every declared test
+ * artifact must be a ledger-declared `tests` file, and the two sets must be disjoint. This is a
+ * consistency check against the record passed in — it is NOT unforgeable by itself; the ledger,
+ * G gate, and signature chain are the authority (G-4).
  */
-export function validateRedGreenEvidence(gap: GapRow, results: CommandEvidence[]): string[] {
+function validateDeclarationAgainstCandidate(
+  declaration: TddArtifactDeclarations,
+  candidate: CodeHealthCandidate | undefined,
+  field: string,
+): string[] {
+  const reasons: string[] = [];
+  if (!candidate) {
+    reasons.push(`${field} declaration requires the ledger candidate record for the gap`);
+    return reasons;
+  }
+  const scopeFiles =
+    isRecord(candidate.changeScope) && Array.isArray(candidate.changeScope.files)
+      ? candidate.changeScope.files.filter((file): file is string => typeof file === 'string')
+      : [];
+  const candidateTests = Array.isArray(candidate.tests)
+    ? candidate.tests.filter((test): test is string => typeof test === 'string')
+    : [];
+  if (scopeFiles.length === 0) {
+    reasons.push(`${field} declaration requires ledger candidate changeScope.files`);
+  } else if (!scopeFiles.includes(declaration.implementationArtifact)) {
+    reasons.push(`${field} implementationArtifact is not in the ledger candidate approved scope`);
+  }
+  if (candidateTests.length === 0) {
+    reasons.push(`${field} declaration requires ledger candidate tests`);
+  } else {
+    for (const artifact of declaration.testArtifacts) {
+      if (!candidateTests.includes(artifact)) {
+        reasons.push(`${field} test artifact ${artifact} is not a ledger-declared candidate test`);
+      }
+    }
+  }
+  if (declaration.testArtifacts.includes(declaration.implementationArtifact)) {
+    reasons.push(`${field} testArtifacts must not include the implementation artifact`);
+  }
+  return reasons;
+}
+
+/**
+ * Strict RED/GREEN validation. Presence is not enough: every observed result must be harness-bound to
+ * the owning gap and declare the artifact set it was produced with; the declared set must be consistent
+ * with the LEDGER-recorded candidate (`changeScope.files` = implementation scope, `tests` = declared
+ * tests); RED and GREEN must declare identical test artifacts and the same implementation artifact
+ * (R-E symmetry), share one assertion hash (so a weakened or deleted assertion cannot produce a matching
+ * GREEN), remain disjoint, be distinguishable, and RED must carry the mandatory real assertion-failure
+ * classification — unrelated failures and unclassified hand-authored rows are rejected.
+ *
+ * Honest residual (G-4): this is a pure consistency check against the ledger record passed in. A pure
+ * function cannot be unforgeable; the ledger, the G gate, and the role signature chain are the authority.
+ */
+export function validateRedGreenEvidence(gap: GapRow, results: CommandEvidence[], ledger: CodeHealthLedger): string[] {
   if (!Array.isArray(results)) return ['RED/GREEN results are required'];
   if (!isRecord(gap) || typeof gap.gapId !== 'string') return ['RED/GREEN validation requires the owning gap'];
+  if (!isRecord(ledger) || !Array.isArray(ledger.candidates)) {
+    return ['RED/GREEN validation requires the ledger candidate record'];
+  }
+  const ledgerCandidate = ledger.candidates.find((entry) => entry.candidateId === gap.candidateId);
+  if (!ledgerCandidate) {
+    return [`RED/GREEN validation requires the ledger candidate record for gap ${gap.gapId}`];
+  }
   const reasons: string[] = [];
   const observed = results.filter((result) => result.observation === 'observed' && typeof result.exitCode === 'number');
   const reds = observed.filter((result) => (result.exitCode as number) !== 0);
@@ -1427,7 +1491,7 @@ export function validateRedGreenEvidence(gap: GapRow, results: CommandEvidence[]
     reasons.push('RED and GREEN were not produced by the same assertion (the assertion was changed or weakened)');
   }
 
-  // R-E: the declared artifact set is mandatory and must be symmetric across the pair.
+  // R-E + G-1/G-2: the declared artifact set is mandatory, symmetric, and consistent with the ledger.
   const declarations = observed.map((result) => ({ result, declaration: tddArtifactDeclarations(result) }));
   for (const { result, declaration } of declarations) {
     const label = result.exitCode === 0 ? 'GREEN' : 'RED';
@@ -1441,6 +1505,7 @@ export function validateRedGreenEvidence(gap: GapRow, results: CommandEvidence[]
     if (declaration.testArtifacts.includes(declaration.implementationArtifact)) {
       reasons.push(`${label} evidence testArtifacts must not include the implementation artifact`);
     }
+    reasons.push(...validateDeclarationAgainstCandidate(declaration, ledgerCandidate, label));
   }
   const declarationSignatures = new Set(
     declarations
