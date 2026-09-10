@@ -83,6 +83,36 @@ async function lstatOrNull(target: string): Promise<Awaited<ReturnType<typeof fs
   }
 }
 
+export interface ControlledRootResolution {
+  ok: boolean;
+  code: ErrorCode | null;
+  canonicalRoot?: string;
+  reason?: string;
+}
+
+/**
+ * Resolve one explicit controlled root: the root itself must be a real non-symlink directory, while
+ * symlinked *ancestors* (for example macOS `/var` → `/private/var` behind `os.tmpdir()`) are allowed.
+ * All containment comparisons use the canonical root returned here.
+ */
+export async function resolveControlledRoot(root: unknown): Promise<ControlledRootResolution> {
+  if (typeof root !== 'string' || root.length === 0) {
+    return { ok: false, code: 'STRUCTURE_INVALID', reason: 'root must be an explicit non-empty directory path' };
+  }
+  const resolvedRoot = path.resolve(root);
+  const entry = await lstatOrNull(resolvedRoot);
+  if (!entry) return { ok: false, code: 'STRUCTURE_INVALID', reason: 'root must be an existing directory' };
+  if (entry.isSymbolicLink()) {
+    return { ok: false, code: 'SECURITY_BLOCKED', reason: 'root must not be a symlink or junction' };
+  }
+  if (!entry.isDirectory()) return { ok: false, code: 'STRUCTURE_INVALID', reason: 'root must be a directory' };
+  const canonicalRoot = await fs.realpath(resolvedRoot).catch(() => null);
+  if (!canonicalRoot) {
+    return { ok: false, code: 'SECURITY_BLOCKED', reason: 'root could not be resolved safely' };
+  }
+  return { ok: true, code: null, canonicalRoot };
+}
+
 export function createCodeHealthFileVerifier(): FileVerifier {
   return {
     async verifyRegularNonSymlinkFile(input): Promise<FileVerificationResult> {
@@ -98,21 +128,22 @@ export function createCodeHealthFileVerifier(): FileVerifier {
       });
 
       const resolution = resolveControlledRelativePath(input?.root, relativePath);
-      if (!resolution.ok || !resolution.absolutePath) {
+      if (!resolution.ok) {
         return failed(resolution.code ?? 'STRUCTURE_INVALID', resolution.reason ?? 'path is not controlled');
       }
       if (!HEX64_PATTERN.test(expectedSha256)) {
         return failed('STRUCTURE_INVALID', 'expectedSha256 must be a lowercase SHA-256 digest');
       }
 
-      const resolvedRoot = path.resolve(input.root);
-      const rootEntry = await lstatOrNull(resolvedRoot);
-      if (!rootEntry || rootEntry.isSymbolicLink() || !rootEntry.isDirectory()) {
-        return failed('STRUCTURE_INVALID', 'root must be an existing non-symlink directory');
+      const rootResolution = await resolveControlledRoot(input?.root);
+      if (!rootResolution.ok || !rootResolution.canonicalRoot) {
+        return failed(rootResolution.code ?? 'STRUCTURE_INVALID', rootResolution.reason ?? 'root is not controlled');
       }
+      const canonicalRoot = rootResolution.canonicalRoot;
+      const canonicalTarget = path.resolve(canonicalRoot, ...relativePath.split('/'));
 
       const parentComponents = relativePath.split('/').slice(0, -1);
-      let current = resolvedRoot;
+      let current = canonicalRoot;
       for (const component of parentComponents) {
         current = path.join(current, component);
         const entry = await lstatOrNull(current);
@@ -121,28 +152,28 @@ export function createCodeHealthFileVerifier(): FileVerifier {
         if (!entry.isDirectory()) return failed('EVIDENCE_INVALID', 'parent path must be a directory');
       }
 
-      const targetEntry = await lstatOrNull(resolution.absolutePath);
+      const targetEntry = await lstatOrNull(canonicalTarget);
       if (!targetEntry) return failed('EVIDENCE_INVALID', 'file is missing beneath the controlled root');
       if (targetEntry.isSymbolicLink()) return failed('SECURITY_BLOCKED', 'target must not be a symlink');
       if (!targetEntry.isFile()) return failed('EVIDENCE_INVALID', 'target must be a regular file');
 
       let bytes: Buffer;
       try {
-        bytes = await fs.readFile(resolution.absolutePath);
+        bytes = await fs.readFile(canonicalTarget);
       } catch {
         return failed('EVIDENCE_INVALID', 'file could not be read safely');
       }
       const actualSha256 = createHash('sha256').update(bytes).digest('hex');
 
-      const afterEntry = await lstatOrNull(resolution.absolutePath);
-      const realPath = await fs.realpath(resolution.absolutePath).catch(() => null);
+      const afterEntry = await lstatOrNull(canonicalTarget);
+      const realPath = await fs.realpath(canonicalTarget).catch(() => null);
       if (
         !afterEntry ||
         afterEntry.isSymbolicLink() ||
         !afterEntry.isFile() ||
         realPath === null ||
-        path.resolve(realPath) !== path.resolve(resolution.absolutePath) ||
-        !isPathWithin(resolvedRoot, realPath)
+        path.resolve(realPath) !== canonicalTarget ||
+        !isPathWithin(canonicalRoot, realPath)
       ) {
         return failed('SECURITY_BLOCKED', 'target changed or escaped the controlled root during verification');
       }

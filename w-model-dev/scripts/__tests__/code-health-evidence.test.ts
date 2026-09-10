@@ -36,13 +36,29 @@ const verifier = createCodeHealthFileVerifier();
 const gitRevisionProvider = createCodeHealthGitRevisionProvider();
 const revisionProvider = gitRevisionProvider;
 
+/**
+ * Canonical Git environment for the test fixtures: it mirrors the audit boundary the provider uses
+ * (no `GIT_DIR`/`GIT_WORK_TREE` redirects, no system/user config) so `git archive` bytes are
+ * comparable across machines regardless of local `core.autocrlf`.
+ */
 const GIT_ENV = {
-  ...process.env,
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
+  GIT_TERMINAL_PROMPT: '0',
   GIT_AUTHOR_NAME: 'code-health-1b',
   GIT_AUTHOR_EMAIL: 'code-health-1b@example.test',
   GIT_COMMITTER_NAME: 'code-health-1b',
   GIT_COMMITTER_EMAIL: 'code-health-1b@example.test',
-};
+  PATH: process.env.PATH,
+  PATHEXT: process.env.PATHEXT,
+  SYSTEMROOT: process.env.SYSTEMROOT,
+  SYSTEMDRIVE: process.env.SYSTEMDRIVE,
+  WINDIR: process.env.WINDIR,
+  COMSPEC: process.env.COMSPEC,
+  TEMP: process.env.TEMP,
+  TMP: process.env.TMP,
+  USERPROFILE: process.env.USERPROFILE,
+} as NodeJS.ProcessEnv;
 
 const createdRoots: string[] = [];
 
@@ -223,6 +239,34 @@ describe('code-health file verifier', () => {
     expect(badRoot.ok).toBe(false);
     expect(badRoot.code).toBe('STRUCTURE_INVALID');
   });
+
+  it('root 的祖先为 symlink 时仍接受合法文件（macOS tmpdir 场景），root 自身 symlink 仍拒绝', async () => {
+    const container = await tempRoot('code-health-1b-ancestor-');
+    const realContainer = path.join(container, 'real');
+    const realRoot = path.join(realContainer, 'root');
+    await fs.mkdir(path.join(realRoot, 'evidence'), { recursive: true });
+    const bytes = Buffer.from('ancestor-link-bytes', 'utf8');
+    await fs.writeFile(path.join(realRoot, 'evidence', 'raw.log'), bytes);
+    const linkedContainer = path.join(container, 'linked');
+    await fs.symlink(realContainer, linkedContainer, process.platform === 'win32' ? 'junction' : 'dir');
+    const ancestorLinkedRoot = path.join(linkedContainer, 'root');
+
+    const result = await verifier.verifyRegularNonSymlinkFile({
+      root: ancestorLinkedRoot,
+      relativePath: 'evidence/raw.log',
+      expectedSha256: sha256(bytes),
+    });
+    expect(result).toMatchObject({ ok: true, code: null, relativePath: 'evidence/raw.log' });
+    expect(result.actualSha256).toBe(sha256(bytes));
+
+    // A root that is itself a symlink or junction must stay rejected.
+    const rootLinkResult = await verifier.verifyRegularNonSymlinkFile({
+      root: linkedContainer,
+      relativePath: 'root/evidence/raw.log',
+      expectedSha256: sha256(bytes),
+    });
+    expect(rootLinkResult).toMatchObject({ ok: false, code: 'SECURITY_BLOCKED' });
+  });
 });
 
 describe('code-health evidence store', () => {
@@ -321,6 +365,64 @@ describe('code-health evidence store', () => {
     expect(await fs.readdir(path.join(root, 'evidence')).catch(() => [])).toEqual([]);
   });
 
+  it('putRawOutput 在 root 为 junction/symlink 时写入前拒绝且不残留文件', async () => {
+    const container = await tempRoot('code-health-1b-root-link-');
+    const realRoot = path.join(container, 'real-root');
+    await fs.mkdir(realRoot, { recursive: true });
+    const linkedRoot = path.join(container, 'linked-root');
+    await fs.symlink(realRoot, linkedRoot, process.platform === 'win32' ? 'junction' : 'dir');
+    const selector = makeSelector('CHG-P1-20260907-907');
+    const store = createCodeHealthEvidenceStore({ repositoryRoot: linkedRoot });
+    await expect(
+      store.putRawOutput({
+        candidateId: selector.candidateId,
+        scopeHash: selector.scopeHash,
+        relativePath: 'raw.log',
+        bytes: Buffer.from('must-not-write'),
+      }),
+    ).rejects.toMatchObject({ code: 'SECURITY_BLOCKED' });
+    expect(await fs.readdir(realRoot)).toEqual([]);
+    expect(await fs.readdir(container)).toEqual(['linked-root', 'real-root']);
+
+    // A rawOutputRoot that is itself a symlink/junction is also rejected before any write.
+    const outside = await tempRoot('code-health-1b-raw-root-outside-');
+    const outsideTarget = path.join(outside, 'target');
+    await fs.mkdir(outsideTarget, { recursive: true });
+    const symlinkedRawRoot = path.join(realRoot, 'evidence-link');
+    await fs.symlink(outsideTarget, symlinkedRawRoot, process.platform === 'win32' ? 'junction' : 'dir');
+    const linkedStore = createCodeHealthEvidenceStore({ repositoryRoot: realRoot, rawOutputRoot: 'evidence-link' });
+    await expect(
+      linkedStore.putRawOutput({
+        candidateId: selector.candidateId,
+        scopeHash: selector.scopeHash,
+        relativePath: 'evidence-link/raw.log',
+        bytes: Buffer.from('must-not-write'),
+      }),
+    ).rejects.toMatchObject({ code: 'SECURITY_BLOCKED' });
+    expect(await fs.readdir(outsideTarget)).toEqual([]);
+  });
+
+  it('root 的祖先为 symlink 时仍能独占写入并回读真实文件', async () => {
+    const container = await tempRoot('code-health-1b-ancestor-store-');
+    const realContainer = path.join(container, 'real');
+    const realRoot = path.join(realContainer, 'root');
+    await fs.mkdir(realRoot, { recursive: true });
+    const linkedContainer = path.join(container, 'linked');
+    await fs.symlink(realContainer, linkedContainer, process.platform === 'win32' ? 'junction' : 'dir');
+    const ancestorLinkedRoot = path.join(linkedContainer, 'root');
+    const selector = makeSelector('CHG-P1-20260907-908');
+    const store = createCodeHealthEvidenceStore({ repositoryRoot: ancestorLinkedRoot, rawOutputRoot: 'evidence' });
+    const stored = await store.putRawOutput({
+      candidateId: selector.candidateId,
+      scopeHash: selector.scopeHash,
+      relativePath: 'evidence/raw-ancestor.log',
+      bytes: Buffer.from('ancestor-store-bytes'),
+    });
+    expect(stored.relativePath).toBe('evidence/raw-ancestor.log');
+    expect(stored.sha256).toBe(sha256('ancestor-store-bytes'));
+    expect(await fs.readFile(path.join(realRoot, 'evidence', 'raw-ancestor.log'), 'utf8')).toBe('ancestor-store-bytes');
+  });
+
   it('verify 拒绝 candidate mismatch、scope mismatch、raw hash mismatch 和 stale revision', async () => {
     const root = await createTempGitRoot();
     const revision = await currentRevision(root);
@@ -411,6 +513,34 @@ describe('code-health evidence store', () => {
       code: 'REVISION_MISMATCH',
       actual: null,
     });
+  });
+
+  it('RevisionProvider 使用最小审计 env，不被 GIT_DIR/GIT_WORK_TREE 重定向到伪仓库', async () => {
+    const root = await createTempGitRoot();
+    const actual = await currentRevision(root);
+    const decoy = await tempRoot('code-health-1b-decoy-git-');
+    const originalGitDir = process.env.GIT_DIR;
+    const originalWorkTree = process.env.GIT_WORK_TREE;
+    const originalIndexFile = process.env.GIT_INDEX_FILE;
+    try {
+      process.env.GIT_DIR = decoy;
+      process.env.GIT_WORK_TREE = decoy;
+      process.env.GIT_INDEX_FILE = path.join(decoy, 'index');
+      const observed = await gitRevisionProvider.current(root);
+      expect(observed).toMatchObject({
+        commitSha: actual.commitSha,
+        treeSha: actual.treeSha,
+        sourceBundleSha256: actual.sourceBundleSha256,
+      });
+      await expect(revisionProvider.verify(root, actual)).resolves.toMatchObject({ ok: true, code: null });
+    } finally {
+      if (originalGitDir === undefined) delete process.env.GIT_DIR;
+      else process.env.GIT_DIR = originalGitDir;
+      if (originalWorkTree === undefined) delete process.env.GIT_WORK_TREE;
+      else process.env.GIT_WORK_TREE = originalWorkTree;
+      if (originalIndexFile === undefined) delete process.env.GIT_INDEX_FILE;
+      else process.env.GIT_INDEX_FILE = originalIndexFile;
+    }
   });
 });
 

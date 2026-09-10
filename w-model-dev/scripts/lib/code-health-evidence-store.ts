@@ -30,6 +30,7 @@ import {
   createCodeHealthFileVerifier,
   isPathWithin,
   resolveControlledRelativePath,
+  resolveControlledRoot,
 } from './code-health-file-verifier.js';
 
 const CANDIDATE_ID_PATTERN = /^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$/;
@@ -100,6 +101,15 @@ async function ensureControlledDirectoryChain(resolvedRoot: string, components: 
   }
 }
 
+/** Best-effort removal of a raw output this store just created, so a failed write leaves no residue. */
+async function removeFailedRawOutput(target: string): Promise<void> {
+  try {
+    await fs.unlink(target);
+  } catch {
+    // Nothing else can be done safely; the caller still fails closed.
+  }
+}
+
 export function createCodeHealthEvidenceStore(options: CodeHealthEvidenceStoreOptions): EvidenceStore {
   const repositoryRoot = path.resolve(options.repositoryRoot);
   const rawOutputRoot = options.rawOutputRoot;
@@ -160,11 +170,25 @@ export function createCodeHealthEvidenceStore(options: CodeHealthEvidenceStoreOp
       if (!(bytes instanceof Uint8Array)) {
         throw new CodeHealthError('ARG_INVALID', 'raw output bytes must be a byte array');
       }
-      const { relativePath, absolutePath } = normalizeRawPath(input.relativePath);
+      const { relativePath } = normalizeRawPath(input.relativePath);
 
-      await ensureControlledDirectoryChain(repositoryRoot, relativePath.split('/').slice(0, -1));
+      // Validate the root itself (and canonicalize it once) before any byte is written: a root that
+      // is a symlink or junction must never become a write target, and symlinked ancestors such as
+      // macOS `/var` → `/private/var` must not break containment proofs.
+      const rootResolution = await resolveControlledRoot(repositoryRoot);
+      if (!rootResolution.ok || !rootResolution.canonicalRoot) {
+        throw new CodeHealthError(
+          rootResolution.code ?? 'STRUCTURE_INVALID',
+          rootResolution.reason ?? 'repository root is not a controlled directory',
+          { safePath: relativePath, candidateId, scopeHash },
+        );
+      }
+      const canonicalRoot = rootResolution.canonicalRoot;
+      const canonicalTarget = path.resolve(canonicalRoot, ...relativePath.split('/'));
 
-      const existing = await lstatOrNull(absolutePath);
+      await ensureControlledDirectoryChain(canonicalRoot, relativePath.split('/').slice(0, -1));
+
+      const existing = await lstatOrNull(canonicalTarget);
       if (existing) {
         if (existing.isSymbolicLink()) {
           throw new CodeHealthError('SECURITY_BLOCKED', 'raw output target must not be a symlink', {
@@ -187,7 +211,7 @@ export function createCodeHealthEvidenceStore(options: CodeHealthEvidenceStoreOp
 
       let handle: Awaited<ReturnType<typeof fs.open>>;
       try {
-        handle = await fs.open(absolutePath, 'wx');
+        handle = await fs.open(canonicalTarget, 'wx');
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
           throw new CodeHealthError('SECURITY_BLOCKED', 'existing raw output must not be overwritten', {
@@ -203,30 +227,33 @@ export function createCodeHealthEvidenceStore(options: CodeHealthEvidenceStoreOp
       try {
         await handle.writeFile(Buffer.from(bytes));
       } catch {
+        await handle.close().catch(() => undefined);
+        await removeFailedRawOutput(canonicalTarget);
         throw new CodeHealthError('EVIDENCE_INVALID', 'raw output could not be written safely', {
           safePath: relativePath,
         });
-      } finally {
-        await handle.close();
       }
+      await handle.close().catch(() => undefined);
 
-      const entry = await lstatOrNull(absolutePath);
-      const realPath = await fs.realpath(absolutePath).catch(() => null);
+      const entry = await lstatOrNull(canonicalTarget);
+      const realPath = await fs.realpath(canonicalTarget).catch(() => null);
       if (
         !entry ||
         entry.isSymbolicLink() ||
         !entry.isFile() ||
         realPath === null ||
-        path.resolve(realPath) !== path.resolve(absolutePath) ||
-        !isPathWithin(repositoryRoot, realPath)
+        path.resolve(realPath) !== canonicalTarget ||
+        !isPathWithin(canonicalRoot, realPath)
       ) {
+        await removeFailedRawOutput(canonicalTarget);
         throw new CodeHealthError('SECURITY_BLOCKED', 'raw output target must be a regular file beneath the root', {
           safePath: relativePath,
         });
       }
-      const writtenSha256 = sha256Hex(await fs.readFile(absolutePath));
+      const writtenSha256 = sha256Hex(await fs.readFile(canonicalTarget));
       const expectedSha256 = sha256Hex(bytes);
       if (writtenSha256 !== expectedSha256) {
+        await removeFailedRawOutput(canonicalTarget);
         throw new CodeHealthError('EVIDENCE_INVALID', 'raw output readback hash does not match the written bytes', {
           safePath: relativePath,
         });

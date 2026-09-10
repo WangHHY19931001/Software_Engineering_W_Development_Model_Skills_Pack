@@ -27,7 +27,7 @@ import type {
 } from '../logic/code-health-contract.js';
 
 import { CodeHealthError } from './code-health-error.js';
-import { isPathWithin, resolveControlledRelativePath } from './code-health-file-verifier.js';
+import { isPathWithin, resolveControlledRelativePath, resolveControlledRoot } from './code-health-file-verifier.js';
 import { containsSensitiveCodeHealthContent, redactCodeHealthArtifact } from './code-health-redaction.js';
 
 export interface CodeHealthCommandRunnerOptions {
@@ -86,9 +86,20 @@ function toRepositoryRelative(repositoryRoot: string, target: string, field: str
   return relative;
 }
 
-/** Pre-flight directory check: existing components must be non-symlink directories. */
+/**
+ * Pre-flight check before any child process starts: the repository root itself must be a real
+ * non-symlink directory, and every existing raw-output component must be a non-symlink directory.
+ * Canonicalizing the root keeps symlinked ancestors (for example macOS `/var`) working.
+ */
 async function assertControlledDirectoryChain(repositoryRoot: string, components: string[]): Promise<void> {
-  let current = repositoryRoot;
+  const rootResolution = await resolveControlledRoot(repositoryRoot);
+  if (!rootResolution.ok || !rootResolution.canonicalRoot) {
+    throw new CodeHealthError(
+      rootResolution.code ?? 'STRUCTURE_INVALID',
+      rootResolution.reason ?? 'repository root is not a controlled directory',
+    );
+  }
+  let current = rootResolution.canonicalRoot;
   for (const component of components) {
     current = path.join(current, component);
     let entry: Awaited<ReturnType<typeof fs.lstat>>;
