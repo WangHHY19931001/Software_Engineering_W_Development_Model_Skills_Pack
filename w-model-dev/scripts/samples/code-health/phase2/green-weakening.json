@@ -41,7 +41,9 @@
       "rawOutputSha256": "1111111111111111111111111111111111111111111111111111111111111111",
       "gapId": "GAP-CHG-P2-20260907-001-security-red-green",
       "assertionHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "implementationHash": null
+      "implementationHash": null,
+      "testArtifacts": ["probe.mjs"],
+      "implementationArtifact": "src/token.mjs"
     },
     {
       "command": "node probe.mjs",
@@ -57,7 +59,9 @@
       "rawOutputSha256": "2222222222222222222222222222222222222222222222222222222222222222",
       "gapId": "GAP-CHG-P2-20260907-001-security-red-green",
       "assertionHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "implementationHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      "implementationHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "testArtifacts": ["probe.mjs"],
+      "implementationArtifact": "src/token.mjs"
     }
   ]
 }

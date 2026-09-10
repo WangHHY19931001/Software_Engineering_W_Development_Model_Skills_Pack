@@ -2584,6 +2584,12 @@ const CODE_HEALTH_GAP_CASES: CodeHealthGapCase[] = [
     description: 'RED 非零但缺 codeHealthTddFailureClass 分类 → 手工证据不能冒充真实 RED',
   },
   {
+    file: 'redgreen-binding-mismatch.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/redEvidence|gap|bound/i],
+    description: '矩阵行 red/green 证据未绑定到该行 gapId → 拒绝跨 gap 拼装',
+  },
+  {
     file: 'green-weakening.json',
     expectedPassed: false,
     expectedReasonPatterns: [/same assertion|weakened|assertionHash/i],

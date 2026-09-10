@@ -7,17 +7,26 @@
  * and a mandatory per-run `EvidenceBinding`. The pure Phase 2 matrix logic stays in
  * `logic/code-health-gap-logic.ts`.
  *
- * Every result additionally binds:
- *   - `gapId` and `assertionHash` (the exact argv plus the content of every file argument, so weakening
- *     or deleting the assertion changes the hash and cannot produce a matching GREEN);
- *   - `implementationHash` (the content of the declared implementation artifact, or `null` for RED);
- *   - `toolVersions[codeHealthTddFailureClass]`, the real failure classification derived from the raw
- *     child output. A non-assertion failure (module missing, syntax error, command not found, ...) is
- *     preserved faithfully with its real exit code but is classified as not RED, so
- *     `validateRedGreenEvidence` rejects it instead of counting an unrelated failure as RED.
+ * `assertionHash` is derived from a fully declared and anchored artifact set, never from caller trust:
+ *   - the implementation artifact must be inside the owning candidate's approved `changeScope.files`
+ *     (R-A: it cannot be the probe/assertion module), must not be an argv entry, and must not appear in
+ *     the declared test artifacts (R-B disjointness);
+ *   - the declared test artifacts must be non-empty, repository-relative, and exist;
+ *   - every statically resolvable local module reachable from the argv entry points must be classified
+ *     as a test artifact or the implementation artifact (R-C closure completeness);
+ *   - every local module file in the test entry points' own directory must be declared or be the
+ *     implementation, which closes non-literal dynamic imports (R-D);
+ *   - `testArtifacts` / `implementationArtifact` are recorded on every result so RED and GREEN symmetry
+ *     is enforced by `validateRedGreenEvidence` (R-E).
+ *
+ * The result also carries `toolVersions[codeHealthTddFailureClass]`, the real failure classification
+ * derived from the raw child output. An unrelated failure (module missing, syntax error, command not
+ * found, ...) keeps its real exit code but is classified as not RED, so `validateRedGreenEvidence`
+ * rejects it instead of counting it as RED.
  */
 
 import { createHash } from 'node:crypto';
+import type { Dirent } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
@@ -61,8 +70,21 @@ const INFRASTRUCTURE_OUTPUT_PATTERN =
 /** A genuine assertion failure is the only signal that counts as RED. */
 const ASSERTION_OUTPUT_PATTERN = /(?:assertionerror|err_assertion|expected .* to (?:be|equal|match)|✗|not ok \d)/i;
 
+const LOCAL_MODULE_EXTENSIONS = ['.mjs', '.js', '.cjs', '.ts', '.tsx', '.jsx'] as const;
+const LOCAL_SPECIFIER_PATTERN = /['"]((?:\.\.?\/)[^'"]+)['"]/g;
+const TEST_RUNNER_NAMES = new Set(['npm', 'npx', 'pnpm', 'yarn']);
+const TEST_RUNNER_SUBCOMMANDS = new Set(['test', 'vitest', 'self-test']);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeRelative(value: string): string {
+  return value.replace(/\\/g, '/').replace(/^\.\//, '');
+}
+
+function isModuleFile(name: string): boolean {
+  return LOCAL_MODULE_EXTENSIONS.some((extension) => name.endsWith(extension));
 }
 
 /** Fail-closed input validation: a gap identity and an exact non-empty argv are mandatory. */
@@ -90,27 +112,6 @@ export function validateTddHarnessInput(input: unknown): asserts input is TddHar
       'TDD harness requires a non-empty argv test command (exact argv, never a shell string)',
     );
   }
-}
-
-async function resolveRegularFile(root: string, relativePath: string): Promise<string | null> {
-  const resolution = resolveControlledRelativePath(root, relativePath);
-  if (!resolution.ok || !resolution.absolutePath) return null;
-  try {
-    const entry = await fs.lstat(resolution.absolutePath);
-    if (entry.isSymbolicLink() || !entry.isFile()) return null;
-    return resolution.absolutePath;
-  } catch {
-    return null;
-  }
-}
-
-const LOCAL_MODULE_EXTENSIONS = ['.mjs', '.js', '.cjs', '.ts', '.tsx', '.jsx'] as const;
-const LOCAL_SPECIFIER_PATTERN = /['"]((?:\.\.?\/)[^'"]+)['"]/g;
-const TEST_RUNNER_NAMES = new Set(['npm', 'npx', 'pnpm', 'yarn']);
-const TEST_RUNNER_SUBCOMMANDS = new Set(['test', 'vitest', 'self-test']);
-
-function normalizeRelative(value: string): string {
-  return value.replace(/\\/g, '/').replace(/^\.\//, '');
 }
 
 function isRepositoryTestArgument(argument: string): boolean {
@@ -142,6 +143,37 @@ function assertNotRepositoryTestInvocation(testCommand: readonly string[]): void
   }
 }
 
+async function resolveRegularFile(root: string, relativePath: string): Promise<string | null> {
+  const resolution = resolveControlledRelativePath(root, relativePath);
+  if (!resolution.ok || !resolution.absolutePath) return null;
+  try {
+    const entry = await fs.lstat(resolution.absolutePath);
+    if (entry.isSymbolicLink() || !entry.isFile()) return null;
+    return resolution.absolutePath;
+  } catch {
+    return null;
+  }
+}
+
+function requireRepositoryRelativePaths(root: string, value: unknown, field: string): string[] {
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.some((entry) => typeof entry !== 'string' || entry.trim() === '')
+  ) {
+    throw new CodeHealthError('ARG_INVALID', `TDD harness requires ${field} to be a non-empty array of paths`);
+  }
+  const normalized: string[] = [];
+  for (const entry of value) {
+    const relative = normalizeRelative(entry as string);
+    if (!resolveControlledRelativePath(root, relative).ok) {
+      throw new CodeHealthError('ARG_INVALID', `TDD harness ${field} entry must be repository-relative: ${entry}`);
+    }
+    normalized.push(relative);
+  }
+  return [...new Set(normalized)];
+}
+
 async function resolveLocalModule(root: string, fromRelative: string, specifier: string): Promise<string | null> {
   const baseDirectory = path.posix.dirname(fromRelative);
   const joined = path.posix.normalize(path.posix.join(baseDirectory, specifier));
@@ -158,29 +190,13 @@ async function resolveLocalModule(root: string, fromRelative: string, specifier:
   return null;
 }
 
-/**
- * The real test artifact set: the exact argv entry files plus every transitively reachable local module.
- * An assertion that lives in an imported (non-argv) module is therefore bound too. The declared
- * implementation artifact is excluded because it is expected to change between RED and GREEN while the
- * assertion must not.
- */
-async function collectTestArtifacts(
-  root: string,
-  testCommand: readonly string[],
-  implementation: string | null,
-): Promise<string[]> {
-  const excluded = implementation === null ? null : normalizeRelative(implementation);
-  const queue: string[] = [];
-  for (const argument of testCommand) {
-    if (argument.startsWith('-')) continue;
-    const normalized = normalizeRelative(argument);
-    if (excluded !== null && normalized === excluded) continue;
-    if ((await resolveRegularFile(root, normalized)) !== null) queue.push(normalized);
-  }
+/** Transitive closure of statically resolvable (literal) local modules reachable from the entry files. */
+async function collectLocalModuleClosure(root: string, entryFiles: readonly string[]): Promise<Set<string>> {
   const visited = new Set<string>();
+  const queue = [...entryFiles];
   while (queue.length > 0) {
     const relative = queue.shift()!;
-    if (visited.has(relative) || relative === excluded) continue;
+    if (visited.has(relative)) continue;
     const absolute = await resolveRegularFile(root, relative);
     if (absolute === null) continue;
     visited.add(relative);
@@ -194,26 +210,146 @@ async function collectTestArtifacts(
       const specifier = match[1];
       if (specifier === undefined) continue;
       const resolved = await resolveLocalModule(root, relative, specifier);
-      if (resolved !== null && resolved !== excluded && !visited.has(resolved)) queue.push(resolved);
+      if (resolved !== null && !visited.has(resolved)) queue.push(resolved);
     }
   }
-  return [...visited].sort();
+  return visited;
+}
+
+interface ResolvedHarnessArtifacts {
+  testArtifacts: string[];
+  implementation: string;
+  testSet: string[];
+  entryFiles: string[];
 }
 
 /**
- * Hash the exact assertion artifact set: the full argv plus the content of every transitively reachable
- * local test module (excluding the declared implementation). Changing, deleting, or `.skip`-ing the
- * assertion — even in an imported module that never appears in argv — changes the hash, so a weakened
- * GREEN can never be paired with the RED.
+ * Resolve and structurally validate the anchored artifact set (R-A..R-D). Every failure is a typed
+ * `ARG_INVALID`; no rule depends on the caller being honest beyond providing the owning candidate.
+ */
+async function resolveHarnessArtifacts(root: string, input: TddHarnessInput): Promise<ResolvedHarnessArtifacts> {
+  const implementationRaw = input.implementation;
+  if (typeof implementationRaw !== 'string' || implementationRaw.trim() === '') {
+    throw new CodeHealthError(
+      'ARG_INVALID',
+      'TDD harness requires an explicit implementation artifact path (string; null/absent/non-string is a violation)',
+    );
+  }
+  const implementation = normalizeRelative(implementationRaw);
+  if (!resolveControlledRelativePath(root, implementation).ok) {
+    throw new CodeHealthError('ARG_INVALID', 'TDD harness implementation artifact must be repository-relative');
+  }
+  if ((await resolveRegularFile(root, implementation)) === null) {
+    throw new CodeHealthError(
+      'ARG_INVALID',
+      `TDD harness implementation artifact must exist as a regular file: ${implementation}`,
+    );
+  }
+
+  const candidate = input.candidate;
+  if (!isRecord(candidate) || candidate.candidateId !== input.gap.candidateId) {
+    throw new CodeHealthError(
+      'ARG_INVALID',
+      'TDD harness requires the owning candidate whose candidateId matches the gap',
+    );
+  }
+  const changeScope = isRecord(candidate.changeScope) ? candidate.changeScope : null;
+  if (changeScope === null) {
+    throw new CodeHealthError('ARG_INVALID', 'TDD harness requires the candidate approved changeScope.files');
+  }
+  const approvedScope = requireRepositoryRelativePaths(root, changeScope.files, 'candidate approved changeScope.files');
+  if (!approvedScope.includes(implementation)) {
+    throw new CodeHealthError(
+      'ARG_INVALID',
+      `TDD harness implementation artifact is not in the candidate approved scope: ${implementation}`,
+    );
+  }
+
+  const testArtifacts = requireRepositoryRelativePaths(root, input.testArtifacts, 'testArtifacts');
+  for (const artifact of testArtifacts) {
+    if ((await resolveRegularFile(root, artifact)) === null) {
+      throw new CodeHealthError(
+        'ARG_INVALID',
+        `TDD harness testArtifacts entry must exist as a regular file: ${artifact}`,
+      );
+    }
+  }
+  if (testArtifacts.includes(implementation)) {
+    throw new CodeHealthError(
+      'ARG_INVALID',
+      'TDD harness implementation artifact must not be declared as a test artifact',
+    );
+  }
+
+  const entryFiles: string[] = [];
+  for (const argument of input.testCommand) {
+    if (argument.startsWith('-')) continue;
+    const relative = normalizeRelative(argument);
+    if ((await resolveRegularFile(root, relative)) !== null) entryFiles.push(relative);
+  }
+  if (entryFiles.length === 0) {
+    throw new CodeHealthError('ARG_INVALID', 'TDD harness test command must reference at least one existing test file');
+  }
+  if (entryFiles.includes(implementation)) {
+    throw new CodeHealthError('ARG_INVALID', 'TDD harness implementation artifact must not be an argv entry');
+  }
+
+  const closure = await collectLocalModuleClosure(root, entryFiles);
+  for (const member of closure) {
+    if (member !== implementation && !testArtifacts.includes(member)) {
+      throw new CodeHealthError(
+        'ARG_INVALID',
+        `TDD harness closure member ${member} is neither a declared test artifact nor the implementation artifact`,
+      );
+    }
+  }
+
+  // R-D: any local module in a test entry point's own directory that is neither declared nor the
+  // implementation artifact is a violation. This closes non-literal dynamic imports, which the static
+  // closure above cannot see.
+  for (const entry of entryFiles) {
+    const directory = path.posix.dirname(entry);
+    const absoluteDirectory = directory === '.' ? root : path.resolve(root, directory);
+    let entries: Dirent[];
+    try {
+      entries = await fs.readdir(absoluteDirectory, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const dirent of entries) {
+      if (!dirent.isFile() || !isModuleFile(dirent.name)) continue;
+      const relative = directory === '.' ? dirent.name : `${directory}/${dirent.name}`;
+      if (relative !== implementation && !testArtifacts.includes(relative)) {
+        throw new CodeHealthError(
+          'ARG_INVALID',
+          `TDD harness local module ${relative} in the test entry directory is neither a declared test artifact nor the implementation artifact`,
+        );
+      }
+    }
+  }
+
+  const testSet = [...new Set([...testArtifacts, ...closure])].filter((file) => file !== implementation).sort();
+  return {
+    testArtifacts: [...testArtifacts].sort(),
+    implementation,
+    testSet,
+    entryFiles,
+  };
+}
+
+/**
+ * Hash the declared+closure test set (sorted) plus the exact argv. Every declared test artifact is
+ * hashed even when it is not statically imported, and the anchored implementation artifact is excluded,
+ * so RED and GREEN must declare identical test artifacts for the hashes to be comparable.
  */
 async function computeAssertionHash(
   root: string,
   testCommand: readonly string[],
-  implementation: string | null,
+  testSet: readonly string[],
 ): Promise<string> {
   const hash = createHash('sha256');
   hash.update(JSON.stringify(testCommand), 'utf8');
-  for (const relative of await collectTestArtifacts(root, testCommand, implementation)) {
+  for (const relative of testSet) {
     const absolute = await resolveRegularFile(root, relative);
     if (absolute === null) continue;
     try {
@@ -253,30 +389,11 @@ async function classifyFailure(root: string, evidence: CommandEvidence): Promise
   return 'unknown';
 }
 
-async function hashImplementation(root: string, implementation: string | null): Promise<string | null> {
-  if (implementation === null) return null;
-  if (typeof implementation !== 'string' || implementation.trim() === '') {
-    throw new CodeHealthError('ARG_INVALID', 'TDD harness implementation must be null or a repository-relative file');
-  }
-  const absolute = await resolveRegularFile(root, implementation.replace(/\\/g, '/'));
-  if (absolute === null) {
-    throw new CodeHealthError(
-      'EVIDENCE_INVALID',
-      `TDD harness implementation is not a readable repository-relative file: ${implementation}`,
-    );
-  }
-  return createHash('sha256')
-    .update(await fs.readFile(absolute))
-    .digest('hex');
-}
-
 /**
- * Run one real RED or GREEN attempt. `input.implementation` is the repository-relative implementation
- * artifact (or `null`); it is read to record `implementationHash` and excluded from `assertionHash`, so
- * declare the same implementation path for RED and GREEN to keep the assertion artifact set stable — the
+ * Run one real RED or GREEN attempt. `input.implementation` is the anchored implementation artifact; the
  * harness never mutates the fixture and the caller owns the fixture state change. Returns the real exit
- * code and the real failure classification; invalid input or missing boundaries fail closed with a typed
- * error.
+ * code, the real failure classification, and the declared artifact set; invalid/unanchored input or
+ * missing boundaries fail closed with a typed error.
  */
 export async function runTddHarness(input: TddHarnessInput, options?: TddHarnessOptions): Promise<TddHarnessResult> {
   validateTddHarnessInput(input);
@@ -288,6 +405,7 @@ export async function runTddHarness(input: TddHarnessInput, options?: TddHarness
     );
   }
   const repositoryRoot = path.resolve(options.repositoryRoot);
+  const artifacts = await resolveHarnessArtifacts(repositoryRoot, input);
   const runner = createCodeHealthCommandRunner({
     repositoryRoot,
     rawOutputDir: options.rawOutputDir,
@@ -295,8 +413,14 @@ export async function runTddHarness(input: TddHarnessInput, options?: TddHarness
     revisionProvider: options.revisionProvider,
     ...(options.now ? { now: options.now } : {}),
   });
-  const assertionHash = await computeAssertionHash(repositoryRoot, input.testCommand, input.implementation);
-  const implementationHash = await hashImplementation(repositoryRoot, input.implementation);
+  const assertionHash = await computeAssertionHash(repositoryRoot, input.testCommand, artifacts.testSet);
+  const implementationAbsolute = await resolveRegularFile(repositoryRoot, artifacts.implementation);
+  if (implementationAbsolute === null) {
+    throw new CodeHealthError('EVIDENCE_INVALID', 'TDD harness implementation artifact became unreadable');
+  }
+  const implementationHash = createHash('sha256')
+    .update(await fs.readFile(implementationAbsolute))
+    .digest('hex');
   const evidence = await runner.run(input.testCommand[0]!, input.testCommand.slice(1), {
     cwd: options.cwd ?? '.',
     env: options.env ?? {},
@@ -309,6 +433,8 @@ export async function runTddHarness(input: TddHarnessInput, options?: TddHarness
     gapId: input.gap.gapId,
     assertionHash,
     implementationHash,
+    testArtifacts: artifacts.testArtifacts,
+    implementationArtifact: artifacts.implementation,
     toolVersions: { ...evidence.toolVersions, [TDD_FAILURE_CLASS_KEY]: failureClass },
   };
 }

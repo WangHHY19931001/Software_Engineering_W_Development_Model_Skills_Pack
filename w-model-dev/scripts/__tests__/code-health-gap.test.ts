@@ -18,12 +18,14 @@ import { promisify } from 'node:util';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type {
+  CodeHealthCandidate,
   CodeHealthLedger,
   CommandEvidence,
   EvidenceBinding,
   GapDiscoveryInput,
   GapRow,
   RevisionIdentity,
+  TddHarnessInput,
 } from '../logic/code-health-contract.js';
 import { findGaps, missingGapDimensions } from '../logic/code-health-gap-logic.js';
 import { validateGapMatrix, validateRedGreenEvidence } from '../logic/code-health-ledger-logic.js';
@@ -243,12 +245,14 @@ describe('phase 2 gap matrix (pure)', () => {
     expect(unboundReasons).toMatch(/not bound to gap/i);
     expect(unboundReasons).toMatch(/classification|assertion/i);
 
-    // The genuine harness-bound pair still passes with the mandatory classification.
+    // The genuine harness-bound pair still passes with the mandatory classification and declarations.
     const boundRed: CommandEvidence = {
       ...unbound[0]!,
       gapId: validGap().gapId,
       assertionHash: 'a'.repeat(64),
       implementationHash: null,
+      testArtifacts: ['probe.mjs'],
+      implementationArtifact: 'src/token.mjs',
       toolVersions: { ...unbound[0]!.toolVersions, codeHealthTddFailureClass: 'assertion' },
     } as CommandEvidence;
     const boundGreen: CommandEvidence = {
@@ -256,10 +260,25 @@ describe('phase 2 gap matrix (pure)', () => {
       gapId: validGap().gapId,
       assertionHash: 'a'.repeat(64),
       implementationHash: 'c'.repeat(64),
+      testArtifacts: ['probe.mjs'],
+      implementationArtifact: 'src/token.mjs',
       toolVersions: { ...unbound[1]!.toolVersions, codeHealthTddFailureClass: 'none' },
     } as CommandEvidence;
     expect(validateRedGreenEvidence({ ...validGap(), assertionHash: 'a'.repeat(64) }, [boundRed, boundGreen])).toEqual(
       [],
+    );
+  });
+
+  it('R-G: 矩阵行 red/green 证据必须成对且绑定到该行 gapId（alt9）', async () => {
+    const fixture = await readFixture('redgreen-binding-mismatch.json');
+    const reasons = validateGapMatrix({ rows: fixture.rows }, fixture.ledger as CodeHealthLedger).join('; ');
+    expect(reasons).toMatch(/redEvidence must be bound to gap/i);
+
+    // A row with only one side of the pair is rejected too.
+    const row = structuredClone((fixture.rows as GapRow[])[0]!);
+    delete row.greenEvidence;
+    expect(validateGapMatrix({ rows: [row] }, fixture.ledger as CodeHealthLedger).join('; ')).toMatch(
+      /present as a pair/i,
     );
   });
 });
@@ -300,6 +319,7 @@ async function git(root: string, args: string[]): Promise<string> {
 const BROKEN_TOKEN =
   'export function isValidToken(token) {\n  return typeof token === "string" && token.length > 0;\n}\n';
 const FIXED_TOKEN = 'export function isValidToken(token) {\n  return token === "valid-token.signature";\n}\n';
+const IMPLEMENTATION_ARTIFACT = 'src/token.mjs';
 const PROBE = [
   "import assert from 'node:assert/strict';",
   "import { isValidToken } from './src/token.mjs';",
@@ -309,7 +329,7 @@ const PROBE = [
   "process.stdout.write('probe passed\\n');",
   '',
 ].join('\n');
-/** An assertion that lives in an imported (non-argv) module: the argv entry only re-exports it. */
+/** An assertion that lives in an imported (non-argv) module: the argv entry only imports it. */
 const RUNNER = "import './assertion.mjs';\n";
 const IMPORTED_ASSERTION = [
   "import assert from 'node:assert/strict';",
@@ -319,6 +339,8 @@ const IMPORTED_ASSERTION = [
   "process.stdout.write('imported assertion passed\\n');",
   '',
 ].join('\n');
+/** Non-literal dynamic import: the static closure cannot see `./assertion.mjs`. */
+const NON_LITERAL_RUNNER = "const specifier = '.' + '/assertion.mjs';\nawait import(specifier);\n";
 const WEAKENED_ASSERTION = 'process.exit(0);\n';
 /** A probe that fails for an unrelated infrastructure reason (module missing), not a gap assertion. */
 const MISSING_MODULE_PROBE = "import 'module-that-does-not-exist-for-code-health-gap-xyz';\n";
@@ -327,6 +349,30 @@ interface HarnessFixture {
   root: string;
   revision: RevisionIdentity;
   options: TddHarnessOptions;
+}
+
+function harnessCandidate(files: string[] = [IMPLEMENTATION_ARTIFACT]): CodeHealthCandidate {
+  return {
+    candidateId,
+    changeScope: { files, symbols: ['isValidToken'], scopeHash },
+  } as unknown as CodeHealthCandidate;
+}
+
+interface HarnessInputOverrides {
+  testCommand?: string[];
+  testArtifacts?: string[];
+  implementation?: string | null;
+  candidate?: CodeHealthCandidate;
+}
+
+function harnessInput(overrides: HarnessInputOverrides = {}): TddHarnessInput {
+  return {
+    gap: validGap(),
+    candidate: overrides.candidate ?? harnessCandidate(),
+    testArtifacts: overrides.testArtifacts ?? ['probe.mjs'],
+    testCommand: overrides.testCommand ?? [process.execPath, 'probe.mjs'],
+    implementation: overrides.implementation === undefined ? IMPLEMENTATION_ARTIFACT : overrides.implementation,
+  };
 }
 
 async function createHarnessFixture(): Promise<HarnessFixture> {
@@ -376,28 +422,24 @@ afterEach(async () => {
 describe('phase 2 TDD RED/GREEN harness (real processes, real exit codes)', () => {
   it('RED 是真实断言失败，GREEN 在同一断言上真实 exit 0，且实现 hash 变化', async () => {
     const fixture = await createHarnessFixture();
-    const testCommand = [process.execPath, 'probe.mjs'];
-    // The implementation artifact is declared for both runs so the assertion artifact set (which
-    // excludes it) is stable; only its content hash changes between the broken RED and the fixed GREEN.
-    const red = await runTddHarness({ gap: validGap(), testCommand, implementation: 'src/token.mjs' }, fixture.options);
+    const red = await runTddHarness(harnessInput(), fixture.options);
     expect(red.exitCode).toBe(1);
     expect(red.observation).toBe('observed');
     expect(red.toolVersions.codeHealthTddFailureClass).toBe('assertion');
     expect(red.implementationHash).toMatch(/^[0-9a-f]{64}$/);
 
     await fs.writeFile(path.join(fixture.root, 'src', 'token.mjs'), FIXED_TOKEN);
-    const green = await runTddHarness(
-      { gap: validGap(), testCommand, implementation: 'src/token.mjs' },
-      fixture.options,
-    );
+    const green = await runTddHarness(harnessInput(), fixture.options);
     expect(green.exitCode).toBe(0);
     expect(green.observation).toBe('observed');
     expect(green.toolVersions.codeHealthTddFailureClass).toBe('none');
     expect(green.implementationHash).toMatch(/^[0-9a-f]{64}$/);
     expect(green.implementationHash).not.toBe(red.implementationHash);
 
-    // Same exact assertion, distinct real runs, and the pair passes the strengthened validator.
+    // Same exact declaration/assertion, distinct real runs, and the pair passes the strengthened validator.
     expect(green.assertionHash).toBe(red.assertionHash);
+    expect(green.testArtifacts).toEqual(['probe.mjs']);
+    expect(green.implementationArtifact).toBe(IMPLEMENTATION_ARTIFACT);
     expect(green.rawOutputSha256).not.toBe(red.rawOutputSha256);
     expect(validateRedGreenEvidence({ ...validGap(), assertionHash: red.assertionHash }, [red, green])).toEqual([]);
 
@@ -408,71 +450,110 @@ describe('phase 2 TDD RED/GREEN harness (real processes, real exit codes)', () =
     );
   });
 
-  it('拒绝因无关基础设施原因失败的 RED（模块缺失 / 命令不存在），不计为 RED', async () => {
+  it('拒绝因无关基础设施原因失败的 RED（模块缺失），不计为 RED', async () => {
     const fixture = await createHarnessFixture();
-    const testCommand = [process.execPath, 'probe.mjs'];
-
     await fs.writeFile(path.join(fixture.root, 'missing.mjs'), MISSING_MODULE_PROBE);
+    const artifacts = ['probe.mjs', 'missing.mjs'];
     const unrelatedRed = await runTddHarness(
-      { gap: validGap(), testCommand: [process.execPath, 'missing.mjs'], implementation: null },
+      harnessInput({ testCommand: [process.execPath, 'missing.mjs'], testArtifacts: artifacts }),
       fixture.options,
     );
     expect(unrelatedRed.exitCode).toBe(1);
     expect(unrelatedRed.observation).toBe('observed');
     expect(unrelatedRed.toolVersions.codeHealthTddFailureClass).toBe('infrastructure');
     await fs.writeFile(path.join(fixture.root, 'src', 'token.mjs'), FIXED_TOKEN);
-    const green = await runTddHarness(
-      { gap: validGap(), testCommand, implementation: 'src/token.mjs' },
-      fixture.options,
-    );
+    const green = await runTddHarness(harnessInput({ testArtifacts: artifacts }), fixture.options);
     expect(green.exitCode).toBe(0);
     const unrelatedReasons = validateRedGreenEvidence({ ...validGap(), assertionHash: green.assertionHash }, [
       unrelatedRed,
       green,
     ]);
     expect(unrelatedReasons.join('; ')).toMatch(/unrelated reason|infrastructure/i);
-
-    const missingCommand = await runTddHarness(
-      { gap: validGap(), testCommand: ['definitely-not-a-real-code-health-command-xyz'], implementation: null },
-      fixture.options,
-    );
-    expect(missingCommand.exitCode).toBeNull();
-    expect(missingCommand.observation).toBe('unavailable');
-    expect(missingCommand.toolVersions.codeHealthTddFailureClass).toBe('unavailable');
-    expect(
-      validateRedGreenEvidence({ ...validGap(), assertionHash: green.assertionHash }, [missingCommand, green]),
-    ).toEqual(expect.arrayContaining([expect.stringMatching(/RED evidence required/i)]));
   });
 
   it('拒绝通过削弱断言获得的 GREEN：assertionHash 改变后 RED/GREEN 不再成对', async () => {
     const fixture = await createHarnessFixture();
-    const testCommand = [process.execPath, 'probe.mjs'];
-    const red = await runTddHarness({ gap: validGap(), testCommand, implementation: null }, fixture.options);
+    const red = await runTddHarness(harnessInput(), fixture.options);
     expect(red.exitCode).toBe(1);
     expect(red.toolVersions.codeHealthTddFailureClass).toBe('assertion');
 
     // Weaken the assertion to an unconditional success instead of fixing the implementation.
     await fs.writeFile(path.join(fixture.root, 'probe.mjs'), 'process.exit(0);\n');
-    const weakenedGreen = await runTddHarness({ gap: validGap(), testCommand, implementation: null }, fixture.options);
+    const weakenedGreen = await runTddHarness(harnessInput(), fixture.options);
     expect(weakenedGreen.exitCode).toBe(0);
     expect(weakenedGreen.assertionHash).not.toBe(red.assertionHash);
     const reasons = validateRedGreenEvidence({ ...validGap(), assertionHash: red.assertionHash }, [red, weakenedGreen]);
     expect(reasons.join('; ')).toMatch(/same assertion|assertionHash|weakened/i);
   });
 
-  it('F-2: 削弱被 import 的（非 argv）断言文件改变 assertionHash，GREEN 被拒绝', async () => {
+  it('R-F(i): 把断言模块声明为 implementation 必须被拒绝（approved scope 锚定）', async () => {
     const fixture = await createHarnessFixture();
     await fs.writeFile(path.join(fixture.root, 'runner.mjs'), RUNNER);
     await fs.writeFile(path.join(fixture.root, 'assertion.mjs'), IMPORTED_ASSERTION);
-    const testCommand = [process.execPath, 'runner.mjs'];
+    // The bypass: exclude the assertion module from assertionHash by calling it "the implementation".
+    await expect(
+      runTddHarness(
+        harnessInput({
+          testCommand: [process.execPath, 'runner.mjs'],
+          testArtifacts: ['runner.mjs'],
+          implementation: 'assertion.mjs',
+        }),
+        fixture.options,
+      ),
+    ).rejects.toThrow(/approved scope/i);
+    // Even if the approved scope is forged to include it, the real implementation imported by the
+    // closure becomes an unclassified closure member and is rejected.
+    await expect(
+      runTddHarness(
+        harnessInput({
+          candidate: harnessCandidate(['assertion.mjs']),
+          testCommand: [process.execPath, 'runner.mjs'],
+          testArtifacts: ['runner.mjs'],
+          implementation: 'assertion.mjs',
+        }),
+        fixture.options,
+      ),
+    ).rejects.toThrow(/closure member|declared test artifact/i);
+    // Declaring an argv entry as the implementation is rejected by R-B.
+    await expect(
+      runTddHarness(
+        harnessInput({
+          candidate: harnessCandidate(['probe.mjs']),
+          testArtifacts: ['src/token.mjs'],
+          implementation: 'probe.mjs',
+        }),
+        fixture.options,
+      ),
+    ).rejects.toThrow(/argv entry/i);
+  });
 
-    const red = await runTddHarness({ gap: validGap(), testCommand, implementation: null }, fixture.options);
+  it('R-F(ii): 非字面量动态 import 的未声明断言文件被拒绝；声明后削弱它改变 hash 并拒绝 GREEN', async () => {
+    const fixture = await createHarnessFixture();
+    await fs.writeFile(path.join(fixture.root, 'runner.mjs'), NON_LITERAL_RUNNER);
+    await fs.writeFile(path.join(fixture.root, 'assertion.mjs'), IMPORTED_ASSERTION);
+    await fs.rm(path.join(fixture.root, 'probe.mjs'));
+
+    // Undeclared assertion file in the test entry directory → R-D violation (the static closure is blind).
+    await expect(
+      runTddHarness(
+        harnessInput({ testCommand: [process.execPath, 'runner.mjs'], testArtifacts: ['runner.mjs'] }),
+        fixture.options,
+      ),
+    ).rejects.toThrow(/entry directory|declared test artifact/i);
+
+    // Declared: the pair is now well-formed, and weakening the assertion changes the hash.
+    const declaredArtifacts = ['runner.mjs', 'assertion.mjs'];
+    const red = await runTddHarness(
+      harnessInput({ testCommand: [process.execPath, 'runner.mjs'], testArtifacts: declaredArtifacts }),
+      fixture.options,
+    );
     expect(red.exitCode).toBe(1);
     expect(red.toolVersions.codeHealthTddFailureClass).toBe('assertion');
-
-    // Only the imported (non-argv) assertion is weakened; the implementation stays broken.
     await fs.writeFile(path.join(fixture.root, 'assertion.mjs'), WEAKENED_ASSERTION);
-    const weakenedGreen = await runTddHarness({ gap: validGap(), testCommand, implementation: null }, fixture.options);
+    const weakenedGreen = await runTddHarness(
+      harnessInput({ testCommand: [process.execPath, 'runner.mjs'], testArtifacts: declaredArtifacts }),
+      fixture.options,
+    );
     expect(weakenedGreen.exitCode).toBe(0);
     expect(weakenedGreen.assertionHash).not.toBe(red.assertionHash);
     expect(
@@ -480,32 +561,61 @@ describe('phase 2 TDD RED/GREEN harness (real processes, real exit codes)', () =
     ).toMatch(/same assertion|assertionHash|weakened/i);
   });
 
+  it('R-B/R-C/R-H: 未声明 closure 成员、空/不存在 testArtifacts、非字符串 implementation 均 fail-closed', async () => {
+    const fixture = await createHarnessFixture();
+    await fs.writeFile(path.join(fixture.root, 'src', 'helper.mjs'), 'export const helper = true;\n');
+    await fs.writeFile(path.join(fixture.root, 'probe2.mjs'), "import './src/helper.mjs';\n");
+    await fs.rm(path.join(fixture.root, 'probe.mjs'));
+    await expect(
+      runTddHarness(
+        harnessInput({ testCommand: [process.execPath, 'probe2.mjs'], testArtifacts: ['probe2.mjs'] }),
+        fixture.options,
+      ),
+    ).rejects.toThrow(/closure member/i);
+
+    await expect(runTddHarness(harnessInput({ testArtifacts: [] }), fixture.options)).rejects.toThrow(/testArtifacts/i);
+    await expect(
+      runTddHarness(harnessInput({ testArtifacts: ['does-not-exist.mjs'] }), fixture.options),
+    ).rejects.toThrow(/must exist/i);
+    await expect(
+      runTddHarness(harnessInput({ testArtifacts: [IMPLEMENTATION_ARTIFACT] }), fixture.options),
+    ).rejects.toThrow(/must not be declared as a test artifact/i);
+    await expect(runTddHarness(harnessInput({ implementation: null }), fixture.options)).rejects.toThrow(
+      /implementation artifact path/i,
+    );
+    await expect(
+      runTddHarness(harnessInput({ implementation: 42 as unknown as string }), fixture.options),
+    ).rejects.toThrow(/implementation artifact path/i);
+  });
+
+  it('R-E: RED/GREEN 声明的 test artifacts 不一致时被拒绝', async () => {
+    const fixture = await createHarnessFixture();
+    const red = await runTddHarness(harnessInput(), fixture.options);
+    await fs.writeFile(path.join(fixture.root, 'extra.mjs'), 'process.stdout.write("extra\\n");\n');
+    await fs.writeFile(path.join(fixture.root, 'src', 'token.mjs'), FIXED_TOKEN);
+    const green = await runTddHarness(harnessInput({ testArtifacts: ['probe.mjs', 'extra.mjs'] }), fixture.options);
+    expect(green.exitCode).toBe(0);
+    expect(
+      validateRedGreenEvidence({ ...validGap(), assertionHash: green.assertionHash }, [red, green]).join('; '),
+    ).toMatch(/identical test artifacts|same implementation artifact/i);
+  });
+
   it('F-4: harness 拒绝指向本仓测试套件的 argv（防递归）', async () => {
     const fixture = await createHarnessFixture();
     const repoTestPath = path.join(repoRoot, 'w-model-dev', 'scripts', '__tests__', 'code-health-gap.test.ts');
     await expect(
-      runTddHarness(
-        { gap: validGap(), testCommand: [process.execPath, repoTestPath], implementation: null },
-        fixture.options,
-      ),
+      runTddHarness(harnessInput({ testCommand: [process.execPath, repoTestPath] }), fixture.options),
     ).rejects.toThrow(/recursion|repository|__tests__|test suite/i);
+    await expect(runTddHarness(harnessInput({ testCommand: ['npm', 'run', 'test'] }), fixture.options)).rejects.toThrow(
+      /recursion|repository|test suite/i,
+    );
     await expect(
-      runTddHarness({ gap: validGap(), testCommand: ['npm', 'run', 'test'], implementation: null }, fixture.options),
-    ).rejects.toThrow(/recursion|repository|test suite/i);
-    await expect(
-      runTddHarness(
-        { gap: validGap(), testCommand: [process.execPath, '--vitest'], implementation: null },
-        fixture.options,
-      ),
+      runTddHarness(harnessInput({ testCommand: [process.execPath, '--vitest'] }), fixture.options),
     ).rejects.toThrow(/recursion|repository|vitest|test suite/i);
   });
 
   it('harness 未注入边界或输入非法时 fail-closed，绝不隐式执行本仓测试套件', async () => {
-    await expect(runTddHarness({ gap: {} as never, testCommand: [], implementation: null } as never)).rejects.toThrow(
-      /gap|argv|requires/i,
-    );
-    await expect(
-      runTddHarness({ gap: validGap(), testCommand: [process.execPath, 'probe.mjs'], implementation: null }),
-    ).rejects.toThrow(/boundaries|requires/i);
+    await expect(runTddHarness({ gap: {} as never, testCommand: [] } as never)).rejects.toThrow(/gap|argv|requires/i);
+    await expect(runTddHarness(harnessInput())).rejects.toThrow(/boundaries|requires/i);
   });
 });

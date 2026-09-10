@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   validateCommandEvidence,
   type CandidateSelector,
+  type CommandEvidence,
   type EvidenceBinding,
   type EvidenceStore,
   type EvidenceVerificationContext,
@@ -581,19 +582,24 @@ function validGapRow(candidateId: string): GapRow {
 /** A fully evidenced gap row at `verified` status: RED observed non-zero, GREEN observed zero, assertion hash. */
 function verifiedGapRow(candidateId: string): GapRow {
   const observed = validCandidate(candidateId).commands[0]!;
+  const gap = validGapRow(candidateId);
   return {
-    ...validGapRow(candidateId),
+    ...gap,
     status: 'verified',
     redEvidence: {
       ...observed,
       exitCode: 1,
+      gapId: gap.gapId,
+      assertionHash: 'a'.repeat(64),
       toolVersions: { ...observed.toolVersions, [TDD_FAILURE_CLASS_KEY]: 'assertion' },
-    },
+    } as unknown as CommandEvidence,
     greenEvidence: {
       ...observed,
       exitCode: 0,
+      gapId: gap.gapId,
+      assertionHash: 'a'.repeat(64),
       toolVersions: { ...observed.toolVersions, [TDD_FAILURE_CLASS_KEY]: 'none' },
-    },
+    } as unknown as CommandEvidence,
     assertionHash: 'a'.repeat(64),
   };
 }
@@ -1228,9 +1234,15 @@ describe('code-health ledger contract', () => {
       }),
     ).resolves.toMatchObject({ exitCode: 0 });
     // Phase 2 TDD harness is real now and requires a gap identity plus an exact argv; it never runs implicitly.
-    await expect(runTddHarness({ gap: {} as never, testCommand: [], implementation: null })).rejects.toThrow(
-      /gap|argv|requires/i,
-    );
+    await expect(
+      runTddHarness({
+        gap: {} as never,
+        candidate: {} as never,
+        testArtifacts: [],
+        testCommand: [],
+        implementation: null,
+      } as never),
+    ).rejects.toThrow(/gap|argv|requires/i);
     // Valid, exactly-scoped human approval resolves to a controlled patch proposal; nothing is applied.
     await expect(
       applyApproved({

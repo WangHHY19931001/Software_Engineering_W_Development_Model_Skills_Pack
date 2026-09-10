@@ -585,6 +585,14 @@ export interface GapDiscoveryResult {
 }
 export interface TddHarnessInput {
   gap: GapRow;
+  /**
+   * The owning candidate. Its `changeScope.files` is the approved target scope: the implementation
+   * artifact must be one of those files, so an assertion/probe module can never be relabelled as
+   * "the implementation" to exclude it from the assertion artifact set.
+   */
+  candidate: CodeHealthCandidate;
+  /** Declared test artifact files (repository-relative, non-empty, exist on disk, disjoint from the implementation). */
+  testArtifacts: string[];
   testCommand: string[];
   implementation: string | null;
 }
@@ -592,6 +600,10 @@ export interface TddHarnessResult extends CommandEvidence {
   gapId: string;
   assertionHash: string;
   implementationHash: string | null;
+  /** The declared test artifacts this run bound into `assertionHash` (sorted). */
+  testArtifacts: string[];
+  /** The approved implementation artifact excluded from `assertionHash`. */
+  implementationArtifact: string;
 }
 export interface ApplyApprovedInput {
   candidate: CodeHealthCandidate;

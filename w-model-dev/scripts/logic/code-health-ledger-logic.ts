@@ -1170,13 +1170,29 @@ function isBoundedGapText(value: unknown): value is string {
 }
 
 function validateGapEvidenceCommand(value: unknown, field: string, expected: 'red' | 'green', reasons: string[]): void {
+  if (!isRecord(value)) {
+    reasons.push(`${field} must be an object`);
+    return;
+  }
+  // Harness binding/declaration fields travel with the command evidence (R-G/R-E); strip them before the
+  // canonical CommandEvidence validator, which only allows its frozen key set.
+  const commandRecord: Record<string, unknown> = { ...value };
+  for (const bindingKey of [
+    'gapId',
+    'assertionHash',
+    'implementationHash',
+    'testArtifacts',
+    'implementationArtifact',
+  ]) {
+    delete commandRecord[bindingKey];
+  }
   const commandReasons: string[] = [];
-  validateCommandEvidence(value, field, commandReasons);
+  validateCommandEvidence(commandRecord, field, commandReasons);
   if (commandReasons.length > 0) {
     reasons.push(...commandReasons);
     return;
   }
-  const command = value as CommandEvidence;
+  const command = value as unknown as CommandEvidence;
   const failureClass = command.toolVersions?.[TDD_FAILURE_CLASS_KEY];
   if (expected === 'red') {
     if (command.observation !== 'observed' || command.exitCode === null || command.exitCode === 0) {
@@ -1260,6 +1276,33 @@ export function validateGapRow(row: unknown, ledger: CodeHealthLedger, seenGapId
   }
   if (row.redEvidence !== undefined) validateGapEvidenceCommand(row.redEvidence, 'redEvidence', 'red', reasons);
   if (row.greenEvidence !== undefined) validateGapEvidenceCommand(row.greenEvidence, 'greenEvidence', 'green', reasons);
+  // R-G: row-level red/green evidence is a pair bound to THIS row's gapId and one assertion hash.
+  const hasRedEvidence = row.redEvidence !== undefined;
+  const hasGreenEvidence = row.greenEvidence !== undefined;
+  if (hasRedEvidence !== hasGreenEvidence) {
+    reasons.push('redEvidence and greenEvidence must be present as a pair');
+  }
+  if (hasRedEvidence && hasGreenEvidence) {
+    const redBinding = tddHarnessBinding(row.redEvidence as CommandEvidence);
+    const greenBinding = tddHarnessBinding(row.greenEvidence as CommandEvidence);
+    if (!redBinding || redBinding.gapId !== row.gapId) {
+      reasons.push(`redEvidence must be bound to gap ${String(row.gapId)}`);
+    }
+    if (!greenBinding || greenBinding.gapId !== row.gapId) {
+      reasons.push(`greenEvidence must be bound to gap ${String(row.gapId)}`);
+    }
+    if (redBinding && greenBinding && redBinding.assertionHash !== greenBinding.assertionHash) {
+      reasons.push('redEvidence and greenEvidence must share one assertionHash');
+    }
+    if (typeof row.assertionHash === 'string') {
+      if (redBinding && redBinding.assertionHash !== row.assertionHash) {
+        reasons.push('redEvidence assertionHash does not match the gap assertionHash');
+      }
+      if (greenBinding && greenBinding.assertionHash !== row.assertionHash) {
+        reasons.push('greenEvidence assertionHash does not match the gap assertionHash');
+      }
+    }
+  }
   if (
     row.assertionHash !== undefined &&
     (typeof row.assertionHash !== 'string' || !HEX64_PATTERN.test(row.assertionHash))
@@ -1323,12 +1366,34 @@ function tddHarnessBinding(result: CommandEvidence): TddHarnessBinding | null {
   return null;
 }
 
+/** Structural view of the declared artifact set one harness result was produced with (R-E). */
+interface TddArtifactDeclarations {
+  testArtifacts: string[];
+  implementationArtifact: string;
+}
+
+function tddArtifactDeclarations(result: CommandEvidence): TddArtifactDeclarations | null {
+  const candidate = result as Partial<TddArtifactDeclarations>;
+  if (
+    Array.isArray(candidate.testArtifacts) &&
+    candidate.testArtifacts.every((entry) => typeof entry === 'string') &&
+    typeof candidate.implementationArtifact === 'string'
+  ) {
+    return {
+      testArtifacts: candidate.testArtifacts as string[],
+      implementationArtifact: candidate.implementationArtifact,
+    };
+  }
+  return null;
+}
+
 /**
  * Strict RED/GREEN validation. Presence is not enough: every observed result must be harness-bound to
- * the owning gap, RED and GREEN must share one assertion hash (so a weakened or deleted assertion cannot
- * produce a matching GREEN), the two evidence records must be distinguishable, and RED must carry the
- * mandatory real assertion-failure classification — unrelated failures (module missing, syntax error,
- * unavailable command) and unclassified hand-authored rows are rejected and can never count as RED.
+ * the owning gap and declare the artifact set it was produced with; RED and GREEN must declare identical
+ * test artifacts and the same implementation artifact (R-E symmetry), share one assertion hash (so a
+ * weakened or deleted assertion cannot produce a matching GREEN), remain disjoint, be distinguishable,
+ * and RED must carry the mandatory real assertion-failure classification — unrelated failures (module
+ * missing, syntax error, unavailable command) and unclassified hand-authored rows are rejected.
  */
 export function validateRedGreenEvidence(gap: GapRow, results: CommandEvidence[]): string[] {
   if (!Array.isArray(results)) return ['RED/GREEN results are required'];
@@ -1361,6 +1426,35 @@ export function validateRedGreenEvidence(gap: GapRow, results: CommandEvidence[]
   if (bound.length > 1 && assertionHashes.size > 1) {
     reasons.push('RED and GREEN were not produced by the same assertion (the assertion was changed or weakened)');
   }
+
+  // R-E: the declared artifact set is mandatory and must be symmetric across the pair.
+  const declarations = observed.map((result) => ({ result, declaration: tddArtifactDeclarations(result) }));
+  for (const { result, declaration } of declarations) {
+    const label = result.exitCode === 0 ? 'GREEN' : 'RED';
+    if (declaration === null) {
+      reasons.push(`${label} evidence must declare its testArtifacts and implementationArtifact`);
+      continue;
+    }
+    if (declaration.testArtifacts.length === 0 || !declaration.testArtifacts.every((entry) => isRelativePath(entry))) {
+      reasons.push(`${label} evidence testArtifacts must be non-empty repository-relative paths`);
+    }
+    if (declaration.testArtifacts.includes(declaration.implementationArtifact)) {
+      reasons.push(`${label} evidence testArtifacts must not include the implementation artifact`);
+    }
+  }
+  const declarationSignatures = new Set(
+    declarations
+      .map((entry) => entry.declaration)
+      .filter((declaration): declaration is TddArtifactDeclarations => declaration !== null)
+      .map(
+        (declaration) =>
+          `${JSON.stringify([...declaration.testArtifacts].sort())}|${declaration.implementationArtifact}`,
+      ),
+  );
+  if (declarationSignatures.size > 1) {
+    reasons.push('RED and GREEN must declare identical test artifacts and the same implementation artifact');
+  }
+
   const rawOutputHashes = results.map((result) => result.rawOutputSha256).filter((hash) => typeof hash === 'string');
   if (results.length > 1 && new Set(rawOutputHashes).size < results.length) {
     reasons.push('RED and GREEN evidence is not distinguishable');
