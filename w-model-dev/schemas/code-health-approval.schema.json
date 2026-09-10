@@ -54,7 +54,7 @@
       "description": "Human decision-maker identity; agent identities cannot substitute for a human checkpoint.",
       "type": "string",
       "minLength": 1,
-      "pattern": "^(?!.*(?:^|[-_ ])(?:agent|bot|automation|system|orchestrator|robot)(?:$|[-_ ]))(?!.*(?:^|[-_ ])[oasvgr](?:$|[-_ ]))[^\\r\\n]+$"
+      "pattern": "^(?!.*(?:^|[-_ \\t])(?:agent|bot|automation|system|orchestrator|robot)(?:$|[-_ \\t]))(?!.*(?:^|[-_ \\t])[oasvgr](?:$|[-_ \\t]))[^\\r\\n]+$"
     },
     "decidedAt": {
       "description": "UTC timestamp of the human checkpoint decision.",

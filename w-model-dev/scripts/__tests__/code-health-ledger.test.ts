@@ -15,6 +15,7 @@ import {
   validateCommandEvidence,
   type CandidateSelector,
   type EvidenceBinding,
+  type EvidenceStore,
   type EvidenceVerificationContext,
   type FileVerificationContext,
   type GapRow,
@@ -401,6 +402,25 @@ function candidateEvent(
 
 function evidencedEvent(candidateId: string): LedgerEvent {
   return candidateEvent(candidateId, 'discovered', 'evidenced', { actorRole: 'A' });
+}
+
+/** Creation event: the only event allowed to carry `from: null`, restricted to A/O discovery roles. */
+function creationEvent(
+  candidateId: string,
+  actorRole: LedgerEvent['actorRole'],
+  at = '2026-09-07T00:01:00.000Z',
+): LedgerEvent {
+  return candidateEvent(candidateId, null, 'discovered', { eventKind: 'discovery', actorRole, at });
+}
+
+/** A real next revision used to prove implementation-only atomic revision advance. */
+function nextRevision(): RevisionIdentity {
+  return {
+    ...revision,
+    commitSha: 'b'.repeat(40),
+    treeSha: 'c'.repeat(40),
+    sourceBundleSha256: 'd'.repeat(64),
+  };
 }
 
 function reviewEvent(candidateId: string, at = '2026-09-07T00:05:00.000Z'): LedgerEvent {
@@ -1645,6 +1665,7 @@ describe('code-health candidate lifecycle reducer (1C)', () => {
       );
     }
     const approved = ledgerWithTwoCandidates('approved');
+    const advancedRevision = nextRevision();
     expect(() =>
       transitionCandidate(
         approved,
@@ -1653,6 +1674,7 @@ describe('code-health candidate lifecycle reducer (1C)', () => {
           eventKind: 'implementation',
           actorRole: 'V',
           previousRevision: revision,
+          revision: advancedRevision,
           at: '2026-09-07T00:06:00.000Z',
         }),
       ),
@@ -1664,6 +1686,7 @@ describe('code-health candidate lifecycle reducer (1C)', () => {
         eventKind: 'implementation',
         actorRole: 'S',
         previousRevision: revision,
+        revision: advancedRevision,
         at: '2026-09-07T00:06:00.000Z',
       }),
     );
@@ -1675,6 +1698,7 @@ describe('code-health candidate lifecycle reducer (1C)', () => {
         candidateEvent(firstId, 'implemented', 'verified', {
           eventKind: 'verification',
           actorRole: 'S',
+          revision: advancedRevision,
           at: '2026-09-07T00:07:00.000Z',
         }),
       ),
@@ -1685,6 +1709,7 @@ describe('code-health candidate lifecycle reducer (1C)', () => {
       candidateEvent(firstId, 'implemented', 'verified', {
         eventKind: 'verification',
         actorRole: 'V',
+        revision: advancedRevision,
         at: '2026-09-07T00:07:00.000Z',
       }),
     );
@@ -1829,5 +1854,255 @@ describe('code-health candidate lifecycle reducer (1C)', () => {
         failureKind: 'gate',
       }),
     ).toThrowError(expect.objectContaining({ code: 'EVIDENCE_INVALID' }));
+  });
+});
+
+describe('code-health lifecycle fix round 1', () => {
+  it('I1: implementation 事件原子推进 candidate revision 与 evidenceBinding.revision，后续事件必须使用新 revision', () => {
+    const ledger = ledgerWithTwoCandidates('approved');
+    const advancedRevision = nextRevision();
+    const implemented = transitionCandidate(
+      ledger,
+      firstId,
+      candidateEvent(firstId, 'approved', 'implemented', {
+        eventKind: 'implementation',
+        actorRole: 'S',
+        previousRevision: revision,
+        revision: advancedRevision,
+        at: '2026-09-07T00:06:00.000Z',
+      }),
+    );
+    const advanced = implemented.candidates.find((c) => c.candidateId === firstId);
+    expect(advanced?.status).toBe('implemented');
+    expect(advanced?.revision).toEqual(advancedRevision);
+    expect(advanced?.evidenceBinding.revision).toEqual(advancedRevision);
+    expect(advanced && validateCodeHealthCandidate(advanced)).toEqual([]);
+    expect(replayCandidate(implemented, firstId).status).toBe('implemented');
+    // Atomic: the previous ledger still carries the pre-implementation revision.
+    expect(ledger.candidates[0]?.revision).toEqual(revision);
+    // A later event still pinned to the old revision is stale.
+    expect(() =>
+      transitionCandidate(
+        implemented,
+        firstId,
+        candidateEvent(firstId, 'implemented', 'verified', {
+          eventKind: 'verification',
+          actorRole: 'V',
+          at: '2026-09-07T00:07:00.000Z',
+        }),
+      ),
+    ).toThrowError(expect.objectContaining({ code: 'REVISION_MISMATCH' }));
+    const verified = transitionCandidate(
+      implemented,
+      firstId,
+      candidateEvent(firstId, 'implemented', 'verified', {
+        eventKind: 'verification',
+        actorRole: 'V',
+        revision: advancedRevision,
+        at: '2026-09-07T00:07:00.000Z',
+      }),
+    );
+    expect(verified.candidates.find((c) => c.candidateId === firstId)?.status).toBe('verified');
+    // A revision advanced by a verified implementation chain must not reject the candidate gaps.
+    expect(validateGapRow(validGapRow(firstId), verified, new Set())).toEqual([]);
+  });
+
+  it('I1 负例：缺 previousRevision、previousRevision 不匹配、相同 revision、非 implementation 事件携带新 revision 均拒绝', () => {
+    const advancedRevision = nextRevision();
+    const ledger = ledgerWithTwoCandidates('approved');
+    expect(() =>
+      transitionCandidate(
+        ledger,
+        firstId,
+        candidateEvent(firstId, 'approved', 'implemented', {
+          eventKind: 'implementation',
+          actorRole: 'S',
+          revision: advancedRevision,
+          at: '2026-09-07T00:06:00.000Z',
+        }),
+      ),
+    ).toThrowError(expect.objectContaining({ code: 'STRUCTURE_INVALID' }));
+    expect(() =>
+      transitionCandidate(
+        ledger,
+        firstId,
+        candidateEvent(firstId, 'approved', 'implemented', {
+          eventKind: 'implementation',
+          actorRole: 'S',
+          previousRevision: { ...revision, commitSha: 'f'.repeat(40) },
+          revision: advancedRevision,
+          at: '2026-09-07T00:06:00.000Z',
+        }),
+      ),
+    ).toThrowError(expect.objectContaining({ code: 'REVISION_MISMATCH' }));
+    expect(() =>
+      transitionCandidate(
+        ledger,
+        firstId,
+        candidateEvent(firstId, 'approved', 'implemented', {
+          eventKind: 'implementation',
+          actorRole: 'S',
+          previousRevision: revision,
+          revision,
+          at: '2026-09-07T00:06:00.000Z',
+        }),
+      ),
+    ).toThrowError(expect.objectContaining({ code: 'REVISION_MISMATCH' }));
+    expect(() =>
+      transitionCandidate(
+        ledgerWithTwoCandidates(),
+        firstId,
+        candidateEvent(firstId, 'discovered', 'evidenced', {
+          revision: advancedRevision,
+          at: '2026-09-07T00:02:00.000Z',
+        }),
+      ),
+    ).toThrowError(expect.objectContaining({ code: 'REVISION_MISMATCH' }));
+    // Refused advances stay atomic.
+    expect(ledger.candidates[0]?.revision).toEqual(revision);
+    expect(ledger.candidates[0]?.status).toBe('approved');
+    expect(ledger.events).toEqual([]);
+  });
+
+  it('I1 负例：重放拒绝与事件历史不一致的 revision', () => {
+    const advancedRevision = nextRevision();
+    const ledger = ledgerWithTwoCandidates('approved');
+    const implemented = transitionCandidate(
+      ledger,
+      firstId,
+      candidateEvent(firstId, 'approved', 'implemented', {
+        eventKind: 'implementation',
+        actorRole: 'S',
+        previousRevision: revision,
+        revision: advancedRevision,
+        at: '2026-09-07T00:06:00.000Z',
+      }),
+    );
+    const verified = transitionCandidate(
+      implemented,
+      firstId,
+      candidateEvent(firstId, 'implemented', 'verified', {
+        eventKind: 'verification',
+        actorRole: 'V',
+        revision: advancedRevision,
+        at: '2026-09-07T00:07:00.000Z',
+      }),
+    );
+    const staleEmbedded = structuredClone(verified);
+    staleEmbedded.candidates[0]!.revision = revision;
+    expect(() => replayCandidate(staleEmbedded, firstId)).toThrowError(
+      expect.objectContaining({ code: 'STRUCTURE_INVALID' }),
+    );
+    const staleEvent = structuredClone(verified);
+    staleEvent.events[1] = { ...staleEvent.events[1]!, revision };
+    expect(() => replayCandidate(staleEvent, firstId)).toThrowError(
+      expect.objectContaining({ code: 'STRUCTURE_INVALID' }),
+    );
+  });
+
+  it('I2: recordVerifiedGateFailure 消费 store 的 ok=false 结果，拒绝且 ledger 不变', async () => {
+    const fixture = await realGateFailureFixture();
+    const binding: EvidenceBinding = {
+      candidate: {
+        candidateId: firstId,
+        phase: 'P1',
+        action: 'delete-code',
+        files: ['src/unused.ts'],
+        symbols: ['unusedFunction'],
+        scopeHash,
+      },
+      revision: fixture.revision,
+      rawOutputPath: fixture.realGateFailureEvidence.rawOutputPath,
+      rawOutputSha256: fixture.realGateFailureEvidence.rawOutputSha256,
+    };
+    const rejectingStore = (code: 'EVIDENCE_INVALID' | 'SECURITY_BLOCKED'): EvidenceStore => ({
+      putRawOutput: () => Promise.reject(new Error('unused in this negative case')),
+      verify: async (_ref, expected) => ({ ok: false, code, binding: expected, reason: 'injected store rejection' }),
+    });
+    const contextOf = (evidenceStore: EvidenceStore): EvidenceVerificationContext => ({
+      repositoryRoot: '.',
+      fileVerifier,
+      evidenceStore,
+      binding,
+    });
+    const before = structuredClone(fixture.ledger);
+    await expect(
+      recordVerifiedGateFailure(
+        fixture.ledger,
+        firstId,
+        fixture.realGateFailureEvidence,
+        contextOf(rejectingStore('EVIDENCE_INVALID')),
+      ),
+    ).rejects.toMatchObject({ code: 'EVIDENCE_INVALID' });
+    await expect(
+      recordVerifiedGateFailure(
+        fixture.ledger,
+        firstId,
+        fixture.realGateFailureEvidence,
+        contextOf(rejectingStore('SECURITY_BLOCKED')),
+      ),
+    ).rejects.toBeInstanceOf(CodeHealthError);
+    await expect(
+      recordVerifiedGateFailure(
+        fixture.ledger,
+        firstId,
+        fixture.realGateFailureEvidence,
+        contextOf(rejectingStore('SECURITY_BLOCKED')),
+      ),
+    ).rejects.toMatchObject({ code: 'SECURITY_BLOCKED' });
+    expect(fixture.ledger).toEqual(before);
+  });
+
+  it('I3: 创建事件 null→discovered 作为首条事件真实可用（限 A/O），并可继续正常转移', () => {
+    const ledger = ledgerWithTwoCandidates();
+    const created = transitionCandidate(ledger, firstId, creationEvent(firstId, 'A'));
+    expect(created.candidates.find((c) => c.candidateId === firstId)?.status).toBe('discovered');
+    expect(created.events).toHaveLength(1);
+    expect(replayCandidate(created, firstId)).toMatchObject({ status: 'discovered', eventCount: 1 });
+    expect(transitionCandidate(ledger, firstId, creationEvent(firstId, 'O')).events).toHaveLength(1);
+    const evidenced = transitionCandidate(created, firstId, evidencedEvent(firstId));
+    expect(replayCandidate(evidenced, firstId).status).toBe('evidenced');
+    expect(ledger.events).toEqual([]);
+  });
+
+  it('I3 负例：重复创建、非首条创建、null→非 discovered、非 A/O 角色与重放伪造创建均拒绝', () => {
+    const ledger = ledgerWithTwoCandidates();
+    const created = transitionCandidate(ledger, firstId, creationEvent(firstId, 'A'));
+    expect(() =>
+      transitionCandidate(created, firstId, creationEvent(firstId, 'A', '2026-09-07T00:02:00.000Z')),
+    ).toThrow(/creation|history|discovered/i);
+    expect(() =>
+      transitionCandidate(
+        ledger,
+        firstId,
+        candidateEvent(firstId, null, 'evidenced', { eventKind: 'evidence', actorRole: 'A' }),
+      ),
+    ).toThrowError(expect.objectContaining({ code: 'TRANSITION_INVALID' }));
+    for (const role of ['S', 'V', 'G', 'R', 'human'] as const) {
+      expect(() => transitionCandidate(ledger, firstId, creationEvent(firstId, role))).toThrowError(
+        expect.objectContaining({ code: 'ROLE_FORBIDDEN' }),
+      );
+    }
+    const forged = structuredClone(created);
+    forged.events = [{ ...forged.events[0]!, to: 'evidenced' }];
+    expect(() => replayCandidate(forged, firstId)).toThrowError(expect.objectContaining({ code: 'STRUCTURE_INVALID' }));
+  });
+
+  it('M2: GapRow 拒绝空字符串的 existingTestIds/rtmIds 条目', () => {
+    const ledger = ledgerWithTwoCandidates('under-review');
+    const validGap = validGapRow(firstId);
+    expect(validateGapRow({ ...validGap, existingTestIds: [''] }, ledger, new Set())).toEqual(
+      expect.arrayContaining([expect.stringMatching(/existingTestIds/i)]),
+    );
+    expect(validateGapRow({ ...validGap, rtmIds: [''] }, ledger, new Set())).toEqual(
+      expect.arrayContaining([expect.stringMatching(/rtm/i)]),
+    );
+  });
+
+  it('M9: 空 GapRow 矩阵不通过', () => {
+    const ledger = ledgerWithTwoCandidates('under-review');
+    expect(validateGapMatrix({ rows: [] }, ledger)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/empty|row/i)]),
+    );
   });
 });

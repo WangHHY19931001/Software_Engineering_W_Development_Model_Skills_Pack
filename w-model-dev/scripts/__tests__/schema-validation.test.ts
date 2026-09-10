@@ -545,6 +545,7 @@ describe('JSON Schema 前置校验（validateBySchema）', () => {
     expect(validateBySchema('code-health-approval', approval).valid).toBe(true);
     expect(validateBySchema('code-health-approval', { ...approval, actor: 'S-agent' }).valid).toBe(false);
     expect(validateBySchema('code-health-approval', { ...approval, actor: 'V-agent' }).valid).toBe(false);
+    expect(validateBySchema('code-health-approval', { ...approval, actor: 'V\t-agent' }).valid).toBe(false);
   });
 
   it('未注册的 schema 返回明确错误，gate-log 使用独立 schema 拒绝无效结构', () => {

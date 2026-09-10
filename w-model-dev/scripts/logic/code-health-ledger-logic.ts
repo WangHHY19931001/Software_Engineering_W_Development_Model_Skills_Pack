@@ -143,7 +143,7 @@ const NORMAL_TRANSITIONS: Readonly<Record<CodeHealthStatus, readonly CodeHealthS
 
 /** Authorized recorder role per target state. R never fixes or signs for S; O never records a transition. */
 const TRANSITION_ROLES: Readonly<Record<CodeHealthStatus, readonly LedgerEvent['actorRole'][]>> = {
-  discovered: ['A'],
+  discovered: ['A', 'O'],
   evidenced: ['A', 'S'],
   'under-review': ['V'],
   approved: ['human'],
@@ -333,7 +333,19 @@ export function replayCandidate(ledger: CodeHealthLedger, candidateId: string): 
   const events = candidateEvents(ledger, candidateId);
   if (events.length === 0) return { candidateId, status: candidate.status, eventCount: 0 };
   const first = events[0]!;
+  if (first.from === null && first.to !== 'discovered') {
+    throw new CodeHealthError('STRUCTURE_INVALID', 'an initial creation event must target discovered');
+  }
   let status: CodeHealthStatus = first.from ?? 'discovered';
+  let runningRevision: RevisionIdentity;
+  if (first.eventKind === 'implementation') {
+    if (!first.previousRevision) {
+      throw new CodeHealthError('STRUCTURE_INVALID', 'implementation events require previousRevision');
+    }
+    runningRevision = first.previousRevision;
+  } else {
+    runningRevision = first.revision;
+  }
   events.forEach((event, index) => {
     if (index > 0) {
       const previous = events[index - 1]!;
@@ -347,12 +359,29 @@ export function replayCandidate(ledger: CodeHealthLedger, candidateId: string): 
     if (event.from !== null && event.from !== status) {
       throw new CodeHealthError('STRUCTURE_INVALID', 'candidate event history does not start from its recorded state');
     }
+    if (event.eventKind === 'implementation') {
+      if (!event.previousRevision || !sameRevision(event.previousRevision, runningRevision)) {
+        throw new CodeHealthError(
+          'STRUCTURE_INVALID',
+          'candidate revision history does not chain through the implementation event',
+        );
+      }
+      runningRevision = event.revision;
+    } else if (!sameRevision(event.revision, runningRevision)) {
+      throw new CodeHealthError('STRUCTURE_INVALID', 'candidate event revision does not match the running revision');
+    }
     status = event.to;
   });
   if (status !== candidate.status) {
     throw new CodeHealthError(
       'STRUCTURE_INVALID',
       `embedded candidate status ${candidate.status} does not match the replayed history ${status}`,
+    );
+  }
+  if (!sameRevision(runningRevision, candidate.revision)) {
+    throw new CodeHealthError(
+      'STRUCTURE_INVALID',
+      'embedded candidate revision does not match the replayed revision history',
     );
   }
   return { candidateId, status, eventCount: events.length };
@@ -441,9 +470,6 @@ function appendEvent(
   if (event.scopeHash !== current.changeScope.scopeHash) {
     throw new CodeHealthError('SCOPE_MISMATCH', 'event scopeHash does not match the candidate scope');
   }
-  if (!sameRevision(event.revision, current.revision)) {
-    throw new CodeHealthError('REVISION_MISMATCH', 'event revision is stale for the candidate revision');
-  }
   if (event.eventKind === 'implementation') {
     if (!event.previousRevision || !sameRevision(event.previousRevision, current.revision)) {
       throw new CodeHealthError(
@@ -451,8 +477,11 @@ function appendEvent(
         'implementation previousRevision does not match the candidate revision',
       );
     }
-  } else if (event.previousRevision !== undefined) {
-    throw new CodeHealthError('STRUCTURE_INVALID', 'previousRevision is only valid for implementation events');
+    if (sameRevision(event.revision, event.previousRevision)) {
+      throw new CodeHealthError('REVISION_MISMATCH', 'implementation must advance the candidate to a new revision');
+    }
+  } else if (!sameRevision(event.revision, current.revision)) {
+    throw new CodeHealthError('REVISION_MISMATCH', 'event revision is stale for the candidate revision');
   }
   replayCandidate(ledger, candidateId);
   const chain = options.rootCauseChain === true;
@@ -478,7 +507,7 @@ function appendEvent(
         `transition from ${String(event.from)} does not match ${current.status}`,
       );
     }
-    if (!NORMAL_TRANSITIONS[current.status].includes(event.to)) {
+    if (event.from !== null && !NORMAL_TRANSITIONS[current.status].includes(event.to)) {
       throw new CodeHealthError('TRANSITION_INVALID', `transition ${current.status} -> ${event.to} is not allowed`);
     }
     if (event.eventKind === 'rework') {
@@ -557,9 +586,18 @@ function appendEvent(
     }
     throw new CodeHealthError('NOT_IMPLEMENTED', 'archive transition producer is reserved for the Task 1D boundary');
   }
-  const candidates = ledger.candidates.map((candidate) =>
-    candidate.candidateId === candidateId ? { ...candidate, status: event.to } : candidate,
-  );
+  const candidates = ledger.candidates.map((candidate) => {
+    if (candidate.candidateId !== candidateId) return candidate;
+    if (event.eventKind !== 'implementation') return { ...candidate, status: event.to };
+    // Implementation is the only event kind allowed to advance the revision; it advances the candidate
+    // revision and the evidence binding that must stay bound to it in the same atomic update.
+    return {
+      ...candidate,
+      status: event.to,
+      revision: event.revision,
+      evidenceBinding: { ...candidate.evidenceBinding, revision: event.revision },
+    };
+  });
   return { ...ledger, candidates, events: [...ledger.events, event] };
 }
 
@@ -819,7 +857,14 @@ export async function recordVerifiedGateFailure(
     revision: candidate.revision,
     observation: evidence.observation,
   };
-  await verification.evidenceStore.verify(ref, verification.binding);
+  const verificationResult = await verification.evidenceStore.verify(ref, verification.binding);
+  if (verificationResult?.ok !== true) {
+    throw new CodeHealthError(
+      verificationResult?.code ?? 'EVIDENCE_INVALID',
+      'gate failure evidence failed store verification',
+      { safePath: evidence.rawOutputPath, candidateId, scopeHash: candidate.changeScope.scopeHash },
+    );
+  }
   const gateFailure: GateFailureEvidence = {
     ...evidence,
     candidateId,
@@ -990,6 +1035,35 @@ function gapStatusAllowedForCandidate(status: CodeHealthStatus): readonly GapRow
   return ['discovered', 'blocked'];
 }
 
+/**
+ * A gap may bind to a candidate whose revision is the ledger baseline or a revision traceable through a
+ * contiguous implementation chain that starts at the baseline; an implementation advance must never
+ * invalidate every gap of that candidate.
+ */
+function isCandidateRevisionBoundToLedger(ledger: CodeHealthLedger, candidate: CodeHealthCandidate): boolean {
+  if (sameRevision(candidate.revision, ledger.baseline)) return true;
+  const events = candidateEvents(ledger, candidate.candidateId);
+  const first = events[0];
+  if (!first) return false;
+  let running: RevisionIdentity;
+  if (first.eventKind === 'implementation') {
+    if (!first.previousRevision) return false;
+    running = first.previousRevision;
+  } else {
+    running = first.revision;
+  }
+  if (!sameRevision(running, ledger.baseline)) return false;
+  for (const event of events) {
+    if (event.eventKind === 'implementation') {
+      if (!event.previousRevision || !sameRevision(event.previousRevision, running)) return false;
+      running = event.revision;
+    } else if (!sameRevision(event.revision, running)) {
+      return false;
+    }
+  }
+  return sameRevision(running, candidate.revision);
+}
+
 function validateGapCoverage(value: unknown, field: string, reasons: string[]): void {
   if (!isRecord(value)) {
     reasons.push(`${field} is required`);
@@ -1079,8 +1153,8 @@ export function validateGapRow(row: unknown, ledger: CodeHealthLedger, seenGapId
       : undefined;
   if (!candidate) {
     reasons.push('gap candidateId does not reference a candidate in the ledger');
-  } else if (!sameRevision(candidate.revision, ledger.baseline)) {
-    reasons.push('gap candidate revision is not bound to the ledger baseline revision');
+  } else if (!isCandidateRevisionBoundToLedger(ledger, candidate)) {
+    reasons.push('gap candidate revision is not bound to a ledger revision');
   }
   if (!GAP_KINDS.includes(row.kind as (typeof GAP_KINDS)[number])) reasons.push('kind is invalid');
   if (
@@ -1089,7 +1163,9 @@ export function validateGapRow(row: unknown, ledger: CodeHealthLedger, seenGapId
   ) {
     reasons.push('testLevels is invalid');
   }
-  if (!isStringArray(row.existingTestIds)) reasons.push('existingTestIds must be a string array');
+  if (!isStringArray(row.existingTestIds) || row.existingTestIds.some((testId) => testId.trim() === '')) {
+    reasons.push('existingTestIds must contain non-empty test identifiers');
+  }
   if (!isBoundedGapText(row.missingScenario)) reasons.push('missingScenario is required and must be specific');
   if (!isStringArray(row.evidenceSources, false)) {
     reasons.push('evidenceSources is required');
@@ -1099,7 +1175,9 @@ export function validateGapRow(row: unknown, ledger: CodeHealthLedger, seenGapId
   validateGapRisk(row.risk, 'risk', reasons);
   if (!GAP_PRIORITIES.includes(row.priority as (typeof GAP_PRIORITIES)[number])) reasons.push('priority is invalid');
   if (!isBoundedGapText(row.owner)) reasons.push('owner is required and must be specific');
-  if (!isStringArray(row.rtmIds, false)) reasons.push('rtmIds is required');
+  if (!isStringArray(row.rtmIds, false) || row.rtmIds.some((rtmId) => rtmId.trim() === '')) {
+    reasons.push('rtmIds must contain non-empty requirement identifiers');
+  }
   validateGapCoverage(row.coverageSignal, 'coverageSignal', reasons);
   if (row.coverageIsSignalOnly !== true) reasons.push('coverageIsSignalOnly must be true');
   if (!GAP_STATUSES.includes(row.status as (typeof GAP_STATUSES)[number])) {
@@ -1134,6 +1212,7 @@ export function validateGapRow(row: unknown, ledger: CodeHealthLedger, seenGapId
 export function validateGapMatrix(matrix: unknown, ledger: CodeHealthLedger): string[] {
   if (!isRecord(matrix)) return ['gap matrix requires an object'];
   if (!Array.isArray(matrix.rows)) return ['gap matrix rows are required'];
+  if (matrix.rows.length === 0) return ['gap matrix rows must not be empty'];
   const reasons: string[] = [];
   hasOnlyProperties(matrix, ['rows'], 'gap matrix', reasons);
   const seenGapIds = new Set<string>();
