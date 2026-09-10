@@ -64,6 +64,7 @@ import { createCodeHealthEvidenceStore } from '../lib/code-health-evidence-store
 import { createCodeHealthFileVerifier } from '../lib/code-health-file-verifier.js';
 import { createCodeHealthGitRevisionProvider } from '../lib/code-health-revision-provider.js';
 import { redactCodeHealthArtifact } from '../lib/code-health-redaction.js';
+import { TDD_FAILURE_CLASS_KEY } from '../lib/code-health-tdd-harness.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const testOutputRoot = path.join(repoRoot, '.tmp-code-health-test-output');
@@ -583,8 +584,16 @@ function verifiedGapRow(candidateId: string): GapRow {
   return {
     ...validGapRow(candidateId),
     status: 'verified',
-    redEvidence: { ...observed, exitCode: 1 },
-    greenEvidence: { ...observed, exitCode: 0 },
+    redEvidence: {
+      ...observed,
+      exitCode: 1,
+      toolVersions: { ...observed.toolVersions, [TDD_FAILURE_CLASS_KEY]: 'assertion' },
+    },
+    greenEvidence: {
+      ...observed,
+      exitCode: 0,
+      toolVersions: { ...observed.toolVersions, [TDD_FAILURE_CLASS_KEY]: 'none' },
+    },
     assertionHash: 'a'.repeat(64),
   };
 }

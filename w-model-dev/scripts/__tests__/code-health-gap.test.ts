@@ -188,6 +188,80 @@ describe('phase 2 gap matrix (pure)', () => {
       validateRedGreenEvidence(unknownCommand.gap as GapRow, unknownCommand.results as CommandEvidence[]).join('; '),
     ).toMatch(/RED evidence required/i);
   });
+
+  it('F-1: 手工非零 RED 缺分类 / 分类非 assertion / 未绑定 gap 均被拒绝', async () => {
+    const fixture = await readFixture('red-unclassified.json');
+    const ledger = fixture.ledger as CodeHealthLedger;
+    const redUnclassified = validateGapMatrix({ rows: fixture.rows }, ledger).join('; ');
+    expect(redUnclassified).toMatch(/redEvidence/i);
+    expect(redUnclassified).toMatch(/classification|assertion/i);
+
+    const baseRow = structuredClone((fixture.rows as GapRow[])[0]!);
+    for (const failureClass of ['infrastructure', 'unavailable'] as const) {
+      const row = structuredClone(baseRow);
+      row.redEvidence = {
+        ...row.redEvidence!,
+        toolVersions: { ...row.redEvidence!.toolVersions, codeHealthTddFailureClass: failureClass },
+      };
+      expect(validateGapMatrix({ rows: [row] }, ledger).join('; ')).toMatch(
+        new RegExp(`classification|${failureClass}`, 'i'),
+      );
+    }
+
+    // Two hand-authored results that carry no harness gap binding cannot stand in for a real pair.
+    const unbound: CommandEvidence[] = [
+      {
+        command: 'node probe.mjs',
+        cwd: '.',
+        environment: {},
+        platform: process.platform,
+        toolVersions: { node: process.version },
+        startedAt: '2026-09-07T00:01:00.000Z',
+        endedAt: '2026-09-07T00:01:01.000Z',
+        exitCode: 1,
+        observation: 'observed',
+        rawOutputPath: '.w-model/code-health/tdd/red.log',
+        rawOutputSha256: '1'.repeat(64),
+      },
+      {
+        command: 'node probe.mjs',
+        cwd: '.',
+        environment: {},
+        platform: process.platform,
+        toolVersions: { node: process.version },
+        startedAt: '2026-09-07T00:02:00.000Z',
+        endedAt: '2026-09-07T00:02:01.000Z',
+        exitCode: 0,
+        observation: 'observed',
+        rawOutputPath: '.w-model/code-health/tdd/green.log',
+        rawOutputSha256: '2'.repeat(64),
+      },
+    ];
+    const unboundReasons = validateRedGreenEvidence({ ...validGap(), assertionHash: 'a'.repeat(64) }, unbound).join(
+      '; ',
+    );
+    expect(unboundReasons).toMatch(/not bound to gap/i);
+    expect(unboundReasons).toMatch(/classification|assertion/i);
+
+    // The genuine harness-bound pair still passes with the mandatory classification.
+    const boundRed: CommandEvidence = {
+      ...unbound[0]!,
+      gapId: validGap().gapId,
+      assertionHash: 'a'.repeat(64),
+      implementationHash: null,
+      toolVersions: { ...unbound[0]!.toolVersions, codeHealthTddFailureClass: 'assertion' },
+    } as CommandEvidence;
+    const boundGreen: CommandEvidence = {
+      ...unbound[1]!,
+      gapId: validGap().gapId,
+      assertionHash: 'a'.repeat(64),
+      implementationHash: 'c'.repeat(64),
+      toolVersions: { ...unbound[1]!.toolVersions, codeHealthTddFailureClass: 'none' },
+    } as CommandEvidence;
+    expect(validateRedGreenEvidence({ ...validGap(), assertionHash: 'a'.repeat(64) }, [boundRed, boundGreen])).toEqual(
+      [],
+    );
+  });
 });
 
 // -------------------- real TDD RED/GREEN harness --------------------
@@ -235,6 +309,17 @@ const PROBE = [
   "process.stdout.write('probe passed\\n');",
   '',
 ].join('\n');
+/** An assertion that lives in an imported (non-argv) module: the argv entry only re-exports it. */
+const RUNNER = "import './assertion.mjs';\n";
+const IMPORTED_ASSERTION = [
+  "import assert from 'node:assert/strict';",
+  "import { isValidToken } from './src/token.mjs';",
+  '',
+  "assert.equal(isValidToken('forged-token'), false, 'gap: imported assertion must reject a forged token');",
+  "process.stdout.write('imported assertion passed\\n');",
+  '',
+].join('\n');
+const WEAKENED_ASSERTION = 'process.exit(0);\n';
 /** A probe that fails for an unrelated infrastructure reason (module missing), not a gap assertion. */
 const MISSING_MODULE_PROBE = "import 'module-that-does-not-exist-for-code-health-gap-xyz';\n";
 
@@ -292,11 +377,13 @@ describe('phase 2 TDD RED/GREEN harness (real processes, real exit codes)', () =
   it('RED 是真实断言失败，GREEN 在同一断言上真实 exit 0，且实现 hash 变化', async () => {
     const fixture = await createHarnessFixture();
     const testCommand = [process.execPath, 'probe.mjs'];
-    const red = await runTddHarness({ gap: validGap(), testCommand, implementation: null }, fixture.options);
+    // The implementation artifact is declared for both runs so the assertion artifact set (which
+    // excludes it) is stable; only its content hash changes between the broken RED and the fixed GREEN.
+    const red = await runTddHarness({ gap: validGap(), testCommand, implementation: 'src/token.mjs' }, fixture.options);
     expect(red.exitCode).toBe(1);
     expect(red.observation).toBe('observed');
     expect(red.toolVersions.codeHealthTddFailureClass).toBe('assertion');
-    expect(red.implementationHash).toBeNull();
+    expect(red.implementationHash).toMatch(/^[0-9a-f]{64}$/);
 
     await fs.writeFile(path.join(fixture.root, 'src', 'token.mjs'), FIXED_TOKEN);
     const green = await runTddHarness(
@@ -307,7 +394,7 @@ describe('phase 2 TDD RED/GREEN harness (real processes, real exit codes)', () =
     expect(green.observation).toBe('observed');
     expect(green.toolVersions.codeHealthTddFailureClass).toBe('none');
     expect(green.implementationHash).toMatch(/^[0-9a-f]{64}$/);
-    expect(green.implementationHash).not.toBeNull();
+    expect(green.implementationHash).not.toBe(red.implementationHash);
 
     // Same exact assertion, distinct real runs, and the pair passes the strengthened validator.
     expect(green.assertionHash).toBe(red.assertionHash);
@@ -371,6 +458,46 @@ describe('phase 2 TDD RED/GREEN harness (real processes, real exit codes)', () =
     expect(weakenedGreen.assertionHash).not.toBe(red.assertionHash);
     const reasons = validateRedGreenEvidence({ ...validGap(), assertionHash: red.assertionHash }, [red, weakenedGreen]);
     expect(reasons.join('; ')).toMatch(/same assertion|assertionHash|weakened/i);
+  });
+
+  it('F-2: 削弱被 import 的（非 argv）断言文件改变 assertionHash，GREEN 被拒绝', async () => {
+    const fixture = await createHarnessFixture();
+    await fs.writeFile(path.join(fixture.root, 'runner.mjs'), RUNNER);
+    await fs.writeFile(path.join(fixture.root, 'assertion.mjs'), IMPORTED_ASSERTION);
+    const testCommand = [process.execPath, 'runner.mjs'];
+
+    const red = await runTddHarness({ gap: validGap(), testCommand, implementation: null }, fixture.options);
+    expect(red.exitCode).toBe(1);
+    expect(red.toolVersions.codeHealthTddFailureClass).toBe('assertion');
+
+    // Only the imported (non-argv) assertion is weakened; the implementation stays broken.
+    await fs.writeFile(path.join(fixture.root, 'assertion.mjs'), WEAKENED_ASSERTION);
+    const weakenedGreen = await runTddHarness({ gap: validGap(), testCommand, implementation: null }, fixture.options);
+    expect(weakenedGreen.exitCode).toBe(0);
+    expect(weakenedGreen.assertionHash).not.toBe(red.assertionHash);
+    expect(
+      validateRedGreenEvidence({ ...validGap(), assertionHash: red.assertionHash }, [red, weakenedGreen]).join('; '),
+    ).toMatch(/same assertion|assertionHash|weakened/i);
+  });
+
+  it('F-4: harness 拒绝指向本仓测试套件的 argv（防递归）', async () => {
+    const fixture = await createHarnessFixture();
+    const repoTestPath = path.join(repoRoot, 'w-model-dev', 'scripts', '__tests__', 'code-health-gap.test.ts');
+    await expect(
+      runTddHarness(
+        { gap: validGap(), testCommand: [process.execPath, repoTestPath], implementation: null },
+        fixture.options,
+      ),
+    ).rejects.toThrow(/recursion|repository|__tests__|test suite/i);
+    await expect(
+      runTddHarness({ gap: validGap(), testCommand: ['npm', 'run', 'test'], implementation: null }, fixture.options),
+    ).rejects.toThrow(/recursion|repository|test suite/i);
+    await expect(
+      runTddHarness(
+        { gap: validGap(), testCommand: [process.execPath, '--vitest'], implementation: null },
+        fixture.options,
+      ),
+    ).rejects.toThrow(/recursion|repository|vitest|test suite/i);
   });
 
   it('harness 未注入边界或输入非法时 fail-closed，绝不隐式执行本仓测试套件', async () => {

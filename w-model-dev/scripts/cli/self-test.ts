@@ -2578,6 +2578,12 @@ const CODE_HEALTH_GAP_CASES: CodeHealthGapCase[] = [
     description: 'implemented gap 的 redEvidence exitCode=0 → validateGapMatrix 拒绝非失败 RED',
   },
   {
+    file: 'red-unclassified.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/redEvidence|classification|assertion/i],
+    description: 'RED 非零但缺 codeHealthTddFailureClass 分类 → 手工证据不能冒充真实 RED',
+  },
+  {
     file: 'green-weakening.json',
     expectedPassed: false,
     expectedReasonPatterns: [/same assertion|weakened|assertionHash/i],

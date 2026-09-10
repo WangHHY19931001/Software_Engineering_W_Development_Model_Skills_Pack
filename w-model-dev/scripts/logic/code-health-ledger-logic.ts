@@ -1177,12 +1177,25 @@ function validateGapEvidenceCommand(value: unknown, field: string, expected: 're
     return;
   }
   const command = value as CommandEvidence;
+  const failureClass = command.toolVersions?.[TDD_FAILURE_CLASS_KEY];
   if (expected === 'red') {
     if (command.observation !== 'observed' || command.exitCode === null || command.exitCode === 0) {
       reasons.push(`${field} must be an observed non-zero RED result`);
     }
-  } else if (command.observation !== 'observed' || command.exitCode !== 0) {
-    reasons.push(`${field} must be an observed zero-exit GREEN result`);
+    // A gap-bound RED must prove it failed on the assertion, not on unrelated infrastructure. The
+    // classification is mandatory: absent evidence fails closed and can never be counted as RED.
+    if (failureClass !== 'assertion') {
+      reasons.push(
+        `${field} must carry the real assertion-failure classification (${TDD_FAILURE_CLASS_KEY}=assertion); got ${String(failureClass)}`,
+      );
+    }
+  } else {
+    if (command.observation !== 'observed' || command.exitCode !== 0) {
+      reasons.push(`${field} must be an observed zero-exit GREEN result`);
+    }
+    if (failureClass !== undefined && failureClass !== 'none') {
+      reasons.push(`${field} must not carry a non-GREEN failure classification; got ${String(failureClass)}`);
+    }
   }
 }
 
@@ -1311,12 +1324,11 @@ function tddHarnessBinding(result: CommandEvidence): TddHarnessBinding | null {
 }
 
 /**
- * Strict RED/GREEN validation. Presence is not enough: a harness-bound result must belong to the same
- * gap, RED and GREEN must share one assertion hash (so a weakened or deleted assertion cannot produce a
- * matching GREEN), the two evidence records must be distinguishable, and RED must be a real assertion
- * failure — an unrelated failure (module missing, syntax error, unavailable command) is rejected and can
- * never count as RED. Assertions are strictly stronger than the Task 1 presence-only contract, so no
- * existing caller can pass by weakening.
+ * Strict RED/GREEN validation. Presence is not enough: every observed result must be harness-bound to
+ * the owning gap, RED and GREEN must share one assertion hash (so a weakened or deleted assertion cannot
+ * produce a matching GREEN), the two evidence records must be distinguishable, and RED must carry the
+ * mandatory real assertion-failure classification — unrelated failures (module missing, syntax error,
+ * unavailable command) and unclassified hand-authored rows are rejected and can never count as RED.
  */
 export function validateRedGreenEvidence(gap: GapRow, results: CommandEvidence[]): string[] {
   if (!Array.isArray(results)) return ['RED/GREEN results are required'];
@@ -1328,17 +1340,23 @@ export function validateRedGreenEvidence(gap: GapRow, results: CommandEvidence[]
   if (reds.length === 0) reasons.push('RED evidence required');
   if (greens.length === 0) reasons.push('GREEN evidence required');
 
-  const bound = results
-    .map((result) => tddHarnessBinding(result))
-    .filter((binding): binding is TddHarnessBinding => binding !== null);
-  for (const binding of bound) {
-    if (binding.gapId !== gap.gapId) {
-      reasons.push(`RED/GREEN evidence gapId ${binding.gapId} is not bound to gap ${gap.gapId}`);
+  // Gap binding is mandatory: a hand-authored pair of results that carries no gapId/assertionHash can
+  // never stand in for a real RED/GREEN pair.
+  for (const result of observed) {
+    const binding = tddHarnessBinding(result);
+    if (binding === null || binding.gapId !== gap.gapId) {
+      reasons.push(
+        `${result.exitCode === 0 ? 'GREEN' : 'RED'} evidence is not bound to gap ${gap.gapId} (missing harness gapId/assertionHash)`,
+      );
+      continue;
     }
     if (typeof gap.assertionHash === 'string' && binding.assertionHash !== gap.assertionHash) {
       reasons.push('RED/GREEN assertionHash does not match the recorded gap assertion');
     }
   }
+  const bound = observed
+    .map((result) => tddHarnessBinding(result))
+    .filter((binding): binding is TddHarnessBinding => binding !== null && binding.gapId === gap.gapId);
   const assertionHashes = new Set(bound.map((binding) => binding.assertionHash));
   if (bound.length > 1 && assertionHashes.size > 1) {
     reasons.push('RED and GREEN were not produced by the same assertion (the assertion was changed or weakened)');
@@ -1349,9 +1367,9 @@ export function validateRedGreenEvidence(gap: GapRow, results: CommandEvidence[]
   }
   for (const red of reds) {
     const failureClass = red.toolVersions?.[TDD_FAILURE_CLASS_KEY];
-    if (failureClass !== undefined && failureClass !== 'assertion') {
+    if (failureClass !== 'assertion') {
       reasons.push(
-        `RED failed for an unrelated reason (${failureClass}); only a real assertion failure can count as RED`,
+        `RED failed for an unrelated reason or is unclassified (${String(failureClass)}); only a real assertion failure (${TDD_FAILURE_CLASS_KEY}=assertion) can count as RED`,
       );
     }
   }
