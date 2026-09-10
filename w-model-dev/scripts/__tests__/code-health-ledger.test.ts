@@ -1,14 +1,23 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- All filesystem paths are generated beneath test-owned temporary output directories. */
 /** Task 1 contract tests for the code-health ledger and evidence boundary. */
 
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 import { describe, expect, it } from 'vitest';
 
+import type {
+  CandidateSelector,
+  EvidenceBinding,
+  EvidenceVerificationContext,
+  FileVerificationContext,
+  RevisionIdentity,
+} from '../logic/code-health-contract.js';
 import {
   applyApproved,
   buildStaticInventory,
@@ -16,6 +25,7 @@ import {
   checkFalsePositiveGuards,
   classifyProtectedTest,
   clusterDuplicates,
+  CodeHealthError,
   evaluateDeletion,
   executeRollback,
   findGaps,
@@ -36,6 +46,9 @@ import {
   type ApprovalDecision,
 } from '../logic/code-health-ledger-logic.js';
 import { createCodeHealthCommandRunner } from '../lib/code-health-command.js';
+import { createCodeHealthEvidenceStore } from '../lib/code-health-evidence-store.js';
+import { createCodeHealthFileVerifier } from '../lib/code-health-file-verifier.js';
+import { createCodeHealthGitRevisionProvider } from '../lib/code-health-revision-provider.js';
 import { redactCodeHealthArtifact } from '../lib/code-health-redaction.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -215,6 +228,86 @@ export function validApproval(candidate: CodeHealthCandidate): ApprovalDecision 
   };
 }
 
+const execFileAsync = promisify(execFile);
+const gitRevisionProvider = createCodeHealthGitRevisionProvider();
+const fileVerifier = createCodeHealthFileVerifier();
+const GIT_ENV = {
+  ...process.env,
+  GIT_AUTHOR_NAME: 'code-health-ledger',
+  GIT_AUTHOR_EMAIL: 'code-health-ledger@example.test',
+  GIT_COMMITTER_NAME: 'code-health-ledger',
+  GIT_COMMITTER_EMAIL: 'code-health-ledger@example.test',
+};
+
+export function sha256Hex(bytes: Buffer | string): string {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+async function git(root: string, args: string[]): Promise<string> {
+  const { stdout } = await execFileAsync('git', args, { cwd: root, env: GIT_ENV, shell: false, windowsHide: true });
+  return stdout;
+}
+
+/** Real isolated Git repository used by the 1B authenticity assertions. */
+async function createTempGitRepository(): Promise<string> {
+  const root = await fs.mkdtemp(path.join(tmpdir(), 'code-health-ledger-1b-'));
+  await git(root, ['init', '--quiet']);
+  await fs.mkdir(path.join(root, 'src'), { recursive: true });
+  await fs.writeFile(path.join(root, 'src', 'unused.ts'), 'export const unusedFunction = 1;\n');
+  await git(root, ['add', '--all']);
+  await git(root, ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'initial']);
+  return root;
+}
+
+async function repositoryRevision(root: string): Promise<RevisionIdentity> {
+  const revision = await gitRevisionProvider.current(root);
+  if (!revision) throw new Error('repository revision is unavailable for the test fixture');
+  return revision;
+}
+
+function commandBinding(
+  candidateId: string,
+  revision: RevisionIdentity,
+  rawOutputPath = '.w-model/code-health/raw/command.log',
+): EvidenceBinding {
+  return {
+    candidate: {
+      candidateId,
+      phase: 'P1',
+      action: 'delete-code',
+      files: ['src/unused.ts'],
+      symbols: ['unusedFunction'],
+      scopeHash: 'sha256:' + 'e'.repeat(64),
+    },
+    revision,
+    rawOutputPath,
+    rawOutputSha256: '0'.repeat(64),
+  };
+}
+
+/** Command runner over the real repository root with the injected 1B evidence boundaries. */
+async function createRepositoryRunner(rawOutputDir: string, extra: { now?: () => Date } = {}) {
+  const relativeRawOutputDir = path.relative(repoRoot, rawOutputDir).replace(/\\/g, '/');
+  const evidenceStore = createCodeHealthEvidenceStore({
+    repositoryRoot: repoRoot,
+    rawOutputRoot: relativeRawOutputDir,
+  });
+  const runner = createCodeHealthCommandRunner({
+    repositoryRoot: repoRoot,
+    rawOutputDir: relativeRawOutputDir,
+    evidenceStore,
+    revisionProvider: gitRevisionProvider,
+    ...(extra.now ? { now: extra.now } : {}),
+  });
+  const revision = await repositoryRevision(repoRoot);
+  return {
+    runner,
+    evidenceStore,
+    revision,
+    binding: (candidateId: string) => commandBinding(candidateId, revision),
+  };
+}
+
 describe('code-health ledger contract', () => {
   it('合法候选包含完整 evidence/impact/rollback/review/signature/archive 字段并可从 discovered 转 evidenced', () => {
     const candidate = validCandidate('CHG-P1-20260907-001', { status: 'discovered' });
@@ -255,14 +348,24 @@ describe('code-health ledger contract', () => {
     await fs.mkdir(testOutputRoot, { recursive: true });
     const rawOutputDir = await fs.mkdtemp(path.join(testOutputRoot, 'code-health-output-'));
     try {
-      const runner = createCodeHealthCommandRunner({ rawOutputDir });
-      const result = await runner.run(process.execPath, ['--version'], { cwd: repoRoot, env: {}, timeoutMs: 5000 });
+      const { runner, binding } = await createRepositoryRunner(rawOutputDir);
+      const result = await runner.run(process.execPath, ['--version'], {
+        cwd: repoRoot,
+        env: {},
+        timeoutMs: 5000,
+        binding: binding('CHG-P1-20260907-019'),
+      });
       expect(result.command).toContain('--version');
       expect(result.exitCode).toBe(0);
       expect(result.observation).toBe('observed');
       expect(result.rawOutputSha256).toMatch(/^[0-9a-f]{64}$/);
       await expect(
-        runner.run('node -e "process.exit(0)"', [], { cwd: repoRoot, env: {}, timeoutMs: 5000 }),
+        runner.run('node -e "process.exit(0)"', [], {
+          cwd: repoRoot,
+          env: {},
+          timeoutMs: 5000,
+          binding: binding('CHG-P1-20260907-019'),
+        }),
       ).rejects.toThrow(/argv/);
     } finally {
       await fs.rm(rawOutputDir, { recursive: true, force: true });
@@ -273,12 +376,13 @@ describe('code-health ledger contract', () => {
     await fs.mkdir(testOutputRoot, { recursive: true });
     const rawOutputDir = await fs.mkdtemp(path.join(testOutputRoot, 'code-health-secret-output-'));
     try {
-      const runner = createCodeHealthCommandRunner({ rawOutputDir });
+      const { runner, binding } = await createRepositoryRunner(rawOutputDir);
       await expect(
         runner.run(process.execPath, ['-e', 'console.log("password=super-secret")'], {
           cwd: repoRoot,
           env: { API_TOKEN: 'token-value-that-must-not-run' },
           timeoutMs: 5000,
+          binding: binding('CHG-P1-20260907-020'),
         }),
       ).rejects.toThrow(/redaction|unsafe|secret/i);
       expect((await fs.readdir(rawOutputDir)).length).toBe(0);
@@ -291,11 +395,12 @@ describe('code-health ledger contract', () => {
     await fs.mkdir(testOutputRoot, { recursive: true });
     const rawOutputDir = await fs.mkdtemp(path.join(testOutputRoot, 'code-health-outcomes-'));
     try {
-      const runner = createCodeHealthCommandRunner({ rawOutputDir });
+      const { runner, binding } = await createRepositoryRunner(rawOutputDir);
       const failed = await runner.run(process.execPath, ['-e', 'console.error("failure output") ; process.exit(1)'], {
         cwd: repoRoot,
         env: {},
         timeoutMs: 5000,
+        binding: binding('CHG-P1-20260907-021'),
       });
       expect(failed.exitCode).toBe(1);
       expect(failed.observation).toBe('observed');
@@ -309,6 +414,7 @@ describe('code-health ledger contract', () => {
           cwd: repoRoot,
           env: {},
           timeoutMs: 5000,
+          binding: binding('CHG-P1-20260907-021'),
         },
       );
       const emittedOutput = await fs.readFile(path.resolve(repoRoot, emittedSecret.rawOutputPath), 'utf8');
@@ -321,6 +427,7 @@ describe('code-health ledger contract', () => {
           cwd: repoRoot,
           env: {},
           timeoutMs: 5000,
+          binding: binding('CHG-P1-20260907-021'),
         });
         expect(result.exitCode).toBe(exitCode);
         expect(result.observation).toBe('observed');
@@ -329,6 +436,7 @@ describe('code-health ledger contract', () => {
         cwd: repoRoot,
         env: {},
         timeoutMs: 5000,
+        binding: binding('CHG-P1-20260907-021'),
       });
       expect(unavailable.exitCode).toBeNull();
       expect(unavailable.observation).toBe('unavailable');
@@ -336,6 +444,7 @@ describe('code-health ledger contract', () => {
         cwd: repoRoot,
         env: {},
         timeoutMs: 10,
+        binding: binding('CHG-P1-20260907-021'),
       });
       expect(timeout.exitCode).toBeNull();
       expect(timeout.observation).toBe('not_run');
@@ -350,12 +459,12 @@ describe('code-health ledger contract', () => {
     await fs.mkdir(testOutputRoot, { recursive: true });
     const rawOutputDir = await fs.mkdtemp(path.join(testOutputRoot, 'code-health-invalid-utf8-'));
     try {
-      const runner = createCodeHealthCommandRunner({ rawOutputDir });
+      const { runner, binding } = await createRepositoryRunner(rawOutputDir);
       await expect(
         runner.run(
           process.execPath,
           ['-e', 'const bytes = Buffer.from([0xff]); process.stdout.write(bytes); process.stderr.write(bytes)'],
-          { cwd: repoRoot, env: {}, timeoutMs: 5000 },
+          { cwd: repoRoot, env: {}, timeoutMs: 5000, binding: binding('CHG-P1-20260907-022') },
         ),
       ).rejects.toThrow(/redaction|utf-?8|decode/i);
       expect(await fs.readdir(rawOutputDir)).toEqual([]);
@@ -379,13 +488,16 @@ describe('code-health ledger contract', () => {
     await fs.mkdir(testOutputRoot, { recursive: true });
     const rawOutputDir = await fs.mkdtemp(path.join(testOutputRoot, 'code-health-concurrent-output-'));
     try {
-      const runner = createCodeHealthCommandRunner({ rawOutputDir, now: () => new Date('2026-09-07T00:00:00.000Z') });
+      const { runner, binding } = await createRepositoryRunner(rawOutputDir, {
+        now: () => new Date('2026-09-07T00:00:00.000Z'),
+      });
       const results = await Promise.all(
         Array.from({ length: 8 }, () =>
           runner.run(process.execPath, ['-e', 'process.stdout.write("ok")'], {
             cwd: repoRoot,
             env: {},
             timeoutMs: 5000,
+            binding: binding('CHG-P1-20260907-023'),
           }),
         ),
       );
@@ -486,7 +598,7 @@ describe('code-health ledger contract', () => {
     const original = process.env.CODE_HEALTH_UNAUDITED_SECRET;
     process.env.CODE_HEALTH_UNAUDITED_SECRET = 'inherited-secret-must-not-leak';
     try {
-      const runner = createCodeHealthCommandRunner({ rawOutputDir });
+      const { runner, binding } = await createRepositoryRunner(rawOutputDir);
       const result = await runner.run(
         process.execPath,
         ['-e', 'process.stdout.write(process.env.CODE_HEALTH_UNAUDITED_SECRET || "missing")'],
@@ -494,6 +606,7 @@ describe('code-health ledger contract', () => {
           cwd: repoRoot,
           env: {},
           timeoutMs: 5000,
+          binding: binding('CHG-P1-20260907-024'),
         },
       );
       expect(result.exitCode).toBe(0);
@@ -505,6 +618,7 @@ describe('code-health ledger contract', () => {
         cwd: repoRoot,
         env: {},
         timeoutMs: 5000,
+        binding: binding('CHG-P1-20260907-024'),
       });
       expect(exitThree.exitCode).toBe(3);
     } finally {
@@ -521,12 +635,13 @@ describe('code-health ledger contract', () => {
     const linkedOutputDir = path.join(linkParent, 'raw');
     try {
       await fs.symlink(outsideDir, linkedOutputDir, process.platform === 'win32' ? 'junction' : 'dir');
-      const runner = createCodeHealthCommandRunner({ rawOutputDir: linkedOutputDir });
+      const { runner, binding } = await createRepositoryRunner(linkedOutputDir);
       await expect(
         runner.run(process.execPath, ['-e', 'process.stdout.write("must-not-write")'], {
           cwd: repoRoot,
           env: {},
           timeoutMs: 5000,
+          binding: binding('CHG-P1-20260907-025'),
         }),
       ).rejects.toThrow(/symlink|controlled|repository/i);
       expect(await fs.readdir(outsideDir)).toEqual([]);
@@ -787,15 +902,38 @@ describe('code-health ledger contract', () => {
     expect(evaluateDeletion({ testCount: 1, coverageProvenance: '', governanceFacts: [] }).passed).toBe(false);
   });
 
-  it.skip('rollback evidence binds real patch and raw-output files (1B not_run)', () => {
+  it('rollback evidence binds real patch and raw-output files', async () => {
+    const root = await createTempGitRepository();
+    const candidateRevision = await repositoryRevision(root);
+    const fixture = validCandidate('CHG-P1-20260907-017', { status: 'blocked' });
+    const patchBytes = Buffer.from(
+      '--- a/src/unused.ts\n+++ b/src/unused.ts\n@@ -1 +1 @@\n-export const unusedFunction = 1;\n+export const unusedFunction = 2;\n',
+    );
+    const rawBytes = Buffer.from('rollback raw output\n');
+    await fs.mkdir(path.join(root, 'evidence'), { recursive: true });
+    await fs.writeFile(path.join(root, 'evidence', 'rollback.patch'), patchBytes);
+    await fs.writeFile(path.join(root, 'evidence', 'rollback.log'), rawBytes);
+    const patchSha256 = sha256Hex(patchBytes);
+    const rawOutputSha256 = sha256Hex(rawBytes);
     const candidate = validCandidate('CHG-P1-20260907-017', {
       status: 'blocked',
-      rollback: { ...validCandidate('CHG-P1-20260907-017').rollback, patchSha256: 'a'.repeat(64) },
+      revision: candidateRevision,
+      commands: [{ ...fixture.commands[0]!, rawOutputPath: 'evidence/rollback.log', rawOutputSha256 }],
+      evidenceBinding: { ...fixture.evidenceBinding, revision: candidateRevision },
+      rollback: {
+        ...fixture.rollback,
+        preChangeRevision: candidateRevision.commitSha,
+        command: 'git apply evidence/rollback.patch',
+        patchPath: 'evidence/rollback.patch',
+        patchSha256,
+      },
     });
-    const evidence = {
+    const rollbackEvidence = {
       command: {
         ...candidate.commands[0]!,
-        rawOutputPath: 'evidence/missing-rollback.log',
+        command: candidate.rollback.command,
+        rawOutputPath: 'evidence/rollback.log',
+        rawOutputSha256,
         exitCode: 0,
         observation: 'observed' as const,
       },
@@ -805,28 +943,192 @@ describe('code-health ledger contract', () => {
       owner: candidate.rollback.owner,
       patchExists: true as const,
       rawOutputExists: true as const,
-      sourceRevision: revision,
+      sourceRevision: candidateRevision,
     };
-    expect(() =>
-      transitionCandidate(validLedger(candidate), candidate.candidateId, {
+    const rollbackEventWith = (evidence: typeof rollbackEvidence): LedgerEvent =>
+      ({
         ...event('blocked', 'rolled-back', candidate.candidateId),
         actorRole: 'S',
+        revision: candidateRevision,
         evidenceRefs: [evidence.command.rawOutputPath],
         rollbackEvidence: evidence,
-      } as unknown as LedgerEvent),
-    ).toThrow(/file|hash|source|exist/i);
+      }) as unknown as LedgerEvent;
+    const context: FileVerificationContext = { repositoryRoot: root, fileVerifier };
+
+    // The real patch and raw output are regular non-symlink files with the declared hashes.
+    await expect(
+      fileVerifier.verifyRegularNonSymlinkFile({
+        root,
+        relativePath: 'evidence/rollback.patch',
+        expectedSha256: patchSha256,
+      }),
+    ).resolves.toMatchObject({ ok: true, code: null });
+    await expect(
+      fileVerifier.verifyRegularNonSymlinkFile({
+        root,
+        relativePath: 'evidence/rollback.log',
+        expectedSha256: rawOutputSha256,
+      }),
+    ).resolves.toMatchObject({ ok: true, code: null });
+    const rolledBack = await transitionCandidate(
+      validLedger(candidate),
+      candidate.candidateId,
+      rollbackEventWith(rollbackEvidence),
+      undefined,
+      context,
+    );
+    expect(rolledBack.candidates[0]?.status).toBe('rolled-back');
+    expect(rolledBack.events[0]?.rollbackEvidence).toMatchObject({
+      patchPath: 'evidence/rollback.patch',
+      patchSha256,
+      sourceRevision: candidateRevision,
+    });
+
+    // Negative cases fail closed with typed codes and never mutate the input ledger.
+    const ledger = validLedger(candidate);
+    const before = structuredClone(ledger);
+    const tamperedCandidate = validCandidate('CHG-P1-20260907-017', {
+      ...candidate,
+      rollback: { ...candidate.rollback, patchSha256: 'a'.repeat(64) },
+    });
+    const tamperedLedger = validLedger(tamperedCandidate);
+    const tamperedBefore = structuredClone(tamperedLedger);
+    await expect(
+      transitionCandidate(
+        tamperedLedger,
+        candidate.candidateId,
+        rollbackEventWith({ ...rollbackEvidence, patchSha256: 'a'.repeat(64) }),
+        undefined,
+        context,
+      ),
+    ).rejects.toMatchObject({ code: 'EVIDENCE_INVALID' });
+    expect(tamperedLedger).toEqual(tamperedBefore);
+
+    const missingRawOutput = {
+      ...rollbackEvidence,
+      command: { ...rollbackEvidence.command, rawOutputPath: 'evidence/missing-rollback.log' },
+    };
+    await expect(
+      transitionCandidate(ledger, candidate.candidateId, rollbackEventWith(missingRawOutput), undefined, context),
+    ).rejects.toMatchObject({ code: 'EVIDENCE_INVALID' });
+    expect(ledger).toEqual(before);
+
+    await fs.symlink(
+      path.join(root, 'evidence', 'rollback.patch'),
+      path.join(root, 'evidence', 'rollback-link.patch'),
+      'file',
+    );
+    const symlinkCandidate = validCandidate('CHG-P1-20260907-017', {
+      ...candidate,
+      rollback: { ...candidate.rollback, patchPath: 'evidence/rollback-link.patch' },
+    });
+    await expect(
+      transitionCandidate(
+        validLedger(symlinkCandidate),
+        symlinkCandidate.candidateId,
+        rollbackEventWith({ ...rollbackEvidence, patchPath: 'evidence/rollback-link.patch' }),
+        undefined,
+        context,
+      ),
+    ).rejects.toMatchObject({ code: 'SECURITY_BLOCKED' });
   });
 
-  it('gate failure evidence cannot be recorded from a missing raw-output file', () => {
-    const candidate = validCandidate('CHG-P1-20260907-018');
-    expect(() =>
-      recordGateFailure(validLedger(candidate), candidate.candidateId, {
-        ...candidate.commands[0]!,
+  it('gate failure evidence cannot be recorded from a missing raw-output file', async () => {
+    const root = await createTempGitRepository();
+    const candidateRevision = await repositoryRevision(root);
+    const fixture = validCandidate('CHG-P1-20260907-018');
+    const rawBytes = Buffer.from('gate failure raw output\n');
+    await fs.mkdir(path.join(root, 'evidence'), { recursive: true });
+    await fs.writeFile(path.join(root, 'evidence', 'gate-failure.log'), rawBytes);
+    const rawOutputSha256 = sha256Hex(rawBytes);
+    const evidenceStore = createCodeHealthEvidenceStore({ repositoryRoot: root, rawOutputRoot: 'evidence' });
+    const selector: CandidateSelector = {
+      candidateId: fixture.candidateId,
+      phase: fixture.phase,
+      action: fixture.action,
+      files: [...fixture.files],
+      symbols: [...fixture.symbols],
+      scopeHash: fixture.changeScope.scopeHash,
+    };
+
+    // Positive: a real raw output bound to candidate/scope/revision can be recorded as a gate failure.
+    const realCandidate = validCandidate('CHG-P1-20260907-018', {
+      revision: candidateRevision,
+      commands: [{ ...fixture.commands[0]!, rawOutputPath: 'evidence/gate-failure.log', rawOutputSha256 }],
+      evidenceBinding: {
+        ...fixture.evidenceBinding,
+        revision: candidateRevision,
+        rawOutputPath: 'evidence/gate-failure.log',
+        rawOutputSha256,
+      },
+    });
+    const realContext: EvidenceVerificationContext = {
+      repositoryRoot: root,
+      fileVerifier,
+      evidenceStore,
+      binding: {
+        candidate: selector,
+        revision: candidateRevision,
+        rawOutputPath: 'evidence/gate-failure.log',
+        rawOutputSha256,
+      },
+    };
+    const recorded = await recordGateFailure(
+      validLedger(realCandidate),
+      realCandidate.candidateId,
+      { ...realCandidate.commands[0]!, exitCode: 7, observation: 'observed' },
+      realContext,
+    );
+    expect(recorded.candidates[0]?.status).toBe('blocked');
+    expect(recorded.events[0]?.gateFailureEvidence).toMatchObject({
+      candidateId: realCandidate.candidateId,
+      rawOutputPath: 'evidence/gate-failure.log',
+      exitCode: 7,
+    });
+
+    // Negative: the same evidence with a missing raw-output file fails closed with a typed code.
+    const missingCandidate = validCandidate('CHG-P1-20260907-018', {
+      revision: candidateRevision,
+      evidenceBinding: { ...fixture.evidenceBinding, revision: candidateRevision },
+    });
+    const ledger = validLedger(missingCandidate);
+    const before = structuredClone(ledger);
+    const missingContext: EvidenceVerificationContext = {
+      ...realContext,
+      binding: {
+        candidate: selector,
+        revision: candidateRevision,
         rawOutputPath: 'evidence/missing-gate-output.log',
-        exitCode: 7,
-        observation: 'observed',
-      }),
-    ).toThrow(/file|hash|evidence|exist/i);
+        rawOutputSha256: missingCandidate.commands[0]!.rawOutputSha256,
+      },
+    };
+    await expect(
+      recordGateFailure(
+        ledger,
+        missingCandidate.candidateId,
+        {
+          ...missingCandidate.commands[0]!,
+          rawOutputPath: 'evidence/missing-gate-output.log',
+          exitCode: 7,
+          observation: 'observed',
+        },
+        missingContext,
+      ),
+    ).rejects.toMatchObject({ code: 'EVIDENCE_INVALID' });
+    await expect(
+      recordGateFailure(
+        ledger,
+        missingCandidate.candidateId,
+        {
+          ...missingCandidate.commands[0]!,
+          rawOutputPath: 'evidence/missing-gate-output.log',
+          exitCode: 7,
+          observation: 'observed',
+        },
+        missingContext,
+      ),
+    ).rejects.toBeInstanceOf(CodeHealthError);
+    expect(ledger).toEqual(before);
   });
 
   it('gap validator rejects invalid identity, priority, status, risk, and coverage signal', () => {

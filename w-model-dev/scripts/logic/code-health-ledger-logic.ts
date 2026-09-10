@@ -31,7 +31,10 @@ import type {
   DynamicTraceReport,
   DynamicTraceScenario,
   EvalDiffInput,
+  EvidenceRef,
+  EvidenceVerificationContext,
   FalsePositiveContext,
+  FileVerificationContext,
   GapRow,
   LedgerEvent,
   Phase1CandidateLead,
@@ -200,7 +203,80 @@ function validateRollbackEvidence(
   return reasons.length === 0;
 }
 
+/** Verify one declared repository file through the injected 1B file-safety boundary. */
+async function verifyDeclaredFile(
+  verification: FileVerificationContext,
+  relativePath: string,
+  expectedSha256: string,
+  field: string,
+): Promise<void> {
+  const result = await verification.fileVerifier.verifyRegularNonSymlinkFile({
+    root: verification.repositoryRoot,
+    relativePath,
+    expectedSha256,
+  });
+  if (!result.ok) {
+    throw new CodeHealthError(
+      result.code ?? 'EVIDENCE_INVALID',
+      `${field} failed file verification: ${result.reason ?? 'unknown reason'}`,
+      { safePath: relativePath },
+    );
+  }
+}
+
+/**
+ * 1B injected-authenticity entry point: the sync reducer runs unchanged and the declared rollback
+ * patch and raw output are then proven to exist as regular non-symlink files with matching hashes.
+ */
+async function transitionCandidateVerified(
+  ledger: CodeHealthLedger,
+  candidateId: string,
+  event: LedgerEvent,
+  approval: ApprovalDecision | undefined,
+  verification: FileVerificationContext,
+): Promise<CodeHealthLedger> {
+  const next = transitionCandidateRecord(ledger, candidateId, event, approval);
+  if (event.to !== 'rolled-back' || !event.rollbackEvidence) return next;
+  await verifyDeclaredFile(
+    verification,
+    event.rollbackEvidence.patchPath,
+    event.rollbackEvidence.patchSha256,
+    'rollback patch',
+  );
+  await verifyDeclaredFile(
+    verification,
+    event.rollbackEvidence.command.rawOutputPath,
+    event.rollbackEvidence.command.rawOutputSha256,
+    'rollback raw output',
+  );
+  return next;
+}
+
 export function transitionCandidate(
+  ledger: CodeHealthLedger,
+  candidateId: string,
+  event: LedgerEvent,
+  approval?: ApprovalDecision,
+): CodeHealthLedger;
+export function transitionCandidate(
+  ledger: CodeHealthLedger,
+  candidateId: string,
+  event: LedgerEvent,
+  approval: ApprovalDecision | undefined,
+  verification: FileVerificationContext,
+): Promise<CodeHealthLedger>;
+export function transitionCandidate(
+  ledger: CodeHealthLedger,
+  candidateId: string,
+  event: LedgerEvent,
+  approval?: ApprovalDecision,
+  verification?: FileVerificationContext,
+): CodeHealthLedger | Promise<CodeHealthLedger> {
+  if (!verification) return transitionCandidateRecord(ledger, candidateId, event, approval);
+  return transitionCandidateVerified(ledger, candidateId, event, approval, verification);
+}
+
+function transitionCandidateRecord(
   ledger: CodeHealthLedger,
   candidateId: string,
   event: LedgerEvent,
@@ -417,6 +493,32 @@ export function canArchiveCandidate(
   return [...new Set(reasons)];
 }
 
+/**
+ * 1B injected-authenticity entry point: gate-failure evidence must resolve to a real stored raw output
+ * that is bound to the candidate, scope, revision, path, and hash before the reducer records it.
+ */
+async function verifyGateFailureEvidence(
+  ledger: CodeHealthLedger,
+  candidateId: string,
+  evidence: CommandEvidence,
+  verification: EvidenceVerificationContext,
+): Promise<void> {
+  const candidate = ledger.candidates.find((entry) => entry.candidateId === candidateId);
+  if (!candidate) {
+    throw new CodeHealthError('STRUCTURE_INVALID', `gate failure candidate identity not found: ${candidateId}`);
+  }
+  const ref: EvidenceRef = {
+    evidenceId: `EVD-GATE-FAIL-${candidateId}-${evidence.rawOutputSha256.slice(0, 16)}`,
+    candidateId,
+    scopeHash: candidate.changeScope.scopeHash,
+    relativePath: evidence.rawOutputPath,
+    sha256: evidence.rawOutputSha256,
+    revision: candidate.revision,
+    observation: evidence.observation,
+  };
+  await verification.evidenceStore.verify(ref, verification.binding);
+}
+
 export function recordGateFailure(
   ledger: CodeHealthLedger,
   candidateId: string,
@@ -425,14 +527,33 @@ export function recordGateFailure(
 export function recordGateFailure(ledger: CodeHealthLedger, evidence: CommandEvidence): never;
 export function recordGateFailure(
   ledger: CodeHealthLedger,
+  candidateId: string,
+  evidence: CommandEvidence,
+  verification: EvidenceVerificationContext,
+): Promise<CodeHealthLedger>;
+export function recordGateFailure(
+  ledger: CodeHealthLedger,
   candidateIdOrEvidence: string | CommandEvidence,
   evidence?: CommandEvidence,
-): CodeHealthLedger {
+  verification?: EvidenceVerificationContext,
+): CodeHealthLedger | Promise<CodeHealthLedger> {
   if (typeof candidateIdOrEvidence !== 'string' || !evidence) {
     throw new Error('gate failure requires explicit candidate identity and evidence');
   }
-  const candidate = ledger.candidates.find((entry) => entry.candidateId === candidateIdOrEvidence);
-  if (!candidate) throw new Error(`gate failure candidate identity not found: ${candidateIdOrEvidence}`);
+  const candidateId = candidateIdOrEvidence;
+  if (!verification) return recordGateFailureRecord(ledger, candidateId, evidence);
+  return verifyGateFailureEvidence(ledger, candidateId, evidence, verification).then(() =>
+    recordGateFailureRecord(ledger, candidateId, evidence),
+  );
+}
+
+function recordGateFailureRecord(
+  ledger: CodeHealthLedger,
+  candidateId: string,
+  evidence: CommandEvidence,
+): CodeHealthLedger {
+  const candidate = ledger.candidates.find((entry) => entry.candidateId === candidateId);
+  if (!candidate) throw new Error(`gate failure candidate identity not found: ${candidateId}`);
   if (!isRelativePath(evidence.rawOutputPath)) {
     throw new Error('gate failure evidence raw output path is unsafe');
   }
@@ -455,7 +576,7 @@ export function recordGateFailure(
       failureKind: 'gate',
     },
   };
-  return transitionCandidate(ledger, candidate.candidateId, event);
+  return transitionCandidateRecord(ledger, candidate.candidateId, event);
 }
 
 export function nextRequiredRoles(ledger: CodeHealthLedger): Array<'R' | 'V' | 'G' | 'S'> {

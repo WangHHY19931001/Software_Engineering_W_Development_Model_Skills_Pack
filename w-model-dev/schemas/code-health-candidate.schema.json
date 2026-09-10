@@ -196,8 +196,15 @@
           "$ref": "#/definitions/relativePath"
         },
         "environment": {
-          "description": "Redacted environment string map.",
+          "description": "Audited redacted environment string map that cannot carry credential-bearing key names.",
           "type": "object",
+          "propertyNames": {
+            "description": "Environment key name that must not match a credential-bearing identifier.",
+            "not": {
+              "description": "Case-insensitive credential key pattern matching the canonical runtime environment audit.",
+              "pattern": "[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii][_-]?[Kk][Ee][Yy]|[Aa][Cc][Cc][Ee][Ss][Ss][_-]?[Kk][Ee][Yy]|[Pp][Rr][Ii][Vv][Aa][Tt][Ee][_-]?[Kk][Ee][Yy]|[Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]"
+            }
+          },
           "additionalProperties": { "description": "Redacted environment value.", "type": "string" }
         },
         "platform": { "description": "Observed operating-system platform.", "type": "string", "minLength": 1 },

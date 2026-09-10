@@ -64,35 +64,11 @@ export interface EvidenceBinding {
   rawOutputSha256: string;
 }
 
-export class CodeHealthError extends Error {
-  readonly code: ErrorCode;
-  readonly safePath?: string;
-  readonly candidateId?: string;
-  readonly scopeHash?: string;
-  readonly expectedRevision?: RevisionIdentity;
-  readonly actualRevision?: RevisionIdentity;
-
-  constructor(
-    code: ErrorCode,
-    reason: string,
-    context: {
-      safePath?: string;
-      candidateId?: string;
-      scopeHash?: string;
-      expectedRevision?: RevisionIdentity;
-      actualRevision?: RevisionIdentity;
-    } = {},
-  ) {
-    super(reason);
-    this.name = 'CodeHealthError';
-    this.code = code;
-    this.safePath = context.safePath;
-    this.candidateId = context.candidateId;
-    this.scopeHash = context.scopeHash;
-    this.expectedRevision = context.expectedRevision;
-    this.actualRevision = context.actualRevision;
-  }
-}
+/**
+ * Canonical typed error, re-exported from the lib boundary so exactly one class is shared by the
+ * injected file/evidence/revision implementations and the lifecycle.
+ */
+export { CodeHealthError } from '../lib/code-health-error.js';
 
 export interface RevisionIdentity {
   commitSha: string;
@@ -501,8 +477,86 @@ export interface CodeHealthCommandRunner {
   run(
     command: string,
     args: string[],
-    options: { cwd: string; env: Record<string, string>; timeoutMs: number },
+    options: { cwd: string; env: Record<string, string>; timeoutMs: number; binding: EvidenceBinding },
   ): Promise<CommandEvidence>;
+}
+
+/** Result of verifying one repository-relative file; no partial success is ever returned. */
+export interface FileVerificationResult {
+  ok: boolean;
+  code: ErrorCode | null;
+  relativePath: string;
+  expectedSha256: string;
+  actualSha256?: string;
+  reason?: string;
+}
+
+/** Injected file-safety boundary over an explicit repository root. */
+export interface FileVerifier {
+  verifyRegularNonSymlinkFile(input: {
+    root: string;
+    relativePath: string;
+    expectedSha256: string;
+  }): Promise<FileVerificationResult>;
+}
+
+/** Ref of one raw output that was exclusively created by the evidence store. */
+export interface StoredEvidenceRef {
+  evidenceId: string;
+  candidateId: string;
+  scopeHash: string;
+  relativePath: string;
+  sha256: string;
+}
+
+/** Stored evidence plus the revision and observation it claims. */
+export interface EvidenceRef extends StoredEvidenceRef {
+  revision: RevisionIdentity;
+  observation: EvidenceObservationStatus;
+}
+
+export interface EvidenceVerificationResult {
+  ok: boolean;
+  code: ErrorCode | null;
+  binding: EvidenceBinding;
+  reason?: string;
+}
+
+/** Injected raw-output store: exclusive create and candidate/scope/revision binding. */
+export interface EvidenceStore {
+  putRawOutput(input: {
+    candidateId: string;
+    scopeHash: string;
+    relativePath: string;
+    bytes: Uint8Array;
+  }): Promise<StoredEvidenceRef>;
+  verify(ref: EvidenceRef, binding: EvidenceBinding): Promise<EvidenceVerificationResult>;
+}
+
+export interface RevisionVerificationResult {
+  ok: boolean;
+  code: 'REVISION_MISMATCH' | null;
+  expected: RevisionIdentity;
+  actual: RevisionIdentity | null;
+  reason?: string;
+}
+
+/** Injected Git revision boundary: commit, tree, and source bundle must agree. */
+export interface RevisionProvider {
+  current(root: string): Promise<RevisionIdentity | null>;
+  verify(root: string, expected: RevisionIdentity): Promise<RevisionVerificationResult>;
+}
+
+/** Injected file-safety boundary for lifecycle call sites that must prove declared repository files exist. */
+export interface FileVerificationContext {
+  repositoryRoot: string;
+  fileVerifier: FileVerifier;
+}
+
+/** Injected evidence boundary that binds a candidate/scope/revision to a real stored raw output. */
+export interface EvidenceVerificationContext extends FileVerificationContext {
+  evidenceStore: EvidenceStore;
+  binding: EvidenceBinding;
 }
 
 export interface Phase1RunResult {
@@ -667,6 +721,22 @@ const LEDGER_EVENT_KINDS: readonly LedgerEventKind[] = [
   'rollback',
   'archive',
 ];
+const STATIC_REFERENCE_KINDS: readonly StaticReference['kind'][] = [
+  'import',
+  'export',
+  'call',
+  'route',
+  'cli-registration',
+  'string-symbol',
+  'generated-input',
+  'schema',
+  'template',
+  'rtm',
+  'test-helper',
+  'dynamic-import',
+  'reflection',
+  'shell-platform',
+];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -728,6 +798,15 @@ function isSafeCommand(value: unknown): value is string {
 
 function hasSecretFieldName(fieldName: string): boolean {
   return /(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|authorization)/i.test(fieldName);
+}
+
+/** Audited environment map: credential-bearing key names and sensitive values are rejected. */
+function isAuditedEnvironmentMap(value: unknown): value is Record<string, string> {
+  return (
+    isRecord(value) &&
+    Object.keys(value).every((key) => !hasSecretFieldName(key)) &&
+    Object.values(value).every((item) => typeof item === 'string' && !containsSensitiveCodeHealthContent(item))
+  );
 }
 
 export function validateRevision(value: unknown, field: string, reasons: string[]): value is RevisionIdentity {
@@ -949,14 +1028,7 @@ export function validateCommandEvidence(value: unknown, field: string, reasons: 
   if (typeof value.platform !== 'string' || value.platform.length === 0) reasons.push(`${field}.platform is required`);
   if (!isRelativePath(value.cwd)) reasons.push(`${field}.cwd must be repository-relative`);
   if (!isRelativePath(value.rawOutputPath)) reasons.push(`${field}.rawOutputPath must be repository-relative`);
-  if (
-    !isRecord(value.environment) ||
-    Object.keys(value.environment).some(hasSecretFieldName) ||
-    Object.values(value.environment).some(
-      (item) => typeof item !== 'string' || containsSensitiveCodeHealthContent(item),
-    )
-  )
-    reasons.push(`${field}.environment is not audited and redacted`);
+  if (!isAuditedEnvironmentMap(value.environment)) reasons.push(`${field}.environment is not audited and redacted`);
   if (!isRecord(value.toolVersions) || Object.values(value.toolVersions).some((item) => typeof item !== 'string'))
     reasons.push(`${field}.toolVersions must be a string map`);
   if (
@@ -979,6 +1051,102 @@ export function validateCommandEvidence(value: unknown, field: string, reasons: 
   if (value.observation !== 'observed' && value.exitCode !== null)
     reasons.push(`${field} unknown result must have exitCode=null`);
   return reasons.length === 0;
+}
+
+function validateStaticReference(value: unknown, field: string, reasons: string[]): boolean {
+  if (!isRecord(value)) {
+    reasons.push(`${field} must be an object`);
+    return false;
+  }
+  hasOnlyKeys(value, ['path', 'symbol', 'consumer', 'kind', 'line', 'sourceHash'], field, reasons);
+  if (!isRelativePath(value.path)) reasons.push(`${field}.path must be repository-relative`);
+  if (typeof value.symbol !== 'string' || value.symbol.length === 0) reasons.push(`${field}.symbol is required`);
+  if (typeof value.consumer !== 'string' || value.consumer.length === 0) reasons.push(`${field}.consumer is required`);
+  if (!STATIC_REFERENCE_KINDS.includes(value.kind as StaticReference['kind'])) reasons.push(`${field}.kind is invalid`);
+  if (typeof value.line !== 'number' || !Number.isInteger(value.line) || value.line < 1)
+    reasons.push(`${field}.line must be a positive integer`);
+  if (typeof value.sourceHash !== 'string' || !HEX64_PATTERN.test(value.sourceHash))
+    reasons.push(`${field}.sourceHash is invalid`);
+  return true;
+}
+
+function validateDynamicScenario(value: unknown, field: string, reasons: string[]): boolean {
+  if (!isRecord(value)) {
+    reasons.push(`${field} must be an object`);
+    return false;
+  }
+  hasOnlyKeys(value, ['id', 'environment', 'reached', 'observation', 'command'], field, reasons);
+  if (typeof value.id !== 'string' || value.id.length === 0) reasons.push(`${field}.id is required`);
+  if (typeof value.environment !== 'string' || value.environment.length === 0)
+    reasons.push(`${field}.environment is required`);
+  if (value.reached !== null && typeof value.reached !== 'boolean') reasons.push(`${field}.reached is invalid`);
+  if (!OBSERVATIONS.includes(value.observation as EvidenceObservationStatus))
+    reasons.push(`${field}.observation is invalid`);
+  validateCommandEvidence(value.command, `${field}.command`, reasons);
+  return true;
+}
+
+/** Runtime mirror of code-health-evidence.schema.json, including the audited environment parity. */
+export function validateCodeHealthEvidence(value: unknown): string[] {
+  const reasons: string[] = [];
+  if (!isRecord(value)) return ['evidence must be an object'];
+  hasOnlyKeys(
+    value,
+    [
+      'evidenceId',
+      'candidateId',
+      'evidenceBinding',
+      'revision',
+      'staticReferences',
+      'dynamicScenarios',
+      'commands',
+      'environment',
+      'toolVersions',
+      'unknowns',
+      'falsePositiveChecks',
+      'rtmImpact',
+      'coverageImpact',
+      'redaction',
+    ],
+    'evidence',
+    reasons,
+  );
+  if (typeof value.evidenceId !== 'string' || value.evidenceId.length === 0)
+    reasons.push('evidence.evidenceId is required');
+  if (typeof value.candidateId !== 'string' || !ID_PATTERN.test(value.candidateId))
+    reasons.push('evidence.candidateId is invalid');
+  validateEvidenceBinding(value.evidenceBinding, 'evidence.evidenceBinding', reasons);
+  validateRevision(value.revision, 'evidence.revision', reasons);
+  if (!Array.isArray(value.staticReferences)) reasons.push('evidence.staticReferences must be an array');
+  else
+    for (const [index, reference] of value.staticReferences.entries())
+      validateStaticReference(reference, `evidence.staticReferences[${index}]`, reasons);
+  if (!Array.isArray(value.dynamicScenarios)) reasons.push('evidence.dynamicScenarios must be an array');
+  else
+    for (const [index, scenario] of value.dynamicScenarios.entries())
+      validateDynamicScenario(scenario, `evidence.dynamicScenarios[${index}]`, reasons);
+  if (!Array.isArray(value.commands) || value.commands.length === 0)
+    reasons.push('evidence.commands must be a non-empty array');
+  else
+    for (const [index, command] of value.commands.entries())
+      validateCommandEvidence(command, `evidence.commands[${index}]`, reasons);
+  if (!isAuditedEnvironmentMap(value.environment)) reasons.push('evidence.environment is not audited and redacted');
+  if (!isRecord(value.toolVersions) || Object.values(value.toolVersions).some((item) => typeof item !== 'string'))
+    reasons.push('evidence.toolVersions must be a string map');
+  if (!isStringArray(value.unknowns) || value.unknowns.some((item) => item.length === 0))
+    reasons.push('evidence.unknowns must be a string array');
+  if (!isStringArray(value.falsePositiveChecks, false) || value.falsePositiveChecks.some((item) => item.length === 0))
+    reasons.push('evidence.falsePositiveChecks must be a non-empty string array');
+  if (value.rtmImpact !== undefined) validateImpact(value.rtmImpact, 'evidence.rtmImpact', reasons);
+  if (value.coverageImpact !== undefined) validateImpact(value.coverageImpact, 'evidence.coverageImpact', reasons);
+  if (!isRecord(value.redaction)) reasons.push('evidence.redaction is required');
+  else {
+    hasOnlyKeys(value.redaction, ['status', 'reasons'], 'evidence.redaction', reasons);
+    if (!['not_reviewed', 'clean', 'blocked'].includes(value.redaction.status as string))
+      reasons.push('evidence.redaction.status is invalid');
+    if (!isStringArray(value.redaction.reasons)) reasons.push('evidence.redaction.reasons must be a string array');
+  }
+  return reasons;
 }
 
 export function validateLedgerEvent(value: unknown, field = 'event'): string[] {
@@ -1193,13 +1361,7 @@ export function validateCodeHealthCandidate(candidate: unknown): string[] {
       if (!isRelativePath(command.cwd)) reasons.push(`commands[${index}].cwd must be repository-relative`);
       if (!isRelativePath(command.rawOutputPath))
         reasons.push(`commands[${index}].rawOutputPath must be repository-relative`);
-      if (
-        !isRecord(command.environment) ||
-        Object.keys(command.environment).some((key) => hasSecretFieldName(key)) ||
-        Object.values(command.environment).some(
-          (value) => typeof value !== 'string' || containsSensitiveCodeHealthContent(value),
-        )
-      ) {
+      if (!isAuditedEnvironmentMap(command.environment)) {
         reasons.push(`commands[${index}].environment must be an audited redacted string map`);
       }
       if (
