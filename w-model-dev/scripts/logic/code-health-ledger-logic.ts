@@ -1026,7 +1026,11 @@ const COVERAGE_KEYS = ['statements', 'branches', 'functions', 'lines'] as const;
 
 /** Highest gap status a candidate lifecycle state may carry; a gap can never run ahead of its candidate. */
 function gapStatusAllowedForCandidate(status: CodeHealthStatus): readonly GapRow['status'][] {
-  if (status === 'implemented' || status === 'verified' || status === 'archived') {
+  if (status === 'implemented') {
+    // Implemented code does not prove the gap was verified: only `verified`/`archived` candidates may carry it.
+    return ['discovered', 'approved', 'implemented', 'blocked'];
+  }
+  if (status === 'verified' || status === 'archived') {
     return ['discovered', 'approved', 'implemented', 'verified', 'blocked'];
   }
   if (status === 'under-review' || status === 'approved' || status === 'deferred') {
@@ -1101,12 +1105,15 @@ function validateGapRisk(value: unknown, field: string, reasons: string[]): void
   }
 }
 
+/**
+ * Unbounded placeholder tokens (English and Chinese) that must never count as a specific, auditable
+ * `missingScenario`/`owner`; matching is full-string so bounded text that merely mentions a token still passes.
+ */
+const GAP_TEXT_PLACEHOLDER_PATTERN =
+  /^(?:unknown|tbd|todo|n\/a|none|not[ -]?provided|pending|later|待补|待补充|以后处理|待定|后续处理|待办|稍后|暂缓|未知|未提供|暂无|无)$/i;
+
 function isBoundedGapText(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    value.trim() !== '' &&
-    !/^(?:unknown|tbd|todo|n\/a|none|not[ -]?provided|pending|later)$/i.test(value.trim())
-  );
+  return typeof value === 'string' && value.trim() !== '' && !GAP_TEXT_PLACEHOLDER_PATTERN.test(value.trim());
 }
 
 function validateGapEvidenceCommand(value: unknown, field: string, expected: 'red' | 'green', reasons: string[]): void {

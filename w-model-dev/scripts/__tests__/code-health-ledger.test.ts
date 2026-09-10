@@ -575,6 +575,18 @@ function validGapRow(candidateId: string): GapRow {
   };
 }
 
+/** A fully evidenced gap row at `verified` status: RED observed non-zero, GREEN observed zero, assertion hash. */
+function verifiedGapRow(candidateId: string): GapRow {
+  const observed = validCandidate(candidateId).commands[0]!;
+  return {
+    ...validGapRow(candidateId),
+    status: 'verified',
+    redEvidence: { ...observed, exitCode: 1 },
+    greenEvidence: { ...observed, exitCode: 0 },
+    assertionHash: 'a'.repeat(64),
+  };
+}
+
 describe('code-health ledger contract', () => {
   it('合法候选包含完整 evidence/impact/rollback/review/signature/archive 字段并可从 discovered 转 evidenced', () => {
     const candidate = validCandidate('CHG-P1-20260907-001', { status: 'discovered' });
@@ -707,10 +719,12 @@ describe('code-health ledger contract', () => {
       });
       expect(unavailable.exitCode).toBeNull();
       expect(unavailable.observation).toBe('unavailable');
-      const timeout = await runner.run(process.execPath, ['-e', 'setTimeout(() => {}, 1000)'], {
+      // A child that never exits on its own: the runner timer is the only termination path, so a slow or
+      // loaded event loop cannot race the assertion (unlike a short-lived child with a near-zero timeout).
+      const timeout = await runner.run(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
         cwd: repoRoot,
         env: {},
-        timeoutMs: 10,
+        timeoutMs: 250,
         binding: binding('CHG-P1-20260907-021'),
       });
       expect(timeout.exitCode).toBeNull();
@@ -2104,5 +2118,83 @@ describe('code-health lifecycle fix round 1', () => {
     expect(validateGapMatrix({ rows: [] }, ledger)).toEqual(
       expect.arrayContaining([expect.stringMatching(/empty|row/i)]),
     );
+  });
+});
+
+describe('code-health final review fix (I-1/I-2)', () => {
+  it('I-1: GapRow 拒绝中英文无边界占位语义，具体可审计文本仍通过', () => {
+    const ledger = ledgerWithTwoCandidates('discovered');
+    const validGap = validGapRow(firstId);
+    expect(validateGapRow(validGap, ledger, new Set())).toEqual([]);
+    const placeholders = [
+      '待补',
+      '待补充',
+      '以后处理',
+      '待定',
+      '后续处理',
+      '待办',
+      '稍后',
+      '暂缓',
+      '未知',
+      '未提供',
+      '暂无',
+      '无',
+      'TBD',
+      'TODO',
+      'pending',
+      'unknown',
+      'N/A',
+      'none',
+      'later',
+      'not provided',
+      'Not-Provided',
+    ];
+    for (const placeholder of placeholders) {
+      expect(validateGapRow({ ...validGap, missingScenario: placeholder }, ledger, new Set())).toEqual(
+        expect.arrayContaining([expect.stringMatching(/missingScenario/i)]),
+      );
+      expect(validateGapRow({ ...validGap, owner: placeholder }, ledger, new Set())).toEqual(
+        expect.arrayContaining([expect.stringMatching(/owner/i)]),
+      );
+    }
+    // Whitespace-padded placeholder tokens are still placeholders.
+    expect(
+      validateGapRow({ ...validGap, missingScenario: '  待补  ', owner: '　以后处理　' }, ledger, new Set()),
+    ).toEqual(expect.arrayContaining([expect.stringMatching(/missingScenario/i), expect.stringMatching(/owner/i)]));
+    // Concrete, bounded text keeps passing.
+    expect(
+      validateGapRow(
+        {
+          ...validGap,
+          missingScenario: 'invalid token is rejected without exposing secret material',
+          owner: 'S-agent (security owner)',
+        },
+        ledger,
+        new Set(),
+      ),
+    ).toEqual([]);
+  });
+
+  it('I-2: gap 不得领先 candidate：implemented candidate 只允许到 implemented，verified gap 仅限 verified/archived candidate', () => {
+    const implementedLedger = ledgerWithTwoCandidates('implemented');
+    expect(validateGapRow(validGapRow(firstId), implementedLedger, new Set())).toEqual([]);
+    const verifiedGap = verifiedGapRow(firstId);
+    expect(validateGapRow({ ...verifiedGap, status: 'implemented' }, implementedLedger, new Set())).toEqual([]);
+    expect(validateGapRow(verifiedGap, implementedLedger, new Set())).toEqual(
+      expect.arrayContaining([expect.stringMatching(/status|candidate/i)]),
+    );
+    // Exactly matching lifecycles pass: verified gap at verified candidate, and at archived candidate.
+    expect(validateGapRow(verifiedGap, ledgerWithTwoCandidates('verified'), new Set())).toEqual([]);
+    expect(validateGapRow(verifiedGap, ledgerWithTwoCandidates('archived'), new Set())).toEqual([]);
+    // Before implementation, both implemented and verified gaps stay ahead of the candidate.
+    for (const status of ['discovered', 'evidenced', 'under-review', 'approved', 'deferred'] as const) {
+      const ledger = ledgerWithTwoCandidates(status);
+      expect(validateGapRow({ ...verifiedGap, status: 'implemented' }, ledger, new Set())).toEqual(
+        expect.arrayContaining([expect.stringMatching(/status|candidate/i)]),
+      );
+      expect(validateGapRow(verifiedGap, ledger, new Set())).toEqual(
+        expect.arrayContaining([expect.stringMatching(/status|candidate/i)]),
+      );
+    }
   });
 });
