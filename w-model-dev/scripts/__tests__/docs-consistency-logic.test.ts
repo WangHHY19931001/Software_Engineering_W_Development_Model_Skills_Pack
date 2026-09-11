@@ -1433,7 +1433,7 @@ describe('runDocConsistencyChecks', () => {
         ),
       ).toBe(true);
     });
-  });
+  }, 90_000); // real CLI spawn: ~12s alone, can exceed the 30s default under full-suite load
 
   it('Exit2ProbeResult 通用字段缺失、null、空值和错误 rule 均 fail-closed', () => {
     const validProbe = {
@@ -1598,7 +1598,7 @@ describe('runDocConsistencyChecks', () => {
         },
       });
     });
-  });
+  }, 90_000); // real CLI spawn: can exceed the 30s default under full-suite load
 
   it('真实 CLI --json 输出 dynamicMeasurements 的完整五字段并保留兼容 violations', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
@@ -1676,7 +1676,7 @@ describe('runDocConsistencyChecks', () => {
         rule: 'P0-1',
       });
     });
-  });
+  }, 90_000); // real CLI spawn: can exceed the 30s default under full-suite load
 
   it('同一 checkout 的无状态与最小合法 run-log 状态使用完全相同的 exit2 probe map，且计数为 43', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
@@ -1768,7 +1768,7 @@ describe('runDocConsistencyChecks', () => {
       expect(result.code).toBe(1);
       expect(result.stdout).toContain('exit2-scripts');
     });
-  });
+  }, 90_000); // real CLI spawn: can exceed the 30s default under full-suite load
 
   it('code-health 门禁脚本未登记 dispatch-matrix（文档事实漂移）→ docs-consistency exit 1 且 reason 含 code-health', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
@@ -1910,7 +1910,7 @@ describe('runDocConsistencyChecks', () => {
       });
       expect(report.violations.some((entry) => (entry as { rule?: string }).rule === 'vitest-results')).toBe(true);
     });
-  });
+  }, 90_000); // real CLI spawn: can exceed the 30s default under full-suite load
 
   it('CLI 注入 testResults=[] 的 coverage JSON 时以 JSON 文件数为准，不能由目录枚举掩盖', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
@@ -1924,7 +1924,7 @@ describe('runDocConsistencyChecks', () => {
       expect(report.dynamicMeasurements.testFileCount).toBe(0);
       expect(report.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
     });
-  });
+  }, 90_000); // real CLI spawn: can exceed the 30s default under full-suite load
 
   it('CLI 拒绝 failed 或 success=false 的 coverage JSON，而不是只提取总用例数', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
@@ -1934,7 +1934,7 @@ describe('runDocConsistencyChecks', () => {
       expect(result.stdout).toMatch(/\[vitest-(tests|results)\]/);
       expect(result.stdout).toMatch(/失败|不可采信|success/);
     });
-  });
+  }, 90_000); // real CLI spawn: can exceed the 30s default under full-suite load
 
   it('真实 docs-consistency 探针报告候选 status/ERROR_JSON 证据及 export 三场景隔离', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
@@ -2022,7 +2022,7 @@ describe('runDocConsistencyChecks', () => {
         ).toBe(true);
       }
     });
-  });
+  }, 120_000); // real CLI spawns (export three-scenario isolation): can exceed the 30s default under full-suite load
 
   it('CLI 无 JSON 且 Vitest 不可用（显式清除外部 JSON 环境变量）→ vitest-tests 违规并 exit 1', async () => {
     await withDocsConsistencyFixture(
@@ -2063,7 +2063,7 @@ describe('runDocConsistencyChecks', () => {
       expect(result.stdout).toContain('docs/skill-design-document_SSoT.md');
     });
     await assertSsotExternalBoundaryFile();
-  });
+  }, 90_000); // real CLI spawns: can exceed the 30s default under full-suite load
 
   it('活体文档并存旧 Vitest 数字时不产生动态文档违规', () => {
     const input = baseInput({

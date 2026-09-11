@@ -234,6 +234,106 @@ describe('code-health-apply approval gate (R5/R7)', () => {
     expect(await gitHead(root)).toBe(headBefore);
   });
 
+  it('approved directory scope fails closed: a directory path is never written as a deletion patch', async () => {
+    const root = await createTempGitRepository();
+    const revision = (await revisionProvider.current(root)) as RevisionIdentity;
+    const workDir = await tempRoot('code-health-cli-inputs-');
+    // A human approval whose exact scope names a DIRECTORY (`src`) rather than a regular file. The plan is
+    // accepted (approval scope matches the candidate exactly), but the real patch builder must refuse a
+    // non-regular path, so nothing is written and the worktree is untouched.
+    const directoryCandidate: CodeHealthCandidate = (() => {
+      const { candidate } = bindRevision(validFixture, revision);
+      return {
+        ...candidate,
+        changeScope: { ...candidate.changeScope, files: ['src'] },
+        files: ['src'],
+      };
+    })();
+    const directoryApproval: ApprovalDecision = {
+      ...(validFixture.approval as ApprovalDecision),
+      approvedFiles: ['src'],
+      revision,
+    };
+    const candidatePath = await writeJson(workDir, 'candidate.json', directoryCandidate);
+    const approvalPath = await writeJson(workDir, 'approval.json', directoryApproval);
+    const before = await gitStatus(root);
+    const headBefore = await gitHead(root);
+
+    const r = runCli('code-health-apply.ts', [
+      '--candidate',
+      candidatePath,
+      '--approval',
+      approvalPath,
+      '--root',
+      root,
+      '--mode',
+      'patch',
+    ]);
+    expect(r.code).toBe(1);
+    const summary = jsonLine<{ kind: string; applied: boolean; errorCode: string | null; patchPath: string | null }>(
+      r.stdout,
+      'APPLY_JSON',
+    );
+    expect(summary?.kind).toBe('blocked');
+    expect(summary?.applied).toBe(false);
+    expect(summary?.patchPath).toBeNull();
+    expect(summary?.errorCode).toBe('EVIDENCE_INVALID');
+    expect(await gitStatus(root)).toBe(before);
+    expect(await gitHead(root)).toBe(headBefore);
+  });
+
+  it('approved scope with a symlinked parent directory never reads outside file contents into the patch', async () => {
+    const root = await createTempGitRepository();
+    const revision = (await revisionProvider.current(root)) as RevisionIdentity;
+    const workDir = await tempRoot('code-health-cli-inputs-');
+    // A real file OUTSIDE the controlled root, reachable only through a symlinked parent directory inside
+    // it. The canonical-root containment rule must refuse the read (SECURITY_BLOCKED), not fold the
+    // outside bytes into the controlled patch.
+    const outsideDir = await tempRoot('code-health-cli-outside-');
+    await fs.writeFile(path.join(outsideDir, 'secret.ts'), 'export const outsideSecret = 1;\n', 'utf8');
+    const linkPath = path.join(root, 'linked');
+    await fs.symlink(outsideDir, linkPath, 'dir');
+    const before = await gitStatus(root);
+
+    const { candidate } = bindRevision(validFixture, revision);
+    const linkedCandidate: CodeHealthCandidate = {
+      ...candidate,
+      changeScope: { ...candidate.changeScope, files: ['linked/secret.ts'] },
+      files: ['linked/secret.ts'],
+    };
+    const linkedApproval: ApprovalDecision = {
+      ...(validFixture.approval as ApprovalDecision),
+      approvedFiles: ['linked/secret.ts'],
+      revision,
+    };
+    const candidatePath = await writeJson(workDir, 'candidate.json', linkedCandidate);
+    const approvalPath = await writeJson(workDir, 'approval.json', linkedApproval);
+
+    const r = runCli('code-health-apply.ts', [
+      '--candidate',
+      candidatePath,
+      '--approval',
+      approvalPath,
+      '--root',
+      root,
+      '--mode',
+      'patch',
+    ]);
+    expect(r.code).toBe(1);
+    const summary = jsonLine<{ kind: string; applied: boolean; errorCode: string | null; patchPath: string | null }>(
+      r.stdout,
+      'APPLY_JSON',
+    );
+    expect(summary?.kind).toBe('blocked');
+    expect(summary?.applied).toBe(false);
+    expect(summary?.patchPath).toBeNull();
+    expect(['SECURITY_BLOCKED', 'EVIDENCE_INVALID']).toContain(summary?.errorCode);
+    // No controlled patch leaked the outside content, and the real worktree is untouched.
+    const patchAbsolute = path.join(root, '.w-model', 'code-health', 'apply', `${linkedCandidate.candidateId}.patch`);
+    expect(await fs.readFile(patchAbsolute, 'utf8').catch(() => '')).not.toContain('outsideSecret');
+    expect(await gitStatus(root)).toBe(before);
+  });
+
   it('批准的 patch 模式只生成受控 patch，不改变隔离项目工作树', async () => {
     const root = await createTempGitRepository();
     const revision = (await revisionProvider.current(root)) as RevisionIdentity;
@@ -567,7 +667,9 @@ describe('code-health-ledger CLI (init/append/validate)', () => {
     ]);
     expect(illegal.code).toBe(1);
     expect(JSON.parse(await fs.readFile(ledger, 'utf8'))).toMatchObject({ events: [{ eventId: 'EV-1' }] });
-  });
+    // Six sequential real `tsx` CLI spawns exceed the 30 s default under full-suite parallel load.
+    // The explicit bound keeps the long-running case bounded without weakening any assertion.
+  }, 120_000);
 
   it('validate 拒绝 status 与 replayed history 不一致的 ledger', async () => {
     const dir = await tempRoot('code-health-ledger-cli-');
@@ -596,6 +698,18 @@ describe('code-health-ledger CLI (init/append/validate)', () => {
     const badFlag = runCli('code-health-ledger.ts', ['validate', '--nope', 'x']);
     expect(badFlag.code).toBe(2);
     expect(badFlag.stdout).toContain('ERROR_JSON');
+  });
+
+  it('--help and help expose a discoverable usage surface without an input error', () => {
+    for (const args of [['--help'], ['help'], ['init', '--help']]) {
+      const result = runCli('code-health-ledger.ts', args);
+      expect(result.code, `code-health-ledger.ts ${args.join(' ')}`).toBe(0);
+      expect(result.stdout).toContain('usage: code-health-ledger.ts');
+      expect(result.stdout).toContain('init');
+      expect(result.stdout).toContain('append');
+      expect(result.stdout).toContain('validate');
+      expect(result.stdout).not.toContain('ERROR_JSON');
+    }
   });
 });
 

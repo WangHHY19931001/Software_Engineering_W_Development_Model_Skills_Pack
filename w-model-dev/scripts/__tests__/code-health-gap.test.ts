@@ -622,6 +622,24 @@ describe('phase 2 TDD RED/GREEN harness (real processes, real exit codes)', () =
     ).rejects.toThrow(/argv entry/i);
   });
 
+  it('consumer validator 拒绝把 implementation artifact 同时声明为 candidate test', async () => {
+    const fixture = await createHarnessFixture();
+    // The producer harness enforces the four set relations; the consumer validator must apply the same
+    // disjointness rule to the LEDGER candidate, not just to the declaration. A ledger whose `tests`
+    // includes the approved implementation file is rejected even when the declaration itself is disjoint.
+    const red = await runTddHarness(harnessInput(), fixture.options);
+    expect(red.exitCode).toBe(1);
+    await fs.writeFile(path.join(fixture.root, 'src', 'token.mjs'), FIXED_TOKEN);
+    const green = await runTddHarness(harnessInput(), fixture.options);
+    expect(green.exitCode).toBe(0);
+    const reasons = validateRedGreenEvidence(
+      validGap(),
+      [red, green],
+      redGreenLedger([IMPLEMENTATION_ARTIFACT], ['probe.mjs', IMPLEMENTATION_ARTIFACT]),
+    );
+    expect(reasons.join('; ')).toMatch(/implementation artifact must not be a ledger-declared candidate test/i);
+  });
+
   it('R-F(ii): 非字面量动态 import 的未声明断言文件被拒绝；声明后削弱它改变 hash 并拒绝 GREEN', async () => {
     const fixture = await createHarnessFixture();
     await fs.writeFile(path.join(fixture.root, 'runner.mjs'), NON_LITERAL_RUNNER);

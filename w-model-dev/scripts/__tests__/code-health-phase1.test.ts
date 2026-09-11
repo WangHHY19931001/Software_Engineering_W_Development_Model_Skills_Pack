@@ -31,7 +31,7 @@ import {
   mergeDynamicTrace,
   type Phase1Scenario,
 } from '../logic/code-health-phase1-logic.js';
-import { runPhase1 } from '../cli/code-health-phase1.js';
+import { runPhase1, PHASE1_USAGE_DETAIL } from '../cli/code-health-phase1.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../../..');
@@ -528,5 +528,12 @@ describe('code-health phase 1 discovery', () => {
     } finally {
       await fs.rm(output, { force: true });
     }
+  });
+});
+
+describe('code-health-phase1 CLI usage surface', () => {
+  it('usage detail states that changedFiles only covers analyzed targets', () => {
+    expect(PHASE1_USAGE_DETAIL).toContain('usage: code-health-phase1.ts');
+    expect(PHASE1_USAGE_DETAIL).toMatch(/changedFiles covers only analyzed targets/);
   });
 });

@@ -79,6 +79,25 @@ const EMPTY_SHA256 = createHash('sha256').update(Buffer.alloc(0)).digest('hex');
 const TIME_BASE = Date.parse('2026-09-07T00:00:00.000Z');
 /** Sibling test transient (`code-health-ledger.test.ts` raw outputs) that may appear mid-run. */
 const SIBLING_TEST_TRANSIENT = '.tmp-code-health-test-output';
+/**
+ * Sibling test transient (`dependency-boundaries.test.ts`) that briefly writes a bare-fs fixture into the
+ * shared `w-model-dev/scripts/logic/` directory and removes it in `finally`. Under full-suite parallelism
+ * the create→delete window can overlap this file's repo-root purity snapshots, so the untracked artifact is
+ * excluded by an explicit, tightly-scoped name pattern. The exclusion only skips these sibling-owned
+ * transient paths; a tracked file being modified is still reported by `git diff --name-only` (the diff
+ * assertion below does not consult this pattern), so the purity invariant is preserved.
+ */
+const SIBLING_TEST_TRANSIENT_PATTERNS: readonly RegExp[] = [
+  new RegExp(`(^|/)${SIBLING_TEST_TRANSIENT}/`),
+  /(^|\/)\.d2-boundary-fixture-\d+\.ts$/,
+];
+
+/** True only for sibling-test transients that may legitimately appear mid-run inside the repo root. */
+function isSiblingTestTransient(statusLine: string): boolean {
+  // `git status --porcelain` lines look like `?? <path>`; isolate the path before matching.
+  const porcelainPath = statusLine.replace(/^..\s+/, '').trim();
+  return SIBLING_TEST_TRANSIENT_PATTERNS.some((pattern) => pattern.test(porcelainPath));
+}
 
 /**
  * Canonical Git environment shared with `code-health-evidence.test.ts`: no system or user Git config and
@@ -241,11 +260,13 @@ function addedDiffNames(before: string[], after: string[]): string[] {
 /** The current repository root must not receive any new tracked/untracked artifact from this test. */
 async function expectRepositoryRootUnpolluted(before: string, beforeDiff: string[]): Promise<void> {
   const after = await gitStatusPorcelain(repoRoot);
-  const added = addedStatusLines(before, after).filter((line) => !line.includes(SIBLING_TEST_TRANSIENT));
+  const added = addedStatusLines(before, after).filter((line) => !isSiblingTestTransient(line));
   expect(added).toEqual([]);
   expect(after).not.toContain('.w-model/');
   expect(after).not.toContain('coverage/');
   expect(after).not.toContain('.zcode/');
+  // Tracked-file modification is never transient: `git diff --name-only` must stay empty, and the
+  // sibling-transient exclusion above does not apply here (a tracked edit is not an untracked status line).
   expect(addedDiffNames(beforeDiff, await gitDiffNames(repoRoot))).toEqual([]);
 }
 
@@ -2371,4 +2392,16 @@ describe('code-health task1 isolated git integration', () => {
       await expectRepositoryRootUnpolluted(repoStatusBefore, repoDiffBefore);
     });
   }
+
+  it('repo-root purity excludes only known sibling transients and still flags tracked edits', () => {
+    // Sibling-owned transient paths (untracked) are excluded: `.d2-boundary-fixture-<pid>.ts` written by
+    // `dependency-boundaries.test.ts` and the ledger test's `.tmp-code-health-test-output`.
+    expect(isSiblingTestTransient('?? w-model-dev/scripts/logic/.d2-boundary-fixture-9980.ts')).toBe(true);
+    expect(isSiblingTestTransient('?? .tmp-code-health-test-output/raw/out.log')).toBe(true);
+    // Everything else is reported: a new untracked file, a modified tracked file, and look-alike names.
+    expect(isSiblingTestTransient('?? w-model-dev/scripts/logic/new-module.ts')).toBe(false);
+    expect(isSiblingTestTransient(' M w-model-dev/scripts/logic/code-health-ledger-logic.ts')).toBe(false);
+    expect(isSiblingTestTransient('?? w-model-dev/scripts/logic/.d2-boundary-fixture.ts')).toBe(false);
+    expect(isSiblingTestTransient('?? .tmp-code-health-test-output-other/file')).toBe(false);
+  });
 });

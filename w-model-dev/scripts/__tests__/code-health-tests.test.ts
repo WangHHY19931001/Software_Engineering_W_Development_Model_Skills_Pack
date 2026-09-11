@@ -34,7 +34,7 @@ import type {
 import { classifyProtectedTest, evaluateDeletion, proveTestRemoval } from '../logic/code-health-ledger-logic.js';
 import { DEFAULT_GOVERNANCE_FACTS, evaluateTestInventory } from '../logic/code-health-test-logic.js';
 import { createCodeHealthCommandRunner } from '../lib/code-health-command.js';
-import { scopePathRoles } from '../lib/code-health-deletion-authority.js';
+import { scopePathRoles, readTrackedJson } from '../lib/code-health-deletion-authority.js';
 import { createCodeHealthEvidenceStore } from '../lib/code-health-evidence-store.js';
 import { createCodeHealthGitRevisionProvider } from '../lib/code-health-revision-provider.js';
 import { runSync } from '../lib/run-sync.js';
@@ -1058,6 +1058,66 @@ describe('guarded real pre/post deletion (F-1/F-2/F-4/F-7)', () => {
     await expect(fs.stat(path.join(project.root, 'tests', 'legacy', 'old.test.mjs'))).rejects.toBeTruthy();
     await expect(fs.stat(path.join(project.root, 'tests', 'legacy', 'sum.test.mjs'))).resolves.toBeTruthy();
   }, 150_000);
+
+  it('a guard candidate whose candidateId differs from the inventory candidateId is refused', async () => {
+    const project = await createGuardedProject('suite.mjs');
+    const workDir = await tempRoot('code-health-phase3-guard-inputs-');
+    // The inventory is anchored to the real candidate id; a guard that swaps in a different candidate
+    // (whose scope still looks plausible) must be refused by an explicit cross-check, not silently
+    // authorized against the inventory's ledger entry.
+    const mismatchedCandidate = {
+      ...structuredClone(project.candidate),
+      candidateId: 'CHG-P3-20260907-999',
+      // Keep the candidate internally consistent (its own evidence binding names the same id) so the
+      // structural candidate validation passes and the explicit inventory cross-check is what refuses it.
+      evidenceBinding: {
+        ...structuredClone(project.candidate).evidenceBinding,
+        candidate: {
+          ...structuredClone(project.candidate).evidenceBinding.candidate,
+          candidateId: 'CHG-P3-20260907-999',
+        },
+      },
+    };
+    const guardPath = await writeJson(workDir, 'guard.json', {
+      ...project.guardDoc,
+      candidate: mismatchedCandidate,
+    });
+    const victim = path.join(project.root, 'tests', 'legacy', 'old.test.mjs');
+    const result = runCli('code-health-tests.ts', [
+      '--guard',
+      guardPath,
+      '--project',
+      project.root,
+      '--ledger',
+      project.ledgerPath,
+    ]);
+    expect(result.code).toBe(1);
+    expect(`${result.stdout}${result.stderr}`).toMatch(/candidateId .*does not match the inventory candidateId/i);
+    await expect(fs.stat(victim)).resolves.toBeTruthy();
+  }, 150_000);
+
+  it('readTrackedJson tolerates a CRLF checkout of an LF-committed tracked blob', async () => {
+    const root = await tempRoot('code-health-tracked-crlf-');
+    await git(root, ['init', '--quiet']);
+    const lfBytes = `${JSON.stringify({ candidateId: 'CHG-P3-20260907-901', value: 1 }, null, 2)}\n`;
+    await fs.writeFile(path.join(root, 'ledger.json'), lfBytes);
+    await git(root, ['add', '--all']);
+    await git(root, ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'lf fixture']);
+    // Simulate a `core.autocrlf=true` checkout: the working bytes are CRLF while the HEAD blob stays LF.
+    await fs.writeFile(path.join(root, 'ledger.json'), lfBytes.replace(/\n/g, '\r\n'));
+    const read = await readTrackedJson(root, 'ledger.json');
+    expect(read.violations).toEqual([]);
+    expect(read.value).toMatchObject({ candidateId: 'CHG-P3-20260907-901' });
+
+    // A real content change must still be refused.
+    await fs.writeFile(
+      path.join(root, 'ledger.json'),
+      `${JSON.stringify({ candidateId: 'forged', value: 2 }, null, 2)}\n`,
+    );
+    const tampered = await readTrackedJson(root, 'ledger.json');
+    expect(tampered.value).toBeUndefined();
+    expect(tampered.violations.join('; ')).toMatch(/does not match its HEAD blob/i);
+  });
 
   it('a no-op suite that prints no facts cannot authorize deletion', async () => {
     const project = await createGuardedProject('noop.mjs');

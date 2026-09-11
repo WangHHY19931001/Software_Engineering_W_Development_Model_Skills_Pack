@@ -169,7 +169,10 @@ function runCli(args: string[]): {
 } {
   const result = spawnSync(process.execPath, [tsxCli, SCRIPT, ...args], {
     encoding: 'utf8',
-    timeout: 15_000,
+    // Load-sensitive: the real `tsx` CLI cold start can exceed 15 s when the full suite runs in parallel
+    // (spawnSync then kills it and reports `status: null`). 60 s keeps the bounded-timeout intent while
+    // removing the false failure; assertions are unchanged.
+    timeout: 60_000,
   });
   return {
     code: result.status,

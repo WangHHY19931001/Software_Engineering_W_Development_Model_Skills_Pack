@@ -30,7 +30,10 @@ afterEach(async () => {
 });
 
 function run(args: string[]): { code: number | null; stdout: string; stderr: string } {
-  const result = runSync(process.execPath, [tsxCli, SCRIPT, ...args], { cwd: REPO_ROOT });
+  // Load-sensitive: the real `tsx` CLI can exceed the 15 s runSync default when the full suite runs in
+  // parallel (spawnSync then reports `status: null`). 60 s keeps the bounded-timeout intent; assertions
+  // are unchanged.
+  const result = runSync(process.execPath, [tsxCli, SCRIPT, ...args], { cwd: REPO_ROOT, timeout: 60_000 });
   return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 

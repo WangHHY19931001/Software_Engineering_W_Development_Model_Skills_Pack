@@ -352,6 +352,29 @@ describe('Phase 4 pure cluster semantics (R3/R4)', () => {
     ).toEqual(expect.arrayContaining([expect.stringMatching(/accidental/i)]));
   });
 
+  it('malformed excluded: facts are default-deny rather than silently ignored', () => {
+    // A malformed exclusion (missing `:<symbol>`) must never be dropped in the permissive direction: the
+    // tracked facts are unparseable, so the cluster cannot authorize and must fail closed.
+    const malformed = 'excluded:generated:src/service-b.ts';
+    const facts = parseTrackedFacts([...trackedFactsFor(SITES), malformed]);
+    expect(facts.malformedExclusions).toEqual([malformed]);
+    expect(() =>
+      clusterDuplicates(authoritativeInput(), authority({ trackedFacts: [...trackedFactsFor(SITES), malformed] })),
+    ).toThrow(/excluded|malformed|default-deny/i);
+  });
+
+  it('structural view key=value values must come from a closed vocabulary', () => {
+    // Meaningless but plausible padding (`node=zzz`) must not satisfy the arity floor; the value side is
+    // a closed vocabulary too, so only real structural content counts.
+    const padded: DuplicateInput = {
+      ...authoritativeInput(),
+      ast: ['node=zzz', 'branch=qqq'],
+      dataFlow: ['input=aaa', 'output=bbb'],
+      callGraph: ['caller=ccc', 'callee=ddd'],
+    };
+    expect(structuralViewSupport(padded)).toBe(0);
+  });
+
   it('F-2: generated / one-off / dead copies recorded in tracked facts are excluded', () => {
     for (const reason of ['generated', 'one-off-experiment', 'dead-copy', 'mock', 'fixture']) {
       const cluster = clusterDuplicates(
