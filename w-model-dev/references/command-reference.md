@@ -355,7 +355,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 ## `/wm code-health <phase>`
 
 - **速查行**：`/wm code-health <P1|P2|P3|P4>`
-- **范围**：已实现并验收 Phase 1–4。campaign 归档（`archiveCampaign` / `verifyArchive`）与 Phase 5–8 迁移**未实现**：`logic/code-health-phase-boundaries.ts` 返回 `NOT_IMPLEMENTED`，不得据此执行归档或迁移。
+- **范围**：已实现并验收 Phase 1–4，以及 campaign 归档（真实 producer/consumer/verifier）。Phase 5–8 迁移**未实现**，不得据此执行迁移。`--verify` 不带 `--source-project` 只能是 package-only，须显式传 `--source-project` 才做 source-bound 重验（package-only 不得表述为 verified source）。`logic/code-health-phase-boundaries.ts` 占位模块已删除。
 - **命令与退出语义**：
 
 | 阶段            | CLI                         | 必填 / 关键参数                                                                                                        | 退出码                                                                |
@@ -366,6 +366,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 | P4 重复簇与抽象 | `code-health-duplicates.ts` | `--matrix <file> [--ledger <file>] [--root <dir>] [--validate]`                                                        | 0 `under-review`/`deferred` / 1 `rejected` 或 guard 违规 / 2 输入错误 |
 | ledger          | `code-health-ledger.ts`     | `init --ledger --campaign-id --baseline`；`append --ledger --candidate --event [--approval]`；`validate --ledger`      | 0 通过 / 1 校验或拒绝 / 2 输入错误                                    |
 | 应用            | `code-health-apply.ts`      | `--candidate <file> [--approval <file>] [--root <dir>] [--mode dry-run\|patch\|commit]`（`commit` 需人类 approval）    | 0 提案/应用成功 / 1 fail-closed / 2 输入错误                          |
+| 归档            | `code-health-archive.ts`    | `produce --campaign <dir> --output <dir> [--verification-level package-only\|source-bound] [--source-project <dir>]`；`verify --verify <package-dir> [--source-project <dir>] [--manifest <file>]` | 0 产出/验证成功 / 1 fail-closed（含 package-only 不得升级 source-bound）/ 2 输入错误 |
 
 - **失败动作**：exit 1 走 code-health 失败链 `gate-failure → blocked → R(root-cause) → V(root-cause-review) → G(root-cause-gate) → S(rework) → evidenced`（顺序不可跳过，见 [code-health-governance.md](code-health-governance.md) §6）；失败的删除/抽象必须回滚（`git apply -R` + `git diff --exit-code`=0）。exit 2 修正参数后重跑，不写任何文件。
 - **CHECKPOINT**：候选进入实现前必须 🔴 CHECKPOINT 由 human 批准（精确 candidate ID / action / files / symbols / scopeHash）；工具或 LLM 输出不能授权。

@@ -19,7 +19,7 @@ npm install          # 同时装配 git hooks（core.hooksPath .githooks）
 > 下列 npm 与 `scripts/cli/doctor.ts` 命令只适用于包含 `scripts/`、`samples/`、`tools/` 的 L1 仓库检出；L0 用户应跳过本节。
 
 ```powershell
-npm run self-test    # 期望：262/262 通过
+npm run self-test    # 期望：322/322 通过
 npm run doctor       # 依赖体检；含 TLA 用 npm run doctor -- --with-tla
 ```
 

@@ -101,7 +101,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | `/wm test type=<单元\|集成\|系统\|验收> result=<pass\|fail>` | 阶段 5–8（result 必填且必须来自真实测试输出）                        | O→S→V→G               |
 | `/wm review <目标>`                                          | 阶段门（外部 Agent 评审）                                            | O→V→G                 |
 | `/wm status` / `/wm help` / `/wm metrics`                    | 只读                                                                 | O 只读                |
-| `/wm code-health <phase>`                                    | Phase 1–4 代码健康治理（只读发现 → 人工授权 → 受控应用；归档未实现） | O→A/S→V→G；human 授权 |
+| `/wm code-health <phase>`                                    | Phase 1–4 代码健康治理（只读发现 → 人工授权 → 受控应用；campaign 归档已实现，`--verify` 无 `--source-project` 仅 package-only） | O→A/S→V→G；human 授权 |
 | `/wm reset` / `/wm import <文件>`                            | 状态操作（🔴 CHECKPOINT 后执行）                                     | O 执行                |
 | `/wm export [目录]` / `/wm hill-climbing`                    | 导出 / 改进信号                                                      | O 只读 / O 分析       |
 

@@ -2,7 +2,7 @@
 
 > 权威定义：`docs/skill-design-document_SSoT.md` §10K。本文件是 `/wm code-health` 的可执行参考，说明已实现的 Phase 1–4 命令、角色边界、退出语义与失败路径。
 > 交付层：全部资产属 L1（`w-model-dev/scripts/**`），不在 L0 纯 skill 副本内；判定为纯函数 + 确定性 CLI，不调用 LLM。
-> **实现边界**：本仓库只实现并验收 Phase 1–4。campaign 归档（`archiveCampaign` / `verifyArchive`）与任何 Phase 5–8 迁移能力**未实现**——`logic/code-health-phase-boundaries.ts` 对未实现能力返回 `NOT_IMPLEMENTED`，不得据本文或计划文本执行归档。
+> **实现边界**：本仓库实现并验收 Phase 1–4，以及 campaign 归档（真实 producer/consumer/verifier）。Phase 5–8 迁移能力仍**未实现**，不得据本文或计划文本执行迁移。归档的验证分两级：`--verify` 不带 `--source-project` 只能是 **package-only**（与 `wm-export-evidence --verify` 语义一致），只有显式传 `--source-project` 才做 source-bound 重验（当前 HEAD / source hash / run 身份 / gate measurements）；package-only **不得**表述为 verified source。旧的 `logic/code-health-phase-boundaries.ts` 占位模块已删除。
 
 ## 1. 何时使用
 
@@ -50,7 +50,13 @@ npx tsx w-model-dev/scripts/cli/code-health-duplicates.ts --matrix <file> [--led
 
 # 应用：dry-run / patch / commit（commit 需人类 approval）
 npx tsx w-model-dev/scripts/cli/code-health-apply.ts --candidate <file> [--approval <file>] [--root <dir>] [--mode dry-run|patch|commit]
+
+# 归档：produce（campaign → 受控 package）/ verify（两级验证）
+npx tsx w-model-dev/scripts/cli/code-health-archive.ts --campaign <dir> --output <dir> [--verification-level package-only|source-bound] [--source-project <dir>]
+npx tsx w-model-dev/scripts/cli/code-health-archive.ts --verify <package-dir> [--source-project <dir>] [--manifest <file>]
 ```
+
+**归档权威规则**：`ledger.json` / `candidate.json` / `approval.json` 齐备且经 V/G 复审、G 门禁、observed passing 命令证据、可执行 rollback、clean redaction、revision 匹配的 verified 候选才能 `archivedAsPassed=true`；`deferred` / `rejected` / `blocked` / `rolled-back` 只可作为终态**非成功**证据归档，绝不报告为 passed。每个声明工件经共享 FileVerifier 重验（regular / non-symlink / canonical containment）并按真实内容哈希复制；package 原子写入（staging + rename + readback），不覆盖已存在的非空 package。归档仍需人类 approval，ARCHIVE 不代替 CHECKPOINT。
 
 退出码统一为 `0 = 通过/正常`、`1 = 校验或 guard 失败（fail-closed）`、`2 = 输入错误`（`ERROR_JSON`，含 `ARG_INVALID`）。未知 flag / 重复值 flag / 缺值 / 缺必需参数一律 exit 2，且不写任何文件。
 

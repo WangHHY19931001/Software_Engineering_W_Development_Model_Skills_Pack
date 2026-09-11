@@ -149,7 +149,7 @@ flowchart LR
 | `/wm code <功能描述>`                                        | 编码实现，同步产出单元测试用例（不自动标记通过）                           |
 | `/wm test type=<单元\|集成\|系统\|验收> result=<pass\|fail>` | 回填指定类型测试的**真实执行结果**                                         |
 | `/wm review <目标>`                                          | 返回结构化评审指引（由 V 子代理执行，不内置 LLM）                          |
-| `/wm code-health <P1\|P2\|P3\|P4>`                           | 代码健康治理 Phase 1–4（只读发现 → 人工授权 → 受控可回滚应用；归档未实现） |
+| `/wm code-health <P1\|P2\|P3\|P4>`                           | 代码健康治理 Phase 1–4（只读发现 → 人工授权 → 受控可回滚应用；campaign 归档已实现） |
 | `/wm status` / `/wm metrics`                                 | 查看阶段进度 / 流程度量（只读脚本）                                        |
 | `/wm export` / `/wm import`                                  | 导出 / 导入项目 JSON + RTM Markdown                                        |
 | `/wm help` / `/wm reset`                                     | 帮助 / 重置项目（保留元信息）                                              |

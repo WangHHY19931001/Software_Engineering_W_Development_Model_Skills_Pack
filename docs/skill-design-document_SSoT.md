@@ -2077,9 +2077,9 @@ interface RunLogEntry {
 ## 10K. 代码健康治理（Code Health Governance, Phase 1–4）
 
 > 目标：为「删除死代码 / 补测试 / 删除冗余测试 / 抽象重复」提供**人类授权 + 证据锚定 + 可回滚**的受控流程，避免凭静态猜测或 LLM 结论直接改动生产代码。
-> 范围：本仓库已实现并验收 **Phase 1–4**。实现位置（单一事实源）：契约与 schema 类型 `w-model-dev/scripts/logic/code-health-contract.ts`；纯逻辑 `code-health-phase1-logic.ts` / `code-health-gap-logic.ts` / `code-health-test-logic.ts` / `code-health-duplicate-logic.ts` / `code-health-ledger-logic.ts`；注入边界 `lib/code-health-command.ts` / `code-health-file-verifier.ts` / `code-health-evidence-store.ts` / `code-health-revision-provider.ts` / `code-health-redaction.ts` / `code-health-tdd-harness.ts`；CLI `cli/code-health-phase1.ts` / `code-health-ledger.ts` / `code-health-apply.ts` / `code-health-gap.ts` / `code-health-tests.ts` / `code-health-duplicates.ts`。
+> 范围：本仓库已实现并验收 **Phase 1–4**，以及 **campaign 归档**（真实 producer/consumer/verifier，见 §10K.6）。实现位置（单一事实源）：契约与 schema 类型 `w-model-dev/scripts/logic/code-health-contract.ts`；纯逻辑 `code-health-phase1-logic.ts` / `code-health-gap-logic.ts` / `code-health-test-logic.ts` / `code-health-duplicate-logic.ts` / `code-health-ledger-logic.ts`；注入边界 `lib/code-health-command.ts` / `code-health-file-verifier.ts` / `code-health-evidence-store.ts` / `code-health-revision-provider.ts` / `code-health-redaction.ts` / `code-health-tdd-harness.ts` / `code-health-archive-boundary.ts`；CLI `cli/code-health-phase1.ts` / `code-health-ledger.ts` / `code-health-apply.ts` / `code-health-gap.ts` / `code-health-tests.ts` / `code-health-duplicates.ts` / `code-health-archive.ts`。
 > 交付层与无 LLM：全部 code-health 资产属 **L1（带门禁）**，位于 `w-model-dev/scripts/**`，L0 纯 skill 副本不含；判定由纯函数 + 确定性 CLI 完成，**不调用 LLM**。
-> **未实现（不得据此执行）**：campaign 归档（`archiveCampaign` / `verifyArchive`，`code-health-archive.schema.json` 为前置契约）与任何 Phase 5–8 迁移能力。`logic/code-health-phase-boundaries.ts` 对未实现能力返回 `NOT_IMPLEMENTED`。
+> **未实现（不得据此执行）**：任何 Phase 5–8 迁移能力。campaign 归档已实现（`cli/code-health-archive.ts` + `lib/code-health-archive-boundary.ts`），但 `--verify` 不带 `--source-project` 只能是 package-only，**不得**表述为 verified source。`logic/code-health-phase-boundaries.ts` 占位模块已删除。
 
 ### 10K.1 campaign policy 与候选非结论原则
 
@@ -2122,6 +2122,13 @@ interface RunLogEntry {
 - **脱敏**：`lib/code-health-redaction.ts` 对 campaign artifact 输出 `status`（`not_reviewed` / `clean` / `blocked`）、`rules` 与 `blockedReasons`；`blocked` 的产物不得导出。
 - **18 项 pre-push 不变**：code-health CLI 不纳入 `.githooks/pre-push`，现有 18 项检查、顺序与 exit 语义原样保留。
 - **codegraph 前置（约束 #14）**：进入阶段 5–8 的代码修改前须先做 codegraph 影响分析并落盘 `.w-model/codegraph-queries/`；本仓库 checkout 无 `.codegraph/` 索引，code-health Phase 1–4 不消费 codegraph，也不得伪造查询记录。
+
+### 10K.6 campaign 归档（已实现）
+
+- **实现位置**：`lib/code-health-archive-boundary.ts`（producer / consumer / verifier）+ `cli/code-health-archive.ts`（`produce` / `verify` / `--help`）；契约类型 `ArchiveBoundaryResult` / `ArchivePackageFile` / `ArchiveProduceInput` / `ArchiveManifest`（含 `archiveStatus` / `archivedAsPassed`）。
+- **授权与证据**：campaign 目录须含 `ledger.json` / `candidate.json` / `approval.json`；verified 候选须同时具备人类 approval、V 复审、G 门禁、observed passing 命令证据、可执行 rollback、clean redaction 与匹配 revision 才 `archivedAsPassed=true`；`deferred` / `rejected` / `blocked` / `rolled-back` 仅可作终态**非成功**证据归档。每个声明工件经共享 FileVerifier 重验（regular / non-symlink / canonical containment）并按真实内容哈希复制；package 原子写入（staging + rename + readback），不覆盖已存在的非空 package。
+- **两级验证（不得混淆）**：`produce`/`verify` 需显式 `--verification-level`；`--verify` 不带 `--source-project` **只能是 package-only**（与 `wm-export-evidence --verify` 语义一致），package-only **不得**表述为 verified source；只有传 `--source-project` 才做 source-bound 重验（HEAD / source hash / run 身份 / gate measurements），复用 `verifySourceProvenance` 规则。
+- **归档不代替 CHECKPOINT**：归档仍需人类 approval，`ARCHIVE` 不能作为阶段放行或授权的替代。
 
 ---
 

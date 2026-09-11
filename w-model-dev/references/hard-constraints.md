@@ -92,7 +92,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 - **权威必须锚定 HEAD-tracked 证据**：ledger、`.code-health-governance.json` 与 suite argv 清单的工作区字节须等于 HEAD blob；`CommandEvidence` 须真实（`exitCode` 为数字、`observation=observed`），revision/scope/path/hash 绑定不一致即拒。
 - **失败链**：`gate-failure → blocked → R(root-cause) → V(root-cause-review) → G(root-cause-gate) → S(rework) → evidenced`，顺序不可跳过（`nextRequiredRoles`）。
 - **可回滚**：失败的删除/抽象必须 `git apply -R` 回滚且 `git diff --exit-code`=0；无法回滚即显式失败。
-- **未实现边界**：campaign 归档（`archiveCampaign` / `verifyArchive`）与 Phase 5–8 迁移**未实现**（`NOT_IMPLEMENTED`），不得执行。codegraph 前置见约束 #14；本 checkout 无 `.codegraph/` 索引，不得伪造查询记录。
+- **实现边界**：campaign 归档已实现（`cli/code-health-archive.ts` + `lib/code-health-archive-boundary.ts`；`--verify` 无 `--source-project` 只能 package-only，不得表述为 verified source）；Phase 5–8 迁移**未实现**，不得执行。codegraph 前置见约束 #14；本 checkout 无 `.codegraph/` 索引，不得伪造查询记录。
 
 详见 [code-health-governance.md](code-health-governance.md) 与 SSoT §10K（`docs/skill-design-document_SSoT.md`）。
 

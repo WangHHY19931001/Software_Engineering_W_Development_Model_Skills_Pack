@@ -75,10 +75,18 @@
 
 ### 代码健康治理（code-health-governance，2026-09-11）
 
-- **新增 `/wm code-health` Phase 1–4 受控治理**：只读发现（P1 静态 inventory + 真实动态 trace + false-positive guard）→ 七维度 gap matrix（P2）→ 受保护测试 inventory（P3，`--guard` 唯一删除路径）→ 重复簇与 abstraction guard（P4）；新增 6 个 CLI（`code-health-phase1` / `code-health-gap` / `code-health-tests` / `code-health-duplicates` / `code-health-ledger` / `code-health-apply`）、纯逻辑与注入边界、9 份 code-health schema、`lib/code-health-tdd-harness.ts` 与 tracked `.code-health-governance.json`。授权链为「人类 approval + HEAD-tracked ledger/evidence/revision 绑定 + 可回滚」；默认拒绝、coverage 仅信号、发现不是结论；`blocked` 走 `gate-failure → R(root-cause) → V(root-cause-review) → G(root-cause-gate) → S(rework)` 失败链。**campaign 归档（`archiveCampaign` / `verifyArchive`）与 Phase 5–8 迁移未实现**，不得文档化为可用。
+- **新增 `/wm code-health` Phase 1–4 受控治理**：只读发现（P1 静态 inventory + 真实动态 trace + false-positive guard）→ 七维度 gap matrix（P2）→ 受保护测试 inventory（P3，`--guard` 唯一删除路径）→ 重复簇与 abstraction guard（P4）；新增 6 个 CLI（`code-health-phase1` / `code-health-gap` / `code-health-tests` / `code-health-duplicates` / `code-health-ledger` / `code-health-apply`）、纯逻辑与注入边界、9 份 code-health schema、`lib/code-health-tdd-harness.ts` 与 tracked `.code-health-governance.json`。授权链为「人类 approval + HEAD-tracked ledger/evidence/revision 绑定 + 可回滚」；默认拒绝、coverage 仅信号、发现不是结论；`blocked` 走 `gate-failure → R(root-cause) → V(root-cause-review) → G(root-cause-gate) → S(rework)` 失败链。**Phase 5–8 迁移**在此时点未实现，不得文档化为可用（campaign 归档随后由 Task 8 实现，见下）。
 - **活体文档同步（SSoT-first）**：SSoT 新增 §10K（权威定义）；新增 `references/code-health-governance.md`（第 42 份 references）；SKILL.md 增 `/wm code-health` 路由 / O-A-S-V-G-R-human 权限 / CHECKPOINT / 按需 reference；command-reference / subagent-delegation（dispatch-matrix 登记 6 个新 CLI）/ hard-constraints / rtm-guide / coding-quality / quality-standards / operation-behaviors / data-models / AGENTS / README / CONTRIBUTING / INSTALL / troubleshooting 同步；版本保持 42.2.1，不 bump。
-- **计数收口（实测）**：cli `.ts` 43、exit-2 脚本 42、references 42、schema 34、test 文件 80、self-test 322；docs-consistency 违规 0；pre-push 18 项不变（code-health 不纳入 hook）。
+- **计数收口（实测，Task 8 后为最终值）**：cli `.ts` 44、exit-2 脚本 43、references 42、schema 34、self-test 322；docs-consistency 违规 0；pre-push 18 项不变（code-health 不纳入 hook）。
 - 本轮无 `.codegraph/` 索引：未接入 codegraph，也未伪造查询记录。
+
+### 代码健康治理 Task 8B（R11 加固 + flake 稳定化 + archive 文档回填，2026-09-11）
+
+- **campaign 归档落地（Task 8A 实现，本任务回填活体文档）**：`code-health-archive.ts` 真实 producer/consumer/verifier；verified 候选（V/G 复审 + G 门禁 + observed passing 命令证据 + 可执行 rollback + clean redaction + revision 匹配）才 `archivedAsPassed=true`，`deferred`/`rejected`/`blocked`/`rolled-back` 只作终态非成功证据；工件经共享 FileVerifier 重验并按真实内容哈希复制，package 原子写入且不覆盖非空 package。`--verify` 不带 `--source-project` 只能 package-only，**不得**表述为 verified source；显式传 `--source-project` 才做 source-bound 重验。活体文档（AGENTS / CHANGELOG / troubleshooting / SSoT §10K / code-health-governance.md / command-reference.md）由「归档未实现」改为上述真实行为。
+- **flake 稳定化（R11.7/R8，保留 fail-closed 不变量）**：`code-health-task1-integration.test.ts` 与 `dependency-boundaries.test.ts` 的共享根竞态改为按紧密路径谓词排除兄弟测试瞬态（`.d2-boundary-fixture-<pid>.ts`、`.tmp-code-health-test-output`），**tracked 文件被改动仍由 `git diff --name-only` 断言捕获**（新增双向单测证明）；`evidence-export-logic` / `evidence-provenance-logic` / `l0-link-audit-cli` / `code-health-cli`（30 s→120 s）/ `docs-consistency-logic` 的负载敏感 spawn 超时改为显式 60–120 s，`state-write-logic` 三个 gated-writer 等待用例 5 s→30 s。**未删除/跳过/弱化任何断言**。
+- **R11 加固**：Phase 3 apply 增加目录 scope 单元断言与符号链接父目录 canonical containment（修复真实的「根外字节被读入受控 patch」读不对称，现 `SECURITY_BLOCKED`）；`code-health-ledger --help` 可发现用法面；consumer validator 拒绝 `candidateTests.includes(implementationArtifact)`；删除已无消费者的 `logic/code-health-phase-boundaries.ts`；Phase 4 tracked-blob 比较归一化 CRLF/LF（`core.autocrlf` 检出不再误拒）、畸形 `excluded:` 事实 default-deny、`structuralViewSupport` 值侧闭集校验；Phase 1 usage 说明 `changedFiles` 仅覆盖 analyzed targets；`code-health-deletion-authority.ts` 过时措辞修正并增加 `candidateId` 交叉校验。
+- **文档修正**：quickstart / user-guide 的 self-test 样本数 262→322；coding-quality「合并条件表达式」行转义竖线恢复单行渲染；INSTALL 的 logic `.ts` 计数与 exit-2 口径（42→43）同步。
+- 版本保持 42.2.1，不 bump；pre-push 18 项通过（无 `--retry`）。
 
 ## 门禁项数 STALE 扫描（gate-count-stale-scan，2026-09-07）
 

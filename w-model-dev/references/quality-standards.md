@@ -208,7 +208,7 @@
 - [ ] 默认拒绝：无法证明「非保护」的候选按受保护处理；`test-only` / generated / dead-copy / one-off / 「少几行 diff」不授权
 - [ ] 变更可回滚（`git apply -R` + `git diff --exit-code`=0），RTM 同步回填
 - [ ] 失败走 code-health 失败链 `gate-failure → blocked → R → V → G → S(rework) → evidenced`，顺序不可跳过
-- [ ] 不执行未实现能力（campaign 归档 / Phase 5–8 迁移返回 `NOT_IMPLEMENTED`）；无 `.codegraph/` 索引时不得伪造查询
+- [ ] 归档为真实实现（`code-health-archive.ts`）：`--verify` 无 `--source-project` 只报 package-only，绝不表述为 verified source；不执行未实现的 Phase 5–8 迁移；无 `.codegraph/` 索引时不得伪造查询
 
 ## 工具缺失与降级处理（边界条件）
 

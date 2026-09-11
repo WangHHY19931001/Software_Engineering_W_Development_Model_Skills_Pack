@@ -116,7 +116,7 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 - 退出 2：按 `ARG_INVALID` 等 6 类错误排查参数（未知/重复值 flag、缺 `--ledger`/`--matrix`/`--inventory`/`--project`）；不写任何文件，修正后再跑。
 - 退出 1（候选校验/`--guard` 拒绝）：走 code-health 失败链 `gate-failure → blocked → R(root-cause) → V(root-cause-review) → G(root-cause-gate) → S(rework) → evidenced`，顺序不可跳过；失败的删除/抽象必须回滚（`git apply -R` + `git diff --exit-code`=0）。
 - `--guard` 的 suite argv 来自 tracked repo-owned suite 清单（默认 `.code-health-suite.json`）；本 checkout 无该文件时 `--guard` 无法执行——不得伪造清单或绕过 `code-health-apply.ts`。
-- campaign 归档（`archiveCampaign`/`verifyArchive`）与 Phase 5–8 迁移**未实现**（`NOT_IMPLEMENTED`）；无 `.codegraph/` 索引时不得伪造 codegraph 查询。
+- campaign 归档（`code-health-archive.ts`）已实现：verified 候选经 V/G 复审、G 门禁、observed passing 命令证据、可执行 rollback、clean redaction 与 revision 匹配后才 `archivedAsPassed`；`deferred`/`rejected`/`blocked`/`rolled-back` 只作终态非成功证据。验证分两级：`--verify` 不带 `--source-project` **只能是 package-only**（不得表述为 verified source），显式传 `--source-project` 才做 source-bound 重验。Phase 5–8 迁移仍未实现；无 `.codegraph/` 索引时不得伪造 codegraph 查询。
 
 见 [code-health-governance.md](../w-model-dev/references/code-health-governance.md)。
 
