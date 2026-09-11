@@ -4,30 +4,34 @@
  *
  * Purpose: identify structurally similar implementations, but authorize an abstraction ONLY when
  *   - at least two INDEPENDENT stable production call sites are positively established from the
- *     ledger-recorded authority (declared in the approved migration scope, not test-only, and covered
- *     by a recorded regression command);
+ *     tracked-ledger candidate: each must be declared in the approved migration scope, carry a
+ *     recorded `call-site:` / `contract:` / `regression:` fact, not be recorded as
+ *     generated/dead/one-off/mock/fixture, not be test-only, and be covered by an observed regression
+ *     command;
+ *   - at least two structural views (AST, data-flow, call-graph) carry TYPED `key=value` evidence with
+ *     a meaningful arity — free text cannot satisfy the floor;
  *   - every semantic dimension (inputs/outputs, ordering/mutations/side-effects, errors/retries,
  *     lifecycle/resources, security, concurrency/platform) is proven item-wise, not merely asserted;
  *   - the maintenance benefit is quantified (fewer behaviour owners / bug-fix surfaces, a cohesive
  *     API, no configuration explosion) rather than "a few lines shorter".
  *
- * Default-deny (Task 4/5 lesson, applied here): a determination that authorizes abstraction is derived
- * from the ledger-recorded authority, and every unproven item is a violation. Textual similarity, a
- * shorter diff, fewer lines, mock/fixture similarity, and platform/lifecycle differences are
- * STRUCTURALLY incapable of clearing a dimension:
- *   - the contract has no textual-similarity or line-count input that counts as a semantic proof;
- *   - the test view never satisfies the ≥2 structural views required for an under-review cluster;
- *   - a test path (declared in `tests` or matching test conventions) is always test-only, so it is
- *     excluded from the stable call-site count and is a violation when claimed as a stable site;
- *   - a proof dimension is accepted only when it carries the canonical `item=equivalent` evidence for
- *     every required sub-item; prose, a difference claim, or a missing/negative verdict fails it.
+ * Default-deny (Task 4/5 lesson, applied here): a determination that authorizes abstraction must be
+ * derived from tracked/ledger-recorded facts. This module is PURE — it cannot itself prove that the
+ * `trackedFacts` it receives came from a HEAD-tracked ledger. The IO entry points must resolve the
+ * authority from a HEAD-tracked ledger (working bytes equal to the HEAD blob) and derive the
+ * authority from it; a caller-declared authority may only ADD restriction, never authorize. When the
+ * IO layer cannot establish that tracked provenance it must pass an authority with empty
+ * `trackedFacts`, which forces `deferred` (a non-approval state). This module never reads files or
+ * runs commands.
  *
- * Honest authority boundary: a pure function cannot authenticate the ledger/authority it is handed.
- * The CLI (IO) resolves the authority from the tracked ledger and cross-checks the caller-declared
- * cluster against the recomputation; the ledger record, the human approval gate, and the role
- * signature chain remain the authority. This module never reads files or runs commands.
- *
- * `logic/` has no `node:fs` / `node:child_process` / `node:path` import (dependency-boundaries gate).
+ * Un-authorizing inputs are STRUCTURALLY incapable of clearing a requirement:
+ *   - textual similarity / line count have no representation in the frozen contract at all;
+ *   - the test view never satisfies the structural-view floor, and a test path (declared in `tests`
+ *     or matching test conventions) is always excluded from the stable call-site count;
+ *   - `excluded:` facts for generated/dead/one-off/mock/fixture copies remove a call site from the
+ *     stable set even when the candidate also declares it in `callSites`;
+ *   - a proof dimension is accepted only when it carries canonical `item=equivalent` evidence for every
+ *     required sub-item; prose, a difference claim, or a missing/negative verdict fails it.
  */
 
 import {
@@ -50,11 +54,32 @@ const CALL_SITE_PATTERN = /^([^\s:]+):([^\s:]+)$/;
 const TEST_PATH_PATTERN = /(^|\/)(tests?|__tests__|spec|fixtures?|mocks?|__mocks__)\/|\.(test|spec)\.[^/]+$/i;
 const DISTINCT_SITE_FILES = 2;
 const STRUCTURAL_VIEW_FLOOR = 2;
+/** Minimum typed entries per view before that view counts as structural support. */
+const STRUCTURAL_VIEW_ARITY = 2;
+
+/** Closed key vocabulary: a structural view entry counts only when it is `<allowed-key>=<value>`. */
+export const STRUCTURAL_VIEW_KEYS = {
+  ast: ['node', 'branch', 'control-flow', 'shape', 'expression', 'statement'],
+  dataFlow: ['input', 'output', 'mutation', 'side-effect', 'flow', 'parameter', 'return'],
+  callGraph: ['caller', 'callee', 'lifecycle', 'ownership', 'neighborhood', 'entry', 'exit'],
+} as const;
 
 /**
- * Ledger-derived authority for one abstraction cluster. Fields are exactly the ledger-recorded facts
- * the CLI resolves from the tracked ledger candidate (`candidate.callSites`, `changeScope.files`,
- * `tests`, `commands`) before any pure decision is made.
+ * Canonical tracked-fact prefixes recorded in the ledger candidate's `sources`:
+ *   - `call-site:<file>:<symbol>`  — the identifier is a supported production call site;
+ *   - `contract:<file>:<symbol>`   — a contract is recorded for it;
+ *   - `regression:<file>:<symbol>` — a regression signal is recorded for it;
+ *   - `excluded:<reason>:<file>:<symbol>` — it must NOT be treated as a stable production site.
+ * Any `excluded:` reason counts (generated / dead / one-off / mock / fixture / …): the exclusion is
+ * default-deny, so a new reason cannot accidentally authorize.
+ */
+export const TRACKED_FACT_PREFIXES = ['call-site', 'contract', 'regression', 'excluded'] as const;
+
+/**
+ * Ledger-derived authority for one abstraction cluster. Field values mirror the tracked ledger
+ * candidate (`changeScope.files`, `callSites`, `tests`, `commands`, `sources`). The IO entry points
+ * must build it from a HEAD-tracked ledger; the pure layer treats it as input and never authenticates
+ * the provenance itself.
  */
 export interface DuplicateClusterAuthority {
   candidateId: string;
@@ -68,6 +93,11 @@ export interface DuplicateClusterAuthority {
   declaredTests: string[];
   /** Ledger-recorded commands; at least one observed command is the required regression signal. */
   regressionCommands: CommandEvidence[];
+  /**
+   * Canonical tracked facts (`call-site:` / `contract:` / `regression:` / `excluded:`) from the ledger
+   * candidate's `sources`. An empty list is the fail-closed default and forces `deferred`.
+   */
+  trackedFacts: string[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -117,13 +147,14 @@ export function validateDuplicateAuthority(authority: unknown): string[] {
   }
   if (authority.phase !== 'P4') reasons.push('authority.phase must be P4');
   if (authority.action !== 'abstract') reasons.push("authority.action must be 'abstract'");
-  if (!Array.isArray(authority.approvedScope) || authority.approvedScope.length === 0) {
-    reasons.push('authority.approvedScope must be a non-empty array');
+  if (!Array.isArray(authority.approvedScope)) {
+    reasons.push('authority.approvedScope must be an array');
   } else if (authority.approvedScope.some((entry) => !isRelativePath(entry))) {
     reasons.push('authority.approvedScope must contain repository-relative paths');
   }
   if (!isStringArray(authority.declaredCallSites)) reasons.push('authority.declaredCallSites must be a string array');
   if (!isStringArray(authority.declaredTests)) reasons.push('authority.declaredTests must be a string array');
+  if (!isStringArray(authority.trackedFacts)) reasons.push('authority.trackedFacts must be a string array');
   if (!Array.isArray(authority.regressionCommands)) {
     reasons.push('authority.regressionCommands must be an array');
   } else {
@@ -203,6 +234,43 @@ function parseCallSite(value: string): { file: string; symbol: string } | null {
   return { file, symbol };
 }
 
+interface ParsedTrackedFacts {
+  callSites: Set<string>;
+  contracts: Set<string>;
+  regressions: Set<string>;
+  exclusions: Set<string>;
+}
+
+/**
+ * Parse the canonical `sources` facts. Only the closed prefix vocabulary is recognised; an unknown or
+ * malformed fact is ignored (it can never add authority). Any `excluded:` reason excludes the id.
+ */
+export function parseTrackedFacts(facts: readonly string[]): ParsedTrackedFacts {
+  const callSites = new Set<string>();
+  const contracts = new Set<string>();
+  const regressions = new Set<string>();
+  const exclusions = new Set<string>();
+  for (const fact of facts) {
+    if (typeof fact !== 'string') continue;
+    const separator = fact.indexOf(':');
+    if (separator === -1) continue;
+    const prefix = fact.slice(0, separator);
+    const rest = fact.slice(separator + 1);
+    if (prefix === 'excluded') {
+      const secondSeparator = rest.indexOf(':');
+      if (secondSeparator === -1) continue;
+      const id = rest.slice(secondSeparator + 1);
+      if (parseCallSite(id) !== null) exclusions.add(id);
+      continue;
+    }
+    if (parseCallSite(rest) === null) continue;
+    if (prefix === 'call-site') callSites.add(rest);
+    else if (prefix === 'contract') contracts.add(rest);
+    else if (prefix === 'regression') regressions.add(rest);
+  }
+  return { callSites, contracts, regressions, exclusions };
+}
+
 /**
  * Test-only determination. Membership in the declared test set OR a conventional test-surface path
  * makes a path test-only; the check can only ADD exclusion, so a caller cannot relabel a test helper
@@ -212,17 +280,112 @@ export function isTestOnlyPath(file: string, declaredTests: ReadonlySet<string>)
   return declaredTests.has(file) || TEST_PATH_PATTERN.test(file);
 }
 
+/** Count of typed `key=value` entries whose key is in the view's closed vocabulary and value is non-empty. */
+function typedEntryCount(entries: readonly string[], allowed: readonly string[]): number {
+  let count = 0;
+  for (const entry of entries) {
+    if (typeof entry !== 'string') continue;
+    const separator = entry.indexOf('=');
+    if (separator <= 0) continue;
+    const key = entry.slice(0, separator).trim();
+    const value = entry.slice(separator + 1).trim();
+    if (value !== '' && (allowed as readonly string[]).includes(key)) count += 1;
+  }
+  return count;
+}
+
+/**
+ * Evidence-based structural support: the number of views that carry at least `STRUCTURAL_VIEW_ARITY`
+ * typed entries from the closed vocabulary. Free text (no `=`, unknown key, empty value) contributes
+ * nothing, so prose placed in `ast`/`dataFlow`/`callGraph` cannot satisfy the floor.
+ */
+export function structuralViewSupport(views: {
+  ast: readonly string[];
+  dataFlow: readonly string[];
+  callGraph: readonly string[];
+}): number {
+  const counts = [
+    typedEntryCount(views.ast, STRUCTURAL_VIEW_KEYS.ast),
+    typedEntryCount(views.dataFlow, STRUCTURAL_VIEW_KEYS.dataFlow),
+    typedEntryCount(views.callGraph, STRUCTURAL_VIEW_KEYS.callGraph),
+  ];
+  return counts.filter((count) => count >= STRUCTURAL_VIEW_ARITY).length;
+}
+
 /** A regression signal is a real observed command with an integer exit code, never a declaration. */
 function hasRegressionSignal(commands: readonly CommandEvidence[]): boolean {
   return commands.some((command) => command.observation === 'observed' && typeof command.exitCode === 'number');
 }
 
 /**
- * Cluster one duplicate pair. Structural views and the ≥2 stable production call-site floor decide
- * whether the pair becomes an `under-review` cluster; anything missing keeps it `deferred` (a
- * non-approval state). A test-only implementation makes the pair a `rejected` cluster, because a
- * test-only helper is never a production implementation. The returned cluster never claims `approved`:
- * approval is a human decision enforced by the apply gate.
+ * Derive the pure authority from a ledger-recorded candidate. The IO layer calls this only after it
+ * has verified the ledger is tracked at HEAD; this helper performs no IO and adds no authority.
+ */
+export function authorityFromLedgerCandidate(candidate: unknown): DuplicateClusterAuthority | null {
+  if (!isRecord(candidate)) return null;
+  if (
+    typeof candidate.candidateId !== 'string' ||
+    candidate.phase !== 'P4' ||
+    candidate.action !== 'abstract' ||
+    !CANDIDATE_ID_PATTERN.test(candidate.candidateId)
+  ) {
+    return null;
+  }
+  const changeScope = isRecord(candidate.changeScope) ? candidate.changeScope : {};
+  const approvedScope = Array.isArray(changeScope.files)
+    ? changeScope.files.filter((entry): entry is string => typeof entry === 'string')
+    : [];
+  const declaredCallSites = isStringArray(candidate.callSites) ? candidate.callSites : [];
+  const declaredTests = isStringArray(candidate.tests) ? candidate.tests : [];
+  const regressionCommands = Array.isArray(candidate.commands)
+    ? (candidate.commands as unknown[]).filter((entry): entry is CommandEvidence => isRecord(entry))
+    : [];
+  const trackedFacts = isStringArray(candidate.sources) ? candidate.sources : [];
+  return {
+    candidateId: candidate.candidateId,
+    phase: 'P4',
+    action: 'abstract',
+    approvedScope,
+    declaredCallSites,
+    declaredTests,
+    regressionCommands,
+    trackedFacts,
+  };
+}
+
+/**
+ * Restrict a tracked authority with caller-declared values. A caller may only NARROW
+ * (`approvedScope` / `declaredCallSites` intersection); a caller-declared call site that is not in the
+ * tracked authority is dropped, never added.
+ */
+export function restrictAuthority(
+  tracked: DuplicateClusterAuthority,
+  restriction: { approvedScope?: unknown; declaredCallSites?: unknown },
+): DuplicateClusterAuthority {
+  const scopeRestriction = isStringArray(restriction.approvedScope) ? new Set(restriction.approvedScope) : undefined;
+  const siteRestriction = isStringArray(restriction.declaredCallSites)
+    ? new Set(restriction.declaredCallSites)
+    : undefined;
+  return {
+    ...tracked,
+    approvedScope:
+      scopeRestriction === undefined
+        ? tracked.approvedScope
+        : tracked.approvedScope.filter((entry) => scopeRestriction.has(entry)),
+    declaredCallSites:
+      siteRestriction === undefined
+        ? tracked.declaredCallSites
+        : tracked.declaredCallSites.filter((entry) => siteRestriction.has(entry)),
+  };
+}
+
+/**
+ * Cluster one duplicate pair. The stable production call-site set is derived from tracked facts only;
+ * a call site needs a `call-site:` + `contract:` + `regression:` fact, must be inside the approved
+ * scope, must not be test-only, and must not be recorded as generated/dead/one-off/mock/fixture.
+ * Anything missing keeps the pair `deferred` (a non-approval state); a test-only implementation makes
+ * it `rejected`. The returned cluster never claims `approved`: approval is a human decision enforced by
+ * the apply gate.
  */
 export function clusterDuplicates(input: DuplicateInput, authority: DuplicateClusterAuthority): DuplicateCluster {
   const inputReasons = validateDuplicateInput(input);
@@ -243,8 +406,9 @@ export function clusterDuplicates(input: DuplicateInput, authority: DuplicateClu
   const declaredTests = new Set<string>([...input.tests, ...authority.declaredTests]);
   const testOnlyImplementations = input.implementations.filter((entry) => isTestOnlyPath(entry.file, declaredTests));
 
-  const structuralSupport = [input.ast, input.dataFlow, input.callGraph].filter((view) => view.length > 0).length;
+  const support = structuralViewSupport(input);
   const regressionSignal = hasRegressionSignal(authority.regressionCommands);
+  const facts = parseTrackedFacts(authority.trackedFacts);
 
   const approvedScope = new Set(authority.approvedScope);
   const seenSiteFiles = new Set<string>();
@@ -254,6 +418,8 @@ export function clusterDuplicates(input: DuplicateInput, authority: DuplicateClu
     if (parsed === null) continue;
     if (isTestOnlyPath(parsed.file, declaredTests)) continue;
     if (!approvedScope.has(parsed.file)) continue;
+    if (!facts.callSites.has(site) || !facts.contracts.has(site) || !facts.regressions.has(site)) continue;
+    if (facts.exclusions.has(site)) continue;
     if (seenSiteFiles.has(parsed.file)) continue;
     seenSiteFiles.add(parsed.file);
     stableProductionCallSites.push(site);
@@ -264,7 +430,7 @@ export function clusterDuplicates(input: DuplicateInput, authority: DuplicateClu
     status = 'rejected';
   } else if (
     stableProductionCallSites.length < DISTINCT_SITE_FILES ||
-    structuralSupport < STRUCTURAL_VIEW_FLOOR ||
+    support < STRUCTURAL_VIEW_FLOOR ||
     !regressionSignal
   ) {
     status = 'deferred';
@@ -416,10 +582,6 @@ function rollbackViolations(rollback: unknown): string[] {
   return [];
 }
 
-function structuralSupport(cluster: DuplicateCluster): number {
-  return [cluster.views.ast, cluster.views.dataFlow, cluster.views.callGraph].filter((view) => view.length > 0).length;
-}
-
 /**
  * Abstraction guard. Returns the blocking violations; an empty array is the ONLY authorization for a
  * later migration. Every dimension must be positively and item-wise proven; the caller-declared
@@ -452,8 +614,8 @@ export function proveAbstraction(cluster: DuplicateCluster, proposal: Abstractio
     violations.push('the abstraction cluster is deferred; authorization facts are incomplete');
   }
 
-  if (structuralSupport(cluster) < STRUCTURAL_VIEW_FLOOR) {
-    violations.push('accidental similarity (textual or test-only) is not structural equivalence evidence');
+  if (structuralViewSupport(cluster.views) < STRUCTURAL_VIEW_FLOOR) {
+    violations.push('accidental similarity (prose or test-only) is not structural equivalence evidence');
   }
 
   const declaredTests = new Set<string>(cluster.views.tests);

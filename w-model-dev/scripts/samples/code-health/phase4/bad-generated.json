@@ -1,8 +1,8 @@
 {
-  "description": "error/retry 语义差异（proposal 与 cluster proof 逐项不一致）→ 不授权抽象",
-  "expectedStatus": "under-review",
+  "description": "tracked record 标记 generated copy → 排除，deferred（非批准）",
+  "expectedStatus": "deferred",
   "expectAuthorized": false,
-  "candidateId": "CHG-P4-20260907-905",
+  "candidateId": "CHG-P4-20260907-909",
   "input": {
     "implementations": [
       {
@@ -22,7 +22,7 @@
     "tests": ["tests/cache-contract.test.ts"]
   },
   "authority": {
-    "candidateId": "CHG-P4-20260907-905",
+    "candidateId": "CHG-P4-20260907-909",
     "phase": "P4",
     "action": "abstract",
     "approvedScope": [
@@ -59,7 +59,8 @@
       "contract:src/service-a.ts:load",
       "contract:src/service-b.ts:load",
       "regression:src/service-a.ts:load",
-      "regression:src/service-b.ts:load"
+      "regression:src/service-b.ts:load",
+      "excluded:generated:src/service-b.ts:load"
     ]
   },
   "review": {
@@ -75,31 +76,14 @@
     "maintenanceBenefit": "Consolidates 2 duplicated cache implementations into 1 cohesive API, removing 1 behavior owner and 2 bug-fix surfaces.",
     "rollback": {
       "preChangeRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "command": "git apply -R .w-model/code-health/apply/CHG-P4-20260907-905.patch",
-      "patchPath": ".w-model/code-health/apply/CHG-P4-20260907-905.patch",
+      "command": "git apply -R .w-model/code-health/apply/CHG-P4-20260907-909.patch",
+      "patchPath": ".w-model/code-health/apply/CHG-P4-20260907-909.patch",
       "owner": "S-agent",
       "executable": true
     },
     "redaction": {
       "status": "clean",
       "reasons": []
-    }
-  },
-  "proposal": {
-    "targetApi": "src/cache-service.ts:readCache",
-    "migratedCallSites": ["src/service-a.ts:load", "src/service-b.ts:load"],
-    "inputsOutputs": "accepted-inputs=equivalent; produced-outputs=equivalent",
-    "errorsRetries": "error-types=different; error-status=equivalent; error-messages=equivalent; retry=equivalent; failure-timing=equivalent",
-    "lifecycleResources": "initialization=equivalent; finalization=equivalent; cleanup=equivalent; cancellation=equivalent; transactions=equivalent; resource-scope=equivalent",
-    "security": "authorization=equivalent; validation-order=equivalent; secrets=equivalent; privilege=equivalent",
-    "concurrencyPlatforms": "locks=equivalent; atomicity=equivalent; idempotency=equivalent; platform=equivalent",
-    "maintenanceBenefit": "Consolidates 2 duplicated cache implementations into 1 cohesive API, removing 1 behavior owner and 2 bug-fix surfaces.",
-    "rollback": {
-      "preChangeRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "command": "git apply -R .w-model/code-health/apply/CHG-P4-20260907-905.patch",
-      "patchPath": ".w-model/code-health/apply/CHG-P4-20260907-905.patch",
-      "owner": "S-agent",
-      "executable": true
     }
   }
 }

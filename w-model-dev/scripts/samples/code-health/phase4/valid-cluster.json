@@ -1,14 +1,24 @@
 {
-  "description": "两个独立稳定生产调用点 + 完整逐项等价证明 + 可量化维护收益 → 授权抽象（under-review，仅提案级）",
-  "expect": "approved",
+  "description": "两个独立稳定生产调用点（HEAD-tracked facts）+ 完整逐项等价证明 + 可量化维护收益 → under-review（仅提案级）",
+  "expectedStatus": "under-review",
+  "expectAuthorized": true,
+  "candidateId": "CHG-P4-20260907-901",
   "input": {
     "implementations": [
-      { "file": "src/cache-a.ts", "symbol": "readCacheA", "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-      { "file": "src/cache-b.ts", "symbol": "readCacheB", "sourceHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+      {
+        "file": "src/cache-a.ts",
+        "symbol": "readCacheA",
+        "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "file": "src/cache-b.ts",
+        "symbol": "readCacheB",
+        "sourceHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
     ],
-    "ast": ["normalized conditional shape: if (missing) load else return", "single return expression"],
-    "dataFlow": ["input key → cache lookup → value or loader"],
-    "callGraph": ["src/service-a.ts:load", "src/service-b.ts:load"],
+    "ast": ["node=conditional", "branch=missing-or-hit", "control-flow=single-return"],
+    "dataFlow": ["input=cache-key", "output=value-or-loader", "side-effect=none"],
+    "callGraph": ["caller=src/service-a.ts:load", "callee=src/cache-a.ts:readCacheA", "lifecycle=shared-cache"],
     "tests": ["tests/cache-contract.test.ts"]
   },
   "authority": {
@@ -28,16 +38,28 @@
       {
         "command": "node --test tests/cache-contract.test.ts",
         "cwd": ".",
-        "environment": { "NODE_ENV": "test" },
+        "environment": {
+          "NODE_ENV": "test"
+        },
         "platform": "linux",
-        "toolVersions": { "node": "20.0.0" },
+        "toolVersions": {
+          "node": "20.0.0"
+        },
         "startedAt": "2026-09-07T00:01:00.000Z",
         "endedAt": "2026-09-07T00:01:01.000Z",
         "exitCode": 0,
         "observation": "observed",
-        "rawOutputPath": ".w-model/code-health/raw/node-test.log",
+        "rawOutputPath": "w-model/code-health/raw/node-test.log",
         "rawOutputSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       }
+    ],
+    "trackedFacts": [
+      "call-site:src/service-a.ts:load",
+      "call-site:src/service-b.ts:load",
+      "contract:src/service-a.ts:load",
+      "contract:src/service-b.ts:load",
+      "regression:src/service-a.ts:load",
+      "regression:src/service-b.ts:load"
     ]
   },
   "review": {
@@ -58,7 +80,10 @@
       "owner": "S-agent",
       "executable": true
     },
-    "redaction": { "status": "clean", "reasons": [] }
+    "redaction": {
+      "status": "clean",
+      "reasons": []
+    }
   },
   "proposal": {
     "targetApi": "src/cache-service.ts:readCache",

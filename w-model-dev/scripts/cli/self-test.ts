@@ -2691,7 +2691,10 @@ const CODE_HEALTH_TEST_CASES: CodeHealthTestInventoryCase[] = [
 
 interface CodeHealthDuplicateFixture {
   description: string;
-  expect: 'approved' | 'deferred' | 'blocked';
+  /** The status the pure cluster is expected to reach (never "approved": approval is a human gate). */
+  expectedStatus: DuplicateCluster['status'];
+  expectAuthorized: boolean;
+  candidateId: string;
   input: DuplicateInput;
   authority: DuplicateClusterAuthority;
   review?: {
@@ -2768,6 +2771,34 @@ const CODE_HEALTH_PHASE4_CASES: CodeHealthDuplicateCase[] = [
     expectedViolations: [/maintenance/i],
     expectAuthorized: false,
     description: '维护收益仅“少几行/更短 diff” → 不构成收益，不授权',
+  },
+  {
+    file: 'bad-generated.json',
+    expectedStatus: 'deferred',
+    expectedViolations: [],
+    expectAuthorized: false,
+    description: 'tracked record 标记 generated copy → 排除，绝不计为稳定生产调用点',
+  },
+  {
+    file: 'bad-oneoff.json',
+    expectedStatus: 'deferred',
+    expectedViolations: [],
+    expectAuthorized: false,
+    description: 'tracked record 标记 one-off experiment → 排除，绝不授权',
+  },
+  {
+    file: 'bad-deadcopy.json',
+    expectedStatus: 'deferred',
+    expectedViolations: [],
+    expectAuthorized: false,
+    description: 'tracked record 标记 dead copy → 排除，绝不授权',
+  },
+  {
+    file: 'bad-prose-views.json',
+    expectedStatus: 'deferred',
+    expectedViolations: [],
+    expectAuthorized: false,
+    description: '三个结构视图均为自由文本 → typed 结构证据不足，deferred',
   },
 ];
 
@@ -4241,10 +4272,12 @@ async function runCodeHealthTestInventoryCases(samplesDir: string): Promise<Case
 }
 
 /**
- * Phase 4 duplicate cluster / abstraction guard: the cluster is always recomputed from input +
- * authority (structural fields never come from the caller), the stable call-site floor and the
- * item-wise semantic proof decide `under-review` vs `deferred`/`rejected`, and un-authorizing inputs
- * (test-only, platform/lifecycle differences, a shorter diff) must never yield an authorization.
+ * Phase 4 duplicate cluster / abstraction guard: the cluster is recomputed from input + tracked-fact
+ * authority, the stable call-site floor (positive `call-site:`/`contract:`/`regression:` facts, no
+ * generated/dead/one-off exclusion) and the item-wise semantic proof decide `under-review` vs
+ * `deferred`/`rejected`, and un-authorizing inputs (test-only, prose-only views, platform/lifecycle
+ * differences, a shorter diff) must never yield an authorization. The IO entry points prove HEAD-tracked
+ * provenance; this pure runner exercises the pure semantics only.
  */
 async function runCodeHealthPhase4Cases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
@@ -4256,6 +4289,9 @@ async function runCodeHealthPhase4Cases(samplesDir: string): Promise<CaseResult[
     let violations: string[] = [];
     let status: DuplicateCluster['status'] | null = null;
     let authorized = false;
+    if (fixture.expectedStatus !== c.expectedStatus) {
+      details.push(`  - fixture.expectedStatus=${fixture.expectedStatus} 与用例声明 ${c.expectedStatus} 不一致`);
+    }
     try {
       const cluster = clusterDuplicates(fixture.input, fixture.authority);
       status = cluster.status;

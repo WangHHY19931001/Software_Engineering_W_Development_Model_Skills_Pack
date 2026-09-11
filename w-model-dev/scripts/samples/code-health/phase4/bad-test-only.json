@@ -1,37 +1,66 @@
 {
-  "description": "test-only helper 作为实现/调用点 → rejected；test-only 绝不授权抽象",
-  "expect": "blocked",
+  "description": "test-only helper 作为实现 → rejected；test-only 绝不授权抽象",
+  "expectedStatus": "rejected",
+  "expectAuthorized": false,
+  "candidateId": "CHG-P4-20260907-903",
   "input": {
     "implementations": [
-      { "file": "src/cache-a.ts", "symbol": "readCacheA", "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-      { "file": "tests/helper.ts", "symbol": "readCacheHelper", "sourceHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" }
+      {
+        "file": "src/cache-a.ts",
+        "symbol": "readCacheA",
+        "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "file": "tests/helper.ts",
+        "symbol": "readCacheHelper",
+        "sourceHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      }
     ],
-    "ast": ["normalized conditional shape"],
-    "dataFlow": ["input key → cache lookup"],
-    "callGraph": ["src/service-a.ts:load", "src/service-b.ts:load"],
+    "ast": ["node=conditional", "branch=missing-or-hit", "control-flow=single-return"],
+    "dataFlow": ["input=cache-key", "output=value-or-loader", "side-effect=none"],
+    "callGraph": ["caller=src/service-a.ts:load", "callee=src/cache-a.ts:readCacheA", "lifecycle=shared-cache"],
     "tests": ["tests/cache-contract.test.ts", "tests/helper.ts"]
   },
   "authority": {
     "candidateId": "CHG-P4-20260907-903",
     "phase": "P4",
     "action": "abstract",
-    "approvedScope": ["src/cache-a.ts", "tests/helper.ts", "src/service-a.ts", "src/service-b.ts", "src/cache-service.ts"],
+    "approvedScope": [
+      "src/cache-a.ts",
+      "src/cache-b.ts",
+      "src/service-a.ts",
+      "src/service-b.ts",
+      "src/cache-service.ts",
+      "tests/helper.ts"
+    ],
     "declaredCallSites": ["src/service-a.ts:load", "src/service-b.ts:load"],
     "declaredTests": ["tests/cache-contract.test.ts", "tests/helper.ts"],
     "regressionCommands": [
       {
         "command": "node --test tests/cache-contract.test.ts",
         "cwd": ".",
-        "environment": { "NODE_ENV": "test" },
+        "environment": {
+          "NODE_ENV": "test"
+        },
         "platform": "linux",
-        "toolVersions": { "node": "20.0.0" },
+        "toolVersions": {
+          "node": "20.0.0"
+        },
         "startedAt": "2026-09-07T00:01:00.000Z",
         "endedAt": "2026-09-07T00:01:01.000Z",
         "exitCode": 0,
         "observation": "observed",
-        "rawOutputPath": ".w-model/code-health/raw/node-test.log",
+        "rawOutputPath": "w-model/code-health/raw/node-test.log",
         "rawOutputSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       }
+    ],
+    "trackedFacts": [
+      "call-site:src/service-a.ts:load",
+      "call-site:src/service-b.ts:load",
+      "contract:src/service-a.ts:load",
+      "contract:src/service-b.ts:load",
+      "regression:src/service-a.ts:load",
+      "regression:src/service-b.ts:load"
     ]
   },
   "review": {
@@ -51,6 +80,10 @@
       "patchPath": ".w-model/code-health/apply/CHG-P4-20260907-903.patch",
       "owner": "S-agent",
       "executable": true
+    },
+    "redaction": {
+      "status": "clean",
+      "reasons": []
     }
   },
   "proposal": {

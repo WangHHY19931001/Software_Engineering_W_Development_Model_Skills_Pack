@@ -1,19 +1,11 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- All filesystem paths are generated beneath test-owned temporary roots. */
 /**
- * Task 6 acceptance: Phase 4 duplicate clustering + abstraction guard.
+ * Task 6 (fix round 1) acceptance: Phase 4 duplicate clustering + abstraction guard.
  *
- * Coverage:
- *   - fewer than two stable production call sites → deferred, and `proveAbstraction` reports
- *     `two stable production call sites`;
- *   - the equivalence proof is item-wise and default-deny: a security/lifecycle/error/platform
- *     difference is a violation, a test-only call site is `test-only`, and a quantified maintenance
- *     benefit is required (a shorter diff is not a benefit);
- *   - textual similarity / line count / mock similarity are structurally unable to authorize;
- *   - the pure module is re-exported from `code-health-ledger-logic.ts` (single source);
- *   - the CLI is read-only and fail-closed (exit 2 on bad input, exit 1 on a blocked cluster,
- *     exit 0 on deferred/under-review);
- *   - `code-health-apply.ts` refuses an `abstract` candidate without the Phase 4 proof and only
- *     produces its patch inside an isolated temporary git repository.
+ * The equivalence default-deny layer is exercised item-wise; the F-1 fix additionally proves that
+ * authorization is anchored to a HEAD-tracked ledger: a caller-declared matrix/authority never
+ * authorizes, and the apply gate recomputes the cluster from the tracked authority instead of trusting
+ * a hand-crafted `--cluster`.
  */
 
 import { createRequire } from 'node:module';
@@ -27,7 +19,10 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   clusterDuplicates,
   isQuantifiedMaintenanceBenefit,
+  parseTrackedFacts,
   proveAbstraction,
+  restrictAuthority,
+  structuralViewSupport,
   validateDuplicateAuthority,
   validateDuplicateCluster,
   validateDuplicateInput,
@@ -144,6 +139,33 @@ const MAINTENANCE = 'Consolidates 2 duplicated implementations into 1 cohesive A
 
 const SCOPE = ['src/cache-a.ts', 'src/cache-b.ts', 'src/service-a.ts', 'src/service-b.ts', 'src/cache-service.ts'];
 const SITES = ['src/service-a.ts:load', 'src/service-b.ts:load'];
+const TEST_FILES = ['tests/cache-contract.test.ts'];
+
+const AST = ['node=conditional', 'branch=missing-or-hit', 'control-flow=single-return'];
+const DATA_FLOW = ['input=cache-key', 'output=value-or-loader', 'side-effect=none'];
+const CALL_GRAPH = ['caller=src/service-a.ts:load', 'callee=src/cache-a.ts:readCacheA', 'lifecycle=shared-cache'];
+
+function trackedFactsFor(sites: readonly string[]): string[] {
+  const facts: string[] = [];
+  for (const site of sites) facts.push(`call-site:${site}`, `contract:${site}`, `regression:${site}`);
+  return facts;
+}
+
+function regressionCommand() {
+  return {
+    command: 'node --test tests/cache-contract.test.ts',
+    cwd: '.',
+    environment: { NODE_ENV: 'test' },
+    platform: 'linux',
+    toolVersions: { node: '20.0.0' },
+    startedAt: '2026-09-07T00:01:00.000Z',
+    endedAt: '2026-09-07T00:01:01.000Z',
+    exitCode: 0,
+    observation: 'observed' as const,
+    rawOutputPath: '.w-model/code-health/raw/node-test.log',
+    rawOutputSha256: 'd'.repeat(64),
+  };
+}
 
 function authoritativeInput(): DuplicateInput {
   return {
@@ -151,10 +173,10 @@ function authoritativeInput(): DuplicateInput {
       { file: 'src/cache-a.ts', symbol: 'readCacheA', sourceHash: 'a'.repeat(64) },
       { file: 'src/cache-b.ts', symbol: 'readCacheB', sourceHash: 'b'.repeat(64) },
     ],
-    ast: ['normalized conditional shape'],
-    dataFlow: ['input key → cache lookup'],
-    callGraph: [...SITES],
-    tests: ['tests/cache-contract.test.ts'],
+    ast: [...AST],
+    dataFlow: [...DATA_FLOW],
+    callGraph: [...CALL_GRAPH],
+    tests: [...TEST_FILES],
   };
 }
 
@@ -165,22 +187,9 @@ function authority(overrides: Partial<DuplicateClusterAuthority> = {}): Duplicat
     action: 'abstract',
     approvedScope: [...SCOPE],
     declaredCallSites: [...SITES],
-    declaredTests: ['tests/cache-contract.test.ts'],
-    regressionCommands: [
-      {
-        command: 'node --test tests/cache-contract.test.ts',
-        cwd: '.',
-        environment: { NODE_ENV: 'test' },
-        platform: 'linux',
-        toolVersions: { node: '20.0.0' },
-        startedAt: '2026-09-07T00:01:00.000Z',
-        endedAt: '2026-09-07T00:01:01.000Z',
-        exitCode: 0,
-        observation: 'observed',
-        rawOutputPath: '.w-model/code-health/raw/node-test.log',
-        rawOutputSha256: 'd'.repeat(64),
-      },
-    ],
+    declaredTests: [...TEST_FILES],
+    regressionCommands: [regressionCommand()],
+    trackedFacts: trackedFactsFor(SITES),
     ...overrides,
   };
 }
@@ -215,11 +224,85 @@ function equivalentCluster(overrides: Partial<DuplicateCluster> = {}): Duplicate
   return { ...base, equivalenceProof: { ...PROOF }, maintenanceBenefit: MAINTENANCE, ...overrides };
 }
 
-describe('Phase 4 cluster semantics (R3/R4)', () => {
-  it('至少两种结构视图支持但少于两个稳定生产调用点 → deferred，且 guard 报 two stable production call sites', () => {
+// -------------------- tracked-ledger helpers --------------------
+
+interface LedgerCandidateShape {
+  candidateId: string;
+  phase: string;
+  action: string;
+  changeScope: { files: string[]; symbols: string[]; scopeHash: string };
+  callSites: string[];
+  tests: string[];
+  commands: unknown[];
+  sources: string[];
+}
+
+function ledgerCandidate(overrides: Partial<LedgerCandidateShape> = {}): LedgerCandidateShape {
+  return {
+    candidateId: 'CHG-P4-20260907-901',
+    phase: 'P4',
+    action: 'abstract',
+    changeScope: {
+      files: [...SCOPE],
+      symbols: ['readCacheA', 'readCacheB', 'readCache'],
+      scopeHash: 'sha256:' + 'f'.repeat(64),
+    },
+    callSites: [...SITES],
+    tests: [],
+    commands: [regressionCommand()],
+    sources: trackedFactsFor(SITES),
+    ...overrides,
+  };
+}
+
+/** A temp git repo with real production files and a HEAD-tracked ledger.json (working == HEAD blob). */
+async function createTrackedRepo(
+  candidateOverrides: Partial<LedgerCandidateShape> = {},
+  extraFiles: Record<string, string> = {},
+): Promise<string> {
+  const root = await tempRoot('code-health-duplicates-repo-');
+  await git(root, ['init', '--quiet']);
+  await fs.mkdir(path.join(root, 'src'), { recursive: true });
+  await fs.writeFile(path.join(root, 'src', 'cache-a.ts'), 'export const readCacheA = 1;\n');
+  await fs.writeFile(path.join(root, 'src', 'cache-b.ts'), 'export const readCacheB = 1;\n');
+  await fs.writeFile(path.join(root, 'src', 'service-a.ts'), 'export const load = 1;\n');
+  await fs.writeFile(path.join(root, 'src', 'service-b.ts'), 'export const load = 1;\n');
+  await fs.writeFile(path.join(root, 'src', 'cache-service.ts'), 'export const readCache = 1;\n');
+  // The apply gate writes its controlled patch beneath .w-model/; keep it out of the real worktree status.
+  await fs.writeFile(path.join(root, '.gitignore'), '.w-model/\n');
+  for (const [relative, content] of Object.entries(extraFiles)) {
+    const absolute = path.join(root, ...relative.split('/'));
+    await fs.mkdir(path.dirname(absolute), { recursive: true });
+    await fs.writeFile(absolute, content);
+  }
+  await fs.writeFile(
+    path.join(root, 'ledger.json'),
+    `${JSON.stringify({ schemaVersion: '1.0', candidates: [ledgerCandidate(candidateOverrides)] }, null, 2)}\n`,
+  );
+  await git(root, ['add', '--all']);
+  await git(root, ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'initial']);
+  return root;
+}
+
+function matrixDocument(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    candidateId: 'CHG-P4-20260907-901',
+    input: authoritativeInput(),
+    restrictions: {},
+    review: { equivalenceProof: PROOF, maintenanceBenefit: MAINTENANCE, rollback: rollback('CHG-P4-20260907-901') },
+    proposal: equivalentProposal(),
+    ...overrides,
+  };
+}
+
+describe('Phase 4 pure cluster semantics (R3/R4)', () => {
+  it('at least two typed views but fewer than two tracked stable sites → deferred; guard reports two stable production call sites', () => {
     const cluster = clusterDuplicates(
       authoritativeInput(),
-      authority({ declaredCallSites: ['src/service-a.ts:load'] }),
+      authority({
+        declaredCallSites: ['src/service-a.ts:load'],
+        trackedFacts: trackedFactsFor(['src/service-a.ts:load']),
+      }),
     );
     expect(cluster.status).toBe('deferred');
     expect(cluster.stableProductionCallSites).toEqual(['src/service-a.ts:load']);
@@ -231,7 +314,7 @@ describe('Phase 4 cluster semantics (R3/R4)', () => {
     ).toBe(true);
   });
 
-  it('测试专用 helper 作为实现 → rejected（test-only 绝不授权）', () => {
+  it('test-only helper as implementation → rejected (test-only never authorizes)', () => {
     const cluster = clusterDuplicates(
       {
         ...authoritativeInput(),
@@ -240,7 +323,7 @@ describe('Phase 4 cluster semantics (R3/R4)', () => {
           { file: 'tests/helper.ts', symbol: 'readCacheHelper', sourceHash: 'e'.repeat(64) },
         ],
       },
-      authority({ declaredTests: ['tests/cache-contract.test.ts', 'tests/helper.ts'] }),
+      authority({ declaredTests: [...TEST_FILES, 'tests/helper.ts'] }),
     );
     expect(cluster.status).toBe('rejected');
     expect(
@@ -251,11 +334,15 @@ describe('Phase 4 cluster semantics (R3/R4)', () => {
     ).toEqual(expect.arrayContaining([expect.stringMatching(/test-only/i)]));
   });
 
-  it('少于两种结构视图（仅文本相似）→ deferred，且 guard 报 accidental', () => {
-    const cluster = clusterDuplicates(
-      { ...authoritativeInput(), ast: [], dataFlow: [], callGraph: [], tests: ['textual similarity is high'] },
-      authority(),
-    );
+  it('F-3: prose-only views cannot satisfy the structural floor', () => {
+    const prose: DuplicateInput = {
+      ...authoritativeInput(),
+      ast: ['the two implementations look textually similar'],
+      dataFlow: ['both read a cache'],
+      callGraph: ['they seem to share a lifecycle'],
+    };
+    expect(structuralViewSupport(prose)).toBe(0);
+    const cluster = clusterDuplicates(prose, authority());
     expect(cluster.status).toBe('deferred');
     expect(
       proveAbstraction(
@@ -265,55 +352,68 @@ describe('Phase 4 cluster semantics (R3/R4)', () => {
     ).toEqual(expect.arrayContaining([expect.stringMatching(/accidental/i)]));
   });
 
-  it('稳定调用点必须是 approved scope 内、非 test-only、且存在真实回归信号', () => {
-    const outsideScope = clusterDuplicates(
+  it('F-2: generated / one-off / dead copies recorded in tracked facts are excluded', () => {
+    for (const reason of ['generated', 'one-off-experiment', 'dead-copy', 'mock', 'fixture']) {
+      const cluster = clusterDuplicates(
+        authoritativeInput(),
+        authority({ trackedFacts: [...trackedFactsFor(SITES), `excluded:${reason}:src/service-b.ts:load`] }),
+      );
+      expect({ reason, status: cluster.status, sites: cluster.stableProductionCallSites }).toEqual({
+        reason,
+        status: 'deferred',
+        sites: ['src/service-a.ts:load'],
+      });
+    }
+    const facts = parseTrackedFacts([...trackedFactsFor(SITES), 'excluded:generated:src/service-b.ts:load']);
+    expect([...facts.exclusions]).toEqual(['src/service-b.ts:load']);
+    expect([...facts.callSites].length).toBe(2);
+  });
+
+  it('a declared call site without tracked call-site/contract/regression facts is not stable (default-deny)', () => {
+    expect(clusterDuplicates(authoritativeInput(), authority({ trackedFacts: [] })).stableProductionCallSites).toEqual(
+      [],
+    );
+    expect(
+      clusterDuplicates(
+        authoritativeInput(),
+        authority({ trackedFacts: ['call-site:src/service-a.ts:load', 'regression:src/service-a.ts:load'] }),
+      ).stableProductionCallSites,
+    ).toEqual([]);
+  });
+
+  it('stable sites must be inside the approved scope and covered by an observed regression command', () => {
+    const outside = clusterDuplicates(
       authoritativeInput(),
       authority({ approvedScope: ['src/cache-a.ts', 'src/cache-b.ts'] }),
     );
-    expect(outsideScope.stableProductionCallSites).toEqual([]);
-    expect(outsideScope.status).toBe('deferred');
-
-    const testSite = clusterDuplicates(
-      authoritativeInput(),
-      authority({
-        declaredCallSites: ['src/service-a.ts:load', 'tests/helper.ts:run'],
-        approvedScope: [...SCOPE, 'tests/helper.ts'],
-      }),
-    );
-    expect(testSite.stableProductionCallSites).toEqual(['src/service-a.ts:load']);
-
+    expect(outside.stableProductionCallSites).toEqual([]);
     const noRegression = clusterDuplicates(
       authoritativeInput(),
-      authority({
-        regressionCommands: [
-          {
-            ...authority().regressionCommands[0]!,
-            observation: 'unavailable',
-            exitCode: null,
-          },
-        ],
-      }),
+      authority({ regressionCommands: [{ ...regressionCommand(), observation: 'unavailable', exitCode: null }] }),
     );
     expect(noRegression.status).toBe('deferred');
   });
 
-  it('重复/相同文件的调用点不构成两个独立稳定点', () => {
-    const cluster = clusterDuplicates(
-      authoritativeInput(),
-      authority({ declaredCallSites: ['src/service-a.ts:load', 'src/service-a.ts:other', 'src/service-b.ts:load'] }),
-    );
-    expect(cluster.stableProductionCallSites).toHaveLength(2);
+  it('restrictAuthority may only narrow the tracked authority', () => {
+    const tracked = authority();
+    const narrowed = restrictAuthority(tracked, {
+      approvedScope: ['src/cache-a.ts', 'src/cache-b.ts', 'src/service-a.ts'],
+      declaredCallSites: ['src/service-b.ts:load', 'src/forged.ts:evil'],
+    });
+    expect(narrowed.approvedScope).toEqual(['src/cache-a.ts', 'src/cache-b.ts', 'src/service-a.ts']);
+    expect(narrowed.declaredCallSites).toEqual(['src/service-b.ts:load']);
+    expect(narrowed.trackedFacts).toEqual(tracked.trackedFacts);
   });
 
-  it('cluster 结果确定可重算，且不复制第二份实现（ledger 单一来源）', () => {
-    const first = clusterDuplicates(authoritativeInput(), authority());
-    const second = clusterDuplicates(authoritativeInput(), authority());
-    expect(second).toEqual(first);
+  it('clustering is deterministic and the ledger re-export is the same single implementation', () => {
+    expect(clusterDuplicates(authoritativeInput(), authority())).toEqual(
+      clusterDuplicates(authoritativeInput(), authority()),
+    );
     expect(ledgerClusterDuplicates).toBe(clusterDuplicates);
     expect(ledgerProveAbstraction).toBe(proveAbstraction);
   });
 
-  it('结构性非法输入 / authority fail-closed', () => {
+  it('structurally invalid input / authority fail closed', () => {
     expect(validateDuplicateInput({})).not.toEqual([]);
     expect(validateDuplicateAuthority({})).not.toEqual([]);
     expect(() => clusterDuplicates({} as unknown as DuplicateInput, authority())).toThrow(/requires/i);
@@ -323,12 +423,12 @@ describe('Phase 4 cluster semantics (R3/R4)', () => {
   });
 });
 
-describe('Phase 4 abstraction guard: eleven item-wise dimensions (R4/R9)', () => {
-  it('完整等价 proof + 可量化维护收益 → 无违规（唯一授权）', () => {
+describe('Phase 4 abstraction guard: item-wise dimensions (R4/R9)', () => {
+  it('complete equivalence proof + quantified maintenance benefit → no violation (the only authorization)', () => {
     expect(proveAbstraction(equivalentCluster(), equivalentProposal())).toEqual([]);
   });
 
-  it('security 差异（different validation order）→ 含 security 违规', () => {
+  it('security difference (different validation order) → security violation', () => {
     const violations = proveAbstraction(
       equivalentCluster(),
       equivalentProposal({ security: 'different validation order' }),
@@ -336,7 +436,7 @@ describe('Phase 4 abstraction guard: eleven item-wise dimensions (R4/R9)', () =>
     expect(violations.some((entry) => entry.includes('security'))).toBe(true);
   });
 
-  it('test-only 调用点（合同形状：路径放进 views.tests 与 stableProductionCallSites）→ 含 test-only', () => {
+  it('test-only call site (contract shape: path in views.tests and stableProductionCallSites) → test-only', () => {
     const violations = proveAbstraction(
       equivalentCluster({
         views: { ...equivalentCluster().views, tests: ['tests/helper.ts'] },
@@ -347,7 +447,7 @@ describe('Phase 4 abstraction guard: eleven item-wise dimensions (R4/R9)', () =>
     expect(violations).toEqual(expect.arrayContaining([expect.stringMatching(/test-only/i)]));
   });
 
-  it('文本相似 / 短 diff / 少行数 / mock-fixture 相似不能授权', () => {
+  it('textual similarity / short diff / mock similarity cannot authorize', () => {
     const textual = equivalentCluster({
       equivalenceProof: { ...PROOF, security: 'the two implementations look textually similar' },
     });
@@ -374,14 +474,13 @@ describe('Phase 4 abstraction guard: eleven item-wise dimensions (R4/R9)', () =>
     expect(isQuantifiedMaintenanceBenefit(MAINTENANCE)).toBe(true);
   });
 
-  it('platform / lifecycle 差异 → 不授权', () => {
+  it('platform / lifecycle differences → not authorized', () => {
     const lifecycle = equivalentCluster({
       equivalenceProof: { ...PROOF, lifecycleResources: 'cleanup=not equivalent' },
     });
     expect(proveAbstraction(lifecycle, equivalentProposal({ lifecycleResources: 'cleanup=not equivalent' }))).toEqual(
       expect.arrayContaining([expect.stringMatching(/lifecycle/i)]),
     );
-
     const platform = equivalentCluster({
       equivalenceProof: { ...PROOF, concurrencyPlatforms: 'locks=equivalent; platform=different' },
     });
@@ -390,19 +489,18 @@ describe('Phase 4 abstraction guard: eleven item-wise dimensions (R4/R9)', () =>
     ).toEqual(expect.arrayContaining([expect.stringMatching(/platform/i)]));
   });
 
-  it('allDimensionsProven 单独声明不被信任；缺维度/负向声明均拒绝', () => {
-    const proof = { ...PROOF, allDimensionsProven: true as const, security: '' };
+  it('allDimensionsProven alone is not trusted; missing/negative dimensions are refused', () => {
+    const proof = { ...PROOF, security: '' };
     expect(proveAbstraction(equivalentCluster({ equivalenceProof: proof }), equivalentProposal())).toEqual(
       expect.arrayContaining([expect.stringMatching(/security/i)]),
     );
     const missing = equivalentCluster({
       equivalenceProof: undefined as unknown as DuplicateCluster['equivalenceProof'],
     });
-    const violations = proveAbstraction(missing, equivalentProposal());
-    expect(violations.length).toBeGreaterThan(0);
+    expect(proveAbstraction(missing, equivalentProposal()).length).toBeGreaterThan(0);
   });
 
-  it('migratedCallSites 必须恰为最小稳定点集合；rollback 必须可执行', () => {
+  it('migratedCallSites must equal the minimal stable set; rollback must be executable', () => {
     expect(
       proveAbstraction(equivalentCluster(), equivalentProposal({ migratedCallSites: ['src/service-a.ts:load'] })),
     ).toEqual(expect.arrayContaining([expect.stringMatching(/migrated/i)]));
@@ -411,110 +509,179 @@ describe('Phase 4 abstraction guard: eleven item-wise dimensions (R4/R9)', () =>
     ).toEqual(expect.arrayContaining([expect.stringMatching(/rollback/i)]));
   });
 
-  it('结构化非法 cluster/proposal fail-closed（STRUCTURE_INVALID）', () => {
+  it('structurally invalid cluster/proposal fail closed (STRUCTURE_INVALID)', () => {
     expect(() => proveAbstraction({} as unknown as DuplicateCluster, equivalentProposal())).toThrow(/requires/i);
     expect(() => proveAbstraction(equivalentCluster(), {} as unknown as AbstractionProposal)).toThrow(/requires/i);
     expect(validateDuplicateCluster({})).not.toEqual([]);
   });
 });
 
-describe('Phase 4 duplicates CLI (R7)', () => {
-  it('未知 flag / 缺 --matrix → exit 2 + ERROR_JSON', () => {
+describe('F-1: duplicates CLI authority is anchored to a HEAD-tracked ledger', () => {
+  it('forged matrix with nonexistent files and no tracked ledger → exit 0 deferred, authorized:false', async () => {
+    const workDir = await tempRoot('code-health-duplicates-forged-');
+    const matrixPath = await writeJson(
+      workDir,
+      'matrix.json',
+      matrixDocument({
+        input: {
+          ...authoritativeInput(),
+          implementations: [
+            { file: 'src/nonexistent-a.ts', symbol: 'a', sourceHash: 'a'.repeat(64) },
+            { file: 'src/nonexistent-b.ts', symbol: 'b', sourceHash: 'b'.repeat(64) },
+          ],
+        },
+      }),
+    );
+    const r = runCli('code-health-duplicates.ts', ['--matrix', matrixPath, '--validate']);
+    expect(r.code).toBe(0);
+    const summary = jsonLine<{ status: string; authorized: boolean; authoritySource: string }>(
+      r.stdout,
+      'DUPLICATES_JSON',
+    );
+    expect(summary?.status).toBe('deferred');
+    expect(summary?.authorized).toBe(false);
+    expect(summary?.authoritySource).toBe('unavailable');
+  });
+
+  it('tracked ledger + complete matrix → exit 0 authorized:true; without --ledger the same matrix is deferred', async () => {
+    const root = await createTrackedRepo();
+    const workDir = await tempRoot('code-health-duplicates-inputs-');
+    const matrixPath = await writeJson(workDir, 'matrix.json', matrixDocument());
+
+    const untracked = runCli('code-health-duplicates.ts', ['--matrix', matrixPath, '--validate']);
+    expect(untracked.code).toBe(0);
+    expect(jsonLine<{ authorized: boolean }>(untracked.stdout, 'DUPLICATES_JSON')?.authorized).toBe(false);
+
+    const tracked = runCli('code-health-duplicates.ts', [
+      '--matrix',
+      matrixPath,
+      '--ledger',
+      path.join(root, 'ledger.json'),
+      '--root',
+      root,
+      '--validate',
+    ]);
+    expect(tracked.code).toBe(0);
+    const summary = jsonLine<{
+      status: string;
+      authorized: boolean;
+      authoritySource: string;
+      stableProductionCallSites: string[];
+    }>(tracked.stdout, 'DUPLICATES_JSON');
+    expect(summary).toMatchObject({
+      status: 'under-review',
+      authorized: true,
+      authoritySource: 'tracked-ledger',
+      stableProductionCallSites: [...SITES],
+    });
+  }, 120_000);
+
+  it('tracked ledger that references a nonexistent production path → exit 1', async () => {
+    const ghostSite = 'src/ghost.ts:load';
+    const root = await createTrackedRepo(
+      {
+        changeScope: {
+          files: [...SCOPE, 'src/ghost.ts'],
+          symbols: ['readCacheA', 'readCacheB', 'readCache'],
+          scopeHash: 'sha256:' + 'f'.repeat(64),
+        },
+        callSites: [...SITES, ghostSite],
+        sources: trackedFactsFor([...SITES, ghostSite]),
+      },
+      { 'src/ghost.ts': 'export const load = 1;\n' },
+    );
+    await fs.rm(path.join(root, 'src', 'ghost.ts'));
+    const workDir = await tempRoot('code-health-duplicates-inputs-');
+    const matrixPath = await writeJson(workDir, 'matrix.json', matrixDocument());
+    const r = runCli('code-health-duplicates.ts', [
+      '--matrix',
+      matrixPath,
+      '--ledger',
+      path.join(root, 'ledger.json'),
+      '--root',
+      root,
+      '--validate',
+    ]);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toMatch(/does not exist beneath --root/i);
+    expect(jsonLine<{ authorized: boolean }>(r.stdout, 'DUPLICATES_JSON')?.authorized).toBe(false);
+  }, 120_000);
+
+  it('unknown flag → exit 2 ERROR_JSON; missing --matrix → exit 2', () => {
     const unknown = runCli('code-health-duplicates.ts', ['--bogus']);
     expect(unknown.code).toBe(2);
     expect(unknown.stdout).toContain('ERROR_JSON');
-    const missing = runCli('code-health-duplicates.ts', []);
-    expect(missing.code).toBe(2);
-    expect(missing.stdout).toContain('ERROR_JSON');
-  }, 120_000);
+    expect(runCli('code-health-duplicates.ts', []).code).toBe(2);
+  });
 
-  it('每个 fixture class 的 exit code / status 与 self-test 声明一致', () => {
-    const expectation: Array<[string, number, string, boolean]> = [
-      ['valid-cluster.json', 0, 'under-review', true],
-      ['deferred-one-site.json', 0, 'deferred', false],
-      ['bad-test-only.json', 1, 'rejected', false],
-      ['bad-platform-difference.json', 1, 'under-review', false],
-      ['bad-error-mismatch.json', 1, 'under-review', false],
-      ['bad-security-mismatch.json', 1, 'under-review', false],
-      ['bad-lifecycle-mismatch.json', 1, 'under-review', false],
-      ['bad-maintenance-only.json', 1, 'under-review', false],
-    ];
-    for (const [file, exitCode, status, authorized] of expectation) {
-      const r = runCli('code-health-duplicates.ts', ['--matrix', path.join(SAMPLE_DIR, file), '--validate']);
-      const summary = jsonLine<{ exitCode: number; status: string; authorized: boolean }>(r.stdout, 'DUPLICATES_JSON');
-      expect({
+  it('F-6: every fixture resolves to its declared pure status/authorized outcome', async () => {
+    const files = (await fs.readdir(SAMPLE_DIR)).filter((entry) => entry.endsWith('.json')).sort();
+    expect(files.length).toBeGreaterThanOrEqual(12);
+    for (const file of files) {
+      const fixture = JSON.parse(await fs.readFile(path.join(SAMPLE_DIR, file), 'utf8')) as {
+        expectedStatus: DuplicateCluster['status'];
+        expectAuthorized: boolean;
+        input: DuplicateInput;
+        authority: DuplicateClusterAuthority;
+        review?: { equivalenceProof?: DuplicateCluster['equivalenceProof']; maintenanceBenefit?: string };
+        proposal?: AbstractionProposal;
+      };
+      let status: string = 'error';
+      let authorized = false;
+      let violations: string[] = [];
+      try {
+        const cluster = clusterDuplicates(fixture.input, fixture.authority);
+        status = cluster.status;
+        const merged: DuplicateCluster = { ...cluster };
+        if (fixture.review?.equivalenceProof !== undefined) merged.equivalenceProof = fixture.review.equivalenceProof;
+        if (fixture.review?.maintenanceBenefit !== undefined)
+          merged.maintenanceBenefit = fixture.review.maintenanceBenefit;
+        if (fixture.proposal !== undefined) violations = proveAbstraction(merged, fixture.proposal);
+        authorized =
+          violations.length === 0 &&
+          status === 'under-review' &&
+          fixture.review?.equivalenceProof !== undefined &&
+          fixture.proposal !== undefined;
+      } catch (error) {
+        violations = [error instanceof Error ? error.message : String(error)];
+      }
+      expect({ file, status, authorized, violations }).toMatchObject({
         file,
-        code: r.code,
-        exitCode: summary?.exitCode,
-        status: summary?.status,
-        authorized: summary?.authorized,
-      }).toEqual({
-        file,
-        code: exitCode,
-        exitCode,
-        status,
-        authorized,
+        status: fixture.expectedStatus,
+        authorized: fixture.expectAuthorized,
       });
     }
   }, 120_000);
-
-  it('CLI 为只读：不写任何文件', async () => {
-    const before = await gitStatus(REPO_ROOT);
-    runCli('code-health-duplicates.ts', ['--matrix', path.join(SAMPLE_DIR, 'valid-cluster.json'), '--validate']);
-    expect(await gitStatus(REPO_ROOT)).toBe(before);
-  }, 120_000);
 });
 
-// -------------------- apply gate: abstract 必须携带 Phase 4 proof，且只在隔离仓库产生 patch --------------------
+// -------------------- apply gate: abstract must recompute from a tracked ledger --------------------
 
-interface ApplyFixture {
-  candidate: CodeHealthCandidate;
-  approval: ApprovalDecision;
-}
-
-let validFixture: { candidate: CodeHealthCandidate; approval: ApprovalDecision };
+let baseCandidate: CodeHealthCandidate | null = null;
 
 beforeAll(async () => {
   const raw = JSON.parse(
     await fs.readFile(path.join(REPO_ROOT, 'w-model-dev/scripts/samples/code-health/apply/valid-patch.json'), 'utf8'),
-  ) as ApplyFixture;
-  validFixture = raw;
+  ) as { candidate: CodeHealthCandidate };
+  baseCandidate = raw.candidate;
 });
 
-async function createAbstractRepository(): Promise<string> {
-  const root = await tempRoot('code-health-duplicates-repo-');
-  await git(root, ['init', '--quiet']);
-  await fs.mkdir(path.join(root, 'src'), { recursive: true });
-  await fs.writeFile(path.join(root, 'src', 'cache-a.ts'), 'export const readCacheA = 1;\n');
-  await fs.writeFile(path.join(root, 'src', 'cache-b.ts'), 'export const readCacheB = 1;\n');
-  await fs.writeFile(path.join(root, 'src', 'service-a.ts'), 'export const load = 1;\n');
-  await fs.writeFile(path.join(root, 'src', 'service-b.ts'), 'export const load = 1;\n');
-  await fs.writeFile(path.join(root, 'src', 'cache-service.ts'), 'export const readCache = 1;\n');
-  await fs.writeFile(path.join(root, '.gitignore'), '.w-model/\n');
-  await git(root, ['add', '--all']);
-  await git(root, ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'initial']);
-  return root;
-}
-
-/** A candidate + approval for the abstraction scope, bound to the isolated repository revision. */
-function abstractFixture(revision: RevisionIdentity): {
-  candidate: CodeHealthCandidate;
-  approval: ApprovalDecision;
-} {
-  const candidate: CodeHealthCandidate = structuredClone(validFixture.candidate);
-  candidate.candidateId = 'CHG-P4-20260907-901';
-  candidate.phase = 'P4';
-  candidate.action = 'abstract';
-  candidate.files = [...SCOPE];
-  candidate.symbols = ['readCacheA', 'readCacheB'];
-  candidate.tests = [];
-  candidate.callSites = [...SITES];
-  candidate.changeScope = {
+function abstractFixture(revision: RevisionIdentity): { candidate: CodeHealthCandidate; approval: ApprovalDecision } {
+  const candidate: CodeHealthCandidate = {
+    ...structuredClone(baseCandidate as CodeHealthCandidate),
+    candidateId: 'CHG-P4-20260907-901',
+    phase: 'P4',
+    action: 'abstract',
     files: [...SCOPE],
-    symbols: ['readCacheA', 'readCacheB', 'readCache'],
-    scopeHash: candidate.changeScope.scopeHash,
+    symbols: ['readCacheA', 'readCacheB'],
+    tests: [],
+    callSites: [...SITES],
+    changeScope: {
+      files: [...SCOPE],
+      symbols: ['readCacheA', 'readCacheB', 'readCache'],
+      scopeHash: 'sha256:' + 'f'.repeat(64),
+    },
+    revision,
   };
-  candidate.revision = revision;
   candidate.evidenceBinding = {
     ...candidate.evidenceBinding,
     candidate: {
@@ -535,78 +702,24 @@ function abstractFixture(revision: RevisionIdentity): {
     patchPath: `.w-model/code-health/apply/${candidate.candidateId}.patch`,
   };
   const approval: ApprovalDecision = {
-    ...(validFixture.approval as ApprovalDecision),
     candidateId: candidate.candidateId,
+    decision: 'approve',
     approvedAction: 'abstract',
     approvedFiles: [...SCOPE],
     approvedSymbols: candidate.changeScope.symbols,
     scopeHash: candidate.changeScope.scopeHash,
+    rationale: 'The exact abstraction scope is independently reviewed and directly reversible.',
+    actor: 'human-decision-maker',
+    decidedAt: '2026-09-07T00:03:00.000Z',
+    signatureRef: 'evidence/signature-human.json',
     revision,
   };
   return { candidate, approval };
 }
 
-describe('code-health-apply abstract guard (R6/R7)', () => {
-  it('无 --cluster/--proposal 的 abstract candidate → exit 1 且工作树不变', async () => {
-    const root = await createAbstractRepository();
-    const revision = (await revisionProvider.current(root)) as RevisionIdentity;
-    const workDir = await tempRoot('code-health-duplicates-inputs-');
-    const { candidate, approval } = abstractFixture(revision);
-    const candidatePath = await writeJson(workDir, 'candidate.json', candidate);
-    const approvalPath = await writeJson(workDir, 'approval.json', approval);
-    const before = await gitStatus(root);
-
-    const r = runCli('code-health-apply.ts', [
-      '--candidate',
-      candidatePath,
-      '--approval',
-      approvalPath,
-      '--root',
-      root,
-      '--mode',
-      'patch',
-    ]);
-    expect(r.code).toBe(1);
-    expect(r.stdout).toContain('abstraction requires a validated Phase 4 proof');
-    expect(await gitStatus(root)).toBe(before);
-    expect((await fs.stat(path.join(root, 'src', 'cache-a.ts'))).isFile()).toBe(true);
-  }, 120_000);
-
-  it('cluster 来自其他 candidate / 稳定点在 approved scope 之外 → exit 1（伪造 scope fail-closed）', async () => {
-    const root = await createAbstractRepository();
-    const revision = (await revisionProvider.current(root)) as RevisionIdentity;
-    const workDir = await tempRoot('code-health-duplicates-inputs-');
-    const { candidate, approval } = abstractFixture(revision);
-    const candidatePath = await writeJson(workDir, 'candidate.json', candidate);
-    const approvalPath = await writeJson(workDir, 'approval.json', approval);
-
-    const forgedCluster = {
-      ...equivalentCluster(),
-      candidateId: 'CHG-P4-20260907-999',
-      stableProductionCallSites: ['src/service-a.ts:load', 'src/other/outside.ts:load'],
-    };
-    const clusterPath = await writeJson(workDir, 'cluster.json', forgedCluster);
-    const proposalPath = await writeJson(workDir, 'proposal.json', equivalentProposal());
-    const r = runCli('code-health-apply.ts', [
-      '--candidate',
-      candidatePath,
-      '--approval',
-      approvalPath,
-      '--root',
-      root,
-      '--mode',
-      'patch',
-      '--cluster',
-      clusterPath,
-      '--proposal',
-      proposalPath,
-    ]);
-    expect(r.code).toBe(1);
-    expect(r.stdout).toContain('abstraction requires a validated Phase 4 proof');
-  }, 120_000);
-
-  it('完整 Phase 4 proof → 只在隔离仓库生成受控 patch，工作树不变', async () => {
-    const root = await createAbstractRepository();
+describe('F-1: apply gate recomputes the abstraction from a tracked ledger', () => {
+  it('a hand-crafted --cluster is refused (unknown flag → exit 2), no patch written', async () => {
+    const root = await createTrackedRepo();
     const revision = (await revisionProvider.current(root)) as RevisionIdentity;
     const workDir = await tempRoot('code-health-duplicates-inputs-');
     const { candidate, approval } = abstractFixture(revision);
@@ -614,7 +727,6 @@ describe('code-health-apply abstract guard (R6/R7)', () => {
     const approvalPath = await writeJson(workDir, 'approval.json', approval);
     const clusterPath = await writeJson(workDir, 'cluster.json', equivalentCluster());
     const proposalPath = await writeJson(workDir, 'proposal.json', equivalentProposal());
-    const before = await gitStatus(root);
 
     const r = runCli('code-health-apply.ts', [
       '--candidate',
@@ -630,26 +742,78 @@ describe('code-health-apply abstract guard (R6/R7)', () => {
       '--proposal',
       proposalPath,
     ]);
+    expect(r.code).toBe(2);
+    expect(r.stdout).toContain('ERROR_JSON');
+    await expect(fs.stat(path.join(root, '.w-model'))).rejects.toBeTruthy();
+  }, 120_000);
+
+  it('without a tracked ledger → exit 1 and no write', async () => {
+    const root = await createTrackedRepo();
+    const revision = (await revisionProvider.current(root)) as RevisionIdentity;
+    const workDir = await tempRoot('code-health-duplicates-inputs-');
+    const { candidate, approval } = abstractFixture(revision);
+    const candidatePath = await writeJson(workDir, 'candidate.json', candidate);
+    const approvalPath = await writeJson(workDir, 'approval.json', approval);
+    const matrixPath = await writeJson(workDir, 'matrix.json', matrixDocument());
+    const before = await gitStatus(root);
+
+    const r = runCli('code-health-apply.ts', [
+      '--candidate',
+      candidatePath,
+      '--approval',
+      approvalPath,
+      '--root',
+      root,
+      '--mode',
+      'patch',
+      '--matrix',
+      matrixPath,
+    ]);
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('abstraction requires a validated Phase 4 proof');
+    expect(await gitStatus(root)).toBe(before);
+  }, 120_000);
+
+  it('tracked ledger + complete matrix → controlled patch only, worktree unchanged', async () => {
+    const root = await createTrackedRepo();
+    const revision = (await revisionProvider.current(root)) as RevisionIdentity;
+    const workDir = await tempRoot('code-health-duplicates-inputs-');
+    const { candidate, approval } = abstractFixture(revision);
+    const candidatePath = await writeJson(workDir, 'candidate.json', candidate);
+    const approvalPath = await writeJson(workDir, 'approval.json', approval);
+    const matrixPath = await writeJson(workDir, 'matrix.json', matrixDocument());
+    const before = await gitStatus(root);
+
+    const r = runCli('code-health-apply.ts', [
+      '--candidate',
+      candidatePath,
+      '--approval',
+      approvalPath,
+      '--root',
+      root,
+      '--mode',
+      'patch',
+      '--matrix',
+      matrixPath,
+      '--ledger',
+      path.join(root, 'ledger.json'),
+    ]);
     expect(r.code).toBe(0);
-    const summary = jsonLine<{ applied: boolean; patchPath: string | null; rollback: { executable: boolean } | null }>(
-      r.stdout,
-      'APPLY_JSON',
-    );
+    const summary = jsonLine<{ applied: boolean; patchPath: string | null }>(r.stdout, 'APPLY_JSON');
     expect(summary?.applied).toBe(false);
     expect(summary?.patchPath).toMatch(/\.patch$/);
     expect((await fs.stat(path.join(root, summary?.patchPath as string))).isFile()).toBe(true);
     expect(await gitStatus(root)).toBe(before);
   }, 120_000);
 
-  it('完整 Phase 4 proof 的 commit 只删除 exact scope，并可回滚', async () => {
-    const root = await createAbstractRepository();
+  it('tracked-ledger commit deletes exactly the approved scope and rolls back', async () => {
+    const root = await createTrackedRepo();
     const revision = (await revisionProvider.current(root)) as RevisionIdentity;
     const workDir = await tempRoot('code-health-duplicates-inputs-');
     const { candidate, approval } = abstractFixture(revision);
     const candidatePath = await writeJson(workDir, 'candidate.json', candidate);
     const approvalPath = await writeJson(workDir, 'approval.json', approval);
-    const clusterPath = await writeJson(workDir, 'cluster.json', equivalentCluster());
-    const proposalPath = await writeJson(workDir, 'proposal.json', equivalentProposal());
+    const matrixPath = await writeJson(workDir, 'matrix.json', matrixDocument());
 
     const r = runCli('code-health-apply.ts', [
       '--candidate',
@@ -660,17 +824,17 @@ describe('code-health-apply abstract guard (R6/R7)', () => {
       root,
       '--mode',
       'commit',
-      '--cluster',
-      clusterPath,
-      '--proposal',
-      proposalPath,
+      '--matrix',
+      matrixPath,
+      '--ledger',
+      path.join(root, 'ledger.json'),
     ]);
     expect(r.code).toBe(0);
     const summary = jsonLine<{
       applied: boolean;
       appliedFiles: string[];
       unrelatedFiles: string[];
-      rollback: { patchPath: string };
+      rollback: { patchPath: string; command: string };
     }>(r.stdout, 'APPLY_JSON');
     expect(summary?.applied).toBe(true);
     expect([...(summary?.appliedFiles ?? [])].sort()).toEqual([...SCOPE].sort());

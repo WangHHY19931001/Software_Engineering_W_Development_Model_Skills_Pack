@@ -34,10 +34,19 @@ import type {
   ApplyResult,
   ApprovalDecision,
   CodeHealthCandidate,
+  CodeHealthLedger,
   DuplicateCluster,
+  DuplicateInput,
+  RollbackPlan,
   RevisionIdentity,
 } from '../logic/code-health-contract.js';
-import { proveAbstraction } from '../logic/code-health-duplicate-logic.js';
+import {
+  authorityFromLedgerCandidate,
+  clusterDuplicates,
+  proveAbstraction,
+  restrictAuthority,
+  type DuplicateClusterAuthority,
+} from '../logic/code-health-duplicate-logic.js';
 import { applyApproved, CodeHealthError, codeHealthApplyPatchPath } from '../logic/code-health-ledger-logic.js';
 import { evaluateTestInventory } from '../logic/code-health-test-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
@@ -56,7 +65,7 @@ import { runMain } from '../lib/run-main.js';
 import { runSync } from '../lib/run-sync.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 
-const VALUE_FLAGS = ['candidate', 'approval', 'root', 'mode', 'inventory', 'ledger', 'cluster', 'proposal'] as const;
+const VALUE_FLAGS = ['candidate', 'approval', 'root', 'mode', 'inventory', 'ledger', 'matrix'] as const;
 type ApplyFlag = (typeof VALUE_FLAGS)[number];
 const APPLY_MODES = new Set(['dry-run', 'patch', 'commit']);
 const GIT_TIMEOUT_MS = 30_000;
@@ -315,55 +324,107 @@ async function deletionScopeGuardViolations(
 }
 
 /**
- * Phase 4 abstraction guard (Task 6). An `abstract` candidate may never be applied through the
- * deletion/patch path on the strength of a human approval alone: it additionally requires the
- * Phase 4 cluster + proposal, and the guard refuses unless
- *   - the cluster belongs to the approved candidate;
- *   - every stable production call site and every clustered implementation is inside the
- *     human-approved change scope (so the guard cannot cite a call site the approval never covered);
- *   - `proveAbstraction` returns no violation (≥2 independent stable production call sites, all
- *     eleven semantic items proven item-wise, a quantified maintenance benefit, an executable
- *     rollback, and an exact minimal migrated call-site set).
- * A malformed cluster/proposal is a blocking violation here (never a silent pass).
+ * Phase 4 abstraction guard (Task 6, fix round 1). An `abstract` candidate may never be applied on the
+ * strength of a human approval alone, and the cluster may never be caller-supplied: the guard requires
+ * a HEAD-tracked ledger (`--ledger`, working bytes equal to the HEAD blob) plus the duplicate matrix
+ * (`--matrix`), derives the authority from the tracked ledger candidate, RECOMPUTES the cluster from
+ * the matrix input, and refuses unless
+ *   - the tracked ledger records a P4 `abstract` candidate matching the approved candidate;
+ *   - the caller's `restrictions` only narrow the tracked scope (never add a call site);
+ *   - every recomputed stable site and implementation is inside the human-approved change scope;
+ *   - `proveAbstraction` returns no violation (≥2 independent tracked stable production call sites, all
+ *     semantic items proven item-wise, a quantified maintenance benefit, an executable rollback, and an
+ *     exact minimal migrated call-site set).
+ * A malformed matrix/ledger/proposal is a blocking violation here (never a silent pass).
  */
 async function abstractionGuardViolations(
   candidate: CodeHealthCandidate,
-  clusterFlag: string | undefined,
-  proposalFlag: string | undefined,
+  matrixFlag: string | undefined,
+  ledgerFlag: string | undefined,
+  root: string,
 ): Promise<string[]> {
   if (candidate.action !== 'abstract') return [];
-  if (clusterFlag === undefined || proposalFlag === undefined) {
-    return ['an abstract candidate requires --cluster <file> and --proposal <file> Phase 4 authorization'];
+  if (matrixFlag === undefined || ledgerFlag === undefined) {
+    return [
+      'an abstract candidate requires a HEAD-tracked --ledger <file> and a --matrix <file> Phase 4 authorization',
+    ];
   }
-  const clusterValue = await readJsonOrExit<unknown>(clusterFlag);
-  const proposalValue = await readJsonOrExit<unknown>(proposalFlag);
-  if (!isRecord(clusterValue) || !isRecord(proposalValue)) {
-    return ['the Phase 4 cluster and proposal must be objects'];
+  const matrixValue = await readJsonOrExit<unknown>(matrixFlag);
+  if (!isRecord(matrixValue) || !isRecord(matrixValue.input)) {
+    return ['the Phase 4 matrix must be an object carrying the duplicate input'];
   }
   const violations: string[] = [];
-  if (clusterValue.candidateId !== candidate.candidateId) {
-    violations.push('the Phase 4 cluster does not belong to the approved candidate');
+  if (matrixValue.candidateId !== candidate.candidateId) {
+    violations.push('the Phase 4 matrix does not belong to the approved candidate');
   }
-  const scope = new Set(candidate.changeScope.files);
-  const sites = Array.isArray(clusterValue.stableProductionCallSites) ? clusterValue.stableProductionCallSites : [];
-  for (const site of sites) {
-    if (typeof site !== 'string') continue;
-    const file = site.split(':')[0] ?? '';
-    if (!scope.has(file)) violations.push(`stable call site ${site} is outside the approved change scope`);
+
+  const ledgerRelative = toTrackedRelativePath(root, ledgerFlag);
+  if (ledgerRelative === null) {
+    return ['the --ledger authority must be a repository-relative tracked file beneath --root'];
   }
-  const implementations = Array.isArray(clusterValue.implementations) ? clusterValue.implementations : [];
-  for (const entry of implementations) {
-    const file = isRecord(entry) && typeof entry.file === 'string' ? entry.file : '';
-    if (!scope.has(file)) {
-      violations.push(`clustered implementation ${file || '<unknown>'} is outside the approved change scope`);
+  const ledgerRead = await readTrackedJson(root, ledgerRelative);
+  if (ledgerRead.value === undefined) {
+    return [
+      `the --ledger authority must be tracked at HEAD with working bytes equal to the HEAD blob${ledgerRead.violations.length > 0 ? `: ${ledgerRead.violations.join('; ')}` : ''}`,
+    ];
+  }
+  const ledger = ledgerRead.value as CodeHealthLedger;
+  const candidates: unknown[] = isRecord(ledger) && Array.isArray(ledger.candidates) ? ledger.candidates : [];
+  const ledgerCandidate = candidates.find(
+    (entry): entry is Record<string, unknown> => isRecord(entry) && entry.candidateId === candidate.candidateId,
+  );
+  if (ledgerCandidate === undefined) {
+    return [`the tracked ledger does not record the approved candidate ${candidate.candidateId}`];
+  }
+  const trackedAuthority = authorityFromLedgerCandidate(ledgerCandidate);
+  if (trackedAuthority === null) {
+    return [`the tracked ledger candidate ${candidate.candidateId} is not a P4 abstract candidate`];
+  }
+
+  const restrictions = isRecord(matrixValue.restrictions) ? matrixValue.restrictions : {};
+  const authority: DuplicateClusterAuthority = restrictAuthority(trackedAuthority, restrictions);
+
+  // The tracked ledger is the authority; the human-approved candidate scope may only NARROW it.
+  const ledgerScope = new Set(trackedAuthority.approvedScope);
+  for (const file of candidate.changeScope.files) {
+    if (!ledgerScope.has(file)) {
+      violations.push(`approved change scope ${file} is not declared by the tracked ledger candidate`);
     }
   }
+
+  let cluster: DuplicateCluster;
   try {
-    violations.push(
-      ...proveAbstraction(clusterValue as unknown as DuplicateCluster, proposalValue as unknown as AbstractionProposal),
-    );
+    cluster = clusterDuplicates(matrixValue.input as unknown as DuplicateInput, authority);
   } catch (error) {
-    violations.push(error instanceof Error ? error.message : String(error));
+    return [...violations, error instanceof Error ? error.message : String(error)];
+  }
+  const review = isRecord(matrixValue.review) ? matrixValue.review : {};
+  const merged: DuplicateCluster = { ...cluster };
+  if (review.equivalenceProof !== undefined)
+    merged.equivalenceProof = review.equivalenceProof as DuplicateCluster['equivalenceProof'];
+  if (typeof review.maintenanceBenefit === 'string') merged.maintenanceBenefit = review.maintenanceBenefit;
+  if (review.rollback !== undefined) merged.rollback = review.rollback as RollbackPlan;
+  if (review.redaction !== undefined) merged.redaction = review.redaction as DuplicateCluster['redaction'];
+
+  const scope = new Set(candidate.changeScope.files);
+  for (const site of merged.stableProductionCallSites) {
+    const file = site.slice(0, site.lastIndexOf(':'));
+    if (!scope.has(file)) violations.push(`stable call site ${site} is outside the approved change scope`);
+  }
+  for (const entry of merged.implementations) {
+    if (!scope.has(entry.file)) {
+      violations.push(`clustered implementation ${entry.file} is outside the approved change scope`);
+    }
+  }
+
+  if (isRecord(matrixValue.proposal)) {
+    try {
+      violations.push(...proveAbstraction(merged, matrixValue.proposal as unknown as AbstractionProposal));
+    } catch (error) {
+      violations.push(error instanceof Error ? error.message : String(error));
+    }
+  } else {
+    violations.push('the Phase 4 matrix must carry an abstraction proposal');
   }
   return violations;
 }
@@ -379,7 +440,7 @@ async function main(): Promise<void> {
       rule: 'P0-1',
       message: error instanceof Error ? error.message : String(error),
       detail:
-        'usage: code-health-apply.ts --candidate <file> [--approval <file>] [--root <dir>] [--mode dry-run|patch|commit] [--cluster <file> --proposal <file>]',
+        'usage: code-health-apply.ts --candidate <file> [--approval <file>] [--root <dir>] [--mode dry-run|patch|commit] [--ledger <file> --matrix <file>]',
       exitCode: 2,
     });
     return;
@@ -428,11 +489,11 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Phase 4 (Task 6): an `abstract` candidate must additionally carry the Phase 4 proof BEFORE any
-  // write. Routing an abstraction through the deletion path on a human approval alone would delete
-  // implementation files without a two-stable-call-site + full equivalence proof.
+  // Phase 4 (Task 6, fix round 1): an `abstract` candidate must additionally carry a HEAD-tracked
+  // ledger + duplicate matrix; the cluster is recomputed from the tracked authority (a caller-supplied
+  // cluster can no longer authorize), before any write.
   if (candidate.action === 'abstract') {
-    const abstractionViolations = await abstractionGuardViolations(candidate, parsed.cluster, parsed.proposal);
+    const abstractionViolations = await abstractionGuardViolations(candidate, parsed.matrix, parsed.ledger, root);
     if (abstractionViolations.length > 0) {
       for (const violation of abstractionViolations) console.error(`✗ [EVIDENCE_INVALID] ${violation}`);
       const reason = `abstraction requires a validated Phase 4 proof: ${abstractionViolations.join('; ')}`;

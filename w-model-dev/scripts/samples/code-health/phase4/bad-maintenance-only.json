@@ -1,6 +1,8 @@
 {
   "description": "维护收益仅“少几行/更短 diff”→ 不构成收益，不授权抽象",
-  "expect": "blocked",
+  "expectedStatus": "under-review",
+  "expectAuthorized": false,
+  "candidateId": "CHG-P4-20260907-908",
   "input": {
     "implementations": [
       {
@@ -14,20 +16,10 @@
         "sourceHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
       }
     ],
-    "ast": [
-      "normalized conditional shape: if (missing) load else return",
-      "single return expression"
-    ],
-    "dataFlow": [
-      "input key → cache lookup → value or loader"
-    ],
-    "callGraph": [
-      "src/service-a.ts:load",
-      "src/service-b.ts:load"
-    ],
-    "tests": [
-      "tests/cache-contract.test.ts"
-    ]
+    "ast": ["node=conditional", "branch=missing-or-hit", "control-flow=single-return"],
+    "dataFlow": ["input=cache-key", "output=value-or-loader", "side-effect=none"],
+    "callGraph": ["caller=src/service-a.ts:load", "callee=src/cache-a.ts:readCacheA", "lifecycle=shared-cache"],
+    "tests": ["tests/cache-contract.test.ts"]
   },
   "authority": {
     "candidateId": "CHG-P4-20260907-908",
@@ -40,13 +32,8 @@
       "src/service-b.ts",
       "src/cache-service.ts"
     ],
-    "declaredCallSites": [
-      "src/service-a.ts:load",
-      "src/service-b.ts:load"
-    ],
-    "declaredTests": [
-      "tests/cache-contract.test.ts"
-    ],
+    "declaredCallSites": ["src/service-a.ts:load", "src/service-b.ts:load"],
+    "declaredTests": ["tests/cache-contract.test.ts"],
     "regressionCommands": [
       {
         "command": "node --test tests/cache-contract.test.ts",
@@ -62,9 +49,17 @@
         "endedAt": "2026-09-07T00:01:01.000Z",
         "exitCode": 0,
         "observation": "observed",
-        "rawOutputPath": ".w-model/code-health/raw/node-test.log",
+        "rawOutputPath": "w-model/code-health/raw/node-test.log",
         "rawOutputSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       }
+    ],
+    "trackedFacts": [
+      "call-site:src/service-a.ts:load",
+      "call-site:src/service-b.ts:load",
+      "contract:src/service-a.ts:load",
+      "contract:src/service-b.ts:load",
+      "regression:src/service-a.ts:load",
+      "regression:src/service-b.ts:load"
     ]
   },
   "review": {
@@ -92,10 +87,7 @@
   },
   "proposal": {
     "targetApi": "src/cache-service.ts:readCache",
-    "migratedCallSites": [
-      "src/service-a.ts:load",
-      "src/service-b.ts:load"
-    ],
+    "migratedCallSites": ["src/service-a.ts:load", "src/service-b.ts:load"],
     "inputsOutputs": "accepted-inputs=equivalent; produced-outputs=equivalent",
     "errorsRetries": "error-types=equivalent; error-status=equivalent; error-messages=equivalent; retry=equivalent; failure-timing=equivalent",
     "lifecycleResources": "initialization=equivalent; finalization=equivalent; cleanup=equivalent; cancellation=equivalent; transactions=equivalent; resource-scope=equivalent",
