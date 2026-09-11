@@ -1223,7 +1223,7 @@ describe('code-health ledger contract', () => {
     );
     expect(() => classifyProtectedTest({} as never)).toThrow(expectedErrors);
     expect(() => proveTestRemoval({} as never)).toThrow(expectedErrors);
-    expect(() => clusterDuplicates({} as never)).toThrow(expectedErrors);
+    expect(() => clusterDuplicates({} as never, {} as never)).toThrow(expectedErrors);
     expect(() => proveAbstraction({} as never, {} as never)).toThrow(expectedErrors);
     const phase1Root = await createTempGitRepository();
     await expect(

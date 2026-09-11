@@ -30,11 +30,14 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type {
+  AbstractionProposal,
   ApplyResult,
   ApprovalDecision,
   CodeHealthCandidate,
+  DuplicateCluster,
   RevisionIdentity,
 } from '../logic/code-health-contract.js';
+import { proveAbstraction } from '../logic/code-health-duplicate-logic.js';
 import { applyApproved, CodeHealthError, codeHealthApplyPatchPath } from '../logic/code-health-ledger-logic.js';
 import { evaluateTestInventory } from '../logic/code-health-test-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
@@ -53,7 +56,7 @@ import { runMain } from '../lib/run-main.js';
 import { runSync } from '../lib/run-sync.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 
-const VALUE_FLAGS = ['candidate', 'approval', 'root', 'mode', 'inventory', 'ledger'] as const;
+const VALUE_FLAGS = ['candidate', 'approval', 'root', 'mode', 'inventory', 'ledger', 'cluster', 'proposal'] as const;
 type ApplyFlag = (typeof VALUE_FLAGS)[number];
 const APPLY_MODES = new Set(['dry-run', 'patch', 'commit']);
 const GIT_TIMEOUT_MS = 30_000;
@@ -311,6 +314,60 @@ async function deletionScopeGuardViolations(
   return violations;
 }
 
+/**
+ * Phase 4 abstraction guard (Task 6). An `abstract` candidate may never be applied through the
+ * deletion/patch path on the strength of a human approval alone: it additionally requires the
+ * Phase 4 cluster + proposal, and the guard refuses unless
+ *   - the cluster belongs to the approved candidate;
+ *   - every stable production call site and every clustered implementation is inside the
+ *     human-approved change scope (so the guard cannot cite a call site the approval never covered);
+ *   - `proveAbstraction` returns no violation (≥2 independent stable production call sites, all
+ *     eleven semantic items proven item-wise, a quantified maintenance benefit, an executable
+ *     rollback, and an exact minimal migrated call-site set).
+ * A malformed cluster/proposal is a blocking violation here (never a silent pass).
+ */
+async function abstractionGuardViolations(
+  candidate: CodeHealthCandidate,
+  clusterFlag: string | undefined,
+  proposalFlag: string | undefined,
+): Promise<string[]> {
+  if (candidate.action !== 'abstract') return [];
+  if (clusterFlag === undefined || proposalFlag === undefined) {
+    return ['an abstract candidate requires --cluster <file> and --proposal <file> Phase 4 authorization'];
+  }
+  const clusterValue = await readJsonOrExit<unknown>(clusterFlag);
+  const proposalValue = await readJsonOrExit<unknown>(proposalFlag);
+  if (!isRecord(clusterValue) || !isRecord(proposalValue)) {
+    return ['the Phase 4 cluster and proposal must be objects'];
+  }
+  const violations: string[] = [];
+  if (clusterValue.candidateId !== candidate.candidateId) {
+    violations.push('the Phase 4 cluster does not belong to the approved candidate');
+  }
+  const scope = new Set(candidate.changeScope.files);
+  const sites = Array.isArray(clusterValue.stableProductionCallSites) ? clusterValue.stableProductionCallSites : [];
+  for (const site of sites) {
+    if (typeof site !== 'string') continue;
+    const file = site.split(':')[0] ?? '';
+    if (!scope.has(file)) violations.push(`stable call site ${site} is outside the approved change scope`);
+  }
+  const implementations = Array.isArray(clusterValue.implementations) ? clusterValue.implementations : [];
+  for (const entry of implementations) {
+    const file = isRecord(entry) && typeof entry.file === 'string' ? entry.file : '';
+    if (!scope.has(file)) {
+      violations.push(`clustered implementation ${file || '<unknown>'} is outside the approved change scope`);
+    }
+  }
+  try {
+    violations.push(
+      ...proveAbstraction(clusterValue as unknown as DuplicateCluster, proposalValue as unknown as AbstractionProposal),
+    );
+  } catch (error) {
+    violations.push(error instanceof Error ? error.message : String(error));
+  }
+  return violations;
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   let parsed: Partial<Record<ApplyFlag, string>>;
@@ -322,7 +379,7 @@ async function main(): Promise<void> {
       rule: 'P0-1',
       message: error instanceof Error ? error.message : String(error),
       detail:
-        'usage: code-health-apply.ts --candidate <file> [--approval <file>] [--root <dir>] [--mode dry-run|patch|commit]',
+        'usage: code-health-apply.ts --candidate <file> [--approval <file>] [--root <dir>] [--mode dry-run|patch|commit] [--cluster <file> --proposal <file>]',
       exitCode: 2,
     });
     return;
@@ -359,6 +416,9 @@ async function main(): Promise<void> {
   // ledger-anchored inventory authorization citing that exact path/identity; a path in neither the
   // implementation nor the test declaration is refused. Embedded ledgers and missing evidence are
   // refused before a single write.
+  // Phase 3 declared-role guard runs for every candidate (including `abstract`): a scope path that
+  // is test-declared, or not declared in the candidate's implementation scope, is refused before any
+  // write. An `abstract` candidate additionally needs the Phase 4 proof below.
   const guardViolations = await deletionScopeGuardViolations(candidate, parsed.inventory, parsed.ledger, root);
   if (guardViolations.length > 0) {
     for (const violation of guardViolations) console.error(`✗ [EVIDENCE_INVALID] ${violation}`);
@@ -366,6 +426,20 @@ async function main(): Promise<void> {
     emit(1, blockResult(mode, reason, 'EVIDENCE_INVALID'));
     process.exitCode = 1;
     return;
+  }
+
+  // Phase 4 (Task 6): an `abstract` candidate must additionally carry the Phase 4 proof BEFORE any
+  // write. Routing an abstraction through the deletion path on a human approval alone would delete
+  // implementation files without a two-stable-call-site + full equivalence proof.
+  if (candidate.action === 'abstract') {
+    const abstractionViolations = await abstractionGuardViolations(candidate, parsed.cluster, parsed.proposal);
+    if (abstractionViolations.length > 0) {
+      for (const violation of abstractionViolations) console.error(`✗ [EVIDENCE_INVALID] ${violation}`);
+      const reason = `abstraction requires a validated Phase 4 proof: ${abstractionViolations.join('; ')}`;
+      emit(1, blockResult(mode, reason, 'EVIDENCE_INVALID'));
+      process.exitCode = 1;
+      return;
+    }
   }
 
   const revision = await revisionProvider.current(root);

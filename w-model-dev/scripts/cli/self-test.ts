@@ -88,17 +88,26 @@ import {
   type Phase1Scenario,
 } from '../logic/code-health-phase1-logic.js';
 import type {
+  AbstractionProposal,
   ApprovalDecision,
   CodeHealthCandidate,
   CodeHealthLedger,
   CommandEvidence,
+  DuplicateCluster,
+  DuplicateInput,
   FalsePositiveContext,
   GapDiscoveryInput,
   GapRow,
   Phase1CandidateLead,
   RevisionIdentity,
+  RollbackPlan,
 } from '../logic/code-health-contract.js';
 import { findGaps } from '../logic/code-health-gap-logic.js';
+import {
+  clusterDuplicates,
+  proveAbstraction,
+  type DuplicateClusterAuthority,
+} from '../logic/code-health-duplicate-logic.js';
 import { evaluateTestInventory } from '../logic/code-health-test-logic.js';
 import {
   applyApproved,
@@ -2678,6 +2687,90 @@ const CODE_HEALTH_TEST_CASES: CodeHealthTestInventoryCase[] = [
   },
 ];
 
+// -------------------- Phase 4 duplicate cluster / abstraction guard（self-test 回归 fixture） --------------------
+
+interface CodeHealthDuplicateFixture {
+  description: string;
+  expect: 'approved' | 'deferred' | 'blocked';
+  input: DuplicateInput;
+  authority: DuplicateClusterAuthority;
+  review?: {
+    equivalenceProof?: DuplicateCluster['equivalenceProof'];
+    maintenanceBenefit?: string;
+    rollback?: RollbackPlan;
+    redaction?: DuplicateCluster['redaction'];
+  };
+  proposal?: AbstractionProposal;
+}
+
+interface CodeHealthDuplicateCase {
+  file: string;
+  expectedStatus: DuplicateCluster['status'];
+  /** 期望 guard 违规至少各匹配一个正则（用于 blocked 用例） */
+  expectedViolations: RegExp[];
+  expectAuthorized: boolean;
+  description: string;
+}
+
+const CODE_HEALTH_PHASE4_CASES: CodeHealthDuplicateCase[] = [
+  {
+    file: 'valid-cluster.json',
+    expectedStatus: 'under-review',
+    expectedViolations: [],
+    expectAuthorized: true,
+    description: '两个独立稳定生产调用点 + 完整逐项等价证明 + 可量化维护收益 → guard 放行（仅提案级）',
+  },
+  {
+    file: 'deferred-one-site.json',
+    expectedStatus: 'deferred',
+    expectedViolations: [],
+    expectAuthorized: false,
+    description: '仅 1 个稳定生产调用点 → deferred（非批准），绝不授权抽象',
+  },
+  {
+    file: 'bad-test-only.json',
+    expectedStatus: 'rejected',
+    expectedViolations: [/test-only/i],
+    expectAuthorized: false,
+    description: 'test-only helper 充当实现 → rejected，test-only 绝不授权',
+  },
+  {
+    file: 'bad-platform-difference.json',
+    expectedStatus: 'under-review',
+    expectedViolations: [/platform/i],
+    expectAuthorized: false,
+    description: 'platform-specific 行为差异 → 不授权',
+  },
+  {
+    file: 'bad-error-mismatch.json',
+    expectedStatus: 'under-review',
+    expectedViolations: [/errors/i],
+    expectAuthorized: false,
+    description: 'error/retry 逐项差异 → 不授权',
+  },
+  {
+    file: 'bad-security-mismatch.json',
+    expectedStatus: 'under-review',
+    expectedViolations: [/security/i],
+    expectAuthorized: false,
+    description: 'security validation-order 差异 → 不授权',
+  },
+  {
+    file: 'bad-lifecycle-mismatch.json',
+    expectedStatus: 'under-review',
+    expectedViolations: [/lifecycle/i],
+    expectAuthorized: false,
+    description: 'lifecycle/resource 差异 → 不授权',
+  },
+  {
+    file: 'bad-maintenance-only.json',
+    expectedStatus: 'under-review',
+    expectedViolations: [/maintenance/i],
+    expectAuthorized: false,
+    description: '维护收益仅“少几行/更短 diff” → 不构成收益，不授权',
+  },
+];
+
 // ==================== 测试执行器 ====================
 
 interface CaseResult {
@@ -4147,6 +4240,62 @@ async function runCodeHealthTestInventoryCases(samplesDir: string): Promise<Case
   return results;
 }
 
+/**
+ * Phase 4 duplicate cluster / abstraction guard: the cluster is always recomputed from input +
+ * authority (structural fields never come from the caller), the stable call-site floor and the
+ * item-wise semantic proof decide `under-review` vs `deferred`/`rejected`, and un-authorizing inputs
+ * (test-only, platform/lifecycle differences, a shorter diff) must never yield an authorization.
+ */
+async function runCodeHealthPhase4Cases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_HEALTH_PHASE4_CASES) {
+    const abs = path.join(samplesDir, 'code-health/phase4', c.file);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs is a self-test-registered fixture beneath samples/
+    const fixture = parseJsonSafe<CodeHealthDuplicateFixture>(await fs.readFile(abs, 'utf-8'));
+    const details: string[] = [];
+    let violations: string[] = [];
+    let status: DuplicateCluster['status'] | null = null;
+    let authorized = false;
+    try {
+      const cluster = clusterDuplicates(fixture.input, fixture.authority);
+      status = cluster.status;
+      const merged: DuplicateCluster = { ...cluster };
+      if (fixture.review?.equivalenceProof !== undefined) merged.equivalenceProof = fixture.review.equivalenceProof;
+      if (fixture.review?.maintenanceBenefit !== undefined)
+        merged.maintenanceBenefit = fixture.review.maintenanceBenefit;
+      if (fixture.review?.rollback !== undefined) merged.rollback = fixture.review.rollback;
+      if (fixture.review?.redaction !== undefined) merged.redaction = fixture.review.redaction;
+      if (fixture.proposal !== undefined) {
+        violations = proveAbstraction(merged, fixture.proposal);
+      }
+      authorized =
+        violations.length === 0 &&
+        status === 'under-review' &&
+        fixture.review?.equivalenceProof !== undefined &&
+        fixture.proposal !== undefined;
+    } catch (error) {
+      violations = [error instanceof Error ? error.message : String(error)];
+    }
+    if (status !== c.expectedStatus) {
+      details.push(`  - 期望 status=${c.expectedStatus}，实际 ${String(status)}`);
+    }
+    if (authorized !== c.expectAuthorized) {
+      details.push(`  - 期望 authorized=${String(c.expectAuthorized)}，实际 ${String(authorized)}`);
+    }
+    if (c.expectedViolations.length > 0) details.push(...matchReasonPatterns(violations, c.expectedViolations));
+    if (c.expectedViolations.length === 0 && violations.length > 0) {
+      details.push(`  - 期望无 guard 违规，实际 ${JSON.stringify(violations)}`);
+    }
+    results.push({
+      name: `code-health/phase4/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 // -------------------- Metadata（版本号双写一致性） --------------------
 
 async function runMetadataCheck(skillRoot: string): Promise<CaseResult[]> {
@@ -4210,6 +4359,7 @@ async function main(): Promise<void> {
   console.log(`CodeHealth Apply 用例: ${CODE_HEALTH_APPLY_CASES.length}`);
   console.log(`CodeHealth Gap 用例: ${CODE_HEALTH_GAP_CASES.length}`);
   console.log(`CodeHealth Phase3 Test 用例: ${CODE_HEALTH_TEST_CASES.length}`);
+  console.log(`CodeHealth Phase4 Duplicate 用例: ${CODE_HEALTH_PHASE4_CASES.length}`);
   console.log(`BDD 用例       : ${BDD_CASES.length}`);
   console.log(`Coverage 用例  : ${COVERAGE_CASES.length}`);
   console.log(`Exemption 用例 : ${EXEMPTION_CASES.length}`);
@@ -4311,6 +4461,7 @@ async function main(): Promise<void> {
   const codeHealthApplyResults = await runCodeHealthApplyCases(samplesDir);
   const codeHealthGapResults = await runCodeHealthGapCases(samplesDir);
   const codeHealthTestResults = await runCodeHealthTestInventoryCases(samplesDir);
+  const codeHealthPhase4Results = await runCodeHealthPhase4Cases(samplesDir);
   const all = [
     ...verifierResults,
     ...gateResults,
@@ -4354,6 +4505,7 @@ async function main(): Promise<void> {
     ...codeHealthApplyResults,
     ...codeHealthGapResults,
     ...codeHealthTestResults,
+    ...codeHealthPhase4Results,
   ];
 
   const passedCount = all.filter((r) => r.passed).length;

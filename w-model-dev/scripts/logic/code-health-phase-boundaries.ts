@@ -1,7 +1,6 @@
 import {
   CodeHealthError,
   type DuplicateCluster,
-  type DuplicateInput,
   type GapRow,
   type Phase1CandidateLead,
   type TestRecord,
@@ -27,7 +26,4 @@ export function proveTestRemoval(input: TestRemovalProofInput): string[] {
     throw new CodeHealthError('NOT_IMPLEMENTED', 'test removal proof is not implemented in Task 1A');
   }
   return ['NOT_IMPLEMENTED: test removal proof is not implemented in Task 1A'];
-}
-export function clusterDuplicates(_input: DuplicateInput): never {
-  throw new CodeHealthError('NOT_IMPLEMENTED', 'duplicate clustering is not implemented in Task 1A');
 }

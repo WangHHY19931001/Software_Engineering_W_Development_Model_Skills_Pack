@@ -1,0 +1,73 @@
+{
+  "description": "platform-specific 行为差异（platform=different）→ 不授权抽象",
+  "expect": "blocked",
+  "input": {
+    "implementations": [
+      { "file": "src/cache-a.ts", "symbol": "readCacheA", "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+      { "file": "src/cache-b.ts", "symbol": "readCacheB", "sourceHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+    ],
+    "ast": ["normalized conditional shape"],
+    "dataFlow": ["input key → cache lookup"],
+    "callGraph": ["src/service-a.ts:load", "src/service-b.ts:load"],
+    "tests": ["tests/cache-contract.test.ts"]
+  },
+  "authority": {
+    "candidateId": "CHG-P4-20260907-904",
+    "phase": "P4",
+    "action": "abstract",
+    "approvedScope": ["src/cache-a.ts", "src/cache-b.ts", "src/service-a.ts", "src/service-b.ts", "src/cache-service.ts"],
+    "declaredCallSites": ["src/service-a.ts:load", "src/service-b.ts:load"],
+    "declaredTests": ["tests/cache-contract.test.ts"],
+    "regressionCommands": [
+      {
+        "command": "node --test tests/cache-contract.test.ts",
+        "cwd": ".",
+        "environment": { "NODE_ENV": "test" },
+        "platform": "linux",
+        "toolVersions": { "node": "20.0.0" },
+        "startedAt": "2026-09-07T00:01:00.000Z",
+        "endedAt": "2026-09-07T00:01:01.000Z",
+        "exitCode": 0,
+        "observation": "observed",
+        "rawOutputPath": ".w-model/code-health/raw/node-test.log",
+        "rawOutputSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    ]
+  },
+  "review": {
+    "equivalenceProof": {
+      "inputsOutputs": "accepted-inputs=equivalent; produced-outputs=equivalent",
+      "orderingMutationsSideEffects": "ordering=equivalent; mutations=equivalent; side-effects=equivalent",
+      "errorsRetries": "error-types=equivalent; error-status=equivalent; error-messages=equivalent; retry=equivalent; failure-timing=equivalent",
+      "lifecycleResources": "initialization=equivalent; finalization=equivalent; cleanup=equivalent; cancellation=equivalent; transactions=equivalent; resource-scope=equivalent",
+      "security": "authorization=equivalent; validation-order=equivalent; secrets=equivalent; privilege=equivalent",
+      "concurrencyPlatforms": "locks=equivalent; atomicity=equivalent; idempotency=equivalent; platform=different",
+      "allDimensionsProven": true
+    },
+    "maintenanceBenefit": "Consolidates 2 duplicated cache implementations into 1 cohesive API, removing 1 behavior owner and 2 bug-fix surfaces.",
+    "rollback": {
+      "preChangeRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "command": "git apply -R .w-model/code-health/apply/CHG-P4-20260907-904.patch",
+      "patchPath": ".w-model/code-health/apply/CHG-P4-20260907-904.patch",
+      "owner": "S-agent",
+      "executable": true
+    }
+  },
+  "proposal": {
+    "targetApi": "src/cache-service.ts:readCache",
+    "migratedCallSites": ["src/service-a.ts:load", "src/service-b.ts:load"],
+    "inputsOutputs": "accepted-inputs=equivalent; produced-outputs=equivalent",
+    "errorsRetries": "error-types=equivalent; error-status=equivalent; error-messages=equivalent; retry=equivalent; failure-timing=equivalent",
+    "lifecycleResources": "initialization=equivalent; finalization=equivalent; cleanup=equivalent; cancellation=equivalent; transactions=equivalent; resource-scope=equivalent",
+    "security": "authorization=equivalent; validation-order=equivalent; secrets=equivalent; privilege=equivalent",
+    "concurrencyPlatforms": "locks=equivalent; atomicity=equivalent; idempotency=equivalent; platform=different",
+    "maintenanceBenefit": "Consolidates 2 duplicated cache implementations into 1 cohesive API, removing 1 behavior owner and 2 bug-fix surfaces.",
+    "rollback": {
+      "preChangeRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "command": "git apply -R .w-model/code-health/apply/CHG-P4-20260907-904.patch",
+      "patchPath": ".w-model/code-health/apply/CHG-P4-20260907-904.patch",
+      "owner": "S-agent",
+      "executable": true
+    }
+  }
+}

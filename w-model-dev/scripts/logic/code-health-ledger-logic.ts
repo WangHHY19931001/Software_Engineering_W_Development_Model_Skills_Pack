@@ -15,7 +15,7 @@ import {
   validateRevision,
 } from './code-health-contract.js';
 import { findGaps } from './code-health-gap-logic.js';
-import { clusterDuplicates } from './code-health-phase-boundaries.js';
+import { clusterDuplicates, proveAbstraction } from './code-health-duplicate-logic.js';
 import { buildStaticInventory, checkFalsePositiveGuards, mergeDynamicTrace } from './code-health-phase1-logic.js';
 import { evaluateDeletionFacts, type ExpectedGovernanceFacts } from './code-health-test-logic.js';
 import type {
@@ -42,7 +42,7 @@ import type {
 } from './code-health-contract.js';
 
 export { CodeHealthError, validateCodeHealthCandidate };
-export { clusterDuplicates, findGaps, runTddHarness };
+export { clusterDuplicates, findGaps, proveAbstraction, runTddHarness };
 
 /**
  * Phase 3 surface (R3 closure). The real pure implementations live in `logic/code-health-test-logic.ts`;
@@ -1358,10 +1358,6 @@ export function validateGapMatrix(matrix: unknown, ledger: CodeHealthLedger): st
   return reasons;
 }
 
-function notImplemented(reason: string): CodeHealthError {
-  return new CodeHealthError('NOT_IMPLEMENTED', reason);
-}
-
 /**
  * Phase 1 discovery surface (R8 closure). The real pure implementations live in
  * `logic/code-health-phase1-logic.ts`; this legacy module re-exports them so existing consumers keep one
@@ -1671,13 +1667,6 @@ export async function executeRollback(rollback: RollbackPlan): Promise<boolean> 
     return false;
   }
   return true;
-}
-
-export function proveAbstraction(cluster: unknown, proposal: unknown): string[] {
-  if (!isRecord(cluster) || !isRecord(proposal)) {
-    throw notImplemented('abstraction proof requires Phase 4 implementation');
-  }
-  throw notImplemented('abstraction proof is not implemented in Task 1A');
 }
 
 /**

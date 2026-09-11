@@ -1,0 +1,37 @@
+{
+  "description": "仅 1 个稳定生产调用点 → deferred（exit 0 非批准），绝不生成 review cluster 授权",
+  "expect": "deferred",
+  "input": {
+    "implementations": [
+      { "file": "src/cache-a.ts", "symbol": "readCacheA", "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+      { "file": "src/cache-b.ts", "symbol": "readCacheB", "sourceHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+    ],
+    "ast": ["normalized conditional shape"],
+    "dataFlow": ["input key → cache lookup"],
+    "callGraph": ["src/service-a.ts:load"],
+    "tests": ["tests/cache-contract.test.ts"]
+  },
+  "authority": {
+    "candidateId": "CHG-P4-20260907-902",
+    "phase": "P4",
+    "action": "abstract",
+    "approvedScope": ["src/cache-a.ts", "src/cache-b.ts", "src/service-a.ts", "src/cache-service.ts"],
+    "declaredCallSites": ["src/service-a.ts:load"],
+    "declaredTests": ["tests/cache-contract.test.ts"],
+    "regressionCommands": [
+      {
+        "command": "node --test tests/cache-contract.test.ts",
+        "cwd": ".",
+        "environment": { "NODE_ENV": "test" },
+        "platform": "linux",
+        "toolVersions": { "node": "20.0.0" },
+        "startedAt": "2026-09-07T00:01:00.000Z",
+        "endedAt": "2026-09-07T00:01:01.000Z",
+        "exitCode": 0,
+        "observation": "observed",
+        "rawOutputPath": ".w-model/code-health/raw/node-test.log",
+        "rawOutputSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    ]
+  }
+}
