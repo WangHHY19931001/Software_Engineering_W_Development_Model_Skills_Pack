@@ -97,17 +97,6 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 }
 
-/** Canonical repository test surface used to key the apply guard on file class instead of `action`. */
-export function isTestSurfacePath(file: unknown): boolean {
-  if (typeof file !== 'string' || file.trim() === '') return false;
-  const normalized = file.replace(/\\/g, '/');
-  return (
-    /(^|\/)__tests__\//.test(normalized) ||
-    /(^|\/)(tests?)\//.test(normalized) ||
-    /\.(test|spec)\.[^/]+$/.test(normalized)
-  );
-}
-
 /**
  * Structural validity of one `TestRecord`. Returns reasons rather than throwing so a whole inventory
  * can be reviewed fail-closed without aborting on the first malformed record.

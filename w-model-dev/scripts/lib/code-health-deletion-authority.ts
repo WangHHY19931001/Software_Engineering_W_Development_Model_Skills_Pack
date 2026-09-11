@@ -276,14 +276,51 @@ function sameRevision(left: unknown, right: RevisionIdentity): boolean {
   );
 }
 
+function stringSet(value: unknown): Set<string> {
+  return new Set(Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []);
+}
+
+function firstLedgerCandidate(ledger: unknown, candidateId: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(ledger) || !Array.isArray(ledger.candidates)) return undefined;
+  return (ledger.candidates as Array<Record<string, unknown>>).find((entry) => entry.candidateId === candidateId);
+}
+
+export interface ScopePathRole {
+  file: string;
+  /** Positively declared as a test by the candidate record or the tracked ledger record. */
+  declaredTest: boolean;
+  /** Positively declared inside the implementation change scope by the candidate or tracked ledger. */
+  declaredImplementation: boolean;
+}
+
+/**
+ * Classify every change-scope path by its DECLARED role instead of by its name. This is the
+ * structural inversion of the old `isTestSurfacePath` name heuristic: renaming a test, moving it to
+ * `spec/` or `legacy/`, or giving it a helper-looking name can never change its declared role.
+ */
+export function scopePathRoles(candidate: CodeHealthCandidate, ledger: unknown): ScopePathRole[] {
+  const scopeFiles = Array.isArray(candidate?.changeScope?.files) ? candidate.changeScope.files : [];
+  const candidateFiles = stringSet((candidate as unknown as { files?: unknown })?.files);
+  const candidateTests = stringSet((candidate as unknown as { tests?: unknown })?.tests);
+  const ledgerCandidate = firstLedgerCandidate(
+    ledger,
+    (candidate as unknown as { candidateId?: unknown })?.candidateId,
+  );
+  const ledgerFiles = stringSet(ledgerCandidate?.files);
+  const ledgerTests = stringSet(ledgerCandidate?.tests);
+  return scopeFiles.map((file) => ({
+    file,
+    declaredTest: candidateTests.has(file) || ledgerTests.has(file),
+    declaredImplementation: candidateFiles.has(file) || ledgerFiles.has(file),
+  }));
+}
+
 export interface DeletionAuthorizationInput {
   repositoryRoot: string;
   candidate: CodeHealthCandidate;
   inventory: unknown;
   /** The tracked ledger record, already read from HEAD by the caller via `readTrackedJson`. */
   ledger: unknown;
-  /** Test-surface files in the candidate's change scope, computed by the pure `isTestSurfacePath`. */
-  testSurfaceFiles: string[];
   /** Pure review result computed by the caller via `evaluateTestInventory` against the tracked ledger. */
   review: { violations: string[] };
   evidenceStore: EvidenceStore;
@@ -388,6 +425,14 @@ export async function verifyDeletionEvidence(input: DeletionAuthorizationInput):
     }
   }
 
+  const roles = scopePathRoles(input.candidate, ledger);
+  for (const role of roles) {
+    if (!role.declaredTest && !role.declaredImplementation) {
+      violations.push(`path ${role.file} is not in the candidate's tracked implementation scope`);
+    }
+  }
+  const declaredTestFiles = roles.filter((role) => role.declaredTest).map((role) => role.file);
+
   const proof = isRecord(inventory.removalProof) ? inventory.removalProof : null;
   if (proof === null) {
     violations.push('a test-surface change requires a removalProof citing the exact deleted test identity');
@@ -403,9 +448,9 @@ export async function verifyDeletionEvidence(input: DeletionAuthorizationInput):
   if (removalFile === null || !scopeFiles.includes(removalFile)) {
     violations.push('deletion scope does not cite the inventory removal candidate file');
   } else {
-    for (const file of input.testSurfaceFiles) {
+    for (const file of declaredTestFiles) {
       if (file !== removalFile) {
-        violations.push(`test-surface scope file ${file} is not the authorized removal candidate`);
+        violations.push(`test-declared scope file ${file} has no ledger-anchored removal authorization`);
       }
     }
   }

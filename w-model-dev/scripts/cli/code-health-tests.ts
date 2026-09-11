@@ -36,11 +36,7 @@ import type {
   EvidenceStore,
   RevisionIdentity,
 } from '../logic/code-health-contract.js';
-import {
-  evaluateTestInventory,
-  isTestSurfacePath,
-  type ExpectedGovernanceFacts,
-} from '../logic/code-health-test-logic.js';
+import { evaluateTestInventory, type ExpectedGovernanceFacts } from '../logic/code-health-test-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { createCodeHealthCommandRunner } from '../lib/code-health-command.js';
 import {
@@ -200,13 +196,11 @@ async function runValidate(parsed: ParsedArgs): Promise<void> {
             rawOutputRoot: '.w-model/code-health/raw',
           });
           const review = evaluateTestInventory({ inventory, ledger: ledgerRead.value }, manifest.facts ?? {});
-          const testSurfaceFiles = (candidate.changeScope?.files ?? []).filter((file) => isTestSurfacePath(file));
           const authority = await verifyDeletionEvidence({
             repositoryRoot: projectRoot,
             candidate,
             inventory,
             ledger: ledgerRead.value,
-            testSurfaceFiles,
             review,
             evidenceStore,
             revisionProvider: createCodeHealthGitRevisionProvider(),
@@ -365,13 +359,11 @@ async function runGuardedDeletion(
     };
   }
   const review = evaluateTestInventory({ inventory, ledger: ledgerRead.value }, manifest.facts ?? {});
-  const testSurfaceFiles = (guard.candidate.changeScope?.files ?? []).filter((file) => isTestSurfacePath(file));
   const authority = await verifyDeletionEvidence({
     repositoryRoot: root,
     candidate: guard.candidate,
     inventory,
     ledger: ledgerRead.value,
-    testSurfaceFiles,
     review,
     evidenceStore,
     revisionProvider,
@@ -434,8 +426,11 @@ async function runGuardedDeletion(
     };
   }
 
-  const applyViolations = await runApplyGate(parsed, guard, root);
-  violations.push(...applyViolations);
+  const applyResult = await runApplyGate(parsed, guard, root);
+  violations.push(...applyResult.violations);
+  let applied = applyResult.applied;
+  let rolledBack = false;
+  const postProofStart = violations.length;
 
   const post = await runner.run(suite.command![0]!, suite.command!.slice(1), {
     cwd: root,
@@ -484,10 +479,25 @@ async function runGuardedDeletion(
     }
   }
 
+  // FIX-B: the deletion is irreversible only if every final proof passes. If any post-deletion proof
+  // fails, roll the exact approved deletion back before exiting 1 so a failed verification never
+  // leaves the tree modified.
+  if (violations.length > postProofStart && applied) {
+    const rollbackViolations = rollbackAppliedDeletion(root, guard.candidate.candidateId);
+    violations.push(...rollbackViolations);
+    if (rollbackViolations.length === 0) {
+      applied = false;
+      rolledBack = true;
+    } else {
+      violations.push('the failed deletion could not be rolled back; the tree may be left modified');
+    }
+  }
+
   const payload = {
     type: 'code-health-tests-guard',
     exitCode: violations.length === 0 ? 0 : 1,
-    applied: applyViolations.length === 0,
+    applied,
+    rolledBack,
     removedIdentity,
     removedIdentityPresentPre: preIdentities.includes(removedIdentity),
     removedIdentityAbsentPost: !postIdentities.includes(removedIdentity),
@@ -499,7 +509,11 @@ async function runGuardedDeletion(
 }
 
 /** Invoke the real Task 3 apply CLI with the inventory + ledger authority; never build a second deletion path. */
-async function runApplyGate(parsed: ParsedArgs, guard: GuardDocument, root: string): Promise<string[]> {
+async function runApplyGate(
+  parsed: ParsedArgs,
+  guard: GuardDocument,
+  root: string,
+): Promise<{ violations: string[]; applied: boolean }> {
   const applyCli = path.join(path.dirname(fileURLToPath(import.meta.url)), 'code-health-apply.ts');
   const tsxCli = createRequire(import.meta.url).resolve('tsx/cli');
   const workDir = await fs.mkdtemp(path.join(process.env.TEMP ?? process.cwd(), 'code-health-guard-'));
@@ -532,13 +546,71 @@ async function runApplyGate(parsed: ParsedArgs, guard: GuardDocument, root: stri
     );
     const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
     return result.status === 0
-      ? []
-      : [
-          `apply gate refused the deletion (exit ${String(result.status)}): ${output.trim().split(/\r?\n/).slice(-1)[0]}`,
-        ];
+      ? { violations: [], applied: true }
+      : {
+          violations: [
+            `apply gate refused the deletion (exit ${String(result.status)}): ${output.trim().split(/\r?\n/).slice(-1)[0]}`,
+          ],
+          applied: false,
+        };
   } finally {
     await fs.rm(workDir, { recursive: true, force: true, maxRetries: 3 });
   }
+}
+
+function guardGitEnvironment(): NodeJS.ProcessEnv {
+  const keys = [
+    'PATH',
+    'PATHEXT',
+    'SYSTEMROOT',
+    'SYSTEMDRIVE',
+    'WINDIR',
+    'COMSPEC',
+    'TEMP',
+    'TMP',
+    'USERPROFILE',
+  ] as const;
+  const environment: NodeJS.ProcessEnv = {
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
+    GIT_TERMINAL_PROMPT: '0',
+    GIT_OPTIONAL_LOCKS: '0',
+    GIT_PAGER: 'cat',
+  };
+  for (const key of keys) {
+    const value = process.env[key];
+    if (typeof value === 'string' && value.length > 0) environment[key] = value;
+  }
+  return environment;
+}
+
+/**
+ * Roll back exactly the approved deletion using the recorded rollback patch (FIX-B), then prove the
+ * worktree is clean again. Returns blocking reasons; empty means the tree was restored.
+ */
+function rollbackAppliedDeletion(root: string, rollbackCandidateId: string): string[] {
+  const patchRelative = `.w-model/code-health/apply/${rollbackCandidateId}.patch`;
+  const resolution = resolveControlledRelativePath(root, patchRelative);
+  if (!resolution.ok || resolution.absolutePath === undefined) {
+    return ['rollback patch path is not controlled; the tree may be left modified'];
+  }
+  const reverted = runSync('git', ['apply', '-R', resolution.absolutePath], {
+    cwd: root,
+    env: guardGitEnvironment(),
+    timeout: 30_000,
+  });
+  if (reverted.status !== 0) {
+    return [`rollback command failed (exit ${String(reverted.status)}); the tree may be left modified`];
+  }
+  const clean = runSync('git', ['diff', '--exit-code'], {
+    cwd: root,
+    env: guardGitEnvironment(),
+    timeout: 30_000,
+  });
+  if (clean.status !== 0) {
+    return ['rollback did not restore a clean worktree'];
+  }
+  return [];
 }
 
 async function main(): Promise<void> {
@@ -570,4 +642,4 @@ async function main(): Promise<void> {
 
 runMain(main);
 
-export { isTestSurfacePath, type ExpectedGovernanceFacts };
+export type { ExpectedGovernanceFacts };

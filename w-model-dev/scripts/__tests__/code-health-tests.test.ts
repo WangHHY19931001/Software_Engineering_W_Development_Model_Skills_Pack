@@ -32,8 +32,9 @@ import type {
   TestRecord,
 } from '../logic/code-health-contract.js';
 import { classifyProtectedTest, evaluateDeletion, proveTestRemoval } from '../logic/code-health-ledger-logic.js';
-import { DEFAULT_GOVERNANCE_FACTS, evaluateTestInventory, isTestSurfacePath } from '../logic/code-health-test-logic.js';
+import { DEFAULT_GOVERNANCE_FACTS, evaluateTestInventory } from '../logic/code-health-test-logic.js';
 import { createCodeHealthCommandRunner } from '../lib/code-health-command.js';
+import { scopePathRoles } from '../lib/code-health-deletion-authority.js';
 import { createCodeHealthEvidenceStore } from '../lib/code-health-evidence-store.js';
 import { createCodeHealthGitRevisionProvider } from '../lib/code-health-revision-provider.js';
 import { runSync } from '../lib/run-sync.js';
@@ -726,85 +727,101 @@ async function loadApplyFixture(name: string): Promise<ApplyFixture> {
   return JSON.parse(await fs.readFile(path.join(APPLY_SAMPLES, name), 'utf8')) as ApplyFixture;
 }
 
-async function createTempGitRepository(): Promise<string> {
-  const root = await tempRoot('code-health-phase3-repo-');
-  await git(root, ['init', '--quiet']);
-  await fs.mkdir(path.join(root, 'tests', 'legacy'), { recursive: true });
-  await fs.writeFile(path.join(root, 'tests', 'legacy', 'sum.test.mjs'), 'export const legacy = true;\n');
-  await fs.writeFile(path.join(root, '.gitignore'), '.w-model/\n');
-  await git(root, ['add', '--all']);
-  await git(root, ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'initial']);
-  return root;
-}
+describe('apply guard default-denies by declared role, never by path name (FIX-A)', () => {
+  async function createRepoWithTrackedPath(relativePath: string): Promise<string> {
+    const root = await tempRoot('code-health-phase3-evade-');
+    await git(root, ['init', '--quiet']);
+    const absolute = path.join(root, ...relativePath.split('/'));
+    await fs.mkdir(path.dirname(absolute), { recursive: true });
+    await fs.writeFile(absolute, 'export const evasive = true;\n');
+    await fs.writeFile(path.join(root, '.gitignore'), '.w-model/\n');
+    await git(root, ['add', '--all']);
+    await git(root, ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'initial']);
+    return root;
+  }
 
-describe('apply guard is keyed on the test surface, not on the declared action (F-1)', () => {
-  it('deleting a test file via delete-code or abstract is refused without an inventory authorization', async () => {
+  const evasivePaths = [
+    'spec/unique-negative.mjs',
+    'src/a.test-helper.mjs',
+    'legacy/unique-negative.mjs',
+    'Spec/Unique-Negative.mjs',
+  ];
+
+  it('a renamed/relocated test-declared path cannot evade the deletion gate', async () => {
     const revisionProvider = createCodeHealthGitRevisionProvider();
     const fixture = await loadApplyFixture('valid-patch.json');
     const workDir = await tempRoot('code-health-phase3-inputs-');
-    for (const action of ['delete-code', 'abstract'] as const) {
-      const root = await createTempGitRepository();
-      const liveRevision = (await revisionProvider.current(root)) as RevisionIdentity;
-      const candidate: CodeHealthCandidate = {
-        ...structuredClone(fixture.candidate),
-        candidateId,
-        phase: 'P3',
-        action,
-        revision: liveRevision,
-        files: ['tests/legacy/sum.test.mjs'],
-        symbols: ['legacy'],
-        tests: ['tests/legacy/sum.test.mjs'],
-        changeScope: { files: ['tests/legacy/sum.test.mjs'], symbols: ['legacy'], scopeHash },
-        evidenceBinding: { ...fixture.candidate.evidenceBinding, revision: liveRevision },
-        rollback: {
-          ...fixture.candidate.rollback,
-          preChangeRevision: liveRevision.commitSha,
-          command: `git apply -R .w-model/code-health/apply/${candidateId}.patch`,
-          patchPath: `.w-model/code-health/apply/${candidateId}.patch`,
-        },
-      };
-      const approval: ApprovalDecision = {
-        ...(fixture.approval as ApprovalDecision),
-        candidateId,
-        approvedAction: action,
-        approvedFiles: ['tests/legacy/sum.test.mjs'],
-        approvedSymbols: ['legacy'],
-        scopeHash,
-        revision: liveRevision,
-      };
-      const candidatePath = await writeJson(workDir, `candidate-${action}.json`, candidate);
-      const approvalPath = await writeJson(workDir, `approval-${action}.json`, approval);
-      const before = await gitStatus(root);
-      const result = runCli('code-health-apply.ts', [
-        '--candidate',
-        candidatePath,
-        '--approval',
-        approvalPath,
-        '--root',
-        root,
-        '--mode',
-        'commit',
-      ]);
-      expect(result.code, `${action}: ${result.stdout}${result.stderr}`).toBe(1);
-      expect(`${result.stdout}${result.stderr}`).toMatch(/test-surface change requires/i);
-      expect(await gitStatus(root)).toBe(before);
-      await expect(fs.stat(path.join(root, 'tests', 'legacy', 'sum.test.mjs'))).resolves.toBeTruthy();
+    for (const evasion of evasivePaths) {
+      for (const action of ['delete-code', 'abstract'] as const) {
+        const root = await createRepoWithTrackedPath(evasion);
+        const liveRevision = (await revisionProvider.current(root)) as RevisionIdentity;
+        const candidate: CodeHealthCandidate = {
+          ...structuredClone(fixture.candidate),
+          candidateId,
+          phase: 'P3',
+          action,
+          revision: liveRevision,
+          files: [evasion],
+          symbols: ['evasive'],
+          tests: [evasion],
+          changeScope: { files: [evasion], symbols: ['evasive'], scopeHash },
+          evidenceBinding: { ...fixture.candidate.evidenceBinding, revision: liveRevision },
+          rollback: {
+            ...fixture.candidate.rollback,
+            preChangeRevision: liveRevision.commitSha,
+            command: `git apply -R .w-model/code-health/apply/${candidateId}.patch`,
+            patchPath: `.w-model/code-health/apply/${candidateId}.patch`,
+          },
+        };
+        const approval: ApprovalDecision = {
+          ...(fixture.approval as ApprovalDecision),
+          candidateId,
+          approvedAction: action,
+          approvedFiles: [evasion],
+          approvedSymbols: ['evasive'],
+          scopeHash,
+          revision: liveRevision,
+        };
+        const candidatePath = await writeJson(workDir, `candidate-${action}.json`, candidate);
+        const approvalPath = await writeJson(workDir, `approval-${action}.json`, approval);
+        const before = await gitStatus(root);
+        const result = runCli('code-health-apply.ts', [
+          '--candidate',
+          candidatePath,
+          '--approval',
+          approvalPath,
+          '--root',
+          root,
+          '--mode',
+          'commit',
+        ]);
+        expect(result.code, `${evasion} (${action}): ${result.stdout}${result.stderr}`).toBe(1);
+        expect(`${result.stdout}${result.stderr}`).toMatch(
+          /a test deletion requires|not in the candidate's tracked implementation scope/i,
+        );
+        expect(await gitStatus(root)).toBe(before);
+        await expect(fs.stat(path.join(root, ...evasion.split('/')))).resolves.toBeTruthy();
+      }
     }
   }, 150_000);
 
-  it('isTestSurfacePath covers the canonical test surface', () => {
-    for (const file of [
-      'w-model-dev/scripts/__tests__/a.test.ts',
-      'tests/legacy/sum.test.mjs',
-      'test/spec.ts',
-      'src/foo.spec.ts',
-      'a/b/foo.test.tsx',
-    ]) {
-      expect(isTestSurfacePath(file)).toBe(true);
-    }
-    for (const file of ['src/unused.ts', 'w-model-dev/scripts/cli/self-test.ts', 'docs/notes.md']) {
-      expect(isTestSurfacePath(file)).toBe(false);
-    }
+  it('scopePathRoles classifies by declaration, not by name', () => {
+    const candidate = {
+      candidateId,
+      files: ['src/unused.ts'],
+      tests: ['spec/unique-negative.mjs'],
+      changeScope: { files: ['src/unused.ts', 'spec/unique-negative.mjs', 'legacy/other.mjs'], scopeHash },
+    } as unknown as CodeHealthCandidate;
+    const roles = scopePathRoles(candidate, undefined);
+    expect(roles).toEqual([
+      { file: 'src/unused.ts', declaredTest: false, declaredImplementation: true },
+      { file: 'spec/unique-negative.mjs', declaredTest: true, declaredImplementation: false },
+      { file: 'legacy/other.mjs', declaredTest: false, declaredImplementation: false },
+    ]);
+    // A tracked ledger can additionally declare the path as a test, regardless of its name/location.
+    const ledger = removalLedger('legacy/other.mjs');
+    const ledgerRoles = scopePathRoles(candidate, ledger);
+    expect(ledgerRoles.find((role) => role.file === 'legacy/other.mjs')).toMatchObject({ declaredTest: true });
   });
 });
 
@@ -1059,7 +1076,7 @@ describe('guarded real pre/post deletion (F-1/F-2/F-4/F-7)', () => {
     await expect(fs.stat(path.join(project.root, 'tests', 'legacy', 'old.test.mjs'))).resolves.toBeTruthy();
   }, 150_000);
 
-  it('a pre-placed coverage artifact that no controlled run wrote is refused', async () => {
+  it('a failed final proof rolls the deletion back and leaves a clean tree (FIX-B)', async () => {
     const project = await createGuardedProject('identities.mjs');
     const coveragePath = path.join(project.root, 'coverage', 'coverage-final.json');
     await fs.writeFile(coveragePath, COVERAGE_BYTES);
@@ -1067,6 +1084,8 @@ describe('guarded real pre/post deletion (F-1/F-2/F-4/F-7)', () => {
     await fs.utimes(coveragePath, pinned, pinned);
     const workDir = await tempRoot('code-health-phase3-guard-inputs-');
     const guardPath = await writeJson(workDir, 'guard.json', project.guardDoc);
+    const victim = path.join(project.root, 'tests', 'legacy', 'old.test.mjs');
+    await expect(fs.stat(victim)).resolves.toBeTruthy();
     const result = runCli('code-health-tests.ts', [
       '--guard',
       guardPath,
@@ -1077,6 +1096,16 @@ describe('guarded real pre/post deletion (F-1/F-2/F-4/F-7)', () => {
     ]);
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
     expect(`${result.stdout}${result.stderr}`).toMatch(/coverage artifact was not produced by the controlled run/i);
+    // Two-phase: the deletion really happened, then the failed proof rolled it back.
+    expect(result.stdout).toMatch(/"applied":false/);
+    expect(result.stdout).toMatch(/"rolledBack":true/);
+    await expect(fs.stat(victim)).resolves.toBeTruthy();
+    const diff = runSync('git', ['diff', '--exit-code'], {
+      cwd: project.root,
+      timeout: 30_000,
+      env: GIT_ENV,
+    });
+    expect(diff.status).toBe(0);
   }, 150_000);
 
   it('an embedded guard ledger is refused even before any suite runs', async () => {

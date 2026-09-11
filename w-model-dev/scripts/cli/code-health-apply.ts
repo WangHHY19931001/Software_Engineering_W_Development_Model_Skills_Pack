@@ -36,11 +36,12 @@ import type {
   RevisionIdentity,
 } from '../logic/code-health-contract.js';
 import { applyApproved, CodeHealthError, codeHealthApplyPatchPath } from '../logic/code-health-ledger-logic.js';
-import { evaluateTestInventory, isTestSurfacePath } from '../logic/code-health-test-logic.js';
+import { evaluateTestInventory } from '../logic/code-health-test-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import {
   readTrackedGovernanceManifest,
   readTrackedJson,
+  scopePathRoles,
   toTrackedRelativePath,
   verifyDeletionEvidence,
 } from '../lib/code-health-deletion-authority.js';
@@ -231,24 +232,55 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * File-class keyed deletion guard (F-1). Any path on the repository test surface may only be deleted
- * or modified when the authorization cites that exact test identity from a ledger-anchored inventory,
- * regardless of the candidate's declared `action`. The authority is delegated to the shared IO
- * verifier, which re-verifies stored evidence and the tracked governance manifest.
+ * Declared-role deletion guard (FIX-A). The decision never depends on a path name: a path is a test
+ * only when the candidate record or the tracked ledger record positively declares it as one
+ * (`tests`), and it is an implementation file only when one of them declares it in `files`. Every
+ * other path is refused (default-deny). A test deletion additionally requires a ledger-anchored
+ * inventory authorization citing that exact path/identity, and a Phase 3 candidate is always treated
+ * as a test deletion. The authority is delegated to the shared IO verifier, which re-verifies the
+ * stored evidence and the tracked governance manifest.
  */
-async function testSurfaceGuardViolations(
+async function deletionScopeGuardViolations(
   candidate: CodeHealthCandidate,
   inventoryFlag: string | undefined,
   ledgerFlag: string | undefined,
   root: string,
 ): Promise<string[]> {
   const scopeFiles = Array.isArray(candidate.changeScope?.files) ? candidate.changeScope.files : [];
-  if (!scopeFiles.some((file) => isTestSurfacePath(file))) return [];
+  if (scopeFiles.length === 0) return [];
+
+  let ledgerValue: unknown;
+  let ledgerRelative: string | null = null;
+  if (ledgerFlag !== undefined) {
+    ledgerRelative = toTrackedRelativePath(root, ledgerFlag);
+    if (ledgerRelative === null) {
+      return ['the --ledger authority must be a repository-relative tracked file beneath --root'];
+    }
+    const ledgerRead = await readTrackedJson(root, ledgerRelative);
+    if (ledgerRead.value === undefined) {
+      return [...ledgerRead.violations, 'the --ledger authority must be a tracked project file recorded at HEAD'];
+    }
+    ledgerValue = ledgerRead.value;
+  }
+  const roles = scopePathRoles(candidate, ledgerValue);
+  const requiresTestAuthorization = candidate.phase === 'P3' || roles.some((role) => role.declaredTest);
+
+  if (!requiresTestAuthorization) {
+    const notImplementation = roles.filter((role) => !role.declaredImplementation);
+    if (notImplementation.length > 0) {
+      return notImplementation.map(
+        (role) => `path ${role.file} is not in the candidate's tracked implementation scope`,
+      );
+    }
+    // Pure implementation deletion: Task 3's approval gate remains the authority.
+    return [];
+  }
+
   if (inventoryFlag === undefined) {
-    return ['a test-surface change requires --inventory <removal-proof>'];
+    return ['a test deletion requires --inventory <removal-proof>'];
   }
   if (ledgerFlag === undefined) {
-    return ['a test-surface change requires an explicit --ledger <file> authority'];
+    return ['a test deletion requires an explicit tracked --ledger <file> authority'];
   }
   const document = await readJsonOrExit<unknown>(inventoryFlag);
   if (!isRecord(document)) return ['the removal inventory must be an object'];
@@ -256,33 +288,21 @@ async function testSurfaceGuardViolations(
     return ['an embedded inventory ledger is not an accepted authority; supply a tracked --ledger file'];
   }
   const inventory = isRecord(document.inventory) ? document.inventory : document;
-  const ledgerRelative = toTrackedRelativePath(root, ledgerFlag);
-  if (ledgerRelative === null) {
-    return ['the --ledger authority must be a repository-relative tracked file beneath --root'];
-  }
   const violations: string[] = [];
   const schema = validateBySchema('code-health-test-inventory', inventory);
   if (!schema.valid) violations.push(...schema.errorMessages.map((message) => `[schema] ${message}`));
   const manifest = await readTrackedGovernanceManifest(root);
   violations.push(...manifest.violations);
-  const ledgerRead = await readTrackedJson(root, ledgerRelative);
-  violations.push(...ledgerRead.violations);
-  if (ledgerRead.value === undefined) {
-    violations.push('the --ledger authority must be a tracked project file recorded at HEAD');
-    return violations;
-  }
   const evidenceStore = createCodeHealthEvidenceStore({
     repositoryRoot: root,
     rawOutputRoot: '.w-model/code-health/raw',
   });
-  const review = evaluateTestInventory({ inventory, ledger: ledgerRead.value }, manifest.facts ?? {});
-  const testSurfaceFiles = scopeFiles.filter((file) => isTestSurfacePath(file));
+  const review = evaluateTestInventory({ inventory, ledger: ledgerValue }, manifest.facts ?? {});
   const authority = await verifyDeletionEvidence({
     repositoryRoot: root,
     candidate,
     inventory,
-    ledger: ledgerRead.value,
-    testSurfaceFiles,
+    ledger: ledgerValue,
     review,
     evidenceStore,
     revisionProvider,
@@ -334,14 +354,15 @@ async function main(): Promise<void> {
   const candidate = await readJsonOrExit<CodeHealthCandidate>(parsed.candidate);
   const approval = parsed.approval === undefined ? undefined : await readJsonOrExit<ApprovalDecision>(parsed.approval);
 
-  // Phase 3 (Task 5, F-1): the guard is keyed on the FILE CLASS, not on the declared `action`. Any
-  // test-surface path may only be deleted with an inventory authorization citing that exact test
-  // identity from the ledger-anchored record; embedded ledgers and missing evidence are refused
-  // before a single write.
-  const guardViolations = await testSurfaceGuardViolations(candidate, parsed.inventory, parsed.ledger, root);
+  // Phase 3 (Task 5, FIX-A): the guard is keyed on the DECLARED ROLE of every change-scope path,
+  // never on a path name. A test-declared path (or any Phase 3 candidate) may only be deleted with a
+  // ledger-anchored inventory authorization citing that exact path/identity; a path in neither the
+  // implementation nor the test declaration is refused. Embedded ledgers and missing evidence are
+  // refused before a single write.
+  const guardViolations = await deletionScopeGuardViolations(candidate, parsed.inventory, parsed.ledger, root);
   if (guardViolations.length > 0) {
     for (const violation of guardViolations) console.error(`✗ [EVIDENCE_INVALID] ${violation}`);
-    const reason = `test-surface change requires a validated deletion authorization: ${guardViolations.join('; ')}`;
+    const reason = `deletion scope requires a validated authorization: ${guardViolations.join('; ')}`;
     emit(1, blockResult(mode, reason, 'EVIDENCE_INVALID'));
     process.exitCode = 1;
     return;
