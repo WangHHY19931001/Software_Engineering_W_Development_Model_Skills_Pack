@@ -36,14 +36,16 @@ import type {
   RevisionIdentity,
 } from '../logic/code-health-contract.js';
 import { applyApproved, CodeHealthError, codeHealthApplyPatchPath } from '../logic/code-health-ledger-logic.js';
+import { evaluateTestInventory } from '../logic/code-health-test-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { createCodeHealthGitRevisionProvider } from '../lib/code-health-revision-provider.js';
 import { resolveControlledRelativePath } from '../lib/code-health-file-verifier.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { runMain } from '../lib/run-main.js';
 import { runSync } from '../lib/run-sync.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 
-const VALUE_FLAGS = ['candidate', 'approval', 'root', 'mode'] as const;
+const VALUE_FLAGS = ['candidate', 'approval', 'root', 'mode', 'inventory'] as const;
 type ApplyFlag = (typeof VALUE_FLAGS)[number];
 const APPLY_MODES = new Set(['dry-run', 'patch', 'commit']);
 const GIT_TIMEOUT_MS = 30_000;
@@ -217,6 +219,68 @@ function emit(exitCode: 0 | 1, payload: object): void {
   console.log(`APPLY_JSON ${JSON.stringify({ type: 'code-health-apply', exitCode, ...payload })}`);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function sortedEqual(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  const a = [...left].sort();
+  const b = [...right].sort();
+  return a.join('\u0000') === b.join('\u0000');
+}
+
+function sameRevisionValue(left: unknown, right: RevisionIdentity): boolean {
+  return (
+    isRecord(left) &&
+    left.commitSha === right.commitSha &&
+    left.treeSha === right.treeSha &&
+    left.sourceBundleSha256 === right.sourceBundleSha256
+  );
+}
+
+/**
+ * Refuse a `delete-test` application unless the supplied removal inventory authorizes it: the
+ * inventory must pass schema + ledger-anchored review, target the same candidate and revision, and
+ * name exactly the approved test files. Returns blocking reasons; empty means the inventory authorizes.
+ */
+async function deleteTestGuardViolations(
+  candidate: CodeHealthCandidate,
+  inventoryFlag: string | undefined,
+): Promise<string[]> {
+  if (inventoryFlag === undefined) {
+    return ['a delete-test candidate requires --inventory <removal-proof>'];
+  }
+  const document = await readJsonOrExit<unknown>(inventoryFlag);
+  if (!isRecord(document)) return ['the removal inventory must be an object'];
+  const inventory = isRecord(document.inventory) ? document.inventory : document;
+  const ledger = isRecord(document.ledger) ? document.ledger : undefined;
+  const violations: string[] = [];
+  const schema = validateBySchema('code-health-test-inventory', inventory);
+  if (!schema.valid) violations.push(...schema.errorMessages.map((message) => `[schema] ${message}`));
+  violations.push(...evaluateTestInventory({ inventory, ledger }).violations);
+
+  if (typeof inventory.candidateId !== 'string' || inventory.candidateId !== candidate.candidateId) {
+    violations.push('inventory candidateId does not match the delete-test candidate');
+  }
+  if (!sameRevisionValue(inventory.revision, candidate.revision)) {
+    violations.push('inventory revision is stale for the delete-test candidate');
+  }
+  const tests = Array.isArray(inventory.tests) ? inventory.tests : [];
+  const removalProof = isRecord(inventory.removalProof) ? inventory.removalProof : null;
+  const removalCandidate =
+    removalProof && typeof removalProof.candidateTestId === 'string'
+      ? tests.find((entry) => isRecord(entry) && entry.testId === removalProof.candidateTestId)
+      : undefined;
+  const expectedFiles =
+    isRecord(removalCandidate) && typeof removalCandidate.file === 'string' ? [removalCandidate.file] : [];
+  const scopeFiles = Array.isArray(candidate.changeScope?.files) ? candidate.changeScope.files : [];
+  if (expectedFiles.length === 0 || !sortedEqual(expectedFiles, scopeFiles)) {
+    violations.push('delete-test scope is not exactly the inventory removal candidate file');
+  }
+  return violations;
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   let parsed: Partial<Record<ApplyFlag, string>>;
@@ -259,6 +323,20 @@ async function main(): Promise<void> {
   const root = path.resolve(parsed.root ?? process.cwd());
   const candidate = await readJsonOrExit<CodeHealthCandidate>(parsed.candidate);
   const approval = parsed.approval === undefined ? undefined : await readJsonOrExit<ApprovalDecision>(parsed.approval);
+
+  // Phase 3 (Task 5): a test deletion is only reachable with a validated removal inventory. The
+  // inventory must be anchored to the ledger, prove an item-wise equivalent survivor, and explain
+  // every measured fact; anything else is refused before a single write.
+  if (candidate?.action === 'delete-test') {
+    const guardViolations = await deleteTestGuardViolations(candidate, parsed.inventory);
+    if (guardViolations.length > 0) {
+      for (const violation of guardViolations) console.error(`✗ [EVIDENCE_INVALID] ${violation}`);
+      const reason = `delete-test requires a validated removal inventory: ${guardViolations.join('; ')}`;
+      emit(1, blockResult(mode, reason, 'EVIDENCE_INVALID'));
+      process.exitCode = 1;
+      return;
+    }
+  }
 
   const revision = await revisionProvider.current(root);
   if (revision === null) {

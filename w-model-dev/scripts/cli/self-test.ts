@@ -99,6 +99,7 @@ import type {
   RevisionIdentity,
 } from '../logic/code-health-contract.js';
 import { findGaps } from '../logic/code-health-gap-logic.js';
+import { evaluateTestInventory } from '../logic/code-health-test-logic.js';
 import {
   applyApproved,
   executeRollback,
@@ -2621,6 +2622,56 @@ const CODE_HEALTH_GAP_CASES: CodeHealthGapCase[] = [
   },
 ];
 
+interface CodeHealthTestInventoryCase {
+  file: string;
+  expectedPassed: boolean;
+  expectedReasonPatterns?: RegExp[];
+  description: string;
+}
+
+const CODE_HEALTH_TEST_CASES: CodeHealthTestInventoryCase[] = [
+  {
+    file: 'valid-inventory.json',
+    expectedPassed: true,
+    description: '受保护唯一负向测试被完整登记 → protected facts 与记录分类一致，且作者/年龄仅为 provenance',
+  },
+  {
+    file: 'valid-redundant-removal.json',
+    expectedPassed: true,
+    description: '等价 survivor + ledger 锚定 scope + 已解释 facts → 允许一次性删除；作者/年龄不参与判定',
+  },
+  {
+    file: 'bad-author-age-deletion.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/protected/i],
+    description: '作者/年龄诱导删除唯一 protected 测试且无 survivor → 拒删',
+  },
+  {
+    file: 'bad-weaker-oracle.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/oracle/i],
+    description: 'survivor oracle 更弱 → 等价性证明失败',
+  },
+  {
+    file: 'bad-governance-drift.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/pre-push|self-test/i],
+    description: '18 项 pre-push 顺序/计数或 self-test facts 漂移未解释 → 阻塞',
+  },
+  {
+    file: 'bad-prepost-regression.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/test count/i],
+    description: 'pre/post 真实回归未观测到减一 → 阻塞',
+  },
+  {
+    file: 'bad-missing-ledger.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/ledger/i],
+    description: '移除声明缺 ledger 记录锚定 → 无授权，fail-closed',
+  },
+];
+
 // ==================== 测试执行器 ====================
 
 interface CaseResult {
@@ -4050,6 +4101,46 @@ async function runCodeHealthGapCases(samplesDir: string): Promise<CaseResult[]> 
   return results;
 }
 
+/**
+ * Phase 3 protected test inventory: schema validity plus ledger-anchored removal review. A removal
+ * claim must carry a computed equivalent survivor and fully explained pre/post facts; author/age never
+ * decide.
+ */
+async function runCodeHealthTestInventoryCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_HEALTH_TEST_CASES) {
+    const abs = path.join(samplesDir, 'code-health/phase3', c.file);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs is a self-test-registered fixture beneath samples/
+    const document = parseJsonSafe(await fs.readFile(abs, 'utf-8'));
+    const wrapped =
+      typeof document === 'object' &&
+      document !== null &&
+      !Array.isArray(document) &&
+      typeof (document as Record<string, unknown>).inventory === 'object' &&
+      (document as Record<string, unknown>).inventory !== null &&
+      !Array.isArray((document as Record<string, unknown>).inventory);
+    const record = document as Record<string, unknown>;
+    const review = wrapped
+      ? { inventory: record.inventory, ledger: record.ledger }
+      : { inventory: document as unknown };
+    const schema = validateBySchema('code-health-test-inventory', review.inventory);
+    const reasons = [...schema.errorMessages, ...evaluateTestInventory(review).violations];
+    const details: string[] = [];
+    const passed = c.expectedPassed ? reasons.length === 0 : reasons.length > 0;
+    if (!passed) details.push(`  - 期望 valid=${c.expectedPassed}，实际 reasons=${JSON.stringify(reasons)}`);
+    if (!c.expectedPassed && c.expectedReasonPatterns) {
+      details.push(...matchReasonPatterns(reasons, c.expectedReasonPatterns));
+    }
+    results.push({
+      name: `code-health/phase3/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 // -------------------- Metadata（版本号双写一致性） --------------------
 
 async function runMetadataCheck(skillRoot: string): Promise<CaseResult[]> {
@@ -4112,6 +4203,7 @@ async function main(): Promise<void> {
   console.log(`CodeHealth Phase1 动态用例: ${CODE_HEALTH_PHASE1_DYNAMIC_CASES.length}`);
   console.log(`CodeHealth Apply 用例: ${CODE_HEALTH_APPLY_CASES.length}`);
   console.log(`CodeHealth Gap 用例: ${CODE_HEALTH_GAP_CASES.length}`);
+  console.log(`CodeHealth Phase3 Test 用例: ${CODE_HEALTH_TEST_CASES.length}`);
   console.log(`BDD 用例       : ${BDD_CASES.length}`);
   console.log(`Coverage 用例  : ${COVERAGE_CASES.length}`);
   console.log(`Exemption 用例 : ${EXEMPTION_CASES.length}`);
@@ -4212,6 +4304,7 @@ async function main(): Promise<void> {
   const codeHealthResults = await runCodeHealthCases(samplesDir);
   const codeHealthApplyResults = await runCodeHealthApplyCases(samplesDir);
   const codeHealthGapResults = await runCodeHealthGapCases(samplesDir);
+  const codeHealthTestResults = await runCodeHealthTestInventoryCases(samplesDir);
   const all = [
     ...verifierResults,
     ...gateResults,
@@ -4254,6 +4347,7 @@ async function main(): Promise<void> {
     ...codeHealthPhase1DynamicResults,
     ...codeHealthApplyResults,
     ...codeHealthGapResults,
+    ...codeHealthTestResults,
   ];
 
   const passedCount = all.filter((r) => r.passed).length;

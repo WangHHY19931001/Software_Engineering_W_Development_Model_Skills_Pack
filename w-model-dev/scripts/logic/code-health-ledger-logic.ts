@@ -15,8 +15,9 @@ import {
   validateRevision,
 } from './code-health-contract.js';
 import { findGaps } from './code-health-gap-logic.js';
-import { clusterDuplicates, proveTestRemoval as proveTestRemovalBoundary } from './code-health-phase-boundaries.js';
+import { clusterDuplicates } from './code-health-phase-boundaries.js';
 import { buildStaticInventory, checkFalsePositiveGuards, mergeDynamicTrace } from './code-health-phase1-logic.js';
+import { evaluateDeletionFacts } from './code-health-test-logic.js';
 import type {
   ApprovalDecision,
   ApplyApprovedInput,
@@ -35,19 +36,27 @@ import type {
   GateFailureEvidence,
   LedgerEvent,
   LedgerEventKind,
-  ProtectedTestClass,
   RevisionIdentity,
   RollbackEvidence,
   RollbackPlan,
-  TestRecord,
-  TestRemovalProofInput,
 } from './code-health-contract.js';
 
 export { CodeHealthError, validateCodeHealthCandidate };
 export { clusterDuplicates, findGaps, runTddHarness };
 
-export function proveTestRemoval(input: TestRemovalProofInput): string[] {
-  return proveTestRemovalBoundary(input);
+/**
+ * Phase 3 surface (R3 closure). The real pure implementations live in `logic/code-health-test-logic.ts`;
+ * this legacy module re-exports them so existing consumers keep one import path. `proveTestRemoval` is
+ * the real proof, replacing the Task 1 NOT_IMPLEMENTED boundary delegate.
+ */
+export { classifyProtectedTest, proveTestRemoval } from './code-health-test-logic.js';
+
+/**
+ * Deletion facts evaluation (R2). The extended real implementation lives in
+ * `logic/code-health-test-logic.ts`; this wrapper keeps the frozen `evaluateDeletion` import path.
+ */
+export function evaluateDeletion(facts: DeletionFacts): DeletionEvaluation {
+  return evaluateDeletionFacts(facts);
 }
 export type {
   AbstractionProposal,
@@ -1662,75 +1671,6 @@ export async function executeRollback(rollback: RollbackPlan): Promise<boolean> 
     return false;
   }
   return true;
-}
-
-export function evaluateDeletion(facts: DeletionFacts): DeletionEvaluation {
-  const violations: string[] = [];
-  if (
-    !isRecord(facts) ||
-    typeof facts.testCount !== 'number' ||
-    !Number.isInteger(facts.testCount) ||
-    facts.testCount < 0
-  ) {
-    violations.push('test count is invalid');
-  }
-  if (!isRecord(facts) || typeof facts.coverageProvenance !== 'string' || facts.coverageProvenance.trim() === '') {
-    violations.push('coverage provenance is required');
-  }
-  if (!isRecord(facts) || !Array.isArray(facts.governanceFacts) || facts.governanceFacts.length === 0) {
-    violations.push('governance facts are required');
-  }
-  if (isRecord(facts) && facts.testCountDelta !== undefined && facts.testCountDelta !== -1) {
-    violations.push('test count delta must explain exactly one removed test');
-  }
-  return { passed: violations.length === 0, violations };
-}
-
-export function classifyProtectedTest(test: TestRecord): ProtectedTestClass | null {
-  if (!isRecord(test)) throw new Error('test record requires a complete object');
-  const requiredTextFields = [
-    'testId',
-    'file',
-    'symbol',
-    'author',
-    'createdAt',
-    'lastChangedAt',
-    'level',
-    'setup',
-    'stimulus',
-    'oracle',
-    'failureSensitivity',
-    'scenarioClass',
-  ] as const;
-  for (const field of requiredTextFields) {
-    if (typeof test[field] !== 'string' || test[field].trim() === '') {
-      throw new Error(`test.${field} requires a non-empty value`);
-    }
-  }
-  if (!Array.isArray(test.rtmIds) || !Array.isArray(test.governanceFacts)) throw new Error('test arrays are required');
-  const text = [
-    test.testId,
-    test.file,
-    test.symbol,
-    test.setup,
-    test.stimulus,
-    test.oracle,
-    test.failureSensitivity,
-    test.scenarioClass,
-    ...test.governanceFacts,
-  ]
-    .join(' ')
-    .toLowerCase();
-  if (/pre[- ]?push/.test(text)) return 'pre-push';
-  if (/self[- ]?test/.test(text)) return 'self-test';
-  if (/docs?[- ]consistency/.test(text)) return 'docs-consistency';
-  if (/security|auth|injection|secret|redact|privilege/.test(text)) return 'security';
-  if (/concurr|race|lock|atomic|idempot|retry|ordering/.test(text)) return 'concurrency';
-  if (/platform|windows|linux|git bash|powershell|line ending|executable/.test(text)) return 'platform';
-  if (/rollback|migration/.test(text)) return 'migration-rollback';
-  if (/boundary|empty|zero|min|max|overflow|truncat|off[- ]by[- ]one/.test(text)) return 'boundary';
-  if (/negative|invalid|malformed|missing|error|failure/.test(text)) return 'unique-negative';
-  return null;
 }
 
 export function proveAbstraction(cluster: unknown, proposal: unknown): string[] {
