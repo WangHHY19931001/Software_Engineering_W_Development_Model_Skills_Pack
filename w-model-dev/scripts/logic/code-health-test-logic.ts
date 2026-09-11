@@ -6,20 +6,23 @@
  * evaluation, and the inventory review that cross-checks a proposed test removal against the
  * ledger-recorded candidate.
  *
- * Guarantee and honest authority boundary (inherited from Task 4's design lesson):
- *   - This module derives every deletion authorization from the record it is handed: the ledger
- *     candidate's approved scope and declared tests, the inventory's recorded pre/post regression
- *     facts, and the item-wise computed survivor equivalence. Caller-declared `*Equivalent` /
- *     `*Rehomed` labels are only ever cross-checked against the computed comparison, never trusted.
- *   - Author, age, name, indirectness, difficulty, and low coverage are provenance output only. They
- *     are never consulted when deciding whether a removal is allowed.
- *   - A pure function cannot be unforgeable: it cannot authenticate the ledger or inventory it is
- *     handed. The ledger record, the human approval gate in `cli/code-health-apply.ts`, and the role
- *     signature chain are the authority for a real deletion. The irreducible limit is documented here
- *     rather than overclaimed.
+ * Default-deny (R6/F-3): a test is treated as protected unless its non-protected status is
+ * positively established from the ledger/tracked record. Heuristic classification may only ADD
+ * protection, never remove it. `proveTestRemoval` therefore refuses a non-protected candidate by
+ * default; only `evaluateTestInventory` may authorize one, and only when the ledger record declares
+ * that exact test as a `delete-test` target.
  *
- * The real process execution for pre/post suites is an IO boundary and lives in `lib/`; `logic/` has
- * no `node:fs` / `node:child_process` / `node:path` import (dependency-boundaries gate).
+ * Evidence boundary (F-4): the pure functions here enforce the structural shape of the recorded
+ * facts (an observed real command, an integer exit code, a controlled raw-output path and hash, and
+ * an explicit coverage provenance). They cannot open files; existence, hash, revision binding, and
+ * count recomputation are enforced at the IO boundary (`lib/code-health-deletion-authority.ts`).
+ *
+ * Honest authority boundary (Task 4 lesson): a pure function cannot authenticate the ledger or the
+ * inventory it is handed. The ledger record, the canonical file verification, the human approval
+ * gate, and the role signature chain are the authority. A fully forged ledger/project is the
+ * irreducible boundary and is documented rather than overclaimed.
+ *
+ * `logic/` has no `node:fs` / `node:child_process` / `node:path` import (dependency-boundaries gate).
  */
 
 import {
@@ -28,7 +31,6 @@ import {
   type CodeHealthLedger,
   type DeletionEvaluation,
   type DeletionFacts,
-  type ErrorCode,
   type ProtectedTestClass,
   type TestRecord,
   type TestRemovalProofInput,
@@ -63,8 +65,25 @@ const TEST_RECORD_TEXT_FIELDS = [
 ] as const;
 
 const TEST_LEVELS = ['unit', 'integration', 'system', 'acceptance'] as const;
+/** Closed vocabulary of rehome artifacts. The declaration is advisory; the RTM superset check is enforced. */
 const REHOME_ARTIFACTS = ['rtm', 'coverage', 'docs-consistency', 'sample-matrix'] as const;
+const LEDGER_DELETION_ACTIONS = ['delete-test', 'delete-code', 'abstract'] as const;
 const CANDIDATE_ID_PATTERN = /^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$/;
+const HEX64_PATTERN = /^[0-9a-f]{64}$/;
+
+/** Repo-owned governance constants. Project-specific counts are supplied by the tracked manifest. */
+export const DEFAULT_GOVERNANCE_FACTS = { prePushItems: 18, fixtureReachability: 'all-referenced' } as const;
+
+export interface ExpectedGovernanceFacts {
+  /** Number of ordered pre-push gate items the repository owns. */
+  prePushItems?: number;
+  /** Repo-owned expected self-test sample-to-check count. */
+  selfTestSamples?: number;
+  /** Repo-owned expected docs-consistency violation count. */
+  docsConsistencyViolations?: number;
+  /** Repo-owned expected fixture-reachability statement. */
+  fixtureReachability?: string;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -78,6 +97,17 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 }
 
+/** Canonical repository test surface used to key the apply guard on file class instead of `action`. */
+export function isTestSurfacePath(file: unknown): boolean {
+  if (typeof file !== 'string' || file.trim() === '') return false;
+  const normalized = file.replace(/\\/g, '/');
+  return (
+    /(^|\/)__tests__\//.test(normalized) ||
+    /(^|\/)(tests?)\//.test(normalized) ||
+    /\.(test|spec)\.[^/]+$/.test(normalized)
+  );
+}
+
 /**
  * Structural validity of one `TestRecord`. Returns reasons rather than throwing so a whole inventory
  * can be reviewed fail-closed without aborting on the first malformed record.
@@ -87,9 +117,6 @@ export function validateTestRecord(value: unknown, field = 'test'): string[] {
   if (!isRecord(value)) return [`${field} must be a test record object`];
   for (const key of TEST_RECORD_TEXT_FIELDS) {
     if (!isNonEmptyString(value[key])) reasons.push(`${field}.${key} requires a non-empty value`);
-  }
-  if (!isNonEmptyString(value.testId)) {
-    // already reported by the loop; keep the record shape stable for downstream lookups
   }
   if (!TEST_LEVELS.includes(value.level as (typeof TEST_LEVELS)[number])) {
     reasons.push(`${field}.level must be unit, integration, system, or acceptance`);
@@ -101,9 +128,10 @@ export function validateTestRecord(value: unknown, field = 'test'): string[] {
 
 /**
  * Classify one test into the protected set, or `null` when no protected class applies. Classification
- * uses the test's behavior contract (setup/stimulus/oracle/failureSensitivity/scenarioClass/
- * governanceFacts) plus its identity; `author`, `createdAt`, and `lastChangedAt` are deliberately
- * excluded so provenance can never influence protection.
+ * uses the test's behavior contract plus its identity; `author`, `createdAt`, and `lastChangedAt` are
+ * deliberately excluded so provenance can never influence protection. A `null` result is NOT
+ * authorization to delete: it only means this heuristic found no protection (default-deny lives in
+ * `proveTestRemoval`/`evaluateTestInventory`).
  */
 export function classifyProtectedTest(test: TestRecord): ProtectedTestClass | null {
   if (!isRecord(test)) throw new Error('test record requires a complete object');
@@ -162,12 +190,13 @@ function factValues(entries: GovernanceFact[], key: string): string[] {
  * provenance, the 18-item pre-push gate count/order, and the self-test / docs-consistency /
  * fixture-reachability facts. Any change that is not explicitly explained blocks the deletion.
  *
+ * When `expected` (repo-owned constants / the tracked governance manifest) is supplied, the declared
+ * values must match it; a self-consistent but repo-contradicting declaration is refused.
+ *
  * Contract-shape note (R1): `governanceFacts` is a `string[]`; the plan's object-shaped
- * `{ prePushCount: 17 }` is expressed here as canonical `key:value` facts (for example
- * `pre-push:17` for an 18-item gate count drift and `post-docs-consistency:40` plus
- * `explained:docs-consistency` for an explained count change).
+ * `{ prePushCount: 17 }` is expressed here as canonical `key:value` facts.
  */
-export function evaluateDeletionFacts(facts: DeletionFacts): DeletionEvaluation {
+export function evaluateDeletionFacts(facts: DeletionFacts, expected?: ExpectedGovernanceFacts): DeletionEvaluation {
   const violations: string[] = [];
   const factsAreRecord = isRecord(facts);
   if (
@@ -213,9 +242,12 @@ export function evaluateDeletionFacts(facts: DeletionFacts): DeletionEvaluation 
     violations.push('coverage provenance is not bound to the recorded coverage-provenance fact');
   }
 
+  const expectedPrePush = expected?.prePushItems ?? DEFAULT_GOVERNANCE_FACTS.prePushItems;
   const prePushCount = value('pre-push');
-  if (prePushCount === undefined || prePushCount.trim() !== '18') {
-    violations.push(`pre-push gate count must remain 18 items (got ${String(prePushCount)})`);
+  if (prePushCount === undefined || prePushCount.trim() !== String(expectedPrePush)) {
+    violations.push(
+      `pre-push gate count must match the repo-owned value ${expectedPrePush} items (got ${String(prePushCount)})`,
+    );
   }
   const prePushOrder = value('pre-push-order');
   const postPushOrder = value('post-push-order');
@@ -229,6 +261,14 @@ export function evaluateDeletionFacts(facts: DeletionFacts): DeletionEvaluation 
   } else if (selfTestDrift && !hasFact('explained', 'self-test')) {
     violations.push('self-test facts drift is unexplained');
   }
+  if (expected?.selfTestSamples !== undefined) {
+    const declared = value('post-self-test');
+    if (declared !== String(expected.selfTestSamples) && !hasFact('explained', 'self-test')) {
+      violations.push(
+        `self-test facts contradict the repo-owned value ${expected.selfTestSamples} (got ${String(declared)}) without an explained:self-test fact`,
+      );
+    }
+  }
 
   const docsDrift = value('pre-docs-consistency') !== value('post-docs-consistency');
   if (value('pre-docs-consistency') === undefined || value('post-docs-consistency') === undefined) {
@@ -236,34 +276,37 @@ export function evaluateDeletionFacts(facts: DeletionFacts): DeletionEvaluation 
   } else if (docsDrift && !hasFact('explained', 'docs-consistency')) {
     violations.push('docs-consistency facts drift is unexplained');
   }
+  if (expected?.docsConsistencyViolations !== undefined) {
+    const declared = value('post-docs-consistency');
+    if (declared !== String(expected.docsConsistencyViolations) && !hasFact('explained', 'docs-consistency')) {
+      violations.push(
+        `docs-consistency facts contradict the repo-owned value ${expected.docsConsistencyViolations} (got ${String(declared)}) without an explained:docs-consistency fact`,
+      );
+    }
+  }
 
-  if (!isNonEmptyString(value('fixture-reachability'))) {
-    violations.push('fixture reachability is unexplained');
+  const expectedReachability = expected?.fixtureReachability ?? DEFAULT_GOVERNANCE_FACTS.fixtureReachability;
+  if (value('fixture-reachability') !== expectedReachability) {
+    violations.push(
+      `fixture reachability must be ${expectedReachability} (got ${String(value('fixture-reachability'))})`,
+    );
   }
 
   for (const artifact of REHOME_ARTIFACTS) {
     if (!hasFact('rehomed', artifact)) {
-      violations.push(`${artifact} rehome is not explicitly recorded`);
+      violations.push(
+        `${artifact} rehome is not explicitly recorded (declaration is advisory, not independently verified)`,
+      );
     }
   }
   return { passed: violations.length === 0, violations };
 }
 
 /**
- * Real removal proof (R2/R7). Removing a test is allowed only when:
- *   - the pre and post regression facts are real, the post run removed exactly one test, and both
- *     carry source-bound coverage provenance;
- *   - an independently verified equivalent survivor exists and is item-wise equal on setup,
- *     stimulus, oracle, failure sensitivity, level, and scenario class, and preserves the candidate's
- *     RTM coverage;
- *   - a protected candidate is preserved by an equally protected survivor (protection is rehomed, not
- *     dropped);
- *   - the RTM / coverage / docs-consistency / sample-matrix rehome is explicitly recorded.
- *
- * A weaker oracle, narrower RTM coverage, lower level, different scenario class, or mere similarity
- * fails. Author, age, and coverage level are never deletion criteria.
+ * Removal proof core. Default-deny: a non-protected candidate is refused unless the caller is the
+ * ledger-anchored inventory reviewer that positively established its non-protected status.
  */
-export function proveTestRemoval(input: TestRemovalProofInput): string[] {
+function proveTestRemovalCore(input: TestRemovalProofInput, nonProtectedEstablished: boolean): string[] {
   if (!isRecord(input) || !isRecord(input.candidate)) {
     throw new CodeHealthError('ARG_INVALID', 'test removal proof requires a candidate test record');
   }
@@ -277,6 +320,11 @@ export function proveTestRemoval(input: TestRemovalProofInput): string[] {
   const candidate = input.candidate as TestRecord;
   const protectedClass = classifyProtectedTest(candidate);
   const violations: string[] = [];
+  if (protectedClass === null && !nonProtectedEstablished) {
+    violations.push(
+      'non-protected status is not positively established from the ledger/tracked record; the test is treated as protected',
+    );
+  }
   const survivor = input.survivor;
 
   if (survivor === null || survivor === undefined) {
@@ -353,6 +401,23 @@ export function proveTestRemoval(input: TestRemovalProofInput): string[] {
   return violations;
 }
 
+/**
+ * Real removal proof (R2/R7). Removing a test is allowed only when:
+ *   - an independently verified equivalent survivor exists and is item-wise equal on setup,
+ *     stimulus, oracle, failure sensitivity, level, and scenario class, and preserves the candidate's
+ *     RTM coverage;
+ *   - a protected candidate is preserved by an equally protected survivor (protection is rehomed);
+ *   - a non-protected candidate is positively established as such by the ledger-anchored reviewer
+ *     (`evaluateTestInventory`); a direct call always treats it as protected (default-deny);
+ *   - the pre/post regression facts are real and the post run removed exactly one test.
+ *
+ * A weaker oracle, narrower RTM coverage, lower level, different scenario class, or mere similarity
+ * fails. Author, age, and coverage level are never deletion criteria.
+ */
+export function proveTestRemoval(input: TestRemovalProofInput): string[] {
+  return proveTestRemovalCore(input, false);
+}
+
 /** One protected test plus its provenance-only author/age metadata. */
 export interface ProtectedTestProvenance {
   testId: string;
@@ -366,7 +431,10 @@ export interface TestInventoryRemovalSummary {
   candidateTestId: string;
   survivorTestId: string | null;
   candidateProtectedClass: ProtectedTestClass | null;
-  equivalent: boolean;
+  /** True only when the survivor is present and every item-wise comparison is computed equal. */
+  equivalenceProven: boolean;
+  /** True only when the ledger record positively establishes the candidate as a non-protected delete-test target. */
+  nonProtectedEstablished: boolean;
 }
 
 export interface TestInventoryEvaluation {
@@ -383,6 +451,7 @@ export interface TestInventoryReviewInput {
   ledger?: unknown;
 }
 
+/** Structural evidence shape required of a recorded regression: a real observed command with a bound raw output. */
 function regressionViolations(value: unknown, field: string): string[] {
   const reasons: string[] = [];
   if (!isRecord(value)) return [`${field} is required`];
@@ -391,39 +460,68 @@ function regressionViolations(value: unknown, field: string): string[] {
   }
   if (!isNonEmptyString(value.coverageProvenance)) reasons.push(`${field}.coverageProvenance is required`);
   if (!isStringArray(value.governanceFacts)) reasons.push(`${field}.governanceFacts must be a string array`);
+  const command = value.command;
+  if (!isRecord(command)) {
+    reasons.push(`${field}.command evidence is required`);
+    return reasons;
+  }
+  if (
+    command.observation !== 'observed' ||
+    typeof command.exitCode !== 'number' ||
+    !Number.isInteger(command.exitCode)
+  ) {
+    reasons.push(`${field}.command must be a real observed run with an integer exit code`);
+  }
+  if (!isNonEmptyString(command.rawOutputPath) || !isNonEmptyString(command.command)) {
+    reasons.push(`${field}.command must carry the executed command and its controlled raw output path`);
+  }
+  if (typeof command.rawOutputSha256 !== 'string' || !HEX64_PATTERN.test(command.rawOutputSha256)) {
+    reasons.push(`${field}.command.rawOutputSha256 must be a lowercase SHA-256 digest`);
+  }
   return reasons;
 }
 
-function declaredEquivalence(proof: Record<string, unknown>): Record<string, unknown> {
-  return {
-    setupEquivalent: proof.setupEquivalent,
-    stimulusEquivalent: proof.stimulusEquivalent,
-    oracleEquivalent: proof.oracleEquivalent,
-    failureSensitivityEquivalent: proof.failureSensitivityEquivalent,
-    levelEquivalent: proof.levelEquivalent,
-  };
+function computedEquivalence(candidate: TestRecord, survivor: TestRecord): boolean {
+  return (
+    survivor.setup === candidate.setup &&
+    survivor.stimulus === candidate.stimulus &&
+    survivor.oracle === candidate.oracle &&
+    survivor.failureSensitivity === candidate.failureSensitivity &&
+    survivor.level === candidate.level &&
+    survivor.scenarioClass === candidate.scenarioClass
+  );
 }
 
-function computedEquivalence(candidate: TestRecord, survivor: TestRecord): Record<string, boolean> {
-  return {
+function declaredEquivalenceMatches(
+  proof: Record<string, unknown>,
+  candidate: TestRecord,
+  survivor: TestRecord,
+): boolean {
+  const computed = {
     setupEquivalent: survivor.setup === candidate.setup,
     stimulusEquivalent: survivor.stimulus === candidate.stimulus,
     oracleEquivalent: survivor.oracle === candidate.oracle,
     failureSensitivityEquivalent: survivor.failureSensitivity === candidate.failureSensitivity,
     levelEquivalent: survivor.level === candidate.level,
   };
+  return Object.entries(computed).every(([key, value]) => proof[key] === value);
 }
 
 /**
- * Review a whole Phase 3 test inventory. Structural completeness and protected-fact declarations are
- * always checked; a proposed removal additionally requires the ledger-recorded candidate (approved
- * scope + declared tests), a computed survivor equivalence whose caller-declared booleans must agree
- * with the computation, a passing removal proof, and fully explained deletion facts.
+ * Review a whole Phase 3 test inventory. Structural completeness (including the real-evidence shape
+ * of every recorded regression) and protected-fact declarations are always checked. A proposed
+ * removal additionally requires the ledger-recorded candidate as its authority, a computed survivor
+ * equivalence whose caller-declared booleans must agree with the computation, a passing default-deny
+ * removal proof, and fully explained deletion facts.
  *
- * Honest limit: the ledger and inventory are inputs. A pure reviewer cannot authenticate them; the
- * ledger record, the human approval gate, and the signature chain remain the authority.
+ * Honest limit: the ledger and inventory are inputs. Existence, hashing, revision binding, and count
+ * recomputation are the IO reviewer's job (`lib/code-health-deletion-authority.ts`); the ledger
+ * record, the human approval gate, and the signature chain remain the authority.
  */
-export function evaluateTestInventory(input: TestInventoryReviewInput): TestInventoryEvaluation {
+export function evaluateTestInventory(
+  input: TestInventoryReviewInput,
+  expected?: ExpectedGovernanceFacts,
+): TestInventoryEvaluation {
   const empty: TestInventoryEvaluation = { passed: false, violations: [], protectedTests: [], removal: null };
   if (!isRecord(input) || !isRecord(input.inventory)) {
     return { ...empty, violations: ['a test inventory document is required'] };
@@ -524,26 +622,25 @@ export function evaluateTestInventory(input: TestInventoryReviewInput): TestInve
         violations.push('removalProof must reference a survivor test in the inventory');
       }
 
+      let ledgerCandidate: CodeHealthLedger['candidates'][number] | undefined;
       if (!isRecord(input.ledger)) {
         violations.push('a removal proof requires the ledger-recorded candidate as its authority (ledger is missing)');
       } else {
         const ledger = input.ledger as unknown as CodeHealthLedger;
-        const ledgerCandidate = Array.isArray(ledger.candidates)
+        ledgerCandidate = Array.isArray(ledger.candidates)
           ? ledger.candidates.find((entry) => entry.candidateId === inventory.candidateId)
           : undefined;
         if (!ledgerCandidate) {
           violations.push('ledger does not contain the inventory candidate record');
         } else {
-          if (ledgerCandidate.action !== 'delete-test') {
-            violations.push('ledger candidate action is not delete-test');
+          if (!(LEDGER_DELETION_ACTIONS as readonly string[]).includes(ledgerCandidate.action)) {
+            violations.push('ledger candidate action is not a deletion action');
           }
           const scopeFiles = Array.isArray(ledgerCandidate.changeScope?.files) ? ledgerCandidate.changeScope.files : [];
           const declaredTests = Array.isArray(ledgerCandidate.tests) ? ledgerCandidate.tests : [];
           if (candidateRecord) {
             const inScope = scopeFiles.includes(candidateRecord.file) || declaredTests.includes(candidateRecord.file);
-            if (!inScope) {
-              violations.push('deletion candidate is not in the ledger candidate approved scope');
-            }
+            if (!inScope) violations.push('deletion candidate is not in the ledger candidate approved scope');
           }
           if (
             survivorRecord &&
@@ -554,21 +651,37 @@ export function evaluateTestInventory(input: TestInventoryReviewInput): TestInve
         }
       }
 
+      let equivalenceProven = false;
       if (candidateRecord) {
         if (survivorRecord) {
-          const computed = computedEquivalence(candidateRecord, survivorRecord);
-          const declared = declaredEquivalence(proof);
-          for (const [key, computedValue] of Object.entries(computed)) {
-            if (declared[key] !== computedValue) {
-              violations.push(`declared ${key} does not match the computed survivor comparison`);
-            }
+          if (!declaredEquivalenceMatches(proof, candidateRecord, survivorRecord)) {
+            violations.push('declared equivalence booleans do not match the computed survivor comparison');
           }
+          equivalenceProven =
+            computedEquivalence(candidateRecord, survivorRecord) &&
+            candidateRecord.rtmIds.every((rtmId) => survivorRecord.rtmIds.includes(rtmId));
         }
         if (proof.rtmRehomed !== true) violations.push('removalProof must record rtmRehomed');
         if (proof.governanceRehomed !== true) violations.push('removalProof must record governanceRehomed');
         if (!isRecord(inventory.preRegression) || !isRecord(inventory.postRegression)) {
           // regression shape already reported; skip the proof derivation to avoid duplicate crashes
         } else {
+          let candidateClass: ProtectedTestClass | null = null;
+          try {
+            candidateClass = classifyProtectedTest(candidateRecord);
+          } catch {
+            candidateClass = null;
+          }
+          // Positive non-protected establishment comes only from the ledger record, never from the
+          // heuristic classifier's null result: the ledger must declare this exact test as a delete-test.
+          const ledgerScopeFiles = Array.isArray(ledgerCandidate?.changeScope?.files)
+            ? ledgerCandidate.changeScope.files
+            : [];
+          const ledgerTests = Array.isArray(ledgerCandidate?.tests) ? ledgerCandidate.tests : [];
+          const nonProtectedEstablished =
+            candidateClass === null &&
+            ledgerCandidate?.action === 'delete-test' &&
+            (ledgerScopeFiles.includes(candidateRecord.file) || ledgerTests.includes(candidateRecord.file));
           const pre = {
             testCount: inventory.preRegression.testCount as number,
             coverageProvenance: inventory.preRegression.coverageProvenance as string,
@@ -580,42 +693,33 @@ export function evaluateTestInventory(input: TestInventoryReviewInput): TestInve
             governanceFacts: inventory.postRegression.governanceFacts as string[],
           };
           violations.push(
-            ...proveTestRemoval({
-              candidate: candidateRecord,
-              survivor: survivorRecord ?? null,
-              pre,
-              post,
-            }),
+            ...proveTestRemovalCore(
+              { candidate: candidateRecord, survivor: survivorRecord ?? null, pre, post },
+              nonProtectedEstablished,
+            ),
           );
           violations.push(
-            ...evaluateDeletionFacts({
-              testCount: post.testCount,
-              coverageProvenance: post.coverageProvenance,
-              governanceFacts: post.governanceFacts,
-              testCountDelta: post.testCount - pre.testCount,
-            }).violations,
+            ...evaluateDeletionFacts(
+              {
+                testCount: post.testCount,
+                coverageProvenance: post.coverageProvenance,
+                governanceFacts: post.governanceFacts,
+                testCountDelta: post.testCount - pre.testCount,
+              },
+              expected,
+            ).violations,
           );
+          removal = {
+            candidateTestId,
+            survivorTestId,
+            candidateProtectedClass: candidateClass,
+            equivalenceProven,
+            nonProtectedEstablished,
+          };
         }
-        removal = {
-          candidateTestId,
-          survivorTestId,
-          candidateProtectedClass: (() => {
-            try {
-              return classifyProtectedTest(candidateRecord);
-            } catch {
-              return null;
-            }
-          })(),
-          equivalent: survivorRecord !== null,
-        };
       }
     }
   }
 
   return { passed: violations.length === 0, violations, protectedTests, removal };
-}
-
-/** Typed fail-closed error helper kept local so the module never leaks an untyped throw. */
-export function testInventoryError(code: ErrorCode, reason: string): CodeHealthError {
-  return new CodeHealthError(code, reason);
 }

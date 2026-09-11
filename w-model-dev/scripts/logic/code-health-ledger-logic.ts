@@ -17,7 +17,7 @@ import {
 import { findGaps } from './code-health-gap-logic.js';
 import { clusterDuplicates } from './code-health-phase-boundaries.js';
 import { buildStaticInventory, checkFalsePositiveGuards, mergeDynamicTrace } from './code-health-phase1-logic.js';
-import { evaluateDeletionFacts } from './code-health-test-logic.js';
+import { evaluateDeletionFacts, type ExpectedGovernanceFacts } from './code-health-test-logic.js';
 import type {
   ApprovalDecision,
   ApplyApprovedInput,
@@ -55,8 +55,8 @@ export { classifyProtectedTest, proveTestRemoval } from './code-health-test-logi
  * Deletion facts evaluation (R2). The extended real implementation lives in
  * `logic/code-health-test-logic.ts`; this wrapper keeps the frozen `evaluateDeletion` import path.
  */
-export function evaluateDeletion(facts: DeletionFacts): DeletionEvaluation {
-  return evaluateDeletionFacts(facts);
+export function evaluateDeletion(facts: DeletionFacts, expected?: ExpectedGovernanceFacts): DeletionEvaluation {
+  return evaluateDeletionFacts(facts, expected);
 }
 export type {
   AbstractionProposal,

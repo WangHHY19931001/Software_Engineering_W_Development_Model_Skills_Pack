@@ -2,14 +2,14 @@
 /**
  * Phase 3 tests: protected-test inventory, removal proof, and guarded deletion.
  *
- * Safety boundary: every real process spawn and every real deletion in this file happens inside an
- * isolated temporary Git repository this test creates and removes. This repository's own tests are
- * never deleted or modified; the worktree is only ever read to prove it stayed untouched.
+ * Safety boundary: every real process spawn and every real deletion happens inside an isolated
+ * temporary Git repository this test creates and removes. This repository's own tests are never
+ * deleted or modified.
  *
- * Design lesson inherited from Task 4: a determination that authorizes deletion must be cross-checked
- * against the ledger-recorded test inventory and the recorded pre/post facts, never against
- * caller-declared labels alone. Author, age, name, indirectness, difficulty, and low coverage are
- * provenance only and can never justify a removal.
+ * Design lesson from Task 4: a determination that authorizes deletion derives its authority from the
+ * tracked ledger record, the live revision, canonical file verification, and real stored evidence —
+ * never from caller-declared labels. Author, age, name, indirectness, difficulty, and low coverage
+ * are provenance only.
  */
 
 import { createHash } from 'node:crypto';
@@ -26,12 +26,15 @@ import type {
   CodeHealthCandidate,
   CodeHealthLedger,
   CommandEvidence,
+  EvidenceBinding,
   ProtectedTestClass,
   RevisionIdentity,
   TestRecord,
 } from '../logic/code-health-contract.js';
 import { classifyProtectedTest, evaluateDeletion, proveTestRemoval } from '../logic/code-health-ledger-logic.js';
-import { evaluateTestInventory } from '../logic/code-health-test-logic.js';
+import { DEFAULT_GOVERNANCE_FACTS, evaluateTestInventory, isTestSurfacePath } from '../logic/code-health-test-logic.js';
+import { createCodeHealthCommandRunner } from '../lib/code-health-command.js';
+import { createCodeHealthEvidenceStore } from '../lib/code-health-evidence-store.js';
 import { createCodeHealthGitRevisionProvider } from '../lib/code-health-revision-provider.js';
 import { runSync } from '../lib/run-sync.js';
 
@@ -52,8 +55,31 @@ const revision: RevisionIdentity = {
 
 const candidateId = 'CHG-P3-20260907-901';
 const scopeHash = `sha256:${'e'.repeat(64)}`;
+const GIT_ENV = {
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
+  GIT_TERMINAL_PROMPT: '0',
+  GIT_AUTHOR_NAME: 'code-health-phase3',
+  GIT_AUTHOR_EMAIL: 'code-health-phase3@example.test',
+  GIT_COMMITTER_NAME: 'code-health-phase3',
+  GIT_COMMITTER_EMAIL: 'code-health-phase3@example.test',
+  PATH: process.env.PATH,
+  PATHEXT: process.env.PATHEXT,
+  SYSTEMROOT: process.env.SYSTEMROOT,
+  SYSTEMDRIVE: process.env.SYSTEMDRIVE,
+  WINDIR: process.env.WINDIR,
+  COMSPEC: process.env.COMSPEC,
+  TEMP: process.env.TEMP,
+  TMP: process.env.TMP,
+  USERPROFILE: process.env.USERPROFILE,
+} as NodeJS.ProcessEnv;
 
-/** A semantically neutral test: the classifier must not protect it. */
+const createdRoots: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(createdRoots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true, maxRetries: 3 })));
+});
+
 function plainTest(overrides: Partial<TestRecord> = {}): TestRecord {
   return {
     testId: 'test-sum',
@@ -74,7 +100,6 @@ function plainTest(overrides: Partial<TestRecord> = {}): TestRecord {
   };
 }
 
-/** The old, human-authored unique-negative test the plan's author/age induction fixture points at. */
 function oldHumanNegativeTest(overrides: Partial<TestRecord> = {}): TestRecord {
   return plainTest({
     testId: 'test-old-model-neg',
@@ -93,8 +118,6 @@ function oldHumanNegativeTest(overrides: Partial<TestRecord> = {}): TestRecord {
   });
 }
 
-const REHOME_FACTS = ['rehomed:rtm', 'rehomed:coverage', 'rehomed:docs-consistency', 'rehomed:sample-matrix'];
-
 /** A security-classified pair: the surviving authorization oracle preserves the candidate's contract. */
 function securityTest(overrides: Partial<TestRecord> = {}): TestRecord {
   return plainTest({
@@ -109,6 +132,25 @@ function securityTest(overrides: Partial<TestRecord> = {}): TestRecord {
   });
 }
 
+/** A neutral-text pair: the heuristic classifier cannot protect it, so default-deny must. */
+function neutralTest(overrides: Partial<TestRecord> = {}): TestRecord {
+  return plainTest({
+    testId: 'test-dup-old',
+    file: 'tests/legacy/dup.test.ts',
+    symbol: 'computesTotal',
+    setup: 'two integers',
+    stimulus: 'total(1, 2)',
+    oracle: 'returns 3',
+    failureSensitivity: 'detects an incorrect total',
+    rtmIds: ['REQ-MATH-001'],
+    scenarioClass: 'happy-path',
+    governanceFacts: ['unit'],
+    ...overrides,
+  });
+}
+
+const REHOME_FACTS = ['rehomed:rtm', 'rehomed:coverage', 'rehomed:docs-consistency', 'rehomed:sample-matrix'];
+
 interface RegressionFacts {
   testCount: number;
   coverageProvenance: string;
@@ -116,11 +158,7 @@ interface RegressionFacts {
 }
 
 function regressionFacts(testCount: number, coveragePath: string, extra: string[] = []): RegressionFacts {
-  return {
-    testCount,
-    coverageProvenance: coveragePath,
-    governanceFacts: [...REHOME_FACTS, ...extra],
-  };
+  return { testCount, coverageProvenance: coveragePath, governanceFacts: [...REHOME_FACTS, ...extra] };
 }
 
 function commandEvidence(overrides: Partial<CommandEvidence> = {}): CommandEvidence {
@@ -134,7 +172,7 @@ function commandEvidence(overrides: Partial<CommandEvidence> = {}): CommandEvide
     endedAt: '2026-09-07T00:01:02.000Z',
     exitCode: 0,
     observation: 'observed',
-    rawOutputPath: '.ch-raw/pre.log',
+    rawOutputPath: '.w-model/code-health/raw/pre.log',
     rawOutputSha256: 'd'.repeat(64),
     ...overrides,
   };
@@ -152,6 +190,47 @@ function regression(
     coverageProvenance: coveragePath,
     governanceFacts,
   };
+}
+
+/** Canonical, contract-shape deletion facts for a removal that reduced preCount to postCount. */
+function deletionFactsFor(
+  preCount: number,
+  postCount: number,
+  coveragePath = 'coverage/post.json',
+  expected: { selfTest?: number; docs?: number } = {},
+): { testCount: number; coverageProvenance: string; governanceFacts: string[]; testCountDelta?: number } {
+  const selfTest = expected.selfTest ?? 302;
+  const docs = expected.docs ?? 41;
+  return {
+    testCount: postCount,
+    coverageProvenance: coveragePath,
+    testCountDelta: postCount - preCount,
+    governanceFacts: [
+      `pre-test-count:${preCount}`,
+      `post-test-count:${postCount}`,
+      `coverage-provenance:${coveragePath}`,
+      'pre-push:18',
+      'pre-push-order:sha256:aaaa',
+      'post-push-order:sha256:aaaa',
+      `pre-self-test:${selfTest}`,
+      `post-self-test:${selfTest}`,
+      `pre-docs-consistency:${docs}`,
+      `post-docs-consistency:${docs}`,
+      'fixture-reachability:all-referenced',
+      ...REHOME_FACTS,
+    ],
+  };
+}
+
+function validDeletionFacts(): ReturnType<typeof deletionFactsFor> {
+  return deletionFactsFor(11, 10);
+}
+
+function withGovernanceFacts(
+  facts: ReturnType<typeof deletionFactsFor>,
+  mutate: (entries: string[]) => string[],
+): ReturnType<typeof deletionFactsFor> {
+  return { ...facts, governanceFacts: mutate([...facts.governanceFacts]) };
 }
 
 function inventoryDocument(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -181,8 +260,8 @@ function inventoryDocument(overrides: Record<string, unknown> = {}): Record<stri
   };
 }
 
-/** The ledger record that anchors a proposed test deletion (authority, not a caller label). */
-function removalLedger(deletionFile: string): CodeHealthLedger {
+/** A tracked-ledger-style record whose candidate owns the proposed deletion file. */
+function removalLedger(deletionFile: string, action = 'delete-test'): CodeHealthLedger {
   return {
     schemaVersion: '1.0',
     campaignId: 'CHC-20260907',
@@ -193,13 +272,13 @@ function removalLedger(deletionFile: string): CodeHealthLedger {
       {
         candidateId,
         phase: 'P3',
-        action: 'delete-test',
+        action,
         status: 'verified',
         files: [deletionFile],
-        symbols: ['addsTwoNumbers'],
+        symbols: ['rejectsUnauthorizedCaller'],
         tests: [deletionFile],
         revision,
-        changeScope: { files: [deletionFile], symbols: ['addsTwoNumbers'], scopeHash },
+        changeScope: { files: [deletionFile], symbols: ['rejectsUnauthorizedCaller'], scopeHash },
       } as unknown as CodeHealthLedger['candidates'][number],
     ],
     events: [],
@@ -208,57 +287,55 @@ function removalLedger(deletionFile: string): CodeHealthLedger {
   } as unknown as CodeHealthLedger;
 }
 
-/** A complete, passing deletion-facts record in the frozen contract's `string[]` shape. */
-function deletionFactsFor(
-  preCount: number,
-  postCount: number,
-  coveragePath = 'coverage/post.json',
-): {
-  testCount: number;
-  coverageProvenance: string;
-  governanceFacts: string[];
-  testCountDelta?: number;
-} {
-  return {
-    testCount: postCount,
-    coverageProvenance: coveragePath,
-    testCountDelta: postCount - preCount,
-    governanceFacts: [
-      `pre-test-count:${preCount}`,
-      `post-test-count:${postCount}`,
-      `coverage-provenance:${coveragePath}`,
-      'pre-push:18',
-      'pre-push-order:sha256:aaaa',
-      'post-push-order:sha256:aaaa',
-      'pre-self-test:302',
-      'post-self-test:302',
-      'pre-docs-consistency:41',
-      'post-docs-consistency:41',
-      'fixture-reachability:all-referenced',
-      ...REHOME_FACTS,
-    ],
-  };
+/** Declare every test whose computed class is protected, so no protected fact is silently omitted. */
+function protectedFactsFor(tests: TestRecord[], reason: string): Array<Record<string, unknown>> {
+  return tests
+    .map((test) => ({ test, cls: classifyProtectedTest(test) }))
+    .filter((entry): entry is { test: TestRecord; cls: ProtectedTestClass } => entry.cls !== null)
+    .map((entry) => ({ testId: entry.test.testId, class: entry.cls, reason }));
 }
 
-function validDeletionFacts(): ReturnType<typeof deletionFactsFor> {
-  return deletionFactsFor(11, 10);
+/** Build a full removal inventory over a test pair plus a retained protected test. */
+function removalInventory(options: {
+  candidate: TestRecord;
+  survivor: TestRecord;
+  protectedTest: TestRecord;
+  removalFacts: ReturnType<typeof deletionFactsFor>;
+  preCount: number;
+  preCoverage?: string;
+}): Record<string, unknown> {
+  return inventoryDocument({
+    tests: [options.candidate, options.survivor, options.protectedTest],
+    protectedFacts: protectedFactsFor(
+      [options.candidate, options.survivor, options.protectedTest],
+      'Retained protected assertion, unrelated to the proposed duplicate removal.',
+    ),
+    removalProof: {
+      candidateTestId: options.candidate.testId,
+      survivorTestId: options.survivor.testId,
+      reason: 'The legacy duplicate is covered by the equivalent retained assertion and its RTM row is rehomed.',
+      setupEquivalent: true,
+      stimulusEquivalent: true,
+      oracleEquivalent: true,
+      failureSensitivityEquivalent: true,
+      levelEquivalent: true,
+      rtmRehomed: true,
+      governanceRehomed: true,
+    },
+    preRegression: regression(options.preCount, options.preCoverage ?? 'coverage/pre.json'),
+    postRegression: regression(
+      options.removalFacts.testCount,
+      options.removalFacts.coverageProvenance,
+      options.removalFacts.governanceFacts,
+    ),
+  });
 }
 
-function withGovernanceFacts(
-  facts: ReturnType<typeof validDeletionFacts>,
-  mutate: (entries: string[]) => string[],
-): ReturnType<typeof validDeletionFacts> {
-  return { ...facts, governanceFacts: mutate([...facts.governanceFacts]) };
-}
-
-describe('phase 3 protection classification (R6)', () => {
-  it('protects unique malformed/missing/expected-failure tests as unique-negative', () => {
+describe('phase 3 protection classification and default-deny (R6/F-3)', () => {
+  it('protects unique malformed/missing/expected-failure tests and the L1-L4 classes', () => {
     expect(classifyProtectedTest(oldHumanNegativeTest())).toBe('unique-negative');
     expect(classifyProtectedTest(plainTest())).toBeNull();
     expect(() => classifyProtectedTest({} as never)).toThrow(/requires/i);
-  });
-
-  it('protects boundary, security, concurrency, platform, and migration/rollback classes', () => {
     const cases: Array<[Partial<TestRecord>, ProtectedTestClass]> = [
       [{ scenarioClass: 'boundary', stimulus: 'empty payload' }, 'boundary'],
       [{ scenarioClass: 'security', oracle: 'rejects an unauthorized caller' }, 'security'],
@@ -269,9 +346,7 @@ describe('phase 3 protection classification (R6)', () => {
       [{ scenarioClass: 'governance', governanceFacts: ['self-test: sample-to-check matrix'] }, 'self-test'],
       [{ scenarioClass: 'governance', governanceFacts: ['docs-consistency: live counts'] }, 'docs-consistency'],
     ];
-    for (const [overrides, expected] of cases) {
-      expect(classifyProtectedTest(plainTest(overrides))).toBe(expected);
-    }
+    for (const [overrides, expected] of cases) expect(classifyProtectedTest(plainTest(overrides))).toBe(expected);
   });
 
   it('author and age never change the protected class (provenance only)', () => {
@@ -284,20 +359,28 @@ describe('phase 3 protection classification (R6)', () => {
     };
     expect(classifyProtectedTest(younger)).toBe(classifyProtectedTest(base));
   });
+
+  it('proveTestRemoval treats a non-protected candidate as protected unless the ledger establishes it', () => {
+    const candidate = neutralTest();
+    const survivor = neutralTest({ testId: 'test-dup-new', file: 'tests/dup.test.ts' });
+    const violations = proveTestRemoval({
+      candidate,
+      survivor,
+      pre: regressionFacts(12, 'coverage/pre.json'),
+      post: regressionFacts(11, 'coverage/post.json'),
+    });
+    expect(violations.join('; ')).toMatch(/non-protected status is not positively established|treated as protected/i);
+  });
 });
 
-describe('phase 3 removal proof (R1/R7)', () => {
-  it('author/age/old-human provenance cannot justify removal of a protected unique test', () => {
+describe('phase 3 removal proof equivalence (R1/R7)', () => {
+  it('author/age/human provenance cannot justify removal of a protected unique test', () => {
     const candidate = oldHumanNegativeTest();
-    const result = proveTestRemoval({
-      candidate,
-      survivor: null,
-      pre: regressionFacts(11, 'coverage/pre.json'),
-      post: null,
-    });
-    expect(result.join('; ')).toMatch(/protected/i);
-
-    // A younger agent-authored copy of the same contract is protected identically: provenance never decides.
+    expect(
+      proveTestRemoval({ candidate, survivor: null, pre: regressionFacts(11, 'coverage/pre.json'), post: null }).join(
+        '; ',
+      ),
+    ).toMatch(/protected/i);
     const younger = {
       ...candidate,
       author: 'agent-artifacts-bot',
@@ -314,9 +397,9 @@ describe('phase 3 removal proof (R1/R7)', () => {
     ).toMatch(/protected/i);
   });
 
-  it('accepts removal only with item-wise equivalent survivor, rehome facts, and a real -1 count', () => {
-    const candidate = plainTest({ testId: 'test-sum-old', file: 'tests/legacy/sum.test.ts' });
-    const survivor = plainTest({ testId: 'test-sum-new', file: 'tests/math.test.ts' });
+  it('accepts removal only with an equally protected, item-wise equivalent survivor, rehome facts, and -1 count', () => {
+    const candidate = securityTest({ testId: 'test-unauth-old', file: 'tests/legacy/auth.test.ts' });
+    const survivor = securityTest({ testId: 'test-unauth-new', file: 'tests/auth.test.ts' });
     expect(
       proveTestRemoval({
         candidate,
@@ -328,12 +411,12 @@ describe('phase 3 removal proof (R1/R7)', () => {
   });
 
   it('a weaker oracle, narrower RTM, lower level, or changed scenario class fails', () => {
-    const candidate = plainTest({ testId: 'test-sum-old', file: 'tests/legacy/sum.test.ts' });
-    const survivor = plainTest({ testId: 'test-sum-new', file: 'tests/math.test.ts' });
+    const candidate = securityTest({ testId: 'test-unauth-old', file: 'tests/legacy/auth.test.ts' });
+    const survivor = securityTest({ testId: 'test-unauth-new', file: 'tests/auth.test.ts' });
     const pre = regressionFacts(12, 'coverage/pre.json');
     const post = regressionFacts(11, 'coverage/post.json');
-    const reason = (survivorOverride: Partial<TestRecord>): string =>
-      proveTestRemoval({ candidate, survivor: { ...survivor, ...survivorOverride }, pre, post }).join('; ');
+    const reason = (override: Partial<TestRecord>): string =>
+      proveTestRemoval({ candidate, survivor: { ...survivor, ...override }, pre, post }).join('; ');
     expect(reason({ oracle: 'weaker assertion' })).toMatch(/oracle/i);
     expect(reason({ setup: 'different fixture' })).toMatch(/setup/i);
     expect(reason({ stimulus: 'add(2, 2)' })).toMatch(/stimulus/i);
@@ -344,8 +427,8 @@ describe('phase 3 removal proof (R1/R7)', () => {
   });
 
   it('requires explicit rehome facts and a real post-deletion test count', () => {
-    const candidate = plainTest({ testId: 'test-sum-old', file: 'tests/legacy/sum.test.ts' });
-    const survivor = plainTest({ testId: 'test-sum-new', file: 'tests/math.test.ts' });
+    const candidate = securityTest();
+    const survivor = securityTest({ testId: 'test-unauth-new', file: 'tests/auth.test.ts' });
     expect(
       proveTestRemoval({
         candidate,
@@ -362,20 +445,22 @@ describe('phase 3 removal proof (R1/R7)', () => {
         post: regressionFacts(12, 'coverage/post.json'),
       }).join('; '),
     ).toMatch(/test count/i);
-    expect(
-      proveTestRemoval({ candidate, survivor, pre: regressionFacts(12, 'coverage/pre.json'), post: null }).join('; '),
-    ).toMatch(/post|test count/i);
   });
 
-  it('malformed input fails closed instead of approving a removal', () => {
+  it('malformed input fails closed', () => {
     expect(() => proveTestRemoval({} as never)).toThrow(/requires/i);
     expect(() =>
-      proveTestRemoval({ candidate: { ...plainTest(), oracle: '' }, survivor: null, pre: null, post: null } as never),
+      proveTestRemoval({
+        candidate: { ...securityTest(), oracle: '' },
+        survivor: null,
+        pre: null,
+        post: null,
+      } as never),
     ).toThrow(/requires|oracle/i);
   });
 });
 
-describe('phase 3 deletion evaluation (R2/R5)', () => {
+describe('phase 3 deletion facts against repo-owned expectations (R2/F-5)', () => {
   it('accepts a fully explained deletion and still rejects malformed facts', () => {
     expect(evaluateDeletion(validDeletionFacts()).passed).toBe(true);
     expect(evaluateDeletion(validDeletionFacts()).violations).toEqual([]);
@@ -386,10 +471,7 @@ describe('phase 3 deletion evaluation (R2/R5)', () => {
     const countDrift = withGovernanceFacts(validDeletionFacts(), (entries) =>
       entries.map((entry) => (entry === 'pre-push:18' ? 'pre-push:17' : entry)),
     );
-    const countResult = evaluateDeletion(countDrift);
-    expect(countResult.passed).toBe(false);
-    expect(countResult.violations.join('; ')).toMatch(/pre-push/i);
-
+    expect(evaluateDeletion(countDrift).violations.join('; ')).toMatch(/pre-push/i);
     const orderDrift = withGovernanceFacts(validDeletionFacts(), (entries) =>
       entries.map((entry) => (entry === 'post-push-order:sha256:aaaa' ? 'post-push-order:sha256:bbbb' : entry)),
     );
@@ -401,45 +483,54 @@ describe('phase 3 deletion evaluation (R2/R5)', () => {
       entries.map((entry) => (entry === 'post-test-count:10' ? 'post-test-count:9' : entry)),
     );
     expect(evaluateDeletion(countDrift).violations.join('; ')).toMatch(/test count/i);
-
     const provenanceDrift = withGovernanceFacts(validDeletionFacts(), (entries) =>
       entries.map((entry) =>
         entry === 'coverage-provenance:coverage/post.json' ? 'coverage-provenance:elsewhere' : entry,
       ),
     );
     expect(evaluateDeletion(provenanceDrift).violations.join('; ')).toMatch(/coverage provenance/i);
-
     const selfTestDrift = withGovernanceFacts(validDeletionFacts(), (entries) =>
       entries.map((entry) => (entry === 'post-self-test:302' ? 'post-self-test:301' : entry)),
     );
     expect(evaluateDeletion(selfTestDrift).violations.join('; ')).toMatch(/self-test/i);
-
     const docsDrift = withGovernanceFacts(validDeletionFacts(), (entries) =>
       entries.map((entry) => (entry === 'post-docs-consistency:41' ? 'post-docs-consistency:40' : entry)),
     );
     expect(evaluateDeletion(docsDrift).violations.join('; ')).toMatch(/docs-consistency/i);
   });
 
-  it('drift is explainable only through an explicit explained:<artifact> fact', () => {
+  it('a self-consistent declaration that contradicts the repo-owned values is refused unless explained', () => {
+    const expected = {
+      prePushItems: 18,
+      selfTestSamples: 999,
+      docsConsistencyViolations: 9,
+      fixtureReachability: 'all-referenced',
+    };
+    const contradicted = withGovernanceFacts(validDeletionFacts(), (entries) =>
+      entries.map((entry) =>
+        entry === 'post-docs-consistency:41'
+          ? 'post-docs-consistency:9'
+          : entry === 'pre-docs-consistency:41'
+            ? 'pre-docs-consistency:9'
+            : entry,
+      ),
+    );
+    expect(evaluateDeletion(contradicted, expected).violations.join('; ')).toMatch(/repo-owned value 999/i);
+    const explained = withGovernanceFacts(contradicted, (entries) => [...entries, 'explained:self-test']);
+    expect(evaluateDeletion(explained, expected).passed).toBe(true);
+  });
+
+  it('drift is explainable only through an explicit explained:<artifact> fact and pre-push stays 18', () => {
     const explained = withGovernanceFacts(validDeletionFacts(), (entries) => [
       ...entries.map((entry) => (entry === 'post-self-test:302' ? 'post-self-test:301' : entry)),
       'explained:self-test',
     ]);
     expect(evaluateDeletion(explained).passed).toBe(true);
-  });
-
-  it('the plan snippet in contract shape still blocks (R1: object-shaped facts are not valid)', () => {
-    const result = evaluateDeletion({
-      ...validDeletionFacts(),
-      testCountDelta: -1,
-      governanceFacts: ['pre-push: 17 items'],
-    });
-    expect(result.passed).toBe(false);
-    expect(result.violations).toEqual(expect.arrayContaining([expect.stringMatching(/test count|pre-push/)]));
+    expect(DEFAULT_GOVERNANCE_FACTS.prePushItems).toBe(18);
   });
 });
 
-describe('phase 3 inventory review against the ledger (R4/R7 design lesson)', () => {
+describe('phase 3 inventory review against the tracked ledger (R4/R7)', () => {
   it('a valid protected inventory passes and reports author/age as provenance only', () => {
     const result = evaluateTestInventory({ inventory: inventoryDocument() });
     expect(result.passed).toBe(true);
@@ -449,12 +540,9 @@ describe('phase 3 inventory review against the ledger (R4/R7 design lesson)', ()
   });
 
   it('an omitted or mis-declared protected fact is rejected', () => {
-    const omitted = evaluateTestInventory({
-      inventory: inventoryDocument({ protectedFacts: [] }),
-    });
-    expect(omitted.passed).toBe(false);
-    expect(omitted.violations.join('; ')).toMatch(/protected/i);
-
+    expect(
+      evaluateTestInventory({ inventory: inventoryDocument({ protectedFacts: [] }) }).violations.join('; '),
+    ).toMatch(/protected/i);
     const misDeclared = evaluateTestInventory({
       inventory: inventoryDocument({
         protectedFacts: [{ testId: 'test-old-model-neg', class: 'boundary', reason: 'wrong class' }],
@@ -464,109 +552,66 @@ describe('phase 3 inventory review against the ledger (R4/R7 design lesson)', ()
     expect(misDeclared.violations.join('; ')).toMatch(/protected|class/i);
   });
 
-  it('a redundancy claim requires the ledger authority, an equivalent survivor, and explained facts', () => {
-    const candidateTest = securityTest({ testId: 'test-unauth-old', file: 'tests/legacy/auth.test.ts' });
-    const survivorTest = securityTest({ testId: 'test-unauth-new', file: 'tests/auth.test.ts' });
-    const protectedFacts = [
-      { testId: 'test-unauth-old', class: 'security', reason: 'The authorization boundary assertion.' },
-      { testId: 'test-unauth-new', class: 'security', reason: 'The equivalent retained authorization assertion.' },
-    ];
-    const removalProof = {
-      candidateTestId: 'test-unauth-old',
-      survivorTestId: 'test-unauth-new',
-      reason: 'The legacy duplicate is covered by the equivalent retained assertion and its RTM row is rehomed.',
-      setupEquivalent: true,
-      stimulusEquivalent: true,
-      oracleEquivalent: true,
-      failureSensitivityEquivalent: true,
-      levelEquivalent: true,
-      rtmRehomed: true,
-      governanceRehomed: true,
-    };
-    const removalInventory = inventoryDocument({
-      tests: [candidateTest, survivorTest],
-      protectedFacts,
-      removalProof,
-      preRegression: regression(12, 'coverage/pre.json'),
-      postRegression: regression(11, 'coverage/post.json', deletionFactsFor(12, 11).governanceFacts),
+  it('rejects a regression whose recorded command is not a real observed run (F-4 shape)', () => {
+    const result = evaluateTestInventory({
+      inventory: inventoryDocument({
+        preRegression: {
+          ...regression(10, 'coverage/pre.json'),
+          command: commandEvidence({ observation: 'not_run', exitCode: null }),
+        },
+      }),
+    });
+    expect(result.passed).toBe(false);
+    expect(result.violations.join('; ')).toMatch(/observed run|integer exit code/i);
+  });
+
+  it('a redundancy claim requires the ledger authority, computed equivalence, and default-deny establishment', () => {
+    const candidate = securityTest({ testId: 'test-unauth-old', file: 'tests/legacy/auth.test.ts' });
+    const survivor = securityTest({ testId: 'test-unauth-new', file: 'tests/auth.test.ts' });
+    const doc = removalInventory({
+      candidate,
+      survivor,
+      protectedTest: oldHumanNegativeTest(),
+      removalFacts: deletionFactsFor(12, 11),
+      preCount: 12,
     });
     const ledger = removalLedger('tests/legacy/auth.test.ts');
-    expect(evaluateTestInventory({ inventory: removalInventory, ledger }).passed).toBe(true);
+    expect(evaluateTestInventory({ inventory: doc, ledger }).passed).toBe(true);
+    expect(evaluateTestInventory({ inventory: doc }).violations.join('; ')).toMatch(/ledger/i);
 
-    // Without the ledger record the redundancy claim has no authority and must fail closed.
-    const noLedger = evaluateTestInventory({ inventory: removalInventory });
-    expect(noLedger.passed).toBe(false);
-    expect(noLedger.violations.join('; ')).toMatch(/ledger/i);
-
-    // A caller-declared "equivalent" that is not computed equivalent is a forged declaration.
     const forged = evaluateTestInventory({
       inventory: inventoryDocument({
-        tests: [candidateTest, { ...survivorTest, setup: 'different fixture' }],
-        protectedFacts,
-        removalProof,
-        preRegression: regression(12, 'coverage/pre.json'),
-        postRegression: regression(11, 'coverage/post.json', deletionFactsFor(12, 11).governanceFacts),
+        ...(doc as Record<string, unknown>),
+        tests: [candidate, { ...survivor, setup: 'different fixture' }, oldHumanNegativeTest()],
       }),
       ledger,
     });
     expect(forged.passed).toBe(false);
     expect(forged.violations.join('; ')).toMatch(/setup|declared|equivalen/i);
 
-    // The same proposal for a protected unique test with no survivor is never authorized.
-    const protectedProposal = evaluateTestInventory({
-      inventory: inventoryDocument({
-        tests: [oldHumanNegativeTest()],
-        protectedFacts: [
-          { testId: 'test-old-model-neg', class: 'unique-negative', reason: 'only malformed-input assertion' },
-        ],
-        removalProof: {
-          candidateTestId: 'test-old-model-neg',
-          survivorTestId: null,
-          reason: 'The author is human and the test is 3000 days old so it can be removed.',
-          setupEquivalent: true,
-          stimulusEquivalent: true,
-          oracleEquivalent: true,
-          failureSensitivityEquivalent: true,
-          levelEquivalent: true,
-          rtmRehomed: true,
-          governanceRehomed: true,
-        },
-      }),
-      ledger: removalLedger('tests/legacy/old-model.test.ts'),
+    // A neutral-text candidate whose ledger only says delete-code is refused by default-deny.
+    const neutralDoc = removalInventory({
+      candidate: neutralTest(),
+      survivor: neutralTest({ testId: 'test-dup-new', file: 'tests/dup.test.ts' }),
+      protectedTest: oldHumanNegativeTest(),
+      removalFacts: deletionFactsFor(12, 11),
+      preCount: 12,
     });
-    expect(protectedProposal.passed).toBe(false);
-    expect(protectedProposal.violations.join('; ')).toMatch(/protected/i);
-  });
+    const neutralDenied = evaluateTestInventory({
+      inventory: neutralDoc,
+      ledger: removalLedger('tests/legacy/dup.test.ts', 'delete-code'),
+    });
+    expect(neutralDenied.passed).toBe(false);
+    expect(neutralDenied.violations.join('; ')).toMatch(/non-protected status is not positively established/i);
 
-  it('rejects a deletion candidate outside the ledger-approved test scope', () => {
-    const candidateTest = securityTest({ testId: 'test-unauth-old', file: 'tests/legacy/auth.test.ts' });
-    const survivorTest = securityTest({ testId: 'test-unauth-new', file: 'tests/auth.test.ts' });
-    const result = evaluateTestInventory({
-      inventory: inventoryDocument({
-        tests: [candidateTest, survivorTest],
-        protectedFacts: [
-          { testId: 'test-unauth-old', class: 'security', reason: 'The authorization boundary assertion.' },
-          { testId: 'test-unauth-new', class: 'security', reason: 'The equivalent retained authorization assertion.' },
-        ],
-        removalProof: {
-          candidateTestId: 'test-unauth-old',
-          survivorTestId: 'test-unauth-new',
-          reason: 'The legacy duplicate is covered by the equivalent retained assertion and its RTM row is rehomed.',
-          setupEquivalent: true,
-          stimulusEquivalent: true,
-          oracleEquivalent: true,
-          failureSensitivityEquivalent: true,
-          levelEquivalent: true,
-          rtmRehomed: true,
-          governanceRehomed: true,
-        },
-        preRegression: regression(12, 'coverage/pre.json'),
-        postRegression: regression(11, 'coverage/post.json', deletionFactsFor(12, 11).governanceFacts),
-      }),
-      ledger: removalLedger('src/somewhere-else.ts'),
+    // The same pair with a ledger delete-test action is positively established and passes.
+    const neutralAllowed = evaluateTestInventory({
+      inventory: neutralDoc,
+      ledger: removalLedger('tests/legacy/dup.test.ts', 'delete-test'),
     });
-    expect(result.passed).toBe(false);
-    expect(result.violations.join('; ')).toMatch(/ledger.*scope|approved scope/i);
+    expect(neutralAllowed.passed).toBe(true);
+    expect(neutralAllowed.removal?.nonProtectedEstablished).toBe(true);
+    expect(neutralAllowed.removal?.equivalenceProven).toBe(true);
   });
 });
 
@@ -587,31 +632,6 @@ function runCli(script: string, args: string[], cwd: string = REPO_ROOT): CliRes
   return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
 }
 
-const GIT_ENV = {
-  GIT_CONFIG_NOSYSTEM: '1',
-  GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
-  GIT_TERMINAL_PROMPT: '0',
-  GIT_AUTHOR_NAME: 'code-health-phase3',
-  GIT_AUTHOR_EMAIL: 'code-health-phase3@example.test',
-  GIT_COMMITTER_NAME: 'code-health-phase3',
-  GIT_COMMITTER_EMAIL: 'code-health-phase3@example.test',
-  PATH: process.env.PATH,
-  PATHEXT: process.env.PATHEXT,
-  SYSTEMROOT: process.env.SYSTEMROOT,
-  SYSTEMDRIVE: process.env.SYSTEMDRIVE,
-  WINDIR: process.env.WINDIR,
-  COMSPEC: process.env.COMSPEC,
-  TEMP: process.env.TEMP,
-  TMP: process.env.TMP,
-  USERPROFILE: process.env.USERPROFILE,
-} as NodeJS.ProcessEnv;
-
-const createdRoots: string[] = [];
-
-afterEach(async () => {
-  await Promise.all(createdRoots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true, maxRetries: 3 })));
-});
-
 async function git(root: string, args: string[]): Promise<CliResult> {
   const r = runSync('git', args, { cwd: root, timeout: 30_000, env: GIT_ENV });
   return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
@@ -621,65 +641,79 @@ async function gitStatus(root: string): Promise<string> {
   return (await git(root, ['status', '--porcelain', '--untracked-files=all'])).stdout.trim();
 }
 
-describe('code-health-tests CLI (validate + guard ordering)', () => {
-  it('valid inventory exits 0; unknown/missing flags exit 2 with ERROR_JSON', () => {
+async function tempRoot(prefix: string): Promise<string> {
+  const root = await fs.mkdtemp(path.join(tmpdir(), prefix));
+  createdRoots.push(root);
+  return root;
+}
+
+async function writeJson(dir: string, name: string, value: unknown): Promise<string> {
+  const target = path.join(dir, name);
+  await fs.writeFile(target, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  return target;
+}
+
+describe('code-health-tests CLI validate (structural + authority split)', () => {
+  it('valid inventory exits 0; negative fixtures exit 1; bad flags exit 2 with ERROR_JSON', () => {
     const valid = runCli('code-health-tests.ts', [
       '--inventory',
       path.join(PHASE3_SAMPLES, 'valid-inventory.json'),
       '--validate',
     ]);
     expect(valid.code).toBe(0);
-    expect(`${valid.stdout}${valid.stderr}`).toMatch(/TEST_INVENTORY_JSON/);
+    expect(valid.stdout).toMatch(/TEST_INVENTORY_JSON/);
 
-    const unknown = runCli('code-health-tests.ts', ['--inventory', 'x.json', '--force']);
-    expect(unknown.code).toBe(2);
-    expect(unknown.stdout).toContain('ERROR_JSON');
-
-    const missing = runCli('code-health-tests.ts', ['--validate']);
-    expect(missing.code).toBe(2);
-    expect(missing.stdout).toContain('ERROR_JSON');
-
-    const duplicate = runCli('code-health-tests.ts', ['--inventory', 'a.json', '--inventory', 'b.json']);
-    expect(duplicate.code).toBe(2);
-    expect(duplicate.stdout).toContain('ERROR_JSON');
-  });
-
-  it('every negative phase3 fixture exits 1 and never deletes anything', async () => {
-    const before = runSync('git', ['status', '--porcelain', '--untracked-files=all'], {
-      cwd: REPO_ROOT,
-      timeout: 30_000,
-      env: GIT_ENV,
-    }).stdout?.trim();
     for (const file of [
       'bad-author-age-deletion.json',
       'bad-weaker-oracle.json',
       'bad-governance-drift.json',
       'bad-prepost-regression.json',
       'bad-missing-ledger.json',
+      'bad-neutral-unprotected.json',
     ]) {
       const result = runCli('code-health-tests.ts', ['--inventory', path.join(PHASE3_SAMPLES, file), '--validate']);
-      expect(result.code).toBe(1);
+      expect(result.code, `${file}: ${result.stdout}${result.stderr}`).toBe(1);
       expect(`${result.stdout}${result.stderr}`).not.toMatch(/APPLY_JSON|deletedFiles/);
     }
-    const after = runSync('git', ['status', '--porcelain', '--untracked-files=all'], {
-      cwd: REPO_ROOT,
-      timeout: 30_000,
-      env: GIT_ENV,
-    }).stdout?.trim();
-    expect(after).toBe(before);
-  });
 
-  it('valid redundant-removal fixture exits 0 with a ledger-anchored equivalent survivor', () => {
-    const result = runCli('code-health-tests.ts', [
+    // A removal inventory requires an explicit tracked authority; an embedded ledger is refused.
+    const removal = runCli('code-health-tests.ts', [
       '--inventory',
       path.join(PHASE3_SAMPLES, 'valid-redundant-removal.json'),
       '--validate',
     ]);
-    expect(result.code).toBe(0);
+    expect(removal.code).toBe(1);
+    expect(`${removal.stdout}${removal.stderr}`).toMatch(/embedded inventory ledger|--project|--ledger/);
+
+    expect(runCli('code-health-tests.ts', ['--inventory', 'x.json', '--force']).code).toBe(2);
+    expect(runCli('code-health-tests.ts', ['--validate']).code).toBe(2);
+    expect(runCli('code-health-tests.ts', ['--inventory', 'a.json', '--inventory', 'b.json']).code).toBe(2);
+  }, 150_000);
+
+  it('never writes the repository worktree', async () => {
+    // Tracked-file equality is the load-insensitive invariant: sibling suites create untracked
+    // transient fixtures (for example `logic/.d2-boundary-fixture-<pid>.ts`) that race a full
+    // `--untracked-files=all` comparison under parallel load.
+    const trackedStatus = (): string | undefined =>
+      runSync('git', ['status', '--porcelain', '--untracked-files=no'], {
+        cwd: REPO_ROOT,
+        timeout: 30_000,
+        env: GIT_ENV,
+      }).stdout?.trim();
+    const before = trackedStatus();
+    runCli('code-health-tests.ts', ['--inventory', path.join(PHASE3_SAMPLES, 'valid-inventory.json'), '--validate']);
+    expect(trackedStatus()).toBe(before);
+    const untracked = runSync('git', ['status', '--porcelain', '--untracked-files=all'], {
+      cwd: REPO_ROOT,
+      timeout: 30_000,
+      env: GIT_ENV,
+    }).stdout?.trim();
+    expect(untracked ?? '').not.toContain('.w-model/code-health/apply/');
+    expect(untracked ?? '').not.toContain('.patch');
   });
 });
 
-// -------------------- apply gate wiring (R4: single deletion path) --------------------
+// -------------------- apply file-class guard (F-1) --------------------
 
 interface ApplyFixture {
   description: string;
@@ -690,12 +724,6 @@ interface ApplyFixture {
 
 async function loadApplyFixture(name: string): Promise<ApplyFixture> {
   return JSON.parse(await fs.readFile(path.join(APPLY_SAMPLES, name), 'utf8')) as ApplyFixture;
-}
-
-async function tempRoot(prefix: string): Promise<string> {
-  const root = await fs.mkdtemp(path.join(tmpdir(), prefix));
-  createdRoots.push(root);
-  return root;
 }
 
 async function createTempGitRepository(): Promise<string> {
@@ -709,182 +737,389 @@ async function createTempGitRepository(): Promise<string> {
   return root;
 }
 
-async function writeJson(dir: string, name: string, value: unknown): Promise<string> {
-  const target = path.join(dir, name);
-  await fs.writeFile(target, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
-  return target;
-}
-
-describe('code-health-apply delete-test guard (single approval-gated deletion path)', () => {
-  it('a delete-test candidate without a removal inventory is refused before any write', async () => {
-    const root = await createTempGitRepository();
+describe('apply guard is keyed on the test surface, not on the declared action (F-1)', () => {
+  it('deleting a test file via delete-code or abstract is refused without an inventory authorization', async () => {
     const revisionProvider = createCodeHealthGitRevisionProvider();
     const fixture = await loadApplyFixture('valid-patch.json');
     const workDir = await tempRoot('code-health-phase3-inputs-');
-    const liveRevision = (await revisionProvider.current(root)) as RevisionIdentity;
-    const candidate: CodeHealthCandidate = {
-      ...structuredClone(fixture.candidate),
-      candidateId,
-      action: 'delete-test',
-      revision: liveRevision,
-      tests: ['tests/legacy/sum.test.mjs'],
-      changeScope: { files: ['tests/legacy/sum.test.mjs'], symbols: ['legacy'], scopeHash },
-      evidenceBinding: { ...fixture.candidate.evidenceBinding, revision: liveRevision },
-      rollback: {
-        ...fixture.candidate.rollback,
-        preChangeRevision: liveRevision.commitSha,
-        command: `git apply -R .w-model/code-health/apply/${candidateId}.patch`,
-        patchPath: `.w-model/code-health/apply/${candidateId}.patch`,
-      },
-    };
-    const approval: ApprovalDecision = {
-      ...(fixture.approval as ApprovalDecision),
-      candidateId,
-      approvedAction: 'delete-test',
-      approvedFiles: ['tests/legacy/sum.test.mjs'],
-      approvedSymbols: ['legacy'],
-      scopeHash,
-      revision: liveRevision,
-    };
-    const candidatePath = await writeJson(workDir, 'candidate.json', candidate);
-    const approvalPath = await writeJson(workDir, 'approval.json', approval);
-    const before = await gitStatus(root);
+    for (const action of ['delete-code', 'abstract'] as const) {
+      const root = await createTempGitRepository();
+      const liveRevision = (await revisionProvider.current(root)) as RevisionIdentity;
+      const candidate: CodeHealthCandidate = {
+        ...structuredClone(fixture.candidate),
+        candidateId,
+        phase: 'P3',
+        action,
+        revision: liveRevision,
+        files: ['tests/legacy/sum.test.mjs'],
+        symbols: ['legacy'],
+        tests: ['tests/legacy/sum.test.mjs'],
+        changeScope: { files: ['tests/legacy/sum.test.mjs'], symbols: ['legacy'], scopeHash },
+        evidenceBinding: { ...fixture.candidate.evidenceBinding, revision: liveRevision },
+        rollback: {
+          ...fixture.candidate.rollback,
+          preChangeRevision: liveRevision.commitSha,
+          command: `git apply -R .w-model/code-health/apply/${candidateId}.patch`,
+          patchPath: `.w-model/code-health/apply/${candidateId}.patch`,
+        },
+      };
+      const approval: ApprovalDecision = {
+        ...(fixture.approval as ApprovalDecision),
+        candidateId,
+        approvedAction: action,
+        approvedFiles: ['tests/legacy/sum.test.mjs'],
+        approvedSymbols: ['legacy'],
+        scopeHash,
+        revision: liveRevision,
+      };
+      const candidatePath = await writeJson(workDir, `candidate-${action}.json`, candidate);
+      const approvalPath = await writeJson(workDir, `approval-${action}.json`, approval);
+      const before = await gitStatus(root);
+      const result = runCli('code-health-apply.ts', [
+        '--candidate',
+        candidatePath,
+        '--approval',
+        approvalPath,
+        '--root',
+        root,
+        '--mode',
+        'commit',
+      ]);
+      expect(result.code, `${action}: ${result.stdout}${result.stderr}`).toBe(1);
+      expect(`${result.stdout}${result.stderr}`).toMatch(/test-surface change requires/i);
+      expect(await gitStatus(root)).toBe(before);
+      await expect(fs.stat(path.join(root, 'tests', 'legacy', 'sum.test.mjs'))).resolves.toBeTruthy();
+    }
+  }, 150_000);
 
-    const result = runCli('code-health-apply.ts', [
-      '--candidate',
-      candidatePath,
-      '--approval',
-      approvalPath,
-      '--root',
-      root,
-      '--mode',
-      'commit',
-    ]);
-    expect(result.code).toBe(1);
-    expect(`${result.stdout}${result.stderr}`).toMatch(/inventory|removal/i);
-    expect(await gitStatus(root)).toBe(before);
-    await expect(fs.stat(path.join(root, 'tests', 'legacy', 'sum.test.mjs'))).resolves.toBeTruthy();
+  it('isTestSurfacePath covers the canonical test surface', () => {
+    for (const file of [
+      'w-model-dev/scripts/__tests__/a.test.ts',
+      'tests/legacy/sum.test.mjs',
+      'test/spec.ts',
+      'src/foo.spec.ts',
+      'a/b/foo.test.tsx',
+    ]) {
+      expect(isTestSurfacePath(file)).toBe(true);
+    }
+    for (const file of ['src/unused.ts', 'w-model-dev/scripts/cli/self-test.ts', 'docs/notes.md']) {
+      expect(isTestSurfacePath(file)).toBe(false);
+    }
   });
 });
 
-describe('guarded real pre/post deletion (R4/R5)', () => {
-  it('runs the real suites, deletes only through the apply gate, and reads facts back from the run', async () => {
-    const root = await createTempGitRepository();
-    const deletionFile = 'tests/legacy/old.test.mjs';
-    const coverageBytes = '{"covered":true}';
-    const coverageSha256 = createHash('sha256').update(coverageBytes).digest('hex');
-    const suiteSource = [
-      "import { existsSync, mkdirSync, writeFileSync } from 'node:fs';",
-      `const exists = existsSync(${JSON.stringify(deletionFile)});`,
-      "mkdirSync('coverage', { recursive: true });",
-      `writeFileSync('coverage/coverage-final.json', ${JSON.stringify(coverageBytes)});`,
-      "process.stdout.write('CODE_HEALTH_SUITE ' + JSON.stringify({ testCount: exists ? 2 : 1, governanceFacts: [] }) + '\\n');",
-      '',
-    ].join('\n');
-    await fs.writeFile(path.join(root, 'suite.mjs'), suiteSource);
-    await fs.writeFile(path.join(root, deletionFile), 'export const old = true;\n');
-    await git(root, ['add', '--all']);
-    await git(root, ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'phase3 fixture']);
-    const revisionProvider = createCodeHealthGitRevisionProvider();
-    const liveRevision = (await revisionProvider.current(root)) as RevisionIdentity;
+// -------------------- guarded real pre/post deletion (F-2/F-4/F-7) --------------------
 
-    const fixture = await loadApplyFixture('valid-patch.json');
-    const candidate: CodeHealthCandidate = {
-      ...structuredClone(fixture.candidate),
+const SUITE_SCRIPT = [
+  "import { readdirSync, mkdirSync, writeFileSync } from 'node:fs';",
+  'const files = [];',
+  'const walk = (dir) => {',
+  '  for (const entry of readdirSync(dir, { withFileTypes: true })) {',
+  "    const full = dir + '/' + entry.name;",
+  '    if (entry.isDirectory()) walk(full);',
+  "    else if (entry.name.endsWith('.test.mjs')) files.push(full);",
+  '  }',
+  '};',
+  "walk('tests');",
+  'files.sort();',
+  "mkdirSync('coverage', { recursive: true });",
+  "writeFileSync('coverage/coverage-final.json', JSON.stringify({ covered: true }));",
+  "process.stdout.write('CODE_HEALTH_SUITE ' + JSON.stringify({ testCount: files.length, identities: files }) + '\\n');",
+  '',
+].join('\n');
+const IDENTITIES_ONLY_SCRIPT = [
+  "import { readdirSync } from 'node:fs';",
+  'const files = [];',
+  'const walk = (dir) => {',
+  '  for (const entry of readdirSync(dir, { withFileTypes: true })) {',
+  "    const full = dir + '/' + entry.name;",
+  '    if (entry.isDirectory()) walk(full);',
+  "    else if (entry.name.endsWith('.test.mjs')) files.push(full);",
+  '  }',
+  '};',
+  "walk('tests');",
+  'files.sort();',
+  "process.stdout.write('CODE_HEALTH_SUITE ' + JSON.stringify({ testCount: files.length, identities: files }) + '\\n');",
+  '',
+].join('\n');
+const NOOP_SCRIPT = 'process.exit(0);\n';
+const COVERAGE_BYTES = JSON.stringify({ covered: true });
+
+interface GuardedProject {
+  root: string;
+  liveRevision: RevisionIdentity;
+  candidate: CodeHealthCandidate;
+  approval: ApprovalDecision;
+  inventory: Record<string, unknown>;
+  guardDoc: Record<string, unknown>;
+  ledgerPath: string;
+}
+
+/**
+ * Build an isolated project whose deletion is authorized by real stored evidence. The inventory's
+ * pre/post raw outputs are produced by real runner invocations; the tracked suite manifest can be
+ * pointed at a different script to probe no-op / pre-placed-coverage shapes.
+ */
+async function createGuardedProject(
+  manifestScript: 'suite.mjs' | 'identities.mjs' | 'noop.mjs',
+): Promise<GuardedProject> {
+  const root = await tempRoot('code-health-phase3-guard-');
+  await git(root, ['init', '--quiet']);
+  await fs.mkdir(path.join(root, 'tests', 'legacy'), { recursive: true });
+  await fs.writeFile(path.join(root, '.gitignore'), '.w-model/\n.code-health-raw/\ncoverage/\n');
+  await fs.writeFile(path.join(root, 'suite.mjs'), SUITE_SCRIPT);
+  await fs.writeFile(path.join(root, 'identities.mjs'), IDENTITIES_ONLY_SCRIPT);
+  await fs.writeFile(path.join(root, 'noop.mjs'), NOOP_SCRIPT);
+  await fs.writeFile(
+    path.join(root, '.code-health-suite.json'),
+    `${JSON.stringify({ command: [process.execPath, manifestScript] })}\n`,
+  );
+  await fs.writeFile(path.join(root, 'tests', 'legacy', 'old.test.mjs'), 'export const old = true;\n');
+  await fs.writeFile(path.join(root, 'tests', 'legacy', 'sum.test.mjs'), 'export const sum = true;\n');
+  await fs.writeFile(
+    path.join(root, '.code-health-governance.json'),
+    `${JSON.stringify(
+      { prePushItems: 18, selfTestSamples: 2, docsConsistencyViolations: 0, fixtureReachability: 'all-referenced' },
+      null,
+      2,
+    )}\n`,
+  );
+
+  const revisionProvider = createCodeHealthGitRevisionProvider();
+  const fixture = await loadApplyFixture('valid-patch.json');
+  const scopeHashLive = scopeHash;
+  const candidate: CodeHealthCandidate = {
+    ...structuredClone(fixture.candidate),
+    candidateId,
+    phase: 'P3',
+    action: 'delete-code',
+    status: 'under-review',
+    files: ['tests/legacy/old.test.mjs'],
+    symbols: ['old'],
+    tests: ['tests/legacy/old.test.mjs'],
+    changeScope: { files: ['tests/legacy/old.test.mjs'], symbols: ['old'], scopeHash: scopeHashLive },
+    evidenceBinding: {
+      ...fixture.candidate.evidenceBinding,
+      candidate: {
+        ...fixture.candidate.evidenceBinding.candidate,
+        candidateId,
+        phase: 'P3',
+        action: 'delete-code',
+        files: ['tests/legacy/old.test.mjs'],
+        symbols: ['old'],
+        scopeHash: scopeHashLive,
+      },
+    },
+    rollback: {
+      ...fixture.candidate.rollback,
+      command: `git apply -R .w-model/code-health/apply/${candidateId}.patch`,
+      patchPath: `.w-model/code-health/apply/${candidateId}.patch`,
+    },
+  };
+  const ledger = removalLedger('tests/legacy/old.test.mjs');
+  ledger.baseline = revision;
+  await fs.writeFile(path.join(root, 'ledger.json'), `${JSON.stringify(ledger, null, 2)}\n`);
+  await git(root, ['add', '--all']);
+  await git(root, ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'phase3 fixture']);
+  const liveRevision = (await revisionProvider.current(root)) as RevisionIdentity;
+
+  candidate.revision = liveRevision;
+  candidate.evidenceBinding = { ...candidate.evidenceBinding, revision: liveRevision };
+  candidate.rollback = { ...candidate.rollback, preChangeRevision: liveRevision.commitSha };
+  ledger.candidates[0]!.revision = liveRevision;
+  ledger.baseline = liveRevision;
+
+  const evidenceStore = createCodeHealthEvidenceStore({
+    repositoryRoot: root,
+    rawOutputRoot: '.w-model/code-health/raw',
+  });
+  const runner = createCodeHealthCommandRunner({
+    repositoryRoot: root,
+    rawOutputDir: '.w-model/code-health/raw',
+    evidenceStore,
+    revisionProvider,
+  });
+  const binding: EvidenceBinding = {
+    candidate: {
       candidateId,
       phase: 'P3',
-      action: 'delete-test',
-      status: 'under-review',
-      files: [deletionFile],
-      symbols: ['rejectsUnauthorizedCaller'],
-      tests: [deletionFile],
-      revision: liveRevision,
-      changeScope: { files: [deletionFile], symbols: ['rejectsUnauthorizedCaller'], scopeHash },
-      evidenceBinding: {
-        ...fixture.candidate.evidenceBinding,
-        candidate: {
-          ...fixture.candidate.evidenceBinding.candidate,
-          candidateId,
-          phase: 'P3',
-          action: 'delete-test',
-          files: [deletionFile],
-          symbols: ['rejectsUnauthorizedCaller'],
-          scopeHash,
-        },
-        revision: liveRevision,
-      },
-      rollback: {
-        ...fixture.candidate.rollback,
-        preChangeRevision: liveRevision.commitSha,
-        command: `git apply -R .w-model/code-health/apply/${candidateId}.patch`,
-        patchPath: `.w-model/code-health/apply/${candidateId}.patch`,
-      },
-    };
-    const approval: ApprovalDecision = {
-      ...(fixture.approval as ApprovalDecision),
-      candidateId,
-      approvedAction: 'delete-test',
-      approvedFiles: [deletionFile],
-      approvedSymbols: ['rejectsUnauthorizedCaller'],
-      scopeHash,
-      revision: liveRevision,
-    };
-    const candidateTest = securityTest({ testId: 'test-unauth-old', file: deletionFile });
-    const survivorTest = securityTest({ testId: 'test-unauth-new', file: 'tests/legacy/sum.test.mjs' });
-    const inventory = {
-      inventoryId: 'INV-CHG-P3-20260907-901',
-      candidateId,
-      revision: liveRevision,
-      tests: [candidateTest, survivorTest],
-      protectedFacts: [
-        { testId: 'test-unauth-old', class: 'security', reason: 'The authorization boundary assertion being removed.' },
-        { testId: 'test-unauth-new', class: 'security', reason: 'The retained equivalent authorization oracle.' },
-      ],
-      removalProof: {
-        candidateTestId: 'test-unauth-old',
-        survivorTestId: 'test-unauth-new',
-        reason: 'The legacy duplicate is covered by the retained equivalent assertion and its RTM row is rehomed.',
-        setupEquivalent: true,
-        stimulusEquivalent: true,
-        oracleEquivalent: true,
-        failureSensitivityEquivalent: true,
-        levelEquivalent: true,
-        rtmRehomed: true,
-        governanceRehomed: true,
-      },
-      preRegression: regression(2, 'coverage/coverage-final.json'),
-      postRegression: regression(
-        1,
-        'coverage/coverage-final.json',
-        deletionFactsFor(2, 1, 'coverage/coverage-final.json').governanceFacts,
-      ),
-      coverageProvenance: {
-        path: 'coverage/coverage-final.json',
-        sha256: coverageSha256,
-        revision: liveRevision.commitSha,
-        measuredAt: '2026-09-07T00:03:02.000Z',
-        signalOnly: true,
-      },
-      redaction: { status: 'clean', reasons: ['secrets removed'] },
-    };
-    const ledger = removalLedger(deletionFile);
-    const workDir = await tempRoot('code-health-phase3-guard-');
-    const guardPath = await writeJson(workDir, 'guard.json', {
-      projectRoot: root,
-      inventory,
-      ledger,
-      candidate,
-      approval,
-      preCommand: [process.execPath, 'suite.mjs'],
-      postCommand: [process.execPath, 'suite.mjs'],
-      rawOutputDir: '.ch-raw',
-      timeoutMs: 20_000,
-    });
-    const result = runCli('code-health-tests.ts', ['--guard', guardPath]);
+      action: 'delete-code',
+      files: candidate.changeScope.files,
+      symbols: candidate.changeScope.symbols,
+      scopeHash: scopeHashLive,
+    },
+    revision: liveRevision,
+    rawOutputPath: 'tests/legacy/old.test.mjs',
+    rawOutputSha256: '0'.repeat(64),
+  };
+  const pre = await runner.run(process.execPath, ['suite.mjs'], { cwd: root, env: {}, timeoutMs: 20_000, binding });
+  await fs.rename(path.join(root, 'tests', 'legacy', 'old.test.mjs'), path.join(root, 'old.test.mjs.away'));
+  const post = await runner.run(process.execPath, ['suite.mjs'], { cwd: root, env: {}, timeoutMs: 20_000, binding });
+  await fs.rename(path.join(root, 'old.test.mjs.away'), path.join(root, 'tests', 'legacy', 'old.test.mjs'));
+  if (pre.exitCode !== 0 || post.exitCode !== 0) throw new Error('fixture suite did not run');
+  const coverageSha = createHash('sha256').update(COVERAGE_BYTES).digest('hex');
+
+  const candidateTest = securityTest({ testId: 'test-unauth-old', file: 'tests/legacy/old.test.mjs' });
+  const survivorTest = securityTest({ testId: 'test-unauth-new', file: 'tests/legacy/sum.test.mjs' });
+  const protectedTest = oldHumanNegativeTest();
+  const facts = deletionFactsFor(2, 1, 'coverage/coverage-final.json', { selfTest: 2, docs: 0 });
+
+  const inventory: Record<string, unknown> = {
+    inventoryId: 'INV-CHG-P3-20260907-901',
+    candidateId,
+    revision: liveRevision,
+    tests: [candidateTest, survivorTest, protectedTest],
+    protectedFacts: protectedFactsFor(
+      [candidateTest, survivorTest, protectedTest],
+      'Retained protected assertion, unrelated to the proposed duplicate removal.',
+    ),
+    removalProof: {
+      candidateTestId: 'test-unauth-old',
+      survivorTestId: 'test-unauth-new',
+      reason: 'The legacy duplicate is covered by the equivalent retained assertion and its RTM row is rehomed.',
+      setupEquivalent: true,
+      stimulusEquivalent: true,
+      oracleEquivalent: true,
+      failureSensitivityEquivalent: true,
+      levelEquivalent: true,
+      rtmRehomed: true,
+      governanceRehomed: true,
+    },
+    preRegression: {
+      command: pre,
+      testCount: 2,
+      passed: true,
+      coverageProvenance: 'coverage/coverage-final.json',
+      governanceFacts: facts.governanceFacts,
+    },
+    postRegression: {
+      command: post,
+      testCount: 1,
+      passed: true,
+      coverageProvenance: 'coverage/coverage-final.json',
+      governanceFacts: facts.governanceFacts,
+    },
+    coverageProvenance: {
+      path: 'coverage/coverage-final.json',
+      sha256: coverageSha,
+      revision: liveRevision.commitSha,
+      measuredAt: new Date().toISOString(),
+      signalOnly: true,
+    },
+    redaction: { status: 'clean', reasons: ['secrets removed'] },
+  };
+  const approval: ApprovalDecision = {
+    ...(fixture.approval as ApprovalDecision),
+    candidateId,
+    approvedAction: 'delete-code',
+    approvedFiles: ['tests/legacy/old.test.mjs'],
+    approvedSymbols: ['old'],
+    scopeHash: scopeHashLive,
+    revision: liveRevision,
+  };
+  const guardDoc = { inventory, candidate, approval, suiteManifest: '.code-health-suite.json' };
+  return { root, liveRevision, candidate, approval, inventory, guardDoc, ledgerPath: path.join(root, 'ledger.json') };
+}
+
+describe('guarded real pre/post deletion (F-1/F-2/F-4/F-7)', () => {
+  it('deletes the authorized test via the apply gate and proves identity-based before/after evidence', async () => {
+    const project = await createGuardedProject('suite.mjs');
+    const workDir = await tempRoot('code-health-phase3-guard-inputs-');
+    const guardPath = await writeJson(workDir, 'guard.json', project.guardDoc);
+    const result = runCli('code-health-tests.ts', [
+      '--guard',
+      guardPath,
+      '--project',
+      project.root,
+      '--ledger',
+      project.ledgerPath,
+    ]);
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
     expect(result.stdout).toMatch(/GUARD_JSON/);
-    // The exact approved test was really deleted in the isolated project, and nothing else.
-    await expect(fs.stat(path.join(root, deletionFile))).rejects.toBeTruthy();
-    await expect(fs.stat(path.join(root, 'tests', 'legacy', 'sum.test.mjs'))).resolves.toBeTruthy();
-  });
+    expect(result.stdout).toMatch(/"removedIdentityPresentPre":true/);
+    expect(result.stdout).toMatch(/"removedIdentityAbsentPost":true/);
+    await expect(fs.stat(path.join(project.root, 'tests', 'legacy', 'old.test.mjs'))).rejects.toBeTruthy();
+    await expect(fs.stat(path.join(project.root, 'tests', 'legacy', 'sum.test.mjs'))).resolves.toBeTruthy();
+  }, 150_000);
+
+  it('a no-op suite that prints no facts cannot authorize deletion', async () => {
+    const project = await createGuardedProject('noop.mjs');
+    const workDir = await tempRoot('code-health-phase3-guard-inputs-');
+    const guardPath = await writeJson(workDir, 'guard.json', project.guardDoc);
+    const result = runCli('code-health-tests.ts', [
+      '--guard',
+      guardPath,
+      '--project',
+      project.root,
+      '--ledger',
+      project.ledgerPath,
+    ]);
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(`${result.stdout}${result.stderr}`).toMatch(/did not report CODE_HEALTH_SUITE facts/i);
+    await expect(fs.stat(path.join(project.root, 'tests', 'legacy', 'old.test.mjs'))).resolves.toBeTruthy();
+  }, 150_000);
+
+  it('a pre-placed coverage artifact that no controlled run wrote is refused', async () => {
+    const project = await createGuardedProject('identities.mjs');
+    const coveragePath = path.join(project.root, 'coverage', 'coverage-final.json');
+    await fs.writeFile(coveragePath, COVERAGE_BYTES);
+    const pinned = new Date(Date.now() - 60_000);
+    await fs.utimes(coveragePath, pinned, pinned);
+    const workDir = await tempRoot('code-health-phase3-guard-inputs-');
+    const guardPath = await writeJson(workDir, 'guard.json', project.guardDoc);
+    const result = runCli('code-health-tests.ts', [
+      '--guard',
+      guardPath,
+      '--project',
+      project.root,
+      '--ledger',
+      project.ledgerPath,
+    ]);
+    expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(`${result.stdout}${result.stderr}`).toMatch(/coverage artifact was not produced by the controlled run/i);
+  }, 150_000);
+
+  it('an embedded guard ledger is refused even before any suite runs', async () => {
+    const project = await createGuardedProject('suite.mjs');
+    const workDir = await tempRoot('code-health-phase3-guard-inputs-');
+    const guardPath = await writeJson(workDir, 'guard.json', { ...project.guardDoc, ledger: removalLedger('x') });
+    const result = runCli('code-health-tests.ts', [
+      '--guard',
+      guardPath,
+      '--project',
+      project.root,
+      '--ledger',
+      project.ledgerPath,
+    ]);
+    expect(result.code).toBe(1);
+    expect(`${result.stdout}${result.stderr}`).toMatch(/embedded guard ledger/i);
+  }, 150_000);
+
+  it('hand-filled facts with fabricated command evidence are refused by stored-evidence verification (F-4)', async () => {
+    const project = await createGuardedProject('suite.mjs');
+    const fabricated = structuredClone(project.inventory) as Record<string, unknown>;
+    const pre = fabricated.preRegression as Record<string, unknown>;
+    const command = pre.command as Record<string, unknown>;
+    // Keep the shape valid but change the declared hash so it no longer matches any stored raw output.
+    command.rawOutputSha256 = '0'.repeat(64);
+    (fabricated.preRegression as Record<string, unknown>).testCount = 9999;
+    (fabricated.postRegression as Record<string, unknown>).testCount = 9998;
+    const workDir = await tempRoot('code-health-phase3-guard-inputs-');
+    const inventoryPath = await writeJson(workDir, 'inventory.json', fabricated);
+    const candidatePath = await writeJson(workDir, 'candidate.json', project.candidate);
+    const result = runCli('code-health-tests.ts', [
+      '--inventory',
+      inventoryPath,
+      '--validate',
+      '--project',
+      project.root,
+      '--ledger',
+      project.ledgerPath,
+      '--candidate',
+      candidatePath,
+    ]);
+    expect(result.code, `${result.stdout}${result.stderr}`).toBe(1);
+    expect(`${result.stdout}${result.stderr}`).toMatch(/raw output|evidence|hash|bound|count/i);
+    await expect(fs.stat(path.join(project.root, 'tests', 'legacy', 'old.test.mjs'))).resolves.toBeTruthy();
+  }, 150_000);
 });

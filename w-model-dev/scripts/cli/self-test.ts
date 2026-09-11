@@ -2670,6 +2670,12 @@ const CODE_HEALTH_TEST_CASES: CodeHealthTestInventoryCase[] = [
     expectedReasonPatterns: [/ledger/i],
     description: '移除声明缺 ledger 记录锚定 → 无授权，fail-closed',
   },
+  {
+    file: 'bad-neutral-unprotected.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/non-protected|treated as protected/i],
+    description: '中性文本测试仅靠 delete-code ledger 声明 → 未正向建立非保护状态，默认按 protected 拒绝',
+  },
 ];
 
 // ==================== 测试执行器 ====================
