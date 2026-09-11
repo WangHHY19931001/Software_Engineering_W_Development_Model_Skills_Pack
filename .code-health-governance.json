@@ -1,6 +1,6 @@
 {
   "prePushItems": 18,
-  "selfTestSamples": 310,
-  "docsConsistencyViolations": 9,
+  "selfTestSamples": 322,
+  "docsConsistencyViolations": 0,
   "fixtureReachability": "all-referenced"
 }

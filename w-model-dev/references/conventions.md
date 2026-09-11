@@ -7,7 +7,6 @@
 
 ## 术语表
 
-
 > **权威定义入口**：本文件为 W-Model skill 包核心术语的**单一权威定义**。
 > 各参考文档定义与本节冲突时，以本节为准（SSoT 例外——SSoT §7 数据模型 schema 为结构权威，本节为语义权威）。
 > 每条含「规范定义 + `_Avoid_` 指令」（禁用别名 / 易混词），防止术语同义异写。
@@ -116,7 +115,7 @@
 
 ### exit-2 脚本口径
 
-- **规范定义**：`scripts/cli/` 下全部脚本除 `self-test.ts`（回归基线，exit 0/1）外均为 exit 2 结构化错误脚本：= 36（26 个 check-* + 10 个工具 CLI，不含 self-test；含 wm-export-evidence.ts / wm-verify-evidence-source.ts）；计数由 docs-consistency 的真实输入错误契约探针得出（AGENTS.md「36 个脚本」与本句由 checkConventionsExit2Count 双向兜底），不维护固定补数。
+- **规范定义**：`scripts/cli/` 下全部脚本除 `self-test.ts`（回归基线，exit 0/1）外均为 exit 2 结构化错误脚本：= 42（26 个 check-* + 16 个工具 CLI（含 6 个 code-health 门禁 CLI），不含 self-test；含 wm-export-evidence.ts / wm-verify-evidence-source.ts）；计数由 docs-consistency 的真实输入错误契约探针得出（AGENTS.md「42 个脚本」与本句由 checkConventionsExit2Count 双向兜底），不维护固定补数。
 - **_Avoid_**：称 self-test 为 exit-2 脚本 / “31 个脚本”之类过期计数（见 [docs-consistency-logic.ts](../scripts/logic/docs-consistency-logic.ts) 的 EXPECTED）。
 
 ### 普通 V/G 失败链
@@ -127,7 +126,6 @@
 ---
 
 > **维护规则**：新增 `.w-model/*.json` 字段或脚本 violation 消息前，先在本表登记术语，再改 schema / 文档（反模式 #28 schema 前置校验缺失同类纪律）。首版 12+ 条。
-
 
 ## 格式约定
 
@@ -143,11 +141,11 @@ path:§3.2,L42       （章节+行号混合）
 
 ### 禁止格式
 
-| 格式 | 说明 | 旧用法位置 |
-|------|------|------------|
-| `path#§section` | 井号分隔 | tla-spec-template.md（已废弃） |
-| `path.field=value` | 点号分隔 | verifier-spec.md §6.2（已废弃） |
-| 纯文件名无定位 | 无定位信息 | — |
+| 格式               | 说明       | 旧用法位置                      |
+| ------------------ | ---------- | ------------------------------- |
+| `path#§section`    | 井号分隔   | tla-spec-template.md（已废弃）  |
+| `path.field=value` | 点号分隔   | verifier-spec.md §6.2（已废弃） |
+| 纯文件名无定位     | 无定位信息 | —                               |
 
 ### 2. 各字段格式规范
 
@@ -214,6 +212,7 @@ path:§3.2,L42       （章节+行号混合）
 ### 4. 引用关系
 
 本文件被以下文件引用：
+
 - `references/verifier-spec.md` §6.2（evidence 格式）
 - `templates/tla-spec-template.md`（@design 格式）
 - `templates/feature.template`（@design 格式）
@@ -240,14 +239,14 @@ path:§3.2,L42       （章节+行号混合）
 
 > 吸收自《代码整洁之道》ch4：以下 6 类注释应删除或改写（对应 coding-quality「代码坏味道清单」组 C）。
 
-| # | 坏注释类型 | 检测信号 | 处理 |
-|---|---|---|---|
-| 1 | 喃喃自语 | 无信息量、自我解释的废话注释 | 删除 |
-| 2 | 冗余注释 | 复述代码本身（what） | 删除（重构让代码自解释） |
-| 3 | 误导性注释 | 注释与代码现状不符/过期 | 删除或修正 |
-| 4 | 日志式注释 | 逐条记录修改历史（应归版本控制） | 删除 |
-| 5 | 注释掉的代码 | 被注释的代码块 | 删除（版本控制可恢复） |
-| 6 | 循规式注释 | 为遵守格式而写的空泛 Javadoc/头注释 | 删除或补充实质内容 |
+| #   | 坏注释类型   | 检测信号                            | 处理                     |
+| --- | ------------ | ----------------------------------- | ------------------------ |
+| 1   | 喃喃自语     | 无信息量、自我解释的废话注释        | 删除                     |
+| 2   | 冗余注释     | 复述代码本身（what）                | 删除（重构让代码自解释） |
+| 3   | 误导性注释   | 注释与代码现状不符/过期             | 删除或修正               |
+| 4   | 日志式注释   | 逐条记录修改历史（应归版本控制）    | 删除                     |
+| 5   | 注释掉的代码 | 被注释的代码块                      | 删除（版本控制可恢复）   |
+| 6   | 循规式注释   | 为遵守格式而写的空泛 Javadoc/头注释 | 删除或补充实质内容       |
 
 ### 6. 命名约定
 
@@ -282,19 +281,17 @@ path:§3.2,L42       （章节+行号混合）
 
 ### 7.2 固定占位符
 
-| 占位符 | 含义 |
-|---|---|
-| `{{v1.0}}` | 文档版本（首版 v1.0，升版时替换为 v1.1 / v2.0 …） |
-| `{{YYYY-MM-DD}}` | 日期（ISO 8601） |
-| `{{项目名称}}` / `{{module}}` | 项目 / 模块名 |
-| `{{}}` | 留空待填（仅用于无默认值的字段） |
+| 占位符                        | 含义                                              |
+| ----------------------------- | ------------------------------------------------- |
+| `{{v1.0}}`                    | 文档版本（首版 v1.0，升版时替换为 v1.1 / v2.0 …） |
+| `{{YYYY-MM-DD}}`              | 日期（ISO 8601）                                  |
+| `{{项目名称}}` / `{{module}}` | 项目 / 模块名                                     |
+| `{{}}`                        | 留空待填（仅用于无默认值的字段）                  |
 
 ### 7.3 检查
 
 - 任一模板文件内不得同时出现 `{{v1.0}}` 与 `v{{1.0}}` 两种写法。
 - `{{}}` 空占位符不参与版本/日期字段（版本/日期必须整段占位）。
-
-
 
 ## 目录约定
 
@@ -302,43 +299,43 @@ path:§3.2,L42       （章节+行号混合）
 
 所有阶段产物统一存放于 `docs/phaseN-{name}/` 子目录下，禁止平铺于 `docs/` 根目录。
 
-| 阶段 | 目录 | 文件命名 | 模板 |
-|------|------|----------|------|
-| 1 需求分析 | `docs/phase1-requirements/` | `requirement-spec.md`, `acceptance-test-design.md` | `templates/requirement-spec.md` |
-| 2 系统设计 | `docs/phase2-design/` | `{module}-system-design.md`, `{module}-system-test.md` | `templates/system-design.md`, `templates/test-case.md` |
-| 3 概要设计 | `docs/phase3-outline/` | `{module}-interface-design.md`, `{module}-integration-test.md` | `templates/interface-design.md`, `templates/test-case.md` |
-| 4 详细设计 | `docs/phase4-detailed/` | `{module}-detailed-design.md`, `{module}-unit-test.md` | `templates/detailed-design.md`, `templates/test-case.md` |
-| 5 编码 | `src/` | 按技术栈约定 | — |
-| 6 集成测试 | `docs/phase6-integration-test/` | `integration-test.md` | `templates/test-case.md` |
-| 7 系统测试 | `docs/phase7-system-test/` | `system-test.md` | `templates/test-case.md` |
-| 8 验收测试 | `docs/phase8-acceptance-test/` | `acceptance-test.md` | `templates/test-case.md` |
+| 阶段       | 目录                            | 文件命名                                                       | 模板                                                      |
+| ---------- | ------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------- |
+| 1 需求分析 | `docs/phase1-requirements/`     | `requirement-spec.md`, `acceptance-test-design.md`             | `templates/requirement-spec.md`                           |
+| 2 系统设计 | `docs/phase2-design/`           | `{module}-system-design.md`, `{module}-system-test.md`         | `templates/system-design.md`, `templates/test-case.md`    |
+| 3 概要设计 | `docs/phase3-outline/`          | `{module}-interface-design.md`, `{module}-integration-test.md` | `templates/interface-design.md`, `templates/test-case.md` |
+| 4 详细设计 | `docs/phase4-detailed/`         | `{module}-detailed-design.md`, `{module}-unit-test.md`         | `templates/detailed-design.md`, `templates/test-case.md`  |
+| 5 编码     | `src/`                          | 按技术栈约定                                                   | —                                                         |
+| 6 集成测试 | `docs/phase6-integration-test/` | `integration-test.md`                                          | `templates/test-case.md`                                  |
+| 7 系统测试 | `docs/phase7-system-test/`      | `system-test.md`                                               | `templates/test-case.md`                                  |
+| 8 验收测试 | `docs/phase8-acceptance-test/`  | `acceptance-test.md`                                           | `templates/test-case.md`                                  |
 
 ### 2. 横切文档
 
-| 产物 | 目录 | 命名 | 强制阶段 |
-|------|------|------|----------|
-| UAT 路径映射 | `docs/` | `uat-path-mapping.md` | 阶段 1 产出，阶段 5/终检校验回填 |
-| RTM | `.w-model/` | `rtm.json` | 阶段 1 起持续维护 |
-| 项目状态 | `.w-model/` | `project.json` | 全阶段 |
-| 编排状态 | `.w-model/` | `orchestrator-state.md` | 全阶段 |
+| 产物         | 目录        | 命名                    | 强制阶段                         |
+| ------------ | ----------- | ----------------------- | -------------------------------- |
+| UAT 路径映射 | `docs/`     | `uat-path-mapping.md`   | 阶段 1 产出，阶段 5/终检校验回填 |
+| RTM          | `.w-model/` | `rtm.json`              | 阶段 1 起持续维护                |
+| 项目状态     | `.w-model/` | `project.json`          | 全阶段                           |
+| 编排状态     | `.w-model/` | `orchestrator-state.md` | 全阶段                           |
 
 ### 3. TLA+ 规格目录
 
-| 层级 | 目录 | 文件命名 |
-|------|------|----------|
-| L1 | `tla/specs/level1/` | `L1_{System}.tla`, `L1_{System}.cfg` |
-| L2 | `tla/specs/level2/` | `L2_{System}_{Subsystem}.tla`, `L2_{System}_{Subsystem}.cfg` |
-| L3 | `tla/specs/level3/` | `L3_{System}_{Subsystem}_{Atom}.tla`, 同名 `.cfg` |
-| L4-L6 | `tla/specs/level{N}/` | `L{N}_{System}_..._{Atom}.tla` |
+| 层级  | 目录                  | 文件命名                                                     |
+| ----- | --------------------- | ------------------------------------------------------------ |
+| L1    | `tla/specs/level1/`   | `L1_{System}.tla`, `L1_{System}.cfg`                         |
+| L2    | `tla/specs/level2/`   | `L2_{System}_{Subsystem}.tla`, `L2_{System}_{Subsystem}.cfg` |
+| L3    | `tla/specs/level3/`   | `L3_{System}_{Subsystem}_{Atom}.tla`, 同名 `.cfg`            |
+| L4-L6 | `tla/specs/level{N}/` | `L{N}_{System}_..._{Atom}.tla`                               |
 
 ### 4. BDD features 目录
 
-| 层级 | 目录 | 文件命名 |
-|------|------|----------|
-| L1 | `features/L1/` | `L1_{system}-001.feature` |
-| L2 | `features/L2/` | `L2_{system}_{subsystem}-001.feature` |
-| L3 | `features/L3/` | `L3_{system}_{subsystem}_{atom}-001.feature` |
-| L4 | `features/L4/` | `L4_{system}_{subsystem}_{atom}_{method}-001.feature` |
+| 层级 | 目录           | 文件命名                                              |
+| ---- | -------------- | ----------------------------------------------------- |
+| L1   | `features/L1/` | `L1_{system}-001.feature`                             |
+| L2   | `features/L2/` | `L2_{system}_{subsystem}-001.feature`                 |
+| L3   | `features/L3/` | `L3_{system}_{subsystem}_{atom}-001.feature`          |
+| L4   | `features/L4/` | `L4_{system}_{subsystem}_{atom}_{method}-001.feature` |
 
 ### 5. .w-model 目录结构
 
@@ -364,4 +361,3 @@ path:§3.2,L42       （章节+行号混合）
 ### 7. 门禁脚本路径解析
 
 `check-artifact-gate.ts` 内置 `resolvePhaseDoc(phase, type)` 函数从本约定解析文档路径，禁止硬编码。
-

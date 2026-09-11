@@ -352,6 +352,26 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 4. 确认后编排者（O）原子写入 `project.json` 与 `rtm.json`，刷新 `updatedAt`。
 5. 输出项目名、阶段、需求数、测试用例数和 RTM 覆盖率。
 
+## `/wm code-health <phase>`
+
+- **速查行**：`/wm code-health <P1|P2|P3|P4>`
+- **范围**：已实现并验收 Phase 1–4。campaign 归档（`archiveCampaign` / `verifyArchive`）与 Phase 5–8 迁移**未实现**：`logic/code-health-phase-boundaries.ts` 返回 `NOT_IMPLEMENTED`，不得据此执行归档或迁移。
+- **命令与退出语义**：
+
+| 阶段            | CLI                         | 必填 / 关键参数                                                                                                        | 退出码                                                                |
+| --------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| P1 只读发现     | `code-health-phase1.ts`     | `--root <dir> --output <file> --scenario <file>`（`--platform` / `--shell` 可选）                                      | 0 全部候选通过校验 / 1 候选校验失败或 revision 不可用 / 2 输入错误    |
+| P2 gap matrix   | `code-health-gap.ts`        | `--matrix <file> [--validate]`                                                                                         | 0 通过 / 1 校验失败 / 2 输入错误                                      |
+| P3 受保护测试   | `code-health-tests.ts`      | `--inventory <file> [--ledger] [--project] [--candidate] --validate`；`--guard <file> --project <dir> --ledger <file>` | 0 通过 / 1 校验或 guard 失败 / 2 输入错误                             |
+| P4 重复簇与抽象 | `code-health-duplicates.ts` | `--matrix <file> [--ledger <file>] [--root <dir>] [--validate]`                                                        | 0 `under-review`/`deferred` / 1 `rejected` 或 guard 违规 / 2 输入错误 |
+| ledger          | `code-health-ledger.ts`     | `init --ledger --campaign-id --baseline`；`append --ledger --candidate --event [--approval]`；`validate --ledger`      | 0 通过 / 1 校验或拒绝 / 2 输入错误                                    |
+| 应用            | `code-health-apply.ts`      | `--candidate <file> [--approval <file>] [--root <dir>] [--mode dry-run\|patch\|commit]`（`commit` 需人类 approval）    | 0 提案/应用成功 / 1 fail-closed / 2 输入错误                          |
+
+- **失败动作**：exit 1 走 code-health 失败链 `gate-failure → blocked → R(root-cause) → V(root-cause-review) → G(root-cause-gate) → S(rework) → evidenced`（顺序不可跳过，见 [code-health-governance.md](code-health-governance.md) §6）；失败的删除/抽象必须回滚（`git apply -R` + `git diff --exit-code`=0）。exit 2 修正参数后重跑，不写任何文件。
+- **CHECKPOINT**：候选进入实现前必须 🔴 CHECKPOINT 由 human 批准（精确 candidate ID / action / files / symbols / scopeHash）；工具或 LLM 输出不能授权。
+- **边界**：Phase 1–4 只读（P1 仅写外部 report + `.w-model/` 独占 raw output；`--guard` 删除仅经 `code-health-apply.ts`）；code-health CLI 不纳入 `.githooks/pre-push`，18 项检查不变。
+- **guide 链接**：[code-health-governance.md](code-health-governance.md)（Phase 1–4 操作参考）与 SSoT §10K（`docs/skill-design-document_SSoT.md`，权威定义）。
+
 ## Artifact Gate 项目阶段证据门
 
 - **速查行**：`npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] [--phase=N] [--cucumber-report=<path>] [--scope=<change-scope.json>|--change=<id> --base=<ref> --head=<ref>] [--json]`
@@ -406,14 +426,14 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **stderr**（人类可读）：`✗ [CATEGORY] <message>: <file|detail>`（类别见下表；file 与 detail 同有则 detail 附于括号 `（detail）`，如 `✗ [STRUCTURE_INVALID] ...: C:\...\scope.json（/changedFiles/0: must match pattern [pattern]）`）
 - **stdout**（机器可读，遵循 SSoT §10E E.1）：`ERROR_JSON {"category","message","exitCode","file?","rule?","field?","detail?"}`，`exitCode` 与 `process.exit()` 实参强一致；`file`/`rule`/`field`/`detail` 为可选字段，仅有值时输出（F-G6-02：detail——如 schema pattern 违规定位 `/changedFiles/0: must match pattern`——同时进入 stderr 与 ERROR_JSON，不再被 file 吞并）
 
-| 类别                | 场景                                                     | 示例                                                            |
-| ------------------- | -------------------------------------------------------- | --------------------------------------------------------------- |
-| `ARG_INVALID`       | 参数值非法（phase/variant/mode/node-type/max-tokens 等） | `✗ [ARG_INVALID] 参数非法 --phase=99: 须为 1-8 整数`            |
-| `FILE_NOT_FOUND`    | 文件/目录不存在（ENOENT）                                | `✗ [FILE_NOT_FOUND] 文件不存在: C:\...\project.json`            |
-| `FILE_PARSE`        | JSON 解析失败（含 JSONL 坏行）                           | `✗ [FILE_PARSE] 文件解析失败（非合法 JSON）: C:\...\rtm.json`   |
-| `FILE_READ`         | 读取异常非 ENOENT                                        | `✗ [FILE_READ] 文件读取失败: C:\...\x.json（EACCES）`           |
+| 类别                | 场景                                                                                                                                   | 示例                                                            |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `ARG_INVALID`       | 参数值非法（phase/variant/mode/node-type/max-tokens 等）                                                                               | `✗ [ARG_INVALID] 参数非法 --phase=99: 须为 1-8 整数`            |
+| `FILE_NOT_FOUND`    | 文件/目录不存在（ENOENT）                                                                                                              | `✗ [FILE_NOT_FOUND] 文件不存在: C:\...\project.json`            |
+| `FILE_PARSE`        | JSON 解析失败（含 JSONL 坏行）                                                                                                         | `✗ [FILE_PARSE] 文件解析失败（非合法 JSON）: C:\...\rtm.json`   |
+| `FILE_READ`         | 读取异常非 ENOENT                                                                                                                      | `✗ [FILE_READ] 文件读取失败: C:\...\x.json（EACCES）`           |
 | `STRUCTURE_INVALID` | 合法 JSON 形状不符（顶层非对象/字段形状不符/类型错；如 state-machine 输入顶层必须为对象且四数组字段齐全、tla-manifest 顶层必须为对象） | `✗ [STRUCTURE_INVALID] 结构不符: C:\...\x.json（缺 rows 数组）` |
-| `UNEXPECTED`        | 未预期异常（main().catch 兜底）                          | `✗ [UNEXPECTED] 脚本异常: <message>`                            |
+| `UNEXPECTED`        | 未预期异常（main().catch 兜底）                                                                                                        | `✗ [UNEXPECTED] 脚本异常: <message>`                            |
 
 - exit 1（校验失败）结构不变：violations 列表 + 既有 `XXX_JSON` 摘要（含 exitCode=1），不输出 ERROR_JSON。
 - 异常不变量：`ERROR_JSON.exitCode` 恒等于脚本 `process.exit()` 实参（§10E E.1 防伪三层机制）。
@@ -421,12 +441,13 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 
 ## CHECKPOINT 统一清单
 
-| CHECKPOINT         | 触发点                                      | 确认对象                                       |
-| ------------------ | ------------------------------------------- | ---------------------------------------------- |
-| 项目初始化         | 首次进入阶段前（SKILL.md 执行工作流步骤 5） | 进入阶段 / 同步测试设计 / 预期产物清单         |
-| ingestion 规划确认 | 阶段 1-4 plan-chunks 产出后（步骤 5.5）     | 分块计划与 A-chunk 分派                        |
-| ingestion 收敛确认 | 收敛循环结束（MAX_ROUNDS=5 或通过）         | 图谱收敛结果                                   |
-| 阶段门放行         | G 门禁通过后（步骤 9）                      | 质量等级 / 子标准分 / reworkHints → 放行或返工 |
-| 发布放行           | 阶段 8 终检 exitCode=0 后                   | RTM 覆盖率 / 四级测试 / GATE_JSON → 发布或回退 |
-| 重置确认           | /wm reset                                   | 清空实体不可逆操作                             |
-| 导入覆盖确认       | /wm import 目标已有数据                     | 覆盖现有数据                                   |
+| CHECKPOINT           | 触发点                                      | 确认对象                                                                      |
+| -------------------- | ------------------------------------------- | ----------------------------------------------------------------------------- |
+| 项目初始化           | 首次进入阶段前（SKILL.md 执行工作流步骤 5） | 进入阶段 / 同步测试设计 / 预期产物清单                                        |
+| ingestion 规划确认   | 阶段 1-4 plan-chunks 产出后（步骤 5.5）     | 分块计划与 A-chunk 分派                                                       |
+| ingestion 收敛确认   | 收敛循环结束（MAX_ROUNDS=5 或通过）         | 图谱收敛结果                                                                  |
+| 阶段门放行           | G 门禁通过后（步骤 9）                      | 质量等级 / 子标准分 / reworkHints → 放行或返工                                |
+| 发布放行             | 阶段 8 终检 exitCode=0 后                   | RTM 覆盖率 / 四级测试 / GATE_JSON → 发布或回退                                |
+| 重置确认             | /wm reset                                   | 清空实体不可逆操作                                                            |
+| 导入覆盖确认         | /wm import 目标已有数据                     | 覆盖现有数据                                                                  |
+| code-health 候选放行 | /wm code-health 候选进入实现前（human）     | candidate ID / action / 精确 files·symbols / scopeHash → approve·reject·defer |

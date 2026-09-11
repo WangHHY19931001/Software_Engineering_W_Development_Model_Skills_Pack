@@ -22,13 +22,13 @@ AI 助手写代码很容易「差不多就行」：跳段、凭感觉、说不�
 
 **健康指标**（全部门禁实测通过，怎么验证见下方「CI 策略」与「快速上手」）：
 
-| 指标 | 结果 |
-| --- | --- |
-| Self-test（262 条样本回归基线） | ✅ 262/262 |
-| 门禁脚本单元测试（vitest） | ✅ 以当前命令输出为准 |
-| TypeScript 类型检查（strict） | ✅ 0 错误 |
-| 安全扫描（eslint-plugin-security） | ✅ baseline 一致 |
-| 推送前门禁（本地 CI，18 项） | ✅ 全通过 |
+| 指标                               | 结果                  |
+| ---------------------------------- | --------------------- |
+| Self-test（322 条样本回归基线）    | ✅ 322/322            |
+| 门禁脚本单元测试（vitest）         | ✅ 以当前命令输出为准 |
+| TypeScript 类型检查（strict）      | ✅ 0 错误             |
+| 安全扫描（eslint-plugin-security） | ✅ baseline 一致      |
+| 推送前门禁（本地 CI，18 项）       | ✅ 全通过             |
 
 ## 两条上手路径
 
@@ -106,14 +106,14 @@ flowchart LR
 
 ### 六种角色（核心：编排者最小化）
 
-| 角色 | 职责 |
-| --- | --- |
-| **O 编排者** | 只做路由 / 状态读写 / 等待核对点 / 分派子代理 / 持久化，**不亲自产出任何东西** |
-| **A 分析** | 把需求切块分析（ingestion），构建需求图谱 |
-| **S 产出** | 实际写文档、写代码、写测试 |
-| **V 评审** | 按评审规范提示词对产出做 LLM 评审（由外部 Agent 执行） |
-| **G 门禁** | 运行 `check-*.ts` 门禁脚本，采集退出码作为证据 |
-| **R 根因定位** | 门禁不通过时，先定位根因（5-Why / 鱼骨图 / 缺陷链 / 上游回溯）再返工 |
+| 角色           | 职责                                                                           |
+| -------------- | ------------------------------------------------------------------------------ |
+| **O 编排者**   | 只做路由 / 状态读写 / 等待核对点 / 分派子代理 / 持久化，**不亲自产出任何东西** |
+| **A 分析**     | 把需求切块分析（ingestion），构建需求图谱                                      |
+| **S 产出**     | 实际写文档、写代码、写测试                                                     |
+| **V 评审**     | 按评审规范提示词对产出做 LLM 评审（由外部 Agent 执行）                         |
+| **G 门禁**     | 运行 `check-*.ts` 门禁脚本，采集退出码作为证据                                 |
+| **R 根因定位** | 门禁不通过时，先定位根因（5-Why / 鱼骨图 / 缺陷链 / 上游回溯）再返工           |
 
 为什么要这样分？—— 干活和把关的人分开，评审不吃「自己写的东西自己觉得很对」的亏。角色与分派规则见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)，评审提示词见 [verifier-spec.md](./w-model-dev/references/verifier-spec.md)。
 
@@ -127,31 +127,32 @@ flowchart LR
 
 ### W 模型 8 阶段 × 门禁对应
 
-| 阶段 | 主要产出 | 主要门禁脚本（`w-model-dev/scripts/cli/`） |
-| --- | --- | --- |
-| 1 需求分析 | 需求规格 + 验收测试设计 + RTM + 需求图谱 + TLA+/BDD 初稿 | `check-requirement-graph.ts --phase=1`、`check-requirement-coverage.ts`、`check-tla-model.ts`、`check-bdd-model.ts` |
-| 2 系统设计 | 系统设计文档 + 系统测试设计 + RTM + 图谱 SD 节点 | `check-requirement-graph.ts --phase=2`、`check-tla-model.ts`、`check-bdd-model.ts` |
-| 3 概要设计 | 接口设计文档 + 集成测试设计 + RTM + 图谱 INTF 节点 | `check-requirement-graph.ts --phase=3`、`check-tla-model.ts`、`check-bdd-model.ts` |
-| 4 详细设计 | 详细设计文档 + 单元测试设计 + RTM + 图谱 DD 节点 | 同阶段 3 + `check-artifact-gate.ts --phase=4`（零违反硬约束才放行） |
-| 5 编码实现 | 实现代码 + 单元测试执行结果 + RTM codeModule 回填 | `check-verifier-output.ts`、`check-code-tla-consistency.ts`、`check-design-contract-consistency.ts`、`check-artifact-gate.ts --phase=5` |
-| 6 集成测试 | 集成测试执行结果 + 测试报告 | `check-verifier-output.ts`、`check-artifact-gate.ts --phase=6`、`check-bdd-model.ts --phase=6` |
-| 7 系统测试 | 系统测试执行结果 + 性能/安全报告 | `check-verifier-output.ts`、`check-artifact-gate.ts --phase=7`、`check-bdd-model.ts --phase=7` |
-| 8 验收测试 | 验收测试执行结果 + 归档产物 | `check-verifier-output.ts`、`check-artifact-gate.ts`（终检）、`check-archive-integrity.ts` |
+| 阶段       | 主要产出                                                 | 主要门禁脚本（`w-model-dev/scripts/cli/`）                                                                                              |
+| ---------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 需求分析 | 需求规格 + 验收测试设计 + RTM + 需求图谱 + TLA+/BDD 初稿 | `check-requirement-graph.ts --phase=1`、`check-requirement-coverage.ts`、`check-tla-model.ts`、`check-bdd-model.ts`                     |
+| 2 系统设计 | 系统设计文档 + 系统测试设计 + RTM + 图谱 SD 节点         | `check-requirement-graph.ts --phase=2`、`check-tla-model.ts`、`check-bdd-model.ts`                                                      |
+| 3 概要设计 | 接口设计文档 + 集成测试设计 + RTM + 图谱 INTF 节点       | `check-requirement-graph.ts --phase=3`、`check-tla-model.ts`、`check-bdd-model.ts`                                                      |
+| 4 详细设计 | 详细设计文档 + 单元测试设计 + RTM + 图谱 DD 节点         | 同阶段 3 + `check-artifact-gate.ts --phase=4`（零违反硬约束才放行）                                                                     |
+| 5 编码实现 | 实现代码 + 单元测试执行结果 + RTM codeModule 回填        | `check-verifier-output.ts`、`check-code-tla-consistency.ts`、`check-design-contract-consistency.ts`、`check-artifact-gate.ts --phase=5` |
+| 6 集成测试 | 集成测试执行结果 + 测试报告                              | `check-verifier-output.ts`、`check-artifact-gate.ts --phase=6`、`check-bdd-model.ts --phase=6`                                          |
+| 7 系统测试 | 系统测试执行结果 + 性能/安全报告                         | `check-verifier-output.ts`、`check-artifact-gate.ts --phase=7`、`check-bdd-model.ts --phase=7`                                          |
+| 8 验收测试 | 验收测试执行结果 + 归档产物                              | `check-verifier-output.ts`、`check-artifact-gate.ts`（终检）、`check-archive-integrity.ts`                                              |
 
 > 阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts`。完整分派矩阵见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)。
 
 ### 常用命令（在 Agent 会话里使用）
 
-| 命令 | 作用 |
-| --- | --- |
-| `/wm analyze <需求描述>` | 需求分析，同步产出验收测试设计 |
-| `/wm design type=<架构\|概要\|详细>` | 设计阶段，同步产出对应测试设计 |
-| `/wm code <功能描述>` | 编码实现，同步产出单元测试用例（不自动标记通过） |
-| `/wm test type=<单元\|集成\|系统\|验收> result=<pass\|fail>` | 回填指定类型测试的**真实执行结果** |
-| `/wm review <目标>` | 返回结构化评审指引（由 V 子代理执行，不内置 LLM） |
-| `/wm status` / `/wm metrics` | 查看阶段进度 / 流程度量（只读脚本） |
-| `/wm export` / `/wm import` | 导出 / 导入项目 JSON + RTM Markdown |
-| `/wm help` / `/wm reset` | 帮助 / 重置项目（保留元信息） |
+| 命令                                                         | 作用                                                                       |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| `/wm analyze <需求描述>`                                     | 需求分析，同步产出验收测试设计                                             |
+| `/wm design type=<架构\|概要\|详细>`                         | 设计阶段，同步产出对应测试设计                                             |
+| `/wm code <功能描述>`                                        | 编码实现，同步产出单元测试用例（不自动标记通过）                           |
+| `/wm test type=<单元\|集成\|系统\|验收> result=<pass\|fail>` | 回填指定类型测试的**真实执行结果**                                         |
+| `/wm review <目标>`                                          | 返回结构化评审指引（由 V 子代理执行，不内置 LLM）                          |
+| `/wm code-health <P1\|P2\|P3\|P4>`                           | 代码健康治理 Phase 1–4（只读发现 → 人工授权 → 受控可回滚应用；归档未实现） |
+| `/wm status` / `/wm metrics`                                 | 查看阶段进度 / 流程度量（只读脚本）                                        |
+| `/wm export` / `/wm import`                                  | 导出 / 导入项目 JSON + RTM Markdown                                        |
+| `/wm help` / `/wm reset`                                     | 帮助 / 重置项目（保留元信息）                                              |
 
 ### 手动跑门禁脚本
 
@@ -159,7 +160,7 @@ flowchart LR
 
 ```bash
 npm install                                   # 首次：安装 tsx / ajv / eslint-plugin-security 等
-npm run self-test                             # 262 条样本回归基线
+npm run self-test                             # 322 条样本回归基线
 npm run check:gate -- [项目目录]              # 工件质量门（退出码 0/1/2）
 npm run check:graph -- <graph.json> --phase=1 # 图谱结构门禁
 npm run check:tla -- <manifest.json>          # TLA+ 行为门禁
@@ -180,6 +181,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 - **RTM 自动维护**：需求 ↔ 设计 ↔ 代码 ↔ 四级测试双向追溯，覆盖率 100% 才允许交付。
 - **TLA+ 层次化建模 + BDD 行为建模**：设计阶段用形式化方法把关键行为「讲清楚、可检查」，编码后用一致性回归守住（见 [tla-plus.md](./w-model-dev/references/tla-plus.md)、[bdd.md](./w-model-dev/references/bdd.md)）。
 - **负面知识库**：48 条流程反模式 + 8 条核心操作行为 + 失败模式，把踩过的坑变成纪律。
+- **代码健康治理（`/wm code-health`）**：Phase 1–4 只读发现 → 七维度 gap → 受保护测试 inventory → 重复簇与抽象 guard；发现不是结论、coverage 仅信号，删除/抽象必须有人类授权 + HEAD-tracked 证据 + 可回滚（见 [code-health-governance.md](./w-model-dev/references/code-health-governance.md)）。
 - **评审人格库**：内置 28 个人格文件（工程 / 测试 / 设计 / 产品 / 项目 5 类），按 [agent-personas.md](./w-model-dev/references/agent-personas.md) 选型多角度评审。
 - **采用路径**：新项目从 Day 0 跑全流程，存量项目增量验证优先（见 [docs/adoption-guide.md](./docs/adoption-guide.md)）。
 - **状态持久化**：`.w-model/*.json` 跨多轮交互保持上下文，34 份 JSON Schema 约束文件保证格式一致。
@@ -191,7 +193,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 .
 ├── w-model-dev/                  # Skill 资产本体（纯 Markdown，可整目录拷贝分发）
 │   ├── SKILL.md                  # 技能定义：触发条件 + /wm 编排规则 + 版本号
-│   ├── references/               # 41 份阶段细则与规范（按需加载，禁止一次性全读）
+│   ├── references/               # 42 份阶段细则与规范（按需加载，禁止一次性全读）
 │   ├── subagent/                 # 28 个人格文件（评审视角预设，不调用 LLM）
 │   ├── templates/                # 各阶段产出文档模板
 │   ├── examples/                 # 交互示例

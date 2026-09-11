@@ -958,8 +958,31 @@ export function appendReworkEvent(ledger: CodeHealthLedger, candidateId: string,
 export function validateEvalDiff(input: EvalDiffInput): string[] {
   if (input.changedBehavior) return [];
   if (!Array.isArray(input.prompts)) return ['prompts must be an array'];
-  if (!isRecord(input.mappings) && !Array.isArray(input.mappings)) return ['mappings must be an object or array'];
-  return [];
+  const mappingsArray = Array.isArray(input.mappings)
+    ? input.mappings
+    : isRecord(input.mappings) && Array.isArray(input.mappings.mappings)
+      ? (input.mappings.mappings as unknown[])
+      : null;
+  if (mappingsArray === null) return ['mappings must be an object or array'];
+  // Eval corpus and mapping matrix are 1:1 by id. When no behavior change is declared, an added
+  // prompt without a mapping (or vice versa) is an undeclared corpus inflation and is rejected.
+  const promptKeys = new Set(input.prompts.map((entry, index) => evalEntryKey(entry, index)));
+  const mappingKeys = new Set(mappingsArray.map((entry, index) => evalEntryKey(entry, index)));
+  const undeclaredPrompts = [...promptKeys].filter((key) => !mappingKeys.has(key));
+  const undeclaredMappings = [...mappingKeys].filter((key) => !promptKeys.has(key));
+  if (undeclaredPrompts.length === 0 && undeclaredMappings.length === 0) return [];
+  return [
+    `behavior change must be declared (changedBehavior=true) before adding prompts/mappings; prompts without mappings: [${undeclaredPrompts.join(', ')}]; mappings without prompts: [${undeclaredMappings.join(', ')}]`,
+  ];
+}
+
+/** Stable identity for an eval prompt/mapping row: its numeric/string `id`, else its positional index. */
+function evalEntryKey(entry: unknown, index: number): string {
+  if (isRecord(entry)) {
+    if (typeof entry.id === 'number' && Number.isInteger(entry.id)) return `id:${entry.id}`;
+    if (typeof entry.id === 'string' && entry.id.trim() !== '') return `id:${entry.id.trim()}`;
+  }
+  return `index:${index}`;
 }
 
 const GAP_KINDS = ['requirement', 'public-contract', 'branch', 'error', 'security', 'concurrency', 'platform'] as const;

@@ -7,10 +7,12 @@
  * `npm run audit:l0-links` 取真实三数更新本模块，两测试文件自动跟随。
  */
 export const L0_BASELINE = {
-  // 651 = 650（2026-09-05 review2-fixes D2 失败链锚点化）+ 1（2026-09-07
-  // trigger-boundary campaign step 6：SKILL.md 触发表「不启用」行新增指向
-  // references/activation-guide.md 的 1 条相对链接，violations 仍 0）。
-  relativeLinkCount: 651,
+  // 662 = 651（2026-09-05 review2-fixes D2 失败链锚点化 + 2026-09-07
+  // trigger-boundary campaign SKILL 触发表 1 条）+ 11（2026-09-11 code-health
+  // Task 7：新增 references/code-health-governance.md 的 3 条同目录链接 +
+  // SKILL/README/AGENTS/INSTALL/troubleshooting 各 1 条指向该文件的链接 +
+  // command-reference/rtm-guide/coding-quality 等新节内的引用链接，violations 仍 0）。
+  relativeLinkCount: 662,
   l1Only: 92,
   placeholders: 36,
 } as const;

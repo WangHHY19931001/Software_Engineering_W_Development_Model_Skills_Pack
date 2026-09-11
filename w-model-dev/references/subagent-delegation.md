@@ -11,32 +11,32 @@
 > 编排者进入某阶段前，按本导引只加载该阶段所需分节，避免一次性载入全文（反模式 #5）。
 > 各阶段对应分节如下：
 
-| 阶段 | 加载分节 | 对应表格 |
-|---|---|---|
-| 1 需求 | §1 + §2 + §3（阶段 1 行）+ §6.3（阶段 1 门） | §3 阶段 1 需求 S-doc/S-tla/S-bdd 三行；§6.3 阶段 1 门禁 |
-| 2 系统设计 | §1 + §2 + §3（阶段 2 行）+ §6.3（阶段 2 门） | §3 阶段 2 系统设计三行；§6.3 阶段 2 门禁 |
-| 3 概要设计 | §1 + §2 + §3（阶段 3 行）+ §6.3（阶段 3 门） | §3 阶段 3 概要设计三行；§6.3 阶段 3 门禁 |
-| 4 详细设计 | §1 + §2 + §3（阶段 4 行）+ §6.3（阶段 4 门） | §3 阶段 4 详细设计三行；§6.3 阶段 4 门禁 |
-| 5 编码 | §1 + §2 + §3（阶段 5 行）+ §5 三段式 + §6.3（阶段 5 门） | §3 阶段 5 编码三行；§5 explore/propose/coding 表；§6.3 阶段 5 门禁 |
-| 6 集成测试 | §1 + §2 + §3（阶段 6 行）+ §5 三段式 + §6.3（阶段 6 门） | §3 阶段 6 集成测试三行；§5 三段式表；§6.3 阶段 6 门禁 |
-| 7 系统测试 | §1 + §2 + §3（阶段 7 行）+ §5 三段式 + §6.3（阶段 7 门） | §3 阶段 7 系统测试三行；§5 三段式表；§6.3 阶段 7 门禁 |
-| 8 验收测试 | §1 + §2 + §3（阶段 8 行）+ §5 三段式 + §6.3（阶段 8 门） | §3 阶段 8 验收测试三行；§5 三段式表；§6.3 阶段 8 门禁 |
-| 返工循环 | §4 返工循环分派 + §1（R 角色）+ §6.2 | §4 返工循环表 + S-emergency-fix 表 |
-| 全阶段通用 | §1 角色速查 + §7 反模式→check 映射 | §1 角色表 + §7 反模式映射表 |
+| 阶段       | 加载分节                                                 | 对应表格                                                           |
+| ---------- | -------------------------------------------------------- | ------------------------------------------------------------------ |
+| 1 需求     | §1 + §2 + §3（阶段 1 行）+ §6.3（阶段 1 门）             | §3 阶段 1 需求 S-doc/S-tla/S-bdd 三行；§6.3 阶段 1 门禁            |
+| 2 系统设计 | §1 + §2 + §3（阶段 2 行）+ §6.3（阶段 2 门）             | §3 阶段 2 系统设计三行；§6.3 阶段 2 门禁                           |
+| 3 概要设计 | §1 + §2 + §3（阶段 3 行）+ §6.3（阶段 3 门）             | §3 阶段 3 概要设计三行；§6.3 阶段 3 门禁                           |
+| 4 详细设计 | §1 + §2 + §3（阶段 4 行）+ §6.3（阶段 4 门）             | §3 阶段 4 详细设计三行；§6.3 阶段 4 门禁                           |
+| 5 编码     | §1 + §2 + §3（阶段 5 行）+ §5 三段式 + §6.3（阶段 5 门） | §3 阶段 5 编码三行；§5 explore/propose/coding 表；§6.3 阶段 5 门禁 |
+| 6 集成测试 | §1 + §2 + §3（阶段 6 行）+ §5 三段式 + §6.3（阶段 6 门） | §3 阶段 6 集成测试三行；§5 三段式表；§6.3 阶段 6 门禁              |
+| 7 系统测试 | §1 + §2 + §3（阶段 7 行）+ §5 三段式 + §6.3（阶段 7 门） | §3 阶段 7 系统测试三行；§5 三段式表；§6.3 阶段 7 门禁              |
+| 8 验收测试 | §1 + §2 + §3（阶段 8 行）+ §5 三段式 + §6.3（阶段 8 门） | §3 阶段 8 验收测试三行；§5 三段式表；§6.3 阶段 8 门禁              |
+| 返工循环   | §4 返工循环分派 + §1（R 角色）+ §6.2                     | §4 返工循环表 + S-emergency-fix 表                                 |
+| 全阶段通用 | §1 角色速查 + §7 反模式→check 映射                       | §1 角色表 + §7 反模式映射表                                        |
 
 > 阶段 1-4 的 A 子代理 ingestion 子流程见 §2 注（A-chunk/A-cross/A-evolve 分别加载 ingestion-chunk/ingestion-cross/graph-guide）。
 > 阶段 5-8 进入 CHECKPOINT 时另跑 ensure-codegraph-opsx（见 §5 依赖引导）。
 
 ### 1. 角色速查
 
-| 角色 | 简称 | 职责一句话 | 关键禁止动作 |
-|---|---|---|---|
-| O | 编排者 | 路由 / 状态 / CHECKPOINT / 分派子代理 / 持久化 / 只读脚本 | 不实施任何产物（反模式 #10） |
-| S | 产出 | 生成阶段产物 + 同步测试设计 + 回填 RTM | 不跑门禁 / 不改 status |
-| V | 评审 | 按 targetKind 路由 Persona + 产出 VerifierOutput JSON | 不改产物 / 不跑门禁 |
-| G | 门禁 | 跑 check 脚本 + 回填证据摘要 | 不改产物 / 不产出评审 |
-| A | 分析 | 阶段 1-4 分块 / 合并 / 图谱演进 | 不跑图谱门禁 / 不写正式产物 |
-| R | 根因 | 返工时定位根因 + R3 预防性审查 | 不实施修复 / 不跨阶段 |
+| 角色 | 简称   | 职责一句话                                                | 关键禁止动作                 |
+| ---- | ------ | --------------------------------------------------------- | ---------------------------- |
+| O    | 编排者 | 路由 / 状态 / CHECKPOINT / 分派子代理 / 持久化 / 只读脚本 | 不实施任何产物（反模式 #10） |
+| S    | 产出   | 生成阶段产物 + 同步测试设计 + 回填 RTM                    | 不跑门禁 / 不改 status       |
+| V    | 评审   | 按 targetKind 路由 Persona + 产出 VerifierOutput JSON     | 不改产物 / 不跑门禁          |
+| G    | 门禁   | 跑 check 脚本 + 回填证据摘要                              | 不改产物 / 不产出评审        |
+| A    | 分析   | 阶段 1-4 分块 / 合并 / 图谱演进                           | 不跑图谱门禁 / 不写正式产物  |
+| R    | 根因   | 返工时定位根因 + R3 预防性审查                            | 不实施修复 / 不跨阶段        |
 
 > S 变体（10 种）：S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd（阶段 1-4 拆分）/ S-explore / S-propose / S-coding（阶段 5-8 三段式）/ S-fix / S-emergency-fix（返工）。
 
@@ -44,20 +44,20 @@
 
 > 事实基准（check-preventive-review.ts 已确认）：R3 变体按**工作类型** 4 种（standard / fix / emergency / ingest），**不按 S 角色拆分**——S-doc / S-tla / S-bdd 共享同一套 standard R3×3。每阶段每变体一套 R3×3 + V×1 + G×1；阶段 5-8 opsx 按段（explore / propose / apply）各一套。消除 18→30 分派漂移歧义。
 
-| 工作类型 variant | 触发场景 | R3 报告前缀 | R3×3 | V×1 | G×1 |
-|---|---|---|---|---|---|
-| standard | 标准 S 产出（S-doc / S-tla / S-bdd 共享一套） | `<phase>-{dim}.json` | ✅ | ✅ | ✅ |
-| fix | S-fix 返工后 | `<phase>-fix-{dim}.json` | ✅ | ✅ | ✅ |
-| emergency | S-emergency-fix 紧急修复后 | `<phase>-emergency-{dim}.json` | ✅ | ✅ | ✅ |
-| ingest | S-ingest-tla / S-ingest-bdd 后 | `<phase>-ingest-{dim}.json` | ✅ | ✅ | ✅ |
+| 工作类型 variant | 触发场景                                      | R3 报告前缀                    | R3×3 | V×1 | G×1 |
+| ---------------- | --------------------------------------------- | ------------------------------ | ---- | --- | --- |
+| standard         | 标准 S 产出（S-doc / S-tla / S-bdd 共享一套） | `<phase>-{dim}.json`           | ✅   | ✅  | ✅  |
+| fix              | S-fix 返工后                                  | `<phase>-fix-{dim}.json`       | ✅   | ✅  | ✅  |
+| emergency        | S-emergency-fix 紧急修复后                    | `<phase>-emergency-{dim}.json` | ✅   | ✅  | ✅  |
+| ingest           | S-ingest-tla / S-ingest-bdd 后                | `<phase>-ingest-{dim}.json`    | ✅   | ✅  | ✅  |
 
 阶段 5-8 opsx 三段式（每段各一套 R3×3 + V×1 + G×1）：
 
-| 段 | S 变体 | R3×3 | V×1 | G×1 |
-|---|---|---|---|---|
-| explore | S-explore | ✅ | ✅ | ✅ |
-| propose | S-propose | ✅ | ✅ | ✅ |
-| apply | S-coding | ✅ | ✅ | ✅ |
+| 段      | S 变体    | R3×3 | V×1 | G×1 |
+| ------- | --------- | ---- | --- | --- |
+| explore | S-explore | ✅   | ✅  | ✅  |
+| propose | S-propose | ✅   | ✅  | ✅  |
+| apply   | S-coding  | ✅   | ✅  | ✅  |
 
 ### 2. 每阶段分派时序
 
@@ -89,37 +89,37 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 ### 阶段 1-4（设计阶段，S 拆分为 S-doc / S-tla / S-bdd）
 
-| 阶段 | S 变体 | 产出物 | 加载的 reference | 触发的 check 脚本 |
-|---|---|---|---|---|
-| 1 需求 | S-doc | 需求规格 + 验收测试用例 + 风险评估 + uat-path-mapping.md + RTM | phase-1-requirements / ingestion-chunk / ingestion-cross / graph-guide / rtm-guide | check-requirement-graph(--phase=1) / check-requirement-coverage / check-verifier-output / check-exemption(豁免时) |
-| 1 需求 | S-tla | L1 TLA+ 规格（.tla + .cfg）+ tla-manifest.json | tla-plus | check-tla-model(--phase=1) + project pair sync（两份 manifest 真实有效且双向配对后） |
-| 1 需求 | S-bdd | L1 BDD features + bdd-manifest.json + RTM acceptanceTest 列 | bdd | check-bdd-model(--phase=1) |
-| 2 系统设计 | S-doc | 系统设计文档 + 系统测试用例（含性能/安全基线）+ RTM | phase-2-system-design / ingestion-cross / graph-guide / rtm-guide | check-requirement-graph(--phase=2) / check-verifier-output |
-| 2 系统设计 | S-tla | L2 TLA+ 规格（L1 细化 + L2）+ tla-manifest.json | tla-plus | check-tla-model(--phase=2, --graph 强制) + project pair sync（两份 manifest 真实有效且双向配对后） |
-| 2 系统设计 | S-bdd | L2 BDD features（parent→L1）+ bdd-manifest.json + RTM systemTest 列 | bdd | check-bdd-model(--phase=2, --graph 强制) |
-| 3 概要设计 | S-doc | 接口设计文档 + 集成测试用例 + RTM | phase-3-outline-design / ingestion-cross / graph-guide / rtm-guide | check-requirement-graph(--phase=3) / check-verifier-output |
-| 3 概要设计 | S-tla | L3 TLA+ 规格（L2 细化 + L3）+ tla-manifest.json | tla-plus | check-tla-model(--phase=3, --graph 强制) + project pair sync（两份 manifest 真实有效且双向配对后） |
-| 3 概要设计 | S-bdd | L3 BDD features（parent→L2）+ bdd-manifest.json + RTM integrationTest 列 | bdd | check-bdd-model(--phase=3, --graph 强制) |
-| 4 详细设计 | S-doc | 详细设计文档 + 单元测试用例 + RTM | phase-4-detailed-design / ingestion-cross / graph-guide / rtm-guide / coding-quality | check-requirement-graph(--phase=4，零违反硬约束) / check-verifier-output |
-| 4 详细设计 | S-tla | L4 TLA+ 规格（L3 + 按需 L4）+ tla-manifest.json | tla-plus | check-tla-model(--phase=4, --graph 强制) + project pair sync（两份 manifest 真实有效且双向配对后） |
-| 4 详细设计 | S-bdd | L4 BDD features（parent→L3）+ bdd-manifest.json + RTM unitTest 列 | bdd | check-bdd-model(--phase=4, --graph 强制) |
+| 阶段       | S 变体 | 产出物                                                                   | 加载的 reference                                                                     | 触发的 check 脚本                                                                                                 |
+| ---------- | ------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| 1 需求     | S-doc  | 需求规格 + 验收测试用例 + 风险评估 + uat-path-mapping.md + RTM           | phase-1-requirements / ingestion-chunk / ingestion-cross / graph-guide / rtm-guide   | check-requirement-graph(--phase=1) / check-requirement-coverage / check-verifier-output / check-exemption(豁免时) |
+| 1 需求     | S-tla  | L1 TLA+ 规格（.tla + .cfg）+ tla-manifest.json                           | tla-plus                                                                             | check-tla-model(--phase=1) + project pair sync（两份 manifest 真实有效且双向配对后）                              |
+| 1 需求     | S-bdd  | L1 BDD features + bdd-manifest.json + RTM acceptanceTest 列              | bdd                                                                                  | check-bdd-model(--phase=1)                                                                                        |
+| 2 系统设计 | S-doc  | 系统设计文档 + 系统测试用例（含性能/安全基线）+ RTM                      | phase-2-system-design / ingestion-cross / graph-guide / rtm-guide                    | check-requirement-graph(--phase=2) / check-verifier-output                                                        |
+| 2 系统设计 | S-tla  | L2 TLA+ 规格（L1 细化 + L2）+ tla-manifest.json                          | tla-plus                                                                             | check-tla-model(--phase=2, --graph 强制) + project pair sync（两份 manifest 真实有效且双向配对后）                |
+| 2 系统设计 | S-bdd  | L2 BDD features（parent→L1）+ bdd-manifest.json + RTM systemTest 列      | bdd                                                                                  | check-bdd-model(--phase=2, --graph 强制)                                                                          |
+| 3 概要设计 | S-doc  | 接口设计文档 + 集成测试用例 + RTM                                        | phase-3-outline-design / ingestion-cross / graph-guide / rtm-guide                   | check-requirement-graph(--phase=3) / check-verifier-output                                                        |
+| 3 概要设计 | S-tla  | L3 TLA+ 规格（L2 细化 + L3）+ tla-manifest.json                          | tla-plus                                                                             | check-tla-model(--phase=3, --graph 强制) + project pair sync（两份 manifest 真实有效且双向配对后）                |
+| 3 概要设计 | S-bdd  | L3 BDD features（parent→L2）+ bdd-manifest.json + RTM integrationTest 列 | bdd                                                                                  | check-bdd-model(--phase=3, --graph 强制)                                                                          |
+| 4 详细设计 | S-doc  | 详细设计文档 + 单元测试用例 + RTM                                        | phase-4-detailed-design / ingestion-cross / graph-guide / rtm-guide / coding-quality | check-requirement-graph(--phase=4，零违反硬约束) / check-verifier-output                                          |
+| 4 详细设计 | S-tla  | L4 TLA+ 规格（L3 + 按需 L4）+ tla-manifest.json                          | tla-plus                                                                             | check-tla-model(--phase=4, --graph 强制) + project pair sync（两份 manifest 真实有效且双向配对后）                |
+| 4 详细设计 | S-bdd  | L4 BDD features（parent→L3）+ bdd-manifest.json + RTM unitTest 列        | bdd                                                                                  | check-bdd-model(--phase=4, --graph 强制)                                                                          |
 
 ### 阶段 5-8（编码/测试执行阶段，S 三段式：S-explore / S-propose / S-coding）
 
-| 阶段 | S 变体 | 产出物 | 加载的 reference | 触发的 check 脚本 |
-|---|---|---|---|---|
-| 5 编码 | S-explore | exploration-analysis.md（方案对比 + codegraph 影响初判） | phase-5-coding / rtm-guide | check-codegraph-queries / check-opsx-artifacts |
-| 5 编码 | S-propose | opsx 产物（proposal/specs/design/tasks）+ tickets.md | phase-5-coding / rtm-guide | check-opsx-artifacts |
-| 5 编码 | S-coding | 代码 + 单元测试 + codegraph-queries 落盘 + code-TLA 校验报告 + RTM codeModule 回填 | phase-5-coding / rtm-guide / quality-standards | check-code-tla-consistency / check-design-contract-consistency / check-state-machine-consistency / check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=5 cucumber) / check-artifact-gate(--phase=5) |
-| 6 集成测试 | S-explore | exploration-analysis.md（测试策略 + codegraph 查被测模块） | phase-6-integration-test / rtm-guide | check-codegraph-queries / check-opsx-artifacts |
-| 6 集成测试 | S-propose | opsx 产物 + tickets.md（测试代码切片） | phase-6-integration-test / rtm-guide | check-opsx-artifacts |
-| 6 集成测试 | S-coding | 集成测试代码 + codegraph-queries 落盘 + 测试报告 + RTM integrationTest 回填 | phase-6-integration-test / rtm-guide | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=6 cucumber) / check-artifact-gate(--phase=6) |
-| 7 系统测试 | S-explore | exploration-analysis.md（测试策略 + codegraph 查被测模块） | phase-7-system-test / rtm-guide / quality-standards | check-codegraph-queries / check-opsx-artifacts |
-| 7 系统测试 | S-propose | opsx 产物 + tickets.md（测试代码切片） | phase-7-system-test / rtm-guide / quality-standards | check-opsx-artifacts |
-| 7 系统测试 | S-coding | 系统测试代码 + codegraph-queries 落盘 + 性能/安全/兼容性报告 + RTM systemTest 回填 | phase-7-system-test / rtm-guide / quality-standards | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=7 cucumber) / check-artifact-gate(--phase=7) |
-| 8 验收测试 | S-explore | exploration-analysis.md（测试策略 + codegraph 查被测模块） | phase-8-acceptance-test / rtm-guide | check-codegraph-queries / check-opsx-artifacts |
-| 8 验收测试 | S-propose | opsx 产物 + tickets.md（测试代码切片） | phase-8-acceptance-test / rtm-guide | check-opsx-artifacts |
-| 8 验收测试 | S-coding | 验收测试代码 + codegraph-queries 落盘 + 验收报告 + Archive 产物 + RTM acceptanceTest 回填 | phase-8-acceptance-test / rtm-guide | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-archive-integrity / check-design-contract-consistency / check-openspec-archive |
+| 阶段       | S 变体    | 产出物                                                                                    | 加载的 reference                                    | 触发的 check 脚本                                                                                                                                                                                                        |
+| ---------- | --------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 5 编码     | S-explore | exploration-analysis.md（方案对比 + codegraph 影响初判）                                  | phase-5-coding / rtm-guide                          | check-codegraph-queries / check-opsx-artifacts                                                                                                                                                                           |
+| 5 编码     | S-propose | opsx 产物（proposal/specs/design/tasks）+ tickets.md                                      | phase-5-coding / rtm-guide                          | check-opsx-artifacts                                                                                                                                                                                                     |
+| 5 编码     | S-coding  | 代码 + 单元测试 + codegraph-queries 落盘 + code-TLA 校验报告 + RTM codeModule 回填        | phase-5-coding / rtm-guide / quality-standards      | check-code-tla-consistency / check-design-contract-consistency / check-state-machine-consistency / check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=5 cucumber) / check-artifact-gate(--phase=5) |
+| 6 集成测试 | S-explore | exploration-analysis.md（测试策略 + codegraph 查被测模块）                                | phase-6-integration-test / rtm-guide                | check-codegraph-queries / check-opsx-artifacts                                                                                                                                                                           |
+| 6 集成测试 | S-propose | opsx 产物 + tickets.md（测试代码切片）                                                    | phase-6-integration-test / rtm-guide                | check-opsx-artifacts                                                                                                                                                                                                     |
+| 6 集成测试 | S-coding  | 集成测试代码 + codegraph-queries 落盘 + 测试报告 + RTM integrationTest 回填               | phase-6-integration-test / rtm-guide                | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=6 cucumber) / check-artifact-gate(--phase=6)                                                                                                    |
+| 7 系统测试 | S-explore | exploration-analysis.md（测试策略 + codegraph 查被测模块）                                | phase-7-system-test / rtm-guide / quality-standards | check-codegraph-queries / check-opsx-artifacts                                                                                                                                                                           |
+| 7 系统测试 | S-propose | opsx 产物 + tickets.md（测试代码切片）                                                    | phase-7-system-test / rtm-guide / quality-standards | check-opsx-artifacts                                                                                                                                                                                                     |
+| 7 系统测试 | S-coding  | 系统测试代码 + codegraph-queries 落盘 + 性能/安全/兼容性报告 + RTM systemTest 回填        | phase-7-system-test / rtm-guide / quality-standards | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=7 cucumber) / check-artifact-gate(--phase=7)                                                                                                    |
+| 8 验收测试 | S-explore | exploration-analysis.md（测试策略 + codegraph 查被测模块）                                | phase-8-acceptance-test / rtm-guide                 | check-codegraph-queries / check-opsx-artifacts                                                                                                                                                                           |
+| 8 验收测试 | S-propose | opsx 产物 + tickets.md（测试代码切片）                                                    | phase-8-acceptance-test / rtm-guide                 | check-opsx-artifacts                                                                                                                                                                                                     |
+| 8 验收测试 | S-coding  | 验收测试代码 + codegraph-queries 落盘 + 验收报告 + Archive 产物 + RTM acceptanceTest 回填 | phase-8-acceptance-test / rtm-guide                 | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-archive-integrity / check-design-contract-consistency / check-openspec-archive                  |
 
 > A 子代理（阶段 1-4 ingestion）：A-chunk 加载 ingestion-chunk / graph-guide；A-cross 加载 ingestion-cross / graph-guide；A-evolve 加载 ingestion-cross / graph-guide。A 不跑 check 脚本（G 负责）。
 
@@ -132,47 +132,47 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 > `references/` 目录共 59 份 .md（39 个非 stub 资源 + 19 个 42.0.0 重定向 stub，另含 quickstart.md 入门速查不入下表）。下表按「触发条件」组织，供编排者判断何时加载某文件。
 > 标注 **2 跳** 的文件不直接出现在 §3 各阶段 reference 列，需经其上游文件（如 hard-constraints / phase-N / subagent-delegation）间接引用才可达——编排者按需显式加载，勿遗漏。
 
-| 文件 | 触发条件 | 可达性 |
-|---|---|---|
-| agent-personas | V 子代理评审时选用 Persona（code-reviewer/test-engineer/security-auditor/performance-auditor）+ R-lead/V-lead 多角度 persona 选择矩阵（「Persona 矩阵」节） | 1 跳 |
-| bdd | BDD 建模指南 + 语法速查 + 模式示例 + 评审清单（42.0.0 合并） | 1 跳 |
-| tla-plus | TLA+ 层次化建模指南 + 语法速查 + 模式示例 + 评审清单 + TLC 配置（42.0.0 合并） | 1 跳 |
-| coding-quality | 设计模式目录（阶段 3/4 设计套用）/ 重构手法与代码坏味道清单（阶段 5 评审 / 重构识别） | 1 跳 |
-| command-reference | 全命令 / 错误码 / ERROR_JSON 约定速查；O 分派脚本前 | 2 跳 |
-| concurrency-guide | 阶段 5 并发专项检查 / 并发代码评审时 | 2 跳 |
-| context-management-guide | 长会话上下文管理时（O 通用加载） | 1 跳 |
-| conventions | 术语表权威定义 + 格式约定 + 目录约定（42.0.0 三合一） | 2 跳 |
-| data-models | `.w-model/*.json` 数据模型 / schema 强约束 / RunLogEntry vs EventIngress 边界 | 2 跳 |
-| design-philosophy | 五条设计哲学（主刀与修正权等）；O 通用加载 | 1 跳 |
-| estimation-guide | 工期 / 预算估算时（O 通用加载） | 1 跳 |
-| evidence-anchored-tree | 路径不确定 / 需求模糊项目的方法论参照（证据支撑树 × W 模型映射，42.1.0 新增） | 1 跳 |
-| event-ingress-guide | Loop 3 事件接驳；L2+ 成熟度激活时 | 2 跳 |
-| graph-guide | 阶段 1-4 图谱门禁与收敛准则（A 子代理 + G） | 1 跳 |
-| hard-constraints | 14 条硬约束 + 反模式（48 条，#1~#48）完整版；执行前必读（O 通用加载；42.0.0 吸收反模式清单） | 1 跳 |
-| hill-climbing-guide | Loop 4 爬坡循环；run-log 分析伴侣 | 2 跳 |
-| iceberg-sweep-guide | 冰山扫掠深度分析（S-fix 后 ICEBERG-A / 阶段门前 ICEBERG-B） | 2 跳 |
-| ingestion-chunk | 阶段 1-4 A-chunk 分块细则 | 1 跳 |
-| ingestion-cross | 阶段 1-4 A-cross/A-evolve 合并与图谱演进 | 1 跳 |
-| operation-behaviors | 八条操作行为 + 失败模式 F1-F10；O 通用加载 | 1 跳 |
-| operational-recovery | 恢复 / 成熟度与行为门禁分级（约束 #13）；O 通用加载 | 1 跳 |
-| phase-1-requirements | 阶段 1 需求细则（含迷雾登记册 Fog of War） | 1 跳 |
-| phase-2-system-design | 阶段 2 系统设计细则 | 1 跳 |
-| phase-3-outline-design | 阶段 3 概要设计细则 | 1 跳 |
-| phase-4-detailed-design | 阶段 4 详细设计细则 | 1 跳 |
-| phase-5-coding | 阶段 5 编码细则（codegraph 修改前影响分析） | 1 跳 |
-| phase-6-integration-test | 阶段 6 集成测试细则 | 1 跳 |
-| phase-7-system-test | 阶段 7 系统测试细则 | 1 跳 |
-| phase-8-acceptance-test | 阶段 8 验收测试细则 | 1 跳 |
-| quality-standards | 阶段 5/7 代码质量 / 评审代码时 | 1 跳 |
-| quick-self-check | 推进前自检清单 + 完成定义（DoD）七维度；O 通用加载 | 1 跳 |
-| root-cause-locator | R 子代理根因分析方法论（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯） | 2 跳 |
-| rtm-guide | RTM 维护 / 回填规则 | 1 跳 |
-| signature-chain-guide | 角色链式签名 + 产出来源正确性（反模式 #32） | 2 跳 |
-| skillopt-adoption | SkillOpt 方法论吸收（bounded edit 边界规则） | 2 跳 |
-| subagent-delegation | O/A/S/V/G/R 编排者-子代理边界权威定义 | 1 跳 |
-| toolbox | 工具/命令速查（「I have X, I want Y → use Z」决策表） | 1 跳 |
-| verifier-spec | V 子代理评审提示词 + 五轴评审 §7.4A + self-as-verifier 模式 | 1 跳 |
-| workflow | 完整工作流程（初始化项目 / 阶段切换 / 向用户解释整体流程时） | 2 跳 |
+| 文件                     | 触发条件                                                                                                                                                    | 可达性 |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| agent-personas           | V 子代理评审时选用 Persona（code-reviewer/test-engineer/security-auditor/performance-auditor）+ R-lead/V-lead 多角度 persona 选择矩阵（「Persona 矩阵」节） | 1 跳   |
+| bdd                      | BDD 建模指南 + 语法速查 + 模式示例 + 评审清单（42.0.0 合并）                                                                                                | 1 跳   |
+| tla-plus                 | TLA+ 层次化建模指南 + 语法速查 + 模式示例 + 评审清单 + TLC 配置（42.0.0 合并）                                                                              | 1 跳   |
+| coding-quality           | 设计模式目录（阶段 3/4 设计套用）/ 重构手法与代码坏味道清单（阶段 5 评审 / 重构识别）                                                                       | 1 跳   |
+| command-reference        | 全命令 / 错误码 / ERROR_JSON 约定速查；O 分派脚本前                                                                                                         | 2 跳   |
+| concurrency-guide        | 阶段 5 并发专项检查 / 并发代码评审时                                                                                                                        | 2 跳   |
+| context-management-guide | 长会话上下文管理时（O 通用加载）                                                                                                                            | 1 跳   |
+| conventions              | 术语表权威定义 + 格式约定 + 目录约定（42.0.0 三合一）                                                                                                       | 2 跳   |
+| data-models              | `.w-model/*.json` 数据模型 / schema 强约束 / RunLogEntry vs EventIngress 边界                                                                               | 2 跳   |
+| design-philosophy        | 五条设计哲学（主刀与修正权等）；O 通用加载                                                                                                                  | 1 跳   |
+| estimation-guide         | 工期 / 预算估算时（O 通用加载）                                                                                                                             | 1 跳   |
+| evidence-anchored-tree   | 路径不确定 / 需求模糊项目的方法论参照（证据支撑树 × W 模型映射，42.1.0 新增）                                                                               | 1 跳   |
+| event-ingress-guide      | Loop 3 事件接驳；L2+ 成熟度激活时                                                                                                                           | 2 跳   |
+| graph-guide              | 阶段 1-4 图谱门禁与收敛准则（A 子代理 + G）                                                                                                                 | 1 跳   |
+| hard-constraints         | 14 条硬约束 + 反模式（48 条，#1~#48）完整版；执行前必读（O 通用加载；42.0.0 吸收反模式清单）                                                                | 1 跳   |
+| hill-climbing-guide      | Loop 4 爬坡循环；run-log 分析伴侣                                                                                                                           | 2 跳   |
+| iceberg-sweep-guide      | 冰山扫掠深度分析（S-fix 后 ICEBERG-A / 阶段门前 ICEBERG-B）                                                                                                 | 2 跳   |
+| ingestion-chunk          | 阶段 1-4 A-chunk 分块细则                                                                                                                                   | 1 跳   |
+| ingestion-cross          | 阶段 1-4 A-cross/A-evolve 合并与图谱演进                                                                                                                    | 1 跳   |
+| operation-behaviors      | 八条操作行为 + 失败模式 F1-F10；O 通用加载                                                                                                                  | 1 跳   |
+| operational-recovery     | 恢复 / 成熟度与行为门禁分级（约束 #13）；O 通用加载                                                                                                         | 1 跳   |
+| phase-1-requirements     | 阶段 1 需求细则（含迷雾登记册 Fog of War）                                                                                                                  | 1 跳   |
+| phase-2-system-design    | 阶段 2 系统设计细则                                                                                                                                         | 1 跳   |
+| phase-3-outline-design   | 阶段 3 概要设计细则                                                                                                                                         | 1 跳   |
+| phase-4-detailed-design  | 阶段 4 详细设计细则                                                                                                                                         | 1 跳   |
+| phase-5-coding           | 阶段 5 编码细则（codegraph 修改前影响分析）                                                                                                                 | 1 跳   |
+| phase-6-integration-test | 阶段 6 集成测试细则                                                                                                                                         | 1 跳   |
+| phase-7-system-test      | 阶段 7 系统测试细则                                                                                                                                         | 1 跳   |
+| phase-8-acceptance-test  | 阶段 8 验收测试细则                                                                                                                                         | 1 跳   |
+| quality-standards        | 阶段 5/7 代码质量 / 评审代码时                                                                                                                              | 1 跳   |
+| quick-self-check         | 推进前自检清单 + 完成定义（DoD）七维度；O 通用加载                                                                                                          | 1 跳   |
+| root-cause-locator       | R 子代理根因分析方法论（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）                                                                                            | 2 跳   |
+| rtm-guide                | RTM 维护 / 回填规则                                                                                                                                         | 1 跳   |
+| signature-chain-guide    | 角色链式签名 + 产出来源正确性（反模式 #32）                                                                                                                 | 2 跳   |
+| skillopt-adoption        | SkillOpt 方法论吸收（bounded edit 边界规则）                                                                                                                | 2 跳   |
+| subagent-delegation      | O/A/S/V/G/R 编排者-子代理边界权威定义                                                                                                                       | 1 跳   |
+| toolbox                  | 工具/命令速查（「I have X, I want Y → use Z」决策表）                                                                                                       | 1 跳   |
+| verifier-spec            | V 子代理评审提示词 + 五轴评审 §7.4A + self-as-verifier 模式                                                                                                 | 1 跳   |
+| workflow                 | 完整工作流程（初始化项目 / 阶段切换 / 向用户解释整体流程时）                                                                                                | 2 跳   |
 
 > 2 跳文件共 11 个：command-reference / concurrency-guide / conventions / data-models / event-ingress-guide / hill-climbing-guide / iceberg-sweep-guide / root-cause-locator / signature-chain-guide / skillopt-adoption / workflow。
 > 其余 28 个文件均直接出现在 §3 各阶段 reference 列或 O/V 通用加载（1 跳）。
@@ -181,24 +181,24 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）（约束 #12 + #11 + #8）
 
-| 步骤 | 角色 | 产物 | check 脚本 | R3 报告路径前缀 |
-|---|---|---|---|---|
-| 1 | R | RootCauseReport JSON + .md | check-rootcause-report | — |
-| 2 | V | VerifierOutput（targetKind=rootcause） | check-verifier-output | — |
-| 3 | G | gate-logs 证据 | check-rootcause-report + check-verifier-output | — |
-| 4 | S-fix | 修复后的产物 + RTM 更新 | 同原阶段 check 脚本 | `<phase>-fix-{dim}.json` |
-| 5 | R3×3 | 3 份 preventive-review JSON（completeness/reliability/security） | check-preventive-review(--variant=fix) | `<phase>-fix-{dim}.json` |
-| 6 | V | VerifierOutput | check-verifier-output | — |
-| 7 | G | gate-logs 证据 | 原阶段门禁脚本 + 5 闭环脚本 | — |
+| 步骤 | 角色  | 产物                                                             | check 脚本                                     | R3 报告路径前缀          |
+| ---- | ----- | ---------------------------------------------------------------- | ---------------------------------------------- | ------------------------ |
+| 1    | R     | RootCauseReport JSON + .md                                       | check-rootcause-report                         | —                        |
+| 2    | V     | VerifierOutput（targetKind=rootcause）                           | check-verifier-output                          | —                        |
+| 3    | G     | gate-logs 证据                                                   | check-rootcause-report + check-verifier-output | —                        |
+| 4    | S-fix | 修复后的产物 + RTM 更新                                          | 同原阶段 check 脚本                            | `<phase>-fix-{dim}.json` |
+| 5    | R3×3  | 3 份 preventive-review JSON（completeness/reliability/security） | check-preventive-review(--variant=fix)         | `<phase>-fix-{dim}.json` |
+| 6    | V     | VerifierOutput                                                   | check-verifier-output                          | —                        |
+| 7    | G     | gate-logs 证据                                                   | 原阶段门禁脚本 + 5 闭环脚本                    | —                        |
 
 ### S-emergency-fix（紧急修复通道，仅阻塞当前阶段时启用）
 
-| 步骤 | 角色 | 产物 | check 脚本 | R3 报告路径前缀 |
-|---|---|---|---|---|
-| 1 | S-emergency-fix | 最小修复（仅阻塞点）+ run-log 标注 blocker | 同原阶段 check 脚本 | `<phase>-emergency-{dim}.json` |
-| 2 | R3×3 | 3 份 preventive-review JSON | check-preventive-review(--variant=emergency) | `<phase>-emergency-{dim}.json` |
-| 3 | V | VerifierOutput | check-verifier-output | — |
-| 4 | G | gate-logs 证据 | 原阶段门禁脚本 + 5 闭环脚本 | — |
+| 步骤 | 角色            | 产物                                       | check 脚本                                   | R3 报告路径前缀                |
+| ---- | --------------- | ------------------------------------------ | -------------------------------------------- | ------------------------------ |
+| 1    | S-emergency-fix | 最小修复（仅阻塞点）+ run-log 标注 blocker | 同原阶段 check 脚本                          | `<phase>-emergency-{dim}.json` |
+| 2    | R3×3            | 3 份 preventive-review JSON                | check-preventive-review(--variant=emergency) | `<phase>-emergency-{dim}.json` |
+| 3    | V               | VerifierOutput                             | check-verifier-output                        | —                              |
+| 4    | G               | gate-logs 证据                             | 原阶段门禁脚本 + 5 闭环脚本                  | —                              |
 
 > 约束 #11：S-fix / S-emergency-fix 与标准 S 一视同仁，产出后须 R3×3 → V → G，不得跳过。跳过命中反模式 #42。事后 R 复核机制（emergencyFixReview 字段）已移除，由前置 R3+V+G 兜底。
 
@@ -211,26 +211,26 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 > 约束 #14。每段产物须跑 R3×3 + V 审查（反模式 #39）。
 > 依赖引导：阶段 5 进入 CHECKPOINT 时另跑 `ensure-codegraph-opsx.ts`（L1 CLI / L2 MCP / L3 项目目录三层检测 + 自动安装）；阶段 6-8 复检（--mode quick）。
 
-| 段 | S 变体 | 产物 | reference | check 脚本 |
-|---|---|---|---|---|
-| explore | S-explore | exploration-analysis.md（方案对比 / 推荐 / codegraph 影响初判） | phase-N-*.md + rtm-guide | check-codegraph-queries / check-opsx-artifacts |
-| propose | S-propose | opsx 产物（proposal/specs/design/tasks）+ tickets.md（tracer-bullet + blocking edges DAG） | phase-N-*.md + rtm-guide | check-opsx-artifacts |
-| coding | S-coding | 代码 + 测试 + codegraph-queries 落盘 + TLA 校验报告 | phase-N-*.md + rtm-guide + quality-standards(阶段5/7) | check-codegraph-queries + check-opsx-artifacts + 原阶段 check |
+| 段      | S 变体    | 产物                                                                                       | reference                                             | check 脚本                                                    |
+| ------- | --------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------- |
+| explore | S-explore | exploration-analysis.md（方案对比 / 推荐 / codegraph 影响初判）                            | phase-N-*.md + rtm-guide                              | check-codegraph-queries / check-opsx-artifacts                |
+| propose | S-propose | opsx 产物（proposal/specs/design/tasks）+ tickets.md（tracer-bullet + blocking edges DAG） | phase-N-*.md + rtm-guide                              | check-opsx-artifacts                                          |
+| coding  | S-coding  | 代码 + 测试 + codegraph-queries 落盘 + TLA 校验报告                                        | phase-N-*.md + rtm-guide + quality-standards(阶段5/7) | check-codegraph-queries + check-opsx-artifacts + 原阶段 check |
 
 ### stage 级 R3 + V 产物（阶段 5-8 opsx 三段式专属）
 
-| 产物类型 | 路径 | 数量 |
-|---|---|---|
-| R3 报告 | `.w-model/r3-reviews/phase<N>-{explore,propose,coding}-{completeness,reliability,security}.md` | 9 份 |
-| V 评审 | `.w-model/v-reviews/phase<N>-{explore,propose,coding}.md` | 3 份 |
+| 产物类型 | 路径                                                                                           | 数量 |
+| -------- | ---------------------------------------------------------------------------------------------- | ---- |
+| R3 报告  | `.w-model/r3-reviews/phase<N>-{explore,propose,coding}-{completeness,reliability,security}.md` | 9 份 |
+| V 评审   | `.w-model/v-reviews/phase<N>-{explore,propose,coding}.md`                                      | 3 份 |
 
 > 缺失任一文件命中反模式 #39（跳过 opsx 产物审查），由 check-opsx-artifacts.ts 校验。
 
 ### opsx 与 S-tickets 职责边界（反模式 #40）
 
-| 制品 | 产出者 | 内容 | 职责 |
-|---|---|---|---|
-| tasks.md | opsx:propose | 高层任务清单（what/why） | 规格级规划 |
+| 制品       | 产出者                      | 内容                               | 职责       |
+| ---------- | --------------------------- | ---------------------------------- | ---------- |
+| tasks.md   | opsx:propose                | 高层任务清单（what/why）           | 规格级规划 |
 | tickets.md | S-tickets（S-propose 兼任） | 代码垂直切片（how，端到端可 demo） | 代码级切片 |
 
 > S-coding 不做拆解，只按 tickets.md frontier 执行。每片 Edit/Write 前须 codegraph_explore（约束 #14，反模式 #38）。
@@ -239,36 +239,36 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 ### 6.1 全阶段必跑脚本（约束 #11，5 个闭环脚本）
 
-| 脚本 | 用途 | 触发时机 |
-|---|---|---|
-| check-budget | 预算检查 | 每阶段门放行前 |
-| check-run-log | run-log 完整性 + 字段 schema + R3 记录数 | 每阶段门放行前 |
-| check-maturity | 成熟度判定 | 每阶段门放行前 |
-| check-checkpoint | CHECKPOINT acknowledgedDecisions 关键词 | 每阶段门放行前 |
+| 脚本                    | 用途                                                         | 触发时机              |
+| ----------------------- | ------------------------------------------------------------ | --------------------- |
+| check-budget            | 预算检查                                                     | 每阶段门放行前        |
+| check-run-log           | run-log 完整性 + 字段 schema + R3 记录数                     | 每阶段门放行前        |
+| check-maturity          | 成熟度判定                                                   | 每阶段门放行前        |
+| check-checkpoint        | CHECKPOINT acknowledgedDecisions 关键词                      | 每阶段门放行前        |
 | check-preventive-review | R3 三份报告完整性（--variant=standard/fix/emergency/ingest） | V 评审前（always-on） |
 
 ### 6.2 全阶段通用脚本
 
-| 脚本 | 用途 | 触发时机 |
-|---|---|---|
-| check-verifier-output | V 评审 JSON 校验（R1-R13，含 R13 单轴下限） | V 产出后 G 跑 |
-| check-rootcause-report | RootCauseReport 校验（R1-R10：根因链 / 可证伪 / 修复建议 / 预防 / 上游缺陷 / 质量等级 / 报告 ID / 多角度 / reality-checker 置信度） | 返工循环：R 定位后 G 校验（见 §4 步骤 1/3） |
-| check-role-dispatch | 角色 S/V/G 各 ≥1 + R3 三维度（role=R 且 outcome=success 的 r3-completeness/r3-reliability/r3-security 各 ≥1）无条件校验（约束 #8/#11）；空或全无效输入 fail-closed；结果含 r3Missing 维度明细 | 每阶段门放行前 |
-| check-signature-chain | 签名链 R1-R10（含 O 越权 / 代签检测） | 每阶段门放行前 |
-| check-iceberg-sweep | 冰山扫掠报告校验（R1-R5，反模式 #44） | S-fix 通过后（ICEBERG-A）+ 阶段门放行前（ICEBERG-B） |
+| 脚本                   | 用途                                                                                                                                                                                          | 触发时机                                             |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| check-verifier-output  | V 评审 JSON 校验（R1-R13，含 R13 单轴下限）                                                                                                                                                   | V 产出后 G 跑                                        |
+| check-rootcause-report | RootCauseReport 校验（R1-R10：根因链 / 可证伪 / 修复建议 / 预防 / 上游缺陷 / 质量等级 / 报告 ID / 多角度 / reality-checker 置信度）                                                           | 返工循环：R 定位后 G 校验（见 §4 步骤 1/3）          |
+| check-role-dispatch    | 角色 S/V/G 各 ≥1 + R3 三维度（role=R 且 outcome=success 的 r3-completeness/r3-reliability/r3-security 各 ≥1）无条件校验（约束 #8/#11）；空或全无效输入 fail-closed；结果含 r3Missing 维度明细 | 每阶段门放行前                                       |
+| check-signature-chain  | 签名链 R1-R10（含 O 越权 / 代签检测）                                                                                                                                                         | 每阶段门放行前                                       |
+| check-iceberg-sweep    | 冰山扫掠报告校验（R1-R5，反模式 #44）                                                                                                                                                         | S-fix 通过后（ICEBERG-A）+ 阶段门放行前（ICEBERG-B） |
 
 ### 6.3 阶段专属脚本
 
-| 阶段门 | 必跑脚本（约束 #11 通用） | 阶段专属脚本 |
-|---|---|---|
-| 1 需求 | 5 闭环 + check-verifier-output + check-role-dispatch + check-signature-chain | check-requirement-graph(--phase=1) / check-requirement-coverage / check-tla-model(--phase=1) / check-bdd-model(--phase=1, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） / check-exemption(豁免时) |
-| 2 系统设计 | 同上 | check-requirement-graph(--phase=2) / check-tla-model(--phase=2, --graph 强制) / check-bdd-model(--phase=2, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） |
-| 3 概要设计 | 同上 | check-requirement-graph(--phase=3) / check-tla-model(--phase=3, --graph 强制) / check-bdd-model(--phase=3, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） |
-| 4 详细设计 | 同上 | check-requirement-graph(--phase=4，零违反硬约束) / check-tla-model(--phase=4, --graph 强制) / check-bdd-model(--phase=4, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） |
-| 5 编码 | 同上 | check-code-tla-consistency / check-design-contract-consistency / check-state-machine-consistency / check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=5 cucumber) / check-artifact-gate(--phase=5) |
-| 6 集成测试 | 同上 | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=6 cucumber) / check-artifact-gate(--phase=6) |
-| 7 系统测试 | 同上 | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=7 cucumber) / check-artifact-gate(--phase=7) |
-| 8 验收测试 | 同上 | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-archive-integrity / check-design-contract-consistency / check-openspec-archive |
+| 阶段门     | 必跑脚本（约束 #11 通用）                                                    | 阶段专属脚本                                                                                                                                                                                                                   |
+| ---------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 需求     | 5 闭环 + check-verifier-output + check-role-dispatch + check-signature-chain | check-requirement-graph(--phase=1) / check-requirement-coverage / check-tla-model(--phase=1) / check-bdd-model(--phase=1, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） / check-exemption(豁免时) |
+| 2 系统设计 | 同上                                                                         | check-requirement-graph(--phase=2) / check-tla-model(--phase=2, --graph 强制) / check-bdd-model(--phase=2, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖）                            |
+| 3 概要设计 | 同上                                                                         | check-requirement-graph(--phase=3) / check-tla-model(--phase=3, --graph 强制) / check-bdd-model(--phase=3, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖）                            |
+| 4 详细设计 | 同上                                                                         | check-requirement-graph(--phase=4，零违反硬约束) / check-tla-model(--phase=4, --graph 强制) / check-bdd-model(--phase=4, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖）              |
+| 5 编码     | 同上                                                                         | check-code-tla-consistency / check-design-contract-consistency / check-state-machine-consistency / check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=5 cucumber) / check-artifact-gate(--phase=5)       |
+| 6 集成测试 | 同上                                                                         | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=6 cucumber) / check-artifact-gate(--phase=6)                                                                                                          |
+| 7 系统测试 | 同上                                                                         | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=7 cucumber) / check-artifact-gate(--phase=7)                                                                                                          |
+| 8 验收测试 | 同上                                                                         | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-archive-integrity / check-design-contract-consistency / check-openspec-archive                        |
 
 > 阶段 4 硬约束：check-requirement-graph.ts --phase=4 + check-tla-model.ts --phase=4 退出码必须为 0（零违反），否则不放行进阶段 5 编码。
 
@@ -276,67 +276,71 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 ### 6.4 工具与元门禁脚本（门禁脚本权威登记表收尾）
 
-> 本小节补全非阶段门触发的工具类 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 37 个 .ts
-> 一一对应（26 个 check-* + 11 个工具：ensure-codegraph-opsx 见 §5 / 其余见下表；其中 36 个为 exit-2 脚本，self-test.ts 为 exit 0/1 回归基线，与 conventions.md「= 36（26 个 check-* + 10 个工具 CLI，不含 self-test）」口径互补）。
+> 本小节补全非阶段门触发的工具类 CLI、code-health 门禁 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 43 个 .ts
+> 一一对应（26 个 check-* + 6 个 code-health 门禁 CLI + 11 个工具：ensure-codegraph-opsx 见 §5 / 其余见下表；其中 42 个为 exit-2 脚本，self-test.ts 为 exit 0/1 回归基线，与 conventions.md「= 42（26 个 check-* + 16 个工具 CLI，不含 self-test；16 = 6 个 code-health 门禁 CLI + 10 个工具 CLI）」口径互补）。
 > **新增 / 改名门禁脚本时登记点为本表 + SKILL.md/AGENTS.md 计数句（由 checkScriptRegistry 与计数检查双向兜底）**——`check-docs-consistency.ts` 的 checkScriptRegistry
-> 核对全部 37 个 cli 脚本名均出现于本文件，SKILL.md「N 个 .ts」/ AGENTS.md「N 个脚本」/ conventions.md 计数句由计数检查同步核对（漏登记即门禁失败，pre-push 第 14 项拦截）。
+> 核对全部 43 个 cli 脚本名均出现于本文件，SKILL.md「N 个 .ts」/ AGENTS.md「N 个脚本」/ conventions.md 计数句由计数检查同步核对（漏登记即门禁失败，pre-push 第 14 项拦截）。
 
-| 脚本 | 类别 | 用途 | 触发时机 |
-|---|---|---|---|
-| check-docs-consistency | 元门禁 | 活体文档一致性门禁（计数 / 枚举 / 版本七处 / 章节号连续性 / 脚本注册表） | 仓库维护（pre-push 第 14 项），非项目阶段门 |
-| check-samples-coverage | 元门禁 | samples 覆盖矩阵门禁（每个 fixture 被 self-test 引用 + 目录在 samples/README 声明） | 仓库维护（pre-push 第 15 项），非项目阶段门 |
-| audit-l0-links（application） | 工具 | L0/L1 分发边界只读审计（Markdown 相对链接、模板占位、目标存在性、包外路径和 symlink/junction fail-closed） | 仓库维护者显式执行 `npm run audit:l0-links [-- --root=<skill-root>]`，非项目阶段门 |
-| check-tla-bdd-sync | 阶段工具 | TLA+ 与 BDD 配对文件的转移集 / 状态集 / 不变式等价同步校验 | 阶段 1-4 Artifact Gate pair sync |
-| security-scan | 工具 | eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免 | 仓库维护（pre-push 第 6 项），非项目阶段门 |
-| self-test | 工具 | 262 条样本回归基线（全部 check 逻辑通过/失败/输入错误三态） | 仓库维护（pre-push 第 1 项），非项目阶段门 |
-| wm-status | 工具 | 状态快照（只读） | O 只读查询，不分派子代理 |
-| metrics-report | 工具 | 流程度量报告（只读） | O 只读查询，不分派子代理 |
-| plan-chunks | 工具 | ingestion 分块规划（O 只读 stdout 输出分块建议） | 阶段 1-4 ingestion 子流程入口（O 执行，见 §5） |
-| wm-write | 工具 | 状态文件安全写：`<target>.lock` 持久目录和可转移 owner 对象保证跨进程竞争 writer 不会双成功；锁内执行 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复。`--lock-timeout` 为安全非负整数；CLI 陈旧锁须显式 `--recover-stale-lock`，否则 `STALE_LOCK` / exit 1（logic/state-write-logic.ts） | O/A/S 持久化 `.w-model/*.json` 状态文件时统一经此写入（防手写漂移） |
-| doctor | 工具 | 环境自检（node/tsx/ajv/java/tla2tools/codegraph/openspec 逐项 ✅/❌/⚠️ + 修复指引；--with-tla 升级 TLA+ 项为阻断级；logic/doctor-logic.ts） | 首次启用 / 依赖报错时诊断（SKILL 步骤 1.5），非阶段门 |
-| wm-export-evidence | 工具 | 将项目 `.w-model/` 白名单状态和文本 run-log 导出为脱敏、SHA-256 manifest 证据包；支持 `--verify` package-only 复核和 `--source-project` source-bound 重验 | 需要按项目安全策略交付本地审计证据时显式运行；不自动提交或发布 |
-| wm-verify-evidence-source | 工具 | 读取并校验当前 HEAD、run-log、passed gate-log、signature-chain 与 source bundle，生产并原子写入 `.w-model/evidence-provenance.json`；不是只读 verify | 导出证据前显式运行；成功才可产生 source-bound provenance，不自动提交或发布 |
-| platform-deps-install | 工具 | 在显式 `--install` 路径验证并原子安装 lockfile 指定的 platform 原生包 | 开发者显式执行，平台依赖缺失时按需运行，非阶段门 |
+| 脚本                          | 类别                     | 用途                                                                                                                                                                                                                                                                                             | 触发时机                                                                           |
+| ----------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| check-docs-consistency        | 元门禁                   | 活体文档一致性门禁（计数 / 枚举 / 版本七处 / 章节号连续性 / 脚本注册表）                                                                                                                                                                                                                         | 仓库维护（pre-push 第 14 项），非项目阶段门                                        |
+| check-samples-coverage        | 元门禁                   | samples 覆盖矩阵门禁（每个 fixture 被 self-test 引用 + 目录在 samples/README 声明）                                                                                                                                                                                                              | 仓库维护（pre-push 第 15 项），非项目阶段门                                        |
+| audit-l0-links（application） | 工具                     | L0/L1 分发边界只读审计（Markdown 相对链接、模板占位、目标存在性、包外路径和 symlink/junction fail-closed）                                                                                                                                                                                       | 仓库维护者显式执行 `npm run audit:l0-links [-- --root=<skill-root>]`，非项目阶段门 |
+| check-tla-bdd-sync            | 阶段工具                 | TLA+ 与 BDD 配对文件的转移集 / 状态集 / 不变式等价同步校验                                                                                                                                                                                                                                       | 阶段 1-4 Artifact Gate pair sync                                                   |
+| code-health-phase1            | code-health 门禁（只读） | Phase 1 静态 inventory + 真实动态 trace + false-positive guard（候选只 `discovered` / `blocked`）；`--root/--output/--scenario`；未知/危险 flag exit 2                                                                                                                                           | `/wm code-health` Phase 1，O 只读执行（反模式 #44 冰山扫掠前）                     |
+| code-health-gap               | code-health 门禁（只读） | Phase 2 七维度 gap matrix + RED-GREEN 证据校验（coverage 仅信号）                                                                                                                                                                                                                                | `/wm code-health` Phase 2，O 只读执行                                              |
+| code-health-tests             | code-health 门禁         | Phase 3 受保护测试 inventory + 默认拒绝 + `--guard` 唯一删除路径（真实 pre/post suite 身份证据）                                                                                                                                                                                                 | `/wm code-health` Phase 3，G 跑 guard；删除仅经 `code-health-apply`                |
+| code-health-duplicates        | code-health 门禁（只读） | Phase 4 重复簇 + abstraction guard（11 维逐项等价证明，权威仅来自 HEAD-tracked ledger）                                                                                                                                                                                                          | `/wm code-health` Phase 4，O 只读执行                                              |
+| code-health-ledger            | code-health 门禁         | append-only ledger `init` / `append` / `validate`（拒绝覆盖、复用 id、非法转移、非单调时间戳）                                                                                                                                                                                                   | `/wm code-health` 全程，O 持久化                                                   |
+| code-health-apply             | code-health 门禁         | 人类批准后的最小可逆应用（`dry-run` / `patch` / `commit`）；scope 外变更即拒；记录可执行 rollback                                                                                                                                                                                                | `/wm code-health` 应用；S 执行、human 授权                                         |
+| security-scan                 | 工具                     | eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免                                                                                                                                                                                                                                       | 仓库维护（pre-push 第 6 项），非项目阶段门                                         |
+| self-test                     | 工具                     | 322 条样本回归基线（全部 check 逻辑通过/失败/输入错误三态）                                                                                                                                                                                                                                      | 仓库维护（pre-push 第 1 项），非项目阶段门                                         |
+| wm-status                     | 工具                     | 状态快照（只读）                                                                                                                                                                                                                                                                                 | O 只读查询，不分派子代理                                                           |
+| metrics-report                | 工具                     | 流程度量报告（只读）                                                                                                                                                                                                                                                                             | O 只读查询，不分派子代理                                                           |
+| plan-chunks                   | 工具                     | ingestion 分块规划（O 只读 stdout 输出分块建议）                                                                                                                                                                                                                                                 | 阶段 1-4 ingestion 子流程入口（O 执行，见 §5）                                     |
+| wm-write                      | 工具                     | 状态文件安全写：`<target>.lock` 持久目录和可转移 owner 对象保证跨进程竞争 writer 不会双成功；锁内执行 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复。`--lock-timeout` 为安全非负整数；CLI 陈旧锁须显式 `--recover-stale-lock`，否则 `STALE_LOCK` / exit 1（logic/state-write-logic.ts） | O/A/S 持久化 `.w-model/*.json` 状态文件时统一经此写入（防手写漂移）                |
+| doctor                        | 工具                     | 环境自检（node/tsx/ajv/java/tla2tools/codegraph/openspec 逐项 ✅/❌/⚠️ + 修复指引；--with-tla 升级 TLA+ 项为阻断级；logic/doctor-logic.ts）                                                                                                                                                      | 首次启用 / 依赖报错时诊断（SKILL 步骤 1.5），非阶段门                              |
+| wm-export-evidence            | 工具                     | 将项目 `.w-model/` 白名单状态和文本 run-log 导出为脱敏、SHA-256 manifest 证据包；支持 `--verify` package-only 复核和 `--source-project` source-bound 重验                                                                                                                                        | 需要按项目安全策略交付本地审计证据时显式运行；不自动提交或发布                     |
+| wm-verify-evidence-source     | 工具                     | 读取并校验当前 HEAD、run-log、passed gate-log、signature-chain 与 source bundle，生产并原子写入 `.w-model/evidence-provenance.json`；不是只读 verify                                                                                                                                             | 导出证据前显式运行；成功才可产生 source-bound provenance，不自动提交或发布         |
+| platform-deps-install         | 工具                     | 在显式 `--install` 路径验证并原子安装 lockfile 指定的 platform 原生包                                                                                                                                                                                                                            | 开发者显式执行，平台依赖缺失时按需运行，非阶段门                                   |
 
 ### 7. 反模式 → check 脚本映射速查
 
-| 反模式 | 守护脚本 / 机制 |
-|---|---|
-| #1 跳过评审 | check-verifier-output + 🔴 CHECKPOINT 阶段门 |
-| #3 / #6 估算质量门/RTM | check-artifact-gate |
-| #4 评审未通过悄悄小修 | check-verifier-output（rework 闭环） |
-| #10 编排者越权 | check-signature-chain + check-role-dispatch |
-| #11-13 ingestion 图谱 | check-requirement-graph |
-| #14-17 TLA+ 行为门禁 | check-tla-model |
-| #18 跳过 R 直接 S 返工 | check-rootcause-report + run-log R3 扩展 |
-| #19 R 报告未 V 复审 | check-verifier-output(targetKind=rootcause) |
-| #21 阶段级门禁跳过 | check-artifact-gate --phase=N（阶段 6/7/8 必须跑对应 --phase=N） |
-| #26 字段混用 | check-run-log R1 |
-| #28 schema 前置校验缺失 | schema-loader validateBySchema |
-| #29 BDD 不符未回退 | check-bdd-model D4 等价性 |
-| #30 豁免审批跳步 | check-exemption E1-E9 |
-| #33 跳过 R3 | check-preventive-review（--variant=standard|fix|emergency|ingest）+ check-run-log R8 |
-| #34 漏派角色 | check-role-dispatch（S/V/G 各 ≥1 + R3 三维度无条件，`--r3-enabled` no-op） |
-| #38 codegraph 未查询 | check-codegraph-queries |
-| #39 跳过 opsx 审查 | check-opsx-artifacts |
-| #41 单轴失败掩盖 | check-verifier-output R13 |
-| #42 S-fix 跳过 R3+V | check-preventive-review(--variant=fix/emergency) + check-run-log R8 |
-| #44 跳过冰山扫掠直接放行 | check-iceberg-sweep（R1-R5，ICEBERG-A/B 触发）+ V 复审新发现 |
-| #48 子代理越界实施 | check-run-log.ts（R5 role-action 配对）/ check-signature-chain.ts |
+| 反模式                   | 守护脚本 / 机制                                                            |
+| ------------------------ | -------------------------------------------------------------------------- |
+| #1 跳过评审              | check-verifier-output + 🔴 CHECKPOINT 阶段门                               |
+| #3 / #6 估算质量门/RTM   | check-artifact-gate                                                        |
+| #4 评审未通过悄悄小修    | check-verifier-output（rework 闭环）                                       |
+| #10 编排者越权           | check-signature-chain + check-role-dispatch                                |
+| #11-13 ingestion 图谱    | check-requirement-graph                                                    |
+| #14-17 TLA+ 行为门禁     | check-tla-model                                                            |
+| #18 跳过 R 直接 S 返工   | check-rootcause-report + run-log R3 扩展                                   |
+| #19 R 报告未 V 复审      | check-verifier-output(targetKind=rootcause)                                |
+| #21 阶段级门禁跳过       | check-artifact-gate --phase=N（阶段 6/7/8 必须跑对应 --phase=N）           |
+| #26 字段混用             | check-run-log R1                                                           |
+| #28 schema 前置校验缺失  | schema-loader validateBySchema                                             |
+| #29 BDD 不符未回退       | check-bdd-model D4 等价性                                                  |
+| #30 豁免审批跳步         | check-exemption E1-E9                                                      |
+| #33 跳过 R3              | check-preventive-review（--variant=standard                                | fix | emergency | ingest）+ check-run-log R8 |
+| #34 漏派角色             | check-role-dispatch（S/V/G 各 ≥1 + R3 三维度无条件，`--r3-enabled` no-op） |
+| #38 codegraph 未查询     | check-codegraph-queries                                                    |
+| #39 跳过 opsx 审查       | check-opsx-artifacts                                                       |
+| #41 单轴失败掩盖         | check-verifier-output R13                                                  |
+| #42 S-fix 跳过 R3+V      | check-preventive-review(--variant=fix/emergency) + check-run-log R8        |
+| #44 跳过冰山扫掠直接放行 | check-iceberg-sweep（R1-R5，ICEBERG-A/B 触发）+ V 复审新发现               |
+| #48 子代理越界实施       | check-run-log.ts（R5 role-action 配对）/ check-signature-chain.ts          |
 
 > 数据来源：SKILL.md + subagent-delegation.md + phase-1~8-*.md + hard-constraints.md；本矩阵随版本演进，以当前 SKILL.md 为准。
 
-
-
 > **§0 按需分节加载导引**（约束 #6）：本文件较大，按下表只读所需节，禁止整文件载入上下文。
 >
-> | 触发场景 | 只读章节 |
-> |---|---|
+> | 触发场景                                   | 只读章节                             |
+> | ------------------------------------------ | ------------------------------------ |
 > | 首次分派子代理（谁做 / 何时派 / 禁做什么） | 角色划分 + 每阶段分派时序 + 强制约束 |
-> | 阶段 1–4 任务过重需拆分 S | S 拆分机制 |
-> | 返工需多角度根因定位 | R-lead 子代理分派模板 |
-> | 覆盖缺失 / 冲突 / 覆盖率不达标需豁免 | 豁免审批角色边界 |
-> | S 发现既有产物 bug 需紧急修复 | S 子代理修改既有产物的边界 |
+> | 阶段 1–4 任务过重需拆分 S                  | S 拆分机制                           |
+> | 返工需多角度根因定位                       | R-lead 子代理分派模板                |
+> | 覆盖缺失 / 冲突 / 覆盖率不达标需豁免       | 豁免审批角色边界                     |
+> | S 发现既有产物 bug 需紧急修复              | S 子代理修改既有产物的边界           |
 >
 > 下方「加载导引」节给出更细的锚点加载策略。
 
@@ -372,15 +376,15 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 ## 角色划分（六类核心角色 O / S / V / G / A / R + R-iceberg 变体）
 
-| 角色 | 简称 | 职责 | 允许动作 | 禁止动作 |
-|---|---|---|---|---|
-| **编排者** | O | 路由、状态读写、CHECKPOINT 等待、分派子代理、持久化 | ① 读 `.w-model/project.json` / `.w-model/rtm.json` / `.w-model/budget.json` / `.w-model/run-log.jsonl` / `.w-model/maturity.json`；② 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` 看**退出码**（只读，用于向用户展示或路由判定）；③ `git status` / `ls` / `Read` 等只读核验；④ 在 CHECKPOINT 暂停等待用户决定；⑤ 用户放行后更新 `project.status` 与 `updatedAt`；⑥ 分派 S / V / G 子代理；⑦ **维护 budget.json / run-log.jsonl / maturity.json**（状态读写+持久化，非实施；见 [operational-recovery.md](operational-recovery.md)「成本预算与运行日志」节 + 「成熟度与 CHECKPOINT 放行」节）：项目初始化创建三文件、每次子代理返回/门禁执行/CHECKPOINT 放行后 append run-log、预算检查、成熟度判定与升降级；⑧ **维护 event-ingress.jsonl + 事件路由**（状态读写+路由判定，非实施；见 [event-ingress-guide.md](event-ingress-guide.md)）：L2+ 激活时读 event-ingress.jsonl 未路由事件、查路由表、写 routedTo、append run-log action=event-route；⑨ **产出 HarnessImprovementReport**（状态分析，非实施；见 [hill-climbing-guide.md](hill-climbing-guide.md)）：分析 run-log 产出改进信号报告，存 `.w-model/hill-climbing/<ts>-report.json`，不自动改 harness | ① 用 `Write` / `Edit` 写或修改任何阶段产物文件；② 产出 `VerifierOutput` JSON 内容；③ 修改 `rtm.json` 实体字段（需求 / 设计 / 测试用例 / 执行结果）；④ 生成测试用例代码或业务代码；⑤ 跳过 S → V → G 顺序（如自评自审） |
-| **产出子代理** | S | 生成阶段开发产物 + 同步测试设计 + 更新 RTM 实体 | ① 写文件（需求规格 / 设计文档 / 代码 / 测试用例代码 / 测试报告）；② 跑测试运行器（仅产出阶段，如 `npx vitest run`）；③ 改 `.w-model/rtm.json` 实体字段（需求 / 设计 / 测试用例 / 执行结果）；④ 加载当前阶段 `phase-N-*.md` 与对应模板 | ① 跑 `check-verifier-output.ts` / `check-artifact-gate.ts`（由 G 子代理负责）；② 越阶段产出（仅产当前阶段）；③ 改 `project.status`（由编排者负责） |
-| **评审子代理** | V | 按 [agent-personas.md](agent-personas.md) + [verifier-spec.md](verifier-spec.md) §8 产出 `VerifierOutput` JSON | ① 读产物文件（需求规格 / 设计文档 / 代码 / 测试用例 / 测试报告）；② 按 `targetKind` 选用 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）；③ 产出 `VerifierOutput` JSON（满足 [verifier-spec.md](verifier-spec.md) §6 Schema） | ① 跑门禁脚本（由 G 子代理负责）；② 改产物文件；③ 改 RTM；④ 跨阶段评审 |
-| **门禁子代理** | G | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` + 回填证据摘要 | ① 跑 `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<json>"`；② 跑 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>`（阶段 5-8 另须 `--scope=<change-scope.json>`）；③ 读 GATE_JSON / Verifier JSON；④ 产出证据摘要字符串（含退出码 / 质量等级 / `passed` / `reworkHints`） | ① 改产物文件；② 产出 `VerifierOutput` JSON（由 V 子代理负责）；③ 改 RTM 实体；④ 跑测试运行器（由 S 子代理负责） |
-| **分析子代理** | A | 分块分析、交叉合并、图谱演进（阶段 1–4） | ① 读原始文档分块 / S 产出的正式文档；② 写 `.w-model/ingestion/<chunk-id>.{md,json}`；③ 读所有 chunk json 合并建图；④ 产出 `consolidated.json` + `cross-analysis-report.md` + `reworkHints`；⑤ 通过晋升 consolidated.json 更新 graph.json | ① 跑 `check-requirement-graph.ts`（G 负责）；② 写正式阶段产物；③ 改 `project.status`；④ 越阶段产出；⑤ 删除前阶段已通过的图谱节点 |
-| **根因定位子代理** | R | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法论定位缺陷根因，产出 `RootCauseReport`（含根因链、上游缺陷标记、修复建议、防御措施） | ① 读失败产物文件 + 上游产物（需求/设计/代码/测试/TLA+/graph.json）；② 读 V 的 `VerifierOutput` JSON + G 的 GATE_JSON；③ 运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）；④ 产出 `RootCauseReport` JSON + `.md` 报告文件；⑤ 标记 `upstreamDefect`（若根因为上游需求/设计缺陷）；⑥ 作为 R-lead 分派 R-persona 子代理（并行或串行均可）并聚合产出（见 root-cause-locator.md §4） | ① 改任何产物文件（由 S 修复）；② 跑门禁脚本（由 G 负责）；③ 改 RTM 实体；④ 改 `project.status`；⑤ 跨阶段定位（仅定位当前阶段产物的缺陷根因，上游回溯仅标记不修改）；⑥ 评审其他角色产出 |
-| **冰山扫掠子代理** | R-iceberg（R 变体） | S-fix 后（ICEBERG-A）或阶段门放行前（ICEBERG-B）以已发现/已修复问题为线索，对全阶段产物做多视角深挖扫掠，产出 `IcebergSweepReport`（多发现扫掠报告，找"水面之下"） | ① 读全阶段产物（需求/设计/代码/测试/TLA+/BDD/graph.json/RTM）；② 读本轮 reworkHints 历史 + 修复点；③ 读上一轮 IcebergSweepReport（避免重复发现）；④ 运用冰山扫掠方法（三维度×六类别，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)）；⑤ 产出 IcebergSweepReport JSON + `.md` | ① 改任何产物文件（由 S-fix 修复）；② 跑门禁脚本（由 G 负责）；③ 改 RTM 实体；④ 改 `project.status`；⑤ 跨阶段定位（仅当前阶段产物）；⑥ 评审其他角色产出；⑦ 跳过 V 复审直接触发 S-fix |
+| 角色               | 简称                | 职责                                                                                                                                                               | 允许动作                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | 禁止动作                                                                                                                                                                                                              |
+| ------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **编排者**         | O                   | 路由、状态读写、CHECKPOINT 等待、分派子代理、持久化                                                                                                                | ① 读 `.w-model/project.json` / `.w-model/rtm.json` / `.w-model/budget.json` / `.w-model/run-log.jsonl` / `.w-model/maturity.json`；② 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` 看**退出码**（只读，用于向用户展示或路由判定）；③ `git status` / `ls` / `Read` 等只读核验；④ 在 CHECKPOINT 暂停等待用户决定；⑤ 用户放行后更新 `project.status` 与 `updatedAt`；⑥ 分派 S / V / G 子代理；⑦ **维护 budget.json / run-log.jsonl / maturity.json**（状态读写+持久化，非实施；见 [operational-recovery.md](operational-recovery.md)「成本预算与运行日志」节 + 「成熟度与 CHECKPOINT 放行」节）：项目初始化创建三文件、每次子代理返回/门禁执行/CHECKPOINT 放行后 append run-log、预算检查、成熟度判定与升降级；⑧ **维护 event-ingress.jsonl + 事件路由**（状态读写+路由判定，非实施；见 [event-ingress-guide.md](event-ingress-guide.md)）：L2+ 激活时读 event-ingress.jsonl 未路由事件、查路由表、写 routedTo、append run-log action=event-route；⑨ **产出 HarnessImprovementReport**（状态分析，非实施；见 [hill-climbing-guide.md](hill-climbing-guide.md)）：分析 run-log 产出改进信号报告，存 `.w-model/hill-climbing/<ts>-report.json`，不自动改 harness | ① 用 `Write` / `Edit` 写或修改任何阶段产物文件；② 产出 `VerifierOutput` JSON 内容；③ 修改 `rtm.json` 实体字段（需求 / 设计 / 测试用例 / 执行结果）；④ 生成测试用例代码或业务代码；⑤ 跳过 S → V → G 顺序（如自评自审） |
+| **产出子代理**     | S                   | 生成阶段开发产物 + 同步测试设计 + 更新 RTM 实体                                                                                                                    | ① 写文件（需求规格 / 设计文档 / 代码 / 测试用例代码 / 测试报告）；② 跑测试运行器（仅产出阶段，如 `npx vitest run`）；③ 改 `.w-model/rtm.json` 实体字段（需求 / 设计 / 测试用例 / 执行结果）；④ 加载当前阶段 `phase-N-*.md` 与对应模板                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | ① 跑 `check-verifier-output.ts` / `check-artifact-gate.ts`（由 G 子代理负责）；② 越阶段产出（仅产当前阶段）；③ 改 `project.status`（由编排者负责）                                                                    |
+| **评审子代理**     | V                   | 按 [agent-personas.md](agent-personas.md) + [verifier-spec.md](verifier-spec.md) §8 产出 `VerifierOutput` JSON                                                     | ① 读产物文件（需求规格 / 设计文档 / 代码 / 测试用例 / 测试报告）；② 按 `targetKind` 选用 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）；③ 产出 `VerifierOutput` JSON（满足 [verifier-spec.md](verifier-spec.md) §6 Schema）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | ① 跑门禁脚本（由 G 子代理负责）；② 改产物文件；③ 改 RTM；④ 跨阶段评审                                                                                                                                                 |
+| **门禁子代理**     | G                   | 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` + 回填证据摘要                                                                                            | ① 跑 `npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<json>"`；② 跑 `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>`（阶段 5-8 另须 `--scope=<change-scope.json>`）；③ 读 GATE_JSON / Verifier JSON；④ 产出证据摘要字符串（含退出码 / 质量等级 / `passed` / `reworkHints`）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | ① 改产物文件；② 产出 `VerifierOutput` JSON（由 V 子代理负责）；③ 改 RTM 实体；④ 跑测试运行器（由 S 子代理负责）                                                                                                       |
+| **分析子代理**     | A                   | 分块分析、交叉合并、图谱演进（阶段 1–4）                                                                                                                           | ① 读原始文档分块 / S 产出的正式文档；② 写 `.w-model/ingestion/<chunk-id>.{md,json}`；③ 读所有 chunk json 合并建图；④ 产出 `consolidated.json` + `cross-analysis-report.md` + `reworkHints`；⑤ 通过晋升 consolidated.json 更新 graph.json                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | ① 跑 `check-requirement-graph.ts`（G 负责）；② 写正式阶段产物；③ 改 `project.status`；④ 越阶段产出；⑤ 删除前阶段已通过的图谱节点                                                                                      |
+| **根因定位子代理** | R                   | 接收 V/G 的 `reworkHints` + 失败产物 + 上游产物，运用根因分析方法论定位缺陷根因，产出 `RootCauseReport`（含根因链、上游缺陷标记、修复建议、防御措施）              | ① 读失败产物文件 + 上游产物（需求/设计/代码/测试/TLA+/graph.json）；② 读 V 的 `VerifierOutput` JSON + G 的 GATE_JSON；③ 运用根因分析方法（5-Why / 鱼骨图 / 缺陷链追溯 / 上游回溯）；④ 产出 `RootCauseReport` JSON + `.md` 报告文件；⑤ 标记 `upstreamDefect`（若根因为上游需求/设计缺陷）；⑥ 作为 R-lead 分派 R-persona 子代理（并行或串行均可）并聚合产出（见 root-cause-locator.md §4）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | ① 改任何产物文件（由 S 修复）；② 跑门禁脚本（由 G 负责）；③ 改 RTM 实体；④ 改 `project.status`；⑤ 跨阶段定位（仅定位当前阶段产物的缺陷根因，上游回溯仅标记不修改）；⑥ 评审其他角色产出                                |
+| **冰山扫掠子代理** | R-iceberg（R 变体） | S-fix 后（ICEBERG-A）或阶段门放行前（ICEBERG-B）以已发现/已修复问题为线索，对全阶段产物做多视角深挖扫掠，产出 `IcebergSweepReport`（多发现扫掠报告，找"水面之下"） | ① 读全阶段产物（需求/设计/代码/测试/TLA+/BDD/graph.json/RTM）；② 读本轮 reworkHints 历史 + 修复点；③ 读上一轮 IcebergSweepReport（避免重复发现）；④ 运用冰山扫掠方法（三维度×六类别，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)）；⑤ 产出 IcebergSweepReport JSON + `.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | ① 改任何产物文件（由 S-fix 修复）；② 跑门禁脚本（由 G 负责）；③ 改 RTM 实体；④ 改 `project.status`；⑤ 跨阶段定位（仅当前阶段产物）；⑥ 评审其他角色产出；⑦ 跳过 V 复审直接触发 S-fix                                   |
 
 > **只读脚本例外**：编排者可执行 `npx tsx w-model-dev/scripts/cli/check-*.ts`、`git status`、`ls` 等确定性只读命令以核验状态/展示证据，但不得**写入或修改**任何产物/评审/RTM 内容。门禁脚本本身为确定性 TypeScript，不含 LLM 调用，编排者跑它仅用于"看退出码"，不构成实施，也**不替代 G 子代理的回填职责**——G 子代理必须独立跑一次并产出证据摘要。
 
@@ -388,11 +392,11 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 > 吸收自《agent 时代的人月神话》第 3 章「外科手术队伍」。概念完整性只能从"一个头脑的持续持有"里长出来——主刀由人坐，支持角色全部可由 agent 出任。
 
-| 外科手术队伍角色 | W 模型对应 | 归属 |
-|---|---|---|
-| 主刀（持有概念 / 拍板 / 核心判断 / 最终负责） | 用户 + 编排者 O（代表人的判断，只做编排不实施） | 人 |
-| 副手（随时可接替主刀） | 不支持由 agent 接替——目的持有不可委托；仅陪练/评审可由 V 兼任 | 人 |
-| 管理员 / 文档 / 录入 / 工具 / 测试 / 语言律师 | S / A 子代理 + 宿主工具（git / lint / schemas / 测试运行器） | agent |
+| 外科手术队伍角色                              | W 模型对应                                                    | 归属  |
+| --------------------------------------------- | ------------------------------------------------------------- | ----- |
+| 主刀（持有概念 / 拍板 / 核心判断 / 最终负责） | 用户 + 编排者 O（代表人的判断，只做编排不实施）               | 人    |
+| 副手（随时可接替主刀）                        | 不支持由 agent 接替——目的持有不可委托；仅陪练/评审可由 V 兼任 | 人    |
+| 管理员 / 文档 / 录入 / 工具 / 测试 / 语言律师 | S / A 子代理 + 宿主工具（git / lint / schemas / 测试运行器）  | agent |
 
 **目的持有者溯源**：开工前在 `project.status` 或阶段产物中写明"此任务最终服务于谁的什么目的"，作为判据的最上游锚点，所有子判据向下推导。
 
@@ -430,34 +434,39 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 ```markdown
 # Orchestrator State
+
 updated: <ISO8601>
 phase: <N - 名称>
 
 ## CURRENT
+
 - 分派 <role>（<dispatch-id>），等待 <产物 beacon | CHECKPOINT 放行 | 用户澄清>
 - started: <ISO8601>
 
 ## DONE
+
 - [<dispatch-id>] <role> → <one-line outcome> | beacon: handoff/<dispatch-id>/status.json
 - ...
 
 ## NEXT
+
 - [<dispatch-id>] <role> 读 handoff/<prev-dispatch-id>/output.md → 产 handoff/<dispatch-id>/output.md
 - ...
 ```
 
 **更新规则**：
+
 - 每次**分派前**与**收到 beacon 后**，O 用 `Write` 整文件覆盖（原子更新，非 append）。
 - compaction / 会话恢复后，O 先 `Read` 本文件 + `run-log.jsonl` 尾部重建位置；**不得凭记忆分派**。
 - 阶段门 CHECKPOINT 须展示本文件 `DONE` 段作为分派完整性证据（与约束 #8 互补）。
 
 **与既有三文件互补、不替代**：
 
-| 文件 | 性质 | 内容 |
-|---|---|---|
-| `orchestrator-state.md` | 当前快照（覆盖式） | current / done / next |
-| `run-log.jsonl` | 事件流水（append-only） | 审计每条分派 / 门禁 / CHECKPOINT |
-| `progress.md` / 阶段门记录 | 完成账本（append-only） | 已完成任务 + 提交区间 |
+| 文件                       | 性质                    | 内容                             |
+| -------------------------- | ----------------------- | -------------------------------- |
+| `orchestrator-state.md`    | 当前快照（覆盖式）      | current / done / next            |
+| `run-log.jsonl`            | 事件流水（append-only） | 审计每条分派 / 门禁 / CHECKPOINT |
+| `progress.md` / 阶段门记录 | 完成账本（append-only） | 已完成任务 + 提交区间            |
 
 ### 2. 交接目录协议（handoff directory）
 
@@ -465,11 +474,11 @@ phase: <N - 名称>
 
 每个分派目录固定三文件：
 
-| 文件 | 写入者 | 内容 | O 是否可读 |
-|---|---|---|---|
-| `brief.md` | O（指针型，非内容） | 任务一句话定位 + 输入产物**路径列表** + 产出契约 + 禁止项 | 否（O 已知路径，无需读） |
-| `output.md` | 子代理 | 完整产出（报告 / VerifierOutput JSON 内容 / diff 摘要 / 根因报告 / 证据） | **否** |
-| `status.json` | 子代理 | 信标（< 200 字节） | **是（唯一可读）** |
+| 文件          | 写入者              | 内容                                                                      | O 是否可读               |
+| ------------- | ------------------- | ------------------------------------------------------------------------- | ------------------------ |
+| `brief.md`    | O（指针型，非内容） | 任务一句话定位 + 输入产物**路径列表** + 产出契约 + 禁止项                 | 否（O 已知路径，无需读） |
+| `output.md`   | 子代理              | 完整产出（报告 / VerifierOutput JSON 内容 / diff 摘要 / 根因报告 / 证据） | **否**                   |
+| `status.json` | 子代理              | 信标（< 200 字节）                                                        | **是（唯一可读）**       |
 
 `status.json` Schema：
 
@@ -487,6 +496,7 @@ phase: <N - 名称>
 ```
 
 **禁止转发规则（核心）**：
+
 - O **只** `Read` 各 `status.json`；**禁止** `Read` 任何 `brief.md` / `output.md` 内容。命中即反模式 #10 变体。
 - 下游子代理**直接** `Read` 上游 `output.md`，不经 O 搬运：
   - V 读 S 的 `output.md`（+ R3 三份报告路径）
@@ -509,6 +519,7 @@ phase: <N - 名称>
 - **预期单次往返**：复杂任务须先拆；子代理 `BLOCKED` / 轮次膨胀 / 产出质量稀释 → O 拆分后重派（**不计入返工 round**，属编排拆分而非质量返工）。
 
 **过重信号**（命中即拆分重派）：
+
 - 子代理返回 `NEEDS_CONTEXT` ≥ 2 次（上下文过大信号）
 - 单次 `output.md` 超过该角色预算（doc ≤ 1 文件、review ≤ 1 JSON、gate ≤ 1 摘要、rootcause ≤ 1 报告）
 - 子代理主动报告"任务过大 / 需要拆分"
@@ -932,16 +943,17 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 
 **S 变体与 R3 报告路径对应**：
 
-| S 变体 | action | R3 报告路径前缀 |
-|---|---|---|
-| 标准 S / S-doc / S-tla / S-bdd | `produce` | `<phase>-{dim}.json` |
-| S-ingest-tla / S-ingest-bdd | `produce` | `<phase>-ingest-{dim}.json` |
-| S-fix（返工变体） | `fix` | `<phase>-fix-{dim}.json` |
+| S 变体                          | action          | R3 报告路径前缀                |
+| ------------------------------- | --------------- | ------------------------------ |
+| 标准 S / S-doc / S-tla / S-bdd  | `produce`       | `<phase>-{dim}.json`           |
+| S-ingest-tla / S-ingest-bdd     | `produce`       | `<phase>-ingest-{dim}.json`    |
+| S-fix（返工变体）               | `fix`           | `<phase>-fix-{dim}.json`       |
 | S-emergency-fix（紧急修复变体） | `emergency-fix` | `<phase>-emergency-{dim}.json` |
 
 `check-preventive-review.ts` 支持 `--variant=standard|fix|emergency|ingest` 参数校验对应路径（ingest 须显式传参）；`--auto-trigger` 模式从 run-log 推断 S 变体。
 
 **R3 子代理输入**：
+
 - 当前阶段产物路径
 - 上游产物（需求/设计文档、RTM、TLA+ 规格、BDD features）
 - 审查维度（completeness / reliability / security）
@@ -961,21 +973,21 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 
 **R3 审查清单（按维度）**：
 
-| 维度 | 检查项 |
-|---|---|
-| completeness | 字段齐全 / 模板套用 / RTM 登记 / demo 范围边界 / N-A 标记 / uat-path-mapping 回填 |
-| reliability | TLA+/BDD 等价性 / 状态机一致性 / 接口契约 / 字段命名业务语义对齐 / 设计项装配点与测试 seam 一致性 |
-| security | 输入校验 / 鉴权 / 越权 / 敏感信息 / 限流装配 / 密码哈希 |
+| 维度         | 检查项                                                                                            |
+| ------------ | ------------------------------------------------------------------------------------------------- |
+| completeness | 字段齐全 / 模板套用 / RTM 登记 / demo 范围边界 / N-A 标记 / uat-path-mapping 回填                 |
+| reliability  | TLA+/BDD 等价性 / 状态机一致性 / 接口契约 / 字段命名业务语义对齐 / 设计项装配点与测试 seam 一致性 |
+| security     | 输入校验 / 鉴权 / 越权 / 敏感信息 / 限流装配 / 密码哈希                                           |
 
 **R3 与返工R的区别**：
 
-| 属性 | 返工R | 预防R3 |
-|---|---|---|
-| 触发时机 | V/G 不通过后触发 | S 产出后主动触发 |
-| 目的 | 定位根因 | 预防性审查 |
-| 产出 | RootCauseReport | PreventiveReview 三份报告 |
-| 方法论 | root-cause-locator.md（5-Why / 鱼骨图 / 上游回溯）定位根因 | 借鉴 root-cause-locator.md 分析工具，但目的不同：预防性审查用「完整性清单 + 可靠性核验 + 安全基线」三维度检查产物，不定位根因 |
-| schema | rootcause-report.schema.json | preventive-review.schema.json |
+| 属性     | 返工R                                                      | 预防R3                                                                                                                        |
+| -------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 触发时机 | V/G 不通过后触发                                           | S 产出后主动触发                                                                                                              |
+| 目的     | 定位根因                                                   | 预防性审查                                                                                                                    |
+| 产出     | RootCauseReport                                            | PreventiveReview 三份报告                                                                                                     |
+| 方法论   | root-cause-locator.md（5-Why / 鱼骨图 / 上游回溯）定位根因 | 借鉴 root-cause-locator.md 分析工具，但目的不同：预防性审查用「完整性清单 + 可靠性核验 + 安全基线」三维度检查产物，不定位根因 |
+| schema   | rootcause-report.schema.json                               | preventive-review.schema.json                                                                                                 |
 
 **V 评审参考方式**：V 子代理在评审时须读取 R3 三份报告，将 R3 发现的问题纳入 `reworkHints`。V 不得跳过 R3 报告直接评审（命中反模式 #33）。
 
@@ -985,6 +997,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 > 方法论见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)；schema 见 `iceberg-sweep.schema.json`；校验脚本 `check-iceberg-sweep.ts`（反模式 #44）。
 
 **分派时序**：
+
 - ICEBERG-A：`S-fix 修复 → R3×3(fix) → V → G → [G 通过] → R-iceberg 扫掠`
 - ICEBERG-B：`标准 V/G 通过（首次或返工最终）→ R-iceberg 全局扫掠 → newFindings=[] → CHECKPOINT 放行`
 
@@ -1039,13 +1052,13 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 
 **R-iceberg 与返工R的区别**：
 
-| 属性 | 返工R | R-iceberg |
-|---|---|---|
-| 触发时机 | V/G 不通过后触发 | S-fix 后（ICEBERG-A）+ 阶段门前（ICEBERG-B） |
-| 目的 | 定位已暴露问题的根因 | 主动深挖未暴露的隐藏问题 |
-| 产出 | RootCauseReport（单问题根因链） | IcebergSweepReport（多发现扫掠报告） |
-| 线索 | V/G reworkHints 单条 | reworkHints 历史 + fixedPoints + previousFindings |
-| schema | rootcause-report.schema.json | iceberg-sweep.schema.json |
+| 属性     | 返工R                           | R-iceberg                                         |
+| -------- | ------------------------------- | ------------------------------------------------- |
+| 触发时机 | V/G 不通过后触发                | S-fix 后（ICEBERG-A）+ 阶段门前（ICEBERG-B）      |
+| 目的     | 定位已暴露问题的根因            | 主动深挖未暴露的隐藏问题                          |
+| 产出     | RootCauseReport（单问题根因链） | IcebergSweepReport（多发现扫掠报告）              |
+| 线索     | V/G reworkHints 单条            | reworkHints 历史 + fixedPoints + previousFindings |
+| schema   | rootcause-report.schema.json    | iceberg-sweep.schema.json                         |
 
 ### V 复审根因报告分派模板（targetKind=rootcause）
 
@@ -1186,6 +1199,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 ```
 
 **RTM 实体回填强制职责**：
+
 - RTM 实体回填是 S 子代理的强制职责，不得委托给其他角色；S 子代理产出后须立即更新 `.w-model/rtm.json`。
 - S 子代理返回时须列出 `rtm.json` 文件路径与 coverage 百分比（如 `coveragePercent=100%`）。
 - `coverageStatus` 字段值须与实际 coveragePercent 一致："100%" 对应 100%，"部分" 对应 < 100%，"待覆盖" 不允许（须回退重做）。
@@ -1229,6 +1243,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 ```
 
 编排者收到 G 子代理返回后：
+
 - `exitCode=0` 且 `qualityLevel ∈ {A,B}` 且 `passed=true` → 进入 🔴 CHECKPOINT · 阶段门放行；
 - `exitCode=1` 视为 V/G 失败 → `reworkHints` 只交 R 形成定位线索；必须完成普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）后，才可按 R 结论返工；
 - `exitCode=2` → 输入错误，仅修正输入并重新运行对应命令（阶段门重新产出/终检修复输入），不进入 S-fix 旁路。
@@ -1247,12 +1262,13 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
   "isolatedNodes": ["<仅 cross/evolve>"],
   "connectedComponents": "<仅 cross/evolve，int>",
   "roots": ["<仅 cross/evolve>"],
-  "reworkHints": [{"chunkId":"<id>","reason":"<...>"}],
+  "reworkHints": [{ "chunkId": "<id>", "reason": "<...>" }],
   "blocked": "<仅 chunk 变体，可选>"
 }
 ```
 
 编排者收到 A 返回后：
+
 - A-chunk `blocked` 非空 → 🔴 CHECKPOINT 介入；
 - A-cross/A-evolve 返回后 → 分派 G 跑 `check-requirement-graph.ts`，按退出码决定收敛或补漏。
 
@@ -1279,6 +1295,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 ```
 
 编排者收到 R 返回后：
+
 - `passed=true` 且 `qualityLevel∈{A,B}` → 分派 V 复审根因报告（targetKind=rootcause）；
 - `passed=false` 或 `qualityLevel∈{C,D}` → 重派 R（R 自评不通过，须重新分析）。
 
@@ -1303,6 +1320,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 ```
 
 编排者收到 S-fix 返回后：
+
 - 分派 V 评审修复产物 → G 门禁 → 通过则阶段门放行 / 不通过则 `round++` 重新分派 R 定位。
 
 ## 强制约束
@@ -1319,6 +1337,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 - **跳过 R 命中反模式 #18**：V/G 不通过后，编排者必须先分派 R 子代理产出 RootCauseReport 并经 V 复审 + G 门禁通过，才可分派 S-fix 修复。直接分派 S 返工（无 R 报告作为输入）命中 #18。
 
 编排者**允许**的动作：
+
 - 读 `.w-model/project.json` / `.w-model/rtm.json`；
 - 跑 `check-verifier-output.ts` / `check-artifact-gate.ts` 看**退出码**（用于向用户展示或路由判定，不替代 G 子代理的回填职责）；
 - `git status` / `ls` / `Read` 等只读核验；
@@ -1377,11 +1396,11 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 
 **职责划分**：
 
-| 子代理 | 产物动作 | 典型场景 |
-|---|---|---|
-| **S 子代理**（标准变体） | **新增**产物（新文件、新测试用例、新文档章节、新 RTM 实体） | 阶段首次产出：按 phase-N 定义产出本阶段开发产物 + 同步测试设计 |
-| **S-fix 子代理**（返工变体） | **修复**既有产物的 bug（覆盖原文件） | 普通 V/G 失败链（hard-constraints） |
-| **R 子代理** | **不修改任何产物**，仅产出 `RootCauseReport` | 定位根因，输出 fixRecommendation 给 S-fix |
+| 子代理                       | 产物动作                                                    | 典型场景                                                       |
+| ---------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------- |
+| **S 子代理**（标准变体）     | **新增**产物（新文件、新测试用例、新文档章节、新 RTM 实体） | 阶段首次产出：按 phase-N 定义产出本阶段开发产物 + 同步测试设计 |
+| **S-fix 子代理**（返工变体） | **修复**既有产物的 bug（覆盖原文件）                        | 普通 V/G 失败链（hard-constraints）                            |
+| **R 子代理**                 | **不修改任何产物**，仅产出 `RootCauseReport`                | 定位根因，输出 fixRecommendation 给 S-fix                      |
 
 > S 子代理**不得**在标准产出阶段直接修复既有产物 bug；发现既有产物 bug 时按下方流程处理。
 
@@ -1413,13 +1432,13 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 
 ### 角色职责划分
 
-| 角色 | 豁免审批职责 | 产出物 | 禁止动作 |
-|---|---|---|---|
-| **S** | 识别需豁免项（覆盖缺失 / conflicts-with / 覆盖率不达标），产出豁免请求 | `exemption-request.json`（含豁免理由、影响范围、替代方案） | **禁止 S 自行决定豁免生效**（FM-EXEMPT-01） |
-| **R** | 按 [root-cause-locator.md](root-cause-locator.md) 方法论审查豁免请求（5-Why / 上游回溯 / 可证伪性） | `exemption-review.json`（含 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions） | **不得直接批准豁免生效**（FM-EXEMPT-02）；R 仅产出审查意见，批准权在人类 |
-| **V** | 校验 R 的审查质量：`reviewDecision` / `rootCauseAnalysis` / `falsifiabilityCheck` / `conditions` 是否齐全且可证伪 | `exemption-verification.json`（含 passed / reworkHints） | 禁止跳过校验直接放行（FM-EXEMPT-03） |
-| **人类** | CHECKPOINT 确认豁免是否生效 | `granted.json`（approve 写入）/ reject 回到原规则 | —（编排者不得代签，FM-EXEMPT-04） |
-| **O（编排者）** | 路由豁免审批流程各阶段，分派 S/R/V，在 CHECKPOINT 暂停等人类确认 | run-log 记录豁免审批各阶段 | 禁止代签人类确认（命中反模式 #10 + #30） |
+| 角色            | 豁免审批职责                                                                                                      | 产出物                                                                                              | 禁止动作                                                                 |
+| --------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **S**           | 识别需豁免项（覆盖缺失 / conflicts-with / 覆盖率不达标），产出豁免请求                                            | `exemption-request.json`（含豁免理由、影响范围、替代方案）                                          | **禁止 S 自行决定豁免生效**（FM-EXEMPT-01）                              |
+| **R**           | 按 [root-cause-locator.md](root-cause-locator.md) 方法论审查豁免请求（5-Why / 上游回溯 / 可证伪性）               | `exemption-review.json`（含 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions） | **不得直接批准豁免生效**（FM-EXEMPT-02）；R 仅产出审查意见，批准权在人类 |
+| **V**           | 校验 R 的审查质量：`reviewDecision` / `rootCauseAnalysis` / `falsifiabilityCheck` / `conditions` 是否齐全且可证伪 | `exemption-verification.json`（含 passed / reworkHints）                                            | 禁止跳过校验直接放行（FM-EXEMPT-03）                                     |
+| **人类**        | CHECKPOINT 确认豁免是否生效                                                                                       | `granted.json`（approve 写入）/ reject 回到原规则                                                   | —（编排者不得代签，FM-EXEMPT-04）                                        |
+| **O（编排者）** | 路由豁免审批流程各阶段，分派 S/R/V，在 CHECKPOINT 暂停等人类确认                                                  | run-log 记录豁免审批各阶段                                                                          | 禁止代签人类确认（命中反模式 #10 + #30）                                 |
 
 ### 流程时序
 
@@ -1506,28 +1525,28 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 
 ## 失败模式与回退
 
-| 失败场景 | 处理 |
-|---|---|
-| S 子代理产出未通过自检（`acceptanceCriteriaMet=false`） | 记录为 R 定位线索；普通失败完成完整链后再由 S-fix 返工：普通 V/G 失败链（hard-constraints） |
-| V 子代理产出 JSON 不满足 Schema | G 子代理 `check-verifier-output.ts` 退出码 2 → 编排者分派 V 重新产出 |
-| G 子代理 `check-verifier-output.ts` 退出码 1（评审未通过） | `reworkHints` 仅作 R 定位线索；必须执行普通 V/G 失败链（hard-constraints）后再由 S-fix 返工 |
-| G 子代理 `check-artifact-gate.ts` 退出码 1（质量门未通过） | 记录为 R 定位线索；必须执行普通 V/G 失败链（hard-constraints）后再由 S-fix 回阶段 5 返工 |
-| 编排者自身越权实施（命中反模式 #10） | 回到当前阶段起点，已越权产出的实体作废重做 |
-| 子代理无法独立完成（如 BLOCKED 状态） | 子代理返回 `{"status": "BLOCKED", "reason": "..."}`；编排者向用户澄清后重新分派 |
-| R 自评不通过（`passed=false` 或 `qualityLevel∈{C,D}`） | 编排者重派 R（同一 round，不递增）；同一 round 内 R 重派 ≥2 次仍不通过 → 🔴 CHECKPOINT 介入（人工根因分析或调整 maxReworkRounds） |
-| V 复审根因不通过（targetKind=rootcause `passed=false`） | 编排者重派 R（带 V 的 rootcause reworkHints，同一 round）；同一 round 内 V 复审不通过 ≥2 次 → 🔴 CHECKPOINT 介入（用户裁定根因） |
-| G 门禁不通过（`check-rootcause-report.ts` exitCode=1） | 编排者重派 R（带 G 的校验失败原因，同一 round）；通常为 Schema 不合规，R 修正报告即可 |
-| S-fix 修复后 V/G 仍不通过 | `round++` → 重新分派 R（不沿用上轮 R 报告，因产物已变化）；round 达 maxReworkRounds → 🔴 CHECKPOINT 升级（见场景 5 阶段回退） |
-| 阶段回退（场景 5：round≥2 + R 标记 upstreamDefect.present=true 且 rollbackRecommended=true + V 复审通过） | 强制 🔴 CHECKPOINT · 阶段回退决策，展示返工历史 + R 的 upstreamDefect 详情 + V 复审结论 + 建议回退阶段编号，由用户选择 A/B/C |
+| 失败场景                                                                                                  | 处理                                                                                                                              |
+| --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| S 子代理产出未通过自检（`acceptanceCriteriaMet=false`）                                                   | 记录为 R 定位线索；普通失败完成完整链后再由 S-fix 返工：普通 V/G 失败链（hard-constraints）                                       |
+| V 子代理产出 JSON 不满足 Schema                                                                           | G 子代理 `check-verifier-output.ts` 退出码 2 → 编排者分派 V 重新产出                                                              |
+| G 子代理 `check-verifier-output.ts` 退出码 1（评审未通过）                                                | `reworkHints` 仅作 R 定位线索；必须执行普通 V/G 失败链（hard-constraints）后再由 S-fix 返工                                       |
+| G 子代理 `check-artifact-gate.ts` 退出码 1（质量门未通过）                                                | 记录为 R 定位线索；必须执行普通 V/G 失败链（hard-constraints）后再由 S-fix 回阶段 5 返工                                          |
+| 编排者自身越权实施（命中反模式 #10）                                                                      | 回到当前阶段起点，已越权产出的实体作废重做                                                                                        |
+| 子代理无法独立完成（如 BLOCKED 状态）                                                                     | 子代理返回 `{"status": "BLOCKED", "reason": "..."}`；编排者向用户澄清后重新分派                                                   |
+| R 自评不通过（`passed=false` 或 `qualityLevel∈{C,D}`）                                                    | 编排者重派 R（同一 round，不递增）；同一 round 内 R 重派 ≥2 次仍不通过 → 🔴 CHECKPOINT 介入（人工根因分析或调整 maxReworkRounds） |
+| V 复审根因不通过（targetKind=rootcause `passed=false`）                                                   | 编排者重派 R（带 V 的 rootcause reworkHints，同一 round）；同一 round 内 V 复审不通过 ≥2 次 → 🔴 CHECKPOINT 介入（用户裁定根因）  |
+| G 门禁不通过（`check-rootcause-report.ts` exitCode=1）                                                    | 编排者重派 R（带 G 的校验失败原因，同一 round）；通常为 Schema 不合规，R 修正报告即可                                             |
+| S-fix 修复后 V/G 仍不通过                                                                                 | `round++` → 重新分派 R（不沿用上轮 R 报告，因产物已变化）；round 达 maxReworkRounds → 🔴 CHECKPOINT 升级（见场景 5 阶段回退）     |
+| 阶段回退（场景 5：round≥2 + R 标记 upstreamDefect.present=true 且 rollbackRecommended=true + V 复审通过） | 强制 🔴 CHECKPOINT · 阶段回退决策，展示返工历史 + R 的 upstreamDefect 详情 + V 复审结论 + 建议回退阶段编号，由用户选择 A/B/C      |
 
 ## 与 addyosmani/agent-skills 的差异
 
-| 维度 | addyosmani 原版 | W 模型适配版 |
-|---|---|---|
+| 维度           | addyosmani 原版   | W 模型适配版                                                                                                                                      |
+| -------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 子代理分派方式 | 由 Agent 自身决定 | 强制 O / S / V / G / A / R 六角色协同：S/V/G 每阶段必派、R3 无条件 ≥3 条、A 阶段 1-4 必派（见本文件「角色分派完整性校验」节），编排者不得越权实施 |
-| 评审独立性 | 由 Agent 自评 | V 子代理物理隔离，不接触 S 子代理内部推理 |
-| 门禁执行 | 由 Agent 直接跑 | G 子代理独立跑 + 回填证据摘要 |
-| 编排者越权处置 | 无强制机制 | 反模式 #10，命中即回退 |
+| 评审独立性     | 由 Agent 自评     | V 子代理物理隔离，不接触 S 子代理内部推理                                                                                                         |
+| 门禁执行       | 由 Agent 直接跑   | G 子代理独立跑 + 回填证据摘要                                                                                                                     |
+| 编排者越权处置 | 无强制机制        | 反模式 #10，命中即回退                                                                                                                            |
 
 ## 角色分派完整性校验
 
@@ -1537,11 +1556,11 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 
 每阶段 run-log 须至少含以下角色记录各 1 条：
 
-| 角色 | 必分派条件 | 校验脚本 |
-|---|---|---|
-| S（产出） | 每阶段必须（产出开发产物 + 测试设计 + RTM 更新） | check-role-dispatch.ts |
-| V（评审） | 每阶段必须（按 verifier-spec.md §6（输出 Schema）+ §8（提示词模板）产出 VerifierOutput JSON） | check-role-dispatch.ts |
-| G（门禁） | 每阶段必须（跑 check-*.ts + 回填证据摘要） | check-role-dispatch.ts |
+| 角色         | 必分派条件                                                                                                                                                                                                                          | 校验脚本                                                                                       |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| S（产出）    | 每阶段必须（产出开发产物 + 测试设计 + RTM 更新）                                                                                                                                                                                    | check-role-dispatch.ts                                                                         |
+| V（评审）    | 每阶段必须（按 verifier-spec.md §6（输出 Schema）+ §8（提示词模板）产出 VerifierOutput JSON）                                                                                                                                       | check-role-dispatch.ts                                                                         |
+| G（门禁）    | 每阶段必须（跑 check-*.ts + 回填证据摘要）                                                                                                                                                                                          | check-role-dispatch.ts                                                                         |
 | R（根因/R3） | **无条件必须**（每阶段须有 `role=R` 且 `outcome=success` 的 `r3-completeness` / `r3-reliability` / `r3-security` 记录各 ≥1，覆盖所有 S 变体含 S-fix / S-emergency-fix；rootcause / iceberg-sweep / 失败记录不充数，重复维度不充数） | check-role-dispatch.ts（`--r3-enabled` flag 保留为 no-op 向后兼容；结果含 r3Missing 维度明细） |
 
 ### 可选条件
@@ -1552,6 +1571,7 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 ### 豁免条件
 
 **self-as-verifier 模式豁免**（仅 demo 项目 / 非生产项目）：
+
 - S/V/G/R 任两角色由同一 Agent 兼任时，run-log 中可同一 `runId` 条目标记多角色（如 `role="S/V"`），但须满足：
   1. 产出各角色独立产物文件（VerifierOutput JSON / RootCauseReport / gate-logs JSON / PreventiveReview JSON 三份路径不同）
   2. run-log 条目的 `artifacts` 字段列出各角色独立产物路径

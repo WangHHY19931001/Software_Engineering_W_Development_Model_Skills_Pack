@@ -70,7 +70,7 @@ const CONVENTIONS_GLOSSARY = [
   `- **规范定义**：run-log 动作类型枚举（共 27 值，以 \`run-log.schema.json\` 为准）：${ACTION_ENUM_27.map((v) => `\`${v}\``).join(' / ')}。`,
   '- **_Avoid_**：operation/op/行为/事件。',
   '### exit-2 脚本口径',
-  '- **规范定义**：scripts/cli/ 下除 self-test 外均为 exit 2 脚本：= 36（26 个 check-* + 10 个工具 CLI，不含 self-test）；计数由探针得出。',
+  '- **规范定义**：scripts/cli/ 下除 self-test 外均为 exit 2 脚本：= 42（26 个 check-* + 16 个工具 CLI，不含 self-test）；计数由探针得出。',
 ].join('\n');
 
 const R10_CONTRACT_FIXTURE = [
@@ -83,7 +83,7 @@ const R10_CONTRACT_FIXTURE = [
   '<r10-contract id="legacy-duplicate" relation=\'{"persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}\'>legacy > 1 duplicate is fail-closed</r10-contract>',
 ].join('\n');
 
-/** scripts/cli 当前 37 个脚本名（fixture 自洽：与 cliScriptFiles / dispatchMatrix / SKILL「N 个 .ts」一致） */
+/** scripts/cli 当前 43 个脚本名（fixture 自洽：与 cliScriptFiles / dispatchMatrix / SKILL「N 个 .ts」一致） */
 const CLI_SCRIPT_NAMES = [
   'check-archive-integrity',
   'check-artifact-gate',
@@ -111,6 +111,12 @@ const CLI_SCRIPT_NAMES = [
   'check-tla-bdd-sync',
   'check-tla-model',
   'check-verifier-output',
+  'code-health-apply',
+  'code-health-duplicates',
+  'code-health-gap',
+  'code-health-ledger',
+  'code-health-phase1',
+  'code-health-tests',
   'doctor',
   'ensure-codegraph-opsx',
   'metrics-report',
@@ -134,7 +140,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
       'evidence-manifest.schema.json',
     ],
     personaCount: 28,
-    exit2ScriptCount: 36,
+    exit2ScriptCount: 42,
     referencesCount: 53,
     rootCauseAuthoritySpec: R10_CONTRACT_FIXTURE,
     rootCauseSchema: R10_CONTRACT_FIXTURE,
@@ -166,11 +172,11 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
       properties: { action: { enum: ACTION_ENUM_27 } },
     }),
     skill:
-      '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（53 个 .md） | 按需加载 |\n| `scripts/cli/`（37 个 .ts） | 仅 G 子代理执行 |',
+      '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（53 个 .md） | 按需加载 |\n| `scripts/cli/`（43 个 .ts） | 仅 G 子代理执行 |',
     operationBehaviors: '## 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
     hardConstraints: Array.from({ length: 14 }, (_, i) => `## #${i + 1} 约束${i + 1}标题`).join('\n'),
     agents:
-      '36 个脚本\n40 个 .test.ts / 530 条\ncoverage/、.zcode/、.w-model/ 是 Git 忽略的本地生成物，不随 Git 交付；需要审计证据时运行 npm run wm:export-evidence -- <project-dir> <output-dir>。',
+      '42 个脚本\n40 个 .test.ts / 530 条\ncoverage/、.zcode/、.w-model/ 是 Git 忽略的本地生成物，不随 Git 交付；需要审计证据时运行 npm run wm:export-evidence -- <project-dir> <output-dir>。',
     pkgJson: JSON.stringify({ name: 'w-model-dev-skill', version: '41.11.0' }),
     metaJson: JSON.stringify({ name: 'w-model-dev', version: '41.11.0' }),
     installDoc: '## 5. 激活机制\n```yaml\nname: w-model-dev\nversion: 41.11.0\n```',
@@ -1004,21 +1010,21 @@ describe('runDocConsistencyChecks', () => {
   });
 
   it('conventions exit-2 计数句：算术不符 / 与实测不符 / 缺计数句 → 违规（F-G7-04）', () => {
-    // 算术不符：26 + 10 ≠ 37
+    // 算术不符：26 + 16 ≠ 43
     const badArithmetic = CONVENTIONS_GLOSSARY.replace(
-      '= 36（26 个 check-* + 10 个工具 CLI',
-      '= 37（26 个 check-* + 10 个工具 CLI',
+      '= 42（26 个 check-* + 16 个工具 CLI',
+      '= 43（26 个 check-* + 16 个工具 CLI',
     );
     let v = runDocConsistencyChecks(baseInput({ glossary: badArithmetic }));
     expect(v.some((x) => x.check === 'exit2-scripts' && x.message.includes('算术不符'))).toBe(true);
 
-    // 声明总数与实测不符（baseInput 实测 36，声明 35）
+    // 声明总数与实测不符（baseInput 实测 42，声明 41）
     const stale = CONVENTIONS_GLOSSARY.replace(
-      '= 36（26 个 check-* + 10 个工具 CLI',
-      '= 35（26 个 check-* + 9 个工具 CLI',
+      '= 42（26 个 check-* + 16 个工具 CLI',
+      '= 41（26 个 check-* + 15 个工具 CLI',
     );
     v = runDocConsistencyChecks(baseInput({ glossary: stale }));
-    expect(v.some((x) => x.check === 'exit2-scripts' && x.message.includes('实际 36 个'))).toBe(true);
+    expect(v.some((x) => x.check === 'exit2-scripts' && x.message.includes('实际 42 个'))).toBe(true);
 
     // 缺计数句
     v = runDocConsistencyChecks(baseInput({ glossary: '### action（RunLogEntry）\n- **规范定义**：枚举列表省略。' }));
@@ -1630,8 +1636,8 @@ describe('runDocConsistencyChecks', () => {
       expect(report.dynamicMeasurements).toMatchObject({
         // 34 = 25 existing schemas + 9 code-health campaign schemas
         schemaCount: 34,
-        cliScriptCount: 37,
-        exit2ScriptCount: 36,
+        cliScriptCount: 43,
+        exit2ScriptCount: 42,
         testFileCount: (coverage.testResults as unknown[]).length,
         vitestTestCount: 1002,
         numPassedTests: 1002,
@@ -1646,7 +1652,7 @@ describe('runDocConsistencyChecks', () => {
       expect(report.dynamicMeasurements.vitestRunId).toMatch(/^[0-9a-f]{16}$/);
       expect(report.dynamicMeasurements.vitestArtifactSha256).toMatch(/^[0-9a-f]{64}$/);
       expect(report.dynamicMeasurements.vitestCommitSha).toMatch(/^[0-9a-f]{40}$/);
-      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(38);
+      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(44);
       expect(
         report.dynamicMeasurements.exit2ProbeResults?.every(
           (probe) =>
@@ -1671,7 +1677,7 @@ describe('runDocConsistencyChecks', () => {
     });
   });
 
-  it('同一 checkout 的无状态与最小合法 run-log 状态使用完全相同的 exit2 probe map，且计数为 36', async () => {
+  it('同一 checkout 的无状态与最小合法 run-log 状态使用完全相同的 exit2 probe map，且计数为 42', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       await writeVitestCount(fixtureRoot, 1002);
       const withoutState = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
@@ -1733,8 +1739,8 @@ describe('runDocConsistencyChecks', () => {
           };
         });
       expect(stable(withStateReport)).toEqual(stable(withoutStateReport));
-      expect(withoutStateReport.dynamicMeasurements.exit2ScriptCount).toBe(36);
-      expect(withStateReport.dynamicMeasurements.exit2ScriptCount).toBe(36);
+      expect(withoutStateReport.dynamicMeasurements.exit2ScriptCount).toBe(42);
+      expect(withStateReport.dynamicMeasurements.exit2ScriptCount).toBe(42);
     });
   }, 120_000);
 
@@ -1748,7 +1754,7 @@ describe('runDocConsistencyChecks', () => {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
       const install = await fs.readFile(installPath, 'utf8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
-      await fs.writeFile(agentsPath, agents.replace('全仓 36 个脚本 exit 2', '全仓 34 个脚本 exit 2'), 'utf8');
+      await fs.writeFile(agentsPath, agents.replace('全仓 42 个脚本 exit 2', '全仓 34 个脚本 exit 2'), 'utf8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
       await fs.writeFile(
         installPath,
@@ -1762,6 +1768,24 @@ describe('runDocConsistencyChecks', () => {
       expect(result.stdout).toContain('exit2-scripts');
     });
   });
+
+  it('code-health 门禁脚本未登记 dispatch-matrix（文档事实漂移）→ docs-consistency exit 1 且 reason 含 code-health', async () => {
+    await withDocsConsistencyFixture(async (fixtureRoot) => {
+      await writeVitestCount(fixtureRoot, 1002);
+      const dispatchPath = path.join(fixtureRoot, 'w-model-dev', 'references', 'subagent-delegation.md');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is inside the mkdtemp-owned fixture
+      const dispatch = await fs.readFile(dispatchPath, 'utf8');
+      expect(dispatch).toContain('code-health-phase1');
+      // Remove the exact registered token (a suffix such as `code-health-phase1-x` would still
+      // satisfy the substring-based script-registry check, so the whole token must disappear).
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is inside the mkdtemp-owned fixture
+      await fs.writeFile(dispatchPath, dispatch.replaceAll('code-health-phase1', 'code-health-phaseX'), 'utf8');
+      const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
+      expect(result.code).toBe(1);
+      expect(result.stdout).toMatch(/code-health|SSoT|exit/);
+      expect(result.stdout).toContain('script-registry');
+    });
+  }, 120_000);
 
   it.each([
     ['missing run identity', { vitestRunId: '' }],
@@ -1935,8 +1959,8 @@ describe('runDocConsistencyChecks', () => {
         };
       };
       expect(report.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
-      expect(report.dynamicMeasurements.exit2ScriptCount).toBe(36);
-      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(38);
+      expect(report.dynamicMeasurements.exit2ScriptCount).toBe(42);
+      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(44);
       expect(
         report.dynamicMeasurements.exit2ProbeResults?.every((probe) => probe.status === 2 && probe.errorExitCode === 2),
       ).toBe(true);
@@ -2316,10 +2340,10 @@ describe('runDocConsistencyChecks', () => {
 
   it('SKILL.md 声明 .ts 计数与实测不符 → script-registry 违规', () => {
     const input = baseInput({
-      skill: baseInput().skill.replace('（37 个 .ts）', '（36 个 .ts）'),
+      skill: baseInput().skill.replace('（43 个 .ts）', '（42 个 .ts）'),
     });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'script-registry');
-    expect(v.some((x) => x.message.includes('36') && x.message.includes('37'))).toBe(true);
+    expect(v.some((x) => x.message.includes('42') && x.message.includes('43'))).toBe(true);
   });
 
   it('cliScriptFiles 为空 → script-registry 守卫跳过（零违规）', () => {
