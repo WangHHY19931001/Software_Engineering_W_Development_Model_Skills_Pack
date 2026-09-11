@@ -65,6 +65,32 @@ export const STRUCTURAL_VIEW_KEYS = {
 } as const;
 
 /**
+ * Per-key closed value vocabulary: `key=zzz` padding must not clear the structural floor. Keys whose
+ * value is a repository call site (`caller` / `callee`) are validated as `<file>:<symbol>` instead of by
+ * literal membership. A value outside the set contributes nothing (fail-closed: no authority is added).
+ */
+export const STRUCTURAL_VIEW_VALUES: Readonly<Record<string, readonly string[]>> = {
+  node: ['conditional', 'sequential', 'loop', 'call', 'expression-statement', 'return', 'throw'],
+  branch: ['missing-or-hit', 'multi-arm', 'early-return', 'guard', 'single-path', 'none'],
+  'control-flow': ['single-return', 'multi-return', 'exception-path', 'fallthrough', 'none'],
+  shape: ['block', 'expression', 'declaration', 'object', 'array', 'function'],
+  expression: ['call', 'member-access', 'binary', 'literal', 'template', 'await'],
+  statement: ['expression-statement', 'declaration', 'return', 'if', 'try', 'loop'],
+  input: ['cache-key', 'request', 'config', 'parameter', 'state', 'none'],
+  output: ['value-or-loader', 'value', 'void', 'promise', 'state', 'none'],
+  mutation: ['none', 'local', 'shared-state', 'parameter', 'cache'],
+  'side-effect': ['none', 'write', 'emit', 'log', 'network', 'storage'],
+  flow: ['forward', 'bidirectional', 'passthrough', 'merge', 'none'],
+  parameter: ['none', 'single', 'multiple', 'options-object', 'callback'],
+  return: ['value', 'void', 'promise', 'early', 'conditional', 'none'],
+  lifecycle: ['shared-cache', 'per-call', 'singleton', 'request-scoped', 'none'],
+  ownership: ['shared', 'caller-owned', 'callee-owned', 'none'],
+  neighborhood: ['single-caller', 'multi-caller', 'isolated', 'none'],
+  entry: ['public-api', 'internal', 'none'],
+  exit: ['return', 'throw', 'callback', 'none'],
+};
+
+/**
  * Canonical tracked-fact prefixes recorded in the ledger candidate's `sources`:
  *   - `call-site:<file>:<symbol>`  — the identifier is a supported production call site;
  *   - `contract:<file>:<symbol>`   — a contract is recorded for it;
@@ -239,17 +265,26 @@ interface ParsedTrackedFacts {
   contracts: Set<string>;
   regressions: Set<string>;
   exclusions: Set<string>;
+  /**
+   * `excluded:` facts whose target id could not be parsed. They are retained (not dropped) because a
+   * malformed exclusion must fail CLOSED: silently ignoring it would leave the site looking stable and
+   * could authorize an abstraction the tracked facts intended to forbid (default-deny).
+   */
+  malformedExclusions: string[];
 }
 
 /**
- * Parse the canonical `sources` facts. Only the closed prefix vocabulary is recognised; an unknown or
- * malformed fact is ignored (it can never add authority). Any `excluded:` reason excludes the id.
+ * Parse the canonical `sources` facts. Only the closed prefix vocabulary is recognised; an unknown
+ * prefix is ignored (it can never add authority). Any `excluded:` reason excludes the id; a malformed
+ * `excluded:` fact is retained in `malformedExclusions` so callers can refuse instead of treating the
+ * site as stable.
  */
 export function parseTrackedFacts(facts: readonly string[]): ParsedTrackedFacts {
   const callSites = new Set<string>();
   const contracts = new Set<string>();
   const regressions = new Set<string>();
   const exclusions = new Set<string>();
+  const malformedExclusions: string[] = [];
   for (const fact of facts) {
     if (typeof fact !== 'string') continue;
     const separator = fact.indexOf(':');
@@ -258,9 +293,13 @@ export function parseTrackedFacts(facts: readonly string[]): ParsedTrackedFacts 
     const rest = fact.slice(separator + 1);
     if (prefix === 'excluded') {
       const secondSeparator = rest.indexOf(':');
-      if (secondSeparator === -1) continue;
+      if (secondSeparator === -1) {
+        malformedExclusions.push(fact);
+        continue;
+      }
       const id = rest.slice(secondSeparator + 1);
-      if (parseCallSite(id) !== null) exclusions.add(id);
+      if (parseCallSite(id) === null) malformedExclusions.push(fact);
+      else exclusions.add(id);
       continue;
     }
     if (parseCallSite(rest) === null) continue;
@@ -268,7 +307,7 @@ export function parseTrackedFacts(facts: readonly string[]): ParsedTrackedFacts 
     else if (prefix === 'contract') contracts.add(rest);
     else if (prefix === 'regression') regressions.add(rest);
   }
-  return { callSites, contracts, regressions, exclusions };
+  return { callSites, contracts, regressions, exclusions, malformedExclusions };
 }
 
 /**
@@ -280,7 +319,10 @@ export function isTestOnlyPath(file: string, declaredTests: ReadonlySet<string>)
   return declaredTests.has(file) || TEST_PATH_PATTERN.test(file);
 }
 
-/** Count of typed `key=value` entries whose key is in the view's closed vocabulary and value is non-empty. */
+/**
+ * Count of typed `key=value` entries whose key is in the view's closed vocabulary AND whose value is in
+ * that key's closed value set (call-site-valued keys are validated as `<file>:<symbol>`).
+ */
 function typedEntryCount(entries: readonly string[], allowed: readonly string[]): number {
   let count = 0;
   for (const entry of entries) {
@@ -289,7 +331,15 @@ function typedEntryCount(entries: readonly string[], allowed: readonly string[])
     if (separator <= 0) continue;
     const key = entry.slice(0, separator).trim();
     const value = entry.slice(separator + 1).trim();
-    if (value !== '' && (allowed as readonly string[]).includes(key)) count += 1;
+    if (value === '' || !(allowed as readonly string[]).includes(key)) continue;
+    // eslint-disable-next-line security/detect-object-injection -- key is validated against the closed key vocabulary above.
+    const allowedValues = STRUCTURAL_VIEW_VALUES[key];
+    if (key === 'caller' || key === 'callee') {
+      if (parseCallSite(value) === null) continue;
+    } else if (allowedValues === undefined || !allowedValues.includes(value)) {
+      continue;
+    }
+    count += 1;
   }
   return count;
 }
@@ -409,6 +459,14 @@ export function clusterDuplicates(input: DuplicateInput, authority: DuplicateClu
   const support = structuralViewSupport(input);
   const regressionSignal = hasRegressionSignal(authority.regressionCommands);
   const facts = parseTrackedFacts(authority.trackedFacts);
+  // Default-deny: an `excluded:` fact whose target cannot be parsed is a contradiction in the tracked
+  // facts. Refuse rather than silently dropping it and treating the site as stable.
+  if (facts.malformedExclusions.length > 0) {
+    throw new CodeHealthError(
+      'STRUCTURE_INVALID',
+      `duplicate clustering refuses malformed excluded: facts (default-deny): ${facts.malformedExclusions.join(', ')}`,
+    );
+  }
 
   const approvedScope = new Set(authority.approvedScope);
   const seenSiteFiles = new Set<string>();

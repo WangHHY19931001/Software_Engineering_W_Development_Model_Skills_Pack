@@ -586,9 +586,12 @@ export interface GapDiscoveryResult {
 export interface TddHarnessInput {
   gap: GapRow;
   /**
-   * The owning candidate. Its `changeScope.files` is the approved target scope: the implementation
-   * artifact must be one of those files, so an assertion/probe module can never be relabelled as
-   * "the implementation" to exclude it from the assertion artifact set.
+   * The owning candidate. CALLER-SUPPLIED: its `changeScope.files` / `tests` are used as the approved
+   * target scope, so the harness is structurally consistent with whatever record the caller passes.
+   * It is NOT unforgeable by itself (G-4) — the ledger, the G gate, and the role signature chain are the
+   * authority, and a forged candidate record is out of scope for this pure structural check. Within that
+   * scope, the implementation artifact must be one of `changeScope.files`, so an assertion/probe module
+   * can never be relabelled as "the implementation" to exclude it from the assertion artifact set.
    */
   candidate: CodeHealthCandidate;
   /** Declared test artifact files (repository-relative, non-empty, exist on disk, disjoint from the implementation). */

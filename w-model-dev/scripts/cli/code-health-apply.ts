@@ -59,7 +59,11 @@ import {
 } from '../lib/code-health-deletion-authority.js';
 import { createCodeHealthEvidenceStore } from '../lib/code-health-evidence-store.js';
 import { createCodeHealthGitRevisionProvider } from '../lib/code-health-revision-provider.js';
-import { resolveControlledRelativePath } from '../lib/code-health-file-verifier.js';
+import {
+  isPathWithin,
+  resolveControlledRelativePath,
+  resolveControlledRoot,
+} from '../lib/code-health-file-verifier.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { runMain } from '../lib/run-main.js';
 import { runSync } from '../lib/run-sync.js';
@@ -165,6 +169,18 @@ function buildDeletionPatch(relativePath: string, content: string): string {
 }
 
 async function buildPatchBytes(root: string, candidate: CodeHealthCandidate): Promise<Uint8Array> {
+  // Canonical-root containment, aligned with `lib/code-health-file-verifier.ts`: the controlled root must
+  // be a real non-symlink directory, and every parent component of a scope path must be a real non-symlink
+  // directory beneath the root. Without this, a symlinked parent directory inside the root could smuggle
+  // bytes from outside the root into the controlled deletion patch (read asymmetry, R11 Task 3 MINOR-3).
+  const rootResolution = await resolveControlledRoot(root);
+  if (!rootResolution.ok || rootResolution.canonicalRoot === undefined) {
+    throw new CodeHealthError(
+      rootResolution.code ?? 'STRUCTURE_INVALID',
+      rootResolution.reason ?? 'the repository root is not controlled',
+    );
+  }
+  const canonicalRoot = rootResolution.canonicalRoot;
   const chunks: string[] = [];
   const seen = new Set<string>();
   for (const relativePath of candidate.changeScope.files) {
@@ -174,10 +190,30 @@ async function buildPatchBytes(root: string, candidate: CodeHealthCandidate): Pr
     if (!resolution.ok || resolution.absolutePath === undefined) {
       throw new CodeHealthError('STRUCTURE_INVALID', `approved scope path is unsafe: ${relativePath}`);
     }
+    // Reject a symlinked parent component before any read (mirrors the file verifier's component walk).
+    let current = canonicalRoot;
+    for (const component of relativePath.split('/').slice(0, -1)) {
+      current = path.join(current, component);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- current is canonicalRoot joined with a validated component of a repository-relative scope path.
+      const entry = await fs.lstat(current).catch(() => null);
+      if (entry === null) {
+        throw new CodeHealthError('EVIDENCE_INVALID', `approved scope parent is missing: ${relativePath}`);
+      }
+      if (entry.isSymbolicLink()) {
+        throw new CodeHealthError(
+          'SECURITY_BLOCKED',
+          `approved scope path traverses a symlinked parent: ${relativePath}`,
+        );
+      }
+      if (!entry.isDirectory()) {
+        throw new CodeHealthError('EVIDENCE_INVALID', `approved scope parent is not a directory: ${relativePath}`);
+      }
+    }
+    const canonicalTarget = path.resolve(canonicalRoot, ...relativePath.split('/'));
     let stats;
     try {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- absolutePath is bounded by resolveControlledRelativePath.
-      stats = await fs.lstat(resolution.absolutePath);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- canonicalTarget is bounded by the canonical root walk above.
+      stats = await fs.lstat(canonicalTarget);
     } catch {
       throw new CodeHealthError('EVIDENCE_INVALID', `approved scope file is missing: ${relativePath}`);
     }
@@ -187,8 +223,17 @@ async function buildPatchBytes(root: string, candidate: CodeHealthCandidate): Pr
         `approved scope is not a regular non-symlink file: ${relativePath}`,
       );
     }
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- absolutePath is bounded by resolveControlledRelativePath.
-    const content = await fs.readFile(resolution.absolutePath, 'utf8');
+    // The realpath must be the canonical target itself and stay inside the canonical root.
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- canonicalTarget is bounded by the canonical root walk above.
+    const realPath = await fs.realpath(canonicalTarget).catch(() => null);
+    if (realPath === null || path.resolve(realPath) !== canonicalTarget || !isPathWithin(canonicalRoot, realPath)) {
+      throw new CodeHealthError(
+        'SECURITY_BLOCKED',
+        `approved scope file escapes the controlled root during verification: ${relativePath}`,
+      );
+    }
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- canonicalTarget is bounded by the walk above.
+    const content = await fs.readFile(canonicalTarget, 'utf8');
     chunks.push(buildDeletionPatch(relativePath, content));
   }
   return new TextEncoder().encode(chunks.join(''));

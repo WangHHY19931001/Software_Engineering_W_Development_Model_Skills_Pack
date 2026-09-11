@@ -8,10 +8,11 @@
  * `logic/code-health-gap-logic.ts`.
  *
  * `assertionHash` is derived from a fully declared and anchored artifact set:
- *   - the implementation artifact must be inside the ledger-recorded candidate's approved
- *     `changeScope.files` (G-1/G-2: the implementation/test split comes from the candidate record, not
- *     from caller labels), must not be a ledger-declared `tests` file, must not be an argv entry, and
- *     must not appear in the declared test artifacts;
+ *   - `TddHarnessInput.candidate` is CALLER-SUPPLIED: its `changeScope.files` / `tests` are the candidate
+ *     record this structural check is anchored to, and the implementation artifact must be inside
+ *     `changeScope.files` (G-1/G-2: the implementation/test split comes from that record, not from caller
+ *     labels), must not be a ledger-declared `tests` file, must not be an argv entry, and must not appear
+ *     in the declared test artifacts. The record is not unforgeable on its own (G-4 below);
  *   - the declared test artifacts must be non-empty, repository-relative, exist, and each must be a
  *     ledger-declared candidate test;
  *   - every statically resolvable local module reachable from the argv entry points must be classified

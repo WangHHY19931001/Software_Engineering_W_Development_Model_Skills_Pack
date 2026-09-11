@@ -12,7 +12,9 @@
  * Unknown flags (including `--delete` / `--apply`) are input errors: exit 2 with the existing
  * structured `ERROR_JSON` contract. Phase 1 is read-only over source: it writes only the external
  * report and exclusive raw outputs beneath the gitignored `.w-model/` evidence root. `changedFiles`
- * is the honest before/after `git status` delta, and a non-empty delta is a loud read-only violation.
+ * is the honest before/after `git status` delta **limited to the analyzed target list** (the caller's
+ * `--scenario`-derived targets): a change to an analyzed target is a loud read-only violation, while
+ * unrelated files (including concurrent sibling-test transients) are deliberately not attributed.
  *
  * Exit codes:
  *   0  every candidate passed `validateCodeHealthCandidate`
@@ -506,6 +508,15 @@ export async function runPhase1(input: Phase1RunInput): Promise<Phase1RunResult>
 
 const VALUE_FLAGS = ['root', 'output', 'scenario', 'platform', 'shell'] as const;
 
+/**
+ * Usage detail surfaced on every input error. It states the honest `changedFiles` detection range: the
+ * read-only invariant is scoped to the analyzed target list, so unrelated worktree changes are not
+ * attributed to Phase 1.
+ */
+export const PHASE1_USAGE_DETAIL =
+  'usage: code-health-phase1.ts --root <dir> --output <report.json> --scenario <scenarios.json>; ' +
+  'note: changedFiles covers only analyzed targets (the report is read-only over source and does not attribute unrelated files)';
+
 class Phase1ArgumentError extends Error {}
 
 function parsePhase1Args(argv: readonly string[]): Partial<Record<(typeof VALUE_FLAGS)[number], string>> {
@@ -588,7 +599,7 @@ async function main(): Promise<void> {
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: `missing required flag(s): ${missing.map((flag) => `--${flag}`).join(', ')}`,
-      detail: 'usage: code-health-phase1.ts --root <dir> --output <report.json> --scenario <scenarios.json>',
+      detail: PHASE1_USAGE_DETAIL,
       exitCode: 2,
     });
     return;

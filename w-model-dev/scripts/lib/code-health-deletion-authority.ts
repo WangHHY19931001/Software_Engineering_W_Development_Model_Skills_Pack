@@ -11,7 +11,7 @@
  *   - the inventory's ledger-anchored review (default-deny, equivalence, deleted-test identity);
  *   - candidate/inventory revision equality with the live repository revision;
  *   - exact change-scope equality with the inventory's removal candidate file, including that every
- *     test-surface file in scope is the authorized candidate (F-1);
+ *     test-declared (declared-role) file in scope is the authorized candidate (F-1);
  *   - each pre/post regression's raw output is verified by the injected `EvidenceStore` against the
  *     candidate/scope/revision binding, then re-read and re-parsed so the recorded count must equal
  *     the recomputed count (F-4);
@@ -118,6 +118,11 @@ function trackedHeadBytes(root: string, relativePath: string): Buffer | null {
   return Buffer.from(result.stdout, 'binary');
 }
 
+/** Normalize line endings (CRLF/CR -> LF) so a `core.autocrlf` checkout compares equal to its LF blob. */
+function normalizeLineEndings(bytes: Buffer): Buffer {
+  return Buffer.from(bytes.toString('binary').replace(/\r\n/g, '\n').replace(/\r/g, '\n'), 'binary');
+}
+
 async function readVerifiedTrackedFile(
   root: string,
   relativePath: string,
@@ -132,6 +137,20 @@ async function readVerifiedTrackedFile(
   const verifier = createCodeHealthFileVerifier();
   const result = await verifier.verifyRegularNonSymlinkFile({ root, relativePath, expectedSha256 });
   if (!result.ok) {
+    // A `core.autocrlf=true` checkout rewrites LF blobs to CRLF on disk. The working bytes then differ
+    // from the HEAD blob only by line endings, which is not a content change: normalize BOTH sides and
+    // accept only when the normalized digests match. Any real content change still fails this fallback
+    // and is refused (fail-closed).
+    const resolution = resolveControlledRelativePath(root, relativePath);
+    if (resolution.ok && resolution.absolutePath !== undefined) {
+      const workingBytes = await fs.readFile(resolution.absolutePath).catch(() => null);
+      if (
+        workingBytes !== null &&
+        createHashHex(normalizeLineEndings(workingBytes)) === createHashHex(normalizeLineEndings(headBytes))
+      ) {
+        return { bytes: workingBytes, violations };
+      }
+    }
     violations.push(`tracked source ${relativePath} does not match its HEAD blob: ${result.reason ?? result.code}`);
     return { bytes: null, violations };
   }
@@ -413,6 +432,14 @@ export async function verifyDeletionEvidence(input: DeletionAuthorizationInput):
   violations.push(...input.review.violations);
   const ledger = input.ledger;
   const inventory = isRecord(input.inventory) ? input.inventory : {};
+  // Explicit identity cross-check: the guard candidate and the removal inventory must describe the SAME
+  // candidate. Without it, a guard could pair a plausible candidate with another candidate's inventory
+  // (whose ledger entry, evidence, and proof are all internally consistent) and be authorized by proxy.
+  if (typeof inventory.candidateId === 'string' && inventory.candidateId !== input.candidate.candidateId) {
+    violations.push(
+      `guard candidateId ${String(input.candidate.candidateId)} does not match the inventory candidateId ${inventory.candidateId}`,
+    );
+  }
   const liveRevision = await input.revisionProvider.current(input.repositoryRoot);
   if (liveRevision === null) {
     violations.push('removal authorization requires an available live repository revision');
@@ -435,7 +462,7 @@ export async function verifyDeletionEvidence(input: DeletionAuthorizationInput):
 
   const proof = isRecord(inventory.removalProof) ? inventory.removalProof : null;
   if (proof === null) {
-    violations.push('a test-surface change requires a removalProof citing the exact deleted test identity');
+    violations.push('a test-declared scope change requires a removalProof citing the exact deleted test identity');
   }
   const tests = Array.isArray(inventory.tests) ? inventory.tests : [];
   const removalCandidate =

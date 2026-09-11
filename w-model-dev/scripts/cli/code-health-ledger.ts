@@ -39,6 +39,23 @@ import { runMain } from '../lib/run-main.js';
 
 class LedgerArgumentError extends Error {}
 
+const USAGE = [
+  'usage: code-health-ledger.ts <init|append|validate> [--flag value]',
+  '',
+  '  init     --ledger <file> --campaign-id <id> --baseline <revision.json> [--environment <rows.json>]',
+  '  append   --ledger <file> --candidate <candidate.json> --event <event.json> [--approval <approval.json>]',
+  '  validate --ledger <file>',
+  '',
+  '--help     show this usage and exit 0',
+  '',
+  'Exit codes: 0 pass, 1 validation/refusal, 2 input error.',
+].join('\n');
+
+/** `--help`, `-h`, or `help` anywhere in the arguments requests the usage surface instead of a command. */
+function isHelpRequest(argv: readonly string[]): boolean {
+  return argv.some((argument) => argument === '--help' || argument === '-h' || argument === 'help');
+}
+
 const FLAGS_BY_COMMAND: Readonly<Record<string, readonly string[]>> = {
   init: ['ledger', 'campaign-id', 'baseline', 'environment'],
   append: ['ledger', 'candidate', 'event', 'approval'],
@@ -242,15 +259,22 @@ async function runValidate(values: Record<string, string>): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  const argv = process.argv.slice(2);
+  // A discoverable usage surface: `--help` / `-h` / `help` prints usage on stdout and exits 0 rather than
+  // being rejected as an unknown subcommand/flag. It performs no read, write, or validation.
+  if (isHelpRequest(argv)) {
+    console.log(USAGE);
+    return;
+  }
   let parsed: { command: string; values: Record<string, string> };
   try {
-    parsed = parseArgs(process.argv.slice(2));
+    parsed = parseArgs(argv);
   } catch (error) {
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: error instanceof Error ? error.message : String(error),
-      detail: 'usage: code-health-ledger.ts init|append|validate [--flag value]',
+      detail: USAGE,
       exitCode: 2,
     });
     return;

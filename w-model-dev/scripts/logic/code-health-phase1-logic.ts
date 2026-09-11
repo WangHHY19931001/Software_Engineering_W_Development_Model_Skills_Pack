@@ -12,8 +12,6 @@
  * `node:fs` / `node:child_process` / `node:path` / `process`.
  */
 
-/* eslint-disable security/detect-object-injection -- Source text and exported-symbol tables are keyed by repository-relative paths from the caller-controlled file list. */
-
 import { createHash } from 'node:crypto';
 
 import * as ts from 'typescript';
@@ -445,6 +443,7 @@ export function buildStaticInventory(input: StaticInventoryInput): StaticInvento
   const exportedBy = new Map<string, string>();
   const unknowns: string[] = [];
   for (const file of files) {
+    // eslint-disable-next-line security/detect-object-injection -- key is a repository-relative path from the same normalized `files` list; a non-string value is skipped, never indexed further.
     const source = input.sourceText[file];
     if (typeof source !== 'string') {
       unknowns.push(file);
@@ -458,6 +457,7 @@ export function buildStaticInventory(input: StaticInventoryInput): StaticInvento
   }
   const references: StaticReference[] = [];
   for (const file of files) {
+    // eslint-disable-next-line security/detect-object-injection -- same normalized repository-relative `files` key as above; a non-string value is skipped before use.
     const source = input.sourceText[file];
     if (typeof source !== 'string') continue;
     references.push(...collectReferences(file, source, files, exportedBy));

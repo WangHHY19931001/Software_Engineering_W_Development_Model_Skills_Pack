@@ -1465,6 +1465,9 @@ function validateDeclarationAgainstCandidate(
       }
     }
   }
+  if (candidateTests.includes(declaration.implementationArtifact)) {
+    reasons.push(`${field} implementation artifact must not be a ledger-declared candidate test`);
+  }
   if (declaration.testArtifacts.includes(declaration.implementationArtifact)) {
     reasons.push(`${field} testArtifacts must not include the implementation artifact`);
   }
