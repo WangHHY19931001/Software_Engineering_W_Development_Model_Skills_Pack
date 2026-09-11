@@ -1939,40 +1939,43 @@ const negativeCases: readonly NegativeCase[] = [
     },
   },
   {
-    id: 'archive-not-implemented',
+    id: 'archive-requires-source-bound-provenance',
     targetStatus: 'verified',
-    codes: ['NOT_IMPLEMENTED'],
+    codes: ['STRUCTURE_INVALID', 'EVIDENCE_INVALID'],
     act: async (context) => {
       const candidate = requireDefined(
         context.ledger.candidates.find((entry) => entry.candidateId === context.candidateId),
         'verified candidate',
       );
       const boundary = createTask1ArchiveBoundary();
-      const results = [
-        await boundary.producer.produce({
-          candidate,
-          ledger: context.ledger,
-          approval: context.approval,
-          verificationLevel: 'package-only',
-        }),
-        await boundary.consumer.consume({
-          manifestPath: 'archive/manifest.json',
-          packageRoot: context.root,
-          verificationLevel: 'package-only',
-        }),
-        await boundary.verifier.verify({
-          manifestPath: 'archive/manifest.json',
-          packageRoot: context.root,
-          verificationLevel: 'source-bound',
-          sourceProject: context.root,
-          expectedRevision: context.revision,
-        }),
-      ];
-      for (const result of results) {
-        expect(result).toMatchObject({ ok: false, errorCode: 'NOT_IMPLEMENTED', manifest: null, createdPaths: [] });
+      // A source-bound archive without an explicit source project must fail closed before any write, and a
+      // declared source-bound verification without a source project never reports a source-bound result.
+      const producerResult = await boundary.producer.produce({
+        candidate,
+        ledger: context.ledger,
+        approval: context.approval,
+        verificationLevel: 'source-bound',
+        campaignRoot: context.root,
+        packageRoot: path.join(context.root, 'archive'),
+        sources: [],
+      });
+      const verifierResult = await boundary.verifier.verify({
+        manifestPath: 'archive/manifest.json',
+        packageRoot: context.root,
+        verificationLevel: 'source-bound',
+        expectedRevision: context.revision,
+      });
+      for (const result of [producerResult, verifierResult]) {
+        expect(result.ok).toBe(false);
+        expect(result.manifest).toBeNull();
+        expect(result.createdPaths).toEqual([]);
+        expect(result.verificationLevel).toBe('package-only');
       }
       expect(await exists(path.join(context.root, 'archive'))).toBe(false);
-      return { code: results[0]?.errorCode ?? null, messages: results.map((result) => result.reason) };
+      return {
+        code: producerResult.errorCode,
+        messages: [producerResult.reason, verifierResult.reason],
+      };
     },
   },
 ];
@@ -2053,9 +2056,14 @@ describe('code-health task1 isolated git integration', () => {
       candidate: verifiedCandidate,
       ledger: verifiedLedger,
       approval,
-      verificationLevel: 'package-only',
+      verificationLevel: 'source-bound',
+      campaignRoot: boundaries.root,
+      packageRoot: path.join(boundaries.root, 'archive'),
+      sources: [],
     });
-    expect(archive).toMatchObject({ ok: false, errorCode: 'NOT_IMPLEMENTED', manifest: null });
+    // A source-bound archive without explicit provenance fails closed and writes nothing.
+    expect(archive).toMatchObject({ ok: false, manifest: null, verificationLevel: 'package-only' });
+    expect(archive.archivedAsPassed).toBe(false);
     expect(await fs.stat(path.join(boundaries.root, 'archive')).catch(() => null)).toBeNull();
 
     expect(await gitStatusPorcelain(boundaries.root)).toBe('');
@@ -2195,29 +2203,34 @@ describe('code-health task1 isolated git integration', () => {
 
     const boundary = createTask1ArchiveBoundary();
     for (const result of [
+      // Incomplete declared sources: a real producer refuses before writing anything.
       await boundary.producer.produce({
         candidate: verifiedCandidateFixture,
         ledger: verifiedLedger,
         approval,
         verificationLevel: 'package-only',
+        campaignRoot: project.root,
+        packageRoot: path.join(project.root, 'archive'),
+        sources: [],
       }),
+      // A missing manifest can never verify.
       await boundary.consumer.consume({
         manifestPath: 'archive/manifest.json',
         packageRoot: project.root,
         verificationLevel: 'package-only',
       }),
+      // A source-bound declaration without explicit provenance fails closed.
       await boundary.verifier.verify({
         manifestPath: 'archive/manifest.json',
         packageRoot: project.root,
         verificationLevel: 'source-bound',
-        sourceProject: project.root,
         expectedRevision: implementedRevision,
       }),
     ]) {
-      expect(result.errorCode).toBe('NOT_IMPLEMENTED');
-      expect(result.manifest).toBeNull();
       expect(result.ok).toBe(false);
+      expect(result.manifest).toBeNull();
       expect(result.createdPaths).toEqual([]);
+      expect(result.archivedAsPassed).toBe(false);
     }
 
     expect(await snapshotTree(project.root)).toEqual(before);

@@ -152,7 +152,9 @@
         "verificationLevel",
         "rollbackRef",
         "producerMetadata",
-        "createdAt"
+        "createdAt",
+        "archiveStatus",
+        "archivedAsPassed"
       ],
       "properties": {
         "archiveId": { "description": "Stable archive manifest identifier.", "type": "string", "minLength": 1 },
@@ -220,6 +222,14 @@
           "type": "string",
           "format": "date-time",
           "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
+        "archiveStatus": {
+          "description": "Candidate terminal state captured by this archive package. A deferred/rejected/blocked/rolled-back state is archived as evidence only and never as a pass.",
+          "enum": ["archived", "deferred", "rejected", "blocked", "rolled-back"]
+        },
+        "archivedAsPassed": {
+          "description": "True only when a verified-success candidate was archived; every terminal non-success archive must record false.",
+          "type": "boolean"
         }
       }
     },

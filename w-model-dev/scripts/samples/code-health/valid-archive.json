@@ -41,5 +41,7 @@
   "verificationLevel": "package-only",
   "rollbackRef": "rollback/rollback.patch",
   "producerMetadata": { "producerId": "task8-archive-producer", "producerVersion": "0.0.0-frozen" },
-  "createdAt": "2026-09-07T00:05:00.000Z"
+  "createdAt": "2026-09-07T00:05:00.000Z",
+  "archiveStatus": "archived",
+  "archivedAsPassed": true
 }

@@ -22,6 +22,8 @@ import type {
   ApprovalDecision,
   ApplyApprovedInput,
   ApplyResult,
+  ArchiveBoundaryResult,
+  ArchivePackageFile,
   CodeHealthCandidate,
   CodeHealthLedger,
   CodeHealthStatus,
@@ -64,6 +66,7 @@ export type {
   ArchiveBoundaryResult,
   ArchiveConsumeInput,
   ArchiveManifest,
+  ArchivePackageFile,
   ArchiveProduceInput,
   ArchiveTransitionEvidence,
   ArchiveVerifyInput,
@@ -1693,30 +1696,42 @@ export async function executeRollback(rollback: RollbackPlan): Promise<boolean> 
 }
 
 /**
- * Compatibility facade for the removed archive campaign entry point. It contains no archive logic of its own:
- * it routes through the single Task 1D boundary factory and surfaces the same typed `NOT_IMPLEMENTED` failure,
- * so no second, half-implemented archive producer can be observed by existing callers.
+ * Archive campaign facade. It contains no archive logic of its own: it routes through the single archive
+ * boundary factory, which is now the real Task 8 producer, and returns its typed fail-closed result. A
+ * verified candidate is only archived when the ledger record authorizes it; a refusal keeps the previous
+ * ledger untouched and never reports a success.
  */
 export async function archiveCampaign(
   campaign: CodeHealthLedger,
-  options: { approval?: ApprovalDecision; verificationLevel?: 'package-only' | 'source-bound' } = {},
-): Promise<never> {
+  options: {
+    approval?: ApprovalDecision;
+    verificationLevel?: 'package-only' | 'source-bound';
+    campaignRoot?: string;
+    packageRoot?: string;
+    sources?: ArchivePackageFile[];
+    sourceProject?: string;
+  } = {},
+): Promise<ArchiveBoundaryResult> {
   const candidates = Array.isArray(campaign?.candidates) ? campaign.candidates : [];
   const candidate = options.approval
     ? candidates.find((entry) => entry.candidateId === options.approval?.candidateId)
     : undefined;
-  const result = await createTask1ArchiveBoundary().producer.produce({
+  return createTask1ArchiveBoundary().producer.produce({
     candidate: candidate as CodeHealthCandidate,
     ledger: campaign,
     approval: options.approval as ApprovalDecision,
     verificationLevel: options.verificationLevel ?? 'package-only',
+    campaignRoot: options.campaignRoot ?? '.',
+    packageRoot: options.packageRoot ?? '.',
+    sources: options.sources ?? [],
+    sourceProject: options.sourceProject,
   });
-  throw new CodeHealthError(result.errorCode, result.reason);
 }
 
 /**
- * Compatibility facade for the removed archive verification entry point. It delegates to the Task 1D boundary
- * verifier and surfaces the same typed `NOT_IMPLEMENTED` failure without reading or hashing anything.
+ * Archive verification facade. It delegates to the real archive verifier and returns its typed result: a
+ * package-only verification never claims source binding, and a source-bound declaration without an explicit
+ * source project fails closed.
  */
 export async function verifyArchive(
   manifestPath: string,
@@ -1726,13 +1741,12 @@ export async function verifyArchive(
     expectedRevision?: RevisionIdentity;
     verificationLevel?: 'package-only' | 'source-bound';
   } = {},
-): Promise<never> {
-  const result = await createTask1ArchiveBoundary().verifier.verify({
+): Promise<ArchiveBoundaryResult> {
+  return createTask1ArchiveBoundary().verifier.verify({
     manifestPath,
     packageRoot: options.packageRoot ?? '.',
     verificationLevel: options.verificationLevel ?? 'package-only',
     sourceProject: options.sourceProject,
     expectedRevision: options.expectedRevision,
   });
-  throw new CodeHealthError(result.errorCode, result.reason);
 }

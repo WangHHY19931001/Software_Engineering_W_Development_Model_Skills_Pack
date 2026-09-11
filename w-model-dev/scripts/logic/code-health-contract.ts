@@ -697,19 +697,39 @@ export interface ArchiveManifest {
   rollbackRef: string;
   producerMetadata: { producerId: string; producerVersion: string };
   createdAt: string;
+  /** Candidate terminal state this package records; a non-success state is never archived as passed. */
+  archiveStatus: 'archived' | 'deferred' | 'rejected' | 'blocked' | 'rolled-back';
+  /** True only when the candidate reached `verified` with every pass gate; terminal non-success stays false. */
+  archivedAsPassed: boolean;
 }
 
 /**
- * Typed fail-closed result of every Task 1D archive boundary entry point. `NOT_IMPLEMENTED` means the real
- * archive producer/consumer/verifier belongs to Task 8; it is never a pass and never carries a manifest.
+ * Result of every Task 1D archive boundary entry point. Task 8 replaced the Task 1 typed
+ * `NOT_IMPLEMENTED` stub with the real producer/consumer/verifier, so the success path carries the verified
+ * manifest. Failures still resolve a typed `ErrorCode` with `manifest: null`; `NOT_IMPLEMENTED` remains a
+ * valid fail-closed value so an unwired caller can never observe a fabricated success.
  */
 export interface ArchiveBoundaryResult {
-  ok: false;
-  errorCode: 'NOT_IMPLEMENTED';
-  manifest: null;
+  ok: boolean;
+  errorCode: ErrorCode | null;
+  manifest: ArchiveManifest | null;
   verificationLevel: 'package-only' | 'source-bound';
-  createdPaths: [];
+  createdPaths: string[];
+  /** 0 = produced/verified, 1 = fail-closed refusal, 2 = malformed input. */
+  exitCode: 0 | 1 | 2;
+  /** Absolute path of the archive package produced or verified; null when no package was involved. */
+  path: string | null;
+  /** True only when a verified-success candidate was archived; terminal non-success archives stay false. */
+  archivedAsPassed: boolean;
   reason: string;
+}
+
+/** One declared source artifact copied into a campaign archive package. */
+export interface ArchivePackageFile {
+  /** Campaign-relative POSIX path of the declared artifact. */
+  path: string;
+  /** The archive artifact kind this source is retained as. */
+  kind: 'ledger' | 'candidate' | 'evidence' | 'approval' | 'review' | 'gate' | 'rollback';
 }
 
 export interface ArchiveProduceInput {
@@ -717,6 +737,14 @@ export interface ArchiveProduceInput {
   ledger: CodeHealthLedger;
   approval: ApprovalDecision;
   verificationLevel: 'package-only' | 'source-bound';
+  /** Explicit root that owns every declared source artifact; no implicit cwd fallback. */
+  campaignRoot: string;
+  /** Explicit root the archive package is written beneath (created by the producer). */
+  packageRoot: string;
+  /** Declared source artifacts; never inferred from prose. */
+  sources: ArchivePackageFile[];
+  /** Explicit source project required to establish a source-bound revision. */
+  sourceProject?: string;
 }
 
 export interface ArchiveConsumeInput {

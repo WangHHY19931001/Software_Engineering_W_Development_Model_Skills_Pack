@@ -627,3 +627,82 @@ describe('fixture integrity', () => {
     expect(digest).toMatch(/^[0-9a-f]{64}$/);
   });
 });
+
+describe('code-health-archive CLI (Task 8A)', () => {
+  it('--help 打印用法且不产生任何 package', () => {
+    const result = runCli('code-health-archive.ts', ['--help']);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toMatch(/--campaign/);
+    expect(result.stdout).toMatch(/--verify/);
+    expect(result.stdout).toMatch(/package-only/);
+  });
+
+  it('缺参数、未知参数与非法 verification-level 都是 exit 2 + ERROR_JSON', () => {
+    for (const args of [
+      [],
+      ['--campaign', '.'],
+      ['--bogus', 'x'],
+      ['--campaign', '.', '--output', '.', '--verification-level', 'source-verified'],
+    ]) {
+      const result = runCli('code-health-archive.ts', args);
+      expect(result.code).toBe(2);
+      expect(result.stdout).toMatch(/ERROR_JSON/);
+      expect(result.stdout).toMatch(/ARG_INVALID/);
+    }
+  });
+
+  it('不存在的 campaign 目录与 verify/produce 混用都是 exit 2', () => {
+    const missing = runCli('code-health-archive.ts', [
+      '--campaign',
+      path.join(REPO_ROOT, '.no-such-campaign'),
+      '--output',
+      path.join(tmpdir(), 'no-such-out'),
+    ]);
+    expect(missing.code).toBe(2);
+
+    const mixed = runCli('code-health-archive.ts', ['--verify', REPO_ROOT, '--campaign', REPO_ROOT]);
+    expect(mixed.code).toBe(2);
+  });
+
+  it('缺少 manifest 的 verify 失败且只报告 package-only，绝不升级为 source-bound', async () => {
+    const root = await fs.mkdtemp(path.join(tmpdir(), 'code-health-archive-cli-'));
+    createdRoots.push(root);
+    const result = runCli('code-health-archive.ts', ['--verify', root, '--source-project', root]);
+    expect(result.code).toBe(1);
+    const payload = jsonLine<{ ok: boolean; verificationLevel: string; archivedAsPassed: boolean }>(
+      result.stdout,
+      'ARCHIVE_JSON',
+    );
+    expect(payload?.ok).toBe(false);
+    expect(payload?.verificationLevel).toBe('package-only');
+    expect(payload?.archivedAsPassed).toBe(false);
+  });
+
+  it('没有 V/G/approval 证据的 campaign 无法归档，且不写出 package', async () => {
+    const root = await fs.mkdtemp(path.join(tmpdir(), 'code-health-archive-cli-'));
+    createdRoots.push(root);
+    const output = path.join(root, 'archive-out');
+    await fs.writeFile(
+      path.join(root, 'ledger.json'),
+      JSON.stringify({ schemaVersion: '1.0', candidates: [], events: [] }),
+      'utf8',
+    );
+    await fs.writeFile(
+      path.join(root, 'candidate.json'),
+      JSON.stringify({ candidateId: 'CHG-P1-20260907-001' }),
+      'utf8',
+    );
+    await fs.writeFile(
+      path.join(root, 'approval.json'),
+      JSON.stringify({ candidateId: 'CHG-P1-20260907-001' }),
+      'utf8',
+    );
+
+    const result = runCli('code-health-archive.ts', ['--campaign', root, '--output', output]);
+    expect(result.code).toBe(1);
+    const payload = jsonLine<{ ok: boolean; archivedAsPassed: boolean }>(result.stdout, 'ARCHIVE_JSON');
+    expect(payload?.ok).toBe(false);
+    expect(payload?.archivedAsPassed).toBe(false);
+    await expect(fs.stat(output)).rejects.toBeTruthy();
+  });
+});

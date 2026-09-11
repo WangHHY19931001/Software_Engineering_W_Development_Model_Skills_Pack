@@ -1528,7 +1528,7 @@ describe('code-health ledger contract', () => {
     ).toEqual(expect.arrayContaining([expect.stringMatching(/candidateId|priority|status|risk|coverage/i)]));
   });
 
-  it('archiveCampaign and verifyArchive return typed NOT_IMPLEMENTED at the 1D boundary', async () => {
+  it('archiveCampaign and verifyArchive return typed fail-closed results instead of a fabricated success', async () => {
     const candidate = validCandidate('CHG-P1-20260907-015', {
       status: 'verified',
       review: { findings: [], unresolvedQuestions: [], decision: 'approve', humanDecision: 'approve' },
@@ -1563,22 +1563,22 @@ describe('code-health ledger contract', () => {
     });
     const ledger = validLedger(candidate);
     ledger.redaction = { status: 'clean', rules: ['remove secrets'], blockedReasons: [] };
-    await expect(
-      (await import('../logic/code-health-ledger-logic.js')).archiveCampaign(ledger, {
-        approval: validApproval(candidate),
-      }),
-    ).rejects.toThrowError(
-      expect.objectContaining({
-        code: 'NOT_IMPLEMENTED',
-      }),
-    );
-    await expect(
-      (await import('../logic/code-health-ledger-logic.js')).verifyArchive('manifest.json'),
-    ).rejects.toThrowError(
-      expect.objectContaining({
-        code: 'NOT_IMPLEMENTED',
-      }),
-    );
+    const { archiveCampaign, verifyArchive } = await import('../logic/code-health-ledger-logic.js');
+
+    // No declared sources/roots: the real producer refuses and never reports archived-as-passed.
+    const archiveResult = await archiveCampaign(ledger, { approval: validApproval(candidate) });
+    expect(archiveResult.ok).toBe(false);
+    expect(archiveResult.manifest).toBeNull();
+    expect(archiveResult.archivedAsPassed).toBe(false);
+    expect(archiveResult.errorCode).not.toBeNull();
+    expect(archiveResult.reason.length).toBeGreaterThan(0);
+
+    // A source-bound verification without an explicit source project can only report package-only.
+    const verifyResult = await verifyArchive('manifest.json', { verificationLevel: 'source-bound' });
+    expect(verifyResult.ok).toBe(false);
+    expect(verifyResult.manifest).toBeNull();
+    expect(verifyResult.verificationLevel).toBe('package-only');
+    expect(verifyResult.errorCode).not.toBeNull();
   });
 });
 
