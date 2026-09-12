@@ -2170,3 +2170,68 @@ describe('run-log reworkHints 强制（LEGACY_REWORK_HINTS cutoff 分界）', ()
     expect(result.violations.some((v) => /\[rework-hints\]|\[schema\].*reworkHints/.test(v))).toBe(false);
   });
 });
+
+describe('A-3d 跨轮次评审一致性（R9 标准偏移）', () => {
+  function entry(over: Partial<RunLogEntry>): RunLogEntry {
+    return {
+      runId: 'r1',
+      timestamp: '2026-09-12T00:00:00Z',
+      phase: 3,
+      phaseName: '概要设计',
+      action: 'review',
+      role: 'V',
+      duration_s: 30,
+      tokens: 100,
+      estimated: false,
+      subagentSpawns: 0,
+      gateExitCode: null,
+      outcome: 'success',
+      ...over,
+    };
+  }
+
+  it('同一产物两次 review 的 qualityLevel 差 ≥2 档 → violation（走人裁定，不走 R）', () => {
+    const out = checkRunLog([
+      entry({ runId: 'r1', artifacts: ['a.md'], qualityLevel: 'A', timestamp: '2026-09-12T00:00:00Z' }),
+      entry({ runId: 'r2', artifacts: ['a.md'], qualityLevel: 'C', timestamp: '2026-09-12T00:01:00Z' }),
+    ]);
+    expect(out.passed).toBe(false);
+    const hit = out.violations.find((v) => v.includes('跨轮次评审不一致'));
+    expect(hit).toBeDefined();
+    // 语义：处置方是人类 CHECKPOINT，而非 R（R 无法自查评审标准）
+    expect(hit).toContain('CHECKPOINT');
+    expect(hit).toContain('不走 R');
+    expect(hit).toContain('a.md');
+  });
+
+  it('同一产物两次 review 只差 1 档 → 不触发（产物确实可能改进了）', () => {
+    const out = checkRunLog([
+      entry({ runId: 'r1', artifacts: ['a.md'], qualityLevel: 'A', timestamp: '2026-09-12T00:00:00Z' }),
+      entry({ runId: 'r2', artifacts: ['a.md'], qualityLevel: 'B', timestamp: '2026-09-12T00:01:00Z' }),
+    ]);
+    expect(out.violations.some((v) => v.includes('跨轮次评审不一致'))).toBe(false);
+  });
+
+  it('同一产物仅一次 review → 不触发（首次评审豁免，无不一致可言）', () => {
+    const out = checkRunLog([entry({ runId: 'r1', artifacts: ['a.md'], qualityLevel: 'A' })]);
+    expect(out.violations.some((v) => v.includes('跨轮次评审不一致'))).toBe(false);
+  });
+
+  it('不同产物各自的等级不同 → 不触发（只在同一产物内比对）', () => {
+    const out = checkRunLog([
+      entry({ runId: 'r1', artifacts: ['a.md'], qualityLevel: 'A', timestamp: '2026-09-12T00:00:00Z' }),
+      entry({ runId: 'r2', artifacts: ['b.md'], qualityLevel: 'C', timestamp: '2026-09-12T00:01:00Z' }),
+    ]);
+    expect(out.violations.some((v) => v.includes('跨轮次评审不一致'))).toBe(false);
+  });
+
+  it('四条记录 A→C 跨多轮 → 只报一次（按产物聚合，不重复报）', () => {
+    const out = checkRunLog([
+      entry({ runId: 'r1', artifacts: ['a.md'], qualityLevel: 'A', timestamp: '2026-09-12T00:00:00Z' }),
+      entry({ runId: 'r2', artifacts: ['a.md'], qualityLevel: 'B', timestamp: '2026-09-12T00:01:00Z' }),
+      entry({ runId: 'r3', artifacts: ['a.md'], qualityLevel: 'B', timestamp: '2026-09-12T00:02:00Z' }),
+      entry({ runId: 'r4', artifacts: ['a.md'], qualityLevel: 'C', timestamp: '2026-09-12T00:03:00Z' }),
+    ]);
+    expect(out.violations.filter((v) => v.includes('跨轮次评审不一致'))).toHaveLength(1);
+  });
+});

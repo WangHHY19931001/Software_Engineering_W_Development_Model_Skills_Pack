@@ -146,6 +146,24 @@ const MIN_RANKING_ROUNDS = 1;
  *  阈值 = qualityLevel B 级分界（§6.1），语义自洽：passed 原判据为「加权平均 ≥ B」，
  *  收紧为「每个子标准自身 ≥ B」。防止加权平均掩盖单轴失败（反模式 #41）。 */
 const SINGLE_AXIS_MIN_SCORE = 0.7;
+
+/**
+ * R18 分辨力下限：`rawScores` 方差低于此值（且非全等）→ 疑似 V 分辨力坍缩（D19）。
+ *
+ * **取值依据（实测，非设计期估算）**：对仓库 `samples/verifier/` 全部含 `subCriteria`
+ * 的 fixture 逐一重算方差，合法产物的实测方差一律为 **6.67e-5**（如 persona×4、
+ * `valid.json`、`valid-rootcause.json`）。计划书原先预定的 `1e-4` **高于**该值，
+ * 会导致 100% 的合法 V 产物被误判红——这是"计划代码片段只是意图草图"的实例。
+ * 现取 `1e-6`：比全部合法产物低 67 倍，比"分布坍缩"形态（`[0.9001, 0.9002, 0.9000]`
+ * → 方差 6.67e-9）高 667 倍，两侧各留约两个数量级的余量。
+ *
+ * **仍为先行取值，端到端调测后校准**（规格 D23 / 任务 16 步骤 2）：仓库内无真实
+ * 历史评审可回测（`.w-model/` 为 gitignored 本地生成物）。
+ */
+export const RESOLUTION_FLOOR = 1e-6;
+
+/** R18 所需最少数据点：少于 3 个不足以判定分布坍缩 */
+export const RESOLUTION_MIN_POINTS = 3;
 /** Only the verifier-spec's explicit Critical/Required prefixes block an otherwise valid review. */
 const BLOCKING_REWORK_HINT_PATTERN = /^\s*(?:\[(Critical|Required)\]|(Critical|Required):)/i;
 
@@ -190,6 +208,51 @@ export function checkR13SingleAxisFloor(subCriteria: Array<Record<string, unknow
       if (sc.score < SINGLE_AXIS_MIN_SCORE) {
         violations.push(`子标准 ${name} 得分 ${sc.score} < ${SINGLE_AXIS_MIN_SCORE}（单轴下限，反模式 #41）`);
       }
+    }
+  }
+  return violations;
+}
+
+/**
+ * R18 分辨力下限（A-3d 校准偏移，D19）。
+ *
+ * **与既有"全等检测"的区别**（刻意不重复）：主循环的防漂移规则 1 检 `max === min`
+ * （完全相等的 rawScores = 复制填入作弊）；本判据检**非全等但方差极小**——
+ * 评分分布坍缩，V 实际上没有区分正负样本的能力。两者互补：全等是"没打分"，
+ * 方差坍缩是"打了分但没分辨力"。故 `max === min` 时本判据**跳过**，避免重复报。
+ *
+ * 论文依据（arXiv:2607.05391）：粒度上升 → 正负样本分离 SNR 上升（Table 1：`G=1 → 0.775`、
+ * `G=20 → 0.799`）；标准 judge 在 100 次重复中 **88 次产生平局**——分辨力不足是真实
+ * 且可测量的失效模式，不是理论担忧。
+ *
+ * 阈值 RESOLUTION_FLOOR 为**先行取值**，端到端调测后校准（规格 D23 / 任务 16 步骤 2）；
+ * 仓库内无真实历史评审可回测（`.w-model/` 为 gitignored 本地生成物）。
+ * 取值保守（显著低于正常评分离散度）以避免假阳性。
+ *
+ * 纯函数、无 I/O；与 checkR13SingleAxisFloor 同形态，便于独立定位与测试。
+ * 返回违规列表；空数组 = 无分辨力塌缩信号。
+ */
+export function checkR18ResolutionFloor(subCriteria: Array<Record<string, unknown>> | unknown[]): string[] {
+  if (!Array.isArray(subCriteria)) return [];
+  const violations: string[] = [];
+  for (let i = 0; i < subCriteria.length; i++) {
+    const sc = subCriteria[i] as Record<string, unknown>;
+    if (!sc || typeof sc !== 'object') continue;
+    if (!Array.isArray(sc.rawScores)) continue;
+    const nums = (sc.rawScores as unknown[]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+    // 少于 3 个数据点不足以判定分布坍缩（也低于 MIN_REPEAT_TIMES 语义）
+    if (nums.length < RESOLUTION_MIN_POINTS) continue;
+    const max = Math.max(...nums);
+    const min = Math.min(...nums);
+    // 全等由既有防漂移规则 1 覆盖，此处跳过以免重复报
+    if (max === min) continue;
+    const variance = computeVariance(nums);
+    if (!Number.isFinite(variance)) continue;
+    if (variance < RESOLUTION_FLOOR) {
+      const name = typeof sc.name === 'string' && sc.name.trim() !== '' ? sc.name : `subCriteria[${i + 1}]`;
+      violations.push(
+        `R18 子标准 ${name} 的 rawScores 方差 ${variance} < 分辨力下限 ${RESOLUTION_FLOOR}（非全等但分布坍缩，疑似 V 无区分能力）`,
+      );
     }
   }
   return violations;
@@ -578,6 +641,9 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   }
   const passed = o.passed;
   const singleAxisViolations = checkR13SingleAxisFloor(subCriteria);
+  // R18：分辨力下限（A-3d 校准偏移）。与 R13 同形态、同层级接入 reasons，
+  // 不改变 passed 判定公式本身——R18 的影响经由 reasons 长度传导（任何 reasons 即 passed=false）。
+  const resolutionViolations = checkR18ResolutionFloor(subCriteria);
   const expectedPassed =
     !hasBlockingReworkHint && (qualityLevel === 'A' || qualityLevel === 'B') && singleAxisViolations.length === 0;
   if (typeof passed !== 'boolean') {
@@ -586,6 +652,7 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
     reasons.push(`passed ${passed} 与 qualityLevel ${qualityLevel} 不一致（应 = ${expectedPassed}）`);
   }
   reasons.push(...singleAxisViolations);
+  reasons.push(...resolutionViolations);
 
   // 8. summary（R1 非空）
   if (typeof o.summary !== 'string' || o.summary.trim() === '') {

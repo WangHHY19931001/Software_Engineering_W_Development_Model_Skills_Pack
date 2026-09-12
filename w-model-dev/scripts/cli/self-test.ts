@@ -1207,6 +1207,14 @@ const RUN_LOG_CASES: RunLogCase[] = [
     expectedReasonPatterns: [/R6.*gateLogPath.*gateExitCode/],
     description: 'gate 条目 gateLogPath 已设但 gateExitCode 为 null，应被 R6 拦截',
   },
+  // ---- A-3d: 跨轮次评审标准漂移 ----
+  {
+    file: 'bad-review-level-drift.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R9 跨轮次评审不一致/, /article-service\.ts[\s\S]*2 档/, /CHECKPOINT/],
+    description:
+      '同一产物两次 review qualityLevel 为 A→C（跨 2 档）→ R9 标准偏移，走高成熟度 CHECKPOINT 交人裁定（不走 R）',
+  },
   // ---- E8: rootcause 之后中间夹普通 review 不误报 ----
   {
     file: 'rootcause-intermediate-review.jsonl',

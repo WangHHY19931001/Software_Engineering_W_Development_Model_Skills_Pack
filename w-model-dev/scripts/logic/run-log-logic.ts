@@ -22,6 +22,21 @@ import { parseJsonSafe } from '../lib/safe-json.js';
 /** variant 规则引入时刻（42.2.1 发布日）：此后写入的 emergency-fix 缺 variant 不再按 legacy 吸收 */
 export const LEGACY_VARIANT_CUTOFF = '2026-09-01T00:00:00Z';
 
+/**
+ * R9 跨轮次评审不一致的档差阈值（A-3d 标准偏移）。
+ *
+ * 2 档意味着评审标准发生实质漂移（1 档可能只是产物确实改进了）。
+ * **先行取值，端到端调测后校准**（规格 D23 / 任务 16 步骤 2）——仓库内无真实
+ * 历史 run-log 可回测（`.w-model/` 为 gitignored 本地生成物）。
+ */
+export const REVIEW_LEVEL_SPREAD = 2;
+
+/** R9 所需最少评审数据点：仅 1 次评审无不一致可言（首次评审豁免） */
+export const REVIEW_LEVEL_MIN_POINTS = 2;
+
+/** R9 质量等级序（A > B > C > D）；未知等级记为 -1 并在计算前过滤 */
+export const REVIEW_LEVEL_ORDER: Record<string, number> = { A: 3, B: 2, C: 1, D: 0 };
+
 // ==================== 自包含类型形状 ====================
 
 /** Canonical target kinds plus historical phase<8 legacy spellings. */
@@ -1246,6 +1261,41 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
           }
         }
       }
+    }
+  }
+
+  // R9: 跨轮次评审一致性（A-3d 标准偏移检测）。
+  //
+  // 同一产物在不同轮次被同一评审标准判出差异显著的等级（≥2 档，如 A→C）意味着
+  // 评审标准发生实质漂移——1 档差异可能合理（产物确实改进了），2 档不是。
+  // 数据基础已具备：run-log 既有 qualityLevel 与 artifacts 字段，无需新字段。
+  //
+  // 处置与 R6（冰山三视角不一致）**刻意不同**：此处不一致的是**评审者自身**，
+  // 而 R 无法自查评审标准，故按 design-philosophy.md 的人机分工线走高成熟度
+  // CHECKPOINT 交人裁定，**不走 R**。不得与产物间客观差异混同。
+  //
+  // 阈值 REVIEW_LEVEL_SPREAD = 2 为先行取值，端到端调测后校准（规格 D23）。
+  const byArtifact = new Map<string, Array<{ level: string; runId: string }>>();
+  for (const e of valid) {
+    if (e.action !== 'review' || typeof e.qualityLevel !== 'string') continue;
+    if (!Array.isArray(e.artifacts)) continue;
+    for (const a of e.artifacts) {
+      if (typeof a !== 'string' || a.trim() === '') continue;
+      const list = byArtifact.get(a) ?? [];
+      list.push({ level: e.qualityLevel, runId: e.runId });
+      byArtifact.set(a, list);
+    }
+  }
+  for (const [artifact, list] of byArtifact) {
+    if (list.length < REVIEW_LEVEL_MIN_POINTS) continue; // 首次评审豁免：无不一致可言
+    const ranks = list.map((x) => REVIEW_LEVEL_ORDER[x.level] ?? -1).filter((r) => r >= 0);
+    if (ranks.length < REVIEW_LEVEL_MIN_POINTS) continue;
+    const spread = Math.max(...ranks) - Math.min(...ranks);
+    if (spread >= REVIEW_LEVEL_SPREAD) {
+      violations.push(
+        `R9 跨轮次评审不一致：${artifact} 的 qualityLevel 跨 ${spread} 档（${list.map((x) => `${x.runId}=${x.level}`).join(', ')}）；` +
+          `评审者自身不一致，须走高成熟度 CHECKPOINT 交人裁定而非 R（R 无法自查评审标准），不走 R 返工链`,
+      );
     }
   }
 

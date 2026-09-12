@@ -19,7 +19,13 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { runSync } from '../lib/run-sync.js';
-import { validateEvidenceFormat, checkR13SingleAxisFloor, checkVerifierOutput } from '../logic/verifier-logic.js';
+import {
+  validateEvidenceFormat,
+  checkR13SingleAxisFloor,
+  checkR18ResolutionFloor,
+  checkVerifierOutput,
+  RESOLUTION_FLOOR,
+} from '../logic/verifier-logic.js';
 
 const require = createRequire(import.meta.url);
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
@@ -538,5 +544,123 @@ describe('targetKind=rootcause（§7.5 V 复审根因报告）', () => {
     expect(result.passed).toBe(false);
     // schema enum 前置拦截（[schema] 前缀）或逻辑层枚举校验均视为拦截成功
     expect(result.reasons.some((m: string) => /targetKind/.test(m))).toBe(true);
+  });
+});
+
+describe('R18 分辨力下限（A-3d 校准偏移，D19）', () => {
+  it('rawScores 非全等但方差坍缩（极近值）→ 命中，含子标准名与方差', () => {
+    const violations = checkR18ResolutionFloor([
+      { name: 'completeness', rawScores: [0.9001, 0.9002, 0.9] },
+      { name: 'clarity', rawScores: [0.2, 0.9, 0.5] },
+    ]);
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain('R18');
+    expect(violations[0]).toContain('completeness');
+    expect(violations[0]).toContain('分辨力');
+  });
+
+  it('rawScores 完全相等 → 不由 R18 报（既有全等检测已覆盖，避免重复报）', () => {
+    const violations = checkR18ResolutionFloor([{ name: 'completeness', rawScores: [0.9, 0.9, 0.9] }]);
+    expect(violations).toEqual([]);
+  });
+
+  it('rawScores 正常离散 → 无违规', () => {
+    const violations = checkR18ResolutionFloor([
+      { name: 'completeness', rawScores: [0.1, 0.5, 0.9] },
+      { name: 'clarity', rawScores: [0.2, 0.95, 0.4] },
+    ]);
+    expect(violations).toEqual([]);
+  });
+
+  it('rawScores 少于 3 个数据点 → 跳过（样本不足以判定分布坍缩）', () => {
+    expect(checkR18ResolutionFloor([{ name: 'completeness', rawScores: [0.9001, 0.9002] }])).toEqual([]);
+  });
+
+  it('非数组/缺 rawScores 的子标准 → 跳过而非抛错', () => {
+    expect(checkR18ResolutionFloor([{ name: 'x' }, { name: 'y', rawScores: 'nope' }])).toEqual([]);
+    expect(checkR18ResolutionFloor(undefined as unknown as unknown[])).toEqual([]);
+  });
+
+  it('RESOLUTION_FLOOR 为导出的可校准常量（端到端调测后可调整）', () => {
+    expect(RESOLUTION_FLOOR).toBeGreaterThan(0);
+  });
+});
+
+describe('R18 端到端接线（checkVerifierOutput.reasons 消费，非仅 helper）', () => {
+  const varianceOf = (n: number[]): number => {
+    const m = n.reduce((a, b) => a + b, 0) / n.length;
+    return n.reduce((a, b) => a + (b - m) ** 2, 0) / n.length;
+  };
+  // 坍缩维度：三次数值几乎相同（非全等）
+  const collapsed = [0.9, 0.9001, 0.9002];
+  // 其余维度：正常离散（方差低于 0.1 阈值，避免命中既有阈值规则）
+  const spread = [0.88, 0.9, 0.92];
+  const sub = (name: string, weight: number, raw: number[]) => ({
+    name,
+    weight,
+    score: 0.9,
+    rawScores: raw,
+    variance: varianceOf(raw),
+    evidence: `requirements.md:§3.2=REQ-001 ${name} 具体引用`,
+  });
+
+  it('合法 VerifierOutput 但某一子标准 rawScores 分布坍缩 → reasons 含 R18（证明接线生效）', () => {
+    const output = {
+      schemaVersion: '1.0',
+      meta: {
+        targetKind: 'requirement',
+        target: 'REQ-001',
+        reviewedAt: '2026-07-31T00:00:00Z',
+        agent: 'test-agent',
+        scoringMethod: 'logits',
+        repeatTimes: 3,
+        varianceThreshold: 0.1,
+      },
+      subCriteria: [
+        sub('completeness', 0.3, collapsed),
+        sub('clarity', 0.25, spread),
+        sub('consistency', 0.2, spread),
+        sub('testability', 0.15, spread),
+        sub('traceability', 0.1, spread),
+      ],
+      compositeScore: 0.9,
+      qualityLevel: 'A',
+      passed: true,
+      summary: '本次评审覆盖五个子标准，全部达标，结论为 A 级可放行，无阻断性返工提示，评审方法为 logits 连续评分。',
+      reworkHints: [],
+    };
+    const result = checkVerifierOutput(output);
+    expect(result.reasons.some((r) => r.includes('R18'))).toBe(true);
+    expect(result.passed).toBe(false);
+  });
+
+  it('全部子标准正常离散 → reasons 不含 R18（假阳性防护）', () => {
+    const output = {
+      schemaVersion: '1.0',
+      meta: {
+        targetKind: 'requirement',
+        target: 'REQ-001',
+        reviewedAt: '2026-07-31T00:00:00Z',
+        agent: 'test-agent',
+        scoringMethod: 'logits',
+        repeatTimes: 3,
+        varianceThreshold: 0.1,
+      },
+      subCriteria: [
+        sub('completeness', 0.3, spread),
+        sub('clarity', 0.25, spread),
+        sub('consistency', 0.2, spread),
+        sub('testability', 0.15, spread),
+        sub('traceability', 0.1, spread),
+      ],
+      compositeScore: 0.9,
+      qualityLevel: 'A',
+      passed: true,
+      summary: '本次评审覆盖五个子标准，全部达标，结论为 A 级可放行，无阻断性返工提示，评审方法为 logits 连续评分。',
+      reworkHints: [],
+    };
+    const result = checkVerifierOutput(output);
+    expect(result.reasons.some((r) => r.includes('R18'))).toBe(false);
+    expect(result.passed).toBe(true);
   });
 });
