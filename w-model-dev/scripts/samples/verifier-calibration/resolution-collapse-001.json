@@ -1,0 +1,63 @@
+{
+  "sampleId": "resolution-collapse-001",
+  "calibrationTarget": "R18",
+  "expectedVerdict": "flagged",
+  "expectedRule": "R18",
+  "expectedRationale": "分辨力坍缩的负样本锚点：completeness 的 rawScores 为 [0.9001, 0.9002, 0.9000]——**非全等**（max≠min，故既有「全等检测」不报）但方差仅 6.7e-9，比 RESOLUTION_FLOOR=1e-6 低约 150 倍。分数虽有微小抖动，抖动幅度远小于正负样本之间应有的差距，属「打了分但没分辨力」。这正是 R18 要抓的形态：若校准显示本样本**未**被 R18 命中，说明阈值被调到了坍缩形态之下，R18 已失效。其余维度保持正常离散，确保唯一触发源是 R18 而非其它规则。",
+  "schemaVersion": "1.0",
+  "meta": {
+    "targetKind": "requirement",
+    "target": "REQ-CAL-002",
+    "reviewedAt": "2026-09-13T00:00:00Z",
+    "agent": "calibration-anchor",
+    "scoringMethod": "logits",
+    "repeatTimes": 3,
+    "varianceThreshold": 0.1
+  },
+  "subCriteria": [
+    {
+      "name": "completeness",
+      "weight": 0.3,
+      "score": 0.9001,
+      "rawScores": [0.9001, 0.9002, 0.9],
+      "variance": 6.7e-9,
+      "evidence": "requirements.md:§3.2=REQ-CAL-002 五条需求条目均已覆盖"
+    },
+    {
+      "name": "clarity",
+      "weight": 0.25,
+      "score": 0.85,
+      "rawScores": [0.84, 0.85, 0.86],
+      "variance": 0.00006667,
+      "evidence": "requirements.md:§3.3=REQ-CAL-002 用语无歧义"
+    },
+    {
+      "name": "consistency",
+      "weight": 0.2,
+      "score": 0.88,
+      "rawScores": [0.87, 0.88, 0.89],
+      "variance": 0.00006667,
+      "evidence": "requirements.md:§3.4=REQ-CAL-002 与上游条款一致"
+    },
+    {
+      "name": "testability",
+      "weight": 0.15,
+      "score": 0.8,
+      "rawScores": [0.79, 0.8, 0.81],
+      "variance": 0.00006667,
+      "evidence": "requirements.md:§3.5=REQ-CAL-002 每条需求可导出验收判据"
+    },
+    {
+      "name": "traceability",
+      "weight": 0.1,
+      "score": 0.95,
+      "rawScores": [0.94, 0.95, 0.96],
+      "variance": 0.00006667,
+      "evidence": "rtm.json:L42=REQ-CAL-002 映射完整"
+    }
+  ],
+  "compositeScore": 0.87353,
+  "qualityLevel": "A",
+  "summary": "REQ-CAL-002 校准锚点：completeness 维度评分分布坍缩（非全等但方差 6.7e-9），其余维度正常，用于验证 R18 能识别「打了分但无分辨力」。",
+  "passed": true
+}

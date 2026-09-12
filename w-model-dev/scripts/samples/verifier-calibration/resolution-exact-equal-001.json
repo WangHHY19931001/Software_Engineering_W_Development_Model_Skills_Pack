@@ -1,0 +1,63 @@
+{
+  "sampleId": "resolution-exact-equal-001",
+  "calibrationTarget": "R18",
+  "expectedVerdict": "flagged",
+  "expectedRule": "drift-rule-1-not-R18",
+  "expectedRationale": "分工边界锚点：completeness 的 rawScores 为 [0.95, 0.95, 0.95]——**完全相等**。这属于「没打分」（复制同一分数填满），由**既有防漂移规则 1** 报，R18 必须**刻意跳过**（`max === min` 时 continue），以免同一缺陷被两条判据重复报。故本样本的预期是「整体被 flagged，但归因是 drift-rule-1，**不是** R18」。校准脚本须按 `expectedRule` 区分归因：若 R18 在此样本上报出，即为**重复报缺陷**（两条判据职责重叠），是应当修复的实现问题而非标注问题。",
+  "schemaVersion": "1.0",
+  "meta": {
+    "targetKind": "requirement",
+    "target": "REQ-CAL-003",
+    "reviewedAt": "2026-09-13T00:00:00Z",
+    "agent": "calibration-anchor",
+    "scoringMethod": "logits",
+    "repeatTimes": 3,
+    "varianceThreshold": 0.1
+  },
+  "subCriteria": [
+    {
+      "name": "completeness",
+      "weight": 0.3,
+      "score": 0.95,
+      "rawScores": [0.95, 0.95, 0.95],
+      "variance": 0,
+      "evidence": "requirements.md:§3.2=REQ-CAL-003 五条需求条目均已覆盖"
+    },
+    {
+      "name": "clarity",
+      "weight": 0.25,
+      "score": 0.85,
+      "rawScores": [0.84, 0.85, 0.86],
+      "variance": 0.00006667,
+      "evidence": "requirements.md:§3.3=REQ-CAL-003 用语无歧义"
+    },
+    {
+      "name": "consistency",
+      "weight": 0.2,
+      "score": 0.88,
+      "rawScores": [0.87, 0.88, 0.89],
+      "variance": 0.00006667,
+      "evidence": "requirements.md:§3.4=REQ-CAL-003 与上游条款一致"
+    },
+    {
+      "name": "testability",
+      "weight": 0.15,
+      "score": 0.8,
+      "rawScores": [0.79, 0.8, 0.81],
+      "variance": 0.00006667,
+      "evidence": "requirements.md:§3.5=REQ-CAL-003 每条需求可导出验收判据"
+    },
+    {
+      "name": "traceability",
+      "weight": 0.1,
+      "score": 0.95,
+      "rawScores": [0.94, 0.95, 0.96],
+      "variance": 0.00006667,
+      "evidence": "rtm.json:L42=REQ-CAL-003 映射完整"
+    }
+  ],
+  "compositeScore": 0.8885,
+  "qualityLevel": "A",
+  "summary": "REQ-CAL-003 校准锚点：completeness 的 rawScores 完全相等，应由既有防漂移规则 1 报出，R18 必须跳过以验证两条判据不重复报同一缺陷。",
+  "passed": true
+}

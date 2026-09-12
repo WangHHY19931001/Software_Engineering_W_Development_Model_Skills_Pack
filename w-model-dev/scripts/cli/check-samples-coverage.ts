@@ -42,8 +42,13 @@ import { printGateReport, printJsonReport } from '../lib/gate-report.js';
  * 豁免子目录：不参与「fixture 被 self-test 引用」核对，仅要求 README 矩阵声明。
  * tla-e2e 为端到端 fixture（需 Java + tools/tla2tools.jar，SANY/TLC 全链路），
  * 手动 / CI 执行，不进 self-test 基线（见 samples/tla-e2e/README.md）。
+ *
+ * verifier-calibration 为 A-3f 校准集，**明确非门禁**：锚定正解由人工标注，且校准需真实跑 LLM
+ * （由外部 Agent 执行），两者都不符合「确定性门禁」定义，故其样本**不得**登记进 self-test 基线
+ * （登记即等于把它变成门禁）。豁免仅指「不要求 self-test 引用」；矩阵声明仍强制
+ * （见该目录 README 首段与 verifier-spec.md §14.4）。
  */
-const EXEMPT_DIRS = ['tla-e2e'];
+const EXEMPT_DIRS = ['tla-e2e', 'verifier-calibration'];
 
 /** samples/ 扫描时排除的目录 / 文件（运行时产物与文档） */
 const SKIP_NAMES = new Set(['.w-model', 'states', 'README.md', '.gitkeep']);

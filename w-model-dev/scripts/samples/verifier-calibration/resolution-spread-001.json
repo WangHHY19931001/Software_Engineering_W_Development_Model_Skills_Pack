@@ -1,0 +1,63 @@
+{
+  "sampleId": "resolution-spread-001",
+  "calibrationTarget": "R18",
+  "expectedVerdict": "pass",
+  "expectedRule": "none",
+  "expectedRationale": "分辨力正常的正样本锚点：五个子标准的 rawScores 均有可见离散度（每次重复的扰动 ≥0.01，方差约 6.7e-5，即仓库内合法产物的实测基线）。V 打了分且分数确实随重复次数波动，说明它没有把同一分数复制填入。这是 R18 必须**不报**的一侧——若校准显示本样本被 R18 命中，说明 RESOLUTION_FLOOR 被调高到了会误伤正常产物的水平（即 1e-4 的教训重演）。",
+  "schemaVersion": "1.0",
+  "meta": {
+    "targetKind": "requirement",
+    "target": "REQ-CAL-001",
+    "reviewedAt": "2026-09-13T00:00:00Z",
+    "agent": "calibration-anchor",
+    "scoringMethod": "logits",
+    "repeatTimes": 3,
+    "varianceThreshold": 0.1
+  },
+  "subCriteria": [
+    {
+      "name": "completeness",
+      "weight": 0.3,
+      "score": 0.9,
+      "rawScores": [0.89, 0.9, 0.91],
+      "variance": 0.00006667,
+      "evidence": "requirements.md:§3.2=REQ-CAL-001 五条需求条目均已覆盖"
+    },
+    {
+      "name": "clarity",
+      "weight": 0.25,
+      "score": 0.85,
+      "rawScores": [0.84, 0.85, 0.86],
+      "variance": 0.00006667,
+      "evidence": "requirements.md:§3.3=REQ-CAL-001 用语无歧义"
+    },
+    {
+      "name": "consistency",
+      "weight": 0.2,
+      "score": 0.88,
+      "rawScores": [0.87, 0.88, 0.89],
+      "variance": 0.00006667,
+      "evidence": "requirements.md:§3.4=REQ-CAL-001 与上游条款一致"
+    },
+    {
+      "name": "testability",
+      "weight": 0.15,
+      "score": 0.8,
+      "rawScores": [0.79, 0.8, 0.81],
+      "variance": 0.00006667,
+      "evidence": "requirements.md:§3.5=REQ-CAL-001 每条需求可导出验收判据"
+    },
+    {
+      "name": "traceability",
+      "weight": 0.1,
+      "score": 0.95,
+      "rawScores": [0.94, 0.95, 0.96],
+      "variance": 0.00006667,
+      "evidence": "rtm.json:L42=REQ-CAL-001 映射完整"
+    }
+  ],
+  "compositeScore": 0.8735,
+  "qualityLevel": "A",
+  "summary": "REQ-CAL-001 校准锚点：五子标准全部达标且各维度评分有可见离散度，V 具备正负样本分辨力，作为 R18 的假阳性防护锚点。",
+  "passed": true
+}

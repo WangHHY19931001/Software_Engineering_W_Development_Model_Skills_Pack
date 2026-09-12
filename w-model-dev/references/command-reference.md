@@ -420,6 +420,13 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **legacy 兼容层**：三脚本保留无 scope 的 legacy 纯逻辑入口（`checkCodegraphQueries` / `checkOpsxArtifacts` / `checkOpenspecArchive`，仅做目录/字段完整性或全扫描 entries[0] 判定），供 self-test 与 fixture 回归；CLI 阶段 5-8 一律走 strict（resolveCliScope → strict 函数）。
 - **退出码判别**：CLI 参数互斥矛盾（如 `--change` 前缀与 `--phase` 不符）为 `ARG_INVALID`/exit 2；scope 文件内容与 Git 实际/CLI flag 冲突为校验失败 exit 1。重复值 flag（如 `--scope` 两次）为 `ARG_INVALID`/exit 2（值 flag 只允许出现一次，旧「取第一个/最后一个」语义已废除）；该语义 2026-09-06（D3/I-3）起全 CLI 生效——`--phase` 的重复与两形态（`--phase=N` / `--phase N`）校验由 `lib/parse-phase.ts` 统一检测，重复即错、非法值 ARG_INVALID，`check-bdd-model` / `check-preventive-review` 仍仅接受等号形态（裸 `--phase` → ARG_INVALID 并提示「--phase 仅支持等号形态 --phase=N」）。
 
+## Verifier 校准（**可选，非门禁**）
+
+- **速查行**：无固定 CLI——校准由外部 Agent 按 [samples/verifier-calibration/README.md](../scripts/samples/verifier-calibration/README.md) 的步骤直接调用逻辑层函数（`checkVerifierOutput` / `checkRunLog`）跑锚定样本，比对 V 判定与人工 `expectedVerdict`。
+- **明确非门禁**：校准集不产生 `exitCode`，不参与阶段门放行，**未接入 CI / pre-push / self-test**。理由：锚定正解由人标注，且校准需真实跑 LLM（外部 Agent 执行）——两者都不符合「确定性门禁」定义。把它说成门禁即为过度声明（verifier-spec.md §14.4）。
+- **不得**把 `samples/verifier-calibration/` 的样本登记进 `self-test.ts`：登记即等于把它变成门禁；`check-samples-coverage.ts` 对该目录的豁免仅指「不要求 self-test 引用」，矩阵声明仍强制。
+- **漂移面**：标注本身会过时（产物形态变化 / 标准修订）。校准报告能暴露漂移但不阻断流程——维护责任见该目录 README「已知漂移面」节。
+
 ## 错误码与 ERROR_JSON 约定
 
 所有 check-*.ts 与工具脚本的 **输入错误（exit 2）** 输出统一结构：

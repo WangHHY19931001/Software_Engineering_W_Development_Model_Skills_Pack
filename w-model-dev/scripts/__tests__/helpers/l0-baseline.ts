@@ -19,7 +19,13 @@ export const L0_BASELINE = {
   // design-philosophy.md 链接 1 条 + signature-chain-guide.md 新增 §6.1 内的
   // evidence-anchored-tree.md 链接 1 条；由 npm run audit:l0-links 实测 rebaseline，
   // l1Only 仍 92、placeholders 仍 36、violations 仍 0）。
-  relativeLinkCount: 665,
-  l1Only: 92,
+  // 666 = 665 + 1；l1Only 93 = 92 + 1（2026-09-13 gate-integrity Task 13：新增
+  // samples/verifier-calibration/README.md——该目录为 L1，正文含 3 条包内相对链接
+  // 指向 ../../../references/verifier-spec.md（2 条）与
+  // ../../../schemas/verifier-output.schema.json（1 条），其中指向 L0 schemas 的
+  // 1 条计为 l1Only、其余计入 relativeLinkCount。原设计规格的仓库外链已改为纯文本
+  // 引用（技能包须自包含）。由 npm run audit:l0-links 实测 rebaseline，violations 仍 0）。
+  relativeLinkCount: 666,
+  l1Only: 93,
   placeholders: 36,
 } as const;
