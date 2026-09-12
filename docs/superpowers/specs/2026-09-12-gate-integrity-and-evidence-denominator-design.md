@@ -40,10 +40,21 @@
 
 且**防伪造判据强于论文框架**：`verifier-logic.ts` 含 60+ 条 `reasons.push`，其中针对 V 漂移的专项检测包括 `rawScores` 全等判定（"视为复制填入作弊"）、`variance` 重算比对（误差 > 1e-6 即失败，且强制总体方差 N 而非 N-1）、扰动范围 > 0.10 判定、`compositeScore ≠ Σ(score*weight)` 判定、单轴下限 R13（论文无此项）。
 
-**真实缺口**：目标库能检测 V **伪造**评分，检测不了 V **偏移**。三类偏移（用户裁定全要）：
+**真实缺口**：目标库能检测 V **伪造**评分，检测不了 V **偏移**。三类偏移（用户裁定全要），且论文提供了分辨力**可测量**的实证依据：
 - **标准偏移**：同一产物跨轮次被判出差异显著的等级 → 无检测（run-log 已记 `qualityLevel` 与 `artifacts`，数据基础已具备）
 - **校准偏移**：V 分辨力不足（正负样本都给高分）→ 无检测（`samples/verifier/` 25 个 fixture 全是"JSON 是否合法"，**无一是"判断是否正确"**）
 - **惰性偏移**：V 走形式（模板化 summary、空泛 evidence）→ 部分覆盖（R11/R12/O3），但 R12 只校验 evidence **格式**不校验被引内容真实存在
+
+**论文实证依据（本次核对原文所得，用于 A-3d 判据论证）**：
+
+| 论据 | 论文原文事实 | 对 A-3d 的意义 |
+| --- | --- | --- |
+| 粒度→信噪比 | Table 1：`Granularity G ∈ {1,4,16,20}` 对应 `SNR(k=16) = 0.775 / 0.786 / 0.797 / 0.799` | V 的**分辨力可测量**；连续评分优于离散 |
+| 离散 judge 平局率 | 100 次重复实验：标准 LM judge 在 1-5 量表上 **88/100 次产生平局**（5 vs 5） | 离散等级（本项目 `qualityLevel`）本身是弱判据，需连续分补充 |
+| 重复评估有效性 | "A single-pass verifier (k=1) already matches a heavily ensembled judge (k=16)" | `repeatTimes≥3` 方向正确 |
+| PPT 参数 | Table 9：`k=1 → 65.83%`、`k=5 → 66.27%`、`k=9 → 67.13%`、Full RR `→ 67.42%` | 本项目 `k=5` 在合理取舍点（D20 不改） |
+
+**边界如实声明**：论文的 SNR 需 **ground truth**（正解/错解样本）才能计算——这正是 A-3f 校准集要做的事。故论文论证**支持 A-3f 的价值**，但**不改变 A-3f 非门禁的性质**（仍需人工标注正解）。**不得表述为"论文为门禁背书"。**
 
 **（二）证据支撑树方法论（Evidence-Anchored Decision Tree）已吸收。**
 
@@ -78,6 +89,13 @@ A-3 的四项与 A-3b（冰山分母）共享同一抽象：**从"形状合规"�
 | D14 | `evidenceAnchor` 必填范围 | **方案 i：阶段 1-4 全部节点必填**                                                      | 用户裁定；"关键节点"的界定本身即判断、会引入新模糊面。存量迁移成本已实测（31 fixture / 124 节点），可机械完成                          |
 | D15 | 三色标签处置              | **不新增第三色**；用 `evidenceStatus: confirmed \| pending` 二值字段                   | 🟢/🟡 由该字段承载；🔴 由既有 `coverageStatus.not-covered` + 反模式 #18/#19 返工链承载。避免"新增三色 emoji"被拒的同型错误（§4）      |
 | D16 | 校准偏移实现形态          | **非门禁**：人维护的锚定集 + 可运行校准命令 + 校准报告                                | 锚定正解需人标注，且校准需真实跑 LLM（外部 Agent 执行）——不符合确定性门禁定义。**声明为非门禁诊断工具，不得表述为门禁**              |
+| D17 | `confirmed` 的机器背书    | **R15e**：要求签名链存在引用该节点的 V review 环，且其 `inputProvenance` 指向该锚点       | 消除"自报 confirmed"。`signature-chain-guide.md:70` 已规定 `G → V review 签名 + V 产物`，链已有 R1-R10（含 R5 代签检测）作背书；无需新机制 |
+| D18 | A-3e 校验深度           | **验存在 + 验覆盖**，**不验语义支持**                                                  | 覆盖对账复用 `hard-constraints.md:79` codegraph `--scope` 式既有实现；语义支持需判断，属 V 评审，超出确定性门禁边界 |
+| D19 | A-3d 判据扩充           | 新增"**`rawScores` 方差持续极低 → 分辨力不足**"判据（除跨轮次等级差外）                  | 论文实证：粒度上升 → 正负样本分离 SNR 上升（Table 1）；离散 judge 在 100 次重复中 88 次平局。方差恒为极小值意味评分分布坍缩 |
+| D20 | PPT / repeatTimes 参数  | **不改**：`k=5` / `temperature=4.0` / `repeatTimes≥3` 均在论文参数空间内                 | 论文 Table 9 实测 `PPT k=5 → 66.27%`（k=9 → 67.13%，Full RR → 67.42%），k 是精度/成本取舍点 |
+| D21 | `pending` 的合法出口    | `exemption` 新增第 6 类 `evidence-anchor-pending`，复用 E1-E9 九项校验                   | `exemption.schema.json` type enum 5 值 → 6 值；四阶段审批链（S→R→V→人类）与 `justification≥20`/`evidence≥1`/E9 时序全部复用 |
+| D22 | violation 定位粒度      | R15 拆 **a–e 五个子项**独立报出（缺失 / 状态非法 / 路径不存在 / 未覆盖 / 缺签名链环）      | Q1 选 c 后两套校验耦合，用分层前缀解决；复用既有 `R11 校验失败：…` 前缀约定（`graph-logic.ts:601` 等）                              |
+| D23 | A-3d 阈值定案方式       | 先行取值，**全部修复后跑一轮完整 e2e 调测校准**                                          | 仓库内无真实历史 run-log 可回测（`.w-model/` 为 gitignored 本地生成物）；只有全部修复后才能产生可回测数据                            |
 
 ## 2. 设计
 
@@ -203,12 +221,23 @@ nodes[].evidenceStatus: "confirmed" | "pending"   ← 新增，必填（D15）
 
 **checker 改动**（`graph-logic.ts` 的 `checkRequirementGraph` 内 R15 块，经 `check-requirement-graph.ts` CLI 暴露）：
 
-1. `evidenceAnchor` 缺失或为空 → violation（原为"未声明不阻断"）。
-2. `evidenceStatus` 缺失或非 `confirmed|pending` → violation。
-3. `evidenceAnchor` 的 `path` 部分**真实性校验**（见 A-3e）。
-4. 格式正则校验保留（复用 `EVIDENCE_PATTERN` 语义，禁止定义第三套）。
+R15 拆为 **五个子项**（D22），每项独立报出、独立定位，复用既有 `R11 校验失败：…` 前缀约定：
 
-**常态触发挂载点（D13）**：阶段门放行前（`quick-self-check.md` 的 DoD 自检清单，已有"阶段门放行已填理解证据""预算与成熟度已检查"两个同类检查项）新增一条：**扫描 `graph.json` 中 `evidenceStatus === 'pending'` 的节点，存在即阻断**，要求先验证转 `confirmed`，或走豁免审批（`exemption.json` / `check-exemption.ts` E1-E9 既有机制）。
+| 子项 | 判据 | 依据 |
+| --- | --- | --- |
+| **R15a** | `evidenceAnchor` 缺失或为空 → violation（原为"未声明不阻断"） | 必填化（D14） |
+| **R15b** | `evidenceStatus` 缺失或非 `confirmed\|pending` → violation | D15 |
+| **R15c** | `evidenceAnchor` 的 `path` 部分不存在 → violation | A-3e 存在性 |
+| **R15d** | 该 `path` 未被任何已落盘的查询/评审记录覆盖 → violation | A-3e 覆盖对账 |
+| **R15e** | `evidenceStatus === 'confirmed'` 但签名链中无引用该节点 id 的 V review 环，或其 `inputProvenance` 未指向该锚点 → violation | D17 |
+
+格式正则校验保留（复用 `EVIDENCE_PATTERN` 语义，**禁止定义第三套**）。
+
+**R15e 的机制说明（D17）**：`signature-chain-guide.md:70` 已规定链条形态 `G → gate → V review 签名 + V 产物 → S 产物`，因此"谁验证的"本就登记在签名链上。R15e 只是要求 `confirmed` **与签名链对账**——把"自我声明"钉到既有链式记录，而非新造验证者声明结构。签名链自带 R5 代签检测（`signer` 不含 orchestrator/self-as-verifier），故 R15e 无需重复实现代签检测。
+
+**跨产物依赖说明**：R15e 使 `graph-logic.ts` 需读 `signature-chain.jsonl`。仓库已有同型先例（`archive-integrity-logic.ts` / `evidence-export-logic.ts` / `evidence-provenance-logic.ts` / `signature-chain-logic.ts` 均跨产物读取），不引入新架构模式。**但须注意**：签名链在阶段 1 可能尚不完整，R15e 仅在 `evidenceStatus === 'confirmed'` 时触发（`pending` 不触发），避免早期阶段误红。
+
+**常态触发挂载点（D13）**：阶段门放行前（`quick-self-check.md` 的 DoD 自检清单，已有"阶段门放行已填理解证据""预算与成熟度已检查"两个同类检查项）新增一条：**扫描 `graph.json` 中 `evidenceStatus === 'pending'` 的节点，存在即阻断**，要求先验证转 `confirmed`，或走豁免审批（D21：`exemption` 第 6 类 `evidence-anchor-pending`）。
 
 **为什么不走 R**：🟡 不是缺陷，是"尚未验证"。走 R 会把"没做功课"误判为"产物有缺陷"。正确处置是**阻断并要求补验证**；若补验证后发现结论站不住，那才触发返工链。
 
@@ -223,21 +252,31 @@ nodes[].evidenceStatus: "confirmed" | "pending"   ← 新增，必填（D15）
 - 仅一次评审记录时不触发（无不一致可言）。
 - **处置（重要且与 D6 不同）**：**走高成熟度 CHECKPOINT 交人裁定，不走 R**。理由——不一致的是**评审者自身**，而 R 无法自查评审标准；按 `design-philosophy.md` 人机分工线，"判据 / 处境判断 → 人"。这与 A-3b 三视角不一致（产物间的客观差异，可由 R 定位）性质不同，**不得混同**。
 
-**判据二 · 惰性偏移加强（复用既有 R11/R12/O3，不新建机制）**：
+**判据二 · 分辨力下限（校准偏移的机检信号）**——D19，论文论证支持：
+
+- `rawScores` 的方差**持续处于极低值**（非全等但近似坍缩，如方差 < 极低下限）→ 疑似 V 无区分能力 → 失败信号。
+- **与既有"全等检测"的区别**（须在实现注释中写明）：既有规则检 `max === min`（完全复制填入）；本判据检"**非全等但方差极小**"（评分分布坍缩、V 实际未区分正负样本）。二者互补，**不是同一条规则的重复**。
+- 论文依据：粒度上升 → 正负样本分离 SNR 上升（Table 1：`G=1 → 0.775` 到 `G=20 → 0.799`）；离散 judge 在 100 次重复中 88 次平局——**分辨力不足是真实且可测量的失效模式**。
+- 极低下限取值：**实施期定案**（无历史数据可回测，见 D23）；先按"显著低于正常评分离散度"设保守值，避免假阳性。
+
+**判据三 · 惰性偏移加强（复用既有 R11/R12/O3，不新建机制）**：
 
 - O3 措辞黑名单扩充：补入模板化模式（相邻两次评审的 `summary` 相似度过高 → 疑似复制）。
 - `VerifierOutput.evidence` 的 path 部分真实性校验（原只校验格式）→ 与 A-3e 同源实现。
 - `targetKind=code` 的评审连续 N 轮 `reworkHints` 无 `[Critical]` → 记入 run-log note 作为 O3 候选信号，**仅告警不阻断**（确实可能一直无严重问题）。
 
-### 2.7 A-3e：证据路径真实性校验（从形状到事实）
+### 2.7 A-3e：证据路径存在性 + 覆盖对账（从形状到事实）
 
-**性质**：把"格式合规"升级为"被引内容真实存在"。这是 §0.2 两处缺口的共同修复。
+**性质**：把"格式合规"升级为"被引内容真实存在且被实际覆盖"（D18）。
 
-**实现**：`evidenceAnchor`（图谱侧）与 `VerifierOutput.evidence`（评审侧）的 `path` 部分，从"匹配正则"升级为"匹配正则 **∧** path 存在"：
+**实现**：`evidenceAnchor`（图谱侧）与 `VerifierOutput.evidence`（评审侧）的 `path` 部分，从"匹配正则"升级为两段校验：
+
+1. **存在性**：`path` 指向的文件真实存在。
+2. **覆盖对账**：该 `path` 被某个已落盘的查询/评审记录**实际覆盖**——移植 `hard-constraints.md:79` 的 codegraph `--scope` 式对账（查询记录须含 `changeId`/`targetFiles`，scope 中每个须覆盖文件"至少被一个查询覆盖"）。
 
 - 复用既有 path 解析约定（`conventions.md` 列定位约定），**禁止定义第三套解析**。
-- 不打开文件验证陈述被支持（那需要语义判断，属 V 评审职责）；**只验证存在性**——这是确定性可判的部分。
-- 这是"递归证据请求"的最小可机检子集：方法论要求"沿依赖链向上追溯直到所有链路有证据状态"，完全实现需语义判断；**当前只实现"引用的东西真的在那里"**。**此边界须在文档中写明，不得声称已实现完整递归追溯。**
+- **不做**：不打开文件验证陈述被支持（需语义判断，属 V 评审职责）。
+- **边界如实声明**：本项实现的是"引用真实存在 + 被覆盖"，**不是**方法论原文"递归证据请求"的完整形态（沿依赖链向上追溯直到所有链路有证据状态）。完整的递归追溯需语义判断，列为 Spec B 之后或独立课题（§7）。**不得声称已实现完整递归追溯。**
 
 ### 2.8 A-3f：校准集规范（防校准偏移，非门禁）
 
@@ -267,7 +306,7 @@ nodes[].evidenceStatus: "confirmed" | "pending"   ← 新增，必填（D15）
 | 11 | `w-model-dev/scripts/samples/README.md`                 | 修改     | 新增样本的矩阵行                                                     |
 | 12 | `w-model-dev/scripts/cli/self-test.ts`                  | 修改     | 新样本登记进 `<AREA>_CASES`                                          |
 | 13 | `w-model-dev/references/iceberg-sweep-guide.md`         | 修改     | 同步对账算法与三类失败信号（文档侧说明，权威为实现）                  |
-| 14 | `docs/skill-design-document_SSoT.md`                    | 修改     | 新增权威定义节（SSoT-first）；R14-R17 承载方式更正                    |
+| 14 | `docs/skill-design-document_SSoT.md`                    | 修改     | 新增权威定义节（SSoT-first）；R14-R17 承载方式更正；证据锚点必填化与 evidenceStatus 权威定义 |
 | 15 | `w-model-dev/schemas/graph.schema.json`                 | 修改     | `nodes[].evidenceAnchor` 改必填；新增 `nodes[].evidenceStatus`（枚举 confirmed\|pending） |
 | 16 | `w-model-dev/scripts/logic/graph-logic.ts`              | 修改     | R15 扩展：必填校验 + `evidenceStatus` 校验 + path 真实性校验          |
 | 17 | `w-model-dev/scripts/logic/run-log-logic.ts`            | 修改     | 新增跨轮次一致性规则（同产物 `qualityLevel` 差异 ≥2 档 / 分差 >0.15）  |
@@ -280,7 +319,10 @@ nodes[].evidenceStatus: "confirmed" | "pending"   ← 新增，必填（D15）
 | 24 | `w-model-dev/references/evidence-anchored-tree.md`      | 修改     | §3 更新：必填化 + `evidenceStatus` + 三处语义丢失的补齐说明            |
 | 25 | `w-model-dev/references/verifier-spec.md`               | 修改     | 新增 §12"评审偏移检测"（标准/校准/惰性三类 + 边界声明）                |
 | 26 | `docs/llm-verifier-integration-design.md`               | 修改     | 指针文档补记本次补齐（三支柱已实现 + 三类偏移检测新增）                |
-| 27 | `CHANGELOG.md`                                          | 修改     | 新增 `### <campaign>（<slug>，2026-09-12）` 小节                      |
+| 27 | `w-model-dev/schemas/exemption.schema.json`             | 修改     | `type` enum 新增第 6 类 `evidence-anchor-pending`（D21）              |
+| 28 | `w-model-dev/scripts/logic/exemption-logic.ts`          | 修改     | 同步 `type` TS union（`:43-48`）+ `:5-14` 规则注释                    |
+| 29 | `w-model-dev/references/signature-chain-guide.md`       | 修改     | 说明 R15e 对签名链的读取契约（V review 环 + inputProvenance 指向锚点） |
+| 30 | `CHANGELOG.md`                                          | 修改     | 新增小节 `### 门禁完整性与证据事实对账（gate-integrity-evidence-reconciliation，2026-09-12）` |
 
 ### 3.1 不改动的文件（明确边界）
 
@@ -320,8 +362,19 @@ nodes[].evidenceStatus: "confirmed" | "pending"   ← 新增，必填（D15）
 5. 节点 `evidenceStatus: "pending"` → 阶段门扫描 → 断言阻断 → 还原（**关键：验证常态触发真的阻断**）。
 6. `evidenceAnchor` 指向不存在路径 → 断言 exit 1 → 还原（**关键：验证路径真实性**）。
 7. 同一产物两次 `review` 记录 `qualityLevel` A→C → `check-run-log.ts` → 断言 exit 1 → 还原。
+8. `evidenceStatus: "confirmed"` 但签名链无对应 V review 环 → 断言 exit 1（**R15e**）→ 还原。
+9. `rawScores` 非全等但方差极低 → 断言触发分辨力下限判据（D19）→ 还原。
+10. 5 类既有 exemption 仍全绿 + 新增 `evidence-anchor-pending` 类通过 E1-E9 → `check-exemption.ts` → 断言 exit 0。
 
 **迁移验证**：124 个节点补字段后 `npm run self-test` 与 `check-requirement-graph.ts` 必须全绿；若有 fixture 语义本就不含锚点（如反例 fixture），须显式确认它期望的是**新增的锚点 violation** 而非原 violation（避免测试意图被迁移掩盖）。
+
+**端到端调测（D23，全部修复后执行一轮）**：按 `/wm` 8 阶段跑一轮完整项目（参照 `eval/e2e/` 既有基线格式），验证：
+
+1. R15a-e 五子项在真实产物上不产生假阳性（重点：R15e 在阶段 1 签名链未完整时不应误红）。
+2. 常态触发（`pending` 扫描）在阶段门确实阻断，且豁免出口可用。
+3. A-3d 两条判据在真实评审历史上不误报；**据此校准阈值**（D23：阈值为先行取值，本轮调测后定稿）。
+4. A-3b 三视角在场表取值经真实阶段产物核定。
+5. e2e 记录写入 `eval/e2e/` 并追加 `eval/w-model-dev-results.tsv`（沿用既有格式）。
 
 ## 5. 风险与回退
 
@@ -334,13 +387,30 @@ nodes[].evidenceStatus: "confirmed" | "pending"   ← 新增，必填（D15）
 | 反模式 #44 措辞与新判据不一致                            | 实施时核查；如需微调则同步 `hard-constraints.md`（编号不变，故 `EXPECTED.maxAntiPattern` 不动） |
 | 样本新增漏登记导致 `check-samples-coverage` red          | 按三向闭包流程：fixture 文件 + `self-test.ts` 用例 + `samples/README.md` 矩阵行           |
 | **124 节点必填迁移改变既有反例 fixture 的测试意图**      | 迁移验证（§4 末）要求逐 fixture 确认期望 violation 未变；反例 fixture 若依赖"缺锚点不阻断"则须重写为期望新 violation |
-| **`evidenceStatus` 被填 `confirmed` 而无实据**           | 本 spec **不解决**：`confirmed` 的真实性需语义判断（V 评审职责 + A-3d 惰性检测间接约束）。**此为已知残留缺口，须在文档中写明，不得声称已解决** |
-| **A-3e 只验证存在性、不验证陈述被支持**                   | 已在 §2.7 显式声明边界；完整"递归证据请求"需语义判断，列为 Spec B 的候选               |
-| **校准集正解标注本身成为新的可漂移物**                   | A-3f 声明为非门禁；标注维护责任登记于此。校准报告可发现漂移但不阻断                       |
-| **A-3d 跨轮次阈值（≥2 档 / 0.15）为设计取值**             | 实施时以既有 run-log 历史数据回测（若有），避免阈值过严产生假阳性；阈值为代码常量便于调整 |
-| 常态触发增加每阶段门强制成本                             | 与既有 DoD 自检项同批执行（`quick-self-check.md` 已有同类项），不新增独立流程             |
+| **R15e 依赖签名链，阶段 1 可能链未完整**                 | R15e 仅在 `evidenceStatus === 'confirmed'` 时触发（`pending` 不触发）；端到端调测（§4）专列验证项 1 检查阶段 1 不误红 |
+| **A-3e 覆盖对账的 scope 语义与图谱节点可能不匹配**       | 移植 `hard-constraints.md:79` 的 `--scope` 语义前，先读 `codegraph-queries` 相关 logic 确认可解析表达；口径不确定则在 spec 评审阶段上报 |
+| **A-3e 仍不验"陈述被支持"**                              | **已解决范围边界如实写明**（§2.7）：本项只做到"存在 + 被覆盖"；完整"递归证据请求"需语义判断，列为 §7 后续课题。**不得声称已实现完整递归追溯** |
+| **D19 方差下限取值无历史数据支撑**                       | 先设保守值（避免假阳性），端到端调测后定稿（D23）；与既有全等检测的区别须在实现注释写明 |
+| **A-3d 跨轮次阈值（≥2 档 / 0.15）为先行取值**            | 端到端调测后校准（D23）；阈值为代码常量便于调整                        |
+| **校准集正解标注本身成为新的可漂移物**                   | A-3f 声明为非门禁；标注维护责任登记于此。校准报告可发现漂移但不阻断       |
+| 常态触发增加每阶段门强制成本                             | 与既有 DoD 自检项同批执行（`quick-self-check.md` 已有同类项），不新增独立流程 |
 
-**回退**：本 spec 全部改动可按文件粒度 `git revert`。**注意 `graph.schema.json` 的必填化是破坏性契约变更**（相对原"可选、未声明不阻断"），回退时须同时还原 31 个 fixture；无历史归档改动。
+**回退**：本 spec 全部改动可按文件粒度 `git revert`。**注意 `graph.schema.json` 的必填化是破坏性契约变更**（相对原"可选、未声明不阻断"），回退时须同时还原 31 个 fixture；`exemption.schema.json` 的 enum 扩展为向后兼容（新增值不使既有值失效）；无历史归档改动。
+
+## 5A. 已解决的残留（修订记录）
+
+设计第二版按用户指示（"处理残留问题"+"能查不问/能用代码测试的不问/能联网确认的不问"）逐项收敛：
+
+| 原残留 | 结论 | 依据 / 查证方式 |
+| --- | --- | --- |
+| `confirmed` 填而无实据 | **已解决**：R15e 要求签名链存在引用该节点的 V review 环 + `inputProvenance` 指向锚点 | 查代码：`signature-chain-guide.md:70` 已规定 V 产物进链；链有 R1-R10（含 R5 代签检测） |
+| A-3e 只验存在 | **已加强**：验存在 + 验覆盖（codegraph `--scope` 式对账）；仍不验语义支持（边界写明） | 查代码：`hard-constraints.md:79` 覆盖对账是既有实现 |
+| A-3d 阈值无据 | **已改善**：新增方差下限判据（论文 SNR 论证）；跨轮次阈值先取值、调测后校准 | 联网/本地查论文：Table 1 SNR 曲线 + 100 次重复 88 次平局 |
+| `pending` 出口未定 | **已定**：`exemption` 第 6 类 `evidence-anchor-pending`，复用 E1-E9 | 查代码：`exemption.schema.json` enum 5 值 + logic union `:43-48` |
+| Q1 选 c 的定位代价 | **已解决**：R15 拆 a-e 五子项独立报出 | 查代码：`R11 校验失败：…` 前缀约定已普遍存在（`graph-logic.ts:601`） |
+| PPT/repeatTimes 参数是否需改 | **不需要**：均在论文参数空间内 | 查论文：Table 9 实测 k=1/3/5/7/9 与 Full RR |
+
+**仍为真实边界（不声称已解决）**：A-3e 的语义支持验证、`confirmed` 的实质真实性（只保证"与签名链对账"，除非 V 评审也造假——而那会被 A-3d 惰性检测间接约束）、A-3f 的标注漂移。
 
 ## 6. 与现有约束/反模式的关系
 
