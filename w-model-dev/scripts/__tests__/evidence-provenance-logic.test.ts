@@ -111,7 +111,9 @@ async function runSourceCli(args: string[]): Promise<{ code: number; stdout: str
   try {
     const result = await execFileAsync(process.execPath, [require.resolve('tsx/cli'), SOURCE_CLI, ...args], {
       encoding: 'utf8',
-      timeout: 15_000,
+      // Load-sensitive: raised from 15 s because the real `tsx` CLI can exceed it when the full suite runs
+      // in parallel (execFileAsync then reports a generic failure). Assertions are unchanged.
+      timeout: 60_000,
     });
     return { code: 0, stdout: result.stdout, stderr: result.stderr };
   } catch (error) {

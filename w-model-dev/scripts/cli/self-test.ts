@@ -80,6 +80,41 @@ import { checkIcebergSweep, type IcebergSweepReport } from '../logic/iceberg-swe
 import { checkTlaBddSync } from '../logic/tla-bdd-sync-logic.js';
 import { checkRoleDispatch } from '../logic/role-dispatch-logic.js';
 import { checkStateMachineConsistency } from '../logic/state-machine-logic.js';
+import {
+  buildStaticInventory,
+  checkFalsePositiveGuards,
+  classifyScenario,
+  mergeDynamicTrace,
+  type Phase1Scenario,
+} from '../logic/code-health-phase1-logic.js';
+import type {
+  AbstractionProposal,
+  ApprovalDecision,
+  CodeHealthCandidate,
+  CodeHealthLedger,
+  CommandEvidence,
+  DuplicateCluster,
+  DuplicateInput,
+  FalsePositiveContext,
+  GapDiscoveryInput,
+  GapRow,
+  Phase1CandidateLead,
+  RevisionIdentity,
+  RollbackPlan,
+} from '../logic/code-health-contract.js';
+import { findGaps } from '../logic/code-health-gap-logic.js';
+import {
+  clusterDuplicates,
+  proveAbstraction,
+  type DuplicateClusterAuthority,
+} from '../logic/code-health-duplicate-logic.js';
+import { evaluateTestInventory } from '../logic/code-health-test-logic.js';
+import {
+  applyApproved,
+  executeRollback,
+  validateGapMatrix,
+  validateRedGreenEvidence,
+} from '../logic/code-health-ledger-logic.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
@@ -2374,6 +2409,399 @@ const CODE_HEALTH_CASES: CodeHealthCase[] = [
   },
 ];
 
+// -------------------- Phase 1 只读发现（静态 / 动态 / guard） --------------------
+
+interface CodeHealthPhase1StaticCase {
+  file: string;
+  expectedBlocked: boolean;
+  expectedCategories?: string[];
+  description: string;
+}
+
+interface CodeHealthPhase1Fixture {
+  revision: RevisionIdentity;
+  files: string[];
+  sourceText: Record<string, string>;
+  expectedCategories?: string[];
+  expectedReferences?: Array<{ kind: string; symbol: string; path: string }>;
+  expectedUnavailable?: string[];
+  context?: FalsePositiveContext;
+  lead?: Phase1CandidateLead;
+}
+
+const CODE_HEALTH_PHASE1_STATIC_CASES: CodeHealthPhase1StaticCase[] = [
+  {
+    file: 'valid.json',
+    expectedBlocked: false,
+    expectedCategories: ['dynamic-import', 'reflection', 'shell-platform', 'schema-template-rtm', 'test-only-helper'],
+    description: '静态 inventory 覆盖动态 import/reflection/shell/schema-template-RTM/test helper',
+  },
+  {
+    file: 'signals.json',
+    expectedBlocked: false,
+    expectedCategories: [
+      'ast-reference',
+      'dynamic-import',
+      'reflection',
+      'shell-platform',
+      'schema-template-rtm',
+      'test-only-helper',
+    ],
+    description:
+      '静态 inventory 逐信号覆盖：decorator/DI metadata、filesystem discovery、config handler、path/EOL、shell literal、schema/template/migration/graph ID、custom matcher、test double import',
+  },
+  {
+    file: 'blocked.json',
+    expectedBlocked: true,
+    expectedCategories: [],
+    description: '源文件不可读 → lead blocked，绝不产出 dead 结论',
+  },
+];
+
+interface CodeHealthPhase1GuardCase {
+  file: string;
+  expectedViolations: 'empty' | 'nonempty';
+  expectedClassification?: Phase1CandidateLead['classification'];
+  description: string;
+}
+
+const CODE_HEALTH_PHASE1_GUARD_CASES: CodeHealthPhase1GuardCase[] = [
+  {
+    file: 'valid.json',
+    expectedViolations: 'empty',
+    expectedClassification: 'candidate',
+    description: '无 false-positive 机制且 trace 全部 observed/reached → guard 为空，lead 保持 candidate（非 dead）',
+  },
+  {
+    file: 'blocked.json',
+    expectedViolations: 'nonempty',
+    expectedClassification: 'unknown',
+    description: 'false-positive guard 命中（dynamic import/reflection/platform）→ classification=unknown',
+  },
+];
+
+interface CodeHealthPhase1DynamicCase {
+  file: string;
+  expectedApplicable: number | 'at-least-one';
+  description: string;
+}
+
+const CODE_HEALTH_PHASE1_DYNAMIC_CASES: CodeHealthPhase1DynamicCase[] = [
+  {
+    file: 'valid.json',
+    expectedApplicable: 'at-least-one',
+    description: 'scenario matrix 结构合法且含声明 supported=false 的环境（保证 unexercisedScenarios 非空）',
+  },
+  {
+    file: 'blocked.json',
+    expectedApplicable: 0,
+    description: '全部 scenario 声明 supported=false → 无可用环境，候选只能 blocked/unknown，绝不产出 dead 结论',
+  },
+];
+
+// -------------------- Phase 1 候选审查与删除执行器（apply 四态） --------------------
+
+interface CodeHealthApplyFixture {
+  mode: 'dry-run' | 'patch' | 'commit';
+  candidate: CodeHealthCandidate;
+  approval: ApprovalDecision | null;
+}
+
+interface CodeHealthApplyCase {
+  file: string;
+  expected: 'approval-required' | 'scope-mismatch' | 'patch-proposal' | 'rollback-failure';
+  description: string;
+}
+
+const CODE_HEALTH_APPLY_CASES: CodeHealthApplyCase[] = [
+  {
+    file: 'approval-required.json',
+    expected: 'approval-required',
+    description: '无人类 approval artifact → HUMAN_APPROVAL_REQUIRED，绝不删除',
+  },
+  {
+    file: 'scope-mismatch.json',
+    expected: 'scope-mismatch',
+    description: 'approval 扩大 files scope → SCOPE_MISMATCH，未知文件 fail-closed',
+  },
+  {
+    file: 'valid-patch.json',
+    expected: 'patch-proposal',
+    description: 'exact human scope/revision → 受控 .patch proposal + executable rollback plan，不写工作树',
+  },
+  {
+    file: 'rollback-failure.json',
+    expected: 'rollback-failure',
+    description: 'candidate rollback plan executable=false → executeRollback 返回 false，绝不声称成功',
+  },
+];
+
+// -------------------- Phase 2 七维度 gap matrix（发现 / 矩阵 / RED-GREEN） --------------------
+
+interface CodeHealthGapFixture {
+  kind: 'discovery' | 'matrix' | 'red-green';
+  ledger?: CodeHealthLedger;
+  discovery?: GapDiscoveryInput;
+  rows?: GapRow[];
+  gap?: GapRow;
+  results?: CommandEvidence[];
+}
+
+interface CodeHealthGapCase {
+  file: string;
+  expectedPassed: boolean;
+  /** 仅 discovery 用例：期望发现的维度数（缺维度时由 findGaps fail-closed，取不到行）。 */
+  expectedKindCount?: number;
+  expectedReasonPatterns?: RegExp[];
+  description: string;
+}
+
+const CODE_HEALTH_GAP_CASES: CodeHealthGapCase[] = [
+  {
+    file: 'valid-gap.json',
+    expectedPassed: true,
+    expectedKindCount: 7,
+    description: '七维度 discovery 生成完整 matrix 并通过 validateGapMatrix（coverage 仅信号）',
+  },
+  {
+    file: 'missing-security.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/security/i],
+    description: '缺 security 维度 → findGaps fail-closed，coverage 不能替代该维度',
+  },
+  {
+    file: 'missing-platform.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/platform/i],
+    description: '缺 platform 维度 → findGaps fail-closed',
+  },
+  {
+    file: 'coverage-only.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/coverage|missing|seven/i],
+    description: 'coverageSignal.lines=1 且缺维度 → 100% coverage 不授权跳过任何维度',
+  },
+  {
+    file: 'red-not-fail.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/redEvidence|RED/i],
+    description: 'implemented gap 的 redEvidence exitCode=0 → validateGapMatrix 拒绝非失败 RED',
+  },
+  {
+    file: 'red-unclassified.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/redEvidence|classification|assertion/i],
+    description: 'RED 非零但缺 codeHealthTddFailureClass 分类 → 手工证据不能冒充真实 RED',
+  },
+  {
+    file: 'redgreen-binding-mismatch.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/redEvidence|gap|bound/i],
+    description: '矩阵行 red/green 证据未绑定到该行 gapId → 拒绝跨 gap 拼装',
+  },
+  {
+    file: 'forged-scope-declaration.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/ledger|scope|test artifact|candidate/i],
+    description: '矩阵行伪造 implementationArtifact/声明 → 与 ledger candidate scope/tests 不一致被拒',
+  },
+  {
+    file: 'forged-scope-redgreen.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/ledger|scope|test artifact|candidate/i],
+    description: 'red-green 伪造声明（断言当实现、真实实现当测试）→ 与 ledger 记录不一致被 CLI 拒绝',
+  },
+  {
+    file: 'green-weakening.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/same assertion|weakened|assertionHash/i],
+    description: 'GREEN 的 assertionHash 与 RED 不同（削弱/改写断言）→ validateRedGreenEvidence 拒绝',
+  },
+  {
+    file: 'infrastructure-red.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/unrelated|infrastructure/i],
+    description: 'RED 因无关基础设施原因失败（模块缺失/语法错误）→ 不计为 RED',
+  },
+  {
+    file: 'unknown-command.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/RED evidence required/i],
+    description: 'RED 命令不存在（observation=unavailable, exitCode=null）→ 不计为 RED',
+  },
+];
+
+interface CodeHealthTestInventoryCase {
+  file: string;
+  expectedPassed: boolean;
+  expectedReasonPatterns?: RegExp[];
+  description: string;
+}
+
+const CODE_HEALTH_TEST_CASES: CodeHealthTestInventoryCase[] = [
+  {
+    file: 'valid-inventory.json',
+    expectedPassed: true,
+    description: '受保护唯一负向测试被完整登记 → protected facts 与记录分类一致，且作者/年龄仅为 provenance',
+  },
+  {
+    file: 'valid-redundant-removal.json',
+    expectedPassed: true,
+    description: '等价 survivor + ledger 锚定 scope + 已解释 facts → 允许一次性删除；作者/年龄不参与判定',
+  },
+  {
+    file: 'bad-author-age-deletion.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/protected/i],
+    description: '作者/年龄诱导删除唯一 protected 测试且无 survivor → 拒删',
+  },
+  {
+    file: 'bad-weaker-oracle.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/oracle/i],
+    description: 'survivor oracle 更弱 → 等价性证明失败',
+  },
+  {
+    file: 'bad-governance-drift.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/pre-push|self-test/i],
+    description: '18 项 pre-push 顺序/计数或 self-test facts 漂移未解释 → 阻塞',
+  },
+  {
+    file: 'bad-prepost-regression.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/test count/i],
+    description: 'pre/post 真实回归未观测到减一 → 阻塞',
+  },
+  {
+    file: 'bad-missing-ledger.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/ledger/i],
+    description: '移除声明缺 ledger 记录锚定 → 无授权，fail-closed',
+  },
+  {
+    file: 'bad-neutral-unprotected.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/non-protected|treated as protected/i],
+    description: '中性文本测试仅靠 delete-code ledger 声明 → 未正向建立非保护状态，默认按 protected 拒绝',
+  },
+];
+
+// -------------------- Phase 4 duplicate cluster / abstraction guard（self-test 回归 fixture） --------------------
+
+interface CodeHealthDuplicateFixture {
+  description: string;
+  /** The status the pure cluster is expected to reach (never "approved": approval is a human gate). */
+  expectedStatus: DuplicateCluster['status'];
+  expectAuthorized: boolean;
+  candidateId: string;
+  input: DuplicateInput;
+  authority: DuplicateClusterAuthority;
+  review?: {
+    equivalenceProof?: DuplicateCluster['equivalenceProof'];
+    maintenanceBenefit?: string;
+    rollback?: RollbackPlan;
+    redaction?: DuplicateCluster['redaction'];
+  };
+  proposal?: AbstractionProposal;
+}
+
+interface CodeHealthDuplicateCase {
+  file: string;
+  expectedStatus: DuplicateCluster['status'];
+  /** 期望 guard 违规至少各匹配一个正则（用于 blocked 用例） */
+  expectedViolations: RegExp[];
+  expectAuthorized: boolean;
+  description: string;
+}
+
+const CODE_HEALTH_PHASE4_CASES: CodeHealthDuplicateCase[] = [
+  {
+    file: 'valid-cluster.json',
+    expectedStatus: 'under-review',
+    expectedViolations: [],
+    expectAuthorized: true,
+    description: '两个独立稳定生产调用点 + 完整逐项等价证明 + 可量化维护收益 → guard 放行（仅提案级）',
+  },
+  {
+    file: 'deferred-one-site.json',
+    expectedStatus: 'deferred',
+    expectedViolations: [],
+    expectAuthorized: false,
+    description: '仅 1 个稳定生产调用点 → deferred（非批准），绝不授权抽象',
+  },
+  {
+    file: 'bad-test-only.json',
+    expectedStatus: 'rejected',
+    expectedViolations: [/test-only/i],
+    expectAuthorized: false,
+    description: 'test-only helper 充当实现 → rejected，test-only 绝不授权',
+  },
+  {
+    file: 'bad-platform-difference.json',
+    expectedStatus: 'under-review',
+    expectedViolations: [/platform/i],
+    expectAuthorized: false,
+    description: 'platform-specific 行为差异 → 不授权',
+  },
+  {
+    file: 'bad-error-mismatch.json',
+    expectedStatus: 'under-review',
+    expectedViolations: [/errors/i],
+    expectAuthorized: false,
+    description: 'error/retry 逐项差异 → 不授权',
+  },
+  {
+    file: 'bad-security-mismatch.json',
+    expectedStatus: 'under-review',
+    expectedViolations: [/security/i],
+    expectAuthorized: false,
+    description: 'security validation-order 差异 → 不授权',
+  },
+  {
+    file: 'bad-lifecycle-mismatch.json',
+    expectedStatus: 'under-review',
+    expectedViolations: [/lifecycle/i],
+    expectAuthorized: false,
+    description: 'lifecycle/resource 差异 → 不授权',
+  },
+  {
+    file: 'bad-maintenance-only.json',
+    expectedStatus: 'under-review',
+    expectedViolations: [/maintenance/i],
+    expectAuthorized: false,
+    description: '维护收益仅“少几行/更短 diff” → 不构成收益，不授权',
+  },
+  {
+    file: 'bad-generated.json',
+    expectedStatus: 'deferred',
+    expectedViolations: [],
+    expectAuthorized: false,
+    description: 'tracked record 标记 generated copy → 排除，绝不计为稳定生产调用点',
+  },
+  {
+    file: 'bad-oneoff.json',
+    expectedStatus: 'deferred',
+    expectedViolations: [],
+    expectAuthorized: false,
+    description: 'tracked record 标记 one-off experiment → 排除，绝不授权',
+  },
+  {
+    file: 'bad-deadcopy.json',
+    expectedStatus: 'deferred',
+    expectedViolations: [],
+    expectAuthorized: false,
+    description: 'tracked record 标记 dead copy → 排除，绝不授权',
+  },
+  {
+    file: 'bad-prose-views.json',
+    expectedStatus: 'deferred',
+    expectedViolations: [],
+    expectAuthorized: false,
+    description: '三个结构视图均为自由文本 → typed 结构证据不足，deferred',
+  },
+];
+
 // ==================== 测试执行器 ====================
 
 interface CaseResult {
@@ -3563,6 +3991,347 @@ async function runCodeHealthCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+// -------------------- Phase 1 只读发现执行器 --------------------
+
+async function loadPhase1Fixture(abs: string): Promise<CodeHealthPhase1Fixture> {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs is a self-test-registered fixture beneath samples/
+  return parseJsonSafe<CodeHealthPhase1Fixture>(await fs.readFile(abs, 'utf-8'));
+}
+
+function phase1UnexercisedTrace(revision: RevisionIdentity) {
+  return {
+    revision,
+    scenarios: [{ id: 'unexercised', environment: 'ci', reached: null, observation: 'unavailable' as const }],
+    rawTraceSha256: 'd'.repeat(64),
+  };
+}
+
+async function runCodeHealthPhase1StaticCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_HEALTH_PHASE1_STATIC_CASES) {
+    const abs = path.join(samplesDir, 'code-health/phase1/static', c.file);
+    const fixture = await loadPhase1Fixture(abs);
+    const report = buildStaticInventory({
+      files: fixture.files,
+      sourceText: fixture.sourceText,
+      revision: fixture.revision,
+    });
+    const leads = mergeDynamicTrace(report, phase1UnexercisedTrace(fixture.revision));
+    const details: string[] = [];
+    const anyBlocked = leads.some((lead) => lead.status === 'blocked');
+    if (anyBlocked !== c.expectedBlocked) {
+      details.push(`  - 期望 blocked=${c.expectedBlocked}，实际 ${anyBlocked}（leads=${leads.length}）`);
+    }
+    for (const category of c.expectedCategories ?? []) {
+      if (!report.categories.includes(category)) {
+        details.push(`  - 缺 category ${category}（实际 ${report.categories.join(',')}）`);
+      }
+    }
+    for (const expected of fixture.expectedReferences ?? []) {
+      const found = report.references.some(
+        (reference) =>
+          reference.kind === expected.kind && reference.symbol === expected.symbol && reference.path === expected.path,
+      );
+      if (!found) {
+        details.push(`  - 缺 reference ${expected.kind}:${expected.symbol}@${expected.path}`);
+      }
+    }
+    for (const unavailable of fixture.expectedUnavailable ?? []) {
+      if (!report.unknowns.includes(unavailable)) {
+        details.push(`  - 期望 unavailable ${unavailable}（实际 ${report.unknowns.join(',')}）`);
+      }
+    }
+    results.push({
+      name: `code-health/phase1/static/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
+async function runCodeHealthPhase1GuardCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_HEALTH_PHASE1_GUARD_CASES) {
+    const abs = path.join(samplesDir, 'code-health/phase1/guards', c.file);
+    const fixture = await loadPhase1Fixture(abs);
+    const details: string[] = [];
+    let lead = fixture.lead;
+    if (lead === undefined && Array.isArray(fixture.files) && fixture.sourceText !== undefined) {
+      const report = buildStaticInventory({
+        files: fixture.files,
+        sourceText: fixture.sourceText,
+        revision: fixture.revision,
+      });
+      lead = mergeDynamicTrace(report, phase1UnexercisedTrace(fixture.revision))[0];
+    }
+    if (lead === undefined) {
+      details.push('  - 无 candidate lead（静态候选选择可能回归）');
+    } else {
+      const context = fixture.context as FalsePositiveContext;
+      const violations = checkFalsePositiveGuards(lead, context);
+      const matched = c.expectedViolations === 'empty' ? violations.length === 0 : violations.length > 0;
+      if (!matched) {
+        details.push(`  - 期望 guard ${c.expectedViolations}，实际 ${violations.length} 条：${violations.join('; ')}`);
+      }
+      if (c.expectedClassification !== undefined && lead.classification !== c.expectedClassification) {
+        details.push(`  - 期望 classification=${c.expectedClassification}，实际 ${lead.classification}`);
+      }
+    }
+    results.push({
+      name: `code-health/phase1/guards/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
+async function runCodeHealthPhase1DynamicCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_HEALTH_PHASE1_DYNAMIC_CASES) {
+    const abs = path.join(samplesDir, 'code-health/phase1/dynamic', c.file);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs is a self-test-registered fixture beneath samples/
+    const fixture = parseJsonSafe<{ scenarios?: Phase1Scenario[] }>(await fs.readFile(abs, 'utf-8'));
+    const details: string[] = [];
+    const scenarios = fixture.scenarios;
+    if (!Array.isArray(scenarios) || scenarios.length === 0) {
+      details.push('  - scenarios 必须是非空数组');
+    } else {
+      for (const [index, scenario] of scenarios.entries()) {
+        if (
+          typeof scenario.id !== 'string' ||
+          typeof scenario.environment !== 'string' ||
+          typeof scenario.command !== 'string'
+        ) {
+          details.push(`  - scenario[${index}] 缺 id/environment/command`);
+        }
+      }
+      const applicable = scenarios.filter((scenario) => classifyScenario(scenario, process.platform).applicable).length;
+      if (c.expectedApplicable === 'at-least-one') {
+        if (applicable < 1) details.push('  - 至少应有一个可在当前 host 运行的 scenario');
+        if (!scenarios.some((scenario) => scenario.supported === false)) {
+          details.push('  - 应含声明 supported=false 的环境（保证 unexercisedScenarios 非空）');
+        }
+      } else if (applicable !== c.expectedApplicable) {
+        details.push(`  - 期望 applicable=${c.expectedApplicable}，实际 ${applicable}`);
+      }
+    }
+    results.push({
+      name: `code-health/phase1/dynamic/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
+/** Phase 1 candidate review + deletion executor: the four apply states must stay fail-closed. */
+async function runCodeHealthApplyCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_HEALTH_APPLY_CASES) {
+    const abs = path.join(samplesDir, 'code-health/apply', c.file);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs is a self-test-registered fixture beneath samples/
+    const fixture = parseJsonSafe<CodeHealthApplyFixture>(await fs.readFile(abs, 'utf-8'));
+    const details: string[] = [];
+    let result: Awaited<ReturnType<typeof applyApproved>> | null = null;
+    try {
+      result = await applyApproved({
+        candidate: fixture.candidate,
+        approval: fixture.approval as ApprovalDecision,
+        mode: fixture.mode,
+        repositoryRoot: '.',
+        currentRevision: fixture.candidate.revision,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (c.expected === 'approval-required') {
+        if (!/HUMAN_APPROVAL_REQUIRED/.test(message))
+          details.push(`  - 期望 HUMAN_APPROVAL_REQUIRED，实际：${message}`);
+      } else if (c.expected === 'scope-mismatch') {
+        if (!/SCOPE_MISMATCH|scope/i.test(message)) details.push(`  - 期望 scope fail-closed，实际：${message}`);
+      } else {
+        details.push(`  - 不期望抛错：${message}`);
+      }
+    }
+    if (result !== null) {
+      if (c.expected === 'approval-required' || c.expected === 'scope-mismatch') {
+        details.push(`  - 期望 fail-closed 拒绝，实际返回 ${result.kind}`);
+      } else if (result.kind !== 'patch-proposal') {
+        details.push(`  - 期望受控 proposal，实际 ${result.kind}`);
+      } else {
+        if (!/\.patch$/.test(result.patchPath)) details.push(`  - patchPath 不受控：${result.patchPath}`);
+        if (result.applied !== false) details.push('  - proposal 不得声称 applied');
+        if (result.rollback?.executable !== true) details.push('  - rollback plan 必须 executable');
+      }
+    }
+    if (c.expected === 'rollback-failure') {
+      const executable = await executeRollback(fixture.candidate.rollback);
+      if (executable !== false) details.push('  - 非可执行 rollback plan 误报成功');
+    }
+    results.push({
+      name: `code-health/apply/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
+/** Phase 2 gap matrix: discovery, matrix, and RED/GREEN evidence must all stay fail-closed. */
+async function runCodeHealthGapCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_HEALTH_GAP_CASES) {
+    const abs = path.join(samplesDir, 'code-health/phase2', c.file);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs is a self-test-registered fixture beneath samples/
+    const fixture = parseJsonSafe<CodeHealthGapFixture>(await fs.readFile(abs, 'utf-8'));
+    const details: string[] = [];
+    let reasons: string[] = [];
+    try {
+      if (fixture.kind === 'discovery') {
+        const matrix = findGaps(fixture.discovery as GapDiscoveryInput);
+        if (matrix.coverageAuthorization !== false) {
+          details.push('  - coverageAuthorization 必须恒为 false（coverage 仅信号）');
+        }
+        if (c.expectedKindCount !== undefined) {
+          const kinds = new Set(matrix.rows.map((row) => row.kind));
+          if (kinds.size !== c.expectedKindCount) {
+            details.push(`  - 期望发现 ${c.expectedKindCount} 个维度，实际 ${kinds.size}（${[...kinds].join(', ')}）`);
+          }
+        }
+        reasons = validateGapMatrix({ rows: matrix.rows }, fixture.ledger as CodeHealthLedger);
+      } else if (fixture.kind === 'matrix') {
+        reasons = validateGapMatrix({ rows: fixture.rows }, fixture.ledger as CodeHealthLedger);
+      } else {
+        reasons = validateRedGreenEvidence(
+          fixture.gap as GapRow,
+          fixture.results as CommandEvidence[],
+          fixture.ledger as CodeHealthLedger,
+        );
+      }
+    } catch (error) {
+      reasons = [error instanceof Error ? error.message : String(error)];
+    }
+    const passed = c.expectedPassed ? reasons.length === 0 : reasons.length > 0;
+    if (!passed) details.push(`  - 期望 valid=${c.expectedPassed}，实际 reasons=${JSON.stringify(reasons)}`);
+    if (!c.expectedPassed && c.expectedReasonPatterns) {
+      details.push(...matchReasonPatterns(reasons, c.expectedReasonPatterns));
+    }
+    results.push({
+      name: `code-health/phase2/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
+/**
+ * Phase 3 protected test inventory: schema validity plus ledger-anchored removal review. A removal
+ * claim must carry a computed equivalent survivor and fully explained pre/post facts; author/age never
+ * decide.
+ */
+async function runCodeHealthTestInventoryCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_HEALTH_TEST_CASES) {
+    const abs = path.join(samplesDir, 'code-health/phase3', c.file);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs is a self-test-registered fixture beneath samples/
+    const document = parseJsonSafe(await fs.readFile(abs, 'utf-8'));
+    const wrapped =
+      typeof document === 'object' &&
+      document !== null &&
+      !Array.isArray(document) &&
+      typeof (document as Record<string, unknown>).inventory === 'object' &&
+      (document as Record<string, unknown>).inventory !== null &&
+      !Array.isArray((document as Record<string, unknown>).inventory);
+    const record = document as Record<string, unknown>;
+    const review = wrapped
+      ? { inventory: record.inventory, ledger: record.ledger }
+      : { inventory: document as unknown };
+    const schema = validateBySchema('code-health-test-inventory', review.inventory);
+    const reasons = [...schema.errorMessages, ...evaluateTestInventory(review).violations];
+    const details: string[] = [];
+    const passed = c.expectedPassed ? reasons.length === 0 : reasons.length > 0;
+    if (!passed) details.push(`  - 期望 valid=${c.expectedPassed}，实际 reasons=${JSON.stringify(reasons)}`);
+    if (!c.expectedPassed && c.expectedReasonPatterns) {
+      details.push(...matchReasonPatterns(reasons, c.expectedReasonPatterns));
+    }
+    results.push({
+      name: `code-health/phase3/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
+/**
+ * Phase 4 duplicate cluster / abstraction guard: the cluster is recomputed from input + tracked-fact
+ * authority, the stable call-site floor (positive `call-site:`/`contract:`/`regression:` facts, no
+ * generated/dead/one-off exclusion) and the item-wise semantic proof decide `under-review` vs
+ * `deferred`/`rejected`, and un-authorizing inputs (test-only, prose-only views, platform/lifecycle
+ * differences, a shorter diff) must never yield an authorization. The IO entry points prove HEAD-tracked
+ * provenance; this pure runner exercises the pure semantics only.
+ */
+async function runCodeHealthPhase4Cases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODE_HEALTH_PHASE4_CASES) {
+    const abs = path.join(samplesDir, 'code-health/phase4', c.file);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs is a self-test-registered fixture beneath samples/
+    const fixture = parseJsonSafe<CodeHealthDuplicateFixture>(await fs.readFile(abs, 'utf-8'));
+    const details: string[] = [];
+    let violations: string[] = [];
+    let status: DuplicateCluster['status'] | null = null;
+    let authorized = false;
+    if (fixture.expectedStatus !== c.expectedStatus) {
+      details.push(`  - fixture.expectedStatus=${fixture.expectedStatus} 与用例声明 ${c.expectedStatus} 不一致`);
+    }
+    try {
+      const cluster = clusterDuplicates(fixture.input, fixture.authority);
+      status = cluster.status;
+      const merged: DuplicateCluster = { ...cluster };
+      if (fixture.review?.equivalenceProof !== undefined) merged.equivalenceProof = fixture.review.equivalenceProof;
+      if (fixture.review?.maintenanceBenefit !== undefined)
+        merged.maintenanceBenefit = fixture.review.maintenanceBenefit;
+      if (fixture.review?.rollback !== undefined) merged.rollback = fixture.review.rollback;
+      if (fixture.review?.redaction !== undefined) merged.redaction = fixture.review.redaction;
+      if (fixture.proposal !== undefined) {
+        violations = proveAbstraction(merged, fixture.proposal);
+      }
+      authorized =
+        violations.length === 0 &&
+        status === 'under-review' &&
+        fixture.review?.equivalenceProof !== undefined &&
+        fixture.proposal !== undefined;
+    } catch (error) {
+      violations = [error instanceof Error ? error.message : String(error)];
+    }
+    if (status !== c.expectedStatus) {
+      details.push(`  - 期望 status=${c.expectedStatus}，实际 ${String(status)}`);
+    }
+    if (authorized !== c.expectAuthorized) {
+      details.push(`  - 期望 authorized=${String(c.expectAuthorized)}，实际 ${String(authorized)}`);
+    }
+    if (c.expectedViolations.length > 0) details.push(...matchReasonPatterns(violations, c.expectedViolations));
+    if (c.expectedViolations.length === 0 && violations.length > 0) {
+      details.push(`  - 期望无 guard 违规，实际 ${JSON.stringify(violations)}`);
+    }
+    results.push({
+      name: `code-health/phase4/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 // -------------------- Metadata（版本号双写一致性） --------------------
 
 async function runMetadataCheck(skillRoot: string): Promise<CaseResult[]> {
@@ -3620,6 +4389,13 @@ async function main(): Promise<void> {
   console.log(`RootCause 用例 : ${ROOTCAUSE_CASES.length}`);
   console.log(`Schema 用例    : ${SCHEMA_CASES.length}`);
   console.log(`CodeHealth 用例: ${CODE_HEALTH_CASES.length}`);
+  console.log(`CodeHealth Phase1 静态用例: ${CODE_HEALTH_PHASE1_STATIC_CASES.length}`);
+  console.log(`CodeHealth Phase1 Guard 用例: ${CODE_HEALTH_PHASE1_GUARD_CASES.length}`);
+  console.log(`CodeHealth Phase1 动态用例: ${CODE_HEALTH_PHASE1_DYNAMIC_CASES.length}`);
+  console.log(`CodeHealth Apply 用例: ${CODE_HEALTH_APPLY_CASES.length}`);
+  console.log(`CodeHealth Gap 用例: ${CODE_HEALTH_GAP_CASES.length}`);
+  console.log(`CodeHealth Phase3 Test 用例: ${CODE_HEALTH_TEST_CASES.length}`);
+  console.log(`CodeHealth Phase4 Duplicate 用例: ${CODE_HEALTH_PHASE4_CASES.length}`);
   console.log(`BDD 用例       : ${BDD_CASES.length}`);
   console.log(`Coverage 用例  : ${COVERAGE_CASES.length}`);
   console.log(`Exemption 用例 : ${EXEMPTION_CASES.length}`);
@@ -3674,6 +4450,9 @@ async function main(): Promise<void> {
     phase3SpecStructureResults,
     detailedEnhanceResults,
     phase4SpecStructureResults,
+    codeHealthPhase1StaticResults,
+    codeHealthPhase1GuardResults,
+    codeHealthPhase1DynamicResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -3710,8 +4489,15 @@ async function main(): Promise<void> {
     runOpenspecArchiveCases(samplesDir),
     runUatPathMappingCases(samplesDir),
     runIcebergCases(samplesDir),
+    runCodeHealthPhase1StaticCases(samplesDir),
+    runCodeHealthPhase1GuardCases(samplesDir),
+    runCodeHealthPhase1DynamicCases(samplesDir),
   ]);
   const codeHealthResults = await runCodeHealthCases(samplesDir);
+  const codeHealthApplyResults = await runCodeHealthApplyCases(samplesDir);
+  const codeHealthGapResults = await runCodeHealthGapCases(samplesDir);
+  const codeHealthTestResults = await runCodeHealthTestInventoryCases(samplesDir);
+  const codeHealthPhase4Results = await runCodeHealthPhase4Cases(samplesDir);
   const all = [
     ...verifierResults,
     ...gateResults,
@@ -3749,6 +4535,13 @@ async function main(): Promise<void> {
     ...phase3SpecStructureResults,
     ...detailedEnhanceResults,
     ...phase4SpecStructureResults,
+    ...codeHealthPhase1StaticResults,
+    ...codeHealthPhase1GuardResults,
+    ...codeHealthPhase1DynamicResults,
+    ...codeHealthApplyResults,
+    ...codeHealthGapResults,
+    ...codeHealthTestResults,
+    ...codeHealthPhase4Results,
   ];
 
   const passedCount = all.filter((r) => r.passed).length;

@@ -1,0 +1,149 @@
+{
+  "inventory": {
+    "inventoryId": "INV-CHG-P3-20260907-901",
+    "candidateId": "CHG-P3-20260907-901",
+    "revision": {
+      "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "analyzedAt": "2026-09-07T00:00:00.000Z"
+    },
+    "tests": [
+      {
+        "testId": "test-unauth-old",
+        "file": "tests/legacy/auth.test.ts",
+        "symbol": "rejectsUnauthorizedCaller",
+        "author": "human",
+        "createdAt": "2016-01-01T00:00:00.000Z",
+        "lastChangedAt": "2016-01-02T00:00:00.000Z",
+        "level": "unit",
+        "setup": "anonymous request fixture",
+        "stimulus": "no bearer token",
+        "oracle": "rejects an unauthorized caller",
+        "failureSensitivity": "detects an authorization bypass",
+        "rtmIds": ["REQ-SEC-002"],
+        "scenarioClass": "security",
+        "governanceFacts": ["redaction"]
+      },
+      {
+        "testId": "test-unauth-new",
+        "file": "tests/auth.test.ts",
+        "symbol": "rejectsUnauthorizedCaller",
+        "author": "human",
+        "createdAt": "2025-06-01T00:00:00.000Z",
+        "lastChangedAt": "2026-08-01T00:00:00.000Z",
+        "level": "unit",
+        "setup": "anonymous request fixture",
+        "stimulus": "no bearer token",
+        "oracle": "rejects an unauthorized caller",
+        "failureSensitivity": "detects an authorization bypass",
+        "rtmIds": ["REQ-SEC-002"],
+        "scenarioClass": "security",
+        "governanceFacts": ["redaction"]
+      }
+    ],
+    "protectedFacts": [
+      {
+        "testId": "test-unauth-old",
+        "class": "security",
+        "reason": "The authorization boundary assertion being removed."
+      },
+      {
+        "testId": "test-unauth-new",
+        "class": "security",
+        "reason": "The retained equivalent authorization oracle that preserves the contract."
+      }
+    ],
+    "removalProof": {
+      "candidateTestId": "test-unauth-old",
+      "survivorTestId": "test-unauth-new",
+      "reason": "The legacy duplicate is covered by the retained equivalent assertion and its RTM row is rehomed.",
+      "setupEquivalent": true,
+      "stimulusEquivalent": true,
+      "oracleEquivalent": true,
+      "failureSensitivityEquivalent": true,
+      "levelEquivalent": true,
+      "rtmRehomed": true,
+      "governanceRehomed": true
+    },
+    "preRegression": {
+      "command": {
+        "command": "node suite.mjs",
+        "cwd": ".",
+        "environment": {
+          "NODE_ENV": "test"
+        },
+        "platform": "linux",
+        "toolVersions": {
+          "node": "20.0.0"
+        },
+        "startedAt": "2026-09-07T00:01:00.000Z",
+        "endedAt": "2026-09-07T00:01:02.000Z",
+        "exitCode": 0,
+        "observation": "observed",
+        "rawOutputPath": ".w-model/code-health/raw/pre.log",
+        "rawOutputSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "testCount": 12,
+      "passed": true,
+      "coverageProvenance": "coverage/pre.json",
+      "governanceFacts": [
+        "rehomed:rtm",
+        "rehomed:coverage",
+        "rehomed:docs-consistency",
+        "rehomed:sample-matrix",
+        "pre-push:18"
+      ]
+    },
+    "postRegression": {
+      "command": {
+        "command": "node suite.mjs",
+        "cwd": ".",
+        "environment": {
+          "NODE_ENV": "test"
+        },
+        "platform": "linux",
+        "toolVersions": {
+          "node": "20.0.0"
+        },
+        "startedAt": "2026-09-07T00:03:00.000Z",
+        "endedAt": "2026-09-07T00:03:02.000Z",
+        "exitCode": 0,
+        "observation": "observed",
+        "rawOutputPath": ".w-model/code-health/raw/post.log",
+        "rawOutputSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "testCount": 11,
+      "passed": true,
+      "coverageProvenance": "coverage/post.json",
+      "governanceFacts": [
+        "pre-test-count:12",
+        "post-test-count:11",
+        "coverage-provenance:coverage/post.json",
+        "pre-push:18",
+        "pre-push-order:sha256:aaaa",
+        "post-push-order:sha256:aaaa",
+        "pre-self-test:302",
+        "post-self-test:302",
+        "pre-docs-consistency:41",
+        "post-docs-consistency:41",
+        "fixture-reachability:all-referenced",
+        "rehomed:rtm",
+        "rehomed:coverage",
+        "rehomed:docs-consistency",
+        "rehomed:sample-matrix"
+      ]
+    },
+    "coverageProvenance": {
+      "path": "coverage/coverage-final.json",
+      "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "measuredAt": "2026-09-07T00:03:02.000Z",
+      "signalOnly": true
+    },
+    "redaction": {
+      "status": "clean",
+      "reasons": ["secrets removed"]
+    }
+  }
+}

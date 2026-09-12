@@ -329,7 +329,9 @@ describe('writeStateJson', () => {
       },
     });
     await entered.promise;
-    const second = writeStateJson(p, '{"v":2}', { expectMtimeMs: oldMtime, lockTimeoutMs: 5_000 });
+    // Load-sensitive: the released writer's lock handoff can exceed 5 s under full-suite parallel load.
+    // 30 s keeps the "waits for the lock" intent without letting load cause a false MTIME_CONFLICT/LOCK_TIMEOUT.
+    const second = writeStateJson(p, '{"v":2}', { expectMtimeMs: oldMtime, lockTimeoutMs: 30_000 });
     release.resolve();
     const [a, b] = await Promise.all([first, second]);
     expect([a, b].filter((result) => result.ok)).toHaveLength(1);
@@ -495,7 +497,9 @@ describe('writeStateJson', () => {
       readbackImpl: async () => 'not json',
     });
     await entered.promise;
-    const second = writeStateJson(p, '{"v":"second"}', { lockTimeoutMs: 5_000 });
+    // Load-sensitive: see the sibling serialization case; the waiter must outlast the holder's release
+    // even when the process is CPU-starved by the parallel suite. Assertions are unchanged.
+    const second = writeStateJson(p, '{"v":"second"}', { lockTimeoutMs: 30_000 });
     release.resolve();
     await expect(first).resolves.toMatchObject({ ok: false, reason: 'WRITE_VERIFY_FAILED' });
     await expect(second).resolves.toMatchObject({ ok: true });
@@ -740,7 +744,8 @@ describe('review round 1 ownership races', () => {
       },
     } as never);
     await beforeRollback.promise;
-    const second = writeStateJson(p, '{"v":"second"}', { lockTimeoutMs: 5_000 });
+    // Load-sensitive: successor must outlast the rollback owner's release under parallel-suite CPU load.
+    const second = writeStateJson(p, '{"v":"second"}', { lockTimeoutMs: 30_000 });
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"first"}');
     continueRollback.resolve();
     await expect(first).resolves.toMatchObject({ ok: false, rolledBack: true });

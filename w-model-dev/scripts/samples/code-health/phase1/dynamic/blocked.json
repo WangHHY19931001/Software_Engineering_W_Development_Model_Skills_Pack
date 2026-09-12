@@ -1,0 +1,15 @@
+{
+  "scenarios": [
+    {
+      "id": "other-host-declared-unsupported",
+      "environment": "aix-korn",
+      "platform": "aix",
+      "shell": "ksh",
+      "supported": false,
+      "command": "node",
+      "args": ["--version"],
+      "cwd": ".",
+      "timeoutMs": 15000
+    }
+  ]
+}

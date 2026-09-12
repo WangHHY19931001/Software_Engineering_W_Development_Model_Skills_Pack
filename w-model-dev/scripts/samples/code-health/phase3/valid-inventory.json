@@ -1,0 +1,81 @@
+{
+  "inventoryId": "INV-CHG-P3-20260907-901",
+  "candidateId": "CHG-P3-20260907-901",
+  "revision": {
+    "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "analyzedAt": "2026-09-07T00:00:00.000Z"
+  },
+  "tests": [
+    {
+      "testId": "test-old-model-neg",
+      "file": "tests/legacy/old-model.test.ts",
+      "symbol": "rejectsMalformedInput",
+      "author": "human",
+      "createdAt": "2015-01-01T00:00:00.000Z",
+      "lastChangedAt": "2015-01-02T00:00:00.000Z",
+      "level": "unit",
+      "setup": "legacy fixture",
+      "stimulus": "malformed payload",
+      "oracle": "rejects the malformed payload",
+      "failureSensitivity": "detects a missing validation guard",
+      "rtmIds": ["REQ-SEC-001"],
+      "scenarioClass": "malformed-input",
+      "governanceFacts": ["governance:legacy-human"]
+    }
+  ],
+  "protectedFacts": [
+    {
+      "testId": "test-old-model-neg",
+      "class": "unique-negative",
+      "reason": "The only assertion covering malformed input rejection; author and age are provenance only."
+    }
+  ],
+  "preRegression": {
+    "command": {
+      "command": "node suite.mjs",
+      "cwd": ".",
+      "environment": { "NODE_ENV": "test" },
+      "platform": "linux",
+      "toolVersions": { "node": "20.0.0" },
+      "startedAt": "2026-09-07T00:01:00.000Z",
+      "endedAt": "2026-09-07T00:01:02.000Z",
+      "exitCode": 0,
+      "observation": "observed",
+      "rawOutputPath": ".w-model/code-health/raw/pre.log",
+      "rawOutputSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    "testCount": 10,
+    "passed": true,
+    "coverageProvenance": "coverage/pre.json",
+    "governanceFacts": ["pre-push:18", "post-test-count:10"]
+  },
+  "postRegression": {
+    "command": {
+      "command": "node suite.mjs",
+      "cwd": ".",
+      "environment": { "NODE_ENV": "test" },
+      "platform": "linux",
+      "toolVersions": { "node": "20.0.0" },
+      "startedAt": "2026-09-07T00:03:00.000Z",
+      "endedAt": "2026-09-07T00:03:02.000Z",
+      "exitCode": 0,
+      "observation": "observed",
+      "rawOutputPath": ".w-model/code-health/raw/post.log",
+      "rawOutputSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "testCount": 10,
+    "passed": true,
+    "coverageProvenance": "coverage/post.json",
+    "governanceFacts": ["pre-push:18", "post-test-count:10"]
+  },
+  "coverageProvenance": {
+    "path": "coverage/coverage-final.json",
+    "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "measuredAt": "2026-09-07T00:03:02.000Z",
+    "signalOnly": true
+  },
+  "redaction": { "status": "clean", "reasons": ["secrets removed"] }
+}

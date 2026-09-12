@@ -18,7 +18,8 @@
  *     convention (runtime evidence is not committed), which is what keeps `git status --porcelain` empty
  *     while real raw outputs and symlink fixtures exist on disk.
  *
- * Boundary: `applyApproved` and the archive producer/consumer/verifier stay typed `NOT_IMPLEMENTED`.
+ * Boundary: `applyApproved` resolves a real exact-scope patch proposal (it never writes without the
+ * human-approved IO executor), while the archive producer/consumer/verifier stay typed `NOT_IMPLEMENTED`.
  * A green 1E run proves the Task 1 contract/evidence/lifecycle integration, never Task 8 archive.
  */
 
@@ -78,6 +79,25 @@ const EMPTY_SHA256 = createHash('sha256').update(Buffer.alloc(0)).digest('hex');
 const TIME_BASE = Date.parse('2026-09-07T00:00:00.000Z');
 /** Sibling test transient (`code-health-ledger.test.ts` raw outputs) that may appear mid-run. */
 const SIBLING_TEST_TRANSIENT = '.tmp-code-health-test-output';
+/**
+ * Sibling test transient (`dependency-boundaries.test.ts`) that briefly writes a bare-fs fixture into the
+ * shared `w-model-dev/scripts/logic/` directory and removes it in `finally`. Under full-suite parallelism
+ * the create→delete window can overlap this file's repo-root purity snapshots, so the untracked artifact is
+ * excluded by an explicit, tightly-scoped name pattern. The exclusion only skips these sibling-owned
+ * transient paths; a tracked file being modified is still reported by `git diff --name-only` (the diff
+ * assertion below does not consult this pattern), so the purity invariant is preserved.
+ */
+const SIBLING_TEST_TRANSIENT_PATTERNS: readonly RegExp[] = [
+  new RegExp(`(^|/)${SIBLING_TEST_TRANSIENT}/`),
+  /(^|\/)\.d2-boundary-fixture-\d+\.ts$/,
+];
+
+/** True only for sibling-test transients that may legitimately appear mid-run inside the repo root. */
+function isSiblingTestTransient(statusLine: string): boolean {
+  // `git status --porcelain` lines look like `?? <path>`; isolate the path before matching.
+  const porcelainPath = statusLine.replace(/^..\s+/, '').trim();
+  return SIBLING_TEST_TRANSIENT_PATTERNS.some((pattern) => pattern.test(porcelainPath));
+}
 
 /**
  * Canonical Git environment shared with `code-health-evidence.test.ts`: no system or user Git config and
@@ -240,11 +260,13 @@ function addedDiffNames(before: string[], after: string[]): string[] {
 /** The current repository root must not receive any new tracked/untracked artifact from this test. */
 async function expectRepositoryRootUnpolluted(before: string, beforeDiff: string[]): Promise<void> {
   const after = await gitStatusPorcelain(repoRoot);
-  const added = addedStatusLines(before, after).filter((line) => !line.includes(SIBLING_TEST_TRANSIENT));
+  const added = addedStatusLines(before, after).filter((line) => !isSiblingTestTransient(line));
   expect(added).toEqual([]);
   expect(after).not.toContain('.w-model/');
   expect(after).not.toContain('coverage/');
   expect(after).not.toContain('.zcode/');
+  // Tracked-file modification is never transient: `git diff --name-only` must stay empty, and the
+  // sibling-transient exclusion above does not apply here (a tracked edit is not an untracked status line).
   expect(addedDiffNames(beforeDiff, await gitDiffNames(repoRoot))).toEqual([]);
 }
 
@@ -1916,67 +1938,65 @@ const negativeCases: readonly NegativeCase[] = [
     },
   },
   {
-    id: 'apply-not-implemented',
+    id: 'apply-approval-scope-guard',
     targetStatus: 'approved',
-    codes: ['NOT_IMPLEMENTED'],
+    codes: ['SCOPE_MISMATCH'],
     act: async (context) => {
       const candidate = requireDefined(
         context.ledger.candidates.find((entry) => entry.candidateId === context.candidateId),
         'approved candidate',
       );
-      const result = await applyApproved({
-        candidate,
-        approval: context.approval,
-        mode: 'patch',
-        repositoryRoot: context.root,
-        currentRevision: context.revision,
-      });
-      expect(result).toEqual({
-        applied: false,
-        errorCode: 'NOT_IMPLEMENTED',
-        patchPath: null,
-        appliedFiles: [],
-        unrelatedFiles: [],
-        rollback: null,
-      });
-      return { code: result.errorCode, messages: [] };
+      const outcome = await captureTyped(() =>
+        applyApproved({
+          candidate,
+          approval: { ...context.approval, approvedFiles: [...context.selector.files, 'src/extra.ts'] },
+          mode: 'commit',
+          repositoryRoot: context.root,
+          currentRevision: context.revision,
+        }),
+      );
+      expect(outcome.code).toBe('SCOPE_MISMATCH');
+      return outcome;
     },
   },
   {
-    id: 'archive-not-implemented',
+    id: 'archive-requires-source-bound-provenance',
     targetStatus: 'verified',
-    codes: ['NOT_IMPLEMENTED'],
+    codes: ['STRUCTURE_INVALID', 'EVIDENCE_INVALID'],
     act: async (context) => {
       const candidate = requireDefined(
         context.ledger.candidates.find((entry) => entry.candidateId === context.candidateId),
         'verified candidate',
       );
       const boundary = createTask1ArchiveBoundary();
-      const results = [
-        await boundary.producer.produce({
-          candidate,
-          ledger: context.ledger,
-          approval: context.approval,
-          verificationLevel: 'package-only',
-        }),
-        await boundary.consumer.consume({
-          manifestPath: 'archive/manifest.json',
-          packageRoot: context.root,
-          verificationLevel: 'package-only',
-        }),
-        await boundary.verifier.verify({
-          manifestPath: 'archive/manifest.json',
-          packageRoot: context.root,
-          verificationLevel: 'source-bound',
-          sourceProject: context.root,
-          expectedRevision: context.revision,
-        }),
-      ];
-      for (const result of results) {
-        expect(result).toMatchObject({ ok: false, errorCode: 'NOT_IMPLEMENTED', manifest: null, createdPaths: [] });
+      // A source-bound archive without an explicit source project must fail closed before any write, and a
+      // declared source-bound verification without a source project never reports a source-bound result.
+      const producerResult = await boundary.producer.produce({
+        candidate,
+        ledger: context.ledger,
+        approval: context.approval,
+        verificationLevel: 'source-bound',
+        campaignRoot: context.root,
+        packageRoot: path.join(context.root, 'archive'),
+        sources: [],
+      });
+      const verifierResult = await boundary.verifier.verify({
+        manifestPath: 'archive/manifest.json',
+        packageRoot: context.root,
+        verificationLevel: 'source-bound',
+        expectedRevision: context.revision,
+      });
+      for (const result of [producerResult, verifierResult]) {
+        expect(result.ok).toBe(false);
+        expect(result.manifest).toBeNull();
+        expect(result.createdPaths).toEqual([]);
+        expect(result.verificationLevel).toBe('package-only');
       }
       expect(await exists(path.join(context.root, 'archive'))).toBe(false);
-      return { code: results[0]?.errorCode ?? null, messages: results.map((result) => result.reason) };
+      return {
+        code: producerResult.errorCode,
+        messages: [producerResult.reason, verifierResult.reason],
+      };
     },
   },
 ];
@@ -2057,16 +2077,21 @@ describe('code-health task1 isolated git integration', () => {
       candidate: verifiedCandidate,
       ledger: verifiedLedger,
       approval,
-      verificationLevel: 'package-only',
+      verificationLevel: 'source-bound',
+      campaignRoot: boundaries.root,
+      packageRoot: path.join(boundaries.root, 'archive'),
+      sources: [],
     });
-    expect(archive).toMatchObject({ ok: false, errorCode: 'NOT_IMPLEMENTED', manifest: null });
+    // A source-bound archive without explicit provenance fails closed and writes nothing.
+    expect(archive).toMatchObject({ ok: false, manifest: null, verificationLevel: 'package-only' });
+    expect(archive.archivedAsPassed).toBe(false);
     expect(await fs.stat(path.join(boundaries.root, 'archive')).catch(() => null)).toBeNull();
 
     expect(await gitStatusPorcelain(boundaries.root)).toBe('');
     await expectRepositoryRootUnpolluted(repoStatusBefore, repoDiffBefore);
   });
 
-  it('applyApproved 和所有 archive boundary 结果为 NOT_IMPLEMENTED，并保持 clean worktree', async () => {
+  it('applyApproved 生成精确 scope 的 patch proposal，archive boundary 保持 NOT_IMPLEMENTED 且 clean worktree', async () => {
     const repoStatusBefore = await gitStatusPorcelain(repoRoot);
     const repoDiffBefore = await gitDiffNames(repoRoot);
     const project = await createIsolatedProject();
@@ -2127,7 +2152,8 @@ describe('code-health task1 isolated git integration', () => {
       'approved candidate',
     );
 
-    // Task 1 must be able to validate a real exact-scope approval and still refuse to apply anything.
+    // Task 3 resolves a real exact-scope approval into a controlled patch proposal; the pure planner never
+    // writes and the IO executor is the only delete path (never exercised here).
     const apply = await applyApproved({
       candidate: approvedCandidateFixture,
       approval,
@@ -2135,14 +2161,16 @@ describe('code-health task1 isolated git integration', () => {
       repositoryRoot: project.root,
       currentRevision: project.initialRevision,
     });
-    expect(apply).toEqual({
+    expect(apply).toMatchObject({
+      kind: 'patch-proposal',
       applied: false,
-      errorCode: 'NOT_IMPLEMENTED',
-      patchPath: null,
+      errorCode: null,
+      mode: 'patch',
+      patchPath: expect.stringMatching(/\.patch$/),
       appliedFiles: [],
       unrelatedFiles: [],
-      rollback: null,
     });
+    expect(apply.rollback?.executable).toBe(true);
 
     const implementedRevision = await commitImplementedState(project.root);
     const implementedCommands: ChainCommands = {
@@ -2196,29 +2224,34 @@ describe('code-health task1 isolated git integration', () => {
 
     const boundary = createTask1ArchiveBoundary();
     for (const result of [
+      // Incomplete declared sources: a real producer refuses before writing anything.
       await boundary.producer.produce({
         candidate: verifiedCandidateFixture,
         ledger: verifiedLedger,
         approval,
         verificationLevel: 'package-only',
+        campaignRoot: project.root,
+        packageRoot: path.join(project.root, 'archive'),
+        sources: [],
       }),
+      // A missing manifest can never verify.
       await boundary.consumer.consume({
         manifestPath: 'archive/manifest.json',
         packageRoot: project.root,
         verificationLevel: 'package-only',
       }),
+      // A source-bound declaration without explicit provenance fails closed.
       await boundary.verifier.verify({
         manifestPath: 'archive/manifest.json',
         packageRoot: project.root,
         verificationLevel: 'source-bound',
-        sourceProject: project.root,
         expectedRevision: implementedRevision,
       }),
     ]) {
-      expect(result.errorCode).toBe('NOT_IMPLEMENTED');
-      expect(result.manifest).toBeNull();
       expect(result.ok).toBe(false);
+      expect(result.manifest).toBeNull();
       expect(result.createdPaths).toEqual([]);
+      expect(result.archivedAsPassed).toBe(false);
     }
 
     expect(await snapshotTree(project.root)).toEqual(before);
@@ -2359,4 +2392,16 @@ describe('code-health task1 isolated git integration', () => {
       await expectRepositoryRootUnpolluted(repoStatusBefore, repoDiffBefore);
     });
   }
+
+  it('repo-root purity excludes only known sibling transients and still flags tracked edits', () => {
+    // Sibling-owned transient paths (untracked) are excluded: `.d2-boundary-fixture-<pid>.ts` written by
+    // `dependency-boundaries.test.ts` and the ledger test's `.tmp-code-health-test-output`.
+    expect(isSiblingTestTransient('?? w-model-dev/scripts/logic/.d2-boundary-fixture-9980.ts')).toBe(true);
+    expect(isSiblingTestTransient('?? .tmp-code-health-test-output/raw/out.log')).toBe(true);
+    // Everything else is reported: a new untracked file, a modified tracked file, and look-alike names.
+    expect(isSiblingTestTransient('?? w-model-dev/scripts/logic/new-module.ts')).toBe(false);
+    expect(isSiblingTestTransient(' M w-model-dev/scripts/logic/code-health-ledger-logic.ts')).toBe(false);
+    expect(isSiblingTestTransient('?? w-model-dev/scripts/logic/.d2-boundary-fixture.ts')).toBe(false);
+    expect(isSiblingTestTransient('?? .tmp-code-health-test-output-other/file')).toBe(false);
+  });
 });

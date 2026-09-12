@@ -585,6 +585,17 @@ export interface GapDiscoveryResult {
 }
 export interface TddHarnessInput {
   gap: GapRow;
+  /**
+   * The owning candidate. CALLER-SUPPLIED: its `changeScope.files` / `tests` are used as the approved
+   * target scope, so the harness is structurally consistent with whatever record the caller passes.
+   * It is NOT unforgeable by itself (G-4) — the ledger, the G gate, and the role signature chain are the
+   * authority, and a forged candidate record is out of scope for this pure structural check. Within that
+   * scope, the implementation artifact must be one of `changeScope.files`, so an assertion/probe module
+   * can never be relabelled as "the implementation" to exclude it from the assertion artifact set.
+   */
+  candidate: CodeHealthCandidate;
+  /** Declared test artifact files (repository-relative, non-empty, exist on disk, disjoint from the implementation). */
+  testArtifacts: string[];
   testCommand: string[];
   implementation: string | null;
 }
@@ -592,6 +603,10 @@ export interface TddHarnessResult extends CommandEvidence {
   gapId: string;
   assertionHash: string;
   implementationHash: string | null;
+  /** The declared test artifacts this run bound into `assertionHash` (sorted). */
+  testArtifacts: string[];
+  /** The approved implementation artifact excluded from `assertionHash`. */
+  implementationArtifact: string;
 }
 export interface ApplyApprovedInput {
   candidate: CodeHealthCandidate;
@@ -602,6 +617,7 @@ export interface ApplyApprovedInput {
 }
 
 export interface ApplyResultNotImplemented {
+  kind: 'not-implemented';
   applied: false;
   errorCode: 'NOT_IMPLEMENTED';
   patchPath: null;
@@ -610,7 +626,50 @@ export interface ApplyResultNotImplemented {
   rollback: null;
 }
 
-export type ApplyResult = ApplyResultNotImplemented;
+export type ApplyMode = 'dry-run' | 'patch' | 'commit';
+
+/**
+ * Real, non-applying apply outcome: the exact approved scope resolved to one controlled patch path and an
+ * executable rollback plan. `commit` plans are also represented here; the IO executor promotes them to
+ * `ApplyCommitResult` only after the real patch/commit succeeded and the scope was read back.
+ */
+export interface ApplyProposalResult {
+  kind: 'patch-proposal';
+  applied: false;
+  errorCode: null;
+  mode: ApplyMode;
+  patchPath: string;
+  appliedFiles: [];
+  unrelatedFiles: [];
+  rollback: RollbackPlan;
+}
+
+/** A real commit that touched exactly `appliedFiles` (equal to the approved change scope). */
+export interface ApplyCommitResult {
+  kind: 'applied';
+  applied: true;
+  errorCode: null;
+  mode: 'commit';
+  patchPath: string;
+  appliedFiles: string[];
+  unrelatedFiles: [];
+  rollback: RollbackPlan;
+}
+
+/** Fail-closed application result: nothing was applied and no success may be claimed. */
+export interface ApplyBlockedResult {
+  kind: 'blocked';
+  applied: false;
+  errorCode: ErrorCode;
+  mode: ApplyMode;
+  patchPath: string | null;
+  appliedFiles: [];
+  unrelatedFiles: [];
+  rollback: RollbackPlan | null;
+  reason: string;
+}
+
+export type ApplyResult = ApplyResultNotImplemented | ApplyProposalResult | ApplyCommitResult | ApplyBlockedResult;
 export interface DeletionFacts {
   testCount: number;
   coverageProvenance: string;
@@ -641,19 +700,39 @@ export interface ArchiveManifest {
   rollbackRef: string;
   producerMetadata: { producerId: string; producerVersion: string };
   createdAt: string;
+  /** Candidate terminal state this package records; a non-success state is never archived as passed. */
+  archiveStatus: 'archived' | 'deferred' | 'rejected' | 'blocked' | 'rolled-back';
+  /** True only when the candidate reached `verified` with every pass gate; terminal non-success stays false. */
+  archivedAsPassed: boolean;
 }
 
 /**
- * Typed fail-closed result of every Task 1D archive boundary entry point. `NOT_IMPLEMENTED` means the real
- * archive producer/consumer/verifier belongs to Task 8; it is never a pass and never carries a manifest.
+ * Result of every Task 1D archive boundary entry point. Task 8 replaced the Task 1 typed
+ * `NOT_IMPLEMENTED` stub with the real producer/consumer/verifier, so the success path carries the verified
+ * manifest. Failures still resolve a typed `ErrorCode` with `manifest: null`; `NOT_IMPLEMENTED` remains a
+ * valid fail-closed value so an unwired caller can never observe a fabricated success.
  */
 export interface ArchiveBoundaryResult {
-  ok: false;
-  errorCode: 'NOT_IMPLEMENTED';
-  manifest: null;
+  ok: boolean;
+  errorCode: ErrorCode | null;
+  manifest: ArchiveManifest | null;
   verificationLevel: 'package-only' | 'source-bound';
-  createdPaths: [];
+  createdPaths: string[];
+  /** 0 = produced/verified, 1 = fail-closed refusal, 2 = malformed input. */
+  exitCode: 0 | 1 | 2;
+  /** Absolute path of the archive package produced or verified; null when no package was involved. */
+  path: string | null;
+  /** True only when a verified-success candidate was archived; terminal non-success archives stay false. */
+  archivedAsPassed: boolean;
   reason: string;
+}
+
+/** One declared source artifact copied into a campaign archive package. */
+export interface ArchivePackageFile {
+  /** Campaign-relative POSIX path of the declared artifact. */
+  path: string;
+  /** The archive artifact kind this source is retained as. */
+  kind: 'ledger' | 'candidate' | 'evidence' | 'approval' | 'review' | 'gate' | 'rollback';
 }
 
 export interface ArchiveProduceInput {
@@ -661,6 +740,14 @@ export interface ArchiveProduceInput {
   ledger: CodeHealthLedger;
   approval: ApprovalDecision;
   verificationLevel: 'package-only' | 'source-bound';
+  /** Explicit root that owns every declared source artifact; no implicit cwd fallback. */
+  campaignRoot: string;
+  /** Explicit root the archive package is written beneath (created by the producer). */
+  packageRoot: string;
+  /** Declared source artifacts; never inferred from prose. */
+  sources: ArchivePackageFile[];
+  /** Explicit source project required to establish a source-bound revision. */
+  sourceProject?: string;
 }
 
 export interface ArchiveConsumeInput {

@@ -4,13 +4,13 @@
 
 ## RTM 结构
 
-| 需求 ID | 需求描述 | 设计文档 | 代码模块 | 单元测试 | 集成测试 | 系统测试 | 验收测试 | 覆盖状态 |
-|---|---|---|---|---|---|---|---|---|
-| REQ-001 | 用户注册功能 | SD-3.2.1 | userController.ts | UT-001 | IT-001 | ST-001 | UAT-001 | 100% |
-| REQ-002 | 用户登录功能 | SD-3.2.2 | authService.ts | UT-002 | IT-002 | ST-002 | UAT-002 | 100% |
-| REQ-003 | 商品浏览功能 | SD-3.3.1 | productController.ts | UT-003 | IT-003 | ST-003 | UAT-003 | 100% |
-| REQ-004 | 购物车功能 | SD-3.3.2 | cartService.ts | UT-004 | IT-004 | ST-004 | UAT-004 | 100% |
-| REQ-005 | 订单管理功能 | SD-3.4.1 | orderController.ts | UT-005 | IT-005 | ST-005 | UAT-005 | 100% |
+| 需求 ID | 需求描述     | 设计文档 | 代码模块             | 单元测试 | 集成测试 | 系统测试 | 验收测试 | 覆盖状态 |
+| ------- | ------------ | -------- | -------------------- | -------- | -------- | -------- | -------- | -------- |
+| REQ-001 | 用户注册功能 | SD-3.2.1 | userController.ts    | UT-001   | IT-001   | ST-001   | UAT-001  | 100%     |
+| REQ-002 | 用户登录功能 | SD-3.2.2 | authService.ts       | UT-002   | IT-002   | ST-002   | UAT-002  | 100%     |
+| REQ-003 | 商品浏览功能 | SD-3.3.1 | productController.ts | UT-003   | IT-003   | ST-003   | UAT-003  | 100%     |
+| REQ-004 | 购物车功能   | SD-3.3.2 | cartService.ts       | UT-004   | IT-004   | ST-004   | UAT-004  | 100%     |
+| REQ-005 | 订单管理功能 | SD-3.4.1 | orderController.ts   | UT-005   | IT-005   | ST-005   | UAT-005  | 100%     |
 
 > 实际填写时使用 [templates/rtm.md](../templates/rtm.md) 模板。
 
@@ -35,15 +35,15 @@
 
 ## 各阶段登记职责
 
-| 阶段 | 登记 / 更新的 RTM 列 |
-|---|---|
-| 1 需求分析 | 需求 ID、需求描述、验收测试 |
-| 2 系统设计 | 设计文档（系统）、系统测试 |
-| 3 概要设计 | 设计文档（接口）、集成测试 |
-| 4 详细设计 | 设计文档（详细）、单元测试 |
-| 5 编码 | 代码模块 |
-| 6 集成测试 | 集成测试状态 |
-| 7 系统测试 | 系统测试状态 |
+| 阶段       | 登记 / 更新的 RTM 列             |
+| ---------- | -------------------------------- |
+| 1 需求分析 | 需求 ID、需求描述、验收测试      |
+| 2 系统设计 | 设计文档（系统）、系统测试       |
+| 3 概要设计 | 设计文档（接口）、集成测试       |
+| 4 详细设计 | 设计文档（详细）、单元测试       |
+| 5 编码     | 代码模块                         |
+| 6 集成测试 | 集成测试状态                     |
+| 7 系统测试 | 系统测试状态                     |
 | 8 验收测试 | 验收测试状态、RTM 需求覆盖率终检 |
 
 ### 阶段级增量校验（强制）
@@ -52,25 +52,35 @@
 
 `check-artifact-gate.ts --phase=N` 在每阶段门执行，校验当前阶段应完成的 RTM 字段：
 
-| Phase | 校验的 RTM 字段 | 新增校验项 |
-|---|---|---|
-| 1 | description, designDoc, **acceptanceTest** | REQ 行 acceptanceTest 须非空 |
-| 2 | description, designDoc, **acceptanceTest** | SD 行 acceptanceTest 须非空 |
-| 3 | description, designDoc, **acceptanceTest** | INTF 行 acceptanceTest 须非空 |
-| 4 | description, designDoc, **acceptanceTest** | DD 行 acceptanceTest 须非空 |
-| 5 | + codeModule, unitTest, **acceptanceTest** | 跑 check-design-contract-consistency.ts |
-| 8 | 全字段终检 | + check-design-contract-consistency.ts 终检 |
+| Phase | 校验的 RTM 字段                            | 新增校验项                                  |
+| ----- | ------------------------------------------ | ------------------------------------------- |
+| 1     | description, designDoc, **acceptanceTest** | REQ 行 acceptanceTest 须非空                |
+| 2     | description, designDoc, **acceptanceTest** | SD 行 acceptanceTest 须非空                 |
+| 3     | description, designDoc, **acceptanceTest** | INTF 行 acceptanceTest 须非空               |
+| 4     | description, designDoc, **acceptanceTest** | DD 行 acceptanceTest 须非空                 |
+| 5     | + codeModule, unitTest, **acceptanceTest** | 跑 check-design-contract-consistency.ts     |
+| 8     | 全字段终检                                 | + check-design-contract-consistency.ts 终检 |
 
 NFR/CON 行的 acceptanceTest 允许为 null（横切治理类豁免，由 `isCrossCutting` 逻辑覆盖）。
+
+## 代码健康治理的 RTM 影响（Phase 1–4）
+
+`/wm code-health` 的每个候选携带 `rtmImpact`（`rtmBefore` / `rtmAfter` 需求 ID 集合 + `coverageBefore` / `coverageAfter` + `testLevels` + `unmappedScenarios`）与 `coverageImpact`，其中 `coverageIsSignalOnly: true`、覆盖率数值恒为 `null`——**coverage 只作发现信号，不授权删除或跳过维度**。
+
+- 删除代码 / 删除测试 / 抽象重复前，人类批准的 scope 必须显式给出受影响的 RTM 行；apply 后 S 子代理须回填 `rtm.json` 实体字段（不得由 O 越权代填）。
+- 任意 RTM 行删除都必须有人类 `ApprovalDecision` + candidate/scope/revision 绑定；无法证明「非保护」的删除按默认拒绝处理。
+- 失败的删除/抽象必须回滚到 pre-change revision（`git apply -R` + `git diff --exit-code`=0），RTM 同步恢复。
+
+详见 [code-health-governance.md](code-health-governance.md) 与 SSoT §10K。
 
 ## 测试用例 ID 命名规则
 
 RTM 与各阶段文档使用两套 ID，按用途区分，不可混用：
 
-| ID 格式 | 用途 | 出现位置 | 示例 |
-|---|---|---|---|
-| `<Type>-NNN`，Type ∈ {`UT`, `IT`, `ST`, `UAT`} | **运行时测试用例 ID**，登记到 RTM 的四级测试列 | RTM、`templates/rtm.md`、`templates/{system,interface,detailed,requirement}-design.md`、`examples/`、阶段 5/6/7/8 文档的「测试用例设计（执行）」表 | `UT-001`（单元测试）、`IT-001`（集成测试）、`ST-001`（系统测试）、`UAT-001`（验收测试） |
-| `TC-<PHASE>-NNN`，PHASE ∈ {`REQ`, `DES`, `COD`} | **阶段产物验证用例 ID**，校验该阶段产物本身是否合格（如「类图生成」「需求完整性检查」），不登记到 RTM | 阶段 1/2/3/4/5 文档的「测试用例设计」表、SSoT §3.2.1-3.2.3 | `TC-REQ-001`（需求解析）、`TC-DES-002`（类图生成）、`TC-COD-004`（单元测试代码覆盖率检查） |
+| ID 格式                                         | 用途                                                                                                  | 出现位置                                                                                                                                           | 示例                                                                                       |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `<Type>-NNN`，Type ∈ {`UT`, `IT`, `ST`, `UAT`}  | **运行时测试用例 ID**，登记到 RTM 的四级测试列                                                        | RTM、`templates/rtm.md`、`templates/{system,interface,detailed,requirement}-design.md`、`examples/`、阶段 5/6/7/8 文档的「测试用例设计（执行）」表 | `UT-001`（单元测试）、`IT-001`（集成测试）、`ST-001`（系统测试）、`UAT-001`（验收测试）    |
+| `TC-<PHASE>-NNN`，PHASE ∈ {`REQ`, `DES`, `COD`} | **阶段产物验证用例 ID**，校验该阶段产物本身是否合格（如「类图生成」「需求完整性检查」），不登记到 RTM | 阶段 1/2/3/4/5 文档的「测试用例设计」表、SSoT §3.2.1-3.2.3                                                                                         | `TC-REQ-001`（需求解析）、`TC-DES-002`（类图生成）、`TC-COD-004`（单元测试代码覆盖率检查） |
 
 要点：
 
@@ -84,26 +94,26 @@ RTM 与各阶段文档使用两套 ID，按用途区分，不可混用：
 
 ### 1. 各阶段 RTM 字段更新清单
 
-| 阶段 | 更新的 RTM 字段 | 登记命令（伪代码） | 校验 |
-|---|---|---|---|
-| 1 需求分析 | 需求 ID、需求描述、验收测试列 | `rtm.addRequirement({id:'REQ-NNN', desc, uatId:'UAT-NNN'})` | 字段非空 + ID 唯一 |
-| 2 系统设计 | 设计文档列、系统测试列 | `rtm.updateDesign(reqId, {sd:'SD-N.N.N', stId:'ST-NNN'})` | `sd` 非空 + `stId` 关联 REQ |
-| 3 概要设计 | 接口设计列、集成测试列 | `rtm.updateDesign(reqId, {interfaceDoc:'SD-N.N.N', itId:'IT-NNN'})` | 同上 |
-| 4 详细设计 | 详细设计列、单元测试列 | `rtm.updateDesign(reqId, {detailedDoc:'SD-N.N.N', utId:'UT-NNN'})` | 同上 |
-| 5 编码 | 代码模块列 | `rtm.updateCode(reqId, '<filename>.ts')` | 文件路径存在 |
-| 6 集成测试 | 集成测试状态列 | `rtm.updateStatus(itId, '通过' \| '失败')` | 状态 ∈ 枚举 |
-| 7 系统测试 | 系统测试状态列 | `rtm.updateStatus(stId, '通过' \| '失败')` | 同上 |
-| 8 验收测试 | 验收测试状态列、覆盖率终检 | `rtm.updateStatus(uatId, '通过' \| '失败')` + 跑 `check-artifact-gate.ts` | 退出码 0 |
+| 阶段       | 更新的 RTM 字段               | 登记命令（伪代码）                                                        | 校验                        |
+| ---------- | ----------------------------- | ------------------------------------------------------------------------- | --------------------------- |
+| 1 需求分析 | 需求 ID、需求描述、验收测试列 | `rtm.addRequirement({id:'REQ-NNN', desc, uatId:'UAT-NNN'})`               | 字段非空 + ID 唯一          |
+| 2 系统设计 | 设计文档列、系统测试列        | `rtm.updateDesign(reqId, {sd:'SD-N.N.N', stId:'ST-NNN'})`                 | `sd` 非空 + `stId` 关联 REQ |
+| 3 概要设计 | 接口设计列、集成测试列        | `rtm.updateDesign(reqId, {interfaceDoc:'SD-N.N.N', itId:'IT-NNN'})`       | 同上                        |
+| 4 详细设计 | 详细设计列、单元测试列        | `rtm.updateDesign(reqId, {detailedDoc:'SD-N.N.N', utId:'UT-NNN'})`        | 同上                        |
+| 5 编码     | 代码模块列                    | `rtm.updateCode(reqId, '<filename>.ts')`                                  | 文件路径存在                |
+| 6 集成测试 | 集成测试状态列                | `rtm.updateStatus(itId, '通过' \| '失败')`                                | 状态 ∈ 枚举                 |
+| 7 系统测试 | 系统测试状态列                | `rtm.updateStatus(stId, '通过' \| '失败')`                                | 同上                        |
+| 8 验收测试 | 验收测试状态列、覆盖率终检    | `rtm.updateStatus(uatId, '通过' \| '失败')` + 跑 `check-artifact-gate.ts` | 退出码 0                    |
 
 ### codeModule 格式规范
 
 `codeModule` 字段须按行类型填写不同格式：
 
-| 行类型 | 格式 | 正则 | 示例 |
-|---|---|---|---|
-| REQ 行 | `SD-xxx:src/path/to/file.ts` | `^SD-[\d.]+:src/.+\.(ts\|js\|py\|java)$` | `SD-5.2.1:src/auth/login.ts` |
+| 行类型 | 格式                            | 正则                                       | 示例                          |
+| ------ | ------------------------------- | ------------------------------------------ | ----------------------------- |
+| REQ 行 | `SD-xxx:src/path/to/file.ts`    | `^SD-[\d.]+:src/.+\.(ts\|js\|py\|java)$`   | `SD-5.2.1:src/auth/login.ts`  |
 | NFR 行 | `src/path/to/file.ts` 或 `横切` | `^src/.+\.(ts\|js\|py\|java)$` 或 `^横切$` | `src/middleware/rateLimit.ts` |
-| CON 行 | 同 NFR | 同 NFR | `横切` |
+| CON 行 | 同 NFR                          | 同 NFR                                     | `横切`                        |
 
 **校验时机**：`check-artifact-gate.ts --phase=5` 强制校验。
 **校验逻辑**：按 `requirementId` 前缀（`REQ-` / `NFR-` / `CON-`）分支匹配正则。
@@ -120,7 +130,8 @@ RTM 与各阶段文档使用两套 ID，按用途区分，不可混用：
 
 ### BDD features 引用格式
 
-BDD features 文件引用附加在短 ID 之后，用 ` | ` 分隔：
+BDD features 文件引用附加在短 ID 之后，用 `|` 分隔：
+
 - `UAT-NNN | BDD-L1-<system>-<num>.feature`
 - `ST-NNN | BDD-L2-<system>_<subsystem>-<num>.feature`
 - `IT-NNN | BDD-L3-<system>_<subsystem>-<num>.feature`

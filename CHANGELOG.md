@@ -73,6 +73,22 @@
 - 实施计划见 `docs/superpowers/plans/2026-09-07-trigger-boundary-fastfollow.md`（本快追无独立规格文件，计划即需求；最终审查发现来源：主 campaign 宽范围审查）。
 - 版本保持 42.2.1，不 bump。
 
+### 代码健康治理（code-health-governance，2026-09-11）
+
+- **新增 `/wm code-health` Phase 1–4 受控治理**：只读发现（P1 静态 inventory + 真实动态 trace + false-positive guard）→ 七维度 gap matrix（P2）→ 受保护测试 inventory（P3，`--guard` 唯一删除路径）→ 重复簇与 abstraction guard（P4）；新增 6 个 CLI（`code-health-phase1` / `code-health-gap` / `code-health-tests` / `code-health-duplicates` / `code-health-ledger` / `code-health-apply`）、纯逻辑与注入边界、9 份 code-health schema、`lib/code-health-tdd-harness.ts` 与 tracked `.code-health-governance.json`。授权链为「人类 approval + HEAD-tracked ledger/evidence/revision 绑定 + 可回滚」；默认拒绝、coverage 仅信号、发现不是结论；`blocked` 走 `gate-failure → R(root-cause) → V(root-cause-review) → G(root-cause-gate) → S(rework)` 失败链。**Phase 5–8 迁移**在此时点未实现，不得文档化为可用（campaign 归档随后由 Task 8 实现，见下）。
+- **活体文档同步（SSoT-first）**：SSoT 新增 §10K（权威定义）；新增 `references/code-health-governance.md`（第 42 份 references）；SKILL.md 增 `/wm code-health` 路由 / O-A-S-V-G-R-human 权限 / CHECKPOINT / 按需 reference；command-reference / subagent-delegation（dispatch-matrix 登记 6 个新 CLI）/ hard-constraints / rtm-guide / coding-quality / quality-standards / operation-behaviors / data-models / AGENTS / README / CONTRIBUTING / INSTALL / troubleshooting 同步；版本保持 42.2.1，不 bump。
+- **计数收口（实测，Task 8 后为最终值）**：cli `.ts` 44、exit-2 脚本 43、references 42、schema 34、self-test 322；docs-consistency 违规 0；pre-push 18 项不变（code-health 不纳入 hook）。
+- 本轮无 `.codegraph/` 索引：未接入 codegraph，也未伪造查询记录。
+
+### 代码健康治理 Task 8B（R11 加固 + flake 稳定化 + archive 文档回填，2026-09-11）
+
+- **campaign 归档落地（Task 8A 实现，本任务回填活体文档）**：`code-health-archive.ts` 真实 producer/consumer/verifier；verified 候选（V/G 复审 + G 门禁 + observed passing 命令证据 + 可执行 rollback + clean redaction + revision 匹配）才 `archivedAsPassed=true`，`deferred`/`rejected`/`blocked`/`rolled-back` 只作终态非成功证据；工件经共享 FileVerifier 重验并按真实内容哈希复制，package 原子写入且不覆盖非空 package。`--verify` 不带 `--source-project` 只能 package-only，**不得**表述为 verified source；显式传 `--source-project` 才做 source-bound 重验。活体文档（AGENTS / CHANGELOG / troubleshooting / SSoT §10K / code-health-governance.md / command-reference.md）由「归档未实现」改为上述真实行为。
+- **flake 稳定化（R11.7/R8，保留 fail-closed 不变量）**：`code-health-task1-integration.test.ts` 与 `dependency-boundaries.test.ts` 的共享根竞态改为按紧密路径谓词排除兄弟测试瞬态（`.d2-boundary-fixture-<pid>.ts`、`.tmp-code-health-test-output`），**tracked 文件被改动仍由 `git diff --name-only` 断言捕获**（新增双向单测证明）；`evidence-export-logic` / `evidence-provenance-logic` / `l0-link-audit-cli` / `code-health-cli`（30 s→120 s）/ `docs-consistency-logic` 的负载敏感 spawn 超时改为显式 60–120 s，`state-write-logic` 三个 gated-writer 等待用例 5 s→30 s。**未删除/跳过/弱化任何断言**。
+- **R11 加固**：Phase 3 apply 增加目录 scope 单元断言与符号链接父目录 canonical containment（修复真实的「根外字节被读入受控 patch」读不对称，现 `SECURITY_BLOCKED`）；`code-health-ledger --help` 可发现用法面；consumer validator 拒绝 `candidateTests.includes(implementationArtifact)`；删除已无消费者的 `logic/code-health-phase-boundaries.ts`；Phase 4 tracked-blob 比较归一化 CRLF/LF（`core.autocrlf` 检出不再误拒）、畸形 `excluded:` 事实 default-deny、`structuralViewSupport` 值侧闭集校验；Phase 1 usage 说明 `changedFiles` 仅覆盖 analyzed targets；`code-health-deletion-authority.ts` 过时措辞修正并增加 `candidateId` 交叉校验。
+- **state-write 锁协议真实缺陷修复（非测试 flake）**：`releaseLock` 把 owner 目录改名为 `.releasing-*` 过渡目录、完成交接后才删除；该窗口内 `staleOwnerState` 读不到 owner 元数据即判定 `'stale'`，使合法并发 writer 收到 `STALE_LOCK`（CPU 负载下复现 4/300，修复后 0/300）。修复为：存在 in-flight 过渡目录时视为「尚未判定」并重试；真正的孤儿过渡仍由 TTL 检查回收/暴露，故**真实陈旧锁的 fail-closed `STALE_LOCK` 语义不变**（既有断言全部保留）。
+- **文档修正**：quickstart / user-guide 的 self-test 样本数 262→322；coding-quality「合并条件表达式」行转义竖线恢复单行渲染；INSTALL 的 logic `.ts` 计数与 exit-2 口径（42→43）同步。
+- 版本保持 42.2.1，不 bump；pre-push 18 项通过（无 `--retry`）。
+
 ## 门禁项数 STALE 扫描（gate-count-stale-scan，2026-09-07）
 
 - **docs-consistency 新增 `gate-count-docs` 白名单扫描**：README/AGENTS/CONTRIBUTING/troubleshooting 四份活体文档的门禁项数引用绑定 `EXPECTED.prePushCount`（行含「门禁/检查」标记时全部「N 项」须一致），防门禁项数 N→N+1 后未测试 docs 文件漏改（trigger-boundary-fastfollow 终审 F1 的结构性 follow-up）。
@@ -83,145 +99,145 @@
 
 以下为从 42.2.1 整改起点 `bc48824894ae076ff0e80d87cebd6c9de4437833` 至本次最终记录前已存在 HEAD 的完整父提交清单，来源为外部 Git 日志；历史/中间提交不冒充最终 HEAD，本 CHANGELOG 不自引用本次最终记录提交。
 
-| 完整 SHA | 提交身份 |
-|---|---|
-| `bc48824894ae076ff0e80d87cebd6c9de4437833` | `release(42.2.1): audit remediation fixes` |
-| `ea49736869e99d52efe4c66021f235ea621b800f` | `docs(changes): record 42.2.1 audit remediation acceptance` |
-| `9c1801f9745c3aa95f7be55bd0bb109e173f47a3` | `docs(changes): record final prepush observation` |
-| `5bb4dcc7938ec6dde91df503ff722bb013ff15ae` | `test(audit): add strict L0 link boundary coverage` |
-| `0da7e05d88e735fb15481ba15cb51ceb336e3148` | `docs(examples): close independent stage rework chains` |
-| `03f1b249044105f3f28165b4abd60d51943056a3` | `docs(bdd): require complete phase gate arguments` |
-| `3c0cbb1644c5b5ea126f7a87498e1414b352e51c` | `docs(workflow): enforce complete rework checkpoints` |
-| `f3bf1bbb8e4e6c8ae186540f313b0d48727cdb90` | `fix(audit): normalize L0 audit root paths` |
-| `664b202936debb5a67e4611f79004c989048a811` | `test(boundaries): register L0 audit filesystem exception` |
-| `4ea55b44a3f70e56ffae4579c0310fbb166d1317` | `docs(tests): document L0 audit I/O exception` |
-| `ef14d03eb5d62a1d47029d35d07fca4305b191f9` | `docs(changes): record review round one remediation` |
-| `4d79f04c5d38ba99681e352817b6317790aa6581` | `fix(security): document L0 audit filesystem paths` |
-| `7502f6629bd96531d06f6dd430e8372e75f58cc2` | `docs(changes): finalize review round one acceptance` |
-| `81aed005ae744f25b869e6b16744bd98e7a6560f` | `docs(changes): record review round one final gate` |
-| `3fae86e127757027ed40c5e653ca0e0d47083444` | `docs(references): close phase failure routing` |
-| `fa30fb982ad080c4ffc11685d9c9411592b20a32` | `fix(audit): fail closed on missing or escaped L0 paths` |
-| `00f513e6343175fab2db5e3a5360c5b49afc4144` | `test(security): document escaped symlink fixtures` |
-| `7319bb716851ceed085c0a13e355df22d8eb6dbb` | `docs(changes): record second review remediation` |
-| `b1e364a81a1f877b3fab6e44dea5d46de0279160` | `docs(references): remove direct phase five fix bypass` |
-| `46a2961937e58a24cc2dc6644dfc39573838c186` | `fix(audit): reject nested L0 directory links` |
-| `778ec87fdd2892f1a8c7d68cf5055366c79175f2` | `feat(audit): expose L0 link boundary command` |
-| `5ce123a5bd9e2dc2c7d355d7dc31a25a0758cd69` | `test(docs): scan all phase references for fix bypasses` |
-| `b9958574bbd4be40da2c68da4f5b3beafb9a8ae0` | `fix(audit): reject top-level L0 directory links` |
-| `43bd922d0db673c875b9fd72b1e407299742bd76` | `test(docs): include templates in bypass scan` |
-| `e3396e5c47226c47e7257c3b0101d4f2a7c0789e` | `docs(changes): record review rounds three and four` |
-| `2e3cee897c6ce883468b0d3e53fd1c6453f56c38` | `test(security): avoid unsafe bypass scan regex` |
-| `b22191490b9c3d9d56bc47de2d9d33462fc308b5` | `docs(changes): record final audit verification scope` |
-| `2e78319f8f9a0e25b327aae1509ec1004dcc8a9f` | `docs(changes): register prior audit commit identity` |
-| `0eee1f48436b1643f14eb449452255e88f4b9418` | `docs(changes): record final audit gate` |
-| `cc0a77e9f51771398f309e80754bc15d236b2b1d` | `docs(changes): register final gate commit identity` |
-| `0974bc0c6b105d7c486fa30f79f2642a2c9ed7d1` | `docs(changes): register audit history before final gate` |
-| `15762dde1b62e98d85fb1e5aa2b88ad893446d45` | `docs(changes): record final clean tree gate` |
-| `e8f6a5b2c6108b1f31061284551492a79fbc62d1` | `docs(changes): finalize audit acceptance records` |
-| `424b91fe57f2ca50dec4f373614c7f0430c2f5b6` | `test(docs): enforce complete ordinary failure routing` |
-| `1aa684c7226ac1dafdd45b5f05e439e95fb24f1d` | `fix(audit): reject all L0 and L1 symlink boundaries` |
-| `2a9930a37f91e12dcc3c09d18fb79bb5ab864f34` | `test(audit): close L0 CLI registration contract` |
-| `08b80c10916178f8f83d8b5a520dfef290977d9d` | `docs(references): close phase failure fallback paths` |
-| `88bd58374e17eb737493ae7f75074bd269c48c19` | `fix(audit): report unreadable L1 boundary entries` |
-| `46db5fcfd702c3bb8837b0bbfab51ca51105ff4d` | `docs(references): route coding input failures through R` |
-| `f8ffe0f7b88313af188cdb247586999d447af10f` | `fix(audit): classify L1 directory read failures` |
-| `43e60df2fb6582ca8e533f1a7d1fa8781a7475c9` | `test(docs): close ordinary failure routing contract` |
-| `75d211e8270c16cc8fcb76b4ada70910e6accc4b` | `fix(audit): validate complete link URI encoding` |
-| `347f43e796fed39570164b9282e6534afdbd1e1b` | `docs(workflow): enforce complete ordinary failure routing` |
-| `c6500ed47e36c8d87fc687875af9213ff95bd7ca` | `fix(audit): validate placeholder URI encoding` |
-| `d4e0e6788ef362a07edd4be7751893ede0021f07` | `fix(docs): close ordinary failure routing contracts` |
-| `b030f8087567355147391f4b10203e57d3f5384a` | `fix(audit): close L0 URI and dependency boundaries` |
-| `b023dc798916169840d83b2e5411f028d4eb3192` | `fix(test): keep examples contract security-clean` |
-| `5f3311f7a889e6a1dc4d3456adb73d0b591a510f` | `fix(deps): patch fast-uri audit vulnerability` |
-| `4562e44b71b3544dfcfac4f7d19a966e8e15c810` | `docs(changes): finalize Task 8 acceptance evidence` |
-| `60694d336a27c52926eec2d1dc2dcfbd3c6441ae` | `fix(audit): reject Windows drive-letter link paths` |
-| `56b7d83d4f3d98497ea00d57902afc4533cbda9c` | `style(references): remove trailing whitespace` |
-| `982d051d7804dab1ecc9ef13e7a65cbf37ce04a6` | `test(audit): preserve valid external URI scope` |
-| `c74d38ecb4faea1efe20d0b1a47919c16d1c154d` | `test(audit): scan all guidance contracts` |
-| `1963406c3ae56ed0e796ffc517f9555fc4b495c2` | `docs(contract): close all ordinary failure routes` |
-| `41ebcb6485c7d5aea78745fe853735a6dd18c702` | `test(audit): verify l0 cli error routing` |
-| `0e9f1ce3f21f84b73be40017321768a5e5232666` | `test(security): document controlled audit fixtures` |
-| `bee1a634d62ac5fce7998cf17ff6c25daa3cc708` | `docs(changes): close task8 audit evidence` |
-| `9567415cb861b0fa461540317a8df2b956360827` | `style(test): format workflow contract scanner` |
-| `6c6ee22d4e36c93f0a8206449409faee42996f68` | `docs(changes): record final task8 gate` |
-| `d997b586afe381c2f8ffcb8edcbcf9d9741fb644` | `docs(changes): finalize task8 evidence` |
-| `0b2a62d3be2077b255be3d23204752bb78f1287e` | `docs(changes): record final prepush verification` |
-| `a6c805ba51ca7cefc5806f0a779fdbd9b86f4281` | `fix(docs): close ordinary failure routing contract` |
-| `751c1e0e172bd49b281e0d5c5919a139440c4e2d` | `test(docs): scan multiline test result tokens` |
-| `6ac25be195d3c841360f6ea0ce0c3c7a1399c377` | `test(audit): cover internal non-markdown l0 links` |
-| `d1c61732184af15ff563c0d923a316d65caa2397` | `test(docs): harden multiline test command extraction` |
-| `ebcc2a678362775675972e65a030fa37ccefceec` | `docs(changes): record Task 8 final repair round` |
-| `54cdf07e1d178062af02d7146661349231658a10` | `docs(changes): synchronize final parent evidence ledger` |
-| `7c70e70c0e1f64f22ca6030844ebd7ce524da6ab` | `style(test): align guidance scanner with prepush format` |
-| `e9062857043ce2e50e2d2ff99b31b0d585b0a397` | `docs(changes): update final verification ledger` |
-| `f832febd5f41a831a4e4cce7e9562f1407b31722` | `docs(changes): finalize Task 8 verification evidence` |
-| `1d148a8a296e159e72f662e2a3b8eaeaa32fa32f` | `docs(changes): record final prepush result` |
-| `c24b2442150f65331e98f6ada1862e4d8bfdb968` | `docs(changes): refresh complete final parent ledger` |
-| `6ddb1978ffc51d790479c25fa9ccb8b9dfb4e81d` | `test(audit): scan whole-row failure routes with chain markers` |
-| `f63989d12bb7bfe7813b93a6706c3438f82fa69f` | `fix(docs): route BDD/TLA+ gate failures through the complete chain` |
-| `07832d7b8596ecc93ef49b290ceb4415d2e4dbdf` | `fix(docs): close /wm review C/D and BDD-gate exit-1 routing bypasses` |
-| `7f994e3d1191b671f371e713034ef26b22148b0a` | `fix(docs): route exit-code table rows 363/366 through the full chain` |
-| `44c057a3e342234e9e9faa0cad4744b161659305` | `fix(docs): remove End Patch residue and restore UAT table row` |
-| `afd99c611b15b5ceb6cb68dac650a7b7fe87cc64` | `docs(changes): record scanner closure round in 42.2.1 changelog` |
-| `fbfd3363d6961b76dfa8029712e2fc36c5544c73` | `docs(changes): record scanner closure round acceptance` |
-| `051c688ecb2ddd361ce19bce560664f456355da1` | `style(test): format whole-row failure scanner` |
-| `c4e3359176a32e2c623f140c48a352349e8b635c` | `docs(changes): refresh complete final parent ledger` |
-| `ac91849b7aa27bb605c3fb2f4ac235ac9645129b` | `docs(changelog): expand 2 short SHAs and append c4e3359 to 42.2.1 parent ledger` |
-| `97b91badfc7fe945ab830b5ea4a594d3c25db877` | `docs(changes): expand short SHAs in acceptance records and append ac91849 to 42.2.1 parent ledger` |
-| `965095e049bf0688e1b343c5adcdd70407642228` | `docs(changes): annotate verbatim subject citations in parent ledgers` |
-| `689e51bd114831a209af92c99e82afea2e97f512` | `feat(gate): add change-scope and codegraph-query JSON Schemas with inventory sync` |
-| `ac90a78b800e5c163944900d7473136d863136b5` | `feat(gate): bind codegraph/opsx/archive checkers to ChangeScope with strict coverage` |
-| `a0f86bbb4c5001f56a3b04143b13834f800b0922` | `refactor(gate): drop dead externalChecks passthrough; aggregate strict codegraph/opsx into artifact gate` |
-| `5197b21cb97002def958de0f33591ba2f1c73a73` | `fix(gate): suppress misleading no-scope reasons when ChangeScope binding fails` |
-| `ed55ff5b80cc81775c82349648dca81cc17a96bf` | `fix(gate): count R3 by success r3-* dimensions and fail closed on empty role logs` |
-| `ce72badd4373cf99ed236bea816ad3cef90076d6` | `fix(run-log): fail closed on empty and malformed input; block action-role mismatch; align fix variant and preventive schemas` |
-| `36c66581b632571e9bb728edcf3f911776aec280` | `fix(run-log): absorb double-legacy emergency-fix rows via merged legacy predicates` |
-| `6adc3215815cff0d355c13a15a6e00278e393812` | `fix(hooks): consume pre-push stdin refs per-line with fail-closed scope` |
-| `13b942f1c36ae9e92c6d9f8ea22d4854340e117f` | `docs(sot): document ChangeScope gate binding and stage 5-8 aggregation` |
-| `c691023e344864e7262b6776b974fec1f56cc4bc` | `docs(references): sync scope and run-log fail-closed semantics across guidance` |
-| `3da9efa8a2ac4b889af8974029d902743eacc126` | `docs(changes): record gate-closure doc sync in 42.2.1 changelog and acceptance` |
-| `0ee78ea23b21325d186fed0b38be2b554c3d1dfc` | `docs(superpowers): add audit-gate-closure fix plan` |
-| `1a032bfab1ae0f224b903024dd3624dfdbfb9733` | `docs(references): state precise R3 dimension counting in summary tables` |
-| `827ebceeb4497a69716a42dd540020b3ae8398c2` | `docs(references): reconcile fix-variant wording and template gate qualifier` |
-| `1a0ed09c460bd42ad1cd964f6b11e35dc1725958` | `fix(gate): report R3 dimension gaps instead of missing R role records` |
-| `25e5bf01a976e234e225bc2bb0397cf5071e2433` | `fix(gate): validate change id in thin scope wrapper` |
-| `e425642d019d3b2d8d55a4471a867eb81d9661fe` | `refactor(gate): share scope-resolution helper across checkers` |
-| `f2570709982f458beb2d9bfb4a8e1754d22deb2d` | `docs(schema): align run-log descriptions with enforced pairing` |
-| `f828b2776a486d674f44d66726d1ab6fa770ed44` | `fix(hooks): skip transient audit network errors and baseline new branches remotely` |
-| `f76dc43fc9571b85964cdefa68bd51df4ccd0e0c` | `docs(references): tighten fix-review wording in violation checks` |
-| `d17594feb65c9b994a0e637d752355822e1abc84` | `docs(changes): make anchor-grep tally reproducible and date the 647 measurement` |
-| `8a7b503fe6077e36b97d02b24f1a1b3e04130759` | `test(gate): sync direct-call manifest line after change-scope case addition` |
-| `0644a0b740325a2e7eedf9860cfd700ede9b7a99` | `style(test): prettier formatting for hook test additions` |
-| `f0add116c98b8f4ab109a01aa6f1543312e19bdc` | `fix(hooks): list merge diffs in remote-tracking enumeration with -m` |
-| `6780e109010835df967159ca52796a40f8970730` | `docs(superpowers): add review-fixes design spec (26 findings, 5 slices)` |
-| `a2cab37592f2e622f18eb4a824ea881eb9bd7304` | `docs(superpowers): add review-fixes implementation plan (6 tasks, SDD)` |
-| `de7152224ff2eab6c7be81807b023f05b1692b50` | `fix(scripts): harden change-scope binding (quotePath, shell whitelist, changeId prefix, dot-segment, archive date, phase filenames, external summary)` |
-| `7076692f9f9aaed021e1a67b8bd155a7658406cf` | `fix(hooks): reject leading-dash remote names in pre-push enumeration (fail-closed)` |
-| `7cd5fcf8e2807db03383c366e010fb931e232afc` | `fix(scripts): parse reference-style links in L0 audit; consolidate pinned baselines; anchor hook failure-source assertion` |
-| `ae73586407c344e1aa2736696414a8808b6f9658` | `docs: require --phase/--scope in gate command examples; document remote-tracking new-branch baseline path` |
-| `dabbe6bc4f3fd5fa267c7f194121844712c20e57` | `docs: reconcile gate/opsx/run-log/NFR/audit/exit-2-count wording with implementations` |
-| `548e43a3553fc1109349e461458a288d0e48e383` | `docs(changes): restore parent-chain continuity (insert 965095e0, append 16 rows through f0add11)` |
-| `558075dacc76756ba9909263723950b0f9f70aeb` | `docs(superpowers): add archival-fixes design spec (13 filed items, 3 slices)` |
-| `73b3f600f282bc76bb3a6142f12a844b661aeb86` | `docs(superpowers): add archival-fixes implementation plan (3 tasks, SDD)` |
-| `1c861082066c710847dcd5fac0cd28e8d0f83eaa` | `fix(scripts): close archival items (summary shape, CLI exit-2 coverage, quotePath in docs-consistency, comment precision)` |
+| 完整 SHA                                   | 提交身份                                                                                                                                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bc48824894ae076ff0e80d87cebd6c9de4437833` | `release(42.2.1): audit remediation fixes`                                                                                                                                           |
+| `ea49736869e99d52efe4c66021f235ea621b800f` | `docs(changes): record 42.2.1 audit remediation acceptance`                                                                                                                          |
+| `9c1801f9745c3aa95f7be55bd0bb109e173f47a3` | `docs(changes): record final prepush observation`                                                                                                                                    |
+| `5bb4dcc7938ec6dde91df503ff722bb013ff15ae` | `test(audit): add strict L0 link boundary coverage`                                                                                                                                  |
+| `0da7e05d88e735fb15481ba15cb51ceb336e3148` | `docs(examples): close independent stage rework chains`                                                                                                                              |
+| `03f1b249044105f3f28165b4abd60d51943056a3` | `docs(bdd): require complete phase gate arguments`                                                                                                                                   |
+| `3c0cbb1644c5b5ea126f7a87498e1414b352e51c` | `docs(workflow): enforce complete rework checkpoints`                                                                                                                                |
+| `f3bf1bbb8e4e6c8ae186540f313b0d48727cdb90` | `fix(audit): normalize L0 audit root paths`                                                                                                                                          |
+| `664b202936debb5a67e4611f79004c989048a811` | `test(boundaries): register L0 audit filesystem exception`                                                                                                                           |
+| `4ea55b44a3f70e56ffae4579c0310fbb166d1317` | `docs(tests): document L0 audit I/O exception`                                                                                                                                       |
+| `ef14d03eb5d62a1d47029d35d07fca4305b191f9` | `docs(changes): record review round one remediation`                                                                                                                                 |
+| `4d79f04c5d38ba99681e352817b6317790aa6581` | `fix(security): document L0 audit filesystem paths`                                                                                                                                  |
+| `7502f6629bd96531d06f6dd430e8372e75f58cc2` | `docs(changes): finalize review round one acceptance`                                                                                                                                |
+| `81aed005ae744f25b869e6b16744bd98e7a6560f` | `docs(changes): record review round one final gate`                                                                                                                                  |
+| `3fae86e127757027ed40c5e653ca0e0d47083444` | `docs(references): close phase failure routing`                                                                                                                                      |
+| `fa30fb982ad080c4ffc11685d9c9411592b20a32` | `fix(audit): fail closed on missing or escaped L0 paths`                                                                                                                             |
+| `00f513e6343175fab2db5e3a5360c5b49afc4144` | `test(security): document escaped symlink fixtures`                                                                                                                                  |
+| `7319bb716851ceed085c0a13e355df22d8eb6dbb` | `docs(changes): record second review remediation`                                                                                                                                    |
+| `b1e364a81a1f877b3fab6e44dea5d46de0279160` | `docs(references): remove direct phase five fix bypass`                                                                                                                              |
+| `46a2961937e58a24cc2dc6644dfc39573838c186` | `fix(audit): reject nested L0 directory links`                                                                                                                                       |
+| `778ec87fdd2892f1a8c7d68cf5055366c79175f2` | `feat(audit): expose L0 link boundary command`                                                                                                                                       |
+| `5ce123a5bd9e2dc2c7d355d7dc31a25a0758cd69` | `test(docs): scan all phase references for fix bypasses`                                                                                                                             |
+| `b9958574bbd4be40da2c68da4f5b3beafb9a8ae0` | `fix(audit): reject top-level L0 directory links`                                                                                                                                    |
+| `43bd922d0db673c875b9fd72b1e407299742bd76` | `test(docs): include templates in bypass scan`                                                                                                                                       |
+| `e3396e5c47226c47e7257c3b0101d4f2a7c0789e` | `docs(changes): record review rounds three and four`                                                                                                                                 |
+| `2e3cee897c6ce883468b0d3e53fd1c6453f56c38` | `test(security): avoid unsafe bypass scan regex`                                                                                                                                     |
+| `b22191490b9c3d9d56bc47de2d9d33462fc308b5` | `docs(changes): record final audit verification scope`                                                                                                                               |
+| `2e78319f8f9a0e25b327aae1509ec1004dcc8a9f` | `docs(changes): register prior audit commit identity`                                                                                                                                |
+| `0eee1f48436b1643f14eb449452255e88f4b9418` | `docs(changes): record final audit gate`                                                                                                                                             |
+| `cc0a77e9f51771398f309e80754bc15d236b2b1d` | `docs(changes): register final gate commit identity`                                                                                                                                 |
+| `0974bc0c6b105d7c486fa30f79f2642a2c9ed7d1` | `docs(changes): register audit history before final gate`                                                                                                                            |
+| `15762dde1b62e98d85fb1e5aa2b88ad893446d45` | `docs(changes): record final clean tree gate`                                                                                                                                        |
+| `e8f6a5b2c6108b1f31061284551492a79fbc62d1` | `docs(changes): finalize audit acceptance records`                                                                                                                                   |
+| `424b91fe57f2ca50dec4f373614c7f0430c2f5b6` | `test(docs): enforce complete ordinary failure routing`                                                                                                                              |
+| `1aa684c7226ac1dafdd45b5f05e439e95fb24f1d` | `fix(audit): reject all L0 and L1 symlink boundaries`                                                                                                                                |
+| `2a9930a37f91e12dcc3c09d18fb79bb5ab864f34` | `test(audit): close L0 CLI registration contract`                                                                                                                                    |
+| `08b80c10916178f8f83d8b5a520dfef290977d9d` | `docs(references): close phase failure fallback paths`                                                                                                                               |
+| `88bd58374e17eb737493ae7f75074bd269c48c19` | `fix(audit): report unreadable L1 boundary entries`                                                                                                                                  |
+| `46db5fcfd702c3bb8837b0bbfab51ca51105ff4d` | `docs(references): route coding input failures through R`                                                                                                                            |
+| `f8ffe0f7b88313af188cdb247586999d447af10f` | `fix(audit): classify L1 directory read failures`                                                                                                                                    |
+| `43e60df2fb6582ca8e533f1a7d1fa8781a7475c9` | `test(docs): close ordinary failure routing contract`                                                                                                                                |
+| `75d211e8270c16cc8fcb76b4ada70910e6accc4b` | `fix(audit): validate complete link URI encoding`                                                                                                                                    |
+| `347f43e796fed39570164b9282e6534afdbd1e1b` | `docs(workflow): enforce complete ordinary failure routing`                                                                                                                          |
+| `c6500ed47e36c8d87fc687875af9213ff95bd7ca` | `fix(audit): validate placeholder URI encoding`                                                                                                                                      |
+| `d4e0e6788ef362a07edd4be7751893ede0021f07` | `fix(docs): close ordinary failure routing contracts`                                                                                                                                |
+| `b030f8087567355147391f4b10203e57d3f5384a` | `fix(audit): close L0 URI and dependency boundaries`                                                                                                                                 |
+| `b023dc798916169840d83b2e5411f028d4eb3192` | `fix(test): keep examples contract security-clean`                                                                                                                                   |
+| `5f3311f7a889e6a1dc4d3456adb73d0b591a510f` | `fix(deps): patch fast-uri audit vulnerability`                                                                                                                                      |
+| `4562e44b71b3544dfcfac4f7d19a966e8e15c810` | `docs(changes): finalize Task 8 acceptance evidence`                                                                                                                                 |
+| `60694d336a27c52926eec2d1dc2dcfbd3c6441ae` | `fix(audit): reject Windows drive-letter link paths`                                                                                                                                 |
+| `56b7d83d4f3d98497ea00d57902afc4533cbda9c` | `style(references): remove trailing whitespace`                                                                                                                                      |
+| `982d051d7804dab1ecc9ef13e7a65cbf37ce04a6` | `test(audit): preserve valid external URI scope`                                                                                                                                     |
+| `c74d38ecb4faea1efe20d0b1a47919c16d1c154d` | `test(audit): scan all guidance contracts`                                                                                                                                           |
+| `1963406c3ae56ed0e796ffc517f9555fc4b495c2` | `docs(contract): close all ordinary failure routes`                                                                                                                                  |
+| `41ebcb6485c7d5aea78745fe853735a6dd18c702` | `test(audit): verify l0 cli error routing`                                                                                                                                           |
+| `0e9f1ce3f21f84b73be40017321768a5e5232666` | `test(security): document controlled audit fixtures`                                                                                                                                 |
+| `bee1a634d62ac5fce7998cf17ff6c25daa3cc708` | `docs(changes): close task8 audit evidence`                                                                                                                                          |
+| `9567415cb861b0fa461540317a8df2b956360827` | `style(test): format workflow contract scanner`                                                                                                                                      |
+| `6c6ee22d4e36c93f0a8206449409faee42996f68` | `docs(changes): record final task8 gate`                                                                                                                                             |
+| `d997b586afe381c2f8ffcb8edcbcf9d9741fb644` | `docs(changes): finalize task8 evidence`                                                                                                                                             |
+| `0b2a62d3be2077b255be3d23204752bb78f1287e` | `docs(changes): record final prepush verification`                                                                                                                                   |
+| `a6c805ba51ca7cefc5806f0a779fdbd9b86f4281` | `fix(docs): close ordinary failure routing contract`                                                                                                                                 |
+| `751c1e0e172bd49b281e0d5c5919a139440c4e2d` | `test(docs): scan multiline test result tokens`                                                                                                                                      |
+| `6ac25be195d3c841360f6ea0ce0c3c7a1399c377` | `test(audit): cover internal non-markdown l0 links`                                                                                                                                  |
+| `d1c61732184af15ff563c0d923a316d65caa2397` | `test(docs): harden multiline test command extraction`                                                                                                                               |
+| `ebcc2a678362775675972e65a030fa37ccefceec` | `docs(changes): record Task 8 final repair round`                                                                                                                                    |
+| `54cdf07e1d178062af02d7146661349231658a10` | `docs(changes): synchronize final parent evidence ledger`                                                                                                                            |
+| `7c70e70c0e1f64f22ca6030844ebd7ce524da6ab` | `style(test): align guidance scanner with prepush format`                                                                                                                            |
+| `e9062857043ce2e50e2d2ff99b31b0d585b0a397` | `docs(changes): update final verification ledger`                                                                                                                                    |
+| `f832febd5f41a831a4e4cce7e9562f1407b31722` | `docs(changes): finalize Task 8 verification evidence`                                                                                                                               |
+| `1d148a8a296e159e72f662e2a3b8eaeaa32fa32f` | `docs(changes): record final prepush result`                                                                                                                                         |
+| `c24b2442150f65331e98f6ada1862e4d8bfdb968` | `docs(changes): refresh complete final parent ledger`                                                                                                                                |
+| `6ddb1978ffc51d790479c25fa9ccb8b9dfb4e81d` | `test(audit): scan whole-row failure routes with chain markers`                                                                                                                      |
+| `f63989d12bb7bfe7813b93a6706c3438f82fa69f` | `fix(docs): route BDD/TLA+ gate failures through the complete chain`                                                                                                                 |
+| `07832d7b8596ecc93ef49b290ceb4415d2e4dbdf` | `fix(docs): close /wm review C/D and BDD-gate exit-1 routing bypasses`                                                                                                               |
+| `7f994e3d1191b671f371e713034ef26b22148b0a` | `fix(docs): route exit-code table rows 363/366 through the full chain`                                                                                                               |
+| `44c057a3e342234e9e9faa0cad4744b161659305` | `fix(docs): remove End Patch residue and restore UAT table row`                                                                                                                      |
+| `afd99c611b15b5ceb6cb68dac650a7b7fe87cc64` | `docs(changes): record scanner closure round in 42.2.1 changelog`                                                                                                                    |
+| `fbfd3363d6961b76dfa8029712e2fc36c5544c73` | `docs(changes): record scanner closure round acceptance`                                                                                                                             |
+| `051c688ecb2ddd361ce19bce560664f456355da1` | `style(test): format whole-row failure scanner`                                                                                                                                      |
+| `c4e3359176a32e2c623f140c48a352349e8b635c` | `docs(changes): refresh complete final parent ledger`                                                                                                                                |
+| `ac91849b7aa27bb605c3fb2f4ac235ac9645129b` | `docs(changelog): expand 2 short SHAs and append c4e3359 to 42.2.1 parent ledger`                                                                                                    |
+| `97b91badfc7fe945ab830b5ea4a594d3c25db877` | `docs(changes): expand short SHAs in acceptance records and append ac91849 to 42.2.1 parent ledger`                                                                                  |
+| `965095e049bf0688e1b343c5adcdd70407642228` | `docs(changes): annotate verbatim subject citations in parent ledgers`                                                                                                               |
+| `689e51bd114831a209af92c99e82afea2e97f512` | `feat(gate): add change-scope and codegraph-query JSON Schemas with inventory sync`                                                                                                  |
+| `ac90a78b800e5c163944900d7473136d863136b5` | `feat(gate): bind codegraph/opsx/archive checkers to ChangeScope with strict coverage`                                                                                               |
+| `a0f86bbb4c5001f56a3b04143b13834f800b0922` | `refactor(gate): drop dead externalChecks passthrough; aggregate strict codegraph/opsx into artifact gate`                                                                           |
+| `5197b21cb97002def958de0f33591ba2f1c73a73` | `fix(gate): suppress misleading no-scope reasons when ChangeScope binding fails`                                                                                                     |
+| `ed55ff5b80cc81775c82349648dca81cc17a96bf` | `fix(gate): count R3 by success r3-* dimensions and fail closed on empty role logs`                                                                                                  |
+| `ce72badd4373cf99ed236bea816ad3cef90076d6` | `fix(run-log): fail closed on empty and malformed input; block action-role mismatch; align fix variant and preventive schemas`                                                       |
+| `36c66581b632571e9bb728edcf3f911776aec280` | `fix(run-log): absorb double-legacy emergency-fix rows via merged legacy predicates`                                                                                                 |
+| `6adc3215815cff0d355c13a15a6e00278e393812` | `fix(hooks): consume pre-push stdin refs per-line with fail-closed scope`                                                                                                            |
+| `13b942f1c36ae9e92c6d9f8ea22d4854340e117f` | `docs(sot): document ChangeScope gate binding and stage 5-8 aggregation`                                                                                                             |
+| `c691023e344864e7262b6776b974fec1f56cc4bc` | `docs(references): sync scope and run-log fail-closed semantics across guidance`                                                                                                     |
+| `3da9efa8a2ac4b889af8974029d902743eacc126` | `docs(changes): record gate-closure doc sync in 42.2.1 changelog and acceptance`                                                                                                     |
+| `0ee78ea23b21325d186fed0b38be2b554c3d1dfc` | `docs(superpowers): add audit-gate-closure fix plan`                                                                                                                                 |
+| `1a032bfab1ae0f224b903024dd3624dfdbfb9733` | `docs(references): state precise R3 dimension counting in summary tables`                                                                                                            |
+| `827ebceeb4497a69716a42dd540020b3ae8398c2` | `docs(references): reconcile fix-variant wording and template gate qualifier`                                                                                                        |
+| `1a0ed09c460bd42ad1cd964f6b11e35dc1725958` | `fix(gate): report R3 dimension gaps instead of missing R role records`                                                                                                              |
+| `25e5bf01a976e234e225bc2bb0397cf5071e2433` | `fix(gate): validate change id in thin scope wrapper`                                                                                                                                |
+| `e425642d019d3b2d8d55a4471a867eb81d9661fe` | `refactor(gate): share scope-resolution helper across checkers`                                                                                                                      |
+| `f2570709982f458beb2d9bfb4a8e1754d22deb2d` | `docs(schema): align run-log descriptions with enforced pairing`                                                                                                                     |
+| `f828b2776a486d674f44d66726d1ab6fa770ed44` | `fix(hooks): skip transient audit network errors and baseline new branches remotely`                                                                                                 |
+| `f76dc43fc9571b85964cdefa68bd51df4ccd0e0c` | `docs(references): tighten fix-review wording in violation checks`                                                                                                                   |
+| `d17594feb65c9b994a0e637d752355822e1abc84` | `docs(changes): make anchor-grep tally reproducible and date the 647 measurement`                                                                                                    |
+| `8a7b503fe6077e36b97d02b24f1a1b3e04130759` | `test(gate): sync direct-call manifest line after change-scope case addition`                                                                                                        |
+| `0644a0b740325a2e7eedf9860cfd700ede9b7a99` | `style(test): prettier formatting for hook test additions`                                                                                                                           |
+| `f0add116c98b8f4ab109a01aa6f1543312e19bdc` | `fix(hooks): list merge diffs in remote-tracking enumeration with -m`                                                                                                                |
+| `6780e109010835df967159ca52796a40f8970730` | `docs(superpowers): add review-fixes design spec (26 findings, 5 slices)`                                                                                                            |
+| `a2cab37592f2e622f18eb4a824ea881eb9bd7304` | `docs(superpowers): add review-fixes implementation plan (6 tasks, SDD)`                                                                                                             |
+| `de7152224ff2eab6c7be81807b023f05b1692b50` | `fix(scripts): harden change-scope binding (quotePath, shell whitelist, changeId prefix, dot-segment, archive date, phase filenames, external summary)`                              |
+| `7076692f9f9aaed021e1a67b8bd155a7658406cf` | `fix(hooks): reject leading-dash remote names in pre-push enumeration (fail-closed)`                                                                                                 |
+| `7cd5fcf8e2807db03383c366e010fb931e232afc` | `fix(scripts): parse reference-style links in L0 audit; consolidate pinned baselines; anchor hook failure-source assertion`                                                          |
+| `ae73586407c344e1aa2736696414a8808b6f9658` | `docs: require --phase/--scope in gate command examples; document remote-tracking new-branch baseline path`                                                                          |
+| `dabbe6bc4f3fd5fa267c7f194121844712c20e57` | `docs: reconcile gate/opsx/run-log/NFR/audit/exit-2-count wording with implementations`                                                                                              |
+| `548e43a3553fc1109349e461458a288d0e48e383` | `docs(changes): restore parent-chain continuity (insert 965095e0, append 16 rows through f0add11)`                                                                                   |
+| `558075dacc76756ba9909263723950b0f9f70aeb` | `docs(superpowers): add archival-fixes design spec (13 filed items, 3 slices)`                                                                                                       |
+| `73b3f600f282bc76bb3a6142f12a844b661aeb86` | `docs(superpowers): add archival-fixes implementation plan (3 tasks, SDD)`                                                                                                           |
+| `1c861082066c710847dcd5fac0cd28e8d0f83eaa` | `fix(scripts): close archival items (summary shape, CLI exit-2 coverage, quotePath in docs-consistency, comment precision)`                                                          |
 | `09b47e428f3c5ee759d05bd0e8da35c4f9b959d8` | `docs: close archival docs items (GATE_JSON provided, l0 fixture form, AGENTS pretty-format, data-models scope note, run-log punctuation, user-guide audit wording, changelog typo)` |
-| `c3636a3b70901f706d15f83bf5daba27ca64fa6a` | `docs(changes): append archival-fixes ledger rows and refresh coverage note (close 13 filed items)` |
-| `ccad270ca42706af54ab5911afef6e8c191368b8` | `docs(superpowers): add archival-fixes-2 plan (4 filed minors, single task)` |
-| `34aad9663f5e5cb5c99a8e315e000ad8edc5fbe6` | `fix(scripts): require attemptedChangeId on scope violations; sharpen two comments` |
-| `7b52d4cd2559abac09abc1c3bb7a04619037ad29` | `docs(changes): correct archival index prose to actual ledger coverage` |
-| `11944cd6130b6f3faa1df497fabae3cea6c8385f` | `docs(changes): append archival-fixes-2 ledger rows (close 4 filed minors)` |
-| `e6de501d655406560a91f2f0a69b60f368812fb8` | `docs(changes): backfill review-fixes campaign rows to restore ledger continuity` |
-| `f7f0bba84fce8f780ce7d983785e5caabb4b6ccc` | `docs(changes): chain previous ledger-closing commit c3636a3 (zero-exemption continuity)` |
-| `14ccc5f33ee671a67db4d4425a57922ca866ad89` | `docs(superpowers): add review2-fixes design spec (27 findings, 6 tasks)` |
-| `5d7046a0a9737fc3714490cc2703408c63bc9ab9` | `docs(superpowers): add review2-fixes implementation plan (6 tasks, SDD)` |
-| `86162def2f56556bf341a82410cce37bea05dfcd` | `docs: close review2 Importants (template --scope, SSoT L0/L1 boundary anchor)` |
-| `0f9986c25fee563305ca3e4f1b2b7cdba9845708` | `fix(scripts): close l0 parser edge forms and classify .githooks as code` |
-| `63687d42d3b40e937ca95f5f6ab500c8a50cf988` | `fix(scripts): reject duplicate flags, bound legacy variant absorption, unify scope loading` |
-| `f79087a6e21c444ebf244e8a0210e30910f6c17f` | `test: close quality minors (dead probe, E5b shape, dedupe scanners, fixed timestamps)` |
-| `35f132ee342fbfa5fc359b7768b8d5d430e0757b` | `fix(hooks): quotePath in pre-push git calls and bound audit skip to anchored transient signals` |
-| `84fe7cb2be83a4451688575b899f74ab1b4ff382` | `docs: anchor ordinary failure chain and close wording minors (review2-fixes)` |
-| `c38fc88f800281f1e27704f57c718c2b7db8bbb6` | `docs(changes): append review2-fixes ledger rows (close 27 findings)` |
-| `a5e2c2723a42eb4e17c5ddc7d10cf1453b2b8f6f` | `style(scripts): prettier formatting for gate scope files` |
+| `c3636a3b70901f706d15f83bf5daba27ca64fa6a` | `docs(changes): append archival-fixes ledger rows and refresh coverage note (close 13 filed items)`                                                                                  |
+| `ccad270ca42706af54ab5911afef6e8c191368b8` | `docs(superpowers): add archival-fixes-2 plan (4 filed minors, single task)`                                                                                                         |
+| `34aad9663f5e5cb5c99a8e315e000ad8edc5fbe6` | `fix(scripts): require attemptedChangeId on scope violations; sharpen two comments`                                                                                                  |
+| `7b52d4cd2559abac09abc1c3bb7a04619037ad29` | `docs(changes): correct archival index prose to actual ledger coverage`                                                                                                              |
+| `11944cd6130b6f3faa1df497fabae3cea6c8385f` | `docs(changes): append archival-fixes-2 ledger rows (close 4 filed minors)`                                                                                                          |
+| `e6de501d655406560a91f2f0a69b60f368812fb8` | `docs(changes): backfill review-fixes campaign rows to restore ledger continuity`                                                                                                    |
+| `f7f0bba84fce8f780ce7d983785e5caabb4b6ccc` | `docs(changes): chain previous ledger-closing commit c3636a3 (zero-exemption continuity)`                                                                                            |
+| `14ccc5f33ee671a67db4d4425a57922ca866ad89` | `docs(superpowers): add review2-fixes design spec (27 findings, 6 tasks)`                                                                                                            |
+| `5d7046a0a9737fc3714490cc2703408c63bc9ab9` | `docs(superpowers): add review2-fixes implementation plan (6 tasks, SDD)`                                                                                                            |
+| `86162def2f56556bf341a82410cce37bea05dfcd` | `docs: close review2 Importants (template --scope, SSoT L0/L1 boundary anchor)`                                                                                                      |
+| `0f9986c25fee563305ca3e4f1b2b7cdba9845708` | `fix(scripts): close l0 parser edge forms and classify .githooks as code`                                                                                                            |
+| `63687d42d3b40e937ca95f5f6ab500c8a50cf988` | `fix(scripts): reject duplicate flags, bound legacy variant absorption, unify scope loading`                                                                                         |
+| `f79087a6e21c444ebf244e8a0210e30910f6c17f` | `test: close quality minors (dead probe, E5b shape, dedupe scanners, fixed timestamps)`                                                                                              |
+| `35f132ee342fbfa5fc359b7768b8d5d430e0757b` | `fix(hooks): quotePath in pre-push git calls and bound audit skip to anchored transient signals`                                                                                     |
+| `84fe7cb2be83a4451688575b899f74ab1b4ff382` | `docs: anchor ordinary failure chain and close wording minors (review2-fixes)`                                                                                                       |
+| `c38fc88f800281f1e27704f57c718c2b7db8bbb6` | `docs(changes): append review2-fixes ledger rows (close 27 findings)`                                                                                                                |
+| `a5e2c2723a42eb4e17c5ddc7d10cf1453b2b8f6f` | `style(scripts): prettier formatting for gate scope files`                                                                                                                           |
 
 注：父链表第二格为提交 subject 逐字引用；subject 内形如短 SHA 的文本（如若干 docs 提交 subject 内嵌的先前提交 SHA）属 commit message 原文，非身份引用，不展开、不补全。
 

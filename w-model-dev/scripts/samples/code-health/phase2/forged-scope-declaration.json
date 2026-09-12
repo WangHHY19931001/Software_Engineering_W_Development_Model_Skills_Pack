@@ -1,0 +1,97 @@
+{
+  "kind": "matrix",
+  "ledger": {
+    "baseline": {
+      "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "analyzedAt": "2026-09-07T00:00:00.000Z"
+    },
+    "candidates": [
+      {
+        "candidateId": "CHG-P2-20260907-001",
+        "phase": "P2",
+        "action": "add-test",
+        "status": "verified",
+        "files": ["src/token.ts"],
+        "symbols": ["validateToken"],
+        "tests": ["probe.mjs"],
+        "revision": {
+          "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "analyzedAt": "2026-09-07T00:00:00.000Z"
+        },
+        "changeScope": {
+          "files": ["src/token.mjs"],
+          "symbols": ["validateToken"],
+          "scopeHash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      }
+    ],
+    "events": []
+  },
+  "rows": [
+    {
+      "gapId": "GAP-CHG-P2-20260907-001-security-forged-scope",
+      "candidateId": "CHG-P2-20260907-001",
+      "kind": "security",
+      "testLevels": ["integration"],
+      "existingTestIds": ["test-token-happy-path"],
+      "missingScenario": "the invalid-signature rejection path is never exercised with a forged token",
+      "evidenceSources": ["evidence/phase2-gaps.json"],
+      "risk": {
+        "severity": "critical",
+        "behavior": "high",
+        "security": "high",
+        "concurrency": "none",
+        "platform": "low",
+        "lifecycle": "low",
+        "governance": "high",
+        "rationale": "An untested signature check is an authorization boundary without proof."
+      },
+      "priority": "critical",
+      "owner": "S-security",
+      "rtmIds": ["REQ-SEC-001"],
+      "coverageSignal": { "statements": 0.9, "branches": 0.5, "functions": 0.8, "lines": 0.9 },
+      "coverageIsSignalOnly": true,
+      "status": "implemented",
+      "redEvidence": {
+        "command": "node runner.mjs",
+        "cwd": ".",
+        "environment": {},
+        "platform": "win32",
+        "toolVersions": { "node": "20.0.0", "codeHealthTddFailureClass": "assertion" },
+        "startedAt": "2026-09-07T00:01:00.000Z",
+        "endedAt": "2026-09-07T00:01:01.000Z",
+        "exitCode": 1,
+        "observation": "observed",
+        "rawOutputPath": ".w-model/code-health/tdd/red.log",
+        "rawOutputSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "gapId": "GAP-CHG-P2-20260907-001-security-forged-scope",
+        "assertionHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "testArtifacts": ["src/token.mjs"],
+        "implementationArtifact": "assertion.mjs"
+      },
+      "greenEvidence": {
+        "command": "node runner.mjs",
+        "cwd": ".",
+        "environment": {},
+        "platform": "win32",
+        "toolVersions": { "node": "20.0.0", "codeHealthTddFailureClass": "none" },
+        "startedAt": "2026-09-07T00:02:00.000Z",
+        "endedAt": "2026-09-07T00:02:01.000Z",
+        "exitCode": 0,
+        "observation": "observed",
+        "rawOutputPath": ".w-model/code-health/tdd/green.log",
+        "rawOutputSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "gapId": "GAP-CHG-P2-20260907-001-security-forged-scope",
+        "assertionHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "testArtifacts": ["src/token.mjs"],
+        "implementationArtifact": "assertion.mjs"
+      },
+      "assertionHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "implementationHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "description": "tracked record 标记 dead copy → 排除，deferred（非批准）",
+  "expectedStatus": "deferred",
+  "expectAuthorized": false,
+  "candidateId": "CHG-P4-20260907-911",
+  "input": {
+    "implementations": [
+      {
+        "file": "src/cache-a.ts",
+        "symbol": "readCacheA",
+        "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "file": "src/cache-b.ts",
+        "symbol": "readCacheB",
+        "sourceHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ],
+    "ast": ["node=conditional", "branch=missing-or-hit", "control-flow=single-return"],
+    "dataFlow": ["input=cache-key", "output=value-or-loader", "side-effect=none"],
+    "callGraph": ["caller=src/service-a.ts:load", "callee=src/cache-a.ts:readCacheA", "lifecycle=shared-cache"],
+    "tests": ["tests/cache-contract.test.ts"]
+  },
+  "authority": {
+    "candidateId": "CHG-P4-20260907-911",
+    "phase": "P4",
+    "action": "abstract",
+    "approvedScope": [
+      "src/cache-a.ts",
+      "src/cache-b.ts",
+      "src/service-a.ts",
+      "src/service-b.ts",
+      "src/cache-service.ts"
+    ],
+    "declaredCallSites": ["src/service-a.ts:load", "src/service-b.ts:load"],
+    "declaredTests": ["tests/cache-contract.test.ts"],
+    "regressionCommands": [
+      {
+        "command": "node --test tests/cache-contract.test.ts",
+        "cwd": ".",
+        "environment": {
+          "NODE_ENV": "test"
+        },
+        "platform": "linux",
+        "toolVersions": {
+          "node": "20.0.0"
+        },
+        "startedAt": "2026-09-07T00:01:00.000Z",
+        "endedAt": "2026-09-07T00:01:01.000Z",
+        "exitCode": 0,
+        "observation": "observed",
+        "rawOutputPath": "w-model/code-health/raw/node-test.log",
+        "rawOutputSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    ],
+    "trackedFacts": [
+      "call-site:src/service-a.ts:load",
+      "call-site:src/service-b.ts:load",
+      "contract:src/service-a.ts:load",
+      "contract:src/service-b.ts:load",
+      "regression:src/service-a.ts:load",
+      "regression:src/service-b.ts:load",
+      "excluded:dead-copy:src/service-b.ts:load"
+    ]
+  },
+  "review": {
+    "equivalenceProof": {
+      "inputsOutputs": "accepted-inputs=equivalent; produced-outputs=equivalent",
+      "orderingMutationsSideEffects": "ordering=equivalent; mutations=equivalent; side-effects=equivalent",
+      "errorsRetries": "error-types=equivalent; error-status=equivalent; error-messages=equivalent; retry=equivalent; failure-timing=equivalent",
+      "lifecycleResources": "initialization=equivalent; finalization=equivalent; cleanup=equivalent; cancellation=equivalent; transactions=equivalent; resource-scope=equivalent",
+      "security": "authorization=equivalent; validation-order=equivalent; secrets=equivalent; privilege=equivalent",
+      "concurrencyPlatforms": "locks=equivalent; atomicity=equivalent; idempotency=equivalent; platform=equivalent",
+      "allDimensionsProven": true
+    },
+    "maintenanceBenefit": "Consolidates 2 duplicated cache implementations into 1 cohesive API, removing 1 behavior owner and 2 bug-fix surfaces.",
+    "rollback": {
+      "preChangeRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "command": "git apply -R .w-model/code-health/apply/CHG-P4-20260907-911.patch",
+      "patchPath": ".w-model/code-health/apply/CHG-P4-20260907-911.patch",
+      "owner": "S-agent",
+      "executable": true
+    },
+    "redaction": {
+      "status": "clean",
+      "reasons": []
+    }
+  }
+}

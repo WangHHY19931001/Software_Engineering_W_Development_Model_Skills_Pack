@@ -2,6 +2,7 @@
 /** Legacy code-health lifecycle compatibility layer over the canonical contract. */
 
 import { createTask1ArchiveBoundary } from '../lib/code-health-archive-boundary.js';
+import { TDD_FAILURE_CLASS_KEY, runTddHarness } from '../lib/code-health-tdd-harness.js';
 
 import {
   CodeHealthError,
@@ -13,49 +14,51 @@ import {
   validateLedgerEvent,
   validateRevision,
 } from './code-health-contract.js';
-import {
-  clusterDuplicates,
-  findGaps,
-  proveTestRemoval as proveTestRemovalBoundary,
-  runTddHarness,
-} from './code-health-phase-boundaries.js';
+import { findGaps } from './code-health-gap-logic.js';
+import { clusterDuplicates, proveAbstraction } from './code-health-duplicate-logic.js';
+import { buildStaticInventory, checkFalsePositiveGuards, mergeDynamicTrace } from './code-health-phase1-logic.js';
+import { evaluateDeletionFacts, type ExpectedGovernanceFacts } from './code-health-test-logic.js';
 import type {
   ApprovalDecision,
   ApplyApprovedInput,
   ApplyResult,
+  ArchiveBoundaryResult,
+  ArchivePackageFile,
   CodeHealthCandidate,
   CodeHealthLedger,
   CodeHealthStatus,
   CommandEvidence,
   DeletionEvaluation,
   DeletionFacts,
-  DynamicTraceReport,
-  DynamicTraceScenario,
   EvalDiffInput,
   EvidenceRef,
   EvidenceVerificationContext,
-  FalsePositiveContext,
   FileVerificationContext,
   GapRow,
   GateFailureEvidence,
   LedgerEvent,
   LedgerEventKind,
-  Phase1CandidateLead,
-  Phase1RunResult,
-  ProtectedTestClass,
   RevisionIdentity,
   RollbackEvidence,
   RollbackPlan,
-  StaticInventoryReport,
-  TestRecord,
-  TestRemovalProofInput,
 } from './code-health-contract.js';
 
 export { CodeHealthError, validateCodeHealthCandidate };
-export { clusterDuplicates, findGaps, runTddHarness };
+export { clusterDuplicates, findGaps, proveAbstraction, runTddHarness };
 
-export function proveTestRemoval(input: TestRemovalProofInput): string[] {
-  return proveTestRemovalBoundary(input);
+/**
+ * Phase 3 surface (R3 closure). The real pure implementations live in `logic/code-health-test-logic.ts`;
+ * this legacy module re-exports them so existing consumers keep one import path. `proveTestRemoval` is
+ * the real proof, replacing the Task 1 NOT_IMPLEMENTED boundary delegate.
+ */
+export { classifyProtectedTest, proveTestRemoval } from './code-health-test-logic.js';
+
+/**
+ * Deletion facts evaluation (R2). The extended real implementation lives in
+ * `logic/code-health-test-logic.ts`; this wrapper keeps the frozen `evaluateDeletion` import path.
+ */
+export function evaluateDeletion(facts: DeletionFacts, expected?: ExpectedGovernanceFacts): DeletionEvaluation {
+  return evaluateDeletionFacts(facts, expected);
 }
 export type {
   AbstractionProposal,
@@ -63,6 +66,7 @@ export type {
   ArchiveBoundaryResult,
   ArchiveConsumeInput,
   ArchiveManifest,
+  ArchivePackageFile,
   ArchiveProduceInput,
   ArchiveTransitionEvidence,
   ArchiveVerifyInput,
@@ -957,8 +961,31 @@ export function appendReworkEvent(ledger: CodeHealthLedger, candidateId: string,
 export function validateEvalDiff(input: EvalDiffInput): string[] {
   if (input.changedBehavior) return [];
   if (!Array.isArray(input.prompts)) return ['prompts must be an array'];
-  if (!isRecord(input.mappings) && !Array.isArray(input.mappings)) return ['mappings must be an object or array'];
-  return [];
+  const mappingsArray = Array.isArray(input.mappings)
+    ? input.mappings
+    : isRecord(input.mappings) && Array.isArray(input.mappings.mappings)
+      ? (input.mappings.mappings as unknown[])
+      : null;
+  if (mappingsArray === null) return ['mappings must be an object or array'];
+  // Eval corpus and mapping matrix are 1:1 by id. When no behavior change is declared, an added
+  // prompt without a mapping (or vice versa) is an undeclared corpus inflation and is rejected.
+  const promptKeys = new Set(input.prompts.map((entry, index) => evalEntryKey(entry, index)));
+  const mappingKeys = new Set(mappingsArray.map((entry, index) => evalEntryKey(entry, index)));
+  const undeclaredPrompts = [...promptKeys].filter((key) => !mappingKeys.has(key));
+  const undeclaredMappings = [...mappingKeys].filter((key) => !promptKeys.has(key));
+  if (undeclaredPrompts.length === 0 && undeclaredMappings.length === 0) return [];
+  return [
+    `behavior change must be declared (changedBehavior=true) before adding prompts/mappings; prompts without mappings: [${undeclaredPrompts.join(', ')}]; mappings without prompts: [${undeclaredMappings.join(', ')}]`,
+  ];
+}
+
+/** Stable identity for an eval prompt/mapping row: its numeric/string `id`, else its positional index. */
+function evalEntryKey(entry: unknown, index: number): string {
+  if (isRecord(entry)) {
+    if (typeof entry.id === 'number' && Number.isInteger(entry.id)) return `id:${entry.id}`;
+    if (typeof entry.id === 'string' && entry.id.trim() !== '') return `id:${entry.id.trim()}`;
+  }
+  return `index:${index}`;
 }
 
 const GAP_KINDS = ['requirement', 'public-contract', 'branch', 'error', 'security', 'concurrency', 'platform'] as const;
@@ -1178,19 +1205,48 @@ function isBoundedGapText(value: unknown): value is string {
 }
 
 function validateGapEvidenceCommand(value: unknown, field: string, expected: 'red' | 'green', reasons: string[]): void {
+  if (!isRecord(value)) {
+    reasons.push(`${field} must be an object`);
+    return;
+  }
+  // Harness binding/declaration fields travel with the command evidence (R-G/R-E); strip them before the
+  // canonical CommandEvidence validator, which only allows its frozen key set.
+  const commandRecord: Record<string, unknown> = { ...value };
+  for (const bindingKey of [
+    'gapId',
+    'assertionHash',
+    'implementationHash',
+    'testArtifacts',
+    'implementationArtifact',
+  ]) {
+    delete commandRecord[bindingKey];
+  }
   const commandReasons: string[] = [];
-  validateCommandEvidence(value, field, commandReasons);
+  validateCommandEvidence(commandRecord, field, commandReasons);
   if (commandReasons.length > 0) {
     reasons.push(...commandReasons);
     return;
   }
-  const command = value as CommandEvidence;
+  const command = value as unknown as CommandEvidence;
+  const failureClass = command.toolVersions?.[TDD_FAILURE_CLASS_KEY];
   if (expected === 'red') {
     if (command.observation !== 'observed' || command.exitCode === null || command.exitCode === 0) {
       reasons.push(`${field} must be an observed non-zero RED result`);
     }
-  } else if (command.observation !== 'observed' || command.exitCode !== 0) {
-    reasons.push(`${field} must be an observed zero-exit GREEN result`);
+    // A gap-bound RED must prove it failed on the assertion, not on unrelated infrastructure. The
+    // classification is mandatory: absent evidence fails closed and can never be counted as RED.
+    if (failureClass !== 'assertion') {
+      reasons.push(
+        `${field} must carry the real assertion-failure classification (${TDD_FAILURE_CLASS_KEY}=assertion); got ${String(failureClass)}`,
+      );
+    }
+  } else {
+    if (command.observation !== 'observed' || command.exitCode !== 0) {
+      reasons.push(`${field} must be an observed zero-exit GREEN result`);
+    }
+    if (failureClass !== undefined && failureClass !== 'none') {
+      reasons.push(`${field} must not carry a non-GREEN failure classification; got ${String(failureClass)}`);
+    }
   }
 }
 
@@ -1255,6 +1311,42 @@ export function validateGapRow(row: unknown, ledger: CodeHealthLedger, seenGapId
   }
   if (row.redEvidence !== undefined) validateGapEvidenceCommand(row.redEvidence, 'redEvidence', 'red', reasons);
   if (row.greenEvidence !== undefined) validateGapEvidenceCommand(row.greenEvidence, 'greenEvidence', 'green', reasons);
+  // R-G: row-level red/green evidence is a pair bound to THIS row's gapId and one assertion hash.
+  const hasRedEvidence = row.redEvidence !== undefined;
+  const hasGreenEvidence = row.greenEvidence !== undefined;
+  if (hasRedEvidence !== hasGreenEvidence) {
+    reasons.push('redEvidence and greenEvidence must be present as a pair');
+  }
+  if (hasRedEvidence && hasGreenEvidence) {
+    const redBinding = tddHarnessBinding(row.redEvidence as CommandEvidence);
+    const greenBinding = tddHarnessBinding(row.greenEvidence as CommandEvidence);
+    if (!redBinding || redBinding.gapId !== row.gapId) {
+      reasons.push(`redEvidence must be bound to gap ${String(row.gapId)}`);
+    }
+    if (!greenBinding || greenBinding.gapId !== row.gapId) {
+      reasons.push(`greenEvidence must be bound to gap ${String(row.gapId)}`);
+    }
+    if (redBinding && greenBinding && redBinding.assertionHash !== greenBinding.assertionHash) {
+      reasons.push('redEvidence and greenEvidence must share one assertionHash');
+    }
+    if (typeof row.assertionHash === 'string') {
+      if (redBinding && redBinding.assertionHash !== row.assertionHash) {
+        reasons.push('redEvidence assertionHash does not match the gap assertionHash');
+      }
+      if (greenBinding && greenBinding.assertionHash !== row.assertionHash) {
+        reasons.push('greenEvidence assertionHash does not match the gap assertionHash');
+      }
+    }
+    // G-1/G-2: any declared artifact set must be consistent with the LEDGER candidate record.
+    for (const [field, evidence] of [
+      ['redEvidence', row.redEvidence],
+      ['greenEvidence', row.greenEvidence],
+    ] as const) {
+      const declaration = tddArtifactDeclarations(evidence as CommandEvidence);
+      if (declaration === null) continue;
+      reasons.push(...validateDeclarationAgainstCandidate(declaration, candidate, field));
+    }
+  }
   if (
     row.assertionHash !== undefined &&
     (typeof row.assertionHash !== 'string' || !HEX64_PATTERN.test(row.assertionHash))
@@ -1292,65 +1384,218 @@ export function validateGapMatrix(matrix: unknown, ledger: CodeHealthLedger): st
   return reasons;
 }
 
-function notImplemented(reason: string): CodeHealthError {
-  return new CodeHealthError('NOT_IMPLEMENTED', reason);
+/**
+ * Phase 1 discovery surface (R8 closure). The real pure implementations live in
+ * `logic/code-health-phase1-logic.ts`; this legacy module re-exports them so existing consumers keep one
+ * import path. `runPhase1` (the IO orchestrator) lives in `cli/code-health-phase1.ts` and is intentionally
+ * not re-exported here: `logic/` must never depend on `cli/`.
+ */
+export { buildStaticInventory, checkFalsePositiveGuards, mergeDynamicTrace };
+
+/** Structural view of a harness-produced RED/GREEN result bound to one gap and one assertion. */
+interface TddHarnessBinding {
+  gapId: string;
+  assertionHash: string;
 }
 
-export function buildStaticInventory(input: {
-  files: string[];
-  sourceText: Map<string, string>;
-  revision: RevisionIdentity;
-}): StaticInventoryReport {
-  if (!isRecord(input) || !Array.isArray(input.files) || input.files.length === 0) {
-    throw notImplemented('static inventory requires Phase 1 implementation');
+function tddHarnessBinding(result: CommandEvidence): TddHarnessBinding | null {
+  const candidate = result as Partial<TddHarnessBinding>;
+  if (typeof candidate.gapId === 'string' && typeof candidate.assertionHash === 'string') {
+    return { gapId: candidate.gapId, assertionHash: candidate.assertionHash };
   }
-  throw notImplemented('static inventory is not implemented in Task 1A');
+  return null;
 }
 
-export function mergeDynamicTrace(
-  _staticReport: StaticInventoryReport,
-  _trace: DynamicTraceReport,
-): Phase1CandidateLead[] {
-  throw notImplemented('dynamic trace merge is not implemented in Task 1A');
+/** Structural view of the declared artifact set one harness result was produced with (R-E). */
+interface TddArtifactDeclarations {
+  testArtifacts: string[];
+  implementationArtifact: string;
 }
 
-export function checkFalsePositiveGuards(_lead: Phase1CandidateLead, _context: FalsePositiveContext): string[] {
-  throw notImplemented('false-positive analysis is not implemented in Task 1A');
+function tddArtifactDeclarations(result: CommandEvidence): TddArtifactDeclarations | null {
+  const candidate = result as Partial<TddArtifactDeclarations>;
+  if (
+    Array.isArray(candidate.testArtifacts) &&
+    candidate.testArtifacts.every((entry) => typeof entry === 'string') &&
+    typeof candidate.implementationArtifact === 'string'
+  ) {
+    return {
+      testArtifacts: candidate.testArtifacts as string[],
+      implementationArtifact: candidate.implementationArtifact,
+    };
+  }
+  return null;
 }
 
-export function runPhase1(_input: {
-  root: string;
-  output: string;
-  scenarios: DynamicTraceScenario[];
-}): Promise<Phase1RunResult> {
-  return Promise.reject(notImplemented('Phase 1 runner is not implemented in Task 1A'));
-}
-
-export function validateRedGreenEvidence(_gap: GapRow, results: CommandEvidence[]): string[] {
-  if (!Array.isArray(results)) return ['RED/GREEN results are required'];
+/**
+ * Structural consistency of one declared artifact set against the ledger-recorded candidate: the
+ * implementation artifact must be in the ledger-approved `changeScope.files`, every declared test
+ * artifact must be a ledger-declared `tests` file, and the two sets must be disjoint. This is a
+ * consistency check against the record passed in — it is NOT unforgeable by itself; the ledger,
+ * G gate, and signature chain are the authority (G-4).
+ */
+function validateDeclarationAgainstCandidate(
+  declaration: TddArtifactDeclarations,
+  candidate: CodeHealthCandidate | undefined,
+  field: string,
+): string[] {
   const reasons: string[] = [];
-  const red = results.some(
-    (result) => result.observation === 'observed' && result.exitCode !== null && result.exitCode !== 0,
-  );
-  const green = results.some((result) => result.observation === 'observed' && result.exitCode === 0);
-  if (!red) reasons.push('RED evidence required');
-  if (!green) reasons.push('GREEN evidence required');
+  if (!candidate) {
+    reasons.push(`${field} declaration requires the ledger candidate record for the gap`);
+    return reasons;
+  }
+  const scopeFiles =
+    isRecord(candidate.changeScope) && Array.isArray(candidate.changeScope.files)
+      ? candidate.changeScope.files.filter((file): file is string => typeof file === 'string')
+      : [];
+  const candidateTests = Array.isArray(candidate.tests)
+    ? candidate.tests.filter((test): test is string => typeof test === 'string')
+    : [];
+  if (scopeFiles.length === 0) {
+    reasons.push(`${field} declaration requires ledger candidate changeScope.files`);
+  } else if (!scopeFiles.includes(declaration.implementationArtifact)) {
+    reasons.push(`${field} implementationArtifact is not in the ledger candidate approved scope`);
+  }
+  if (candidateTests.length === 0) {
+    reasons.push(`${field} declaration requires ledger candidate tests`);
+  } else {
+    for (const artifact of declaration.testArtifacts) {
+      if (!candidateTests.includes(artifact)) {
+        reasons.push(`${field} test artifact ${artifact} is not a ledger-declared candidate test`);
+      }
+    }
+  }
+  if (candidateTests.includes(declaration.implementationArtifact)) {
+    reasons.push(`${field} implementation artifact must not be a ledger-declared candidate test`);
+  }
+  if (declaration.testArtifacts.includes(declaration.implementationArtifact)) {
+    reasons.push(`${field} testArtifacts must not include the implementation artifact`);
+  }
   return reasons;
 }
 
 /**
- * Task 1 approved-application boundary: validate the candidate, the human exact-scope approval, the
- * repository root, the mode, and the current revision, then return a typed NOT_IMPLEMENTED result. It never
- * touches the filesystem, Git, patches, commits, or the ledger, and `dry-run` cannot skip any validation.
+ * Strict RED/GREEN validation. Presence is not enough: every observed result must be harness-bound to
+ * the owning gap and declare the artifact set it was produced with; the declared set must be consistent
+ * with the LEDGER-recorded candidate (`changeScope.files` = implementation scope, `tests` = declared
+ * tests); RED and GREEN must declare identical test artifacts and the same implementation artifact
+ * (R-E symmetry), share one assertion hash (so a weakened or deleted assertion cannot produce a matching
+ * GREEN), remain disjoint, be distinguishable, and RED must carry the mandatory real assertion-failure
+ * classification — unrelated failures and unclassified hand-authored rows are rejected.
+ *
+ * Honest residual (G-4): this is a pure consistency check against the ledger record passed in. A pure
+ * function cannot be unforgeable; the ledger, the G gate, and the role signature chain are the authority.
+ */
+export function validateRedGreenEvidence(gap: GapRow, results: CommandEvidence[], ledger: CodeHealthLedger): string[] {
+  if (!Array.isArray(results)) return ['RED/GREEN results are required'];
+  if (!isRecord(gap) || typeof gap.gapId !== 'string') return ['RED/GREEN validation requires the owning gap'];
+  if (!isRecord(ledger) || !Array.isArray(ledger.candidates)) {
+    return ['RED/GREEN validation requires the ledger candidate record'];
+  }
+  const ledgerCandidate = ledger.candidates.find((entry) => entry.candidateId === gap.candidateId);
+  if (!ledgerCandidate) {
+    return [`RED/GREEN validation requires the ledger candidate record for gap ${gap.gapId}`];
+  }
+  const reasons: string[] = [];
+  const observed = results.filter((result) => result.observation === 'observed' && typeof result.exitCode === 'number');
+  const reds = observed.filter((result) => (result.exitCode as number) !== 0);
+  const greens = observed.filter((result) => result.exitCode === 0);
+  if (reds.length === 0) reasons.push('RED evidence required');
+  if (greens.length === 0) reasons.push('GREEN evidence required');
+
+  // Gap binding is mandatory: a hand-authored pair of results that carries no gapId/assertionHash can
+  // never stand in for a real RED/GREEN pair.
+  for (const result of observed) {
+    const binding = tddHarnessBinding(result);
+    if (binding === null || binding.gapId !== gap.gapId) {
+      reasons.push(
+        `${result.exitCode === 0 ? 'GREEN' : 'RED'} evidence is not bound to gap ${gap.gapId} (missing harness gapId/assertionHash)`,
+      );
+      continue;
+    }
+    if (typeof gap.assertionHash === 'string' && binding.assertionHash !== gap.assertionHash) {
+      reasons.push('RED/GREEN assertionHash does not match the recorded gap assertion');
+    }
+  }
+  const bound = observed
+    .map((result) => tddHarnessBinding(result))
+    .filter((binding): binding is TddHarnessBinding => binding !== null && binding.gapId === gap.gapId);
+  const assertionHashes = new Set(bound.map((binding) => binding.assertionHash));
+  if (bound.length > 1 && assertionHashes.size > 1) {
+    reasons.push('RED and GREEN were not produced by the same assertion (the assertion was changed or weakened)');
+  }
+
+  // R-E + G-1/G-2: the declared artifact set is mandatory, symmetric, and consistent with the ledger.
+  const declarations = observed.map((result) => ({ result, declaration: tddArtifactDeclarations(result) }));
+  for (const { result, declaration } of declarations) {
+    const label = result.exitCode === 0 ? 'GREEN' : 'RED';
+    if (declaration === null) {
+      reasons.push(`${label} evidence must declare its testArtifacts and implementationArtifact`);
+      continue;
+    }
+    if (declaration.testArtifacts.length === 0 || !declaration.testArtifacts.every((entry) => isRelativePath(entry))) {
+      reasons.push(`${label} evidence testArtifacts must be non-empty repository-relative paths`);
+    }
+    if (declaration.testArtifacts.includes(declaration.implementationArtifact)) {
+      reasons.push(`${label} evidence testArtifacts must not include the implementation artifact`);
+    }
+    reasons.push(...validateDeclarationAgainstCandidate(declaration, ledgerCandidate, label));
+  }
+  const declarationSignatures = new Set(
+    declarations
+      .map((entry) => entry.declaration)
+      .filter((declaration): declaration is TddArtifactDeclarations => declaration !== null)
+      .map(
+        (declaration) =>
+          `${JSON.stringify([...declaration.testArtifacts].sort())}|${declaration.implementationArtifact}`,
+      ),
+  );
+  if (declarationSignatures.size > 1) {
+    reasons.push('RED and GREEN must declare identical test artifacts and the same implementation artifact');
+  }
+
+  const rawOutputHashes = results.map((result) => result.rawOutputSha256).filter((hash) => typeof hash === 'string');
+  if (results.length > 1 && new Set(rawOutputHashes).size < results.length) {
+    reasons.push('RED and GREEN evidence is not distinguishable');
+  }
+  for (const red of reds) {
+    const failureClass = red.toolVersions?.[TDD_FAILURE_CLASS_KEY];
+    if (failureClass !== 'assertion') {
+      reasons.push(
+        `RED failed for an unrelated reason or is unclassified (${String(failureClass)}); only a real assertion failure (${TDD_FAILURE_CLASS_KEY}=assertion) can count as RED`,
+      );
+    }
+  }
+  return reasons;
+}
+
+const APPLY_PATCH_RELATIVE_ROOT = '.w-model/code-health/apply';
+const SHA40_PATTERN = /^[0-9a-f]{40}$/;
+
+/** Controlled repository-relative patch path for one approved candidate. */
+export function codeHealthApplyPatchPath(candidateId: string): string {
+  return `${APPLY_PATCH_RELATIVE_ROOT}/${candidateId}.patch`;
+}
+
+/**
+ * Real approved-application plan. It validates the candidate, the exact human approval scope, the mode, and
+ * the current revision, then returns a `patch-proposal` carrying one controlled patch path and an executable
+ * rollback plan. It never touches the filesystem, Git, or the ledger: the IO executor in
+ * `cli/code-health-apply.ts` writes the patch and, for `commit`, applies it and promotes the result to
+ * `ApplyCommitResult` only after a real scope read-back. Missing / non-human / scope / revision approval
+ * failures carry the `HUMAN_APPROVAL_REQUIRED` guard token.
  */
 export function applyApproved(input: ApplyApprovedInput): Promise<ApplyResult> {
   if (!isRecord(input)) {
     return Promise.reject(new CodeHealthError('ARG_INVALID', 'approved application requires an input object'));
   }
   const { candidate, approval, mode, repositoryRoot, currentRevision } = input;
-  if (!isRecord(candidate) || !isRecord(approval)) {
+  if (mode !== 'dry-run' && mode !== 'patch' && mode !== 'commit') {
     return Promise.reject(
-      new CodeHealthError('EVIDENCE_INVALID', 'approved application requires a candidate and an approval decision'),
+      new CodeHealthError(
+        'ARG_INVALID',
+        `approved application mode must be dry-run, patch, or commit; received ${String(mode)}`,
+      ),
     );
   }
   if (typeof repositoryRoot !== 'string' || repositoryRoot.length === 0) {
@@ -1358,10 +1603,8 @@ export function applyApproved(input: ApplyApprovedInput): Promise<ApplyResult> {
       new CodeHealthError('EVIDENCE_INVALID', 'approved application requires an explicit repository root'),
     );
   }
-  if (mode !== 'dry-run' && mode !== 'patch' && mode !== 'commit') {
-    return Promise.reject(
-      new CodeHealthError('EVIDENCE_INVALID', 'approved application mode must be dry-run, patch, or commit'),
-    );
+  if (!isRecord(candidate)) {
+    return Promise.reject(new CodeHealthError('EVIDENCE_INVALID', 'approved application requires a candidate object'));
   }
   const candidateReasons = validateCodeHealthCandidate(candidate);
   if (candidateReasons.length > 0) {
@@ -1372,12 +1615,17 @@ export function applyApproved(input: ApplyApprovedInput): Promise<ApplyResult> {
       ),
     );
   }
+  if (!isRecord(approval)) {
+    return Promise.reject(
+      new CodeHealthError('ROLE_FORBIDDEN', 'HUMAN_APPROVAL_REQUIRED: a human ApprovalDecision is required'),
+    );
+  }
   const approvalCheck = checkApprovalScope(candidate, approval);
   if (approvalCheck.revision.length > 0) {
     return Promise.reject(
       new CodeHealthError(
         'REVISION_MISMATCH',
-        `approved application revision is stale: ${approvalCheck.revision.join('; ')}`,
+        `HUMAN_APPROVAL_REQUIRED: approval revision is stale for the candidate (${approvalCheck.revision.join('; ')})`,
       ),
     );
   }
@@ -1385,18 +1633,21 @@ export function applyApproved(input: ApplyApprovedInput): Promise<ApplyResult> {
     return Promise.reject(
       new CodeHealthError(
         'EVIDENCE_INVALID',
-        `approved application approval is invalid: ${approvalCheck.evidence.join('; ')}`,
+        `HUMAN_APPROVAL_REQUIRED: approval is not a valid human decision (${approvalCheck.evidence.join('; ')})`,
       ),
     );
   }
   if (approvalCheck.scope.length > 0) {
     return Promise.reject(
-      new CodeHealthError('SCOPE_MISMATCH', `approved application scope is invalid: ${approvalCheck.scope.join('; ')}`),
+      new CodeHealthError(
+        'SCOPE_MISMATCH',
+        `HUMAN_APPROVAL_REQUIRED: approval scope does not match the candidate (${approvalCheck.scope.join('; ')})`,
+      ),
     );
   }
   if (approval.decision !== 'approve') {
     return Promise.reject(
-      new CodeHealthError('EVIDENCE_INVALID', 'approved application requires a human approve decision'),
+      new CodeHealthError('EVIDENCE_INVALID', 'HUMAN_APPROVAL_REQUIRED: the approval decision must be approve'),
     );
   }
   if (!isRecord(currentRevision) || !sameRevision(currentRevision as unknown as RevisionIdentity, candidate.revision)) {
@@ -1404,121 +1655,86 @@ export function applyApproved(input: ApplyApprovedInput): Promise<ApplyResult> {
       new CodeHealthError('REVISION_MISMATCH', 'approved application current revision does not match the candidate'),
     );
   }
+  const patchPath = codeHealthApplyPatchPath(candidate.candidateId);
+  const rollback: RollbackPlan = {
+    preChangeRevision: candidate.revision.commitSha,
+    command: `git apply -R ${patchPath}`,
+    patchPath,
+    owner: 'code-health-apply',
+    executable: true,
+  };
   return Promise.resolve({
+    kind: 'patch-proposal',
     applied: false,
-    errorCode: 'NOT_IMPLEMENTED',
-    patchPath: null,
+    errorCode: null,
+    mode,
+    patchPath,
     appliedFiles: [],
     unrelatedFiles: [],
-    rollback: null,
+    rollback,
   });
 }
 
-export async function executeRollback(_rollback: RollbackPlan): Promise<boolean> {
-  return false;
-}
-
-export function evaluateDeletion(facts: DeletionFacts): DeletionEvaluation {
-  const violations: string[] = [];
+/**
+ * Real rollback executability gate. The plan must be explicitly executable, carry a safe exact revert
+ * command, a controlled repository-relative patch path, a real pre-change revision, and an optional valid
+ * patch hash. A non-executable or malformed plan can never report success; the IO executor runs the recorded
+ * exact command via argv (never a shell string).
+ */
+export async function executeRollback(rollback: RollbackPlan): Promise<boolean> {
+  if (!isRecord(rollback) || rollback.executable !== true) return false;
+  if (typeof rollback.preChangeRevision !== 'string' || !SHA40_PATTERN.test(rollback.preChangeRevision)) return false;
+  if (typeof rollback.owner !== 'string' || rollback.owner.length === 0) return false;
+  if (typeof rollback.command !== 'string' || rollback.command.length === 0 || /[;&|<>\r\n]/.test(rollback.command)) {
+    return false;
+  }
+  if (!isRelativePath(rollback.patchPath)) return false;
   if (
-    !isRecord(facts) ||
-    typeof facts.testCount !== 'number' ||
-    !Number.isInteger(facts.testCount) ||
-    facts.testCount < 0
+    rollback.patchSha256 !== undefined &&
+    (typeof rollback.patchSha256 !== 'string' || !HEX64_PATTERN.test(rollback.patchSha256))
   ) {
-    violations.push('test count is invalid');
+    return false;
   }
-  if (!isRecord(facts) || typeof facts.coverageProvenance !== 'string' || facts.coverageProvenance.trim() === '') {
-    violations.push('coverage provenance is required');
-  }
-  if (!isRecord(facts) || !Array.isArray(facts.governanceFacts) || facts.governanceFacts.length === 0) {
-    violations.push('governance facts are required');
-  }
-  if (isRecord(facts) && facts.testCountDelta !== undefined && facts.testCountDelta !== -1) {
-    violations.push('test count delta must explain exactly one removed test');
-  }
-  return { passed: violations.length === 0, violations };
-}
-
-export function classifyProtectedTest(test: TestRecord): ProtectedTestClass | null {
-  if (!isRecord(test)) throw new Error('test record requires a complete object');
-  const requiredTextFields = [
-    'testId',
-    'file',
-    'symbol',
-    'author',
-    'createdAt',
-    'lastChangedAt',
-    'level',
-    'setup',
-    'stimulus',
-    'oracle',
-    'failureSensitivity',
-    'scenarioClass',
-  ] as const;
-  for (const field of requiredTextFields) {
-    if (typeof test[field] !== 'string' || test[field].trim() === '') {
-      throw new Error(`test.${field} requires a non-empty value`);
-    }
-  }
-  if (!Array.isArray(test.rtmIds) || !Array.isArray(test.governanceFacts)) throw new Error('test arrays are required');
-  const text = [
-    test.testId,
-    test.file,
-    test.symbol,
-    test.setup,
-    test.stimulus,
-    test.oracle,
-    test.failureSensitivity,
-    test.scenarioClass,
-    ...test.governanceFacts,
-  ]
-    .join(' ')
-    .toLowerCase();
-  if (/pre[- ]?push/.test(text)) return 'pre-push';
-  if (/self[- ]?test/.test(text)) return 'self-test';
-  if (/docs?[- ]consistency/.test(text)) return 'docs-consistency';
-  if (/security|auth|injection|secret|redact|privilege/.test(text)) return 'security';
-  if (/concurr|race|lock|atomic|idempot|retry|ordering/.test(text)) return 'concurrency';
-  if (/platform|windows|linux|git bash|powershell|line ending|executable/.test(text)) return 'platform';
-  if (/rollback|migration/.test(text)) return 'migration-rollback';
-  if (/boundary|empty|zero|min|max|overflow|truncat|off[- ]by[- ]one/.test(text)) return 'boundary';
-  if (/negative|invalid|malformed|missing|error|failure/.test(text)) return 'unique-negative';
-  return null;
-}
-
-export function proveAbstraction(cluster: unknown, proposal: unknown): string[] {
-  if (!isRecord(cluster) || !isRecord(proposal)) {
-    throw notImplemented('abstraction proof requires Phase 4 implementation');
-  }
-  throw notImplemented('abstraction proof is not implemented in Task 1A');
+  return true;
 }
 
 /**
- * Compatibility facade for the removed archive campaign entry point. It contains no archive logic of its own:
- * it routes through the single Task 1D boundary factory and surfaces the same typed `NOT_IMPLEMENTED` failure,
- * so no second, half-implemented archive producer can be observed by existing callers.
+ * Archive campaign facade. It contains no archive logic of its own: it routes through the single archive
+ * boundary factory, which is now the real Task 8 producer, and returns its typed fail-closed result. A
+ * verified candidate is only archived when the ledger record authorizes it; a refusal keeps the previous
+ * ledger untouched and never reports a success.
  */
 export async function archiveCampaign(
   campaign: CodeHealthLedger,
-  options: { approval?: ApprovalDecision; verificationLevel?: 'package-only' | 'source-bound' } = {},
-): Promise<never> {
+  options: {
+    approval?: ApprovalDecision;
+    verificationLevel?: 'package-only' | 'source-bound';
+    campaignRoot?: string;
+    packageRoot?: string;
+    sources?: ArchivePackageFile[];
+    sourceProject?: string;
+  } = {},
+): Promise<ArchiveBoundaryResult> {
   const candidates = Array.isArray(campaign?.candidates) ? campaign.candidates : [];
   const candidate = options.approval
     ? candidates.find((entry) => entry.candidateId === options.approval?.candidateId)
     : undefined;
-  const result = await createTask1ArchiveBoundary().producer.produce({
+  return createTask1ArchiveBoundary().producer.produce({
     candidate: candidate as CodeHealthCandidate,
     ledger: campaign,
     approval: options.approval as ApprovalDecision,
     verificationLevel: options.verificationLevel ?? 'package-only',
+    campaignRoot: options.campaignRoot ?? '.',
+    packageRoot: options.packageRoot ?? '.',
+    sources: options.sources ?? [],
+    sourceProject: options.sourceProject,
   });
-  throw new CodeHealthError(result.errorCode, result.reason);
 }
 
 /**
- * Compatibility facade for the removed archive verification entry point. It delegates to the Task 1D boundary
- * verifier and surfaces the same typed `NOT_IMPLEMENTED` failure without reading or hashing anything.
+ * Archive verification facade. It delegates to the real archive verifier and returns its typed result: a
+ * package-only verification never claims source binding, and a source-bound declaration without an explicit
+ * source project fails closed.
  */
 export async function verifyArchive(
   manifestPath: string,
@@ -1528,13 +1744,12 @@ export async function verifyArchive(
     expectedRevision?: RevisionIdentity;
     verificationLevel?: 'package-only' | 'source-bound';
   } = {},
-): Promise<never> {
-  const result = await createTask1ArchiveBoundary().verifier.verify({
+): Promise<ArchiveBoundaryResult> {
+  return createTask1ArchiveBoundary().verifier.verify({
     manifestPath,
     packageRoot: options.packageRoot ?? '.',
     verificationLevel: options.verificationLevel ?? 'package-only',
     sourceProject: options.sourceProject,
     expectedRevision: options.expectedRevision,
   });
-  throw new CodeHealthError(result.errorCode, result.reason);
 }

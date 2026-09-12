@@ -1,0 +1,23 @@
+{
+  "revision": {
+    "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "analyzedAt": "2026-09-07T00:00:00.000Z"
+  },
+  "files": ["src/plugin.ts", "src/cli.ts", "schema.json", "template.md", "tests/setup.ts"],
+  "expectedCategories": [
+    "dynamic-import",
+    "reflection",
+    "shell-platform",
+    "schema-template-rtm",
+    "test-only-helper"
+  ],
+  "sourceText": {
+    "src/plugin.ts": "// AUTO-GENERATED plugin manifest\nimport type { Plugin } from './plugin-types.js';\n\n@injectable()\nexport class PluginRegistry {}\n\nexport const registry = new PluginRegistry();\nregistry.register('PluginRegistry', registry);\nconst paramTypes = Reflect.getMetadata('design:paramtypes', PluginRegistry);\nvoid paramTypes;\n",
+    "src/cli.ts": "export async function main(): Promise<void> {\n  const platform = process.platform;\n  const shell = platform === \"win32\" ? \"powershell\" : \"bash\";\n  const plugin = await import('./plugin.js');\n  app.get('/plugins/:name', handler);\n  program.command('plugins list');\n  const schema = readFileSync('schema.json', 'utf8');\n  const template = readFileSync('template.md', 'utf8');\n  const rtmId = 'REQ-1';\n  const handlers: Record<string, () => void> = { audit: auditHandler };\n  const selected = handlers[process.env.HANDLER ?? 'audit'];\n  void [plugin, shell, schema, template, rtmId, selected];\n}\n",
+    "schema.json": "{\n  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n  \"title\": \"REQ-1 retry schema\",\n  \"type\": \"object\",\n  \"properties\": { \"retryCount\": { \"type\": \"integer\" }, \"serializedField\": { \"type\": \"string\" } }\n}\n",
+    "template.md": "# {{projectName}}\n\nSerialized field: {{serializedField}}\nMigration: {{fromVersion}} -> {{toVersion}}\nRequirement: REQ-1\n",
+    "tests/setup.ts": "import { expect } from 'vitest';\nimport { FakeClock } from './fake-clock.js';\n\nexpect.extend({ toBeWithinRange(): boolean { return true; } });\nexport const clock = new FakeClock();\n"
+  }
+}

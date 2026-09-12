@@ -19,18 +19,19 @@
 
 ## 代码质量标准
 
-| 标准项 | 工具 / 命令 | 通过阈值 | 不通过 → 动作 |
-|---|---|---|---|
-| 单元测试代码覆盖率 | `npx vitest --coverage`（或等价运行器） | ≥ 80%（分支 + 行） | 回到编码补测试，禁止调低阈值放行 |
-| 代码规范检查 | `npx eslint --no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore w-model-dev/scripts/` / `npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs"` | 0 error，0 warning | 回到编码修复违规，禁止 `// eslint-disable` 绕过 |
-| 安全漏洞扫描 | `npm audit --audit-level=high` + ESLint security plugin | 高危漏洞数 = 0 | 回到编码修复，禁止降级为"已知风险"放行 |
-| 性能指标监控 | k6 / JMeter 负载脚本 | P95 响应 < 2s，高负载无崩溃 | 回到编码定位瓶颈，禁止仅跑 happy path 判定通过 |
+| 标准项             | 工具 / 命令                                                                                                                                                                                                                                        | 通过阈值                    | 不通过 → 动作                                   |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ----------------------------------------------- |
+| 单元测试代码覆盖率 | `npx vitest --coverage`（或等价运行器）                                                                                                                                                                                                            | ≥ 80%（分支 + 行）          | 回到编码补测试，禁止调低阈值放行                |
+| 代码规范检查       | `npx eslint --no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore w-model-dev/scripts/` / `npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs"` | 0 error，0 warning          | 回到编码修复违规，禁止 `// eslint-disable` 绕过 |
+| 安全漏洞扫描       | `npm audit --audit-level=high` + ESLint security plugin                                                                                                                                                                                            | 高危漏洞数 = 0              | 回到编码修复，禁止降级为"已知风险"放行          |
+| 性能指标监控       | k6 / JMeter 负载脚本                                                                                                                                                                                                                               | P95 响应 < 2s，高负载无崩溃 | 回到编码定位瓶颈，禁止仅跑 happy path 判定通过  |
 
 ### 生产目标值 vs 测试环境基线
 
 > 性能指标须区分生产目标值与测试环境基线。
 
 **区分原则**：
+
 1. **生产目标值（targetValue）**：生产环境须达成的硬性指标
 2. **测试环境基线（testThreshold）**：测试环境的放宽阈值，须声明测试环境类型、放宽倍数、放宽原因
 
@@ -40,11 +41,11 @@
 
 ## 文档质量标准
 
-| 标准项 | 检查方法 | 通过阈值 | 不通过 → 动作 |
-|---|---|---|---|
-| 文档完整性 | 对照 [templates/](../templates/) 13 个模板逐一核验 | 需求 / 设计 / 测试 / RTM 四类文档齐全 | 补齐缺失文档，禁止用 README 替代规格文档 |
-| 文档一致性 | 术语 / 接口 / 字段跨文档交叉比对 | 0 不一致（接口签名、字段名、错误码全匹配） | 回到对应阶段修正，禁止"以代码为准"忽略文档 |
-| 版本控制管理 | `git status` 工作树干净 + 产物已提交 | 无未提交的产物文件 | 提交后再放行，禁止带未提交改动进质量门 |
+| 标准项       | 检查方法                                           | 通过阈值                                   | 不通过 → 动作                              |
+| ------------ | -------------------------------------------------- | ------------------------------------------ | ------------------------------------------ |
+| 文档完整性   | 对照 [templates/](../templates/) 13 个模板逐一核验 | 需求 / 设计 / 测试 / RTM 四类文档齐全      | 补齐缺失文档，禁止用 README 替代规格文档   |
+| 文档一致性   | 术语 / 接口 / 字段跨文档交叉比对                   | 0 不一致（接口签名、字段名、错误码全匹配） | 回到对应阶段修正，禁止"以代码为准"忽略文档 |
+| 版本控制管理 | `git status` 工作树干净 + 产物已提交               | 无未提交的产物文件                         | 提交后再放行，禁止带未提交改动进质量门     |
 
 ### 信息密度指标
 
@@ -55,21 +56,23 @@
 **关键实体**：SD-xxx / DD-xxx / REQ-xxx / NFR-xxx / INTF-xxx 等设计文档实体 ID
 
 **度量规则**：
+
 - 信息密度 ≥ 2/章节：合格
 - 信息密度 1-2/章节：警告（可能存在内容稀疏）
 - 信息密度 < 1/章节：不合格（命中反模式 #37）
 
 **示例**：
+
 - 文件 A：50 章节，SD-xxx 引用 120 次 → 信息密度 2.4/章节 → 合格
 - 文件 B：50 章节，SD-xxx 引用 30 次 → 信息密度 0.6/章节 → 不合格（产物膨胀但核心决策稀疏）
 
 ## 测试质量标准
 
-| 标准项 | 检查方法 | 通过阈值 | 不通过 → 动作 |
-|---|---|---|---|
-| 测试用例评审 | 按 [verifier-spec.md](verifier-spec.md) 子标准评审 | 质量等级 A/B（`passed=true`） | 失败只作为 R 定位线索；完成普通 V/G 失败链（hard-constraints）后由 S-fix 返工，禁止 C/D 等级放行 |
-| 测试覆盖率分析 | 四级测试用例状态统计 | 单元 / 集成 / 系统 / 验收全部 `passed` | 失败只作为 R 定位线索；完成普通 V/G 失败链（hard-constraints）后由 S-fix 补测，禁止跳过任一级 |
-| 缺陷追踪管理 | `.w-model/rtm.json` 的 `executionSummary` | `failed=0` 且 `pending=0` | 先执行普通 V/G 失败链（hard-constraints），再按 R 结论由 S-fix 修复；禁止 `pending` 状态进质量门 |
+| 标准项         | 检查方法                                           | 通过阈值                               | 不通过 → 动作                                                                                    |
+| -------------- | -------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 测试用例评审   | 按 [verifier-spec.md](verifier-spec.md) 子标准评审 | 质量等级 A/B（`passed=true`）          | 失败只作为 R 定位线索；完成普通 V/G 失败链（hard-constraints）后由 S-fix 返工，禁止 C/D 等级放行 |
+| 测试覆盖率分析 | 四级测试用例状态统计                               | 单元 / 集成 / 系统 / 验收全部 `passed` | 失败只作为 R 定位线索；完成普通 V/G 失败链（hard-constraints）后由 S-fix 补测，禁止跳过任一级    |
+| 缺陷追踪管理   | `.w-model/rtm.json` 的 `executionSummary`          | `failed=0` 且 `pending=0`              | 先执行普通 V/G 失败链（hard-constraints），再按 R 结论由 S-fix 修复；禁止 `pending` 状态进质量门 |
 
 ### 测试代码整洁标准
 
@@ -135,12 +138,12 @@
 
 设计评审/系统测试设计时逐项核对：
 
-| 检查项 | 判定基准 | 不通过 → 动作 |
-|---|---|---|
-| 容错策略选择 | 7 策略对比（故障转移/快速失败/安全失败/沉默失败/故障恢复/并行调用/广播调用）按场景选型 | 回设计补策略声明 |
-| 断路器状态机 | CLOSED/OPEN/HALF OPEN 三态；OPEN 触发 = 请求数阈值 + 故障率阈值双条件 | 回设计补状态机（可映射 TLA+ 建模） |
-| 舱壁隔离 | 线程池 / 信号量隔离下游故障 | 回设计补隔离方案 |
-| 重试四前提 | ① 仅主路关键服务 ② 仅瞬时故障 ③ 仅幂等服务 ④ 有超时/次数终止条件 | 违反任一即重试反模式；多组件同开重试致乘法效应（4×4×4×4=256） |
+| 检查项       | 判定基准                                                                               | 不通过 → 动作                                                 |
+| ------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| 容错策略选择 | 7 策略对比（故障转移/快速失败/安全失败/沉默失败/故障恢复/并行调用/广播调用）按场景选型 | 回设计补策略声明                                              |
+| 断路器状态机 | CLOSED/OPEN/HALF OPEN 三态；OPEN 触发 = 请求数阈值 + 故障率阈值双条件                  | 回设计补状态机（可映射 TLA+ 建模）                            |
+| 舱壁隔离     | 线程池 / 信号量隔离下游故障                                                            | 回设计补隔离方案                                              |
+| 重试四前提   | ① 仅主路关键服务 ② 仅瞬时故障 ③ 仅幂等服务 ④ 有超时/次数终止条件                       | 违反任一即重试反模式；多组件同开重试致乘法效应（4×4×4×4=256） |
 
 ### 日志规范
 
@@ -195,17 +198,29 @@
 
 任一条件不满足均视为普通质量门失败：先交给 R 形成定位线索，执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）并经用户 CHECKPOINT 后，才可按 R 结论进行修复或阶段切换。
 
+## 代码健康治理质量门（Phase 1–4）
+
+删除死代码 / 补测试 / 删除冗余测试 / 抽象重复是一次**受控变更**，受以下质量门约束（详见 [code-health-governance.md](code-health-governance.md) 与 SSoT §10K）：
+
+- [ ] 候选不是结论：Phase 1/2 产出 `discovered`，coverage 仅信号（`coverageIsSignalOnly: true`，数值恒 `null`）
+- [ ] 有人类 `ApprovalDecision`，精确绑定 candidate ID / action / files / symbols / scopeHash
+- [ ] 证据锚定 HEAD-tracked ledger/治理清单/证据存储（revision + path + SHA-256），`CommandEvidence` 为真实 `observed`
+- [ ] 默认拒绝：无法证明「非保护」的候选按受保护处理；`test-only` / generated / dead-copy / one-off / 「少几行 diff」不授权
+- [ ] 变更可回滚（`git apply -R` + `git diff --exit-code`=0），RTM 同步回填
+- [ ] 失败走 code-health 失败链 `gate-failure → blocked → R → V → G → S(rework) → evidenced`，顺序不可跳过
+- [ ] 归档为真实实现（`code-health-archive.ts`）：`--verify` 无 `--source-project` 只报 package-only，绝不表述为 verified source；不执行未实现的 Phase 5–8 迁移；无 `.codegraph/` 索引时不得伪造查询
+
 ## 工具缺失与降级处理（边界条件）
 
 > 当质量门检查清单中引用的工具未安装或运行失败时，按以下降级路径处理，**禁止因工具缺失而跳过检查或放行**。
 
-| 标准项 | 主工具缺失判定 | 降级工具 | 降级有效性约束 |
-|---|---|---|---|
-| 代码规范检查 | `npx eslint --version` 退出码 ≠ 0（未安装 / 无配置） | `npx tsc --noEmit`（TypeScript 项目）/ `node --check <file>`（JS 文件） | 仅校验语法与类型错误，不覆盖风格规则；降级时必须在《测试报告》备注「eslint 缺失，仅做 tsc 语法兜底」 |
-| 单元测试运行 | `npx vitest --version` 退出码 ≠ 0 | `npx jest --coverage`（须有 jest 配置） | 覆盖率阈值同主工具（≥80% 分支+行）；jest 也缺失则停止推进，提示用户安装测试运行器 |
-| 覆盖率统计失败 | 运行器退出码 0 但未生成 coverage 报告（JSON 解析失败 / 字段缺失） | 改用 `npx c8 --reporter=json <test-runner>` 包裹运行器；仍失败则统计「通过用例数 / 总用例数」作粗略覆盖率 | 粗略覆盖率仅作临时判定，**不得作为放行依据**；须在 24h 内修复运行器并重跑 |
-| 安全漏洞扫描 | `npm audit` stderr 含 `command not found` / npm 不可用 | `npx audit-ci --moderate` 或对 `package-lock.json` 调用 OSV API（`https://api.osv.dev/v1/query`）批量查询 | 降级结果须标注数据源；高危漏洞判定与主工具一致（高危数 = 0 才放行） |
-| ESLint security plugin 缺失 | `npx eslint --print-config .` 输出不含 `eslint-plugin-security` | `npx eslint . --rule '{"no-eval":"error","no-implied-eval":"error","no-new-func":"error"}'` 跑核心安全规则补位 | 仅覆盖基础安全规则，缺漏项必须在备注列出，不得视为等价于 security plugin |
+| 标准项                      | 主工具缺失判定                                                    | 降级工具                                                                                                       | 降级有效性约束                                                                                       |
+| --------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| 代码规范检查                | `npx eslint --version` 退出码 ≠ 0（未安装 / 无配置）              | `npx tsc --noEmit`（TypeScript 项目）/ `node --check <file>`（JS 文件）                                        | 仅校验语法与类型错误，不覆盖风格规则；降级时必须在《测试报告》备注「eslint 缺失，仅做 tsc 语法兜底」 |
+| 单元测试运行                | `npx vitest --version` 退出码 ≠ 0                                 | `npx jest --coverage`（须有 jest 配置）                                                                        | 覆盖率阈值同主工具（≥80% 分支+行）；jest 也缺失则停止推进，提示用户安装测试运行器                    |
+| 覆盖率统计失败              | 运行器退出码 0 但未生成 coverage 报告（JSON 解析失败 / 字段缺失） | 改用 `npx c8 --reporter=json <test-runner>` 包裹运行器；仍失败则统计「通过用例数 / 总用例数」作粗略覆盖率      | 粗略覆盖率仅作临时判定，**不得作为放行依据**；须在 24h 内修复运行器并重跑                            |
+| 安全漏洞扫描                | `npm audit` stderr 含 `command not found` / npm 不可用            | `npx audit-ci --moderate` 或对 `package-lock.json` 调用 OSV API（`https://api.osv.dev/v1/query`）批量查询      | 降级结果须标注数据源；高危漏洞判定与主工具一致（高危数 = 0 才放行）                                  |
+| ESLint security plugin 缺失 | `npx eslint --print-config .` 输出不含 `eslint-plugin-security`   | `npx eslint . --rule '{"no-eval":"error","no-implied-eval":"error","no-new-func":"error"}'` 跑核心安全规则补位 | 仅覆盖基础安全规则，缺漏项必须在备注列出，不得视为等价于 security plugin                             |
 
 ### 降级流程
 
@@ -220,12 +235,12 @@
 
 > 与 [hard-constraints.md](hard-constraints.md) 互引：以下为质量门层面的高发陷阱，命中即回编码。
 
-| # | 禁止行为 | 对应反模式 | 正确做法 |
-|---|---|---|---|
-| 1 | 用 LLM 估算覆盖率 / 测试结果 | anti-patterns #3 / #6 | 必须跑真实测试运行器 + `check-artifact-gate.ts` |
-| 2 | 把退出码 1/2 当警告忽略 | anti-patterns #7 | 退出码 1/2 一律不得放行；退出码 1 先走普通 V/G 失败链（hard-constraints），再按 R 结论由 S-fix 修复并回到对应阶段；退出码 2 仅修正输入后重跑 |
-| 3 | 用 `// eslint-disable` 绕过规范检查 | — | 修复违规源，禁止整文件 disable |
-| 4 | 把安全高危降级为"已知风险"放行 | — | 高危必须修复后重扫，不得降级 |
-| 5 | 仅跑 happy path 判定性能通过 | — | 必须按负载模型（ramp-up → sustain → ramp-down）压测 |
-| 6 | 带 `pending` 测试进质量门 | anti-patterns #9 | 所有用例必须 `passed` 或显式 `failed` 并返工 |
-| 7 | 用 README 替代规格文档判完整 | — | 必须对照 templates/ 12 个模板逐一核验 |
+| #   | 禁止行为                            | 对应反模式            | 正确做法                                                                                                                                     |
+| --- | ----------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 用 LLM 估算覆盖率 / 测试结果        | anti-patterns #3 / #6 | 必须跑真实测试运行器 + `check-artifact-gate.ts`                                                                                              |
+| 2   | 把退出码 1/2 当警告忽略             | anti-patterns #7      | 退出码 1/2 一律不得放行；退出码 1 先走普通 V/G 失败链（hard-constraints），再按 R 结论由 S-fix 修复并回到对应阶段；退出码 2 仅修正输入后重跑 |
+| 3   | 用 `// eslint-disable` 绕过规范检查 | —                     | 修复违规源，禁止整文件 disable                                                                                                               |
+| 4   | 把安全高危降级为"已知风险"放行      | —                     | 高危必须修复后重扫，不得降级                                                                                                                 |
+| 5   | 仅跑 happy path 判定性能通过        | —                     | 必须按负载模型（ramp-up → sustain → ramp-down）压测                                                                                          |
+| 6   | 带 `pending` 测试进质量门           | anti-patterns #9      | 所有用例必须 `passed` 或显式 `failed` 并返工                                                                                                 |
+| 7   | 用 README 替代规格文档判完整        | —                     | 必须对照 templates/ 12 个模板逐一核验                                                                                                        |

@@ -1,0 +1,165 @@
+{
+  "description": "exact-scope human approval yields a controlled patch proposal without touching the worktree",
+  "mode": "patch",
+  "candidate": {
+    "candidateId": "CHG-P1-20260907-301",
+    "phase": "P1",
+    "action": "delete-code",
+    "status": "under-review",
+    "files": ["src/unused.ts"],
+    "symbols": ["unusedFunction"],
+    "tests": ["w-model-dev/scripts/__tests__/unused.test.ts"],
+    "callSites": ["src/app.ts:useUnused"],
+    "sources": ["static-inventory.json"],
+    "revision": {
+      "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "analyzedAt": "2026-09-07T00:00:00.000Z"
+    },
+    "confidence": {
+      "level": "medium",
+      "score": 0.8,
+      "rationale": "static evidence is recorded for review",
+      "uncertainties": ["dynamic import requires runtime confirmation"]
+    },
+    "risk": {
+      "severity": "low",
+      "behavior": "low",
+      "security": "none",
+      "concurrency": "none",
+      "platform": "low",
+      "lifecycle": "low",
+      "governance": "low",
+      "rationale": "isolated helper with a direct rollback path"
+    },
+    "rtmImpact": {
+      "rtmBefore": ["REQ-001"],
+      "rtmAfter": ["REQ-001"],
+      "coverageBefore": {
+        "statements": 0.8,
+        "branches": null,
+        "functions": 0.7,
+        "lines": 0.8
+      },
+      "coverageAfter": {
+        "statements": 0.8,
+        "branches": null,
+        "functions": 0.7,
+        "lines": 0.8
+      },
+      "testLevels": ["unit"],
+      "unmappedScenarios": [],
+      "coverageIsSignalOnly": true
+    },
+    "coverageImpact": {
+      "rtmBefore": ["REQ-001"],
+      "rtmAfter": ["REQ-001"],
+      "coverageBefore": {
+        "statements": 0.8,
+        "branches": null,
+        "functions": 0.7,
+        "lines": 0.8
+      },
+      "coverageAfter": {
+        "statements": 0.8,
+        "branches": null,
+        "functions": 0.7,
+        "lines": 0.8
+      },
+      "testLevels": ["unit"],
+      "unmappedScenarios": [],
+      "coverageIsSignalOnly": true
+    },
+    "commands": [
+      {
+        "command": "node --version",
+        "cwd": ".",
+        "environment": {
+          "NODE_ENV": "test"
+        },
+        "platform": "win32",
+        "toolVersions": {
+          "node": "20.0.0"
+        },
+        "startedAt": "2026-09-07T00:01:00.000Z",
+        "endedAt": "2026-09-07T00:01:01.000Z",
+        "exitCode": 0,
+        "observation": "observed",
+        "rawOutputPath": ".w-model/code-health/raw/node-version.log",
+        "rawOutputSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    ],
+    "rollback": {
+      "preChangeRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "command": "git apply -R .w-model/code-health/apply/CHG-P1-20260907-301.patch",
+      "patchPath": ".w-model/code-health/apply/CHG-P1-20260907-301.patch",
+      "owner": "S-agent",
+      "executable": true
+    },
+    "review": {
+      "findings": [],
+      "unresolvedQuestions": [],
+      "decision": null,
+      "humanDecision": null
+    },
+    "signatures": [
+      {
+        "role": "A",
+        "actor": "analyst",
+        "event": "discovered",
+        "scopeHash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "provenanceRef": "evidence/signature-a.json",
+        "signedAt": "2026-09-07T00:02:00.000Z"
+      }
+    ],
+    "changeScope": {
+      "files": ["src/unused.ts"],
+      "symbols": ["unusedFunction"],
+      "scopeHash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    "evidenceBinding": {
+      "candidate": {
+        "candidateId": "CHG-P1-20260907-301",
+        "phase": "P1",
+        "action": "delete-code",
+        "files": ["src/unused.ts"],
+        "symbols": ["unusedFunction"],
+        "scopeHash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "revision": {
+        "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "analyzedAt": "2026-09-07T00:00:00.000Z"
+      },
+      "rawOutputPath": ".w-model/code-health/raw/node-version.log",
+      "rawOutputSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    "evidenceRef": "evidence/CHG-P1-20260907-301.json",
+    "archive": {
+      "state": "not_archived",
+      "manifestPath": null,
+      "contentHash": null,
+      "redactionStatus": "not_reviewed"
+    }
+  },
+  "approval": {
+    "candidateId": "CHG-P1-20260907-301",
+    "decision": "approve",
+    "approvedAction": "delete-code",
+    "approvedFiles": ["src/unused.ts"],
+    "approvedSymbols": ["unusedFunction"],
+    "scopeHash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "rationale": "The exact scope is independently reviewed and directly reversible.",
+    "actor": "human-decision-maker",
+    "decidedAt": "2026-09-07T00:03:00.000Z",
+    "signatureRef": "evidence/signature-human.json",
+    "revision": {
+      "commitSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "treeSha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "analyzedAt": "2026-09-07T00:00:00.000Z"
+    }
+  }
+}

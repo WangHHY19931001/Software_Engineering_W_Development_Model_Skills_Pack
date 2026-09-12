@@ -15,12 +15,6 @@ import {
   validateCodeHealthCandidate,
   validateLedgerEvent,
 } from '../logic/code-health-contract.js';
-import {
-  consumePhase1Candidate,
-  consumePhase2Gap,
-  consumePhase3Test,
-  consumePhase4Cluster,
-} from '../logic/code-health-phase-boundaries.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -94,13 +88,6 @@ describe('code-health canonical contract', () => {
         },
       }),
     ).toEqual(expect.arrayContaining([expect.stringMatching(/coverageIsSignalOnly/)]));
-  });
-
-  it('Phase 1-4 compile-only consumers 只接受 canonical 类型且不执行 IO', () => {
-    expect(consumePhase1Candidate).toBeTypeOf('function');
-    expect(consumePhase2Gap).toBeTypeOf('function');
-    expect(consumePhase3Test).toBeTypeOf('function');
-    expect(consumePhase4Cluster).toBeTypeOf('function');
   });
 
   it('LedgerEvent Schema 与 runtime 对 typed event shape 给出一致结论', async () => {

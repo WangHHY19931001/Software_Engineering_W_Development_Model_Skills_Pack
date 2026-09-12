@@ -82,6 +82,20 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 详见 [phase-5-coding.md](phase-5-coding.md)「codegraph 修改前影响分析」+「增量集成纪律」节。
 
+## 代码健康治理硬边界（Phase 1–4）
+
+`/wm code-health` 复用 O/A/S/V/G/R/human 六类角色，但授权链与失败链独立于 W 模型阶段门；命中以下任一即失败，回到候选进入实现前的 CHECKPOINT：
+
+- **只有 human 能授权删除/抽象**：候选进入实现前必须 🔴 CHECKPOINT 由人类批准（精确 candidate ID / action / files / symbols / scopeHash）；工具或 LLM 输出本身不能授权。
+- **发现不是结论**：Phase 1/2 只登记 `discovered`；coverage 仅信号（`coverageIsSignalOnly: true`，数值恒 `null`），不授权删除或跳过任何维度。
+- **默认拒绝**：无法正向证明「非保护」的候选一律按受保护处理；`test-only`、生成代码、死副本、一次性实验、平台/lifecycle/安全/并发差异与「少几行 diff」都不构成删除或抽象依据。
+- **权威必须锚定 HEAD-tracked 证据**：ledger、`.code-health-governance.json` 与 suite argv 清单的工作区字节须等于 HEAD blob；`CommandEvidence` 须真实（`exitCode` 为数字、`observation=observed`），revision/scope/path/hash 绑定不一致即拒。
+- **失败链**：`gate-failure → blocked → R(root-cause) → V(root-cause-review) → G(root-cause-gate) → S(rework) → evidenced`，顺序不可跳过（`nextRequiredRoles`）。
+- **可回滚**：失败的删除/抽象必须 `git apply -R` 回滚且 `git diff --exit-code`=0；无法回滚即显式失败。
+- **实现边界**：campaign 归档已实现（`cli/code-health-archive.ts` + `lib/code-health-archive-boundary.ts`；`--verify` 无 `--source-project` 只能 package-only，不得表述为 verified source）；Phase 5–8 迁移**未实现**，不得执行。codegraph 前置见约束 #14；本 checkout 无 `.codegraph/` 索引，不得伪造查询记录。
+
+详见 [code-health-governance.md](code-health-governance.md) 与 SSoT §10K（`docs/skill-design-document_SSoT.md`）。
+
 ## 普通 V/G 失败链
 
 **完整链（权威定义，全包唯一全句落点）**：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`

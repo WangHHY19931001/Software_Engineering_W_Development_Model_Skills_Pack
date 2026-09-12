@@ -94,6 +94,7 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 **现象**：`git push` 未输出 `[pre-push]` 门禁日志（但钩子已启用），或提示「本次推送仅删除远端 ref」「无法证明变更范围」。
 
 **原因**：
+
 - pre-push 以 git push 写入 stdin 的 ref 行（每行 `<local ref> <local sha> <remote ref> <remote sha>` 四字段）判定范围，并支持多 ref 聚合；delete-only 推送（local sha 全零）放行跳过；
 - 新分支（remote sha 全零）基线按序解析：`git merge-base --fork-point` → 普通 merge-base → remote-tracking 排除集枚举（remote 名经白名单与 `git remote get-url` 验证后执行 `git log -m --name-only --pretty=format: <local_sha> --not --remotes=<remote>`，`-m` 确保合并提交按父逐个列出避免空 diff 漏检）；
 - 变更未触及 `w-model-dev/**`、根级 README/AGENTS/CONTRIBUTING/配置、`config/**`、`scripts/**`、`.githooks/**` 或 `docs/*.md`（bash case 模式 `*` 跨 `/`，实测命中 `docs/` 任意层级）时放行；**任一 ref 行解析失败或新分支三级基线全部失败 → fail-closed（运行全部门禁）**，空 stdin 回退 `HEAD@{push}`/`origin/HEAD` 失败同样 fail-closed——不存在「静默跳过门禁」路径（纯 Windows shell 提示放行除外，见 [1.1](#11-windows-非-git-bash-环境执行钩子--门禁报错)）。
@@ -104,7 +105,20 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 
 **现象**：修改 `*-logic.ts` 后 `npm run self-test` 失败（样本期望不匹配 / 新逻辑无样本覆盖）。
 
-**处置**：在 `w-model-dev/scripts/samples/` 补充对应通过 / 失败 / 输入错误三态样本，并同步 `__tests__/README.md` coverage 矩阵（规则：每次修改校验逻辑必须跑通 self-test，新增校验项需同步增加样本）。
+**处置**：在 `w-model-dev/scripts/samples/` 补充对应通过 / 失败 / 输入错误三态样本，并同步 `__tests__/README.md` coverage matrix（规则：每次修改校验逻辑必须跑通 self-test，新增校验项需同步增加样本）。
+
+### 1.9 `/wm code-health` CLI 失败
+
+**现象**：`code-health-*` CLI 退出 2（`ERROR_JSON`）、退出 1（候选 `blocked`/guard 拒绝），或 `--guard` 无法读取 suite 清单。
+
+**处置**：
+
+- 退出 2：按 `ARG_INVALID` 等 6 类错误排查参数（未知/重复值 flag、缺 `--ledger`/`--matrix`/`--inventory`/`--project`）；不写任何文件，修正后再跑。
+- 退出 1（候选校验/`--guard` 拒绝）：走 code-health 失败链 `gate-failure → blocked → R(root-cause) → V(root-cause-review) → G(root-cause-gate) → S(rework) → evidenced`，顺序不可跳过；失败的删除/抽象必须回滚（`git apply -R` + `git diff --exit-code`=0）。
+- `--guard` 的 suite argv 来自 tracked repo-owned suite 清单（默认 `.code-health-suite.json`）；本 checkout 无该文件时 `--guard` 无法执行——不得伪造清单或绕过 `code-health-apply.ts`。
+- campaign 归档（`code-health-archive.ts`）已实现：verified 候选经 V/G 复审、G 门禁、observed passing 命令证据、可执行 rollback、clean redaction 与 revision 匹配后才 `archivedAsPassed`；`deferred`/`rejected`/`blocked`/`rolled-back` 只作终态非成功证据。验证分两级：`--verify` 不带 `--source-project` **只能是 package-only**（不得表述为 verified source），显式传 `--source-project` 才做 source-bound 重验。Phase 5–8 迁移仍未实现；无 `.codegraph/` 索引时不得伪造 codegraph 查询。
+
+见 [code-health-governance.md](../w-model-dev/references/code-health-governance.md)。
 
 ## 2. 环境问题矩阵
 
@@ -122,15 +136,16 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 
 ## 3. 快速排查路径
 
-| 现象                                             | 可能原因                               | 处置                                                                                                |
-| ------------------------------------------------ | -------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| push 无任何 `[pre-push]` 输出                    | 钩子未启用 / 路径过滤未命中            | `npm run setup:hooks`；确认变更触及 `docs/*.md`、`w-model-dev/**` 等触发路径                        |
-| push 提示「纯 Windows cmd/PowerShell」           | 在 cmd/PowerShell 而非 Git Bash 中操作 | 换 Git Bash / WSL（见 [1.1](#11-windows-非-git-bash-环境执行钩子--门禁报错)）                       |
-| `npm run prepush` 报 `'bash' 不是内部或外部命令` | 无 bash 解释器                         | 安装 Git for Windows 用 Git Bash 运行                                                               |
-| `npm run lint:security` 退出 1 / 2               | baseline 指纹失效                      | 人工确认风险后 `--regenerate`（见 [1.4](#14-eslint-security-baseline-指纹失效--需重生成)）          |
-| 门禁脚本退出 2（`ERROR_JSON`）                   | 参数 / 文件路径 / JSON 格式问题        | 按 6 类错误类别排查，见 [user-guide.md §3.3](./user-guide.md)                                       |
-| `check-docs-consistency` 退出 1                  | 动态 provenance 缺失/不可信或静态计数漂移        | 按 violations 文本同步文档；动态侧重跑 vitest + 同次 provenance（见 [1.7](#17-docs-consistency-报动态测量缺失--provenance-不可信)） |
-| 依赖升级后门禁失败                               | 依赖行为变化影响校验逻辑               | 回到当批起点修正，跑全量回归；勿用 `--no-verify` 绕过（见 [1.2](#12-git-push---no-verify契约声明)） |
+| 现象                                             | 可能原因                                          | 处置                                                                                                                                |
+| ------------------------------------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| push 无任何 `[pre-push]` 输出                    | 钩子未启用 / 路径过滤未命中                       | `npm run setup:hooks`；确认变更触及 `docs/*.md`、`w-model-dev/**` 等触发路径                                                        |
+| push 提示「纯 Windows cmd/PowerShell」           | 在 cmd/PowerShell 而非 Git Bash 中操作            | 换 Git Bash / WSL（见 [1.1](#11-windows-非-git-bash-环境执行钩子--门禁报错)）                                                       |
+| `npm run prepush` 报 `'bash' 不是内部或外部命令` | 无 bash 解释器                                    | 安装 Git for Windows 用 Git Bash 运行                                                                                               |
+| `npm run lint:security` 退出 1 / 2               | baseline 指纹失效                                 | 人工确认风险后 `--regenerate`（见 [1.4](#14-eslint-security-baseline-指纹失效--需重生成)）                                          |
+| 门禁脚本退出 2（`ERROR_JSON`）                   | 参数 / 文件路径 / JSON 格式问题                   | 按 6 类错误类别排查，见 [user-guide.md §3.3](./user-guide.md)                                                                       |
+| `check-docs-consistency` 退出 1                  | 动态 provenance 缺失/不可信或静态计数漂移         | 按 violations 文本同步文档；动态侧重跑 vitest + 同次 provenance（见 [1.7](#17-docs-consistency-报动态测量缺失--provenance-不可信)） |
+| 依赖升级后门禁失败                               | 依赖行为变化影响校验逻辑                          | 回到当批起点修正，跑全量回归；勿用 `--no-verify` 绕过（见 [1.2](#12-git-push---no-verify契约声明)）                                 |
+| `code-health-*` CLI 退出 1/2                     | 参数错误 / 候选 `blocked` / 缺 tracked suite 清单 | 按 [1.9](#19-wm-code-health-cli-失败) 处置；不得绕过 `code-health-apply.ts`                                                         |
 
 ## 4. 相关文档
 

@@ -196,7 +196,17 @@ async function hasTransition(lockDir: string): Promise<boolean> {
 
 async function staleOwnerState(lockDir: string, opts: StateWriteOptions): Promise<'none' | 'stale' | 'recoverable'> {
   const metadata = await readMetadata(ownerPathFor(lockDir));
-  if (!metadata) return opts.recoverStaleLock === true ? 'recoverable' : 'stale';
+  if (!metadata) {
+    // A missing owner directory is NOT by itself proof of a stale lock: `releaseLock` / `recoverLockIfStale`
+    // move the owner aside into a `.releasing-*` / `.recovering-*` transition directory that is removed only
+    // after the handoff completes. During that window there is no owner metadata but a live writer is still
+    // finishing, so reporting `stale` here would fail a legitimate waiter with STALE_LOCK. Treat an in-flight
+    // transition as "not yet decided" and let the caller retry until the transition resolves (or its TTL
+    // expires and `recoverOrphanTransitions` reclaims it). This preserves fail-closed semantics: a genuinely
+    // orphaned transition is still reclaimed/surfaced by the TTL check, never silently adopted.
+    if (await hasTransition(lockDir)) return 'none';
+    return opts.recoverStaleLock === true ? 'recoverable' : 'stale';
+  }
   const expired = Date.now() - Date.parse(metadata.createdAt) > (opts.staleLockTtlMs ?? 60_000);
   const stale = expired && !isPidRunning(metadata.pid);
   if (!stale) return 'none';
