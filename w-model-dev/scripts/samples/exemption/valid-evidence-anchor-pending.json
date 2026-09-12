@@ -1,0 +1,32 @@
+{
+  "id": "EXEMPT-006",
+  "type": "evidence-anchor-pending",
+  "target": "SD-007",
+  "ruleId": "R15",
+  "justification": "SD-007（文章归档子系统）的 evidenceAnchor 已声明但尚未完成验证，本阶段门需放行进入下一阶段，故申请豁免并承诺在阶段 5 编码前完成验证转为 confirmed。",
+  "evidence": [
+    "graph.json:SD-007.evidenceStatus=pending",
+    "docs/phase3-outline/blog-system-outline-design.md:§4.2=SD-007 归档子系统的证据锚点",
+    ".w-model/evidence-anchor-pending-register.jsonl:SD-007 登记于待验证清单"
+  ],
+  "proposedAlternative": "在阶段 5 编码启动前由 S 子代理补齐 SD-007 的锚点验证并对齐签名链 V review 环，届时移除本豁免",
+  "submittedAt": "2026-09-12T09:00:00Z",
+  "review": {
+    "reviewDecision": "approve",
+    "rootCauseAnalysis": "SD-007 源自阶段 2 系统设计中对归档能力的补充描述，其锚点引用的是阶段 4 将要细化的设计章节，故在阶段 3 尚无法完整验证；根因是验证时机与产物产出顺序的错配，而非需求或设计本身缺失。",
+    "falsifiabilityCheck": "若阶段 5 started 时 SD-007 仍为 pending，则本豁免失效并须回退至阶段 3 重做",
+    "riskAssessment": "中等风险：待验证锚点若最终无法证实，会推翻 SD-007 的设计依据，故附带阶段 5 启动前强制复核条件",
+    "conditions": ["阶段 5 编码启动前必须完成 SD-007 锚点验证并转 confirmed", "若验证失败须回退阶段 3 并作废相关产物"],
+    "reviewedAt": "2026-09-12T10:00:00Z"
+  },
+  "verification": {
+    "verified": true,
+    "reworkHints": [],
+    "verifiedAt": "2026-09-12T11:00:00Z"
+  },
+  "humanDecision": {
+    "decision": "approve",
+    "decidedAt": "2026-09-12T12:00:00Z",
+    "decidedBy": "user"
+  }
+}

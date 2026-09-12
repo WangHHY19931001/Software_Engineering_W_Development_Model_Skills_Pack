@@ -12,6 +12,13 @@
  *   E7  verification.verified = true
  *   E8  humanDecision.decision = approve
  *   E9  时间戳时序 submittedAt < reviewedAt < verifiedAt < decidedAt
+ *
+ * 豁免类型（6 类，见 exemption.schema.json 的 `type` enum）：
+ * small-project-hierarchy / stakeholder-not-applicable / scenario-type-not-applicable /
+ * coverage-missing-declared / nfr-subtype-not-applicable /
+ * evidence-anchor-pending（第 6 类：graph.json 中 evidenceStatus=pending 的节点
+ * 在阶段门放行前的合法出口——不给出口会逼人把未验证锚点直接标 confirmed）。
+ * 六类**共用同一套 E1-E9**，不因类型分叉，无类型专属逻辑。
  */
 import { validateBySchema, type SchemaValidationResult } from '../infrastructure/schema-loader.js';
 
@@ -45,7 +52,8 @@ export interface ExemptionShape {
     | 'stakeholder-not-applicable'
     | 'scenario-type-not-applicable'
     | 'coverage-missing-declared'
-    | 'nfr-subtype-not-applicable';
+    | 'nfr-subtype-not-applicable'
+    | 'evidence-anchor-pending';
   target: string;
   ruleId: string;
   justification: string;

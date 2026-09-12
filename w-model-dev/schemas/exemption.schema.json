@@ -9,13 +9,14 @@
   "properties": {
     "id": { "description": "豁免申请 ID（格式 EXEMPT-NNN，如 EXEMPT-001）", "type": "string", "pattern": "^EXEMPT-\\d{3}$" },
     "type": {
-      "description": "豁免类型（5 类）：small-project-hierarchy=小项目无需 REQ-group 层级拆分 / stakeholder-not-applicable=干系人维度不适用 / scenario-type-not-applicable=某场景类型不适用 / coverage-missing-declared=覆盖缺失已在 Out of Scope 声明 / nfr-subtype-not-applicable=NFR 子类不适用",
+      "description": "豁免类型（6 类）：small-project-hierarchy=小项目无需 REQ-group 层级拆分 / stakeholder-not-applicable=干系人维度不适用 / scenario-type-not-applicable=某场景类型不适用 / coverage-missing-declared=覆盖缺失已在 Out of Scope 声明 / nfr-subtype-not-applicable=NFR 子类不适用 / evidence-anchor-pending=证据锚点待验证（graph.json 中 evidenceStatus=pending 的节点在阶段门放行前的合法出口，复用 E1-E9 四阶段审批链）",
       "enum": [
         "small-project-hierarchy",
         "stakeholder-not-applicable",
         "scenario-type-not-applicable",
         "coverage-missing-declared",
-        "nfr-subtype-not-applicable"
+        "nfr-subtype-not-applicable",
+        "evidence-anchor-pending"
       ]
     },
     "target": { "description": "豁免目标（被豁免的实体 ID 或产物路径，如 REQ-group / STK-NNN）", "type": "string", "minLength": 1 },
