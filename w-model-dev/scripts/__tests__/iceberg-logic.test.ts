@@ -270,6 +270,27 @@ describe('A-3b 三视角对账', () => {
       expect(ICEBERG_VIEW_PRESENCE[p]!.length).toBeGreaterThan(0);
     }
   });
+
+  it('graph 在阶段 2-8 全部在场：阶段 5-8 亦消费 graph.json（D8 SD Coverage），遗漏即盲区', () => {
+    // 阶段 2-4 缺 --graph 为 ARG_INVALID/exit 2（graph 是 D8 数据源）；
+    // 阶段 5-8 以 --graph=.w-model/ingestion/graph.json 校验 D8。故 2-8 均须含 graph。
+    for (let p = 2; p <= 8; p++) {
+      expect(ICEBERG_VIEW_PRESENCE[p]).toContain('graph');
+    }
+  });
+
+  it('同一产物集在阶段 4 与阶段 5 派生出相同的 graph 视角（防 5-8 回归为盲区）', () => {
+    const artifacts = {
+      graph: { nodes: [{ id: 'SD-001' }, { id: 'SD-002' }] },
+      tlaManifest: { sdCoverage: { coveredSdNodes: ['SD-001'] } },
+      rtm: { rows: [{ designDoc: 'SD-001' }] },
+      changeScope: {},
+    };
+    const atPhase4 = deriveViewSets(4, artifacts);
+    const atPhase5 = deriveViewSets(5, artifacts);
+    expect(atPhase5.graph).toEqual(atPhase4.graph);
+    expect(atPhase5.graph).toEqual(['SD-001', 'SD-002']);
+  });
 });
 
 describe('deriveViewSets（CLI 侧上游产物 → 各视角应扫集合）', () => {

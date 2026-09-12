@@ -50,18 +50,20 @@ export type IcebergView = 'graph' | 'tla' | 'rtm' | 'scope';
  * 缺席者**不静默跳过**——必须由 R 显式记入 `sweepCoverage.absentViews`，由 R7 校验
  * （理由：`check-signature-chain.ts` R8 在找不到 `project.json` 时静默跳过，正是同类陷阱）。
  *
- * **取值待端到端调测核定**（规格 D23 / 任务 16 步骤 2：本表为设计意图取值，
- * 须在完整 8 阶段调测后按各阶段实际产出物校准）。改动成本低（代码常量）。
+ * **取值经阶段文献核定**（规格 D23 / 任务 16）：`graph` 在阶段 2-8 全部在场——阶段 2-4
+ * 缺 `--graph` 即 `ARG_INVALID`/exit 2（graph 是 D8 的数据源），阶段 5-8 亦以
+ * `--graph=.w-model/ingestion/graph.json` 校验 D8 SD Coverage。故 5-8 含 graph；
+ * 遗漏会使 graph↔rtm 的设计 ID 漂移在阶段 5-8 静默无人对账。
  */
 export const ICEBERG_VIEW_PRESENCE: Record<number, readonly IcebergView[]> = {
   1: ['graph', 'rtm'],
   2: ['graph', 'tla', 'rtm'],
   3: ['graph', 'tla', 'rtm'],
   4: ['graph', 'tla', 'rtm'],
-  5: ['tla', 'rtm', 'scope'],
-  6: ['tla', 'rtm', 'scope'],
-  7: ['tla', 'rtm', 'scope'],
-  8: ['tla', 'rtm', 'scope'],
+  5: ['graph', 'tla', 'rtm', 'scope'],
+  6: ['graph', 'tla', 'rtm', 'scope'],
+  7: ['graph', 'tla', 'rtm', 'scope'],
+  8: ['graph', 'tla', 'rtm', 'scope'],
 };
 
 /**
