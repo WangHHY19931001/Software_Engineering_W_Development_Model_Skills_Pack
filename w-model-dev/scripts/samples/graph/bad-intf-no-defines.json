@@ -3,13 +3,49 @@
   "currentPhase": 3,
   "rootId": "REQ-ROOT",
   "nodes": [
-    {"id":"REQ-ROOT","type":"REQ","phase":1,"title":"根","summary":"s"},
-    {"id":"SD-001","type":"SD","phase":2,"title":"模块","summary":"s"},
-    {"id":"INTF-001","type":"INTF","phase":3,"title":"接口","summary":"缺defines"}
+    {
+      "id": "REQ-ROOT",
+      "type": "REQ",
+      "phase": 1,
+      "title": "根",
+      "summary": "s",
+      "evidenceAnchor": "w-model-dev/references/graph-guide.md:§3=s",
+      "evidenceStatus": "confirmed"
+    },
+    {
+      "id": "SD-001",
+      "type": "SD",
+      "phase": 2,
+      "title": "模块",
+      "summary": "s",
+      "evidenceAnchor": "w-model-dev/references/graph-guide.md:§3=s",
+      "evidenceStatus": "confirmed"
+    },
+    {
+      "id": "INTF-001",
+      "type": "INTF",
+      "phase": 3,
+      "title": "接口",
+      "summary": "缺defines",
+      "evidenceAnchor": "w-model-dev/references/graph-guide.md:§3=缺defines",
+      "evidenceStatus": "confirmed"
+    }
   ],
   "edges": [
-    {"from":"REQ-ROOT","to":"SD-001","type":"parent"},
-    {"from":"SD-001","to":"INTF-001","type":"parent"},
-    {"from":"SD-001","to":"REQ-ROOT","type":"implements"}
+    {
+      "from": "REQ-ROOT",
+      "to": "SD-001",
+      "type": "parent"
+    },
+    {
+      "from": "SD-001",
+      "to": "INTF-001",
+      "type": "parent"
+    },
+    {
+      "from": "SD-001",
+      "to": "REQ-ROOT",
+      "type": "implements"
+    }
   ]
 }

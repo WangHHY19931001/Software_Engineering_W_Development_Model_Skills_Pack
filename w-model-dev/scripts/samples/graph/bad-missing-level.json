@@ -2,10 +2,30 @@
   "version": 1,
   "currentPhase": 1,
   "nodes": [
-    {"id": "REQ-001", "type": "REQ", "phase": 1, "title": "用户域", "summary": "缺 level 字段"},
-    {"id": "REQ-002", "type": "REQ", "phase": 1, "title": "注册模块", "summary": "缺 level 字段"}
+    {
+      "id": "REQ-001",
+      "type": "REQ",
+      "phase": 1,
+      "title": "用户域",
+      "summary": "缺 level 字段",
+      "evidenceAnchor": "w-model-dev/references/graph-guide.md:§3=缺 level 字段",
+      "evidenceStatus": "confirmed"
+    },
+    {
+      "id": "REQ-002",
+      "type": "REQ",
+      "phase": 1,
+      "title": "注册模块",
+      "summary": "缺 level 字段",
+      "evidenceAnchor": "w-model-dev/references/graph-guide.md:§3=缺 level 字段",
+      "evidenceStatus": "confirmed"
+    }
   ],
   "edges": [
-    {"from": "REQ-001", "to": "REQ-002", "type": "parent"}
+    {
+      "from": "REQ-001",
+      "to": "REQ-002",
+      "type": "parent"
+    }
   ]
 }

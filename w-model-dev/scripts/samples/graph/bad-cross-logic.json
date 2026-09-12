@@ -2,15 +2,68 @@
   "version": 1,
   "currentPhase": 1,
   "nodes": [
-    {"id": "REQ-001", "type": "REQ", "phase": 1, "title": "用户域", "summary": "level=1", "level": 1},
-    {"id": "REQ-002", "type": "REQ", "phase": 1, "title": "注册模块", "summary": "level=2", "level": 2, "reqGroup": "REQ-001"},
-    {"id": "REQ-003", "type": "REQ", "phase": 1, "title": "登录模块", "summary": "level=2", "level": 2, "reqGroup": "REQ-001"},
-    {"id": "SD-001", "type": "SD", "phase": 1, "title": "设计节点", "summary": "非 REQ 节点"}
+    {
+      "id": "REQ-001",
+      "type": "REQ",
+      "phase": 1,
+      "title": "用户域",
+      "summary": "level=1",
+      "level": 1,
+      "evidenceAnchor": "w-model-dev/references/graph-guide.md:§3=level=1",
+      "evidenceStatus": "confirmed"
+    },
+    {
+      "id": "REQ-002",
+      "type": "REQ",
+      "phase": 1,
+      "title": "注册模块",
+      "summary": "level=2",
+      "level": 2,
+      "reqGroup": "REQ-001",
+      "evidenceAnchor": "w-model-dev/references/graph-guide.md:§3=level=2",
+      "evidenceStatus": "confirmed"
+    },
+    {
+      "id": "REQ-003",
+      "type": "REQ",
+      "phase": 1,
+      "title": "登录模块",
+      "summary": "level=2",
+      "level": 2,
+      "reqGroup": "REQ-001",
+      "evidenceAnchor": "w-model-dev/references/graph-guide.md:§3=level=2",
+      "evidenceStatus": "confirmed"
+    },
+    {
+      "id": "SD-001",
+      "type": "SD",
+      "phase": 1,
+      "title": "设计节点",
+      "summary": "非 REQ 节点",
+      "evidenceAnchor": "w-model-dev/references/graph-guide.md:§3=非 REQ 节点",
+      "evidenceStatus": "confirmed"
+    }
   ],
   "edges": [
-    {"from": "REQ-001", "to": "REQ-002", "type": "parent"},
-    {"from": "REQ-001", "to": "REQ-003", "type": "parent"},
-    {"from": "REQ-002", "to": "REQ-003", "type": "conflicts-with"},
-    {"from": "REQ-002", "to": "SD-001", "type": "cross-cuts"}
+    {
+      "from": "REQ-001",
+      "to": "REQ-002",
+      "type": "parent"
+    },
+    {
+      "from": "REQ-001",
+      "to": "REQ-003",
+      "type": "parent"
+    },
+    {
+      "from": "REQ-002",
+      "to": "REQ-003",
+      "type": "conflicts-with"
+    },
+    {
+      "from": "REQ-002",
+      "to": "SD-001",
+      "type": "cross-cuts"
+    }
   ]
 }
