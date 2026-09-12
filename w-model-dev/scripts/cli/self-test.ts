@@ -76,7 +76,7 @@ import {
   type TlaSpecSnapshot,
 } from '../logic/bdd-logic.js';
 import { checkPreventiveReview, type PreventiveReview } from '../logic/preventive-review-logic.js';
-import { checkIcebergSweep, type IcebergSweepReport } from '../logic/iceberg-sweep-logic.js';
+import { checkIcebergSweep, type IcebergSweepReport, type IcebergView } from '../logic/iceberg-sweep-logic.js';
 import { checkTlaBddSync } from '../logic/tla-bdd-sync-logic.js';
 import { checkRoleDispatch } from '../logic/role-dispatch-logic.js';
 import { checkStateMachineConsistency } from '../logic/state-machine-logic.js';
@@ -1469,6 +1469,15 @@ interface IcebergCase {
   expectedReasonPatterns?: RegExp[];
   /** 用例说明 */
   description: string;
+  /**
+   * 注入三视角"应扫集合"（分母对账 R6-R8 的输入）。
+   *
+   * 生产路径由 `check-iceberg-sweep.ts` 从项目根的上游已落盘产物实测注入（D7：分母非 R 自报）；
+   * 样本目录无 `.w-model/` 上游产物，故样本层用本字段显式提供同形状输入，
+   * 与 `GRAPH_CASES.injectAnchorPaths` 同一约定（logic 层不为测试开洞）。
+   * 仅视角对账反例需要——其余用例保持无注入，避免既有 fixture 被误伤。
+   */
+  injectViewSets?: Partial<Record<IcebergView, readonly string[]>>;
 }
 
 const ICEBERG_CASES: IcebergCase[] = [
@@ -1494,6 +1503,33 @@ const ICEBERG_CASES: IcebergCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/已在上一轮发现/],
     description: 'findingId 与 previousFindings 重复（R3 去重失败）',
+  },
+  {
+    file: 'bad-empty-swept-artifacts.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/sweptArtifacts.*minItems/],
+    description: 'sweptArtifacts 为空数组（schema minItems=1：空声明使零发现不可对账）',
+  },
+  {
+    file: 'bad-view-disagreement.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R6/, /视角间存在未对账差异/, /视角间存在未对账差异[\s\S]*SD-002/],
+    injectViewSets: { graph: ['SD-001', 'SD-002'], tla: ['SD-001'], rtm: ['SD-001', 'SD-002'] },
+    description: 'graph/rtm 视角含 SD-002 而 tla 不含，两两对账差异即刻失败（R6，三视角平权）',
+  },
+  {
+    file: 'bad-view-absent-silent.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R7/, /视角缺席未显式声明/, /rtm/],
+    injectViewSets: { graph: ['SD-001'], tla: ['SD-001'] },
+    description: '阶段 3 在场表含 rtm 但未提供且 absentViews 未声明（R7：禁止静默跳过）',
+  },
+  {
+    file: 'bad-empty-findings-uncovered.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R8/, /零发现但 sweptArtifacts 未覆盖收敛集合/],
+    injectViewSets: { graph: ['SD-007'], tla: ['SD-007'], rtm: ['SD-007'] },
+    description: '三视角收敛于 SD-007 但 sweptArtifacts 未覆盖，newFindings=[] 无法证明扫掠发生（R8）',
   },
 ];
 
@@ -3495,7 +3531,8 @@ async function runIcebergCases(samplesDir: string): Promise<CaseResult[]> {
     try {
       const raw = await fs.readFile(abs, 'utf-8');
       const report = parseJsonSafe(raw) as IcebergSweepReport;
-      const r = checkIcebergSweep(report);
+      // 三视角分母对账输入：样本层显式提供（生产路径由 check-iceberg-sweep.ts 从上游产物实测注入）
+      const r = checkIcebergSweep(report, c.injectViewSets ? { viewSets: c.injectViewSets } : undefined);
       const details: string[] = [];
       if (r.passed !== c.expectedPassed) {
         details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);

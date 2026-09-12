@@ -31,12 +31,24 @@
  * 命令行参数：支持 --json（机器可读输出）、--auto-trigger、--run-log=
  * 退出码：0=通过 / 1=校验失败（reasons）/ 2=输入错误（ERROR_JSON）
  *
+ * 三视角分母对账（R6-R8）：本脚本从报告所在项目根的上游已落盘产物
+ * （`.w-model/ingestion/graph.json` / `.w-model/tla-manifest.json` / `.w-model/rtm.json` /
+ * `.w-model/change-scope.json`）按设计 ID 命名空间实测各视角"应扫集合"并注入 logic 层
+ * （D7：分母不由 R 声明）。上游产物全缺时不注入 → R6-R8 跳过（阶段早期不误红）。
+ *
  * @module
  */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 
-import { checkIcebergSweep, type IcebergSweepReport } from '../logic/iceberg-sweep-logic.js';
+import {
+  checkIcebergSweep,
+  deriveViewSets,
+  parseIcebergPhase,
+  type IcebergCheckExternalEvidence,
+  type IcebergSweepReport,
+} from '../logic/iceberg-sweep-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { writeGateLog, type GateLogWriteError } from '../lib/gate-log-writer.js';
 import { runMain } from '../lib/run-main.js';
@@ -122,6 +134,55 @@ async function inferPhaseFromRunLog(runLogPath: string): Promise<number | null> 
   return lastPhase;
 }
 
+/**
+ * 定位项目根（供三视角分母从上游已落盘产物实测）。与 `check-requirement-graph.ts`
+ * 的 `resolveAnchorBaseDir` 同口径：自报告所在目录向上找 `.w-model/` 或 `.git`。
+ * 报告常规落在 `.w-model/iceberg/<id>.json`，故上一级即项目根。
+ */
+function resolveProjectRoot(reportAbsPath: string): string {
+  let dir = path.dirname(reportAbsPath);
+  const start = dir;
+  for (let i = 0; i < 8; i++) {
+    if (existsSync(path.join(dir, '.w-model')) || existsSync(path.join(dir, '.git'))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return start;
+}
+
+/** 读取 JSON 文件；不存在/不可解析返回 undefined（分母缺失即该视角不在场，交由 R7 显式声明） */
+function tryReadJson(fileAbs: string): unknown {
+  if (!existsSync(fileAbs)) return undefined;
+  try {
+    return JSON.parse(readFileSync(fileAbs, 'utf-8')) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * 读盘构造注入面（CLI 层唯一读盘点；logic 层保持纯函数）。
+ * 任一上游产物缺失即该视角键缺席，不合成空集合——空集合与"未读盘"语义不同，
+ * 前者会被 R6 当成真的一致从而放行（下一个"空即合规"）。
+ */
+function buildIcebergExternalEvidence(
+  reportAbsPath: string,
+  phase: number | undefined,
+): IcebergCheckExternalEvidence | undefined {
+  if (phase === undefined) return undefined;
+  const root = resolveProjectRoot(reportAbsPath);
+  const artifacts = {
+    graph: tryReadJson(path.join(root, '.w-model', 'ingestion', 'graph.json')),
+    tlaManifest: tryReadJson(path.join(root, '.w-model', 'tla-manifest.json')),
+    rtm: tryReadJson(path.join(root, '.w-model', 'rtm.json')),
+    changeScope: tryReadJson(path.join(root, '.w-model', 'change-scope.json')),
+  };
+  if (Object.values(artifacts).every((a) => a === undefined)) return undefined;
+  const viewSets = deriveViewSets(phase, artifacts);
+  return Object.keys(viewSets).length > 0 ? { viewSets } : undefined;
+}
+
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读 JSON 摘要与 gate-logs 写入）
   const jsonMode = hasFlag(process.argv.slice(2), 'json');
@@ -148,7 +209,10 @@ async function main(): Promise<void> {
     return;
   }
 
-  const result = checkIcebergSweep(report);
+  const result = checkIcebergSweep(
+    report,
+    buildIcebergExternalEvidence(path.resolve(reportPathArg), parseIcebergPhase(report.phase)),
+  );
   const reasons = [...result.reasons];
 
   // 交叉核对：--auto-trigger 模式下校验 report.phase 与 run-log 最近 checkpoint phase 一致（独立于 logic 层 R1-R5 编号体系）

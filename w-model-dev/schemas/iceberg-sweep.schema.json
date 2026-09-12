@@ -6,9 +6,17 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "reportId", "phase", "triggerType", "icebergRound",
-    "sweptAt", "sweptBy", "线索来源",
-    "newFindings", "sweepCoverage", "summary", "passed"
+    "reportId",
+    "phase",
+    "triggerType",
+    "icebergRound",
+    "sweptAt",
+    "sweptBy",
+    "线索来源",
+    "newFindings",
+    "sweepCoverage",
+    "summary",
+    "passed"
   ],
   "properties": {
     "reportId": {
@@ -71,7 +79,16 @@
         "description": "单条本轮新发现（IcebergFinding：findingId 唯一，重复由 R3 去重拦截）",
         "type": "object",
         "additionalProperties": false,
-        "required": ["findingId", "severity", "category", "location", "description", "evidence", "hypothesis", "relatedFixedPoint"],
+        "required": [
+          "findingId",
+          "severity",
+          "category",
+          "location",
+          "description",
+          "evidence",
+          "hypothesis",
+          "relatedFixedPoint"
+        ],
         "properties": {
           "findingId": {
             "type": "string",
@@ -85,7 +102,14 @@
           },
           "category": {
             "type": "string",
-            "enum": ["same-root-cause-spread", "same-defect-class", "fix-induced-regression", "adjacent-logic", "coverage-gap", "cross-artifact-inconsistency"],
+            "enum": [
+              "same-root-cause-spread",
+              "same-defect-class",
+              "fix-induced-regression",
+              "adjacent-logic",
+              "coverage-gap",
+              "cross-artifact-inconsistency"
+            ],
             "description": "发现类别：same-root-cause-spread=同根因扩散 / same-defect-class=同缺陷类 / fix-induced-regression=修复引入回归 / adjacent-logic=相邻逻辑 / coverage-gap=覆盖缺口 / cross-artifact-inconsistency=跨产物不一致"
           },
           "location": {
@@ -124,8 +148,14 @@
       "properties": {
         "sweptArtifacts": {
           "type": "array",
+          "minItems": 1,
           "items": { "type": "string" },
-          "description": "扫掠的产物路径列表"
+          "description": "扫掠的产物路径列表（不得为空：空数组使零发现不可对账，「扫完了确实没有」与「根本没扫」将无法区分）"
+        },
+        "absentViews": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["graph", "tla", "rtm", "scope"] },
+          "description": "本阶段不参与的视角（显式记录，禁止静默跳过；在场视角由 iceberg-sweep-logic.ts 的 ICEBERG_VIEW_PRESENCE 按阶段裁定，缺席者须出现在本数组，否则触发 R7）"
         },
         "sweptDimensions": {
           "type": "array",

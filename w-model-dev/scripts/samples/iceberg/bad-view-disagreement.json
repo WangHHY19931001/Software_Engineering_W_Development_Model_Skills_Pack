@@ -1,0 +1,20 @@
+{
+  "reportId": "IS-phase3-1-03",
+  "phase": "phase3-outline",
+  "triggerType": "ICEBERG-B",
+  "icebergRound": 1,
+  "sweptAt": "2026-09-12T00:01:00Z",
+  "sweptBy": "R-iceberg",
+  "线索来源": {
+    "reworkHintsHistory": ["V 评审发现概要设计接口清单缺 SD-002 的错误码"],
+    "fixedPoints": ["docs/phase3-outline/blog-system-interface-design.md:L88"],
+    "previousFindings": []
+  },
+  "newFindings": [],
+  "sweepCoverage": {
+    "sweptArtifacts": ["docs/phase3-outline/blog-system-interface-design.md"],
+    "sweptDimensions": ["completeness", "reliability", "security"]
+  },
+  "summary": "本次扫掠覆盖 completeness/reliability/security 三维度共 1 份产物，三视角对账发现 graph/rtm 含 SD-002 而 tla 不含，视角间未收敛，不得放行。",
+  "passed": true
+}
