@@ -85,7 +85,18 @@
       "if": {
         "properties": {
           "phase": { "const": 8 },
-          "action": { "enum": ["rootcause", "review", "gate", "r3-completeness", "r3-reliability", "r3-security", "fix", "emergency-fix"] }
+          "action": {
+            "enum": [
+              "rootcause",
+              "review",
+              "gate",
+              "r3-completeness",
+              "r3-reliability",
+              "r3-security",
+              "fix",
+              "emergency-fix"
+            ]
+          }
         },
         "required": ["phase", "action"]
       },
@@ -102,7 +113,9 @@
       "if": {
         "properties": {
           "phase": { "const": 8 },
-          "action": { "enum": ["review", "gate", "r3-completeness", "r3-reliability", "r3-security", "fix", "emergency-fix"] },
+          "action": {
+            "enum": ["review", "gate", "r3-completeness", "r3-reliability", "r3-security", "fix", "emergency-fix"]
+          },
           "targetKind": { "enum": ["requirement", "design", "code", "test"] }
         },
         "required": ["phase", "action", "targetKind"]

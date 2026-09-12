@@ -8,14 +8,16 @@
     "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "analyzedAt": "2026-09-07T00:00:00.000Z"
   },
-  "environmentMatrix": [{
-    "platform": "win32",
-    "shell": "git-bash",
-    "runtime": "node20",
-    "supported": true,
-    "observed": "unavailable",
-    "reason": "required runtime unavailable but incorrectly treated as pass"
-  }],
+  "environmentMatrix": [
+    {
+      "platform": "win32",
+      "shell": "git-bash",
+      "runtime": "node20",
+      "supported": true,
+      "observed": "unavailable",
+      "reason": "required runtime unavailable but incorrectly treated as pass"
+    }
+  ],
   "candidateIds": ["CHG-P1-20260907-001"],
   "ledgerPath": ".w-model/code-health/ledger.jsonl",
   "evidencePath": ".w-model/code-health/evidence.jsonl",

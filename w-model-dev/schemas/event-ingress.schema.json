@@ -7,8 +7,16 @@
   "additionalProperties": false,
   "required": ["eventId", "timestamp", "source", "eventType", "summary"],
   "properties": {
-    "eventId": { "description": "事件 ID（UUID 或时间戳；与 run-log runId 属不同命名空间，不可混用，反模式 #26）", "type": "string", "minLength": 1 },
-    "timestamp": { "description": "事件发生时间（ISO 8601；路由前由消费方填写）", "type": "string", "format": "date-time" },
+    "eventId": {
+      "description": "事件 ID（UUID 或时间戳；与 run-log runId 属不同命名空间，不可混用，反模式 #26）",
+      "type": "string",
+      "minLength": 1
+    },
+    "timestamp": {
+      "description": "事件发生时间（ISO 8601；路由前由消费方填写）",
+      "type": "string",
+      "format": "date-time"
+    },
     "source": {
       "description": "事件来源（消费方自填，技能不内置触发器）：webhook=外部 webhook 触发 / cron=定时任务触发 / user-report=用户报告 / ci=CI 流水线触发 / external-agent=外部代理触发 / manual=手动录入",
       "enum": ["webhook", "cron", "user-report", "ci", "external-agent", "manual"]
@@ -49,10 +57,26 @@
       "additionalProperties": false,
       "required": ["phase", "phaseName", "routedAt", "highRiskGate"],
       "properties": {
-        "phase": { "description": "目标阶段编号，取值 1-8（按 eventType 查路由表所得）", "type": "integer", "minimum": 1, "maximum": 8 },
-        "phaseName": { "description": "目标阶段名称（如 编码修复 / 需求重跑，与 phase 对应）", "type": "string", "minLength": 1 },
-        "routedAt": { "description": "路由时间戳（ISO 8601；编排者 O 写入路由决策时填写）", "type": "string", "format": "date-time" },
-        "highRiskGate": { "description": "是否触发高风险路径强制决策型 CHECKPOINT（affectedArtifacts 含 auth/加密/发布相关，或 requirement-change 涉及架构变更时为 true）", "type": "boolean" }
+        "phase": {
+          "description": "目标阶段编号，取值 1-8（按 eventType 查路由表所得）",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "phaseName": {
+          "description": "目标阶段名称（如 编码修复 / 需求重跑，与 phase 对应）",
+          "type": "string",
+          "minLength": 1
+        },
+        "routedAt": {
+          "description": "路由时间戳（ISO 8601；编排者 O 写入路由决策时填写）",
+          "type": "string",
+          "format": "date-time"
+        },
+        "highRiskGate": {
+          "description": "是否触发高风险路径强制决策型 CHECKPOINT（affectedArtifacts 含 auth/加密/发布相关，或 requirement-change 涉及架构变更时为 true）",
+          "type": "boolean"
+        }
       }
     }
   }

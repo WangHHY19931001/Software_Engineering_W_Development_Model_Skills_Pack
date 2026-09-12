@@ -27,9 +27,7 @@
       "terminalStates": ["LoggedIn"],
       "acceptingStates": ["LoggedIn"],
       "rejectingStates": ["LoggedOut"],
-      "transitions": [
-        { "from": "LoggedOut", "event": "login", "to": "LoggedIn" }
-      ],
+      "transitions": [{ "from": "LoggedOut", "event": "login", "to": "LoggedIn" }],
       "invariants": ["LoggedIn => sessionValid"]
     }
   ]

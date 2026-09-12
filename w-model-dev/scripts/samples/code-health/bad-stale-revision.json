@@ -14,15 +14,78 @@
     "sourceBundleSha256": "333333333333333333333333333333333333333333333333333333333333333",
     "analyzedAt": "2026-09-06T00:00:00.000Z"
   },
-  "confidence": { "level": "medium", "score": 0.8, "rationale": "stale evidence is intentionally rejected", "uncertainties": ["revision changed"] },
-  "risk": { "severity": "low", "behavior": "low", "security": "none", "concurrency": "none", "platform": "low", "lifecycle": "low", "governance": "low", "rationale": "isolated" },
-  "rtmImpact": { "rtmBefore": ["REQ-001"], "rtmAfter": ["REQ-001"], "coverageBefore": { "statements": 0.8, "branches": null, "functions": 0.7, "lines": 0.8 }, "coverageAfter": { "statements": 0.8, "branches": null, "functions": 0.7, "lines": 0.8 }, "testLevels": ["unit"], "unmappedScenarios": [], "coverageIsSignalOnly": true },
-  "coverageImpact": { "rtmBefore": ["REQ-001"], "rtmAfter": ["REQ-001"], "coverageBefore": { "statements": 0.8, "branches": null, "functions": 0.7, "lines": 0.8 }, "coverageAfter": { "statements": 0.8, "branches": null, "functions": 0.7, "lines": 0.8 }, "testLevels": ["unit"], "unmappedScenarios": [], "coverageIsSignalOnly": true },
-  "commands": [{ "command": "node --version", "cwd": ".", "environment": {}, "platform": "win32", "toolVersions": { "node": "20.0.0" }, "startedAt": "2026-09-06T00:00:00.000Z", "endedAt": "2026-09-06T00:00:01.000Z", "exitCode": 0, "observation": "observed", "rawOutputPath": ".w-model/code-health/raw/stale.log", "rawOutputSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd" }],
-  "rollback": { "preChangeRevision": "1111111111111111111111111111111111111111", "command": "git revert commit", "patchPath": "rollback.patch", "owner": "S-agent", "executable": true },
+  "confidence": {
+    "level": "medium",
+    "score": 0.8,
+    "rationale": "stale evidence is intentionally rejected",
+    "uncertainties": ["revision changed"]
+  },
+  "risk": {
+    "severity": "low",
+    "behavior": "low",
+    "security": "none",
+    "concurrency": "none",
+    "platform": "low",
+    "lifecycle": "low",
+    "governance": "low",
+    "rationale": "isolated"
+  },
+  "rtmImpact": {
+    "rtmBefore": ["REQ-001"],
+    "rtmAfter": ["REQ-001"],
+    "coverageBefore": { "statements": 0.8, "branches": null, "functions": 0.7, "lines": 0.8 },
+    "coverageAfter": { "statements": 0.8, "branches": null, "functions": 0.7, "lines": 0.8 },
+    "testLevels": ["unit"],
+    "unmappedScenarios": [],
+    "coverageIsSignalOnly": true
+  },
+  "coverageImpact": {
+    "rtmBefore": ["REQ-001"],
+    "rtmAfter": ["REQ-001"],
+    "coverageBefore": { "statements": 0.8, "branches": null, "functions": 0.7, "lines": 0.8 },
+    "coverageAfter": { "statements": 0.8, "branches": null, "functions": 0.7, "lines": 0.8 },
+    "testLevels": ["unit"],
+    "unmappedScenarios": [],
+    "coverageIsSignalOnly": true
+  },
+  "commands": [
+    {
+      "command": "node --version",
+      "cwd": ".",
+      "environment": {},
+      "platform": "win32",
+      "toolVersions": { "node": "20.0.0" },
+      "startedAt": "2026-09-06T00:00:00.000Z",
+      "endedAt": "2026-09-06T00:00:01.000Z",
+      "exitCode": 0,
+      "observation": "observed",
+      "rawOutputPath": ".w-model/code-health/raw/stale.log",
+      "rawOutputSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    }
+  ],
+  "rollback": {
+    "preChangeRevision": "1111111111111111111111111111111111111111",
+    "command": "git revert commit",
+    "patchPath": "rollback.patch",
+    "owner": "S-agent",
+    "executable": true
+  },
   "review": { "findings": [], "unresolvedQuestions": [], "decision": null, "humanDecision": null },
-  "signatures": [{ "role": "A", "actor": "analyst", "event": "discovered", "scopeHash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "provenanceRef": "evidence/signature.json", "signedAt": "2026-09-06T00:00:02.000Z" }],
-  "changeScope": { "files": ["src/unused.ts"], "symbols": ["unusedFunction"], "scopeHash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" },
+  "signatures": [
+    {
+      "role": "A",
+      "actor": "analyst",
+      "event": "discovered",
+      "scopeHash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "provenanceRef": "evidence/signature.json",
+      "signedAt": "2026-09-06T00:00:02.000Z"
+    }
+  ],
+  "changeScope": {
+    "files": ["src/unused.ts"],
+    "symbols": ["unusedFunction"],
+    "scopeHash": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
   "evidenceRef": "evidence/candidate.json",
   "archive": { "state": "not_archived", "manifestPath": null, "contentHash": null, "redactionStatus": "not_reviewed" }
 }

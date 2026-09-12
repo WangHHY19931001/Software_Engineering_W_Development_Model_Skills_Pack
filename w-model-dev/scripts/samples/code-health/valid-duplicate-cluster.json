@@ -2,8 +2,16 @@
   "clusterId": "DUP-CHG-P4-20260907-001",
   "candidateId": "CHG-P4-20260907-001",
   "implementations": [
-    { "file": "src/cache-a.ts", "symbol": "readCacheA", "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-    { "file": "src/cache-b.ts", "symbol": "readCacheB", "sourceHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+    {
+      "file": "src/cache-a.ts",
+      "symbol": "readCacheA",
+      "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "file": "src/cache-b.ts",
+      "symbol": "readCacheB",
+      "sourceHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
   ],
   "views": {
     "ast": ["normalized conditional shape"],

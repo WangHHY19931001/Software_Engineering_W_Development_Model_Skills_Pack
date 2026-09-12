@@ -27,9 +27,7 @@
     ]
   },
   "rtm": {
-    "rows": [
-      { "requirementId": "REQ-001", "codeModule": "src/auth.ts" }
-    ]
+    "rows": [{ "requirementId": "REQ-001", "codeModule": "src/auth.ts" }]
   },
   "codeSources": [
     {

@@ -7,7 +7,11 @@
   "additionalProperties": false,
   "required": ["reportId", "generatedAt", "analysisWindow", "signals", "metaAnalysis", "recommendations"],
   "properties": {
-    "reportId": { "description": "报告 ID（爬坡循环改进报告唯一标识，如 <timestamp>-report）", "type": "string", "minLength": 1 },
+    "reportId": {
+      "description": "报告 ID（爬坡循环改进报告唯一标识，如 <timestamp>-report）",
+      "type": "string",
+      "minLength": 1
+    },
     "generatedAt": { "description": "报告生成时间（ISO 8601）", "type": "string", "format": "date-time" },
     "analysisWindow": {
       "description": "分析窗口（本次分析覆盖的 run-log 时间范围与范围描述）",
@@ -32,18 +36,14 @@
         "description": "单条改进信号（Signal：signalId + 类别 + 严重度 + 证据 + 建议 + 优先级）",
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "signalId",
-          "category",
-          "severity",
-          "evidence",
-          "suggestion",
-          "affectedAssets",
-          "priority"
-        ],
+        "required": ["signalId", "category", "severity", "evidence", "suggestion", "affectedAssets", "priority"],
         "properties": {
           "signalId": { "description": "信号 ID（唯一标识）", "type": "string", "minLength": 1 },
-          "category": { "description": "信号类别：prompt=提示词 / tool=工具 / verification-rule=验证规则 / anti-pattern=反模式 / maturity=成熟度 / budget=预算", "type": "string", "minLength": 1 },
+          "category": {
+            "description": "信号类别：prompt=提示词 / tool=工具 / verification-rule=验证规则 / anti-pattern=反模式 / maturity=成熟度 / budget=预算",
+            "type": "string",
+            "minLength": 1
+          },
           "severity": { "description": "严重度：S1=高 / S2=中 / S3=低", "type": "string", "minLength": 1 },
           "evidence": {
             "description": "证据（来自 run-log 的引用与量化指标）",
@@ -68,7 +68,10 @@
                 "required": ["occurrences", "trend"],
                 "properties": {
                   "occurrences": { "description": "发生次数（非负整数）", "type": "integer", "minimum": 0 },
-                  "trend": { "description": "趋势：stable=稳定 / increasing=上升 / decreasing=下降", "enum": ["stable", "increasing", "decreasing"] }
+                  "trend": {
+                    "description": "趋势：stable=稳定 / increasing=上升 / decreasing=下降",
+                    "enum": ["stable", "increasing", "decreasing"]
+                  }
                 }
               }
             }
@@ -79,7 +82,12 @@
             "type": "array",
             "items": { "type": "string" }
           },
-          "priority": { "description": "建议应用优先级，取值 1-5（数值越小越优先：1=立即应用 / 2=下个版本 / 3=backlog；4-5 为预留）", "type": "integer", "minimum": 1, "maximum": 5 }
+          "priority": {
+            "description": "建议应用优先级，取值 1-5（数值越小越优先：1=立即应用 / 2=下个版本 / 3=backlog；4-5 为预留）",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          }
         }
       }
     },
@@ -106,8 +114,15 @@
           "type": "array",
           "items": { "type": "string" }
         },
-        "verifierDisagreements": { "description": "V-G 矛盾次数（V passed=true 但 G exit=1；非负整数）", "type": "integer", "minimum": 0 },
-        "budgetBurnTrend": { "description": "预算消耗趋势：stable=稳定 / increasing=上升 / decreasing=下降", "enum": ["stable", "increasing", "decreasing"] },
+        "verifierDisagreements": {
+          "description": "V-G 矛盾次数（V passed=true 但 G exit=1；非负整数）",
+          "type": "integer",
+          "minimum": 0
+        },
+        "budgetBurnTrend": {
+          "description": "预算消耗趋势：stable=稳定 / increasing=上升 / decreasing=下降",
+          "enum": ["stable", "increasing", "decreasing"]
+        },
         "operationalFailureHits": {
           "description": "O 系列失败模式命中频次映射（键为 O1-O6，值为命中次数）",
           "type": "object",
@@ -119,8 +134,18 @@
           "additionalProperties": false,
           "required": ["emptyOrTrivialRate", "uniqueDecisionRate"],
           "properties": {
-            "emptyOrTrivialRate": { "description": "空/trivial 决策占比（0-1 小数；越高表示理解证据质量越差）", "type": "number", "minimum": 0, "maximum": 1 },
-            "uniqueDecisionRate": { "description": "唯一决策占比（0-1 小数；越高表示决策重复越少、信息质量越好）", "type": "number", "minimum": 0, "maximum": 1 }
+            "emptyOrTrivialRate": {
+              "description": "空/trivial 决策占比（0-1 小数；越高表示理解证据质量越差）",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "uniqueDecisionRate": {
+              "description": "唯一决策占比（0-1 小数；越高表示决策重复越少、信息质量越好）",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
           }
         }
       }

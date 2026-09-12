@@ -27,9 +27,7 @@
       "terminalStates": ["Authenticated"],
       "acceptingStates": ["Authenticated"],
       "rejectingStates": ["Unauthenticated"],
-      "transitions": [
-        { "from": "Unauthenticated", "event": "login", "to": "Authenticated" }
-      ],
+      "transitions": [{ "from": "Unauthenticated", "event": "login", "to": "Authenticated" }],
       "invariants": ["Authenticated => sessionValid"]
     }
   ]

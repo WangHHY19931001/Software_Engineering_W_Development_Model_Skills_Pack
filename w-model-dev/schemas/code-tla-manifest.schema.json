@@ -32,18 +32,41 @@
               "children"
             ],
             "properties": {
-              "id": { "description": "规格 ID（MODULE 名格式 L<level>_<system>[_<subsystem>]，须符合 tla-plus.md §2.0 命名规范，禁止连字符）", "type": "string", "minLength": 1 },
-              "level": { "description": "规格层级：L1=系统内外交互 / L2=子系统 / L3=原子行为 / L4-L6=更深层次分解（维度3/4 遍历全部层级 specs 的 tlaContent）", "type": "string", "minLength": 1 },
+              "id": {
+                "description": "规格 ID（MODULE 名格式 L<level>_<system>[_<subsystem>]，须符合 tla-plus.md §2.0 命名规范，禁止连字符）",
+                "type": "string",
+                "minLength": 1
+              },
+              "level": {
+                "description": "规格层级：L1=系统内外交互 / L2=子系统 / L3=原子行为 / L4-L6=更深层次分解（维度3/4 遍历全部层级 specs 的 tlaContent）",
+                "type": "string",
+                "minLength": 1
+              },
               "phase": { "description": "产出阶段编号，取值 1-8", "type": "integer", "minimum": 1, "maximum": 8 },
-              "system": { "description": "所属系统名称（层次路径用 :: 分隔，如 blog-system::auth-subsystem）", "type": "string", "minLength": 1 },
+              "system": {
+                "description": "所属系统名称（层次路径用 :: 分隔，如 blog-system::auth-subsystem）",
+                "type": "string",
+                "minLength": 1
+              },
               "requirementIds": {
                 "description": "关联需求 ID 列表（与 rtm.json 需求 ID 一致，须登记于 RTM）",
                 "type": "array",
                 "items": { "type": "string", "minLength": 1 }
               },
-              "tlaPath": { "description": ".tla 文件路径（相对 manifest 文件所在目录解析，见 tla-plus.md §2.1）", "type": "string", "minLength": 1 },
-              "cfgPath": { "description": ".cfg 文件路径（相对 manifest 文件所在目录解析，见 tla-plus.md §2.1）", "type": "string", "minLength": 1 },
-              "parent": { "description": "上级 TLA 文件相对路径（相对该 .tla 文件所在目录解析；L1 填 null）", "type": ["string", "null"] },
+              "tlaPath": {
+                "description": ".tla 文件路径（相对 manifest 文件所在目录解析，见 tla-plus.md §2.1）",
+                "type": "string",
+                "minLength": 1
+              },
+              "cfgPath": {
+                "description": ".cfg 文件路径（相对 manifest 文件所在目录解析，见 tla-plus.md §2.1）",
+                "type": "string",
+                "minLength": 1
+              },
+              "parent": {
+                "description": "上级 TLA 文件相对路径（相对该 .tla 文件所在目录解析；L1 填 null）",
+                "type": ["string", "null"]
+              },
               "children": {
                 "description": "下级 TLA 文件相对路径列表（叶子填 []；与文件头 @child 双向一致）",
                 "type": "array",
@@ -54,7 +77,10 @@
                 "type": "array",
                 "items": { "type": "string" }
               },
-              "tlaContent": { "description": ".tla 文件文本内容（可选；CLI 读取后注入，供维度3 Next 分支 / 维度4 不变式覆盖校验使用；无 tlaContent 的 spec 跳过维度3/4）", "type": "string" }
+              "tlaContent": {
+                "description": ".tla 文件文本内容（可选；CLI 读取后注入，供维度3 Next 分支 / 维度4 不变式覆盖校验使用；无 tlaContent 的 spec 跳过维度3/4）",
+                "type": "string"
+              }
             }
           }
         }
@@ -75,8 +101,16 @@
             "additionalProperties": true,
             "required": ["id", "type"],
             "properties": {
-              "id": { "description": "节点 ID（如 REQ-001 / SD-5.2.1 / INTF-x / DD-x；维度1 对 type=SD 节点的 id 校验是否有 codeModule 映射）", "type": "string", "minLength": 1 },
-              "type": { "description": "节点类型：REQ=需求 / SD=设计 / INTF=接口 / DD=详细设计 / NFR / CON 等（维度1 仅取 type=SD 节点参与 SD→codeModule 映射）", "type": "string", "minLength": 1 }
+              "id": {
+                "description": "节点 ID（如 REQ-001 / SD-5.2.1 / INTF-x / DD-x；维度1 对 type=SD 节点的 id 校验是否有 codeModule 映射）",
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "description": "节点类型：REQ=需求 / SD=设计 / INTF=接口 / DD=详细设计 / NFR / CON 等（维度1 仅取 type=SD 节点参与 SD→codeModule 映射）",
+                "type": "string",
+                "minLength": 1
+              }
             }
           }
         },
@@ -91,7 +125,11 @@
             "properties": {
               "from": { "description": "边起点节点 ID（须存在于 nodes[]）", "type": "string", "minLength": 1 },
               "to": { "description": "边终点节点 ID（须存在于 nodes[]）", "type": "string", "minLength": 1 },
-              "type": { "description": "边类型：parent/depends-on/implements/defines/realizes/produces/governs/collaborates-with/derives", "type": "string", "minLength": 1 }
+              "type": {
+                "description": "边类型：parent/depends-on/implements/defines/realizes/produces/governs/collaborates-with/derives",
+                "type": "string",
+                "minLength": 1
+              }
             }
           }
         }
@@ -112,8 +150,15 @@
             "additionalProperties": true,
             "required": ["requirementId"],
             "properties": {
-              "requirementId": { "description": "需求 ID（与 graph 中 REQ 节点 id / rtm.json 一致）", "type": "string", "minLength": 1 },
-              "codeModule": { "description": "代码模块文件路径（阶段5 编码后回填，格式 SD-xxx:src/path/to/file.ts；维度1 校验每个 type=SD 节点 id 须被至少一个 codeModule 覆盖，匹配 SD id 去前缀分段或包含路径段）", "type": "string" }
+              "requirementId": {
+                "description": "需求 ID（与 graph 中 REQ 节点 id / rtm.json 一致）",
+                "type": "string",
+                "minLength": 1
+              },
+              "codeModule": {
+                "description": "代码模块文件路径（阶段5 编码后回填，格式 SD-xxx:src/path/to/file.ts；维度1 校验每个 type=SD 节点 id 须被至少一个 codeModule 覆盖，匹配 SD id 去前缀分段或包含路径段）",
+                "type": "string"
+              }
             }
           }
         }
@@ -129,7 +174,10 @@
         "required": ["path", "content"],
         "properties": {
           "path": { "description": "代码文件路径（相对仓库根目录；须存在于磁盘）", "type": "string", "minLength": 1 },
-          "content": { "description": "代码文件文本内容（供 AST 抽取状态转移 / Next 分支 / 不变式覆盖校验）", "type": "string" }
+          "content": {
+            "description": "代码文件文本内容（供 AST 抽取状态转移 / Next 分支 / 不变式覆盖校验）",
+            "type": "string"
+          }
         }
       }
     }

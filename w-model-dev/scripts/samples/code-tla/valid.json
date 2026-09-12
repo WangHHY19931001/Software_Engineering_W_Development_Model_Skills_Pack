@@ -20,14 +20,10 @@
       { "id": "REQ-001", "type": "REQ" },
       { "id": "SD-AUTH", "type": "SD" }
     ],
-    "edges": [
-      { "from": "SD-AUTH", "to": "REQ-001", "type": "parent" }
-    ]
+    "edges": [{ "from": "SD-AUTH", "to": "REQ-001", "type": "parent" }]
   },
   "rtm": {
-    "rows": [
-      { "requirementId": "REQ-001", "codeModule": "src/auth.ts" }
-    ]
+    "rows": [{ "requirementId": "REQ-001", "codeModule": "src/auth.ts" }]
   },
   "codeSources": [
     {

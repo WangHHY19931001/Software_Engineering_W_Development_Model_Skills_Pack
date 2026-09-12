@@ -5,17 +5,29 @@
   "currentPhase": 2,
   "features": [
     {
-      "id": "L1_test-001", "level": 1, "filePath": "L1/L1_test-001.feature",
-      "scenarioCount": 1, "stateMachineId": "SM-L1-test", "tlaSpecId": "L1_test",
-      "reqIds": ["REQ-001"], "designIds": ["SD-001"],
-      "parentFeatureIds": [], "siblingFeatureIds": [], "childFeatureIds": []
+      "id": "L1_test-001",
+      "level": 1,
+      "filePath": "L1/L1_test-001.feature",
+      "scenarioCount": 1,
+      "stateMachineId": "SM-L1-test",
+      "tlaSpecId": "L1_test",
+      "reqIds": ["REQ-001"],
+      "designIds": ["SD-001"],
+      "parentFeatureIds": [],
+      "siblingFeatureIds": [],
+      "childFeatureIds": []
     }
   ],
   "stateMachines": [
     {
-      "id": "SM-L1-test", "level": 1, "states": ["S1", "S2"],
-      "initialState": "S1", "terminalStates": [], "acceptingStates": ["S2"],
-      "rejectingStates": [], "transitions": [{ "from": "S1", "event": "e", "to": "S2" }],
+      "id": "SM-L1-test",
+      "level": 1,
+      "states": ["S1", "S2"],
+      "initialState": "S1",
+      "terminalStates": [],
+      "acceptingStates": ["S2"],
+      "rejectingStates": [],
+      "transitions": [{ "from": "S1", "event": "e", "to": "S2" }],
       "invariants": ["S2 => true"]
     }
   ],

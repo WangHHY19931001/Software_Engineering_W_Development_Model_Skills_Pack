@@ -10,11 +10,46 @@
     "varianceThreshold": 0.1
   },
   "subCriteria": [
-    { "name": "correctness", "weight": 0.3, "score": 0.91, "rawScores": [0.9, 0.91, 0.92], "variance": 0.0000667, "evidence": "w-model-dev/scripts/logic/verifier-logic.ts:L511-525=compositeScore 按 score*weight 重算并校验" },
-    { "name": "security", "weight": 0.2, "score": 0.92, "rawScores": [0.91, 0.92, 0.93], "variance": 0.0000667, "evidence": "w-model-dev/scripts/logic/verifier-logic.ts:L279-291=Schema 前置校验拒绝额外或缺失字段" },
-    { "name": "readability", "weight": 0.15, "score": 0.88, "rawScores": [0.87, 0.88, 0.89], "variance": 0.0000667, "evidence": "w-model-dev/scripts/logic/verifier-logic.ts:L257-277=主校验规则按编号说明" },
-    { "name": "maintainability", "weight": 0.15, "score": 0.87, "rawScores": [0.86, 0.87, 0.88], "variance": 0.0000667, "evidence": "w-model-dev/scripts/logic/verifier-logic.ts:L76-113=targetKind 子标准与权重集中定义" },
-    { "name": "conformance", "weight": 0.2, "score": 0.9, "rawScores": [0.89, 0.9, 0.91], "variance": 0.0000667, "evidence": "w-model-dev/references/verifier-spec.md:§6=VerifierOutput 输出契约" }
+    {
+      "name": "correctness",
+      "weight": 0.3,
+      "score": 0.91,
+      "rawScores": [0.9, 0.91, 0.92],
+      "variance": 0.0000667,
+      "evidence": "w-model-dev/scripts/logic/verifier-logic.ts:L511-525=compositeScore 按 score*weight 重算并校验"
+    },
+    {
+      "name": "security",
+      "weight": 0.2,
+      "score": 0.92,
+      "rawScores": [0.91, 0.92, 0.93],
+      "variance": 0.0000667,
+      "evidence": "w-model-dev/scripts/logic/verifier-logic.ts:L279-291=Schema 前置校验拒绝额外或缺失字段"
+    },
+    {
+      "name": "readability",
+      "weight": 0.15,
+      "score": 0.88,
+      "rawScores": [0.87, 0.88, 0.89],
+      "variance": 0.0000667,
+      "evidence": "w-model-dev/scripts/logic/verifier-logic.ts:L257-277=主校验规则按编号说明"
+    },
+    {
+      "name": "maintainability",
+      "weight": 0.15,
+      "score": 0.87,
+      "rawScores": [0.86, 0.87, 0.88],
+      "variance": 0.0000667,
+      "evidence": "w-model-dev/scripts/logic/verifier-logic.ts:L76-113=targetKind 子标准与权重集中定义"
+    },
+    {
+      "name": "conformance",
+      "weight": 0.2,
+      "score": 0.9,
+      "rawScores": [0.89, 0.9, 0.91],
+      "variance": 0.0000667,
+      "evidence": "w-model-dev/references/verifier-spec.md:§6=VerifierOutput 输出契约"
+    }
   ],
   "compositeScore": 0.8995,
   "qualityLevel": "A",

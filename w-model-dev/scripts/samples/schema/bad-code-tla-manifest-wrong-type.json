@@ -3,14 +3,10 @@
     "specs": "should-be-array-not-string"
   },
   "graph": {
-    "nodes": [
-      { "id": "REQ-001", "type": "REQ" }
-    ],
+    "nodes": [{ "id": "REQ-001", "type": "REQ" }],
     "edges": []
   },
   "rtm": {
-    "rows": [
-      { "requirementId": "REQ-001", "codeModule": "src/auth.ts" }
-    ]
+    "rows": [{ "requirementId": "REQ-001", "codeModule": "src/auth.ts" }]
   }
 }

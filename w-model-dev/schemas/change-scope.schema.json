@@ -5,14 +5,7 @@
   "description": "变更上下文 manifest（2026-09-04 audit-gate-closure）：把 codegraph/opsx/archive 门禁与实际变更绑定。scope 由 S-coding 产出并落盘（如 .w-model/change-scope.json），CLI 以 --scope=<file> 传入；strict 门禁只认 scope.changedFiles 与实际 Git 变更集合（baseRef..headRef + worktree）精确一致的 scope（headRef 必须等于当前 HEAD，否则 fail-closed）。对应 lib/change-scope.ts 与三个 strict checker。",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "changeId",
-    "phase",
-    "baseRef",
-    "headRef",
-    "scopeCreatedAt",
-    "changedFiles"
-  ],
+  "required": ["changeId", "phase", "baseRef", "headRef", "scopeCreatedAt", "changedFiles"],
   "properties": {
     "changeId": {
       "description": "变更唯一标识（与 opsx 变更目录/查询记录一致，如 phase5-demo；须含 phaseN- 前缀以表达阶段归属）",

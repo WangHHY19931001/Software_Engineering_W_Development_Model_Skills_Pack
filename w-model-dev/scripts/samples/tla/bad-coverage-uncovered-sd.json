@@ -6,14 +6,24 @@
   "tools": { "jarPath": "tla2tools.jar", "javaMinVersion": 11 },
   "specs": [
     {
-      "id": "L1_Test", "level": "L1", "phase": 1, "system": "test",
+      "id": "L1_Test",
+      "level": "L1",
+      "phase": 1,
+      "system": "test",
       "requirementIds": ["SD-001"],
       "designRef": "docs/phase1-requirements/requirement-spec.md:§1",
-      "tlaPath": "L1_Test.tla", "cfgPath": "L1_Test.cfg",
-      "parent": null, "siblings": [], "children": [],
-      "variableCombination": 100, "decompositionDecision": "kept-below-threshold",
-      "syntaxChecked": true, "tlcChecked": true, "deadlockFree": true,
-      "invariantsHold": true, "stateExplosion": false
+      "tlaPath": "L1_Test.tla",
+      "cfgPath": "L1_Test.cfg",
+      "parent": null,
+      "siblings": [],
+      "children": [],
+      "variableCombination": 100,
+      "decompositionDecision": "kept-below-threshold",
+      "syntaxChecked": true,
+      "tlcChecked": true,
+      "deadlockFree": true,
+      "invariantsHold": true,
+      "stateExplosion": false
     }
   ],
   "graphSdNodes": ["SD-001", "SD-002", "SD-003"],

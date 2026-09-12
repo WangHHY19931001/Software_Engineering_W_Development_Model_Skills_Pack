@@ -7,27 +7,31 @@
     "sourceBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "analyzedAt": "2026-09-07T00:00:00.000Z"
   },
-  "tests": [{
-    "testId": "test-auth-negative",
-    "file": "src/auth.test.ts",
-    "symbol": "rejectsInvalidToken",
-    "author": "human-author",
-    "createdAt": "2025-01-01T00:00:00.000Z",
-    "lastChangedAt": "2026-09-01T00:00:00.000Z",
-    "level": "unit",
-    "setup": "valid session fixture",
-    "stimulus": "invalid bearer token",
-    "oracle": "returns unauthorized without secret",
-    "failureSensitivity": "detects authorization bypass",
-    "rtmIds": ["REQ-SEC-001"],
-    "scenarioClass": "unique-negative",
-    "governanceFacts": ["redaction"]
-  }],
-  "protectedFacts": [{
-    "testId": "test-auth-negative",
-    "class": "security",
-    "reason": "This is the only assertion protecting the authorization boundary."
-  }],
+  "tests": [
+    {
+      "testId": "test-auth-negative",
+      "file": "src/auth.test.ts",
+      "symbol": "rejectsInvalidToken",
+      "author": "human-author",
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "lastChangedAt": "2026-09-01T00:00:00.000Z",
+      "level": "unit",
+      "setup": "valid session fixture",
+      "stimulus": "invalid bearer token",
+      "oracle": "returns unauthorized without secret",
+      "failureSensitivity": "detects authorization bypass",
+      "rtmIds": ["REQ-SEC-001"],
+      "scenarioClass": "unique-negative",
+      "governanceFacts": ["redaction"]
+    }
+  ],
+  "protectedFacts": [
+    {
+      "testId": "test-auth-negative",
+      "class": "security",
+      "reason": "This is the only assertion protecting the authorization boundary."
+    }
+  ],
   "preRegression": {
     "command": {
       "command": "npm test -- auth",

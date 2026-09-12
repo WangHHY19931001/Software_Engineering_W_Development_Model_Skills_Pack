@@ -98,25 +98,19 @@
     {
       "phase": 1,
       "round": 1,
-      "violations": [
-        "连通性校验失败：存在 2 个连通分量"
-      ],
+      "violations": ["连通性校验失败：存在 2 个连通分量"],
       "converged": false
     },
     {
       "phase": 1,
       "round": 3,
-      "violations": [
-        "R2 父唯一性校验失败"
-      ],
+      "violations": ["R2 父唯一性校验失败"],
       "converged": false
     },
     {
       "phase": 1,
       "round": 6,
-      "violations": [
-        "轮次上限校验失败"
-      ],
+      "violations": ["轮次上限校验失败"],
       "converged": false
     }
   ]
