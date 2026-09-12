@@ -63,6 +63,7 @@ import {
   type GraphShape,
   type OutlineSpecEnhanceViolations,
   type RequirementSpecEnhanceViolations,
+  type SignatureChainEntryLike,
 } from '../logic/graph-logic.js';
 import { readJsonOrExit, readJsonClassified } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
@@ -70,6 +71,74 @@ import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg, phaseFlagPresent } from '../lib/parse-phase.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
+import { existsSync, readFileSync } from 'node:fs';
+
+/**
+ * 解析锚点路径的基准项目根。
+ *
+ * 锚点按仓库/项目约定写作**项目根相对路径**（conventions.md 列定位约定），而
+ * graph.json 通常位于 `<project>/.w-model/graph.json`——故基准不能简单取 graph.json
+ * 所在目录。解析规则：从 graph.json 所在目录向上至多 8 层，取第一个含 `.w-model/`
+ * 或 `.git/` 的目录为项目根；都不命中则退回 graph.json 所在目录（样本 fixture 场景）。
+ */
+function resolveAnchorBaseDir(graphAbsPath: string): string {
+  let dir = path.dirname(graphAbsPath);
+  const start = dir;
+  for (let i = 0; i < 8; i++) {
+    if (existsSync(path.join(dir, '.w-model')) || existsSync(path.join(dir, '.git'))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return start;
+}
+
+/**
+ * 构造 R15c/R15e 的外部证据注入面（CLI 层唯一读盘点；logic 层保持纯函数）。
+ *
+ * - existingAnchorPaths：对图中每个节点的 evidenceAnchor 取 `:` 之前的 path 部分，
+ *   以项目根（见 resolveAnchorBaseDir）为基准按正斜杠相对路径解析，逐个 existsSync
+ *   判定后收集。仅收集**存在**的 path，R15c 以「不在集合中」判缺失。
+ * - signatureChainEntries：项目根 `.w-model/signature-chain.jsonl`；文件不存在
+ *   （阶段 1 早期）→ 返回 undefined → R15e 跳过，符合规格 §5「签名链未完整时不得误红」。
+ */
+function buildGraphExternalEvidence(
+  graph: GraphShape,
+  graphAbsPath: string,
+): { existingAnchorPaths: Set<string>; signatureChainEntries?: SignatureChainEntryLike[] } {
+  const baseDir = resolveAnchorBaseDir(graphAbsPath);
+  const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
+  const existingAnchorPaths = new Set<string>();
+  for (const n of nodes) {
+    const anchor = n?.evidenceAnchor;
+    if (typeof anchor !== 'string' || anchor.trim() === '') continue;
+    const anchorPath = anchor.split(':')[0];
+    if (!anchorPath) continue;
+    if (existsSync(path.resolve(baseDir, anchorPath))) existingAnchorPaths.add(anchorPath);
+  }
+
+  const chainPath = path.join(baseDir, '.w-model', 'signature-chain.jsonl');
+  if (!existsSync(chainPath)) return { existingAnchorPaths };
+  let raw: string;
+  try {
+    raw = readFileSync(chainPath, 'utf-8');
+  } catch {
+    return { existingAnchorPaths };
+  }
+  const entries: SignatureChainEntryLike[] = [];
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed === '') continue;
+    try {
+      const parsedLine = JSON.parse(trimmed) as SignatureChainEntryLike;
+      if (parsedLine && typeof parsedLine === 'object') entries.push(parsedLine);
+    } catch {
+      // 单行不可解析：跳过该行（签名链完整性由 check-signature-chain.ts 单独把关，
+      // 本处不重复其职责，避免把格式问题误报成 R15e）
+    }
+  }
+  return { existingAnchorPaths, signatureChainEntries: entries };
+}
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
@@ -280,7 +349,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  const result = checkRequirementGraph(parsed, effectivePhase);
+  // R15c/R15e 外部证据注入：logic 层为纯函数（无 I/O），由本 CLI 读盘后注入。
+  //   R15c：锚点 path 部分是否真实存在（相对项目根解析，以 graph.json 所在目录为基准）
+  //   R15e：signature-chain.jsonl 是否存在引用该节点 id 的 V review 环
+  //         文件不存在（阶段 1 早期）→ 不注入 → R15e 跳过，不误红。
+  const externalEvidence = buildGraphExternalEvidence(parsed as GraphShape, abs);
+
+  const result = checkRequirementGraph(parsed, effectivePhase, externalEvidence);
 
   // R6 扩展：cross-cuts 源类型 RTM 关联校验（若提供 --rtm）
   if (rtmRows && result.crossLogic) {

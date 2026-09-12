@@ -1352,3 +1352,204 @@ describe('R15 evidenceAnchor 格式校验', () => {
     expect(r.violations.some((v) => v.includes('R15 evidenceAnchor 格式校验失败'))).toBe(false);
   });
 });
+
+// ==================== R15a-e 五子项（A-3c：锚点必填 + 状态 + 存在性 + 签名链对账） ====================
+describe('R15a-e 证据锚点子项', () => {
+  /**
+   * 构造纯 REQ 图：默认两节点均带合法锚点 + confirmed，可逐项覆写。
+   * r15Violation(out, 'a') 取回以 'R15a' 开头的 violation 文本。
+   */
+  function makeGraph(overrides: { nodes?: Array<Record<string, unknown>> }): Record<string, unknown> {
+    return {
+      version: 1,
+      currentPhase: 1,
+      nodes: overrides.nodes ?? [
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: '用户登录',
+          summary: '登录',
+          level: 1,
+          evidenceAnchor: 'docs/req.md:§4=登录需密码',
+          evidenceStatus: 'confirmed',
+        },
+        {
+          id: 'REQ-002',
+          type: 'REQ',
+          phase: 1,
+          title: '密码策略',
+          summary: '密码',
+          level: 2,
+          reqGroup: 'REQ-001',
+          evidenceAnchor: 'docs/req.md:§4=登录需密码',
+          evidenceStatus: 'confirmed',
+        },
+      ],
+      edges: [
+        { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
+        { from: 'REQ-001', to: 'REQ-002', type: 'produces' },
+      ],
+    };
+  }
+
+  function r15(out: GraphCheckResult, sub: string): string | undefined {
+    return out.violations.find((v) => v.startsWith(`R15${sub} `) || v.startsWith(`R15${sub} `));
+  }
+
+  it('R15a 节点缺 evidenceAnchor → violation', () => {
+    const g = makeGraph({
+      nodes: [
+        { id: 'REQ-001', type: 'REQ', phase: 1, title: 't', summary: 's', level: 1, evidenceStatus: 'confirmed' },
+      ],
+    });
+    const out = checkRequirementGraph(g, 1);
+    expect(out.passed).toBe(false);
+    expect(r15(out, 'a')).toBeDefined();
+    expect(r15(out, 'a')).toContain('evidenceAnchor 缺失');
+  });
+
+  it('R15b evidenceStatus 非法 → violation', () => {
+    const g = makeGraph({
+      nodes: [
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: 't',
+          summary: 's',
+          level: 1,
+          evidenceAnchor: 'docs/req.md:§4=x',
+          evidenceStatus: 'maybe',
+        },
+      ],
+    });
+    const out = checkRequirementGraph(g, 1);
+    expect(out.passed).toBe(false);
+    expect(r15(out, 'b')).toBeDefined();
+    expect(r15(out, 'b')).toContain('evidenceStatus 非法');
+  });
+
+  it('R15b evidenceStatus 缺失 → violation', () => {
+    const g = makeGraph({
+      nodes: [
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: 't',
+          summary: 's',
+          level: 1,
+          evidenceAnchor: 'docs/req.md:§4=x',
+        },
+      ],
+    });
+    const out = checkRequirementGraph(g, 1);
+    expect(r15(out, 'b')).toBeDefined();
+  });
+
+  it('R15c 锚点 path 不存在 → violation（须注入 existingAnchorPaths）', () => {
+    const g = makeGraph({
+      nodes: [
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: 't',
+          summary: 's',
+          level: 1,
+          evidenceAnchor: 'nonexistent/path.md:§4=x',
+          evidenceStatus: 'confirmed',
+        },
+      ],
+    });
+    // 未注入 → R15c 不触发（纯函数不做 I/O，存在性由 CLI 注入）
+    const without = checkRequirementGraph(g, 1);
+    expect(r15(without, 'c')).toBeUndefined();
+    // 注入一个不含该 path 的集合 → R15c 触发
+    const out = checkRequirementGraph(g, 1, { existingAnchorPaths: new Set(['other.md']) });
+    expect(out.passed).toBe(false);
+    expect(r15(out, 'c')).toBeDefined();
+    expect(r15(out, 'c')).toContain('证据路径不存在');
+  });
+
+  it('R15c 锚点 path 存在 → 不触发', () => {
+    const g = makeGraph({});
+    const out = checkRequirementGraph(g, 1, { existingAnchorPaths: new Set(['docs/req.md']) });
+    expect(r15(out, 'c')).toBeUndefined();
+  });
+
+  it('R15e confirmed 但签名链无引用该节点的 V review 环 → violation', () => {
+    const g = makeGraph({
+      nodes: [
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: 't',
+          summary: 's',
+          level: 1,
+          evidenceAnchor: 'docs/req.md:§4=x',
+          evidenceStatus: 'confirmed',
+        },
+      ],
+    });
+    const out = checkRequirementGraph(g, 1, { signatureChainEntries: [] });
+    expect(out.passed).toBe(false);
+    expect(out.violations.some((v) => v.startsWith('R15e '))).toBe(true);
+    expect(out.violations.some((v) => v.includes('缺签名链 V review 环'))).toBe(true);
+  });
+
+  it('R15e pending 不触发（避免早期阶段误红）', () => {
+    const g = makeGraph({
+      nodes: [
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: 't',
+          summary: 's',
+          level: 1,
+          evidenceAnchor: 'docs/req.md:§4=x',
+          evidenceStatus: 'pending',
+        },
+      ],
+    });
+    const out = checkRequirementGraph(g, 1, { signatureChainEntries: [] });
+    expect(out.violations.some((v) => v.startsWith('R15e '))).toBe(false);
+  });
+
+  it('R15e 未注入签名链（阶段 1 早期文件不存在）→ 不触发', () => {
+    const g = makeGraph({});
+    const out = checkRequirementGraph(g, 1);
+    expect(out.violations.some((v) => v.startsWith('R15e '))).toBe(false);
+  });
+
+  it('R15e 存在引用该节点的 V review 环且 inputProvenance 指向锚点 → 不触发', () => {
+    const g = makeGraph({
+      nodes: [
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: 't',
+          summary: 's',
+          level: 1,
+          evidenceAnchor: 'docs/req.md:§4=x',
+          evidenceStatus: 'confirmed',
+        },
+      ],
+    });
+    const out = checkRequirementGraph(g, 1, {
+      signatureChainEntries: [
+        {
+          role: 'V',
+          action: 'review',
+          artifacts: ['REQ-001'],
+          inputProvenance: { sourceArtifacts: [{ path: 'docs/req.md' }] },
+        },
+      ],
+    });
+    expect(out.violations.some((v) => v.startsWith('R15e '))).toBe(false);
+  });
+});

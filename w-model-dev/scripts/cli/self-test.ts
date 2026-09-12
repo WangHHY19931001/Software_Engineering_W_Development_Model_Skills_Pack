@@ -29,7 +29,7 @@
  *   2. 在 SAMPLES 表中声明期望结果
  */
 
-import { promises as fs } from 'node:fs';
+import { promises as fs, existsSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -440,6 +440,12 @@ interface GraphCase {
   expectedReasonPatterns?: RegExp[];
   expectedWarningPatterns?: RegExp[];
   description: string;
+  /**
+   * 注入 R15c 所需的 existingAnchorPaths（以技能包真实仓库根解析锚点 path）。
+   * 仅锚点存在性反例需要——其余用例保持无注入（纯逻辑层语义），
+   * 避免所有既有 fixture 因路径解析差异被误伤。
+   */
+  injectAnchorPaths?: boolean;
 }
 
 const GRAPH_CASES: GraphCase[] = [
@@ -654,6 +660,28 @@ const GRAPH_CASES: GraphCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/R15 evidenceAnchor 格式校验失败/],
     description: 'REQ 节点 evidenceAnchor 无定位（"登录需要密码"），应被 R15 拦截',
+  },
+  {
+    file: 'bad-evidence-anchor-missing.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/R15a evidenceAnchor 缺失/],
+    description: 'R15a：节点缺 evidenceAnchor（必填），应被锚点必填校验拦截（不再"未声明不阻断"）',
+  },
+  {
+    file: 'bad-evidence-status-invalid.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/R15b evidenceStatus 非法/],
+    description: 'R15b：evidenceStatus="maybe" 非 confirmed|pending，应被状态枚举校验拦截',
+  },
+  {
+    file: 'bad-evidence-path-missing.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/R15c 证据路径不存在/],
+    injectAnchorPaths: true,
+    description: 'R15c：evidenceAnchor 指向不存在的路径 nonexistent/does-not-exist.md，应被存在性校验拦截',
   },
 ];
 
@@ -2886,13 +2914,36 @@ async function runGateCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+/**
+ * 收集图谱中真实存在的锚点 path（供 R15c 注入）。
+ * 与 check-requirement-graph.ts CLI 同口径：取 `:` 之前的 path 部分，以仓库根解析。
+ */
+function collectExistingAnchorPaths(graph: unknown, repoRoot: string): Set<string> {
+  const existing = new Set<string>();
+  const nodes = (graph as { nodes?: unknown })?.nodes;
+  if (!Array.isArray(nodes)) return existing;
+  for (const n of nodes) {
+    const anchor = (n as { evidenceAnchor?: unknown })?.evidenceAnchor;
+    if (typeof anchor !== 'string' || anchor.trim() === '') continue;
+    const anchorPath = anchor.split(':')[0];
+    if (!anchorPath) continue;
+    if (existsSync(path.resolve(repoRoot, anchorPath))) existing.add(anchorPath);
+  }
+  return existing;
+}
+
 async function runGraphCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
+  // R15c 存在性校验的真实仓库根（logic 层不做 I/O，由本处按需注入）
+  const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
   for (const c of GRAPH_CASES) {
     const abs = path.join(samplesDir, 'graph', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
     const parsed: unknown = parseJsonSafe(raw);
-    const r = checkRequirementGraph(parsed, c.phase);
+    const externalEvidence = c.injectAnchorPaths
+      ? { existingAnchorPaths: collectExistingAnchorPaths(parsed, repoRoot) }
+      : undefined;
+    const r = checkRequirementGraph(parsed, c.phase, externalEvidence);
 
     const details: string[] = [];
     if (r.passed !== c.expectedPassed) {

@@ -218,7 +218,121 @@ function detectParentCycle(edges: GraphEdge[], nodeIds: Set<string>, violations:
 
 // ==================== 校验入口 ====================
 
-export function checkRequirementGraph(graph: unknown, phase: number): GraphCheckResult {
+/**
+ * R15c/R15e 的外部产物注入面（本文件不做 I/O；CLI 层读盘后注入）。
+ * 两个字段均可选：未提供即跳过对应子项。这是刻意的——纯单测无文件系统上下文，
+ * 而阶段 1 早期签名链文件可能尚不存在（规格 §5 要求此时不得误红）。
+ */
+export interface GraphCheckExternalEvidence {
+  /** 真实存在的锚点 path 集合（CLI 以项目根解析后按 path 部分校验存在性）→ 启用 R15c */
+  existingAnchorPaths?: ReadonlySet<string>;
+  /** signature-chain.jsonl 条目（CLI 读取）→ 启用 R15e 签名链对账 */
+  signatureChainEntries?: readonly SignatureChainEntryLike[];
+}
+
+/** R15e 所需的最小签名链条目形状（结构子集，避免 logic 层跨模块依赖） */
+export interface SignatureChainEntryLike {
+  role: string;
+  action: string;
+  artifacts: string[];
+  inputProvenance?: { sourceArtifacts?: Array<{ path?: string }> } | null;
+}
+
+/** evidenceAnchor 格式正则（复用 verifier-logic EVIDENCE_PATTERN 语义，禁止定义第三套解析） */
+const EVIDENCE_ANCHOR_PATTERN = /^(?:[\w/.-]+:§[\w.-]+|[\w/.-]+:L\d+(?:-\d+)?)=.+$/;
+
+/** evidenceStatus 合法枚举（R15b） */
+const VALID_EVIDENCE_STATUS: readonly string[] = ['confirmed', 'pending'];
+
+/**
+ * R15a-e 证据锚点子项校验（纯函数，无 I/O）。
+ *
+ * 独立于 schema 校验存在的原因：schema 的 `required` 会让缺锚点/缺状态一律报成
+ * 笼统 `[schema] ... required`，子项名（R15a/R15b）将不可定位——而「拆五子项」的
+ * 全部意义就是失败可定位。故本函数在 schema 校验之前调用，两层各自独立成立。
+ *
+ * R15c/R15e 依赖外部产物（真实文件系统 / signature-chain.jsonl），本文件不做 I/O，
+ * 由 CLI 层读盘后经 externalEvidence 注入；未注入即跳过（不报错也不假红）：
+ *   - 未注入 existingAnchorPaths → 跳过 R15c（纯单测无文件系统上下文）
+ *   - 未注入 signatureChainEntries → 跳过 R15e（阶段 1 早期签名链文件可能尚不存在，
+ *     规格 §5 风险表要求此时不得误红）
+ */
+export function checkEvidenceAnchors(
+  nodes: readonly GraphNode[],
+  externalEvidence: GraphCheckExternalEvidence,
+): string[] {
+  const { existingAnchorPaths, signatureChainEntries } = externalEvidence;
+  const violations: string[] = [];
+  const missingAnchors: string[] = [];
+  const badStatus: string[] = [];
+  const badFormat: string[] = [];
+  const missingPaths: string[] = [];
+  const noSignatureRing: string[] = [];
+  for (const n of nodes) {
+    const anchor = n.evidenceAnchor;
+    // R15a 必填（缺失/空串/non-string 均计缺失）
+    if (typeof anchor !== 'string' || anchor.trim() === '') {
+      missingAnchors.push(n.id);
+      continue;
+    }
+    // 格式（保留原 R15 语义；缺失分支已 continue，故此处 anchor 必为非空 string）
+    if (!EVIDENCE_ANCHOR_PATTERN.test(anchor)) {
+      badFormat.push(`${n.id}（${anchor}）`);
+      // 格式非法则 path 部分不可信，跳过 R15b/c/e 以免产生二次噪声 violation
+      continue;
+    }
+    // R15b 状态枚举（缺失 = undefined，同样非法）
+    if (typeof n.evidenceStatus !== 'string' || !VALID_EVIDENCE_STATUS.includes(n.evidenceStatus)) {
+      badStatus.push(`${n.id}（${String(n.evidenceStatus)}）`);
+    }
+    const anchorPath = anchor.split(':')[0] ?? '';
+    // R15c 路径存在性（仅在 CLI 注入存在集合时校验）
+    if (existingAnchorPaths !== undefined && anchorPath !== '' && !existingAnchorPaths.has(anchorPath)) {
+      missingPaths.push(`${n.id}（${anchorPath}）`);
+    }
+    // R15e 签名链对账（仅 confirmed 触发；仅在注入签名链时校验）
+    if (n.evidenceStatus === 'confirmed' && signatureChainEntries !== undefined) {
+      const hasRing = signatureChainEntries.some((e) => {
+        if (e.role !== 'V' || e.action !== 'review') return false;
+        // 须引用该节点 id（artifacts 含节点 id）
+        if (!Array.isArray(e.artifacts) || !e.artifacts.includes(n.id)) return false;
+        // 且其 inputProvenance 指向该锚点 path
+        const sources = e.inputProvenance?.sourceArtifacts;
+        if (!Array.isArray(sources)) return false;
+        return sources.some(
+          (s) => typeof s === 'object' && s !== null && (s as { path?: unknown }).path === anchorPath,
+        );
+      });
+      if (!hasRing) noSignatureRing.push(`${n.id}（锚点 ${anchorPath}）`);
+    }
+  }
+  if (missingAnchors.length > 0) {
+    violations.push(`R15a evidenceAnchor 缺失：${missingAnchors.join(', ')}（阶段 1-4 全节点必填）`);
+  }
+  if (badFormat.length > 0) {
+    violations.push(
+      `R15 evidenceAnchor 格式校验失败：${badFormat.join('；')}（格式须为 path:§section=statement 或 path:L42=statement）`,
+    );
+  }
+  if (badStatus.length > 0) {
+    violations.push(`R15b evidenceStatus 非法：${badStatus.join(', ')}（须为 confirmed | pending）`);
+  }
+  if (missingPaths.length > 0) {
+    violations.push(`R15c 证据路径不存在：${missingPaths.join(', ')}（引用的东西必须真实存在）`);
+  }
+  if (noSignatureRing.length > 0) {
+    violations.push(
+      `R15e confirmed 缺签名链 V review 环：${noSignatureRing.join(', ')}（confirmed 须与签名链对账，不得自报）`,
+    );
+  }
+  return violations;
+}
+
+export function checkRequirementGraph(
+  graph: unknown,
+  phase: number,
+  externalEvidence?: GraphCheckExternalEvidence,
+): GraphCheckResult {
   const result: GraphCheckResult = {
     passed: false,
     phase,
@@ -252,14 +366,19 @@ export function checkRequirementGraph(graph: unknown, phase: number): GraphCheck
     return result;
   }
 
-  // === Schema 前置校验 ===
-  // 结构性约束（additionalProperties / required / type）由 schema 拦截，
-  // 通过后才进入下方业务规则校验（连通性 / 层级树 / 信息流等）。
+  // === Schema 前置校验（含 R15a-e 锚点证据子项）===
+  // R15a-e 先于 schema 早退运行：schema 的 required 会把缺锚点报成笼统 [schema]，
+  // 子项名不可定位，拆分即失效。两层各自独立成立（见 checkEvidenceAnchors JSDoc）。
+  const rawNodes = (graph as { nodes?: unknown }).nodes;
+  const evidenceViolations = Array.isArray(rawNodes)
+    ? checkEvidenceAnchors(rawNodes as GraphNode[], externalEvidence ?? {})
+    : [];
   const schemaResult = validateBySchema('graph', graph);
   if (!schemaResult.valid) {
     for (const m of schemaResult.errorMessages) {
       result.violations.push(`[schema] ${m}`);
     }
+    result.violations.push(...evidenceViolations);
     return result;
   }
 
@@ -798,19 +917,12 @@ export function checkRequirementGraph(graph: unknown, phase: number): GraphCheck
     );
   }
 
-  // R15: evidenceAnchor 仅声明则须格式合法（可选字段；格式复用 verifier-logic EVIDENCE_PATTERN 语义）
-  const EVIDENCE_ANCHOR_PATTERN = /^(?:[\w/.-]+:§[\w.-]+|[\w/.-]+:L\d+(?:-\d+)?)=.+$/;
-  const badEvidenceAnchors: string[] = [];
-  for (const n of g.nodes) {
-    if (n.evidenceAnchor !== undefined && n.evidenceAnchor !== '' && !EVIDENCE_ANCHOR_PATTERN.test(n.evidenceAnchor)) {
-      badEvidenceAnchors.push(`${n.id}（${n.evidenceAnchor}）`);
-    }
-  }
-  if (badEvidenceAnchors.length > 0) {
-    result.violations.push(
-      `R15 evidenceAnchor 格式校验失败：${badEvidenceAnchors.join('；')}（格式须为 path:§section=statement 或 path:L42=statement）`,
-    );
-  }
+  // R15a-e: evidenceAnchor 必填 + evidenceStatus + 路径存在性 + 签名链对账
+  // 格式复用 verifier-logic EVIDENCE_PATTERN 语义（禁止定义第三套解析）。
+  // 本块已提前至 schema 校验之前执行（见文件上方 checkEvidenceAnchors 调用），以确保
+  // 子项名（R15a/R15b）在 schema 也失败时仍可定位——否则 schema 的 required 消息会把
+  // 缺锚点/缺状态一律报成笼统 [schema]，拆分就失去意义。此处追加（schema 通过路径）。
+  result.violations.push(...evidenceViolations);
 
   // 汇总 passed
   const tv = result.traceabilityViolations;

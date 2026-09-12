@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "currentPhase": 1,
+  "nodes": [
+    {
+      "id": "REQ-001",
+      "type": "REQ",
+      "phase": 1,
+      "title": "域",
+      "summary": "level=1 根",
+      "level": 1,
+      "evidenceAnchor": "nonexistent/does-not-exist.md:§3=level=1 根",
+      "evidenceStatus": "pending"
+    },
+    {
+      "id": "REQ-002",
+      "type": "REQ",
+      "phase": 1,
+      "title": "模块",
+      "summary": "level=2",
+      "level": 2,
+      "reqGroup": "REQ-001",
+      "evidenceAnchor": "w-model-dev/references/graph-guide.md:§3=level=2",
+      "evidenceStatus": "pending"
+    }
+  ],
+  "edges": [{ "from": "REQ-001", "to": "REQ-002", "type": "parent" }]
+}
