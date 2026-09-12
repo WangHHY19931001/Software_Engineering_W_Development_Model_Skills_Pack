@@ -49,6 +49,7 @@
  */
 
 import * as path from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 
 import {
   checkDesignSpecEnhance,
@@ -71,7 +72,6 @@ import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg, phaseFlagPresent } from '../lib/parse-phase.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
-import { existsSync, readFileSync } from 'node:fs';
 
 /**
  * 解析锚点路径的基准项目根。
