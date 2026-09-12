@@ -9,6 +9,23 @@
 
 ## [42.2.1] - 2026-09-01
 
+### 门禁完整性与证据事实对账（gate-integrity-evidence-reconciliation，2026-09-12）
+
+> 本 campaign 修的四个缺陷共享同一根因：**形态合规但事实不正确**。同义反复的测试可通过四级门；`newFindings: []` 可通过冰山校验；`passed` 在 R3 中从未被读取；捏造的 `evidenceAnchor` 路径可通过 R15 正则。通用修法是**分母来自上游产物，而非自我声明**。
+
+- **A-1 verifier-spec R14-R17 悬空规范修正**：`:278` 原规定四问结论写入 `summary.collaborationReview` 对象，但 `verifier-output.schema.json` 声明 `summary` 为 string 且父对象 `additionalProperties:false`——**无任何输入可同时满足**（实测：对象 → `must be string`）。改为固定前缀文本（`交接：…｜计划坚持：…｜角色匹配：…｜增量价值：…`），零 schema 成本。
+- **A-2 死引用修正（8 处）**：全仓 8 处引用 `SKILL.md「阶段门与质量门」`，该章节不存在（实际已拆为 `workflow.md` 的「阶段门评审」与 `quality-standards.md` 的「质量门检查清单」）。含反模式 #1 的安全关键路径。逐处改指真实承载章节。
+- **A-3a R3 预防性审查判据接上**：`preventive-review-logic.ts` 原抄录 `passed`/`findingCount` 但从不纳入 `reasons`，三份 `{"findings":[],"passed":true}` 即通过。现 `passed=false` 产生 violation。
+- **A-3b 冰山扫掠分母对账**：原 `expectedPassed = newFindings.length === 0`——**通过 ≡ 声明未发现任何东西**，且 `sweptArtifacts` 无 `minItems`。现分母由上游产物实测，graph/TLA/RTM **三视角平权**两两对账（无主分母、不归一化、不取并集放行），差异即刻失败（R6）；在场表为代码常量（D9）；缺席须显式声明（R7，禁止静默跳过）；零发现但覆盖不足为失败信号（R8）。
+- **A-3c 证据锚点必填 + 常态扫描**：`evidenceAnchor` 由可选改**阶段 1-4 全节点必填**，新增 `evidenceStatus`（`confirmed`/`pending`）。阶段门放行前扫描 `pending` 即阻断（**常态触发，非返工触发**——pending 是「尚未验证」而非「产物有缺陷」，走 R 会把没做功课误判为产物有缺陷）。R15 拆为 **R15a/b/c/e** 独立定位（缺失/状态/存在性/签名链环）。**不新增第三色**：invalid 由既有 `coverageStatus` + 返工链承载。
+- **A-3d 评审偏移检测**：标准偏移（同一产物跨轮次 `qualityLevel` 差 ≥2 档 → **人裁定，不走 R**——评审者自身不一致，R 无法自查评审标准）、校准偏移（`rawScores` 非全等但方差坍缩 → 分辨力不足；与既有「全等检测」区分，不重复报）。
+- **A-3e 证据路径存在性**：原只校验格式，`src/nonexistent.ts:L999=捏造` 可通过。现验存在性 + 与签名链对账。**仍不验语义支持**（需判断，属 V 评审）。
+- **A-3f 校准集（非门禁）**：新增 `samples/verifier-calibration/`，人工标注正解，**明确声明非门禁**（标注与 LLM 执行均非确定性）。
+- 124 个 graph 节点 / 31 个 fixture 迁移至必填字段；`exemption` 新增第 6 类 `evidence-anchor-pending`（复用 E1-E9 四阶段审批）。
+- **两处设计中发现的真问题**（均由"实测而非直觉"捕获）：① 计划的 `RESOLUTION_FLOOR = 1e-4` 会误报 **122/137（89%）** 的合法样本（真实合法方差下限约 `6.67e-5`），定稿 `1e-6`（仅命中刻意负样本）；② `ICEBERG_VIEW_PRESENCE` 原把 `graph` 排除在阶段 5-8 之外，但阶段 2-8 **全部**消费 `graph.json`（D8 SD Coverage），遗漏构成真实盲区——同一产物集在阶段 4 可测出的 graph↔rtm 差异，在阶段 5 会因 graph 视角不派生而被静默吞掉。已修正并补两条回归测试锁定。
+- **R15d 已决议不实现**：codegraph `--scope` 覆盖语义限定阶段 5-8，图谱节点只在阶段 1-4，定义域不相交。编号空缺为已决议项，非遗漏。
+- **本轮验证**：pre-push 18 项全绿；self-test 332/332；Vitest 1904 用例；coverage 76.75/71.92/87.69/78.8（阈值 75/65/85/75）；eval 60/60；docs-consistency 静态/动态违规 0。**破坏性验证十项逐项实测**（记录见 `docs/changes/gate-integrity-destructive-verification.md`），其中 2 项曾以无关红灯充数，已如实标注为无效控制并改用有效证据。阈值定稿依据见 `docs/changes/gate-integrity-threshold-calibration.md`。版本保持 42.2.1，不 bump。
+
 ### 修复（42.2.0 后静态审计整改）
 
 - **模板链接与门禁一致性**：修正 `templates/requirement-spec.md` 的 6 条子模板路径，并将模板漂移门禁及回归 fixture 同步到 `requirement-spec/` 子目录；聚焦 Vitest 52/52、全量 Vitest 1247/1247。
