@@ -21,6 +21,7 @@
 - [ ] **阶段5 codeModule 回填**：RTM.codeModule 列已回填（格式 SD-xxx:src/path，编码后强制）；缺失 → `check-code-tla-consistency.ts` 维度1 退出码 1
 - [ ] **阶段门放行已填理解证据**：run-log `acknowledgedDecisions` 非空且含 ≥1 关键决策摘要（非"确认"/"同意"）；为空视为 O4（Comprehension Debt）命中，拒绝放行（见本文件「完成定义（DoD）」节 第六维度）
 - [ ] **预算与成熟度已检查**：阶段门放行前跑预算检查（超 `budget.json` 限制按 `onExceed` 处置）；CHECKPOINT 类型由 `maturity.json.level` 决定（L1+ 操作型自动放行仍记录 run-log）；见 [operational-recovery.md](operational-recovery.md)
+- [ ] **未验证证据锚点已清零**：`graph.json` 中 `evidenceStatus === 'pending'` 的节点数为 0；存在 pending → 阻断放行，须补验证转 `confirmed`，或走 `exemption` 的 `evidence-anchor-pending` 豁免（S→R→V→人类四阶段）。**常态触发（非返工触发）**：pending 不是缺陷而是"尚未验证"，走 R 会把"没做功课"误判为"产物有缺陷"；若补验证后发现结论站不住，那才触发返工链。见 [evidence-anchored-tree.md](evidence-anchored-tree.md) §3
 - [ ] `check-budget.ts` 是否 exitCode=0
 - [ ] `check-run-log.ts` 是否 exitCode=0
 - [ ] `check-maturity.ts` 是否 exitCode=0
@@ -61,7 +62,7 @@ DoD 是项目级跨阶段标准，不替代各阶段产物的验收标准（见�
 | 行为 | 运行时验证行为符合规格 | 手动或自动化验证关键路径，不得仅凭单测通过；阶段 1-4 须有 BDD features 作为可执行规格（`check-bdd-model.ts` 退出码 0） | 补运行时验证（curl / Postman / 浏览器 / k6），禁止「单测过即视为行为正确」；阶段 1-4 BDD features 缺失或不通过 `check-bdd-model.ts` 须补产出 |
 | 文档 | 涉及 API / 接口 / 数据模型的变更须同步更新文档 | `git diff` 包含相关 `docs/` 与 `templates/` 更新；RTM 字段同步 | 补文档更新，禁止「以代码为准」忽略文档 |
 | RTM | 需求 / 设计 / 代码 / 测试映射同步 | `.w-model/rtm.json` 字段无空缺；覆盖率不下降；BDD features 引用按 `<Type>-NNN \| BDD-L<level>-<system>-<num>.feature` 格式登记 | 补登记 RTM 字段，禁止「验收时再补」 |
-| 状态 | `Project.status` / `Requirement.status` 如实反映 | 字段值与磁盘产物一致；未完成不得标完成 | 修正 `status` 字段，禁止「乐观标记」 |
+| 状态 | `Project.status` / `Requirement.status` 如实反映；`graph.json` 节点的 `evidenceStatus` 如实反映验证状态 | 字段值与磁盘产物一致；未完成不得标完成；`evidenceStatus === 'pending'` 的节点数为 0（存在即阻断放行，须补验证转 `confirmed` 或走 `exemption` 第 6 类 `evidence-anchor-pending`） | 修正 `status` 字段，禁止「乐观标记」；`confirmed` 须与签名链对账（`check-requirement-graph.ts` R15e），不得把 pending 直接标 confirmed |
 | **理解证据** | 阶段门放行须有用户理解证据 | run-log `acknowledgedDecisions` 非空且含 ≥1 关键决策摘要（非"确认"/"同意"） | 拒绝放行；要求用户填入理解证据（O4 命中） |
 | **签名链完整性** | 每阶段每角色动作写入 `signature-chain.jsonl`；断裂视为 #32 命中 | `check-signature-chain.ts` R1-R10 全通过 | 补齐缺失角色签名与来源证明（详见下方「第七维度」节） |
 
@@ -95,6 +96,7 @@ DoD 是项目级跨阶段标准，不替代各阶段产物的验收标准（见�
 - [ ] `.w-model/rtm.json` 字段无空缺，覆盖率未下降；BDD features 引用按 `<Type>-NNN | BDD-L<level>-<system>-<num>.feature` 格式登记
 - [ ] `Project.status` / `Requirement.status` 与磁盘产物一致
 - [ ] 阶段门 CHECKPOINT 放行时，run-log `acknowledgedDecisions` 已填入 ≥1 关键决策摘要（非"确认"/"同意"）
+- [ ] 阶段门放行前 `graph.json` 中 `evidenceStatus === 'pending'` 的节点数已为 0（或已有 `evidence-anchor-pending` 豁免覆盖）
 - [ ] 无未提交的产物文件（`git status` 工作树干净，或显式说明未提交原因）
 - [ ] 未命中 [hard-constraints.md](hard-constraints.md)「反模式」节 48 条流程反模式（#1~#48）、[operation-behaviors.md](operation-behaviors.md) F1~F10 失败模式与 SSoT §4A.2a O1~O6 运维失败模式
 - [ ] L2+ 项目：阶段门放行后已审查 Loop 4 产出的 HarnessImprovementReport（若有）；appliedSignals/deferredSignals/rejectedSignals 已填入 applicationStatus

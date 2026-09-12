@@ -12,7 +12,10 @@ export const L0_BASELINE = {
   // Task 7：新增 references/code-health-governance.md 的 3 条同目录链接 +
   // SKILL/README/AGENTS/INSTALL/troubleshooting 各 1 条指向该文件的链接 +
   // command-reference/rtm-guide/coding-quality 等新节内的引用链接，violations 仍 0）。
-  relativeLinkCount: 662,
+  // 663 = 662 + 1（2026-09-12 gate-integrity Task 11：quick-self-check.md 的
+  // 「未验证证据锚点已清零」自检项新增 1 条指向 evidence-anchored-tree.md 的链接，
+  // 由 npm run audit:l0-links 实测 rebaseline，violations 仍 0）。
+  relativeLinkCount: 663,
   l1Only: 92,
   placeholders: 36,
 } as const;

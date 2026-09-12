@@ -2011,8 +2011,7 @@ const EXEMPTION_CASES: ExemptionCase[] = [
   {
     file: 'valid-evidence-anchor-pending.json',
     expectedPassed: true,
-    description:
-      '四维·豁免：第 6 类 evidence-anchor-pending（pending 锚点的阶段门合法出口），复用 E1-E9 四阶段审批链',
+    description: '四维·豁免：第 6 类 evidence-anchor-pending（pending 锚点的阶段门合法出口），复用 E1-E9 四阶段审批链',
   },
   // -------------------- 5 bad 样本（覆盖 E4-E8 各阶段失败） --------------------
   {
