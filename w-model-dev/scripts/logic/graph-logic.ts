@@ -54,8 +54,10 @@ export interface GraphNode {
   priority?: 'P0' | 'P1' | 'P2' | 'P3';
   /** 所属 REQ-group ID（level=1 REQ 自身为 group 无此字段；level≥2 须指向 level=1 祖先） */
   reqGroup?: string;
-  /** 节点结论的前提事实锚点（可选；格式见 conventions.md 列定位约定；由 A 子代理 ingestion 时声明） */
+  /** 节点结论的前提事实锚点（阶段 1-4 全节点必填；格式见 conventions.md 列定位约定；由 A 子代理 ingestion 时声明）。R15a-e 校验。 */
   evidenceAnchor?: string;
+  /** 证据状态（阶段 1-4 全节点必填）：confirmed=已核验（R15e 要求签名链存在引用本节点的 V review 环）；pending=基于逻辑推理尚未验证。 */
+  evidenceStatus?: 'confirmed' | 'pending';
 }
 
 export interface GraphEdge {
