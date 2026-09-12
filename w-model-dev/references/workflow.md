@@ -8,7 +8,8 @@
 
 - 总体流程与阶段对应
 - 阶段产物和切换判定
-- 阶段门与质量门
+- 阶段门评审（每个阶段统一）
+- 质量门（编码及之后阶段强制）
 - 回退路径和工作流反模式
 
 ## 总体流程图
@@ -118,7 +119,7 @@ S 产出后、V 评审前，强制插入三阶段R预防性审查（R3）：
 
 - 评审通过（`passed=true`，质量等级 A/B）后，O 展示证据并在 🔴 CHECKPOINT 等待用户放行；用户确认后才进入下一阶段并更新项目状态。
 - 评审不通过（`passed=false`，质量等级 C/D）时，普通 V/G 失败**必须经 `R 根因定位 → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`** 返工，禁止直接分派 S（反模式 #18）；阶段 1 ingestion 图谱失败仅走 A-chunk/A-cross→G 专用收敛。
-- 评审流程详见 [`verifier-spec.md`](verifier-spec.md) 与 SKILL.md「阶段门与质量门」节。
+- 评审流程详见 [`verifier-spec.md`](verifier-spec.md) 与本文件「阶段门评审（每个阶段统一）」节。
 
 **R3 预防性审查强制**：V 评审前须先完成 R3 三阶段审查（completeness/reliability/security），产出三份 PreventiveReport JSON。V 子代理须读取 R3 报告并将发现纳入 reworkHints。跳过 R3 直接进入 V 评审命中反模式 #33。G 子代理须跑 `check-preventive-review.ts` 校验三份报告完整性。
 
