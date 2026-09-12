@@ -6,14 +6,24 @@
  * with the real implementation while keeping the same injected shape and the same fail-closed rules.
  *
  * Authority and evidence rules:
+ *   - the campaign directory is CALLER-SUPPLIED: `ledger.json` / `candidate.json` / `approval.json` are read from
+ *     the `--campaign` directory named by the caller. This producer validates their INTERNAL consistency
+ *     (candidate/ledger/approval agreement, revision match, signature roles, redaction) but does not anchor them
+ *     to HEAD or to any tracked record; authenticating the campaign directory itself is the caller's / human's
+ *     responsibility. This differs from the Phase 3/4 tracked-ledger authority, whose working bytes must equal
+ *     the HEAD blob;
  *   - a verified candidate is archived only after the ledger record proves human approval, V review, a G gate,
- *     observed passing command evidence, an executable rollback, clean redaction, and a matching revision;
+ *     structurally validated command evidence, an executable rollback, clean redaction, and a matching revision;
+ *   - command evidence is SHAPE-CHECKED only: each command must be `observation === 'observed'`, `exitCode === 0`
+ *     (a numeric zero), carry a repository-relative `rawOutputPath` and a 64-hex `rawOutputSha256`. The raw output
+ *     file is NOT read and the digest is NOT recomputed by this boundary; byte-level verification of the raw
+ *     output is the upstream `EvidenceStore`'s responsibility;
  *   - `deferred` / `rejected` / `blocked` / `rolled-back` candidates may be archived as terminal NON-success
  *     evidence but are never reported as `archivedAsPassed`;
  *   - every declared source artifact is re-verified through the shared FileVerifier (regular, non-symlink,
  *     canonical containment) and copied with its true content hash; a prediction is never written as a result;
  *   - the package is written atomically (staging directory + rename + readback) and never overwrites an
- *     existing non-empty package;
+ *     existing non-empty package; the manifest digest is an unkeyed integrity checksum, not a signature;
  *   - `package-only` verification can never be described as source verified; only an explicit `sourceProject`
  *     performs a source-bound revision re-verification.
  */

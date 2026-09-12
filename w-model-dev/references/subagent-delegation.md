@@ -276,10 +276,10 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 ### 6.4 工具与元门禁脚本（门禁脚本权威登记表收尾）
 
-> 本小节补全非阶段门触发的工具类 CLI、code-health 门禁 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 43 个 .ts
-> 一一对应（26 个 check-* + 6 个 code-health 门禁 CLI + 11 个工具：ensure-codegraph-opsx 见 §5 / 其余见下表；其中 42 个为 exit-2 脚本，self-test.ts 为 exit 0/1 回归基线，与 conventions.md「= 42（26 个 check-* + 16 个工具 CLI，不含 self-test；16 = 6 个 code-health 门禁 CLI + 10 个工具 CLI）」口径互补）。
+> 本小节补全非阶段门触发的工具类 CLI、code-health 门禁 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 44 个 .ts
+> 一一对应（26 个 check-* + 7 个 code-health 门禁 CLI + 11 个工具：ensure-codegraph-opsx 见 §5 / 其余见下表；其中 43 个为 exit-2 脚本，self-test.ts 为 exit 0/1 回归基线，与 conventions.md「= 43（26 个 check-* + 17 个工具 CLI，不含 self-test；17 = 7 个 code-health 门禁 CLI + 10 个工具 CLI）」口径互补）。
 > **新增 / 改名门禁脚本时登记点为本表 + SKILL.md/AGENTS.md 计数句（由 checkScriptRegistry 与计数检查双向兜底）**——`check-docs-consistency.ts` 的 checkScriptRegistry
-> 核对全部 43 个 cli 脚本名均出现于本文件，SKILL.md「N 个 .ts」/ AGENTS.md「N 个脚本」/ conventions.md 计数句由计数检查同步核对（漏登记即门禁失败，pre-push 第 14 项拦截）。
+> 核对全部 44 个 cli 脚本名均出现于本文件，SKILL.md「N 个 .ts」/ AGENTS.md「N 个脚本」/ conventions.md 计数句由计数检查同步核对（漏登记即门禁失败，pre-push 第 14 项拦截）。
 
 | 脚本                          | 类别                     | 用途                                                                                                                                                                                                                                                                                             | 触发时机                                                                           |
 | ----------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |

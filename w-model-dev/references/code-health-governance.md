@@ -56,7 +56,7 @@ npx tsx w-model-dev/scripts/cli/code-health-archive.ts --campaign <dir> --output
 npx tsx w-model-dev/scripts/cli/code-health-archive.ts --verify <package-dir> [--source-project <dir>] [--manifest <file>]
 ```
 
-**归档权威规则**：`ledger.json` / `candidate.json` / `approval.json` 齐备且经 V/G 复审、G 门禁、observed passing 命令证据、可执行 rollback、clean redaction、revision 匹配的 verified 候选才能 `archivedAsPassed=true`；`deferred` / `rejected` / `blocked` / `rolled-back` 只可作为终态**非成功**证据归档，绝不报告为 passed。每个声明工件经共享 FileVerifier 重验（regular / non-symlink / canonical containment）并按真实内容哈希复制；package 原子写入（staging + rename + readback），不覆盖已存在的非空 package。归档仍需人类 approval，ARCHIVE 不代替 CHECKPOINT。
+**归档权威规则**：`ledger.json` / `candidate.json` / `approval.json` 从 **caller 通过 `--campaign` 指定的目录**读取，生产者校验三者**内部一致性**（candidate/ledger/approval 相互一致、revision 匹配、签名角色、脱敏），但**不**锚定 HEAD 或任何 tracked 记录——**campaign 目录本身的真实性由 caller / 人类负责**（与 Phase 3/4 的 HEAD-tracked ledger 权威不同；对照 §5 第 3 条）。`ledger.json` / `candidate.json` / `approval.json` 齐备且经 V/G 复审、G 门禁、observed + `exitCode=0` + 安全仓库相对 `rawOutputPath` + 64 位十六进制 `rawOutputSha256` 的命令证据、可执行 rollback、clean redaction、revision 匹配的 verified 候选才能 `archivedAsPassed=true`；该边界**不读取 raw 输出文件、不重算摘要**，raw 内容按字节验证属上游 `EvidenceStore` 职责；`deferred` / `rejected` / `blocked` / `rolled-back` 只可作为终态**非成功**证据归档，绝不报告为 passed。每个声明工件经共享 FileVerifier 重验（regular / non-symlink / canonical containment）并按真实内容哈希复制；package 原子写入（staging + rename + readback），不覆盖已存在的非空 package；manifest 摘要是**无密钥完整性校验和，不是签名**。归档仍需人类 approval，ARCHIVE 不代替 CHECKPOINT。`--verification-level` 可省略，缺省即 `package-only`。
 
 退出码统一为 `0 = 通过/正常`、`1 = 校验或 guard 失败（fail-closed）`、`2 = 输入错误`（`ERROR_JSON`，含 `ARG_INVALID`）。未知 flag / 重复值 flag / 缺值 / 缺必需参数一律 exit 2，且不写任何文件。
 
