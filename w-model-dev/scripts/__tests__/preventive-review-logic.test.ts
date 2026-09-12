@@ -244,3 +244,37 @@ describe('checkPreventiveReview: variant 选项（S-fix/emergency）', () => {
     expect(r.reasons).toHaveLength(0);
   });
 });
+
+describe('passed=false 的 R3 报告必须产生 violation', () => {
+  it('三份报告齐备但其一 passed=false → passed 应为 false 且 reasons 指名该维度', () => {
+    const reviews: Record<string, PreventiveReview | null> = {
+      completeness: {
+        reviewedAt: '2026-07-30T10:00:00Z',
+        reviewer: 'R3-completeness-bot',
+        phase: 3,
+        dimension: 'completeness',
+        findings: [],
+        passed: true,
+      },
+      reliability: {
+        reviewedAt: '2026-07-30T10:00:00Z',
+        reviewer: 'R3-reliability-bot',
+        phase: 3,
+        dimension: 'reliability',
+        findings: [{ severity: 'Required', description: 'x', evidence: 'y' }],
+        passed: false,
+      },
+      security: {
+        reviewedAt: '2026-07-30T10:00:00Z',
+        reviewer: 'R3-security-bot',
+        phase: 3,
+        dimension: 'security',
+        findings: [],
+        passed: true,
+      },
+    };
+    const out = checkPreventiveReview(reviews, 3);
+    expect(out.passed).toBe(false);
+    expect(out.reasons.some((r) => r.includes('reliability'))).toBe(true);
+  });
+});

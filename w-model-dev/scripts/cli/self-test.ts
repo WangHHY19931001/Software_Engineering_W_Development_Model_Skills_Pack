@@ -1422,6 +1422,12 @@ const PREVENTIVE_REVIEW_CASES: PreventiveReviewCase[] = [
     expectedReasonPatterns: [/evidence/],
     description: 'R3 报告缺失 evidence 字段（schema 校验失败 + 其他维度缺失）',
   },
+  {
+    file: 'bad-passed-false.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/passed=false/],
+    description: 'R3 报告 passed=false 须产生 violation（checker 须读取 passed）',
+  },
 ];
 
 // -------------------- Iceberg Sweep --------------------

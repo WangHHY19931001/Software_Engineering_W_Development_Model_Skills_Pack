@@ -1,0 +1,14 @@
+{
+  "reviewedAt": "2026-07-30T10:00:00Z",
+  "reviewer": "R3-security-bot",
+  "phase": 2,
+  "dimension": "security",
+  "findings": [
+    {
+      "severity": "Critical",
+      "description": "输入校验缺失，存在注入风险",
+      "evidence": "api/handlers/login.ts L42 直接将 req.body.username 拼入查询"
+    }
+  ],
+  "passed": false
+}

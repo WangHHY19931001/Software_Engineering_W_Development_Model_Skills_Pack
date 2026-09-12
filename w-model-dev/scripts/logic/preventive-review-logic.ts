@@ -43,7 +43,7 @@ const REQUIRED_DIMENSIONS = ['completeness', 'reliability', 'security'] as const
  * 校验 R3 三份报告完整性。
  * - 三份报告须全部存在
  * - 每份报告通过 schema 校验
- * - 每份报告 passed=true（或 passed=false 但 V 已纳入 reworkHints，此处只校验报告存在性和格式）
+ * - 每份报告 passed=true；passed=false 时本校验产生 violation（由 V 评审读取并纳入 reworkHints）
  *
  * `options.variant` 参数用于 CLI 层路径前缀推断；
  * 纯逻辑层校验对所有 S 变体一致（三份齐备 + schema + phase/dimension 一致）。
@@ -82,6 +82,13 @@ export function checkPreventiveReview(
     // dimension 一致性
     if (review.dimension !== dim) {
       reasons.push(`R3 报告 dimension 不匹配：文件名维度=${dim}，报告维度=${review.dimension}`);
+    }
+
+    if (review.passed === false) {
+      reasons.push(
+        `R3 报告声明未通过：${dim} 维度 passed=false（findings=${review.findings.length}）；` +
+          `V 评审须读取本报告并将发现纳入 reworkHints（反模式 #33）`,
+      );
     }
 
     reviewSummaries.push({
