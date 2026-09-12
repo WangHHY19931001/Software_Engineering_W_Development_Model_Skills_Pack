@@ -54,7 +54,7 @@ export interface GraphNode {
   priority?: 'P0' | 'P1' | 'P2' | 'P3';
   /** 所属 REQ-group ID（level=1 REQ 自身为 group 无此字段；level≥2 须指向 level=1 祖先） */
   reqGroup?: string;
-  /** 节点结论的前提事实锚点（阶段 1-4 全节点必填；格式见 conventions.md 列定位约定；由 A 子代理 ingestion 时声明）。R15a-e 校验。 */
+  /** 节点结论的前提事实锚点（阶段 1-4 全节点必填；格式见 conventions.md 列定位约定；由 A 子代理 ingestion 时声明）。R15a/b/c/e 校验（R15d 已决议不实现，见 evidence-anchored-tree.md §3）。 */
   evidenceAnchor?: string;
   /** 证据状态（阶段 1-4 全节点必填）：confirmed=已核验（R15e 要求签名链存在引用本节点的 V review 环）；pending=基于逻辑推理尚未验证。 */
   evidenceStatus?: 'confirmed' | 'pending';
@@ -245,7 +245,7 @@ const EVIDENCE_ANCHOR_PATTERN = /^(?:[\w/.-]+:§[\w.-]+|[\w/.-]+:L\d+(?:-\d+)?)=
 const VALID_EVIDENCE_STATUS: readonly string[] = ['confirmed', 'pending'];
 
 /**
- * R15a-e 证据锚点子项校验（纯函数，无 I/O）。
+ * R15a/b/c/e 证据锚点子项校验（纯函数，无 I/O）；R15d 已决议不实现，编号空缺是决议项。
  *
  * 独立于 schema 校验存在的原因：schema 的 `required` 会让缺锚点/缺状态一律报成
  * 笼统 `[schema] ... required`，子项名（R15a/R15b）将不可定位——而「拆五子项」的
@@ -366,8 +366,8 @@ export function checkRequirementGraph(
     return result;
   }
 
-  // === Schema 前置校验（含 R15a-e 锚点证据子项）===
-  // R15a-e 先于 schema 早退运行：schema 的 required 会把缺锚点报成笼统 [schema]，
+  // === Schema 前置校验（含 R15a/b/c/e 锚点证据子项）===
+  // R15a/b/c/e 先于 schema 早退运行：schema 的 required 会把缺锚点报成笼统 [schema]，
   // 子项名不可定位，拆分即失效。两层各自独立成立（见 checkEvidenceAnchors JSDoc）。
   const rawNodes = (graph as { nodes?: unknown }).nodes;
   const evidenceViolations = Array.isArray(rawNodes)
@@ -917,7 +917,7 @@ export function checkRequirementGraph(
     );
   }
 
-  // R15a-e: evidenceAnchor 必填 + evidenceStatus + 路径存在性 + 签名链对账
+  // R15a/b/c/e: evidenceAnchor 必填 + evidenceStatus + 路径存在性 + 签名链对账
   // 格式复用 verifier-logic EVIDENCE_PATTERN 语义（禁止定义第三套解析）。
   // 本块已提前至 schema 校验之前执行（见文件上方 checkEvidenceAnchors 调用），以确保
   // 子项名（R15a/R15b）在 schema 也失败时仍可定位——否则 schema 的 required 消息会把

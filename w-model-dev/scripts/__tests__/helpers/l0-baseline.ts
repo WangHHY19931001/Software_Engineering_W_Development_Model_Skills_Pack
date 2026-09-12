@@ -15,7 +15,11 @@ export const L0_BASELINE = {
   // 663 = 662 + 1（2026-09-12 gate-integrity Task 11：quick-self-check.md 的
   // 「未验证证据锚点已清零」自检项新增 1 条指向 evidence-anchored-tree.md 的链接，
   // 由 npm run audit:l0-links 实测 rebaseline，violations 仍 0）。
-  relativeLinkCount: 663,
+  // 665 = 663 + 2（2026-09-12 gate-integrity Task 12：verifier-spec.md 新增 §14 内的
+  // design-philosophy.md 链接 1 条 + signature-chain-guide.md 新增 §6.1 内的
+  // evidence-anchored-tree.md 链接 1 条；由 npm run audit:l0-links 实测 rebaseline，
+  // l1Only 仍 92、placeholders 仍 36、violations 仍 0）。
+  relativeLinkCount: 665,
   l1Only: 92,
   placeholders: 36,
 } as const;

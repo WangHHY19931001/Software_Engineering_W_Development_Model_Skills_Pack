@@ -111,6 +111,27 @@ G 角色在跑门禁脚本前，**先调用 `check-signature-chain.ts` 校验签
 
 R6 校验规则：对每条签名记录，用上述公式重算 sigHash，与记录中的 sigHash 比对；不一致即篡改。
 
+### 6.1 R15e：签名链作为 `evidenceStatus=confirmed` 的证据来源
+
+`check-requirement-graph.ts` 的 R15e 把签名链当作**外部证据源**消费：图谱节点标 `confirmed` 时，
+必须有签名链事实支撑，不得自报。判据（权威实现：`graph-logic.ts` `checkEvidenceAnchors`）——
+签名链中须存在**同时满足以下三条**的条目（同一环，缺一不可）：
+
+1. `role === 'V'` 且 `action === 'review'`；
+2. `artifacts` 数组**包含该节点 id**（即这个 V 评审审的就是这个节点）；
+3. 该条目的 `inputProvenance.sourceArtifacts[].path` **等于锚点的 path 部分**（`evidenceAnchor` 中 `:` 之前的那段）。
+
+即：V 评审不仅覆盖了该节点，且其来源被显式指向该锚点引用的事实——"评审过这个节点"与
+"核验过这个锚点"是两件事，R15e 要求两者同时成立。
+
+**为什么不读自身字段**：`evidenceStatus` 是产出者的声明，声明本身不能作为声明为真的证据
+（本战役的共同根因）。R15e 的整个意义就是把"已核验"从自报改为对账。
+
+**触发边界**：
+- 仅 `evidenceStatus === 'confirmed'` 触发；`pending` 不触发（pending 本来就是"尚未验证"，见 [evidence-anchored-tree.md](evidence-anchored-tree.md) §3 与 `exemption` 第 6 类）。
+- 仅在 CLI 注入签名链条目时校验。阶段 1 早期签名链文件可能尚不存在，此时**跳过**而非报错（规格 §5：不得误红）。
+- 锚点格式非法时跳过 R15e（path 部分不可信，避免二次噪声违规）。
+
 ## 7. 与反模式 #32 的对应关系
 
 反模式 #32（签名链断裂）检测信号：`check-signature-chain.ts` R1-R10 任一失败。详见 [`hard-constraints.md`](./hard-constraints.md) #32。

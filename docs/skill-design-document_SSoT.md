@@ -2132,6 +2132,98 @@ interface RunLogEntry {
 
 ---
 
+## 10L. 证据事实对账（门禁完整性战役）
+
+> 本节确立「形状合规 ≠ 实际正确」类缺陷的权威修复定义：**证据须来自上游产物，不得自报**。
+> 共同根因：门禁此前只校验产物的**形状**，因此同义重言式测试能通过四级测试、`newFindings: []` 能通过冰山检查、
+> `passed` 从未被读取、伪造的 `evidenceAnchor` 路径能通过格式正则。修复模式统一为**由上游产物提供分母/证据**。
+> 实现位置：[`w-model-dev/scripts/logic/`](../w-model-dev/scripts/logic/)（各 `*-logic.ts` 纯逻辑）+ 对应 `cli/*.ts`（读盘注入）。
+
+### 10L.1 证据锚点必填化与 `evidenceStatus`（权威定义）
+
+- **必填范围**：阶段 1-4 **全部** `graph.json` 节点必填 `evidenceAnchor` 与 `evidenceStatus`（`graph.schema.json` 强制）。
+- **`evidenceAnchor` 格式**：`path:§section=statement` 或 `path:L42=statement`（复用 `EVIDENCE_PATTERN` 语义，禁止第三套解析）。
+- **`evidenceStatus` 枚举**：`confirmed` = 已核验；`pending` = 基于逻辑推理尚未验证。**必填**，无默认值。
+- **语义**：两者如实反映验证状态；`pending` 是合法中间态而非缺陷，`confirmed` 必须有证据（见 §10L.2 的 R15e）。
+- 升级影响：存量 `graph.json` 须补锚点方可过门禁（**批量迁移是升级动作，不是可选清理**：可选锚点会让伪路径混入）。
+
+### 10L.2 R15 子项权威定义
+
+`check-requirement-graph.ts` 证据锚点子项，**在 schema 校验之前**独立运行——schema 的 `required` 会把缺锚点
+报成笼统 `[schema] ... required`，子项名将不可定位，而"拆子项"的全部意义就是失败可定位。两层各自独立成立。
+
+| 子项 | 判据 | 依赖 |
+| --- | --- | --- |
+| R15a | `evidenceAnchor` 缺失 / 空串 / 非字符串 | 无（纯逻辑） |
+| R15b | `evidenceStatus` 非法（缺失或不在枚举内） | 无（纯逻辑） |
+| R15c | 锚点 `path` 部分在磁盘不存在 | CLI 注入真实路径集合 |
+| R15e | `confirmed` 但签名链中无引用本节点的 V review 环 | CLI 注入 signature-chain 条目 |
+
+- **R15d 已决议不实现**：原设计意图为用 codegraph `--scope` 覆盖度对账锚点，但 `--scope` 的覆盖语义是
+  `ChangeScope.changedFiles` 上的集合成员判定，而 `check-codegraph-queries.ts` 被硬限制在 `--phase 5|6|7|8`
+  （`parsePhaseArg(process.argv, { min: 5, max: 8 })`）；阶段 1-4 按设计不产出 codegraph 查询，图谱节点又只存在于阶段 1-4，
+  两者定义域不相交，无可解析表达式。故 R15 落地为 **R15a/b/c/e**；**编号空缺是已决议项，不是遗漏**。
+- **外部依赖注入**：R15c/R15e 依赖真实文件系统与 `signature-chain.jsonl`，logic 层不做 I/O，
+  由 CLI 读盘后经 `externalEvidence` 注入（与 §10L.3 的 `viewSets` 同一约定）；未注入即**跳过**（不报错也不假红，
+  阶段早期产物/签名链尚不存在时不得误红）。
+- **R15e 契约**：须存在**同一**签名链条目同时满足 —— `role=V` 且 `action=review`；其 `artifacts` 含该节点 id；
+  其 `inputProvenance.sourceArtifacts[].path` 等于锚点 `path` 部分。"审过该节点"与"核验过该锚点"是两件事，二者须同时成立。
+
+### 10L.3 冰山扫掠分母对账（三视角平权）
+
+- **分母来源**：`newFindings: []` 此前即可通过，且 `sweptArtifacts` 允许空数组，导致「最省事的报告」与
+  「最彻底的报告」不可区分。分母（该扫多少）改由 checker 从**上游已放行产物实测**，不由 R 声明——
+  声明式分母只是把自证从"自报发现了什么"换成"自报该发现多少"。
+- **注入约定**：`check-iceberg-sweep.ts` 读盘后经 `externalEvidence.viewSets` 注入（与 §10L.2 的 R15c/R15e 同构）；
+  `iceberg-sweep-logic.ts` 保持纯函数。
+- **派生口径**：三份产物的**最窄公共命名空间** `SD-NNN / DD-NNN / INTF-NNN`——
+  graph 取节点 `id`、tla 取 `sdCoverage.coveredSdNodes`、rtm 取各行 `designDoc` 解析值；
+  阶段 5-8 的 `scope` 视角取 `change-scope.json` 的 `changedFiles`。**刻意不含 REQ/NFR/CON**（TLA 侧无此命名空间，混入制造结构性假阳性）。
+- **在场表**：`ICEBERG_VIEW_PRESENCE`（**代码常量，非文档**——写文档会与实现漂移，先例见 `subagent-delegation.md` 计数漂移）。
+  取值待端到端调测按各阶段实际产出物核定。
+- **三视角平权**：graph / TLA / RTM 等权，两两比对，任一差异即刻失败；**无主视角、不仲裁、不取并集后放行**
+  （取并集会把真实缺口洗成"已覆盖"）。
+- **三类失败信号**：R6 视角间差异（→ 普通 V/G 失败链由 R 定位）/ R7 视角缺席未在 `sweepCoverage.absentViews` 显式声明
+  （**禁止静默跳过**；产物缺失时**不合成空集合**，空集合会被当作"真的一致"放行）/ R8 零发现但收敛集合为空或 `sweptArtifacts` 未覆盖。
+- **schema 强化**：`sweepCoverage.sweptArtifacts` 加 `minItems: 1`；新增可选 `sweepCoverage.absentViews`。
+
+### 10L.4 三类评审偏移检测（权威定义）
+
+V 评审的失效不止"评错"，还包括"评审者漂移"：
+
+| 类型 | 判据 | 实现 | 处置 |
+| --- | --- | --- | --- |
+| 标准偏移 | 同一产物跨轮 review 的 `qualityLevel` 档差 ≥ 阈值（A>B>C>D） | `run-log-logic.ts` R9 | **走高成熟度 CHECKPOINT 交人裁定，不走 R** |
+| 校准偏移 | 子标准 `rawScores` 方差 < 下限**且非全等**（分布坍缩） | `verifier-logic.ts` R18 | 校准评审方法（重评 / 调阈值） |
+| 惰性偏移 | `summary` 空泛 / `evidence` 无具体引用 | 既有 R11 / R12 / O3 | 重评 |
+
+- **标准偏移不走 R 的理由**：此处不一致的是**评审者自身**，而 R 无法自查评审标准；须按人机分工线交人裁定。
+  这与"产物之间的客观差异"（→ R6，走 R）必须区分。
+- **R9 首次评审豁免**：仅一次评审无不一致可言；按产物聚合避免重复报。
+- **R18 与既有全等检测互补、不重复**：既有防漂移规则检 `max === min`（完全相等 = 复制填入作弊），
+  R18 检**非全等但方差极小**（打了分但无分辨力）；`max === min` 时 R18 跳过。
+- **阈值性质**：`REVIEW_LEVEL_SPREAD` / `RESOLUTION_FLOOR` / 最少数据点均为**代码常量、先行取值**，
+  待端到端调测校准；校准依据为仓库 fixture 实测重算（初版 `1e-4` 会命中 100% 合法产物，实测合法方差为 `6.67e-5`）。
+- **A-3f 校准集是**非门禁**：不参与阶段门放行、不产生 exitCode，是离线诊断工具；
+  不得当作可阻断流程的检查项，也不得因"未接入 CI"判定其失效。
+- **参数无需改动**：`k=5` / `temperature=4.0` / `repeatTimes≥3` 与方差坍缩正交，调整它们不会修复坍缩。
+
+### 10L.5 `exemption` 第 6 类：`evidence-anchor-pending`
+
+- **权威定义**：`graph.json` 中 `evidenceStatus=pending` 的节点在阶段门放行前的**合法出口**，
+  复用完整 E1-E9 审批链（S→R→V→人类四阶段、justification ≥20 字符、evidence 非空、时间戳时序），**不新增逻辑**。
+- **存在理由**：若无合法出口，pending 锚点要么使阶段门死锁，要么迫使产出者无证据地把状态改成 `confirmed`
+  （正是 R15e 要防的"自报"）。给出合法出口比堵死更安全。
+- **与 R15e 的分工**：`confirmed` 须有签名链证据（R15e）；尚未验证则如实标 `pending` 并走本类豁免，而非标 `confirmed`。
+
+### 10L.6 阶段门 pending 常态扫描
+
+`quick-self-check.md` DoD 自检含「未验证证据锚点已清零」项：阶段门放行前 `graph.json` 中
+`evidenceStatus === 'pending'` 的节点数须为 0。**常态触发、非返工触发**——pending 表示"还没做功课"，
+不是"产物有缺陷"，走 R 会把前者误判为后者；若补验证后发现结论站不住，那才触发返工链。
+
+---
+
 ## 10.10 系统层级树与多层图谱
 
 > 本节确立系统层级树 + 7 层图谱模型。

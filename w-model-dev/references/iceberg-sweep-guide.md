@@ -2,6 +2,7 @@
 
 > 本指南供 R-iceberg 子代理使用：以已发现/已修复问题为线索，对全阶段产物做多视角深挖扫掠，产出 IcebergSweepReport。
 > Schema：`schemas/iceberg-sweep.schema.json`；校验脚本：`scripts/cli/check-iceberg-sweep.ts`；反模式：#44。
+> **权威为实现**（`scripts/logic/iceberg-sweep-logic.ts`）：本文件与实现冲突时以实现为准；阈值与在场表均为代码常量，不在本文件复制数值。
 
 ## 1. 冰山理论在 W 模型的映射
 
@@ -12,7 +13,7 @@
 | 水面之上（1/8，已发现的问题） | V/G 标准评审命中的 reworkHint，或 S-fix 刚修复的缺陷 |
 | 水面之下（7/8，未发现的隐藏问题） | 同根因扩散到其他产物 / 同缺陷类出现在其他位置 / 修复引入的回归 / 相邻逻辑的同类隐患 |
 | 深度分析→修复→再分析循环 | R-iceberg 扫掠 → V 复审 → 标准 R 报告复审 / 根因门禁 / S-fix 后 R3×3 / 预防审查 / V / G / CHECKPOINT → 再次 R-iceberg 扫掠 |
-| 直到不能发现问题 | 一轮扫掠 `newFindings=[]` 即终止 |
+| 直到不能发现问题 | 一轮扫掠 `newFindings=[]` **且**三视角对账通过（分母已覆盖、视角无差异、无静默缺席）即终止——「零发现」单独不构成终止条件，见 §3 |
 
 **核心洞察**：V/G 通过仅证明"既定标准下无问题"，不证明"同类深挖下无问题"。冰山机制填补的是"通过后仍可能有未发现缺陷"的盲区。
 
@@ -154,7 +155,7 @@
 2. 提取每个 fixedPoint 的根因类别（从关联的 RootCauseReport）
 3. 对全阶段产物按三维度×六类别扫掠
 4. 去重（与 previousFindings 比对）
-5. 产出 IcebergSweepReport
+5. 产出 IcebergSweepReport（sweptArtifacts 须非空且覆盖三视角收敛集合，见 §8）
 ```
 
 ## 6. 产出契约与禁止事项
@@ -182,3 +183,56 @@
 | V | R3 后 | 按既定标准评审 | targetKind 对应评审标准 |
 | R | V/G 不通过后 | 定位已暴露问题的根因 | 单一问题根因链 |
 | R-iceberg | S-fix 后 + V/G 通过后 | 主动深挖隐藏问题 | 多视角全产物扫掠 |
+
+## 8. 三视角平权对账（分母校验）
+
+> **为什么需要**：在本次修复前，`newFindings=[]` 就能通过——「最省事的报告」与「最彻底的报告」不可区分，
+> 且 `sweptArtifacts` 允许空数组，零发现因此无法对账。分母（该扫多少）若由 R 自己声明，仍属自证，
+> 只是从"自报发现了什么"变成"自报该发现多少"。故分母改由 checker 从**上游已放行产物实测**。
+
+### 8.1 分母的来源：上游产物，不是报告字段
+
+`iceberg-sweep-logic.ts` 不做 I/O；CLI（`check-iceberg-sweep.ts`）读盘后经 `externalEvidence.viewSets`
+注入每个视角的「应扫集合」（与 `graph-logic.ts` 的 `GraphCheckExternalEvidence` 同一约定）。派生口径
+（`deriveViewSets`）取三份产物共有的**最窄设计 ID 命名空间** `SD-NNN / DD-NNN / INTF-NNN`：
+
+| 视角 | 集合来源 |
+|---|---|
+| graph | `graph.json` 各节点 `id` 中的设计 ID |
+| tla | `tla-manifest.json` 的 `sdCoverage.coveredSdNodes` |
+| rtm | `rtm.json` 各行 `designDoc` 解析出的设计 ID |
+| scope | 阶段 5-8 用 `change-scope.json` 的 `changedFiles`（变更范围视角，非 ID 命名空间） |
+
+刻意**不含** REQ/NFR/CON：需求命名空间只有 graph 与 rtm 视角有，混入会制造结构性差异（假阳性）。
+
+### 8.2 在场表是代码常量
+
+各阶段参与哪些视角由 `ICEBERG_VIEW_PRESENCE`（代码常量，非本文档）裁定——写进文档会与实现漂移
+（先例：`subagent-delegation.md` 的计数漂移）。**本文件不复制该表数值**；需要时读实现。
+
+### 8.3 三视角**平权**：无主分母、不取并集
+
+graph / TLA / RTM 三视角等权，两两比对，任一方向存在差异即刻失败。**不设主视角、不做仲裁、
+不取并集后放行**——取并集会把真实缺口洗成"已覆盖"，取交集会把噪声洗成"一致"。
+差异项会逐条列在 `reasons` 里（如 `graph↔tla 差异项：SD-002`）供 R 定位。
+
+### 8.4 三类失败信号
+
+| 信号 | 判据 | 含义 |
+|---|---|---|
+| R6 视角间存在未对账差异 | 两个在场视角的集合不相等 | 三份产物对"应扫集合"口径不一致 → 走普通 V/G 失败链由 R 定位 |
+| R7 视角缺席未显式声明 | 按在场表应在场、但注入面缺该键，且未记入 `sweepCoverage.absentViews` | **禁止静默跳过**。产物在盘但不派生、或产物缺失，都须显式声明缺席 |
+| R8 零发现但覆盖不足 | `newFindings=[]` 且（收敛集合为空 或 `sweptArtifacts` 未覆盖收敛集合） | 「零发现」无法证明扫掠真的发生 |
+
+**缺席不静默的理由**：`check-signature-chain.ts` R8 在找不到 `project.json` 时静默跳过，正是同一类陷阱——
+"检查没跑"和"检查通过"在输出上不可区分。产物不存在时**不合成空集合**：空集合会被当作"真的一致"从而放行。
+
+### 8.5 未注入注入面时的行为
+
+未注入 `viewSets`（纯逻辑层调用）时 R6/R7/R8 整块跳过，不误红——阶段早期上游产物尚未生成，
+此时报红是假阳性（规格 §5）。这是**跳过**而非**通过**：CLI 生产路径总会尝试读盘注入。
+
+### 8.6 报告字段要求
+
+- `sweepCoverage.sweptArtifacts`：**`minItems: 1`**，空数组使零发现不可对账，schema 直接拒绝。
+- `sweepCoverage.absentViews`：可选；本阶段确认不参与的视角须显式列入，否则 R7 触发。
