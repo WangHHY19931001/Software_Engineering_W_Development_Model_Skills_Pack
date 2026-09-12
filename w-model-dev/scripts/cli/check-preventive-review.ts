@@ -19,8 +19,8 @@
  *   --json                   机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）。默认与 --json 均在输出摘要前尝试写 gate log；写失败通过 gateLogWriteError 反映，不改变主 passed / exitCode
  *
  * 退出码：
- *   0  校验通过（各维度审查报告齐全且格式合规——存在性 + schema + phase/dimension 一致；报告内 passed 状态由 V 评审纳入 reworkHints）
- *   1  校验失败（reasons 列出具体原因，S 子代理须按原因返工后重跑）
+ *   0  校验通过（各维度审查报告齐全且格式合规——存在性 + schema + phase/dimension 一致，且无任何维度 passed=false）
+ *   1  校验失败（reasons 列出具体原因——含任一维度 passed=false；S 子代理须按原因返工后重跑）
  *   2  输入错误（参数非法 / 文件不存在 / JSON 解析失败，stderr 打印人类可读错误，stdout 输出 ERROR_JSON）
  *
  * 输出：

@@ -37,6 +37,6 @@
         }
       }
     },
-    "passed": { "description": "该维度审查是否通过（boolean；passed=false 时 findings 必须含 ≥1 条发现，schema 强制；三份报告 passed=true 或 passed=false 但 V 已纳入 reworkHints，check-preventive-review.ts 校验三份齐备 + phase/dimension 一致）", "type": "boolean" }
+    "passed": { "description": "该维度审查是否通过（boolean；passed=false 时 findings 必须含 ≥1 条发现，schema 强制）。passed=false 的维度由 check-preventive-review.ts 直接判为 violation（exit 1），之后由 V 评审读取该报告并将发现纳入 reworkHints——不是「仅校验存在性和格式」即放行", "type": "boolean" }
   }
 }
