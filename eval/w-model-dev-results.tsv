@@ -38,3 +38,4 @@ timestamp	commit	skill	old_score	new_score	status	dimension	note	eval_mode
 2026-09-07T09:48	9e755b4	w-model-dev	-	-	keep	触发边界/反例登记册	语料25→60;负向22条L1N;notContains守卫+coverageMatrix;activation-guide第41份reference	dry_run
 2026-09-07T14:17	8238e7f	w-model-dev	-	-	keep	触发边界快追	pre-push第18项eval;不启用行锚点10条;selfCheckMatrix负例×5;术语L1/L1N/L2归一	dry_run
 2026-09-07T18:04	140f795	w-model-dev	-	-	keep	门禁项数STALE扫描	docs-consistency 新增 gate-count-docs 白名单扫描（绑定 prePushCount=18），防 N→N+1 活体文档漏改；版本保持 42.2.1	dry_run
+2026-09-12T23:59	9608cca	w-model-dev	-	-	keep	门禁完整性与证据事实对账	A-1~A-3f 八项（形态合规但事实不正确）；A-3b 三视角平权对账+minItems；A-3c 锚点必填+evidenceStatus+pending 常态扫描+R15a/b/c/e；A-3d R9/R18 偏移检测；A-3f 校准集非门禁。实测纠两处设计错：RESOLUTION_FLOOR 1e-4→1e-6（1e-4 误报 122/137=89%）、ICEBERG_VIEW_PRESENCE 补 graph 于阶段 5-8（否则真盲区）。R15d 决议不实现。self-test 332/332；Vitest 1904 串行确定性全绿；prepush 18 项；破坏性验证十项实测	dry_run
