@@ -1,6 +1,6 @@
 # samples/ 覆盖矩阵
 
-> 本目录为 `self-test.ts`（262 条回归基线）与各 `check-*.ts` 门禁脚本的 fixture 样本集。
+> 本目录为 `self-test.ts`（332 条回归基线）与各 `check-*.ts` 门禁脚本的 fixture 样本集。
 > **每个 fixture 必须被 `w-model-dev/scripts/cli/self-test.ts` 用例数组引用**（`file` / `sampleDir` 字段），
 > 未登记的 fixture 不参与任何检查——由 `check-samples-coverage.ts` 门禁自动核对（新增样本后运行
 > `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts` 确认全绿）。

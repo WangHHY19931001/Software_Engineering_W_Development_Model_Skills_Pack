@@ -129,7 +129,8 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 ### 3.1 全 references 触发条件表（39 非 stub 文件，含 19 个 42.0.0 重定向 stub）
 
-> `references/` 目录共 59 份 .md（39 个非 stub 资源 + 19 个 42.0.0 重定向 stub，另含 quickstart.md 入门速查不入下表）。下表按「触发条件」组织，供编排者判断何时加载某文件。
+> `references/` 目录共 42 份 .md（无 stub——42.0.0 的合并已就地完成，不存在重定向文件）。下表按「触发条件」组织，供编排者判断何时加载某文件；**行的粒度是「主题」而非「文件」**：多份合并来源共用一个主题行（如 bdd 行含 BDD 建模 / 语法速查 / 模式示例 / 评审清单），故行数多于文件数。
+> 未列入下表的有 `quickstart.md`（入门速查）、`activation-guide.md`（触发边界与反例）与 `code-health-governance.md`（`/wm code-health` 操作参考），按各自场景直接加载；其余文件均有主题行。行内计数以本节为准（历史数字 `59/39/19` 系旧口径，已失效）。
 > 标注 **2 跳** 的文件不直接出现在 §3 各阶段 reference 列，需经其上游文件（如 hard-constraints / phase-N / subagent-delegation）间接引用才可达——编排者按需显式加载，勿遗漏。
 
 | 文件                     | 触发条件                                                                                                                                                    | 可达性 |

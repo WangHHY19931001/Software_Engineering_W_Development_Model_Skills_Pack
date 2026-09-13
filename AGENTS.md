@@ -75,7 +75,7 @@ Set-Location w-model-skill-pack; npm install; npm run self-test; npm run doctor
 npm install
 
 # 校验脚本（依赖 tsx runtime + ajv devDep，schema 校验由 logic 层自动调用）
-npm run self-test                           # 322 条样本回归基线，退出码 0/1
+npm run self-test                           # 332 条样本回归基线，退出码 0/1
 npm run audit:l0-links                       # L0/L1 链接边界审计，结构化退出码 0/1/2
 npm run check:verifier -- <output.json>     # Verifier 输出校验，退出码 0/1/2
 npm run check:gate -- [project-dir]         # 工件质量门，退出码 0/1/2
@@ -179,7 +179,7 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 | code-health-apply.ts                 | 人类批准后的最小可逆应用（`--mode dry-run\|patch\|commit`）；scope 外变更即拒；记录可执行 rollback（`git apply -R` + `git diff --exit-code`=0）                                                                                                                 | code-health 应用           | 0=提案/应用成功，1=fail-closed，2=输入错误           |
 | code-health-archive.ts               | campaign 证据归档 `produce`/`verify`（权威取自 caller 指定 `--campaign` 目录，内部一致性校验但目录本身真实性由 caller 负责；命令证据仅结构性校验，不读 raw 文件；`--verify` 无 `--source-project` 只能 package-only）                                            | code-health 归档           | 0=produced/verified，1=fail-closed 拒绝，2=输入错误  |
 | ensure-codegraph-opsx.ts             | codegraph + OpenSpec 依赖三层检测（L1 CLI / L2 MCP / L3 项目目录）+ 自动安装，full/quick/light 三模式                                                                                                                                                           | 5（初始化），6-8（复检）   | 0=ready/installed，1=有 CHECKPOINT 项，2=输入错误    |
-| self-test.ts                         | 回归基线（322 条样本）；Vitest 动态 facts/provenance 由同次受控运行提供                                                                                                                                                                                         | -                          | 0=通过，1=失败                                       |
+| self-test.ts                         | 回归基线（332 条样本）；Vitest 动态 facts/provenance 由同次受控运行提供                                                                                                                                                                                         | -                          | 0=通过，1=失败                                       |
 | wm-status.ts                         | 状态快照（当前阶段/进度/RTM 覆盖/四级测试/最近动作/下一步建议），只读                                                                                                                                                                                           | -                          | 0=通过，2=输入错误                                   |
 | metrics-report.ts                    | 流程度量报告（动作/角色/结果分布、返工、预算 burn rate、killSwitch 预警），只读                                                                                                                                                                                 | -                          | 0=通过，2=输入错误                                   |
 | security-scan.ts                     | eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免（`--regenerate` 重生成 baseline）                                                                                                                                                                    | -                          | 0=通过，1=新增发现，2=输入错误                       |

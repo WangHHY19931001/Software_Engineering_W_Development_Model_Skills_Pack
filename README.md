@@ -24,7 +24,7 @@ AI 助手写代码很容易「差不多就行」：跳段、凭感觉、说不�
 
 | 指标                               | 结果                  |
 | ---------------------------------- | --------------------- |
-| Self-test（322 条样本回归基线）    | ✅ 322/322            |
+| Self-test（332 条样本回归基线）    | ✅ 332/332            |
 | 门禁脚本单元测试（vitest）         | ✅ 以当前命令输出为准 |
 | TypeScript 类型检查（strict）      | ✅ 0 错误             |
 | 安全扫描（eslint-plugin-security） | ✅ baseline 一致      |
@@ -160,7 +160,7 @@ flowchart LR
 
 ```bash
 npm install                                   # 首次：安装 tsx / ajv / eslint-plugin-security 等
-npm run self-test                             # 322 条样本回归基线
+npm run self-test                             # 332 条样本回归基线
 npm run check:gate -- [项目目录]              # 工件质量门（退出码 0/1/2）
 npm run check:graph -- <graph.json> --phase=1 # 图谱结构门禁
 npm run check:tla -- <manifest.json>          # TLA+ 行为门禁
