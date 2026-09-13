@@ -1,25 +1,94 @@
-// Vitest 配置：仅扫描技能包门禁脚本单元测试。
+// Vitest 配置：仅扫描技能包门禁脚本单元测试，按「是否启动真实子进程」拆成两个 project。
 // 不依赖 vitest/config 的 defineConfig，纯对象导出避免 vitest 包未装时的 ERR_MODULE_NOT_FOUND。
 //
 // testTimeout 说明：部分测试用 execSync 启动 `npx tsx <script>` 子进程（CLI 集成测试）。
 // 在 WSL（Windows Subsystem for Linux）下访问 /mnt/d 挂载的 node_modules 冷启动较慢，
 // 单次子进程可能超过默认 5000ms 超时（Windows 原生无此问题）。调大上限不影响 Windows 表现。
 //
-// fileParallelism: false 说明：仓库中 25/80 个测试文件用 execSync/spawnSync 启动真实 CLI 子进程，
-// 并行执行时子进程互相竞争资源，导致偶发失败（`expected null to be N`：子进程未真正运行；
-// 或 `Test timed out in 30000ms`），且每次落在不同文件——同一命令同一代码两次运行失败数可差 10 倍
-// （实测 20 vs 2），量级跳动排除"断言写错"。已排除的修法：--maxWorkers=4 与 --testTimeout=120000 均仍失败；
-// 基线 72081e2（未含相关改动）同样复现，故非某次改动引入。串行（本配置）实测确定性通过。
-// 代价：带 coverage 的全量约 1090s（并行约 457s 但 exit 1）；pre-push 第 12 项因此项改动从
-// "偶发红需重跑"变为"确定性绿"。排障与实测记录见 docs/troubleshooting.md §1.7a 与
-// docs/changes/vitest-parallel-flakiness-finding.md。**不得为提速回退此开关**——回退即恢复抖动。
+// 为什么拆两个 project（背景：docs/changes/vitest-parallel-flakiness-finding.md）：
+//   仓库里 30 个测试文件会真实 execSync/spawnSync/runSync 启动 CLI 子进程。这些文件
+//   **彼此并行**时子进程互相竞争，出现 `expected null to be N`（子进程未真正运行）、
+//   STACK_TRACE_ERROR、30s 超时，且每次落在不同文件——同一命令同一代码两次运行失败数
+//   可差 10 倍（实测 20 vs 2），量级跳动排除"断言写错"；基线 72081e2 同样复现。
+//   --maxWorkers=4 与 --testTimeout=120000 均被实测否定，唯一有效解是子进程类文件互不重叠。
+//   故：cli-serial 项目 fileParallelism:false（子进程类串行，互不重叠），其余纯逻辑文件
+//   在 unit-parallel 项目保持并行以保速度。**新增会真实 spawn 子进程的测试文件必须登记进
+//   SUBPROCESS_TEST_FILES**（vitest-project-split.test.ts 会用源码证据强制此约定，
+//   漏登记即红灯）；反向地，不再 spawn 的文件也应从清单移除（该测试双向校验）。
+//   判定口径：真实 import node:child_process 或调用 runSync/execSync/spawnSync/execFile
+//   （后跟左括号）；vi.mock('node:child_process') 的文件（artifact-gate-assets、run-sync）
+//   子进程被替换为 mock、从不真实启动，**不算** spawn。
+
+const TEST_DIR = 'w-model-dev/scripts/__tests__';
+
+/**
+ * 会启动真实子进程的测试文件（相对 TEST_DIR）。
+ * 判定口径：源码含 `from 'node:child_process'` 或调用 `runSync(/execSync(/spawnSync(/execFile(`。
+ * 此清单是 **cli-serial 项目的成员名单 + unit-parallel 项目的排除名单**，两处由本常量派生，
+ * 不会漂移；清单本身的正确性由 vitest-project-split.test.ts 双向守护。
+ */
+export const SUBPROCESS_TEST_FILES: readonly string[] = [
+  'bdd-cli.test.ts',
+  'change-scope.test.ts',
+  'check-codegraph-queries.test.ts',
+  'check-openspec-archive.test.ts',
+  'check-opsx-artifacts.test.ts',
+  'check-samples-coverage.test.ts',
+  'cli-arg-unification.test.ts',
+  'cli-natural-exit.test.ts',
+  'code-health-cli.test.ts',
+  'code-health-duplicates.test.ts',
+  'code-health-evidence.test.ts',
+  'code-health-gap.test.ts',
+  'code-health-ledger.test.ts',
+  'code-health-phase1.test.ts',
+  'code-health-task1-integration.test.ts',
+  'code-health-tests.test.ts',
+  'coverage-logic.test.ts',
+  'docs-consistency-logic.test.ts',
+  'eval-runner.test.ts',
+  'evidence-export-logic.test.ts',
+  'evidence-provenance-logic.test.ts',
+  'gate-report.test.ts',
+  'l0-link-audit-cli.test.ts',
+  'metrics-report.test.ts',
+  'platform-deps-hook.test.ts',
+  'platform-deps-install.test.ts',
+  'project-read-validation.test.ts',
+  'verifier-logic.test.ts',
+  'wm-status.test.ts',
+  'wm-write.test.ts',
+];
+
+const subprocessGlobs = SUBPROCESS_TEST_FILES.map((f) => `${TEST_DIR}/${f}`);
+
 export default {
   test: {
-    include: ['w-model-dev/scripts/__tests__/**/*.test.ts'],
-    exclude: ['node_modules/**'],
-    testTimeout: 30000,
-    hookTimeout: 30000,
-    fileParallelism: false,
+    // 定义 projects 后，测试收集只发生在各 project 内；coverage / reporter 为仓库级全局配置。
+    projects: [
+      {
+        test: {
+          name: 'unit-parallel',
+          include: [`${TEST_DIR}/**/*.test.ts`],
+          exclude: ['node_modules/**', ...subprocessGlobs],
+          testTimeout: 30000,
+          hookTimeout: 30000,
+          // fileParallelism 缺省即 true：纯逻辑文件无子进程竞争，保持并行。
+        },
+      },
+      {
+        test: {
+          name: 'cli-serial',
+          include: [...subprocessGlobs],
+          exclude: ['node_modules/**'],
+          testTimeout: 30000,
+          hookTimeout: 30000,
+          // 子进程类文件串行：同一时刻至多一个文件在 spawn CLI 子进程，
+          // 消除子进程互抢导致的偶发失败（见文件头说明）。不要为提速改回 true。
+          fileParallelism: false,
+        },
+      },
+    ],
   },
   // 覆盖率门禁：仅统计门禁核心实现（logic/ + lib/），不包括 CLI 入口与 __tests__。
   // include 与 test.include 一样相对仓库根解析（cwd=仓库根）。

@@ -48,8 +48,9 @@
 
 ## 建议（**短期项已于 2026-09-12 实施**）
 
-1. **短期（已实施）**：`config/vitest.config.ts` 的 `test` 内已设 `fileParallelism: false`。实施后复验两次：门禁原命令（`vitest run --coverage`，无附加 flag）分别 1059s / 1035s，均 exit 0、1904/1904 全绿；串行化连带两处配套校准——`check-docs-consistency.ts` `VITEST_SPAWN_TIMEOUT_MS` 600s→1800s（套件 975~1060s 会撞 600s 上限被误杀），`lib/run-sync.ts` manifest 两处行号锚 +2 顺延（run-sync.test.ts 行级断言抓住，属真实失败非抖动）。最终整链验证：`npm run prepush` 18 项全绿 exit 0（1055s）。**不得为提速回退此开关**——回退即恢复抖动；如需提速，正确方向是第 2 条的按需拆分。
-2. **中期（未实施，可选）**：把子进程类用例集中到独立 project，单独串行跑，其余保持并行以保速度。
+1. **短期（已实施，后被中期方案取代）**：`config/vitest.config.ts` 的 `test` 内曾设全局 `fileParallelism: false`。复验两次均 exit 0、1904/1904 全绿；连带两处配套校准——`check-docs-consistency.ts` `VITEST_SPAWN_TIMEOUT_MS` 600s→1800s（套件 975~1060s 会撞 600s 上限被误杀），`lib/run-sync.ts` manifest 两处行号锚 +2 顺延（run-sync.test.ts 行级断言抓住，属真实失败非抖动）。最终整链验证：`npm run prepush` 18 项全绿 exit 0（1055s）。
+2. **中期（2026-09-12 已实施，取代短期项的全局串行）**：配置改为 `test.projects` 双 project——`cli-serial`（30 个真实启动子进程的测试文件，`fileParallelism: false`）+ `unit-parallel`（其余纯逻辑文件，保持并行）。成员清单 `SUBPROCESS_TEST_FILES` 由新增的 `vitest-project-split.test.ts` **双向守护**（真实 spawn 未登记 / 无证据残留 / 文件不存在均红灯；判定口径排除三类已知误报：vi.mock 替换 child_process 的 artifact-gate-assets 与 run-sync、仅类型导入的 dependency-boundaries、注释与正则里的词）。拆分后全量无 coverage 974s / 1908 tests（80 原有 + 4 守护）exit 0。
+   **诚实的收益边界**：全量墙钟几乎不变（974s vs 全串行 975s）——子进程文件的执行时间本身占大头，串行集合再小也省不动；拆分的实际收益是**结构性的**：① 并行/串行集合显式化并由守护测试锁定，未来新增测试不会静默落入错误的一侧；② 纯逻辑文件的迭代回归（51 文件）恢复并行，只跑这一侧时明显更快；③ 澄清了"真正提速要把子进程测试本身做轻（减少真实 spawn 次数），而非调并发结构"。
 3. **不建议**：放宽断言、重试掩盖、或把 stale artifact 豁免掉——抖动是环境暴露的真实现象，掩盖会同时掩盖真失败。
 
 ## 边界声明
