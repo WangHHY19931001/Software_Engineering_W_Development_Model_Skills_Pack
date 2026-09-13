@@ -43,7 +43,7 @@
 | `uat-path-mapping`   | check-artifact-gate（B4/B5）                                                       | UAT_PATH_MAPPING_CASES（5，sampleDir 形态）                                                                      | uat-path-mapping.md 解析与回填校验                                                                                                                                                                                                                                                                                                                                                             | 嵌套 `docs/uat-path-mapping.md`                                                         |
 | `verifier-calibration` | **无（非门禁）**                                                                 | **无（非门禁，不登记 self-test）**                                                                               | Verifier 校准集（非门禁，人工标注正解）：带 `expectedVerdict`/`expectedRationale` 的锚定样本，用于离线诊断 V 的校准偏移（R18 分辨力下限）与标准偏移（R9 跨轮次不一致）。**无脚本读取，不阻断任何流程**——锚定正解由人标注且校准需真实跑 LLM，不符合「确定性门禁」定义；升级为门禁须走独立决策（见该目录 README 首段）                                                                                | 平铺 JSON（VerifierOutput 形态 + run-log 条目形态）                                     |
 
-合计 321 条用例 + 1 条 metadata 用例 = **322 条**（`self-test.ts` 基线）。用例数与「对应 check 脚本」列的数组条数不一致时以 self-test.ts 为准（数组条目数 = 实际执行数）。
+**总计 332 条用例**（实测 `npm run self-test`，以 self-test.ts 为准）。上表的 `..._CASES（N）` 为各区域数组条目数（合计 300），与总数相差 **32 条**是元数据校验用例（`metadataResults`，self-test.ts 末尾与各 `_CASES` 一并汇总，校验 SKILL.md 版本与 skill-metadata.json 一致等），**不属于任何样本目录**，故本表不列。逐行相加小于总数属正常，勿据此"修正"单行数字。用例数与「对应 check 脚本」列的数组条数不一致时以 self-test.ts 为准（数组条目数 = 实际执行数）。
 
 ## 排除项
 
