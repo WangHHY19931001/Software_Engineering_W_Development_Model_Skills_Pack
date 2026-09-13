@@ -23,7 +23,9 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
+
 import { SUBPROCESS_TEST_FILES } from '../../../config/vitest.config.js';
 
 // 本文件位于 __tests__/ 下，dirname 即测试目录（与 run-sync.test.ts 同一 fileURLToPath 模式）
