@@ -89,6 +89,21 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 
 **处置**：动态侧先按 CLI 提示重跑（`npm run prepush` 会先跑 vitest 再以同次 JSON + provenance 调 docs-consistency；手动验证用 `npx vitest run --reporter=json --outputFile=...` + 环境变量 `WM_VITEST_COUNT_FILE` / `WM_VITEST_PROVENANCE_FILE` / `WM_VITEST_PROVENANCE_ROOT` 传入同次受控运行），确认全部用例通过（用例数以当前命令输出为准）且 provenance 指向当前 HEAD 后重跑；若为负载敏感瞬时失败（读取数 < 全量）须隔离重跑，不得把失败 provenance 写成通过。静态侧按 violations 文本同步文档声明（新增 schema 文件须同步 `data-models.md`「Schema 清单」与 README/AGENTS/CONTRIBUTING/INSTALL 的 schema 计数表述）。
 
+### 1.7a pre-push 第 12 项 vitest 偶发 exit 1（并行下子进程测试抖动）
+
+**现象**：`npm run prepush` 第 12 项「vitest 单元测试 + coverage 阈值通过」exit 1，失败数为 1~2 条（极端时可达 20 条），且**每次落在不同文件**；失败形态为 `AssertionError: expected null to be 1`（子进程退出码读到 `null`，即子进程未真正运行）、`Error: STACK_TRACE_ERROR` 或 `Test timed out in 30000ms`。命中的都是 `execSync` / `spawnSync` 启动真实 CLI 子进程的测试文件（`cli-natural-exit` / `gate-report` / `evidence-export-logic` / `evidence-provenance-logic` / `bdd-cli` / `wm-write` / `platform-deps-*` 等 25 个）。
+
+**原因**：**并发资源竞争，非代码缺陷**。同一命令、同一代码两次运行的失败数可相差 10 倍（实测 20 失败 vs 2 失败），失败集合互不相同——若为断言写错则会稳定复现，量级跳动只能归因于子进程并发。已排除：机器负载（`nproc=16`、CPU 11% 时同样复现）、timeout 过小（`--testTimeout=120000` 仍失败）、worker 数过多（`--maxWorkers=4` 仍失败）、本仓库某次改动引入（**基线 `72081e2` 同样复现**）。
+
+**处置**：
+
+1. **确认是否真失败**：先隔离重跑可疑文件（`npx vitest run --config config/vitest.config.ts <file>`，应全绿），再串行全量 `npx vitest run --no-file-parallelism --coverage --config config/vitest.config.ts`（实测确定性 1904/1904 全绿）。
+2. **不得**放宽断言、加重试掩盖或改写 coverage 阈值——抖动是环境暴露的真实现象，掩盖会同时掩盖真失败。
+3. **代价对照（实测）**：并行 457s / exit 1；串行 1090s / exit 0。若接受约 2.4× 时长，可在 `config/vitest.config.ts` 的 `test` 内加 `fileParallelism: false` 使门禁确定性通过；否则保留现状，失败时按第 1 步复测。
+4. 同一原因也会使 `check-docs-consistency` 的 standalone 自采集路径 fail-closed（它自 spawn 并行 vitest）：此时 `staticViolationCount` 恒为 0，即**文档侧无违规**，按 [1.7](#17-docs-consistency-报动态测量缺失--provenance-不可信) 处置即可。
+
+详见 `docs/changes/vitest-parallel-flakiness-finding.md`（含七组对照实测记录）。
+
 ### 1.7b pre-push 未跑门禁或误放行（stdin ref 判定）
 
 **现象**：`git push` 未输出 `[pre-push]` 门禁日志（但钩子已启用），或提示「本次推送仅删除远端 ref」「无法证明变更范围」。
