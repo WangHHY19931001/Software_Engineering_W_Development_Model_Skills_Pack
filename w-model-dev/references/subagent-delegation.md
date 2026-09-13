@@ -127,7 +127,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 > O / 全角色通用加载：hard-constraints（14 条硬约束完整版，执行前必读）/ operation-behaviors（八条操作行为 + F1-F10）/ quick-self-check（推进前自检清单）/ design-philosophy（五条设计哲学）/ operational-recovery「成熟度与行为门禁」节（约束 #13 强制级别判定）/ estimation-guide（工期/预算估算时）/ context-management-guide（长会话上下文管理时）。
 
-### 3.1 全 references 触发条件表（39 非 stub 文件，含 19 个 42.0.0 重定向 stub）
+### 3.1 全 references 触发条件表（42 份 .md，无 stub；行按主题组织）
 
 > `references/` 目录共 42 份 .md（无 stub——42.0.0 的合并已就地完成，不存在重定向文件）。下表按「触发条件」组织，供编排者判断何时加载某文件；**行的粒度是「主题」而非「文件」**：多份合并来源共用一个主题行（如 bdd 行含 BDD 建模 / 语法速查 / 模式示例 / 评审清单），故行数多于文件数。
 > 未列入下表的有 `quickstart.md`（入门速查）、`activation-guide.md`（触发边界与反例）与 `code-health-governance.md`（`/wm code-health` 操作参考），按各自场景直接加载；其余文件均有主题行。行内计数以本节为准（历史数字 `59/39/19` 系旧口径，已失效）。
