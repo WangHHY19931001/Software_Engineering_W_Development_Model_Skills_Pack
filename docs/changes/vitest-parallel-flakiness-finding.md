@@ -47,10 +47,10 @@
 - 本 campaign 全量验证期间该现象多次出现，均经"单文件隔离 → 全量串行"两次复测确认非真实失败。
 
 
-## 建议（未在本次实施）
+## 建议（**短期项已于 2026-09-12 实施**）
 
-1. **短期**：`config/vitest.config.ts` 增加 `fileParallelism: false`（或对子进程密集目录设 `poolOptions` 限并发），把"偶发红"变为确定性绿——证据 3/5 已证明该路径全绿。
-2. **中期**：把子进程类用例集中到独立 project，单独串行跑，其余保持并行以保速度。
+1. **短期（已实施）**：`config/vitest.config.ts` 的 `test` 内已设 `fileParallelism: false`。实施后复验两次：门禁原命令（`vitest run --coverage`，无附加 flag）分别 1059s / 1035s，均 exit 0、1904/1904 全绿；串行化连带两处配套校准——`check-docs-consistency.ts` `VITEST_SPAWN_TIMEOUT_MS` 600s→1800s（套件 975~1060s 会撞 600s 上限被误杀），`lib/run-sync.ts` manifest 两处行号锚 +2 顺延（run-sync.test.ts 行级断言抓住，属真实失败非抖动）。最终整链验证：`npm run prepush` 18 项全绿 exit 0（1055s）。**不得为提速回退此开关**——回退即恢复抖动；如需提速，正确方向是第 2 条的按需拆分。
+2. **中期（未实施，可选）**：把子进程类用例集中到独立 project，单独串行跑，其余保持并行以保速度。
 3. **不建议**：放宽断言、重试掩盖、或把 stale artifact 豁免掉——抖动是环境暴露的真实现象，掩盖会同时掩盖真失败。
 
 ## 边界声明

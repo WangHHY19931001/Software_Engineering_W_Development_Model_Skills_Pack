@@ -597,10 +597,12 @@ function readVitestCountFile(root: string): VitestMeasurements | null {
 
 /**
  * Vitest standalone 自采集的 spawn 墙钟上限（毫秒）。随套件规模调整；快路径（WM_VITEST_COUNT_FILE）不受影响。
- * 当前 600s：全量套件实测墙钟约 302s（1600 用例规模），取约一倍余量，避免健康仓库在
- * standalone 自采集时因超时被误判 fail-closed；pre-push/probe 仍走 WM_VITEST_COUNT_FILE 快路径。
+ * 当前 1800s：`fileParallelism: false`（config/vitest.config.ts，消除子进程测试并行抖动）后，
+ * 全量套件实测墙钟约 975~1060s（1904 用例），取约 1.7 倍余量，避免健康仓库在
+ * standalone 自采集时因超时被误判 fail-closed（600s 时代实测：spawn 被杀 → JSON 未落盘 → 双 -1）。
+ * pre-push/probe 仍走 WM_VITEST_COUNT_FILE 快路径，不受此常量影响。
  */
-const VITEST_SPAWN_TIMEOUT_MS = 600_000;
+const VITEST_SPAWN_TIMEOUT_MS = 1_800_000;
 
 /**
  * 采集 Vitest 完整运行事实包（堵住只查文件数或用例总数的盲区）。

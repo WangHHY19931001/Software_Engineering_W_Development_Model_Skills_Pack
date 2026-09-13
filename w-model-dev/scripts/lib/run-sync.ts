@@ -63,20 +63,20 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 630,
+    line: 632,
     symbol: 'collectVitestMeasurements',
     reason:
-      'B3 migrated direct Node Vitest execution through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (600 s) timeout.（行号 2026-09-06 audit-fixes task 9 随 VITEST_SPAWN_TIMEOUT_MS 常量提取下移 7 行）',
+      'B3 migrated direct Node Vitest execution through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (1800 s) timeout.（行号 2026-09-06 audit-fixes task 9 随 VITEST_SPAWN_TIMEOUT_MS 常量提取下移 7 行；2026-09-14 fileParallelism 抖动处置随该常量注释扩充再下移 2 行，600s→1800s 同步改值）',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 636,
+    line: 638,
     symbol: 'collectVitestMeasurements',
     reason:
-      'B3 migrated the shell Vitest fallback through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (600 s) timeout.（行号 2026-09-06 audit-fixes task 9 同上顺延）',
+      'B3 migrated the shell Vitest fallback through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (1800 s) timeout.（行号 2026-09-06 audit-fixes task 9 同上顺延；2026-09-14 同上再下移 2 行）',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
