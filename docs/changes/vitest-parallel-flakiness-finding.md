@@ -12,25 +12,25 @@
 
 命中的文件（每次随机其一或其二，均以 `execSync`/`spawnSync` 启动 `npx tsx <cli>` 子进程）：
 
-| 文件                                          | 直接原因                          |
-| --------------------------------------------- | --------------------------------- |
-| `cli-natural-exit.test.ts`                    | 真机 CLI 子进程退出码断言          |
-| `gate-report.test.ts`                         | `check-*` CLI 子进程冒烟           |
-| `evidence-export-logic.test.ts`               | 真实 CLI 导出/校验子进程           |
-| `evidence-provenance-logic.test.ts`           | 真实 CLI provenance 子进程         |
-| `wm-write.test.ts` / `platform-deps-install.test.ts` | 真实 CLI 子进程退出契约      |
+| 文件                                                 | 直接原因                   |
+| ---------------------------------------------------- | -------------------------- |
+| `cli-natural-exit.test.ts`                           | 真机 CLI 子进程退出码断言  |
+| `gate-report.test.ts`                                | `check-*` CLI 子进程冒烟   |
+| `evidence-export-logic.test.ts`                      | 真实 CLI 导出/校验子进程   |
+| `evidence-provenance-logic.test.ts`                  | 真实 CLI provenance 子进程 |
+| `wm-write.test.ts` / `platform-deps-install.test.ts` | 真实 CLI 子进程退出契约    |
 
 ## 证据（七组对照，均由实测得出）
 
-| # | 环境                                    | 结果                                              |
-| - | --------------------------------------- | ------------------------------------------------- |
-| 1 | **基线 `72081e2`**（未含本 campaign 任何改动），并行 + 无 coverage | **1 个失败**（`gate-report.test.ts` → `STACK_TRACE_ERROR`） |
-| 2 | 本 campaign worktree，并行 + 无 coverage | 偶发 1-2 个失败，落点每次不同                     |
-| 3 | 本 campaign worktree，**串行**（`--no-file-parallelism`）+ 无 coverage | **1904 / 1904 通过，success=true** |
-| 4 | 本 campaign worktree，并行 + `--coverage`（第 1 次） | **20 个失败**（含 `bdd-cli.test.ts` 的 D5 evidence 用例） |
-| 5 | 本 campaign worktree，并行 + `--coverage`（第 2 次，**同一命令、同一代码**） | **2 个失败**                                       |
-| 6 | 本 campaign worktree，**串行 + `--coverage`** | **1904 / 1904 通过，success=true** |
-| 7 | 本 campaign worktree，串行（复测确认）  | 再次 1904 / 1904 通过                              |
+| #   | 环境                                                                         | 结果                                                        |
+| --- | ---------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| 1   | **基线 `72081e2`**（未含本 campaign 任何改动），并行 + 无 coverage           | **1 个失败**（`gate-report.test.ts` → `STACK_TRACE_ERROR`） |
+| 2   | 本 campaign worktree，并行 + 无 coverage                                     | 偶发 1-2 个失败，落点每次不同                               |
+| 3   | 本 campaign worktree，**串行**（`--no-file-parallelism`）+ 无 coverage       | **1904 / 1904 通过，success=true**                          |
+| 4   | 本 campaign worktree，并行 + `--coverage`（第 1 次）                         | **20 个失败**（含 `bdd-cli.test.ts` 的 D5 evidence 用例）   |
+| 5   | 本 campaign worktree，并行 + `--coverage`（第 2 次，**同一命令、同一代码**） | **2 个失败**                                                |
+| 6   | 本 campaign worktree，**串行 + `--coverage`**                                | **1904 / 1904 通过，success=true**                          |
+| 7   | 本 campaign worktree，串行（复测确认）                                       | 再次 1904 / 1904 通过                                       |
 
 **结论**：与改动内容无关，与**并行度**和 **coverage 插桩开销**共同相关。两条决定性证据：
 
@@ -45,7 +45,6 @@
 - `npm run prepush` 第 12 项（`vitest run --coverage`）会因此偶发 exit 1，**阻断推送但非真实回归**。
 - `check-docs-consistency` 的 standalone 自采集路径（无 `WM_VITEST_COUNT_FILE`）同样会 spawn 并行 vitest，故也会读到含失败的 artifact 而 fail-closed。本轮实测该路径连续 3 次均因该原因 exit 1，而 `staticViolationCount` 恒为 0——**文档侧无一违规**。
 - 本 campaign 全量验证期间该现象多次出现，均经"单文件隔离 → 全量串行"两次复测确认非真实失败。
-
 
 ## 建议（**短期项已于 2026-09-12 实施**）
 
