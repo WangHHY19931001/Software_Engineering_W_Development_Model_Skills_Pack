@@ -4,12 +4,12 @@
 
 ## 与 samples/tla/ 的区别
 
-| 维度 | `samples/tla/` | `samples/tla-e2e/`（本目录） |
-|------|----------------|-------------------------------|
-| 用途 | 纯逻辑回归基线（self-test.ts 驱动） | 端到端工具链验证（手动 / CI 驱动） |
-| 依赖 | 无（仅 JSON + checkTlaModel 纯逻辑） | Java 11+ + tla2tools.jar |
+| 维度     | `samples/tla/`                         | `samples/tla-e2e/`（本目录）                     |
+| -------- | -------------------------------------- | ------------------------------------------------ |
+| 用途     | 纯逻辑回归基线（self-test.ts 驱动）    | 端到端工具链验证（手动 / CI 驱动）               |
+| 依赖     | 无（仅 JSON + checkTlaModel 纯逻辑）   | Java 11+ + tla2tools.jar                         |
 | 校验内容 | manifest 结构 + 层次 + 拆解 + 声明标志 | 上述 + 实际 SANY 语法 + TLC 死锁/不变式/状态爆炸 |
-| 触发方式 | `npm run self-test`（自动） | `npx tsx check-tla-model.ts <manifest>`（手动） |
+| 触发方式 | `npm run self-test`（自动）            | `npx tsx check-tla-model.ts <manifest>`（手动）  |
 
 ## 前置条件
 
@@ -21,12 +21,12 @@
 
 本目录覆盖 4 个场景，每个场景含 `.tla`（规格）+ `.cfg`（TLC 配置）+ `tla-manifest-*.json`（校验清单）：
 
-| 场景 | .tla | .cfg | manifest | 期望结果 |
-|------|------|------|----------|----------|
-| 正常通过 | Counter.tla | Counter.cfg | tla-manifest-counter-pass.json | ✓ SANY 通过 + TLC 零违反 |
-| 死锁 | DeadlockDemo.tla | DeadlockDemo.cfg | tla-manifest-deadlock-fail.json | ✗ TLC 检出死锁 |
-| 不变式违反 | InvViolation.tla | InvViolation.cfg | tla-manifest-invviolation-fail.json | ✗ TLC 检出 Inv 不变式违反 |
-| 语法错误 | SyntaxError.tla | SyntaxError.cfg | tla-manifest-syntax-error-fail.json | ✗ SANY 语法检查失败（TLC 不执行） |
+| 场景       | .tla             | .cfg             | manifest                            | 期望结果                          |
+| ---------- | ---------------- | ---------------- | ----------------------------------- | --------------------------------- |
+| 正常通过   | Counter.tla      | Counter.cfg      | tla-manifest-counter-pass.json      | ✓ SANY 通过 + TLC 零违反          |
+| 死锁       | DeadlockDemo.tla | DeadlockDemo.cfg | tla-manifest-deadlock-fail.json     | ✗ TLC 检出死锁                    |
+| 不变式违反 | InvViolation.tla | InvViolation.cfg | tla-manifest-invviolation-fail.json | ✗ TLC 检出 Inv 不变式违反         |
+| 语法错误   | SyntaxError.tla  | SyntaxError.cfg  | tla-manifest-syntax-error-fail.json | ✗ SANY 语法检查失败（TLC 不执行） |
 
 ### 场景说明
 
@@ -58,11 +58,11 @@ npx tsx ../../cli/check-tla-model.ts tla-manifest-syntax-error-fail.json
 
 ## 退出码约定
 
-| 退出码 | 含义 |
-|--------|------|
-| 0 | 校验通过（环境就绪 + 头部一致 + 层次一致 + 拆解合规 + SANY 通过 + TLC 零违反） |
-| 1 | 校验失败（violations 列出具体原因） |
-| 2 | 输入错误（文件不存在 / 非法 JSON / 参数非法） |
+| 退出码 | 含义                                                                           |
+| ------ | ------------------------------------------------------------------------------ |
+| 0      | 校验通过（环境就绪 + 头部一致 + 层次一致 + 拆解合规 + SANY 通过 + TLC 零违反） |
+| 1      | 校验失败（violations 列出具体原因）                                            |
+| 2      | 输入错误（文件不存在 / 非法 JSON / 参数非法）                                  |
 
 ## .tla 文件头注解
 
