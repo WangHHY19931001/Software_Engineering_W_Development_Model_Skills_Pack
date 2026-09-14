@@ -20,7 +20,7 @@
  * 边界：本测试只读仓库工作树、只在本测试进程拥有的 os.tmpdir() 临时目录里造探针 fixture，
  * 绝不写 .w-model/；断言失败即真实缺陷（门禁在失败路径上留下了半成品），不得放宽。
  */
-import { execFile, execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
@@ -39,6 +39,8 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { runSync } from '../lib/run-sync.js';
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(TEST_DIR, '..', '..', '..');
@@ -143,17 +145,26 @@ function takeSnapshot(): RepoSnapshot {
   const sortedPaths = Object.fromEntries([...pathEntries.entries()].sort(([a], [b]) => a.localeCompare(b)));
   return {
     paths: sortedPaths,
-    gitStatus: execFileSync('git', ['status', '--porcelain'], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-      maxBuffer: 64 * 1024 * 1024,
-    }),
-    gitDiffNames: execFileSync('git', ['diff', '--name-only'], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-      maxBuffer: 64 * 1024 * 1024,
-    }),
+    gitStatus: runGit(['status', '--porcelain']),
+    gitDiffNames: runGit(['diff', '--name-only']),
   };
+}
+
+/**
+ * 经 `lib/run-sync` 的 `runSync` 入口执行 git 探针（见其"正规入口"约定）。
+ * 这样本文件不再出现任何**直接**的同步 child_process 调用（spawnSync/execSync/execFileSync），
+ * 因而无需登记 `SYNC_PROCESS_EXCEPTIONS`（该清单只约束直接同步调用；由 run-sync.test.ts 守护）。
+ * runSync 返回 `{ status, stdout, stderr, error }`；失败时在此**显式抛出**而非吞错，
+ * 保证状态探针不会静默退化（不得用 try/catch 掩盖）。
+ */
+function runGit(args: readonly string[]): string {
+  const result = runSync('git', [...args], { cwd: REPO_ROOT });
+  if (result.error !== undefined || result.status !== 0) {
+    throw new Error(
+      `git ${args.join(' ')} 失败：status=${String(result.status)} stderr=${String(result.stderr ?? '')}`,
+    );
+  }
+  return String(result.stdout ?? '');
 }
 
 /**
