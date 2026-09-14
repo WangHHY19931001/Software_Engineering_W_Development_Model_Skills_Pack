@@ -28,7 +28,11 @@ export const L0_BASELINE = {
   // 670 = 666 + 4（2026-09-14 P1 Task 1：新增 references/asset-authoring.md 的 3 条同目录链接
   // + SKILL.md「门禁契约与资源清单」指向该文件的指针 1 条；由 npm run audit:l0-links 实测
   // rebaseline，l1Only 仍 93、placeholders 仍 36、violations 仍 0）。
-  relativeLinkCount: 670,
+  // 671 = 670 + 1（2026-09-14 P1 Task 6：SKILL.md「编排者-子代理边界」节末追加 1 条指向
+  // references/subagent-delegation.md 的指针，作为新增「调用分类」与「跨阶段与跨角色交接的
+  // 书写规则」两节的入口；由 npm run audit:l0-links 实测 rebaseline，l1Only 仍 93、
+  // placeholders 仍 36、violations 仍 0）。
+  relativeLinkCount: 671,
   l1Only: 93,
   placeholders: 36,
 } as const;

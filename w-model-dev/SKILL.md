@@ -72,7 +72,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | A 分析 | 阶段 1–4 分块分析、合并建图                                 | 只产出 ingestion 中间产物        |
 | R 根因 | 定位根因产出 RootCauseReport；R3 预防性审查                 | 只产出报告，不实施修复           |
 
-每阶段时序：O 路由 → 🔴 CHECKPOINT 进入确认 → S 产出 → R3 预防性审查 → G 运行 `check-preventive-review.ts`（exitCode=0）→ V 评审 → G 常规门禁 → O 展示证据 → 🔴 CHECKPOINT 阶段门放行 → O 更新状态。细则（S 拆分、self-as-verifier 模式、只读脚本例外、dispatch-matrix 总览）见 [references/subagent-delegation.md](references/subagent-delegation.md)。
+每阶段时序：O 路由 → 🔴 CHECKPOINT 进入确认 → S 产出 → R3 预防性审查 → G 运行 `check-preventive-review.ts`（exitCode=0）→ V 评审 → G 常规门禁 → O 展示证据 → 🔴 CHECKPOINT 阶段门放行 → O 更新状态。细则（S 拆分、self-as-verifier 模式、只读脚本例外、dispatch-matrix 总览）见 [references/subagent-delegation.md](references/subagent-delegation.md)。跨阶段/跨角色交接与调用分类的书写规则见 [references/subagent-delegation.md](references/subagent-delegation.md)「调用分类」与「跨阶段与跨角色交接的书写规则」两节；交接必须写成显式动作句，人类入口不得由子代理代达。
 
 ## 执行工作流
 
