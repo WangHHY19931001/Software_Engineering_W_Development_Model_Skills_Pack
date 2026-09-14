@@ -86,11 +86,7 @@ Bash 和 PowerShell 7 可以用命令简写；`self-test` 与 `doctor` 在 Power
 
 ## 安装 Skill
 
-把 `w-model-dev/` 目录整体拷贝到目标 Agent 的 skills 目录（具体路径以该 Agent 官方文档为准，**不要把 `.agent` 当通用路径**）：
-
-```bash
-cp -r w-model-dev /path/to/<agent-specific-skills>/w-model-dev
-```
+安装命令与目标路径的唯一权威是 `docs/INSTALL.md` §3 标准安装，本页不再复制命令（与上文「单一权威文案」一致）；目标 skills 路径以具体 Agent 官方文档为准，`.agent` 不是通用路径，切勿照抄。
 
 **Skill 资产是纯 Markdown，零依赖**（不要求 Node.js / npm，脚本依赖只属于仓库）。安装后，支持技能发现机制的 Agent 会在你提到 W 模型或输入 `/wm` 命令时激活它。详细步骤见 [docs/INSTALL.md](./docs/INSTALL.md)。
 
