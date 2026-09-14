@@ -49,6 +49,7 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'eval-runner.test.ts',
   'evidence-export-logic.test.ts',
   'evidence-provenance-logic.test.ts',
+  'exit2-failure-atomicity.test.ts',
   'gate-report.test.ts',
   'l0-link-audit-cli.test.ts',
   'metrics-report.test.ts',
