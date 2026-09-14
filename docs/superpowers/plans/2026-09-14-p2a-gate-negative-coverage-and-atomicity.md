@@ -296,3 +296,38 @@ git commit -m "docs(spec): record P2-A acceptance status for AC-7"
 **3. 类型与命名一致性：** 全程统一使用 `NEGATIVE-COVERAGE.md`、三个机制取值 `fixture|invocation|mutated-copy`、新 check id `negative-coverage-missing` / `negative-coverage-dangling`、新测试文件 `exit2-failure-atomicity.test.ts`、门禁集合口径"`cli/*.ts` 减 `self-test.ts` = 43"。与既有命名（`fixture-unregistered` / `reference-dangling` / `matrix-undeclared`）风格一致。
 
 **4. 与既有验收标准的关系：** AC-7 由任务 5 如实回填（四项分句分别标达成/部分达成/未达成）；AC-8（S27）不在本计划；AC-11 的"无新依赖/新脚本/新 Schema"由全局约束 1/6 保证，任务 5 步骤 3 用命令复验。
+
+---
+
+## 收尾（实现完成后回填；本节由控制者撰写）
+
+### 1. 交付与提交序列
+
+P2-A base = `3ed66ec6`（本计划），HEAD = `1395d883`，共 13 个提交（12 个实现/修复 + 本收尾节）：
+
+`56fde6d0`(T1 弱断言强化) → `37e7b533`(T2 负向覆盖不变量) → `77394f78`(T2-fix1 证据指针) → `925bc3f0`(T2-fix2 security 豁免注释) → `13116e5f`(计划勘误 E1/E2) → `73bd55b8`(T3 失败原子性) → `594574df`(T3-fix1 单调口径) → `2552a423`(T4 替身保真) → `4c829ce1`(T3-fix2 runSync 改道) → `9245e71c`(gate-report 夹具修复) → `4e8553b6`(T5 全量门禁 + AC-7 回填) → `1395d883`(T5-fix1 证据命令可复现化)
+
+### 2. 审查记录（SDD：任务级 5 轮 + 最终 1 轮）
+
+- **任务级审查**：T1 通过（含 1 条归因更正：接口扩展系实现者依技术必要性自行判定，非经用户批准）；T2 通过（2 修复轮：证据指针 + security 新发现）；T3 通过（2 修复轮：gitStatus 相等→单调、run-sync 例外清单）；T4 通过（0 Critical/Important）；T5 通过带 1 Important（AC-7 行内证据命令 `grep -c '^| '` 实测 49≠43，已修为 `grep -cE '^\| [a-z]'`=43，复审确认精确修复）。
+- **整分支最终审查**：**可以合并**，0 Critical / 0 Important。程序化验证：登记册/第 4 规则/README 矩阵/原子性探针四层对「43 门禁」口径**精确等集**且全方向 fail-closed；抽查 12 行登记零捏造；约束 4 逐 hunk 审全部为收紧；AC-7 回填每个数字独立可复现。**修复波未触发**（无 Critical/Important）。
+- **权威门禁运行**：`4e8553b6` 与 `1395d883` 上各一次 `npm run prepush` → **18/18 全绿，`PREPUSH_EXIT=0`**（`sh -c` 直捕退出码；vitest 全量无抖动；npm audit 真实执行）。本收尾节为 `docs/superpowers/` 纯文档追加（不在 18 项门禁任何输入集内），合并前在本提交上复跑一次全量门禁作最终确认，结果记于 SDD 账本；若红则中止合并。
+
+### 3. 搁置项裁定（最终审查裁定，全部「继续搁置」，移交 P2-B）
+
+| # | 搁置项 | 处置 |
+| --- | --- | --- |
+| 1 | `NEGATIVE-COVERAGE.md:24` 行号偏 5（`:373` 应为 `:381`，最终审查新发现） | P2-B 触及 `w-model-dev/scripts/**` 时顺手修 |
+| 2 | `NEGATIVE-COVERAGE.md:62` 指向 `it(` 声明行（`:2342` 应为 `:2344` 或 `:2347`）+ 该行「所防回归」措辞不精确 | 同上 |
+| 3 | 登记册不变量单向（孤儿行不报错）；未来可加 `negative-coverage-unknown` 规则 | P2-B 评估 |
+| 4 | `AGENTS.md` §8 / `command-reference.md` 对 `check-samples-coverage.ts` 仍写三条规则（实为四条） | P2-B 清偿文档债 |
+| 5 | 原子性单调口径残余盲区（删除三个快照目标之外的既有脏文件不红） | 已文档化取舍，不改 |
+| — | T1 两处 Minor（硬编码中文原因字面量与文件惯例一致；`:3595` 冗余守卫）；T3 单调口径设计边界；wm-export-evidence 探针由 docs-consistency 中心探针覆盖；T4/T5 报告内部数字小误差（不入库） | 维持搁置 |
+| — | 既有三项（非本分支引入）：`docs-consistency-logic.ts:1309/:231` 注释过时；`quickstart.md:22` `322/322` vs 基线 332；`.code-health-governance.json` `selfTestSamples: 322` vs 332 | 维持搁置 |
+
+### 4. P2-B 移交清单（下一计划的强制输入）
+
+1. **范围**：S25（L0 规则负载性两态 fixture）+ S31（完整性审计维度）+ S32（评审包 CLI）+ S30（定量预算断言）+ S27（`revertEvidence`）；**M07 另立独立批准单元**（裁定 D-2：RTM `testSummary` 的 Schema 变更须单独批准，不得包裹）。
+2. **计数契约同步清单（S32 会使 cli 计数 44→45 / 43→44）**：`EXPECTED_GATE_COUNT=43`（`exit2-failure-atomicity.test.ts`）、`NEGATIVE-COVERAGE.md` 加行、`AGENTS.md`「43 个脚本」、`SKILL.md`「44 个 .ts」、`check-docs-consistency` script-registry——前两处有本分支留下的独立 tripwire，会自动拦住漏改。
+3. **顺手清偿**：搁置表 #1/#2/#4（两处行号 + 一处门禁描述）。
+4. **流程教训（本计划 3 次同类红灯）**：任务级验证清单必须包含 (a) `npm run lint:security`；(b) 全量 vitest 或所有全局契约守卫测试；(c) 凡新增「必需文件/必需字段」，先全仓搜索消费该契约的夹具与测试。
