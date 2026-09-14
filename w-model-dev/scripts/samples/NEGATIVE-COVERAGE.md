@@ -4,10 +4,10 @@
 > `self-test.ts` 的**每一个 exit-2 门禁**都必须登记一条**会失败的**负向案例。未登记 →
 > `negative-coverage-missing`（exit 1）；`fixture` 机制的证据路径必须在盘存在，否则 →
 > `negative-coverage-dangling`（exit 1）。口径与 `check-docs-consistency.ts` 的 exit-2 中心探针一致
-> （43 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` / `metrics-report.ts`
+> （44 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` / `metrics-report.ts`
 > 使用特殊探针参数，但仍计入集合）。
 >
-> - **门禁脚本**：基名（`w-model-dev/scripts/cli/<name>.ts` 去掉 `.ts`）。全表 43 行，每门禁恰一行。
+> - **门禁脚本**：基名（`w-model-dev/scripts/cli/<name>.ts` 去掉 `.ts`）。全表 44 行，每门禁恰一行。
 > - **负向机制**：只允许 `fixture`（在盘 `samples/` fixture）/ `invocation`（CLI 参数或测试临时目录调用）/
 >   `mutated-copy`（测试内改写文本副本）三种。
 > - **负向案例 / 证据位置**：`fixture` 行写 `` `samples/...` ``（相对 `w-model-dev/scripts/`），可附
@@ -55,7 +55,7 @@
 | --- | --- | --- | --- |
 | check-tla-bdd-sync | fixture | `samples/tla-bdd-sync/bad-transition-mismatch.json`（self-test.ts:1562，任务 1 强化后断言转移未找到） | 去掉转移等价断言后 TLA+ 转移在 BDD 中缺对应 When 步骤仍判等价 |
 
-### C 组：负向输入是参数或变异副本（14）
+### C 组：负向输入是参数或变异副本（15）
 
 | 门禁脚本 | 负向机制 | 负向案例 / 证据位置 | 所防回归（一句话） |
 | --- | --- | --- | --- |
@@ -68,6 +68,7 @@
 | metrics-report | invocation | `w-model-dev/scripts/__tests__/cli-natural-exit.test.ts:176` | 非法 `--phase` 不再 exit 2，度量报告会在错误阶段上给出结论 |
 | plan-chunks | invocation | `w-model-dev/scripts/__tests__/cli-arg-unification.test.ts:139` | 重复 `--phase` 返回 0，分块规划会按 first-wins 的静默阶段执行 |
 | platform-deps-install | invocation | `w-model-dev/scripts/__tests__/platform-deps-install.test.ts:1173` | 缺 `--lockfile` / `--package` 不再 exit 2，平台依赖会在未验证 lockfile 时安装 |
+| review-package | invocation | `w-model-dev/scripts/__tests__/review-package-cli.test.ts:163`（同测试 :166 断言目标 out 路径零文件） | 未知 flag 不在任何写盘前被拒时，评审包会以残缺参数先写盘再失败，留下半成品或覆盖既有 diff 文件（exit-2 失败原子性失守） |
 | security-scan | invocation | `w-model-dev/scripts/__tests__/cli-natural-exit.test.ts:217` | baseline 缺失不再 exit 2，扫描会以「无新增」通过而实际未做比对 |
 | wm-export-evidence | invocation | `w-model-dev/scripts/__tests__/evidence-export-logic.test.ts:1191` | 非法参数不再 exit 2 且可能建出输出目录，导出会留下半成品证据包 |
 | wm-status | invocation | `w-model-dev/scripts/__tests__/cli-natural-exit.test.ts:231` | project.json 损坏不再 exit 2，状态快照会以默认值给出假状态 |

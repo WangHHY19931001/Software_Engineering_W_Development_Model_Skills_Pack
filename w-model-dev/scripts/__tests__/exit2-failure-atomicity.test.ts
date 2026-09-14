@@ -58,8 +58,8 @@ const GATE_FILES: readonly string[] = readdirSync(CLI_DIR)
   .filter((name) => name.endsWith('.ts') && name !== 'self-test.ts')
   .sort();
 
-/** 集合规模漂移守卫：43 = cli/*.ts(44) - self-test.ts。名字仍由 readdirSync 动态推导。 */
-const EXPECTED_GATE_COUNT = 43;
+/** 集合规模漂移守卫：44 = cli/*.ts(45) - self-test.ts。名字仍由 readdirSync 动态推导。 */
+const EXPECTED_GATE_COUNT = 44;
 
 /**
  * 负向调用可能触碰的仓库工作树路径。缺失路径记 `<missing>`（可侦测"被半成品创建出来"）。

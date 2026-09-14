@@ -105,7 +105,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | `/wm reset` / `/wm import <文件>`                            | 状态操作（🔴 CHECKPOINT 后执行）                                     | O 执行                |
 | `/wm export [目录]` / `/wm hill-climbing`                    | 导出 / 改进信号                                                      | O 只读 / O 分析       |
 
-每命令的输入、输出、失败动作见 [references/command-reference.md](references/command-reference.md)。门禁脚本 44 个 .ts，登记总览见 subagent-delegation.md「dispatch-matrix」节。
+每命令的输入、输出、失败动作见 [references/command-reference.md](references/command-reference.md)。门禁脚本 45 个 .ts，登记总览见 subagent-delegation.md「dispatch-matrix」节。
 
 > **`/wm code-health` 权限与 CHECKPOINT**：O 只路由 / 只读 / 持久化；A 产出 Phase 1–2 发现（发现不是结论）；S 仅在人类批准 scope 内经 `code-health-apply.ts` 执行最小可逆改动；V 独立复核分类 / 等价证明 / scope / 回滚；G 跑 code-health CLI 并回填真实退出码；R 定位 `blocked` 候选根因；**只有 human 能批准**（精确 candidate ID / action / files / symbols / scopeHash）。实现前与放行前均须 🔴 CHECKPOINT 等待人类决定；失败链 `gate-failure → blocked → R → V → G → S(rework) → evidenced` 顺序不可跳过。详见 [references/code-health-governance.md](references/code-health-governance.md)。
 
@@ -128,7 +128,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 - **核心操作行为**：完整的八条操作行为与失败模式 F1-F10 见 [references/operation-behaviors.md](references/operation-behaviors.md)，按需加载。
 - **技能资产编写**：写或评审 `SKILL.md`/`references/`/`templates/` 前必读 [references/asset-authoring.md](references/asset-authoring.md)（no-op test、渐进披露阈值、授权不写）。
-- **资源计数**：`references/`（43 个 .md）、`schemas/`（34 份 JSON Schema draft-07，含 change-scope / codegraph-query 与 evidence-manifest / evidence-provenance）、门禁脚本 44 个 .ts。
+- **资源计数**：`references/`（43 个 .md）、`schemas/`（34 份 JSON Schema draft-07，含 change-scope / codegraph-query 与 evidence-manifest / evidence-provenance）、门禁脚本 45 个 .ts。
 - **状态写锁协议**：状态写入统一经 `wm-write.ts` 使用 `<target>.lock` 持久目录与可转移 `owner` 对象实施跨进程锁，锁内校验 mtime 并毫秒+UUID 备份、tmp+rename 原子替换与回读恢复；CLI 用 `--lock-timeout` 控制等待，陈旧锁必须显式 `--recover-stale-lock`，否则以退出码 1 拒绝写入。
 - **行为门禁**：阶段 1-4 传 `--require-tla-equivalence --tla-manifest=<path>`，阶段 5-8 传 `--require-cucumber-report --cucumber-report=<path>`。
 - **证据与审计**：`coverage/`、`.zcode/` 与 `.w-model/` 是 Git 忽略的本地生成物，默认不随 Git 交付；需要交付审计证据时先运行 `npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts` producer+verify 命令，写入 source-bound provenance，登记 `evidence-provenance.schema.json`），再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；受控本机 provenance 提供流程完整性，不是密码学签名，也不是第三方不可抵赖证明；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
