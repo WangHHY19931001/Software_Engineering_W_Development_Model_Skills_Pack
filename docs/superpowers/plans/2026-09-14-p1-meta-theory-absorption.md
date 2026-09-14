@@ -197,7 +197,15 @@ git commit -m "docs(skill): make the description name when-to-use only (S02)"
   同时 `grep -n "48 条" w-model-dev/references/hard-constraints.md` 的所有既有表述**保持不矛盾**（新子节说"本轮不改写主表述"，与"48 条反模式"的总数陈述不冲突）。
 
 - [ ] **步骤 4：跑定向门禁。**
-  - `npm run check:docs-consistency` → exit 0（**按约束 22/23：此命令在任务级只在必要时跑——它独立运行会 re-spawn 全量 vitest；任务 8 的 `npm run prepush` 已完整覆盖它。此处列出的检查点须在任务 8 逐项确认；若本任务能在任务级跑就更好**）。**这是本任务的关键门禁**：它同时校验 `anti-patterns`（`| 48 |` 在区间内 + `#1~#48` 存在）与 `hard-constraints`（SKILL.md 指针仍在）
+  - **本任务的关键门禁可在任务级廉价实跑**（复刻 `checkAntiPatterns` 的完整判据，读**真实文件**，不 spawn 全量 vitest）：运行
+
+    ```bash
+    node -e "const t=require('fs').readFileSync('w-model-dev/references/hard-constraints.md','utf8');const H='| # | 反模式（不要做） | 危害 | 正确做法 |';const i=t.indexOf(H);const tail=i<0?'':t.slice(i);const m=tail.search(/\r?\n#{1,6} /);const main=m<0?tail:tail.slice(0,m);const stale=['#1~#29','#1~#19','#1～#29','#1～#19'].filter(s=>t.includes(s));console.log(JSON.stringify({headerFound:i>=0,has48InMain:main.includes('\n| 48 |'),hasRange48:t.includes('#1~#48'),staleRangesPresent:stale}))"
+    ```
+
+    预期输出：`{"headerFound":true,"has48InMain":true,"hasRange48":true,"staleRangesPresent":[]}`。
+    三个常量与判据的权威定义：`w-model-dev/scripts/logic/docs-consistency-logic.ts:234`（`ANTI_PATTERN_MAIN_TABLE_HEADER`）、`:245`（`STALE_RANGES`）、`:221`（`EXPECTED.maxAntiPattern = 48`）、`:1318/:1327`（两条断言）。**任一为 false 或 stale 非空即门禁必红**，必须回步骤 1 调整插入位置。注意新子节的文字**不得**出现 `#1~#29` / `#1~#19` / `#1～#29` / `#1～#19` 这四个过时区间串。
+  - `npm run check:docs-consistency` → exit 0（**按约束 22/23：此命令在任务级只在必要时跑——它独立运行会 re-spawn 全量 vitest；任务 8 的 `npm run prepush` 已完整覆盖它。此处列出的检查点须在任务 8 逐项确认；若本任务能在任务级跑就更好**）
   - `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/examples-contract.test.ts` → 全通过（新文字进入语料扫描，约束 17）
   - `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts` → 全通过
 
