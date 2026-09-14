@@ -60,7 +60,7 @@
 | 门禁脚本 | 负向机制 | 负向案例 / 证据位置 | 所防回归（一句话） |
 | --- | --- | --- | --- |
 | check-docs-consistency | mutated-copy | `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts:2342` | 把 SKILL.md 的 `.ts` 计数改错却不报 script-registry 漂移，文档与实测脱节将无人发现 |
-| check-samples-coverage | invocation | `w-model-dev/scripts/__tests__/check-samples-coverage.test.ts:111` | 引用指向不存在的 fixture 却 exit 0，self-test 基线会带着悬空引用变绿 |
+| check-samples-coverage | invocation | `w-model-dev/scripts/__tests__/check-samples-coverage.test.ts:228`（缺 NEGATIVE-COVERAGE.md → exit 2） | 缺失必需文件（清单本身）不再 exit 2 时，清单缺失会被当作通过，负向覆盖不变量静默失效 |
 | code-health-archive | invocation | `w-model-dev/scripts/__tests__/code-health-archive-boundary.test.ts:710` | malformed produce 输入不被 exit 2 拒绝，归档会写入半成品证据 |
 | code-health-ledger | invocation | `w-model-dev/scripts/__tests__/code-health-cli.test.ts:696` | 未知子命令不再 exit 2，append-only ledger 可能被非法子命令破坏 |
 | doctor | invocation | 由任务 3 的 exit2-failure-atomicity.test.ts 提供 | doctor 对非法参数返回 0/1 而非 2，环境缺失会被误报为通过 |
