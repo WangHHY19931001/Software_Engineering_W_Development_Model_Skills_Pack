@@ -192,6 +192,19 @@ describe('check-samples-coverage.ts --json（子进程冒烟：shell exit 与 JS
     await fs.writeFile(path.join(tmpDir, 'w-model-dev', 'scripts', 'samples', 'README.md'), '', 'utf-8');
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test fixture path
     await fs.writeFile(path.join(tmpDir, 'w-model-dev', 'scripts', 'cli', 'self-test.ts'), '', 'utf-8');
+    // 任务 2 起 samples/NEGATIVE-COVERAGE.md 属必需文件；本夹具 cli/ 仅含 self-test.ts（门禁集合为空），
+    // 故只写表头即同时满足两条路径：违规路径仍是单一的 fixture-unregistered，无违规路径仍 exit 0。
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test fixture path
+    await fs.writeFile(
+      path.join(tmpDir, 'w-model-dev', 'scripts', 'samples', 'NEGATIVE-COVERAGE.md'),
+      [
+        '# 负向覆盖登记册',
+        '',
+        '| 门禁脚本 | 负向机制 | 负向案例 / 证据位置 | 所防回归（一句话） |',
+        '| --- | --- | --- | --- |',
+      ].join('\n'),
+      'utf-8',
+    );
     if (withViolation) {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test fixture path
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
