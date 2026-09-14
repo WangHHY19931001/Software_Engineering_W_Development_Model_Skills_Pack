@@ -18,7 +18,7 @@
 
 该入口验证仓库本身，不安装 Skill。命令必须从仓库根目录执行，需要 Node.js ≥20、Git，以及可访问的 npm registry/网络。
 
-仓库验证的完整命令序列（`git clone` / `npm install` / `npm run self-test` / `npm run doctor`，含 PowerShell 逐行写法）以 [README.md](../README.md#验证仓库) 的「验证仓库」快速开始块为唯一权威，本节不重复；需要改命令时先改该权威块。
+仓库验证的完整命令序列以 [README.md](../README.md#验证仓库) 的「验证仓库」快速开始块为唯一权威，本节不重复；需要改命令时先改该权威块。
 
 `self-test` 与 `doctor` 可在 PowerShell 或 Windows Terminal 中运行，不需要 Git Bash。Bash 只用于 `pre-push` 和平台依赖检查。
 
@@ -194,21 +194,12 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 
 ### 校验脚本可用性
 
-确认 Agent 能运行门禁脚本（需先在仓库根目录 `npm install` 拉取 devDeps，详见 §2）：
+确认 Agent 能运行门禁脚本：先在仓库根目录完成依赖安装（`npm install`，命令见 [README.md](../README.md#验证仓库) 的「验证仓库」快速开始块），再跑下面的探针命令。仓库验证入口（`npm install` / `npm run self-test` / `npm run doctor`）同样以上述 README 权威块为准，本节不重复。
 
 ```bash
-# 首次：在仓库根目录安装 devDependencies（ajv / eslint-plugin-security / tsx 等）
-npm install
-
 # 验证脚本可执行 + schema 校验链路通：
 npx tsx "w-model-dev/scripts/cli/check-verifier-output.ts"
 # 预期退出码 2，并输出用法；这同时证明脚本可执行且 ajv + schema-loader 链路无错误
-
-# 验证回归基线（self-test 332 条样本全部通过）：
-npm run self-test
-
-# 环境自检（doctor：node/tsx/ajv 等就绪性，exit 0 = 环境就绪）：
-npm run doctor
 
 # 验证安全扫描基线（exit 0 = 无新增风险）：
 npm run lint:security
@@ -217,13 +208,8 @@ npm run lint:security
 PowerShell 5.1：请逐行执行，不能使用 `&&`。
 
 ```powershell
-npm install
 npx tsx "w-model-dev/scripts/cli/check-verifier-output.ts"
 $LASTEXITCODE  # 预期为 2
-npm run self-test
-$LASTEXITCODE  # 预期为 0
-npm run doctor
-$LASTEXITCODE  # 预期为 0
 npm run lint:security
 $LASTEXITCODE  # 预期为 0
 ```
@@ -241,6 +227,7 @@ W-Model 的方法论参考类文件可脱离编排单独拷贝到其他 Agent �
 | 文件                                                      | 可复用能力                                           |
 | --------------------------------------------------------- | ---------------------------------------------------- |
 | `references/root-cause-locator.md`                        | 根因分析方法论（5-Why / 鱼骨图 / 缺陷链追溯）        |
+| `references/asset-authoring.md`                           | 技能资产编写方法论（渐进披露阈值 / no-op test / 授权不写） |
 | `references/iceberg-sweep-guide.md`                       | 隐藏问题深挖扫掠方法                                 |
 | `references/agent-personas.md` + `subagent/`（28 个人格） | 评审角色提示词与多角度分析                           |
 | `references/conventions.md`                               | 术语表 / 格式 / 目录约定                             |
@@ -342,7 +329,7 @@ Remove-Item -Recurse -Force "<agent-specific-skills>\w-model-dev"
 
 **Q：仓库验证和 Skill 安装是同一件事吗？**
 
-- 不是。仓库验证是从仓库根目录执行 `npm install`、`npm run self-test`、`npm run doctor`，用于确认脚本环境健康；Skill 安装只复制 `w-model-dev/` 到目标 Agent 的 Agent-specific skills 目录。
+- 不是。仓库验证用于确认脚本环境健康，命令以 [README.md 的「验证仓库」](../README.md#验证仓库) 快速开始块为唯一权威，本节不复述；Skill 安装只复制 `w-model-dev/` 到目标 Agent 的 Agent-specific skills 目录。
 - `npm install` 的 `postinstall` 只设置当前 checkout 的 `core.hooksPath=.githooks`，不负责激活 Agent Skill。
 
 **Q：安装需要联网或 API key 吗？**

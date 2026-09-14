@@ -68,7 +68,7 @@ PowerShell 5.1 请逐行执行，不能使用 `&&`（具体命令见上述权威
 `self-test` / `doctor` 可在 PowerShell 或 Windows Terminal 中运行；Bash 只用于 `pre-push` 和平台依赖检查。`npm install` 的 `postinstall` 会设置当前仓库本地 Git 配置 `core.hooksPath=.githooks`，这是仓库验证的副作用，不是 Skill 激活必需。缺平台依赖时须显式运行 `npm run platform-deps:check` 或由用户显式运行 `npm run platform-deps:install` 在受控 staging 中验证并安装；pre-push 不会自动修复。
 
 ```bash
-# 仓库验证入口命令（npm install / npm run self-test / npm run doctor）见 README.md「验证仓库」快速开始块；此处不重复，避免两处过期
+# 仓库验证入口命令见 README.md「验证仓库」快速开始块；此处不重复，避免两处过期
 
 # 门禁脚本参考索引（依赖 tsx runtime + ajv devDep，schema 校验由 logic 层自动调用）
 npm run audit:l0-links                       # L0/L1 链接边界审计，结构化退出码 0/1/2

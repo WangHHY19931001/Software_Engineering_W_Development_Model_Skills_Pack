@@ -14,19 +14,13 @@
 
 本仓库是单纯的编排 + 校验脚本技能，工程化极简：根目录有一个 `package.json`，声明 `tsx`（运行 `w-model-dev/scripts/cli/*.ts`）+ `ajv`/`ajv-formats`（schema 校验 runtime 依赖）+ `eslint-plugin-security`（安全扫描）+ `@typescript-eslint/*` + `vitest` 等开发依赖，无构建步骤、无 `src/`、无编程式 SDK。
 
-贡献者先验证仓库，再参与修改。以下命令必须从仓库根目录执行；需要 Node.js ≥20、Git 和 npm registry/网络。普通用户只需按 README 的「验证仓库」或「安装 Skill」入口选择目标，不需要运行贡献者的 pre-push 门禁：
+贡献者先验证仓库，再参与修改。仓库验证的克隆与依赖安装命令（`git clone` / `npm install`）以 [README.md 的「验证仓库」](./README.md#验证仓库) 快速开始块为唯一权威，本节不复述；以下只列本仓库贡献者专属的钩子步骤。这些命令必须从仓库根目录执行；需要 Node.js ≥20、Git 和 npm registry/网络。普通用户只需按 README 的「验证仓库」或「安装 Skill」入口选择目标，不需要运行贡献者的 pre-push 门禁：
 
 ```bash
-# 1. 克隆仓库
-git clone https://github.com/WangHHY110001001/Software_Engineering_W_Development_Model_Skills_Pack.git w-model-skill-pack
-cd w-model-skill-pack
-
-# 2. 安装开发依赖（tsx / ajv / eslint-plugin-security / vitest 等）
-npm install
-# 克隆后首次 npm install 即自动启用本地推送前门禁：
+# 完成克隆与 npm install 后：克隆后首次 npm install 即自动启用本地推送前门禁：
 # postinstall 自动执行 git config core.hooksPath .githooks（仅当 .githooks/ 存在时，失败仅 warn 不阻断 install）
 
-# 3.（可选）如需手动重置 / 确认钩子配置，执行一次（写入本地 .git/config）
+# （可选）如需手动重置 / 确认钩子配置，执行一次（写入本地 .git/config）
 npm run setup:hooks
 # 等价于 git config core.hooksPath .githooks
 # 启用后每次 git push 会自动跑回归基线，详见下方「本地推送前门禁」一节

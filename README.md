@@ -34,7 +34,7 @@ AI 助手写代码很容易「差不多就行」：跳段、凭感觉、说不�
 
 这个仓库只有两个用途：**验证仓库健康**，或者**把 Skill 装进你的 AI 助手**。两者不是同一条命令链，按需二选一。
 
-**单一权威文案**：**仓库验证**命令的唯一权威是本页下方 [验证仓库](#验证仓库) 的命令块；**Skill 安装**的唯一权威是 [docs/INSTALL.md](./docs/INSTALL.md) §2 前置条件 + §3 标准安装。两处互不复述——本页其余位置与仓库内其他文档讲这两条路线时一律指向对应权威、不复制命令（复制块会各自过期，需改时先改权威再让消费者指向）。
+**单一权威文案**：**仓库验证**命令的唯一权威是本页下方 [验证仓库](#验证仓库) 的命令块；**Skill 安装**的唯一权威是 [docs/INSTALL.md](./docs/INSTALL.md) §2 前置条件 + §3 标准安装。两处互不复述——本页其余位置与安装/验证入口文档（[docs/INSTALL.md](./docs/INSTALL.md)、[AGENTS.md](./AGENTS.md)、[CONTRIBUTING.md](./CONTRIBUTING.md)、[docs/adoption-guide.md](./docs/adoption-guide.md)）讲这两条路线时一律指向对应权威、不复制命令（复制块会各自过期，需改时先改权威再让消费者指向）。L0 自包含资产（`w-model-dev/references/quickstart.md`）随技能包单独分发，无法依赖包外 README，其 L1 上手块保留自身命令。
 
 ## 验证仓库
 

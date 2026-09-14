@@ -30,7 +30,7 @@
 
 ### Day 0 | 先验证仓库，再安装 Skill
 
-1. 先按 [`README.md`](../README.md) 的「验证仓库」入口，从仓库根目录执行 `git clone`、`npm install`、`npm run self-test`、`npm run doctor`。这一步验证仓库脚本健康，不会安装 Agent Skill。
+1. 先按 [`README.md`](../README.md) 的「验证仓库」入口执行仓库验证命令（完整命令序列以该入口的命令块为唯一权威，本节不复述）。这一步验证仓库脚本健康，不会安装 Agent Skill。
 2. 再按 [`INSTALL.md`](./INSTALL.md) 的「安装 Skill」入口，将 `w-model-dev/` 复制到目标 Agent-specific skills 目录。目标路径、激活方式和官方 canonical URL 以具体 Agent 文档为准，不要把 `.agent` 当通用路径。
 3. 首次启用执行 `/wm analyze`，触发 SSoT [§4A.1](./skill-design-document_SSoT.md)「显式声明假设」：列出对需求 / 技术栈 / 范围的假设，等用户确认。
 4. 创建 `.w-model/` 持久化目录，初始化 `project.json` / `rtm.json`。

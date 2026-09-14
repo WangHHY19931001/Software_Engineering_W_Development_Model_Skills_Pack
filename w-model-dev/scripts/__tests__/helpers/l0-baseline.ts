@@ -32,7 +32,10 @@ export const L0_BASELINE = {
   // references/subagent-delegation.md 的指针，作为新增「调用分类」与「跨阶段与跨角色交接的
   // 书写规则」两节的入口；由 npm run audit:l0-links 实测 rebaseline，l1Only 仍 93、
   // placeholders 仍 36、violations 仍 0）。
-  relativeLinkCount: 671,
+  // 670 = 671 - 1（2026-09-14 P1 最终审查修复：合并 SKILL.md「编排者-子代理边界」节内
+  // 指向 references/subagent-delegation.md 的两条同目标链接为一条；由 npm run audit:l0-links
+  // 实测 rebaseline，l1Only 仍 93、placeholders 仍 36、violations 仍 0）。
+  relativeLinkCount: 670,
   l1Only: 93,
   placeholders: 36,
 } as const;
