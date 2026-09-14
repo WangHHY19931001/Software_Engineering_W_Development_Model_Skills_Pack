@@ -254,6 +254,7 @@ function extractFixturePath(evidence: string): string | null {
 /** 门禁集合口径：w-model-dev/scripts/cli/*.ts 减去 self-test.ts（与 check-docs-consistency 中心探针一致） */
 function listGateNames(root: string): string[] {
   const cliDir = join(root, 'w-model-dev/scripts/cli');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控固定相对路径（repo-root 下 w-model-dev/scripts/cli），仅列目录条目名、不做任何写入
   return readdirSync(cliDir)
     .filter((f) => f.endsWith('.ts') && f !== 'self-test.ts')
     .map((f) => f.slice(0, -'.ts'.length))
@@ -306,6 +307,7 @@ async function main(): Promise<void> {
   const uncovered = findUncovered(samplesRoot, refs);
   const dangling = findDanglingRefs(samplesRoot, refs);
   const undeclared = findUndeclaredDirs(samplesRoot, readFileSync(readmePath, 'utf-8'));
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控固定文件名（repo-root 下 samples/NEGATIVE-COVERAGE.md），只读不写
   const negativeEntries = parseNegativeCoverage(readFileSync(negativePath, 'utf-8'));
   const missingNegative = findMissingNegativeGates(root, negativeEntries);
   const danglingNegative = findDanglingNegativeFixtures(root, negativeEntries);
