@@ -116,19 +116,22 @@ const ASSET_BUDGET = {
   skillFenceMaxLines: 50,
   // asset-authoring.md §5 :66「100+ 行的重参考内容须落到独立文件」+ :69「> 100 行的参考文件
   // 在顶部加目录（TOC）」→ 每文件上限 2500。
-  // 当前实测最大 tla-plus.md = 2295 行（2026-09-15 P2-B Task 3 实测，含该次补入的目录节）。
+  // 当前实测最大 tla-plus.md：base 3e3b521f 实测 2295 行（无目录节）；head 实测 2317 行
+  // （含本次补入的目录节 +22；2026-09-15 P2-B Task 3 实测）。
   referenceFileMaxLines: 2500,
   // references 文件数上限。当前实测 43 个 .md；预算 48 留 5 个新增余量（2026-09-15 实测）。
   referenceMaxFileCount: 48,
-  // references 总行数上限。当前实测 16442 行（2026-09-15 P2-B Task 3 实测，含 Task 1 对
-  // hard-constraints.md 的 S27 链接增行与 Task 3 补入的两个目录节）。
+  // references 总行数上限。当前实测 16482 行（含 Task 1 对 hard-constraints.md 的 S27 链接
+  // 增行 +4 与 Task 3 补入的两个目录节 +40；base 3e3b521f 实测 16442 行；
+  // 2026-09-15 P2-B Task 3 实测）。
   referenceTotalMaxLines: 20000,
   // asset-authoring.md §5 :68「引用只允许一层深」的结构性表达：references 保持平坦无子目录。
   // 当前实测 0 个子目录（2026-09-15 实测）。
   referenceMaxSubdirectoryCount: 0,
   // asset-authoring.md §5 :69「> 100 行的参考文件在顶部加目录（TOC）」——按 P2-B 计划 §0.1.3
-  // 范围裁定只对 >1000 行的文件断言。当前实测 5 个：tla-plus 2295 / bdd 1784 /
-  // subagent-delegation 1617 / data-models 1042 / verifier-spec 1026（2026-09-15 实测）。
+  // 范围裁定只对 >1000 行的文件断言。当前实测 5 个（head 实测）：tla-plus 2317（base 2295，
+  // 差值即本次目录节 +22）/ bdd 1802（base 1784，含目录节 +18）/ subagent-delegation 1617 /
+  // data-models 1042 / verifier-spec 1026（2026-09-15 P2-B Task 3 实测）。
   tocRequiredAboveLines: 1000,
 } as const;
 
@@ -194,7 +197,7 @@ describe('L0 载体定量预算（S30，真实包上限断言）', () => {
       const content = await fs.readFile(path.join(REFERENCES_DIR, file.name), 'utf8');
       if (toLines(content).length > ASSET_BUDGET.tocRequiredAboveLines) {
         oversized.push(file.name);
-        expect(hasTocSection(toLines(content))).toBe(true);
+        expect(hasTocSection(toLines(content)), `${file.name} 超过 1000 行但缺少目录（TOC）`).toBe(true);
       }
     }
 
