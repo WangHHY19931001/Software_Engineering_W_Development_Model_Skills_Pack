@@ -378,6 +378,7 @@ const GATE_CASES: GateCase[] = [
   {
     file: 'valid-phase6.json',
     expectedPassed: false,
+    expectedReasonPatterns: [/系统测试: 8 个待执行/, /验收测试: 6 个待执行/],
     description: 'P1.1 未传 phaseOption 默认 phase=8（向后兼容，valid-phase6 应因 pending 失败）',
   },
   // -------------------- §10J RTM 增量校验修正 --------------------
@@ -1450,6 +1451,7 @@ const PREVENTIVE_REVIEW_CASES: PreventiveReviewCase[] = [
   {
     file: 'valid-completeness.json',
     expectedPassed: false, // 单份报告不齐 → checkPreventiveReview 返回 false
+    expectedReasonPatterns: [/R3 报告缺失：reliability 维度报告未找到/, /R3 报告缺失：security 维度报告未找到/],
     description: 'R3 完整性报告合规（但其他维度缺失，整体 passed=false）',
   },
   {
@@ -1548,13 +1550,20 @@ interface TlaBddSyncCase {
   file: string;
   /** 期望校验是否通过 */
   expectedPassed: boolean;
+  /** 期望 violations[].description 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedReasonPatterns?: RegExp[];
   /** 用例说明 */
   description: string;
 }
 
 const TLA_BDD_SYNC_CASES: TlaBddSyncCase[] = [
   { file: 'valid.json', expectedPassed: true, description: 'TLA+/BDD 一致' },
-  { file: 'bad-transition-mismatch.json', expectedPassed: false, description: 'TLA+/BDD 转移不一致' },
+  {
+    file: 'bad-transition-mismatch.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/TLA\+ 转移 "Register" 在 BDD 中未找到对应 When 步骤/],
+    description: 'TLA+/BDD 转移不一致',
+  },
 ];
 
 // -------------------- P0 角色分派完整性校验 --------------------
@@ -3582,6 +3591,14 @@ async function runTlaBddSyncCases(samplesDir: string): Promise<CaseResult[]> {
       const details: string[] = [];
       if (r.passed !== c.expectedPassed) {
         details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+      }
+      if (!c.expectedPassed && c.expectedReasonPatterns) {
+        details.push(
+          ...matchReasonPatterns(
+            r.violations.map((v) => v.description),
+            c.expectedReasonPatterns,
+          ),
+        );
       }
       results.push({
         name: `tla-bdd-sync/${c.file}`,
