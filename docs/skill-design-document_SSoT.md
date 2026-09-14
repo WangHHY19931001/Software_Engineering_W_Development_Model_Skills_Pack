@@ -427,6 +427,8 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 L0 文档（`SKILL.md` / `references/` / `templates/` / `examples/` / `subagent/` / `schemas/`）中指向 `scripts/`、`samples/`、`tools/` 的相对链接统一为 **L1-only 导航**：L0 副本预期不含这些目标，链接检查必须将其分类为分层边界，不得据此报告「L0 全链接通过」；取得 L1 交付（L0 + `scripts/` + `samples/` + `tools/`）后才校验这些目标。仓库侧审计入口为 `npm run audit:l0-links [-- --root=<skill-root>]`（`w-model-dev/scripts/application/audit-l0-links.ts`，只读，exit 0/1/2；实现与已知近似见 `w-model-dev/references/command-reference.md`「L0/L1 链接边界审计」节）。本节是该边界的权威定义；INSTALL §2 与 w-model-dev 侧描述均以本节为准。
 
+**机械判定与判断题的分工**：能被正则 / 计数 / 存在性机械判定的部分**一律由 `audit:l0-links` 执行**——链接是否存在、是否逃出包根、是否命中 `scripts/`、`samples/`、`tools/` 这三类 L1-only 目标、占位符是否合法；文档**不得**把这部分复述成需要人工核对的规则。本节只保留**判断题**：分层的**归属判据**（哪些目标属于 L0、哪些属于 L1-only），以及「链接检查结论不得表述为『L0 全链接通过』」这类**语义约束**。新增 L0/L1 边界规则时，先问它能否被脚本判定——能则加进审计实现（`npm run audit:l0-links [-- --root=<skill-root>]` / `w-model-dev/scripts/application/audit-l0-links.ts`），不能才写进本节。
+
 ### 3.6 触发边界与反例登记册（Trigger Boundary & Anti-Scenario Registry）
 
 技能触发边界由三层资产共同度量，本节为权威定义（规格：docs/superpowers/specs/2026-09-07-trigger-boundary-campaign-design.md）。
