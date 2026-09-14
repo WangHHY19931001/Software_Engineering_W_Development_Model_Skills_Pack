@@ -25,7 +25,10 @@ export const L0_BASELINE = {
   // ../../../schemas/verifier-output.schema.json（1 条），其中指向 L0 schemas 的
   // 1 条计为 l1Only、其余计入 relativeLinkCount。原设计规格的仓库外链已改为纯文本
   // 引用（技能包须自包含）。由 npm run audit:l0-links 实测 rebaseline，violations 仍 0）。
-  relativeLinkCount: 666,
+  // 670 = 666 + 4（2026-09-14 P1 Task 1：新增 references/asset-authoring.md 的 3 条同目录链接
+  // + SKILL.md「门禁契约与资源清单」指向该文件的指针 1 条；由 npm run audit:l0-links 实测
+  // rebaseline，l1Only 仍 93、placeholders 仍 36、violations 仍 0）。
+  relativeLinkCount: 670,
   l1Only: 93,
   placeholders: 36,
 } as const;
