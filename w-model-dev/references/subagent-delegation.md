@@ -127,15 +127,16 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 > O / 全角色通用加载：hard-constraints（14 条硬约束完整版，执行前必读）/ operation-behaviors（八条操作行为 + F1-F10）/ quick-self-check（推进前自检清单）/ design-philosophy（五条设计哲学）/ operational-recovery「成熟度与行为门禁」节（约束 #13 强制级别判定）/ estimation-guide（工期/预算估算时）/ context-management-guide（长会话上下文管理时）。
 
-### 3.1 全 references 触发条件表（42 份 .md，无 stub；行按主题组织）
+### 3.1 全 references 触发条件表（43 份 .md，无 stub；行按主题组织）
 
-> `references/` 目录共 42 份 .md（无 stub——42.0.0 的合并已就地完成，不存在重定向文件）。下表按「触发条件」组织，供编排者判断何时加载某文件；**行的粒度是「主题」而非「文件」**：多份合并来源共用一个主题行（如 bdd 行含 BDD 建模 / 语法速查 / 模式示例 / 评审清单），故行数多于文件数。
+> `references/` 目录共 43 份 .md（无 stub——42.0.0 的合并已就地完成，不存在重定向文件）。下表按「触发条件」组织，供编排者判断何时加载某文件；**行的粒度是「主题」而非「文件」**：多份合并来源共用一个主题行（如 bdd 行含 BDD 建模 / 语法速查 / 模式示例 / 评审清单），故行数多于文件数。
 > 未列入下表的有 `quickstart.md`（入门速查）、`activation-guide.md`（触发边界与反例）与 `code-health-governance.md`（`/wm code-health` 操作参考），按各自场景直接加载；其余文件均有主题行。行内计数以本节为准（历史数字 `59/39/19` 系旧口径，已失效）。
 > 标注 **2 跳** 的文件不直接出现在 §3 各阶段 reference 列，需经其上游文件（如 hard-constraints / phase-N / subagent-delegation）间接引用才可达——编排者按需显式加载，勿遗漏。
 
 | 文件                     | 触发条件                                                                                                                                                    | 可达性 |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
 | agent-personas           | V 子代理评审时选用 Persona（code-reviewer/test-engineer/security-auditor/performance-auditor）+ R-lead/V-lead 多角度 persona 选择矩阵（「Persona 矩阵」节） | 1 跳   |
+| asset-authoring          | 技能资产编写杠杆 + 渐进披露数字阈值 + 授权不写（no-op test / 指针措辞 / pruning 四刀）                                                                      | 1 跳   |
 | bdd                      | BDD 建模指南 + 语法速查 + 模式示例 + 评审清单（42.0.0 合并）                                                                                                | 1 跳   |
 | tla-plus                 | TLA+ 层次化建模指南 + 语法速查 + 模式示例 + 评审清单 + TLC 配置（42.0.0 合并）                                                                              | 1 跳   |
 | coding-quality           | 设计模式目录（阶段 3/4 设计套用）/ 重构手法与代码坏味道清单（阶段 5 评审 / 重构识别）                                                                       | 1 跳   |
@@ -176,7 +177,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 | workflow                 | 完整工作流程（初始化项目 / 阶段切换 / 向用户解释整体流程时）                                                                                                | 2 跳   |
 
 > 2 跳文件共 11 个：command-reference / concurrency-guide / conventions / data-models / event-ingress-guide / hill-climbing-guide / iceberg-sweep-guide / root-cause-locator / signature-chain-guide / skillopt-adoption / workflow。
-> 其余 28 个文件均直接出现在 §3 各阶段 reference 列或 O/V 通用加载（1 跳）。
+> 其余 29 个文件均直接出现在 §3 各阶段 reference 列或 O/V 通用加载（1 跳）。
 
 ### 4. 返工循环分派
 
