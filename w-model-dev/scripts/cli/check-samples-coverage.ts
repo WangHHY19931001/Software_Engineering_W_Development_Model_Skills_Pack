@@ -9,6 +9,12 @@
  *   - 引用 → 在盘：self-test.ts 引用的 file / sampleDir 路径必须真实存在（悬空 → reference-dangling / exit 1）；
  *   - 声明 → 矩阵行：README 覆盖矩阵按表行首列解析（正文反引号提及不算声明）。
  *
+ * 第 4 条规则（M06 / S28，P2-A 任务 2）：负向覆盖不变量——`cli/*.ts` 减去 `self-test.ts` 的每个
+ * exit-2 门禁必须在 samples/NEGATIVE-COVERAGE.md 登记一条会失败的负向案例（fixture / invocation /
+ * mutated-copy）。门禁集合从既有事实源（cli 目录）推导，不另写硬编码清单：
+ *   - 未登记 → negative-coverage-missing（exit 1）；
+ *   - fixture 机制行的证据路径在盘不存在 → negative-coverage-dangling（exit 1）。
+ *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts [repo-root] [--json]
  *   （repo-root 默认 cwd；本仓库根目录）
@@ -17,9 +23,9 @@
  *   --json   机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
- *   0  全部覆盖（无未登记 fixture，矩阵声明齐全，引用无悬空）
- *   1  存在未登记 fixture / 引用悬空（dangling）/ 矩阵声明缺失（violations 列出）
- *   2  输入错误（repo-root 缺必需文件）
+ *   0  全部覆盖（无未登记 fixture，矩阵声明齐全，引用无悬空，负向覆盖登记齐全）
+ *   1  存在未登记 fixture / 引用悬空（dangling）/ 矩阵声明缺失 / 负向案例未登记或悬空（violations 列出）
+ *   2  输入错误（repo-root 缺必需文件，含 samples/NEGATIVE-COVERAGE.md）
  *
  * 输出：
  *   stdout 打印结构化校验报告（人类可读 + 收尾 SAMPLES_COVERAGE_JSON 摘要，便于 Agent 正则截取）
@@ -50,8 +56,21 @@ import { printGateReport, printJsonReport } from '../lib/gate-report.js';
  */
 const EXEMPT_DIRS = ['tla-e2e', 'verifier-calibration'];
 
-/** samples/ 扫描时排除的目录 / 文件（运行时产物与文档） */
-const SKIP_NAMES = new Set(['.w-model', 'states', 'README.md', '.gitkeep']);
+/** samples/ 扫描时排除的目录 / 文件（运行时产物与文档；NEGATIVE-COVERAGE.md 为声明式清单，非 fixture） */
+const SKIP_NAMES = new Set(['.w-model', 'states', 'README.md', 'NEGATIVE-COVERAGE.md', '.gitkeep']);
+
+/** 负向案例机制（NEGATIVE-COVERAGE.md 第 2 列，只允许这三值） */
+const NEGATIVE_MECHANISMS = new Set(['fixture', 'invocation', 'mutated-copy']);
+
+/** NEGATIVE-COVERAGE.md 的一行登记 */
+interface NegativeEntry {
+  /** 门禁基名（cli/<name>.ts 去掉 .ts） */
+  name: string;
+  /** 负向机制：fixture / invocation / mutated-copy */
+  mechanism: string;
+  /** 证据位置：fixture 为 `samples/...`；invocation / mutated-copy 为 文件:行号 */
+  evidence: string;
+}
 
 /** 从 self-test.ts 提取的引用集合 */
 interface ReferenceSets {
@@ -202,6 +221,63 @@ function findUndeclaredDirs(samplesRoot: string, readmeContent: string): string[
   return undeclared;
 }
 
+/**
+ * 解析 samples/NEGATIVE-COVERAGE.md 的表格行：首单元格 = 门禁基名，第 2 列 = 机制，第 3 列 = 证据。
+ * 仅接受三值枚举机制且证据非空的行（表头 / 分隔行 / 空行跳过），避免「写了行但不构成负向案例」的假登记。
+ */
+function parseNegativeCoverage(content: string): NegativeEntry[] {
+  const entries: NegativeEntry[] = [];
+  for (const line of content.split('\n')) {
+    if (!/^\s*\|/.test(line)) continue;
+    const cells = line
+      .replace(/^\s*\|/, '')
+      .split('|')
+      .map((c) => c.trim());
+    const name = (cells[0] ?? '').replace(/^`/, '').replace(/`$/, '');
+    if (name === '' || name === '门禁脚本' || /^-+$/.test(name)) continue;
+    const mechanism = (cells[1] ?? '').replace(/^`/, '').replace(/`$/, '');
+    const evidence = cells[2] ?? '';
+    if (!NEGATIVE_MECHANISMS.has(mechanism) || evidence === '') continue;
+    entries.push({ name, mechanism, evidence });
+  }
+  return entries;
+}
+
+/** fixture 机制行的证据路径（`samples/...`，相对 w-model-dev/scripts/）；无法解析返回 null */
+function extractFixturePath(evidence: string): string | null {
+  const backticked = evidence.match(/`([^`]+)`/);
+  const raw = backticked !== null ? backticked[1] : evidence.split('（')[0];
+  const trimmed = (raw ?? '').trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+/** 门禁集合口径：w-model-dev/scripts/cli/*.ts 减去 self-test.ts（与 check-docs-consistency 中心探针一致） */
+function listGateNames(root: string): string[] {
+  const cliDir = join(root, 'w-model-dev/scripts/cli');
+  return readdirSync(cliDir)
+    .filter((f) => f.endsWith('.ts') && f !== 'self-test.ts')
+    .map((f) => f.slice(0, -'.ts'.length))
+    .sort();
+}
+
+/** 负向清单未登记的门禁（每个 exit-2 门禁须有会失败的负向案例） */
+function findMissingNegativeGates(root: string, entries: NegativeEntry[]): string[] {
+  const registered = new Set(entries.map((e) => e.name));
+  return listGateNames(root).filter((name) => !registered.has(name));
+}
+
+/** fixture 机制行中证据路径在盘不存在（或无法解析）的条目 */
+function findDanglingNegativeFixtures(root: string, entries: NegativeEntry[]): string[] {
+  const dangling: string[] = [];
+  for (const e of entries) {
+    if (e.mechanism !== 'fixture') continue;
+    const rel = extractFixturePath(e.evidence);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控清单条目（NEGATIVE-COVERAGE.md 内 samples/ 相对路径），仅作存在性探测
+    if (rel === null || !existsSync(join(root, 'w-model-dev/scripts', rel))) dangling.push(rel ?? e.evidence);
+  }
+  return dangling;
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const jsonMode = argv.includes('--json');
@@ -210,11 +286,12 @@ async function main(): Promise<void> {
   const samplesRoot = join(root, 'w-model-dev/scripts/samples');
   const selfTestPath = join(root, 'w-model-dev/scripts/cli/self-test.ts');
   const readmePath = join(samplesRoot, 'README.md');
+  const negativePath = join(samplesRoot, 'NEGATIVE-COVERAGE.md');
 
   // S20：repo-root 缺必需文件属输入错误（ARG_INVALID / exit 2，与 check-docs-consistency 同口径）；
   // 其余读取异常冒泡交由 runMain 的 UNEXPECTED 兜底（ERROR_JSON + exit 2），不再自吞堆栈
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控仓库相对路径（repo-root 下 samples/ 与 self-test.ts），仅作存在性探测
-  const missingRequired = [samplesRoot, selfTestPath, readmePath].filter((p) => !existsSync(p));
+  const missingRequired = [samplesRoot, selfTestPath, readmePath, negativePath].filter((p) => !existsSync(p));
   if (missingRequired.length > 0) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -229,6 +306,9 @@ async function main(): Promise<void> {
   const uncovered = findUncovered(samplesRoot, refs);
   const dangling = findDanglingRefs(samplesRoot, refs);
   const undeclared = findUndeclaredDirs(samplesRoot, readFileSync(readmePath, 'utf-8'));
+  const negativeEntries = parseNegativeCoverage(readFileSync(negativePath, 'utf-8'));
+  const missingNegative = findMissingNegativeGates(root, negativeEntries);
+  const danglingNegative = findDanglingNegativeFixtures(root, negativeEntries);
 
   const violations: Array<{ check: string; message: string }> = [
     ...uncovered.map((rel) => ({
@@ -242,6 +322,14 @@ async function main(): Promise<void> {
     ...undeclared.map((dir) => ({
       check: 'matrix-undeclared',
       message: `samples/${dir}/ 未在 samples/README.md 覆盖矩阵声明`,
+    })),
+    ...missingNegative.map((name) => ({
+      check: 'negative-coverage-missing',
+      message: `samples/NEGATIVE-COVERAGE.md 未登记负向案例：${name}（每个 exit-2 门禁须有会失败的负向案例）`,
+    })),
+    ...danglingNegative.map((rel) => ({
+      check: 'negative-coverage-dangling',
+      message: `负向案例指向不存在的 fixture：${rel}`,
     })),
   ];
 
@@ -276,6 +364,8 @@ async function main(): Promise<void> {
       unregistered: uncovered.length,
       danglingRefs: dangling.length,
       undeclaredDirs: undeclared.length,
+      negativeCoverageMissing: missingNegative.length,
+      negativeCoverageDangling: danglingNegative.length,
     },
     violations.length === 0 ? 0 : 1,
   );

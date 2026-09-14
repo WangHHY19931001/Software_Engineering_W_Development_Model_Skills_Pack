@@ -55,6 +55,17 @@ function fakeReadme(matrixDirs: string[], proseMentions: string[] = []): string 
   ].join('\n');
 }
 
+/** NEGATIVE-COVERAGE.md：未登记的门禁由门禁脚本枚举 cli/*.ts（减 self-test.ts）得出 */
+function fakeNegativeCoverage(rows: Array<{ name: string; mechanism: string; evidence: string }>): string {
+  return [
+    '# 负向覆盖登记册',
+    '',
+    '| 门禁脚本 | 负向机制 | 负向案例 / 证据位置 | 所防回归（一句话） |',
+    '| --- | --- | --- | --- |',
+    ...rows.map((r) => `| ${r.name} | ${r.mechanism} | ${r.evidence} | 防某具体回归 |`),
+  ].join('\n');
+}
+
 let tmpDir: string;
 
 beforeEach(async () => {
@@ -69,15 +80,27 @@ async function setupRepo(opts: {
   refs: Array<{ subdir: string; file: string }>;
   onDisk: string[];
   readme: string;
+  /** 额外 cli/*.ts（非 self-test）用于构成 exit-2 门禁集合 */
+  cliScripts?: string[];
+  /** NEGATIVE-COVERAGE.md 内容；缺省为空登记表 */
+  negative?: string;
 }): Promise<void> {
   await fs.mkdir(path.join(tmpDir, 'w-model-dev/scripts/cli'), { recursive: true });
   await fs.writeFile(path.join(tmpDir, 'w-model-dev/scripts/cli/self-test.ts'), fakeSelfTest(opts.refs), 'utf-8');
+  for (const script of opts.cliScripts ?? []) {
+    await fs.writeFile(path.join(tmpDir, 'w-model-dev/scripts/cli', script), '// stub\n', 'utf-8');
+  }
   for (const rel of opts.onDisk) {
     const p = path.join(tmpDir, 'w-model-dev/scripts/samples', rel);
     await fs.mkdir(path.dirname(p), { recursive: true });
     await fs.writeFile(p, '{}', 'utf-8');
   }
   await fs.writeFile(path.join(tmpDir, 'w-model-dev/scripts/samples/README.md'), opts.readme, 'utf-8');
+  await fs.writeFile(
+    path.join(tmpDir, 'w-model-dev/scripts/samples/NEGATIVE-COVERAGE.md'),
+    opts.negative ?? fakeNegativeCoverage([]),
+    'utf-8',
+  );
 }
 
 function run(): { code: number | null; stdout: string; stderr: string } {
@@ -134,9 +157,76 @@ describe('check-samples-coverage 双向闭环（F-G7-06/07）', () => {
     );
     await fs.mkdir(path.join(tmpDir, 'w-model-dev/scripts/samples'), { recursive: true });
     await fs.writeFile(path.join(tmpDir, 'w-model-dev/scripts/samples/README.md'), fakeReadme([]), 'utf-8');
+    await fs.writeFile(
+      path.join(tmpDir, 'w-model-dev/scripts/samples/NEGATIVE-COVERAGE.md'),
+      fakeNegativeCoverage([]),
+      'utf-8',
+    );
     const r = run();
     expect(r.code).toBe(1);
     expect(r.stdout).toContain('reference-dangling');
     expect(r.stdout).toContain('opsx-artifacts/ghost-phase5');
+  });
+});
+
+describe('check-samples-coverage 负向覆盖不变量（M06 / S28）', () => {
+  it('RED：清单缺一个 exit-2 门禁 → exit 1 negative-coverage-missing', async () => {
+    await setupRepo({
+      refs: [{ subdir: 'foo', file: 'a.json' }],
+      onDisk: ['foo/a.json'],
+      readme: fakeReadme(['foo']),
+      cliScripts: ['check-foo.ts'],
+      negative: fakeNegativeCoverage([]),
+    });
+    const r = run();
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('negative-coverage-missing');
+    expect(r.stdout).toContain('check-foo');
+  });
+
+  it('RED：fixture 机制行指向不存在的 fixture → exit 1 negative-coverage-dangling', async () => {
+    await setupRepo({
+      refs: [{ subdir: 'foo', file: 'a.json' }],
+      onDisk: ['foo/a.json'],
+      readme: fakeReadme(['foo']),
+      cliScripts: ['check-foo.ts'],
+      negative: fakeNegativeCoverage([
+        { name: 'check-foo', mechanism: 'fixture', evidence: '`samples/foo/ghost.json`（self-test.ts:1）' },
+      ]),
+    });
+    const r = run();
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('negative-coverage-dangling');
+    expect(r.stdout).toContain('samples/foo/ghost.json');
+  });
+
+  it('正例：清单齐全且 fixture 在盘 + invocation 行不校验路径 → exit 0', async () => {
+    await setupRepo({
+      refs: [{ subdir: 'foo', file: 'a.json' }],
+      onDisk: ['foo/a.json'],
+      readme: fakeReadme(['foo']),
+      cliScripts: ['check-foo.ts', 'check-bar.ts'],
+      negative: fakeNegativeCoverage([
+        { name: 'check-foo', mechanism: 'fixture', evidence: '`samples/foo/a.json`（self-test.ts:1）' },
+        { name: 'check-bar', mechanism: 'invocation', evidence: 'w-model-dev/scripts/__tests__/x.test.ts:1' },
+      ]),
+    });
+    const r = run();
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('"negativeCoverageMissing":0');
+    expect(r.stdout).toContain('"negativeCoverageDangling":0');
+  });
+
+  it('缺 samples/NEGATIVE-COVERAGE.md → exit 2（与既有三必需文件同口径）', async () => {
+    await setupRepo({
+      refs: [{ subdir: 'foo', file: 'a.json' }],
+      onDisk: ['foo/a.json'],
+      readme: fakeReadme(['foo']),
+    });
+    await fs.rm(path.join(tmpDir, 'w-model-dev/scripts/samples/NEGATIVE-COVERAGE.md'));
+    const r = run();
+    expect(r.code).toBe(2);
+    expect(r.stdout).toContain('ERROR_JSON');
+    expect(r.stdout).toContain('NEGATIVE-COVERAGE.md');
   });
 });
