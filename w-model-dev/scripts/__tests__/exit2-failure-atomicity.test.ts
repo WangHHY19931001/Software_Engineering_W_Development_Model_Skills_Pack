@@ -71,9 +71,9 @@ const SNAPSHOT_TARGETS = ['w-model-dev/scripts/samples', 'coverage', '.w-model']
 interface RepoSnapshot {
   /** 仓库根相对 POSIX 路径 → `directory` / `symlink:<target>` / `file:<sha256>` / `<missing>`。 */
   readonly paths: Record<string, string>;
-  /** `git status --porcelain` 的原始输出（跟踪/未跟踪变更）。 */
+  /** `git status --porcelain` 的原始输出（跟踪/未跟踪变更）；消费方式为**单调**，见 expectNoNewDirtyPaths()。 */
   readonly gitStatus: string;
-  /** `git diff --name-only` 的原始输出（工作区 vs index）。 */
+  /** `git diff --name-only` 的原始输出（工作区 vs index）；同样按单调口径消费。 */
   readonly gitDiffNames: string;
 }
 
@@ -156,6 +156,44 @@ function takeSnapshot(): RepoSnapshot {
   };
 }
 
+/**
+ * 从 `git status --porcelain` 输出解析脏路径集合。
+ * porcelain v1 每行形如 `XY PATH`（固定 3 字符前缀）；rename/copy 为 `XY OLD -> NEW`，取 NEW。
+ * 解析保持宽松（不反转义 C-quote）：只用于子集比较，同一输入的解析是稳定的。
+ */
+function porcelainDirtyPaths(statusOutput: string): Set<string> {
+  const paths = new Set<string>();
+  for (const line of statusOutput.split(/\r?\n/)) {
+    if (line.length < 4) continue;
+    const rest = line.slice(3);
+    const arrow = rest.lastIndexOf(' -> ');
+    paths.add(arrow === -1 ? rest : rest.slice(arrow + 4));
+  }
+  return paths;
+}
+
+/** 从 `git diff --name-only` 输出解析脏路径集合（每行一个路径）。 */
+function nameOnlyDirtyPaths(diffOutput: string): Set<string> {
+  return new Set(diffOutput.split(/\r?\n/).filter((line) => line.length > 0));
+}
+
+/**
+ * 单调断言：after 的脏路径集合必须是 before 的**子集** —— 只禁止门禁**新增**脏路径。
+ *
+ * 为什么是单调而非相等（请勿"修回"成相等）：全仓 `git status` 对任何**与本任务无关**的并发
+ * 工作树变动都敏感。本仓库已有 vitest 抖动记录（docs/changes/vitest-parallel-flakiness-finding.md），
+ * P2-A 不应引入新的抖动源：开发者机器、prepush 双 project 并发、乃至审查期间控制者提交别的
+ * 文件，都会让"快照前脏、快照后被外部改干净"从而相等断言假红（真实发生过一次：审查独立复跑时
+ * 控制者正在提交 `check-samples-coverage.ts` 的安全扫描修复）。单调口径保留真正要防的风险
+ * （门禁不能把干净文件弄脏 / 不能"回退"已有脏项——后者为 after 新增了另一个路径也算新增），
+ * 不要求 after 仍包含 before 里与本测试无关的脏项。门禁自身的可写面由 `paths` 的**相等**断言
+ * （sha256 逐字节）覆盖，那才是本测试的核心证据，保持不变。
+ */
+function expectNoNewDirtyPaths(after: Set<string>, before: Set<string>, label: string): void {
+  const added = [...after].filter((path) => !before.has(path));
+  expect(added, `${label} 失败后不得新增脏路径（allowed: after ⊆ before）`).toEqual([]);
+}
+
 /** 与 collectExit2ScriptResults 同源的每门禁负向探针参数。 */
 function negativeProbeFor(gateFile: string, probeRoot: string): NegativeProbe {
   switch (gateFile) {
@@ -224,8 +262,14 @@ describe('exit-2 门禁失败原子性（S26）', () => {
   for (const gateFile of GATE_FILES) {
     it(`${gateFile} 负向调用 exit 2 后仓库状态逐字节不变`, async () => {
       const before = takeSnapshot();
-      // 快照非空守卫：空快照会让"前后相等"恒真（断言被架空）。
+      // 快照非空守卫（一）：三个目标全缺失时各记一条 `<missing>`，故 `>0` 单独不足以证明快照有效。
       expect(Object.keys(before.paths).length, `${gateFile} 的快照不应为空`).toBeGreaterThan(0);
+      // 快照非空守卫（二）：必须至少有一条**真实**路径条目（samples/ 整树必然在盘），
+      // 使"快照失效到只剩 `<missing>` 占位"无法蒙混过关（前后相等会近似真空）。
+      expect(
+        Object.keys(before.paths).some((key) => key.startsWith('w-model-dev/scripts/samples/')),
+        `${gateFile} 的快照必须含 samples/ 下的真实条目（防 <missing> 占位蒙混）`,
+      ).toBe(true);
 
       const outcome = await runNegativeProbe(gateFile, probeRoot);
       const after = takeSnapshot();
@@ -235,9 +279,16 @@ describe('exit-2 门禁失败原子性（S26）', () => {
         `${gateFile} 的负向探针应 exit 2（stdout=${outcome.stdout.slice(0, 300)} stderr=${outcome.stderr.slice(0, 300)}）`,
       ).toBe(2);
       expect(after.paths, `${gateFile} 失败后仓库路径快照应逐字节不变`).toEqual(before.paths);
-      expect(after.gitStatus, `${gateFile} 失败后 git status --porcelain 应不变`).toBe(before.gitStatus);
-      expect(after.gitDiffNames, `${gateFile} 失败后 git diff --name-only 应不变（工作区无新增/回退改动）`).toBe(
-        before.gitDiffNames,
+      // git 状态用**单调**口径（不新增脏路径），非相等；理由见 expectNoNewDirtyPaths() 的 JSDoc。
+      expectNoNewDirtyPaths(
+        porcelainDirtyPaths(after.gitStatus),
+        porcelainDirtyPaths(before.gitStatus),
+        `${gateFile} git status --porcelain`,
+      );
+      expectNoNewDirtyPaths(
+        nameOnlyDirtyPaths(after.gitDiffNames),
+        nameOnlyDirtyPaths(before.gitDiffNames),
+        `${gateFile} git diff --name-only`,
       );
     }, 60_000);
   }
