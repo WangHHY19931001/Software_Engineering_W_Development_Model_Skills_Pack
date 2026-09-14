@@ -35,6 +35,16 @@
 - **M07 移出 P2**：裁定 D-2 要求 RTM `testSummary` 的 Schema 变更**单独批准**，故 M07 须自成一个"Schema 变更批准 + 计划"单元，不得包裹在本计划内。
 - **P2 拆为 P2-A / P2-B**：设计规格 §11 要求每期"独立可审阅、独立可回滚"。P2-A = M06 + S26 + S28 + S29（负向覆盖、失败原子性、矩阵列、测试替身保真）；P2-B = S25 + S31 + S32 + S30 + S27（规则负载性两态 fixture、完整性审计、评审包 CLI、定量预算断言、revertEvidence）。**本文件只覆盖 P2-A**；P2-B 另立计划。
 
+### 0.1 本计划的勘误（由任务 2 的实现者发现、审查者独立复核后修正）
+
+| # | 原写法 | 实际 | 处置 |
+| --- | --- | --- | --- |
+| **E1** | 多处以 `npm run check:samples-coverage` 作为验证命令 | **该 npm 脚本不存在**（`package.json` 里 `grep -c 'check:samples-coverage'` = 0；易与 `check:coverage`（另一个脚本 `check-requirement-coverage.ts`）混淆）。正确形式是本仓既有惯例的 CLI 直调：`npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts` | 本文件已全文改写为正确命令；**不新增 npm 脚本别名**（那会改动 `package.json`，超出本计划授权面） |
+| **E2** | §2 台账写「A 组 **27** 个」「C 组 **13** 个」 | 实测枚举为 **A = 28**、**C = 14**（B 组 3 个中有 2 个与 A 重叠，独有 `check-tla-bdd-sync`）；三组名字**并集仍恰为 43** | 本文件已改为 28 / 14；**任务 5 回填 AC-7 时须按校正后的标签叙述**。清单本身（43 行）**未受影响**——审查者已独立完成集合比对，确认与门禁集合精确等集 |
+
+> 两处都是**计划文档的错误**，不是实现错误；据 SDD，计划强制与计划自身出错同属必须显式留痕的事项，故记于此。
+
+
 ---
 
 ## 1. 全局约束（每个任务都适用）
@@ -61,7 +71,7 @@
 **验证纪律**
 
 14. 每个任务收尾**必须实跑**该任务"预期"节列出的命令，把**真实输出**写进报告；不得以推理代替运行。
-15. **任务级验证**：`npm run self-test`（332 条基线）、该任务点名的 vitest 文件、必要时 `npm run check:samples-coverage`。**`npm run prepush`（18 项，约 20 分钟）只在最后任务跑一次**。
+15. **任务级验证**：`npm run self-test`（332 条基线）、该任务点名的 vitest 文件、必要时 `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`。**`npm run prepush`（18 项，约 20 分钟）只在最后任务跑一次**。
 16. **诚实性**：vitest 有本仓库**已记录的并行抖动**（`docs/changes/vitest-parallel-flakiness-finding.md`：同一命令同一代码两次运行失败数可差 10 倍，基线提交同样复现，阻断推送但非真实回归；配置已把子进程类文件拆到 `cli-serial` 串行）。若出现 1–3 个失败：先看形态是否在已记录抖动内，再**聚焦重跑该文件一次**；判定为抖动须在报告里写明失败文件名、断言原文、聚焦重跑结果与依据。**不得把真实失败说成抖动，也不得把抖动说成绿。**
 
 ---
@@ -72,9 +82,9 @@
 
 | 组 | 门禁 | 负向案例机制 | 现状 |
 | --- | --- | --- | --- |
-| **A. 已有强负向 fixture（27）** | `check-verifier-output` / `check-artifact-gate` / `check-requirement-graph` / `check-tla-model` / `check-bdd-model` / `check-budget` / `check-run-log` / `check-maturity` / `check-checkpoint` / `check-code-tla-consistency` / `check-rootcause-report` / `check-preventive-review` / `check-iceberg-sweep` / `check-role-dispatch` / `check-state-machine-consistency` / `check-codegraph-queries` / `check-opsx-artifacts` / `check-openspec-archive` / `check-requirement-coverage` / `check-exemption` / `check-design-contract-consistency` / `check-signature-chain` / `check-archive-integrity` / `code-health-gap` / `code-health-tests` / `code-health-apply` / `code-health-duplicates` / `code-health-phase1` | fixture（`samples/<area>/bad-*`）+ `expectedPassed:false` 或等价断言字段 | 已有，**登记即可**（无需新增 fixture） |
+| **A. 已有强负向 fixture（28）** | `check-verifier-output` / `check-artifact-gate` / `check-requirement-graph` / `check-tla-model` / `check-bdd-model` / `check-budget` / `check-run-log` / `check-maturity` / `check-checkpoint` / `check-code-tla-consistency` / `check-rootcause-report` / `check-preventive-review` / `check-iceberg-sweep` / `check-role-dispatch` / `check-state-machine-consistency` / `check-codegraph-queries` / `check-opsx-artifacts` / `check-openspec-archive` / `check-requirement-coverage` / `check-exemption` / `check-design-contract-consistency` / `check-signature-chain` / `check-archive-integrity` / `code-health-gap` / `code-health-tests` / `code-health-apply` / `code-health-duplicates` / `code-health-phase1` | fixture（`samples/<area>/bad-*`）+ `expectedPassed:false` 或等价断言字段 | 已有，**登记即可**（无需新增 fixture） |
 | **B. 弱断言，须强化（3 用例）** | `check-artifact-gate`（`self-test.ts:378`）· `check-preventive-review`（`:1450`）· `check-tla-bdd-sync`（`:1557`） | fixture 已有但**无断言机制** | 任务 1 强化 |
-| **C. 无 fixture 概念，负向输入是参数（13）** | `check-docs-consistency` / `check-samples-coverage` / `code-health-archive` / `code-health-ledger` / `doctor` / `ensure-codegraph-opsx` / `metrics-report` / `plan-chunks` / `platform-deps-install` / `security-scan` / `wm-export-evidence` / `wm-status` / `wm-verify-evidence-source` / `wm-write`（其中 `check-docs-consistency` 的负向覆盖在 `docs-consistency-logic.test.ts` 的**变异副本**用例里） | **参数**（`--d4-invalid-argument` 等）或**变异副本** | 已在中心探针/`__tests__` 覆盖；任务 2 登记机制 + 任务 3 补原子性断言 |
+| **C. 无 fixture 概念，负向输入是参数（14）** | `check-docs-consistency` / `check-samples-coverage` / `code-health-archive` / `code-health-ledger` / `doctor` / `ensure-codegraph-opsx` / `metrics-report` / `plan-chunks` / `platform-deps-install` / `security-scan` / `wm-export-evidence` / `wm-status` / `wm-verify-evidence-source` / `wm-write`（其中 `check-docs-consistency` 的负向覆盖在 `docs-consistency-logic.test.ts` 的**变异副本**用例里） | **参数**（`--d4-invalid-argument` 等）或**变异副本** | 已在中心探针/`__tests__` 覆盖；任务 2 登记机制 + 任务 3 补原子性断言 |
 
 > **注**：C 组里 `wm-write` / `metrics-report` / `wm-status` / `plan-chunks` / `platform-deps-install` / `security-scan` / `wm-export-evidence` / `wm-verify-evidence-source` 已有 CLI 级 vitest 的 exit-2 断言（如 `wm-write.test.ts`、`metrics-report.test.ts`、`project-read-validation.test.ts:100`）。任务 2 须**逐个核实**并在清单里写明其**证据位置**；核实不到的才是真正要补的缺口。
 
@@ -154,7 +164,7 @@ git commit -m "test(self-test): make the three presence-only negative cases actu
   ⚠ 该测试文件已在 `SUBPROCESS_TEST_FILES` 中（它 spawn CLI）；**不要**改 `config/vitest.config.ts` 除非你新增了测试文件。
 
 - [ ] **步骤 5：跑验证。** 依次：
-  - `npm run check:samples-coverage` → exit 0（清单齐全、矩阵行尾新列不破坏第一单元格契约）
+  - `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts` → exit 0（清单齐全、矩阵行尾新列不破坏第一单元格契约）
   - `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/check-samples-coverage.test.ts` → 全通过
   - `npm run self-test` → exit 0
   - `npm run check:docs-consistency` 的 `references-count`/`asset-counts` 不受影响（本任务未动 `references/`）；若你想省时间，可跳过这条（它由最后任务的全量 prepush 覆盖）
@@ -245,7 +255,7 @@ git commit -m "test(gates): make test doubles mirror the real contracts (S29)"
 - [ ] **步骤 3：一致性自查（记入报告）。**
   - `npm run audit:l0-links` → exit 0 且 `violations: []`（三个计数与基线一致，或已重基线）
   - `npm run self-test` → exit 0，样本数如实记录
-  - `npm run check:samples-coverage` → exit 0
+  - `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts` → exit 0
   - `git diff --stat <base>..HEAD -- w-model-dev/scripts/cli/` → 确认**没有新增** cli 脚本（契约 6）；`grep -n "个脚本\|个 \.ts" AGENTS.md w-model-dev/SKILL.md` → 计数**未变**（仍为 43 / 44）
 
 - [ ] **步骤 4：回填 AC-7 的真实状态。** 在 §13 的 AC-7 行**行内追加**状态标注，**只加状态、不改判据文本**。按实测如实写，格式照 AC-2/AC-4/AC-11 的既有风格（`**P2-A 范围内已达成 / 部分达成**：…证据命令…`）。须覆盖 AC-7 的四个分句各自的真实状态：
