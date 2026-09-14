@@ -206,9 +206,12 @@ describe('runSync', () => {
     expect(securitySource).toMatch(/const r = runSync\([\s\S]*?timeout\s*:\s*300_000[\s\S]*?maxBuffer\s*:/);
     expect(securitySource).toMatch(/if \(r\.error \|\| \(r\.status !== 0 && !r\.stdout\)\)/);
 
+    // 复刻 Node spawnSync 的失败契约（run-sync.ts 是 spawnSync 的薄封装，逐字段透传）：
+    // spawn 失败 / 超时 → status 为 null 且 error 携带 code；数字 status 只出现在子进程
+    // 真实运行后退出的场景，此时 error 为 undefined。故二者不同时出现。
     for (const result of [
       { status: null, error: Object.assign(new Error('git timed out'), { code: 'ETIMEDOUT' }) },
-      { status: 1, error: Object.assign(new Error('git unavailable'), { code: 'ENOENT' }) },
+      { status: null, error: Object.assign(new Error('git unavailable'), { code: 'ENOENT' }) },
     ]) {
       spawnSyncMock.mockReset();
       spawnSyncMock.mockReturnValue({ stdout: '', stderr: '', ...result });
