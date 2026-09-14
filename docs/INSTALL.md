@@ -276,12 +276,11 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 ```yaml
 name: w-model-dev
 version: 42.2.1
-description: >-
-  Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
-  requests requirements traceability (RTM), stage gates, quality gates, or development
-  and testing in parallel. When the user only asks for an end-to-end or complete
-  development process without these signals, ask whether to use the W-model first.
+# description 不在此处复制：SKILL.md 的 frontmatter 是其唯一权威来源
+# （本节曾逐字镜像该字段，已发生过一次漂移，故改为指向而非复述）
 ```
+
+`description` 的权威来源是 `w-model-dev/SKILL.md` 的 frontmatter，本节不再复述；需要确认当前触发文本时直接读 [`w-model-dev/SKILL.md`](../w-model-dev/SKILL.md)。
 
 触发条件摘要：
 
