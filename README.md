@@ -34,6 +34,8 @@ AI 助手写代码很容易「差不多就行」：跳段、凭感觉、说不�
 
 这个仓库只有两个用途：**验证仓库健康**，或者**把 Skill 装进你的 AI 助手**。两者不是同一条命令链，按需二选一。
 
+**单一权威文案**：**仓库验证**命令的唯一权威是本页下方 [验证仓库](#验证仓库) 的命令块；**Skill 安装**的唯一权威是 [docs/INSTALL.md](./docs/INSTALL.md) §2 前置条件 + §3 标准安装。两处互不复述——本页其余位置与仓库内其他文档讲这两条路线时一律指向对应权威、不复制命令（复制块会各自过期，需改时先改权威再让消费者指向）。
+
 ## 验证仓库
 
 只检查仓库脚本和依赖是否健康，不会安装到任何 Agent。需要 Node.js ≥ 20 与 Git；命令必须从仓库根目录执行。PowerShell 5.1 请逐行执行，不要使用 `&&`：
@@ -159,8 +161,7 @@ flowchart LR
 仓库里的门禁脚本是自包含 TypeScript，可在仓库根目录用 npm 快捷脚本或 `npx tsx` 直接执行：
 
 ```bash
-npm install                                   # 首次：安装 tsx / ajv / eslint-plugin-security 等
-npm run self-test                             # 332 条样本回归基线
+# 仓库验证入口命令（npm install / npm run self-test）见上文「验证仓库」快速开始块；此处不重复，避免两处过期
 npm run check:gate -- [项目目录]              # 工件质量门（退出码 0/1/2）
 npm run check:graph -- <graph.json> --phase=1 # 图谱结构门禁
 npm run check:tla -- <manifest.json>          # TLA+ 行为门禁

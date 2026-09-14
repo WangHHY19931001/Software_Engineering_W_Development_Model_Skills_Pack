@@ -269,7 +269,7 @@ W-Model 的方法论参考类文件可脱离编排单独拷贝到其他 Agent �
 
 ---
 
-## 5. 激活机制（来自 `SKILL.md` frontmatter）
+## 5. 激活机制（来自 `SKILL.md` frontmatter，节选）
 
 Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能：
 
@@ -282,12 +282,7 @@ version: 42.2.1
 
 `description` 的权威来源是 `w-model-dev/SKILL.md` 的 frontmatter，本节不再复述；需要确认当前触发文本时直接读 [`w-model-dev/SKILL.md`](../w-model-dev/SKILL.md)。
 
-触发条件摘要：
-
-- 用户提及「W 模型」「W 开发模型」或「开发与测试并行」
-- 用户使用 `/wm` 系列命令
-- 用户要从需求出发完成设计 → 编码 → 各级测试的完整交付
-- 用户需要需求追溯 / 质量门检查 / 补齐测试设计
+触发边界与触发信号不在本节复述：触发边界的权威定义在 [`w-model-dev/references/activation-guide.md`](../w-model-dev/references/activation-guide.md)，触发决策表在 [`w-model-dev/SKILL.md`](../w-model-dev/SKILL.md)（`description` 即其权威来源）；本节不再维护触发清单——手工复述的触发信号会与 `description` 漂移，需要确认时直接读上述两处权威。
 
 > `version` 字段与 [`w-model-dev/skill-metadata.json`](../w-model-dev/skill-metadata.json) 镜像双写，由 [`__tests__/skill-metadata.test.ts`](../w-model-dev/scripts/__tests__/skill-metadata.test.ts) 回归校验一致。
 
