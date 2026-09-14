@@ -209,6 +209,21 @@ export interface DocConsistencyInput {
    * 可选——缺省（fixture 未注入）时跳过出站链接检查。
    */
   skillPkgDocs?: Array<{ name: string; content: string; baseDir: string }>;
+  /**
+   * S31 orphan-reference 完整性审计数据源：SKILL.md + references/*.md（declared-list 计数
+   * 之外的互补维度——计数相等不代表每份载体都被导航覆盖）。
+   * name = 相对技能包根 w-model-dev/ 的 POSIX 路径（'SKILL.md' / 'references/<f>'）；
+   * baseDir = name 所在目录（'.' / 'references'）；相对 .md 链接按 baseDir 解析为包内路径。
+   * 目标集 = baseDir==='references' 的条目；入链来源 = SKILL.md 条目 + 全部 references 条目。
+   * 可选——缺省（fixture 未注入）时跳过孤儿检查。
+   */
+  orphanAuditDocs?: Array<{ name: string; content: string; baseDir: string }>;
+  /**
+   * S31 agents-nav-missing 检查数据源：AGENTS.md 原文 + scripts/cli/ 实测 .ts 清单。
+   * 每个 cli 基名（去 .ts 后缀）须以子串出现在 AGENTS.md（§8 脚本导航表漂移即违规）。
+   * 可选——缺省（fixture 未注入）时跳过该检查，与 cliScriptFiles 空守卫策略互补。
+   */
+  agentsNav?: { agents: string; cliScriptFiles: string[] };
 }
 
 /**
@@ -812,6 +827,8 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
     violations.push(...checkSkillOutboundLinks(input.skillPkgDocs));
     violations.push(...checkSchemaLoaderPaths(input.skillPkgDocs));
   }
+  violations.push(...checkOrphanReferences(input.orphanAuditDocs));
+  violations.push(...checkAgentsNavCoverage(input.agentsNav));
   violations.push(...checkExit2ProbeResults(input.exit2ProbeResults));
   violations.push(
     ...checkRootCauseR10Contract({
@@ -1895,6 +1912,88 @@ export function checkSkillOutboundLinks(
           message: `${doc.name} 链接逃逸技能包根：${target}（resolve → ${resolved}，超出 w-model-dev/）；技能包须自包含，改包内相对路径或纯文本引用（如「见仓库 docs/xxx.md」）`,
         });
       }
+    }
+  }
+  return violations;
+}
+
+// ==================== S31 完整性审计双维度（orphan-reference / agents-nav-missing） ====================
+
+/**
+ * S31 orphan-reference 豁免清单（条目 = references/ 下文件名，如 'draft-appendix.md'）。
+ * 当前为空数组：实测 43 个 references/*.md 全部有 ≥1 条来自 SKILL.md 或其它 references/*.md
+ * 的相对入链，门禁先天严格。未来出现合法孤儿载体（如纯附录页）时登记到此处并注明理由；
+ * 清单外文件一律强制入链——豁免是显式登记，不是缺省放行。
+ */
+export const ORPHAN_REFERENCE_EXEMPTIONS: ReadonlyArray<string> = [];
+
+/**
+ * S31 orphan-reference：每个 references/*.md 须有 ≥1 条来自 SKILL.md 或「其它」references/*.md
+ * 的相对 .md 入链（自链接不计——自我引用不构成导航）。与 references-count「计数相等」正交互补：
+ * 计数相等只保证清单完整，不保证每份载体都被 SKILL/references 导航网覆盖（孤儿 = 死文档前兆）。
+ * 链接提取复用 extractMarkdownRelLinks（围栏/行内 code span 剥离、锚点/query 剥离、外部 URL 跳过），
+ * 按 baseDir 做 POSIX 归一化解析到包内路径后与目标名比对。
+ * fail-closed：docs 注入但缺 SKILL.md 条目（name==='SKILL.md' 且 baseDir==='.'）→ 单条违规，
+ * 不在来源不完整时对目标集静默放行。豁免经 ORPHAN_REFERENCE_EXEMPTIONS（exemptions 参数注入，
+ * 生产挂载用默认常量）。守卫：docs 缺省时跳过（fixture 兼容，与 linkDocs/skillPkgDocs 一致）。
+ */
+export function checkOrphanReferences(
+  docs: Array<{ name: string; content: string; baseDir: string }> | undefined,
+  exemptions: ReadonlyArray<string> = ORPHAN_REFERENCE_EXEMPTIONS,
+): DocCheckViolation[] {
+  if (docs === undefined) return [];
+  const hasSkillDoc = docs.some((d) => d.name === 'SKILL.md' && d.baseDir === '.');
+  if (!hasSkillDoc) {
+    return [
+      {
+        check: 'orphan-reference',
+        message:
+          'orphanAuditDocs 未注入 SKILL.md 条目（name=SKILL.md、baseDir=.），入链来源不完整，fail-closed（CLI 须注入 SKILL.md + references/*.md 全量）',
+      },
+    ];
+  }
+  const targets = docs.filter((d) => d.baseDir === 'references' && d.name.endsWith('.md'));
+  // 每个入链来源的解析目标集（包内相对路径）；自链接不作为自身目标的入链来源（「其它 references」语义）
+  const sourceLinks = docs.map((doc) => ({
+    name: doc.name,
+    targets: new Set(
+      extractMarkdownRelLinks(doc.content).map((link) => path.posix.normalize(path.posix.join(doc.baseDir, link))),
+    ),
+  }));
+  const violations: DocCheckViolation[] = [];
+  for (const target of targets) {
+    const basename = target.name.slice(target.name.lastIndexOf('/') + 1);
+    if (exemptions.includes(basename)) continue;
+    const linked = sourceLinks.some((source) => source.name !== target.name && source.targets.has(target.name));
+    if (!linked) {
+      violations.push({
+        check: 'orphan-reference',
+        message: `${target.name} 无任何来自 SKILL.md 或其它 references/*.md 的相对入链（孤儿载体）；补导航链接，或按豁免流程登记 ORPHAN_REFERENCE_EXEMPTIONS（须注明理由）`,
+      });
+    }
+  }
+  return violations;
+}
+
+/**
+ * S31 agents-nav-missing：每个 w-model-dev/scripts/cli/*.ts 基名（去 .ts 后缀）须以子串出现
+ * 在 AGENTS.md——把「AGENTS.md §8 脚本导航表漂移」从散文债变成门禁强制：新增 cli 脚本而漏登记
+ * §8 表即红。子串语义（不要求整词/整行）与 §8 表的 `脚本名.ts` 表格形态、散文提及均兼容，
+ * 且不误伤 §3 的 npm 别名形态（wm:status ≠ wm-status，别名不满足子串，仍须表格行登记）。
+ * 守卫：agentsNav 缺省时跳过（fixture 兼容；实测量来自 cli readdir + AGENTS.md 读取，零新增 spawn）。
+ */
+export function checkAgentsNavCoverage(
+  nav: { agents: string; cliScriptFiles: string[] } | undefined,
+): DocCheckViolation[] {
+  if (nav === undefined) return [];
+  const violations: DocCheckViolation[] = [];
+  for (const file of nav.cliScriptFiles) {
+    const basename = file.replace(/\.ts$/, '');
+    if (!nav.agents.includes(basename)) {
+      violations.push({
+        check: 'agents-nav-missing',
+        message: `AGENTS.md 未登记 cli 脚本基名 ${basename}（§8 脚本导航表漂移；新增 cli 脚本须同步登记 AGENTS.md §8 行）`,
+      });
     }
   }
   return violations;

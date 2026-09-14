@@ -766,6 +766,17 @@ async function main(): Promise<void> {
   // docs/INSTALL.md 被 installDoc 与局部文档契约各消费一次——先读取复用到两处，避免重复 IO
   const installDocText = read('docs/INSTALL.md');
 
+  // S31 orphan-reference 数据源：SKILL.md + references/*.md（入链来源 = 全部条目；审计目标 = references 条目）。
+  // 复用既有 referenceFiles readdir 与定向 read，零新增 spawn / 零新增全仓遍历。
+  const orphanAuditDocs = [
+    { name: 'SKILL.md', content: read('w-model-dev/SKILL.md'), baseDir: '.' },
+    ...referenceFiles.map((f) => ({
+      name: `references/${f}`,
+      content: read(join('w-model-dev/references', f)),
+      baseDir: 'references',
+    })),
+  ];
+
   const input: DocConsistencyInput = {
     schemaFiles,
     schemas,
@@ -851,6 +862,8 @@ async function main(): Promise<void> {
     linkDocs,
     linkExists: (relPath: string) => existsSync(join(root, relPath)),
     skillPkgDocs: collectSkillPkgDocs(root),
+    orphanAuditDocs,
+    agentsNav: { agents: read('AGENTS.md'), cliScriptFiles },
     localEvidenceDocs: [
       { name: 'README.md', content: read('README.md') },
       { name: 'AGENTS.md', content: read('AGENTS.md') },

@@ -19,6 +19,9 @@ import {
   buildDocConsistencyReport,
   extractMarkdownRelLinks,
   checkSkillOutboundLinks,
+  checkOrphanReferences,
+  checkAgentsNavCoverage,
+  ORPHAN_REFERENCE_EXEMPTIONS,
   checkSchemaFieldDescriptions,
   type DocConsistencyInput,
 } from '../logic/docs-consistency-logic.js';
@@ -2514,6 +2517,162 @@ describe('内链存在性检查（internal-links，C3）', () => {
     expect(violations[0]!.message).toContain('../../CHANGELOG.md');
   });
 });
+
+describe('S31 完整性审计双维度（orphan-reference / agents-nav-missing）', () => {
+  /** S31 orphan-reference fixture 类型（name=相对技能包根 POSIX 路径；baseDir=所在目录） */
+  type OrphanDoc = { name: string; content: string; baseDir: string };
+
+  it('references 孤儿文件（零入链）→ orphan-reference 违规，含文件名定位', () => {
+    const docs: OrphanDoc[] = [
+      { name: 'SKILL.md', content: '见 [图谱](references/graph-guide.md)。', baseDir: '.' },
+      { name: 'references/graph-guide.md', content: '见 [词汇表](glossary.md)。', baseDir: 'references' },
+      { name: 'references/orphan-draft.md', content: '# 草稿\n没有任何链接。', baseDir: 'references' },
+    ];
+    const v = runDocConsistencyChecks(baseInput({ orphanAuditDocs: docs })).filter(
+      (x) => x.check === 'orphan-reference',
+    );
+    expect(v).toHaveLength(1);
+    expect(v[0]!.message).toContain('references/orphan-draft.md');
+  });
+
+  it('SKILL.md 与 references 互链覆盖全部文件（./ 前缀 + 锚点剥离）→ 零违规', () => {
+    const docs: OrphanDoc[] = [
+      { name: 'SKILL.md', content: '见 [a](./references/a.md)。', baseDir: '.' },
+      { name: 'references/a.md', content: '见 [b](./b.md#sec)。', baseDir: 'references' },
+      { name: 'references/b.md', content: '无链接正文。', baseDir: 'references' },
+    ];
+    expect(
+      runDocConsistencyChecks(baseInput({ orphanAuditDocs: docs })).some((x) => x.check === 'orphan-reference'),
+    ).toBe(false);
+  });
+
+  it('自链接不计入入链（「其它 references」语义）→ 仍判孤儿', () => {
+    const docs: OrphanDoc[] = [
+      { name: 'SKILL.md', content: '', baseDir: '.' },
+      { name: 'references/self-link.md', content: '[自己](self-link.md)', baseDir: 'references' },
+    ];
+    const v = runDocConsistencyChecks(baseInput({ orphanAuditDocs: docs })).filter(
+      (x) => x.check === 'orphan-reference',
+    );
+    expect(v).toHaveLength(1);
+    expect(v[0]!.message).toContain('references/self-link.md');
+  });
+
+  it('指向包根/包外的链接（../SKILL.md）不影响 references 目标判定', () => {
+    const docs: OrphanDoc[] = [
+      { name: 'SKILL.md', content: '[a](references/a.md)', baseDir: '.' },
+      { name: 'references/a.md', content: '[SKILL](../SKILL.md) 与 [SSoT](../../docs/ssot.md)', baseDir: 'references' },
+    ];
+    expect(
+      runDocConsistencyChecks(baseInput({ orphanAuditDocs: docs })).some((x) => x.check === 'orphan-reference'),
+    ).toBe(false);
+  });
+
+  it('围栏代码块与行内 code span 内的链接不作为入链（剥离后无链 → 孤儿）', () => {
+    const docs: OrphanDoc[] = [
+      {
+        name: 'SKILL.md',
+        content: '```md\n[fake](references/a.md)\n```\n行内 `[fake2](references/a.md)` 不算。',
+        baseDir: '.',
+      },
+      { name: 'references/a.md', content: '无链接正文。', baseDir: 'references' },
+    ];
+    const v = runDocConsistencyChecks(baseInput({ orphanAuditDocs: docs })).filter(
+      (x) => x.check === 'orphan-reference',
+    );
+    expect(v).toHaveLength(1);
+    expect(v[0]!.message).toContain('references/a.md');
+  });
+
+  it('豁免清单生效：豁免文件零违规，非豁免文件仍报（checkOrphanReferences 第二参注入）', () => {
+    const docs: OrphanDoc[] = [
+      { name: 'SKILL.md', content: '', baseDir: '.' },
+      { name: 'references/exempt-draft.md', content: '无链接。', baseDir: 'references' },
+      { name: 'references/plain.md', content: '无链接。', baseDir: 'references' },
+    ];
+    const v = checkOrphanReferences(docs, ['exempt-draft.md']);
+    expect(v).toHaveLength(1);
+    expect(v[0]!.message).toContain('references/plain.md');
+    expect(v[0]!.message).not.toContain('exempt-draft');
+  });
+
+  it('ORPHAN_REFERENCE_EXEMPTIONS 生产常量当前为空数组（真实包零豁免；未来合法孤儿才登记）', () => {
+    expect(ORPHAN_REFERENCE_EXEMPTIONS).toEqual([]);
+  });
+
+  it('orphanAuditDocs 缺省注入 → 跳过检查（零违规，fixture 兼容）', () => {
+    expect(runDocConsistencyChecks(baseInput()).some((x) => x.check === 'orphan-reference')).toBe(false);
+  });
+
+  it('orphanAuditDocs 缺 SKILL.md 条目 → fail-closed 违规（入链来源不完整不静默放行）', () => {
+    const docs: OrphanDoc[] = [{ name: 'references/a.md', content: '', baseDir: 'references' }];
+    const v = runDocConsistencyChecks(baseInput({ orphanAuditDocs: docs })).filter(
+      (x) => x.check === 'orphan-reference',
+    );
+    expect(v).toHaveLength(1);
+    expect(v[0]!.message).toContain('SKILL.md');
+  });
+
+  it('checkOrphanReferences undefined 注入 → 跳过（零违规）', () => {
+    expect(checkOrphanReferences(undefined)).toEqual([]);
+  });
+
+  it('AGENTS.md 缺某 cli 基名 → agents-nav-missing 违规，含基名定位', () => {
+    const v = runDocConsistencyChecks(
+      baseInput({
+        agentsNav: {
+          agents: '# AGENTS\n| wm-write.ts | 状态写 |',
+          cliScriptFiles: ['wm-write.ts', 'check-tla-model.ts'],
+        },
+      }),
+    ).filter((x) => x.check === 'agents-nav-missing');
+    expect(v).toHaveLength(1);
+    expect(v[0]!.message).toContain('check-tla-model');
+  });
+
+  it('全部 cli 基名以子串出现（§8 表含 .ts 后缀形态）→ 零 agents-nav-missing 违规', () => {
+    const agents = '## 8. 脚本导航表\n| check-tla-model.ts | TLA+ 门禁 |\n| wm-write.ts | 状态写 |';
+    expect(
+      runDocConsistencyChecks(
+        baseInput({ agentsNav: { agents, cliScriptFiles: ['check-tla-model.ts', 'wm-write.ts'] } }),
+      ).some((x) => x.check === 'agents-nav-missing'),
+    ).toBe(false);
+  });
+
+  it('agentsNav 缺省注入 → 跳过检查（零违规，fixture 兼容）', () => {
+    expect(runDocConsistencyChecks(baseInput()).some((x) => x.check === 'agents-nav-missing')).toBe(false);
+  });
+
+  it('checkAgentsNavCoverage undefined 注入 → 跳过（零违规）', () => {
+    expect(checkAgentsNavCoverage(undefined)).toEqual([]);
+  });
+
+  it('真实 CLI fixture：新增未登记 cli 脚本 + 孤儿 references → exit 1 且 reasons 含两违规码', async () => {
+    await withDocsConsistencyFixture(async (fixtureRoot) => {
+      await writeVitestCount(fixtureRoot, 1002);
+      // 未登记进 AGENTS.md §8 表的新 cli 脚本（基名 zz-fake-tool 不在 AGENTS.md）
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
+      await fs.writeFile(
+        path.join(fixtureRoot, 'w-model-dev', 'scripts', 'cli', 'zz-fake-tool.ts'),
+        'console.log(1);\n',
+        'utf8',
+      );
+      // 无任何入链的孤儿 references 文件
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled fixture path
+      await fs.writeFile(
+        path.join(fixtureRoot, 'w-model-dev', 'references', 'zz-orphan-note.md'),
+        '# 孤儿备注\n\n无入链正文。\n',
+        'utf8',
+      );
+      const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
+      expect(result.code).toBe(1);
+      const report = JSON.parse(result.stdout) as { reasons: string[] };
+      expect(report.reasons.some((r) => r.startsWith('[orphan-reference]'))).toBe(true);
+      expect(report.reasons.some((r) => r.startsWith('[agents-nav-missing]'))).toBe(true);
+    });
+  }, 120_000);
+});
+
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
 const DOCS_CONSISTENCY_CLI = path.resolve(
