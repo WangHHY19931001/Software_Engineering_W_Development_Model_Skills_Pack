@@ -2,11 +2,11 @@
 name: w-model-dev
 version: 42.2.1
 description: >-
-  Use when the user explicitly invokes /wm, mentions W-model, W 模型 or W 开发模型,
-  requests requirements traceability (RTM), stage gates, quality gates, or development
-  and testing in parallel. When the user only asks for an end-to-end or complete
-  development process without these signals, ask whether to use the W-model first.
-  Do NOT use for one-off scripts, styling fixes or small bug fixes, pure explanations, config changes, document writing, data queries, dependency upgrades, non-development tasks, or single-point edit instructions, or tool executions already handled by lint/format/build tools — see references/activation-guide.md.
+  Use when the user invokes /wm, mentions W-model, W 模型 or W 开发模型, requests
+  requirements traceability (RTM), stage gates, quality gates, or development and
+  testing in parallel, or asks for an end-to-end / complete development process.
+  Trigger boundaries, anti-scenarios and the handling of ambiguous requests are
+  defined in references/activation-guide.md.
 ---
 
 # W-Model Development
