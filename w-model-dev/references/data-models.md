@@ -476,6 +476,8 @@ interface RunLogEntry {
   passed?: boolean;
   /** review: 返工提示数组（passed=false 时必须为非空数组；reworkHints 规则与 variant 规则同窗引入，LEGACY_VARIANT_CUTOFF 前旧行经 LEGACY_REWORK_HINTS 非阻断 diagnostic 吸收，此后 blocking） */
   reworkHints?: string[];
+  /** fix/emergency-fix: S-fix 复现测试的回滚证伪声明（R10 强制携带，schema 层 optional；LEGACY_REVERT_EVIDENCE_CUTOFF 前旧行经 LEGACY_REVERT_EVIDENCE 非阻断 diagnostic 吸收，此后 blocking） */
+  revertEvidence?: { command: string; description?: string };
   /** effective consumer 的机器状态，不改写 raw JSONL；exit 0 仍可能是 NOT_CLOSED_NOT_PROVEN */
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
 }
@@ -557,6 +559,8 @@ interface RunLogEntry {
 **variant / blocker 与 legacy 吸收（2026-09-04 audit-gate-closure）**：schema（`run-log.schema.json`）新增 `variant`（enum `fix`/`emergency-fix`）/ `blocker` / `fixedLocation` / `fixBasedOn` 字段与条件约束——`action=emergency-fix` ⇒ `variant=emergency-fix` 且 `blocker` 非空；`variant=emergency-fix` ⇒ `blocker` 非空；`action=fix` 的 `variant` 若出现必须为 `"fix"`（不强制出现）。variant 规则引入前的旧记录（未声明 variant，含同时缺 identity 字段的「双 legacy」旧 emergency-fix 行）经合并 legacy 谓词（`isLegacySchemaFailure`：可容忍缺失 ⊆ LIFECYCLE_IDENTITY_FIELDS ∪ {variant, blocker}）吸收为 **LEGACY_VARIANT / LEGACY_UNSCOPED 非阻断 diagnostic**；已声明 variant 却缺 blocker 或 variant 值不符 const 属真实不一致 → blocking `[schema]`（吸收不覆盖）。
 
 **reworkHints 强制与 cutoff 分界（2026-09-06 audit-fixes）**：schema allOf 新增条件约束——`action ∈ {review, iceberg-review}` 且 `passed=false` ⇒ `reworkHints` 非空（`minItems: 1`，缺失或空数组均拦截）。reworkHints 规则与 variant 规则同窗引入，复用同一分界 `LEGACY_VARIANT_CUTOFF='2026-09-01T00:00:00Z'`（`run-log-logic.ts:23`）：cutoff 前写入的失败 review 旧行（缺 hints 或 hints 为空数组）经 `LEGACY_REWORK_HINTS` 非阻断 diagnostic 吸收（含与缺 identity 字段叠加的双 legacy 行，identity 缺失部分由 LEGACY_UNSCOPED 循环补充说明）；cutoff 后属真实不一致 → blocking `[rework-hints] 条目 N <action> passed=false 须带非空 reworkHints`。timestamp 缺失/非法时视为非 legacy（保守不吸收）。其余 schema 错误（如字段类型错误）非 legacy 可容忍时不经此吸收，回退通用 `[schema]` blocking。
+
+**revertEvidence 回滚证伪强制与 cutoff 分界（2026-09-15 P2-B / S27 / AC-8）**：schema 根 properties 登记 `revertEvidence`（object，`required:["command"]`，command 非空字符串）但 optional——由 `checkRunLog` 逻辑层 R10 强制：`action ∈ {fix, emergency-fix}` ⇒ 须携带合法 `revertEvidence.command`（S-fix 复现测试的回滚证伪声明：执行 command 使复现测试回到失败态；命令本身由 S 在真实执行中出示，门禁只验载体存在与形态，反模式 #45 的确定性挂点）。分界常量 `LEGACY_REVERT_EVIDENCE_CUTOFF='2026-09-15T00:00:00Z'`（P2-B 计划合并日）：cutoff 前写入的旧行缺合法声明经 `LEGACY_REVERT_EVIDENCE` 非阻断 diagnostic 吸收（legacy schema 吸收路径放行的旧行可与 LEGACY_VARIANT/LEGACY_UNSCOPED 并存，互不吞没）；cutoff 后缺失/非法（含仅空白 command）→ blocking `R10: <action> 动作 <runId> 须携带合法 revertEvidence.command…`。CLI 摘要 `r10` 计数字段：`{checked, missing, legacy}`。
 
 动作-角色配对（`r3-*`→R、`fix`/`emergency-fix`/`produce`→S、`review`→V、`gate`/`tla-gate`/`graph-gate`→G）由 `checkRunLog` logic 层 blocking 强制（schema 的 description 注明，不在 schema 强制以兼容历史样本）。`check-run-log.ts` CLI 的 parseErrors 并入 blocking violations（坏行使输入不完整，fail-closed）；`checkRunLog([])` → `passed=false` + `NOT_CLOSED_NOT_PROVEN`。
 

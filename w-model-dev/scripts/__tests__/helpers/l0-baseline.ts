@@ -35,7 +35,11 @@ export const L0_BASELINE = {
   // 670 = 671 - 1（2026-09-14 P1 最终审查修复：合并 SKILL.md「编排者-子代理边界」节内
   // 指向 references/subagent-delegation.md 的两条同目标链接为一条；由 npm run audit:l0-links
   // 实测 rebaseline，l1Only 仍 93、placeholders 仍 36、violations 仍 0）。
-  relativeLinkCount: 670,
-  l1Only: 93,
+  // 672 = 670 + 2；l1Only 95 = 93 + 2（2026-09-15 P2-B Task 1 / S27：hard-constraints.md
+  // 反模式 #45 的「门禁脚本」对照表行与正文行各新增 1 条指向 ../scripts/cli/check-run-log.ts
+  // 的链接（R10 revertEvidence 回滚证伪挂点）；由 npm run audit:l0-links 实测 rebaseline，
+  // placeholders 仍 36、violations 仍 0）。
+  relativeLinkCount: 672,
+  l1Only: 95,
   placeholders: 36,
 } as const;

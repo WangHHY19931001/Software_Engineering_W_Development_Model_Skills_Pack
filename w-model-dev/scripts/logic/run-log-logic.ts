@@ -1333,8 +1333,10 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   // LEGACY_REVERT_EVIDENCE 非阻断诊断吸收（结构照抄 LEGACY_VARIANT / LEGACY_REWORK_HINTS
   // 先例）；cutoff 后缺失/非法 → blocking。timestamp 缺失/非法时视为 cutoff 后
   // （保守不吸收，与 reworkHints 先例一致；schema format=date-time 下实际不可达）。
-  // 仅作用于 schema-valid 的 valid 条目：legacy schema 吸收路径的行已有独立
-  // LEGACY_VARIANT/LEGACY_UNSCOPED 诊断，不在本规则重复标注。
+  // 作用域为进入 valid 的条目，含 legacy schema 吸收路径放行的旧行——cutoff 前的
+  // 吸收行会同时持有 LEGACY_VARIANT/LEGACY_UNSCOPED 与 LEGACY_REVERT_EVIDENCE 两条
+  // 非阻断诊断（并存不吞没，各自如实标注，均不阻断）；cutoff 后的吸收行（如仅缺
+  // identity 字段）缺声明时同样落入 R10 blocking（只收紧方向不变）。
   const r10Counts = { checked: 0, missing: 0, legacy: 0 };
   for (const e of valid) {
     if (!['fix', 'emergency-fix'].includes(e.action)) continue;
