@@ -298,6 +298,8 @@ git commit -m "docs(delegation): add invocation classes and cross-phase handoff 
 **文件：**
 - 修改：`README.md`（消除 **README 内部**的两处命令块重复：L40-51 的快速开始块 与 L162-163 的命令块）
 - 修改：`AGENTS.md`（把 L67-68 的字面命令块改为指向权威块；顺带在 §2 的 `references/` 行补 `asset-authoring`）
+- 修改：`docs/INSTALL.md`（§5 的「触发条件摘要」4 条改为指向 `references/activation-guide.md`；并修正 §5 节标题）
+- **文件数说明（3 个，属规格授权）**：设计 spec §3.1 给 M16 指定的落点就是 `README.md` / `docs/INSTALL.md` / `AGENTS.md` **三个文件**，故本任务的 3 文件是规格要求的，不是越界（`skillopt-adoption.md` 的"单信号 ≤2 文件"是对自发信号的启发式裁剪，规格点名落点优先）。
 
 - [ ] **步骤 1：定权威块并写声明。** 先读三处现状：`README.md:40-51`（快速开始）、`README.md:162-163`（命令注释块）、`docs/INSTALL.md` §3（标准安装）、`AGENTS.md:62-80`（仓库验证与安装两入口）。**权威分工如下，写进被改文件的注释或小节导语**：
   - **Skill 安装** 的单一权威 = `docs/INSTALL.md`（§2 前置条件 + §3 标准安装）。
@@ -310,6 +312,11 @@ git commit -m "docs(delegation): add invocation classes and cross-phase handoff 
   **必须保住**的既有断言文本：`AGENTS.md` 中的"`N 个脚本`"计数表述（`checkExit2ScriptCount` 用正则解析）与 "18 项门禁"（`checkPrePushCount`）。改完自查这两处仍在。
 
 - [ ] **步骤 4：补 §2 的 references 枚举。** 在 `AGENTS.md` §2 表格的 `w-model-dev/references/` 行内，按该行既有格式补入 `asset-authoring（技能资产编写杠杆 + 渐进披露阈值 + 授权不写，三合一）`。该行是散文式枚举、无门禁校验，但补入可避免新的过期层（受任务 1 的 relevance/sediment 判据约束）。
+
+- [ ] **步骤 4b：`docs/INSTALL.md` §5 的触发摘要改为指向（由任务 3 的审查者发现，控制者裁定并入本任务）。** 现状：`docs/INSTALL.md:286-291` 的「触发条件摘要」4 条是**手工维护的触发信号复述**，与 `description` / `references/activation-guide.md` 构成同类漂移面（任务 3 已把该节的 `description` 镜像删掉，这 4 条是**同一节里剩余的**同类复述）；且它未覆盖新 description 的 `W-model`（英文）与 "stage gates" 措辞。
+  处理：把 4 条**替换为指向权威的一条说明**（按 M16「消费者指向、不复述」），语义须包含"触发边界的权威定义在 `references/activation-guide.md`，触发决策表在 `w-model-dev/SKILL.md`，本节不再复述触发清单"。**不要**把 activation-guide 的 10 类反例再抄一遍。
+  同一步顺手修正 §5 的节标题 `## 5. 激活机制（来自 \`SKILL.md\` frontmatter）`（`docs/INSTALL.md:269`）——yaml 块现已含 frontmatter 中不存在的注释行，故标题宜改成 `## 5. 激活机制（来自 \`SKILL.md\` frontmatter，节选）`。
+  ⚠ 不得动 `docs/INSTALL.md:278` 的 `version: 42.2.1`（`skill-metadata.test.ts` 用 `/^version:\s*(\d+\.\d+\.\d+)\s*$/m` 提取它，必须恰 1 行），也不得动 §2/§3 的安装内容。
 
 - [ ] **步骤 5：跑定向门禁。**
   - `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/skill-metadata.test.ts` → 全通过（README/INSTALL 版本镜像未动）
