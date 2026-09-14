@@ -18,20 +18,7 @@
 
 该入口验证仓库本身，不安装 Skill。命令必须从仓库根目录执行，需要 Node.js ≥20、Git，以及可访问的 npm registry/网络。
 
-```bash
-git clone https://github.com/WangHHY110001001/Software_Engineering_W_Development_Model_Skills_Pack.git w-model-skill-pack
-cd w-model-skill-pack
-npm install
-npm run self-test
-npm run doctor
-```
-
-PowerShell 5.1 请使用两行或逐行命令，不要使用 `&&`：
-
-```powershell
-git clone https://github.com/WangHHY110001001/Software_Engineering_W_Development_Model_Skills_Pack.git w-model-skill-pack
-Set-Location w-model-skill-pack; npm install; npm run self-test; npm run doctor
-```
+仓库验证的完整命令序列（`git clone` / `npm install` / `npm run self-test` / `npm run doctor`，含 PowerShell 逐行写法）以 [README.md](../README.md#验证仓库) 的「验证仓库」快速开始块为唯一权威，本节不重复；需要改命令时先改该权威块。
 
 `self-test` 与 `doctor` 可在 PowerShell 或 Windows Terminal 中运行，不需要 Git Bash。Bash 只用于 `pre-push` 和平台依赖检查。
 

@@ -59,20 +59,18 @@
 
 ## 3. 常用命令
 
-仓库验证与 Skill 安装是两个独立入口：从仓库根目录执行 `npm install`、`npm run self-test`、`npm run doctor` 只验证仓库脚本健康；安装 Skill 时只复制 `w-model-dev/` 到具体 Agent 的 Agent-specific skills 目录，路径以官方文档为准，不要把 `.agent` 当通用路径。Windows 与 WSL 不要在同一个 checkout 混用 `node_modules`。
+仓库验证与 Skill 安装是两个独立入口：仓库验证入口只检查仓库脚本是否健康、不安装任何 Skill，命令以 [README.md](./README.md) 的 [验证仓库](./README.md#验证仓库) 快速开始块为唯一权威，本节不列举；安装 Skill 时只复制 `w-model-dev/` 到具体 Agent 的 Agent-specific skills 目录，路径以官方文档为准，不要把 `.agent` 当通用路径。Windows 与 WSL 不要在同一个 checkout 混用 `node_modules`。
 
-**单一权威文案（本节只指向、不复述命令）**：**Skill 安装**的完整命令序列以 [docs/INSTALL.md](./docs/INSTALL.md) §2 前置条件 + §3 标准安装为唯一权威——按 [docs/INSTALL.md](./docs/INSTALL.md) §3 标准安装执行（含 `git clone` 与首次 `npm install`）；**仓库验证**命令以 [README.md](./README.md) 的 [验证仓库](./README.md#验证仓库) 快速开始块为唯一权威。两条路线互不复述；需要改命令时先改权威块，其余位置只保持指向。
+**单一权威文案（本节只指向、不复述安装/上手命令）**：**Skill 安装**的完整命令序列以 [docs/INSTALL.md](./docs/INSTALL.md) §2 前置条件 + §3 标准安装为唯一权威——按 [docs/INSTALL.md](./docs/INSTALL.md) §3 标准安装执行；**仓库验证**命令以 [README.md](./README.md) 的 [验证仓库](./README.md#验证仓库) 快速开始块为唯一权威。两条路线互不复述；需要改命令时先改权威块，其余位置只保持指向。
 
 PowerShell 5.1 请逐行执行，不能使用 `&&`（具体命令见上述权威块，本节不重复）。
 
 `self-test` / `doctor` 可在 PowerShell 或 Windows Terminal 中运行；Bash 只用于 `pre-push` 和平台依赖检查。`npm install` 的 `postinstall` 会设置当前仓库本地 Git 配置 `core.hooksPath=.githooks`，这是仓库验证的副作用，不是 Skill 激活必需。缺平台依赖时须显式运行 `npm run platform-deps:check` 或由用户显式运行 `npm run platform-deps:install` 在受控 staging 中验证并安装；pre-push 不会自动修复。
 
 ```bash
-# 首次：在仓库根目录安装 devDependencies（ajv / ajv-formats / eslint-plugin-security / tsx / typescript / vitest 等，约 30MB）
-npm install
+# 仓库验证入口命令（npm install / npm run self-test / npm run doctor）见 README.md「验证仓库」快速开始块；此处不重复，避免两处过期
 
-# 校验脚本（依赖 tsx runtime + ajv devDep，schema 校验由 logic 层自动调用）
-npm run self-test                           # 332 条样本回归基线，退出码 0/1
+# 门禁脚本参考索引（依赖 tsx runtime + ajv devDep，schema 校验由 logic 层自动调用）
 npm run audit:l0-links                       # L0/L1 链接边界审计，结构化退出码 0/1/2
 npm run check:verifier -- <output.json>     # Verifier 输出校验，退出码 0/1/2
 npm run check:gate -- [project-dir]         # 工件质量门，退出码 0/1/2
