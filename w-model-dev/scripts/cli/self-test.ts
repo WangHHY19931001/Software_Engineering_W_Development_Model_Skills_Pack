@@ -1242,6 +1242,14 @@ const RUN_LOG_CASES: RunLogCase[] = [
     description:
       'cutoff 后 review passed=false 无 reworkHints，应被 [rework-hints] 规则拦截（LEGACY_VARIANT_CUTOFF 起强制，cutoff 前旧行按 LEGACY_REWORK_HINTS 诊断吸收）',
   },
+  // ---- P2-B（S27 / AC-8）: R10 revertEvidence 回滚证伪协议 ----
+  {
+    file: 'bad-fix-missing-revert-evidence.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R10.*revertEvidence/],
+    description:
+      'cutoff 后 fix 无 revertEvidence，应被 R10 拦截（LEGACY_REVERT_EVIDENCE_CUTOFF 起强制，cutoff 前旧行按 LEGACY_REVERT_EVIDENCE 诊断吸收）',
+  },
 ];
 
 // -------------------- Maturity --------------------

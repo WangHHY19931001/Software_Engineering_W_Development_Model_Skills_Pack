@@ -5,7 +5,9 @@
  * 对应 w-model-dev/references/data-models.md RunLogEntry schema
  * 与 docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md §5.2。
  * 供 O 子代理在阶段推进前调用，校验运行日志完整性、tokens 合规、返工一致、
- * O 越权检测、exitCode 防伪交叉校验、append-only 时序、轨迹模板（R1-R8）。
+ * O 越权检测、exitCode 防伪交叉校验、append-only 时序、轨迹模板、跨轮次评审一致、
+ * revertEvidence 回滚证伪（R1-R10）。
+ * 摘要 JSON 的 r10 字段 = R10 revertEvidence 维度计数（checked/missing/legacy）。
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>] [--json]
@@ -271,6 +273,7 @@ async function main(): Promise<void> {
     lifecycleStatus,
     ...(statusNote ? { statusNote } : {}),
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
+    ...(result.revertEvidence ? { r10: result.revertEvidence } : {}),
     durationMs: Date.now() - startTime,
   };
 

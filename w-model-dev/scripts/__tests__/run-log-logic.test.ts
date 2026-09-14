@@ -2235,3 +2235,86 @@ describe('A-3d 跨轮次评审一致性（R9 标准偏移）', () => {
     expect(out.violations.filter((v) => v.includes('跨轮次评审不一致'))).toHaveLength(1);
   });
 });
+
+// ==================== R10: revertEvidence 回滚证伪协议（P2-B / S27 / AC-8） ====================
+//
+// fix/emergency-fix 记录必须携带合法 revertEvidence.command（非空字符串）：执行该命令使
+// S-fix 的复现测试回到失败态，证明测试确实锚定被修缺陷（反模式 #45「改断言让测试通过」
+// 的确定性挂点）。兼容分界：timestamp < LEGACY_REVERT_EVIDENCE_CUTOFF（P2-B 计划合并日）
+// 的旧行按 LEGACY_REVERT_EVIDENCE 非阻断诊断吸收；cutoff 后缺失/非法 → blocking。
+// 注：规则编号为 R10——R9 已被 A-3d 跨轮次评审一致性占用（计划文本写作 R9 属编号漂移）。
+
+describe('run-log R10: revertEvidence 回滚证伪（LEGACY_REVERT_EVIDENCE cutoff 分界）', () => {
+  const VALID_EVIDENCE = {
+    command: 'git apply -R fix.patch && npm run self-test',
+    description: '回滚修复后复现测试应回到失败态',
+  };
+
+  /** 样本整体平移到 cutoff 之后（保持 R7 时序单调），用于 post-cutoff 形态用例 */
+  async function loadShiftedPastCutoff(): Promise<RunLogEntry[]> {
+    const lines = await loadJsonl('rootcause-valid.jsonl');
+    return lines.map((l) => ({ ...l, timestamp: l.timestamp.replace('2026-07-24', '2026-09-16') }));
+  }
+
+  /** 去掉 fix/emergency-fix 条目的 revertEvidence（无论夹具是否已登记该字段） */
+  function stripRevertEvidence(entries: RunLogEntry[]): RunLogEntry[] {
+    return entries.map((l) => {
+      if (!['fix', 'emergency-fix'].includes(l.action)) return l;
+      const clone = { ...l } as RunLogEntry & { revertEvidence?: unknown };
+      delete clone.revertEvidence;
+      return clone;
+    });
+  }
+
+  it('post-cutoff fix 缺 revertEvidence → R10 blocking（无 LEGACY 吸收）', async () => {
+    const result = checkRunLog(stripRevertEvidence(await loadShiftedPastCutoff()));
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => v.startsWith('R10:') && v.includes('revertEvidence'))).toBe(true);
+    expect(result.diagnostics?.some((d) => d.startsWith('LEGACY_REVERT_EVIDENCE')) ?? false).toBe(false);
+    expect(result.revertEvidence).toEqual({ checked: 1, missing: 1, legacy: 0 });
+  });
+
+  it('post-cutoff fix command 仅空白 → R10 blocking（逻辑层判据，schema minLength 不拦）', async () => {
+    const entries = (await loadShiftedPastCutoff()).map((l) =>
+      l.action === 'fix' ? { ...l, revertEvidence: { command: '   ' } } : l,
+    );
+    const result = checkRunLog(entries);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => v.startsWith('R10:') && v.includes('revertEvidence'))).toBe(true);
+    expect(result.violations.some((v) => v.includes('[schema]'))).toBe(false);
+  });
+
+  it('cutoff 前 fix 缺 revertEvidence → LEGACY_REVERT_EVIDENCE 诊断放行（exit 0 + NOT_CLOSED）', async () => {
+    const result = checkRunLog(stripRevertEvidence(await loadJsonl('rootcause-valid.jsonl')));
+    expect(result.passed).toBe(true);
+    expect(result.violations.some((v) => v.startsWith('R10:'))).toBe(false);
+    expect(result.diagnostics?.some((d) => d.startsWith('LEGACY_REVERT_EVIDENCE'))).toBe(true);
+    expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+  });
+
+  it('合法携带 revertEvidence → 通过且 r10 计数 checked=1/missing=0/legacy=0', async () => {
+    const entries = (await loadShiftedPastCutoff()).map((l) =>
+      l.action === 'fix' ? { ...l, revertEvidence: VALID_EVIDENCE } : l,
+    );
+    const result = checkRunLog(entries);
+    expect(result.passed).toBe(true);
+    expect(result.violations.some((v) => v.startsWith('R10:'))).toBe(false);
+    expect(result.diagnostics?.some((d) => d.startsWith('LEGACY_REVERT_EVIDENCE')) ?? false).toBe(false);
+    expect(result.revertEvidence).toEqual({ checked: 1, missing: 0, legacy: 0 });
+  });
+
+  it('post-cutoff emergency-fix 缺 revertEvidence → R10 blocking', () => {
+    const result = checkRunLog([
+      makeEntry({
+        runId: 'em-r10-post-cutoff',
+        action: 'emergency-fix',
+        role: 'S',
+        variant: 'emergency-fix',
+        blocker: '线上阻断须立即修复',
+        timestamp: '2026-09-16T00:00:00.000Z',
+      }),
+    ]);
+    expect(result.violations.some((v) => v.startsWith('R10:') && v.includes('emergency-fix'))).toBe(true);
+    expect(result.revertEvidence?.missing).toBe(1);
+  });
+});

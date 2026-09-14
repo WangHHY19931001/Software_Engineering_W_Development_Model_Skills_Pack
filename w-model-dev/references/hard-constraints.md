@@ -353,7 +353,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #42（S-fix 后跳过 R3+V） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R8（S(fix/emergency-fix)→V 间 R3 记录数）+ [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) `--variant=fix\|emergency` |
 | #43（敏感信息写入状态文件） | 无专用脚本（V/G 人工核验 + [`security-scan.ts`](../scripts/cli/security-scan.ts) 源码级扫描） |
 | #44（跳过冰山扫掠直接放行） | [`check-iceberg-sweep.ts`](../scripts/cli/check-iceberg-sweep.ts)（IcebergSweepReport R1-R5 校验，exitCode=1 命中）；run-log `iceberg-sweep` / `iceberg-review` 动作缺失检测为软检测（编排者自查 + V/G 人工核验，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节） |
-| #45（为通过测试而修改断言/测试期望） | 无专用脚本（V 评审人工核验断言与需求对应关系） |
+| #45（为通过测试而修改断言/测试期望） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R10 revertEvidence 回滚证伪（fix/emergency-fix 记录须携带合法 `revertEvidence.command`，`LEGACY_REVERT_EVIDENCE_CUTOFF` 起强制，exitCode=1 命中）；断言与需求的语义对应仍由 V 评审人工核验 |
 | #46（只给审计权不给修正权） | 无专用脚本（CHECKPOINT 介入路径标注） |
 | #47（大规模重构式改动） | 无专用脚本（diff 可审性由评审人工核验 + 增量集成纪律约束） |
 
@@ -896,7 +896,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **例外**：经用户/主刀明确批准的需求变更（走豁免或 S→R→V→人类四阶段），不视为违反。
 
-**门禁脚本**：无专用脚本（软检测——由 V 评审人工核验断言与需求对应关系）
+**门禁脚本**：[`check-run-log.ts`](../scripts/cli/check-run-log.ts) R10 revertEvidence 回滚证伪——fix/emergency-fix 记录须携带合法 `revertEvidence.command`（S-fix 复现测试的回滚证伪声明：执行 command 使复现测试回到失败态，AC-8；`LEGACY_REVERT_EVIDENCE_CUTOFF` 起强制，cutoff 前旧行按 LEGACY_REVERT_EVIDENCE 非阻断诊断吸收）；断言与需求的语义对应仍由 V 评审人工核验（软检测兜底）
 
 **关联**：「改断言让测试通过」条目；"记叙性优先"（测试断言不是金标准，失败先归因，见 [bdd.md](bdd.md)「记叙性优先」节）
 

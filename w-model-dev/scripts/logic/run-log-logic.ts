@@ -23,6 +23,15 @@ import { parseJsonSafe } from '../lib/safe-json.js';
 export const LEGACY_VARIANT_CUTOFF = '2026-09-01T00:00:00Z';
 
 /**
+ * revertEvidence 规则（R10 回滚证伪协议，P2-B / S27 / AC-8）引入时刻：取 P2-B
+ * 规则负载性计划（docs/superpowers/plans/2026-09-15-p2b-rule-loadbearing-and-completeness.md）
+ * 的合并日。此后写入的 fix/emergency-fix 记录缺合法 revertEvidence.command 落入
+ * blocking [R10]；此前写入的旧行按 LEGACY_REVERT_EVIDENCE 非阻断诊断吸收
+ * （结构照抄 LEGACY_VARIANT / LEGACY_REWORK_HINTS 先例）。
+ */
+export const LEGACY_REVERT_EVIDENCE_CUTOFF = '2026-09-15T00:00:00Z';
+
+/**
  * R9 跨轮次评审不一致的档差阈值（A-3d 标准偏移）。
  *
  * 2 档意味着评审标准发生实质漂移（1 档可能只是产物确实改进了）。
@@ -124,6 +133,8 @@ export interface RunLogEntry {
   passed?: boolean;
   /** review: 返工提示 */
   reworkHints?: string[];
+  /** fix/emergency-fix: S-fix 复现测试的回滚证伪声明（R10 强制携带；schema 层 optional，cutoff 前旧行按 LEGACY_REVERT_EVIDENCE 吸收） */
+  revertEvidence?: { command: string; description?: string };
   /** rootcause/fix: 返工轮次 */
   round?: number;
   /** gate: 门禁脚本名 */
@@ -148,6 +159,8 @@ export interface RunLogCheckResult {
   diagnostics?: string[];
   /** 当前输入是否在无 blocking violation 且无 deferred diagnostic 的意义下闭合。 */
   lifecycleStatus: RunLogLifecycleStatus;
+  /** R10 revertEvidence 维度计数（checked=校验的 fix/emergency-fix 条数；missing=缺合法声明条数；legacy=按 cutoff 吸收条数）。CLI 摘要透传为 r10 字段；非数组/空输入等早退路径缺省。 */
+  revertEvidence?: { checked: number; missing: number; legacy: number };
 }
 
 interface LifecycleIdentity {
@@ -428,6 +441,16 @@ function isLegacyMissingReworkHints(raw: RunLogEntry): boolean {
   if (!isFailedReviewMissingReworkHints(raw)) return false;
   const ts = Date.parse(raw.timestamp ?? '');
   return Number.isFinite(ts) && ts < Date.parse(LEGACY_VARIANT_CUTOFF);
+}
+
+/**
+ * R10 判定：fix/emergency-fix 记录是否携带合法 revertEvidence.command（非空字符串）。
+ * schema 层已保证出现时为 object 且 command 为 minLength 1 字符串；此处对仅空白
+ * command（schema 可通过）按非法处理，与非空字符串判据（isNonEmptyString）对齐。
+ */
+function hasValidRevertEvidence(entry: RunLogEntry): boolean {
+  const evidence = entry.revertEvidence as { command?: unknown } | undefined;
+  return typeof evidence === 'object' && evidence !== null && isNonEmptyString(evidence.command);
 }
 
 const GATE_ACTIONS = new Set(['gate', 'tla-gate', 'graph-gate']);
@@ -1299,11 +1322,44 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
+  // R10: revertEvidence 回滚证伪协议（P2-B / S27 / AC-8）。
+  //
+  // fix/emergency-fix 记录必须携带合法 revertEvidence.command（非空字符串）：执行该
+  // 命令使 S-fix 的复现测试回到失败态，证明测试确实锚定被修缺陷——反模式 #45
+  // 「改断言让测试通过」的确定性挂点（命令本身由 S 在真实执行中出示，此处只验
+  // 载体存在与形态）。
+  //
+  // 兼容分界：timestamp < LEGACY_REVERT_EVIDENCE_CUTOFF（P2-B 计划合并日）的旧行按
+  // LEGACY_REVERT_EVIDENCE 非阻断诊断吸收（结构照抄 LEGACY_VARIANT / LEGACY_REWORK_HINTS
+  // 先例）；cutoff 后缺失/非法 → blocking。timestamp 缺失/非法时视为 cutoff 后
+  // （保守不吸收，与 reworkHints 先例一致；schema format=date-time 下实际不可达）。
+  // 仅作用于 schema-valid 的 valid 条目：legacy schema 吸收路径的行已有独立
+  // LEGACY_VARIANT/LEGACY_UNSCOPED 诊断，不在本规则重复标注。
+  const r10Counts = { checked: 0, missing: 0, legacy: 0 };
+  for (const e of valid) {
+    if (!['fix', 'emergency-fix'].includes(e.action)) continue;
+    r10Counts.checked++;
+    if (hasValidRevertEvidence(e)) continue;
+    r10Counts.missing++;
+    const ts = Date.parse(e.timestamp ?? '');
+    if (Number.isFinite(ts) && ts < Date.parse(LEGACY_REVERT_EVIDENCE_CUTOFF)) {
+      r10Counts.legacy++;
+      diagnostics.push(
+        `LEGACY_REVERT_EVIDENCE: ${e.action} ${e.runId} 缺合法 revertEvidence.command（${LEGACY_REVERT_EVIDENCE_CUTOFF} 前旧记录）; deferred`,
+      );
+      continue;
+    }
+    violations.push(
+      `R10: ${e.action} 动作 ${e.runId} 须携带合法 revertEvidence.command（非空字符串；S-fix 复现测试的回滚证伪声明，执行后复现测试回到失败态，AC-8）`,
+    );
+  }
+
   const passed = violations.length === 0;
   return {
     passed,
     violations,
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
+    revertEvidence: r10Counts,
     lifecycleStatus: passed && diagnostics.length === 0 ? 'CLOSED_UNDER_CURRENT_RULES' : 'NOT_CLOSED_NOT_PROVEN',
   };
 }

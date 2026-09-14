@@ -36,6 +36,7 @@
       }
     },
     {
+      "description": "action=fix/emergency-fix 时强制 basedOnReport 非空 + artifacts 非空数组。revertEvidence（回滚证伪声明，AC-8）形态在此登记但 schema 不强制出现——由 check-run-log R10 逻辑按 LEGACY_REVERT_EVIDENCE_CUTOFF（run-log-logic.ts，P2-B 计划合并日）分界强制：cutoff 后缺失/非法 revertEvidence.command 为 blocking，cutoff 前旧行按 LEGACY_REVERT_EVIDENCE 非阻断诊断吸收。",
       "if": {
         "properties": { "action": { "enum": ["fix", "emergency-fix"] } },
         "required": ["action"]
@@ -43,7 +44,8 @@
       "then": {
         "properties": {
           "basedOnReport": {},
-          "artifacts": { "type": "array", "minItems": 1 }
+          "artifacts": { "type": "array", "minItems": 1 },
+          "revertEvidence": {}
         },
         "required": ["basedOnReport", "artifacts"]
       }
@@ -320,6 +322,22 @@
       "description": "review 返工提示数组（passed=false 时必须为非空数组）",
       "type": "array",
       "items": { "type": "string" }
+    },
+    "revertEvidence": {
+      "description": "S-fix 复现测试的回滚证伪声明：执行 command 使复现测试回到失败态（AC-8）。fix/emergency-fix 记录由 check-run-log R10 逻辑强制携带（schema 层 optional；时间戳早于 LEGACY_REVERT_EVIDENCE_CUTOFF 的旧记录按 LEGACY_REVERT_EVIDENCE 非阻断诊断吸收）",
+      "type": "object",
+      "required": ["command"],
+      "properties": {
+        "command": {
+          "description": "回滚证伪命令：执行后使 S-fix 的复现测试回到失败态（非空字符串；命令本身由 S 在真实执行中出示，G 只验载体存在与形态）",
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "description": "可选说明：回滚证伪的执行上下文与预期失败输出（审计用）",
+          "type": "string"
+        }
+      }
     },
     "round": {
       "description": "返工轮次（rootcause/fix 动作），从 1 起",
