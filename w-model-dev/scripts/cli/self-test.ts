@@ -2370,6 +2370,13 @@ const SCHEMA_CASES: SchemaCase[] = [
     description: 'rtm currentPhase 为字符串应被 type:integer 拦截',
   },
   {
+    file: 'bad-rtm-evidence-wrong-type.json',
+    schema: 'rtm',
+    expectedValid: false,
+    expectedErrorPatterns: [/evidence\/exitCode/, /\[type\]/],
+    description: 'rtm testSummary.evidence.exitCode 为字符串应被 type:integer 拦截',
+  },
+  {
     file: 'bad-run-log-missing-required.json',
     schema: 'run-log',
     expectedValid: false,

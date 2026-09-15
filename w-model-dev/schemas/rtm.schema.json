@@ -112,6 +112,41 @@
           "type": "number",
           "minimum": 0,
           "maximum": 100
+        },
+        "evidence": {
+          "description": "本级测试结果的可验证运行证据（M07 新增，可选；缺失时门禁按 cutoff 决定是否吸收）。绑定真实测试命令、退出码与观测时间，可选携带原始输出文件路径与 SHA-256，使测试摘要不再是可随意填写的数字",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["command", "exitCode", "observedAt"],
+          "properties": {
+            "command": {
+              "description": "产生本次测试摘要的真实命令（不含未受控的 shell 管道/重定向；禁 ; & | < > 与换行）",
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!.*[;&|<>\\r\\n]).+$"
+            },
+            "exitCode": {
+              "description": "真实进程退出码，非负整数；本字段是「测试结果与真实运行绑定」的锚点（有失败必须来自非零退出）",
+              "type": "integer",
+              "minimum": 0
+            },
+            "observedAt": {
+              "description": "命令观测时间，UTC ISO-8601 毫秒精度（如 2026-09-15T10:00:00.000Z）",
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            },
+            "rawOutputPath": {
+              "description": "原始测试输出文件的仓库相对路径（可选；须与 rawOutputSha256 成对出现，且不得为绝对路径或越出仓库根）",
+              "type": "string",
+              "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)(?!.*/$)(?!.*\\u0000).+$"
+            },
+            "rawOutputSha256": {
+              "description": "原始测试输出文件的 SHA-256 十六进制摘要（可选；须与 rawOutputPath 成对出现，由门禁重新计算比对）",
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
         }
       }
     }
