@@ -7,12 +7,18 @@
  * 本文件仅保留编排。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] [--phase=N] [--cucumber-report=<path>] [--scope=<change-scope.json>] [--json]
+ *   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] [--phase=N] [--cucumber-report=<path>] [--tickets=<path>] [--scope=<change-scope.json>] [--json]
  *   npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts --validate-templates [--json]
  *
  * 参数：
  *   project-dir   项目根目录（默认：当前工作目录）
  *   --phase=N     校验阶段 1-8（默认终检 phase=8，向后兼容；兼容历史短参数 -p）
+ *   --tickets=<path>  S18 票据内容校验（`tickets.md`）：六条黑名单 + Buildability 判据（一律符号级，
+ *                 不要求文件路径或内联代码块），违反并入 reasons / exit 1，计数进
+ *                 `GATE_JSON.tickets:{checked,criticalMissing,buildabilityMissing}`。
+ *                 **缺省不触发**（既有调用方零影响）；仅适用 `--phase=5..8`
+ *                 （`--phase<5` 给定 → exit 2 ARG_INVALID，不静默忽略）；文件不存在 → exit 2
+ *                 FILE_NOT_FOUND；只接受等号形态，路径相对 project-dir 解析
  *   --scope=FILE  阶段 5-8 变更上下文 manifest（schemas/change-scope.schema.json；与
  *                 --change/--base/--head 互斥）：聚合 codegraph/opsx strict 校验，
  *                 violations 并入 reasons/exitCode（不被 RTM 通过掩盖）；
@@ -317,6 +323,33 @@ async function main(): Promise<void> {
   // --spec-dir=<dir>（phase=1 需求规格独立产物目录，含 requirement-spec.md + 6 独立文件）
   // 全量 argv 扫描（与 parsePhaseArg 一致），避免 --spec-dir 出现在任意位置被静默忽略（false-pass 方向）
   const specDir = parseFlagValue(process.argv, 'spec-dir');
+
+  // ==================== --tickets=<path> 参数契约（S18，计划 §0.1.4） ====================
+  // 1) 缺省不触发（既有调用方零影响）；2) 空格形态 / 空值非静默忽略而是 ARG_INVALID
+  //    （本 CLI 的值 flag 一律等号形态，与 --scope 同口径）；3) --phase<5 给定 → ARG_INVALID，
+  //    不在低阶段静默跳过参数。
+  const ticketsArg = parseFlagValue(process.argv, 'tickets');
+  if (hasFlag(process.argv, 'tickets') || ticketsArg === '') {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'S18',
+      message: '参数非法 --tickets',
+      detail: '仅接受等号形态且值非空：--tickets=<path>（空格形态不解析，避免被静默忽略）',
+      exitCode: 2,
+    });
+    return;
+  }
+  if (ticketsArg !== undefined && (phaseOption ?? 8) < 5) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'S18',
+      message: '参数非法 --tickets',
+      detail: `票据内容校验仅适用于阶段 5-8（收到 --phase=${phaseOption ?? 8}）；低阶段票据尚未进入阶段 5 编码，不得静默忽略`,
+      exitCode: 2,
+    });
+    return;
+  }
+
   const projectDir = parseProjectDir(process.argv);
   const cucumberReportArg = parseFlagValue(process.argv, 'cucumber-report');
   const cucumberReportFile = path.resolve(
@@ -324,6 +357,30 @@ async function main(): Promise<void> {
     cucumberReportArg ?? path.join('.w-model', 'bdd', 'reports', 'report.json'),
   );
   const rtmFile = path.resolve(projectDir, ARTIFACT_PATHS.rtm);
+
+  // S18 票据文本读取（--tickets 缺省时 ticketsFile/ticketsText 均为 undefined → 不触发校验）。
+  // 文件不存在 → exit 2 FILE_NOT_FOUND；其它读取失败（目录 / 权限等）→ exit 2 FILE_READ。
+  let ticketsFile: string | undefined;
+  let ticketsText: string | undefined;
+  if (ticketsArg !== undefined) {
+    ticketsFile = path.resolve(projectDir, ticketsArg);
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- ticketsFile 由 --tickets 参数经 path.resolve(projectDir, ...) 得到，仅只读
+      ticketsText = nodeFs.readFileSync(ticketsFile, 'utf-8');
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      exitWithError({
+        category: code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
+        rule: 'S18',
+        message: '票据文件不可读（--tickets）',
+        file: ticketsFile,
+        detail: code ?? (err as Error).message,
+        exitCode: 2,
+      });
+      return;
+    }
+  }
+
   // RTM 读取（FILE_NOT_FOUND / FILE_READ / FILE_PARSE 统一走 readJsonClassified，哨兵由 runMain 兜底）
   // ENOENT 预探测：readJsonClassified 对缺失文件只报通用「文件不存在」，此处补回原「请先执行 /wm」引导语（非 ENOENT 交回统一分类）
   try {
@@ -394,6 +451,8 @@ async function main(): Promise<void> {
     phaseOption,
     specDir,
     projectRoot: projectDir,
+    // S18：--tickets 缺省时为 undefined → 纯函数不触发票据校验（既有调用方零影响）
+    ticketsText,
   });
 
   // ==================== 终检调用 TLA+/BDD model 校验（设计文档 §3.3.8） ====================
@@ -475,6 +534,8 @@ async function main(): Promise<void> {
   // M07 测试证据：legacy 为非阻断诊断（不进 reasons/overallPassed）；testEvidence 为 e-rule 计数
   const legacyDiagnostics = result.legacy ?? [];
   const testEvidenceSummary = result.testEvidence ?? null;
+  // S18 票据内容计数：--tickets 缺省时为 null（键恒存在，便于编排消费）
+  const ticketsSummary = result.tickets ?? null;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
@@ -490,6 +551,8 @@ async function main(): Promise<void> {
         // M07：legacy 非阻断诊断 + 测试证据 e-rule 计数（键恒存在，便于编排消费）
         ...(legacyDiagnostics.length > 0 ? { legacy: legacyDiagnostics } : {}),
         testEvidence: testEvidenceSummary,
+        // S18：票据内容校验计数（缺省不触发时为 null）
+        tickets: ticketsSummary,
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -519,6 +582,12 @@ async function main(): Promise<void> {
   console.log(
     `graph 资产    : ${graph ? `✓ ${graphSource}（${graph.nodes.length} 节点）` : '⚠ 未发现任何 graph 资产'}`,
   );
+  // S18：仅在给定 --tickets 时输出票据内容校验行（缺省不改变既有输出）
+  if (ticketsSummary !== null) {
+    console.log(
+      `票据内容      : ${ticketsSummary.checked} 张票据，黑名单违规 ${ticketsSummary.criticalMissing} 条，Buildability 违规 ${ticketsSummary.buildabilityMissing} 条（${ticketsFile ?? '（--tickets）'}）`,
+    );
+  }
   if (externalAggregate !== undefined) {
     const ext = externalAggregate.summary;
     console.log(
@@ -562,6 +631,8 @@ async function main(): Promise<void> {
       // M07：非阻断 legacy 诊断（仅在非空时出现）+ 测试证据 e-rule 计数（键恒存在）
       ...(legacyDiagnostics.length > 0 ? { legacy: legacyDiagnostics } : {}),
       testEvidence: testEvidenceSummary,
+      // S18：票据内容校验计数（键恒存在；缺省不触发时为 null）
+      tickets: ticketsSummary,
     },
     exitCode,
   );

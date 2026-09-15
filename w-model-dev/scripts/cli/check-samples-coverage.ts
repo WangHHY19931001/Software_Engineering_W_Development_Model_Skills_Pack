@@ -3,7 +3,7 @@
  * samples 覆盖矩阵门禁（Samples Coverage Checker）
  *
  * 核对 w-model-dev/scripts/samples/ 下每个 fixture（文件 / 嵌套目录）都被 self-test.ts
- * 用例数组引用（file / sampleDir 字段），且每个子目录在 samples/README.md 覆盖矩阵中有声明——
+ * 用例数组引用（file / manifestFile / ticketsFile / auxFiles / sampleDir 字段），且每个子目录在 samples/README.md 覆盖矩阵中有声明——
  * 堵住「新增 fixture 后遗忘在 self-test.ts 登记」的缺口（未登记的 fixture 不参与任何检查，
  * self-test 基线依然全绿）。双向闭环（F-G7-06/07，audit-fixes task 6）：
  *   - 引用 → 在盘：self-test.ts 引用的 file / sampleDir 路径必须真实存在（悬空 → reference-dangling / exit 1）；
@@ -111,7 +111,7 @@ function extractReferences(selfTestContent: string): ReferenceSets {
     }
   }
 
-  // 2) 用例数组块（const <NAME>_CASES: ... 行号区间）→ file/manifestFile 字段值，
+  // 2) 用例数组块（const <NAME>_CASES: ... 行号区间）→ file/manifestFile/ticketsFile 字段值，
   //    组合为 `<子目录>/<file>` 精确引用
   const caseStarts: Array<{ name: string; start: number }> = [];
   lines.forEach((l, i) => {
@@ -124,7 +124,8 @@ function extractReferences(selfTestContent: string): ReferenceSets {
     if (dir === undefined) continue; // 无 run 函数配对的数组（理论上不存在）
     const end = i + 1 < caseStarts.length ? caseStarts[i + 1]!.start : lines.length;
     const block = lines.slice(caseStarts[i]!.start, end).join('\n');
-    for (const m of block.matchAll(/\b(?:file|manifestFile): '([^']+)'/g)) {
+    // 精确文件引用字段：file（主输入）/ manifestFile（bdd）/ ticketsFile（S18 票据内容 fixture）
+    for (const m of block.matchAll(/\b(?:file|manifestFile|ticketsFile): '([^']+)'/g)) {
       files.add(`${dir}/${m[1]!}`);
     }
     // 配套产物文件数组字段（相对 samples/<子目录>/）：

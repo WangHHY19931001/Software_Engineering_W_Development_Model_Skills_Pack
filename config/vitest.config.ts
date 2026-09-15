@@ -51,6 +51,7 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'evidence-provenance-logic.test.ts',
   'exit2-failure-atomicity.test.ts',
   'gate-report.test.ts',
+  'gate-ticket-content.test.ts',
   'l0-link-audit-cli.test.ts',
   'metrics-report.test.ts',
   'platform-deps-hook.test.ts',

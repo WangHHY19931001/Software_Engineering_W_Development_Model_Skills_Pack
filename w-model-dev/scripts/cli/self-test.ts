@@ -151,6 +151,12 @@ interface GateCase {
    * 不作为门禁运行输入。当前用于 M07 E2 的原始测试输出产物 test-evidence-output.txt。
    */
   auxFiles?: string[];
+  /**
+   * S18 票据内容 fixture（相对 samples/gate/，`.md`）。runGateCases 读取其文本作为
+   * `checkArtifactGate({ ticketsText })` 输入；同时被 check-samples-coverage 登记为已引用
+   * （`ticketsFile` 与 `file` / `auxFiles` 同为覆盖矩阵的可识别引用字段）。
+   */
+  ticketsFile?: string;
 }
 
 const VERIFIER_CASES: VerifierCase[] = [
@@ -480,6 +486,28 @@ const GATE_CASES: GateCase[] = [
     expectedPassed: true,
     phaseOption: 6,
     description: 'M07 E4 legacy 吸收：lastUpdated 早于 cutoff 且阶段内层无 evidence → 非阻断通过（legacy 标注）',
+  },
+  {
+    file: 'valid-rtm.json',
+    ticketsFile: 'tickets-valid.md',
+    expectedPassed: true,
+    description:
+      'S18 正例：票据含符号级契约（接口签名 / 状态转移）与验收标准、零占位符 → --tickets 不引入任何阻断（tickets 计数全 0）',
+  },
+  {
+    file: 'valid-rtm.json',
+    ticketsFile: 'tickets-bad-content.md',
+    expectedPassed: false,
+    expectedReasonPatterns: [
+      /票据内容校验失败：票据 01「待补登录」placeholder "TODO"/,
+      /票据 01「待补登录」vague-imperative/,
+      /票据 01「待补登录」test-without-signature/,
+      /票据 01「待补登录」undefined-symbol `AuditLogWriter\.write`/,
+      /票据 02「与任务 01 类似」similar-to-task/,
+      /票据 02「与任务 01 类似」Buildability：只给路径/,
+    ],
+    description:
+      'S18 反例：占位短语 TODO / 无具体动作祈使 / 要求写测试无符号 / 类似任务 N / 引用未定义符号 / 只给路径不给符号 → 逐条被黑名单与 Buildability 拦截',
   },
 ];
 
@@ -3018,6 +3046,11 @@ async function runGateCases(samplesDir: string): Promise<CaseResult[]> {
     // M07 E2：evidence.rawOutputPath 以「项目根」解析。样本级夹具的项目根即 samples/gate/，
     // 透传后 valid-test-evidence.json 的同目录产物可走通哈希核验端到端（不传则 E2 fail-closed）。
     options.projectRoot = path.join(samplesDir, 'gate');
+    // S18：票据内容 fixture 文本作为纯函数输入（未声明 ticketsFile 的用例不触发票据校验）
+    if (c.ticketsFile) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控仓库固定路径（samples/gate/ 下的用例声明 fixture），仅只读
+      options.ticketsText = await fs.readFile(path.join(samplesDir, 'gate', c.ticketsFile), 'utf-8');
+    }
     const r = checkArtifactGate(parsed as never, Object.keys(options).length > 0 ? (options as never) : undefined);
 
     const details: string[] = [];
@@ -3029,8 +3062,9 @@ async function runGateCases(samplesDir: string): Promise<CaseResult[]> {
     }
 
     const phaseTag = c.phaseOption ? `[p${c.phaseOption}]` : '';
+    const ticketsTag = c.ticketsFile ? `+${c.ticketsFile}` : '';
     results.push({
-      name: `gate/${c.file}${phaseTag}`,
+      name: `gate/${c.file}${phaseTag}${ticketsTag}`,
       passed: details.length === 0,
       description: c.description,
       details: details.length > 0 ? details : undefined,

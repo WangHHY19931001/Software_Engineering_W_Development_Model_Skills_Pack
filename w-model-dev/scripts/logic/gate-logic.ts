@@ -82,6 +82,8 @@ export interface ArtifactGateResult {
   legacy?: string[];
   /** M07 测试证据维度计数；结构失败早退路径不产出 */
   testEvidence?: ArtifactGateTestEvidenceSummary;
+  /** S18 票据内容校验计数；未给定票据文本（`options.ticketsText` 缺省）或结构失败早退时不产出 */
+  tickets?: TicketContentSummary;
 }
 
 /**
@@ -200,6 +202,12 @@ export interface CheckArtifactGateOptions {
    * check-artifact-gate.ts 始终传 project-dir。
    */
   projectRoot?: string;
+  /**
+   * S18 票据文本（`--tickets=<path>` 读取的 `tickets.md` 内容）。
+   * **缺省时不触发任何票据校验**（既有调用方零影响）；仅当 CLI 侧确认 phase>=5 且文件存在时传入。
+   * 纯函数不读盘：文件不存在 / 参数非法的 exit 2 判定由 CLI 层负责。
+   */
+  ticketsText?: string;
 }
 
 /**
@@ -280,6 +288,351 @@ export function checkCodeModuleFormat(rows: RTMRowShape[]): string[] {
     }
   }
   return violations;
+}
+
+// ==================== S18 票据内容校验（No Placeholders 黑名单 + Buildability） ====================
+/**
+ * S18 票据内容门禁计数（GATE_JSON `tickets` 键；结构照 M07 `testEvidence` 先例）。
+ * - `checked`：识别到的票据块数（`# <NN> — <标题>`）
+ * - `criticalMissing`：六条黑名单命中数
+ * - `buildabilityMissing`：Buildability 负面判据命中数
+ */
+export interface TicketContentSummary {
+  checked: number;
+  criticalMissing: number;
+  buildabilityMissing: number;
+}
+
+export interface TicketContentResult {
+  passed: boolean;
+  violations: string[];
+  summary: TicketContentSummary;
+}
+
+/** 票据块标题：`# 01 — 标题` / `## 01 - 标题`（`#{1,3}` + 数字票据号 + 可选分隔符） */
+const TICKET_HEADING_RE = /^#{1,3}\s+(\d{1,4})\s*[—\-–:.]?\s*(.*)$/;
+
+/**
+ * 黑名单第 1 条（台账 `sources/2026-09-14-superpowers-adopted-excerpts.md:696`）：
+ * 禁止占位短语。ASCII 词表与 `logic/code-health-ledger-logic.ts` 的 PLACEHOLDER 正则**术语对齐**
+ * （`tbd|todo|…|待定|待补`），但不复用其函数——两者域不同（code-health 候选 ledger vs 阶段 5 票据）。
+ */
+const TICKET_PLACEHOLDER_ASCII_RE = /\b(tbd|todo|implement later|fill in details)\b/i;
+const TICKET_PLACEHOLDER_CJK = ['待补建', '待补', '待定', '稍后实现', '填充细节'];
+
+/** 黑名单第 2 条（台账 :697）：无具体动作的祈使（只与「行内无符号引用」同时成立才命中） */
+const TICKET_VAGUE_IMPERATIVES = [
+  '加适当的错误处理',
+  '添加适当的错误处理',
+  '加合适的错误处理',
+  '加校验',
+  '添加校验',
+  '加验证',
+  '添加验证',
+  '处理边界情况',
+  '处理边界条件',
+  '处理各种边界情况',
+  'add appropriate error handling',
+  'add proper error handling',
+  'add validation',
+  'handle edge cases',
+];
+
+/** 黑名单第 3 条（台账 :698）：要求写测试但未给出测试符号或用例名 */
+const TICKET_TEST_WITHOUT_SIGNATURE = [
+  '为上述写测试',
+  '写测试',
+  '补测试',
+  '添加测试',
+  'write tests for the above',
+  'write tests',
+  'add tests',
+  'add unit tests',
+];
+
+/** 黑名单第 4 条（台账 :699）：以「类似任务 N」指代其他票据而未重复符号级说明 */
+const TICKET_SIMILAR_TO_TASK_RE =
+  /(?:similar to|same as)\s+(?:task|ticket)\s*\d+|(?:与|类似|如同|参照)[^。\n]{0,12}?(?:任务|票据)\s*\d+/i;
+
+/**
+ * 「定义标记词」：该行出现任一标记时，行内反引号符号引用视为**被定义**（进入全票据符号词汇表）。
+ * 依据本仓票据内容契约（`phase-5-coding.md`「票据内容 durability」）：票据主体=接口签名 / 类型约束 /
+ * 状态转移。词汇表是**跨票据**的——某符号在任一票据被定义，其他票据引用它即视为合法。
+ */
+const TICKET_DEFINITION_MARKERS = [
+  '接口签名',
+  '类型约束',
+  '状态转移',
+  '符号契约',
+  '契约',
+  '定义',
+  '入参',
+  '出参',
+  '返回',
+  '参数',
+  '签名',
+  'signature',
+  'returns',
+];
+
+/** 票据内的文件路径（Buildability ③；与 `phase-5-coding.md:162`「禁止具体文件路径」同向）
+ *  两个分支均为顺序量词（无嵌套重复），避免 `security/detect-unsafe-regex` 击穿。 */
+const TICKET_FILE_PATH_RE =
+  /[A-Za-z0-9_.-]+[\\/][A-Za-z0-9_.\\/-]+|\b[A-Za-z0-9_.-]+\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|ya?ml|py|go|java|rb|rs|sql|html|css|sh|feature|tla|cfg)\b/gi;
+
+/**
+ * 第 5 条的**替代形态**（§0.1.3「须点名接口签名/类型约束/状态转移**或**可执行步骤的具体动作与产出物」）：
+ * 非代码票据（文档 / 手册 / 流程）无法给出符号契约时，可用显式「具体动作 / 产出物」行表达「怎么做」。
+ * 判定：该行出现标记词，且标记词之后仍有实质内容（≥2 个非空白非标点字符）。
+ */
+const TICKET_CONCRETE_DELIVERABLE_MARKERS = ['产出物', '交付物', '具体动作', 'deliverable', 'concrete steps'];
+
+function hasConcreteDeliverable(lines: string[]): boolean {
+  return lines.some((line) => {
+    const lower = line.toLowerCase();
+    return TICKET_CONCRETE_DELIVERABLE_MARKERS.some((k) => {
+      const idx = lower.indexOf(k);
+      if (idx === -1) return false;
+      const tail = line.slice(idx + k.length).replace(/[\s:：*_\u002d\u2014、,，]+/g, '');
+      return tail.length >= 2;
+    });
+  });
+}
+
+/** 反引号 span（票据内单行内联标记） */
+const BACKTICK_SPAN_RE = /`([^`\n]+)`/g;
+
+/** 符号 span 头部标识符：标识符 / 点分标识符（如 `A`、`A.b`） */
+const IDENT_HEAD_RE = /^[A-Za-z_$][\w$.]*/;
+
+/** 符号 span 可选后缀：类型注解或状态转移（`: T` / `→ T` / `-> T`） */
+const SYMBOL_SUFFIX_RE = /^\s*(?::|→|->)\s*\S[\s\S]*$/;
+
+/**
+ * 符号 span 判定（顺序量词 + 括号手工配对，避免嵌套重复的 unsafe-regex）：
+ * 整个 span 为「标识符 / 点分标识符（可带调用）」，其后可跟类型注解或状态转移。
+ */
+function isSymbolSpan(span: string): boolean {
+  const id = IDENT_HEAD_RE.exec(span)?.[0] ?? '';
+  if (id === '') return false;
+  let head = id;
+  // 可选调用：标识符后紧跟 `(` 且存在配对 `)` 时，把头扩到 `)` 为止（含参数）
+  if (span[id.length] === '(') {
+    const close = span.indexOf(')', id.length + 1);
+    if (close !== -1) head = span.slice(0, close + 1);
+  }
+  const rest = span.slice(head.length);
+  return rest === '' || SYMBOL_SUFFIX_RE.test(rest);
+}
+
+/** 标识符 token（用于定义词汇表；`` `describe('A.b')` `` 可抽出 `describe` 与 `A.b`） */
+const IDENT_TOKEN_RE = /[A-Za-z_$][\w$.]*/g;
+
+/** 源码类文件后缀：命中即视为路径（避免把 `Foo.bar` 误判为路径） */
+const FILE_EXT_RE = /\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|ya?ml|py|go|java|rb|rs|sql|html|css|sh|feature|tla|cfg)$/i;
+
+/** 接口签名 span（Buildability ①：`name(...)` 形态） */
+const SIGNATURE_SPAN_RE = /^[A-Za-z_$][\w$.]*\([^)]*\)/;
+
+/** 验收标准行（`- [ ] …`） */
+const ACCEPTANCE_CRITERION_RE = /^\s*-\s*\[[ xX]\]/;
+
+function isPathLikeSpan(span: string): boolean {
+  return /[/\\]/.test(span) || FILE_EXT_RE.test(span);
+}
+
+/** 取一行内全部反引号 span，过滤出符号 span（排除路径 / JSON 字面量等） */
+function symbolSpansOfLine(line: string): string[] {
+  const out: string[] = [];
+  for (const m of line.matchAll(BACKTICK_SPAN_RE)) {
+    const s = (m[1] ?? '').trim();
+    if (s === '' || isPathLikeSpan(s)) continue;
+    if (isSymbolSpan(s)) out.push(s);
+  }
+  return out;
+}
+
+/** 取字符串内全部标识符 token（含点分） */
+function identTokens(text: string): string[] {
+  return [...text.matchAll(IDENT_TOKEN_RE)].map((m) => m[0]);
+}
+
+function hasDefinitionMarker(line: string): boolean {
+  const lower = line.toLowerCase();
+  return TICKET_DEFINITION_MARKERS.some((k) => lower.includes(k.toLowerCase()));
+}
+
+interface TicketBlock {
+  id: string;
+  title: string;
+  lines: string[];
+}
+
+/** 按 `# <NN> — <标题>` 标题切分票据块（标题前的内容视为文档前言，不参与校验） */
+function splitTicketBlocks(text: string): TicketBlock[] {
+  const blocks: TicketBlock[] = [];
+  let current: TicketBlock | null = null;
+  for (const line of text.split(/\r?\n/)) {
+    const m = TICKET_HEADING_RE.exec(line);
+    if (m) {
+      if (current) blocks.push(current);
+      current = { id: m[1] ?? '', title: (m[2] ?? '').trim() || '（无标题）', lines: [] };
+      continue;
+    }
+    if (current) current.lines.push(line);
+  }
+  if (current) blocks.push(current);
+  return blocks;
+}
+
+/**
+ * S18 票据内容校验（纯函数，不读盘）。
+ *
+ * 判据集 = 六条黑名单 + Buildability 三条负面判据；逐条出处见计划
+ * `docs/superpowers/plans/2026-09-15-p4-test-quality-and-design-rules.md` §0.1.3/§0.1.5，
+ * 黑名单行号对应台账 `docs/superpowers/sources/2026-09-14-superpowers-adopted-excerpts.md:696-701`。
+ *
+ * **符号类改写（本仓库对源文的适配，非源文原义）**：台账标题写「七条」而原文块实测 6 条 bullet，
+ * 且原文块含 `（略）` 截断（源仓库不在本仓，路径类原文**未见、未核实**）。规格 §11 :304 的硬约束是
+ * 「S18 路径类黑名单换符号类」，本仓既有票据契约（`phase-5-coding.md:162` 禁止具体文件路径与代码片段；
+ * `:168-173` 票据主体=符号级契约）与之同向。故第 5 条（源文附「code blocks required」）与第 1/2/3 条中
+ * 「怎么写」的部分一律落为**符号级要求**：票据须点名接口签名 / 类型约束 / 状态转移，或可执行步骤的
+ * **具体动作与产出物**——**不要求写文件路径，也不要求内联代码块**。
+ *
+ * 判据分工（避免同一断言重复触发）：
+ * - 第 6 条只审**非验收标准行**的未定义符号引用；Buildability ② 只审**验收标准行**的未定义符号引用；
+ * - 第 5 条只在「无符号且无路径且未给显式产出物行」时命中；Buildability ③ 只在「无符号但有路径」时命中。
+ */
+export function checkTicketContent(ticketsText: string): TicketContentResult {
+  const violations: string[] = [];
+  const blocks = splitTicketBlocks(typeof ticketsText === 'string' ? ticketsText : '');
+  if (blocks.length === 0) {
+    return {
+      passed: false,
+      violations: ['票据内容校验失败：未发现任何票据（期望 `# <NN> — <标题>` 形式的票据块；S18 票据内容契约）'],
+      summary: { checked: 0, criticalMissing: 1, buildabilityMissing: 0 },
+    };
+  }
+
+  // 跨票据符号定义词汇表：任一票据的定义行上出现的符号即视为已定义
+  const definedSymbols = new Set<string>();
+  for (const b of blocks) {
+    for (const line of b.lines) {
+      if (!hasDefinitionMarker(line)) continue;
+      for (const span of symbolSpansOfLine(line)) {
+        for (const tok of identTokens(span)) definedSymbols.add(tok);
+      }
+    }
+  }
+  const isDefinedSpan = (span: string): boolean => identTokens(span).some((t) => definedSymbols.has(t));
+
+  let criticalMissing = 0;
+  let buildabilityMissing = 0;
+
+  for (const block of blocks) {
+    const where = `票据 ${block.id}「${block.title}」`;
+    const text = block.lines.join('\n');
+    const criterionLines = block.lines.filter((l) => ACCEPTANCE_CRITERION_RE.test(l));
+    const bodyLines = block.lines.filter((l) => !ACCEPTANCE_CRITERION_RE.test(l));
+    const bodySymbols = bodyLines.flatMap((l) => symbolSpansOfLine(l));
+    const criterionSymbols = criterionLines.flatMap((l) => symbolSpansOfLine(l));
+    const allSymbols = [...bodySymbols, ...criterionSymbols];
+    const paths = text.match(TICKET_FILE_PATH_RE) ?? [];
+    const lineHasSymbol = (l: string): boolean => symbolSpansOfLine(l).length > 0;
+
+    // ---- 第 1 条：禁止占位短语 ----
+    const asciiHit = TICKET_PLACEHOLDER_ASCII_RE.exec(text)?.[1];
+    const cjkHit = TICKET_PLACEHOLDER_CJK.find((t) => text.includes(t));
+    if (asciiHit !== undefined || cjkHit !== undefined) {
+      criticalMissing++;
+      violations.push(
+        `票据内容校验失败：${where}placeholder "${asciiHit ?? cjkHit}"（S18 黑名单第 1 条：禁止占位短语；台账 :696）`,
+      );
+    }
+
+    // ---- 第 2 条：无具体动作的祈使（须行内无符号引用） ----
+    const vagueHit = block.lines.find(
+      (l) => !lineHasSymbol(l) && TICKET_VAGUE_IMPERATIVES.some((p) => l.toLowerCase().includes(p)),
+    );
+    if (vagueHit !== undefined) {
+      criticalMissing++;
+      violations.push(
+        `票据内容校验失败：${where}vague-imperative（S18 黑名单第 2 条：无具体动作的祈使；台账 :697；符号级改写——须点名符号或给出具体动作与产出物）`,
+      );
+    }
+
+    // ---- 第 3 条：要求写测试但无测试符号 / 用例名 ----
+    const testHit = block.lines.find(
+      (l) => !lineHasSymbol(l) && TICKET_TEST_WITHOUT_SIGNATURE.some((p) => l.toLowerCase().includes(p)),
+    );
+    if (testHit !== undefined) {
+      criticalMissing++;
+      violations.push(
+        `票据内容校验失败：${where}test-without-signature（S18 黑名单第 3 条：要求写测试但未给出测试符号或用例名；台账 :698）`,
+      );
+    }
+
+    // ---- 第 4 条：类似任务 N 而无符号级重复说明 ----
+    const similarHit = block.lines.find((l) => !lineHasSymbol(l) && TICKET_SIMILAR_TO_TASK_RE.test(l));
+    if (similarHit !== undefined) {
+      criticalMissing++;
+      violations.push(
+        `票据内容校验失败：${where}similar-to-task（S18 黑名单第 4 条：以「类似任务 N」指代而未重复符号级说明；台账 :699）`,
+      );
+    }
+
+    // ---- 第 5 条：只说要做什么不说怎么做（符号级改写）----
+    // 无符号且无路径 → 违反；例外：非代码票据给出显式「具体动作 / 产出物」行（§0.1.3 的「或」分支）
+    if (allSymbols.length === 0 && paths.length === 0 && !hasConcreteDeliverable(block.lines)) {
+      criticalMissing++;
+      violations.push(
+        `票据内容校验失败：${where}no-symbol-contract（S18 黑名单第 5 条：只说要做什么不说怎么做；台账 :700；` +
+          `本仓库适配，非源文原义——须点名接口签名/类型约束/状态转移，或给出具体动作与产出物；不要求文件路径或内联代码块）`,
+      );
+    }
+
+    // ---- 第 6 条：引用任何任务中都未定义的符号（只审非验收标准行） ----
+    const undefinedBody = [...new Set(bodySymbols.filter((s) => !isDefinedSpan(s)))];
+    for (const sym of undefinedBody) {
+      criticalMissing++;
+      violations.push(
+        `票据内容校验失败：${where}undefined-symbol \`${sym}\`（S18 黑名单第 6 条：引用任何任务中都未定义的 type/function/method；台账 :701）`,
+      );
+    }
+
+    // ---- Buildability ①：缺接口签名且缺验收标准 ----
+    const hasSignature = text.includes('接口签名') || allSymbols.some((s) => SIGNATURE_SPAN_RE.test(s));
+    if (!hasSignature && criterionLines.length === 0) {
+      buildabilityMissing++;
+      violations.push(
+        `票据内容校验失败：${where}Buildability：缺接口签名且缺验收标准（S18 Buildability 判据，§0.1.5②）`,
+      );
+    }
+
+    // ---- Buildability ②：验收标准引用未定义符号（只审验收标准行） ----
+    const undefinedCriteria = [...new Set(criterionSymbols.filter((s) => !isDefinedSpan(s)))];
+    for (const sym of undefinedCriteria) {
+      buildabilityMissing++;
+      violations.push(
+        `票据内容校验失败：${where}Buildability：验收标准引用未定义符号 \`${sym}\`（S18 Buildability 判据，§0.1.5②）`,
+      );
+    }
+
+    // ---- Buildability ③：只给路径不给符号 ----
+    if (allSymbols.length === 0 && paths.length > 0) {
+      buildabilityMissing++;
+      violations.push(
+        `票据内容校验失败：${where}Buildability：只给路径 \`${paths[0]}\` 不给符号（S18 Buildability 判据；` +
+          `路径不是定位手段，位置交给 codegraph_explore，phase-5-coding.md 票据内容 durability）`,
+      );
+    }
+  }
+
+  return {
+    passed: violations.length === 0,
+    violations,
+    summary: { checked: blocks.length, criticalMissing, buildabilityMissing },
+  };
 }
 
 // ==================== uat-path-mapping 回填校验（P0-1） ====================
@@ -850,6 +1203,16 @@ export function checkArtifactGate(
     for (const v of formatViolations) reasons.push(v);
   }
 
+  // ==================== S18 票据内容校验（给定票据文本时） ====================
+  // 参数契约（计划 §0.1.4）：`--tickets` 缺省时**不触发**（既有调用方零影响）；
+  // phase<5 给定 `--tickets`、以及文件不存在，均由 CLI 层在调用前判定为 exit 2，纯函数不读盘。
+  let tickets: TicketContentSummary | undefined;
+  if (typeof options?.ticketsText === 'string') {
+    const ticketResult = checkTicketContent(options.ticketsText);
+    for (const v of ticketResult.violations) reasons.push(v);
+    tickets = ticketResult.summary;
+  }
+
   return {
     passed: reasons.length === 0,
     reasons,
@@ -858,5 +1221,6 @@ export function checkArtifactGate(
     unitCoveragePercent,
     ...(legacyDiagnostics.length > 0 ? { legacy: legacyDiagnostics } : {}),
     testEvidence: testEvidenceCounts,
+    ...(tickets !== undefined ? { tickets } : {}),
   };
 }

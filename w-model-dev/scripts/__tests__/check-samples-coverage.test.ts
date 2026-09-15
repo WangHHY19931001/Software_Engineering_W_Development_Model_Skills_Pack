@@ -206,7 +206,7 @@ describe('check-samples-coverage 双向闭环（F-G7-06/07）', () => {
     expect(r.stdout).toContain('"unregistered":0');
   });
 
-  it('M07 RED：配套产物未被任何用例字段登记 → exit 1（auxFiles 是唯一登记途径，不得默认放行）', async () => {
+  it('M07 RED：配套产物未被任何用例字段登记 → exit 1（仅 file/manifestFile/ticketsFile/auxFiles 是登记途径，不得默认放行）', async () => {
     await setupGateRepo([], ['gate/a.json', 'gate/test-evidence-output.txt']);
     const r = run();
     expect(r.code).toBe(1);
