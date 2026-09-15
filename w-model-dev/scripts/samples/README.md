@@ -43,7 +43,7 @@
 | `uat-path-mapping`     | check-artifact-gate（B4/B5）                                                       | UAT_PATH_MAPPING_CASES（5，sampleDir 形态）                                                                      | uat-path-mapping.md 解析与回填校验                                                                                                                                                                                                                                                                                                                                                             | 嵌套 `docs/uat-path-mapping.md`                                                         | 放宽 uat-path-mapping 解析将漏掉空表格/畸形行导致 UAT 路径回填缺失 |
 | `verifier-calibration` | **无（非门禁）**                                                                   | **无（非门禁，不登记 self-test）**                                                                               | Verifier 校准集（非门禁，人工标注正解）：带 `expectedVerdict`/`expectedRationale` 的锚定样本，用于离线诊断 V 的校准偏移（R18 分辨力下限）与标准偏移（R9 跨轮次不一致）。**无脚本读取，不阻断任何流程**——锚定正解由人标注且校准需真实跑 LLM，不符合「确定性门禁」定义；升级为门禁须走独立决策（见该目录 README 首段）                                                                           | 平铺 JSON（VerifierOutput 形态 + run-log 条目形态）                                     | 校准集被误当门禁登记进 self-test，会让需人工标注或真实 LLM 的样本伪装成确定性门禁 |
 
-**总计 332 条用例**（实测 `npm run self-test`，以 self-test.ts 为准）。上表的 `..._CASES（N）` 为各区域数组条目数（合计 300），与总数相差 **32 条**是元数据校验用例（`metadataResults`，self-test.ts 末尾与各 `_CASES` 一并汇总，校验 SKILL.md 版本与 skill-metadata.json 一致等），**不属于任何样本目录**，故本表不列。逐行相加小于总数属正常，勿据此"修正"单行数字。用例数与「对应 check 脚本」列的数组条数不一致时以 self-test.ts 为准（数组条目数 = 实际执行数）。
+**总计 333 条用例**（实测 `npm run self-test`，以 self-test.ts 为准）。上表的 `..._CASES（N）` 为各区域数组条目数（合计 301），与总数相差 **32 条**是元数据校验用例（`metadataResults`，self-test.ts 末尾与各 `_CASES` 一并汇总，校验 SKILL.md 版本与 skill-metadata.json 一致等），**不属于任何样本目录**，故本表不列。逐行相加小于总数属正常，勿据此"修正"单行数字。用例数与「对应 check 脚本」列的数组条数不一致时以 self-test.ts 为准（数组条目数 = 实际执行数）。
 
 ## 排除项
 
@@ -61,6 +61,6 @@
 
 ## 维护约定
 
-- 门禁：`check-samples-coverage.ts`（pre-push 第 15 项）核对「每个 fixture 被引用」+「每个子目录在本矩阵声明」+「每个 exit-2 门禁在 `NEGATIVE-COVERAGE.md` 登记会失败的负向案例（fixture 机制路径须在盘存在）」；`self-test.ts` 头部注释声明新增约定。
+- 门禁：`check-samples-coverage.ts`（pre-push 第 15 项）核对「每个 fixture 被引用」+「引用路径无悬空（self-test.ts 引用的 file / sampleDir 路径须在盘存在）」+「每个子目录在本矩阵声明」+「每个 exit-2 门禁在 `NEGATIVE-COVERAGE.md` 登记会失败的负向案例（fixture 机制路径须在盘存在）」；`self-test.ts` 头部注释声明新增约定。
 - 负向覆盖：新增 / 改名任一 `cli/*.ts`（非 `self-test.ts`）门禁时，须在 `NEGATIVE-COVERAGE.md` 追加一行并在本矩阵该子目录的「所防回归」列写明它防的那个具体回归；否则 `check-samples-coverage.ts` 报 `negative-coverage-missing`。
 - 本矩阵与 `self-test.ts` 用例数组、pre-push spot-check 路径三者必须一致——改动任一须同步另外两处。
