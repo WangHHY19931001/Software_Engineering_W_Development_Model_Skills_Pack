@@ -203,6 +203,69 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 2. **一个动作一个接收者。** 一次分派只指派一个角色做一件事；需要两个角色或两个动作时写两句（「先派 R 子代理定位根因，再派 S 子代理修复」），不写「请 A 和 B 一起处理」——后者会被读成一次调用同时承担两件事，导致其中一件被漏掉。
 3. **人类入口不可被模型代达。** 当某步骤的前置是**人类入口**（`/wm` 命令本身、🔴 CHECKPOINT 用户确认等）时，必须写成「告诉用户执行 `<X>`」，不得写成「由子代理调用 `<X>`」——后者命中反模式 #8（越过 🔴 CHECKPOINT 自动推进）与反模式 #10（编排者越权实施）。
 
+### 3.4 禁预判 findings 与 scoped re-review 契约
+
+本节与 §3.3 并列，都是**分派书写规则**：§3.3 规定交接怎么写，本节规定**评审分派与复审轮次怎么写**。适用对象是编排者（写 V 分派 prompt）与 V（执行复审）；它只约束 V 复审的**范围与结论格式**，返工链的其余步骤（R → V → G → S-fix → R3×3 → V → G）顺序与门禁判据一概不变（见 §3.4.6）。
+
+#### 3.4.1 禁止编排者预判 findings
+
+编排者**不得**在 V 分派 prompt 里预判 findings——不得指示评审者忽略某个问题、不要报某个问题，也不得预先给严重度封顶。命中判断是**逐字**的：prompt 里出现下列任一片语，即停下重写。
+
+| 命中片语（逐字）   | 它在做什么                       |
+| ------------------ | -------------------------------- |
+| `do not flag`      | 指示评审者不要报某个具体问题     |
+| `don't treat X as a defect` | 预先豁免某个具体问题     |
+| `at most Minor`    | 预先给严重度封顶                 |
+| `the plan chose`   | 用「计划已经这么选了」预先驳回 finding |
+
+**处置：停下重写 prompt。** 如果你正在写的 prompt 含上述任一片语，说明你正在预判 findings——这是为了给自己省掉一轮评审；这不是可接受的理由。删掉预判句后重写，把判断留给 V。
+
+**误报的正确出口**：如果你认为某个 finding 会是误报，**让评审者先把它报出来**，在评审回路里裁决（见 §3.4.5）——不得在分派阶段预先压制 finding。
+
+#### 3.4.2 scoped re-review 的范围契约
+
+S-fix 之后的复审是**受范围约束的复审**（scoped re-review），不是第二次全量评审：
+
+- **范围 = findings 清单 + fix diff 两项**；对 findings 清单**逐条**出结论。
+- 检查 fix diff 本身**是否引入新问题**。
+- **不复审 fix 未触及的代码**：若发现的问题完全落在 fix diff 之外，写入「范围外观察」（Out-of-Scope Observations）——它**不阻塞本任务，也不延长 loop**；整分支的宽范围复审在所有任务完成后单独进行。
+- **一轮 = 一次 fix 分派 + 一次 scoped re-review**；**每任务最多 5 轮**。
+
+> 轮次口径：该 5 轮上限**不放松**既有 `budget.json.perPhase.maxReworkRounds` 预算门禁——两者取更严者；达 `maxReworkRounds` 仍须按既有机制强制 🔴 CHECKPOINT 升级（见「失败模式与回退」节 + operational-recovery.md 场景 5）。
+
+#### 3.4.3 逐 finding 结论：ADDRESSED / NOT ADDRESSED
+
+按 findings 清单的**原有顺序**逐条输出：`<finding 一行摘要> — ADDRESSED | NOT ADDRESSED`，并附 `file:line` 证据。
+
+**"Attempted" is not addressed**——「尝试修复」不算已修复：那条**具体缺陷必须已经不存在**；不得以「已改过该段 / 已加注释 / 已说明理由 / 已部分覆盖」结案。缺陷仍可复现即 `NOT ADDRESSED`。
+
+#### 3.4.4 Minor 不进 loop
+
+- Minor finding 记入进度台账：`Task <N>: minor (deferred): <一行摘要>`，并**明确指向最终整分支复审**，由它分诊哪些必须在合入前修完。
+- **没人读的汇总等于静默丢弃**：只记录不指向、或指向了不读，等价于丢弃该 Minor。
+- **Minor findings never enter the loop**：Minor 不触发 fix 分派、不计入每任务 5 轮上限。
+
+#### 3.4.5 finding 结论与误报质疑的承载通道（零 Schema 变更）
+
+结论与质疑一律以**固定前缀写入既有文本字段**，**不新增字段、不改 `verifier-output.schema.json`**（先例：`verifier-spec.md` 把 R14-R17 四问结论以固定前缀写入 `summary`，:278-281）。
+
+| 内容           | 承载字段（既有）      | 固定前缀                                                          |
+| -------------- | --------------------- | ----------------------------------------------------------------- |
+| 逐 finding 结论 | `reworkHints`（`string[]`） | `ADDRESSED: <一行摘要> — <file:line 证据>` ／ `NOT ADDRESSED: <一行摘要> — <file:line 证据>` |
+| 误报质疑       | `summary` ／ `reworkHints`  | `FALSE-POSITIVE-CHALLENGE: <finding 摘要> — <技术理由 + 反证>`      |
+
+**误报质疑的裁决者是新的 V**（V-lead，或换 Persona 的另一位 V 重新评审），既不是编排者，也不是被质疑的评审者本人：
+
+- 编排者（O）只能**转达与记录**质疑，**不得裁决 finding 成立与否**——O 自行判定 finding 成立/不成立命中反模式 #10（编排者越权实施）。
+- 质疑须给出**技术理由与反证**，不得情绪化；质疑不改变 §3.4.2 的范围与轮次契约。
+- 质疑未被受理时的升级路径是 🔴 CHECKPOINT（交用户裁决），不是由 O 拍板。
+
+#### 3.4.6 R 前置不变（本节不构成旁路）
+
+scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只审 fix delta），**不改变返工链的前置顺序**：V/G 不通过仍须**先派 R 定位根因**，R 报告经 **V 复审 + G 门禁**（`check-rootcause-report.ts` exitCode=0）后才可分派 S-fix（反模式 #18 / #19）。
+
+**复审不得成为跳过 R 的旁路**：不得以「这次只审 fix delta」「问题很明确」为由省略 R 定位；误报质疑与 scoped re-review 都不是跳过 R 的合法路径。
+
 ### 4. 返工循环分派
 
 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）（约束 #12 + #11 + #8）
@@ -230,7 +293,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 > 冰山扫掠（反模式 #44）：S-fix 完成 R3×3 / 预防审查 / V / G 后跑 ICEBERG-A、阶段门放行前跑 ICEBERG-B（`check-iceberg-sweep.ts` R1-R5）；`newFindings=[]` 或达 maxIcebergRounds=5 才放行，新发现须经 V 复审后走完整 R 报告复审、根因门禁、S-fix 后 R3×3 / 预防审查 / V / G / CHECKPOINT 链。
 
-> 跳过 R 直接 S 返工命中反模式 #18；R 报告未 V 复审直接 S 修复命中反模式 #19。
+> 跳过 R 直接 S 返工命中反模式 #18；R 报告未 V 复审直接 S 修复命中反模式 #19。S-fix 之后那次 V 复审（第 6 步）与后续复审轮次按 §3.4「scoped re-review 契约」执行：只审 fix delta、逐 finding 给 `ADDRESSED` / `NOT ADDRESSED`、Minor 不进 loop、每任务最多 5 轮；该契约**不改变本前置**——复审不得成为跳过 R 的旁路。
 
 ### 5. 阶段 5-8 三段式 S 分派（opsx + codegraph）
 
