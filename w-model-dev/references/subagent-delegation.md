@@ -728,7 +728,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
   - 上游产物路径（用于追溯）：<列出>
 必读：
   - references/agent-personas.md（按 targetKind 选用 Persona）
-  - references/verifier-spec.md §6（输出 Schema）+ §8（提示词模板）+ §7.4A（五轴 + Severity）
+  - references/verifier-spec.md §6（输出 Schema）+ §8（提示词模板）+ §7.4A（五轴 + Severity）+ §15（评审信任、质疑与校准口径）
   - references/quality-standards.md（如评审代码 / 测试）
   - references/quick-self-check.md（完成定义（DoD）节；如评审阶段门）
 产出契约：

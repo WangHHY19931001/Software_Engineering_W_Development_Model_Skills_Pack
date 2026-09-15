@@ -51,6 +51,7 @@
 | 多候选排序 | §5 |
 | 跨阶段 evidence 一致性 | §12 |
 | self-as-verifier 模式 | §13 |
+| 评审独立性 / 误报质疑 / scoped re-review / spec 自审与校准口径 | §15（含 §15.1-§15.4） |
 
 ## 目录
 
@@ -1021,10 +1022,10 @@ V 评审的失效不只是"评错"，还包括"评审者漂移"。三类偏移�
 （方差坍缩）正交——前者决定采样分布形状，后者是分布坍缩的信号。改动这些参数不会修复坍缩，
 调整 `RESOLUTION_FLOOR` 才会。
 
-## 15. 评审侧信任、质疑与校准契约（S07 / S08 / S16）
+## 15. 评审侧信任、质疑与校准契约（S07 / S08 / S09 / S16）
 
 > 吸收自 superpowers：**不信任报告**（`skills/subagent-driven-development/task-reviewer-prompt.md` L64-71 / L84-85 / L153-157，台账 :233-265）、**对外部评审结论的合理质疑**（`skills/receiving-code-review/SKILL.md` L68-84 / L88-98 / L113-129，台账 :268-313）、**spec 自审与评审者校准**（`skills/brainstorming/SKILL.md` L211-219 与 `skills/brainstorming/spec-document-reviewer-prompt.md` L19-34，台账 :603-630）。
-> 本节是**评审行为契约**：只规定 V 与 spec 评审者的判断口径，**不新增任何 Schema 字段**（S08 的质疑结论以固定前缀写入既有文本字段，先例为 §3.3 R14-R17 的 `summary` 固定前缀写入）。§15.1 / §15.2 / §15.3 分别对应 S07 / S08 / S16。
+> 本节是**评审行为契约**：只规定 V 与 spec 评审者的判断口径，**不新增任何 Schema 字段**（S08 的质疑结论以固定前缀写入既有文本字段，先例为 §3.3 R14-R17 的 `summary` 固定前缀写入）。§15.1 / §15.2 / §15.3 / §15.4 分别对应 S07 / S08 / S16 / S09（§15.4 是 S09 的 V 侧摘要）。
 
 ### 15.1 不信任报告（S07）
 
@@ -1033,7 +1034,7 @@ V 评审的失效不只是"评错"，还包括"评审者漂移"。三类偏移�
 1. **实现者报告 = 未经核实的 claim**：报告可能不完整、不准确、或过于乐观（"unverified claims about the code… may be incomplete, inaccurate, or optimistic"）。V 须**对照 diff / 产物本身**核实报告中的每条断言，不得以报告的自述结案。
 2. **报告里的设计 rationale 同样是 claim，不得据此降级 severity**：「按 YAGNI 保留」「刻意保持简单」之类理由，是**实现者在给自己的作业打分**（"the implementer grading their own work"）。发现项按代码 / 产物本身的性质定级——**陈述了理由从不降低 finding 的 severity**（"a stated rationale never downgrades a finding's severity"）。理由可作 finding 的上下文，但不改变 Critical / Required / Optional 的归属（§7.4A.2）。
 3. **实现者报告的测试输出里的 warning / 噪声即 finding**：测试输出应当是干净的（"test output should be pristine"）；V 在报告里看到的 warning、噪声、被忽略的输出**本身就是 finding**，不得当作背景噪声略过。报告对 warning 的沉默不是「干净」，而是漏报。
-4. **plan 作者不自评自己的 plan**：当 plan / 简报**显式要求**了本规范认定为缺陷的东西（什么都不断言的空测试、逻辑块的逐字复制），**那仍然是 finding**——按 Important 报出并标注 `plan-mandated`。**plan 的作者不为自己的 plan 评分，由人类裁决**（"The plan's authorship does not grade its own work; the human decides."）；W 模型中该判断由独立评审者 V 报出、最终裁决权在人。这与 `subagent-delegation.md` §3.4.1「禁止编排者预判 findings」互为两侧：O 不得在分派阶段预先压制 finding，V 不得因「计划已经这么选了」一类 rationale 将其降级。
+4. **plan 作者不自评自己的 plan**：当 plan / 简报**显式要求**了本规范认定为缺陷的东西（什么都不断言的空测试、逻辑块的逐字复制），**那仍然是 finding**——按 **Required** 报出并标注 `plan-mandated`（上游原文记作 Important；本规范统一用 §7.4A.2 的 `Required` 前缀，不引入表外档位）。**plan 的作者不为自己的 plan 评分，由人类裁决**（"The plan's authorship does not grade its own work; the human decides."）；W 模型中该判断由独立评审者 V 报出、最终裁决权在人。这与 `subagent-delegation.md` §3.4.1「禁止编排者预判 findings」互为两侧：O 不得在分派阶段预先压制 finding，V 不得因「计划已经这么选了」一类 rationale 将其降级。
 
 > 边界：本节不要求 V 对报告做「有罪推定」，只要求**把报告与产物分开对待**——报告是线索，产物是证据。
 
@@ -1109,6 +1110,21 @@ spec 文档（阶段 1-4 需求 / 设计类产物）写完，作者须**换一�
 - **R18 治「不给分辨」**：某子标准 `rawScores` 方差坍缩（非全等但极小）＝ V 打了分却没有区分正负样本的能力，属**评分分布**问题，由 `verifier-logic.ts` 按 `RESOLUTION_FLOOR` 自动判据、随 R13 同形态进入 `reasons`。
 - **本节治「过度判负」**：V 把措辞 / 风格偏好 / 详略不均当成缺陷报出，使合格 spec 被反复打回——属**判据口径**问题，靠本小节的散文判据约束，无阈值、无门禁。
 - 一个是「评了但没分辨力」，另一个是「分辨了但尺子太严」：调整 R18 阈值不会改善过度判负，改 calibration 口径也不会修复方差坍缩。
+
+#### 15.4 scoped re-review 契约（S09）
+
+> 本节是 **V 侧摘要**：让评审者知道复审的范围与结论形状。**完整契约与分派书写规则见 `subagent-delegation.md` §3.4**（§3.4.2 范围 / §3.4.3 逐 finding 结论 / §3.4.4 Minor / §3.4.5 承载通道 / §3.4.6 R 前置），本节**不复制**其全文，避免出现两处事实源。
+
+S-fix 之后的复审是**受范围约束的复审**（scoped re-review），不是第二次全量评审：
+
+- **范围 = findings 清单 + fix diff 两项**：对 findings 清单**逐条**出结论，并检查 fix diff 本身是否引入新问题；fix 未触及的代码不在本次复审范围内。
+- **逐 finding 结论**（按 findings 原顺序）：`<finding 一行摘要> — ADDRESSED | NOT ADDRESSED`，附 `file:line` 证据；**「Attempted」不算 addressed**——那条具体缺陷必须已经不存在。
+- **Minor 不进 loop**：Minor 记入进度台账并指向最终整分支复审，不触发 fix 分派、不计入轮次上限。
+- **一轮 = 一次 fix 分派 + 一次 scoped re-review**，**每任务最多 5 轮**；该上限不放松 `budget.json.perPhase.maxReworkRounds`，两者取更严者。
+- **范围外观察不阻塞**：完全落在 fix diff 之外的问题记为范围外观察，不阻塞本任务、不延长 loop。
+- **R 前置不变（`普通 V/G 失败链`）**：V/G 不通过须先分派 R 定位根因，R 报告经 V 复审 + G 门禁（`check-rootcause-report.ts` exitCode=0）通过后才分派 S-fix；scoped re-review 不是跳过 R 的旁路（反模式 #18 / #19）。
+
+**与 §15.2 误报质疑通道的关系**：质疑由新 V 裁决。**质疑成立**（该 finding 确为误报）→ 撤回该 finding，不进入返工；**质疑不成立** → 该 finding 维持原样，按上述范围契约进入 fix 分派与复审；**裁决未被受理**时走 §15.2 的 🔴 CHECKPOINT 升级。质疑既不扩大也不缩小 §3.4.2 的范围与轮次契约。
 
 ## 相关资源
 
