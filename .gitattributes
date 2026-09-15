@@ -1,3 +1,8 @@
 # Shell 脚本统一 LF 行尾（Windows autocrlf 环境下 bash 无法解析 CRLF）
 .githooks/* text eol=lf
 *.sh text eol=lf
+
+# M07 E2 哈希核验产物：固定 LF，使 samples/gate/valid-test-evidence.json 声明的
+# rawOutputSha256 在 Windows（core.autocrlf=true）与 Linux 检出下都一致——否则
+# 工作区 CRLF 与索引 LF 会让同一文件算出两个 SHA-256，样本级 E2 用例随平台红绿漂移。
+w-model-dev/scripts/samples/gate/test-evidence-output.txt text eol=lf

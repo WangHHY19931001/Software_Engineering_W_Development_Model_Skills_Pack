@@ -167,6 +167,51 @@ describe('check-samples-coverage 双向闭环（F-G7-06/07）', () => {
     expect(r.stdout).toContain('reference-dangling');
     expect(r.stdout).toContain('opsx-artifacts/ghost-phase5');
   });
+
+  // ==================== M07：配套产物文件（auxFiles）引用登记 ====================
+  /** 构造含 auxFiles 数组字段的 gate 用例块（形态同 GATE_CASES + runGateCases） */
+  function fakeGateSelfTest(auxFiles: string[]): string {
+    const aux = auxFiles.map((f) => `'${f}'`).join(', ');
+    return [
+      `const GATE_CASES: Array<{ file: string; auxFiles?: string[] }> = [{ file: 'a.json', auxFiles: [${aux}] }];`,
+      'async function runGateCases(): Promise<void> {',
+      "  const gateSamplesDir = path.join(samplesDir, 'gate');",
+      '  for (const c of GATE_CASES) {',
+      '    await run(path.join(gateSamplesDir, c.file));',
+      '  }',
+      '}',
+    ].join('\n');
+  }
+
+  async function setupGateRepo(auxFiles: string[], onDisk: string[]): Promise<void> {
+    await fs.mkdir(path.join(tmpDir, 'w-model-dev/scripts/cli'), { recursive: true });
+    await fs.writeFile(path.join(tmpDir, 'w-model-dev/scripts/cli/self-test.ts'), fakeGateSelfTest(auxFiles), 'utf-8');
+    for (const rel of onDisk) {
+      const p = path.join(tmpDir, 'w-model-dev/scripts/samples', rel);
+      await fs.mkdir(path.dirname(p), { recursive: true });
+      await fs.writeFile(p, 'x', 'utf-8');
+    }
+    await fs.writeFile(path.join(tmpDir, 'w-model-dev/scripts/samples/README.md'), fakeReadme(['gate']), 'utf-8');
+    await fs.writeFile(
+      path.join(tmpDir, 'w-model-dev/scripts/samples/NEGATIVE-COVERAGE.md'),
+      fakeNegativeCoverage([]),
+      'utf-8',
+    );
+  }
+
+  it('M07：auxFiles 数组声明的配套产物被登记引用 → exit 0（不再误报未覆盖 fixture）', async () => {
+    await setupGateRepo(['test-evidence-output.txt'], ['gate/a.json', 'gate/test-evidence-output.txt']);
+    const r = run();
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('"unregistered":0');
+  });
+
+  it('M07 RED：配套产物未被任何用例字段登记 → exit 1（auxFiles 是唯一登记途径，不得默认放行）', async () => {
+    await setupGateRepo([], ['gate/a.json', 'gate/test-evidence-output.txt']);
+    const r = run();
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('samples/gate/test-evidence-output.txt');
+  });
 });
 
 describe('check-samples-coverage 负向覆盖不变量（M06 / S28）', () => {

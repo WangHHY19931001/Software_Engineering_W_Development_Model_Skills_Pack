@@ -146,6 +146,11 @@ interface GateCase {
   phaseOption?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   /** SD→codeModule 映射校验（phase >= 5 + graph 存在时触发 checkSdToCodeModuleMapping） */
   graph?: GateGraph;
+  /**
+   * 配套产物文件（相对 samples/gate/），仅供 check-samples-coverage 引用登记（未被引用即在盘悬空 → exit 1）；
+   * 不作为门禁运行输入。当前用于 M07 E2 的原始测试输出产物 test-evidence-output.txt。
+   */
+  auxFiles?: string[];
 }
 
 const VERIFIER_CASES: VerifierCase[] = [
@@ -431,6 +436,50 @@ const GATE_CASES: GateCase[] = [
     phaseOption: 5,
     expectedReasonPatterns: [/codeModule 格式错误/],
     description: 'phase5 终检：REQ 行 codeModule 缺 SD 前缀（"src/auth/login.ts"），应被 SD→codeModule 格式校验拦截',
+  },
+  // -------------------- M07 测试证据（E1-E4 样本级正反夹具，D-2 批准单元） --------------------
+  // 正例带 rawOutputPath + 真实 rawOutputSha256（指向同目录 test-evidence-output.txt），
+  // 由 runGateCases 透传 projectRoot（samples/gate/）走通 E2 哈希核验端到端。
+  {
+    file: 'valid-test-evidence.json',
+    expectedPassed: true,
+    phaseOption: 6,
+    auxFiles: ['test-evidence-output.txt'],
+    description: 'M07 E2 端到端：四级全绿 + 各层 evidence，unitTest 携 rawOutput 对（真实 sha256）→ 通过',
+  },
+  {
+    file: 'bad-test-evidence-hash-mismatch.json',
+    expectedPassed: false,
+    phaseOption: 6,
+    expectedReasonPatterns: [/E2[\s\S]*SHA-256[\s\S]*不符/],
+    description: 'M07 E2：声明 rawOutputSha256 与产物实际 SHA-256 不符，应被哈希核验拦截',
+  },
+  {
+    file: 'bad-test-evidence-exitcode-mismatch.json',
+    expectedPassed: false,
+    phaseOption: 6,
+    expectedReasonPatterns: [/E3[\s\S]*记录 failed=1[\s\S]*exitCode=0/],
+    description: 'M07 E3 RED 绑定：failed=1 却记 exitCode=0（有失败必来自非零退出），应被结果一致性拦截',
+  },
+  {
+    file: 'bad-test-evidence-unpaired-output.json',
+    expectedPassed: false,
+    phaseOption: 6,
+    expectedReasonPatterns: [/E1[\s\S]*必须成对出现（当前只有 rawOutputPath）/],
+    description: 'M07 E1 配对：只有 rawOutputPath 缺 rawOutputSha256，应被配对校验拦截',
+  },
+  {
+    file: 'bad-test-evidence-missing.json',
+    expectedPassed: false,
+    phaseOption: 6,
+    expectedReasonPatterns: [/E4[\s\S]*单元测试[\s\S]*缺 evidence/],
+    description: 'M07 E4：lastUpdated 缺失（保守按 cutoff 后）且单元测试层 total>0 无 evidence，应被存在性校验拦截',
+  },
+  {
+    file: 'valid-test-evidence-legacy.json',
+    expectedPassed: true,
+    phaseOption: 6,
+    description: 'M07 E4 legacy 吸收：lastUpdated 早于 cutoff 且阶段内层无 evidence → 非阻断通过（legacy 标注）',
   },
 ];
 
@@ -2966,6 +3015,9 @@ async function runGateCases(samplesDir: string): Promise<CaseResult[]> {
     const options: Record<string, unknown> = {};
     if (c.phaseOption) options.phaseOption = c.phaseOption;
     if (c.graph) options.graph = c.graph;
+    // M07 E2：evidence.rawOutputPath 以「项目根」解析。样本级夹具的项目根即 samples/gate/，
+    // 透传后 valid-test-evidence.json 的同目录产物可走通哈希核验端到端（不传则 E2 fail-closed）。
+    options.projectRoot = path.join(samplesDir, 'gate');
     const r = checkArtifactGate(parsed as never, Object.keys(options).length > 0 ? (options as never) : undefined);
 
     const details: string[] = [];

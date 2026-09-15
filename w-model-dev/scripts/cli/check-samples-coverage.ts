@@ -127,8 +127,9 @@ function extractReferences(selfTestContent: string): ReferenceSets {
     for (const m of block.matchAll(/\b(?:file|manifestFile): '([^']+)'/g)) {
       files.add(`${dir}/${m[1]!}`);
     }
-    // bdd 配套 .feature（featureFiles 数组字段，相对 samples/bdd/）
-    for (const m of block.matchAll(/featureFiles: \[([^\]]*)\]/g)) {
+    // 配套产物文件数组字段（相对 samples/<子目录>/）：
+    //   bdd 配套 .feature（featureFiles）、gate 配套 M07 E2 原始输出产物（auxFiles）
+    for (const m of block.matchAll(/(?:featureFiles|auxFiles): \[([^\]]*)\]/g)) {
       for (const ff of m[1]!.matchAll(/'([^']+)'/g)) {
         files.add(`${dir}/${ff[1]!}`);
       }

@@ -1,0 +1,4 @@
+M07 gate fixture artifact: raw test output for samples/gate/test-evidence-output.txt.
+Referenced by valid-test-evidence.json evidence.rawOutputPath (E2 end-to-end).
+rawOutputSha256 in that fixture must equal the SHA-256 of this exact file.
+EOL is pinned to LF via .gitattributes so the hash is platform-independent.

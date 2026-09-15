@@ -151,7 +151,10 @@ describe('M07 测试证据门禁规则（E1-E4 + cutoff）', () => {
       makeMatrix({ unitTest: makeSummary({ evidence: makeEvidence({ rawOutputPath: 'artifacts/run.txt' }) }) }),
     );
     expect(result.passed).toBe(false);
-    expect(result.reasons.join('\n')).toMatch(/E1[\s\S]*rawOutputPath[\s\S]*rawOutputSha256/);
+    // 正则须锚定消息尾部的「当前只有 <缺失字段>」：只写 /E1…rawOutputPath…rawOutputSha256/
+    // 会同时命中「必须成对出现」前缀里的两个字段名，对字段顺序/缺失方毫无鉴别力（任务 2 审查移交）。
+    expect(result.reasons.join('\n')).toMatch(/E1[\s\S]*必须成对出现（当前只有 rawOutputPath）/);
+    expect(result.reasons.join('\n')).not.toMatch(/当前只有 rawOutputSha256/);
   });
 
   it('E1: 只有 rawOutputSha256（缺 rawOutputPath）→ 红', () => {
@@ -212,6 +215,21 @@ describe('M07 测试证据门禁规则（E1-E4 + cutoff）', () => {
     );
     expect(result.passed).toBe(false);
     expect(result.reasons.join('\n')).toMatch(/E2[\s\S]*不存在/);
+  });
+
+  it('E2: 携 rawOutputPath + rawOutputSha256 但未提供 projectRoot → 红（fail-closed，无法核验不得放行）', () => {
+    // 锁死 fail-closed 契约（任务 2 审查移交）：调用方漏传项目根时，E2 必须拒绝而非静默跳过——
+    // 否则「声明了哈希」反而因无法核验被放行，E2 形同虚设。
+    const result = run(
+      makeMatrix({
+        unitTest: makeSummary({
+          evidence: makeEvidence({ rawOutputPath: 'artifacts/run.txt', rawOutputSha256: 'd'.repeat(64) }),
+        }),
+      }),
+    );
+    expect(result.passed).toBe(false);
+    expect(result.reasons.join('\n')).toMatch(/E2[\s\S]*未提供项目根[\s\S]*fail-closed/);
+    expect(result.testEvidence?.e2).toBe(1);
   });
 
   it('E2: 路径越出项目根 → resolveTestEvidenceOutputPath 拒绝；根内相对路径接受', () => {
