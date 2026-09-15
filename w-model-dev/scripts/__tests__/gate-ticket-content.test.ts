@@ -129,6 +129,58 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
     );
   });
 
+  it('修复轮 2 (B) 正向边界：专指契约标记行 / `What to build` 行上的无返回标注调用式 → 视为已定义', () => {
+    const cases: Array<{ line: string; criteria: string }> = [
+      // 复审 I-1 实测反例 1：标记行上的无返回标注调用式（base passed，修复轮 1 误报）
+      {
+        line: '**What to build:** 接口签名 `AuthService.authenticate(credentials)`',
+        criteria: '- [ ] `AuthService.authenticate` 可用',
+      },
+      // 复审 I-1 实测反例 2a：其它契约标记词（`契约`）行 + 调用式
+      { line: '**What to build:** 本票契约：`A.b(x)`', criteria: '- [ ] `A.b` 可用' },
+      // 复审 I-1 实测反例 2b：`What to build` 行上的**带参**调用式（形如签名的 `Login(username, password)`）
+      { line: '**What to build:** 实现 `Login(username, password)`', criteria: '- [ ] `Login` 可用' },
+    ];
+    for (const c of cases) {
+      const r = checkTicketContent(['# 01 — 边界', '', c.line, '**Blocked by:** None', '', c.criteria, ''].join('\n'));
+      expect(r.violations, `${c.line} → ${JSON.stringify(r.violations)}`).toEqual([]);
+      expect(r.summary).toEqual({ checked: 1, criticalMissing: 0, buildabilityMissing: 0 });
+    }
+  });
+
+  it('修复轮 2 (B) 反向边界：`What to build` 行单独出现**空括号**调用 → 仍判未定义（保留 finding #2 拦截）', () => {
+    const r = checkTicketContent(
+      [
+        '# 01 — 空括号调用',
+        '',
+        '**What to build:** 调用 `Cache.clear()`',
+        '**Blocked by:** None',
+        '',
+        '- [ ] 无异常',
+        '',
+      ].join('\n'),
+    );
+    expect(r.passed).toBe(false);
+    expect(r.summary.criticalMissing).toBe(1);
+    expect(r.violations.join('\n')).toMatch(/undefined-symbol.*`Cache\.clear\(\)`/);
+  });
+
+  it('修复轮 2 (B) 组合边界（复审反例 3）：标记行调用式 + 验收标准引用同一符号 → ⑥/B② 均不触发', () => {
+    const r = checkTicketContent(
+      [
+        '# 01 — 契约票',
+        '',
+        '**What to build:** 接口签名 `A.b(x)`',
+        '**Blocked by:** None',
+        '',
+        '- [ ] `A.b` 返回会话',
+        '',
+      ].join('\n'),
+    );
+    expect(r.violations).toEqual([]);
+    expect(r.summary).toEqual({ checked: 1, criticalMissing: 0, buildabilityMissing: 0 });
+  });
+
   it('修复轮 1 ①（⑥ 假阳）：What to build 直接点名带返回契约的符号、无「接口签名」等魔法词 → passed', () => {
     const r = checkTicketContent(
       [

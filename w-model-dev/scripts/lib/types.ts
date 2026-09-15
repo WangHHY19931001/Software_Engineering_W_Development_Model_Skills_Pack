@@ -49,6 +49,13 @@ export interface JsonReport {
   legacy?: string[];
   /** M07 测试证据维度计数（checked/withEvidence/missing/legacy + E1-E4 违规计数）；结构失败早退时为 null。 */
   testEvidence?: unknown;
+  /**
+   * S18 票据内容校验计数（check-artifact-gate --json，与 `GATE_JSON.tickets` 同构）。
+   * 形状与运行时一致：`checked`=票据块数 / `criticalMissing`=六条黑名单命中数 /
+   * `buildabilityMissing`=Buildability 命中数；**键恒存在**——未给定 `--tickets` 时为 `null`。
+   * 其它门禁不提供此字段（可选）。
+   */
+  tickets?: { checked: number; criticalMissing: number; buildabilityMissing: number } | null;
   /** run-log lifecycle 状态；通过但有历史诊断时仍为 NOT_CLOSED_NOT_PROVEN。 */
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
   /** run-log exit 0 的语义边界说明。 */

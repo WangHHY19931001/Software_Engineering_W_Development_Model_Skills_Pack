@@ -437,19 +437,34 @@ function isSymbolSpan(span: string): boolean {
   return head !== '' && (tail === '' || SYMBOL_SUFFIX_RE.test(tail));
 }
 
+/** 调用式 span 是否为「带参调用」（`A.b(x)`）；空括号 `A.b()` 不算声明形态——防「只调用不声明」旁路 */
+function hasCallArguments(head: string): boolean {
+  const open = head.indexOf('(');
+  if (open === -1) return false;
+  return head.slice(open + 1, -1).trim() !== '';
+}
+
 /**
- * 定义判定（修复轮 1 ①：与 B① 的签名识别**同源**，取代原先的散文短语词表）：
- * - span 自身带**契约标注**（`: T` / `→ b` / `-> T`）→ 视为定义（与 B① 的 `接口签名(...): T` 同口径）；
- * - **裸符号**（`A`、`A.b`，无参数括号）出现在**契约行**（含契约标记词的行，或 `What to build` 字段行）
- *   → 视为定义（本仓票据契约正是「点名符号」的写法，`phase-5-coding.md:149/168-173`）；
- * - 仅被**调用**（`A.b()`）且无契约标注、行内也无契约标记 → **不**视为定义（⑥ 判未声明符号）。
+ * 定义判定（修复轮 2 B：与 B① 的签名识别同源；`What to build` 与专指契约标记行按不同规则处理）：
+ * 1. span 自身带**契约标注**（`: T` / `→ b` / `-> T`）→ 视为定义（任意行，与 B① 的 `接口签名(...): T` 同口径）；
+ * 2. **专指契约标记行**（`接口签名`/`类型约束`/`状态转移`/`符号契约`/`契约`/`定义`/`入参`/`出参`）→
+ *    该行上的**裸符号与调用式一律视为定义**（本轮 I-1 复位：无返回标注的调用式签名同样算声明；
+ *    标记词本身已表达「这是契约」的意图）；
+ * 3. **`What to build` 字段行**（无专指标记词）→ 裸符号（点名符号，`phase-5-coding.md:149/168-173` 的写法）
+ *    与**带参调用式**（`A.b(x)`，形如签名）视为定义；
+ *    **空括号调用式**（`A.b()`）**不**视为定义——保住修复轮 1 finding #2
+ *    （`调用 \`Ghost.do()\`，返回值忽略` 必须仍被第 6 条拦下）；
+ * 4. 其余行（说明 / 散文行）→ 只有情形 1 算定义；**通用散文词**（`返回`/`参数`/`签名`/`signature`/`returns`）
+ *    不参与判定，避免「加两个字即放行」。
  */
 function isDefinitionSpanInLine(span: string, line: string): boolean {
   const { head, tail } = splitSymbolSpan(span);
   if (head === '') return false;
   if (tail !== '' && SYMBOL_SUFFIX_RE.test(tail)) return true;
-  const bare = !head.includes('(');
-  return bare && (hasContractMarker(line) || isContractFieldLine(line));
+  if (hasContractMarker(line)) return true;
+  if (!isContractFieldLine(line)) return false;
+  const isCall = head.includes('(');
+  return !isCall || hasCallArguments(head);
 }
 
 /** 标识符 token（用于定义词汇表；`` `describe('A.b')` `` 可抽出 `describe` 与 `A.b`） */
@@ -529,11 +544,11 @@ function splitTicketBlocks(text: string): TicketBlock[] {
  * - 第 5 条只在「无符号且无路径且未给显式产出物行」时命中；Buildability ③ 只在「无符号但有路径」时命中；
  * - 第 5 条命中时 Buildability ①（缺签名且缺验收标准）**不再重复计数**（同一根因，§0.1.5 不重复断言）。
  *
- * **符号「已定义」的结构性判定**（修复轮 1 ①②）：span 自身带契约标注（`: T` / `→ b` / `-> T`），
- * 或**裸符号**出现在契约行（含专指契约标记词的行 / `What to build` 字段行）→ 视为已定义。
- * 仅被调用（`A.b()`）且无标注、行内无契约标记 → 视为未定义（第 6 条）。
- * 通用散文词（`返回` / `参数` / `签名` / `signature` / `returns`）**不**参与定义判定——避免
- * 「加两个字即放行」的旁路。
+ * **符号「已定义」的结构性判定**（修复轮 1 ①②、修复轮 2 B）：span 自身带契约标注（`: T` / `→ b` / `-> T`）
+ * 任意行成立；**专指契约标记行**（`接口签名`/`类型约束`/`状态转移`/`符号契约`/`契约`/`定义`/`入参`/`出参`）上
+ * 裸符号与调用式**一律**算定义；**`What to build` 字段行**（无专指标记词）上裸符号与**带参**调用式算定义，
+ * **空括号**调用式（`A.b()`）不算。通用散文词（`返回` / `参数` / `签名` / `signature` / `returns`）**不**参与判定
+ * ——既避免「加两个字即放行」的旁路，也避免把「无返回标注的调用式签名」（如 `接口签名 \`A.b(x)\``）误报为未定义。
  */
 export function checkTicketContent(ticketsText: string): TicketContentResult {
   const violations: string[] = [];
