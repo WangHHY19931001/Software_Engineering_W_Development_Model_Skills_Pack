@@ -150,13 +150,16 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 - **失败动作**：`result` 缺省或与测试输出冲突时拒绝回填；未执行即标通过、LLM 估算结果、把 pending 当 passed、**编排者越权回填 RTM 实体**（反模式 #10）均禁止。
 - **guide 链接**：[phase-6-integration-test.md](phase-6-integration-test.md) / [phase-7-system-test.md](phase-7-system-test.md) / [phase-8-acceptance-test.md](phase-8-acceptance-test.md)（对应测试阶段）、[rtm-guide.md](rtm-guide.md)（RTM 执行结果回填）。
 
-- **执行方**：O 路由 + CHECKPOINT → **S 执行测试运行器 + 回填 RTM 执行结果** → **V 评审测试报告** → **G 门禁**（阶段 8 跑 `check-artifact-gate.ts`）→ O 持久化。
+- **执行方**：O 路由 + CHECKPOINT → **S 执行测试运行器 + 回填 RTM 执行结果** → **V 评审测试报告** → **G 门禁**（阶段 5~8 跑 `check-artifact-gate.ts --phase=N`）→ O 持久化。
 - **必要证据**（S 子代理产出）：测试命令、退出码、`passed/failed/pending`；单元测试还需覆盖率。
 - **真实回填**（S 子代理）：`result` 必须与测试输出一致；缺证据或冲突时拒绝回填。**编排者不得直接回填 RTM 执行结果**。
+- **测试执行证据**（S 子代理，M07 起）：更新某层 `executionSummary.<type>Test` 时须同时登记 `evidence`——`command`（非空，禁 `;` `&` `|` `<` `>` 与换行）、`exitCode`（非负整数）、`observedAt`（UTC ISO-8601 毫秒）；可选 `rawOutputPath`（项目根相对路径）与 `rawOutputSha256`（64 位小写十六进制）**须成对登记**。输出文件与哈希是**可选**的，不登记即不触发哈希核验；字段形态与规则见 `rtm-guide.md`「测试执行证据（M07）」节。
+- **证据校验**（G 子代理，M07 起）：`check-artifact-gate.ts --phase=N`（阶段 5~8）校验四条规则——E1 配对、E2 哈希核验（相对项目根解析、文件须存在、SHA-256 须相符）、E3 结果一致性（`failed=0 && pending=0` ⇒ `exitCode=0`；`failed>0` ⇒ `exitCode≥1`；`failed=0 && pending>0` 不约束）、E4 存在性（`lastUpdated` 不早于 cutoff 时，当前阶段层只要 `total>0` 就必须带 `evidence`）。任一违规 → 退出码 1。
+- **旧项目 cutoff 吸收**（G 子代理）：`rtm.json.lastUpdated` 早于 `2026-09-15T00:00:00Z`（M07/D-2 生效日）的 RTM 缺 `evidence` 时输出 `LEGACY_TEST_EVIDENCE` 非阻断诊断（不改变退出码）；`lastUpdated` **缺失或不可解析**按 cutoff 后处理（**保守不吸收**），仍须携带证据。
 - **`pass`**（S 子代理）：仅将实际通过用例标为通过，并更新 `executionSummary.<type>Test`。
 - **`fail`**（S 子代理）：记录失败用例、根因和关联模块，更新 RTM，按阶段参考回退。
 - **评审**（V 子代理）：按 `targetKind=test` 路由 `test-engineer` Persona。
-- **门禁**（G 子代理）：阶段 1~7 跑 `check-verifier-output.ts`；阶段 8 跑 `check-artifact-gate.ts`。
+- **门禁**（G 子代理）：阶段 1~7 跑 `check-verifier-output.ts`；阶段 5~8 另跑 `check-artifact-gate.ts --phase=N`（M07 起含测试证据 E1~E4 校验，`GATE_JSON.testEvidence` 给出 `checked` / `withEvidence` / `e4` 计数）。
 - **产出**（S 子代理）：使用 `templates/test-report.md` 生成测试报告。
 
 ## `/wm review <target>`

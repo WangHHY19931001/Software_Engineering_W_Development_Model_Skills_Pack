@@ -241,6 +241,8 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 - **不得在早期阶段填写晚期字段**：如阶段 1/2 不得填 `codeModule`（阶段 5）、不得填 `integrationTest` 执行状态（阶段 6）、不得填 `unitTest` 执行状态（阶段 5）；早期阶段仅登记该阶段「设计」职责对应的用例 ID，不预填「执行」状态。
 - `coverageStatus` 仅用于展示，门禁脚本从原始字段重算（见 [rtm-guide.md](rtm-guide.md) 覆盖率算法）；手工预填 `100%` 不被信任。
 
+**测试执行证据 `executionSummary.<layer>.evidence`（M07 / D-2，2026-09-15）**：`definitions.testSummary` 新增**可选**对象 `evidence`（`rtm.schema.json`；`required:["command","exitCode","observedAt"]`，`additionalProperties:false`），把该层 `passed/failed/pending` 摘要绑定到真实运行——`command`（非空、禁 `;` `&` `|` `<` `>` 与换行）、`exitCode`（非负整数）、`observedAt`（UTC ISO-8601 毫秒），可选 `rawOutputPath`（项目根相对路径，与 `rawOutputSha256` 成对）与 `rawOutputSha256`（64 位小写十六进制）。**RTM 行字段、追溯关系与覆盖率语义均未变动**（D-2 硬约束：只新增可选字段）。门禁 `check-artifact-gate.ts --phase=N`（阶段 5~8）按四条规则校验：E1 配对、E2 哈希核验（相对项目根解析、文件须存在、SHA-256 须相符）、E3 结果一致性（`failed=0 && pending=0` ⇒ `exitCode=0`；`failed>0` ⇒ `exitCode≥1`；`failed=0 && pending>0` 不约束）、E4 当前阶段层 `total>0` 的 `evidence` 存在性。分界常量 `M07_TEST_EVIDENCE_CUTOFF='2026-09-15T00:00:00Z'`：`lastUpdated` 早于 cutoff 的旧 RTM 缺证据经 `LEGACY_TEST_EVIDENCE` 非阻断 diagnostic 吸收；`lastUpdated` 缺失/不可解析按 cutoff 后处理（保守不吸收）。`GATE_JSON` 摘要字段 `testEvidence`（`checked` / `withEvidence` / `e4`，非阻断 `legacy` 非空时另见）。**边界**：与 run-log `revertEvidence`（R10）**载体不同、绑定对象不同、不得互相替代**——RTM 证据绑定阶段级测试运行，run-log 证据绑定 S-fix 复现测试的回滚证伪（详见 `rtm-guide.md`「测试执行证据（M07）」节）。
+
 ## 数据迁移与异常处理（边界条件）
 
 > 项目演进中常见的数据层边界场景：枚举变更 / techStack 增删 / JSON 损坏 / 并发写入。Agent 须按以下策略处理，**禁止直接丢弃历史数据**。

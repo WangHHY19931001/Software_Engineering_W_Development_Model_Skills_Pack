@@ -63,6 +63,42 @@
 
 NFR/CON 行的 acceptanceTest 允许为 null（横切治理类豁免，由 `isCrossCutting` 逻辑覆盖）。
 
+## 测试执行证据（M07）
+
+> `rtm.json` 的 `executionSummary.<layer>.evidence` 承载「本层测试摘要来自哪次真实运行」。`check-artifact-gate.ts --phase=N`（阶段 5~8，与既有四级测试校验同一链路）校验；RTM 是这一证据的**唯一载体**。
+
+**字段形态**（`rtm.schema.json` `definitions.testSummary.evidence`，schema 层整块**可选**，`evidence` 自身 `additionalProperties: false`）：
+
+| 字段              | 必填 | 形态              | 说明                                                                              |
+| ----------------- | ---- | ----------------- | --------------------------------------------------------------------------------- |
+| `command`         | 是   | 非空字符串        | 产生该层摘要的真实命令；禁 `;` `&` `\|` `<` `>` 与换行                            |
+| `exitCode`        | 是   | 非负整数          | 真实进程退出码，是「结果与真实运行绑定」的锚点                                    |
+| `observedAt`      | 是   | UTC ISO-8601 毫秒 | 形如 `2026-09-15T10:00:00.000Z`                                                   |
+| `rawOutputPath`   | 否   | 项目根相对路径    | 原始输出文件；须与 `rawOutputSha256` 成对出现，不得为绝对路径 / 盘符 / 越出项目根 |
+| `rawOutputSha256` | 否   | 64 位小写十六进制 | 由门禁重新计算文件 SHA-256 比对；须与 `rawOutputPath` 成对出现                    |
+
+**四条门禁规则**（`gate-logic.ts`，M07 / D-2）：
+
+- **E1 配对**：`rawOutputPath` 与 `rawOutputSha256` 要么都无、要么都有；只出现其一 → 违规。
+- **E2 哈希核验**（仅在二者齐备时）：以项目根解析 `rawOutputPath`（非法路径 / 越出根即拒），文件必须存在，其 SHA-256 必须等于 `rawOutputSha256`；不符或缺失 → 违规。**哈希是可选层，不登记输出文件即不触发 E2。**
+- **E3 结果一致性**（只要该层填写了 `evidence` 即强制，与该层是否属于当前阶段、与 cutoff 无关）：`failed=0 && pending=0` ⇒ `exitCode=0`；`failed>0` ⇒ `exitCode≥1`（记录里有失败，就不可能来自一次绿色运行）；`failed=0 && pending>0` 不作约束（部分执行两种退出码都合理，如实不编码）。
+- **E4 存在性**：`lastUpdated` 不早于 cutoff 时，**当前阶段须校验的层**（阶段 5 = `unitTest`；6 = +`integrationTest`；7 = +`systemTest`；8 = +`acceptanceTest`）只要 `total>0` 就必须携带 `evidence`；缺失 → 违规（携带的 evidence 再由 E1~E3 校验合法性）。
+
+**cutoff 吸收**：cutoff = `2026-09-15T00:00:00Z`（M07/D-2 批准日零点 UTC）。
+
+- `lastUpdated` **早于** cutoff 的旧 RTM，在其阶段范围内 `total>0` 的层缺 `evidence` → 输出 `LEGACY_TEST_EVIDENCE` **非阻断诊断**（不改变退出码）。
+- `lastUpdated` **缺失或不可解析** → 按 cutoff 后处理（**保守不吸收**），即仍须携带 `evidence`，否则退出码 1。
+- `GATE_JSON.testEvidence` 给出 `{checked, withEvidence, e4}`（另有非阻断 `legacy` 数组，仅非空时出现）。
+
+**与 run-log `revertEvidence` 的边界（不同载体、不得互相替代）**：两者都叫「证据」，但绑定对象与门禁挂点不同——
+
+| 维度     | RTM `testSummary.evidence`（M07）                                 | run-log `revertEvidence`（P2-B / R10）                             |
+| -------- | ----------------------------------------------------------------- | ------------------------------------------------------------------ |
+| 载体     | `.w-model/rtm.json`                                               | `.w-model/run-log.jsonl`                                           |
+| 绑定对象 | **阶段级测试运行**（某层 `passed/failed/pending` 摘要的产出依据） | **S-fix 的复现测试**（执行命令使复现测试回到失败态，证伪修复声明） |
+| 校验     | `check-artifact-gate.ts` E1~E4                                    | `check-run-log.ts` R10                                             |
+| 可否替代 | 不得用 run-log 声明充当阶段测试证据                               | 不得用 RTM 证据充当 S-fix 的回滚证伪                               |
+
 ## 代码健康治理的 RTM 影响（Phase 1–4）
 
 `/wm code-health` 的每个候选携带 `rtmImpact`（`rtmBefore` / `rtmAfter` 需求 ID 集合 + `coverageBefore` / `coverageAfter` + `testLevels` + `unmappedScenarios`）与 `coverageImpact`，其中 `coverageIsSignalOnly: true`、覆盖率数值恒为 `null`——**coverage 只作发现信号，不授权删除或跳过维度**。

@@ -32,6 +32,8 @@
 | 系统测试 | {{}} | {{}} | {{}} | {{}} | {{%}} |
 | 验收测试 | {{}} | {{}} | {{}} | {{}} | {{%}} |
 
+> **测试执行证据（M07）**：更新本表时，阶段范围内 `total>0` 的层须在该层 `executionSummary.<layer>` 登记 `evidence`（`command` + `exitCode` + `observedAt`，可选 `rawOutputPath` + `rawOutputSha256` **成对**）；`lastUpdated` 早于 `2026-09-15T00:00:00Z` 的旧 RTM 缺证据由门禁 `LEGACY_TEST_EVIDENCE` 非阻断吸收，`lastUpdated` 缺失或不可解析则必须携带。字段与规则详见 `references/rtm-guide.md`「测试执行证据（M07）」节。
+
 ## RTM 需求覆盖率检查
 
 - [ ] 所有需求均有设计文档对应
