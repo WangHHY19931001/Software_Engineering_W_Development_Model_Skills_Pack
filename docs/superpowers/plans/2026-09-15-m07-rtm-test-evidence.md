@@ -132,9 +132,9 @@
 
 M07 base = `f19682a0`，共 6 个提交：
 
-`bea9e9d1`(T1 schema 可选字段) → `6abbe31c`(T2 E1-E4 + cutoff) → `ad55d6f0`(T3 夹具与计数) → `dddíc38ae`(T4 文档同步) → `44c515e5`(T5 收口 + AC-11 回填) → `c909b591`(最终修复波)
+`bea9e9d1`(T1 schema 可选字段) → `6abbe31c`(T2 E1-E4 + cutoff) → `ad55d6f0`(T3 夹具与计数) → `dddc38ae`(T4 文档同步) → `44c515e5`(T5 收口 + AC-11 回填) → `c909b591`(最终修复波)
 
-（勘误：`dddíc38ae` 实为 `dddc38ae`。）
+（勘误：`dddc38ae` 实为 `dddc38ae`。）
 
 ### 2. 审查记录（SDD：任务级 5 轮 + 最终 1 轮 + 修复波 1 + 定向复审 1）
 
