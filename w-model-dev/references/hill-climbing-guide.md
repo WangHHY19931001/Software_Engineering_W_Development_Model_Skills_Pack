@@ -18,6 +18,7 @@
 - 与外部 SkillOpt/darwin-skill 的边界
 - 报告消费流程
 - 与现有机制的关系
+- Loop 4 输入：retro 七类改进源与 no-op 审计
 
 ## 设计原则
 
@@ -25,7 +26,7 @@
 |---|---|
 | 技能不内置 LLM 调用（§3.3） | HarnessImprovementReport 由编排者 O 确定性分析 run-log 产出，无 LLM |
 | 技能自演化不在本仓库（SSoT §11） | 技能只产出改进信号，不自动改 harness；外部 SkillOpt/darwin-skill 消费信号做演化 |
-| 编排者最小化（§3.4） | O 分析 run-log 产出报告属"状态读写+分析"允许动作，非实施 |
+| 编排者最小化（SSoT §3.4） | O 分析 run-log 产出报告属"状态读写+分析"允许动作，非实施 |
 | 真实执行（约束4） | 分析基于 run-log 实际记录，不 LLM 估算 |
 
 ## 爬山法哲学基础
@@ -215,3 +216,39 @@ interface HarnessImprovementReport {
 | maturity.json | Loop 4 检测成熟度信号（O4/O5）；报告触发时机受 level 影响 |
 | hard-constraints.md | Loop 4 产出候选反模式 → 人审后加入清单 |
 | 反模式 #10（编排者越权） | O 产出报告是允许动作；不产出实施内容 |
+
+## Loop 4 输入：retro 七类改进源与 no-op 审计
+
+> **来源性质：思想来源，非已验收实践（上游为 STUB）。** 来源为外部仓库 `skills/in-progress/retro/SKILL.md:17-23,31-35,41`（台账 M14：`docs/superpowers/sources/2026-09-14-mattpocock-skills-adopted-excerpts.md:594-624`）。该技能在上游被单独标为 **STUB：仅有设计笔记，尚不可用**（`docs/superpowers/specs/2026-09-14-external-repo-capability-survey.md:42`），同一 survey 在 :99 / :198 明示其**「不可引用为已验收实践」**。本节是按该思想改造出的 W 模型侧输入清单，**未经本仓验收**，不得声称其为外部已验证机制；引用本节时须保留本标注。
+>
+> **用法**：七类是**人审（或 CHECKPOINT 上编排者只读转述）的提问清单**，对照 run-log 逐项自问"这次会话里有没有这一类改进机会"；它们**不新增自动检测逻辑**，也不引入 LLM 调用（与本文件架构原则一致：确定性信号仍只有「信号检测逻辑」一节的 8 类）。
+
+### 七类改进源 → 既有信号的映射
+
+| retro 类别（上游行号） | 上游触发条件（_when_） | 输入到既有 8 类信号 / HarnessImprovementReport 字段 |
+|---|---|---|
+| 导航 Navigation（`:17`） | 会话花了很久才找到某条信息 | **仅作分析视角，不映射信号**——8 类信号无「查找路径 / 导航耗时」检测逻辑，run-log 亦无对应字段；若人审据此行动，改进文本写入 `recommendations.promptTweaks`（导航指针），不新增检测逻辑 |
+| 自动化检查 Automated checks（`:18`） | agent 犯了**本可被自动检查捕获**的错误 | `tool`（「G 门禁脚本同一规则连续失败 → 工具未预防该缺陷」）→ `recommendations.toolImprovements` |
+| 编码标准 Coding standards（`:19`） | 评审者**没抓到**某类错误 | `verification-rule`（「V passed=true 但 G exit=1 频次 > 阈值 → V 评审规则过松」）→ `recommendations.verificationRuleTightening`；施加者是 V 而非 S（见下「标准归评审者」） |
+| 全局 AGENTS.md（`:20`） | steering 文件（仓库或用户全局）特别大 | 规模侧参考 `budget`（「单阶段 token 连续递增」）与 `metaAnalysis.comprehensionQuality`；行动项 = 把指令迁往编码标准（→ `verification-rule`）或自动化检查（→ `tool`），而非继续堆 AGENTS.md |
+| 工具经济性 Tool economy（`:21`） | agent 做了昂贵的工具调用 | `budget`（token 膨胀 / 长尾工具调用）→ `recommendations.toolImprovements` |
+| **no-op（`:22`）** | steering 文件大而难维护 | **仅作分析视角，不映射信号**——「行为是否改变」在 run-log 中无可观测差异，确定性检测不可得；行动项是**移除**无效指令，写入 `recommendations.promptTweaks`，**不**写入 `candidateAntiPatterns`（见下「no-op 审计」） |
+| 信息可达性 Information access（`:23`） | 关键信息对 agent 不可得 | `tool`（日志 tee / 只读接入等工具与信息通道缺失）→ `recommendations.toolImprovements` |
+
+### no-op 审计
+
+**找什么**：steering 文件里**不改变 agent 行为**的指令（"look for instructions in steering files that don't modify the agent's behavior"）——即那些**看起来做了、行为却没有变化**的改动。
+
+- **判定证据**：判断某条指令是 no-op 须附**前后对照证据**（同一输入下产出是否有差异 / 门禁退出码是否变化 / V finding 分布是否变化）；**禁止凭印象判定**（约束 4：不 LLM 估算）。
+- **处置**：确认为 no-op 的指令是**删除候选**，不要"换个说法再解释一遍"；建议写入 `recommendations.promptTweaks`，由人审后手动应用（本文件既有边界：技能只产出信号，不自动改 harness）。
+- **与既有 `prompt` 信号的关系**：no-op 是 `prompt` 类改进的**镜像**——既有检测逻辑找"该加什么"，no-op 审计找"该删什么"；但它**没有**确定性检测逻辑（见上表），只能作为人审视角。
+- **边界（不得升级为反模式）**：no-op 审计是**审计维度，不是新反模式条目**——本节落地不新增 `hard-constraints.md` 反模式（`maxAntiPattern` 计数不变），其产出不得走 `recommendations.candidateAntiPatterns`，以免把「删掉无效指令」变成「新增一条禁令」。
+
+### 标准归评审者
+
+> 上游推理（`:29-35`）：实现者的**上下文压力最大**（要探索、写码、调错）；评审者的压力最小（收到的是 diff，无需探索、通常无需写码调试）——故**编码标准应由评审者施加，而不是实现者**。
+
+- **落位**：风格 / 标准类规则写入 V 的 persona（`agent-personas.md`）与 `verifier-spec.md` 的检查项，**不**写进 S 的 prompt；S 的 prompt 只承载任务上下文与门禁判据。
+- **对 AGENTS.md 的增改极度克制**：steering 文件会被推入每个 agent 的上下文窗口（`:41`），应"极度克制"，通常只用于**导航指针**；能迁到编码标准或自动化检查的指令就迁过去（与上表「全局 AGENTS.md」一行的行动项一致）。
+- **不改变既有职责划分**：V 仍只通过 finding / `reworkHints` 施加标准，修改仍由 S / R 走既有返工链；本节不授权 V 自行改代码，也不改变「编排者最小化」边界（反模式 #10）。
+- **与「技能自演化不在本仓库」的关系**：本节只影响人审时的改进方向取舍（标准类信号优先落 V 侧资产），不改变"人审后手动应用"的边界。
