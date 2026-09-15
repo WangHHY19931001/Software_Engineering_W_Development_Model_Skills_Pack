@@ -121,6 +121,7 @@
 - "最高 seam"在单元层 = 函数/类的公共 API（to-spec 原则：理想零新 seam）
 - 私有状态机/内部转移的测试通过 TLA+ 不变式断言覆盖（与约束 13 TLA+ 行为门禁协同），不在代码层引入测试 seam
 - 必须显式引用阶段 3 选定 seam
+- 选定 seam 前先过 `coding-quality.md`「seam 与依赖的负向判据（M09）」：两 adapter 才成真 seam / 无变化处不得引入 port / 依赖四分类→测试策略 / deletion test / DESIGN-IT-TWICE（该节是上述规则的判定依据，不替代本节规则）。
 
 ## 类设计规则引用
 

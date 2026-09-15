@@ -212,6 +212,7 @@
 - "最高 seam"在模块层 = 模块公共导出（不深入私有方法）
 - 必须显式声明「复用阶段 2 seam 的部分」（避免重复引入 seam）
 - 阶段 4 必须显式引用阶段 3 选定 seam
+- 选定 seam 前先过 `coding-quality.md`「seam 与依赖的负向判据（M09）」：两 adapter 才成真 seam / 无变化处不得引入 port / 依赖四分类→测试策略 / deletion test / DESIGN-IT-TWICE（该节是上述规则的判定依据，不替代本节规则）。
 
 ## 并行任务（强制）
 

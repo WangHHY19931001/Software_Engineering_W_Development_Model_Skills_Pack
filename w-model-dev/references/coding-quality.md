@@ -337,3 +337,78 @@
 - 重构手法速查见 [重构目录](#重构目录)
 - 并发专项检查见 [concurrency-guide.md](concurrency-guide.md)
 - 设计判据来源见《软件设计哲学》危险信号总清单（吸收决策记录见 `docs/changes/decision-log/absorptions.md`）
+
+## seam 与依赖的负向判据（M09）
+
+> 吸收自 mattpocock `skills/engineering/codebase-design/`：`DEEPENING.md`（依赖四分类 + seam 纪律）、`SKILL.md`（deletion test + seam 纪律）、`DESIGN-IT-TWICE.md`（多变体设计）。台账出处 = `docs/superpowers/sources/2026-09-14-mattpocock-skills-adopted-excerpts.md` M09 节（台账 :421-512）。
+> 前面各节管「怎么设计 / 怎么重构」；本节管**什么时候不该引入抽象**——seam / port / adapter 是间接层，有代价，只在确实有东西跨它变化时才成立。S 子代理在阶段 2/3/4 选 seam 前自检，V 子代理评审 Architecture 轴时作**过度设计**基准。
+> 与 phase 文档的分工：本文件持**判定依据**；`phase-2-system-design.md` / `phase-3-outline-design.md` / `phase-4-detailed-design.md` 的「测试 seam 决策」节持**阶段落地规则**（本节只给指针，不复制其规则）。
+
+### ① 两 adapter 才成真 seam（一 adapter = 假想 seam）
+
+- **正向判据**（台账 :463；DEEPENING.md L28）：只有当**至少两个 adapter 被证实需要**（典型 = 生产 adapter + 测试 adapter）时才引入 port；跨 seam 的东西确实变化，seam 才成立。
+- **负向判据**（台账 :463 / :481；DEEPENING.md L28 / SKILL.md L65）：只有**一个 adapter**，或只有**一个调用方** → 这是**假想 seam（hypothetical seam）**，**不得引入 port**；单 adapter 的 seam 只是**间接层（indirection）**。原句：**One adapter means a hypothetical seam. Two adapters means a real one.** / **Don't introduce a seam unless something actually varies across it.**
+- **内部 seam vs 外部 seam**（台账 :464；DEEPENING.md L29-30）：深模块可以有**内部 seam**（实现私有、供自身测试用），也有接口处的**外部 seam**；**不得因为测试要用就把内部 seam 暴露到接口**——测试需求不是放宽接口的理由。
+
+### ② 无变化处不得引入 seam/port
+
+- **判据**：先写出一句「**跨这个 seam 变化的东西是什么**」。写不出（无第二实现、无第二调用方、无平台/环境差异）→ **不引入 seam/port**。这是 ① 的推广：seam 是变化的占位，不是测试的占位。
+- **反例**（命中「夸夸其谈通用性：为假设的未来需求建立的抽象/钩子」）：为「将来可能换数据库」抽的 repository 接口（现在只有一个实现）；为「将来可能多端」抽的 adapter（现在只有一个调用方）；测试专用 setter/getter 进入生产类接口（同「为拆而拆」：拆分理由不是变化）。
+- **与阶段规则的协同**：阶段 3 的「禁止为了覆盖率在系统层引入新 seam」与阶段 4 的「理想零新 seam」是本条在**测试 seam 决策**上的既有落点；本条给的是它们的判定依据，不替代阶段规则（指针见上述阶段文档「测试 seam 决策」节）。
+
+### ③ 依赖四分类 → 测试策略
+
+> 台账 :434-458；DEEPENING.md L5-26。先判定待深化模块的依赖属于哪一类，**类别决定它跨 seam 怎么测**——分类选错，adapter/port 决策必错。
+
+| 类别 | 判据（源文） | 深化可行性 | 跨 seam 测试策略 | adapter / port 决策 |
+| --- | --- | --- | --- | --- |
+| 1. In-process（进程内） | 纯计算、内存状态、无 I/O | 总是可深化（Always deepenable） | **真对象**：合并模块后直接经新接口测，不引入替身 | 不需要 adapter |
+| 2. Local-substitutable（本地可替） | 有本地测试替身（Postgres 用 PGLite、内存文件系统） | 替身**存在**才可深化（if the stand-in exists） | **替身**：替身在测试套件内运行 | seam 是**内部 seam**；模块**外部接口不开 port** |
+| 3. Remote but owned（远程但自有） | 跨网络边界的自有服务（微服务、内部 API） | 可深化：深模块拥有逻辑，transport 作 adapter 注入 | **契约测试**：测试用 in-memory adapter，生产用 HTTP/gRPC/queue adapter；两 adapter 共守 port 契约 | 在 seam **定义 port**（两 adapter 才成真 seam，见 ①） |
+| 4. True external（真外部） | 第三方服务（Stripe、Twilio 等），不受我们控制 | 可深化：外部依赖作为**注入的 port** | **替身（mock adapter）+ 不测第三方内部行为**：只测我们对其的假设与失败路径 | 注入 port，测试提供 mock adapter |
+
+- **replace, don't layer**（台账 :468-471；DEEPENING.md L32-34）：深模块接口处的测试一旦存在，旧的浅模块单元测试就是**浪费**，**删除它们**——不要新旧叠加保留。
+- 第 4 类的「不测」只针对**第三方内部行为**；我们对它的**假设、超时、错误路径、重试**属于我们自己的行为，**必须测**。
+
+### ④ deletion test（删掉该抽象后是否仍能工作）
+
+- **判据**（台账 :475-476；SKILL.md L63）：**想象删掉这个模块/抽象**——若**复杂性随之消失**，它是 **pass-through（透传，多余）**；若**复杂性在 N 个调用方处重新出现**，它**在挣工资（earning its keep）**，保留。一句话：删了它，「复杂性是消失，还是搬到 N 个调用方」。
+- **负向结论的处置**：pass-through → 按「移除中间人 / 内联函数」手法删掉（见上文「重构目录」），并复核既有「中间人」坏味道（「对象大量转发调用 / 透传方法（只转发不增值）」）。
+- **与抽象门槛的协同**：`/wm code-health` Phase 4 的「稳定点下限 ≥2 个非 test-only 生产调用点」与本节 ① 的「两 adapter」同向——**一个调用点或一个 adapter 都不构成抽象依据**（见上文「重复簇与抽象门槛」）。
+
+### ⑤ DESIGN-IT-TWICE 约束矩阵（何时必须做第二次设计）
+
+> 台账 :485-511；DESIGN-IT-TWICE.md L19-44。**摘录自源文步骤 2（L19）起**，故「何时触发」不在摘录内：下表 (a) 是由本节 ①②④ 负向判据推出的**本仓适配触发条件（非源文原义，如实标注）**；(b)(c)(d) 逐项对应摘录。
+
+**(a) 触发条件（命中任一即必须做第二次设计 — 本仓适配）**
+
+| 触发条件 | 为什么必须对照 |
+| --- | --- |
+| 要在 seam 处引入 **port/adapter**（依赖类别 ③ / ④） | 接口是跨 seam 的契约，定错时代价最高；至少并置「最小接口」与「ports & adapters」两个变体 |
+| deletion test 显示抽象**在挣工资**，但接口超过 1–3 个入口 | 深度（leverage）与灵活性取舍真实存在，须并置比较而非单方拍板 |
+| 同一模块被**冲突约束**的调用方使用（默认路径要简单 vs 扩展点要多） | 单一设计必偏向一方，须显式权衡 |
+| 依赖类别为 3（远程但自有，跨 seam） | 源文 Agent 4 约束「Design around ports & adapters for cross-seam dependencies」即为此类而设 |
+
+**(b) 每个子代理一个不同设计约束（台账 :490-495；DESIGN-IT-TWICE.md L488-495，源文步骤 2）**
+
+| 子代理 | 约束（源文） | 优化目标 |
+| --- | --- | --- |
+| Agent 1 | Minimize the interface: 1–3 个入口点上限，最大化每个入口点的 leverage | 最小接口 / 最大深度 |
+| Agent 2 | Maximise flexibility: 支持多用例与扩展 | 最大灵活 |
+| Agent 3 | Optimise for the most common caller: 让默认场景 trivial | 最常见调用者 |
+| Agent 4（适用时） | Design around ports & adapters for cross-seam dependencies | 跨 seam 依赖 |
+
+**(c) 每个子代理的 5 项固定产物（台账 :499-505；DESIGN-IT-TWICE.md L499-505）**
+
+1. **Interface**（types、methods、params，加 invariants、ordering、error modes）——签名级，不是自然语言描述。
+2. **Usage example**（调用者怎么用）。
+3. **What the implementation hides behind the seam**（seam 背后藏了什么）。
+4. **Dependency strategy and adapters**（依赖类别 + adapter 策略，接 ③）。
+5. **Trade-offs**: where leverage is high / where it's thin（哪里杠杆高、哪里薄）。
+
+**(d) 呈现与比较（台账 :507-511；DESIGN-IT-TWICE.md L507-511）**
+
+- **顺序**呈现每个设计（便于逐个吸收），再以散文比较。
+- 比较三维：**depth**（接口处的 leverage）/ **locality**（变化集中在哪里）/ **seam placement**（seam 放在哪）。
+- 最后给**有主见的推荐**（哪个最强、为什么；可组合则给 hybrid）——不交付菜单（源文：the user wants a strong read, not a menu）。
+- 子代理 brief 须**自带技术事实**（文件路径、耦合细节、③ 的依赖类别、seam 背后是什么），并使用 SKILL / CONTEXT 词汇表命名，保证与项目架构语言、领域语言一致。
