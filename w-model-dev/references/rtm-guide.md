@@ -84,11 +84,27 @@ NFR/CON 行的 acceptanceTest 允许为 null（横切治理类豁免，由 `isCr
 - **E3 结果一致性**（只要该层填写了 `evidence` 即强制，与该层是否属于当前阶段、与 cutoff 无关）：`failed=0 && pending=0` ⇒ `exitCode=0`；`failed>0` ⇒ `exitCode≥1`（记录里有失败，就不可能来自一次绿色运行）；`failed=0 && pending>0` 不作约束（部分执行两种退出码都合理，如实不编码）。
 - **E4 存在性**：`lastUpdated` 不早于 cutoff 时，**当前阶段须校验的层**（阶段 5 = `unitTest`；6 = +`integrationTest`；7 = +`systemTest`；8 = +`acceptanceTest`）只要 `total>0` 就必须携带 `evidence`；缺失 → 违规（携带的 evidence 再由 E1~E3 校验合法性）。
 
+**阶段作用域**（`gate-logic.ts`）：**E4 只作用于当前阶段必须存在的层**（`PHASE_TEST_LAYERS`；阶段 1~4 无层，不触发 E4）——未到该阶段、或 `total=0` 的层不进入 `checked`，一律不触发 E4。**E1~E3 与阶段无关**：任何层（含未到阶段的层）只要携带 `evidence` 即强制校验（证据一旦出现就必须自洽）；未携带 `evidence` 的层不触发 E1~E3。
+
 **cutoff 吸收**：cutoff = `2026-09-15T00:00:00Z`（M07/D-2 批准日零点 UTC）。
 
 - `lastUpdated` **早于** cutoff 的旧 RTM，在其阶段范围内 `total>0` 的层缺 `evidence` → 输出 `LEGACY_TEST_EVIDENCE` **非阻断诊断**（不改变退出码）。
 - `lastUpdated` **缺失或不可解析** → 按 cutoff 后处理（**保守不吸收**），即仍须携带 `evidence`，否则退出码 1。
-- `GATE_JSON.testEvidence` 给出 `{checked, withEvidence, e4}`（另有非阻断 `legacy` 数组，仅非空时出现）。
+
+**`GATE_JSON.testEvidence` 完整形状（8 键，键恒存在；结构失败早退路径不产出该对象）**：
+
+| 键             | 类型   | 含义                                                                            |
+| -------------- | ------ | ------------------------------------------------------------------------------- |
+| `checked`      | number | 阶段范围内且 `total>0`、进入 E4 存在性判定的层数                                 |
+| `withEvidence` | number | `checked` 中携带 `evidence` 对象的层数                                           |
+| `missing`      | number | `checked` 中 cutoff 后缺 `evidence` 的层数（`=== e4`，即因缺证据未通过的存在性检查数） |
+| `legacy`       | number | `checked` 中 `lastUpdated` 早于 cutoff、被非阻断吸收的层数                       |
+| `e1`           | number | E1 配对违规计数                                                                  |
+| `e2`           | number | E2 哈希核验违规计数                                                              |
+| `e3`           | number | E3 结果一致性违规计数                                                            |
+| `e4`           | number | E4 存在性违规计数（`=== missing`）                                               |
+
+> **同名不同型，勿混用**：`testEvidence.legacy` 是**数值**（被 legacy 吸收的层数）；`GATE_JSON` **顶层** `legacy` 是**非阻断诊断字符串数组**（`LEGACY_TEST_EVIDENCE` 消息，仅非空时出现）。二者名字相同，但类型、层级与作用均不同。
 
 **与 run-log `revertEvidence` 的边界（不同载体、不得互相替代）**：两者都叫「证据」，但绑定对象与门禁挂点不同——
 
