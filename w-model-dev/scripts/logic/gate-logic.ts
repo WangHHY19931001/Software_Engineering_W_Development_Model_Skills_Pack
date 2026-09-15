@@ -363,16 +363,27 @@ const TICKET_SIMILAR_TO_TASK_RE =
 /**
  * 契约标记词（修复轮 1 ①②：由「13 个散文短语」收紧为**专指契约**的词，剔除通用词
  * `返回` / `参数` / `签名` / `signature` / `returns`——通用词会让「加两个字即放行」成为旁路）。
- * 出现标记词的行按契约行处理：其上的**裸符号**（`A`、`A.b`）视为被定义。
+ * 修复轮 3：标记词须与 span **声明式邻接**才算契约声明（见 `hasAdjacentContractMarker()`），
+ * 不再用「行内任意位置含标记词」——否则否定/旁述语义（如「无接口签名要求，调用 X()」）会误判为声明。
  */
 const TICKET_CONTRACT_MARKERS = ['接口签名', '类型约束', '状态转移', '符号契约', '契约', '定义', '入参', '出参'];
 
 /** `What to build` 字段行（`phase-5-coding.md:149` 票据内容契约的字段名） */
 const TICKET_CONTRACT_FIELD_RE = /^\s*(?:\*\*)?\s*what to build\s*(?:\*\*)?\s*[:：]/i;
 
-function hasContractMarker(line: string): boolean {
-  const lower = line.toLowerCase();
-  return TICKET_CONTRACT_MARKERS.some((k) => lower.includes(k.toLowerCase()));
+/** 声明式邻接允许的间隔符（空白 / 冒号 / 顿号逗号分号 / 星号 / 各类引号与括号） */
+const DECLARATIVE_SEPARATOR_RE = /[\s:：、,，;；*`'"“”‘’「」『』（）()[\]【】]+$/;
+
+/** 标记词是否紧邻该 span 之前（`接口签名 \`A.b(x)\``、`本票契约：\`A.b(x)\`` 的声明式形态） */
+function hasAdjacentContractMarker(line: string, span: string): boolean {
+  let from = 0;
+  for (;;) {
+    const idx = line.indexOf(span, from);
+    if (idx === -1) return false;
+    const before = line.slice(0, idx).replace(DECLARATIVE_SEPARATOR_RE, '');
+    if (TICKET_CONTRACT_MARKERS.some((k) => before.endsWith(k))) return true;
+    from = idx + 1;
+  }
 }
 
 function isContractFieldLine(line: string): boolean {
@@ -445,12 +456,15 @@ function hasCallArguments(head: string): boolean {
 }
 
 /**
- * 定义判定（修复轮 2 B：与 B① 的签名识别同源；`What to build` 与专指契约标记行按不同规则处理）：
+ * 定义判定（修复轮 2 B 复位 + 修复轮 3 收紧二级判定）：
  * 1. span 自身带**契约标注**（`: T` / `→ b` / `-> T`）→ 视为定义（任意行，与 B① 的 `接口签名(...): T` 同口径）；
- * 2. **专指契约标记行**（`接口签名`/`类型约束`/`状态转移`/`符号契约`/`契约`/`定义`/`入参`/`出参`）→
- *    该行上的**裸符号与调用式一律视为定义**（本轮 I-1 复位：无返回标注的调用式签名同样算声明；
- *    标记词本身已表达「这是契约」的意图）；
- * 3. **`What to build` 字段行**（无专指标记词）→ 裸符号（点名符号，`phase-5-coding.md:149/168-173` 的写法）
+ * 2. **声明式邻接**：专指契约标记词紧邻该 span 之前（仅允许空白/冒号/顿号/引号/括号等间隔符，
+ *    形如 `接口签名 \`A.b(x)\``、`本票契约：\`A.b(x)\``）→ 视为定义。该分支对**裸符号与调用式一律**成立
+ *    （含空括号调用：声明式形态已明确「这是签名」）。
+ *    修复轮 3：不再用「行内任意位置含标记词」——`无接口签名要求，调用 \`Ghost.do()\`` /
+ *    `沿用现有契约，调用 \`Ghost.do()\`` / `调用 \`X.render()\`，不定义新类型` 这类**否定 / 旁述**
+ *    语义不得被当作契约声明；
+ * 3. **`What to build` 字段行**（无声明式邻接）→ 裸符号（点名符号，`phase-5-coding.md:149/168-173` 的写法）
  *    与**带参调用式**（`A.b(x)`，形如签名）视为定义；
  *    **空括号调用式**（`A.b()`）**不**视为定义——保住修复轮 1 finding #2
  *    （`调用 \`Ghost.do()\`，返回值忽略` 必须仍被第 6 条拦下）；
@@ -461,7 +475,7 @@ function isDefinitionSpanInLine(span: string, line: string): boolean {
   const { head, tail } = splitSymbolSpan(span);
   if (head === '') return false;
   if (tail !== '' && SYMBOL_SUFFIX_RE.test(tail)) return true;
-  if (hasContractMarker(line)) return true;
+  if (hasAdjacentContractMarker(line, span)) return true;
   if (!isContractFieldLine(line)) return false;
   const isCall = head.includes('(');
   return !isCall || hasCallArguments(head);

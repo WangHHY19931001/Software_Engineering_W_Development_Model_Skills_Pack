@@ -165,6 +165,37 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
     expect(r.violations.join('\n')).toMatch(/undefined-symbol.*`Cache\.clear\(\)`/);
   });
 
+  it('修复轮 3：标记词在非声明位置（否定 / 旁述语义）不得使该行调用式成为定义 → 仍被 ⑥ 拦下', () => {
+    const cases = [
+      '**What to build:** 沿用现有契约，调用 `Ghost.do()`',
+      '**What to build:** 调用 `ReportRenderer.render()`，不定义新类型',
+      '**What to build:** 无接口签名要求，调用 `Ghost.do()`',
+    ];
+    for (const line of cases) {
+      const r = checkTicketContent(
+        ['# 01 — 否定语义', '', line, '**Blocked by:** None', '', '- [ ] 无异常', ''].join('\n'),
+      );
+      expect(r.summary.criticalMissing, `${line} → ${JSON.stringify(r.violations)}`).toBe(1);
+      expect(r.violations.join('\n'), line).toMatch(/undefined-symbol/);
+    }
+  });
+
+  it('修复轮 3 正向：声明式邻接（标记词紧邻 span 之前）仍算定义 → passed', () => {
+    const cases = [
+      '**What to build:** 接口签名 `AuthService.authenticate(credentials)`',
+      '**What to build:** 实现 `Login(username, password)`',
+      '**What to build:** 本票契约：`A.b(x)`',
+      '**What to build:** 类型约束 `Session`；状态转移 `anonymous → authenticated`',
+    ];
+    for (const line of cases) {
+      const r = checkTicketContent(
+        ['# 01 — 声明式', '', line, '**Blocked by:** None', '', '- [ ] 无异常', ''].join('\n'),
+      );
+      expect(r.violations, `${line} → ${JSON.stringify(r.violations)}`).toEqual([]);
+      expect(r.summary).toEqual({ checked: 1, criticalMissing: 0, buildabilityMissing: 0 });
+    }
+  });
+
   it('修复轮 2 (B) 组合边界（复审反例 3）：标记行调用式 + 验收标准引用同一符号 → ⑥/B② 均不触发', () => {
     const r = checkTicketContent(
       [
