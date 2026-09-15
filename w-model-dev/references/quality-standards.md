@@ -93,7 +93,7 @@
 
 #### ① 断言强度（S21）
 
-- **"Name the break" 前置门**（源 L22-25）：写测试体之前先回答——**什么生产改动应让这个测试失败？那个改动是 bug，还是一个有意的决定？** 测试靠抓住「错误分支 / 缺失副作用 / 错误参数 / 边界情形 / 契约破裂」之一取得席位。说不清它抓的是哪一类破坏 → **重命名或删除**，不得因「已经写了」而保留。
+- **"Name the break" 前置门**（源 L22-25）：写测试体之前先回答——**什么生产改动应让这个测试失败？那个改动是 bug，还是一个有意的决定？** 测试靠抓住「错误分支 / 缺失副作用 / 错误参数 / 边界情形 / 契约破裂」之一取得席位。说不清它抓的是哪一类破坏 → **重命名或删除**，不得因「已经写了」而保留（末句「重命名或删除 / 不得因已经写了而保留」为本仓处置要求，非源文原文）。
 - **change detector 反例**（源 L41-46）：若只有「有意的决定」能让测试失败——常量值、精确消息措辞、私有结构——则它**在重构时报警、在缺陷前沉睡**。反例：只断言 `expect(x).toBeDefined()`、只断言「不抛异常」、`expect(MAX_RETRIES).toBe(5)`。正例：测依赖该决定的行为——「失败的调用被重试 5 次，且第 6 次永不发生」，而不是断言那个常量等于 5。
 - **string-presence trap**（源 L47-52）：断言脚本 / 技能 / 配置「包含某一行」只证明**源就是源**；实现改写（措辞、格式、行序变化）后测试仍绿，而真实破坏不被捕获。正确做法：对受控输入**跑**脚本，断言**输出 / 副作用 / 退出码**；面向 agent 的指令文档由**消费 agent 的行为**测试；面向人类的散文**不配测试**。
 - **期望值独立推导**（源 L27-39）：用**字面量与手工核对的 fixture**；表驱动 + 字面量 `want` 是首选形态。期望值**不得由被测代码或其 helper 计算 / 复制**——两侧用同一 builder 重算的 mirror assertion 恒真，无论被测代码做什么都通过。
@@ -137,7 +137,7 @@ expect(buildSearchQuery({ tag: 'urgent' })).toBe('tag:"urgent"');
 - **mock 边界（mock 用错层级）**：只在系统边界 mock —— 外部 API（支付、邮件等）/ 数据库（优先真实测试库）/ 时间与随机性 / 文件系统（视情况）；**不 mock**：自己的类或模块、内部协作者、任何自己掌控的东西。
 - **horizontal slicing（横切切片）**：先写完所有测试再写实现 → 批量测试验证的是**想象中的行为**、测的是「形状」而非用户可见行为，测试对真实变化失敏，且在尚未理解实现前就锁死测试结构。**改为垂直切片**：一个测试 → 一份实现 → 重复，每个测试是响应上一轮所学（tracer bullet）的探针。
 
-> 溯源标注：`tautological` 与 `implementation-coupled` 的**命名与判据以 S 源为主**（S21 期望值独立推导 + S19 的 tautological 判据），M03（mattpocock `skills/engineering/tdd/tests.md` L38-45 / L63-77、`mocking.md` L3-13、`SKILL.md` L32）补充红榜枚举、系统边界清单与 vertical slicing。本节四条经 V 侧必答项消费：见 `verifier-spec.md` §4.2.1 与 `agent-personas.md` Persona 2 评审方法，**不新增子标准名**。
+> 溯源标注：`tautological` 与 `implementation-coupled` 的**判据以 S 源为主**（S21 期望值独立推导 + S19 的 tautological 判据）；**命名沿用设计规格 M03 行**，M03（mattpocock `skills/engineering/tdd/tests.md` L38-45 / L63-77、`mocking.md` L3-13、`SKILL.md` L32）补充红榜枚举、系统边界清单与 vertical slicing。本节四条经 V 侧必答项消费：见 `verifier-spec.md` §4.2.1 与 `agent-personas.md` Persona 2 评审方法，**不新增子标准名**。
 
 ### 函数与错误处理规范
 

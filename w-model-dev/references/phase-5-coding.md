@@ -146,7 +146,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 - 用 expand-contract 序列：expand（新旧并存）→ migrate batches（每批 CI 绿）→ contract（删旧）
 - 每批大小按 blast radius（按目录/按包）
 - **兜底（扩展期跨多个部署单元 / 多批次时）**：当同一机械改动的 blast radius 横跨多个部署单元，使任何单独 migrate 批次都无法自证 CI 绿时，**保持 expand → migrate → contract 序列不变**，但让全部 migrate 批次**共享一条 integration 分支**；「绿」只在最后一张 **integrate-and-verify 票**上承诺，各 migrate 批次自身不再单独承诺绿。该票不改变 expand / migrate / contract 三阶段语义，只改变「绿在哪里被承诺」。
-- **integrate-and-verify 票的内容契约**（沿用「票据内容契约」节四字段，一律符号级）：
+- **integrate-and-verify 票的内容契约**（沿用「票据内容契约」节三字段，一律符号级）：
   - **What to build**：在共享 integration 分支上合并全部 migrate 批次并完成验证——给出该宽重构的**符号级终态**（被重命名 / 被重类型的符号名及其新接口签名、类型约束或状态转移）与验证动作（跑全量回归 + 该符号全部调用点的契约测试）；不写文件路径与行号（位置由 `codegraph_explore` 查询决定）。
   - **Blocked by**：全部 migrate 批次票据；本票不反向阻塞任何 migrate 批次，各票既有 `Blocked by` 关系与 expand → migrate → contract 序列均不变，本票仅作为「绿」的唯一承诺点。
   - **验收标准**：integration 分支全量测试绿（含每批次的独立测试与该宽重构的回归测试）；被改符号的新旧两种形式在分支上均已通过契约测试；符号级检查确认无残留旧形式调用点（新形式调用点计数与调用点迁移清单一致）。
