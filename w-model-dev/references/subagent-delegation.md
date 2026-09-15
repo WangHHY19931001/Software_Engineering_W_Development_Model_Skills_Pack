@@ -722,6 +722,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 角色：评审子代理（V）
 评审目标：<targetKind> / <targetId>
 任务：按 agent-personas.md 对应 Persona + verifier-spec.md §8 提示词产出 VerifierOutput JSON
+模型档位：<显式指定，不得省略（省略即静默继承编排者会话模型）；按 diff 规模/复杂度/风险定档，小 fix delta 的 scoped re-review 可用便宜到中档 — 判据见 estimation-guide.md「模型档位 × 修复轮次 escalation」>
 上下文：
   - 待评审批产物路径：<列出 S 子代理产出的文件路径>
   - 上游产物路径（用于追溯）：<列出>
@@ -985,6 +986,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 角色：根因定位子代理（R）
 当前 W 模型阶段：<阶段 N - 名称>
 返工轮次：<round，从 1 开始>
+模型档位：<显式指定，不得省略（省略即静默继承编排者会话模型）；返工轮次 4-5 时至少比卡住的实现者高一档 — 判据见 estimation-guide.md「模型档位 × 修复轮次 escalation」>
 任务：诊断 V/G 命中的返工问题根因，产出 RootCauseReport
 
 上下文：
@@ -1196,6 +1198,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 角色：产出子代理-修复变体（S-fix）
 当前 W 模型阶段：<阶段 N - 名称>
 返工轮次：<round>
+模型档位：<显式指定，不得省略（省略即静默继承编排者会话模型）；返工轮次 4-5 时至少比卡住的实现者高一档 — 判据见 estimation-guide.md「模型档位 × 修复轮次 escalation」>
 任务：按 R 报告的 fixRecommendation 修复产物 + 更新 RTM
 
 上下文：
