@@ -309,8 +309,14 @@ export interface TicketContentResult {
   summary: TicketContentSummary;
 }
 
-/** 票据块标题：`# 01 — 标题` / `## 01 - 标题`（`#{1,3}` + 数字票据号 + 可选分隔符） */
-const TICKET_HEADING_RE = /^#{1,3}\s+(\d{1,4})\s*[—\-–:.]?\s*(.*)$/;
+/**
+ * 票据式标题（修复轮 1 ④：收紧边界识别，避免把 `### 1. 步骤一` 这类分节标题虚增为票据）：
+ * - 模板形态：`# <NN> — <标题>`（`phase-5-coding.md` 票据内容契约的实际形态，分隔符限破折号族）；
+ * - 关键词形态：`# 票据 N …` / `# Ticket N …` / `# 任务 N …`（大小写不敏感）。
+ * 纯「`#` + 数字 + 点号」的分节标题（`### 1. 步骤一`）**不再**被当作票据边界。
+ */
+const TICKET_HEADING_NUM_RE = /^#{1,3}\s+(\d{1,4})\s*[—–-]\s*(.*)$/;
+const TICKET_HEADING_KEYWORD_RE = /^#{1,3}\s+(?:票据|ticket|任务|task)\s*(\d{1,4})\b\s*[—–\-:：.]?\s*(.*)$/i;
 
 /**
  * 黑名单第 1 条（台账 `sources/2026-09-14-superpowers-adopted-excerpts.md:696`）：
@@ -355,25 +361,26 @@ const TICKET_SIMILAR_TO_TASK_RE =
   /(?:similar to|same as)\s+(?:task|ticket)\s*\d+|(?:与|类似|如同|参照)[^。\n]{0,12}?(?:任务|票据)\s*\d+/i;
 
 /**
- * 「定义标记词」：该行出现任一标记时，行内反引号符号引用视为**被定义**（进入全票据符号词汇表）。
- * 依据本仓票据内容契约（`phase-5-coding.md`「票据内容 durability」）：票据主体=接口签名 / 类型约束 /
- * 状态转移。词汇表是**跨票据**的——某符号在任一票据被定义，其他票据引用它即视为合法。
+ * 契约标记词（修复轮 1 ①②：由「13 个散文短语」收紧为**专指契约**的词，剔除通用词
+ * `返回` / `参数` / `签名` / `signature` / `returns`——通用词会让「加两个字即放行」成为旁路）。
+ * 出现标记词的行按契约行处理：其上的**裸符号**（`A`、`A.b`）视为被定义。
  */
-const TICKET_DEFINITION_MARKERS = [
-  '接口签名',
-  '类型约束',
-  '状态转移',
-  '符号契约',
-  '契约',
-  '定义',
-  '入参',
-  '出参',
-  '返回',
-  '参数',
-  '签名',
-  'signature',
-  'returns',
-];
+const TICKET_CONTRACT_MARKERS = ['接口签名', '类型约束', '状态转移', '符号契约', '契约', '定义', '入参', '出参'];
+
+/** `What to build` 字段行（`phase-5-coding.md:149` 票据内容契约的字段名） */
+const TICKET_CONTRACT_FIELD_RE = /^\s*(?:\*\*)?\s*what to build\s*(?:\*\*)?\s*[:：]/i;
+
+function hasContractMarker(line: string): boolean {
+  const lower = line.toLowerCase();
+  return TICKET_CONTRACT_MARKERS.some((k) => lower.includes(k.toLowerCase()));
+}
+
+function isContractFieldLine(line: string): boolean {
+  return TICKET_CONTRACT_FIELD_RE.test(line);
+}
+
+/** 语言字面量 / 关键字（不作为符号引用比对，避免 `false` / `void` 之类被误报为未定义符号） */
+const TICKET_SYMBOL_STOPWORDS = new Set(['true', 'false', 'null', 'undefined', 'void', 'this']);
 
 /** 票据内的文件路径（Buildability ③；与 `phase-5-coding.md:162`「禁止具体文件路径」同向）
  *  两个分支均为顺序量词（无嵌套重复），避免 `security/detect-unsafe-regex` 击穿。 */
@@ -409,20 +416,40 @@ const IDENT_HEAD_RE = /^[A-Za-z_$][\w$.]*/;
 const SYMBOL_SUFFIX_RE = /^\s*(?::|→|->)\s*\S[\s\S]*$/;
 
 /**
- * 符号 span 判定（顺序量词 + 括号手工配对，避免嵌套重复的 unsafe-regex）：
- * 整个 span 为「标识符 / 点分标识符（可带调用）」，其后可跟类型注解或状态转移。
+ * 符号 span 拆为「头 + 尾」（顺序量词 + 括号手工配对，避免嵌套重复的 unsafe-regex）：
+ * 头 = 标识符 / 点分标识符（可带调用）；尾 = 其余（类型注解 / 状态转移等）。
  */
-function isSymbolSpan(span: string): boolean {
+function splitSymbolSpan(span: string): { head: string; tail: string } {
   const id = IDENT_HEAD_RE.exec(span)?.[0] ?? '';
-  if (id === '') return false;
+  if (id === '') return { head: '', tail: span };
   let head = id;
   // 可选调用：标识符后紧跟 `(` 且存在配对 `)` 时，把头扩到 `)` 为止（含参数）
   if (span[id.length] === '(') {
     const close = span.indexOf(')', id.length + 1);
     if (close !== -1) head = span.slice(0, close + 1);
   }
-  const rest = span.slice(head.length);
-  return rest === '' || SYMBOL_SUFFIX_RE.test(rest);
+  return { head, tail: span.slice(head.length) };
+}
+
+/** 符号 span 判定：整个 span 为「标识符 / 点分标识符（可带调用）」，其后可跟类型注解或状态转移。 */
+function isSymbolSpan(span: string): boolean {
+  const { head, tail } = splitSymbolSpan(span);
+  return head !== '' && (tail === '' || SYMBOL_SUFFIX_RE.test(tail));
+}
+
+/**
+ * 定义判定（修复轮 1 ①：与 B① 的签名识别**同源**，取代原先的散文短语词表）：
+ * - span 自身带**契约标注**（`: T` / `→ b` / `-> T`）→ 视为定义（与 B① 的 `接口签名(...): T` 同口径）；
+ * - **裸符号**（`A`、`A.b`，无参数括号）出现在**契约行**（含契约标记词的行，或 `What to build` 字段行）
+ *   → 视为定义（本仓票据契约正是「点名符号」的写法，`phase-5-coding.md:149/168-173`）；
+ * - 仅被**调用**（`A.b()`）且无契约标注、行内也无契约标记 → **不**视为定义（⑥ 判未声明符号）。
+ */
+function isDefinitionSpanInLine(span: string, line: string): boolean {
+  const { head, tail } = splitSymbolSpan(span);
+  if (head === '') return false;
+  if (tail !== '' && SYMBOL_SUFFIX_RE.test(tail)) return true;
+  const bare = !head.includes('(');
+  return bare && (hasContractMarker(line) || isContractFieldLine(line));
 }
 
 /** 标识符 token（用于定义词汇表；`` `describe('A.b')` `` 可抽出 `describe` 与 `A.b`） */
@@ -441,12 +468,12 @@ function isPathLikeSpan(span: string): boolean {
   return /[/\\]/.test(span) || FILE_EXT_RE.test(span);
 }
 
-/** 取一行内全部反引号 span，过滤出符号 span（排除路径 / JSON 字面量等） */
+/** 取一行内全部反引号 span，过滤出符号 span（排除路径 / JSON 字面量 / 语言字面量等） */
 function symbolSpansOfLine(line: string): string[] {
   const out: string[] = [];
   for (const m of line.matchAll(BACKTICK_SPAN_RE)) {
     const s = (m[1] ?? '').trim();
-    if (s === '' || isPathLikeSpan(s)) continue;
+    if (s === '' || isPathLikeSpan(s) || TICKET_SYMBOL_STOPWORDS.has(s.toLowerCase())) continue;
     if (isSymbolSpan(s)) out.push(s);
   }
   return out;
@@ -457,23 +484,21 @@ function identTokens(text: string): string[] {
   return [...text.matchAll(IDENT_TOKEN_RE)].map((m) => m[0]);
 }
 
-function hasDefinitionMarker(line: string): boolean {
-  const lower = line.toLowerCase();
-  return TICKET_DEFINITION_MARKERS.some((k) => lower.includes(k.toLowerCase()));
-}
-
 interface TicketBlock {
   id: string;
   title: string;
   lines: string[];
 }
 
-/** 按 `# <NN> — <标题>` 标题切分票据块（标题前的内容视为文档前言，不参与校验） */
+/**
+ * 按票据式标题切分票据块（标题前的内容视为文档前言，不参与校验）。
+ * 边界识别见 `TICKET_HEADING_NUM_RE` / `TICKET_HEADING_KEYWORD_RE`（修复轮 1 ④：分节标题不虚增）。
+ */
 function splitTicketBlocks(text: string): TicketBlock[] {
   const blocks: TicketBlock[] = [];
   let current: TicketBlock | null = null;
   for (const line of text.split(/\r?\n/)) {
-    const m = TICKET_HEADING_RE.exec(line);
+    const m = TICKET_HEADING_NUM_RE.exec(line) ?? TICKET_HEADING_KEYWORD_RE.exec(line);
     if (m) {
       if (current) blocks.push(current);
       current = { id: m[1] ?? '', title: (m[2] ?? '').trim() || '（无标题）', lines: [] };
@@ -501,7 +526,14 @@ function splitTicketBlocks(text: string): TicketBlock[] {
  *
  * 判据分工（避免同一断言重复触发）：
  * - 第 6 条只审**非验收标准行**的未定义符号引用；Buildability ② 只审**验收标准行**的未定义符号引用；
- * - 第 5 条只在「无符号且无路径且未给显式产出物行」时命中；Buildability ③ 只在「无符号但有路径」时命中。
+ * - 第 5 条只在「无符号且无路径且未给显式产出物行」时命中；Buildability ③ 只在「无符号但有路径」时命中；
+ * - 第 5 条命中时 Buildability ①（缺签名且缺验收标准）**不再重复计数**（同一根因，§0.1.5 不重复断言）。
+ *
+ * **符号「已定义」的结构性判定**（修复轮 1 ①②）：span 自身带契约标注（`: T` / `→ b` / `-> T`），
+ * 或**裸符号**出现在契约行（含专指契约标记词的行 / `What to build` 字段行）→ 视为已定义。
+ * 仅被调用（`A.b()`）且无标注、行内无契约标记 → 视为未定义（第 6 条）。
+ * 通用散文词（`返回` / `参数` / `签名` / `signature` / `returns`）**不**参与定义判定——避免
+ * 「加两个字即放行」的旁路。
  */
 export function checkTicketContent(ticketsText: string): TicketContentResult {
   const violations: string[] = [];
@@ -514,12 +546,13 @@ export function checkTicketContent(ticketsText: string): TicketContentResult {
     };
   }
 
-  // 跨票据符号定义词汇表：任一票据的定义行上出现的符号即视为已定义
+  // 跨票据符号定义词汇表：任一票据的**契约行**上按定义形态出现的符号即视为已定义
+  // （修复轮 1 ①②：定义判定与 B① 的签名识别同源，不再由通用散文词触发）
   const definedSymbols = new Set<string>();
   for (const b of blocks) {
     for (const line of b.lines) {
-      if (!hasDefinitionMarker(line)) continue;
       for (const span of symbolSpansOfLine(line)) {
+        if (!isDefinitionSpanInLine(span, line)) continue;
         for (const tok of identTokens(span)) definedSymbols.add(tok);
       }
     }
@@ -583,11 +616,14 @@ export function checkTicketContent(ticketsText: string): TicketContentResult {
 
     // ---- 第 5 条：只说要做什么不说怎么做（符号级改写）----
     // 无符号且无路径 → 违反；例外：非代码票据给出显式「具体动作 / 产出物」行（§0.1.3 的「或」分支）
+    let noSymbolContract = false;
     if (allSymbols.length === 0 && paths.length === 0 && !hasConcreteDeliverable(block.lines)) {
+      noSymbolContract = true;
       criticalMissing++;
       violations.push(
         `票据内容校验失败：${where}no-symbol-contract（S18 黑名单第 5 条：只说要做什么不说怎么做；台账 :700；` +
-          `本仓库适配，非源文原义——须点名接口签名/类型约束/状态转移，或给出具体动作与产出物；不要求文件路径或内联代码块）`,
+          `本仓库适配，非源文原义——须点名接口签名/类型约束/状态转移，或给出具体动作与产出物；不要求文件路径或内联代码块。` +
+          `同根因的 Buildability 缺签名已并入本条，不重复计数——§0.1.5 不重复断言）`,
       );
     }
 
@@ -601,8 +637,10 @@ export function checkTicketContent(ticketsText: string): TicketContentResult {
     }
 
     // ---- Buildability ①：缺接口签名且缺验收标准 ----
+    // 修复轮 1 ③：与第 5 条**同根因**（本票既无符号级契约又无验收标准）时只计一处——⑤ 优先，
+    // 本条不再重复断言（§0.1.5 要求 B 的负面判据与 ⑤/⑥ 不重复）。
     const hasSignature = text.includes('接口签名') || allSymbols.some((s) => SIGNATURE_SPAN_RE.test(s));
-    if (!hasSignature && criterionLines.length === 0) {
+    if (!hasSignature && criterionLines.length === 0 && !noSymbolContract) {
       buildabilityMissing++;
       violations.push(
         `票据内容校验失败：${where}Buildability：缺接口签名且缺验收标准（S18 Buildability 判据，§0.1.5②）`,

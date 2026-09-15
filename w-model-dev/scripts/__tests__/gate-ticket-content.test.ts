@@ -129,6 +129,90 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
     );
   });
 
+  it('修复轮 1 ①（⑥ 假阳）：What to build 直接点名带返回契约的符号、无「接口签名」等魔法词 → passed', () => {
+    const r = checkTicketContent(
+      [
+        '# 01 — 限流',
+        '',
+        '**What to build:** 实现 `RateLimiter.allow(key): boolean`；超额时给出 `TicketRejected`',
+        '**Blocked by:** None',
+        '',
+        '- [ ] `RateLimiter.allow` 超额时给出 `TicketRejected`',
+        '',
+      ].join('\n'),
+    );
+    expect(r.violations).toEqual([]);
+    expect(r.passed).toBe(true);
+    expect(r.summary).toEqual({ checked: 1, criticalMissing: 0, buildabilityMissing: 0 });
+  });
+
+  it('修复轮 1 ②（⑥ 旁路）：通用散文词（返回/参数）不得使「只调用未声明」的符号通过', () => {
+    const r = checkTicketContent(
+      [
+        '# 01 — 幽灵调用',
+        '',
+        '**What to build:** 调用 `Ghost.do()`，返回值忽略，参数透传',
+        '**Blocked by:** None',
+        '',
+        '- [ ] 无异常',
+        '',
+      ].join('\n'),
+    );
+    expect(r.passed).toBe(false);
+    expect(r.summary.criticalMissing).toBe(1);
+    expect(r.violations.join('\n')).toMatch(/undefined-symbol.*`Ghost\.do\(\)`/);
+  });
+
+  it('修复轮 1 ③（同根因去重）：⑤ 与 Buildability 缺签名只计一处（⑤ 优先，B① 不重复计数）', () => {
+    const r = checkTicketContent(
+      ['# 01 — 空壳票据', '', '**What to build:** 实现登录功能', '**Blocked by:** None', ''].join('\n'),
+    );
+    expect(r.summary.criticalMissing).toBe(1);
+    expect(r.summary.buildabilityMissing).toBe(0);
+    expect(r.violations.filter((v) => v.includes('no-symbol-contract'))).toHaveLength(1);
+    expect(r.violations.join('\n')).not.toMatch(/缺接口签名且缺验收标准/);
+    // 互指：⑤ 文案须说明同根因的 Buildability 缺签名已被吸收，避免读者以为漏报
+    expect(r.violations.join('\n')).toMatch(/no-symbol-contract[\s\S]*Buildability 缺签名/);
+  });
+
+  it('修复轮 1 ④（标题边界）：分节标题 `### 1. 步骤一` 不虚增 checked，也不产出虚假违规', () => {
+    const r = checkTicketContent(
+      [
+        '# 01 — 限流',
+        '',
+        '**What to build:** 实现 `RateLimiter.allow(key): boolean`',
+        '',
+        '### 1. 步骤一',
+        '',
+        '- [ ] `RateLimiter.allow` 可用',
+        '',
+      ].join('\n'),
+    );
+    expect(r.summary.checked).toBe(1);
+    expect(r.violations).toEqual([]);
+  });
+
+  it('修复轮 1 ④（标题边界）：票据关键词标题（票据 N / Ticket N / 任务 N）仍被识别为票据边界', () => {
+    const r = checkTicketContent(
+      [
+        '# 票据 01 — 限流',
+        '',
+        '**What to build:** 实现 `RateLimiter.allow(key): boolean`',
+        '',
+        '## Ticket 02 — 续期',
+        '',
+        '**What to build:** 实现 `SessionStore.renew(sessionId): Session`',
+        '',
+        '### 任务 3 — 审计',
+        '',
+        '**What to build:** 实现 `AuditLogWriter.write(entry): void`',
+        '',
+      ].join('\n'),
+    );
+    expect(r.summary.checked).toBe(3);
+    expect(r.violations).toEqual([]);
+  });
+
   it('黑名单第 5 条替代形态（§0.1.3「或具体动作与产出物」）：非代码票据给显式产出物行 → 不触发', () => {
     const r = checkTicketContent(
       [
