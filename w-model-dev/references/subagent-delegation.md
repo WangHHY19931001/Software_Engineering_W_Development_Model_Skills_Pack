@@ -722,7 +722,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 角色：评审子代理（V）
 评审目标：<targetKind> / <targetId>
 任务：按 agent-personas.md 对应 Persona + verifier-spec.md §8 提示词产出 VerifierOutput JSON
-模型档位：<显式指定，不得省略（省略即静默继承编排者会话模型）；按 diff 规模/复杂度/风险定档，小 fix delta 的 scoped re-review 可用便宜到中档 — 判据见 estimation-guide.md「模型档位 × 修复轮次 escalation」>
+模型档位：<显式指定，不得省略（省略即静默继承编排者会话模型）；按 diff 规模/复杂度/风险定档，小 fix delta 的 scoped re-review 可用便宜到中档；修复轮次 4-5 时至少比卡住的实现者高一档（本仓库把同轮评审一并纳入升级） — 判据见 estimation-guide.md「模型档位 × 修复轮次 escalation」>
 上下文：
   - 待评审批产物路径：<列出 S 子代理产出的文件路径>
   - 上游产物路径（用于追溯）：<列出>
