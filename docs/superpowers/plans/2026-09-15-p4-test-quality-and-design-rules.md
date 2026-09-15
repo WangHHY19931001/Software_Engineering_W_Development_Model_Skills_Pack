@@ -126,3 +126,29 @@
 **2. 占位符扫描**：无「待定/后续补充」。T4 的夹具载体形态（.md vs 新子目录）留作**有界选择 + 报告义务**（受 `check-samples-coverage` 规则约束），非占位符。
 **3. 命名一致性**：`change detector` / `string-presence trap` / `Name the break` / `Mutation Check` / `deletion test` / `DESIGN-IT-TWICE` / `Buildability` / `preflight 成对冲突扫描表` / `--tickets` / `tickets:{checked,criticalMissing,buildabilityMissing}` 与台账/规格措辞对齐。
 **4. 与既有验收的关系**：无新增 AC；不动 `/wm` 命令的输入输出语义（`--tickets` 是新增**可选**参数，既有调用零影响）；不新增 RTM 关系或 Schema 字段。
+
+---
+
+## 收尾（实现完成后由控制者回填）
+
+### 1. 交付与提交序列
+
+P4 base = `eb0e300f`，共 10 个提交：
+
+`93fb9548`(T1 S21+S19+S20+M03) → `44a7282c`(T2 M09+M10) → `d9cb26ee`(T3 M11+S12) → `3104005d`(T4 S18 门禁) → `64f79dfd`(T4-fix1) → `5e59b1ad`(T4-fix2) → `0245c6a2`(T4-fix3) → `e292fc25`(最终修复波 3I+5m) → 本收尾节（及其后控制者的修正提交，若有）
+
+### 2. 审查记录（SDD：任务级 5 轮含 T4 三轮修复 + 最终 1 轮 + 修复波 1 + 定向复审 1）
+
+- **任务级**：T1/T2/T3 各 0 Critical/0 Important 通过；**T4 三轮修复**——轮 1（判据 ⑥ 假阳/旁路、⑤与B① 重复计数、标题正则过宽）→ 复审判仍有未解决（修复轮 1 引入契约行调用式签名的新假阳）；轮 2（四级判定 + JsonReport 补类型）→ 复审判仍有未解决（二级判定的全行子串匹配可被否定语素救活）；轮 3（声明式邻接）→ 复审通过（22 个独立边界样本全符预期、零放松、无新破坏）。
+- **整分支最终审查**：**修完再合** —— 3 Important（S18 的「V 必答项」被计划阶段静默裁掉 / samples-README 合计算术双重失实且被沿袭 / `checkTicketContent` JSDoc 仍记载已废旁路语义）+ 5 Minor 搭车；修复波 `e292fc25`（7 文件 +16/−9）八处全落地，定向复审 8/8 ADDRESSED、无新破坏（I2 新算术经审查者独立重算与 self-test 双向闭合）。
+- **权威门禁运行**：`0245c6a2` 上独占 prepush 18/18 全绿（PREPUSH_EXIT=0）；修复波与收尾节之后，在最终树上重跑全量 prepush 作最终确认（结果记于账本；若红则中止合并）。
+
+### 3. 搁置项裁定（最终审查裁定，维持搁置）
+
+T1「重命名或删除」已在 :96 补本仓处置标注（进入修复波）；verifier-spec §4.2.1 编号 9/10 接在缺 5-7 清单后（既有）；T2「契约测试」归纳（授权内）、:387 行号混排、新节内轻微重复、报告 hunk 笔误；T3 S12 第二扫描项未落（简报未要求）、行 5 处置本地延伸、报告 BASE 行号；T4 `What to build` 行无括号裸符号可旁路（报告自陈理由：唯一可行判别是散文动词）、带返回标注的一级判定可旁路（`X(): void`）、否定语素紧贴标记词可旁路——**三类已由 command-reference「已知边界」行认领，V 复核兜底**；B①+B③ 同根因双计（既有，路径分支未被⑤前置条件覆盖）；`samples/README.md`「照抄复现」措辞歧义（本轮未引入）；既有陈旧计数三处（user-guide 332 / pre-push:320 262 / code-health-governance 322）。
+
+### 4. 程序级遗留（非本单元）
+
+- **教训**（延续前四期）：⑤ 证据命令必须逐条实跑（P2-A 49≠43、P4 C1）；⑥ **收口 prepush 的价值在本期两次实证**——examples-contract 抓到 P3 的契约链回归、tsc 抓到 P4 的 JsonReport 编译错（十守卫清单此后应含 `npm run typecheck` 与 `examples-contract`，凡触及 .ts 与 references/.md 的任务）；⑦ **同一 worktree 内绝不允许两个 vitest/coverage 并发**（P4 修复轮 3 与收口 prepush 撞车各一次，均表现为「环境性红」或「coverage 临时文件 ENOENT」）。
+- **跨期遗留**：CHANGELOG 缺口（P1/P2-A/P2-B/M07/P3/P4 六期均按批准偏差禁改，须在 M 程序整体收口时统一补记）；陈旧计数三处（user-guide 332 / pre-push:320 262 / code-health-governance 322，实际 342）。
+- **P4 无专属 AC 行**（规格 §13 未为此期预留）→ 本期达成证据以本收尾节为记录载体，未新增 AC 编号、未改 §13。
