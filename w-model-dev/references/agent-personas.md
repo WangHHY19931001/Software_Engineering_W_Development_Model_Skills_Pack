@@ -199,6 +199,15 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts \
 | 错误路径 | 非法输入 / 网络失败 / 超时 |
 | 并发 | 快速重复调用 / 乱序响应 |
 
+#### 5. 断言强度与替身规则自检（S21/S19/S20/M03）
+
+评审判据见 `quality-standards.md`「测试质量判据（S21/S19/S20/M03）」节；本 Persona 评审 `targetKind=test` 时按该节逐条核对（**只加判据，不新增子标准名**——仍用 `coverage` / `correctness` / `independence` / `clarity` / `priority-reasonableness`）：
+
+1. **断言强度（S21）**：是否 change detector（只断言常量值 / 精确措辞 / 私有结构，重构即红、缺陷即绿）；是否 string-presence trap（只断言源文本包含某行）；测试名 / 意图能否点名它抓的破坏（"Name the break"，点不出即要求重命名或删除）；期望值是否独立推导（字面量 / 手工核对 fixture），而非由被测代码或其 helper 重算（mirror assertion 恒真）。
+2. **变异检查（S19）**：按 5 类变异（错误常量/参数、错误分支、缺失状态变更/副作用、空或 default 返回、零/空/nil/未授权/畸形输入缺校验）逐类核对——每个现实变异至少应让一个测试转红；无测试捕获的变异 → 该行为未被保护或该测试 tautological，两者都阻断。
+3. **mock 规则（S20）**：是否先学清真实方法副作用再替身；替身是否镜像被替对象的全部已文档化字段；生产类是否混入 test-only 方法（应移入测试工具）。**作用域限定**：只评审被测生产代码，门禁 fixture（`samples/**`）与本仓脚本不适用本规则。
+4. **反模式（M03）**：tautological / implementation-coupled（信号=「重构但行为未变时测试碎掉」）/ mock 用错层级（只在系统边界 mock）/ horizontal slicing（应用垂直切片）。
+
 ### Severity 标签
 
 适配为测试场景：
