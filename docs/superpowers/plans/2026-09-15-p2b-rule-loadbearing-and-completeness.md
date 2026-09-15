@@ -139,3 +139,30 @@
 **2. 占位符扫描**：无「待定/后续补充」。T3 步骤 1 与 T5 步骤 1 是**先实测再动手**的有界出口，不是占位符。
 **3. 命名一致性**：`review-package.ts` / `REVIEW_PACKAGE_JSON` / `revertEvidence` / `LEGACY_REVERT_EVIDENCE` / `orphan-reference` / `agents-nav-missing` / `l0-rule-loadbearing.test.ts` / `asset-budget.test.ts`，与既有命名风格一致。
 **4. 与既有验收的关系**：AC-8 由 T1 落地、T7 回填；AC-7③ 由 T2 落地、T7 回填；AC-11 复验项（无新依赖/新 hook/新 npm script）由约束 1/5 保证，T7 用 `git diff <base>..HEAD -- package.json` 为空复验。
+
+---
+
+## 收尾（实现完成后由控制者回填）
+
+### 1. 交付与提交序列
+
+P2-B base = `dd8d7016`（本计划），HEAD 见下方序列，共 11 个提交（9 个实现/修复 + 本收尾节）：
+
+`96f93583`(T1/S27 revertEvidence→R10) → `b9410314`(T2/S25 三态) → `3e3b521f`(T1-fix L0 重基线+镜像) → `01907a75`(T3/S30 预算) → `b4026cec`(T3-fix 溯源注释) → `262e2d71`(T4/S32 评审包 CLI+台账) → `dbba33f7`(T5/S31 双维度) → `f76b2367`(T6/清偿) → `9256f597`(T7/AC 回填) → `5ea0f508`(最终修复波)
+
+### 2. 审查记录（SDD：任务级 7 轮 + 最终 1 轮 + 修复波 1 + 定向复审 1）
+
+- **任务级**：T1 通过带 1 Important→修复轮 1（L0 重基线红灯 + 注释失准 + data-models/CONTRIBUTING 镜像，复审 4/4 ADDRESSED）；T2 通过（0C/0I）；T3 通过带 1 Important→修复轮 1（ASSET_BUDGET 溯源注释，复审 ADDRESSED）；T4 通过（0C/0I；实现者被会话超时终止于等全量 vitest，控制者补跑 85/1983/exit0 并代提交 262e2d71，审查者逐字节对账无夹带）；T5 通过（run-sync.ts 38 行逐行核实为纯行号钉扎同步）；T6 通过（五处逐字核验）；T7 通过（字节级重建证实判据零改动 + 全部承重证据可复现；prepush 18/18 绿）。
+- **整分支最终审查**：**修完再合**——1 Important（samples/README.md:46 计数漏网 332/300）+ 3 Minor 进修复波（AC-7③「无其他规则兜底」措辞限定、CONTRIBUTING:104 与 samples/README:64 四条规则口径）；其余 15 项搁置 Minor 全部裁定继续搁置（逐条理由见审查记录）；已申报偏差（R9→R10、:2344→:2347、T4 代提交、TOC 判据按实测形态）均有据合理。修复波 = `5ea0f508`（3 文件 +4/−4），定向复审随后执行并记于账本。
+- **权威门禁运行**：T7 收口 `npm run prepush` 18/18 全绿（PREPUSH_EXIT=0，9256f597 上）；本收尾节与修复波为 docs-only 追加，合并前在最终树上复跑一次全量 prepush 作最终确认（结果记于账本；若红则中止合并）。
+
+### 3. 搁置项裁定（最终审查裁定，维持搁置）
+
+T1 emergency-fix 用例断言对称性；T2 fs.rm Windows EPERM 韧性、①STRIPPED 白名单分支健康检查、报告行号注记；T3 报告 15/17 笔误、readdir 三份重复；T4 review-package 7 位缩写 range / writeFileSync 非 tmp+rename / --out= 空串无专测；T5 orphanAuditDocs 重复读、孤儿判定不校验入链目标存在（由 internal-links 正交承担）、两份 .md 存量 prettier（非门禁面）；quickstart.md:22「322/322」（已落后两个基线，随下次内容性改动顺带清偿）；既有 .code-health-governance.json selfTestSamples:322、docs-consistency-logic.ts 过时注释（行号已漂移至约 :1414/:246）、check-docs-consistency 单独跑慢——均维持搁置。
+
+### 4. M07 移交清单（独立计划；用户 2026-09-15 已单独批准 RTM `testSummary` Schema 变更——裁定 D-2 前置满足）
+
+1. **范围**：把 code-health 的 redEvidence/assertionHash 证据模式扩展到阶段 5-8 RTM `testSummary`（`rtm.schema.json` + 消费门禁）；与 P2-B 的 R10 revertEvidence 同族但载体不同（RTM vs run-log），设计时须明确两者边界避免双写同一证据。
+2. **前置实测**：rtm.schema.json `executionSummary.{unit,integration,system,acceptance}TestSummary` 字段（total/passed/failed/pending/coverage 全 required，:87-96）；testSummary 的生产者与消费者全仓搜索义务（约束 10c）。
+3. **计划缺口教训入法**（P2-A 三次 + P2-B 一次同类）：任务级验证清单必须含 lint:security、全量 vitest 或全部全局契约守卫（现为**十文件**：八守卫 + gate-report + docs-consistency-logic）、新增必需字段/文件先全仓 consumer 搜索；**触及 .md 链接须同步 L0_BASELINE**（P2-B 教训 ④）。
+4. **流程**：沿用 SDD + worktree；counts 契约若 rtm.schema.json 字段变化不触发文件计数门禁，但 checkSchemaFieldDescriptions 管 description。
