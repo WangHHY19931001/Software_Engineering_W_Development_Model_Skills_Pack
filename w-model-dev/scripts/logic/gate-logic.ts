@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import * as nodeFs from 'node:fs';
 import * as path from 'node:path';
 
@@ -19,6 +20,8 @@ export interface RTMRowShape {
 }
 
 export interface RTMMatrixShape {
+  /** RTM 最后更新时间（ISO 8601）；M07 E4 用它判定是否在测试证据 cutoff 之后 */
+  lastUpdated?: string;
   rows: RTMRowShape[];
   executionSummary: {
     unitTest: TestSummaryShape;
@@ -28,12 +31,45 @@ export interface RTMMatrixShape {
   };
 }
 
+/**
+ * 单级测试摘要的真实运行证据（M07，rtm.schema.json definitions.testSummary.evidence）。
+ * command/exitCode/observedAt 为必填锚点；rawOutputPath 与 rawOutputSha256 成对可选。
+ */
+export interface TestEvidenceShape {
+  command: string;
+  exitCode: number;
+  observedAt: string;
+  rawOutputPath?: string;
+  rawOutputSha256?: string;
+}
+
 export interface TestSummaryShape {
   total: number;
   passed: number;
   failed: number;
   pending: number;
   coverage: number;
+  evidence?: TestEvidenceShape;
+}
+
+/** M07 测试证据维度计数（GATE_JSON e-rule 计数）。missing === e4（同义，保留 run-log r10 的 checked/missing/legacy 形态）。 */
+export interface ArtifactGateTestEvidenceSummary {
+  /** 阶段范围内且 total>0、进入 E4 存在性判定的层数 */
+  checked: number;
+  /** checked 中携带 evidence 对象的层数 */
+  withEvidence: number;
+  /** checked 中 cutoff 后（含缺失/不可解析）缺 evidence 的层数（= e4 违规） */
+  missing: number;
+  /** checked 中 lastUpdated 早于 cutoff、被非阻断吸收的层数 */
+  legacy: number;
+  /** E1 配对违规计数 */
+  e1: number;
+  /** E2 哈希核验违规计数 */
+  e2: number;
+  /** E3 结果一致性违规计数 */
+  e3: number;
+  /** E4 存在性违规计数（=== missing） */
+  e4: number;
 }
 
 export interface ArtifactGateResult {
@@ -42,6 +78,60 @@ export interface ArtifactGateResult {
   coveragePercent: number;
   missingItems: Array<{ requirementId: string; fields: string[] }>;
   unitCoveragePercent: number;
+  /** 非阻断 legacy 诊断（M07：cutoff 前旧 RTM 缺 evidence）；结构照 run-log diagnostics 先例，非空才出现 */
+  legacy?: string[];
+  /** M07 测试证据维度计数；结构失败早退路径不产出 */
+  testEvidence?: ArtifactGateTestEvidenceSummary;
+}
+
+/**
+ * M07 RTM 测试证据绑定（D-2 批准单元）引入时刻。
+ *
+ * 依据：`docs/superpowers/plans/2026-09-14-external-absorption-adjudication.md` 的 D-2
+ * 于 **2026-09-15** 单独批准（「只能是新增可选字段；不得改动 RTM 实体、关系、覆盖率语义」），
+ * 本常量取批准日零点（UTC）。此后写入的 RTM，其阶段范围内 total>0 的测试层必须携带
+ * 合法 `testSummary.evidence` 才可进入门禁放行（E4）；此前写入的旧 RTM 按
+ * `LEGACY_TEST_EVIDENCE` 非阻断诊断吸收（方向与 run-log `LEGACY_REVERT_EVIDENCE` 一致）。
+ */
+export const M07_TEST_EVIDENCE_CUTOFF = '2026-09-15T00:00:00Z';
+
+/** E2 相对路径解析结果；ok=false 时 reason 为人类可读拒绝原因。 */
+export type EvidencePathResolution = { ok: true; absPath: string } | { ok: false; reason: string };
+
+/**
+ * E2 路径解析：以项目根解析相对路径，拒绝绝对路径 / 盘符路径 / 反斜杠分隔 / NUL，
+ * 并做根内包含性检查（lexical，`..` 归一化后仍须落在根内）。
+ *
+ * 说明：rtm.schema.json 的 `rawOutputPath.pattern` 已在前置 schema 校验拦截
+ * `..` / 绝对路径 / 反斜杠；本函数是逻辑层的第二道防线（schema 被绕过或未来放宽时仍拒）。
+ */
+export function resolveTestEvidenceOutputPath(projectRoot: string, rawOutputPath: string): EvidencePathResolution {
+  if (typeof rawOutputPath !== 'string' || rawOutputPath.trim() === '') {
+    return { ok: false, reason: '路径为空' };
+  }
+  const rel = rawOutputPath.trim();
+  if (rel.includes('\u0000')) return { ok: false, reason: '路径含 NUL' };
+  if (path.isAbsolute(rel) || /^[A-Za-z]:[\\/]/.test(rel) || rel.includes('\\')) {
+    return { ok: false, reason: '须为相对路径（不得为绝对路径 / 盘符 / 反斜杠分隔）' };
+  }
+  const root = path.resolve(projectRoot);
+  const abs = path.resolve(root, rel);
+  const prefix = root.endsWith(path.sep) ? root : root + path.sep;
+  if (abs !== root && !abs.startsWith(prefix)) {
+    return { ok: false, reason: '越出项目根' };
+  }
+  return { ok: true, absPath: abs };
+}
+
+/** 计算文件 SHA-256（十六进制小写）；读取失败返回 undefined。 */
+function sha256OfFile(absPath: string): string | undefined {
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- absPath 由 resolveTestEvidenceOutputPath 校验（相对项目根、禁越出根）后传入
+    const buf = nodeFs.readFileSync(absPath);
+    return createHash('sha256').update(buf).digest('hex');
+  } catch {
+    return undefined;
+  }
 }
 
 // RTM 追溯字段单点事实源：lib/constants.ts（RTM_FIELDS），此处仅保持名称与类型不变
@@ -104,6 +194,12 @@ export interface CheckArtifactGateOptions {
   phaseOption?: PhaseOption;
   /** phase=1 需求规格独立产物目录（docs/phase1-requirements/），提供时做结构校验。 */
   specDir?: string;
+  /**
+   * 项目根目录（M07 E2 解析 evidence.rawOutputPath 用）。
+   * 未提供且某层携带 rawOutputPath+rawOutputSha256 时 E2 fail-closed（无法核验）；
+   * check-artifact-gate.ts 始终传 project-dir。
+   */
+  projectRoot?: string;
 }
 
 /**
@@ -627,6 +723,116 @@ export function checkArtifactGate(
     }
   }
 
+  // ==================== M07 测试证据绑定（E1-E4 + cutoff 吸收） ====================
+  // D-2 批准单元（2026-09-15）：阶段范围内 total>0 的测试层必须把摘要数字绑定到真实运行
+  // （command + exitCode + observedAt，可选 rawOutputPath + rawOutputSha256）。四条规则：
+  //   E1 配对：rawOutputPath 与 rawOutputSha256 要么都无、要么都有。
+  //   E2 哈希核验（二者齐备）：以项目根解析（禁越出根）、文件须存在、sha256 须相符。
+  //   E3 结果一致性：failed=0&&pending=0 ⇒ exitCode=0；failed>0 ⇒ exitCode≥1；
+  //      failed=0&&pending>0 不约束（部分执行两种退出码都合理，如实不编码）。
+  //   E4 存在性 + cutoff：lastUpdated ≥ M07_TEST_EVIDENCE_CUTOFF（或缺失/不可解析，保守不吸收）
+  //      时，阶段范围内（PHASE_TEST_LAYERS）total>0 的层缺 evidence → 违规；早于 cutoff →
+  //      非阻断 LEGACY_TEST_EVIDENCE 诊断（结构照 run-log LEGACY_REVERT_EVIDENCE 先例）。
+  const testEvidenceCounts: ArtifactGateTestEvidenceSummary = {
+    checked: 0,
+    withEvidence: 0,
+    missing: 0,
+    legacy: 0,
+    e1: 0,
+    e2: 0,
+    e3: 0,
+    e4: 0,
+  };
+  const legacyDiagnostics: string[] = [];
+  const cutoffMs = Date.parse(M07_TEST_EVIDENCE_CUTOFF);
+  // 仅当 lastUpdated 可解析且严格早于 cutoff 才吸收；缺失/不可解析一律按 cutoff 后处理
+  // （保守不吸收，与 run-log R10 timestamp 方向一致）。
+  const legacyTimestamp =
+    typeof matrix.lastUpdated === 'string' &&
+    Number.isFinite(Date.parse(matrix.lastUpdated)) &&
+    Date.parse(matrix.lastUpdated) < cutoffMs;
+  const evidenceProjectRoot = options?.projectRoot;
+  for (const { name, layer, summary } of summaries) {
+    if (!summary || typeof summary !== 'object') continue;
+    const evidence = summary.evidence;
+    const hasEvidence = evidence !== null && typeof evidence === 'object';
+    const countsValid = [summary.total, summary.passed, summary.failed, summary.pending].every(
+      isFiniteNonNegativeInteger,
+    );
+    // ---- E4 存在性 + cutoff（阶段范围内、total>0 的层）----
+    if (phaseLayers.includes(layer) && isFiniteNonNegativeInteger(summary.total) && summary.total > 0) {
+      testEvidenceCounts.checked++;
+      if (hasEvidence) {
+        testEvidenceCounts.withEvidence++;
+      } else if (legacyTimestamp) {
+        testEvidenceCounts.legacy++;
+        legacyDiagnostics.push(
+          `LEGACY_TEST_EVIDENCE: ${name} total=${summary.total}>0 缺 evidence，但 lastUpdated=${matrix.lastUpdated} 早于 ${M07_TEST_EVIDENCE_CUTOFF}（M07/D-2 生效前旧 RTM）; deferred`,
+        );
+      } else {
+        testEvidenceCounts.missing++;
+        testEvidenceCounts.e4++;
+        reasons.push(
+          `RTM 测试证据 E4: ${name} total=${summary.total}>0 但缺 evidence（lastUpdated ${typeof matrix.lastUpdated === 'string' ? `=${matrix.lastUpdated}` : '缺失或不可解析'}，M07/D-2 生效后必须绑定真实运行证据 command/exitCode/observedAt）`,
+        );
+      }
+    }
+    // E1-E3 仅在有 evidence 时强制（与阶段是否到该层无关：证据只要出现就必须自洽）
+    if (!hasEvidence) continue;
+    const ev = evidence as TestEvidenceShape;
+    const rawOutputPath = typeof ev.rawOutputPath === 'string' ? ev.rawOutputPath.trim() : '';
+    const rawOutputSha256 = typeof ev.rawOutputSha256 === 'string' ? ev.rawOutputSha256.trim() : '';
+    const hasPath = rawOutputPath !== '';
+    const hasSha = rawOutputSha256 !== '';
+    // ---- E1 配对 ----
+    if (hasPath !== hasSha) {
+      testEvidenceCounts.e1++;
+      reasons.push(
+        `RTM 测试证据 E1: ${name} evidence.rawOutputPath 与 evidence.rawOutputSha256 必须成对出现（当前只有 ${hasPath ? 'rawOutputPath' : 'rawOutputSha256'}）`,
+      );
+    }
+    // ---- E2 哈希核验（其余二者齐备）----
+    if (hasPath && hasSha) {
+      if (typeof evidenceProjectRoot !== 'string' || evidenceProjectRoot.trim() === '') {
+        testEvidenceCounts.e2++;
+        reasons.push(`RTM 测试证据 E2: ${name} 无法核验 evidence.rawOutputPath（未提供项目根，fail-closed）`);
+      } else {
+        const resolved = resolveTestEvidenceOutputPath(evidenceProjectRoot, rawOutputPath);
+        if (!resolved.ok) {
+          testEvidenceCounts.e2++;
+          reasons.push(
+            `RTM 测试证据 E2: ${name} evidence.rawOutputPath 非法（${resolved.reason}；须相对项目根且不得越出根）`,
+          );
+        } else {
+          const actual = sha256OfFile(resolved.absPath);
+          if (actual === undefined) {
+            testEvidenceCounts.e2++;
+            reasons.push(
+              `RTM 测试证据 E2: ${name} evidence.rawOutputPath 指向的原始输出文件不存在或不可读（${rawOutputPath}）`,
+            );
+          } else if (actual !== rawOutputSha256.toLowerCase()) {
+            testEvidenceCounts.e2++;
+            reasons.push(
+              `RTM 测试证据 E2: ${name} evidence.rawOutputSha256 与文件实际 SHA-256 不符（声明 ${rawOutputSha256.toLowerCase()}，实际 ${actual}）`,
+            );
+          }
+        }
+      }
+    }
+    // ---- E3 结果一致性 ----
+    if (countsValid && isFiniteNonNegativeInteger(ev.exitCode)) {
+      if (summary.failed === 0 && summary.pending === 0 && ev.exitCode !== 0) {
+        testEvidenceCounts.e3++;
+        reasons.push(`RTM 测试证据 E3: ${name} failed=0/pending=0（全绿）但 evidence.exitCode=${ev.exitCode}，须为 0`);
+      } else if (summary.failed > 0 && ev.exitCode === 0) {
+        testEvidenceCounts.e3++;
+        reasons.push(
+          `RTM 测试证据 E3: ${name} 记录 failed=${summary.failed} 但 evidence.exitCode=0（有失败必须来自非零退出码）`,
+        );
+      }
+    }
+  }
+
   // ==================== TLA+ 资产校验（spec §3.4.4，追加项） ====================
   // 1. TLA+ 资产存在性：manifestExists 显式为 false 时追加违反（未传时跳过，保持向后兼容）
   if (options && options.manifestExists === false) {
@@ -650,5 +856,7 @@ export function checkArtifactGate(
     coveragePercent,
     missingItems,
     unitCoveragePercent,
+    ...(legacyDiagnostics.length > 0 ? { legacy: legacyDiagnostics } : {}),
+    testEvidence: testEvidenceCounts,
   };
 }

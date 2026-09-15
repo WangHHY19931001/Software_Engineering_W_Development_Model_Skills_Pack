@@ -869,12 +869,15 @@ describe('gate-logic 修正', () => {
           },
         ],
         executionSummary: {
+          // M07 E4：phase 8 阶段内四层 total>0 须携带合法 evidence（本内联矩阵无 lastUpdated
+          // → 保守按 cutoff 后处理，不吸收；补 evidence 而非改时间戳）
           unitTest: {
             total: 1,
             passed: 1,
             failed: 0,
             pending: 0,
             coverage: 90,
+            evidence: { command: 'npx vitest run', exitCode: 0, observedAt: '2026-09-15T10:00:00.000Z' },
           },
           integrationTest: {
             total: 1,
@@ -882,6 +885,7 @@ describe('gate-logic 修正', () => {
             failed: 0,
             pending: 0,
             coverage: 90,
+            evidence: { command: 'npx vitest run', exitCode: 0, observedAt: '2026-09-15T10:00:00.000Z' },
           },
           systemTest: {
             total: 1,
@@ -889,6 +893,7 @@ describe('gate-logic 修正', () => {
             failed: 0,
             pending: 0,
             coverage: 90,
+            evidence: { command: 'npx vitest run', exitCode: 0, observedAt: '2026-09-15T10:00:00.000Z' },
           },
           acceptanceTest: {
             total: 1,
@@ -896,6 +901,7 @@ describe('gate-logic 修正', () => {
             failed: 0,
             pending: 0,
             coverage: 90,
+            evidence: { command: 'npx vitest run', exitCode: 0, observedAt: '2026-09-15T10:00:00.000Z' },
           },
         },
       };

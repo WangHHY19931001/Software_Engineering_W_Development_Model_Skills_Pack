@@ -227,7 +227,16 @@ describe('aggregateExternalChecks（artifact gate 外部校验聚合）', () => 
         },
       ],
       executionSummary: {
-        unitTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 100 },
+        // M07 E4：phase 5 阶段内 unitTest total>0 须携带合法 evidence（fixture 无 lastUpdated
+        // → 保守按 cutoff 后处理，不吸收；补 evidence 而非改时间戳）
+        unitTest: {
+          total: 1,
+          passed: 1,
+          failed: 0,
+          pending: 0,
+          coverage: 100,
+          evidence: { command: 'npx vitest run', exitCode: 0, observedAt: '2026-09-15T10:00:00.000Z' },
+        },
         integrationTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
         systemTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
         acceptanceTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
@@ -257,7 +266,16 @@ describe('aggregateExternalChecks（artifact gate 外部校验聚合）', () => 
         },
       ],
       executionSummary: {
-        unitTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 100 },
+        // M07 E4：phase 5 阶段内 unitTest total>0 须携带合法 evidence（fixture 无 lastUpdated
+        // → 保守按 cutoff 后处理，不吸收；补 evidence 而非改时间戳）
+        unitTest: {
+          total: 1,
+          passed: 1,
+          failed: 0,
+          pending: 0,
+          coverage: 100,
+          evidence: { command: 'npx vitest run', exitCode: 0, observedAt: '2026-09-15T10:00:00.000Z' },
+        },
         integrationTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
         systemTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },
         acceptanceTest: { total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 },

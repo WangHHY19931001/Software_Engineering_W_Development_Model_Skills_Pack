@@ -385,13 +385,15 @@ async function main(): Promise<void> {
     syncPairCoverageValid = pairResult.pairCoverageValid;
   }
 
-  // 调用纯逻辑校验（传入 graph + manifestExists + phaseOption + specDir，启用 TLA+ 资产校验与阶段分层）
+  // 调用纯逻辑校验（传入 graph + manifestExists + phaseOption + specDir + projectRoot，
+  // 启用 TLA+ 资产校验与阶段分层；projectRoot 供 M07 E2 解析 evidence.rawOutputPath）
   const result = checkArtifactGate(matrix, {
     graph,
     // TLA+ is a required project asset only for phases 1-4; phase 5-8 uses Cucumber evidence.
     manifestExists: isProjectTlaBddEvidencePhase(effectivePhase) ? tlaAsset.valid : undefined,
     phaseOption,
     specDir,
+    projectRoot: projectDir,
   });
 
   // ==================== 终检调用 TLA+/BDD model 校验（设计文档 §3.3.8） ====================
@@ -470,6 +472,9 @@ async function main(): Promise<void> {
     modelCheckViolations.length === 0 &&
     (externalAggregate?.passed ?? true);
   const exitCode = overallPassed ? 0 : 1;
+  // M07 测试证据：legacy 为非阻断诊断（不进 reasons/overallPassed）；testEvidence 为 e-rule 计数
+  const legacyDiagnostics = result.legacy ?? [];
+  const testEvidenceSummary = result.testEvidence ?? null;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
@@ -482,6 +487,9 @@ async function main(): Promise<void> {
         // S46（O1 增强）：--json 与 GATE_JSON 同构，补 external summary；
         // 非 5-8 阶段（无外部校验）时为 null，键恒存在便于编排消费
         external: externalAggregate?.summary ?? null,
+        // M07：legacy 非阻断诊断 + 测试证据 e-rule 计数（键恒存在，便于编排消费）
+        ...(legacyDiagnostics.length > 0 ? { legacy: legacyDiagnostics } : {}),
+        testEvidence: testEvidenceSummary,
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -531,6 +539,11 @@ async function main(): Promise<void> {
       console.log(`  - ${r}`);
     }
   }
+  // M07：cutoff 前旧 RTM 的测试证据缺失按非阻断 legacy 诊断呈现（不改变 exitCode）
+  if (legacyDiagnostics.length > 0) {
+    console.log('测试证据 legacy 诊断（非阻断）：');
+    for (const d of legacyDiagnostics) console.log(`  - ${d}`);
+  }
 
   // 末尾 JSON 摘要（供 Agent 程序解析；行首标记便于正则截取）
   // exitCode 与 process.exitCode 一致（门禁防伪造三层机制之一）
@@ -546,6 +559,9 @@ async function main(): Promise<void> {
       bddManifestExists,
       // 阶段 5-8 外部校验 summary（两个 checker 的 passed/violations 计数与相对路径计数）
       external: externalAggregate?.summary,
+      // M07：非阻断 legacy 诊断（仅在非空时出现）+ 测试证据 e-rule 计数（键恒存在）
+      ...(legacyDiagnostics.length > 0 ? { legacy: legacyDiagnostics } : {}),
+      testEvidence: testEvidenceSummary,
     },
     exitCode,
   );
