@@ -1021,6 +1021,95 @@ V 评审的失效不只是"评错"，还包括"评审者漂移"。三类偏移�
 （方差坍缩）正交——前者决定采样分布形状，后者是分布坍缩的信号。改动这些参数不会修复坍缩，
 调整 `RESOLUTION_FLOOR` 才会。
 
+## 15. 评审侧信任、质疑与校准契约（S07 / S08 / S16）
+
+> 吸收自 superpowers：**不信任报告**（`skills/subagent-driven-development/task-reviewer-prompt.md` L64-71 / L84-85 / L153-157，台账 :233-265）、**对外部评审结论的合理质疑**（`skills/receiving-code-review/SKILL.md` L68-84 / L88-98 / L113-129，台账 :268-313）、**spec 自审与评审者校准**（`skills/brainstorming/SKILL.md` L211-219 与 `skills/brainstorming/spec-document-reviewer-prompt.md` L19-34，台账 :603-630）。
+> 本节是**评审行为契约**：只规定 V 与 spec 评审者的判断口径，**不新增任何 Schema 字段**（S08 的质疑结论以固定前缀写入既有文本字段，先例为 §3.3 R14-R17 的 `summary` 固定前缀写入）。§15.1 / §15.2 / §15.3 分别对应 S07 / S08 / S16。
+
+### 15.1 不信任报告（S07）
+
+**报告不是证据，产物才是。** V 评审由 S 子代理（实现者）自述过程的目标（尤其 `targetKind=code`）时，按下述四条执行：
+
+1. **实现者报告 = 未经核实的 claim**：报告可能不完整、不准确、或过于乐观（"unverified claims about the code… may be incomplete, inaccurate, or optimistic"）。V 须**对照 diff / 产物本身**核实报告中的每条断言，不得以报告的自述结案。
+2. **报告里的设计 rationale 同样是 claim，不得据此降级 severity**：「按 YAGNI 保留」「刻意保持简单」之类理由，是**实现者在给自己的作业打分**（"the implementer grading their own work"）。发现项按代码 / 产物本身的性质定级——**陈述了理由从不降低 finding 的 severity**（"a stated rationale never downgrades a finding's severity"）。理由可作 finding 的上下文，但不改变 Critical / Required / Optional 的归属（§7.4A.2）。
+3. **实现者报告的测试输出里的 warning / 噪声即 finding**：测试输出应当是干净的（"test output should be pristine"）；V 在报告里看到的 warning、噪声、被忽略的输出**本身就是 finding**，不得当作背景噪声略过。报告对 warning 的沉默不是「干净」，而是漏报。
+4. **plan 作者不自评自己的 plan**：当 plan / 简报**显式要求**了本规范认定为缺陷的东西（什么都不断言的空测试、逻辑块的逐字复制），**那仍然是 finding**——按 Important 报出并标注 `plan-mandated`。**plan 的作者不为自己的 plan 评分，由人类裁决**（"The plan's authorship does not grade its own work; the human decides."）；W 模型中该判断由独立评审者 V 报出、最终裁决权在人。这与 `subagent-delegation.md` §3.4.1「禁止编排者预判 findings」互为两侧：O 不得在分派阶段预先压制 finding，V 不得因「计划已经这么选了」一类 rationale 将其降级。
+
+> 边界：本节不要求 V 对报告做「有罪推定」，只要求**把报告与产物分开对待**——报告是线索，产物是证据。
+
+### 15.2 误报质疑通道（S08）
+
+V 的 finding 被 S / O 认为误报时，**有正规出口，但出口既不是「不报」，也不是「由 O 拍板」**。分派侧的书写规则见 `subagent-delegation.md` §3.4.5（固定前缀通道与禁预判），本节规定质疑与裁决的口径。
+
+**质疑格式（技术性，禁情绪化）**：
+
+```
+FALSE-POSITIVE-CHALLENGE: <finding 一行摘要> — <技术理由 + 反证>
+```
+
+- **须给技术理由与反证**：引用可运行的测试 / 代码 / 规范（"Use technical reasoning, not defensiveness"、"Ask specific questions"、"Reference working tests/code"）；不得以情绪化措辞、资历或「已经改过了」代替论证。
+- **无法自行核实就说出来**：不具前置条件（缺环境 / 缺上下文）时不得断言误报，须显式说明「无法在 [X] 条件下核实」（"IF can't easily verify: Say so"）。
+- **与人类既有决策冲突时停下**：质疑若与用户既有架构决策冲突，先交用户讨论，不由子代理层层加码（"IF conflicts with your human partner's prior decisions: Stop and discuss with your human partner first"）。
+- **YAGNI 质疑须给用法证据**：对「要实现得更正规」类 finding，先 grep 代码库确认实际使用；确认未被调用才可提出 YAGNI 质疑（"grep codebase for actual usage" / "IF unused: … Remove it (YAGNI)?"）。用户是最终裁决者——"You and reviewer both report to me"。
+
+**裁决者 = 新的 V，不是 O**：
+
+| 角色 | 对误报质疑的权限 |
+| --- | --- |
+| 质疑者（S，或 O 转述 S 的理由） | 提质疑：技术理由 + 反证 |
+| **裁决者：新 V**（V-lead，或换 Persona 的另一位 V 重新评审） | 判定 finding 成立 / 不成立 |
+| 编排者（O） | **只转达与记录，不得裁决** |
+| 用户 | 质疑未被受理时的最终升级对象 |
+
+- O 自行判定 finding 成立与否**命中反模式 #10（编排者越权实施）**：预支评审判断与预判 findings（`subagent-delegation.md` §3.4.1）同属越权。
+- 被质疑的那位 V **不得自行改判自己的 finding**；改判须由新 V 重新评审并产出结论，避免「评审者自证」。
+- 质疑结论承载走**既有文本字段的固定前缀**（`summary` / `reworkHints`），**不新增 Schema 字段**（§6 不变）。
+- **质疑未受理时的升级路径 = 🔴 CHECKPOINT（交用户裁决）**：不得由 O 拍板，也不得静默丢弃。
+- 质疑**不改变返工链前置**：V/G 不通过仍须先派 R 定位根因，R 报告经 V 复审 + G 门禁（`check-rootcause-report.ts` exitCode=0）后才可分派 S-fix（反模式 #18 / #19）。质疑成立与否都不构成跳过 R 的路径。
+
+### 15.3 spec 自审与评审者校准（S16）
+
+#### 15.3.1 作者自审四项
+
+spec 文档（阶段 1-4 需求 / 设计类产物）写完，作者须**换一双眼睛**自查四项，并**就地修正**：
+
+1. **占位符扫描**：`TBD` / `TODO` / 未完成章节 / 含糊需求——补齐。
+2. **内部一致性**：章节之间是否互相矛盾；架构描述与特性描述是否对得上。
+3. **范围检查**：是否聚焦到可由**单一**实施计划承载，还是需要拆分。
+4. **歧义检查**：是否有需求可被两种方式理解——若是，**选定一种并写明**。
+
+> 四项自查**就地修完即走**（"Fix any issues inline. No need to re-review"）：不额外生成一轮评审记录，也不新增门禁检查项。
+
+#### 15.3.2 独立 spec reviewer 五类别
+
+独立评审者（V 评审 `targetKind ∈ {requirement, design}` 的目标）按五类别组织发现项：
+
+| 类别 | 看什么 |
+| --- | --- |
+| Completeness（完整性） | `TODO`、占位符、`TBD`、未完成章节 |
+| Consistency（一致性） | 内部矛盾、互相冲突的需求 |
+| Clarity（清晰度） | 需求含糊到足以让人构建出错误的东西 |
+| Scope（范围） | 聚焦到单一计划可承载——不覆盖多个相互独立的子系统 |
+| YAGNI | 未被请求的特性、过度设计 |
+
+> 与 §7.4A 同构：这五类别是**发现项的组织方式**，**不是新的 subCriteria**——§7.1 / §7.2 的子标准集合与权重不变，`subCriteria` 仍固定 5 项（§2.3 与 `verifier-logic.ts` 强制）。
+
+#### 15.3.3 calibration 阈值（散文判据）
+
+**只报会导致实施期真实问题的问题**（"Only flag issues that would cause real problems during implementation planning"）：
+
+- **是问题的**：缺章节、自相矛盾、歧义到可被两种方式解读的需求。
+- **不是问题的**：措辞改进、风格偏好、「本节不如其它节详细」。
+- **默认批准**：除非存在会导致计划走偏的**严重缺口**，否则批准（"Approve unless there are serious gaps that would lead to a flawed plan"）。
+
+> 本小节是**散文判据**（照 §14.4「校准集是非门禁」的既有形态）：**不新增字段、不新增门禁检查项**——它约束 V 的判据口径，由 V 在输出 JSON 时自检；`check-verifier-output.ts` 不为它新增校验（形态同 §7.4A.2 对 Severity 前缀的处理）。
+
+**与 §14.2 R18（分辨力下限）的区别——勿混淆**：两者都谈「校准」，但治的是相反方向的失效。
+
+- **R18 治「不给分辨」**：某子标准 `rawScores` 方差坍缩（非全等但极小）＝ V 打了分却没有区分正负样本的能力，属**评分分布**问题，由 `verifier-logic.ts` 按 `RESOLUTION_FLOOR` 自动判据、随 R13 同形态进入 `reasons`。
+- **本节治「过度判负」**：V 把措辞 / 风格偏好 / 详略不均当成缺陷报出，使合格 spec 被反复打回——属**判据口径**问题，靠本小节的散文判据约束，无阈值、无门禁。
+- 一个是「评了但没分辨力」，另一个是「分辨了但尺子太严」：调整 R18 阈值不会改善过度判负，改 calibration 口径也不会修复方差坍缩。
+
 ## 相关资源
 
 - 代码审查员提示模板：参见 [agent-personas.md](agent-personas.md)（code-reviewer persona）

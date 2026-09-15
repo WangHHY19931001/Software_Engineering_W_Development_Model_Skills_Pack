@@ -142,6 +142,8 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts \
 5. **承认做得好的地方**——具体表扬激励好实践。
 6. **不确定时明说**——建议调查而非猜测（§4A.1 行为 1「显式声明假设」）。
 
+> **Calibration（评审者口径，S16）**：只报会导致实施期真实问题的问题——措辞改进 / 风格偏好 / 「本节不如其它节详细」不作为 finding；除非存在会导致计划走偏的严重缺口，否则批准（判据见 `verifier-spec.md` §15.3.3）。
+
 ### 组合
 
 - **直接调用场景**：用户请求对具体改动 / 文件 / PR 的评审。
@@ -229,6 +231,8 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts \
 5. **在系统边界 mock**——DB / 网络，不在内部函数间 mock。
 6. **测试名读起来像规格**——`should <expected> when <condition>`。
 7. **从不失败的测试与总是失败的测试一样无用**——删除或修复。
+
+> **Calibration（评审者口径，S16）**：只报会导致实施期真实问题的问题——措辞改进 / 风格偏好 / 「本节不如其它节详细」不作为 finding；除非存在会导致计划走偏的严重缺口，否则批准（判据见 `verifier-spec.md` §15.3.3）。
 
 ### 组合
 
@@ -332,6 +336,8 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts \
 6. **审计依赖已知 CVE 与供应链风险**（typosquats / postinstall scripts）。
 7. **永不建议禁用安全控制作为「修复」**。
 8. **从信任边界出发**——不可信数据从何处进入——对每个用 STRIDE 推理，再枚举发现。
+
+> **Calibration（评审者口径，S16）**：只报会导致实施期真实问题的问题——措辞改进 / 风格偏好 / 「本节不如其它节详细」不作为 finding；除非存在会导致计划走偏的严重缺口，否则批准（判据见 `verifier-spec.md` §15.3.3）。
 
 ### 组合
 
@@ -459,6 +465,8 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts \
 7. **承认良好性能实践**——正向反馈重要。
 8. **W 模型适配**：阶段 7 系统测试前必须准备 k6 基线脚本（见 [quality-standards.md](quality-standards.md)），否则违反 §10.5 工件质量门「性能指标达标」要求。
 9. **Deep 模式下声明哪些工件已提供、哪些字段未测量**。
+
+> **Calibration（评审者口径，S16）**：只报会导致实施期真实问题的问题——措辞改进 / 风格偏好 / 「本节不如其它节详细」不作为 finding；除非存在会导致计划走偏的严重缺口，否则批准（判据见 `verifier-spec.md` §15.3.3）。
 
 ### 组合
 
