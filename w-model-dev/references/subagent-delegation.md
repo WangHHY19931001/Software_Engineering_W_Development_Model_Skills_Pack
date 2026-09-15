@@ -262,7 +262,7 @@ S-fix 之后的复审是**受范围约束的复审**（scoped re-review），不
 
 #### 3.4.6 R 前置不变（本节不构成旁路）
 
-scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只审 fix delta），**不改变返工链的前置顺序**：V/G 不通过仍须**先派 R 定位根因**，R 报告经 **V 复审 + G 门禁**（`check-rootcause-report.ts` exitCode=0）后才可分派 S-fix（反模式 #18 / #19）。
+scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只审 fix delta），**不改变普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）的前置顺序**：V/G 不通过仍须**先派 R 定位根因**，R 报告经 **V 复审 + G 门禁**（`check-rootcause-report.ts` exitCode=0）后才可分派 S-fix（反模式 #18 / #19）。
 
 **复审不得成为跳过 R 的旁路**：不得以「这次只审 fix delta」「问题很明确」为由省略 R 定位；误报质疑与 scoped re-review 都不是跳过 R 的合法路径。
 
