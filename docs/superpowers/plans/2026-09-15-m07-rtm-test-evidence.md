@@ -123,3 +123,31 @@
 **2. 占位符扫描**：无「待定/后续补充/类似任务 N」。T1 步骤 1 与 T2 步骤 3 是**先实测再处置**的有界出口（既有夹具 lastUpdated 实测决定是否补数据），非占位符。
 **3. 命名一致性**：`evidence` / `rawOutputPath` / `rawOutputSha256` / `observedAt` / `M07_TEST_EVIDENCE_CUTOFF` / `LEGACY_TEST_EVIDENCE`，与 run-log `revertEvidence` 与 code-health `definitions.command` 的既有命名同族。
 **4. 与既有验收的关系**：AC-11 由 T5 行内回填；AC-9/AC-10 等无关；本计划不触碰 `/wm` 命令语义（新增的是校验与文档义务，命令输入输出不变）。M07 无独立 AC 行——已裁定不新增编号，理由见 §0 表格末行。
+
+---
+
+## 收尾（实现完成后由控制者回填）
+
+### 1. 交付与提交序列
+
+M07 base = `f19682a0`，共 6 个提交：
+
+`bea9e9d1`(T1 schema 可选字段) → `6abbe31c`(T2 E1-E4 + cutoff) → `ad55d6f0`(T3 夹具与计数) → `dddíc38ae`(T4 文档同步) → `44c515e5`(T5 收口 + AC-11 回填) → `c909b591`(最终修复波)
+
+（勘误：`dddíc38ae` 实为 `dddc38ae`。）
+
+### 2. 审查记录（SDD：任务级 5 轮 + 最终 1 轮 + 修复波 1 + 定向复审 1）
+
+- **任务级**：T1 通过（D-2 边界经「去字段后与 base 深度相等」结构化证明；RED 形态如实记录为 `additionalProperties` 拦截）；T2 通过（四规则语义逐条对照 §0.1.2，legacy 确非阻断，**全 diff 无任何 lastUpdated 增删改**）；T3 通过（六夹具语义独立复算为真、E2 哈希不变量三态一致、auxFiles 经复核为不放松覆盖门禁的唯一最小方案）；T4 通过（逐句与 schema/gate-logic/CLI 点名对应，最危险的越界表述三处均未踩）；T5 通过（回填每个数字与行为断言均经仓库复现，判据原文 609 字符逐字节保留、无新 AC 编号）。
+- **整分支最终审查**：**修完再合**——D-2 批准边界**完全干净**（schema 只增一个可选字段、required/additionalProperties/rows/覆盖率语义原样、零删除、零越界新增物）；1 Important = 文档层 `GATE_JSON.testEvidence` 只写 8 键中的 3 个且 `legacy` 同名不同型未说明（`references/rtm-guide.md:91` 等三处）→ 修复波 `c909b591`（3 个 .md，+19/−3）写全 8 键形状 + 阶段作用域精确化；定向复审 ADDRESSED、无新破坏（L0 三计数 672/95/36 未变）。8 项其余搁置 Minor 全部裁定继续搁置（逐条理由见审查记录）。
+- **权威门禁运行**：T5 收口 `npm run prepush` 18/18 全绿（PREPUSH_EXIT=0，`44c515e5` 上）；修复波与收尾节为 docs-only，合并前在最终树上复跑一次全量 prepush 作最终确认（结果记于账本；若红则中止合并）。
+
+### 3. 搁置项裁定（最终审查裁定，维持搁置）
+
+`docs/user-guide.md:110`（332）与 `.githooks/pre-push:320`（262）与 `.code-health-governance.json`（selfTestSamples:322）——既有陈旧值，计划 §0 已登记不扩大战场；`samples/README.md:47`「相差 32 条是元数据校验用例」措辞（BASE 既有文本）；`self-test.ts:3021` 死分支（行为等价）；`bad-test-evidence-exitcode-mismatch.json` 非唯一原因（正则可辨）；E2 越界检查 lexical（schema pattern 前置拦截，非对抗面可接受）；`.gitattributes` 在 `w-model-dev/` 可分发单元之外（安装方不跑 self-test，边界已披露）；`auxFiles` 登记与消费解耦（可选增强）；`rtm-guide.md:84` 对 E3 附加前提的简化表述（既有文本）。
+
+### 4. 程序级遗留（非本单元）
+
+- **CHANGELOG 缺口**：`AGENTS.md` §6 要求资产改动同步 `CHANGELOG.md`，但本计划约束 5 与 P2 各期一致**显式禁止触碰**（避免多期并发冲突）。属已批准偏差，须在 M 程序收口时统一补记（P1/P2-A/P2-B/M07 四批）。
+- **分发边界**：`w-model-dev/` 拷贝到 autocrlf=true 的仓库时，`valid-test-evidence.json` 的 E2 可能平台性红（`.gitattributes` 在包外）——安装方不跑 self-test，实际影响为零；若未来要求可分发单元自足，须把该行或等价机制纳入包内。
+- **`docs/user-guide.md:110` 等陈旧计数**：建议随下次内容性改动统一清偿（已跨三个基线）。
