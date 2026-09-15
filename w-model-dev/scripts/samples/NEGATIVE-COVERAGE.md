@@ -21,7 +21,7 @@
 | 门禁脚本 | 负向机制 | 负向案例 / 证据位置 | 所防回归（一句话） |
 | --- | --- | --- | --- |
 | check-verifier-output | fixture | `samples/verifier/bad-ranking-k.json`（self-test.ts:178） | 放宽分数与一致性不变量将漏掉 ranking.k=2.5 非整数、compositeScore≠Σ(score*weight) 仍判 passed 的漂移 |
-| check-artifact-gate | fixture | `samples/gate/valid-phase6.json`（self-test.ts:373，B 组强化后断言 /待执行/） | 去掉 /待执行/ 断言后 phase=8 终检会漏掉 system/acceptance 仍 pending 却被判合格 |
+| check-artifact-gate | fixture | `samples/gate/valid-phase6.json`（self-test.ts:381，B 组强化后断言 /待执行/） | 去掉 /待执行/ 断言后 phase=8 终检会漏掉 system/acceptance 仍 pending 却被判合格 |
 | check-requirement-graph | fixture | `samples/graph/bad-isolated.json`（self-test.ts:454） | 放宽图谱结构门将漏掉孤立节点（无入边/出边）被当作合法需求图放行 |
 | check-tla-model | fixture | `samples/tla/bad-no-l1-root.json`（self-test.ts:975） | 放宽 manifest 校验将漏掉缺 L1 根节点的规格仍被当作可建模通过 |
 | check-bdd-model | fixture | `samples/bdd/bad-schema.manifest.json`（self-test.ts:1824） | 放宽 BDD 校验将漏掉 manifest 缺必填字段仍通过 D1/D2 |
@@ -59,7 +59,7 @@
 
 | 门禁脚本 | 负向机制 | 负向案例 / 证据位置 | 所防回归（一句话） |
 | --- | --- | --- | --- |
-| check-docs-consistency | mutated-copy | `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts:2342` | 把 SKILL.md 的 `.ts` 计数改错却不报 script-registry 漂移，文档与实测脱节将无人发现 |
+| check-docs-consistency | mutated-copy | `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts:2347` | 去掉该计数变异断言后，script-registry 维度退化为空转/假绿，SKILL.md 的 `.ts` 计数改错（如 44→43）无人发现 |
 | check-samples-coverage | invocation | `w-model-dev/scripts/__tests__/check-samples-coverage.test.ts:228`（缺 NEGATIVE-COVERAGE.md → exit 2） | 缺失必需文件（清单本身）不再 exit 2 时，清单缺失会被当作通过，负向覆盖不变量静默失效 |
 | code-health-archive | invocation | `w-model-dev/scripts/__tests__/code-health-archive-boundary.test.ts:710` | malformed produce 输入不被 exit 2 拒绝，归档会写入半成品证据 |
 | code-health-ledger | invocation | `w-model-dev/scripts/__tests__/code-health-cli.test.ts:696` | 未知子命令不再 exit 2，append-only ledger 可能被非法子命令破坏 |
