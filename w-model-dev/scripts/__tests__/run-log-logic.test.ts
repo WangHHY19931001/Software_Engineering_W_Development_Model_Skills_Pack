@@ -2284,12 +2284,11 @@ describe('run-log R10: revertEvidence 回滚证伪（LEGACY_REVERT_EVIDENCE cuto
     expect(result.violations.some((v) => v.includes('[schema]'))).toBe(false);
   });
 
-  it('cutoff 前 fix 缺 revertEvidence → LEGACY_REVERT_EVIDENCE 诊断放行（exit 0 + NOT_CLOSED）', async () => {
+  it('R10: cutoff 前 fix 缺 revertEvidence 仍阻断，timestamp 不得作为 legacy 放行', async () => {
     const result = checkRunLog(stripRevertEvidence(await loadJsonl('rootcause-valid.jsonl')));
-    expect(result.passed).toBe(true);
-    expect(result.violations.some((v) => v.startsWith('R10:'))).toBe(false);
-    expect(result.diagnostics?.some((d) => d.startsWith('LEGACY_REVERT_EVIDENCE'))).toBe(true);
-    expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => v.startsWith('R10:'))).toBe(true);
+    expect(result.diagnostics?.some((d) => d.startsWith('LEGACY_REVERT_EVIDENCE')) ?? false).toBe(false);
   });
 
   it('合法携带 revertEvidence → 通过且 r10 计数 checked=1/missing=0/legacy=0', async () => {

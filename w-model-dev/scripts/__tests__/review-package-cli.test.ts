@@ -117,7 +117,7 @@ describe('review-package CLI（S32 确定性评审包）', () => {
 
     // 固定顺序：header（含 base/head range）→ commits → diff-stat → diff
     const headerIdx = content1.indexOf('# review-package');
-    const rangeIdx = content1.indexOf(`# range: ${baseSha.slice(0, 7)}..${headSha.slice(0, 7)}`);
+    const rangeIdx = content1.indexOf(`# range: ${baseSha}..${headSha}`);
     const commitsIdx = content1.indexOf('## commits');
     const statIdx = content1.indexOf('## diff-stat');
     const diffIdx = content1.indexOf('## diff\n'); // 含换行防前缀命中 '## diff-stat'
@@ -215,5 +215,33 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     const notARepo = runReviewPackage([`--repo=${tmpDir}`, `--base=${baseSha}`, `--head=${headSha}`]);
     expect(notARepo.code).toBe(2);
     expect(errorJson(notARepo.stdout)).toMatchObject({ exitCode: 2 });
+  });
+
+  it('空 --repo 与位置参数 → ARG_INVALID，且不创建输出目标', async () => {
+    const out = path.join(tmpDir, 'must-not-exist.diff');
+    for (const args of [
+      ['--repo=', `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`],
+      [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`, 'unexpected'],
+    ]) {
+      const result = runReviewPackage(args);
+      expect(result.code).toBe(2);
+      expect(result.stderr).toContain('ARG_INVALID');
+      expect(errorJson(result.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
+      await expect(fs.access(out)).rejects.toThrow();
+    }
+  });
+
+  it('输出目标为 symlink 时须拒绝且不改写其项目外目标', async () => {
+    const external = path.join(tmpDir, 'external.diff');
+    const out = path.join(tmpDir, 'out-link.diff');
+    await fs.writeFile(external, 'unchanged\n', 'utf8');
+    await fs.symlink(external, out, 'file');
+
+    const result = runReviewPackage([`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`]);
+
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('ARG_INVALID');
+    expect(errorJson(result.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
+    await expect(fs.readFile(external, 'utf8')).resolves.toBe('unchanged\n');
   });
 });

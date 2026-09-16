@@ -129,6 +129,17 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
     );
   });
 
+  it('黑名单第 6 条：跨票据仅参数名重叠不构成符号契约 → undefined-symbol', () => {
+    const r = checkTicketContent([
+      '# 01 — define',
+      'What to build: `Foo.run(job): Result`',
+      '# 02 — use',
+      '调用 `Other.call(job)`',
+    ].join('\n'));
+    expect(r.passed).toBe(false);
+    expect(r.violations.join('\n')).toMatch(/undefined-symbol[\s\S]*`Other\.call\(job\)`[\s\S]*S18 黑名单第 6 条/);
+  });
+
   it('修复轮 2 (B) 正向边界：专指契约标记行 / `What to build` 行上的无返回标注调用式 → 视为已定义', () => {
     const cases: Array<{ line: string; criteria: string }> = [
       // 复审 I-1 实测反例 1：标记行上的无返回标注调用式（base passed，修复轮 1 误报）

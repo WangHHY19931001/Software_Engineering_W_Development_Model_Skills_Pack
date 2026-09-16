@@ -346,7 +346,7 @@ describe('M07 测试证据门禁规则（E1-E4 + cutoff）', () => {
     expect(result.reasons.join('\n')).toMatch(/E4[\s\S]*集成测试/);
   });
 
-  it('E4: lastUpdated 早于 cutoff → 绿 + LEGACY_TEST_EVIDENCE 非阻断标注', () => {
+  it('E4: lastUpdated 早于旧 cutoff 仍须阻断，时间戳不得作为 legacy 放行', () => {
     const result = run(
       makeMatrix({
         lastUpdated: BEFORE_CUTOFF,
@@ -355,10 +355,15 @@ describe('M07 测试证据门禁规则（E1-E4 + cutoff）', () => {
       }),
       { phaseOption: 6 },
     );
-    expect(result.passed).toBe(true);
-    expect(result.reasons).toEqual([]);
-    expect((result.legacy ?? []).join('\n')).toMatch(/LEGACY_TEST_EVIDENCE/);
-    expect((result.legacy ?? []).length).toBeGreaterThanOrEqual(2);
+    expect(result.passed).toBe(false);
+    expect(result.reasons.join('\n')).toMatch(/E4[\s\S]*单元测试[\s\S]*缺 evidence/);
+    expect(result.legacy ?? []).toEqual([]);
+  });
+
+  it('E4: evidence.command 仅空白时须阻断，不能以对象存在替代可执行命令', () => {
+    const result = run(makeMatrix({ unitTest: makeSummary({ evidence: makeEvidence({ command: '   ' }) }) }));
+    expect(result.passed).toBe(false);
+    expect(result.reasons.join('\n')).toMatch(/E4[\s\S]*command/);
   });
 
   it('E4: lastUpdated 不可解析 → 红（保守按 cutoff 后处理，不吸收）', () => {
@@ -429,7 +434,7 @@ describe('M07 测试证据门禁规则（E1-E4 + cutoff）', () => {
       }),
       { phaseOption: 6 },
     );
-    expect(before.testEvidence?.legacy).toBe(2);
-    expect(before.testEvidence?.e4).toBe(0);
+    expect(before.testEvidence?.legacy).toBe(0);
+    expect(before.testEvidence?.e4).toBe(2);
   });
 });
