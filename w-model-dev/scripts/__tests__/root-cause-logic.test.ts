@@ -278,4 +278,20 @@ describe('valid 样本', () => {
     expect(result.passed).toBe(true);
     expect(result.reasons).toHaveLength(0);
   });
+
+  it('调查与缓解证据完整的 noRootCause 合法出口通过', async () => {
+    const report = await loadSample('valid-no-root-cause.json');
+    const result = checkRootCauseReport(report);
+    expect(result.passed).toBe(true);
+    expect(result.reasons).toHaveLength(0);
+  });
+});
+
+describe('noRootCause 合法出口', () => {
+  it('无调查记录的 noRootCause 宣告失败并指向 investigation', async () => {
+    const report = await loadSample('bad-no-root-cause-missing-investigation.json');
+    const result = checkRootCauseReport(report);
+    expect(result.passed).toBe(false);
+    expect(result.reasons.some((reason) => /noRootCause.*investigation/.test(reason))).toBe(true);
+  });
 });

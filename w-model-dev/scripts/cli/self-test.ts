@@ -1451,6 +1451,17 @@ interface RootCauseCase {
 const ROOTCAUSE_CASES: RootCauseCase[] = [
   { file: 'valid.json', expectedPassed: true, description: '完整、合规的 RootCauseReport，应通过所有校验' },
   {
+    file: 'valid-no-root-cause.json',
+    expectedPassed: true,
+    description: '调查与缓解证据完整的 noRootCause 合法出口，应通过校验',
+  },
+  {
+    file: 'bad-no-root-cause-missing-investigation.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/noRootCause.*investigation/],
+    description: 'noRootCause 缺 investigation 调查记录，应被拒绝',
+  },
+  {
     file: 'bad-r1-missing-fields.json',
     expectedPassed: false,
     expectedReasonPatterns: [/rootCause/],

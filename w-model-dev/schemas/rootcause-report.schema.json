@@ -11,8 +11,6 @@
     "meta",
     "input",
     "phenomenon",
-    "rootCauseChain",
-    "rootCause",
     "upstreamDefect",
     "fixRecommendation",
     "prevention",
@@ -106,8 +104,30 @@
         }
       }
     },
+    "noRootCause": {
+      "description": "系统化调查完成后确无可归根因时的合法出口；仅限 environmental / timing / external，且调查记录与缓解措施缺一不可",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "investigation", "mitigation"],
+      "properties": {
+        "kind": {
+          "description": "无根因现象形态：environmental=环境型 / timing=时序型 / external=外部依赖型",
+          "enum": ["environmental", "timing", "external"]
+        },
+        "investigation": {
+          "description": "已完成的调查过程、排除项与逐步证据；必须非空，禁止用未调查的“没找到”代替",
+          "type": "string",
+          "minLength": 1
+        },
+        "mitigation": {
+          "description": "已确定的缓解与可观测性措施，如重试、超时、明确错误提示、监控或日志",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "rootCauseChain": {
-      "description": "根因分析链数组（5-why 等逐层追问；R2 校验长度 [2,5] 且每环 evidence 非空）",
+      "description": "常规根因分支的根因分析链数组（5-why 等逐层追问；R2 校验长度 [2,5] 且每环 evidence 非空）；仅 noRootCause 合法分支条件豁免",
       "type": "array",
       "minItems": 2,
       "maxItems": 5,
@@ -129,7 +149,7 @@
       }
     },
     "rootCause": {
-      "description": "根因结论（分类 + 描述 + 证据 + 可证伪检查）",
+      "description": "常规根因分支的根因结论（分类 + 描述 + 证据 + 可证伪检查）；仅 noRootCause 合法分支条件豁免",
       "type": "object",
       "additionalProperties": false,
       "required": ["category", "description", "evidence", "falsifiabilityCheck"],
@@ -239,5 +259,48 @@
         }
       }
     }
-  }
+  },
+  "oneOf": [
+    {
+      "description": "常规 RootCauseReport：R2/R3 字段保持必填，且不得同时宣告 noRootCause",
+      "required": ["rootCauseChain", "rootCause"],
+      "properties": {
+        "rootCauseChain": { "description": "常规分支必须存在根因链标识（实际结构由根 properties 约束）。" },
+        "rootCause": { "description": "常规分支必须存在根因结论标识（实际结构由根 properties 约束）。" }
+      },
+      "not": {
+        "description": "常规分支不得出现 noRootCause，防止以合法出口规避 R2/R3 根因链要求",
+        "required": ["noRootCause"],
+        "properties": {
+          "noRootCause": { "description": "出现即触发 not 失败，常规分支禁止该字段。" }
+        }
+      }
+    },
+    {
+      "description": "noRootCause 合法出口：完整出口证据替代常规根因链与可证伪根因结论",
+      "required": ["noRootCause"],
+      "properties": {
+        "noRootCause": { "description": "合法出口必须存在 noRootCause 标识（实际结构由根 properties 约束）。" }
+      },
+      "not": {
+        "description": "合法出口分支不得同时携带 rootCauseChain 或 rootCause，双分支互斥",
+        "anyOf": [
+          {
+            "description": "出现 rootCauseChain 即触发 not 失败。",
+            "required": ["rootCauseChain"],
+            "properties": {
+              "rootCauseChain": { "description": "出现即判定混用常规与合法出口分支。" }
+            }
+          },
+          {
+            "description": "出现 rootCause 即触发 not 失败。",
+            "required": ["rootCause"],
+            "properties": {
+              "rootCause": { "description": "出现即判定混用常规与合法出口分支。" }
+            }
+          }
+        ]
+      }
+    }
+  ]
 }

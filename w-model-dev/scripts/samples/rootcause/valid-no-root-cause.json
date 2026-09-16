@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "reportId": "RC-phase5-2-01",
+    "targetKind": "rootcause",
+    "targetArtifact": "w-model-dev-demo/src/services/external.service.ts",
+    "targetPhase": "阶段 5 - 编码",
+    "reworkRound": 2,
+    "reworkSource": "gate",
+    "persona": "root-cause-locator",
+    "method": "combined",
+    "analysisTimestamp": "2026-09-16T02:00:00Z"
+  },
+  "input": {
+    "reworkHints": ["第三方服务偶发超时，受控重放无法归因到仓内代码"],
+    "gateJsonPath": ".w-model/gate-logs/external-timeout.json"
+  },
+  "phenomenon": {
+    "summary": "第三方服务在相同输入下偶发超时",
+    "severity": "Required",
+    "affectedArtifacts": ["w-model-dev-demo/src/services/external.service.ts"]
+  },
+  "noRootCause": {
+    "kind": "external",
+    "investigation": "依次完成 failing test、CLI fixture diff、replay trace、throwaway harness 与 differential 调查；仓内请求参数和调用路径稳定，超时仅出现在第三方边界且无法由受控输入稳定复现。",
+    "mitigation": "为第三方调用增加有界重试、超时和明确错误提示，并记录请求关联 ID、耗时与第三方响应状态以支持未来调查。"
+  },
+  "upstreamDefect": {
+    "present": false,
+    "rollbackRecommended": false
+  },
+  "fixRecommendation": [
+    {
+      "target": "w-model-dev-demo/src/services/external.service.ts",
+      "location": "external.service.ts 第三方调用边界",
+      "action": "增加有界重试、超时、错误提示与结构化边界日志",
+      "rationale": "在不可归因到仓内根因时降低外部抖动影响，并为再次发生保留可追踪证据"
+    }
+  ],
+  "prevention": [
+    {
+      "scope": "external-service-observability",
+      "measure": "持续记录第三方请求关联 ID、耗时、状态码与重试结果",
+      "owner": "S-code"
+    }
+  ],
+  "qualityLevel": "A",
+  "passed": true,
+  "summary": "系统化调查未发现仓内可归根因；按 external 合法出口实施缓解并补齐监控证据。",
+  "partialReports": [
+    {
+      "personaSlice": "testing-reality-checker",
+      "path": ".w-model/rootcause/partial/RC-phase5-2-01/testing-reality-checker.json",
+      "confidence": 0.8
+    }
+  ]
+}

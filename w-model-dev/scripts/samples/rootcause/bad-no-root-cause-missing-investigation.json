@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.0",
+  "meta": {
+    "reportId": "RC-phase5-2-02",
+    "targetKind": "rootcause",
+    "targetArtifact": "w-model-dev-demo/src/services/external.service.ts",
+    "targetPhase": "阶段 5 - 编码",
+    "reworkRound": 2,
+    "reworkSource": "gate",
+    "persona": "root-cause-locator",
+    "method": "combined",
+    "analysisTimestamp": "2026-09-16T02:05:00Z"
+  },
+  "input": {
+    "reworkHints": ["第三方服务偶发超时，受控重放无法归因到仓内代码"],
+    "gateJsonPath": ".w-model/gate-logs/external-timeout.json"
+  },
+  "phenomenon": {
+    "summary": "第三方服务在相同输入下偶发超时",
+    "severity": "Required",
+    "affectedArtifacts": ["w-model-dev-demo/src/services/external.service.ts"]
+  },
+  "noRootCause": {
+    "kind": "external",
+    "mitigation": "增加有界重试、超时、错误提示与结构化边界日志。"
+  },
+  "upstreamDefect": {
+    "present": false,
+    "rollbackRecommended": false
+  },
+  "fixRecommendation": [
+    {
+      "target": "w-model-dev-demo/src/services/external.service.ts",
+      "location": "external.service.ts 第三方调用边界",
+      "action": "增加有界重试、超时、错误提示与结构化边界日志",
+      "rationale": "降低外部抖动影响"
+    }
+  ],
+  "prevention": [
+    {
+      "scope": "external-service-observability",
+      "measure": "记录第三方请求关联 ID、耗时、状态码与重试结果",
+      "owner": "S-code"
+    }
+  ],
+  "qualityLevel": "A",
+  "passed": true,
+  "summary": "未记录调查过程即宣告 external 无根因出口。",
+  "partialReports": [
+    {
+      "personaSlice": "testing-reality-checker",
+      "path": ".w-model/rootcause/partial/RC-phase5-2-02/testing-reality-checker.json",
+      "confidence": 0.8
+    }
+  ]
+}

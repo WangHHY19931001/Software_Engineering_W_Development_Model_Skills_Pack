@@ -58,6 +58,7 @@ export type AnalysisMethod = '5-why' | 'fishbone' | 'defect-chain' | 'upstream-t
 export type RootCauseCategory =
   'requirement-gap' | 'design-flaw' | 'coding-error' | 'test-gap' | 'process-missing' | 'tool-gap' | 'upstream-defect';
 export type QualityLevel = 'A' | 'B' | 'C' | 'D';
+export type NoRootCauseKind = 'environmental' | 'timing' | 'external';
 
 export interface RootCauseReportShape {
   schemaVersion: string;
@@ -82,13 +83,18 @@ export interface RootCauseReportShape {
     severity: 'Critical' | 'Required' | 'Optional' | 'Nit' | 'FYI';
     affectedArtifacts: string[];
   };
-  rootCauseChain: Array<{
+  noRootCause?: {
+    kind: NoRootCauseKind;
+    investigation: string;
+    mitigation: string;
+  };
+  rootCauseChain?: Array<{
     step: number;
     why: string;
     answer: string;
     evidence: string;
   }>;
-  rootCause: {
+  rootCause?: {
     category: RootCauseCategory;
     description: string;
     evidence: string;
@@ -168,6 +174,7 @@ function isIso8601(value: unknown): value is string {
  *   R8 reportId 格式
  *   R9 多角度场景 partialReports 非空
  *   R10 多角度场景 canonical testing-reality-checker confidence >= 0.5；legacy reality-checker 仅在 canonical 缺失时 fallback；同 artifact canonical-first 不重复计数；跨 artifact 冲突、canonical 重复、legacy 重复均 fail-closed
+ *   S13 noRootCause 仅允许 environmental|timing|external，且 investigation / mitigation 非空；该分支条件豁免 R2/R3 字段，常规分支判据不变
  *
  * R10 结构化契约节点见模块顶部的 R10_CONTRACT_NODES；关系与 prose 必须同节点一致。
  */
@@ -190,6 +197,7 @@ export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
   }
 
   const r = input as Partial<RootCauseReportShape>;
+  const hasNoRootCause = r.noRootCause !== undefined;
 
   // schemaVersion
   if (r.schemaVersion !== SCHEMA_VERSION) {
@@ -231,50 +239,67 @@ export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
     }
   }
 
-  // R2 rootCauseChain 长度 [2,5] + evidence 非空
-  if (
-    !Array.isArray(r.rootCauseChain) ||
-    r.rootCauseChain.length < MIN_CHAIN_LENGTH ||
-    r.rootCauseChain.length > MAX_CHAIN_LENGTH
-  ) {
-    reasons.push(
-      `rootCauseChain 长度必须在 [${MIN_CHAIN_LENGTH},${MAX_CHAIN_LENGTH}]，实际为 ${Array.isArray(r.rootCauseChain) ? r.rootCauseChain.length : '非数组'}`,
-    );
-  } else {
-    for (let i = 0; i < r.rootCauseChain.length; i++) {
-      const step = r.rootCauseChain[i];
-      if (!step || typeof step !== 'object') {
-        reasons.push(`rootCauseChain[${i}] 非对象`);
-        continue;
+  if (hasNoRootCause) {
+    const noRootCause = r.noRootCause;
+    if (!noRootCause || typeof noRootCause !== 'object') {
+      reasons.push('noRootCause 字段必须为对象');
+    } else {
+      if (!['environmental', 'timing', 'external'].includes(noRootCause.kind ?? '')) {
+        reasons.push('noRootCause.kind 必须为 environmental|timing|external');
       }
-      if (!isNonEmptyString(step.why)) reasons.push(`rootCauseChain[${i}].why 必填且非空`);
-      if (!isNonEmptyString(step.answer)) reasons.push(`rootCauseChain[${i}].answer 必填且非空`);
-      if (!isNonEmptyString(step.evidence)) reasons.push(`rootCauseChain[${i}].evidence 必填且非空`);
+      if (!isNonEmptyString(noRootCause.investigation)) {
+        reasons.push('noRootCause.investigation 必填且非空');
+      }
+      if (!isNonEmptyString(noRootCause.mitigation)) {
+        reasons.push('noRootCause.mitigation 必填且非空');
+      }
     }
-  }
-
-  // R1 rootCause 字段 + R3 falsifiabilityCheck 句式
-  if (!r.rootCause || typeof r.rootCause !== 'object') {
-    reasons.push('rootCause 字段缺失或非对象');
   } else {
-    const validCategories: RootCauseCategory[] = [
-      'requirement-gap',
-      'design-flaw',
-      'coding-error',
-      'test-gap',
-      'process-missing',
-      'tool-gap',
-      'upstream-defect',
-    ];
-    if (!validCategories.includes(r.rootCause.category)) {
-      reasons.push(`rootCause.category 必须为 ${validCategories.join('|')} 之一`);
+    // R2 rootCauseChain 长度 [2,5] + evidence 非空（常规分支判据不放松）
+    if (
+      !Array.isArray(r.rootCauseChain) ||
+      r.rootCauseChain.length < MIN_CHAIN_LENGTH ||
+      r.rootCauseChain.length > MAX_CHAIN_LENGTH
+    ) {
+      reasons.push(
+        `rootCauseChain 长度必须在 [${MIN_CHAIN_LENGTH},${MAX_CHAIN_LENGTH}]，实际为 ${Array.isArray(r.rootCauseChain) ? r.rootCauseChain.length : '非数组'}`,
+      );
+    } else {
+      for (let i = 0; i < r.rootCauseChain.length; i++) {
+        const step = r.rootCauseChain[i];
+        if (!step || typeof step !== 'object') {
+          reasons.push(`rootCauseChain[${i}] 非对象`);
+          continue;
+        }
+        if (!isNonEmptyString(step.why)) reasons.push(`rootCauseChain[${i}].why 必填且非空`);
+        if (!isNonEmptyString(step.answer)) reasons.push(`rootCauseChain[${i}].answer 必填且非空`);
+        if (!isNonEmptyString(step.evidence)) reasons.push(`rootCauseChain[${i}].evidence 必填且非空`);
+      }
     }
-    if (!isNonEmptyString(r.rootCause.description)) reasons.push('rootCause.description 必填且非空');
-    if (!isNonEmptyString(r.rootCause.evidence)) reasons.push('rootCause.evidence 必填且非空');
-    if (!isNonEmptyString(r.rootCause.falsifiabilityCheck)) {
-      reasons.push('rootCause.falsifiabilityCheck 必填且非空');
-    } else if (!FALSIFIABILITY_PATTERN.test(r.rootCause.falsifiabilityCheck)) {
-      reasons.push('rootCause.falsifiabilityCheck 必须含「若...则」句式（可证伪假设）');
+
+    // R1 rootCause 字段 + R3 falsifiabilityCheck 句式（常规分支判据不放松）
+    if (!r.rootCause || typeof r.rootCause !== 'object') {
+      reasons.push('rootCause 字段缺失或非对象');
+    } else {
+      const validCategories: RootCauseCategory[] = [
+        'requirement-gap',
+        'design-flaw',
+        'coding-error',
+        'test-gap',
+        'process-missing',
+        'tool-gap',
+        'upstream-defect',
+      ];
+      if (!validCategories.includes(r.rootCause.category)) {
+        reasons.push(`rootCause.category 必须为 ${validCategories.join('|')} 之一`);
+      }
+      if (!isNonEmptyString(r.rootCause.description)) reasons.push('rootCause.description 必填且非空');
+      if (!isNonEmptyString(r.rootCause.evidence)) reasons.push('rootCause.evidence 必填且非空');
+      if (!isNonEmptyString(r.rootCause.falsifiabilityCheck)) {
+        reasons.push('rootCause.falsifiabilityCheck 必填且非空');
+      } else if (!FALSIFIABILITY_PATTERN.test(r.rootCause.falsifiabilityCheck)) {
+        reasons.push('rootCause.falsifiabilityCheck 必须含「若...则」句式（可证伪假设）');
+      }
     }
   }
 
