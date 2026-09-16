@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 const repoRoot = path.resolve(import.meta.dirname, '../../..');
 const hookSource = path.join(repoRoot, '.githooks', 'pre-commit');
 const tempRoots: string[] = [];
+let bashRuntimePath: string | undefined;
 
 function fileSymlinkSupport(): string | undefined {
   const probeRoot = mkdtempSync(path.join(os.tmpdir(), 'wm-pre-commit-link-probe-'));
@@ -43,7 +44,17 @@ function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
-async function makeFixture(): Promise<string> {
+function getBashRuntimePath(): string {
+  if (bashRuntimePath !== undefined) return bashRuntimePath;
+  const result = spawnSync('bash', ['-c', 'printenv PATH'], {
+    encoding: 'utf8',
+    input: '',
+  });
+  bashRuntimePath = String(result.stdout ?? '').trim();
+  return bashRuntimePath;
+}
+
+async function makeFixture(options: { realTypecheck?: boolean } = {}): Promise<string> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'wm pre提交 (hook)-'));
   tempRoots.push(root);
   await fs.mkdir(path.join(root, '.githooks'), { recursive: true });
@@ -61,6 +72,24 @@ async function makeFixture(): Promise<string> {
     'utf8',
   );
   await fs.writeFile(
+    path.join(root, 'config', 'tsconfig.json'),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'ESNext',
+          moduleResolution: 'Bundler',
+          strict: true,
+          noEmit: true,
+        },
+        include: ['../src.ts'],
+      },
+      null,
+      2,
+    ) + '\n',
+    'utf8',
+  );
+  await fs.writeFile(
     path.join(root, 'node_modules', '.bin', 'prettier'),
     [
       '#!/usr/bin/env bash',
@@ -68,14 +97,19 @@ async function makeFixture(): Promise<string> {
       'previous=""',
       'for arg in "$@"; do',
       '  if [ "$previous" = "--config" ]; then config="$arg"; fi',
+      '  if [ "$previous" = "--ignore-path" ]; then ignore_path="$arg"; fi',
       '  previous="$arg"',
       'done',
+      'if [ "${1-}" = "--version" ]; then printf "fixture-prettier 0.0.0\\n"; exit 0; fi',
+      'if [ -z "$config" ] || [ -z "$ignore_path" ] || [ ! -f "$ignore_path" ]; then exit 12; fi',
       'if [ -n "$config" ] && grep -q CONFIG_WORKTREE "$config"; then exit 1; fi',
+      'printf "%s|%s|%s\\n" "$PWD" "$config" "$ignore_path" > "$PRECOMMIT_PRETTIER_CAPTURE"',
+      'if [ -n "${PRECOMMIT_PRETTIER_DELAY_SECONDS-}" ]; then sleep "$PRECOMMIT_PRETTIER_DELAY_SECONDS"; fi',
       'for arg in "$@"; do',
       '  case "$arg" in',
       '    *.json) grep -q \'"ok":true\' "$arg" && exit 1 ;;',
       '    *src.ts) ',
-      '      if [ -f .prettierignore ] && grep -qx source.ts .prettierignore; then continue; fi',
+      '      if grep -qx src.ts "$ignore_path"; then continue; fi',
       '      grep -q INVALID_FORMAT "$arg" && exit 1 ;;',
       '  esac',
       'done',
@@ -85,12 +119,62 @@ async function makeFixture(): Promise<string> {
     'utf8',
   );
   await fs.chmod(path.join(root, 'node_modules', '.bin', 'prettier'), 0o755);
+  const tscPath = path.join(root, 'node_modules', '.bin', 'tsc');
+  if (options.realTypecheck) {
+    const realTscEntry = toBashPath(path.join(repoRoot, 'node_modules', 'typescript', 'bin', 'tsc'));
+    await fs.writeFile(
+      tscPath,
+      [
+        '#!/usr/bin/env bash',
+        'config=""',
+        'previous=""',
+        'for arg in "$@"; do',
+        '  if [ "$previous" = "-p" ]; then config="$arg"; fi',
+        '  previous="$arg"',
+        'done',
+        'printf "%s|%s|%s\\n" "$PWD" "$config" "$(node ' +
+          shellQuote(realTscEntry) +
+          ' --version)" > "$PRECOMMIT_TSC_CAPTURE"',
+        'exec node ' + shellQuote(realTscEntry) + ' "$@"',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+  } else {
+    await fs.writeFile(
+      tscPath,
+      [
+        '#!/usr/bin/env bash',
+        'config=""',
+        'previous=""',
+        'for arg in "$@"; do',
+        '  if [ "$previous" = "-p" ]; then config="$arg"; fi',
+        '  previous="$arg"',
+        'done',
+        'if [ "${1-}" = "--version" ]; then printf "Version 0.0.0-fixture\\n"; exit 0; fi',
+        'if [ -z "$config" ] || [ ! -f "$config" ]; then exit 12; fi',
+        'source="$(dirname "$config")/../src.ts"',
+        'printf "%s|%s\\n" "$PWD" "$config" > "$PRECOMMIT_TSC_CAPTURE"',
+        'if [ -n "${PRECOMMIT_TSC_DELAY_SECONDS-}" ]; then sleep "$PRECOMMIT_TSC_DELAY_SECONDS"; fi',
+        'grep -Eq "^(VALID_STAGED|VALID_WORKTREE)$" "$source"',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+  }
+  await fs.chmod(tscPath, 0o755);
   await fs.writeFile(
     path.join(root, 'test-bin', 'npx'),
     ['#!/usr/bin/env bash', 'printf "npx preflight invoked\\n" > "$PRECOMMIT_NPX_MARKER"', 'exit 99', ''].join('\n'),
     'utf8',
   );
   await fs.chmod(path.join(root, 'test-bin', 'npx'), 0o755);
+  await fs.writeFile(
+    path.join(root, 'test-bin', 'npm'),
+    ['#!/usr/bin/env bash', 'printf "npm invoked\\n" > "$PRECOMMIT_NPM_MARKER"', 'exit 99', ''].join('\n'),
+    'utf8',
+  );
+  await fs.chmod(path.join(root, 'test-bin', 'npm'), 0o755);
   await fs.writeFile(
     path.join(root, 'check-type.js'),
     [
@@ -122,12 +206,35 @@ function indexHash(indexFile: string): string {
 
 async function temporaryHookDirs(root: string): Promise<string[]> {
   return (await fs.readdir(root, { withFileTypes: true }))
-    .filter(
-      (entry) =>
-        entry.isDirectory() &&
-        (entry.name.startsWith('.pre-commit-snapshot.') || entry.name.startsWith('.pre-commit-blobs.')),
-    )
+    .filter((entry) => entry.name.startsWith('.pre-commit-snapshot.') || entry.name.startsWith('.pre-commit-blobs.'))
     .map((entry) => entry.name);
+}
+
+function readPrettierCapture(root: string): {
+  cwd: string;
+  config: string;
+  ignore: string;
+} {
+  const [cwd, config, ignore] = readFileSync(path.join(root, 'prettier.capture'), 'utf8').trim().split('|');
+  expect(cwd).toBeTruthy();
+  expect(config).toBeTruthy();
+  expect(ignore).toBeTruthy();
+  return { cwd: cwd!, config: config!, ignore: ignore! };
+}
+
+function readTscCapture(root: string): {
+  cwd: string;
+  config: string;
+  version?: string;
+} {
+  const [cwd, config, version] = readFileSync(path.join(root, 'tsc.capture'), 'utf8').trim().split('|');
+  expect(cwd).toBeTruthy();
+  expect(config).toBeTruthy();
+  return {
+    cwd: cwd!,
+    config: config!,
+    ...(version === undefined ? {} : { version }),
+  };
 }
 
 function gitShow(root: string, spec: string): string {
@@ -141,26 +248,86 @@ function gitShow(root: string, spec: string): string {
   return String(result.stdout);
 }
 
-function runHook(root: string, indexFile: string): ReturnType<typeof spawnSync> {
+function runHook(
+  root: string,
+  indexFile: string,
+  options: {
+    bashEnv?: string;
+    commandTimeoutSeconds?: number;
+    prettierDelaySeconds?: number;
+    tscDelaySeconds?: number;
+  } = {},
+): ReturnType<typeof spawnSync> {
   const hookPath = toBashPath(path.join(root, '.githooks', 'pre-commit'));
   const bashCwd = toBashPath(root);
   const npxMarker = path.join(root, 'npx.marker');
-  return spawnSync('bash', ['-c', `cd ${shellQuote(bashCwd)} && bash ${shellQuote(hookPath)}`], {
+  const npmMarker = path.join(root, 'npm.marker');
+  const prettierCapture = path.join(root, 'prettier.capture');
+  const tscCapture = path.join(root, 'tsc.capture');
+  const command = [
+    `export GIT_INDEX_FILE=${shellQuote(toBashPath(indexFile))}`,
+    `export PATH=${shellQuote(`${toBashPath(path.join(root, 'test-bin'))}:${getBashRuntimePath()}`)}`,
+    `export PRECOMMIT_NPX_MARKER=${shellQuote(toBashPath(npxMarker))}`,
+    `export PRECOMMIT_NPM_MARKER=${shellQuote(toBashPath(npmMarker))}`,
+    `export PRECOMMIT_PRETTIER_CAPTURE=${shellQuote(toBashPath(prettierCapture))}`,
+    `export PRECOMMIT_TSC_CAPTURE=${shellQuote(toBashPath(tscCapture))}`,
+    `export PRE_COMMIT_COMMAND_TIMEOUT_SECONDS=${shellQuote(String(options.commandTimeoutSeconds ?? 20))}`,
+    `export PRECOMMIT_PRETTIER_DELAY_SECONDS=${shellQuote(String(options.prettierDelaySeconds ?? ''))}`,
+    `export PRECOMMIT_TSC_DELAY_SECONDS=${shellQuote(String(options.tscDelaySeconds ?? ''))}`,
+    `cd ${shellQuote(bashCwd)}`,
+    options.bashEnv === undefined ? ':' : `source ${shellQuote(toBashPath(options.bashEnv))}`,
+    options.bashEnv === undefined ? ':' : 'export -f git 2>/dev/null || true',
+    `bash ${shellQuote(hookPath)}`,
+  ].join('; ');
+  return spawnSync('bash', ['-c', command], {
     cwd: root,
     encoding: 'utf8',
     input: '',
     timeout: 60_000,
-    env: {
-      ...process.env,
-      GIT_INDEX_FILE: toBashPath(indexFile),
-      PATH: `${toBashPath(path.join(root, 'test-bin'))}:${process.env.PATH ?? ''}`,
-      PRECOMMIT_NPX_MARKER: toBashPath(npxMarker),
-    },
+    env: { ...process.env },
   });
 }
 
-async function initFixture(source: string): Promise<{ root: string; index: string; worktree: string }> {
-  const root = await makeFixture();
+type FakeIndexRecord = { mode: string; object: string; path: string };
+
+async function runWithFakeIndexRecords(
+  fixture: { root: string; index: string },
+  records: FakeIndexRecord[],
+  blob: string,
+  options: { batchOnly?: boolean } = {},
+): Promise<ReturnType<typeof spawnSync>> {
+  const bashEnv = path.join(fixture.root, 'test-bin', 'fake-git-env.sh');
+  const recordArgs = records
+    .map(({ mode, object, path: recordPath }) => shellQuote(`${mode} ${object} 0\t${recordPath}`))
+    .join(' ');
+  const pathArgs = records.map(({ path: recordPath }) => shellQuote(recordPath)).join(' ');
+  await fs.writeFile(
+    bashEnv,
+    [
+      'git() {',
+      '  case "$*" in',
+      `    *'rev-parse --show-toplevel'*) printf '%s\\n' "${'$'}PWD" ;;`,
+      `    *'diff --cached --name-only -z'*) printf '%s\\0' ${pathArgs} ;;`,
+      `    *'ls-files --stage -z'*) printf '%s\\0' ${recordArgs} ;;`,
+      `    *'cat-file --batch'*) while IFS= read -r object; do printf '%s blob %s\\n' "${'$'}object" ${blob.length}; printf '%s' ${shellQuote(blob)}; printf '\\n'; done ;;`,
+      options.batchOnly
+        ? "    *'cat-file blob'*) return 91 ;;"
+        : `    *'cat-file blob'*) printf '%s' ${shellQuote(blob)} ;;`,
+      '    *) return 1 ;;',
+      '  esac',
+      '}',
+      '',
+    ].join('\n'),
+    'utf8',
+  );
+  return runHook(fixture.root, fixture.index, { bashEnv });
+}
+
+async function initFixture(
+  source: string,
+  options: { realTypecheck?: boolean } = {},
+): Promise<{ root: string; index: string; worktree: string }> {
+  const root = await makeFixture(options);
   const index = path.join(root, '.git', 'index');
   await fs.writeFile(path.join(root, 'src.ts'), source, 'utf8');
   git(root, ['init', '-q']);
@@ -189,7 +356,9 @@ afterEach(async () => {
 
 describe('pre-commit staged snapshot', () => {
   it('passes when staged JSON is formatted and the worktree copy is not', async () => {
-    const fixture = await initFixture('VALID_STAGED\n');
+    const fixture = await initFixture('BASELINE\n');
+    await fs.writeFile(fixture.worktree, 'VALID_STAGED\n', 'utf8');
+    git(fixture.root, ['add', 'src.ts']);
     const file = path.join(fixture.root, 'fixture.json');
     await fs.writeFile(file, '{\n  "ok": true\n}\n', 'utf8');
     git(fixture.root, ['add', 'fixture.json']);
@@ -198,6 +367,12 @@ describe('pre-commit staged snapshot', () => {
     const result = runHook(fixture.root, fixture.index);
 
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    const prettier = readPrettierCapture(fixture.root);
+    expect(prettier.config).toBe(`${prettier.cwd}/config/prettier.config.cjs`);
+    expect(prettier.ignore).toBe(`${prettier.cwd}/.prettierignore`);
+    const tsc = readTscCapture(fixture.root);
+    expect(tsc.config).toBe(`${tsc.cwd}/config/tsconfig.json`);
+    expect(tsc.cwd).toMatch(/\.pre-commit-snapshot\.[^/]+$/);
     expect(await fs.readFile(file, 'utf8')).toBe('{"ok":true}\n');
     expect(await fs.readFile(path.join(fixture.root, '.git', 'index'))).toBeTruthy();
     expect(await temporaryHookDirs(fixture.root)).toEqual([]);
@@ -210,6 +385,32 @@ describe('pre-commit staged snapshot', () => {
 
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
     expect(existsSync(path.join(fixture.root, 'npx.marker'))).toBe(false);
+    expect(await temporaryHookDirs(fixture.root)).toEqual([]);
+  });
+
+  it('uses a repository-local tsc with the staged snapshot config and not npm discovery', async () => {
+    const stagedSource = "export const stagedValue: string = 'VALID_STAGED';\n";
+    const fixture = await initFixture("export const stagedValue: string = 'BASELINE';\n", {
+      realTypecheck: true,
+    });
+    await fs.writeFile(fixture.worktree, stagedSource, 'utf8');
+    git(fixture.root, ['add', 'src.ts']);
+    const beforeHash = indexHash(fixture.index);
+    const worktreeSource = 'export const stagedValue: string = ;\n';
+    await fs.writeFile(fixture.worktree, worktreeSource, 'utf8');
+    await fs.writeFile(path.join(fixture.root, 'config', 'tsconfig.json'), '{ invalid worktree config\n', 'utf8');
+
+    const result = runHook(fixture.root, fixture.index);
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    const tsc = readTscCapture(fixture.root);
+    expect(tsc.cwd).toMatch(/\.pre-commit-snapshot\.[^/]+$/);
+    expect(tsc.config).toBe(`${tsc.cwd}/config/tsconfig.json`);
+    expect(tsc.version).toMatch(/^Version \d+\.\d+\.\d+$/);
+    expect(existsSync(path.join(fixture.root, 'npm.marker'))).toBe(false);
+    expect(await fs.readFile(fixture.worktree, 'utf8')).toBe(worktreeSource);
+    expect(indexHash(fixture.index)).toBe(beforeHash);
+    expect(gitShow(fixture.root, ':src.ts')).toBe(stagedSource);
     expect(await temporaryHookDirs(fixture.root)).toEqual([]);
   });
 
@@ -294,6 +495,9 @@ describe('pre-commit staged snapshot', () => {
     const result = runHook(fixture.root, fixture.index);
 
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    const prettier = readPrettierCapture(fixture.root);
+    expect(prettier.config).toBe(`${prettier.cwd}/config/prettier.config.cjs`);
+    expect(prettier.ignore).toBe(`${prettier.cwd}/.prettierignore`);
     expect(await temporaryHookDirs(fixture.root)).toEqual([]);
   });
 
@@ -310,5 +514,134 @@ describe('pre-commit staged snapshot', () => {
     expect(await fs.readFile(path.join(fixture.root, 'src.ts'), 'utf8')).toBe('INVALID_FORMAT\n');
     expect(gitShow(fixture.root, ':src.ts')).toBe('INVALID_FORMAT\n');
     expect(await temporaryHookDirs(fixture.root)).toEqual([]);
+    const prettier = readPrettierCapture(fixture.root);
+    expect(prettier.config).toBe(`${prettier.cwd}/config/prettier.config.cjs`);
+    expect(prettier.ignore).toBe(`${prettier.cwd}/.prettierignore`);
   });
+
+  it('bounds a hanging Prettier check, reports its phase, and cleans the snapshot', async () => {
+    const fixture = await initFixture('VALID_STAGED\n');
+    const prettierTarget = path.join(fixture.root, 'fixture.json');
+    await fs.writeFile(prettierTarget, '{\n  "ok": true\n}\n', 'utf8');
+    git(fixture.root, ['add', 'fixture.json']);
+    const startedAt = Date.now();
+    const result = runHook(fixture.root, fixture.index, {
+      commandTimeoutSeconds: 3,
+      prettierDelaySeconds: 7,
+    });
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(124);
+    expect(Date.now() - startedAt).toBeLessThan(12_000);
+    expect(result.stderr).toContain('Prettier 检查 index snapshot');
+    expect(result.stderr).toContain('超时（3s）');
+    expect(await temporaryHookDirs(fixture.root)).toEqual([]);
+
+    const typecheckFixture = await initFixture('BASELINE\n');
+    await fs.writeFile(typecheckFixture.worktree, 'VALID_STAGED\n', 'utf8');
+    git(typecheckFixture.root, ['add', 'src.ts']);
+    const typecheckResult = runHook(typecheckFixture.root, typecheckFixture.index, {
+      commandTimeoutSeconds: 3,
+      tscDelaySeconds: 7,
+    });
+
+    expect(typecheckResult.status, `${typecheckResult.stdout}\n${typecheckResult.stderr}`).toBe(124);
+    expect(typecheckResult.stderr).toContain('TypeScript 检查 index snapshot');
+    expect(typecheckResult.stderr).toContain('超时（3s）');
+    expect(await temporaryHookDirs(typecheckFixture.root)).toEqual([]);
+  });
+
+  it.each([
+    {
+      label: 'parent symlink',
+      message: 'snapshot 路径组件不是目录',
+      records: [
+        {
+          mode: '120000',
+          object: '1111111111111111111111111111111111111111',
+          path: 'parent',
+        },
+        {
+          mode: '100644',
+          object: '2222222222222222222222222222222222222222',
+          path: 'parent/child.ts',
+        },
+      ],
+    },
+    {
+      label: 'nested symlink',
+      message: 'snapshot 路径组件不是目录',
+      records: [
+        {
+          mode: '120000',
+          object: '3333333333333333333333333333333333333333',
+          path: 'nested/link',
+        },
+        {
+          mode: '100644',
+          object: '4444444444444444444444444444444444444444',
+          path: 'nested/link/child.ts',
+        },
+      ],
+    },
+    {
+      label: 'absolute path',
+      message: '拒绝越界 index 路径',
+      records: [
+        {
+          mode: '100644',
+          object: '5555555555555555555555555555555555555555',
+          path: '/absolute.ts',
+        },
+      ],
+    },
+    {
+      label: 'traversal path',
+      message: '拒绝越界 index 路径',
+      records: [
+        {
+          mode: '100644',
+          object: '6666666666666666666666666666666666666666',
+          path: 'nested/../../escape.ts',
+        },
+      ],
+    },
+  ])('fails closed for a staged $label record without touching an external sentinel', async ({ records, message }) => {
+    const fixture = await initFixture('VALID_STAGED\n');
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-pre-commit-record-sentinel-'));
+    tempRoots.push(outside);
+    const sentinel = path.join(outside, 'sentinel.txt');
+    await fs.writeFile(sentinel, 'DO NOT TOUCH\n', 'utf8');
+    const beforeHash = indexHash(fixture.index);
+
+    const result = await runWithFakeIndexRecords(fixture, records, sentinel.replaceAll('\\', '/'));
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(result.stderr).toContain(message);
+    expect(await fs.readFile(sentinel, 'utf8')).toBe('DO NOT TOUCH\n');
+    expect(await fs.readFile(fixture.worktree, 'utf8')).toBe('VALID_STAGED\n');
+    expect(gitShow(fixture.root, ':src.ts')).toBe('VALID_STAGED\n');
+    expect(indexHash(fixture.index)).toBe(beforeHash);
+    expect(await temporaryHookDirs(fixture.root)).toEqual([]);
+  });
+});
+
+it('materializes 200 staged blobs through one batch protocol within the snapshot budget', async () => {
+  const fixture = await initFixture('VALID_STAGED\\n');
+  const records = Array.from({ length: 200 }, (_, index) => ({
+    mode: '100644',
+    object: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    path: `bulk/${String(index).padStart(3, '0')}.md`,
+  }));
+  const startedAt = Date.now();
+
+  const result = await runWithFakeIndexRecords(fixture, records, 'fixture blob\\n', {
+    batchOnly: true,
+  });
+
+  expect(result.status, `${result.stdout}\\n${result.stderr}`).toBe(0);
+  // This is deliberately well below the hook's 45 s snapshot budget while
+  // leaving room for the Windows/WSL fixture filesystem.
+  expect(Date.now() - startedAt).toBeLessThan(20_000);
+  expect(result.stderr).toContain('批量物化 index snapshot');
+  expect(await temporaryHookDirs(fixture.root)).toEqual([]);
 });

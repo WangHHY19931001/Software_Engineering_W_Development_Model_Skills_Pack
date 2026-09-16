@@ -7,43 +7,176 @@ warn() { printf '⚠ pre-commit: %s\n' "$*" >&2; }
 pass() { printf '✓ pre-commit: %s\n' "$*" >&2; }
 step() { printf '▸ pre-commit: %s\n' "$*" >&2; }
 
-repo_root="$(git rev-parse --show-toplevel)"
-cd "$repo_root"
-
+repo_root=''
 original_git_index_file="${GIT_INDEX_FILE-}"
 original_git_index_was_set=0
 if [ "${GIT_INDEX_FILE+x}" = x ]; then original_git_index_was_set=1; fi
 snapshot_dir=''
 blob_staging_dir=''
+repo_root_probe=''
+staged_paths_file=''
+active_child_pid=''
+active_child_label=''
+
+command_timeout_seconds=20
+if [ -n "${PRE_COMMIT_COMMAND_TIMEOUT_SECONDS-}" ]; then
+  case "$PRE_COMMIT_COMMAND_TIMEOUT_SECONDS" in
+    *[!0-9]*) warn "忽略非法 PRE_COMMIT_COMMAND_TIMEOUT_SECONDS：$PRE_COMMIT_COMMAND_TIMEOUT_SECONDS" ;;
+    0) command_timeout_seconds=1 ;;
+    1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30)
+      command_timeout_seconds="$PRE_COMMIT_COMMAND_TIMEOUT_SECONDS"
+      ;;
+    *) command_timeout_seconds=30 ;;
+  esac
+fi
+
+terminate_child() {
+  local child_pid="$1"
+  local child_label="$2"
+  local attempt
+  if ! kill -0 "$child_pid" 2>/dev/null; then
+    wait "$child_pid" 2>/dev/null || true
+    return 0
+  fi
+  warn "终止子进程：$child_label（pid $child_pid）"
+  kill -TERM "$child_pid" 2>/dev/null || true
+  for attempt in 1 2 3 4 5; do
+    if ! kill -0 "$child_pid" 2>/dev/null; then break; fi
+    sleep 0.1
+  done
+  if kill -0 "$child_pid" 2>/dev/null; then
+    warn "子进程未响应 TERM，发送 KILL：$child_label（pid $child_pid）"
+    kill -KILL "$child_pid" 2>/dev/null || true
+  fi
+  wait "$child_pid" 2>/dev/null || true
+}
+
+run_bounded() {
+  local timeout_seconds="$1"
+  local label="$2"
+  shift 2
+  local announce=1
+  if [ "${1-}" = "--quiet" ]; then
+    announce=0
+    shift
+  fi
+  local child_pid
+  local start_time
+  local status=0
+
+  if [ "$announce" -eq 1 ]; then step "$label（最多 ${timeout_seconds}s）"; fi
+  "$@" &
+  child_pid=$!
+  active_child_pid="$child_pid"
+  active_child_label="$label"
+  start_time="$SECONDS"
+  while kill -0 "$child_pid" 2>/dev/null; do
+    if [ "$((SECONDS - start_time))" -ge "$timeout_seconds" ]; then
+      warn "$label 超时（${timeout_seconds}s）"
+      terminate_child "$child_pid" "$label"
+      active_child_pid=''
+      active_child_label=''
+      return 124
+    fi
+    sleep 0.01
+  done
+  if wait "$child_pid"; then status=0; else status=$?; fi
+  active_child_pid=''
+  active_child_label=''
+  if [ "$status" -ne 0 ]; then
+    warn "$label 失败（exit $status）"
+  fi
+  return "$status"
+}
+
+remove_temp_dir() {
+  local target="$1"
+  local attempt
+  local status=0
+  for attempt in 1 2 3 4 5; do
+    if [ ! -e "$target" ] && [ ! -L "$target" ]; then return 0; fi
+    if run_bounded 2 "清理临时目录（第 ${attempt}/5 次）：$target" rm -rf -- "$target"; then
+      return 0
+    else
+      status=$?
+    fi
+    if [ "$attempt" -lt 5 ]; then sleep 0.1; fi
+  done
+  return "$status"
+}
+
 cleanup() {
   local exit_code=$?
   local cleanup_failed=0
   trap - EXIT INT TERM
+  if [ -n "$active_child_pid" ]; then
+    terminate_child "$active_child_pid" "$active_child_label"
+    active_child_pid=''
+    active_child_label=''
+  fi
   if [ "$original_git_index_was_set" -eq 1 ]; then
     export GIT_INDEX_FILE="$original_git_index_file"
   else
     unset GIT_INDEX_FILE
   fi
+  for cleanup_file in "$repo_root_probe" "$staged_paths_file"; do
+    if [ -n "$cleanup_file" ] && { [ -e "$cleanup_file" ] || [ -L "$cleanup_file" ]; }; then
+      if ! run_bounded 2 "清理 hook 临时文件：$cleanup_file" rm -f -- "$cleanup_file"; then cleanup_failed=1; fi
+    fi
+  done
   for cleanup_dir in "$blob_staging_dir" "$snapshot_dir"; do
-    if [ -n "$cleanup_dir" ] && [ -d "$cleanup_dir" ]; then
-      for attempt in 1 2 3 4 5; do
-        if rm -rf -- "$cleanup_dir"; then break; fi
-        if [ "$attempt" -eq 5 ]; then cleanup_failed=1; else sleep 0.1; fi
-      done
+    if [ -n "$cleanup_dir" ] && { [ -d "$cleanup_dir" ] || [ -L "$cleanup_dir" ]; }; then
+      if ! remove_temp_dir "$cleanup_dir"; then cleanup_failed=1; fi
     fi
   done
   if [ "$cleanup_failed" -eq 1 ]; then
-    warn "无法清理临时 index snapshot：$snapshot_dir"
+    warn "无法清理临时 index snapshot/blob：$snapshot_dir / $blob_staging_dir"
     exit_code=1
+  else
+    pass "临时 snapshot/blob 已清理"
   fi
   exit "$exit_code"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
+step "定位仓库根目录"
+repo_root_probe="$(mktemp "${TMPDIR:-/tmp}/wm-pre-commit-root.XXXXXX")"
+if run_bounded "$command_timeout_seconds" "读取仓库根目录" git rev-parse --show-toplevel > "$repo_root_probe"; then
+  :
+else
+  status=$?
+  warn "无法定位仓库根目录（exit $status）"
+  exit "$status"
+fi
+IFS= read -r repo_root < "$repo_root_probe"
+if [ -z "$repo_root" ]; then
+  warn "仓库根目录探针为空"
+  exit 1
+fi
+cd "$repo_root"
+
+staged_paths_file="$(mktemp "${TMPDIR:-/tmp}/wm-pre-commit-staged.XXXXXX")"
+if run_bounded "$command_timeout_seconds" "读取暂存路径（NUL 分隔）" \
+  git -c core.quotePath=false diff --cached --name-only -z --diff-filter=ACMR > "$staged_paths_file"; then
+  :
+else
+  status=$?
+  warn "读取暂存路径失败（exit $status）"
+  exit "$status"
+fi
 staged_array=()
 while IFS= read -r -d '' staged_path; do
   staged_array+=("$staged_path")
-done < <(git -c core.quotePath=false diff --cached --name-only -z --diff-filter=ACMR)
+done < "$staged_paths_file"
+if run_bounded 2 "释放暂存路径探针" rm -f -- "$staged_paths_file"; then
+  staged_paths_file=''
+else
+  status=$?
+  warn "释放暂存路径探针失败（exit $status）"
+  exit "$status"
+fi
 if [ "${#staged_array[@]}" -eq 0 ]; then
   pass "无暂存文件，跳过快速检查"
   exit 0
@@ -68,9 +201,34 @@ else
   warn "本地 prettier 不可用 → 降级放行（格式检查未执行）"
   exit 0
 fi
-if ! "${prettier_command[@]}" --version >/dev/null 2>&1; then
+if run_bounded "$command_timeout_seconds" "检查本地 prettier 入口" "${prettier_command[@]}" --version >/dev/null; then
+  :
+else
+  status=$?
+  if [ "$status" -eq 124 ]; then
+    warn "本地 prettier 预检超时 → 提交中止"
+    exit "$status"
+  fi
   warn "本地 prettier 启动失败 → 降级放行（格式检查未执行）"
   exit 0
+fi
+typescript_command=()
+typescript_bin="$repo_root/node_modules/.bin/tsc"
+typescript_entry="$repo_root/node_modules/typescript/bin/tsc"
+if [ -f "$typescript_entry" ]; then
+  typescript_command=(node "$typescript_entry")
+elif [ -f "$typescript_bin" ]; then
+  typescript_command=("$typescript_bin")
+else
+  warn "本地 TypeScript 不可用 → 提交中止（无法验证 index snapshot）"
+  exit 1
+fi
+if run_bounded "$command_timeout_seconds" "检查本地 TypeScript 入口" "${typescript_command[@]}" --version >/dev/null; then
+  :
+else
+  status=$?
+  warn "本地 TypeScript 预检失败（exit $status）→ 提交中止"
+  exit "$status"
 fi
 
 snapshot_dir="$(mktemp -d "$repo_root/.pre-commit-snapshot.XXXXXX")"
@@ -104,41 +262,225 @@ ensure_snapshot_parent() {
   done
 }
 
-# 不使用 git archive / write-tree：二者可能物化或改写 index 元数据。
-# 每个 index 条目都先写入由 mktemp 创建的普通临时文件，再移动到受控 snapshot。
-while IFS= read -r -d '' index_record; do
-  index_meta="${index_record%%$'\t'*}"
-  index_path="${index_record#*$'\t'}"
-  index_mode="${index_meta%% *}"
-  index_object="${index_meta#* }"
-  index_object="${index_object%% *}"
+# 不使用 git archive / write-tree：二者可能物化或改写 index 元数据。NUL 分隔的
+# index 记录流只用于解析 mode/object/path；blob 内容仅由 --batch 二进制流读取，二者绝不混用。
+index_records_file="$blob_staging_dir/index-records"
+snapshot_started_at="$SECONDS"
 
-  case "$index_path" in
-    ''|/*|../*|*/../*|*/..|./*|*/./*|.|..)
-      warn "拒绝越界 index 路径：$index_path"
-      exit 1
-      ;;
-  esac
+if run_bounded "$command_timeout_seconds" "读取 index 记录（NUL 分隔）" git -c core.quotePath=false ls-files --stage -z > "$index_records_file"; then
+  :
+else
+  status=$?
+  warn "读取 index 记录失败（exit $status）"
+  exit "$status"
+fi
 
-  snapshot_path="$snapshot_dir/$index_path"
-  ensure_snapshot_parent "$(dirname -- "$index_path")"
-  if [ -L "$snapshot_path" ] || [ -e "$snapshot_path" ]; then
-    warn "snapshot 目标已存在或为 link：$index_path"
-    exit 1
-  fi
+materialize_index_snapshot_batch() {
+node - "$index_records_file" "$snapshot_dir" "$blob_staging_dir" <<'NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+const { once } = require('node:events');
+const { spawn } = require('node:child_process');
 
-  blob_file="$(mktemp "$blob_staging_dir/blob.XXXXXX")"
-  git cat-file blob "$index_object" > "$blob_file"
-  mv -- "$blob_file" "$snapshot_path"
-  case "$index_mode" in
-    100755) chmod 755 -- "$snapshot_path" ;;
-    100644|120000) chmod 644 -- "$snapshot_path" ;;
-  esac
-done < <(git ls-files --stage -z)
+const [recordsPath, snapshotDir, stagingDir] = process.argv.slice(2);
+const startedAt = Date.now();
+const budgetMs = 45_000;
+let lastPath = '';
 
-# blob 临时目录不再参与检查；尽快释放其句柄，清理失败仍由 EXIT trap 记录。
-rm -rf -- "$blob_staging_dir"
-blob_staging_dir=''
+function fail(message) {
+  throw new Error(`⚠ pre-commit: ${message}`);
+}
+
+function assertBudget() {
+  if (Date.now() - startedAt >= budgetMs) fail(`index snapshot 物化超时（45s，最后路径：${lastPath}）`);
+}
+
+function lstatOrNull(candidate) {
+  try {
+    return fs.lstatSync(candidate);
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+function parseRecord(raw, ordinal) {
+  const tab = raw.indexOf('\t');
+  if (tab < 0) fail(`index 记录缺少路径分隔符（第 ${ordinal} 条）`);
+  const fields = raw.subarray(0, tab).toString('ascii').split(' ');
+  const relativePath = raw.subarray(tab + 1).toString('utf8');
+  const [mode, object, stage] = fields;
+  if (fields.length !== 3 || stage !== '0' || !/^[0-9a-f]{40}$/i.test(object ?? '')) {
+    fail(`拒绝未合并或缺少 blob 的 index 记录：${relativePath}`);
+  }
+  if (!['100644', '100755', '120000'].includes(mode)) fail(`拒绝不支持的 index mode：${mode}（${relativePath}）`);
+  const components = relativePath.split('/');
+  if (
+    relativePath === '' ||
+    relativePath.startsWith('/') ||
+    relativePath.includes('\\') ||
+    components.some((component) => component === '' || component === '.' || component === '..')
+  ) {
+    fail(`拒绝越界 index 路径：${relativePath}`);
+  }
+  return { mode, object, relativePath, components };
+}
+
+function prepareTarget(record) {
+  let parent = snapshotDir;
+  for (const component of record.components.slice(0, -1)) {
+    const next = path.join(parent, component);
+    const info = lstatOrNull(next);
+    if (info === null) fs.mkdirSync(next);
+    else if (info.isSymbolicLink()) fail(`拒绝沿 snapshot symlink/junction 创建路径：${record.relativePath}`);
+    else if (!info.isDirectory()) fail(`snapshot 路径组件不是目录：${record.relativePath}`);
+    parent = next;
+  }
+  const target = path.join(parent, record.components.at(-1));
+  const info = lstatOrNull(target);
+  if (info !== null) fail(`snapshot 目标已存在或为 link：${record.relativePath}`);
+  return target;
+}
+
+async function main() {
+  const recordsBuffer = fs.readFileSync(recordsPath);
+  const child = spawn('bash', ['-c', 'git cat-file --batch'], { stdio: ['pipe', 'pipe', 'inherit'] });
+  const chunks = [];
+  let available = 0;
+  let ended = false;
+  let streamError = null;
+  let notifier = null;
+  const notify = () => {
+    const wake = notifier;
+    notifier = null;
+    if (wake) wake();
+  };
+  child.stdout.on('data', (chunk) => {
+    chunks.push(chunk);
+    available += chunk.length;
+    notify();
+  });
+  child.stdout.on('end', () => {
+    ended = true;
+    notify();
+  });
+  child.on('error', (error) => {
+    streamError = error;
+    ended = true;
+    notify();
+  });
+  const waitForData = async () => {
+    while (available === 0 && !ended) await new Promise((resolve) => (notifier = resolve));
+    if (available === 0) fail(`批量读取 index blob 短流：${streamError ? streamError.message : lastPath}`);
+  };
+  const take = async (size) => {
+    const result = Buffer.allocUnsafe(size);
+    let written = 0;
+    while (written < size) {
+      if (available === 0) await waitForData();
+      const chunk = chunks[0];
+      const count = Math.min(size - written, chunk.length);
+      chunk.copy(result, written, 0, count);
+      written += count;
+      available -= count;
+      if (count === chunk.length) chunks.shift();
+      else chunks[0] = chunk.subarray(count);
+    }
+    return result;
+  };
+  const readHeader = async () => {
+    for (;;) {
+      let offset = 0;
+      for (const chunk of chunks) {
+        const found = chunk.indexOf(0x0a);
+        if (found >= 0) return (await take(offset + found + 1)).subarray(0, offset + found).toString('ascii');
+        offset += chunk.length;
+      }
+      if (ended) fail(`批量读取 index blob header 短流（最后路径：${lastPath}）`);
+      await new Promise((resolve) => (notifier = resolve));
+    }
+  };
+  const request = async (object) => {
+    if (!child.stdin.write(`${object}\n`)) await once(child.stdin, 'drain');
+  };
+
+  try {
+    let offset = 0;
+    let count = 0;
+    while (offset < recordsBuffer.length) {
+      const end = recordsBuffer.indexOf(0, offset);
+      if (end < 0) fail('index 记录流缺少 NUL 分隔符');
+      count += 1;
+      const record = parseRecord(recordsBuffer.subarray(offset, end), count);
+      offset = end + 1;
+      lastPath = record.relativePath;
+      assertBudget();
+      const target = prepareTarget(record);
+      await request(record.object);
+      const header = await readHeader();
+      const headerParts = header.split(' ');
+      if (headerParts[0] !== record.object) fail(`批量读取 index blob header object 不匹配（第 ${count} 条：${lastPath}）`);
+      if (headerParts[1] === 'missing') fail(`批量读取 index blob 缺失（第 ${count} 条：${lastPath}）`);
+      if (headerParts.length !== 3 || headerParts[1] !== 'blob' || !/^\d+$/.test(headerParts[2])) {
+        fail(`批量读取 index blob header 类型或 size 非法（第 ${count} 条：${lastPath}）`);
+      }
+      const size = Number(headerParts[2]);
+      if (!Number.isSafeInteger(size)) fail(`批量读取 index blob header size 超出安全范围（第 ${count} 条：${lastPath}）`);
+      const payload = await take(size);
+      const delimiter = await take(1);
+      if (delimiter[0] !== 0x0a) fail(`批量读取 index blob 分隔符非法或短流（第 ${count} 条：${lastPath}）`);
+      const temporary = path.join(stagingDir, `blob-${count}-${process.pid}.tmp`);
+      const descriptor = fs.openSync(temporary, 'wx', 0o600);
+      try {
+        let written = 0;
+        while (written < payload.length) written += fs.writeSync(descriptor, payload, written, payload.length - written);
+      } finally {
+        fs.closeSync(descriptor);
+      }
+      const temporaryInfo = fs.lstatSync(temporary);
+      if (!temporaryInfo.isFile() || temporaryInfo.isSymbolicLink() || temporaryInfo.size !== size) {
+        fail(`index blob 临时文件不是精确普通文件（第 ${count} 条：${lastPath}）`);
+      }
+      fs.renameSync(temporary, target);
+      fs.chmodSync(target, record.mode === '100755' ? 0o755 : 0o644);
+      if (count === 1 || count % 25 === 0) process.stderr.write(`▸ pre-commit: 已物化 index snapshot：${count} 条（最后：${lastPath}）\n`);
+      assertBudget();
+    }
+    if (recordsBuffer.length === 0) fail('index 记录为空，无法建立 staged snapshot');
+    child.stdin.end();
+    const [exitCode] = await once(child, 'close');
+    if (exitCode !== 0) fail(`git cat-file --batch 异常退出（exit ${exitCode}）`);
+    process.stderr.write(`✓ pre-commit: index snapshot 物化完成：${count} 条\n`);
+  } finally {
+    child.stdin.destroy();
+    child.kill('SIGTERM');
+  }
+}
+
+main().catch((error) => {
+  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  process.exitCode = 1;
+});
+NODE
+}
+
+step "开始批量物化 index snapshot（阶段上限 45s）"
+if run_bounded 45 "批量物化 index snapshot" materialize_index_snapshot_batch; then
+  :
+else
+  status=$?
+  warn "批量物化 index snapshot 失败（exit $status）"
+  exit "$status"
+fi
+
+# blob 临时目录不再参与检查；先有界释放句柄，失败仍由 EXIT trap 重试清理。
+if run_bounded "$command_timeout_seconds" "释放 blob staging" rm -rf -- "$blob_staging_dir"; then
+  blob_staging_dir=''
+else
+  status=$?
+  warn "释放 blob staging 失败（exit $status）"
+  exit "$status"
+fi
 
 prettier_targets=()
 for staged_path in "${staged_array[@]}"; do
@@ -155,12 +497,15 @@ else
   if [ ! -f "$prettier_ignore" ]; then
     : > "$prettier_ignore"
   fi
-  step "prettier --ignore-unknown --check（index snapshot，${#prettier_targets[@]} 个暂存文件）"
-  if ! (cd "$snapshot_dir" && "${prettier_command[@]}" --ignore-unknown --check \
-    --config "$snapshot_dir/config/prettier.config.cjs" --ignore-path "$prettier_ignore" \
-    "${prettier_targets[@]}"); then
-    warn "暂存文件格式不符合 Prettier → 提交中止"
-    exit 1
+  if (cd "$snapshot_dir" && run_bounded "$command_timeout_seconds" \
+    "Prettier 检查 index snapshot（${#prettier_targets[@]} 个文件）" "${prettier_command[@]}" \
+    --ignore-unknown --check --config "$snapshot_dir/config/prettier.config.cjs" \
+    --ignore-path "$prettier_ignore" "${prettier_targets[@]}"); then
+    :
+  else
+    status=$?
+    warn "暂存文件 Prettier 检查失败（exit $status）→ 提交中止"
+    exit "$status"
   fi
   pass "格式检查通过"
 fi
@@ -176,10 +521,14 @@ if [ "${#ts_targets[@]}" -eq 0 ]; then
   exit 0
 fi
 
-step "npm run typecheck（index snapshot，${#ts_targets[@]} 个 .ts 暂存文件触发）"
-if ! (cd "$snapshot_dir" && npm run --silent typecheck); then
-  warn "类型检查不通过 → 提交中止"
-  exit 1
+if (cd "$snapshot_dir" && run_bounded "$command_timeout_seconds" \
+  "TypeScript 检查 index snapshot（${#ts_targets[@]} 个暂存文件触发）" "${typescript_command[@]}" \
+  -p "$snapshot_dir/config/tsconfig.json"); then
+  :
+else
+  status=$?
+  warn "类型检查失败（exit $status）→ 提交中止"
+  exit "$status"
 fi
 pass "类型检查通过"
 exit 0
