@@ -27,3 +27,15 @@ Every npm invocation printed the existing warning `npm warn Unknown user config 
 ## Unresolved issues
 
 None for Task 3. The pre-existing npm configuration warning remains informational.
+
+## Round 1 rework (2026-09-17)
+
+Independent review found an out-of-scope wording regression introduced by formatting: the active command reference said `阶段 1~~7` and `阶段 5~~8` instead of the baseline `阶段 1~7` and `阶段 5~8`. Restored only those two range expressions from baseline `a6f9aa61`; the S18 documentation additions remain unchanged.
+
+Validation:
+
+- `npx prettier --config config/prettier.config.cjs --check w-model-dev/references/command-reference.md`: returned exit 1 because the formatter proposes changing the restored baseline wording `阶段 1~7 / 阶段 5~8` back to `1~~7 / 5~~8`; this round preserves the required baseline semantics instead of accepting that formatter rewrite. The baseline content from `a6f9aa61` was checked with the same formatter input path and did not report a content error.
+- `git diff --check`: passed.
+- `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/gate-ticket-content.test.ts`: passed, 38/38 (rerun as a short focused regression check).
+
+No full test suite was run.
