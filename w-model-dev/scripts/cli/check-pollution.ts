@@ -16,6 +16,12 @@
  * 说明失败信号被吞掉、只留下了产物。本工具列出这些痕迹，供污染源二分定位；
  * 判据纯函数见 logic/pollution-logic.ts。
  *
+ * ⚠️ `coverage/` 判据是**深度 1 的名称启发式**：只按目录名匹配、**不嗅探内容**，
+ * 因此对「把 `coverage/` 用作用户自身目录名」的项目会**误报** exit 1（本仓实测例：
+ * `--project=w-model-dev/scripts/samples` 会命中 `samples/coverage/*.json` 这一合法
+ * fixture 集）。二分定位时须**人工排除**此类同名合法目录；不得据此自动删除 / 清理，
+ * 也不得把本判据当作放行或拒绝依据（同上方「按需工具」声明）。
+ *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-pollution.ts [--project=<dir>]
  *
