@@ -18,6 +18,18 @@ async function makeTempDir(prefix: string): Promise<string> {
   return dir;
 }
 
+async function removeTempDir(dir: string): Promise<void> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await fs.rm(dir, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (attempt === 4) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+    }
+  }
+}
+
 /**
  * 运行被测 bash 脚本。stdin 缺省时不提供内容——但必须显式关闭子进程 stdin：
  * execFile 的 input 选项对 execFile 无效（子进程 stdin 是永不关闭的管道），
@@ -127,7 +139,7 @@ mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; exit 99; }
 }
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
+  await Promise.all(tempDirs.splice(0).map(removeTempDir));
 });
 
 type SimulatedAuditCase =

@@ -2911,14 +2911,11 @@ mktemp() {
     );
 
     const result = await new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
-      execFile(
+      const child = execFile(
         'bash',
         [
           '-c',
-          'source "$BASH_ENV"; export -f npm npx mktemp 2>/dev/null || true; script="$1"; shift; bash "$script" "$@"',
-          '--',
-          '.githooks/pre-push',
-          '--force',
+          'source "$BASH_ENV"; export -f npm npx mktemp 2>/dev/null || true; bash "$(pwd)/.githooks/pre-push" --force',
         ],
         {
           cwd: REPO_ROOT,
@@ -2938,6 +2935,8 @@ mktemp() {
             stderr: String(stderr),
           }),
       );
+      // execFile 的 stdin 是管道；pre-push 无 ref 输入时必须显式 EOF，避免 Windows/WSL 挂起。
+      child.stdin?.end();
     });
 
     expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);

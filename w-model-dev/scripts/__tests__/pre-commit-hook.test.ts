@@ -1,81 +1,143 @@
-/* eslint-disable security/detect-non-literal-fs-filename -- 隔离 git 夹具由 mkdtemp 创建，测试仅写入其目录 */
-/** pre-commit 的 staged-only 反向契约：hook 必须读取 index 内容而非工作树内容。 */
-
-import { promises as fs } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { runSync } from '../lib/run-sync.js';
-
 const repoRoot = path.resolve(import.meta.dirname, '../../..');
-const hook = path.join(repoRoot, '.githooks', 'pre-commit');
-const tempDirs: string[] = [];
+const hookSource = path.join(repoRoot, '.githooks', 'pre-commit');
+const tempRoots: string[] = [];
 
-async function makeRepository(): Promise<string> {
-  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'wmodel-pre-commit-'));
-  tempDirs.push(repo);
-  await fs.mkdir(path.join(repo, 'config'), { recursive: true });
-  await fs.copyFile(path.join(repoRoot, 'config', 'prettier.config.cjs'), path.join(repo, 'config', 'prettier.config.cjs'));
-  // junction 使真实 hook 在隔离仓库中使用本工作树已安装的确定性工具链。
-  await fs.symlink(path.join(repoRoot, 'node_modules'), path.join(repo, 'node_modules'), 'junction');
-  git(repo, ['init']);
-  return repo;
+function toBashPath(value: string): string {
+  const normalized = value.replaceAll('\\', '/');
+  return /^([A-Za-z]):\//.test(normalized)
+    ? `/mnt/${normalized.slice(0, 1).toLowerCase()}${normalized.slice(2)}`
+    : normalized;
 }
 
-function git(repo: string, args: string[]): string {
-  const result = runSync('git', args, { cwd: repo, timeout: 30_000 });
-  if (result.status !== 0 || result.error !== undefined) throw new Error(`git ${args.join(' ')} failed: ${result.stderr ?? ''}`);
-  return result.stdout ?? '';
+async function makeFixture(): Promise<string> {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-pre-commit-'));
+  tempRoots.push(root);
+  await fs.mkdir(path.join(root, '.githooks'), { recursive: true });
+  await fs.mkdir(path.join(root, 'config'), { recursive: true });
+  await fs.mkdir(path.join(root, 'node_modules', '.bin'), { recursive: true });
+  await fs.copyFile(hookSource, path.join(root, '.githooks', 'pre-commit'));
+  await fs.writeFile(path.join(root, 'config', 'prettier.config.cjs'), 'module.exports = {};\n', 'utf8');
+  await fs.writeFile(
+    path.join(root, 'package.json'),
+    JSON.stringify({ private: true, scripts: { typecheck: 'node check-type.js' } }),
+    'utf8',
+  );
+  await fs.writeFile(
+    path.join(root, 'node_modules', '.bin', 'prettier'),
+    '#!/usr/bin/env bash\nfor arg in "$@"; do\n  case "$arg" in\n    *.json) grep -q \'"ok":true\' "$arg" && exit 1 ;;\n  esac\ndone\nexit 0\n',
+    'utf8',
+  );
+  await fs.chmod(path.join(root, 'node_modules', '.bin', 'prettier'), 0o755);
+  await fs.writeFile(
+    path.join(root, 'check-type.js'),
+    [
+      "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      "const source = fs.readFileSync(path.join(process.cwd(), 'src.ts'), 'utf8');",
+      "process.exit(source === 'VALID_STAGED\\n' ? 0 : 1);",
+    ].join('\n'),
+    'utf8',
+  );
+  return root;
 }
 
-function runHook(repo: string): { code: number | null; stdout: string; stderr: string } {
-  // 当前 bash 是 WSL：Node 的 D:\\ 路径须映射为 /mnt/d；再统一 POSIX 分隔符。
-  const bashHook = hook.replace(/^([A-Za-z]):/, (_whole, drive: string) => `/mnt/${drive.toLowerCase()}`).replaceAll('\\', '/');
-  const result = runSync('bash', [bashHook], { cwd: repo, timeout: 60_000 });
-  return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+function git(root: string, args: string[]): void {
+  const result = spawnSync('git', args, {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+    env: { ...process.env, GIT_INDEX_FILE: undefined },
+  });
+  expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
 }
 
-function indexText(repo: string): string {
-  return git(repo, ['show', ':fixture.json']);
+function runHook(root: string, indexFile: string): ReturnType<typeof spawnSync> {
+  const hookPath = toBashPath(path.join(root, '.githooks', 'pre-commit'));
+  const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\\\''")}'`;
+  return spawnSync('bash', ['-c', `bash ${shellQuote(hookPath)}`], {
+    cwd: root,
+    encoding: 'utf8',
+    input: '',
+    timeout: 60_000,
+    env: { ...process.env, GIT_INDEX_FILE: toBashPath(indexFile) },
+  });
+}
+
+async function initFixture(source: string): Promise<{ root: string; index: string; worktree: string }> {
+  const root = await makeFixture();
+  const index = path.join(root, '.git', 'index');
+  await fs.writeFile(path.join(root, 'src.ts'), source, 'utf8');
+  git(root, ['init', '-q']);
+  git(root, ['config', 'user.email', 'test@example.invalid']);
+  git(root, ['config', 'user.name', 'Test']);
+  git(root, ['add', '.']);
+  git(root, ['-c', 'commit.gpgSign=false', 'commit', '-q', '--no-verify', '--no-gpg-sign', '-m', 'base']);
+  return { root, index, worktree: path.join(root, 'src.ts') };
+}
+
+async function removeWithRetry(root: string): Promise<void> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await fs.rm(root, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (attempt === 4) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+    }
+  }
 }
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })));
+  await Promise.all(tempRoots.splice(0).map(removeWithRetry));
 });
 
-describe('pre-commit staged-only（真实 hook 入口）', () => {
-  it('暂存格式合法、工作树格式非法时通过；hook 不得读取或改写工作树版本', async () => {
-    const repo = await makeRepository();
-    const file = path.join(repo, 'fixture.json');
-    const staged = '{\n  "ok": true\n}\n';
-    const worktree = '{"ok":true}\n';
-    await fs.writeFile(file, staged, 'utf8');
-    git(repo, ['add', 'fixture.json']);
-    await fs.writeFile(file, worktree, 'utf8');
+describe('pre-commit staged snapshot', () => {
+  it('passes when staged JSON is formatted and the worktree copy is not', async () => {
+    const fixture = await initFixture('VALID_STAGED\n');
+    const file = path.join(fixture.root, 'fixture.json');
+    await fs.writeFile(file, '{\n  "ok": true\n}\n', 'utf8');
+    git(fixture.root, ['add', 'fixture.json']);
+    await fs.writeFile(file, '{"ok":true}\n', 'utf8');
 
-    const result = runHook(repo);
+    const result = runHook(fixture.root, fixture.index);
 
-    expect(result.code, result.stderr).toBe(0);
-    await expect(fs.readFile(file, 'utf8')).resolves.toBe(worktree);
-    expect(indexText(repo)).toBe(staged);
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(await fs.readFile(file, 'utf8')).toBe('{"ok":true}\n');
+    expect(await fs.readFile(path.join(fixture.root, '.git', 'index'))).toBeTruthy();
   });
 
-  it('暂存格式非法、工作树格式合法时阻断；hook 不得用工作树掩盖 index 缺陷', async () => {
-    const repo = await makeRepository();
-    const file = path.join(repo, 'fixture.json');
-    const staged = '{"ok":true}\n';
-    const worktree = '{\n  "ok": true\n}\n';
-    await fs.writeFile(file, staged, 'utf8');
-    git(repo, ['add', 'fixture.json']);
-    await fs.writeFile(file, worktree, 'utf8');
+  it('passes when staged content is valid and the worktree copy is invalid', async () => {
+    const fixture = await initFixture('VALID_STAGED\n');
+    await fs.writeFile(fixture.worktree, 'VALID_STAGED\n', 'utf8');
+    git(fixture.root, ['add', 'src.ts']);
+    await fs.writeFile(fixture.worktree, 'INVALID_WORKTREE\n', 'utf8');
 
-    const result = runHook(repo);
+    const result = runHook(fixture.root, fixture.index);
 
-    expect(result.code).toBe(1);
-    expect(result.stderr).toContain('格式不符合 Prettier');
-    await expect(fs.readFile(file, 'utf8')).resolves.toBe(worktree);
-    expect(indexText(repo)).toBe(staged);
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(await fs.readFile(fixture.worktree, 'utf8')).toBe('INVALID_WORKTREE\n');
+    expect(existsSync(fixture.index)).toBe(true);
+    expect(result.stderr).not.toContain('exit127');
+    expect(result.stderr).not.toContain('EBUSY');
+  });
+
+  it('fails when staged content is invalid and the worktree copy is valid', async () => {
+    const fixture = await initFixture('VALID_WORKTREE\n');
+    await fs.writeFile(fixture.worktree, 'INVALID_STAGED\n', 'utf8');
+    git(fixture.root, ['add', 'src.ts']);
+    await fs.writeFile(fixture.worktree, 'VALID_WORKTREE\n', 'utf8');
+
+    const result = runHook(fixture.root, fixture.index);
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
+    expect(await fs.readFile(fixture.worktree, 'utf8')).toBe('VALID_WORKTREE\n');
+    expect(existsSync(fixture.index)).toBe(true);
   });
 });

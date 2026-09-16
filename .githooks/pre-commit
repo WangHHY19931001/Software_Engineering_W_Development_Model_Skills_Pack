@@ -1,21 +1,5 @@
 #!/usr/bin/env bash
-# 本地提交前快层（pre-commit fast layer，M12 / D-4）
-#
-# 目的：把「格式 + 类型」两类秒级反馈留在 `git commit` 前，避免反馈代价全部压到
-#       `.githooks/pre-push`（18 项门禁）。本层只做 staged-only 快速检查。
-#
-# 快慢分层（M12 的 W-model 落位）：
-#   - 快层（本文件）：staged-only prettier + 条件触发的 tsc。
-#   - 慢层（`pre-push`）：全量 vitest / 门禁脚本 / 安全扫描 / samples 覆盖 / 18 项门禁。
-#   本层是慢层的**严格子集**，不重复慢层工作，**绝不跑全量 vitest**。
-#
-# 启用方式：`core.hooksPath=.githooks` 已由 npm postinstall（`scripts/setup-hooks.cjs`）设置，
-#           **不引入 husky**、**不改 `package.json`**。本文件由 git 直接执行（git 自带 sh/bash），
-#           不经 npm script 入口，故无需 cmd/PowerShell 降级守卫。
-# 临时跳过（仅紧急情况，勿用于常规开发）：`git commit --no-verify`
-#
-# 缺工具即降级告知（M12 台账明文）：node / node_modules / prettier 任一不可用时，
-#   打印明确告警并**放行**（exit 0）——不静默失败、不阻断提交。
+# 本地提交前快层：只校验 index snapshot，不读取工作树中的同名文件。
 
 set -euo pipefail
 
@@ -24,115 +8,101 @@ info() { printf '  %s\n' "$*" >&2; }
 pass() { printf '✓ pre-commit: %s\n' "$*" >&2; }
 step() { printf '▸ pre-commit: %s\n' "$*" >&2; }
 
-# ---------- 1. 取暂存文件列表（staged-only，不扫全仓） ----------
-# --diff-filter=ACMR：只取 Added / Copied / Modified / Renamed；已删除文件无需检查。
-# `git diff --cached --name-only` 输出在含中文路径时可能被转义，先关闭 quotePath。
-staged_files="$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR)"
-if [ -z "$staged_files" ]; then
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+original_git_index_file="${GIT_INDEX_FILE-}"
+original_git_index_was_set=0
+if [ "${GIT_INDEX_FILE+x}" = x ]; then original_git_index_was_set=1; fi
+snapshot_dir=''
+cleanup() {
+  local exit_code=$?
+  local cleanup_failed=0
+  trap - EXIT INT TERM
+  if [ "$original_git_index_was_set" -eq 1 ]; then
+    export GIT_INDEX_FILE="$original_git_index_file"
+  else
+    unset GIT_INDEX_FILE
+  fi
+  if [ -n "$snapshot_dir" ] && [ -d "$snapshot_dir" ]; then
+    for attempt in 1 2 3 4 5; do
+      if rm -rf -- "$snapshot_dir"; then break; fi
+      if [ "$attempt" -eq 5 ]; then cleanup_failed=1; else sleep 0.1; fi
+    done
+  fi
+  if [ "$cleanup_failed" -eq 1 ]; then
+    warn "无法清理临时 index snapshot：$snapshot_dir"
+    exit_code=1
+  fi
+  exit "$exit_code"
+}
+trap cleanup EXIT INT TERM
+
+staged_array=()
+while IFS= read -r -d '' staged_path; do
+  staged_array+=("$staged_path")
+done < <(git -c core.quotePath=false diff --cached --name-only -z --diff-filter=ACMR)
+if [ "${#staged_array[@]}" -eq 0 ]; then
   pass "无暂存文件，跳过快速检查"
   exit 0
 fi
 
-staged_array=()
-while IFS= read -r staged_path; do
-  if [ -n "$staged_path" ]; then
-    staged_array+=("$staged_path")
-  fi
-done <<< "$staged_files"
-staged_count="${#staged_array[@]}"
-
-# ---------- 2. 缺工具降级判定（M12：缺脚本即降级告知） ----------
 if ! command -v node >/dev/null 2>&1; then
   warn "node 不可用 → 降级放行（格式检查与类型检查均未执行）"
-  info "恢复后重试：node --version 确认可用，再重新 git commit"
   exit 0
 fi
-
-if [ ! -d node_modules ]; then
+if [ ! -d "$repo_root/node_modules" ]; then
   warn "node_modules 缺失 → 降级放行（格式检查与类型检查均未执行）"
-  info "恢复后重试：先 npm install，再重新 git commit"
   exit 0
 fi
-
 if ! npx --no-install prettier --version >/dev/null 2>&1; then
   warn "prettier 不可用 → 降级放行（格式检查未执行）"
-  info "恢复后重试：确认 devDependencies 含 prettier 且已 npm install"
   exit 0
 fi
 
-# prettier 就绪判定：配置文件缺失时**跳过格式检查但不阻断**（继续下面的类型检查），
-# 避免把「配置缺失」误报成「格式不符合」而给出误导性的拦截。
-prettier_ready=1
-if [ ! -f config/prettier.config.cjs ]; then
-  warn "prettier 配置 config/prettier.config.cjs 缺失 → 跳过格式检查（继续类型检查）"
-  prettier_ready=0
-fi
+# 用 index 生成临时工作副本；每个暂存路径再由 git show :path 显式写入。
+snapshot_dir="$(mktemp -d "$repo_root/.pre-commit-snapshot.XXXXXX")"
+index_tree="$(git write-tree)"
+git archive --format=tar "$index_tree" | tar -xf - -C "$snapshot_dir"
+for staged_path in "${staged_array[@]}"; do
+  snapshot_path="$snapshot_dir/$staged_path"
+  mkdir -p -- "$(dirname -- "$snapshot_path")"
+  git show ":$staged_path" > "$snapshot_path"
+done
 
-# ---------- 3. prettier：staged-only 格式检查 ----------
-# 检查面 = 本仓 prettier 已治理的文件；以下类别**按类别排除**，否则会产生系统性误伤
-# （实测口径：对 tracked 文件跑 `prettier --config config/prettier.config.cjs --check`（排除目录按本
-#   hook 同口径加 `--ignore-unknown`），计 `[warn] <path>` 行并扣除汇总行——分母 = tracked 文件数，
-#   分子 = 报 `[warn]` 的文件数。实测：全仓 `*.md` 432 份中 321 份非 clean；下列排除目录内非 `.md`
-#   文件 370 份中 8 份非 clean；排除面之外的非 `.md` 文件仅 `docs/index.html` 非 clean）：
-#   - `*.md`：markdown 不在本仓 prettier 面内（pre-push 的 prettier 门禁只覆盖
-#     `w-model-dev/scripts/**/*.ts` / `config/**/*.{cjs,ts}` / `scripts/*.cjs`）；
-#     纳入 .md 会把每次文档提交变成误伤拦截，且需先整体重排 321 份既有文档。
-#   - `docs/index.html`：既存非 clean 的静态文档页，同样不在 pre-push prettier 面内（同上）；
-#     纳入会以既有格式问题拦下提交，而 pre-push 会放行——正是本排除面要消除的误伤类。
-#   - `docs/changes/**`：受控历史归档（冻结证据，不得重排）。
-#   - `eval/**`：评估语料（手工维护，`eval/mappings.json` 现状非 prettier-clean）。
-#   - `w-model-dev/scripts/samples/**`：手写门禁 fixture（JSON 契约手工维护）。
-#   - `w-model-dev/templates/**`：模板（含占位符形态，非 prettier 规范）。
-# 其余暂存文件一律交给 prettier；`--ignore-unknown` 使不可处理类型（二进制等）自动跳过。
 prettier_targets=()
 for staged_path in "${staged_array[@]}"; do
   case "$staged_path" in
-    *.md) continue ;;
-    docs/index.html) continue ;;
-    docs/changes/*) continue ;;
-    eval/*) continue ;;
-    w-model-dev/scripts/samples/*) continue ;;
-    w-model-dev/templates/*) continue ;;
+    *.md|docs/index.html|docs/changes/*|eval/*|w-model-dev/scripts/samples/*|w-model-dev/templates/*) continue ;;
   esac
-  prettier_targets+=("$staged_path")
+  prettier_targets+=("$snapshot_dir/$staged_path")
 done
-
-if [ "$prettier_ready" -eq 0 ]; then
-  pass "格式检查已跳过（prettier 配置缺失，见上方告警）"
-elif [ "${#prettier_targets[@]}" -eq 0 ]; then
-  pass "暂存 ${staged_count} 个文件，均不在本仓 prettier 面内，跳过格式检查"
+if [ "${#prettier_targets[@]}" -eq 0 ]; then
+  pass "暂存 ${#staged_array[@]} 个文件，均不在本仓 prettier 面内，跳过格式检查"
 else
-  step "prettier --ignore-unknown --check（staged-only，${#prettier_targets[@]}/${staged_count} 个暂存文件）"
-  if ! npx --no-install prettier --ignore-unknown --check --config config/prettier.config.cjs \
-    "${prettier_targets[@]}"; then
+  step "prettier --ignore-unknown --check（index snapshot，${#prettier_targets[@]} 个暂存文件）"
+  if ! npx --no-install prettier --ignore-unknown --check --config "$snapshot_dir/config/prettier.config.cjs" "${prettier_targets[@]}"; then
     warn "暂存文件格式不符合 Prettier → 提交中止"
-    info "修复：npx prettier --write <上述文件> 后重新 git add"
-    info "临时跳过（仅紧急情况）：git commit --no-verify"
     exit 1
   fi
   pass "格式检查通过"
 fi
 
-# ---------- 4. tsc：仅当暂存含 TypeScript 时触发（无 TS 暂存则跳过） ----------
 ts_targets=()
 for staged_path in "${staged_array[@]}"; do
   case "$staged_path" in
     *.ts|*.tsx|*.mts|*.cts) ts_targets+=("$staged_path") ;;
   esac
 done
-
 if [ "${#ts_targets[@]}" -eq 0 ]; then
   pass "无 TypeScript 暂存文件，跳过类型检查"
   exit 0
 fi
 
-step "npm run typecheck（${#ts_targets[@]} 个 .ts 暂存文件触发）"
-if ! npm run --silent typecheck; then
+step "npm run typecheck（index snapshot，${#ts_targets[@]} 个 .ts 暂存文件触发）"
+if ! (cd "$snapshot_dir" && npm run --silent typecheck); then
   warn "类型检查不通过 → 提交中止"
-  info "修复：npm run typecheck 定位后修正，再重新 git add"
-  info "临时跳过（仅紧急情况）：git commit --no-verify"
   exit 1
 fi
 pass "类型检查通过"
-
 exit 0
