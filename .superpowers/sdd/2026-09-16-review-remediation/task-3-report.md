@@ -39,3 +39,15 @@ Validation:
 - `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/gate-ticket-content.test.ts`: passed, 38/38 (rerun as a short focused regression check).
 
 No full test suite was run.
+
+## Round 2 rework (2026-09-17)
+
+The review requested the active command-reference wording `阶段 1~~7 / 阶段 5~~8`; restored only those two expressions and left the S18 documentation unchanged. A byte-level `git show a6f9aa61:w-model-dev/references/command-reference.md` check in this checkout emitted the single-tilde form, which conflicts with the explicit round-2 target; the requested target text was followed and the discrepancy is recorded here.
+
+Validation:
+
+- `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/gate-ticket-content.test.ts`: passed, 38/38.
+- `npx prettier --config config/prettier.config.cjs --check w-model-dev/references/command-reference.md`: passed after restoring the document's original CRLF line endings.
+- `git diff --check`: passed; the only output was Git's existing LF-to-CRLF warning for the report/document working-copy line endings.
+
+No full test suite was run.

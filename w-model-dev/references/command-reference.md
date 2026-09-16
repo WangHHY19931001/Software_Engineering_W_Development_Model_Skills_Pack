@@ -160,7 +160,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 - **`pass`**（S 子代理）：仅将实际通过用例标为通过，并更新 `executionSummary.<type>Test`。
 - **`fail`**（S 子代理）：记录失败用例、根因和关联模块，更新 RTM，按阶段参考回退。
 - **评审**（V 子代理）：按 `targetKind=test` 路由 `test-engineer` Persona。
-- **门禁**（G 子代理）：阶段 1~7 跑 `check-verifier-output.ts`；阶段 5~8 另跑 `check-artifact-gate.ts --phase=N`（M07 起含测试证据 E1~E4 校验，`GATE_JSON.testEvidence` 为 8 键计数对象——完整形状与「`testEvidence.legacy`（数值）vs 顶层 `legacy`（非阻断诊断数组）」的区别见 `rtm-guide.md`「测试执行证据（M07）」节；给定 `--tickets` 时另含 `GATE_JSON.tickets:{checked,criticalMissing,buildabilityMissing}`，见下「Artifact Gate 项目阶段证据门」节）。
+- **门禁**（G 子代理）：阶段 1~~7 跑 `check-verifier-output.ts`；阶段 5~~8 另跑 `check-artifact-gate.ts --phase=N`（M07 起含测试证据 E1~E4 校验，`GATE_JSON.testEvidence` 为 8 键计数对象——完整形状与「`testEvidence.legacy`（数值）vs 顶层 `legacy`（非阻断诊断数组）」的区别见 `rtm-guide.md`「测试执行证据（M07）」节；给定 `--tickets` 时另含 `GATE_JSON.tickets:{checked,criticalMissing,buildabilityMissing}`，见下「Artifact Gate 项目阶段证据门」节）。
 - **产出**（S 子代理）：使用 `templates/test-report.md` 生成测试报告。
 
 ## `/wm review <target>`
