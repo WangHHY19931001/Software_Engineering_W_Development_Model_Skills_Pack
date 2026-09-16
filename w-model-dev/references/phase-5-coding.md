@@ -243,7 +243,7 @@ D-6 裁定原文（`:133`）：「worktree 内**禁止**写 `.w-model`；跨 wor
 
 1. **平行事实源**：新建 worktree **不继承** `.w-model/`；风险不是继承，而是「worktree 内跑 `/wm` 会**新建**一份」，造成**写入位置分叉**。
 2. **锁**：`wm-write.ts` 的锁在**同一文件路径**上生效，**跨 worktree 不互斥**，多 worktree 各写各的不保证全局单写者（设计规格 §4.4 `:195`）。
-3. **SSoT `headRef`**：SSoT `:283` 要求 ChangeScope 的 `headRef` 解析 sha **等于当前 HEAD**，而每个 worktree 有独立 HEAD——这正是设计规格 §4.4 `:195` 所指的冲突点（SSoT §4.4 正文见 `:596`）。
+3. **SSoT `headRef`**：SSoT `:283` 要求 ChangeScope 的 `headRef` 解析 sha **等于当前 HEAD**，而每个 worktree 有独立 HEAD——这正是设计规格 §4.4 `:195` 所指的冲突点（该 headRef 规则所属 SSoT 节为 §3.3.1 外部工具集成，正文见 `:283`）。
 
 ### 五条隔离纪律
 

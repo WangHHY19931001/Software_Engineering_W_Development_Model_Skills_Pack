@@ -30,7 +30,7 @@
 | check-maturity | fixture | `samples/maturity/bad-stale.json`（self-test.ts:1269） | 放宽周期校验将漏掉 maturity 过期未降级导致的成熟度虚高 |
 | check-checkpoint | fixture | `samples/checkpoint/bad-empty-decisions.jsonl`（self-test.ts:1303） | 放宽 R1 决策非空将漏掉空决策的 CHECKPOINT 被判通过（人类确认被绕过） |
 | check-code-tla-consistency | fixture | `samples/code-tla/bad-sd-no-code-module.json`（self-test.ts:1330） | 放宽 SD→codeModule 将漏掉设计组件无对应实现仍通过一致性回归 |
-| check-rootcause-report | fixture | `samples/rootcause/bad-r1-missing-fields.json`（self-test.ts:1369） | 放宽 R1 将漏掉缺必填字段的 RootCauseReport 被 V/G 接受进入返工 |
+| check-rootcause-report | fixture | `samples/rootcause/bad-r1-missing-fields.json`（self-test.ts:1465） | 放宽 R1 将漏掉缺必填字段的 RootCauseReport 被 V/G 接受进入返工 |
 | check-preventive-review | fixture | `samples/preventive-review/valid-completeness.json`（self-test.ts:1452，B 组强化后断言 /R3 报告缺失/） | 去掉缺失维度断言后 reliability/security 缺二仍整体 passed=true |
 | check-iceberg-sweep | fixture | `samples/iceberg/bad-round-out-of-range.json`（self-test.ts:1500） | 放宽 R1-R5 将漏掉 iceberg round 越界（超过 maxIcebergRounds）仍被接受 |
 | check-role-dispatch | fixture | `samples/run-log/bad-missing-V-role.jsonl`（self-test.ts:1580） | 放宽角色分派完整性（约束 #8）将漏掉阶段缺 V 分派记录仍通过 |

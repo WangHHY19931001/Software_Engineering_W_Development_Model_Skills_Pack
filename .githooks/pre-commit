@@ -70,10 +70,15 @@ fi
 
 # ---------- 3. prettier：staged-only 格式检查 ----------
 # 检查面 = 本仓 prettier 已治理的文件；以下类别**按类别排除**，否则会产生系统性误伤
-# （实测：全仓 40 份 .md 与 8 份归档 / fixture JSON 现状非 prettier-clean）：
+# （实测口径：对 tracked 文件跑 `prettier --config config/prettier.config.cjs --check`（排除目录按本
+#   hook 同口径加 `--ignore-unknown`），计 `[warn] <path>` 行并扣除汇总行——分母 = tracked 文件数，
+#   分子 = 报 `[warn]` 的文件数。实测：全仓 `*.md` 432 份中 321 份非 clean；下列排除目录内非 `.md`
+#   文件 370 份中 8 份非 clean；排除面之外的非 `.md` 文件仅 `docs/index.html` 非 clean）：
 #   - `*.md`：markdown 不在本仓 prettier 面内（pre-push 的 prettier 门禁只覆盖
 #     `w-model-dev/scripts/**/*.ts` / `config/**/*.{cjs,ts}` / `scripts/*.cjs`）；
-#     纳入 .md 会把每次文档提交变成误伤拦截，且需先整体重排 40 份既有文档。
+#     纳入 .md 会把每次文档提交变成误伤拦截，且需先整体重排 321 份既有文档。
+#   - `docs/index.html`：既存非 clean 的静态文档页，同样不在 pre-push prettier 面内（同上）；
+#     纳入会以既有格式问题拦下提交，而 pre-push 会放行——正是本排除面要消除的误伤类。
 #   - `docs/changes/**`：受控历史归档（冻结证据，不得重排）。
 #   - `eval/**`：评估语料（手工维护，`eval/mappings.json` 现状非 prettier-clean）。
 #   - `w-model-dev/scripts/samples/**`：手写门禁 fixture（JSON 契约手工维护）。
@@ -83,6 +88,7 @@ prettier_targets=()
 for staged_path in "${staged_array[@]}"; do
   case "$staged_path" in
     *.md) continue ;;
+    docs/index.html) continue ;;
     docs/changes/*) continue ;;
     eval/*) continue ;;
     w-model-dev/scripts/samples/*) continue ;;
