@@ -5,7 +5,7 @@
  * - StructuredViolation / GateCheckResult：结构化违规双轨的结构化形态
  * - JsonReport：--json 输出摘要形态
  */
-export type { Phase } from "./constants.js";
+export type { Phase } from './constants.js';
 
 /** 结构化违规（rule/field/message 三要素） */
 export interface StructuredViolation {
@@ -58,7 +58,7 @@ export interface JsonReport {
     buildabilityMissing: number;
   } | null;
   /** run-log lifecycle 状态；通过但有历史诊断时仍为 NOT_CLOSED_NOT_PROVEN。 */
-  lifecycleStatus?: "CLOSED_UNDER_CURRENT_RULES" | "NOT_CLOSED_NOT_PROVEN";
+  lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
   /** run-log exit 0 的语义边界说明。 */
   statusNote?: string;
   durationMs: number;

@@ -36,26 +36,22 @@
  * @module
  */
 
-import { promises as fs } from "node:fs";
-import * as path from "node:path";
+import { promises as fs } from 'node:fs';
+import * as path from 'node:path';
 
 import {
   checkRunLog,
   inspectGateLogContent,
   buildGateLogKeys,
   type RunLogLifecycleStatus,
-} from "../logic/run-log-logic.js";
-import { validateBySchema } from "../infrastructure/schema-loader.js";
-import { readJsonlOrExitDetailed } from "../lib/read-json-or-exit.js";
-import { exitWithError } from "../lib/cli-error.js";
-import { runMain } from "../lib/run-main.js";
-import { parseJsonSafe } from "../lib/safe-json.js";
-import {
-  printGateReport,
-  printJsonReport,
-  buildViolationDistribution,
-} from "../lib/gate-report.js";
-import { hasFlag, parseFlagValue } from "../lib/parse-args.js";
+} from '../logic/run-log-logic.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
+import { readJsonlOrExitDetailed } from '../lib/read-json-or-exit.js';
+import { exitWithError } from '../lib/cli-error.js';
+import { runMain } from '../lib/run-main.js';
+import { parseJsonSafe } from '../lib/safe-json.js';
+import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
+import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 
 // ==================== 参数解析 ====================
 
@@ -69,22 +65,22 @@ interface ParsedArgs {
 
 function parseArgs(argv: string[]): ParsedArgs {
   const args = argv.slice(2);
-  const runLogFile = args.find((a) => !a.startsWith("--"));
-  const gateLogsPrefix = "--gate-logs=";
+  const runLogFile = args.find((a) => !a.startsWith('--'));
+  const gateLogsPrefix = '--gate-logs=';
   let gateLogsDir: string | undefined;
   let gateLogsExplicit = false;
   let gateLogsInvalid = false;
   for (const arg of args) {
-    if (arg !== "--gate-logs" && !arg.startsWith(gateLogsPrefix)) continue;
+    if (arg !== '--gate-logs' && !arg.startsWith(gateLogsPrefix)) continue;
     gateLogsExplicit = true;
-    const value = arg === "--gate-logs" ? "" : arg.slice(gateLogsPrefix.length);
-    if (value.trim() === "") {
+    const value = arg === '--gate-logs' ? '' : arg.slice(gateLogsPrefix.length);
+    if (value.trim() === '') {
       gateLogsInvalid = true;
     } else if (gateLogsDir === undefined) {
       gateLogsDir = value;
     }
   }
-  const tlaManifestFile = parseFlagValue(args, "tla-manifest");
+  const tlaManifestFile = parseFlagValue(args, 'tla-manifest');
   return {
     runLogFile,
     gateLogsDir,
@@ -116,13 +112,11 @@ async function loadGateLogs(gateLogsDir: string): Promise<GateLogsResult> {
     files = await fs.readdir(dirAbs);
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
-    const category = e.code === "ENOENT" ? "输入错误" : "证据违规";
+    const category = e.code === 'ENOENT' ? '输入错误' : '证据违规';
     return {
       map: new Map(),
       fileCount: 0,
-      violations: [
-        `R6: gate-logs 目录读取失败（${category}）: ${dirAbs}（${e.code ?? e.message}）`,
-      ],
+      violations: [`R6: gate-logs 目录读取失败（${category}）: ${dirAbs}（${e.code ?? e.message}）`],
     };
   }
 
@@ -133,7 +127,7 @@ async function loadGateLogs(gateLogsDir: string): Promise<GateLogsResult> {
     fileCount++;
     const fileAbs = path.join(dirAbs, file);
     try {
-      const content = await fs.readFile(fileAbs, "utf-8");
+      const content = await fs.readFile(fileAbs, 'utf-8');
       let parsed: unknown;
       try {
         parsed = parseJsonSafe(content);
@@ -147,15 +141,10 @@ async function loadGateLogs(gateLogsDir: string): Promise<GateLogsResult> {
       }
       const inspected = inspectGateLogContent(content);
       let schemaValid = false;
-      if (
-        !inspected.rootJson ||
-        !parsed ||
-        typeof parsed !== "object" ||
-        Array.isArray(parsed)
-      ) {
+      if (!inspected.rootJson || !parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
         violations.push(`R6: gate-log ${fileAbs} 根 JSON 必须为 object`);
       } else {
-        const schemaResult = validateBySchema("gate-log", parsed);
+        const schemaResult = validateBySchema('gate-log', parsed);
         schemaValid = schemaResult.valid;
         if (!schemaResult.valid) {
           for (const message of schemaResult.errorMessages) {
@@ -163,25 +152,18 @@ async function loadGateLogs(gateLogsDir: string): Promise<GateLogsResult> {
           }
         }
       }
-      for (const violation of inspected.violations)
-        violations.push(`R6: gate-log ${fileAbs} ${violation}`);
+      for (const violation of inspected.violations) violations.push(`R6: gate-log ${fileAbs} ${violation}`);
       if (inspected.exitCode === undefined) {
         violations.push(`R6: gate-log ${fileAbs} 未提取到合法 exitCode`);
       }
-      if (
-        schemaValid &&
-        inspected.violations.length === 0 &&
-        inspected.exitCode !== undefined
-      ) {
+      if (schemaValid && inspected.violations.length === 0 && inspected.exitCode !== undefined) {
         const data = { exitCode: inspected.exitCode, content };
         const keys = buildGateLogKeys(fileAbs, process.cwd());
         for (const k of keys) map.set(k, data);
       }
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
-      violations.push(
-        `R6: gate-log 文件读取失败: ${fileAbs}（${e.code ?? e.message}）`,
-      );
+      violations.push(`R6: gate-log 文件读取失败: ${fileAbs}（${e.code ?? e.message}）`);
     }
   }
   return { map, fileCount, violations };
@@ -194,25 +176,19 @@ async function loadGateLogs(gateLogsDir: string): Promise<GateLogsResult> {
  * tla-manifest.checkRounds 是数组（见 tla-logic.ts TlaManifest.checkRounds），
  * 其长度应与 run-log 中 action=rework 记录数一致。
  */
-async function loadTlaCheckRounds(
-  tlaManifestFile: string,
-): Promise<number | undefined> {
+async function loadTlaCheckRounds(tlaManifestFile: string): Promise<number | undefined> {
   const abs = path.resolve(tlaManifestFile);
   try {
-    const raw = await fs.readFile(abs, "utf-8");
+    const raw = await fs.readFile(abs, 'utf-8');
     const parsed = parseJsonSafe(raw) as { checkRounds?: unknown };
     if (Array.isArray(parsed.checkRounds)) {
       return parsed.checkRounds.length;
     }
-    console.error(
-      `⚠ tla-manifest 未含有效 checkRounds 数组，跳过 R3 返工一致性校验: ${abs}`,
-    );
+    console.error(`⚠ tla-manifest 未含有效 checkRounds 数组，跳过 R3 返工一致性校验: ${abs}`);
     return undefined;
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
-    console.error(
-      `⚠ tla-manifest 文件读取失败，跳过 R3 返工一致性校验: ${abs}（${e.code ?? e.message}）`,
-    );
+    console.error(`⚠ tla-manifest 文件读取失败，跳过 R3 返工一致性校验: ${abs}（${e.code ?? e.message}）`);
     return undefined;
   }
 }
@@ -221,23 +197,17 @@ async function loadTlaCheckRounds(
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
-  const jsonMode = hasFlag(process.argv.slice(2), "json");
+  const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
-  const {
-    runLogFile,
-    gateLogsDir,
-    gateLogsExplicit,
-    gateLogsInvalid,
-    tlaManifestFile,
-  } = parseArgs(process.argv);
+  const { runLogFile, gateLogsDir, gateLogsExplicit, gateLogsInvalid, tlaManifestFile } = parseArgs(process.argv);
 
   if (!runLogFile) {
     exitWithError({
-      category: "ARG_INVALID",
-      rule: "P0-1",
-      message: "参数缺失 <run-log.jsonl>",
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: '参数缺失 <run-log.jsonl>',
       detail:
-        "用法: npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>]",
+        '用法: npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>]',
       exitCode: 2,
     });
     return;
@@ -245,10 +215,10 @@ async function main(): Promise<void> {
 
   if (gateLogsExplicit && (gateLogsInvalid || !gateLogsDir)) {
     exitWithError({
-      category: "ARG_INVALID",
-      rule: "P0-2",
-      message: "--gate-logs 需要非空目录路径（使用 --gate-logs=<dir>）",
-      detail: "收到空值或缺失值",
+      category: 'ARG_INVALID',
+      rule: 'P0-2',
+      message: '--gate-logs 需要非空目录路径（使用 --gate-logs=<dir>）',
+      detail: '收到空值或缺失值',
       exitCode: 2,
     });
     return;
@@ -257,7 +227,7 @@ async function main(): Promise<void> {
   const runLogAbs = path.resolve(runLogFile);
 
   // 读 run-log.jsonl（ENOENT → exit(2)；坏行保留 parseErrors，避免部分历史被当成完整输入）
-  const parsedRunLog = await readJsonlOrExitDetailed(runLogAbs, "run-log");
+  const parsedRunLog = await readJsonlOrExitDetailed(runLogAbs, 'run-log');
   const entries = parsedRunLog.entries;
 
   // 可选输入：--gate-logs；一旦显式传入，读取/schema/协议错误均为 blocking violation。
@@ -296,15 +266,13 @@ async function main(): Promise<void> {
   const diagnostics = [...(result.diagnostics ?? [])];
   const exitCode = passed ? 0 : 1;
   const lifecycleStatus: RunLogLifecycleStatus =
-    passed && diagnostics.length === 0
-      ? "CLOSED_UNDER_CURRENT_RULES"
-      : "NOT_CLOSED_NOT_PROVEN";
+    passed && diagnostics.length === 0 ? 'CLOSED_UNDER_CURRENT_RULES' : 'NOT_CLOSED_NOT_PROVEN';
   const statusNote =
     passed && diagnostics.length > 0
-      ? "exit 0 仅表示当前规则未产生 blocking diagnostics；不等于 lifecycle closed 或阶段放行。"
+      ? 'exit 0 仅表示当前规则未产生 blocking diagnostics；不等于 lifecycle closed 或阶段放行。'
       : undefined;
   const summary = {
-    type: "run-log",
+    type: 'run-log',
     passed,
     reasons: allViolations,
     violations: buildViolationDistribution(allViolations.length),
@@ -323,43 +291,41 @@ async function main(): Promise<void> {
   }
 
   // ==================== 报告输出 ====================
-  console.log("═".repeat(60));
-  console.log("运行日志校验（Run-Log Checker）");
-  console.log("═".repeat(60));
+  console.log('═'.repeat(60));
+  console.log('运行日志校验（Run-Log Checker）');
+  console.log('═'.repeat(60));
   console.log(`输入文件        : ${runLogAbs}`);
   console.log(`条目数          : ${entries.length}`);
+  console.log(`--gate-logs     : ${gateLogsDir ?? '未提供'}${gateLogs ? `（已加载 ${gateLogFileCount} 个文件）` : ''}`);
   console.log(
-    `--gate-logs     : ${gateLogsDir ?? "未提供"}${gateLogs ? `（已加载 ${gateLogFileCount} 个文件）` : ""}`,
+    `--tla-manifest  : ${tlaManifestFile ?? '未提供'}${tlaCheckRounds !== undefined ? `（checkRounds=${tlaCheckRounds}）` : ''}`,
   );
-  console.log(
-    `--tla-manifest  : ${tlaManifestFile ?? "未提供"}${tlaCheckRounds !== undefined ? `（checkRounds=${tlaCheckRounds}）` : ""}`,
-  );
-  console.log(`校验结果        : ${passed ? "✓ 通过" : "✗ 未通过"}`);
+  console.log(`校验结果        : ${passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log(`生命周期状态    : ${lifecycleStatus}`);
-  console.log("─".repeat(60));
+  console.log('─'.repeat(60));
 
   if (passed) {
     console.log(
-      "运行日志符合 data-models.md RunLogEntry schema：动作完整 + tokens 合规 + 返工一致 + 无 O 越权 + exitCode 一致 + append-only + 轨迹符合。",
+      '运行日志符合 data-models.md RunLogEntry schema：动作完整 + tokens 合规 + 返工一致 + 无 O 越权 + exitCode 一致 + append-only + 轨迹符合。',
     );
   } else {
-    console.log("未通过原因：");
+    console.log('未通过原因：');
     for (const r of allViolations) {
       console.log(`  - ${r}`);
     }
-    console.log("");
+    console.log('');
     console.log(
-      "O 子代理须按上述原因处置（补全动作记录 / 修正 tokens / 对齐返工计数 / 补 acknowledgedDecisions / 停止越权 / 修正 exitCode / 恢复 append-only / 对齐理想轨迹，详见 w-model-dev/references/operational-recovery.md §5.2）",
+      'O 子代理须按上述原因处置（补全动作记录 / 修正 tokens / 对齐返工计数 / 补 acknowledgedDecisions / 停止越权 / 修正 exitCode / 恢复 append-only / 对齐理想轨迹，详见 w-model-dev/references/operational-recovery.md §5.2）',
     );
   }
   if (diagnostics.length > 0) {
-    console.log("生命周期诊断（非阻断）：");
+    console.log('生命周期诊断（非阻断）：');
     for (const diagnostic of diagnostics) console.log(`  - ${diagnostic}`);
   }
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exitCode 一致（门禁防伪造三层机制之一）
-  printGateReport("RUN_LOG", summary, exitCode);
+  printGateReport('RUN_LOG', summary, exitCode);
   process.exitCode = exitCode;
   return;
 }

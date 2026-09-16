@@ -95,12 +95,7 @@
       "description": "四级测试执行汇总（单元/集成/系统/验收），对应门禁 check-artifact-gate.ts 的四级测试校验（按阶段递进校验层）",
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "unitTest",
-        "integrationTest",
-        "systemTest",
-        "acceptanceTest"
-      ],
+      "required": ["unitTest", "integrationTest", "systemTest", "acceptanceTest"],
       "properties": {
         "unitTest": {
           "description": "单元测试执行汇总（阶段 5 起校验；覆盖率须 ≥80%）",
