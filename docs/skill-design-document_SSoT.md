@@ -1373,6 +1373,23 @@ npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>
 
 **关键约束**：工件质量门的有效性依赖真实测试结果回填。`/wm test` 命令不得自动将测试标记为通过——必须由上游 AI / 测试运行器执行真实测试后通过 `result=pass|fail` 参数回填，否则质量门形同虚设。
 
+#### 10.5.3 §8 拒绝登记结构校验（M08，2026-09-16）
+
+**目标**：把阶段 1 迷雾毕业的「判 Out of Scope」从**单轮散文**升级为**概念粒度的持久拒绝登记**（含 `Prior requests` 回链），并在**需求入口**加入按概念相似度去重的读取动作；全部**挂靠既有事实源与既有门禁**——**不新建自由目录、不新增 CLI、不新增 Schema**（自由目录会成为与规格书并列的平行事实源）。
+
+| 面 | 落点与内容 | 实现位置 |
+| --- | --- | --- |
+| 事实源（登记载体） | `docs/phase1-requirements/requirement-spec.md` §8 Out of Scope 固定列表格（`conceptKey` / `拒绝理由` / `Prior requests` / `状态` / `来源`） | `w-model-dev/templates/requirement-spec.md` §8 |
+| 门禁（结构） | `check-artifact-gate.ts --phase=1 --spec-dir=<dir>` 的 `outOfScope` violation 桶，与既有 `refs` / `ssot` / `dod` 三桶并列（既有三组判据逐字未改） | `w-model-dev/scripts/logic/gate-logic.ts` `checkOutOfScopeRegister` |
+| 入口读取动作（语义） | A-chunk 读 §8 全量 → 按概念相似度（**非关键词**）匹配 → 命中向用户 surface 并给三选一 **Confirm**（追加 `Prior requests`，本次不走正常 ingest）/ **Reconsider**（状态改 `reconsidered` + 替代指向，本次走正常 ingest）/ **Disagree**（相关但不同，本次走正常 ingest，§8 不动）；**判定必须口播**，不得静默处置 | `w-model-dev/references/ingestion-chunk.md`「需求入口读取动作（拒绝登记去重，M08）」节 |
+| 登记规则 | 概念粒度（一概念一行）/ `conceptKey` 唯一 / `Prior requests` 回链取**既有可引用标识**（`REQ-xxx` / 轮次形态 / 请求短引，不得发明第二套编号）/ **仅 rejected enhancement 入册、已实现者拒收、bug 不入册** / **Reconsider 只改状态标记、任何情况下不删行** | `w-model-dev/references/phase-1-requirements.md`「拒绝登记规则（§8 Out of Scope，M08）」节 |
+| 门禁契约文档 | 判定 (a)(b)(c)、退出码语义（违规 → exit 1）、**如何读证据**（`GATE_JSON.reasons` 中 §8 桶计数 = 0，**不得以整体退出码为据**）、判据强化披露 | `w-model-dev/references/command-reference.md`「§8 拒绝登记结构校验（M08，phase 1）」节 |
+
+- **零面承诺（D7 确认的可证形式）**：**不新增 Schema**（`w-model-dev/schemas/**` 零变更，尤其**不改 `rtm.schema.json`**）、**不新增 CLI**（`cli/*.ts` 46 不变、exit-2 45 不变）、**不改 `rtm.json` 字段或关系**（D7 负向约束）、**不新增 `.w-model/*.json`**、**不升版本号**、**反模式仍 48 条**（不新增 #49）。
+- **能力分工（不得夸大）**：门禁**只校验登记结构**——§8 节存在、表头五列齐、`conceptKey` 非空且唯一、`状态` ∈ {`rejected`, `reconsidered`}、`Prior requests` 单元格非空（显式 `-` 合法）；**「概念相似度」由入口读取动作的语义匹配承担**，确定性脚本**不校验语义**。「门禁通过」**不等于**「去重已发生」——两者是**结构门禁 + 语义读取**的分工，不得声称门禁校验了概念相似度。
+- **判据强化（AC-11 披露义务）**：本机制**不新增命令、不新增放行路径**，但**改变了「什么样的 phase-1 规格能过门」**——phase-1 规格从此**须含合规 §8 表格**，旧散文形态不再放行；属既有门禁的**数据要求收紧**，**不引入 legacy 时间豁免**（本仓零 `requirement-spec.md` 存量夹具、无迁移对象，时间豁免会给「忘了写表格」开永久后门）。
+- **反模式挂靠（不新增条目）**：#3（RTM 为事实源——本机制不改 RTM 即其正面证据）、#10（编排者边界——A-chunk 只读 §8，写盘是 S 的产出职责）与既有「禁止平行事实源」约束（`phase-5-coding.md` 同族纪律）。
+
 ### 10.6 项目级 Definition of Done（每次变更的日常标准）
 
 > 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `references/definition-of-done.md`。

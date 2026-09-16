@@ -389,6 +389,20 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - 缺失/非法 JSON/schema 畸形/空资产/关联 `.tla`、`.cfg` 或 `.feature` 文件缺失均由各自 evidence gate 产生 blocking violation；不得把缺资产转化为 sync skip。配对孤儿、路径映射不完整、无完整 pair、转移/状态/不变式不一致或 sync 子进程失败同样阻断。phase 5-8 不启用该 TLA↔BDD 文件同步，改用 required Cucumber 执行证据。
 - 该项目阶段门与本地 pre-push fixture 回归分层：pre-push 不调用本 CLI，不启用上述 project-only required flags，也不运行项目 TLA、TLA↔BDD pair sync 或 Cucumber 证据。
 
+### §8 拒绝登记结构校验（M08，phase 1）
+
+- **命令**：`npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts <project-dir> --phase=1 --spec-dir=<dir>`。判据纯函数 = `w-model-dev/scripts/logic/gate-logic.ts` 的 `checkOutOfScopeRegister`，经 `checkPhaseSpecStructure` 在 phase=1 时并入 `RequirementSpecStructureViolations.outOfScope` 桶。**增强既有脚本：不新增 CLI、不新增参数、不新增 Schema。**
+- **输入**：`--spec-dir=<dir>` 指向阶段 1 规格目录（含 `requirement-spec.md` 与 `discipline-dod.md`）。**未传 `--spec-dir` 时本项不生效**（既有调用方零影响）；非 phase 1（phase≥2 主文档的 §8 不是拒绝登记）时**不施加**该组判定。
+- **判定**（与既有 `refs`（6 引用块）/ `ssot`（§0 四项）/ `dod`（DoD ≥ 8）三桶并列，既有三组判据逐字未改）：
+  - (a) **§8 节缺失** → 违规（「无」也必须显式声明该节）；
+  - (b) **§8 无固定列表格** → 违规。旧散文形态（节内含 `- {{`）的消息带迁移指引（「须表化：conceptKey / 拒绝理由 / Prior requests / 状态 / 来源」）；无表格的自由散文同样 fail-closed（自由散文无法承载结构校验）；
+  - (c) **§8 有表格** → 校验表头**五列齐**（`conceptKey` / `拒绝理由` / `Prior requests` / `状态` / `来源`）、`conceptKey` **非空且唯一**、`状态` ∈ {`rejected`,`reconsidered`}、`Prior requests` 单元格**非空**（显式 `-` 合法）；另校验**至少 1 行数据行**（「无」也须保留一行 `-` 哨兵行，哨兵行豁免状态与回链校验）。缺列时该列的派生校验整体跳过（保证「恰好报该违规」）。
+- **退出码语义**：任一 (a)(b)(c) 违规 → **exit 1**（并入既有 exit 1 语义，**不新增退出码**；输入/参数错误仍为 exit 2，不静默跳过）。
+- **如何读证据（审查者裁定，必读）**：以 **`GATE_JSON.reasons` 中 §8 桶的计数 = 0** 判定合规——即 `reasons` 中以 `structure: §8` 开头的条目数为 0。**不得以整体退出码为据**：`check-artifact-gate.ts` 是**聚合门**，退出码是三态聚合结果，会被**无关缺件**（如 tla/bdd/uat 资产缺失、RTM 覆盖率不足）掩盖——「exit 0」不证明 §8 合规，「exit 1」也不证明 §8 违规（可能是别的原因）。使用 `--json` 时同样按同一字段与同一前缀定位。
+- **判据强化披露（AC-11 义务）**：本项**不新增命令、不新增放行路径**，但**改变了「什么样的 phase-1 规格能过门」**——phase-1 规格从此**须含合规 §8 表格**，旧散文形态的 §8 不再放行；这属既有门禁的**判据强化（数据要求收紧）**，不是「门禁未变」。**不引入 legacy 时间豁免**：本仓零 `requirement-spec.md` 存量夹具、无迁移对象，而时间豁免会给「忘了写表格」开永久后门。
+- **边界（不得夸大）**：门禁**只校验登记结构**；**「概念相似度」由需求入口读取动作的语义匹配承担**（A-chunk，见 `w-model-dev/references/ingestion-chunk.md`「需求入口读取动作（拒绝登记去重，M08）」节），确定性脚本**不校验语义**。门禁通过**不等于**去重已发生——两者是**结构门禁 + 语义读取**的分工（AC-10 措辞不得被夸大）。
+- **失败处置**：exit 1 属普通 V/G 失败 → 先走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），再按 R 结论由 S-fix 补齐/表化 §8 后重跑门禁。登记规则权威细则见 `w-model-dev/references/phase-1-requirements.md`「拒绝登记规则（§8 Out of Scope，M08）」节。
+
 ## BDD 项目行为证据门
 
 - **速查行**：`npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json> --phase=N [--require-tla-equivalence --tla-manifest=<path>] [--require-cucumber-report --cucumber-report=<path>] [--graph=<path>]`

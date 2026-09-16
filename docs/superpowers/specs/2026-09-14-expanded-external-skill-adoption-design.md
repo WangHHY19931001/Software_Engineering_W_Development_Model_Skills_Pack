@@ -210,7 +210,7 @@
 | `check-docs-consistency.ts` 完整性审计维度（S31） | 既有脚本增强 | declared-list + 全仓 grep 未登记载体（与既有"计数相等"正交互补） |
 | `noRootCause` / `environmental` 分支（S13） | Schema 扩展 | 新增分支，不放松 R2/R3 |
 
-**一切新增/增强的脚本与 Schema 都必须同步** `check-docs-consistency` 的联动计数器（`exit2ScriptCount: 43` / `schemaCount: 34` / `runLogActionCount: 27` / `prePushCount: 18` / `maxAntiPattern: 48` / 资产计数）与 dispatch-matrix 登记表。
+**一切新增/增强的脚本与 Schema 都必须同步** `check-docs-consistency` 的联动计数器（`exit2ScriptCount: 45` / `schemaCount: 34` / `runLogActionCount: 27` / `prePushCount: 18` / `maxAntiPattern: 48` / 资产计数）与 dispatch-matrix 登记表。
 
 ## 6. D 级：M08 拒绝知识库
 
