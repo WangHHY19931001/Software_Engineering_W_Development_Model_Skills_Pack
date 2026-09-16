@@ -140,6 +140,17 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
     expect(r.violations.join('\n')).toMatch(/undefined-symbol[\s\S]*`Other\.call\(job\)`[\s\S]*S18 黑名单第 6 条/);
   });
 
+  it('黑名单第 6 条正向边界：同一 Foo.run 仅参数名变化仍视为同一已定义符号', () => {
+    const r = checkTicketContent([
+      '# 01 — define',
+      'What to build: `Foo.run(job): Result`',
+      '# 02 — use',
+      '调用 `Foo.run(task)`',
+    ].join('\n'));
+    expect(r.passed).toBe(true);
+    expect(r.violations).toEqual([]);
+  });
+
   it('修复轮 2 (B) 正向边界：专指契约标记行 / `What to build` 行上的无返回标注调用式 → 视为已定义', () => {
     const cases: Array<{ line: string; criteria: string }> = [
       // 复审 I-1 实测反例 1：标记行上的无返回标注调用式（base passed，修复轮 1 误报）

@@ -1,10 +1,5 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- 全部路径由 mkdtemp 测试夹具生成 */
-/**
- * M07 原始测试产物路径的安全边界。
- *
- * 这些断言目前经已有的 resolveTestEvidenceOutputPath 入口登记；待安全路径 helper
- * 落地后可迁移到它，但本文件不 import 尚不存在的生产符号。
- */
+/** 安全项目路径 helper 的公开契约：拒绝穿越、链接和非普通文件。 */
 
 import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -12,47 +7,84 @@ import { join, resolve } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { resolveTestEvidenceOutputPath } from '../logic/gate-logic.js';
+import { resolveProjectRelativeRegularFile, SafeProjectPathError } from '../lib/safe-project-path.js';
 
 const dirs: string[] = [];
 
-function makeProject(): string {
-  const project = mkdtempSync(join(tmpdir(), 'wmodel-safe-project-path-'));
-  dirs.push(project);
-  return project;
+function makeDir(prefix = 'wmodel-safe-project-path-'): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  dirs.push(dir);
+  return dir;
 }
+
+function expectRejected(project: string, candidate: string, reason: SafeProjectPathError['reason']): void {
+  try {
+    resolveProjectRelativeRegularFile(project, candidate);
+    throw new Error(`expected ${JSON.stringify(candidate)} to be rejected`);
+  } catch (error) {
+    expect(error).toBeInstanceOf(SafeProjectPathError);
+    expect((error as SafeProjectPathError).reason).toBe(reason);
+  }
+}
+
+function junctionSupport(): string | undefined {
+  const project = makeDir('wmodel-junction-probe-project-');
+  const target = makeDir('wmodel-junction-probe-target-');
+  try {
+    symlinkSync(target, join(project, 'probe-junction'), 'junction');
+    return undefined;
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error ? String((error as NodeJS.ErrnoException).code) : 'unknown';
+    return `junction unavailable on this platform (${code})`;
+  }
+}
+
+const junctionUnavailable = junctionSupport();
 
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-describe('M07 safe project evidence paths', () => {
-  it.each(['C:\\outside.txt', '\\\\server\\share\\x', '/tmp/x', '../outside', 'a\\b', 'nul\u0000path'])(
-    '拒绝非项目相对安全路径 %j',
-    (candidate) => {
-      const result = resolveTestEvidenceOutputPath(makeProject(), candidate);
-      expect(result.ok).toBe(false);
-    },
-  );
+describe('resolveProjectRelativeRegularFile', () => {
+  it.each([
+    ['C:\\outside.txt', 'absolute'],
+    ['\\\\server\\share\\x', 'absolute'],
+    ['/tmp/x', 'absolute'],
+    ['../outside', 'invalid-segment'],
+    ['a\\b', 'invalid-segment'],
+    ['nul\u0000path', 'invalid-segment'],
+  ] as const)('拒绝 %j 并保留结构化原因 %s', (candidate, reason) => {
+    expectRejected(makeDir(), candidate, reason);
+  });
 
-  it('只接受项目内普通文件并返回规范绝对路径', () => {
-    const project = makeProject();
+  it('项目内普通文件返回规范绝对路径', () => {
+    const project = makeDir();
     mkdirSync(join(project, 'evidence'));
     writeFileSync(join(project, 'evidence', 'result.json'), '{}\n', 'utf8');
 
-    const result = resolveTestEvidenceOutputPath(project, 'evidence/result.json');
-
-    expect(result).toEqual({ ok: true, absPath: resolve(project, 'evidence', 'result.json') });
+    expect(resolveProjectRelativeRegularFile(project, 'evidence/result.json')).toBe(resolve(project, 'evidence', 'result.json'));
   });
 
-  it('拒绝项目内目录和指向项目外的 symlink，不能以词法根内替代真实路径检查', () => {
-    const project = makeProject();
-    const outside = makeProject();
+  it('目录以 not-file 拒绝，普通文件的项目外 symlink 以 link 拒绝', () => {
+    const project = makeDir();
+    const outside = makeDir();
     mkdirSync(join(project, 'directory'));
     writeFileSync(join(outside, 'outside.txt'), 'outside\n', 'utf8');
     symlinkSync(join(outside, 'outside.txt'), join(project, 'outside-link.txt'), 'file');
 
-    expect(resolveTestEvidenceOutputPath(project, 'directory').ok).toBe(false);
-    expect(resolveTestEvidenceOutputPath(project, 'outside-link.txt').ok).toBe(false);
+    expectRejected(project, 'directory', 'not-file');
+    expectRejected(project, 'outside-link.txt', 'link');
   });
+
+  it.runIf(junctionUnavailable === undefined)(
+    '项目外 junction 以 link 拒绝（当前平台不支持时跳过：junction unavailable）',
+    () => {
+      const project = makeDir();
+      const outside = makeDir();
+      writeFileSync(join(outside, 'outside.txt'), 'outside\n', 'utf8');
+      symlinkSync(outside, join(project, 'outside-junction'), 'junction');
+
+      expectRejected(project, 'outside-junction/outside.txt', 'link');
+    },
+  );
 });

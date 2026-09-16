@@ -217,6 +217,18 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     expect(errorJson(notARepo.stdout)).toMatchObject({ exitCode: 2 });
   });
 
+  it('短 SHA 与同名 ref 冲突时仍确定性解析为提交对象，并在正文使用完整 SHA', async () => {
+    const shortBase = baseSha.slice(0, 7);
+    git(['update-ref', `refs/heads/${shortBase}`, headSha]);
+    const out = path.join(tmpDir, 'short-prefix.diff');
+
+    const result = runReviewPackage([`--repo=${repoDir}`, `--base=${shortBase}`, `--head=${headSha}`, `--out=${out}`]);
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(JSON.parse(result.stdout.replace('REVIEW_PACKAGE_JSON ', ''))).toMatchObject({ base: baseSha, head: headSha });
+    await expect(fs.readFile(out, 'utf8')).resolves.toContain(`# range: ${baseSha}..${headSha}`);
+  });
+
   it('空 --repo 与位置参数 → ARG_INVALID，且不创建输出目标', async () => {
     const out = path.join(tmpDir, 'must-not-exist.diff');
     for (const args of [
@@ -243,5 +255,18 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     expect(result.stderr).toContain('ARG_INVALID');
     expect(errorJson(result.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
     await expect(fs.readFile(external, 'utf8')).resolves.toBe('unchanged\n');
+  });
+
+  it('输出目标是目录时须 ARG_INVALID 拒绝，并且目录内容不变', async () => {
+    const out = path.join(tmpDir, 'out-directory');
+    await fs.mkdir(out);
+    await fs.writeFile(path.join(out, 'sentinel.txt'), 'unchanged\n', 'utf8');
+
+    const result = runReviewPackage([`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`]);
+
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('ARG_INVALID');
+    expect(errorJson(result.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
+    await expect(fs.readFile(path.join(out, 'sentinel.txt'), 'utf8')).resolves.toBe('unchanged\n');
   });
 });
