@@ -108,7 +108,9 @@ function findCommitPrefixCollision(tree: string, parent: string, maxAttempts = 1
       `prefix-collision-${counter}`,
       '',
     ].join('\n');
-    const sha = createHash('sha1').update(`commit ${Buffer.byteLength(body, 'utf8')}\0${body}`).digest('hex');
+    const sha = createHash('sha1')
+      .update(`commit ${Buffer.byteLength(body, 'utf8')}\0${body}`)
+      .digest('hex');
     const object = { body, sha };
     const prefix = sha.slice(0, 7);
     const previous = seen.get(prefix);
@@ -324,5 +326,67 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     expect(result.stderr).toContain('ARG_INVALID');
     expect(errorJson(result.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
     await expect(fs.readFile(path.join(out, 'sentinel.txt'), 'utf8')).resolves.toBe('unchanged\n');
+  });
+
+  it('在 Git 采集前拒绝非法 --out，即使 revision 也无效', async () => {
+    const out = path.join(tmpDir, 'missing-parent', 'package.diff');
+    const result = runReviewPackage([`--repo=${repoDir}`, '--base=not-a-rev', `--head=${headSha}`, `--out=${out}`]);
+
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('--out 所在目录不存在');
+    expect(errorJson(result.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
+  });
+
+  it('core.abbrev 改变时正文提交列表保持完整 SHA 且字节一致', async () => {
+    const out4 = path.join(tmpDir, 'abbrev-4.diff');
+    const out12 = path.join(tmpDir, 'abbrev-12.diff');
+    const common = [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`];
+
+    git(['config', 'core.abbrev', '4']);
+    const run4 = runReviewPackage([...common, `--out=${out4}`]);
+    git(['config', 'core.abbrev', '12']);
+    const run12 = runReviewPackage([...common, `--out=${out12}`]);
+
+    expect(run4.code).toBe(0);
+    expect(run12.code).toBe(0);
+    const content4 = await fs.readFile(out4, 'utf8');
+    const content12 = await fs.readFile(out12, 'utf8');
+    expect(content4).toBe(content12);
+    expect(content4).toContain(`${headSha} commit B: second`);
+  });
+
+  it('无值选项、空白值和未知位置参数均为 ARG_INVALID', async () => {
+    const out = path.join(tmpDir, 'must-not-exist-2.diff');
+    for (const args of [
+      ['--repo', `--base=${baseSha}`, `--head=${headSha}`],
+      [`--repo=${repoDir}`, '--base', `--head=${headSha}`],
+      [`--repo=${repoDir}`, `--base=${baseSha}`, '--head', `--out=${out}`],
+      [`--repo=  `, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`],
+      [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=  `],
+      [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`, 'unexpected'],
+    ]) {
+      const result = runReviewPackage(args);
+      expect(result.code).toBe(2);
+      expect(result.stderr).toContain('ARG_INVALID');
+      expect(errorJson(result.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
+      await expect(fs.access(out)).rejects.toThrow();
+    }
+  });
+
+  it('写入失败时保留既有 sentinel 文件', async () => {
+    if (process.platform === 'win32') return;
+    const readonlyDir = path.join(tmpDir, 'readonly');
+    const out = path.join(readonlyDir, 'package.diff');
+    await fs.mkdir(readonlyDir);
+    await fs.writeFile(out, 'sentinel\n', 'utf8');
+    await fs.chmod(readonlyDir, 0o500);
+    try {
+      const result = runReviewPackage([`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`]);
+      expect(result.code).toBe(2);
+      expect(errorJson(result.stdout)).toMatchObject({ exitCode: 2 });
+      await expect(fs.readFile(out, 'utf8')).resolves.toBe('sentinel\n');
+    } finally {
+      await fs.chmod(readonlyDir, 0o700);
+    }
   });
 });
