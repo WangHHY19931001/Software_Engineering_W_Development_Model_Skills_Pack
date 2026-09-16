@@ -1,4 +1,3 @@
-/* eslint-disable security/detect-non-literal-fs-filename -- fixture 项目目录均位于本测试拥有的 os.tmpdir() 临时目录 */
 /**
  * check-pollution CLI 契约测试（S24 污染源二分定位，按需工具）。
  *
@@ -47,6 +46,7 @@ let projectDir: string;
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'check-pollution-cli-'));
   projectDir = path.join(tmpDir, 'project');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 由本测试创建于 os.tmpdir() 下，仅用于 fixture 初始化
   await fs.mkdir(projectDir, { recursive: true });
 });
 
@@ -83,12 +83,14 @@ async function snapshotTree(root: string): Promise<Record<string, string>> {
   const entries = new Map<string, string>();
   async function walk(rel: string): Promise<void> {
     const abs = path.join(root, rel);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- root/rel 来自本测试创建的临时目录快照范围
     for (const dirent of await fs.readdir(abs, { withFileTypes: true })) {
       const childRel = rel === '' ? dirent.name : `${rel}/${dirent.name}`;
       if (dirent.isDirectory()) {
         entries.set(childRel, 'dir');
         await walk(childRel);
       } else {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- root/childRel 仅读取本测试临时目录中的快照文件
         entries.set(childRel, `file:${await fs.readFile(path.join(root, childRel), 'utf8')}`);
       }
     }
@@ -100,13 +102,16 @@ async function snapshotTree(root: string): Promise<Record<string, string>> {
 /** 在临时项目里造一个文件（含父目录） */
 async function putFile(relPath: string, content: string): Promise<void> {
   const abs = path.join(projectDir, relPath);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs 始终是本测试拥有的临时项目路径
   await fs.mkdir(path.dirname(abs), { recursive: true });
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs 始终是本测试拥有的临时项目路径，仅写入 fixture
   await fs.writeFile(abs, content, 'utf8');
 }
 
 describe('check-pollution CLI（S24 污染源定位，按需工具）', () => {
   it('干净目录 → exit 0 + 单行 POLLUTION_JSON（passed=true，findings 空）', async () => {
     await putFile('src/index.ts', 'export {};\n');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 是本测试创建的临时项目，仅构造 .w-model fixture
     await fs.mkdir(path.join(projectDir, '.w-model'), { recursive: true });
     await putFile('.w-model/project.json', '{}\n'); // .w-model 本身存在不是污染，仅 *.lock 残留是
 
@@ -131,6 +136,7 @@ describe('check-pollution CLI（S24 污染源定位，按需工具）', () => {
   });
 
   it('.w-model/*.lock 陈旧锁目录残留 → exit 1 且列出 kind=stale-lock-dir', async () => {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 是本测试创建的临时项目，仅构造污染 fixture
     await fs.mkdir(path.join(projectDir, '.w-model', 'project.json.lock'), { recursive: true });
     await putFile('.w-model/project.json.lock/owner.json', '{}\n'); // 锁目录内可有 owner 对象文件，本体目录已列
 
@@ -158,6 +164,7 @@ describe('check-pollution CLI（S24 污染源定位，按需工具）', () => {
   });
 
   it('coverage/ 残留（含 coverage/.tmp）→ exit 1 且列出 kind=coverage-residue', async () => {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 是本测试创建的临时项目，仅构造污染 fixture
     await fs.mkdir(path.join(projectDir, 'coverage', '.tmp'), { recursive: true });
     await putFile('coverage/lcov.info', 'TN:\n');
 
@@ -185,8 +192,10 @@ describe('check-pollution CLI（S24 污染源定位，按需工具）', () => {
   });
 
   it('混合污染 → exit 1 且四类逐项全部列出（findingCount 计数正确）', async () => {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 是本测试创建的临时项目，仅构造污染 fixture
     await fs.mkdir(path.join(projectDir, '.w-model', 'rtm.json.lock'), { recursive: true });
     await putFile('budget.lock', 'owner\n');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 是本测试创建的临时项目，仅构造污染 fixture
     await fs.mkdir(path.join(projectDir, 'coverage'), { recursive: true });
     await putFile('vitest-results.json', '{}\n');
 
@@ -204,6 +213,7 @@ describe('check-pollution CLI（S24 污染源定位，按需工具）', () => {
   });
 
   it('未知 flag（--d4-invalid-argument）→ exit 2 + ERROR_JSON 且项目目录零副作用、无 POLLUTION_JSON 输出', async () => {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 是本测试创建的临时项目，仅构造零副作用断言 fixture
     await fs.mkdir(path.join(projectDir, '.w-model', 'project.json.lock'), { recursive: true });
     const before = await snapshotTree(projectDir);
 
