@@ -73,3 +73,51 @@
 **2. 占位符扫描**：无。CHANGELOG 条目的**条目粒度**为有界选择 + 报告义务（逐期列用户可见变更，不逐提交堆砌）。
 **3. 命名一致性**：子节标题沿用既有 `### <中文标题>（<slug>，<日期>）` 形态。
 **4. 与既有验收的关系**：不改任何 AC 行（AC-0…AC-12 已由各期回填）；不改任何门禁判据；**唯一门禁面变化 = CHANGELOG 首个版本节头必须仍可解析**（§0 已给机制与验证）。
+
+---
+
+## 执行结果（计划收尾节，控制者终版回填 2026-09-16）
+
+**状态：三组遗留全部清偿完毕。** 分支 `feat/programme-leftovers`，BASE `63d7bb41`（main）。
+
+### 一、提交序列（3 个）
+
+| # | commit | 内容 |
+| --- | --- | --- |
+| 0 | `4a98bd07` | 本计划（含实测的 CHANGELOG 缺口与 `extractChangelogVersion` 约束） |
+| 1 | `a34f9d00` | CHANGELOG 补记：M 程序 P0–P6（A 组）+ vitest 执行模型（B 组），`CHANGELOG.md` **28/0 纯增** |
+| 2 | `ac83fc76` | 三处陈旧 self-test 计数清偿（各 1/1） |
+
+### 二、收口门禁（控制者在最终树独占运行）
+
+`npm run prepush` → **18/18 全绿、`PREPUSH_EXIT=0`**，末行「全部门禁通过，允许推送 ✓」。
+控制者核验（实测）：`grep -m1 "^## \[" CHANGELOG.md` 仍 = `## [42.2.1] - 2026-09-01`（**首个版本节头可解析**，version-consistency 不破）；`git diff --numstat` 对 `CHANGELOG.md` = **28/0**（纯增）；`.githooks/pre-push` 的 `^# [0-9]*\.` 块 = **18** 且字面「18 项检查」仍在；`grep -c Unreleased CHANGELOG.md` = **0**；改动文件恰 **5**（4 处授权 + 本计划）；`cli` 46 / `schemas` 34 / `references` 43 未变。
+实现者实测：`self-test` **352/352**；`audit:l0-links` exit 0（672/95/36）；`lint:security` 新增 0；`skill-metadata` 6/6；`code-health-tests` 28/28；**`docs-consistency-logic` 190/190（404.14s）**——本单元唯一门禁风险点（version-consistency）已通过；另在真实 CHANGELOG 上模拟 `extractChangelogVersion` → `"42.2.1"` 且匹配 `VERSION_PATTERN`。
+
+### 三、清偿明细
+
+1. **CHANGELOG 缺口**（实测覆盖 P0–P6 全程序 **+** vitest 执行模型，两者此前均零记录）：两个 `###` 子节落 `## [42.2.1] - 2026-09-01` 节内、既有 2026-09-12 子节之前（新者在前）。**未新增 `## [Unreleased]`**（`extractChangelogVersion` 取首个 `## [...]` 再套版本正则，`[Unreleased]` 会解析为 `null` → version-consistency 直红）；**未 bump 版本**（延续各期「不升版本号」）；**未改写任何既有条目文本**（含其中的历史数值 262/322/332）。
+   A 组如实记录三处**用户可见语义变化**：① 新增按需工具 CLI `check-pollution.ts`（**不进 pre-push**，`prePushCount` 仍 18）；② 新增 `.githooks/pre-commit` 快层（**不引入 husky**、不改 `package.json`）；③ **phase-1 结构门禁数据要求收紧**（§8 须为合规五列表格 = P6 的 AC-11 披露）。
+   计数变化按实测写入：`cli/*.ts` **44→46**、exit-2 脚本 **43→45**、`self-test` **332→352**、`references` **42→43**、`schemas` 仍 **34**。
+2. **三处陈旧计数**（活体文档/清单，非历史记录）：`docs/user-guide.md:110` 332→**352**；`.githooks/pre-push:320` 注释 262→**352**（**只改数字**，`# 1.` 前缀与「18 项检查」字面未动）；`.code-health-governance.json` 的 `selfTestSamples` 322→**352**（仓库自有期望值，与当前实测一致）。
+3. **P6 两个观察项：裁定「接受、不改」**（记录于此，未改文件）：① 模板 §8 用具体 `dark-mode` 示例行替代原占位符——同节已显式标注「**仅为形态示范，须替换为本项目实际登记行**」，且保留原占位行必然破坏「交付模板逐字过自己的门禁」守卫（状态格 `` `rejected` / `reconsidered` `` 非单一合法枚举），**自洽优先**；② `REQ-102` 为新增标识但**仍是 `REQ-xxx` 形态**，未发明第二套编号，符合 P6 §0.1.7。
+
+### 四、「历史不可改」边界（说明哪些数字**故意**保持历史值）
+
+本单元清偿的是**活体文档与清单**；以下**故意未动**（属审计轨迹，改即篡改历史）：
+- `CHANGELOG.md` 既有条目内出现的 262 / 322 / 332（**当时值**）；
+- `CHANGELOG-archive.md` 全文；
+- `docs/changes/**` 全部（含 `decision-log/README.md`「归档内容保留原文，不篡改历史事实」所辖记录、`vitest-parallel-flakiness-finding.md`）；
+- `docs/superpowers/**` 各期计划与规格里的**中间值**（如 P2-A 的 43、P4 的 342、P5 的 344）——它们是各期当时的实测快照。
+
+### 五、控制者记录更正（本单元发现，前几期遗留的错误前提）
+
+1. **`cli/*.ts` 的 P2-B→P5 增量是 +2 而非 +1**：44（P2-B 前）→ 45（P2-B S32 `review-package.ts`）→ 46（P5 S24 `check-pollution.ts`）。前几期文档只记了 P5 那一步。
+2. **vitest 拆分的两个 project 真实名为 `cli-serial` / `unit-parallel`**；`subprocess-serial` / `pure-parallel` 只是提交主题的措辞（在 P5 的纪律盘点中被当作 project 名引用过）。
+3. **vitest 拆分的提交时间是 2026-09-14（02:44 → 03:43，先全局串行、后拆 project）**，不是 09-15~16。
+
+### 六、M 程序（P0–P6）到此**整体收尾**
+
+- P0–P6 全部落地并合并；规格 §13 的 **AC-0…AC-12 全部有处置**（AC-0 部分达成 + 本单元未改；AC-6/AC-9/AC-10 已由 P5/P6 闭环或标注；AC-11 已含 P6 的判据强化披露）。
+- **遗留清零**：本单元清偿了 P5/P6 收尾节登记的三组遗留。**当前无已知未登记遗留。**
+- 版本仍 **42.2.1**（本程序全程未 bump）；`main` 领先 `origin/main`，**未推送**。
