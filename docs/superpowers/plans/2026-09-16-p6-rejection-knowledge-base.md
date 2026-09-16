@@ -136,3 +136,60 @@
 **3. 命名一致性**：`conceptKey`（来源「concept」词）/ `Prior requests`（来源逐字）/ `rejected`·`reconsidered`（用户裁定的状态标记）/ `outOfScope`（violation 桶名，与既有 `refs`/`ssot`/`dod` 同风格）。
 **4. 与既有验收的关系**：AC-10 达成（任务 6 回填）；**AC-7/AC-8/AC-9 不受影响**（不动 S24/run-log/AC-9 面）；**AC-11 须复验**（任务 6：无新依赖/hook/HTML/CDN/本地服务，`l0` exit 0；并按 §0.1.4 披露判据强化）。
 **5. 零面承诺**：**零新增文件 / 零新增 CLI / 零新增 Schema / 零新增依赖 / 零 `run-log` action**；唯一计数变化 = `self-test` 用例数（任务 2 同步 9 处）。
+
+---
+
+## 执行结果（计划收尾节，控制者终版回填 2026-09-16）
+
+**状态：全部 6 个任务完成，验收 AC-10 已闭环、AC-11 已披露。** 分支 `feat/p6-rejection-knowledge-base`，BASE `ad48e469`（main）→ 本收尾节所在提交。**M08 单项目标 12/12 子项落地**（内化产物 4 项 + 边界 3 项 + AC-10 六子项 + D7）。
+
+### 一、提交序列（7 个）
+
+| # | commit | 内容 | 评审 |
+| --- | --- | --- | --- |
+| 0 | `cf6b8c0d` | 计划本体（含 780 行实测勘察的结论） | — |
+| 1 | `6a94ac30` | T1：`templates/requirement-spec.md` §8 散文 → 五列表格 + 哨兵行 + 登记规则速览 | 并入 T2 审查 |
+| 2 | `e56e0898` | T2：`checkRequirementSpecStructure` / `checkPhaseSpecStructure` 共用 helper 新增 `outOfScope` 桶（TDD 红→绿） | **不通过**（1 Important） |
+| 2b | `4746ecac` | T2 修复：`normalizeMarkdownCell`（仅剥整格单对反引号）+ 模板示例行合规化 + 转义管道语义显式化 | 定向复审**通过** |
+| 3 | `a904a020` | T3+T4+T5：入口读取动作 + 登记规则 + 门禁文档 + SSoT 先行 + 陈旧 exit-2 计数清偿 | 并入整分支审查 |
+| — | `fd767952` | 修复波：过程报告移出版本控制 + 补「哨兵行 / ≥1 数据行」权威细则 | 控制者机械核验 |
+| 6 | `f9d3710b` | T6：AC-10 回填 + AC-11 披露 | — |
+
+### 二、评审与修复轮次
+
+- **逐任务/合并审查 2 轮** + **定向复审 1 轮**：T1+T2 合并审查（独立 V，112509 字节包）判 **不通过**——**1 Important：模板自带的「无」哨兵行过不了它自己的门禁**。根因：模板单元格为反引号包裹（`` `-` ``），而门禁 `splitTableRow` 不剥反引号 → 哨兵豁免失效；**两套既有测试都手写裸 `-`，无任何测试覆盖交付模板的真实文本**；`gate-logic.ts` 的注释「否则模板自身的「无」形态会过不了本门禁」被**证伪**。
+- **定向复审用 A/B 四象限证据证明修复两半各自承重**：BASE gate+BASE 模板 = **2**、HEAD gate+BASE 模板 = 1、BASE gate+HEAD 模板 = 2、**HEAD+HEAD = 0**；并独立复核**归一化未过宽**（4 例反向探针仍判非法）、**唯一性用归一化值**（`` `dark-mode` `` 与 `dark-mode` 判重复 = 否则可用反引号绕过唯一性）、**既有三组判据体无 hunk 覆盖**（gate-logic 仅 3 hunk 全 ≤ 860 行）。
+- **整分支最终审查**（BASE `ad48e469` → `a904a020`，243967 字节包）：**可合并**（0 Critical / 0 Important / 4 Minor）。逐项判定：M08 内化产物/边界**逐条落地**；交付判据（挂靠既有事实源 + 既有门禁、**无自由目录**）**满足**；**AC-10 六子项全过**；**D7/RTM 未变**；**AC-11 满足且披露义务已履行**；**跨任务一致性五组全组一致**；**T4 的 `GATE_JSON` 证据描述与实测形态完全一致**（实建临时 phase-1 项目核对字段路径）。
+
+### 三、收口门禁（控制者在最终树独占运行）
+
+`npm run prepush` → **18/18 全绿、`PREPUSH_EXIT=0`**，末行「全部门禁通过，允许推送 ✓」（含 `vitest 全量 + coverage 阈值`、`npm audit` **真实执行未网络跳过**、`docs-consistency`、`tsc`、`eval`）。
+一致性自查（实测）：`self-test` **352/352**、`audit:l0-links` exit 0（**672/95/36**）、计数 `cli` **46** / `schemas` **34** / `references` **43** / exit-2 **45** / `runLogActionCount` **27** / `prePushCount` **18** / `maxAntiPattern` **48** / 版本 **42.2.1** 全部未变；**「344」计数零残留**。
+
+### 四、AC-10 达成的限定（**必须随验收一起读**）
+
+AC-10 的「**对应门禁**」判定为**达成，但须强制披露边界**。P6 的门禁是**确定性、fail-closed、有负向测试**的**结构**门禁：节存在 / 五列齐 / `conceptKey` 非空且唯一 / `状态` 枚举 / `Prior requests` 非空 / ≥1 数据行（哨兵行豁免）。
+**它不校验概念相似度**——概念相似度由入口读取动作的**语义匹配**承担。
+**⇒ 「门禁通过」≠「去重已发生」**；两者是「结构门禁 + 语义读取」的分工。该措辞已在四处文档就位（`command-reference.md:403`、SSoT §10.5.3、`phase-1-requirements.md`、`ingestion-chunk.md:90`），并在 AC-10 行内如实写明。
+
+**AC-10 的证据读法（审查者裁定，勿以退出码为据）**：三态（合规 / 旧散文 / 缺 §8）的**整体退出码均为 exit 1**（被无关缺件 `tla-manifest` / `bdd-manifest` / `uat-path-mapping` 掩盖），因此证据**必须**引用 **`GATE_JSON.reasons` 中 `structure: §8` 桶的计数**（合规模板逐字 → **0**；旧散文 → **1**）。
+
+### 五、AC-11 披露：phase-1 门禁的判据强化
+
+P6 对 **phase-1 结构门禁**做了**数据要求收紧**——`docs/phase1-requirements/requirement-spec.md` 的 §8 须为合规五列表格（含 ≥1 数据行或哨兵行），否则报 `structure: §8 …` 违规（exit 1）。
+**该收紧不新增命令、不新增放行路径、不改 `/wm` 命令的输入/输出语义**，属**既有门禁的判据强化**。P6 **未**引入 legacy 时间豁免：本仓**零** `requirement-spec.md` 夹具（self-test 走内存 fs stub），无迁移对象；时间豁免会给「忘了写表格」开永久后门。
+AC-11 复验：`git diff ad48e469..HEAD -- package.json package-lock.json .githooks/` 为空（零新依赖、零 hook）；无 HTML/CDN/本地服务；`audit:l0-links` exit 0。
+
+### 六、控制者事实更正（审查者独立发现，控制者实测确认并自纠）
+
+1. **「零新增文件」说法错误**：`ad48e469..a904a020` 实际新增 **2** 个（P6 计划本体 + **误提交**的 `.superpowers/sdd/.../task-345-report.md`）。根因：**控制者照抄实现者报告未自行核验**。修复波 `fd767952` 把过程报告 `git rm --cached`（**磁盘保留 16618 B**），改后新增文件**恰 1 个**。
+   **教训**：新增文件数必须由控制者亲自 `git diff --diff-filter=A --name-only` 核，不得采信报告。
+2. **「`.superpowers/` 是 gitignored」错误告知**：此前多份简报如此声明，**实测不成立**——base 已跟踪 **29** 份该类历史报告（本仓库对该目录**不做** ignore）。后续简报不得再作此声称。
+3. **勘察数字勘误**：计划 §0 记 `__tests__` 88 —— 实为 `*.test.ts` = **88**（base = head，非本分支造成）；跟踪文件总数 **92**、非递归口径 **90**。三种口径 base/head 均相同，**属口径差异非漂移**。
+
+### 七、遗留（不属 P6，交后续）
+
+1. **CHANGELOG 缺口**：P1–P6 七期均按批准偏差禁改 CHANGELOG，**须在 M 程序整体收口时统一补记**。
+2. **陈旧计数三处**（P2-B 裁定继续搁置）：`docs/user-guide.md` 的 332、`.githooks/pre-push` 注释的「262 条」、`.code-health-governance.json` 的 `selfTestSamples: 322`——实际均为 **352**（P6 后）。
+3. **观察项**：模板 §8 用具体 `dark-mode` 示例行替代原占位符（同节已标注「仅为形态示范，须替换」）；`REQ-102` 为新增标识但仍是 `REQ-xxx` 形态（**未发明第二套编号**，符合 §0.1.7）。
+4. **P6 不改任何反模式条目**（48 上限双向断言）；新纪律挂靠既有条目：反模式 #3（RTM 为事实源）、#10（编排者边界）与既有「平行事实源」约束（`phase-5-coding.md:238` 同族）。
