@@ -115,3 +115,66 @@
 **2. 占位符扫描**：无。S24 夹具载体与 logic 文件归并形态为有界选择 + 报告义务。
 **3. 命名一致性**：`check-pollution.ts` / `tickets` 先例的计数对象形态 / `noRootCause`（台账原文词）/ `disposable: true`（M 台账 :202 原文）/ `integrate-and-verify`。
 **4. 与既有验收的关系**：AC-6 闭环（任务 8）；AC-9 达成（任务 7+8）；AC-10/AC-11 不受影响（S24 不进 pre-push、无新 Schema 文件、无新依赖）。
+
+---
+
+## 执行结果（计划收尾节，控制者终版回填 2026-09-16）
+
+**状态：全部 8 个任务完成并通过评审。** 分支 `feat/p5-debug-ops-interaction`，BASE `be1a77a9`（main）→ 本收尾节所在提交。**12/12 采纳项全部落地**（M05/M17/S13/S24/S22/M13/M04/S17/M18/M12/S15/S23），AC-6 已闭环、AC-9 已标注（见规格 §13 :363 / :366）。
+
+### 一、提交序列（12 个）
+
+| # | commit | 内容 | 任务评审 |
+| --- | --- | --- | --- |
+| 0 | `f0b180c1` | 计划本体（含实测基线） | — |
+| 1 | `7e78a04b` | 任务 1：M05 §2.7 入场门 + M17 §2.8 loop 清单 + S13 §2.9 无根因出口（散文） | 通过（0C/0I） |
+| 2 | `de7671ff` | 任务 2：S24 `check-pollution.ts` + `pollution-logic.ts` + 级联 11/11 | 不通过 → 修复 → 定向复审通过 |
+| 2b | `e2d28b17` | 任务 2 修复：整文件 eslint 豁免收窄为 11 处行级豁免 | ADDRESSED |
+| 3 | `40e9ba95` | 任务 3：S13 schema `noRootCause` 分支 + logic 分流 + 夹具 +2 + 计数级联 9 处 | 通过（0C/0I/3M） |
+| 4 | `1ddf27e3` | 任务 4：S22 条件等待三要素/三反模式 + M13 受理前核实 | 通过（0C/0I/2M） |
+| 5 | `456a02e6` | 任务 5：M04 十条 + S17 呈现内核四条 | 通过（0C/0I/0M） |
+| 6 | `d8bff4ef` | 任务 6：S15 阶段开工前分诊（D-5 最小落地）+ M18 受控探索通道 | 通过（0C/0I/3M） |
+| 7 | `e93a1b7d` | 任务 7：S23 worktree 纪律定稿 + M12 `.githooks/pre-commit` | 通过（0C/0I/3M） |
+| — | `3e890765` | 累积 Minor 修复批（7 项） | — |
+| — | `24fe0316` | 最终审查修复波（2 Important + 2 Minor） | 定向复审通过（4/4 ADDRESSED） |
+| 8 | `99e4a46e` | 任务 8：AC-6 闭环回填 + AC-9 达成标注 + AGENTS 措辞精度 | — |
+
+### 二、评审与修复轮次（SDD 纪律）
+
+- **逐任务评审 7 轮**，全程独立 V 子代理、附审查包（`review-<base>..<head>.diff`）；**两轮修复**：任务 2 的 I1（整文件 eslint 豁免 → 11 处行级）、最终审查的 I1/I2（见下）。
+- **整分支最终审查**（BASE `be1a77a9` → `3e890765`，281960 字节包）：判 **不可合并**，0 Critical / **2 Important** / 2 Minor。
+  - **I1**：`phase-1-requirements.md` 的 M18 段规定「登记 `disposable: true`」，但**该字段无 schema 家**——`project.schema.json` 根级 `additionalProperties: false`，且 `wm-status.ts` / `check-budget.ts` / `check-maturity.ts` 对 `project.json` 是**读取侧 fail-closed**（未知字段 → exit 2），照字面执行会让项目**卡死在门禁**。**处置：改写措辞（保留「一次性 / 不参与签名链·阶段门·证据导出」意图句，去掉对无 schema 背书字段的 prescribe）**，并**如实记录该处偏离计划 §0.1.6 字面**。审查者反证：合法 `project.json` → `wm-status` exit 0；加 `disposable: true` → **exit 2 STRUCTURE_INVALID**。
+  - **I2**：`root-cause-locator.md` §2.7 写「五件套」，而 AC-6 冻结文本 / M 台账 `:189` / 计划 §0.1.3 用「红信号**四项验收**」，`grep 四项验收` 于 references **零命中** → AC-6 回填后无 grep 锚点。**处置：加别名（两名义并存，判据表仍 5 行）**。
+  - Minor：`check-pollution.ts` 的 `coverage/` 判据**名称启发式**未声明（对 `--project=.../samples` 会误报，已补声明、**行为未改**）；`.githooks/pre-commit` 在技能包文档零落点（已补 `AGENTS.md` §2）。
+- **修复波后一次定向复审**：4/4 **ADDRESSED**、0 新破坏；工作树干净。
+
+### 三、收口门禁（控制者在最终树独占运行）
+
+`npm run prepush` → **18/18 全绿、`PREPUSH_EXIT=0`**，末行「全部门禁通过，允许推送 ✓」。**S24 未进该 18 项**（`prePushCount: 18` 不变，符合规格 :305「只作按需工具」）。
+一致性自查（实测）：`self-test` **344/344**、`audit:l0-links` exit 0（**672/95/36**，无重基线）、`check-samples-coverage` exit 0（`negativeCoverageMissing` / `negativeCoverageDangling` 均 0）、`schemas` **34**、`cli/*.ts` **46**、`references/*.md` **43**、反模式 **48**（无 #49）、版本 **42.2.1** 未升。
+**守卫组**：13 文件 `442 passed / GUARD_EXIT=0`（含 `docs-consistency-logic` 190、`exit2-failure-atomicity` 46）。**「342 条用例」计数零残留**（9 处声明全为 344）。
+
+### 四、规格 :305 三条硬约束达成
+
+1. **S13 不放松 R2/R3**：`root-cause-logic.ts` 的 R1/R2/R3 判据**逐字保留**于常规分支（`git diff -w` 对 `MIN/MAX_CHAIN_LENGTH`、`FALSIFIABILITY_PATTERN`、判据句**零增删**；盘上常量 2／5／`/若.*则/` 未变）；新分支为**条件豁免**而非删除；四组绕过探针（双分支并存／皆无／空白 investigation／noRootCause+短链）**全部被拒**。
+2. **S24 只作按需工具**：未进 pre-push、未接入任何阶段门，`prePushCount: 18` 不变。
+3. **S23 的 `.w-model` 规则先批准**：D-6（裁定 `:133` 原则 + `:224` 生效）→ 定稿于 `phase-5-coding.md` 新节，含三条依据、五条隔离纪律、拥有权判定、`prune` 自愈、clean baseline 强制与三条禁令边界。
+
+### 五、计划勘误（控制者实测，实现未按其字面执行）
+
+1. **计划 §0.1.3「红信号四项验收」列了 5 项**（真实跑过 / 断言用户症状 / deterministic / fast / agent-runnable）——标签笔误；落地文本用「五件套」并列 5 行判据，并在 §2.7 加「四项验收」别名以保住 AC-6 锚点。
+2. **计划任务 7 称「hooks 文件在 pre-push prettier 门禁面内」——不成立**。实测该门禁只覆盖 `w-model-dev/scripts/**/*.ts`、`config/**/*.{cjs,ts}`、`scripts/*.cjs`，**不含 `.githooks/**`**；故以 `bash -n` + 三态实跑（干净放行／未格式化拦截／缺工具降级）替代。
+3. **计划 §0.1.6 的 `disposable: true`** → 见上「最终审查 I1」，改为不点名无 schema 字段的措辞（**本计划唯一实质偏离，已记录理由**）。
+
+### 六、如实申报的偏差与裁定
+
+- **M12 的 `pre-commit` 排除面（任务 7）**：M12 字面要求对全部暂存 prettier 可处理文件检查，但本仓 `.md` **321/432 非 prettier-clean**（BASE 即如此），照字面会**每次文档提交必被拦**。故 hook 按类别排除 `*.md` / `docs/changes/*` / `eval/*` / `samples/*` / `templates/*` / `docs/index.html`，逐类注明理由。审查者独立实测：**被排除类别内 `.ts`/`.cjs` 计数 = 0 → hook 检查面 ⊇ pre-push 面**，裁定**合理收敛、非放松门禁**。（本任务唯一新增文件约束使其不能改用 `.prettierignore`。）
+- **任务 3 由两任实现者接力**：首任落主体实现但未提交且计数级联仅 1/9；续做者补完 7 处并**发现首任 `oneOf` 分支在 Ajv `strict: true` 下编译抛 `strictRequired`**（会导致全部 rootcause 报告 exit 2），按最小方式补同层 `properties` 修复（值恒真、不改判定语义，审查者独立复现该编译错误与修复后 OK）。
+- **任务 2 由两任实现者接力**（首任无输出超时终止，留下未提交半成品）。
+
+### 七、遗留（不属 P5，交后续）
+
+1. **CHANGELOG 缺口**：P1/P2-A/P2-B/M07/P3/P4/P5 七期均按批准偏差禁改 CHANGELOG，**须在 M 程序整体收口时统一补记**。
+2. **陈旧计数三处**（P2-B 裁定继续搁置，未随本次同步）：`docs/user-guide.md` 的 332、`.githooks/pre-push` 注释的「262 条」、`.code-health-governance.json` 的 `selfTestSamples: 322`——实际均为 344。
+3. **P6（M08 拒绝知识库）** 未启动，待用户指示。
+4. 本次未新增反模式条目（48 上限，双向断言），新纪律**挂靠既有条目**（如 Push right 只重排不删 CHECKPOINT → 「CHECKPOINT 不可绕过」与反模式 #8/#10；S23 worktree 纪律 → 反模式 #10 的编排者边界）。
