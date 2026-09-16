@@ -79,16 +79,36 @@ interface EventIngress {
 1. 读取 event-ingress.jsonl 末尾未路由事件（routedTo 为空）
 2. 读取 maturity.json.level
 3. 若 level < L2 → 拒绝路由，run-log append note="L<N> 不支持事件驱动"
-4. 识别 eventType，查路由表得目标阶段
-5. 检查高风险路径：
+4. 受理前核实（M13，见下节「先核实主张再受理」）：
+   - 按 reporter 步骤复现；
+   - PR 类事件检出分支跑相关测试；
+   - 核实不通过 → 不写入 routedTo，记录核实结果并交人 / 转 R；不得按 reporter 定性直接分类
+5. 识别 eventType，查路由表得目标阶段
+6. 检查高风险路径：
    - 若 affectedArtifacts 含 auth/加密/发布相关 → highRiskGate=true
    - 若 eventType=requirement-change 且涉及架构变更 → highRiskGate=true
-6. 写入 routedTo，append run-log action=event-route
-7. 触发目标阶段执行（单阶段，非完整 8 阶段）：
+7. 写入 routedTo，append run-log action=event-route
+8. 触发目标阶段执行（单阶段，非完整 8 阶段）：
    - 若 highRiskGate=true → 决策型 CHECKPOINT 等用户确认
    - 否则按当前 maturity level 操作型 CHECKPOINT 规则
-8. 阶段完成后，事件标记为 resolved
+9. 阶段完成后，事件标记为 resolved
 ```
+
+### 先核实主张再受理（M13）
+
+**位置**：路由逻辑步骤 4——在识别 eventType、查路由表**之前**。reporter 的定性（"这是 bug" / "这个 PR 修好了"）是**主张**而非事实；未核实就按主张分类，等于把误报与错误定性直接放大成一次阶段执行。
+
+**两个动作**（按事件形态至少执行适用者）：
+
+1. **按 reporter 步骤复现**：把 reporter 给出的步骤当可执行脚本，由 agent 真实跑一遍，结果落入事件 `evidence`（复现成功与否 + 输出摘要），不采信转述。
+2. **PR 类事件检出分支跑相关测试**：事件针对某个 PR/分支时，检出该分支、跑与该变更相关的测试，测试结论作为分类依据。
+
+**判定出口**：
+
+- 核实通过（能复现 / 相关测试通过）→ 按路由表正常分类（从步骤 5 起）。
+- 核实不通过（复现不出 / 相关测试未通过）→ **不得**按 reporter 的定性直接分类（不得直接判 `bug`、不得直接进阶段 5 修复）；应记录核实结果（含已尝试步骤与卡点）并**交人裁决 / 转 R 定位**，run-log 留痕。
+
+**与既有 R 流程的先后划界**：本节是**受理前**核实——用「能否复现」决定**是否受理、如何分类**；`root-cause-locator.md` §2.5 的复现测试强制是**受理后**的 R 流程——事件已受理、确认为真实缺陷并进入普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）后，才由 R 做**根因定位**（入场前须先有红信号，见该文件 §2.7）。先核实、后受理、再根因，三步不跳序。
 
 ## 高风险路径强制 CHECKPOINT
 
