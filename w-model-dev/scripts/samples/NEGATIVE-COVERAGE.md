@@ -4,10 +4,10 @@
 > `self-test.ts` 的**每一个 exit-2 门禁**都必须登记一条**会失败的**负向案例。未登记 →
 > `negative-coverage-missing`（exit 1）；`fixture` 机制的证据路径必须在盘存在，否则 →
 > `negative-coverage-dangling`（exit 1）。口径与 `check-docs-consistency.ts` 的 exit-2 中心探针一致
-> （44 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` / `metrics-report.ts`
+> （45 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` / `metrics-report.ts`
 > 使用特殊探针参数，但仍计入集合）。
 >
-> - **门禁脚本**：基名（`w-model-dev/scripts/cli/<name>.ts` 去掉 `.ts`）。全表 44 行，每门禁恰一行。
+> - **门禁脚本**：基名（`w-model-dev/scripts/cli/<name>.ts` 去掉 `.ts`）。全表 45 行，每门禁恰一行。
 > - **负向机制**：只允许 `fixture`（在盘 `samples/` fixture）/ `invocation`（CLI 参数或测试临时目录调用）/
 >   `mutated-copy`（测试内改写文本副本）三种。
 > - **负向案例 / 证据位置**：`fixture` 行写 `` `samples/...` ``（相对 `w-model-dev/scripts/`），可附
@@ -55,12 +55,13 @@
 | --- | --- | --- | --- |
 | check-tla-bdd-sync | fixture | `samples/tla-bdd-sync/bad-transition-mismatch.json`（self-test.ts:1562，任务 1 强化后断言转移未找到） | 去掉转移等价断言后 TLA+ 转移在 BDD 中缺对应 When 步骤仍判等价 |
 
-### C 组：负向输入是参数或变异副本（15）
+### C 组：负向输入是参数或变异副本（16）
 
 | 门禁脚本 | 负向机制 | 负向案例 / 证据位置 | 所防回归（一句话） |
 | --- | --- | --- | --- |
 | check-docs-consistency | mutated-copy | `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts:2347` | 去掉该计数变异断言后，script-registry 维度退化为空转/假绿，SKILL.md 的 `.ts` 计数改错（如 44→43）无人发现 |
 | check-samples-coverage | invocation | `w-model-dev/scripts/__tests__/check-samples-coverage.test.ts:228`（缺 NEGATIVE-COVERAGE.md → exit 2） | 缺失必需文件（清单本身）不再 exit 2 时，清单缺失会被当作通过，负向覆盖不变量静默失效 |
+| check-pollution | invocation | `w-model-dev/scripts/__tests__/check-pollution-cli.test.ts:212`（同测试 :216 断言项目目录快照逐字节不变） | 未知 flag 不在任何扫描前被拒时，污染定位会在非法参数下继续跑（半程结果被当作结论），「吞掉测试失败只看产物」的工具自己先吞掉输入错误 |
 | code-health-archive | invocation | `w-model-dev/scripts/__tests__/code-health-archive-boundary.test.ts:710` | malformed produce 输入不被 exit 2 拒绝，归档会写入半成品证据 |
 | code-health-ledger | invocation | `w-model-dev/scripts/__tests__/code-health-cli.test.ts:696` | 未知子命令不再 exit 2，append-only ledger 可能被非法子命令破坏 |
 | doctor | invocation | 由任务 3 的 exit2-failure-atomicity.test.ts 提供 | doctor 对非法参数返回 0/1 而非 2，环境缺失会被误报为通过 |

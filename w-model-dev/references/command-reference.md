@@ -36,6 +36,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 | `security-scan.ts`         | 0 / 1 / 2    | 扫描/重生成结果设置 `process.exitCode`，自然返回          |
 | `self-test.ts`             | 0 / 1        | 汇总或未预期异常设置 `process.exitCode`，自然返回         |
 | `wm-status.ts`             | 0 / 2        | 状态输出或未初始化提示设置 `process.exitCode=0`，自然返回 |
+| `check-pollution.ts`       | 0 / 1 / 2    | 扫描与单行 `POLLUTION_JSON` 输出完成后设置 `process.exitCode`，自然返回 |
 
 生产 CLI 的 exit `1` 仅适用于具有校验失败/检查点结果的 runner；metrics-report 与 wm-status 没有 exit 1 结果分支，输入错误统一为 exit 2。测试工具、fixtures 与 `exitWithError` 的结构化错误处理不属于生产 CLI 直接退出静态检查范围。新增生产 CLI 或结果分支时，须更新自然退出契约测试。
 
@@ -424,6 +425,14 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **GATE_JSON / 摘要**：codegraph 收尾 `CODEGRAPH_QUERIES_JSON`、opsx 收尾 `OPSX_ARTIFACTS_JSON`、archive 收尾 `OPENSPEC_ARCHIVE_JSON`（均含 passed/violations/exitCode，phase 5-8 strict 模式下额外含 changeId 与覆盖/制品计数）。
 - **legacy 兼容层**：三脚本保留无 scope 的 legacy 纯逻辑入口（`checkCodegraphQueries` / `checkOpsxArtifacts` / `checkOpenspecArchive`，仅做目录/字段完整性或全扫描 entries[0] 判定），供 self-test 与 fixture 回归；CLI 阶段 5-8 一律走 strict（resolveCliScope → strict 函数）。
 - **退出码判别**：CLI 参数互斥矛盾（如 `--change` 前缀与 `--phase` 不符）为 `ARG_INVALID`/exit 2；scope 文件内容与 Git 实际/CLI flag 冲突为校验失败 exit 1。重复值 flag（如 `--scope` 两次）为 `ARG_INVALID`/exit 2（值 flag 只允许出现一次，旧「取第一个/最后一个」语义已废除）；该语义 2026-09-06（D3/I-3）起全 CLI 生效——`--phase` 的重复与两形态（`--phase=N` / `--phase N`）校验由 `lib/parse-phase.ts` 统一检测，重复即错、非法值 ARG_INVALID，`check-bdd-model` / `check-preventive-review` 仍仅接受等号形态（裸 `--phase` → ARG_INVALID 并提示「--phase 仅支持等号形态 --phase=N」）。
+
+## 污染源定位 CLI（check-pollution，S24）
+
+- **速查行**：`npx tsx w-model-dev/scripts/cli/check-pollution.ts [--project=<dir>]`（`--project` 仅等号形态，缺省 cwd）
+- **按需工具声明**：S24 **只作按需工具，不得当门禁**（规格 :187/:305）——不进 pre-push 18 项（`prePushCount: 18` 不变）、不进任何阶段门；exit 1 仅供人工二分定位参考。
+- **检查对象**（规格 :206）：`.w-model/` 残留（`*.lock` 陈旧锁目录/文件）、`*.lock` 锁文件、`coverage/` 残留（含 `coverage/.tmp`）、vitest 语义污染形态（`--outputFile` JSON 残留等，项目根深度 1 名称白名单）；扫描剪除 `node_modules/` 与 `.git/`。判据纯函数在 `logic/pollution-logic.ts`。
+- **「吞掉测试失败只看产物」语义**：逐文件定位「存在测试失败痕迹（锁残留 / 覆盖率产物 / vitest 输出 JSON）但工作区产物却被判通过」的污染形态——失败信号被吞掉、只留下产物；本 CLI 把这些痕迹逐项列出，供污染源二分定位使用。
+- **退出码**：0=干净（stdout 单行 `POLLUTION_JSON {type,passed,project,findings,findingCount,exitCode}`）/ 1=发现污染源（逐项 `✗ [kind] path — reason` 列表 + `POLLUTION_JSON`）/ 2=输入错误（未知/重复 flag、`--project` 空值或不存在、多余位置参数 → `ARG_INVALID`/`FILE_NOT_FOUND`，在任何扫描前拒绝、零副作用）。
 
 ## Verifier 校准（**可选，非门禁**）
 

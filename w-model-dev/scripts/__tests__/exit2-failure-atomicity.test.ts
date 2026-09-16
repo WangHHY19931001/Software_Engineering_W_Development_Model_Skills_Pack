@@ -58,8 +58,8 @@ const GATE_FILES: readonly string[] = readdirSync(CLI_DIR)
   .filter((name) => name.endsWith('.ts') && name !== 'self-test.ts')
   .sort();
 
-/** 集合规模漂移守卫：44 = cli/*.ts(45) - self-test.ts。名字仍由 readdirSync 动态推导。 */
-const EXPECTED_GATE_COUNT = 44;
+/** 集合规模漂移守卫：45 = cli/*.ts(46) - self-test.ts。名字仍由 readdirSync 动态推导。 */
+const EXPECTED_GATE_COUNT = 45;
 
 /**
  * 负向调用可能触碰的仓库工作树路径。缺失路径记 `<missing>`（可侦测"被半成品创建出来"）。
@@ -264,7 +264,7 @@ describe('exit-2 门禁失败原子性（S26）', () => {
     if (probeRoot !== '') rmSync(probeRoot, { recursive: true, force: true });
   });
 
-  it('门禁集合 = cli/*.ts 减去 self-test.ts（43 个，动态推导，无手抄名单）', () => {
+  it('门禁集合 = cli/*.ts 减去 self-test.ts（45 个，动态推导，无手抄名单）', () => {
     expect(GATE_FILES).toHaveLength(EXPECTED_GATE_COUNT);
     expect(GATE_FILES).not.toContain('self-test.ts');
     expect(GATE_FILES.every((name) => name.endsWith('.ts'))).toBe(true);
