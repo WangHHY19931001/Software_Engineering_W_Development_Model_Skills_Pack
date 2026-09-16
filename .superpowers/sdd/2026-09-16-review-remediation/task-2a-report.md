@@ -131,4 +131,4 @@ Windows junction creation succeeded. The junction case was not skipped: the help
 
 ## Commit SHA
 
-Pending commit at report creation time; updated after commit below.
+Implementation commit: `b99093edb5a4300fed00d6f06f67b42682e82dc3` (`fix: close project-relative evidence path boundary`).
