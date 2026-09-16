@@ -1115,6 +1115,47 @@ describe('Phase 1 §8 拒绝登记结构校验（M08）', () => {
     expect(v.outOfScope).toEqual([]);
   });
 
+  /** 从交付模板截取 §8 节正文（`## 8. …` 到下一个 `## ` 标题为止）。 */
+  const extractTemplateSection8 = (): string => {
+    const templatePath = path.resolve(here, '..', '..', 'templates', 'requirement-spec.md');
+    const template = fs.readFileSync(templatePath, 'utf-8');
+    const start = template.search(/^##[ \t]+8\.[ \t]+Out of Scope[ \t]*$/m);
+    if (start < 0) throw new Error('templates/requirement-spec.md 缺 §8 标题');
+    const body = template.slice(template.indexOf('\n', start) + 1);
+    const next = /^##[ \t]/m.exec(body);
+    return next ? body.slice(0, next.index) : body;
+  };
+
+  // 交付模板自洽守卫：门禁之前只用手写的裸 `-` / 裸枚举值做夹具，**没有任何测试覆盖
+  // 模板真实文本**，导致模板自带的「无」哨兵行（`` | `-` | … ``）与占位行过不了自己的门禁。
+  // 本用例把模板 §8 正文**逐字**喂给门禁 → §8 桶必须 0 违规。
+  it('交付模板 templates/requirement-spec.md §8 正文逐字喂门禁 → §8 桶 0 违规（模板自洽守卫）', () => {
+    const section = extractTemplateSection8();
+    // 防假绿：截取必须真的含固定列表头与分隔行（截取失效会在 run 里退化为「无表格」1 条违规）。
+    // 逐行断言（不比对含 \n 的整块）：模板文件是 CRLF，比对整块会因 \r 假红。
+    expect(section).toContain('| conceptKey | 拒绝理由 | Prior requests | 状态 | 来源 |');
+    expect(section).toMatch(/^[ \t]*\|[ \t]*---/m);
+    const { v, counts } = run(section);
+    expect(v.outOfScope).toEqual([]);
+    expect(counts.oos).toBe(0);
+  });
+
+  it('判定 (c)：单元格内含转义管道 `\\|` 不当分隔符（不误报「单元格数不符」）→ 无违规', () => {
+    const { v, counts } = run(
+      `${OOS_TABLE_HEADER}\n` + '| dark-mode | 与 A \\| B 双管线方案冲突 | `REQ-101` | `rejected` | 阶段1 |\n',
+    );
+    expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 0 });
+    expect(v.outOfScope).toEqual([]);
+  });
+
+  it('单元格归一化只剥「整格单层反引号」：`` `rejected` / `reconsidered` `` 不被剥离 → 状态仍非法', () => {
+    const { v, counts } = run(
+      `${OOS_TABLE_HEADER}\n| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | \`rejected\` / \`reconsidered\` | 阶段1 |\n`,
+    );
+    expect(counts.oos).toBe(1);
+    expect(v.outOfScope[0]).toMatch(/§8 表格第 1 行状态非法/);
+  });
+
   it('判定 (a)：§8 节缺失 → 恰好 1 条', () => {
     const { counts, v } = run(undefined);
     expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 1 });

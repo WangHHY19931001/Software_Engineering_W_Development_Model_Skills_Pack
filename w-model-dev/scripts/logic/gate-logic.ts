@@ -788,14 +788,46 @@ function extractOutOfScopeSection(spec: string): string | undefined {
   return next ? body.slice(0, next.index) : body;
 }
 
-/** 拆分 Markdown 表格行 → 单元格（去首尾 `|` 后 trim）。 */
+/** 单元格归一化：**单层**反引号剥离。
+ *
+ *  Markdown 表格习惯用 `` `code` `` 包裹标识符与枚举值（模板 / README 皆有先例），门禁若
+ *  按原样比对，会把交付模板自带的 `` `-` `` / `` `rejected` `` 误判为非法。
+ *
+ *  规则（最小一致；**不做**「删除所有反引号字符」的粗暴处理）：
+ *  - 仅当整格**恰好**被一对反引号包裹、内层非空且不含反引号（`` `x` ``）时剥离为 `x`；
+ *  - 其余形态原样保留 —— `` `a` `b` ``、`` `a` bar ``、`` a` `` 等都不剥离。若被
+ *    粗暴清洗会静默吞掉真实非法值（例如 `` `rejected` / `reconsidered` `` 这类混合形态
+ *    必须仍判为非法枚举）。
+ */
+function normalizeMarkdownCell(cell: string): string {
+  const trimmed = cell.trim();
+  return /^`[^`]+`$/.test(trimmed) ? trimmed.slice(1, -1) : trimmed;
+}
+
+/** 去掉行首 / 行尾的**未转义** `|` 分隔符（`\|` 属单元格内容，不当分隔符）。 */
+function stripRowEdgePipes(line: string): string {
+  const trimmed = line.trim();
+  const withoutHead = trimmed.startsWith('|') ? trimmed.slice(1) : trimmed;
+  return withoutHead.endsWith('|') && !withoutHead.endsWith('\\|') ? withoutHead.slice(0, -1) : withoutHead;
+}
+
+/** 未转义的 `|` 分隔符（lookbehind：前一字符非反斜杠）。
+ *
+ *  **单元格内嵌管道语义（显式声明）**：单元格内的 `\|` **不当分隔符** ——
+ *  `| a \| b | c |` 是 2 格而非 3 格，不会误报「单元格数与表头不符」。内容保留 `\|` 原文
+ *  （本门禁只做结构判定，不做 Markdown 渲染期反转义）。由 `gate-enhancement.test.ts`
+ *  「单元格内含转义管道 `\|` 不当分隔符」用例覆盖。
+ */
+const MD_ROW_DELIMITER = /(?<!\\)\|/;
+
+/** 拆分 Markdown 表格行 → 单元格（去首尾未转义 `|` → 按未转义 `|` 切分 → 单元格归一化）。
+ *
+ *  归一化在**此处**统一做单层反引号剥离，故表头列名匹配与所有单元格派生校验
+ *  （哨兵判定 / 状态枚举 / `Prior requests` 非空 / `conceptKey` 唯一性）看到的是同一份
+ *  归一化值。
+ */
 function splitTableRow(line: string): string[] {
-  return line
-    .trim()
-    .replace(/^\|/, '')
-    .replace(/\|$/, '')
-    .split('|')
-    .map((c) => c.trim());
+  return stripRowEdgePipes(line).split(MD_ROW_DELIMITER).map(normalizeMarkdownCell);
 }
 
 /** 表头列名 × 单元格 → 列名到值的映射。
@@ -822,8 +854,10 @@ function mapRowValues(headerCells: string[], cells: string[]): Map<string, strin
  *  - (c) §8 有表格 → 表头五列齐全、conceptKey 非空且唯一、状态 ∈ {rejected, reconsidered}、
  *        Prior requests 非空（`-` 合法）。列缺失时跳过该列的派生校验（避免同因多报）。
  *
- * 「无」哨兵行（conceptKey === '-'，模板的显式「无」形态）**豁免状态枚举与
- * Prior requests 校验** —— 否则模板自身的「无」形态会过不了本门禁。
+ * 「无」哨兵行（归一化后 conceptKey === '-'，交付模板的显式「无」形态）**豁免状态枚举与
+ * Prior requests 校验** —— 否则模板自身的「无」形态会过不了本门禁。该豁免依赖
+ * splitTableRow 的单层反引号剥离：模板写成 `` | `-` | … | ``，不剥离则 conceptKey 拿到
+ * `` `-` `` 而非 `-`，豁免失效（由 gate-enhancement.test.ts 的「模板自洽守卫」用例锁定）。
  */
 function checkOutOfScopeRegister(spec: string): string[] {
   const v: string[] = [];
