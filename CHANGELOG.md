@@ -9,6 +9,34 @@
 
 ## [42.2.1] - 2026-09-01
 
+### M 程序：外部技能采纳 P0–P6（expanded-external-skill-adoption，2026-09-14 ~ 2026-09-16）
+
+> 采纳判据与逐项验收见 `docs/superpowers/specs/2026-09-14-expanded-external-skill-adoption-design.md` §13（AC-0…AC-12）；各期提交序列、评审轮次与收口实测记于 `docs/superpowers/plans/2026-09-14-external-absorption-adjudication.md`、`2026-09-14-p1-meta-theory-absorption.md`、`2026-09-14-p2a-gate-negative-coverage-and-atomicity.md`、`2026-09-15-p2b-rule-loadbearing-and-completeness.md`、`2026-09-15-m07-rtm-test-evidence.md`、`2026-09-15-p3-role-independence-and-review.md`、`2026-09-15-p4-test-quality-and-design-rules.md`、`2026-09-16-p5-debug-ops-interaction.md`、`2026-09-16-p6-rejection-knowledge-base.md` 的收尾节。**本节计数一律取收口实测**，不沿用各期文档写作时的中间值（43 / 44 / 332 / 340 / 344）。
+
+- **P0 裁定录入（2026-09-14）**：50 个采纳项全部带裁定记录（44 项直接采纳 + 6 个决策点 D-1 至 D-6 由用户裁定），不存在「实现时再决定」的流程语义；两张 vendor 摘录入库，证据图 4 条 🟡 全部解除；D-1 的「不全量改写 48 条反模式主表述」由「未验证」升级为「有本地 A/B 证据支持」——对照臂未复现失败，按已采纳的 S04 属无可修缺陷。
+- **P1 元理论层（M01 / S03 / S04 / S02 / S05 / M02 / S01 / M16 / M15，2026-09-14）**：新增 `references/asset-authoring.md`（资产编写杠杆、渐进披露数字阈值、指针约定、no-guidance control 的「授权不写」）；`SKILL.md` 的 description 收敛为只写 when、不概括工作流（仍是完整触发清单）；`hard-constraints.md` 落地「失败类型 → 指令形式」分流判据与 No nuance clauses / Exemption clauses don't scope（48 条主表述不改写）；单一权威文案纪律落到 `README.md` / `docs/INSTALL.md` / `AGENTS.md`，安装与快速开始命令只留一处权威、其余指向。
+- **P2-A 门禁负向覆盖与失败原子性（M06 / S26 / S28 / S29，2026-09-14）**：`check-samples-coverage.ts` 新增「每个 exit-2 门禁都有会失败的负向案例」强制不变量（第四条规则：未登记 missing 与证据悬空均 exit 1）；测试层对每个 exit-2 门禁断言「负向路径失败后状态逐字节不变」；`samples/README.md` 矩阵增「所防回归」列；mock 须复刻真实契约的替身保真判据。
+- **P2-B 规则负载性与完整性（S25 / S27 / S30 / S31 / S32，2026-09-15）**：新增规则级三态 fixture 协议（RED / GREEN / PRESSURE——移除该规则文本必须复现旧行为）；run-log 新增 R10 `revertEvidence`（回滚后必须变红，否则该修复无证据）；L0 载体定量预算断言；`check-docs-consistency` 增完整性审计双维度；**新增确定性 CLI `review-package.ts`**（评审包按固定顺序落单文件，同输入同字节可复现、不含时间戳）。
+- **M07 RTM 测试证据（独立 Schema 批准单元，2026-09-15）**：经用户单独批准（裁定 D-2）后，`rtm.schema.json` 新增**可选** `testSummary.evidence`（`command` / `exitCode` / `observedAt` + 可选 `rawOutputPath` / `rawOutputSha256`）；`check-artifact-gate.ts` 经 `gate-logic.ts` 新增 E1–E4 四规则（配对 / SHA-256 核验 / 结果一致性含 RED 绑定 `failed>0 ⇒ exitCode≥1` / 存在性 + cutoff，早于 cutoff 吸收为非阻断 legacy）；RTM 实体、关系与覆盖率语义不变，schema 文件数不变。
+- **P3 角色独立性与评审（S06 / S07 / S08 / S09 / S10 / S11 / S14 / S16 / M14，2026-09-15）**：禁止编排者在派单提示中预判 findings（不得写 "do not flag" / "at most Minor"）；「不信任报告」——作者 rationale 是 claim、不得据此降级 severity，plan 作者不自评自己的 plan，test output 的 warning 即 finding；面向 V finding 的误报质疑通道（回流新 V，禁编排者裁决）；scoped re-review（只审 fix delta 并逐 finding 判 ADDRESSED / NOT ADDRESSED，"Attempted is not addressed"，Minor 不进 loop）；CHECKPOINT Ruling 三要素（含「若错代价」）；模型档位 × 修复轮次 escalation 且必须显式指定模型；≥3 次修复失败的技术判据（暴露新共享状态且位置不同 / 要求大规模重构 / 别处产生新症状 ⇒ 架构错误）；Loop 4 retro 七类改进源。
+- **P4 测试质量与设计规则（S21 / S19 / S20 / M03 / M09 / M10 / M11 / S12 / S18，2026-09-15）**：测试质量判据（change detector / string-presence trap / "Name the break" 前置门 / 期望值独立推导 / Mutation Check 五类变异 / Mock 三条硬规则）；设计压力与 seam 负向判据（两 adapter 才成真 seam、deletion test）与 ADR 入选三问门槛；expand-contract 兜底与票据 preflight 成对冲突扫描表；**票据内容门禁**在 `check-artifact-gate.ts --phase=5` 生效（占位符黑名单 + 可构建性判据），V 侧对应必答项。
+- **P5 调试运维与交互（M05 / M17 / S13 / S24 / S22 / M13 / M04 / S17 / M18 / M12 / S15 / S23，2026-09-16）**：R 入场门（红信号四项验收 + 3–5 条排序可证伪假设 + 预测格式）；S 的 loop 构造方法清单与「提高复现率而非干净复现」；「无根因」合法出口（`check-rootcause-report.ts` 新增 `noRootCause` 条件分支——R1/R2/R3 判据逐字保留，是条件豁免而非删除）；条件等待三要素与三反模式；事件接驳前置核实（先核实主张再受理）；CHECKPOINT 提问与呈现规范（每题一想法 + 答案 stub、必给推荐答案、Push right、Brief 三段式）；`.w-model` 在 worktree 内的隔离五条纪律定稿；受控低仪式探索通道；阶段开工前三路径分诊与分类口播；clean baseline 强制与 `git worktree prune` 自愈。
+- **P6 拒绝知识库（M08，2026-09-16）**：拒绝登记挂靠阶段 1 规格产物的**既有** §8（五列：`conceptKey` / 拒绝理由 / `Prior requests` / 状态 / 来源；一概念一行、`conceptKey` 归一化后唯一、仅 rejected enhancement 入册），零新增目录、零新增 `.w-model/*.json`；需求入口新增「按概念相似度去重」读取动作（surface → Confirm / Reconsider / Disagree 三选一 → 判定必须口播），**不新增 `/wm` 子命令、不改 ingest 既有确定性分流**；门禁（`gate-logic.ts` 的 `checkOutOfScopeRegister`）只校验**登记结构**——**「门禁通过」≠「去重已发生」**：概念相似度由入口的语义匹配承担，证据须引用 `GATE_JSON.reasons` 中 `structure: §8` 桶的计数，不得以整体退出码为据。
+- **三处用户会注意到的语义变化（P5 / P6，如实披露）**：
+  - **新增一个按需工具 CLI**：`check-pollution.ts`（污染源二分定位：逐文件跑、停在第一个污染源，确定性、不调用 LLM）。**不进 pre-push**、不接入任何阶段门，`prePushCount` 仍 **18**；`cli/*.ts` 44 → **46**（P2-B 的 `review-package.ts` 与 P5 的 `check-pollution.ts`）。
+  - **新增提交前快层 `.githooks/pre-commit`**：staged-only 快层（staged prettier `--ignore-unknown` + 增量 `tsc`），慢层全量 suite 仍留 pre-push；**不引入 husky、不改 `package.json`**。按类别排除 `*.md` / `docs/changes/*` / `eval/*` / `samples/*` / `templates/*` / `docs/index.html`（被排除类别内 `.ts`/`.cjs` 计数为 0，故 hook 检查面 ⊇ pre-push 面，属收敛而非放松）。
+  - **phase-1 结构门禁的数据要求收紧**：`docs/phase1-requirements/requirement-spec.md` 的 §8 须为合规五列表格（含 ≥1 数据行或哨兵行），否则阶段 1 结构校验报 `structure: §8 …` 违规（exit 1）。属**既有门禁的判据强化**——不新增命令、不新增放行路径、不改 `/wm` 命令的输入 / 输出 / 语义；未引入 legacy 时间豁免。
+- **计数变化（2026-09-16 收口实测）**：exit-2 脚本 43 → **45**；`self-test` 332 → **352**；`cli/*.ts` 44 → **46**；`references/*.md` 42 → **43**；`schemas/*.schema.json` 仍 **34**（M07 为既有 schema 增可选字段）；`prePushCount` 仍 **18**；反模式仍 **48**（无 #49）；`audit:l0-links` exit 0（672 / 95 / 36，`violations: []`）；**版本保持 42.2.1，不 bump**。
+
+### vitest 执行模型与推送前门禁确定性（vitest-project-split，2026-09-14）
+
+> 这是**测试基础设施**变更：不影响 `/wm` 命令语义、不改任何门禁判据、pre-push 项数仍 **18**。现象、根因与排除过程记录在 `docs/changes/vitest-parallel-flakiness-finding.md` 与 `docs/troubleshooting.md` 1.7a 节。
+
+- **先全局串行化（`b71c2fe1`）**：`npm run prepush` 第 12 项（vitest + coverage）偶发红，失败数为 1–2 条（极端时达 20 条）且**每次落在不同文件**，形态为 `expected null to be N`（子进程未真正运行）/ `STACK_TRACE_ERROR` / 30s 超时——同一命令同一代码两次运行失败数可差 10 倍，量级跳动排除「断言写错」；基线 `72081e2` 同样复现。`--maxWorkers=4` 与 `--testTimeout=120000` 实测均无效，唯一有效解是**子进程类文件互不重叠**，故设全局 `fileParallelism: false`。代价是墙钟翻倍（带 coverage 457s 抖动 → 1055s 绿），属接受成本。
+- **再收敛为两个 project（`5d212e52`）**：`cli-serial`（30 个真实 spawn CLI 子进程的测试文件，`fileParallelism: false`）与 `unit-parallel`（其余纯逻辑文件，保持默认并行），取代全局串行。成员名单是单一常量 `SUBPROCESS_TEST_FILES`，两个 project 的 include / exclude 由它派生，两个视图不会漂移；新增 `vitest-project-split.test.ts` 按**源码证据双向**守护该清单（真实 spawn 未登记、无证据残留、文件不存在均红灯），并显式登记三类判定陷阱：`vi.mock('node:child_process')` 的替身文件、仅类型导入、注释与正则里的词，均**不算**真实 spawn、不登记。
+- **配套校准**：`check-docs-consistency.ts` 的 `VITEST_SPAWN_TIMEOUT_MS` 600s → 1800s（串行后套件 975–1060s，旧上限会把健康仓库误杀成 `vitestTestCount: -1`）；`lib/run-sync.ts` 两条 runSync 行号锚随注释扩充 +2 行顺延（`run-sync.test.ts` 有行级断言）。
+- **诚实边界**：全量墙钟几乎不变（974s vs 全串行 975s）——**子进程文件自身的执行时间占大头**；本变更的收益在**结构确定性**（并行集合与串行集合显式化并由守护测试锁定），真正的提速方向是降低子进程测试自身耗时，而非调整并发结构。实测结果：`npm run prepush` 首次获得确定性全绿（18 项、exit 0、1055s），含此前无法可靠通过的第 12 项与第 14 项。
+
 ### 门禁完整性与证据事实对账（gate-integrity-evidence-reconciliation，2026-09-12）
 
 > 本 campaign 修的四个缺陷共享同一根因：**形态合规但事实不正确**。同义反复的测试可通过四级门；`newFindings: []` 可通过冰山校验；`passed` 在 R3 中从未被读取；捏造的 `evidenceAnchor` 路径可通过 R15 正则。通用修法是**分母来自上游产物，而非自我声明**。
