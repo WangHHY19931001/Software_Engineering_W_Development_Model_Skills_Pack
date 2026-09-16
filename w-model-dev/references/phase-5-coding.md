@@ -229,6 +229,43 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 | 规范检查 | `npx eslint . --max-warnings=0` + `npx prettier --check .` | 0 error，0 warning |
 | 编译验证 | `npx tsc --noEmit`（TS）/ `npm run build` | 退出码 0 |
 
+## worktree 纪律（S23）
+
+> 依据：S23 台账 `docs/superpowers/specs/2026-09-14-superpowers-capability-survey.md:176`；D-6 裁定 `docs/superpowers/plans/2026-09-14-external-absorption-adjudication.md:133-134`（§10.2 回执 `:224`）；设计规格 §4.4 `docs/superpowers/specs/2026-09-14-expanded-external-skill-adoption-design.md:190-198`。本节是**文档规则**（git-only），不配脚本、不新增门禁。
+
+### `.w-model/` 归属（D-6 定稿）
+
+**worktree 内禁止写 `.w-model/`（含其锁目录）；跨 worktree 的状态与证据一律回主仓 `.w-model/` 登记；`wm-write.ts` 的锁只在主仓路径上生效，worktree 内的平行 `.w-model/` 构成平行事实源，禁止创建。**
+
+D-6 裁定原文（`:133`）：「worktree 内**禁止**写 `.w-model`；跨 worktree 的状态与证据**一律回主仓**」。
+
+三点依据（D-6 实测理由，`:134`）：
+
+1. **平行事实源**：新建 worktree **不继承** `.w-model/`；风险不是继承，而是「worktree 内跑 `/wm` 会**新建**一份」，造成**写入位置分叉**。
+2. **锁**：`wm-write.ts` 的锁在**同一文件路径**上生效，**跨 worktree 不互斥**，多 worktree 各写各的不保证全局单写者（设计规格 §4.4 `:195`）。
+3. **SSoT `headRef`**：SSoT `:283` 要求 ChangeScope 的 `headRef` 解析 sha **等于当前 HEAD**，而每个 worktree 有独立 HEAD——这正是设计规格 §4.4 `:195` 所指的冲突点（SSoT §4.4 正文见 `:596`）。
+
+### 五条隔离纪律
+
+| # | 纪律 | 为什么 |
+|---|---|---|
+| 1 | **Step0 已隔离检测 + submodule 守卫**：动手前先判定自己是否已在 worktree 内，再用 `git rev-parse --show-superproject-working-tree` 守卫 submodule 场景 | 已在隔离区再建一层，会得到 harness 看不见的双重工作树 |
+| 2 | **建前取用户同意**：创建 worktree 前必须取得用户明确同意 | worktree 改变工作区语义，属用户决策，不是 Agent 自决 |
+| 3 | **原生工具优先**：一律用 `git worktree` 原生命令，不用平台工具或手工目录绕过 | **绕过会产生 harness 看不见的 phantom state** |
+| 4 | **`git check-ignore` 强制**：`git check-ignore <path>` 未命中即先加入 `.gitignore` 并 commit，再建 worktree | 未忽略的隔离目录会被误纳入变更集合，污染 ChangeScope 与评审包 |
+| 5 | **clean baseline 强制**：开工前工作区与暂存区必须干净（"A dirty baseline makes every later failure ambiguous"） | **脏基线会让后续每一次失败都变得不可归因**，无法区分新缺陷与旧污染 |
+
+### 清理拥有权判定与 `prune` 自愈
+
+- **拥有权判定**：收尾时只清理位于 `.worktrees/` / `worktrees/` 下、且**由本次工作创建**的 worktree；**非自建的一律不清理**，交还用户处置。PR 未落地前不删 worktree。
+- **`git worktree prune` 自愈**：元数据残留（工作目录已删但 `.git/worktrees/` 记录仍在）用 `git worktree prune` 收敛；**不做手工 `rm -rf` 元数据**。
+
+### 边界
+
+- **git-only**：本节纪律一律用 git 原生命令表达——**W-model 不引入平台工具**（设计规格 §4.4 `:197`）。
+- **不得自动 `git reset`、不得自动清理用户文件**（同 `:197`）。
+- **不新增检测脚本**：S23 纪律为**文档规则**（无脚本配额）——不得为本节新增任何 `.ts` 检测脚本，也不得修改既有脚本。
+
 ## 测试用例设计（本阶段执行单元测试）
 
 | 用例 ID | 测试场景 | 输入 | 预期输出 | 优先级 |

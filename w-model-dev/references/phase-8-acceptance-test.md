@@ -271,6 +271,10 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 - archive 产物只读，后续项目引用时只读取不修改
 - archive 产物禁止具体文件路径（OpenSpec 与 to-spec 共识）
 - **tickets.md 源路径无关性**：阶段 5 票据产出位置（`.w-model/tickets.md` 或 `docs/tickets.md`）不影响 archive——archive 时 S 子代理从源路径读取内容，写入 archive 的 `tasks.md`，源文件保留不动
+- **worktree 收尾归属（S23）**：归档/收尾时按 `phase-5-coding.md`「worktree 纪律（S23）」的**拥有权判定**处置 worktree：
+  - 仅清理**本次自建**且位于 `.worktrees/` / `worktrees/` 下的 worktree；**非自建的一律不清理**，交还用户处置；
+  - 元数据残留用 `git worktree prune` 自愈，不做手工 `rm -rf` 元数据；
+  - 不得自动 `git reset`、不得自动清理用户文件。
 
 ### 与 project.json 的关系
 - archive 完成后 S 子代理回填 `project.json.status = "项目完成 + 已归档"`

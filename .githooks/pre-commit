@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# 本地提交前快层（pre-commit fast layer，M12 / D-4）
+#
+# 目的：把「格式 + 类型」两类秒级反馈留在 `git commit` 前，避免反馈代价全部压到
+#       `.githooks/pre-push`（18 项门禁）。本层只做 staged-only 快速检查。
+#
+# 快慢分层（M12 的 W-model 落位）：
+#   - 快层（本文件）：staged-only prettier + 条件触发的 tsc。
+#   - 慢层（`pre-push`）：全量 vitest / 门禁脚本 / 安全扫描 / samples 覆盖 / 18 项门禁。
+#   本层是慢层的**严格子集**，不重复慢层工作，**绝不跑全量 vitest**。
+#
+# 启用方式：`core.hooksPath=.githooks` 已由 npm postinstall（`scripts/setup-hooks.cjs`）设置，
+#           **不引入 husky**、**不改 `package.json`**。本文件由 git 直接执行（git 自带 sh/bash），
+#           不经 npm script 入口，故无需 cmd/PowerShell 降级守卫。
+# 临时跳过（仅紧急情况，勿用于常规开发）：`git commit --no-verify`
+#
+# 缺工具即降级告知（M12 台账明文）：node / node_modules / prettier 任一不可用时，
+#   打印明确告警并**放行**（exit 0）——不静默失败、不阻断提交。
+
+set -euo pipefail
+
+warn() { printf '⚠ pre-commit: %s\n' "$*" >&2; }
+info() { printf '  %s\n' "$*" >&2; }
+pass() { printf '✓ pre-commit: %s\n' "$*" >&2; }
+step() { printf '▸ pre-commit: %s\n' "$*" >&2; }
+
+# ---------- 1. 取暂存文件列表（staged-only，不扫全仓） ----------
+# --diff-filter=ACMR：只取 Added / Copied / Modified / Renamed；已删除文件无需检查。
+# `git diff --cached --name-only` 输出在含中文路径时可能被转义，先关闭 quotePath。
+staged_files="$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR)"
+if [ -z "$staged_files" ]; then
+  pass "无暂存文件，跳过快速检查"
+  exit 0
+fi
+
+staged_array=()
+while IFS= read -r staged_path; do
+  if [ -n "$staged_path" ]; then
+    staged_array+=("$staged_path")
+  fi
+done <<< "$staged_files"
+staged_count="${#staged_array[@]}"
+
+# ---------- 2. 缺工具降级判定（M12：缺脚本即降级告知） ----------
+if ! command -v node >/dev/null 2>&1; then
+  warn "node 不可用 → 降级放行（格式检查与类型检查均未执行）"
+  info "恢复后重试：node --version 确认可用，再重新 git commit"
+  exit 0
+fi
+
+if [ ! -d node_modules ]; then
+  warn "node_modules 缺失 → 降级放行（格式检查与类型检查均未执行）"
+  info "恢复后重试：先 npm install，再重新 git commit"
+  exit 0
+fi
+
+if ! npx --no-install prettier --version >/dev/null 2>&1; then
+  warn "prettier 不可用 → 降级放行（格式检查未执行）"
+  info "恢复后重试：确认 devDependencies 含 prettier 且已 npm install"
+  exit 0
+fi
+
+# prettier 就绪判定：配置文件缺失时**跳过格式检查但不阻断**（继续下面的类型检查），
+# 避免把「配置缺失」误报成「格式不符合」而给出误导性的拦截。
+prettier_ready=1
+if [ ! -f config/prettier.config.cjs ]; then
+  warn "prettier 配置 config/prettier.config.cjs 缺失 → 跳过格式检查（继续类型检查）"
+  prettier_ready=0
+fi
+
+# ---------- 3. prettier：staged-only 格式检查 ----------
+# 检查面 = 本仓 prettier 已治理的文件；以下类别**按类别排除**，否则会产生系统性误伤
+# （实测：全仓 40 份 .md 与 8 份归档 / fixture JSON 现状非 prettier-clean）：
+#   - `*.md`：markdown 不在本仓 prettier 面内（pre-push 的 prettier 门禁只覆盖
+#     `w-model-dev/scripts/**/*.ts` / `config/**/*.{cjs,ts}` / `scripts/*.cjs`）；
+#     纳入 .md 会把每次文档提交变成误伤拦截，且需先整体重排 40 份既有文档。
+#   - `docs/changes/**`：受控历史归档（冻结证据，不得重排）。
+#   - `eval/**`：评估语料（手工维护，`eval/mappings.json` 现状非 prettier-clean）。
+#   - `w-model-dev/scripts/samples/**`：手写门禁 fixture（JSON 契约手工维护）。
+#   - `w-model-dev/templates/**`：模板（含占位符形态，非 prettier 规范）。
+# 其余暂存文件一律交给 prettier；`--ignore-unknown` 使不可处理类型（二进制等）自动跳过。
+prettier_targets=()
+for staged_path in "${staged_array[@]}"; do
+  case "$staged_path" in
+    *.md) continue ;;
+    docs/changes/*) continue ;;
+    eval/*) continue ;;
+    w-model-dev/scripts/samples/*) continue ;;
+    w-model-dev/templates/*) continue ;;
+  esac
+  prettier_targets+=("$staged_path")
+done
+
+if [ "$prettier_ready" -eq 0 ]; then
+  pass "格式检查已跳过（prettier 配置缺失，见上方告警）"
+elif [ "${#prettier_targets[@]}" -eq 0 ]; then
+  pass "暂存 ${staged_count} 个文件，均不在本仓 prettier 面内，跳过格式检查"
+else
+  step "prettier --ignore-unknown --check（staged-only，${#prettier_targets[@]}/${staged_count} 个暂存文件）"
+  if ! npx --no-install prettier --ignore-unknown --check --config config/prettier.config.cjs \
+    "${prettier_targets[@]}"; then
+    warn "暂存文件格式不符合 Prettier → 提交中止"
+    info "修复：npx prettier --write <上述文件> 后重新 git add"
+    info "临时跳过（仅紧急情况）：git commit --no-verify"
+    exit 1
+  fi
+  pass "格式检查通过"
+fi
+
+# ---------- 4. tsc：仅当暂存含 TypeScript 时触发（无 TS 暂存则跳过） ----------
+ts_targets=()
+for staged_path in "${staged_array[@]}"; do
+  case "$staged_path" in
+    *.ts|*.tsx|*.mts|*.cts) ts_targets+=("$staged_path") ;;
+  esac
+done
+
+if [ "${#ts_targets[@]}" -eq 0 ]; then
+  pass "无 TypeScript 暂存文件，跳过类型检查"
+  exit 0
+fi
+
+step "npm run typecheck（${#ts_targets[@]} 个 .ts 暂存文件触发）"
+if ! npm run --silent typecheck; then
+  warn "类型检查不通过 → 提交中止"
+  info "修复：npm run typecheck 定位后修正，再重新 git add"
+  info "临时跳过（仅紧急情况）：git commit --no-verify"
+  exit 1
+fi
+pass "类型检查通过"
+
+exit 0
