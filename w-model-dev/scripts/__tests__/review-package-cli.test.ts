@@ -16,6 +16,7 @@
  * 子进程 → 已登记 config/vitest.config.ts 的 SUBPROCESS_TEST_FILES（vitest-project-split 双向守护）。
  */
 
+import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { createRequire } from 'node:module';
 import * as os from 'node:os';
@@ -87,6 +88,46 @@ function errorJson(stdout: string): Record<string, unknown> | null {
   const line = stdout.split(/\r?\n/).find((l) => l.startsWith('ERROR_JSON '));
   if (line === undefined) return null;
   return JSON.parse(line.slice('ERROR_JSON '.length)) as Record<string, unknown>;
+}
+
+interface CommitObject {
+  body: string;
+  sha: string;
+}
+
+/** 在内存中按 Git loose-object 格式找两个不同 commit object 的 7 位 SHA-1 前缀碰撞。 */
+function findCommitPrefixCollision(tree: string, parent: string, maxAttempts = 100_000): [CommitObject, CommitObject] {
+  const seen = new Map<string, CommitObject>();
+  for (let counter = 0; counter < maxAttempts; counter++) {
+    const body = [
+      `tree ${tree}`,
+      `parent ${parent}`,
+      'author Prefix Collision <prefix-collision@example.test> 0 +0000',
+      'committer Prefix Collision <prefix-collision@example.test> 0 +0000',
+      '',
+      `prefix-collision-${counter}`,
+      '',
+    ].join('\n');
+    const sha = createHash('sha1').update(`commit ${Buffer.byteLength(body, 'utf8')}\0${body}`).digest('hex');
+    const object = { body, sha };
+    const prefix = sha.slice(0, 7);
+    const previous = seen.get(prefix);
+    if (previous !== undefined && previous.sha !== sha) return [previous, object];
+    seen.set(prefix, object);
+  }
+  throw new Error(`未在 ${maxAttempts} 次内找到两个不同 commit object 的 7 位 SHA-1 前缀碰撞`);
+}
+
+/** 只在碰撞找到后调用两次 Git；对象实际写入并以 ref 固定，使 git log 可遍历。 */
+function writeCommitObject(name: string, object: CommitObject): void {
+  const write = runSync('git', ['hash-object', '-t', 'commit', '-w', '--stdin'], {
+    cwd: repoDir,
+    input: object.body,
+    timeout: 30_000,
+  });
+  if (write.status !== 0 || write.error !== undefined) throw new Error(`写入 ${name} 失败: ${write.stderr ?? ''}`);
+  expect(String(write.stdout).trim()).toBe(object.sha);
+  git(['update-ref', `refs/heads/${name}`, object.sha]);
 }
 
 describe('review-package CLI（S32 确定性评审包）', () => {
@@ -217,16 +258,31 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     expect(errorJson(notARepo.stdout)).toMatchObject({ exitCode: 2 });
   });
 
-  it('短 SHA 与同名 ref 冲突时仍确定性解析为提交对象，并在正文使用完整 SHA', async () => {
-    const shortBase = baseSha.slice(0, 7);
-    git(['update-ref', `refs/heads/${shortBase}`, headSha]);
-    const out = path.join(tmpDir, 'short-prefix.diff');
+  it('两个真实 commit object 共享 7 位前缀时，完整 SHA 输入仍生成非空评审包', async () => {
+    const tree = git(['rev-parse', `${baseSha}^{tree}`]).trim();
+    const [collisionBase, collisionPeer] = findCommitPrefixCollision(tree, baseSha);
+    expect(collisionBase.sha).not.toBe(collisionPeer.sha);
+    expect(collisionBase.sha.slice(0, 7)).toBe(collisionPeer.sha.slice(0, 7));
+    writeCommitObject('prefix-collision-a', collisionBase);
+    writeCommitObject('prefix-collision-b', collisionPeer);
+    const out = path.join(tmpDir, 'real-prefix-collision.diff');
 
-    const result = runReviewPackage([`--repo=${repoDir}`, `--base=${shortBase}`, `--head=${headSha}`, `--out=${out}`]);
+    const result = runReviewPackage([
+      `--repo=${repoDir}`,
+      `--base=${collisionBase.sha}`,
+      `--head=${headSha}`,
+      `--out=${out}`,
+    ]);
 
     expect(result.code, result.stderr).toBe(0);
-    expect(JSON.parse(result.stdout.replace('REVIEW_PACKAGE_JSON ', ''))).toMatchObject({ base: baseSha, head: headSha });
-    await expect(fs.readFile(out, 'utf8')).resolves.toContain(`# range: ${baseSha}..${headSha}`);
+    expect(JSON.parse(result.stdout.replace('REVIEW_PACKAGE_JSON ', ''))).toMatchObject({
+      base: collisionBase.sha,
+      head: headSha,
+      commits: expect.any(Number),
+    });
+    const content = await fs.readFile(out, 'utf8');
+    expect(content).toContain(`# range: ${collisionBase.sha}..${headSha}`);
+    expect(content).toContain('commit B: second');
   });
 
   it('空 --repo 与位置参数 → ARG_INVALID，且不创建输出目标', async () => {
