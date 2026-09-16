@@ -3,7 +3,7 @@
   "description": "结构校验失败：§0 SSOT 头缺「自身校验」",
   "expectedPassed": false,
   "expectedReasonPatterns": ["§0 SSOT 头缺「自身校验」"],
-  "specContent": "> **文档版本**\n> **SSOT 声明**\n> **禁止占位词**\n> 系统上下文详见 [x](./system-context.md)\n> 术语表详见 [x](./glossary.md)\n> 需求追踪矩阵详见 [x](./traceability-matrix.md)\n> 行为规格模型详见 [x](./behavior-spec.md)\n> Phase 1 工程纪律与 DoD 详见 [x](./discipline-dod.md)\n> UML 需求建模详见 [x](./uml-modeling.md)\n",
+  "specContent": "> **文档版本**\n> **SSOT 声明**\n> **禁止占位词**\n> 系统上下文详见 [x](./system-context.md)\n> 术语表详见 [x](./glossary.md)\n> 需求追踪矩阵详见 [x](./traceability-matrix.md)\n> 行为规格模型详见 [x](./behavior-spec.md)\n> Phase 1 工程纪律与 DoD 详见 [x](./discipline-dod.md)\n> UML 需求建模详见 [x](./uml-modeling.md)\n\n## 8. Out of Scope\n\n| conceptKey | 拒绝理由 | Prior requests | 状态 | 来源 |\n| --- | --- | --- | --- | --- |\n| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | rejected | 阶段1 |\n",
   "refFiles": [
     "system-context.md",
     "glossary.md",

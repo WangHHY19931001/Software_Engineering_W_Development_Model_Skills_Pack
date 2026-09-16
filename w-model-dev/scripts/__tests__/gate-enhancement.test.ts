@@ -997,6 +997,9 @@ describe('gate-logic 修正', () => {
 // ==================== Phase 1 需求规格结构校验 ====================
 // 内存 fs stub：文件键用 path.join 构造，与 checkRequirementSpecStructure 内部
 // path.join 分隔符一致（Windows 反斜杠），保证 existsSync/readFileSync 命中。
+/** §8 拒绝登记固定列表格表头（五列，与 templates/requirement-spec.md §8 逐字一致）。 */
+const OOS_TABLE_HEADER = '| conceptKey | 拒绝理由 | Prior requests | 状态 | 来源 |\n| --- | --- | --- | --- | --- |';
+
 describe('Phase 1 需求规格结构校验', () => {
   const mkFs = (files: Record<string, string>) => ({
     readFileSync(p: string): string {
@@ -1008,7 +1011,7 @@ describe('Phase 1 需求规格结构校验', () => {
     },
   });
 
-  it('引用块齐全 + SSOT 头 + DoD≥8 通过', () => {
+  it('引用块齐全 + SSOT 头 + DoD≥8 + §8 合规表格 通过', () => {
     const dir = 'docs/phase1-requirements';
     const refs = [
       'system-context.md',
@@ -1020,12 +1023,13 @@ describe('Phase 1 需求规格结构校验', () => {
     ];
     let spec = refs.map((r) => `> 详见 [x](./${r})`).join('\n');
     spec += '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    spec += `\n## 8. Out of Scope\n\n${OOS_TABLE_HEADER}\n| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | rejected | 阶段1 |\n`;
     const files: Record<string, string> = {};
     files[path.join(dir, 'requirement-spec.md')] = spec;
     for (const r of refs) files[path.join(dir, r)] = '';
     files[path.join(dir, 'discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
     const v = checkRequirementSpecStructure(dir, mkFs(files));
-    expect([...v.refs, ...v.ssot, ...v.dod]).toEqual([]);
+    expect([...v.refs, ...v.ssot, ...v.dod, ...v.outOfScope]).toEqual([]);
   });
 
   it('引用文件缺失报 refs', () => {
@@ -1056,6 +1060,106 @@ describe('Phase 1 需求规格结构校验', () => {
     files[path.join(dir, 'discipline-dod.md')] = Array(5).fill('- [ ] x').join('\n');
     const v = checkRequirementSpecStructure(dir, mkFs(files));
     expect(v.dod.some((m) => m.includes('DoD 清单仅 5 项'))).toBe(true);
+  });
+});
+
+// ==================== Phase 1 §8 拒绝登记结构校验（M08） ====================
+// 边界：门禁**只校验登记结构**（节 / 表格 / 列齐 / 键唯一 / 状态枚举 / 回链非空）。
+// 「概念相似度」由阶段 1 入口读取动作以语义匹配（Agent）承担，确定性脚本不校验语义。
+describe('Phase 1 §8 拒绝登记结构校验（M08）', () => {
+  const REFS = [
+    'system-context.md',
+    'glossary.md',
+    'traceability-matrix.md',
+    'behavior-spec.md',
+    'discipline-dod.md',
+    'uml-modeling.md',
+  ];
+  const mkFs = (files: Record<string, string>) => ({
+    readFileSync(p: string): string {
+      if (!(p in files)) throw new Error(`missing ${p}`);
+      return files[p] ?? '';
+    },
+    existsSync(p: string): boolean {
+      return p in files;
+    },
+  });
+  /** §8 之前的全部内容由本 builder 固定，使 §8 成为唯一变量。 */
+  const run = (section?: string) => {
+    const dir = 'docs/phase1-requirements';
+    let spec = REFS.map((r) => `> 详见 [x](./${r})`).join('\n');
+    spec += '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    if (section !== undefined) spec += `\n## 8. Out of Scope\n\n${section}\n`;
+    const files: Record<string, string> = {};
+    files[path.join(dir, 'requirement-spec.md')] = spec;
+    for (const r of REFS) files[path.join(dir, r)] = '';
+    files[path.join(dir, 'discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+    const v = checkRequirementSpecStructure(dir, mkFs(files));
+    // 断言各桶计数：既锁定「恰好报该违规」，也证明未误伤其他桶
+    return { v, counts: { refs: v.refs.length, ssot: v.ssot.length, dod: v.dod.length, oos: v.outOfScope.length } };
+  };
+
+  it('合规表格（rejected + reconsidered + 显式 `-` 回链）→ 无违规', () => {
+    const { v, counts } = run(
+      `${OOS_TABLE_HEADER}\n` +
+        '| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101, REQ-205 | rejected | 阶段1 |\n' +
+        '| offline-queue | 离线队列超出本期部署边界（→ REQ-118） | - | reconsidered | 阶段1 |\n',
+    );
+    expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 0 });
+    expect(v.outOfScope).toEqual([]);
+  });
+
+  it('仅哨兵行（conceptKey = `-`，模板的「无」形态）→ 无违规', () => {
+    const { v, counts } = run(`${OOS_TABLE_HEADER}\n| - | 本阶段无排除项（显式「无」） | - | - | - |\n`);
+    expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 0 });
+    expect(v.outOfScope).toEqual([]);
+  });
+
+  it('判定 (a)：§8 节缺失 → 恰好 1 条', () => {
+    const { counts, v } = run(undefined);
+    expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 1 });
+    expect(v.outOfScope[0]).toMatch(/§8 Out of Scope 节缺失/);
+  });
+
+  it('判定 (b)：旧散文形态（无表格 + `- {{`）→ 恰好 1 条并含迁移指引', () => {
+    const { counts, v } = run('- {{out-of-scope 项}}\n- {{Brownfield 不动的历史模块}}\n');
+    expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 1 });
+    expect(v.outOfScope[0]).toMatch(/§8 无固定列表格/);
+  });
+
+  it('判定 (c)：表头缺列（缺「状态」）→ 恰好 1 条（缺失列不叠加派生违规）', () => {
+    const { counts, v } = run(
+      '| conceptKey | 拒绝理由 | Prior requests | 来源 |\n| --- | --- | --- | --- |\n' +
+        '| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | 阶段1 |\n',
+    );
+    expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 1 });
+    expect(v.outOfScope[0]).toMatch(/§8 表格表头缺列：状态/);
+  });
+
+  it('判定 (c)：conceptKey 重复 → 恰好 1 条', () => {
+    const { counts, v } = run(
+      `${OOS_TABLE_HEADER}\n` +
+        '| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | rejected | 阶段1 |\n' +
+        '| dark-mode | 换个说法的同一概念 | REQ-205 | rejected | 阶段2 |\n',
+    );
+    expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 1 });
+    expect(v.outOfScope[0]).toMatch(/§8 表格 conceptKey 重复：dark-mode/);
+  });
+
+  it('判定 (c)：状态非法枚举 → 恰好 1 条', () => {
+    const { counts, v } = run(
+      `${OOS_TABLE_HEADER}\n| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | 已完成 | 阶段1 |\n`,
+    );
+    expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 1 });
+    expect(v.outOfScope[0]).toMatch(/§8 表格第 1 行状态非法："已完成"/);
+  });
+
+  it('判定 (c)：Prior requests 留白 → 恰好 1 条', () => {
+    const { counts, v } = run(
+      `${OOS_TABLE_HEADER}\n| dark-mode | 主题切换与既有品牌规范冲突 |  | rejected | 阶段1 |\n`,
+    );
+    expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 1 });
+    expect(v.outOfScope[0]).toMatch(/§8 表格第 1 行 Prior requests 为空/);
   });
 });
 

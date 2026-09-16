@@ -744,6 +744,8 @@ export interface RequirementSpecStructureViolations {
   refs: string[];
   ssot: string[];
   dod: string[];
+  /** §8 Out of Scope 拒绝登记（M08）结构违规；判定见 checkOutOfScopeRegister。 */
+  outOfScope: string[];
 }
 
 /** 真实 node:fs 适配（readFileSync 显式 utf-8 以满足 string 返回类型）。 */
@@ -757,7 +759,145 @@ const nodeFsAdapter: {
   readdirSync: (p: string) => nodeFs.readdirSync(p),
 };
 
-/** Phase 1 需求规格结构校验：引用块完整性 + §0 SSOT 头 + DoD 清单
+// ==================== §8 拒绝登记（Out of Scope）结构校验（M08） ====================
+// 边界（不得夸大）：本组判定**只校验登记结构** —— 节存在 / 固定列表格 / 五列齐全 /
+// conceptKey 非空且唯一 / 状态枚举 / Prior requests 非空。
+// **不校验「概念相似度」**：确定性脚本无法判定两个概念是否语义相同；该判定由阶段 1
+// 入口读取动作（A 子代理语义匹配）承担，见 references/ingestion-chunk.md
+// 「REQ 入学锐利性测试」节。门禁只保证登记结构可信。
+
+/** §8 标题（`## 8. Out of Scope`）。`[.．]?` + 分隔符要求使 `## 8.5 …` 不会误命中。 */
+const OUT_OF_SCOPE_HEADING = /^#{1,6}[ \t]*§?8[.．]?(?:[ \t]|$)/m;
+/** §8 固定列表格的五个必需列（与 templates/requirement-spec.md §8 逐字一致）。 */
+const OUT_OF_SCOPE_COLUMNS = ['conceptKey', '拒绝理由', 'Prior requests', '状态', '来源'];
+/** `状态` 枚举（用户裁定 2026-09-16：改主意改状态标记，不删除行）。 */
+const OUT_OF_SCOPE_STATUSES = ['rejected', 'reconsidered'];
+/** 「无」哨兵键：整行全 `-` 时 conceptKey === '-'，显式声明本阶段无排除项。 */
+const OUT_OF_SCOPE_SENTINEL = '-';
+/** Markdown 表格分隔行（`| --- | --- |`）。 */
+const MD_TABLE_SEPARATOR = /^\|[\s:|-]+\|$/;
+
+/** 抽取 `## 8.` 节正文（到下一个标题行为止）；无该节时返回 undefined。 */
+function extractOutOfScopeSection(spec: string): string | undefined {
+  const head = OUT_OF_SCOPE_HEADING.exec(spec);
+  if (!head) return undefined;
+  const rest = spec.slice(head.index);
+  const newline = rest.indexOf('\n');
+  const body = newline < 0 ? '' : rest.slice(newline + 1);
+  const next = /^#{1,6}[ \t]/m.exec(body);
+  return next ? body.slice(0, next.index) : body;
+}
+
+/** 拆分 Markdown 表格行 → 单元格（去首尾 `|` 后 trim）。 */
+function splitTableRow(line: string): string[] {
+  return line
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((c) => c.trim());
+}
+
+/** 表头列名 × 单元格 → 列名到值的映射。
+ *
+ * 刻意用 Map + 数组解构而非 `cells[index]` / `record[name]`：后两者是动态下标 /
+ * 动态属性访问，会触发 security/detect-object-injection（无意义豁免会稀释 baseline）。
+ * 列缺失时对应值为空字符串（调用方据 hasXxx 跳过该列校验）。
+ */
+function mapRowValues(headerCells: string[], cells: string[]): Map<string, string> {
+  const values = new Map<string, string>();
+  let pending = [...cells];
+  for (const column of headerCells) {
+    const [head, ...tail] = pending;
+    pending = tail;
+    values.set(column, head ?? '');
+  }
+  return values;
+}
+
+/** §8 拒绝登记结构校验（判定 (a)(b)(c)，P6 计划 §0.1.2）。
+ *
+ *  - (a) §8 节缺失 → 违规（「无」也要显式声明）；
+ *  - (b) §8 无固定列表格 → 违规（旧散文形态含 `- {{` 时给迁移指引）；
+ *  - (c) §8 有表格 → 表头五列齐全、conceptKey 非空且唯一、状态 ∈ {rejected, reconsidered}、
+ *        Prior requests 非空（`-` 合法）。列缺失时跳过该列的派生校验（避免同因多报）。
+ *
+ * 「无」哨兵行（conceptKey === '-'，模板的显式「无」形态）**豁免状态枚举与
+ * Prior requests 校验** —— 否则模板自身的「无」形态会过不了本门禁。
+ */
+function checkOutOfScopeRegister(spec: string): string[] {
+  const v: string[] = [];
+  const section = extractOutOfScopeSection(spec);
+  if (section === undefined) {
+    v.push('structure: §8 Out of Scope 节缺失（须显式声明该节；「无」也要显式声明）');
+    return v;
+  }
+  // (b) 「有表格」= 首个 `|` 行 + 紧随其后的分隔行；否则一律 fail-closed 报无表格
+  //（不是仅匹配旧形态 `- {{`：无表格的自由散文同样无法承载结构校验）
+  const lines = section.split(/\r?\n/);
+  const headerIndex = lines.findIndex((l) => l.trim().startsWith('|'));
+  const tableLines = headerIndex >= 0 ? lines.slice(headerIndex) : [];
+  const [headerLine = '', separatorLine = '', ...dataLines] = tableLines;
+  const headerCells = tableLines.length > 0 ? splitTableRow(headerLine) : [];
+  const hasSeparator = tableLines.length > 0 && MD_TABLE_SEPARATOR.test(separatorLine.trim());
+  if (headerIndex < 0 || !hasSeparator) {
+    const legacyForm = section.includes('- {{');
+    v.push(
+      legacyForm
+        ? 'structure: §8 无固定列表格（旧散文形态「- {{」须表化：conceptKey / 拒绝理由 / Prior requests / 状态 / 来源）'
+        : 'structure: §8 无固定列表格（须为五列表格：conceptKey / 拒绝理由 / Prior requests / 状态 / 来源）',
+    );
+    return v;
+  }
+  // (c) 表头列齐
+  const missingColumns = OUT_OF_SCOPE_COLUMNS.filter((c) => !headerCells.includes(c));
+  for (const col of missingColumns) v.push(`structure: §8 表格表头缺列：${col}`);
+  // 缺列 → 该列的派生校验整体跳过（保证「恰好报该违规」）
+  const hasKeyColumn = headerCells.includes('conceptKey');
+  const hasStatusColumn = headerCells.includes('状态');
+  const hasPriorColumn = headerCells.includes('Prior requests');
+
+  const dataRows = dataLines.filter((l) => l.trim().startsWith('|'));
+  if (dataRows.length === 0) {
+    v.push('structure: §8 表格无数据行（须 ≥ 1 行；「无」也须显式保留一行 `-`）');
+    return v;
+  }
+  const seenKeys = new Set<string>();
+  let rowNo = 0;
+  for (const rawRow of dataRows) {
+    rowNo += 1;
+    const cells = splitTableRow(rawRow);
+    if (cells.length !== headerCells.length) {
+      v.push(`structure: §8 表格第 ${rowNo} 行单元格数 ${cells.length} 与表头 ${headerCells.length} 列不符`);
+      continue;
+    }
+    const values = mapRowValues(headerCells, cells);
+    const conceptKey = values.get('conceptKey') ?? '';
+    if (hasKeyColumn) {
+      if (conceptKey === '') {
+        v.push(`structure: §8 表格第 ${rowNo} 行 conceptKey 为空`);
+      } else if (seenKeys.has(conceptKey)) {
+        v.push(`structure: §8 表格 conceptKey 重复：${conceptKey}`);
+      } else {
+        seenKeys.add(conceptKey);
+      }
+    }
+    // 哨兵行（显式「无」）：豁免状态枚举与 Prior requests 校验
+    if (conceptKey === OUT_OF_SCOPE_SENTINEL) continue;
+    if (hasStatusColumn) {
+      const status = values.get('状态') ?? '';
+      if (!OUT_OF_SCOPE_STATUSES.includes(status)) {
+        v.push(`structure: §8 表格第 ${rowNo} 行状态非法："${status}"（须 ∈ rejected / reconsidered）`);
+      }
+    }
+    if (hasPriorColumn && (values.get('Prior requests') ?? '') === '') {
+      v.push(`structure: §8 表格第 ${rowNo} 行 Prior requests 为空（须为逗号分隔回链或显式 \`-\`）`);
+    }
+  }
+  return v;
+}
+
+/** Phase 1 需求规格结构校验：引用块完整性 + §0 SSOT 头 + DoD 清单 + §8 拒绝登记结构
  *  @param specDir  docs/phase1-requirements/ 目录（含 requirement-spec.md + 6 独立产物）
  *  @param fs       文件系统注入 { readFileSync(p): string; existsSync(p): boolean }，便于单测 mock
  */
@@ -765,7 +905,7 @@ export function checkRequirementSpecStructure(
   specDir: string,
   fs: { readFileSync(p: string): string; existsSync(p: string): boolean },
 ): RequirementSpecStructureViolations {
-  const v: RequirementSpecStructureViolations = { refs: [], ssot: [], dod: [] };
+  const v: RequirementSpecStructureViolations = { refs: [], ssot: [], dod: [], outOfScope: [] };
   const specPath = path.join(specDir, 'requirement-spec.md');
   if (!fs.existsSync(specPath)) {
     v.refs.push('structure: requirement-spec.md 不存在');
@@ -799,6 +939,8 @@ export function checkRequirementSpecStructure(
     const checks = (dod.match(/- \[ \]/g) ?? []).length;
     if (checks < 8) v.dod.push(`structure: discipline-dod.md DoD 清单仅 ${checks} 项（须 ≥ 8）`);
   }
+  // §8 拒绝登记（Out of Scope）结构校验（M08）——只校验登记结构，不校验概念相似度
+  v.outOfScope.push(...checkOutOfScopeRegister(spec));
   return v;
 }
 
@@ -842,7 +984,7 @@ export function checkPhaseSpecStructure(
   specDir: string,
   fs: { readFileSync(p: string): string; existsSync(p: string): boolean; readdirSync(p: string): string[] },
 ): RequirementSpecStructureViolations {
-  const v: RequirementSpecStructureViolations = { refs: [], ssot: [], dod: [] };
+  const v: RequirementSpecStructureViolations = { refs: [], ssot: [], dod: [], outOfScope: [] };
   const layout = PHASE_SPEC_LAYOUT[phase];
   if (!layout) {
     v.refs.push(`structure: 不支持的 phase=${phase}（当前支持 1/2/3/4）`);
@@ -886,6 +1028,9 @@ export function checkPhaseSpecStructure(
     const checks = (dod.match(/- \[ \]/g) ?? []).length;
     if (checks < 8) v.dod.push(`structure: ${dodName} DoD 清单仅 ${checks} 项（须 ≥ 8）`);
   }
+  // §8 拒绝登记（Out of Scope）结构校验：仅 phase=1 的 requirement-spec.md 含该固定节
+  //（phase≥2 主文档的 §8 不是拒绝登记，故不施加该组判定）
+  if (phase === 1) v.outOfScope.push(...checkOutOfScopeRegister(spec));
   return v;
 }
 
@@ -1008,6 +1153,7 @@ export function checkArtifactGate(
       ...specStructureViolations.refs,
       ...specStructureViolations.ssot,
       ...specStructureViolations.dod,
+      ...specStructureViolations.outOfScope,
     ]) {
       reasons.push(m);
     }

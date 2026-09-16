@@ -833,6 +833,100 @@ const SPEC_STRUCTURE_CASES: SpecStructureCase[] = [
   },
 ];
 
+// ==================== Phase 1 §8 拒绝登记结构校验（M08） ====================
+// **内联用例（零新增 fixture 文件）**：只改 §8 段，其余 6 引用块 + §0 SSOT 头四项 +
+// DoD 9 项由 runner 统一补齐 —— 因此 expectedBucketCounts 里 refs/ssot/dod 恒为 0
+// 就等价于断言「新校验不误伤其他桶」（恰好报该违规）。
+//
+// 边界：门禁**只校验登记结构**（节 / 表格 / 列 / 键唯一 / 状态枚举 / 回链非空）。
+// 「概念相似度」由阶段 1 入口读取动作以语义匹配承担，确定性脚本不校验语义。
+
+/** §8 之前的主规格前缀（6 引用块 + §0 SSOT 头四项），所有内联用例共用。 */
+const OOS_SPEC_PREFIX =
+  '> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n' +
+  '> 系统上下文详见 [x](./system-context.md)\n' +
+  '> 术语表详见 [x](./glossary.md)\n' +
+  '> 需求追踪矩阵详见 [x](./traceability-matrix.md)\n' +
+  '> 行为规格模型详见 [x](./behavior-spec.md)\n' +
+  '> Phase 1 工程纪律与 DoD 详见 [x](./discipline-dod.md)\n' +
+  '> UML 需求建模详见 [x](./uml-modeling.md)\n';
+
+const OOS_TABLE_HEADER = '| conceptKey | 拒绝理由 | Prior requests | 状态 | 来源 |\n| --- | --- | --- | --- | --- |';
+
+interface SpecStructureOutOfScopeCase {
+  name: string;
+  /** 只提供 §8 段正文；`undefined` = 故意整节缺失（判定 (a)）。 */
+  section?: string;
+  expectedBucketCounts: { refs: number; ssot: number; dod: number; outOfScope: number };
+  expectedReasonPatterns?: RegExp[];
+  description: string;
+}
+
+const SPEC_STRUCTURE_OUT_OF_SCOPE_CASES: SpecStructureOutOfScopeCase[] = [
+  {
+    name: 'spec-structure/oos-valid-register',
+    section:
+      `${OOS_TABLE_HEADER}\n` +
+      '| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101, REQ-205 | rejected | 阶段1 |\n' +
+      '| offline-queue | 离线队列超出本期部署边界（→ REQ-118） | - | reconsidered | 阶段1 |\n',
+    expectedBucketCounts: { refs: 0, ssot: 0, dod: 0, outOfScope: 0 },
+    description: '§8 合规表格：五列齐全 + rejected/reconsidered 两态 + 显式 `-` 回链 → 无违规',
+  },
+  {
+    name: 'spec-structure/oos-sentinel-only',
+    section: `${OOS_TABLE_HEADER}\n| - | 本阶段无排除项（显式「无」） | - | - | - |\n`,
+    expectedBucketCounts: { refs: 0, ssot: 0, dod: 0, outOfScope: 0 },
+    description: '§8 仅含 `conceptKey = -` 哨兵行（模板的「无」形态）→ 豁免状态枚举与 Prior requests 校验，无违规',
+  },
+  {
+    name: 'spec-structure/oos-section-missing',
+    section: undefined,
+    expectedBucketCounts: { refs: 0, ssot: 0, dod: 0, outOfScope: 1 },
+    expectedReasonPatterns: [/§8 Out of Scope 节缺失/],
+    description: '判定 (a)：§8 节缺失（「无」也须显式声明）',
+  },
+  {
+    name: 'spec-structure/oos-legacy-prose',
+    section: '- {{out-of-scope 项}}\n- {{Brownfield 不动的历史模块}}\n',
+    expectedBucketCounts: { refs: 0, ssot: 0, dod: 0, outOfScope: 1 },
+    expectedReasonPatterns: [/§8 无固定列表格/],
+    description: '判定 (b)：§8 为旧模板散文形态（含 `- {{`）且无表格 → 迁移指引',
+  },
+  {
+    name: 'spec-structure/oos-header-missing-column',
+    section:
+      '| conceptKey | 拒绝理由 | Prior requests | 来源 |\n| --- | --- | --- | --- |\n' +
+      '| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | 阶段1 |\n',
+    expectedBucketCounts: { refs: 0, ssot: 0, dod: 0, outOfScope: 1 },
+    expectedReasonPatterns: [/§8 表格表头缺列：状态/],
+    description: '判定 (c)：表头缺列（缺「状态」）；缺失列不叠加派生违规 → 恰好 1 条',
+  },
+  {
+    name: 'spec-structure/oos-duplicate-concept-key',
+    section:
+      `${OOS_TABLE_HEADER}\n` +
+      '| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | rejected | 阶段1 |\n' +
+      '| dark-mode | 换个说法的同一概念 | REQ-205 | rejected | 阶段2 |\n',
+    expectedBucketCounts: { refs: 0, ssot: 0, dod: 0, outOfScope: 1 },
+    expectedReasonPatterns: [/§8 表格 conceptKey 重复：dark-mode/],
+    description: '判定 (c)：conceptKey 重复（须一概念一行）',
+  },
+  {
+    name: 'spec-structure/oos-status-invalid',
+    section: `${OOS_TABLE_HEADER}\n| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | 已完成 | 阶段1 |\n`,
+    expectedBucketCounts: { refs: 0, ssot: 0, dod: 0, outOfScope: 1 },
+    expectedReasonPatterns: [/§8 表格第 1 行状态非法："已完成"/],
+    description: '判定 (c)：状态 ∉ {rejected, reconsidered}',
+  },
+  {
+    name: 'spec-structure/oos-prior-requests-blank',
+    section: `${OOS_TABLE_HEADER}\n| dark-mode | 主题切换与既有品牌规范冲突 |  | rejected | 阶段1 |\n`,
+    expectedBucketCounts: { refs: 0, ssot: 0, dod: 0, outOfScope: 1 },
+    expectedReasonPatterns: [/§8 表格第 1 行 Prior requests 为空/],
+    description: '判定 (c)：Prior requests 留白（须为回链列表或显式 `-`）',
+  },
+];
+
 // ==================== Phase 2 系统设计增强 ====================
 
 interface DesignEnhanceCase {
@@ -3186,7 +3280,7 @@ async function runSpecStructureCases(samplesDir: string): Promise<CaseResult[]> 
       },
     };
     const v = checkRequirementSpecStructure(dir, fsStub);
-    const violations = [...v.refs, ...v.ssot, ...v.dod];
+    const violations = [...v.refs, ...v.ssot, ...v.dod, ...v.outOfScope];
     const actualPassed = violations.length === 0;
     const details: string[] = [];
     if (actualPassed !== c.expectedPassed)
@@ -3194,6 +3288,70 @@ async function runSpecStructureCases(samplesDir: string): Promise<CaseResult[]> 
     if (!c.expectedPassed) details.push(...matchReasonPatterns(violations, c.expectedReasonPatterns));
     results.push({
       name: `gate/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
+// 内存 fs stub（内联用例）：键用 path.join 构造，与 checkRequirementSpecStructure
+// 内部 path.join 一致（Windows 反斜杠）。§8 之前的 6 引用块 + §0 四项 + DoD 9 项
+// 由本 runner 统一补齐，使 §8 成为唯一变量。
+const OOS_REF_FILES = [
+  'system-context.md',
+  'glossary.md',
+  'traceability-matrix.md',
+  'behavior-spec.md',
+  'discipline-dod.md',
+  'uml-modeling.md',
+];
+
+async function runSpecStructureOutOfScopeCases(): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  const dir = 'docs/phase1-requirements';
+  for (const c of SPEC_STRUCTURE_OUT_OF_SCOPE_CASES) {
+    const files: Record<string, string> = {};
+    files[path.join(dir, 'requirement-spec.md')] =
+      OOS_SPEC_PREFIX + (c.section === undefined ? '' : `## 8. Out of Scope\n\n${c.section}\n`);
+    for (const f of OOS_REF_FILES) files[path.join(dir, f)] = '';
+    files[path.join(dir, 'discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+    const fsStub = {
+      readFileSync(p: string): string {
+        return files[p] ?? '';
+      },
+      existsSync(p: string): boolean {
+        return p in files;
+      },
+    };
+    const v = checkRequirementSpecStructure(dir, fsStub);
+    const violations = [...v.refs, ...v.ssot, ...v.dod, ...v.outOfScope];
+    const actualCounts = {
+      refs: v.refs.length,
+      ssot: v.ssot.length,
+      dod: v.dod.length,
+      outOfScope: v.outOfScope.length,
+    };
+    const details: string[] = [];
+    // 各桶计数逐一比对：既锁定「恰好报该违规」，也证明未误伤其他桶
+    // （逐字段显式比较，不用 `obj[key]` —— 动态属性访问会触发 security/detect-object-injection）
+    const expected = c.expectedBucketCounts;
+    const mismatchedBuckets: string[] = [];
+    if (expected.refs !== actualCounts.refs) mismatchedBuckets.push('refs');
+    if (expected.ssot !== actualCounts.ssot) mismatchedBuckets.push('ssot');
+    if (expected.dod !== actualCounts.dod) mismatchedBuckets.push('dod');
+    if (expected.outOfScope !== actualCounts.outOfScope) mismatchedBuckets.push('outOfScope');
+    if (mismatchedBuckets.length > 0) {
+      details.push(
+        `  - 期望各桶违规数 ${JSON.stringify(expected)}，实际 ${JSON.stringify(actualCounts)}（不符桶：${mismatchedBuckets.join('、')}）`,
+      );
+    }
+    if (mismatchedBuckets.length > 0 || c.expectedBucketCounts.outOfScope > 0) {
+      details.push(...matchReasonPatterns(violations, c.expectedReasonPatterns));
+    }
+    results.push({
+      name: c.name,
       passed: details.length === 0,
       description: c.description,
       details: details.length > 0 ? details : undefined,
@@ -4610,6 +4768,7 @@ async function main(): Promise<void> {
   console.log(`Graph 用例    : ${GRAPH_CASES.length}`);
   console.log(`SpecEnhance 用例 : ${SPEC_ENHANCE_CASES.length}`);
   console.log(`SpecStructure 用例 : ${SPEC_STRUCTURE_CASES.length}`);
+  console.log(`SpecStructureOutOfScope 用例（内联，§8 M08）: ${SPEC_STRUCTURE_OUT_OF_SCOPE_CASES.length}`);
   console.log(`DesignEnhance 用例 : ${DESIGN_ENHANCE_CASES.length}`);
   console.log(`Phase2SpecStructure 用例 : ${PHASE2_SPEC_STRUCTURE_CASES.length}`);
   console.log(`OutlineEnhance 用例 : ${OUTLINE_ENHANCE_CASES.length}`);
@@ -4680,6 +4839,7 @@ async function main(): Promise<void> {
     icebergResults,
     specEnhanceResults,
     specStructureResults,
+    specStructureOutOfScopeResults,
     designEnhanceResults,
     phase2SpecStructureResults,
     outlineEnhanceResults,
@@ -4695,6 +4855,7 @@ async function main(): Promise<void> {
     runGraphCases(samplesDir),
     runSpecEnhanceCases(samplesDir),
     runSpecStructureCases(samplesDir),
+    runSpecStructureOutOfScopeCases(),
     runDesignEnhanceCases(samplesDir),
     runPhase2SpecStructureCases(samplesDir),
     runOutlineEnhanceCases(samplesDir),
@@ -4765,6 +4926,7 @@ async function main(): Promise<void> {
     ...icebergResults,
     ...specEnhanceResults,
     ...specStructureResults,
+    ...specStructureOutOfScopeResults,
     ...designEnhanceResults,
     ...phase2SpecStructureResults,
     ...outlineEnhanceResults,
