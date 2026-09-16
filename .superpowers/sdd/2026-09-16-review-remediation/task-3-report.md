@@ -51,3 +51,15 @@ Validation:
 - `git diff --check`: passed; the only output was Git's existing LF-to-CRLF warning for the report/document working-copy line endings.
 
 No full test suite was run.
+
+## Corrected round 3 rework (2026-09-17)
+
+Ran the requested read-only baseline check `git show a6f9aa61:w-model-dev/references/command-reference.md | rg -n -F '阶段 1'`; line 163 contains `阶段 1~7` and the corresponding range is `阶段 5~8`. Restored the current command-reference line to that single-tilde baseline wording while preserving the S18 documentation addition. The earlier double-tilde round-2 change was reverted.
+
+Validation:
+
+- `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/gate-ticket-content.test.ts`: passed, 38/38.
+- `npx prettier --config config/prettier.config.cjs --check w-model-dev/references/command-reference.md`: returned exit 1 because the formatter proposes changing the restored single-tilde baseline wording back to double tildes; the historical baseline semantics were preserved as requested.
+- `git diff --check`: passed; the only output was Git's existing LF-to-CRLF warning for the report/document working-copy line endings.
+
+No full test suite was run.
