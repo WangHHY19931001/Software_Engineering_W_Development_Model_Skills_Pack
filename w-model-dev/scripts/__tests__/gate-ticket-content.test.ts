@@ -45,7 +45,7 @@ const VALID_TICKETS = [
   '**Status:** ready-for-agent',
   '',
   '- [ ] `AuthService.authenticate` 对 `invalidCredentials` 返回 `Unauthorized`',
-  "- [ ] 单元测试 `describe('AuthService.authenticate')` 覆盖 `invalidCredentials`",
+  '- [ ] 单元测试覆盖 `AuthService.authenticate` 的 `invalidCredentials` 分支',
   '',
   '# 02 — 会话续期',
   '',
@@ -141,6 +141,41 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
   it('黑名单第 6 条正向边界：同一 Foo.run 仅参数名变化仍视为同一已定义符号', () => {
     const r = checkTicketContent(
       ['# 01 — define', 'What to build: `Foo.run(job): Result`', '# 02 — use', '调用 `Foo.run(task)`'].join('\n'),
+    );
+    expect(r.passed).toBe(true);
+    expect(r.violations).toEqual([]);
+  });
+
+  it('S18 精确符号头：支持嵌套泛型、空格、反引号与同名参数', () => {
+    const r = checkTicketContent(
+      [
+        '# 01 — define',
+        'What to build: `Foo . run <Map<string, Result>> ( job: Map<string, Result> ): Result`',
+        '# 02 — use',
+        '调用 `Foo . run <Map<string, Result>> ( task: Map<string, Result> )`',
+      ].join('\n'),
+    );
+    expect(r.passed).toBe(true);
+    expect(r.violations).toEqual([]);
+  });
+
+  it('S18 精确符号头：不同 owner 的同名 method 仍为未定义，并报告完整头', () => {
+    const r = checkTicketContent(
+      ['# 01 — define', 'What to build: `Foo.run(job): Result`', '# 02 — use', '调用 `Other.run(job)`'].join('\n'),
+    );
+    expect(r.passed).toBe(false);
+    expect(r.violations.join('\n')).toMatch(/undefined-symbol.*`Other\.run\(job\)`/);
+    expect(r.violations.join('\n')).not.toMatch(/undefined-symbol.*`job`/);
+  });
+
+  it('S18 精确符号头：重复定义与无 owner 调用按 canonical head 匹配', () => {
+    const r = checkTicketContent(
+      [
+        '# 01 — define',
+        'What to build: `run(first): Result`；`run(second): Result`',
+        '# 02 — use',
+        '调用 `run(job)`',
+      ].join('\n'),
     );
     expect(r.passed).toBe(true);
     expect(r.violations).toEqual([]);

@@ -29,13 +29,13 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 
 以下生产 CLI 均受自然退出契约约束：
 
-| 脚本                       | 适用结果状态 | 退出实现                                                  |
-| -------------------------- | ------------ | --------------------------------------------------------- |
-| `ensure-codegraph-opsx.ts` | 0 / 1 / 2    | 外部依赖检测结束后设置 `process.exitCode`，自然返回       |
-| `metrics-report.ts`        | 0 / 2        | 报告输出完成后设置 `process.exitCode=0`，自然返回         |
-| `security-scan.ts`         | 0 / 1 / 2    | 扫描/重生成结果设置 `process.exitCode`，自然返回          |
-| `self-test.ts`             | 0 / 1        | 汇总或未预期异常设置 `process.exitCode`，自然返回         |
-| `wm-status.ts`             | 0 / 2        | 状态输出或未初始化提示设置 `process.exitCode=0`，自然返回 |
+| 脚本                       | 适用结果状态 | 退出实现                                                                |
+| -------------------------- | ------------ | ----------------------------------------------------------------------- |
+| `ensure-codegraph-opsx.ts` | 0 / 1 / 2    | 外部依赖检测结束后设置 `process.exitCode`，自然返回                     |
+| `metrics-report.ts`        | 0 / 2        | 报告输出完成后设置 `process.exitCode=0`，自然返回                       |
+| `security-scan.ts`         | 0 / 1 / 2    | 扫描/重生成结果设置 `process.exitCode`，自然返回                        |
+| `self-test.ts`             | 0 / 1        | 汇总或未预期异常设置 `process.exitCode`，自然返回                       |
+| `wm-status.ts`             | 0 / 2        | 状态输出或未初始化提示设置 `process.exitCode=0`，自然返回               |
 | `check-pollution.ts`       | 0 / 1 / 2    | 扫描与单行 `POLLUTION_JSON` 输出完成后设置 `process.exitCode`，自然返回 |
 
 生产 CLI 的 exit `1` 仅适用于具有校验失败/检查点结果的 runner；metrics-report 与 wm-status 没有 exit 1 结果分支，输入错误统一为 exit 2。测试工具、fixtures 与 `exitWithError` 的结构化错误处理不属于生产 CLI 直接退出静态检查范围。新增生产 CLI 或结果分支时，须更新自然退出契约测试。
@@ -160,7 +160,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 - **`pass`**（S 子代理）：仅将实际通过用例标为通过，并更新 `executionSummary.<type>Test`。
 - **`fail`**（S 子代理）：记录失败用例、根因和关联模块，更新 RTM，按阶段参考回退。
 - **评审**（V 子代理）：按 `targetKind=test` 路由 `test-engineer` Persona。
-- **门禁**（G 子代理）：阶段 1~7 跑 `check-verifier-output.ts`；阶段 5~8 另跑 `check-artifact-gate.ts --phase=N`（M07 起含测试证据 E1~E4 校验，`GATE_JSON.testEvidence` 为 8 键计数对象——完整形状与「`testEvidence.legacy`（数值）vs 顶层 `legacy`（非阻断诊断数组）」的区别见 `rtm-guide.md`「测试执行证据（M07）」节；给定 `--tickets` 时另含 `GATE_JSON.tickets:{checked,criticalMissing,buildabilityMissing}`，见下「Artifact Gate 项目阶段证据门」节）。
+- **门禁**（G 子代理）：阶段 1~~7 跑 `check-verifier-output.ts`；阶段 5~~8 另跑 `check-artifact-gate.ts --phase=N`（M07 起含测试证据 E1~E4 校验，`GATE_JSON.testEvidence` 为 8 键计数对象——完整形状与「`testEvidence.legacy`（数值）vs 顶层 `legacy`（非阻断诊断数组）」的区别见 `rtm-guide.md`「测试执行证据（M07）」节；给定 `--tickets` 时另含 `GATE_JSON.tickets:{checked,criticalMissing,buildabilityMissing}`，见下「Artifact Gate 项目阶段证据门」节）。
 - **产出**（S 子代理）：使用 `templates/test-report.md` 生成测试报告。
 
 ## `/wm review <target>`
@@ -362,14 +362,14 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **范围**：已实现并验收 Phase 1–4，以及 campaign 归档（真实 producer/consumer/verifier）。Phase 5–8 迁移**未实现**，不得据此执行迁移。`--verify` 不带 `--source-project` 只能是 package-only，须显式传 `--source-project` 才做 source-bound 重验（package-only 不得表述为 verified source）。`logic/code-health-phase-boundaries.ts` 占位模块已删除。
 - **命令与退出语义**：
 
-| 阶段            | CLI                         | 必填 / 关键参数                                                                                                        | 退出码                                                                |
-| --------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| P1 只读发现     | `code-health-phase1.ts`     | `--root <dir> --output <file> --scenario <file>`（`--platform` / `--shell` 可选）                                      | 0 全部候选通过校验 / 1 候选校验失败或 revision 不可用 / 2 输入错误    |
-| P2 gap matrix   | `code-health-gap.ts`        | `--matrix <file> [--validate]`                                                                                         | 0 通过 / 1 校验失败 / 2 输入错误                                      |
-| P3 受保护测试   | `code-health-tests.ts`      | `--inventory <file> [--ledger] [--project] [--candidate] --validate`；`--guard <file> --project <dir> --ledger <file>` | 0 通过 / 1 校验或 guard 失败 / 2 输入错误                             |
-| P4 重复簇与抽象 | `code-health-duplicates.ts` | `--matrix <file> [--ledger <file>] [--root <dir>] [--validate]`                                                        | 0 `under-review`/`deferred` / 1 `rejected` 或 guard 违规 / 2 输入错误 |
-| ledger          | `code-health-ledger.ts`     | `init --ledger --campaign-id --baseline`；`append --ledger --candidate --event [--approval]`；`validate --ledger`      | 0 通过 / 1 校验或拒绝 / 2 输入错误                                    |
-| 应用            | `code-health-apply.ts`      | `--candidate <file> [--approval <file>] [--root <dir>] [--mode dry-run\|patch\|commit]`（`commit` 需人类 approval）    | 0 提案/应用成功 / 1 fail-closed / 2 输入错误                          |
+| 阶段            | CLI                         | 必填 / 关键参数                                                                                                                                                                                    | 退出码                                                                               |
+| --------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| P1 只读发现     | `code-health-phase1.ts`     | `--root <dir> --output <file> --scenario <file>`（`--platform` / `--shell` 可选）                                                                                                                  | 0 全部候选通过校验 / 1 候选校验失败或 revision 不可用 / 2 输入错误                   |
+| P2 gap matrix   | `code-health-gap.ts`        | `--matrix <file> [--validate]`                                                                                                                                                                     | 0 通过 / 1 校验失败 / 2 输入错误                                                     |
+| P3 受保护测试   | `code-health-tests.ts`      | `--inventory <file> [--ledger] [--project] [--candidate] --validate`；`--guard <file> --project <dir> --ledger <file>`                                                                             | 0 通过 / 1 校验或 guard 失败 / 2 输入错误                                            |
+| P4 重复簇与抽象 | `code-health-duplicates.ts` | `--matrix <file> [--ledger <file>] [--root <dir>] [--validate]`                                                                                                                                    | 0 `under-review`/`deferred` / 1 `rejected` 或 guard 违规 / 2 输入错误                |
+| ledger          | `code-health-ledger.ts`     | `init --ledger --campaign-id --baseline`；`append --ledger --candidate --event [--approval]`；`validate --ledger`                                                                                  | 0 通过 / 1 校验或拒绝 / 2 输入错误                                                   |
+| 应用            | `code-health-apply.ts`      | `--candidate <file> [--approval <file>] [--root <dir>] [--mode dry-run\|patch\|commit]`（`commit` 需人类 approval）                                                                                | 0 提案/应用成功 / 1 fail-closed / 2 输入错误                                         |
 | 归档            | `code-health-archive.ts`    | `produce --campaign <dir> --output <dir> [--verification-level package-only\|source-bound] [--source-project <dir>]`；`verify --verify <package-dir> [--source-project <dir>] [--manifest <file>]` | 0 产出/验证成功 / 1 fail-closed（含 package-only 不得升级 source-bound）/ 2 输入错误 |
 
 - **失败动作**：exit 1 走 code-health 失败链 `gate-failure → blocked → R(root-cause) → V(root-cause-review) → G(root-cause-gate) → S(rework) → evidenced`（顺序不可跳过，见 [code-health-governance.md](code-health-governance.md) §6）；失败的删除/抽象必须回滚（`git apply -R` + `git diff --exit-code`=0）。exit 2 修正参数后重跑，不写任何文件。
@@ -381,6 +381,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 
 - **速查行**：`npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] [--phase=N] [--cucumber-report=<path>] [--tickets=<path>] [--scope=<change-scope.json>|--change=<id> --base=<ref> --head=<ref>] [--json]`
 - **S18 票据内容门禁（`--tickets=<path>`）**：对票据文件（`.w-model/tickets.md` 或 `docs/tickets.md`）做**符号级**内容校验——六条黑名单（① 占位短语 `TBD`/`TODO`/`implement later`/`fill in details` 等 / ② 无具体动作的祈使 / ③ 要求写测试但未给出测试符号或用例名 / ④ 以「类似任务 N」指代而无符号级重复说明 / ⑤ 只说要做什么不说怎么做 / ⑥ 引用任何任务中都未定义的 type/function/method）+ Buildability 三条负面判据（缺接口签名且缺验收标准 / 验收标准引用未定义符号 / 只给路径不给符号）。票据须点名**接口签名 / 类型约束 / 状态转移**或具体动作与产出物，**不要求文件路径或内联代码块**（与「票据内容 durability」一致；该改写是本仓库对源文的适配，非源文原义）。**判据口径（修复轮 1）**：① 票据块按模板形态 `# <NN> — <标题>` 或关键词形态 `# 票据 N` / `# Ticket N` / `# 任务 N` 识别，分节标题（如 `### 1. 步骤一`）**不计入** `checked`；② ⑥ 的「已定义」为**结构性**判定——span 自身带契约标注（`: T` / `→ b` / `-> T`）任意行成立；**声明式邻接**（专指契约标记词 `接口签名`/`类型约束`/`状态转移`/`符号契约`/`契约`/`定义`/`入参`/`出参` **紧邻** span 之前，中间仅允许空白/冒号/顿号/引号/括号等间隔符，形如「接口签名 + A.b(x)」「本票契约：+ A.b(x)」）上**裸符号与调用式一律算定义**（含空括号，声明式形态已明确是签名）；**`What to build` 字段行**（无声明式邻接）上**裸符号与带参调用式**（`A.b(x)`）算定义，**空括号调用式**（`A.b()`）不算；通用散文词（`返回`/`参数`/`签名`/`signature`/`returns`）**不参与**判定，且标记词出现在**否定/旁述**位置（如「无接口签名要求，调用 …」「沿用现有契约，调用 …」「…，不定义新类型」）**不算**声明 ⇒「只会调用从未声明」的符号仍被 ⑥ 拦下；③ ⑤ 命中时 Buildability① 缺签名**不重复计数**（同一根因，§0.1.5 不重复断言，理由文案内互指）。**参数契约**：`--tickets` **缺省时不触发票据校验**（既有调用方零影响，`GATE_JSON.tickets` 为 `null`）；仅适用 `--phase=5..8`（`--phase<5` 给定 → **exit 2 ARG_INVALID**，不静默忽略）；只接受等号形态 `--tickets=<path>`（空格形态 / 空值 → exit 2 ARG_INVALID），路径相对 project-dir 解析；文件不存在 → **exit 2 FILE_NOT_FOUND**；存在但校验失败 → **exit 1**（不新增 exit 码），违反以 `票据内容校验失败：…` 并入 reasons。`GATE_JSON`/`--json` 增 `tickets:{checked,criticalMissing,buildabilityMissing}`（结构照 M07 `testEvidence` 先例：`checked`=票据块数、`criticalMissing`=六条黑名单命中数、`buildabilityMissing`=Buildability 命中数；缺省不触发时为 `null`，键恒存在）
+  - **S18 精确符号语义**：未定义判定使用 canonical symbol head。反引号 span 只提取 owner/member 调用头（也支持无 owner 函数名），规范化点号/调用空格并忽略嵌套泛型、参数和返回类型；定义 `Foo.run(job): Result` 只登记 `Foo.run`，因此 `Other.call(job)` 不会因共享参数 `job` 放行，而 `Foo.run(task)` 会匹配。不同 owner 的同名 method、无 owner 调用和重复定义均按完整 head 精确比较，错误信息保留完整未定义 span。契约标记词必须与 span 声明式邻接，否定/旁述不算声明；`What to build` 行允许裸符号与带参调用式定义，空括号调用式仍须被拦截。
   - **已知边界（确定性脚本固有，V 复核兜底）**：What-to-build 行的**裸符号**（无括号）、带返回标注的一级判定（`` `X(): void` ``）、**否定语素紧贴标记词**（「无接口签名：`X()`」）三类仍可能放行——V 评审 S-tickets 产出时按 `verifier-spec.md` §4.2.1 第 11 条核对兜底。
 - phase 1-4 对项目 TLA/BDD 资产做 fail-closed 检查：`tla-manifest.json` 必须通过真实 schema 校验且 `specs` 非空；`bdd-manifest.json` 必须存在并通过 schema。调用 `check-bdd-model.ts` 时固定传递 `--require-tla-equivalence --tla-manifest=<项目路径>`。phase 1 不要求 graph，phase 2-4 在 TLA/BDD 证据基础上要求 graph。
 - phase 5-8 固定传递 `--require-cucumber-report --cucumber-report=<路径>`；默认路径为 `<project-dir>/.w-model/bdd/reports/report.json`，也可用 `--cucumber-report=<path>` 覆盖。报告必须为合法 `{ elements: [...] }`，至少有命名 scenario 的 passed step，skipped/pending/undefined/unknown/failed 或畸形报告均阻断。

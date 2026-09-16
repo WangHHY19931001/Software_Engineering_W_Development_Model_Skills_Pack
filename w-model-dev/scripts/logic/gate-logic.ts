@@ -404,8 +404,8 @@ function hasConcreteDeliverable(lines: string[]): boolean {
 /** 反引号 span（票据内单行内联标记） */
 const BACKTICK_SPAN_RE = /`([^`\n]+)`/g;
 
-/** 符号 span 头部标识符：标识符 / 点分标识符（如 `A`、`A.b`） */
-const IDENT_HEAD_RE = /^[A-Za-z_$][\w$.]*/;
+/** 符号 span 头部标识符：标识符 / 点分标识符（允许点号两侧有空格） */
+const IDENTIFIER_RE = /^[A-Za-z_$][\w$]*/;
 
 /** 符号 span 可选后缀：类型注解或状态转移（`: T` / `→ T` / `-> T`） */
 const SYMBOL_SUFFIX_RE = /^\s*(?::|→|->)\s*\S[\s\S]*$/;
@@ -415,15 +415,85 @@ const SYMBOL_SUFFIX_RE = /^\s*(?::|→|->)\s*\S[\s\S]*$/;
  * 头 = 标识符 / 点分标识符（可带调用）；尾 = 其余（类型注解 / 状态转移等）。
  */
 function splitSymbolSpan(span: string): { head: string; tail: string } {
-  const id = IDENT_HEAD_RE.exec(span)?.[0] ?? '';
-  if (id === '') return { head: '', tail: span };
-  let head = id;
-  // 可选调用：标识符后紧跟 `(` 且存在配对 `)` 时，把头扩到 `)` 为止（含参数）
-  if (span[id.length] === '(') {
-    const close = span.indexOf(')', id.length + 1);
-    if (close !== -1) head = span.slice(0, close + 1);
+  const parsed = parseSymbolHead(span);
+  if (parsed === null) return { head: '', tail: span };
+  return { head: parsed.head, tail: span.slice(parsed.end) };
+}
+
+interface ParsedSymbolHead {
+  head: string;
+  canonical: string;
+  end: number;
+  hasCall: boolean;
+}
+
+/**
+ * 解析符号的结构头，忽略泛型参数、调用参数和格式空格。
+ * 只返回 owner/member（或无 owner 的函数名）作为 canonical key，避免参数/返回类型参与匹配。
+ */
+function parseSymbolHead(span: string): ParsedSymbolHead | null {
+  let index = 0;
+  const parts: string[] = [];
+  const first = IDENTIFIER_RE.exec(span);
+  if (first === null) return null;
+  parts.push(first[0]);
+  index = first[0].length;
+
+  for (;;) {
+    const beforeDot = index;
+    while (/\s/.test(span[index] ?? '')) index++;
+    if (span[index] !== '.') {
+      index = beforeDot;
+      break;
+    }
+    index++;
+    while (/\s/.test(span[index] ?? '')) index++;
+    const member = IDENTIFIER_RE.exec(span.slice(index));
+    if (member === null) return null;
+    parts.push(member[0]);
+    index += member[0].length;
   }
-  return { head, tail: span.slice(head.length) };
+
+  while (/\s/.test(span[index] ?? '')) index++;
+  if (span[index] === '<') {
+    let depth = 0;
+    let close = -1;
+    for (let i = index; i < span.length; i++) {
+      if (span[i] === '<') depth++;
+      if (span[i] === '>') {
+        depth--;
+        if (depth === 0) {
+          close = i;
+          break;
+        }
+      }
+    }
+    if (close === -1) return null;
+    index = close + 1;
+    while (/\s/.test(span[index] ?? '')) index++;
+  }
+
+  let end = index;
+  let hasCall = false;
+  if (span[index] === '(') {
+    hasCall = true;
+    let depth = 0;
+    let close = -1;
+    for (let i = index; i < span.length; i++) {
+      if (span[i] === '(') depth++;
+      if (span[i] === ')') {
+        depth--;
+        if (depth === 0) {
+          close = i;
+          break;
+        }
+      }
+    }
+    if (close === -1) return null;
+    end = close + 1;
+  }
+
+  return { head: span.slice(0, end), canonical: parts.join('.'), end, hasCall };
 }
 
 /** 符号 span 判定：整个 span 为「标识符 / 点分标识符（可带调用）」，其后可跟类型注解或状态转移。 */
@@ -437,6 +507,10 @@ function hasCallArguments(head: string): boolean {
   const open = head.indexOf('(');
   if (open === -1) return false;
   return head.slice(open + 1, -1).trim() !== '';
+}
+
+function canonicalSymbolHead(span: string): string {
+  return parseSymbolHead(span)?.canonical ?? '';
 }
 
 /**
@@ -465,9 +539,6 @@ function isDefinitionSpanInLine(span: string, line: string): boolean {
   return !isCall || hasCallArguments(head);
 }
 
-/** 标识符 token（用于定义词汇表；`` `describe('A.b')` `` 可抽出 `describe` 与 `A.b`） */
-const IDENT_TOKEN_RE = /[A-Za-z_$][\w$.]*/g;
-
 /** 源码类文件后缀：命中即视为路径（避免把 `Foo.bar` 误判为路径） */
 const FILE_EXT_RE = /\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|ya?ml|py|go|java|rb|rs|sql|html|css|sh|feature|tla|cfg)$/i;
 
@@ -490,11 +561,6 @@ function symbolSpansOfLine(line: string): string[] {
     if (isSymbolSpan(s)) out.push(s);
   }
   return out;
-}
-
-/** 取字符串内全部标识符 token（含点分） */
-function identTokens(text: string): string[] {
-  return [...text.matchAll(IDENT_TOKEN_RE)].map((m) => m[0]);
 }
 
 interface TicketBlock {
@@ -566,18 +632,21 @@ export function checkTicketContent(ticketsText: string): TicketContentResult {
     };
   }
 
-  // 跨票据符号定义词汇表：任一票据的**契约行**上按定义形态出现的符号即视为已定义
-  // （修复轮 1 ①②：定义判定与 B① 的签名识别同源，不再由通用散文词触发）
+  // 跨票据符号定义词汇表：只登记精确的 owner/member（或无 owner 函数）canonical head。
   const definedSymbols = new Set<string>();
   for (const b of blocks) {
     for (const line of b.lines) {
       for (const span of symbolSpansOfLine(line)) {
         if (!isDefinitionSpanInLine(span, line)) continue;
-        for (const tok of identTokens(span)) definedSymbols.add(tok);
+        const key = canonicalSymbolHead(span);
+        if (key !== '') definedSymbols.add(key);
       }
     }
   }
-  const isDefinedSpan = (span: string): boolean => identTokens(span).some((t) => definedSymbols.has(t));
+  const isDefinedSpan = (span: string): boolean => {
+    const key = canonicalSymbolHead(span);
+    return key !== '' && definedSymbols.has(key);
+  };
 
   let criticalMissing = 0;
   let buildabilityMissing = 0;
@@ -659,7 +728,9 @@ export function checkTicketContent(ticketsText: string): TicketContentResult {
     // ---- Buildability ①：缺接口签名且缺验收标准 ----
     // 修复轮 1 ③：与第 5 条**同根因**（本票既无符号级契约又无验收标准）时只计一处——⑤ 优先，
     // 本条不再重复断言（§0.1.5 要求 B 的负面判据与 ⑤/⑥ 不重复）。
-    const hasSignature = text.includes('接口签名') || allSymbols.some((s) => SIGNATURE_SPAN_RE.test(s));
+    const hasSignature =
+      text.includes('接口签名') ||
+      allSymbols.some((s) => SIGNATURE_SPAN_RE.test(s) || parseSymbolHead(s)?.hasCall === true);
     if (!hasSignature && criterionLines.length === 0 && !noSymbolContract) {
       buildabilityMissing++;
       violations.push(

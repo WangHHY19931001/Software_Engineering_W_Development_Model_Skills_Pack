@@ -5,7 +5,7 @@
 **Status:** ready-for-agent
 
 - [ ] `AuthService.authenticate` 对 `invalidCredentials` 返回 `Unauthorized`
-- [ ] 单元测试 `describe('AuthService.authenticate')` 覆盖 `invalidCredentials`
+- [ ] 单元测试覆盖 `AuthService.authenticate` 的 `invalidCredentials` 分支
 
 # 02 — 会话续期
 
