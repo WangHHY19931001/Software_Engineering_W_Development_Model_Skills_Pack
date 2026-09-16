@@ -4,7 +4,6 @@
 set -euo pipefail
 
 warn() { printf '⚠ pre-commit: %s\n' "$*" >&2; }
-info() { printf '  %s\n' "$*" >&2; }
 pass() { printf '✓ pre-commit: %s\n' "$*" >&2; }
 step() { printf '▸ pre-commit: %s\n' "$*" >&2; }
 
@@ -15,6 +14,7 @@ original_git_index_file="${GIT_INDEX_FILE-}"
 original_git_index_was_set=0
 if [ "${GIT_INDEX_FILE+x}" = x ]; then original_git_index_was_set=1; fi
 snapshot_dir=''
+blob_staging_dir=''
 cleanup() {
   local exit_code=$?
   local cleanup_failed=0
@@ -24,12 +24,14 @@ cleanup() {
   else
     unset GIT_INDEX_FILE
   fi
-  if [ -n "$snapshot_dir" ] && [ -d "$snapshot_dir" ]; then
-    for attempt in 1 2 3 4 5; do
-      if rm -rf -- "$snapshot_dir"; then break; fi
-      if [ "$attempt" -eq 5 ]; then cleanup_failed=1; else sleep 0.1; fi
-    done
-  fi
+  for cleanup_dir in "$blob_staging_dir" "$snapshot_dir"; do
+    if [ -n "$cleanup_dir" ] && [ -d "$cleanup_dir" ]; then
+      for attempt in 1 2 3 4 5; do
+        if rm -rf -- "$cleanup_dir"; then break; fi
+        if [ "$attempt" -eq 5 ]; then cleanup_failed=1; else sleep 0.1; fi
+      done
+    fi
+  done
   if [ "$cleanup_failed" -eq 1 ]; then
     warn "无法清理临时 index snapshot：$snapshot_dir"
     exit_code=1
@@ -55,20 +57,88 @@ if [ ! -d "$repo_root/node_modules" ]; then
   warn "node_modules 缺失 → 降级放行（格式检查与类型检查均未执行）"
   exit 0
 fi
-if ! npx --no-install prettier --version >/dev/null 2>&1; then
-  warn "prettier 不可用 → 降级放行（格式检查未执行）"
+prettier_command=()
+prettier_bin="$repo_root/node_modules/.bin/prettier"
+prettier_entry="$repo_root/node_modules/prettier/bin/prettier.cjs"
+if [ -f "$prettier_bin" ]; then
+  prettier_command=("$prettier_bin")
+elif [ -f "$prettier_entry" ]; then
+  prettier_command=(node "$prettier_entry")
+else
+  warn "本地 prettier 不可用 → 降级放行（格式检查未执行）"
+  exit 0
+fi
+if ! "${prettier_command[@]}" --version >/dev/null 2>&1; then
+  warn "本地 prettier 启动失败 → 降级放行（格式检查未执行）"
   exit 0
 fi
 
-# 用 index 生成临时工作副本；每个暂存路径再由 git show :path 显式写入。
 snapshot_dir="$(mktemp -d "$repo_root/.pre-commit-snapshot.XXXXXX")"
-index_tree="$(git write-tree)"
-git archive --format=tar "$index_tree" | tar -xf - -C "$snapshot_dir"
-for staged_path in "${staged_array[@]}"; do
-  snapshot_path="$snapshot_dir/$staged_path"
-  mkdir -p -- "$(dirname -- "$snapshot_path")"
-  git show ":$staged_path" > "$snapshot_path"
-done
+blob_staging_dir="$(mktemp -d "$repo_root/.pre-commit-blobs.XXXXXX")"
+
+ensure_snapshot_parent() {
+  local relative_dir="$1"
+  local current="$snapshot_dir"
+  local component next
+  if [ "$relative_dir" = "." ]; then return 0; fi
+  IFS='/' read -r -a parent_components <<< "$relative_dir"
+  for component in "${parent_components[@]}"; do
+    if [ -z "$component" ] || [ "$component" = "." ] || [ "$component" = ".." ]; then
+      warn "index 路径含非法父目录：$relative_dir"
+      return 1
+    fi
+    next="$current/$component"
+    if [ -L "$next" ]; then
+      warn "拒绝沿 snapshot symlink/junction 创建路径：$relative_dir"
+      return 1
+    fi
+    if [ -e "$next" ]; then
+      if [ ! -d "$next" ]; then
+        warn "snapshot 路径组件不是目录：$relative_dir"
+        return 1
+      fi
+    else
+      mkdir -- "$next"
+    fi
+    current="$next"
+  done
+}
+
+# 不使用 git archive / write-tree：二者可能物化或改写 index 元数据。
+# 每个 index 条目都先写入由 mktemp 创建的普通临时文件，再移动到受控 snapshot。
+while IFS= read -r -d '' index_record; do
+  index_meta="${index_record%%$'\t'*}"
+  index_path="${index_record#*$'\t'}"
+  index_mode="${index_meta%% *}"
+  index_object="${index_meta#* }"
+  index_object="${index_object%% *}"
+
+  case "$index_path" in
+    ''|/*|../*|*/../*|*/..|./*|*/./*|.|..)
+      warn "拒绝越界 index 路径：$index_path"
+      exit 1
+      ;;
+  esac
+
+  snapshot_path="$snapshot_dir/$index_path"
+  ensure_snapshot_parent "$(dirname -- "$index_path")"
+  if [ -L "$snapshot_path" ] || [ -e "$snapshot_path" ]; then
+    warn "snapshot 目标已存在或为 link：$index_path"
+    exit 1
+  fi
+
+  blob_file="$(mktemp "$blob_staging_dir/blob.XXXXXX")"
+  git cat-file blob "$index_object" > "$blob_file"
+  mv -- "$blob_file" "$snapshot_path"
+  case "$index_mode" in
+    100755) chmod 755 -- "$snapshot_path" ;;
+    100644|120000) chmod 644 -- "$snapshot_path" ;;
+  esac
+done < <(git ls-files --stage -z)
+
+# blob 临时目录不再参与检查；尽快释放其句柄，清理失败仍由 EXIT trap 记录。
+rm -rf -- "$blob_staging_dir"
+blob_staging_dir=''
 
 prettier_targets=()
 for staged_path in "${staged_array[@]}"; do
@@ -80,8 +150,15 @@ done
 if [ "${#prettier_targets[@]}" -eq 0 ]; then
   pass "暂存 ${#staged_array[@]} 个文件，均不在本仓 prettier 面内，跳过格式检查"
 else
+  # cwd 和 ignore-path 都固定在 snapshot，禁止回退读取工作树配置。
+  prettier_ignore="$snapshot_dir/.prettierignore"
+  if [ ! -f "$prettier_ignore" ]; then
+    : > "$prettier_ignore"
+  fi
   step "prettier --ignore-unknown --check（index snapshot，${#prettier_targets[@]} 个暂存文件）"
-  if ! npx --no-install prettier --ignore-unknown --check --config "$snapshot_dir/config/prettier.config.cjs" "${prettier_targets[@]}"; then
+  if ! (cd "$snapshot_dir" && "${prettier_command[@]}" --ignore-unknown --check \
+    --config "$snapshot_dir/config/prettier.config.cjs" --ignore-path "$prettier_ignore" \
+    "${prettier_targets[@]}"); then
     warn "暂存文件格式不符合 Prettier → 提交中止"
     exit 1
   fi

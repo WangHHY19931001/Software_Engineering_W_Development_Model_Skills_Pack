@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
@@ -11,6 +11,76 @@ const ensureScript = path.join(repoRoot, '.githooks', 'ensure-platform-deps.sh')
 const prePushScript = path.join(repoRoot, '.githooks', 'pre-push');
 const packageJsonPath = path.join(repoRoot, 'package.json');
 const tempDirs: string[] = [];
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+let bashPathTool: 'wslpath' | 'cygpath' | null | undefined;
+let bashRuntimePath: string | undefined;
+
+function getBashPathTool(): 'wslpath' | 'cygpath' | undefined {
+  if (bashPathTool !== undefined) return bashPathTool ?? undefined;
+  const result = spawnSync(
+    'bash',
+    [
+      '-c',
+      'if command -v wslpath >/dev/null 2>&1; then printf wslpath; elif command -v cygpath >/dev/null 2>&1; then printf cygpath; fi',
+    ],
+    { encoding: 'utf8', input: '' },
+  );
+  const tool = String(result.stdout ?? '').trim();
+  bashPathTool = tool === 'wslpath' || tool === 'cygpath' ? tool : null;
+  return bashPathTool ?? undefined;
+}
+
+function getBashRuntimePath(): string {
+  if (bashRuntimePath !== undefined) return bashRuntimePath;
+  const result = spawnSync('bash', ['-c', 'printenv PATH'], { encoding: 'utf8', input: '' });
+  bashRuntimePath = String(result.stdout ?? '').trim();
+  return bashRuntimePath;
+}
+
+function convertBashPaths(values: string[]): string[] {
+  const normalized = values.map((value) => value.replaceAll('\\', '/'));
+  if (process.platform !== 'win32') return normalized;
+  const windowsPaths = normalized.filter((value) => /^([A-Za-z]):\//.test(value));
+  if (windowsPaths.length === 0) return normalized;
+  const tool = getBashPathTool();
+  if (tool === undefined) return normalized;
+  const command = normalized
+    .map((value) => (/^([A-Za-z]):\//.test(value) ? `${tool} -a -u ${shellQuote(value)}` : `printf '%s\\n' ${shellQuote(value)}`))
+    .join('; ');
+  const result = spawnSync('bash', ['-c', command], { encoding: 'utf8', input: '' });
+  const converted = String(result.stdout ?? '').replace(/\r?\n$/, '').split(/\r?\n/);
+  return result.status === 0 && converted.length === normalized.length ? converted : normalized;
+}
+
+function toBashPath(value: string): string {
+  return convertBashPaths([value])[0] ?? value;
+}
+
+function toBashPathList(value: string): string {
+  if (process.platform !== 'win32') return value;
+  return convertBashPaths(value.split(path.delimiter).filter(Boolean)).join(':');
+}
+
+function prependBashPath(binDir: string): string {
+  return [toBashPath(binDir), getBashRuntimePath(), toBashPathList(process.env.PATH ?? '')]
+    .filter(Boolean)
+    .join(':');
+}
+
+function bashEnvironment(environment: Record<string, string>): NodeJS.ProcessEnv {
+  // 这些值只用于 Bash 内部的显式 export；Windows spawn 必须继续使用宿主原生 PATH。
+  const env = { ...environment };
+  if (env.PATH !== undefined) env.PATH = toBashPathList(env.PATH);
+  for (const key of ['BASH_ENV', 'CALLS', 'CLI_CALLS', 'WM_PREPUSH_CAPTURE', 'WM_PREPUSH_ARTIFACT_DIR']) {
+    const value = env[key];
+    if (value !== undefined && /^[A-Za-z]:[\\/]/.test(value)) env[key] = toBashPath(value);
+  }
+  return env;
+}
 
 async function makeTempDir(prefix: string): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), prefix));
@@ -44,17 +114,25 @@ async function run(
   stdin?: string,
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   return await new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
-    const child = spawn(
-      'bash',
-      [
-        '-c',
-        'source "$BASH_ENV"; export -f git node npm tar cp rm mv mkdir 2>/dev/null || true; script="$1"; shift; bash "$script" "$@"',
-        '--',
-        script,
-        ...args,
-      ],
-      { cwd, env: { ...process.env, ...environment }, stdio: ['pipe', 'pipe', 'pipe'] },
-    );
+    const convertedEnvironment = bashEnvironment(environment);
+    const bashEnv = convertedEnvironment.BASH_ENV;
+    const exportedEnvironment = Object.entries(environment).map(([key, value]) => {
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) throw new Error(`invalid test environment key: ${key}`);
+      return `export ${key}=${shellQuote(convertedEnvironment[key] ?? value)}`;
+    });
+    const command = [
+      ...exportedEnvironment,
+      `cd ${shellQuote(toBashPath(cwd))}`,
+      bashEnv === undefined ? ':' : `source ${shellQuote(bashEnv)}`,
+      'export -f git node npm tar cp rm mv mkdir 2>/dev/null || true',
+      `bash ${shellQuote(toBashPath(script))}${args.length === 0 ? '' : ` ${args.map(shellQuote).join(' ')}`}`,
+    ].join('; ');
+    const childEnvironment: NodeJS.ProcessEnv = { ...process.env };
+    const child = spawn('bash', ['-c', command], {
+      cwd,
+      env: childEnvironment,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
     let stdout = '';
     let stderr = '';
     child.stdout.setEncoding('utf8');
@@ -123,7 +201,7 @@ mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; exit 99; }
     ensureScript,
     args,
     {
-      PATH: `${binDir}:${process.env.PATH}`,
+      PATH: prependBashPath(binDir),
       CALLS: callsPath,
       CLI_CALLS: cliCallsPath,
       BASH_ENV: bashEnv,
@@ -295,7 +373,7 @@ npm() {
     ['--force'],
     {
       BASH_ENV: bashEnv,
-      PATH: `${binDir}:${process.env.PATH}`,
+      PATH: prependBashPath(binDir),
       AUDIT_CASE: auditCase,
       OSTYPE: 'linux-gnu',
     },
@@ -533,7 +611,7 @@ npm() { printf 'npm %s\\n' "$*" >> "$CALLS"; return 98; }
         prePushScript,
         [],
         {
-          PATH: `${binDir}:${process.env.PATH}`,
+          PATH: prependBashPath(binDir),
           CALLS: callsPath,
           BASH_ENV: bashEnv,
           PREPUSH_FORCE: '0',
@@ -570,7 +648,7 @@ git() {
       prePushScript,
       [],
       {
-        PATH: `${binDir}:${process.env.PATH}`,
+        PATH: prependBashPath(binDir),
         BASH_ENV: bashEnv,
         PREPUSH_FORCE: '0',
         OSTYPE: 'linux-gnu',
@@ -620,7 +698,7 @@ npm() { printf 'npm %s\\n' "$*" >> "$CALLS"; return 98; }
       prePushScript,
       [],
       {
-        PATH: `${binDir}:${process.env.PATH}`,
+        PATH: prependBashPath(binDir),
         CALLS: callsPath,
         BASH_ENV: bashEnv,
         PREPUSH_FORCE: '0',
@@ -708,7 +786,7 @@ mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; return 98; }
     const calls = await fs.readFile(callsPath, 'utf8').catch(() => '');
 
     expect(result.code, `${result.stdout}\n${result.stderr}`).not.toBe(0);
-    expect(result.stdout).toContain('平台依赖齐备（linux-x64）');
+    expect(result.stdout, `${result.stdout}\n${result.stderr}`).toContain('平台依赖齐备（linux-x64）');
     expect(calls, `${result.stdout}\n${result.stderr}`).toContain('npm run self-test');
     expect(calls).not.toMatch(/npm (install|pack)|\btar\b|\bcp\b|\bmv\b|\bmkdir\b|\brm\b.*node_modules/);
   });
@@ -779,7 +857,7 @@ npm() { return 98; }
       prePushScript,
       opts.args ?? [],
       {
-        PATH: `${binDir}:${process.env.PATH}`,
+        PATH: prependBashPath(binDir),
         BASH_ENV: bashEnv,
         PREPUSH_FORCE: '0',
         OSTYPE: 'linux-gnu',
@@ -1307,7 +1385,7 @@ esac
       {
         BASH_ENV: bashEnv,
         CALLS: callsPath,
-        PATH: `${binDir}:${process.env.PATH}`,
+        PATH: prependBashPath(binDir),
         TMPDIR: tempRoot,
         OSTYPE: 'linux-gnu',
       },

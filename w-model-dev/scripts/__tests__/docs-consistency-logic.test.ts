@@ -2073,8 +2073,14 @@ describe('runDocConsistencyChecks', () => {
       readme: '**当前版本**：`41.11.0`\n40 files / 530 tests\n42 files / 663 tests',
       agents: '31 个脚本\n41 个 .test.ts / 530 条',
       vitestExtraDocs: [
-        { name: 'CONTRIBUTING.md', content: '| 12 | vitest 全量（40 files / 623 tests） | 0 |' },
-        { name: 'docs/INSTALL.md', content: '# vitest 单元测试（40 个 .test.ts / 623 条）' },
+        {
+          name: 'CONTRIBUTING.md',
+          content: '| 12 | vitest 全量（40 files / 623 tests） | 0 |',
+        },
+        {
+          name: 'docs/INSTALL.md',
+          content: '# vitest 单元测试（40 个 .test.ts / 623 条）',
+        },
       ],
     });
     expect(runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests')).toEqual([]);
@@ -2681,6 +2687,38 @@ const DOCS_CONSISTENCY_CLI = path.resolve(
 );
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function toBashPath(value: string): string {
+  const normalized = value.replaceAll('\\', '/');
+  if (process.platform !== 'win32' || !/^([A-Za-z]):\//.test(normalized)) return normalized;
+  const result = spawnSync(
+    'bash',
+    [
+      '-c',
+      `if command -v wslpath >/dev/null 2>&1; then wslpath -a -u ${shellQuote(normalized)}; elif command -v cygpath >/dev/null 2>&1; then cygpath -a -u ${shellQuote(normalized)}; else printf '%s\\n' ${shellQuote(normalized)}; fi`,
+    ],
+    { encoding: 'utf8', input: '' },
+  );
+  const converted = String(result.stdout ?? '').trim();
+  return result.status === 0 && converted !== '' ? converted : normalized;
+}
+
+async function removeWithRetry(target: string, options: { recursive?: boolean; force?: boolean } = {}): Promise<void> {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      await fs.rm(target, { ...options, force: options.force ?? true });
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (!['EBUSY', 'EPERM', 'ENOTEMPTY'].includes(code ?? '') || attempt === 5) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+    }
+  }
+}
+
 async function withDocsConsistencyFixture(
   assertResult: (fixtureRoot: string) => Promise<void>,
   options: { availablePackages?: string[] } = {},
@@ -2700,10 +2738,7 @@ async function withDocsConsistencyFixture(
     const gitInit = spawnSync('git', ['init'], { cwd: fixtureRoot, encoding: 'utf-8', timeout: 15_000 });
     expect(gitInit.status, gitInit.stderr).toBe(0);
     expect(
-      spawnSync('git', ['config', '--local', 'user.email', 'fixture@example.invalid'], {
-        cwd: fixtureRoot,
-        timeout: 15_000,
-      }).status,
+      spawnSync('git', ['config', '--local', 'user.email', 'fixture@example.invalid'], { cwd: fixtureRoot, timeout: 15_000 }).status,
     ).toBe(0);
     expect(
       spawnSync('git', ['config', '--local', 'user.name', 'fixture'], { cwd: fixtureRoot, timeout: 15_000 }).status,
@@ -2716,7 +2751,9 @@ async function withDocsConsistencyFixture(
     await fs.mkdir(fixtureHooksPath, { recursive: true });
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture marker is inside the mkdtemp-owned test root
     await fs.writeFile(path.join(fixtureRoot, '.provenance-fixture'), 'fixture\n', 'utf8');
-    expect(spawnSync('git', ['add', '.provenance-fixture'], { cwd: fixtureRoot, timeout: 15_000 }).status).toBe(0);
+    expect(
+      spawnSync('git', ['add', '.provenance-fixture'], { cwd: fixtureRoot, timeout: 15_000 }).status,
+    ).toBe(0);
     const commit = spawnSync(
       'git',
       [
@@ -2764,7 +2801,7 @@ async function withDocsConsistencyFixture(
     }
     await assertResult(fixtureRoot);
   } finally {
-    await fs.rm(fixtureRoot, { recursive: true, force: true });
+    await removeWithRetry(fixtureRoot, { recursive: true });
   }
 }
 
@@ -2911,12 +2948,17 @@ mktemp() {
     );
 
     const result = await new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
+      const bashEnvPath = toBashPath(bashEnv);
+      const prePushPath = toBashPath(path.join(REPO_ROOT, '.githooks', 'pre-push'));
+      const command = [
+        `cd ${shellQuote(toBashPath(REPO_ROOT))}`,
+        `source ${shellQuote(bashEnvPath)}`,
+        'export -f npm npx mktemp 2>/dev/null || true',
+        `bash ${shellQuote(prePushPath)} --force`,
+      ].join('; ');
       const child = execFile(
         'bash',
-        [
-          '-c',
-          'source "$BASH_ENV"; export -f npm npx mktemp 2>/dev/null || true; bash "$(pwd)/.githooks/pre-push" --force',
-        ],
+        ['-c', command],
         {
           cwd: REPO_ROOT,
           encoding: 'utf8',
@@ -2952,7 +2994,7 @@ mktemp() {
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- artifact directory is a mkdtemp-owned test path
     expect(existsSync(artifactDir)).toBe(false);
   } finally {
-    await fs.rm(toolRoot, { recursive: true, force: true });
+    await removeWithRetry(toolRoot, { recursive: true });
   }
 }
 
