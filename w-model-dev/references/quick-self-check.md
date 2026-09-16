@@ -96,6 +96,7 @@ DoD 是项目级跨阶段标准，不替代各阶段产物的验收标准（见�
 - [ ] `.w-model/rtm.json` 字段无空缺，覆盖率未下降；BDD features 引用按 `<Type>-NNN | BDD-L<level>-<system>-<num>.feature` 格式登记
 - [ ] `Project.status` / `Requirement.status` 与磁盘产物一致
 - [ ] 阶段门 CHECKPOINT 放行时，run-log `acknowledgedDecisions` 已填入 ≥1 关键决策摘要（非"确认"/"同意"）
+- [ ] CHECKPOINT 提问与呈现已按 `command-reference.md`「提问与呈现规范（M04+S17）」节执行（每题一想法、每题必给推荐答案、Push right 只重排不删点、Brief 三段式）
 - [ ] 阶段门放行前 `graph.json` 中 `evidenceStatus === 'pending'` 的节点数已为 0（或已有 `evidence-anchor-pending` 豁免覆盖）
 - [ ] 无未提交的产物文件（`git status` 工作树干净，或显式说明未提交原因）
 - [ ] 未命中 [hard-constraints.md](hard-constraints.md)「反模式」节 48 条流程反模式（#1~#48）、[operation-behaviors.md](operation-behaviors.md) F1~F10 失败模式与 SSoT §4A.2a O1~O6 运维失败模式
