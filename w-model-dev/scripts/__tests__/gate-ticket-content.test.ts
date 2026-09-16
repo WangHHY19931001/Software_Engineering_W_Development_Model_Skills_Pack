@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { parseTicketsArg } from '../cli/check-artifact-gate.js';
 import { checkArtifactGate, checkTicketContent } from '../logic/gate-logic.js';
 import { runSync } from '../lib/run-sync.js';
 
@@ -432,6 +433,14 @@ describe('check-artifact-gate.ts --tickets 参数契约（子进程，S18 §0.1.
     const r = runSync(process.execPath, [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, ...args, '--json'], {});
     return { status: r.status, stdout: r.stdout ?? '' };
   }
+
+  it('进程内 argv 校验：--tickets=NUL 映射为 ARG_INVALID/exit 2', () => {
+    const result = parseTicketsArg(['node', CHECK_ARTIFACT_GATE_SCRIPT, '--phase=8', '--tickets=tickets\u0000.md']);
+    expect(result).toEqual({
+      ok: false,
+      error: expect.objectContaining({ category: 'ARG_INVALID', rule: 'S18', exitCode: 2 }),
+    });
+  });
 
   it('缺省不触发：无 --tickets 时 GATE_JSON.tickets 为 null 且无票据 reasons（既有调用方零影响）', async () => {
     const dir = await makeProject();

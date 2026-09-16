@@ -16,7 +16,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -201,6 +201,29 @@ describe('M07 测试证据门禁规则（E1-E4 + cutoff）', () => {
     );
     expect(result.passed).toBe(false);
     expect(result.reasons.join('\n')).toMatch(/E2[\s\S]*SHA-256[\s\S]*不符/);
+  });
+
+  it('E2: 项目内 evidence output 指向项目外 symlink → checkArtifactGate fail-closed 且可观察 e2', () => {
+    const root = makeTmpDir();
+    const outside = makeTmpDir();
+    mkdirSync(join(root, 'artifacts'), { recursive: true });
+    const content = 'outside evidence\n';
+    writeFileSync(join(outside, 'run.txt'), content, 'utf-8');
+    symlinkSync(join(outside, 'run.txt'), join(root, 'artifacts', 'run-link.txt'), 'file');
+    const sha = createHash('sha256').update(content).digest('hex');
+
+    const result = run(
+      makeMatrix({
+        unitTest: makeSummary({
+          evidence: makeEvidence({ rawOutputPath: 'artifacts/run-link.txt', rawOutputSha256: sha }),
+        }),
+      }),
+      { projectRoot: root },
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.testEvidence?.e2).toBe(1);
+    expect(result.reasons.join('\n')).toMatch(/E2[\s\S]*单元测试[\s\S]*非法[\s\S]*link/);
   });
 
   it('E2: rawOutputPath 指向的文件不存在 → 红', () => {

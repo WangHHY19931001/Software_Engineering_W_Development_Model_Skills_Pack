@@ -72,7 +72,7 @@ import {
   type PhaseOption,
   type RTMMatrixShape,
 } from '../logic/gate-logic.js';
-import { exitWithError } from '../lib/cli-error.js';
+import { exitWithError, type CliError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { ARTIFACT_PATHS } from '../lib/constants.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
@@ -86,6 +86,38 @@ import { loadCliScope } from '../lib/load-cli-scope.js';
 import { checkCodegraphQueriesStrict } from './check-codegraph-queries.js';
 import { checkOpsxArtifactsStrict } from './check-opsx-artifacts.js';
 export { checkUatPathMappingContent }; // self-test 兼容：UAT 映射内容校验保持从本入口导出
+
+export type TicketsArgResult = { ok: true; value: string | undefined } | { ok: false; error: CliError };
+
+/** Pure argv validation for --tickets; filesystem validation remains in main before reading. */
+export function parseTicketsArg(argv: readonly string[]): TicketsArgResult {
+  const ticketsArg = parseFlagValue(argv, 'tickets');
+  if (hasFlag(argv, 'tickets') || ticketsArg === '') {
+    return {
+      ok: false,
+      error: {
+        category: 'ARG_INVALID',
+        rule: 'S18',
+        message: '参数非法 --tickets',
+        detail: '仅接受等号形态且值非空：--tickets=<path>（空格形态不解析，避免被静默忽略）',
+        exitCode: 2,
+      },
+    };
+  }
+  if (ticketsArg?.includes('\u0000')) {
+    return {
+      ok: false,
+      error: {
+        category: 'ARG_INVALID',
+        rule: 'S18',
+        message: '参数非法 --tickets',
+        detail: '路径值不得包含 NUL',
+        exitCode: 2,
+      },
+    };
+  }
+  return { ok: true, value: ticketsArg };
+}
 
 // ==================== --phase 参数解析（P1.1） ====================
 /**
@@ -329,17 +361,12 @@ async function main(): Promise<void> {
   // 1) 缺省不触发（既有调用方零影响）；2) 空格形态 / 空值非静默忽略而是 ARG_INVALID
   //    （本 CLI 的值 flag 一律等号形态，与 --scope 同口径）；3) --phase<5 给定 → ARG_INVALID，
   //    不在低阶段静默跳过参数。
-  const ticketsArg = parseFlagValue(process.argv, 'tickets');
-  if (hasFlag(process.argv, 'tickets') || ticketsArg === '') {
-    exitWithError({
-      category: 'ARG_INVALID',
-      rule: 'S18',
-      message: '参数非法 --tickets',
-      detail: '仅接受等号形态且值非空：--tickets=<path>（空格形态不解析，避免被静默忽略）',
-      exitCode: 2,
-    });
+  const ticketsArgResult = parseTicketsArg(process.argv);
+  if (!ticketsArgResult.ok) {
+    exitWithError(ticketsArgResult.error);
     return;
   }
+  const ticketsArg = ticketsArgResult.value;
   if (ticketsArg !== undefined && (phaseOption ?? 8) < 5) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -360,7 +387,8 @@ async function main(): Promise<void> {
   const rtmFile = path.resolve(projectDir, ARTIFACT_PATHS.rtm);
 
   // S18 票据文本读取（--tickets 缺省时 ticketsFile/ticketsText 均为 undefined → 不触发校验）。
-  // 文件不存在 → exit 2 FILE_NOT_FOUND；其它读取失败（目录 / 权限等）→ exit 2 FILE_READ。
+  // 文件不存在 → exit 2 FILE_NOT_FOUND；路径不是普通文件（含目录、链接或非法路径）→ exit 2 ARG_INVALID；
+  // 通过边界检查后发生的其它读取失败（如权限/竞态）→ exit 2 FILE_READ。
   let ticketsFile: string | undefined;
   let ticketsText: string | undefined;
   if (ticketsArg !== undefined) {

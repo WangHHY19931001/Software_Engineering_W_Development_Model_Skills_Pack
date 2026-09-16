@@ -126,9 +126,59 @@ Windows junction creation succeeded. The junction case was not skipped: the help
 
 1. M07 E4 strict timestamp/empty-command behavior is task 2B scope and intentionally remains unchanged; three corresponding tests fail at current HEAD.
 2. `gate-ticket-content.test.ts` has one pre-existing unrelated `checkTicketContent` failure (`跨票据仅参数名重叠...`). It failed in the initial RED run before this path implementation and still fails afterward.
-3. A literal NUL cannot be delivered through Node `spawnSync` argv (Node rejects it before the CLI starts), so the CLI table omits that impossible transport case. The task 1 helper suite directly exercises `nul\u0000path` and passes with `reason === 'invalid-segment'`.
-4. npm emits a pre-existing local configuration warning: `Unknown user config "home"`.
+3. npm emits a pre-existing local configuration warning: `Unknown user config "home"`.
 
 ## Commit SHA
 
 Implementation commit: `b99093edb5a4300fed00d6f06f67b42682e82dc3` (`fix: close project-relative evidence path boundary`).
+
+## 2A 第 1 轮返工
+
+### 修复内容
+
+- 增加真正调用 `checkArtifactGate()` 的 E2 项目外 symlink 回归，断言 `passed=false`、`testEvidence.e2=1` 和含 `link` 的 E2 reason。
+- 从 `check-artifact-gate.ts` 抽出纯 argv 函数 `parseTicketsArg()`；真实 `main` 在读取票据文件前调用它。进程内测试覆盖 NUL 并断言 `ARG_INVALID`、`S18`、exit 2。
+- 更新目录/链接/非法路径在安全边界阶段映射为 `ARG_INVALID` 的 CLI 注释；未修改 M07 时间戳、R10、Schema 或其它任务。
+
+### 本轮实际命令和完整输出
+
+#### `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/gate-test-evidence.test.ts -t "项目内 evidence output"`
+
+```text
+npm warn Unknown user config "home". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+ RUN  v4.1.11 D:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/.worktrees/review-remediation
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 21 skipped (22)
+   Start at  20:36:15
+   Duration  422ms (transform 94ms, setup 0ms, import 127ms, tests 114ms, environment 0ms)
+```
+
+#### `npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/gate-ticket-content.test.ts -t "进程内 argv 校验"`
+
+```text
+npm warn Unknown user config "home". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+ RUN  v4.1.11 D:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/.worktrees/review-remediation
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 34 skipped (35)
+   Start at  20:36:15
+   Duration  823ms (transform 348ms, setup 0ms, import 630ms, tests 6ms, environment 0ms)
+```
+
+#### `npm run typecheck`
+
+```text
+npm warn Unknown user config "home". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> w-model-dev-skill@42.2.1 typecheck
+> tsc -p config/tsconfig.json
+```
+
+本轮未运行全量 `npm test`，也未重跑会启动大量子进程的 `gate-ticket-content.test.ts` 整文件；其既存失败及上一轮 M07 2B 失败保留在上文记录。
+
+### 本轮提交
+
+Implementation commit SHA: pending at report write time.
