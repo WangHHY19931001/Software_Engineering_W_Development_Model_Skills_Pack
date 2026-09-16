@@ -13,8 +13,8 @@
  *      且发生在任何磁盘写入之前（exit-2 失败原子性，exit2-failure-atomicity.test.ts 探针）；
  *   2. 坏 rev（--base/--head 无法解析为 commit）→ exit 2；
  *   3. 成功 exit 0，stdout 单行 `REVIEW_PACKAGE_JSON {path, base, head, commits, bytes}`；
- *   4. 文件内容顺序固定：header（含 base/head range）→ `git log --oneline base..head` →
- *      `git diff --stat base..head` → `git diff -U10 base..head`，不含任何时间戳
+ *   4. 文件内容顺序固定：header（含完整 base/head range）→ `git log --format=%H %s base..head` →
+ *      `git diff --full-index --stat base..head` → `git diff --full-index -U10 base..head`，不含任何时间戳
  *      （同输入同字节 = 可复现）；--out 缺省时写入 cwd 下 `review-<base7>..<head7>.diff`。
  *
  * 退出码：
@@ -24,9 +24,10 @@
  * git 调用一律经 lib/run-sync.ts 的 runSync（强制 timeout/SIGKILL/UTF-8，不进 SYNC_PROCESS_EXCEPTIONS）。
  */
 
-import { closeSync, lstatSync, openSync, renameSync, unlinkSync, writeSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { lstatSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { exitWithError, HandledCliError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
@@ -69,7 +70,7 @@ function parseArgs(argv: string[]): ReviewPackageArgs {
   return args;
 }
 
-/** 解析 revision 为完整 commit SHA；无法解析（含 --repo 非 git 仓）返回 undefined */
+/** 解析 revision 为完整 commit SHA；无法解析返回 undefined。 */
 function resolveRev(repo: string, rev: string): string | undefined {
   const result = runSync('git', ['rev-parse', '--verify', `${rev}^{commit}`], {
     cwd: repo,
@@ -80,73 +81,156 @@ function resolveRev(repo: string, rev: string): string | undefined {
   return stdout === '' ? undefined : stdout;
 }
 
-function validateOutputPath(input: string | undefined): string {
-  const rawPath = input ?? `review-pending.diff`;
-  if (rawPath.includes('\0') || rawPath.trim() === '') {
-    exitWithError({ category: 'ARG_INVALID', rule: 'P0-1', message: '--out 不是有效文件路径', exitCode: 2 });
-    throw new HandledCliError();
+class OutputPathError extends Error {
+  constructor(
+    public readonly kind: 'invalid-path' | 'missing-parent' | 'unsafe-target' | 'changed-parent',
+    public readonly file?: string,
+  ) {
+    super('输出路径校验失败');
   }
-  let outPath: string;
-  try {
-    outPath = path.resolve(rawPath);
-  } catch {
-    exitWithError({ category: 'ARG_INVALID', rule: 'P0-1', message: '--out 不是有效文件路径', exitCode: 2 });
-    throw new HandledCliError();
-  }
-  const outDir = path.dirname(outPath);
-  try {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outDir 派生自调用方 --out，仅作预校验
-    if (!lstatSync(outDir).isDirectory()) throw new Error('not-directory');
-    try {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- outPath 派生自调用方 --out，仅作预校验
-      const target = lstatSync(outPath);
-      if (target.isDirectory() || target.isSymbolicLink()) throw new Error('unsafe-target');
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    }
-  } catch {
-    exitWithError({
-      category: 'ARG_INVALID',
-      rule: 'P0-2',
-      message: '--out 所在目录不存在或输出目标不可用',
-      file: outDir,
-      exitCode: 2,
-    });
-    throw new HandledCliError();
-  }
-  return outPath;
 }
 
-function writeAtomically(outPath: string, content: string): void {
-  const temporaryPath = path.join(
-    path.dirname(outPath),
-    `.${path.basename(outPath)}.${process.pid}.${randomUUID()}.tmp`,
-  );
-  let fd: number | undefined;
+export class AtomicWriteError extends Error {
+  constructor() {
+    super('评审包原子写入失败');
+  }
+}
+
+interface OutputDirectoryIdentity {
+  canonicalPath: string;
+  dev: number;
+  ino: number;
+}
+
+export interface ValidatedOutputPath {
+  path: string;
+  parent: OutputDirectoryIdentity;
+}
+
+export interface AtomicWriteFileSystem {
+  writeFileSync: (filePath: string, data: string, options: { encoding: 'utf8'; flag: 'wx'; mode: number }) => void;
+  renameSync: (oldPath: string, newPath: string) => void;
+  unlinkSync: (filePath: string) => void;
+}
+
+const DEFAULT_ATOMIC_WRITE_FS: AtomicWriteFileSystem = { writeFileSync, renameSync, unlinkSync };
+
+function normalizeOutputPath(input: string): string {
+  if (input.includes('\0') || input.trim() === '') throw new OutputPathError('invalid-path');
   try {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- temporaryPath 位于已预校验的输出目录
-    fd = openSync(temporaryPath, 'wx', 0o600);
-    writeSync(fd, content, undefined, 'utf8');
-    closeSync(fd);
-    fd = undefined;
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同目录临时文件到已预校验目标的原子替换
-    renameSync(temporaryPath, outPath);
+    return path.resolve(input);
   } catch {
-    if (fd !== undefined) {
-      try {
-        closeSync(fd);
-      } catch {
-        // best effort cleanup
-      }
+    throw new OutputPathError('invalid-path');
+  }
+}
+
+function readOutputDirectoryIdentity(outDir: string): OutputDirectoryIdentity {
+  let directoryStats: ReturnType<typeof statSync>;
+  let canonicalPath: string;
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outDir 派生自调用方 --out，仅作目录预校验
+    directoryStats = statSync(outDir);
+    if (!directoryStats.isDirectory()) throw new OutputPathError('missing-parent', outDir);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- canonicalize 已预校验的输出父目录
+    canonicalPath = realpathSync(outDir);
+  } catch (error) {
+    if (error instanceof OutputPathError) throw error;
+    throw new OutputPathError('missing-parent', outDir);
+  }
+  return { canonicalPath, dev: directoryStats.dev, ino: directoryStats.ino };
+}
+
+function inspectOutputPath(input: string): ValidatedOutputPath {
+  const outPath = normalizeOutputPath(input);
+  const outDir = path.dirname(outPath);
+  const parent = readOutputDirectoryIdentity(outDir);
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- outPath 派生自调用方 --out，仅作目标预校验
+    const target = lstatSync(outPath);
+    if (target.isDirectory() || target.isSymbolicLink() || !target.isFile()) {
+      throw new OutputPathError('unsafe-target', outPath);
     }
-    try {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- 仅清理本次创建的唯一临时文件
-      unlinkSync(temporaryPath);
-    } catch {
-      // best effort cleanup
+  } catch (error) {
+    if (error instanceof OutputPathError) throw error;
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw new OutputPathError('unsafe-target', outPath);
+  }
+  return { path: outPath, parent };
+}
+
+export function validateOutputPath(input: string): ValidatedOutputPath {
+  try {
+    return inspectOutputPath(input);
+  } catch (error) {
+    const outputError = error instanceof OutputPathError ? error : new OutputPathError('invalid-path');
+    if (outputError.kind === 'missing-parent') {
+      exitWithError({
+        category: 'FILE_NOT_FOUND',
+        rule: 'P0-2',
+        message: '--out 所在目录不存在',
+        file: outputError.file,
+        exitCode: 2,
+      });
+    } else {
+      exitWithError({
+        category: 'ARG_INVALID',
+        rule: 'P0-2',
+        message: '--out 不是可用的普通文件路径',
+        file: outputError.file,
+        exitCode: 2,
+      });
     }
-    exitWithError({ category: 'FILE_READ', rule: 'P0-2', message: '评审包写入失败', file: outPath, exitCode: 2 });
     throw new HandledCliError();
+  }
+}
+
+function samePath(left: string, right: string): boolean {
+  return process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
+}
+
+function sameDirectoryIdentity(left: OutputDirectoryIdentity, right: OutputDirectoryIdentity): boolean {
+  return samePath(left.canonicalPath, right.canonicalPath) && left.dev === right.dev && left.ino === right.ino;
+}
+
+function revalidateOutputPath(output: ValidatedOutputPath): void {
+  let current: ValidatedOutputPath;
+  try {
+    current = inspectOutputPath(output.path);
+  } catch {
+    throw new OutputPathError('changed-parent', output.path);
+  }
+  if (!sameDirectoryIdentity(output.parent, current.parent)) {
+    throw new OutputPathError('changed-parent', output.path);
+  }
+}
+
+export function writeAtomically(
+  output: ValidatedOutputPath,
+  content: string,
+  fileSystem: AtomicWriteFileSystem = DEFAULT_ATOMIC_WRITE_FS,
+): void {
+  const temporaryPath = path.join(
+    output.parent.canonicalPath,
+    `.${path.basename(output.path)}.${process.pid}.${randomUUID()}.tmp`,
+  );
+  try {
+    // 父目录 canonical 身份和目标类型在创建临时文件前再次确认。
+    revalidateOutputPath(output);
+    // writeFileSync 负责完整 UTF-8 写入并在返回前关闭文件，不存在 writeSync 短写窗口。
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 临时文件位于已确认 canonical 父目录
+    fileSystem.writeFileSync(temporaryPath, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+    // rename 前再次确认父目录 canonical 身份和目标类型，避免采集期间目录被替换。
+    revalidateOutputPath(output);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同目录临时文件到已确认目标的原子替换
+    fileSystem.renameSync(temporaryPath, output.path);
+  } catch (error) {
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- 仅清理本次生成的 canonical 临时文件
+      fileSystem.unlinkSync(temporaryPath);
+    } catch {
+      // best effort cleanup；不覆盖原始写入/rename 错误
+    }
+    if (error instanceof AtomicWriteError) throw error;
+    throw new AtomicWriteError();
   }
 }
 
@@ -195,16 +279,15 @@ async function main(): Promise<void> {
   let repoIsDirectory = false;
   try {
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- repo 为调用方显式传入的 --repo 参数（缺省 cwd），仅作存在性探测
-    repoIsDirectory = lstatSync(repo).isDirectory();
+    repoIsDirectory = statSync(repo).isDirectory();
   } catch {
     repoIsDirectory = false;
   }
   if (!repoIsDirectory) {
     exitWithError({
-      category: 'FILE_NOT_FOUND',
-      rule: 'P0-2',
-      message: '--repo 不是存在的目录',
-      file: repo,
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: '--repo 必须是存在的目录',
       exitCode: 2,
     });
     return;
@@ -242,7 +325,18 @@ async function main(): Promise<void> {
     return;
   }
 
-  const outPath = preliminaryOut ?? validateOutputPath(`review-${baseSha.slice(0, 7)}..${headSha.slice(0, 7)}.diff`);
+  const output = preliminaryOut ?? validateOutputPath(`review-${baseSha.slice(0, 7)}..${headSha.slice(0, 7)}.diff`);
+  try {
+    revalidateOutputPath(output);
+  } catch {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-2',
+      message: '--out 父目录身份或目标类型在采集前发生变化',
+      exitCode: 2,
+    });
+    return;
+  }
 
   // 契约 4：内容顺序固定（header → log → stat → diff），一律使用解析后的完整 SHA（同输入同字节）
   const fullRange = `${baseSha}..${headSha}`;
@@ -269,14 +363,30 @@ async function main(): Promise<void> {
   ].join('\n');
 
   // 契约 1（原子性）：到这里全部校验已完成，之后才是唯一的磁盘写入
-  writeAtomically(outPath, content);
+  try {
+    writeAtomically(output, content);
+  } catch (error) {
+    if (error instanceof AtomicWriteError) {
+      exitWithError({ category: 'FILE_READ', rule: 'P0-2', message: '评审包写入失败', file: output.path, exitCode: 2 });
+      return;
+    }
+    throw error;
+  }
 
   // 契约 3：stdout 单行摘要（base/head 为解析后的完整 SHA，与文件 header 一致）
   console.log(
-    `REVIEW_PACKAGE_JSON ${JSON.stringify({ path: outPath, base: baseSha, head: headSha, commits, bytes: Buffer.byteLength(content, 'utf8') })}`,
+    `REVIEW_PACKAGE_JSON ${JSON.stringify({ path: output.path, base: baseSha, head: headSha, commits, bytes: Buffer.byteLength(content, 'utf8') })}`,
   );
   process.exitCode = 0;
 }
 
-// 统一入口（lib/run-main.ts）：main().catch 统一为 UNEXPECTED + exit 2；exitWithError 已完成输出则静默退出
-runMain(main);
+// 统一入口（lib/run-main.ts）：main().catch 统一为 UNEXPECTED + exit 2；导入模块时不启动 CLI，便于测试写入层。
+const modulePath = path.resolve(fileURLToPath(import.meta.url));
+const invokedAsScript = process.argv.slice(1, 3).some((argument) => {
+  try {
+    return path.resolve(argument) === modulePath;
+  } catch {
+    return false;
+  }
+});
+if (invokedAsScript) runMain(main);

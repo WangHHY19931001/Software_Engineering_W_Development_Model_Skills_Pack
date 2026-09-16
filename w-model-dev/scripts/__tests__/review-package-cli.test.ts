@@ -4,8 +4,9 @@
  *
  * 覆盖（P2-B 计划约束 6，逐条强制）：
  *   - 成功路径：exit 0 + stdout 单行 `REVIEW_PACKAGE_JSON {path, base, head, commits, bytes}`；
- *     文件按固定顺序（header 含 base/head range → `git log --oneline` → `git diff --stat` →
- *     `git diff -U10`）且不含任何时间戳 —— 同输入两次运行逐字节一致（可复现契约）；
+ *     文件按固定顺序（header 含完整 base/head range → 固定 `%H %s` 提交列表 →
+ *     `git diff --full-index --stat` → `git diff --full-index -U10`）且不含任何时间戳 ——
+ *     同输入两次运行逐字节一致（可复现契约）；
  *   - `--out` 缺省：写入 cwd 下 `review-<base7>..<head7>.diff`；
  *   - 未知 flag（`--d4-invalid-argument`）→ exit 2 + stdout ERROR_JSON，且目标 out 路径零文件
  *     （exit-2 失败原子性：未知 flag 在任何磁盘写入之前拒绝）；
@@ -17,6 +18,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { unlinkSync as unlinkFileSync, writeFileSync as writeFileSyncNative } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import { createRequire } from 'node:module';
 import * as os from 'node:os';
@@ -26,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { runSync } from '../lib/run-sync.js';
+import { validateOutputPath, writeAtomically, type AtomicWriteFileSystem } from '../cli/review-package.js';
 
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
@@ -79,8 +82,13 @@ function git(args: string[]): string {
 function runReviewPackage(
   args: string[],
   cwd: string = REPO_ROOT,
+  env?: NodeJS.ProcessEnv,
 ): { code: number | null; stdout: string; stderr: string } {
-  const result = runSync(process.execPath, [tsxCli, SCRIPT, ...args], { cwd, timeout: 60_000 });
+  const result = runSync(process.execPath, [tsxCli, SCRIPT, ...args], {
+    cwd,
+    timeout: 60_000,
+    env: env === undefined ? undefined : { ...process.env, ...env },
+  });
   return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 
@@ -130,6 +138,24 @@ function writeCommitObject(name: string, object: CommitObject): void {
   if (write.status !== 0 || write.error !== undefined) throw new Error(`写入 ${name} 失败: ${write.stderr ?? ''}`);
   expect(String(write.stdout).trim()).toBe(object.sha);
   git(['update-ref', `refs/heads/${name}`, object.sha]);
+}
+
+async function createGitCallProbe(): Promise<{ marker: string; env: NodeJS.ProcessEnv }> {
+  const probeDir = path.join(tmpDir, 'git-probe');
+  await fs.mkdir(probeDir);
+  const marker = path.join(probeDir, 'called.txt');
+  if (process.platform === 'win32') {
+    await fs.writeFile(
+      path.join(probeDir, 'git.cmd'),
+      `@echo off\r\n>>"${marker}" echo called\r\nexit /b 99\r\n`,
+      'utf8',
+    );
+  } else {
+    const escapedMarker = marker.replaceAll("'", "'\\''");
+    await fs.writeFile(path.join(probeDir, 'git'), `#!/bin/sh\nprintf called >> '${escapedMarker}'\nexit 99\n`, 'utf8');
+    await fs.chmod(path.join(probeDir, 'git'), 0o700);
+  }
+  return { marker, env: { PATH: `${probeDir}${path.delimiter}${process.env.PATH ?? ''}` } };
 }
 
 describe('review-package CLI（S32 确定性评审包）', () => {
@@ -246,18 +272,24 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     expect(errorJson(garbage.stdout)).toMatchObject({ category: 'ARG_INVALID' });
   });
 
-  it('--repo 非法目录（不存在 / 非 git 仓）→ exit 2', () => {
+  it('--repo 不存在、不是目录或不是 Git 仓库时统一 ARG_INVALID → exit 2', async () => {
+    const filePath = path.join(tmpDir, 'repo-file');
+    await fs.writeFile(filePath, 'not a directory\n', 'utf8');
     const missing = runReviewPackage([
       `--repo=${path.join(tmpDir, 'no-such-repo')}`,
       `--base=${baseSha}`,
       `--head=${headSha}`,
     ]);
     expect(missing.code).toBe(2);
-    expect(errorJson(missing.stdout)).toMatchObject({ exitCode: 2 });
+    expect(errorJson(missing.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
+
+    const file = runReviewPackage([`--repo=${filePath}`, `--base=${baseSha}`, `--head=${headSha}`]);
+    expect(file.code).toBe(2);
+    expect(errorJson(file.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
 
     const notARepo = runReviewPackage([`--repo=${tmpDir}`, `--base=${baseSha}`, `--head=${headSha}`]);
     expect(notARepo.code).toBe(2);
-    expect(errorJson(notARepo.stdout)).toMatchObject({ exitCode: 2 });
+    expect(errorJson(notARepo.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
   });
 
   it('两个真实 commit object 共享 7 位前缀时，完整 SHA 输入仍生成非空评审包', async () => {
@@ -334,7 +366,21 @@ describe('review-package CLI（S32 确定性评审包）', () => {
 
     expect(result.code).toBe(2);
     expect(result.stderr).toContain('--out 所在目录不存在');
-    expect(errorJson(result.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
+    expect(errorJson(result.stdout)).toMatchObject({ category: 'FILE_NOT_FOUND', exitCode: 2 });
+  });
+
+  it('非法 --out 前置校验时真实 Git 调用计数为 0', async () => {
+    const out = path.join(tmpDir, 'missing-parent-for-git-probe', 'package.diff');
+    const probe = await createGitCallProbe();
+    const result = runReviewPackage(
+      [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`],
+      REPO_ROOT,
+      probe.env,
+    );
+
+    expect(result.code).toBe(2);
+    expect(errorJson(result.stdout)).toMatchObject({ category: 'FILE_NOT_FOUND', exitCode: 2 });
+    await expect(fs.access(probe.marker)).rejects.toThrow();
   });
 
   it('core.abbrev 改变时正文提交列表保持完整 SHA 且字节一致', async () => {
@@ -373,8 +419,7 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     }
   });
 
-  it('写入失败时保留既有 sentinel 文件', async () => {
-    if (process.platform === 'win32') return;
+  it.skipIf(process.platform === 'win32')('Unix 权限拒绝时保留既有 sentinel 文件', async () => {
     const readonlyDir = path.join(tmpDir, 'readonly');
     const out = path.join(readonlyDir, 'package.diff');
     await fs.mkdir(readonlyDir);
@@ -388,5 +433,64 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     } finally {
       await fs.chmod(readonlyDir, 0o700);
     }
+  });
+
+  it('注入 writeFileSync 失败时清理临时文件并保留 sentinel', async () => {
+    const out = path.join(tmpDir, 'write-failure.diff');
+    await fs.writeFile(out, 'sentinel\n', 'utf8');
+    const validated = validateOutputPath(out);
+    const unlinkCalls: string[] = [];
+    const fileSystem: AtomicWriteFileSystem = {
+      writeFileSync: () => {
+        throw new Error('injected write failure');
+      },
+      renameSync: () => {
+        throw new Error('rename must not be reached');
+      },
+      unlinkSync: (filePath) => {
+        unlinkCalls.push(filePath);
+        try {
+          unlinkFileSync(filePath);
+        } catch {
+          // The injected write may fail before creating the temporary file.
+        }
+      },
+    };
+
+    expect(() => writeAtomically(validated, 'replacement\n', fileSystem)).toThrow('评审包原子写入失败');
+    await expect(fs.readFile(out, 'utf8')).resolves.toBe('sentinel\n');
+    expect(unlinkCalls).toHaveLength(1);
+    expect((await fs.readdir(tmpDir)).some((name) => name.startsWith('.write-failure.diff.'))).toBe(false);
+  });
+
+  it('注入 renameSync 失败时清理已写入临时文件并保留 sentinel', async () => {
+    const out = path.join(tmpDir, 'rename-failure.diff');
+    await fs.writeFile(out, 'sentinel\n', 'utf8');
+    const validated = validateOutputPath(out);
+    const fileSystem: AtomicWriteFileSystem = {
+      writeFileSync: (filePath, data, options) => writeFileSyncNative(filePath, data, options),
+      renameSync: () => {
+        throw new Error('injected rename failure');
+      },
+      unlinkSync: unlinkFileSync,
+    };
+
+    expect(() => writeAtomically(validated, 'replacement\n', fileSystem)).toThrow('评审包原子写入失败');
+    await expect(fs.readFile(out, 'utf8')).resolves.toBe('sentinel\n');
+    expect((await fs.readdir(tmpDir)).some((name) => name.startsWith('.rename-failure.diff.'))).toBe(false);
+  });
+
+  it('父目录 canonical 身份改变时写入前拒绝且不创建输出', async () => {
+    const outputDir = path.join(tmpDir, 'identity-check');
+    const movedDir = path.join(tmpDir, 'identity-check-moved');
+    const out = path.join(outputDir, 'package.diff');
+    await fs.mkdir(outputDir);
+    const validated = validateOutputPath(out);
+    await fs.rename(outputDir, movedDir);
+    await fs.mkdir(outputDir);
+
+    expect(() => writeAtomically(validated, 'replacement\n')).toThrow('评审包原子写入失败');
+    await expect(fs.access(out)).rejects.toThrow();
+    await expect(fs.readdir(outputDir)).resolves.toEqual([]);
   });
 });
