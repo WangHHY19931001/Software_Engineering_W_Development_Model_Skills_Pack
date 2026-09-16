@@ -32,11 +32,16 @@
           "upstreamDefect": { "type": "boolean" },
           "rollbackRecommended": { "type": "boolean" }
         },
-        "required": ["reportId", "rootCauseCategory", "upstreamDefect", "rollbackRecommended"]
+        "required": [
+          "reportId",
+          "rootCauseCategory",
+          "upstreamDefect",
+          "rollbackRecommended"
+        ]
       }
     },
     {
-      "description": "action=fix/emergency-fix 时强制 basedOnReport 非空 + artifacts 非空数组。revertEvidence（回滚证伪声明，AC-8）形态在此登记但 schema 不强制出现——由 check-run-log R10 逻辑按 LEGACY_REVERT_EVIDENCE_CUTOFF（run-log-logic.ts，P2-B 计划合并日）分界强制：cutoff 后缺失/非法 revertEvidence.command 为 blocking，cutoff 前旧行按 LEGACY_REVERT_EVIDENCE 非阻断诊断吸收。",
+      "description": "action=fix/emergency-fix 时强制 basedOnReport 非空 + artifacts 非空数组。revertEvidence（回滚证伪声明，AC-8）形态在此登记但 schema 不强制出现——由 check-run-log R10 逻辑始终强制 fix/emergency-fix 携带合法非空 command。",
       "if": {
         "properties": { "action": { "enum": ["fix", "emergency-fix"] } },
         "required": ["action"]
@@ -106,7 +111,9 @@
         "properties": {
           "round": { "type": "integer", "minimum": 1 },
           "reportId": { "type": "string", "minLength": 1 },
-          "targetKind": { "enum": ["rootcause", "requirement", "design", "code", "test"] }
+          "targetKind": {
+            "enum": ["rootcause", "requirement", "design", "code", "test"]
+          }
         },
         "required": ["round", "reportId", "targetKind"]
       }
@@ -116,7 +123,15 @@
         "properties": {
           "phase": { "const": 8 },
           "action": {
-            "enum": ["review", "gate", "r3-completeness", "r3-reliability", "r3-security", "fix", "emergency-fix"]
+            "enum": [
+              "review",
+              "gate",
+              "r3-completeness",
+              "r3-reliability",
+              "r3-security",
+              "fix",
+              "emergency-fix"
+            ]
           },
           "targetKind": { "enum": ["requirement", "design", "code", "test"] }
         },
@@ -129,19 +144,34 @@
           "target": { "type": "string", "minLength": 1 },
           "artifacts": { "type": "array", "minItems": 1 }
         },
-        "required": ["basedOnReport", "implementationTarget", "target", "artifacts"]
+        "required": [
+          "basedOnReport",
+          "implementationTarget",
+          "target",
+          "artifacts"
+        ]
       }
     },
     {
-      "if": { "properties": { "lifecycleStatus": {} }, "required": ["lifecycleStatus"] },
+      "if": {
+        "properties": { "lifecycleStatus": {} },
+        "required": ["lifecycleStatus"]
+      },
       "then": {
-        "properties": { "lifecycleStatus": { "enum": ["CLOSED_UNDER_CURRENT_RULES", "NOT_CLOSED_NOT_PROVEN"] } }
+        "properties": {
+          "lifecycleStatus": {
+            "enum": ["CLOSED_UNDER_CURRENT_RULES", "NOT_CLOSED_NOT_PROVEN"]
+          }
+        }
       }
     },
     {
       "description": "action=review/iceberg-review 且 passed=false 时强制 reworkHints 非空（≥1 条返工提示）。历史兼容：reworkHints 规则与 variant 规则同窗引入，以 LEGACY_VARIANT_CUTOFF='2026-09-01T00:00:00Z'（run-log-logic.ts）为吸收/阻断分界——cutoff 前写入的失败 review 旧行由 check-run-log 以 LEGACY_REWORK_HINTS 非阻断 diagnostic 吸收；cutoff 后 passed=false 无非空 reworkHints 属真实不一致，blocking。",
       "if": {
-        "properties": { "action": { "enum": ["review", "iceberg-review"] }, "passed": { "const": false } },
+        "properties": {
+          "action": { "enum": ["review", "iceberg-review"] },
+          "passed": { "const": false }
+        },
         "required": ["action", "passed"]
       },
       "then": {
@@ -324,14 +354,15 @@
       "items": { "type": "string" }
     },
     "revertEvidence": {
-      "description": "S-fix 复现测试的回滚证伪声明：执行 command 使复现测试回到失败态（AC-8）。fix/emergency-fix 记录由 check-run-log R10 逻辑强制携带（schema 层 optional；时间戳早于 LEGACY_REVERT_EVIDENCE_CUTOFF 的旧记录按 LEGACY_REVERT_EVIDENCE 非阻断诊断吸收）",
+      "description": "S-fix 复现测试的回滚证伪声明：执行 command 使复现测试回到失败态（AC-8）。fix/emergency-fix 记录由 check-run-log R10 逻辑强制携带（schema 层 optional）",
       "type": "object",
       "required": ["command"],
       "properties": {
         "command": {
           "description": "回滚证伪命令：执行后使 S-fix 的复现测试回到失败态（非空字符串；命令本身由 S 在真实执行中出示，G 只验载体存在与形态）",
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "pattern": "^(?=.*\\S).+$"
         },
         "description": {
           "description": "可选说明：回滚证伪的执行上下文与预期失败输出（审计用）",

@@ -1,10 +1,13 @@
-import { createHash } from 'node:crypto';
-import * as nodeFs from 'node:fs';
-import * as path from 'node:path';
+import { createHash } from "node:crypto";
+import * as nodeFs from "node:fs";
+import * as path from "node:path";
 
-import { validateBySchema } from '../infrastructure/schema-loader.js';
-import { RTM_FIELDS } from '../lib/constants.js';
-import { SafeProjectPathError, resolveProjectRelativeRegularFile } from '../lib/safe-project-path.js';
+import { validateBySchema } from "../infrastructure/schema-loader.js";
+import { RTM_FIELDS } from "../lib/constants.js";
+import {
+  SafeProjectPathError,
+  resolveProjectRelativeRegularFile,
+} from "../lib/safe-project-path.js";
 
 export interface RTMRowShape {
   requirementId: string;
@@ -15,13 +18,13 @@ export interface RTMRowShape {
   integrationTest: string;
   systemTest: string;
   acceptanceTest: string;
-  coverageStatus?: '100%' | '部分' | '待覆盖';
+  coverageStatus?: "100%" | "部分" | "待覆盖";
   targetValue?: string;
   testThreshold?: string;
 }
 
 export interface RTMMatrixShape {
-  /** RTM 最后更新时间（ISO 8601）；M07 E4 用它判定是否在测试证据 cutoff 之后 */
+  /** RTM 最后更新时间（ISO 8601）；仅作 RTM 元数据，不参与 M07 证据信任判定。 */
   lastUpdated?: string;
   rows: RTMRowShape[];
   executionSummary: {
@@ -59,9 +62,9 @@ export interface ArtifactGateTestEvidenceSummary {
   checked: number;
   /** checked 中携带 evidence 对象的层数 */
   withEvidence: number;
-  /** checked 中 cutoff 后（含缺失/不可解析）缺 evidence 的层数（= e4 违规） */
+  /** checked 中缺 evidence 的层数（= e4 违规） */
   missing: number;
-  /** checked 中 lastUpdated 早于 cutoff、被非阻断吸收的层数 */
+  /** 严格模式固定为 0；保留该键用于 GATE_JSON 兼容。 */
   legacy: number;
   /** E1 配对违规计数 */
   e1: number;
@@ -87,33 +90,33 @@ export interface ArtifactGateResult {
   tickets?: TicketContentSummary;
 }
 
-/**
- * M07 RTM 测试证据绑定（D-2 批准单元）引入时刻。
- *
- * 依据：`docs/superpowers/plans/2026-09-14-external-absorption-adjudication.md` 的 D-2
- * 于 **2026-09-15** 单独批准（「只能是新增可选字段；不得改动 RTM 实体、关系、覆盖率语义」），
- * 本常量取批准日零点（UTC）。此后写入的 RTM，其阶段范围内 total>0 的测试层必须携带
- * 合法 `testSummary.evidence` 才可进入门禁放行（E4）；此前写入的旧 RTM 按
- * `LEGACY_TEST_EVIDENCE` 非阻断诊断吸收（方向与 run-log `LEGACY_REVERT_EVIDENCE` 一致）。
- */
-export const M07_TEST_EVIDENCE_CUTOFF = '2026-09-15T00:00:00Z';
-
 /** E2 相对路径解析结果；ok=false 时 reason 为人类可读拒绝原因。 */
-export type EvidencePathResolution = { ok: true; absPath: string } | { ok: false; reason: string };
+export type EvidencePathResolution =
+  { ok: true; absPath: string } | { ok: false; reason: string };
 
 /**
  * E2 路径解析：复用项目相对普通文件边界，逐段拒绝链接、junction 和根外规范路径。
  * schema 是第一层过滤；这里保留逻辑层的 fail-closed 防线及既有返回结构。
  */
-export function resolveTestEvidenceOutputPath(projectRoot: string, rawOutputPath: string): EvidencePathResolution {
-  if (typeof rawOutputPath !== 'string' || rawOutputPath.trim() === '') {
-    return { ok: false, reason: '路径为空' };
+export function resolveTestEvidenceOutputPath(
+  projectRoot: string,
+  rawOutputPath: string,
+): EvidencePathResolution {
+  if (typeof rawOutputPath !== "string" || rawOutputPath.trim() === "") {
+    return { ok: false, reason: "路径为空" };
   }
   try {
-    return { ok: true, absPath: resolveProjectRelativeRegularFile(projectRoot, rawOutputPath.trim()) };
+    return {
+      ok: true,
+      absPath: resolveProjectRelativeRegularFile(
+        projectRoot,
+        rawOutputPath.trim(),
+      ),
+    };
   } catch (error) {
-    if (error instanceof SafeProjectPathError) return { ok: false, reason: error.reason };
-    return { ok: false, reason: '路径不可解析' };
+    if (error instanceof SafeProjectPathError)
+      return { ok: false, reason: error.reason };
+    return { ok: false, reason: "路径不可解析" };
   }
 }
 
@@ -122,7 +125,7 @@ function sha256OfFile(absPath: string): string | undefined {
   try {
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- absPath 由 resolveTestEvidenceOutputPath 校验（相对项目根、禁越出根）后传入
     const buf = nodeFs.readFileSync(absPath);
-    return createHash('sha256').update(buf).digest('hex');
+    return createHash("sha256").update(buf).digest("hex");
   } catch {
     return undefined;
   }
@@ -148,10 +151,10 @@ const PHASE_TEST_LAYERS: Record<number, readonly string[]> = {
   2: [],
   3: [],
   4: [],
-  5: ['unitTest'],
-  6: ['unitTest', 'integrationTest'],
-  7: ['unitTest', 'integrationTest', 'systemTest'],
-  8: ['unitTest', 'integrationTest', 'systemTest', 'acceptanceTest'],
+  5: ["unitTest"],
+  6: ["unitTest", "integrationTest"],
+  7: ["unitTest", "integrationTest", "systemTest"],
+  8: ["unitTest", "integrationTest", "systemTest", "acceptanceTest"],
 };
 
 /**
@@ -159,14 +162,37 @@ const PHASE_TEST_LAYERS: Record<number, readonly string[]> = {
  * phase=8 与 REQUIRED_TRACE_FIELDS 完全一致（向后兼容）。
  */
 const PHASE_TRACE_FIELDS: Record<number, readonly (keyof RTMRowShape)[]> = {
-  1: ['description', 'designDoc', 'acceptanceTest'],
-  2: ['description', 'designDoc', 'acceptanceTest'],
-  3: ['description', 'designDoc', 'acceptanceTest'],
-  4: ['description', 'designDoc', 'acceptanceTest'],
-  5: ['description', 'designDoc', 'codeModule', 'unitTest', 'acceptanceTest'],
-  6: ['description', 'designDoc', 'codeModule', 'unitTest', 'integrationTest', 'acceptanceTest'],
-  7: ['description', 'designDoc', 'codeModule', 'unitTest', 'integrationTest', 'systemTest', 'acceptanceTest'],
-  8: ['description', 'designDoc', 'codeModule', 'unitTest', 'integrationTest', 'systemTest', 'acceptanceTest'],
+  1: ["description", "designDoc", "acceptanceTest"],
+  2: ["description", "designDoc", "acceptanceTest"],
+  3: ["description", "designDoc", "acceptanceTest"],
+  4: ["description", "designDoc", "acceptanceTest"],
+  5: ["description", "designDoc", "codeModule", "unitTest", "acceptanceTest"],
+  6: [
+    "description",
+    "designDoc",
+    "codeModule",
+    "unitTest",
+    "integrationTest",
+    "acceptanceTest",
+  ],
+  7: [
+    "description",
+    "designDoc",
+    "codeModule",
+    "unitTest",
+    "integrationTest",
+    "systemTest",
+    "acceptanceTest",
+  ],
+  8: [
+    "description",
+    "designDoc",
+    "codeModule",
+    "unitTest",
+    "integrationTest",
+    "systemTest",
+    "acceptanceTest",
+  ],
 };
 
 /**
@@ -208,31 +234,44 @@ export interface CheckArtifactGateOptions {
  * 校验：每个 SD 节点须有至少一个 codeModule 映射。
  * 映射判定：SD id 去 "SD-" 前缀，按 -/_/. 拆段（长度 >= 2），任一段在 codeModule 路径中出现。
  */
-function checkSdToCodeModuleMapping(graph: GateGraph, rows: RTMRowShape[]): string[] {
+function checkSdToCodeModuleMapping(
+  graph: GateGraph,
+  rows: RTMRowShape[],
+): string[] {
   const violations: string[] = [];
   if (!graph || !Array.isArray(graph.nodes)) return violations;
-  const sdNodes = graph.nodes.filter((n) => n && n.type === 'SD');
+  const sdNodes = graph.nodes.filter((n) => n && n.type === "SD");
   if (sdNodes.length === 0) return violations;
 
   const codeModules: string[] = [];
   for (const row of rows) {
-    if (row && typeof row.codeModule === 'string' && row.codeModule.trim() !== '') {
+    if (
+      row &&
+      typeof row.codeModule === "string" &&
+      row.codeModule.trim() !== ""
+    ) {
       codeModules.push(row.codeModule);
     }
   }
 
   for (const sd of sdNodes) {
-    const id = String(sd.id ?? '');
-    const stripped = id.replace(/^SD-/, '');
+    const id = String(sd.id ?? "");
+    const stripped = id.replace(/^SD-/, "");
     const segments = stripped
       .split(/[-_.]+/)
       .map((s) => s.toLowerCase())
       .filter((s) => s.length >= 2);
-    if (id !== '' && segments.length === 0 && codeModules.some((m: string) => m.includes(`${id}:`))) {
+    if (
+      id !== "" &&
+      segments.length === 0 &&
+      codeModules.some((m: string) => m.includes(`${id}:`))
+    ) {
       continue; // 数字层级 id（如 SD-5.2.1）命中 codeModule 前缀映射
     }
     if (segments.length === 0) {
-      violations.push(`TLA+ 资产校验失败：SD 节点 id 为空或无可识别段，无法映射 codeModule: ${id}`);
+      violations.push(
+        `TLA+ 资产校验失败：SD 节点 id 为空或无可识别段，无法映射 codeModule: ${id}`,
+      );
       continue;
     }
     const matched = codeModules.some((cm) => {
@@ -241,7 +280,7 @@ function checkSdToCodeModuleMapping(graph: GateGraph, rows: RTMRowShape[]): stri
     });
     if (!matched) {
       violations.push(
-        `TLA+ 资产校验失败：SD 节点 ${id} 无对应 codeModule（期望 codeModule 路径包含以下任一段: ${segments.join(', ')}）`,
+        `TLA+ 资产校验失败：SD 节点 ${id} 无对应 codeModule（期望 codeModule 路径包含以下任一段: ${segments.join(", ")}）`,
       );
     }
   }
@@ -260,21 +299,26 @@ export function checkCodeModuleFormat(rows: RTMRowShape[]): string[] {
   const nfrPattern = /^src\/.+/;
 
   for (const row of rows) {
-    if (!row || typeof row.codeModule !== 'string' || row.codeModule.trim() === '') continue;
+    if (
+      !row ||
+      typeof row.codeModule !== "string" ||
+      row.codeModule.trim() === ""
+    )
+      continue;
 
     const id = row.requirementId;
     const cm = row.codeModule.trim();
 
-    if (id.startsWith('REQ-')) {
+    if (id.startsWith("REQ-")) {
       if (!reqPattern.test(cm)) {
         violations.push(
           `codeModule 格式错误：REQ 行 ${id} 的 codeModule "${cm}" 须匹配 ^SD-[\\d.]+:src/.+（示例：SD-5.2.1:src/auth/login.ts）`,
         );
       }
-    } else if (id.startsWith('NFR-') || id.startsWith('CON-')) {
-      if (cm !== '横切' && !nfrPattern.test(cm)) {
+    } else if (id.startsWith("NFR-") || id.startsWith("CON-")) {
+      if (cm !== "横切" && !nfrPattern.test(cm)) {
         violations.push(
-          `codeModule 格式错误：${id.startsWith('NFR-') ? 'NFR' : 'CON'} 行 ${id} 的 codeModule "${cm}" 须匹配 ^src/.+ 或 === "横切"`,
+          `codeModule 格式错误：${id.startsWith("NFR-") ? "NFR" : "CON"} 行 ${id} 的 codeModule "${cm}" 须匹配 ^src/.+ 或 === "横切"`,
         );
       }
     }
@@ -308,44 +352,52 @@ export interface TicketContentResult {
  * 纯「`#` + 数字 + 点号」的分节标题（`### 1. 步骤一`）**不再**被当作票据边界。
  */
 const TICKET_HEADING_NUM_RE = /^#{1,3}\s+(\d{1,4})\s*[—–-]\s*(.*)$/;
-const TICKET_HEADING_KEYWORD_RE = /^#{1,3}\s+(?:票据|ticket|任务|task)\s*(\d{1,4})\b\s*[—–\-:：.]?\s*(.*)$/i;
+const TICKET_HEADING_KEYWORD_RE =
+  /^#{1,3}\s+(?:票据|ticket|任务|task)\s*(\d{1,4})\b\s*[—–\-:：.]?\s*(.*)$/i;
 
 /**
  * 黑名单第 1 条（台账 `sources/2026-09-14-superpowers-adopted-excerpts.md:696`）：
  * 禁止占位短语。ASCII 词表与 `logic/code-health-ledger-logic.ts` 的 PLACEHOLDER 正则**术语对齐**
  * （`tbd|todo|…|待定|待补`），但不复用其函数——两者域不同（code-health 候选 ledger vs 阶段 5 票据）。
  */
-const TICKET_PLACEHOLDER_ASCII_RE = /\b(tbd|todo|implement later|fill in details)\b/i;
-const TICKET_PLACEHOLDER_CJK = ['待补建', '待补', '待定', '稍后实现', '填充细节'];
+const TICKET_PLACEHOLDER_ASCII_RE =
+  /\b(tbd|todo|implement later|fill in details)\b/i;
+const TICKET_PLACEHOLDER_CJK = [
+  "待补建",
+  "待补",
+  "待定",
+  "稍后实现",
+  "填充细节",
+];
 
 /** 黑名单第 2 条（台账 :697）：无具体动作的祈使（只与「行内无符号引用」同时成立才命中） */
 const TICKET_VAGUE_IMPERATIVES = [
-  '加适当的错误处理',
-  '添加适当的错误处理',
-  '加合适的错误处理',
-  '加校验',
-  '添加校验',
-  '加验证',
-  '添加验证',
-  '处理边界情况',
-  '处理边界条件',
-  '处理各种边界情况',
-  'add appropriate error handling',
-  'add proper error handling',
-  'add validation',
-  'handle edge cases',
+  "加适当的错误处理",
+  "添加适当的错误处理",
+  "加合适的错误处理",
+  "加校验",
+  "添加校验",
+  "加验证",
+  "添加验证",
+  "处理边界情况",
+  "处理边界条件",
+  "处理各种边界情况",
+  "add appropriate error handling",
+  "add proper error handling",
+  "add validation",
+  "handle edge cases",
 ];
 
 /** 黑名单第 3 条（台账 :698）：要求写测试但未给出测试符号或用例名 */
 const TICKET_TEST_WITHOUT_SIGNATURE = [
-  '为上述写测试',
-  '写测试',
-  '补测试',
-  '添加测试',
-  'write tests for the above',
-  'write tests',
-  'add tests',
-  'add unit tests',
+  "为上述写测试",
+  "写测试",
+  "补测试",
+  "添加测试",
+  "write tests for the above",
+  "write tests",
+  "add tests",
+  "add unit tests",
 ];
 
 /** 黑名单第 4 条（台账 :699）：以「类似任务 N」指代其他票据而未重复符号级说明 */
@@ -358,13 +410,24 @@ const TICKET_SIMILAR_TO_TASK_RE =
  * 修复轮 3：标记词须与 span **声明式邻接**才算契约声明（见 `hasAdjacentContractMarker()`），
  * 不再用「行内任意位置含标记词」——否则否定/旁述语义（如「无接口签名要求，调用 X()」）会误判为声明。
  */
-const TICKET_CONTRACT_MARKERS = ['接口签名', '类型约束', '状态转移', '符号契约', '契约', '定义', '入参', '出参'];
+const TICKET_CONTRACT_MARKERS = [
+  "接口签名",
+  "类型约束",
+  "状态转移",
+  "符号契约",
+  "契约",
+  "定义",
+  "入参",
+  "出参",
+];
 
 /** `What to build` 字段行（`phase-5-coding.md:149` 票据内容契约的字段名） */
-const TICKET_CONTRACT_FIELD_RE = /^\s*(?:\*\*)?\s*what to build\s*(?:\*\*)?\s*[:：]/i;
+const TICKET_CONTRACT_FIELD_RE =
+  /^\s*(?:\*\*)?\s*what to build\s*(?:\*\*)?\s*[:：]/i;
 
 /** 声明式邻接允许的间隔符（空白 / 冒号 / 顿号逗号分号 / 星号 / 各类引号与括号） */
-const DECLARATIVE_SEPARATOR_RE = /[\s:：、,，;；*`'"“”‘’「」『』（）()[\]【】]+$/;
+const DECLARATIVE_SEPARATOR_RE =
+  /[\s:：、,，;；*`'"“”‘’「」『』（）()[\]【】]+$/;
 
 /** 标记词是否紧邻该 span 之前（`接口签名 \`A.b(x)\``、`本票契约：\`A.b(x)\`` 的声明式形态） */
 function hasAdjacentContractMarker(line: string, span: string): boolean {
@@ -372,7 +435,7 @@ function hasAdjacentContractMarker(line: string, span: string): boolean {
   for (;;) {
     const idx = line.indexOf(span, from);
     if (idx === -1) return false;
-    const before = line.slice(0, idx).replace(DECLARATIVE_SEPARATOR_RE, '');
+    const before = line.slice(0, idx).replace(DECLARATIVE_SEPARATOR_RE, "");
     if (TICKET_CONTRACT_MARKERS.some((k) => before.endsWith(k))) return true;
     from = idx + 1;
   }
@@ -383,7 +446,14 @@ function isContractFieldLine(line: string): boolean {
 }
 
 /** 语言字面量 / 关键字（不作为符号引用比对，避免 `false` / `void` 之类被误报为未定义符号） */
-const TICKET_SYMBOL_STOPWORDS = new Set(['true', 'false', 'null', 'undefined', 'void', 'this']);
+const TICKET_SYMBOL_STOPWORDS = new Set([
+  "true",
+  "false",
+  "null",
+  "undefined",
+  "void",
+  "this",
+]);
 
 /** 票据内的文件路径（Buildability ③；与 `phase-5-coding.md:162`「禁止具体文件路径」同向）
  *  两个分支均为顺序量词（无嵌套重复），避免 `security/detect-unsafe-regex` 击穿。 */
@@ -395,7 +465,13 @@ const TICKET_FILE_PATH_RE =
  * 非代码票据（文档 / 手册 / 流程）无法给出符号契约时，可用显式「具体动作 / 产出物」行表达「怎么做」。
  * 判定：该行出现标记词，且标记词之后仍有实质内容（≥2 个非空白非标点字符）。
  */
-const TICKET_CONCRETE_DELIVERABLE_MARKERS = ['产出物', '交付物', '具体动作', 'deliverable', 'concrete steps'];
+const TICKET_CONCRETE_DELIVERABLE_MARKERS = [
+  "产出物",
+  "交付物",
+  "具体动作",
+  "deliverable",
+  "concrete steps",
+];
 
 function hasConcreteDeliverable(lines: string[]): boolean {
   return lines.some((line) => {
@@ -403,7 +479,9 @@ function hasConcreteDeliverable(lines: string[]): boolean {
     return TICKET_CONCRETE_DELIVERABLE_MARKERS.some((k) => {
       const idx = lower.indexOf(k);
       if (idx === -1) return false;
-      const tail = line.slice(idx + k.length).replace(/[\s:：*_\u002d\u2014、,，]+/g, '');
+      const tail = line
+        .slice(idx + k.length)
+        .replace(/[\s:：*_\u002d\u2014、,，]+/g, "");
       return tail.length >= 2;
     });
   });
@@ -423,12 +501,12 @@ const SYMBOL_SUFFIX_RE = /^\s*(?::|→|->)\s*\S[\s\S]*$/;
  * 头 = 标识符 / 点分标识符（可带调用）；尾 = 其余（类型注解 / 状态转移等）。
  */
 function splitSymbolSpan(span: string): { head: string; tail: string } {
-  const id = IDENT_HEAD_RE.exec(span)?.[0] ?? '';
-  if (id === '') return { head: '', tail: span };
+  const id = IDENT_HEAD_RE.exec(span)?.[0] ?? "";
+  if (id === "") return { head: "", tail: span };
   let head = id;
   // 可选调用：标识符后紧跟 `(` 且存在配对 `)` 时，把头扩到 `)` 为止（含参数）
-  if (span[id.length] === '(') {
-    const close = span.indexOf(')', id.length + 1);
+  if (span[id.length] === "(") {
+    const close = span.indexOf(")", id.length + 1);
     if (close !== -1) head = span.slice(0, close + 1);
   }
   return { head, tail: span.slice(head.length) };
@@ -437,14 +515,14 @@ function splitSymbolSpan(span: string): { head: string; tail: string } {
 /** 符号 span 判定：整个 span 为「标识符 / 点分标识符（可带调用）」，其后可跟类型注解或状态转移。 */
 function isSymbolSpan(span: string): boolean {
   const { head, tail } = splitSymbolSpan(span);
-  return head !== '' && (tail === '' || SYMBOL_SUFFIX_RE.test(tail));
+  return head !== "" && (tail === "" || SYMBOL_SUFFIX_RE.test(tail));
 }
 
 /** 调用式 span 是否为「带参调用」（`A.b(x)`）；空括号 `A.b()` 不算声明形态——防「只调用不声明」旁路 */
 function hasCallArguments(head: string): boolean {
-  const open = head.indexOf('(');
+  const open = head.indexOf("(");
   if (open === -1) return false;
-  return head.slice(open + 1, -1).trim() !== '';
+  return head.slice(open + 1, -1).trim() !== "";
 }
 
 /**
@@ -465,11 +543,11 @@ function hasCallArguments(head: string): boolean {
  */
 function isDefinitionSpanInLine(span: string, line: string): boolean {
   const { head, tail } = splitSymbolSpan(span);
-  if (head === '') return false;
-  if (tail !== '' && SYMBOL_SUFFIX_RE.test(tail)) return true;
+  if (head === "") return false;
+  if (tail !== "" && SYMBOL_SUFFIX_RE.test(tail)) return true;
   if (hasAdjacentContractMarker(line, span)) return true;
   if (!isContractFieldLine(line)) return false;
-  const isCall = head.includes('(');
+  const isCall = head.includes("(");
   return !isCall || hasCallArguments(head);
 }
 
@@ -477,7 +555,8 @@ function isDefinitionSpanInLine(span: string, line: string): boolean {
 const IDENT_TOKEN_RE = /[A-Za-z_$][\w$.]*/g;
 
 /** 源码类文件后缀：命中即视为路径（避免把 `Foo.bar` 误判为路径） */
-const FILE_EXT_RE = /\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|ya?ml|py|go|java|rb|rs|sql|html|css|sh|feature|tla|cfg)$/i;
+const FILE_EXT_RE =
+  /\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|ya?ml|py|go|java|rb|rs|sql|html|css|sh|feature|tla|cfg)$/i;
 
 /** 接口签名 span（Buildability ①：`name(...)` 形态） */
 const SIGNATURE_SPAN_RE = /^[A-Za-z_$][\w$.]*\([^)]*\)/;
@@ -493,8 +572,13 @@ function isPathLikeSpan(span: string): boolean {
 function symbolSpansOfLine(line: string): string[] {
   const out: string[] = [];
   for (const m of line.matchAll(BACKTICK_SPAN_RE)) {
-    const s = (m[1] ?? '').trim();
-    if (s === '' || isPathLikeSpan(s) || TICKET_SYMBOL_STOPWORDS.has(s.toLowerCase())) continue;
+    const s = (m[1] ?? "").trim();
+    if (
+      s === "" ||
+      isPathLikeSpan(s) ||
+      TICKET_SYMBOL_STOPWORDS.has(s.toLowerCase())
+    )
+      continue;
     if (isSymbolSpan(s)) out.push(s);
   }
   return out;
@@ -519,10 +603,15 @@ function splitTicketBlocks(text: string): TicketBlock[] {
   const blocks: TicketBlock[] = [];
   let current: TicketBlock | null = null;
   for (const line of text.split(/\r?\n/)) {
-    const m = TICKET_HEADING_NUM_RE.exec(line) ?? TICKET_HEADING_KEYWORD_RE.exec(line);
+    const m =
+      TICKET_HEADING_NUM_RE.exec(line) ?? TICKET_HEADING_KEYWORD_RE.exec(line);
     if (m) {
       if (current) blocks.push(current);
-      current = { id: m[1] ?? '', title: (m[2] ?? '').trim() || '（无标题）', lines: [] };
+      current = {
+        id: m[1] ?? "",
+        title: (m[2] ?? "").trim() || "（无标题）",
+        lines: [],
+      };
       continue;
     }
     if (current) current.lines.push(line);
@@ -561,11 +650,15 @@ function splitTicketBlocks(text: string): TicketBlock[] {
  */
 export function checkTicketContent(ticketsText: string): TicketContentResult {
   const violations: string[] = [];
-  const blocks = splitTicketBlocks(typeof ticketsText === 'string' ? ticketsText : '');
+  const blocks = splitTicketBlocks(
+    typeof ticketsText === "string" ? ticketsText : "",
+  );
   if (blocks.length === 0) {
     return {
       passed: false,
-      violations: ['票据内容校验失败：未发现任何票据（期望 `# <NN> — <标题>` 形式的票据块；S18 票据内容契约）'],
+      violations: [
+        "票据内容校验失败：未发现任何票据（期望 `# <NN> — <标题>` 形式的票据块；S18 票据内容契约）",
+      ],
       summary: { checked: 0, criticalMissing: 1, buildabilityMissing: 0 },
     };
   }
@@ -581,21 +674,29 @@ export function checkTicketContent(ticketsText: string): TicketContentResult {
       }
     }
   }
-  const isDefinedSpan = (span: string): boolean => identTokens(span).some((t) => definedSymbols.has(t));
+  const isDefinedSpan = (span: string): boolean =>
+    identTokens(span).some((t) => definedSymbols.has(t));
 
   let criticalMissing = 0;
   let buildabilityMissing = 0;
 
   for (const block of blocks) {
     const where = `票据 ${block.id}「${block.title}」`;
-    const text = block.lines.join('\n');
-    const criterionLines = block.lines.filter((l) => ACCEPTANCE_CRITERION_RE.test(l));
-    const bodyLines = block.lines.filter((l) => !ACCEPTANCE_CRITERION_RE.test(l));
+    const text = block.lines.join("\n");
+    const criterionLines = block.lines.filter((l) =>
+      ACCEPTANCE_CRITERION_RE.test(l),
+    );
+    const bodyLines = block.lines.filter(
+      (l) => !ACCEPTANCE_CRITERION_RE.test(l),
+    );
     const bodySymbols = bodyLines.flatMap((l) => symbolSpansOfLine(l));
-    const criterionSymbols = criterionLines.flatMap((l) => symbolSpansOfLine(l));
+    const criterionSymbols = criterionLines.flatMap((l) =>
+      symbolSpansOfLine(l),
+    );
     const allSymbols = [...bodySymbols, ...criterionSymbols];
     const paths = text.match(TICKET_FILE_PATH_RE) ?? [];
-    const lineHasSymbol = (l: string): boolean => symbolSpansOfLine(l).length > 0;
+    const lineHasSymbol = (l: string): boolean =>
+      symbolSpansOfLine(l).length > 0;
 
     // ---- 第 1 条：禁止占位短语 ----
     const asciiHit = TICKET_PLACEHOLDER_ASCII_RE.exec(text)?.[1];
@@ -609,7 +710,9 @@ export function checkTicketContent(ticketsText: string): TicketContentResult {
 
     // ---- 第 2 条：无具体动作的祈使（须行内无符号引用） ----
     const vagueHit = block.lines.find(
-      (l) => !lineHasSymbol(l) && TICKET_VAGUE_IMPERATIVES.some((p) => l.toLowerCase().includes(p)),
+      (l) =>
+        !lineHasSymbol(l) &&
+        TICKET_VAGUE_IMPERATIVES.some((p) => l.toLowerCase().includes(p)),
     );
     if (vagueHit !== undefined) {
       criticalMissing++;
@@ -620,7 +723,9 @@ export function checkTicketContent(ticketsText: string): TicketContentResult {
 
     // ---- 第 3 条：要求写测试但无测试符号 / 用例名 ----
     const testHit = block.lines.find(
-      (l) => !lineHasSymbol(l) && TICKET_TEST_WITHOUT_SIGNATURE.some((p) => l.toLowerCase().includes(p)),
+      (l) =>
+        !lineHasSymbol(l) &&
+        TICKET_TEST_WITHOUT_SIGNATURE.some((p) => l.toLowerCase().includes(p)),
     );
     if (testHit !== undefined) {
       criticalMissing++;
@@ -630,7 +735,9 @@ export function checkTicketContent(ticketsText: string): TicketContentResult {
     }
 
     // ---- 第 4 条：类似任务 N 而无符号级重复说明 ----
-    const similarHit = block.lines.find((l) => !lineHasSymbol(l) && TICKET_SIMILAR_TO_TASK_RE.test(l));
+    const similarHit = block.lines.find(
+      (l) => !lineHasSymbol(l) && TICKET_SIMILAR_TO_TASK_RE.test(l),
+    );
     if (similarHit !== undefined) {
       criticalMissing++;
       violations.push(
@@ -641,7 +748,11 @@ export function checkTicketContent(ticketsText: string): TicketContentResult {
     // ---- 第 5 条：只说要做什么不说怎么做（符号级改写）----
     // 无符号且无路径 → 违反；例外：非代码票据给出显式「具体动作 / 产出物」行（§0.1.3 的「或」分支）
     let noSymbolContract = false;
-    if (allSymbols.length === 0 && paths.length === 0 && !hasConcreteDeliverable(block.lines)) {
+    if (
+      allSymbols.length === 0 &&
+      paths.length === 0 &&
+      !hasConcreteDeliverable(block.lines)
+    ) {
       noSymbolContract = true;
       criticalMissing++;
       violations.push(
@@ -652,7 +763,9 @@ export function checkTicketContent(ticketsText: string): TicketContentResult {
     }
 
     // ---- 第 6 条：引用任何任务中都未定义的符号（只审非验收标准行） ----
-    const undefinedBody = [...new Set(bodySymbols.filter((s) => !isDefinedSpan(s)))];
+    const undefinedBody = [
+      ...new Set(bodySymbols.filter((s) => !isDefinedSpan(s))),
+    ];
     for (const sym of undefinedBody) {
       criticalMissing++;
       violations.push(
@@ -663,7 +776,9 @@ export function checkTicketContent(ticketsText: string): TicketContentResult {
     // ---- Buildability ①：缺接口签名且缺验收标准 ----
     // 修复轮 1 ③：与第 5 条**同根因**（本票既无符号级契约又无验收标准）时只计一处——⑤ 优先，
     // 本条不再重复断言（§0.1.5 要求 B 的负面判据与 ⑤/⑥ 不重复）。
-    const hasSignature = text.includes('接口签名') || allSymbols.some((s) => SIGNATURE_SPAN_RE.test(s));
+    const hasSignature =
+      text.includes("接口签名") ||
+      allSymbols.some((s) => SIGNATURE_SPAN_RE.test(s));
     if (!hasSignature && criterionLines.length === 0 && !noSymbolContract) {
       buildabilityMissing++;
       violations.push(
@@ -672,7 +787,9 @@ export function checkTicketContent(ticketsText: string): TicketContentResult {
     }
 
     // ---- Buildability ②：验收标准引用未定义符号（只审验收标准行） ----
-    const undefinedCriteria = [...new Set(criterionSymbols.filter((s) => !isDefinedSpan(s)))];
+    const undefinedCriteria = [
+      ...new Set(criterionSymbols.filter((s) => !isDefinedSpan(s))),
+    ];
     for (const sym of undefinedCriteria) {
       buildabilityMissing++;
       violations.push(
@@ -709,18 +826,24 @@ export interface UatPathMappingRow {
  * - 每条 UAT-NNN 的 actualPath 非 "_待阶段5回填_"
  * - mappingType ∈ ["直接", "等价", "替代"]
  */
-export function checkUatPathMappingBackfill(mappings: UatPathMappingRow[]): string[] {
+export function checkUatPathMappingBackfill(
+  mappings: UatPathMappingRow[],
+): string[] {
   const violations: string[] = [];
-  const validMappingTypes = ['直接', '等价', '替代'];
+  const validMappingTypes = ["直接", "等价", "替代"];
 
   for (const m of mappings) {
-    if (!m || typeof m.uatId !== 'string') continue;
-    if (typeof m.actualPath !== 'string' || typeof m.mappingType !== 'string') {
-      violations.push(`uat-path-mapping 字段类型非法：${m.uatId} 的 actualPath/mappingType 必须为字符串`);
+    if (!m || typeof m.uatId !== "string") continue;
+    if (typeof m.actualPath !== "string" || typeof m.mappingType !== "string") {
+      violations.push(
+        `uat-path-mapping 字段类型非法：${m.uatId} 的 actualPath/mappingType 必须为字符串`,
+      );
       continue;
     }
-    if (m.actualPath.includes('_待阶段5回填_') || m.actualPath.trim() === '') {
-      violations.push(`uat-path-mapping 未回填：${m.uatId} 的实际路径仍为 "_待阶段5回填_" 或为空`);
+    if (m.actualPath.includes("_待阶段5回填_") || m.actualPath.trim() === "") {
+      violations.push(
+        `uat-path-mapping 未回填：${m.uatId} 的实际路径仍为 "_待阶段5回填_" 或为空`,
+      );
     }
     if (!validMappingTypes.includes(m.mappingType)) {
       violations.push(
@@ -746,7 +869,7 @@ const nodeFsAdapter: {
   existsSync(p: string): boolean;
   readdirSync(p: string): string[];
 } = {
-  readFileSync: (p: string) => nodeFs.readFileSync(p, 'utf-8'),
+  readFileSync: (p: string) => nodeFs.readFileSync(p, "utf-8"),
   existsSync: (p: string) => nodeFs.existsSync(p),
   readdirSync: (p: string) => nodeFs.readdirSync(p),
 };
@@ -761,11 +884,17 @@ const nodeFsAdapter: {
 /** §8 标题（`## 8. Out of Scope`）。`[.．]?` + 分隔符要求使 `## 8.5 …` 不会误命中。 */
 const OUT_OF_SCOPE_HEADING = /^#{1,6}[ \t]*§?8[.．]?(?:[ \t]|$)/m;
 /** §8 固定列表格的五个必需列（与 templates/requirement-spec.md §8 逐字一致）。 */
-const OUT_OF_SCOPE_COLUMNS = ['conceptKey', '拒绝理由', 'Prior requests', '状态', '来源'];
+const OUT_OF_SCOPE_COLUMNS = [
+  "conceptKey",
+  "拒绝理由",
+  "Prior requests",
+  "状态",
+  "来源",
+];
 /** `状态` 枚举（用户裁定 2026-09-16：改主意改状态标记，不删除行）。 */
-const OUT_OF_SCOPE_STATUSES = ['rejected', 'reconsidered'];
+const OUT_OF_SCOPE_STATUSES = ["rejected", "reconsidered"];
 /** 「无」哨兵键：整行全 `-` 时 conceptKey === '-'，显式声明本阶段无排除项。 */
-const OUT_OF_SCOPE_SENTINEL = '-';
+const OUT_OF_SCOPE_SENTINEL = "-";
 /** Markdown 表格分隔行（`| --- | --- |`）。 */
 const MD_TABLE_SEPARATOR = /^\|[\s:|-]+\|$/;
 
@@ -774,8 +903,8 @@ function extractOutOfScopeSection(spec: string): string | undefined {
   const head = OUT_OF_SCOPE_HEADING.exec(spec);
   if (!head) return undefined;
   const rest = spec.slice(head.index);
-  const newline = rest.indexOf('\n');
-  const body = newline < 0 ? '' : rest.slice(newline + 1);
+  const newline = rest.indexOf("\n");
+  const body = newline < 0 ? "" : rest.slice(newline + 1);
   const next = /^#{1,6}[ \t]/m.exec(body);
   return next ? body.slice(0, next.index) : body;
 }
@@ -799,8 +928,10 @@ function normalizeMarkdownCell(cell: string): string {
 /** 去掉行首 / 行尾的**未转义** `|` 分隔符（`\|` 属单元格内容，不当分隔符）。 */
 function stripRowEdgePipes(line: string): string {
   const trimmed = line.trim();
-  const withoutHead = trimmed.startsWith('|') ? trimmed.slice(1) : trimmed;
-  return withoutHead.endsWith('|') && !withoutHead.endsWith('\\|') ? withoutHead.slice(0, -1) : withoutHead;
+  const withoutHead = trimmed.startsWith("|") ? trimmed.slice(1) : trimmed;
+  return withoutHead.endsWith("|") && !withoutHead.endsWith("\\|")
+    ? withoutHead.slice(0, -1)
+    : withoutHead;
 }
 
 /** 未转义的 `|` 分隔符（lookbehind：前一字符非反斜杠）。
@@ -819,7 +950,9 @@ const MD_ROW_DELIMITER = /(?<!\\)\|/;
  *  归一化值。
  */
 function splitTableRow(line: string): string[] {
-  return stripRowEdgePipes(line).split(MD_ROW_DELIMITER).map(normalizeMarkdownCell);
+  return stripRowEdgePipes(line)
+    .split(MD_ROW_DELIMITER)
+    .map(normalizeMarkdownCell);
 }
 
 /** 表头列名 × 单元格 → 列名到值的映射。
@@ -828,13 +961,16 @@ function splitTableRow(line: string): string[] {
  * 动态属性访问，会触发 security/detect-object-injection（无意义豁免会稀释 baseline）。
  * 列缺失时对应值为空字符串（调用方据 hasXxx 跳过该列校验）。
  */
-function mapRowValues(headerCells: string[], cells: string[]): Map<string, string> {
+function mapRowValues(
+  headerCells: string[],
+  cells: string[],
+): Map<string, string> {
   const values = new Map<string, string>();
   let pending = [...cells];
   for (const column of headerCells) {
     const [head, ...tail] = pending;
     pending = tail;
-    values.set(column, head ?? '');
+    values.set(column, head ?? "");
   }
   return values;
 }
@@ -855,37 +991,45 @@ function checkOutOfScopeRegister(spec: string): string[] {
   const v: string[] = [];
   const section = extractOutOfScopeSection(spec);
   if (section === undefined) {
-    v.push('structure: §8 Out of Scope 节缺失（须显式声明该节；「无」也要显式声明）');
+    v.push(
+      "structure: §8 Out of Scope 节缺失（须显式声明该节；「无」也要显式声明）",
+    );
     return v;
   }
   // (b) 「有表格」= 首个 `|` 行 + 紧随其后的分隔行；否则一律 fail-closed 报无表格
   //（不是仅匹配旧形态 `- {{`：无表格的自由散文同样无法承载结构校验）
   const lines = section.split(/\r?\n/);
-  const headerIndex = lines.findIndex((l) => l.trim().startsWith('|'));
+  const headerIndex = lines.findIndex((l) => l.trim().startsWith("|"));
   const tableLines = headerIndex >= 0 ? lines.slice(headerIndex) : [];
-  const [headerLine = '', separatorLine = '', ...dataLines] = tableLines;
+  const [headerLine = "", separatorLine = "", ...dataLines] = tableLines;
   const headerCells = tableLines.length > 0 ? splitTableRow(headerLine) : [];
-  const hasSeparator = tableLines.length > 0 && MD_TABLE_SEPARATOR.test(separatorLine.trim());
+  const hasSeparator =
+    tableLines.length > 0 && MD_TABLE_SEPARATOR.test(separatorLine.trim());
   if (headerIndex < 0 || !hasSeparator) {
-    const legacyForm = section.includes('- {{');
+    const legacyForm = section.includes("- {{");
     v.push(
       legacyForm
-        ? 'structure: §8 无固定列表格（旧散文形态「- {{」须表化：conceptKey / 拒绝理由 / Prior requests / 状态 / 来源）'
-        : 'structure: §8 无固定列表格（须为五列表格：conceptKey / 拒绝理由 / Prior requests / 状态 / 来源）',
+        ? "structure: §8 无固定列表格（旧散文形态「- {{」须表化：conceptKey / 拒绝理由 / Prior requests / 状态 / 来源）"
+        : "structure: §8 无固定列表格（须为五列表格：conceptKey / 拒绝理由 / Prior requests / 状态 / 来源）",
     );
     return v;
   }
   // (c) 表头列齐
-  const missingColumns = OUT_OF_SCOPE_COLUMNS.filter((c) => !headerCells.includes(c));
-  for (const col of missingColumns) v.push(`structure: §8 表格表头缺列：${col}`);
+  const missingColumns = OUT_OF_SCOPE_COLUMNS.filter(
+    (c) => !headerCells.includes(c),
+  );
+  for (const col of missingColumns)
+    v.push(`structure: §8 表格表头缺列：${col}`);
   // 缺列 → 该列的派生校验整体跳过（保证「恰好报该违规」）
-  const hasKeyColumn = headerCells.includes('conceptKey');
-  const hasStatusColumn = headerCells.includes('状态');
-  const hasPriorColumn = headerCells.includes('Prior requests');
+  const hasKeyColumn = headerCells.includes("conceptKey");
+  const hasStatusColumn = headerCells.includes("状态");
+  const hasPriorColumn = headerCells.includes("Prior requests");
 
-  const dataRows = dataLines.filter((l) => l.trim().startsWith('|'));
+  const dataRows = dataLines.filter((l) => l.trim().startsWith("|"));
   if (dataRows.length === 0) {
-    v.push('structure: §8 表格无数据行（须 ≥ 1 行；「无」也须显式保留一行 `-`）');
+    v.push(
+      "structure: §8 表格无数据行（须 ≥ 1 行；「无」也须显式保留一行 `-`）",
+    );
     return v;
   }
   const seenKeys = new Set<string>();
@@ -894,13 +1038,15 @@ function checkOutOfScopeRegister(spec: string): string[] {
     rowNo += 1;
     const cells = splitTableRow(rawRow);
     if (cells.length !== headerCells.length) {
-      v.push(`structure: §8 表格第 ${rowNo} 行单元格数 ${cells.length} 与表头 ${headerCells.length} 列不符`);
+      v.push(
+        `structure: §8 表格第 ${rowNo} 行单元格数 ${cells.length} 与表头 ${headerCells.length} 列不符`,
+      );
       continue;
     }
     const values = mapRowValues(headerCells, cells);
-    const conceptKey = values.get('conceptKey') ?? '';
+    const conceptKey = values.get("conceptKey") ?? "";
     if (hasKeyColumn) {
-      if (conceptKey === '') {
+      if (conceptKey === "") {
         v.push(`structure: §8 表格第 ${rowNo} 行 conceptKey 为空`);
       } else if (seenKeys.has(conceptKey)) {
         v.push(`structure: §8 表格 conceptKey 重复：${conceptKey}`);
@@ -911,13 +1057,17 @@ function checkOutOfScopeRegister(spec: string): string[] {
     // 哨兵行（显式「无」）：豁免状态枚举与 Prior requests 校验
     if (conceptKey === OUT_OF_SCOPE_SENTINEL) continue;
     if (hasStatusColumn) {
-      const status = values.get('状态') ?? '';
+      const status = values.get("状态") ?? "";
       if (!OUT_OF_SCOPE_STATUSES.includes(status)) {
-        v.push(`structure: §8 表格第 ${rowNo} 行状态非法："${status}"（须 ∈ rejected / reconsidered）`);
+        v.push(
+          `structure: §8 表格第 ${rowNo} 行状态非法："${status}"（须 ∈ rejected / reconsidered）`,
+        );
       }
     }
-    if (hasPriorColumn && (values.get('Prior requests') ?? '') === '') {
-      v.push(`structure: §8 表格第 ${rowNo} 行 Prior requests 为空（须为逗号分隔回链或显式 \`-\`）`);
+    if (hasPriorColumn && (values.get("Prior requests") ?? "") === "") {
+      v.push(
+        `structure: §8 表格第 ${rowNo} 行 Prior requests 为空（须为逗号分隔回链或显式 \`-\`）`,
+      );
     }
   }
   return v;
@@ -931,39 +1081,49 @@ export function checkRequirementSpecStructure(
   specDir: string,
   fs: { readFileSync(p: string): string; existsSync(p: string): boolean },
 ): RequirementSpecStructureViolations {
-  const v: RequirementSpecStructureViolations = { refs: [], ssot: [], dod: [], outOfScope: [] };
-  const specPath = path.join(specDir, 'requirement-spec.md');
+  const v: RequirementSpecStructureViolations = {
+    refs: [],
+    ssot: [],
+    dod: [],
+    outOfScope: [],
+  };
+  const specPath = path.join(specDir, "requirement-spec.md");
   if (!fs.existsSync(specPath)) {
-    v.refs.push('structure: requirement-spec.md 不存在');
+    v.refs.push("structure: requirement-spec.md 不存在");
     return v;
   }
   // 引用块完整性：6 个独立文件（主规格引用块 `> xxx详见 [name](./name.md)`）
   // String() 兼容注入 fs 返回 Buffer 的场景（真实 node:fs 无编码 readFileSync 返回 Buffer）
   const spec = String(fs.readFileSync(specPath));
   const requiredRefs = [
-    'system-context.md',
-    'glossary.md',
-    'traceability-matrix.md',
-    'behavior-spec.md',
-    'discipline-dod.md',
-    'uml-modeling.md',
+    "system-context.md",
+    "glossary.md",
+    "traceability-matrix.md",
+    "behavior-spec.md",
+    "discipline-dod.md",
+    "uml-modeling.md",
   ];
   for (const ref of requiredRefs) {
-    if (!spec.includes(`](./${ref})`)) v.refs.push(`structure: 主规格缺引用块 → ${ref}`);
-    if (!fs.existsSync(path.join(specDir, ref))) v.refs.push(`structure: 引用文件不存在 ${ref}`);
+    if (!spec.includes(`](./${ref})`))
+      v.refs.push(`structure: 主规格缺引用块 → ${ref}`);
+    if (!fs.existsSync(path.join(specDir, ref)))
+      v.refs.push(`structure: 引用文件不存在 ${ref}`);
   }
   // §0 SSOT 头四项声明
-  for (const key of ['文档版本', 'SSOT 声明', '自身校验', '禁止占位词']) {
+  for (const key of ["文档版本", "SSOT 声明", "自身校验", "禁止占位词"]) {
     if (!spec.includes(key)) v.ssot.push(`structure: §0 SSOT 头缺「${key}」`);
   }
   // DoD 清单：discipline-dod.md - [ ] 项 ≥ 8
-  const dodPath = path.join(specDir, 'discipline-dod.md');
+  const dodPath = path.join(specDir, "discipline-dod.md");
   if (!fs.existsSync(dodPath)) {
-    v.dod.push('structure: discipline-dod.md 不存在');
+    v.dod.push("structure: discipline-dod.md 不存在");
   } else {
     const dod = String(fs.readFileSync(dodPath));
     const checks = (dod.match(/- \[ \]/g) ?? []).length;
-    if (checks < 8) v.dod.push(`structure: discipline-dod.md DoD 清单仅 ${checks} 项（须 ≥ 8）`);
+    if (checks < 8)
+      v.dod.push(
+        `structure: discipline-dod.md DoD 清单仅 ${checks} 项（须 ≥ 8）`,
+      );
   }
   // §8 拒绝登记（Out of Scope）结构校验（M08）——只校验登记结构，不校验概念相似度
   v.outOfScope.push(...checkOutOfScopeRegister(spec));
@@ -974,29 +1134,53 @@ export function checkRequirementSpecStructure(
  *  phase=1: requirement-spec.md 主文档 + 6 子文件（无前缀）
  *  phase=2: {module}-system-design.md 主文档 + 6 子文件（带 {module}- 前缀）
  */
-const PHASE_SPEC_LAYOUT: Record<number, { mainSuffix: string; refs: string[] }> = {
+const PHASE_SPEC_LAYOUT: Record<
+  number,
+  { mainSuffix: string; refs: string[] }
+> = {
   1: {
-    mainSuffix: 'requirement-spec.md',
+    mainSuffix: "requirement-spec.md",
     refs: [
-      'system-context.md',
-      'glossary.md',
-      'traceability-matrix.md',
-      'behavior-spec.md',
-      'discipline-dod.md',
-      'uml-modeling.md',
+      "system-context.md",
+      "glossary.md",
+      "traceability-matrix.md",
+      "behavior-spec.md",
+      "discipline-dod.md",
+      "uml-modeling.md",
     ],
   },
   2: {
-    mainSuffix: '-system-design.md',
-    refs: ['system-architecture', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod', 'uml-modeling'],
+    mainSuffix: "-system-design.md",
+    refs: [
+      "system-architecture",
+      "glossary",
+      "traceability-matrix",
+      "behavior-spec",
+      "discipline-dod",
+      "uml-modeling",
+    ],
   },
   3: {
-    mainSuffix: '-interface-design.md',
-    refs: ['interface-contract', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod', 'uml-modeling'],
+    mainSuffix: "-interface-design.md",
+    refs: [
+      "interface-contract",
+      "glossary",
+      "traceability-matrix",
+      "behavior-spec",
+      "discipline-dod",
+      "uml-modeling",
+    ],
   },
   4: {
-    mainSuffix: '-detailed-design.md',
-    refs: ['class-design', 'data-model', 'glossary', 'traceability-matrix', 'behavior-spec', 'discipline-dod'],
+    mainSuffix: "-detailed-design.md",
+    refs: [
+      "class-design",
+      "data-model",
+      "glossary",
+      "traceability-matrix",
+      "behavior-spec",
+      "discipline-dod",
+    ],
   },
 };
 
@@ -1008,9 +1192,18 @@ const PHASE_SPEC_LAYOUT: Record<number, { mainSuffix: string; refs: string[] }> 
 export function checkPhaseSpecStructure(
   phase: number,
   specDir: string,
-  fs: { readFileSync(p: string): string; existsSync(p: string): boolean; readdirSync(p: string): string[] },
+  fs: {
+    readFileSync(p: string): string;
+    existsSync(p: string): boolean;
+    readdirSync(p: string): string[];
+  },
 ): RequirementSpecStructureViolations {
-  const v: RequirementSpecStructureViolations = { refs: [], ssot: [], dod: [], outOfScope: [] };
+  const v: RequirementSpecStructureViolations = {
+    refs: [],
+    ssot: [],
+    dod: [],
+    outOfScope: [],
+  };
   const layout = PHASE_SPEC_LAYOUT[phase];
   if (!layout) {
     v.refs.push(`structure: 不支持的 phase=${phase}（当前支持 1/2/3/4）`);
@@ -1021,9 +1214,13 @@ export function checkPhaseSpecStructure(
   if (phase === 1) {
     mainPath = path.join(specDir, layout.mainSuffix);
   } else {
-    const mains = fs.readdirSync(specDir).filter((f) => f.endsWith(layout.mainSuffix));
+    const mains = fs
+      .readdirSync(specDir)
+      .filter((f) => f.endsWith(layout.mainSuffix));
     if (mains.length !== 1) {
-      v.refs.push(`structure: 主文档 glob *${layout.mainSuffix} 匹配 ${mains.length} 个（须恰 1 个）`);
+      v.refs.push(
+        `structure: 主文档 glob *${layout.mainSuffix} 匹配 ${mains.length} 个（须恰 1 个）`,
+      );
       return v;
     }
     mainPath = path.join(specDir, mains[0]!);
@@ -1034,25 +1231,32 @@ export function checkPhaseSpecStructure(
   }
   const spec = String(fs.readFileSync(mainPath));
   // module 前缀提取（phase≥2 时用于引用文件名校对，通用去掉主文档后缀）
-  const modulePrefix = phase === 1 ? '' : path.basename(mainPath).slice(0, -layout.mainSuffix.length);
+  const modulePrefix =
+    phase === 1
+      ? ""
+      : path.basename(mainPath).slice(0, -layout.mainSuffix.length);
   for (const ref of layout.refs) {
     const refName = phase === 1 ? ref : `${modulePrefix}-${ref}.md`;
-    if (!spec.includes(`](./${refName})`)) v.refs.push(`structure: 主文档缺引用块 → ${refName}`);
-    if (!fs.existsSync(path.join(specDir, refName))) v.refs.push(`structure: 引用文件不存在 ${refName}`);
+    if (!spec.includes(`](./${refName})`))
+      v.refs.push(`structure: 主文档缺引用块 → ${refName}`);
+    if (!fs.existsSync(path.join(specDir, refName)))
+      v.refs.push(`structure: 引用文件不存在 ${refName}`);
   }
   // §0 SSOT 头四项声明
-  for (const key of ['文档版本', 'SSOT 声明', '自身校验', '禁止占位词']) {
+  for (const key of ["文档版本", "SSOT 声明", "自身校验", "禁止占位词"]) {
     if (!spec.includes(key)) v.ssot.push(`structure: §0 SSOT 头缺「${key}」`);
   }
   // DoD 清单：discipline-dod.md - [ ] 项 ≥ 8
-  const dodName = phase === 1 ? 'discipline-dod.md' : `${modulePrefix}-discipline-dod.md`;
+  const dodName =
+    phase === 1 ? "discipline-dod.md" : `${modulePrefix}-discipline-dod.md`;
   const dodPath = path.join(specDir, dodName);
   if (!fs.existsSync(dodPath)) {
     v.dod.push(`structure: ${dodName} 不存在`);
   } else {
     const dod = String(fs.readFileSync(dodPath));
     const checks = (dod.match(/- \[ \]/g) ?? []).length;
-    if (checks < 8) v.dod.push(`structure: ${dodName} DoD 清单仅 ${checks} 项（须 ≥ 8）`);
+    if (checks < 8)
+      v.dod.push(`structure: ${dodName} DoD 清单仅 ${checks} 项（须 ≥ 8）`);
   }
   // §8 拒绝登记（Out of Scope）结构校验：仅 phase=1 的 requirement-spec.md 含该固定节
   //（phase≥2 主文档的 §8 不是拒绝登记，故不施加该组判定）
@@ -1062,10 +1266,10 @@ export function checkPhaseSpecStructure(
 
 /** 技能包 templates/ 各阶段目录映射（主模板文件名 + 子模板目录名） */
 const TEMPLATES_PHASE_DIR: Record<number, { main: string; dir: string }> = {
-  1: { main: 'requirement-spec.md', dir: 'requirement-spec' },
-  2: { main: 'system-design.md', dir: 'system-design' },
-  3: { main: 'interface-design.md', dir: 'interface-design' },
-  4: { main: 'detailed-design.md', dir: 'detailed-design' },
+  1: { main: "requirement-spec.md", dir: "requirement-spec" },
+  2: { main: "system-design.md", dir: "system-design" },
+  3: { main: "interface-design.md", dir: "interface-design" },
+  4: { main: "detailed-design.md", dir: "detailed-design" },
 };
 
 /**
@@ -1088,7 +1292,7 @@ export function checkTemplatesStructure(
   for (const phase of [1, 2, 3, 4] as const) {
     const layout = PHASE_SPEC_LAYOUT[phase]!;
     const tdir = TEMPLATES_PHASE_DIR[phase]!;
-    const prefix = 'templates:';
+    const prefix = "templates:";
 
     // 1. 主模板存在
     const mainPath = path.join(templatesDir, tdir.main);
@@ -1099,54 +1303,83 @@ export function checkTemplatesStructure(
     const main = String(fs.readFileSync(mainPath));
 
     for (const ref of layout.refs) {
-      const refFile = ref.endsWith('.md') ? ref : `${ref}.md`;
+      const refFile = ref.endsWith(".md") ? ref : `${ref}.md`;
       // 2. 引用块存在（phase=1 指向 requirement-spec/ 子目录；phase≥2 使用 {{module}} 占位符）
-      const refLink = phase === 1 ? `](./requirement-spec/${refFile})` : `](./{{module}}-${refFile})`;
+      const refLink =
+        phase === 1
+          ? `](./requirement-spec/${refFile})`
+          : `](./{{module}}-${refFile})`;
       if (!main.includes(refLink)) {
-        violations.push(`${prefix} 阶段 ${phase} 主模板 ${tdir.main} 缺引用块 → ${refLink}`);
+        violations.push(
+          `${prefix} 阶段 ${phase} 主模板 ${tdir.main} 缺引用块 → ${refLink}`,
+        );
       }
       // 3. 子模板存在（子目录内，无前缀）
       if (!fs.existsSync(path.join(templatesDir, tdir.dir, refFile))) {
-        violations.push(`${prefix} 阶段 ${phase} 子模板缺失 ${tdir.dir}/${refFile}`);
+        violations.push(
+          `${prefix} 阶段 ${phase} 子模板缺失 ${tdir.dir}/${refFile}`,
+        );
       }
     }
 
     // 4. §0 SSOT 头四项声明
-    for (const key of ['文档版本', 'SSOT 声明', '自身校验', '禁止占位词']) {
-      if (!main.includes(key)) violations.push(`${prefix} 阶段 ${phase} 主模板 §0 SSOT 头缺「${key}」`);
+    for (const key of ["文档版本", "SSOT 声明", "自身校验", "禁止占位词"]) {
+      if (!main.includes(key))
+        violations.push(
+          `${prefix} 阶段 ${phase} 主模板 §0 SSOT 头缺「${key}」`,
+        );
     }
 
     // 5. DoD 清单：discipline-dod 子模板 - [ ] 项 ≥ 8
-    const dodPath = path.join(templatesDir, tdir.dir, 'discipline-dod.md');
+    const dodPath = path.join(templatesDir, tdir.dir, "discipline-dod.md");
     if (!fs.existsSync(dodPath)) {
-      violations.push(`${prefix} 阶段 ${phase} DoD 子模板缺失 ${tdir.dir}/discipline-dod.md`);
+      violations.push(
+        `${prefix} 阶段 ${phase} DoD 子模板缺失 ${tdir.dir}/discipline-dod.md`,
+      );
     } else {
       const dod = String(fs.readFileSync(dodPath));
       const checks = (dod.match(/- \[ \]/g) ?? []).length;
-      if (checks < 8) violations.push(`${prefix} 阶段 ${phase} DoD 清单仅 ${checks} 项（须 ≥ 8）`);
+      if (checks < 8)
+        violations.push(
+          `${prefix} 阶段 ${phase} DoD 清单仅 ${checks} 项（须 ≥ 8）`,
+        );
     }
   }
   return violations;
 }
 
-function failureResult(reasons: string[], coveragePercent = 0): ArtifactGateResult {
-  return { passed: false, reasons, coveragePercent, missingItems: [], unitCoveragePercent: 0 };
+function failureResult(
+  reasons: string[],
+  coveragePercent = 0,
+): ArtifactGateResult {
+  return {
+    passed: false,
+    reasons,
+    coveragePercent,
+    missingItems: [],
+    unitCoveragePercent: 0,
+  };
 }
 
 function isFiniteNonNegativeInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && Number.isFinite(value) && value >= 0;
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    Number.isFinite(value) &&
+    value >= 0
+  );
 }
 
 export function checkArtifactGate(
   matrix: RTMMatrixShape | null | undefined,
   options?: CheckArtifactGateOptions,
 ): ArtifactGateResult {
-  if (!matrix) return failureResult(['RTM 未初始化']);
+  if (!matrix) return failureResult(["RTM 未初始化"]);
 
   // === Schema 前置校验 ===
   // 结构性约束（additionalProperties / required / type）由 schema 拦截，
   // 通过后才进入下方业务规则校验（覆盖率 / 阶段级字段 / TLA+ 资产等）。
-  const schemaResult = validateBySchema('rtm', matrix);
+  const schemaResult = validateBySchema("rtm", matrix);
   if (!schemaResult.valid) {
     return {
       passed: false,
@@ -1164,17 +1397,25 @@ export function checkArtifactGate(
 
   const reasons: string[] = [];
 
-  if (!Array.isArray(matrix.rows)) reasons.push('RTM 结构错误：rows 字段缺失或非数组');
-  if (!matrix.executionSummary || typeof matrix.executionSummary !== 'object') {
-    reasons.push('RTM 结构错误：executionSummary 字段缺失或非对象');
+  if (!Array.isArray(matrix.rows))
+    reasons.push("RTM 结构错误：rows 字段缺失或非数组");
+  if (!matrix.executionSummary || typeof matrix.executionSummary !== "object") {
+    reasons.push("RTM 结构错误：executionSummary 字段缺失或非对象");
   }
   if (reasons.length > 0) return failureResult(reasons);
 
   // phase=1/2/3/4 且提供 specDir 时做规格/设计结构校验
   // （置于 RTM 早退检查后：RTM 结构损坏时直接失败，不叠加 spec 校验；spec 违反仅进 reasons，不影响覆盖率计算）
   let specStructureViolations: RequirementSpecStructureViolations | undefined;
-  if ((phase === 1 || phase === 2 || phase === 3 || phase === 4) && options?.specDir) {
-    specStructureViolations = checkPhaseSpecStructure(phase, options.specDir, nodeFsAdapter);
+  if (
+    (phase === 1 || phase === 2 || phase === 3 || phase === 4) &&
+    options?.specDir
+  ) {
+    specStructureViolations = checkPhaseSpecStructure(
+      phase,
+      options.specDir,
+      nodeFsAdapter,
+    );
     for (const m of [
       ...specStructureViolations.refs,
       ...specStructureViolations.ssot,
@@ -1185,20 +1426,30 @@ export function checkArtifactGate(
     }
   }
 
-  const requiredTestTypes: Array<{ key: keyof RTMMatrixShape['executionSummary']; name: string; layer: string }> = [
-    { key: 'unitTest', name: '单元测试', layer: 'unitTest' },
-    { key: 'integrationTest', name: '集成测试', layer: 'integrationTest' },
-    { key: 'systemTest', name: '系统测试', layer: 'systemTest' },
-    { key: 'acceptanceTest', name: '验收测试', layer: 'acceptanceTest' },
+  const requiredTestTypes: Array<{
+    key: keyof RTMMatrixShape["executionSummary"];
+    name: string;
+    layer: string;
+  }> = [
+    { key: "unitTest", name: "单元测试", layer: "unitTest" },
+    { key: "integrationTest", name: "集成测试", layer: "integrationTest" },
+    { key: "systemTest", name: "系统测试", layer: "systemTest" },
+    { key: "acceptanceTest", name: "验收测试", layer: "acceptanceTest" },
   ];
-  const summaries: Array<{ name: string; layer: string; summary: TestSummaryShape | undefined }> = [];
+  const summaries: Array<{
+    name: string;
+    layer: string;
+    summary: TestSummaryShape | undefined;
+  }> = [];
 
   for (const { key, name, layer } of requiredTestTypes) {
     const summary = matrix.executionSummary[key];
-    if (!summary || typeof summary !== 'object') {
+    if (!summary || typeof summary !== "object") {
       // 仅当该层属于当前阶段校验范围时才报结构错误（未到的层允许缺失）
       if (phaseLayers.includes(layer)) {
-        reasons.push(`RTM 结构错误：executionSummary.${key}（${name}汇总）缺失或非对象`);
+        reasons.push(
+          `RTM 结构错误：executionSummary.${key}（${name}汇总）缺失或非对象`,
+        );
       }
     }
     summaries.push({ name, layer, summary });
@@ -1208,12 +1459,17 @@ export function checkArtifactGate(
   const ids = new Set<string>();
   for (let index = 0; index < matrix.rows.length; index++) {
     const row = matrix.rows[index];
-    if (!row || typeof row !== 'object') {
+    if (!row || typeof row !== "object") {
       reasons.push(`RTM 结构错误：rows[${index}] 非对象`);
       continue;
     }
-    if (typeof row.requirementId !== 'string' || row.requirementId.trim() === '') {
-      reasons.push(`RTM 结构错误：rows[${index}].requirementId 必须为非空字符串`);
+    if (
+      typeof row.requirementId !== "string" ||
+      row.requirementId.trim() === ""
+    ) {
+      reasons.push(
+        `RTM 结构错误：rows[${index}].requirementId 必须为非空字符串`,
+      );
       continue;
     }
     if (ids.has(row.requirementId)) {
@@ -1222,52 +1478,64 @@ export function checkArtifactGate(
     ids.add(row.requirementId);
     // P1.2 横切治理：NFR/CON 行只校验 designDoc（phase<5）或 designDoc+codeModule（phase>=5），
     // 不强制要求 test 字段（横切测试通过 REQ 行的测试用例覆盖）
-    const isCrossCutting = row.requirementId.startsWith('NFR') || row.requirementId.startsWith('CON');
+    const isCrossCutting =
+      row.requirementId.startsWith("NFR") ||
+      row.requirementId.startsWith("CON");
     const fieldsToCheck = isCrossCutting
       ? phase >= 5
-        ? (['description', 'designDoc', 'codeModule'] as const)
-        : (['description', 'designDoc'] as const)
+        ? (["description", "designDoc", "codeModule"] as const)
+        : (["description", "designDoc"] as const)
       : phaseFields;
     const missing = fieldsToCheck.filter(
-      (field) => typeof row[field] !== 'string' || (row[field] as string).trim() === '',
+      (field) =>
+        typeof row[field] !== "string" || (row[field] as string).trim() === "",
     );
-    if (missing.length > 0) missingItems.push({ requirementId: row.requirementId, fields: missing });
+    if (missing.length > 0)
+      missingItems.push({ requirementId: row.requirementId, fields: missing });
   }
 
   for (const item of missingItems) {
-    reasons.push(`RTM 追溯不完整：${item.requirementId} 缺少 ${item.fields.join('、')}`);
+    reasons.push(
+      `RTM 追溯不完整：${item.requirementId} 缺少 ${item.fields.join("、")}`,
+    );
   }
 
   const totalRows = matrix.rows.length;
   const coveredRows = totalRows - missingItems.length;
-  let coveragePercent = totalRows > 0 ? Math.round((coveredRows / totalRows) * 100) : 0;
+  let coveragePercent =
+    totalRows > 0 ? Math.round((coveredRows / totalRows) * 100) : 0;
   // coveragePercent 与 missingItems 联动（约束 #3）：存在追溯缺失项时覆盖率强制 < 100，
   // 防止 (total-1)/total 舍入边界（如 199/200=99.5→100）掩盖缺失
   if (missingItems.length > 0 && coveragePercent >= 100) coveragePercent = 99;
-  if (coveragePercent < 100) reasons.push(`RTM 覆盖率未达 100%（当前 ${coveragePercent}%）`);
-  if (totalRows === 0) reasons.push('RTM 无需求行');
+  if (coveragePercent < 100)
+    reasons.push(`RTM 覆盖率未达 100%（当前 ${coveragePercent}%）`);
+  if (totalRows === 0) reasons.push("RTM 无需求行");
 
   // ==================== coverageStatus 字段一致性校验（P0，行级） ====================
   // 约束 #3：coverageStatus 须与该行自身完整性一致，不再与矩阵全局 coveragePercent 比较
   //   "100%" → 该行所需 RTM 字段齐全；"部分" → 该行存在追溯缺失；"待覆盖" → 违反
   //   （"完整" 等历史兼容值与非标准值不参与一致性判定，由 missingItems 覆盖检查兜底）
   const missingReqIds = new Set(missingItems.map((item) => item.requirementId));
-  const missingFieldsByReqId = new Map<string, string[]>(missingItems.map((item) => [item.requirementId, item.fields]));
+  const missingFieldsByReqId = new Map<string, string[]>(
+    missingItems.map((item) => [item.requirementId, item.fields]),
+  );
   for (const row of matrix.rows) {
-    if (!row || typeof row.coverageStatus !== 'string') continue;
+    if (!row || typeof row.coverageStatus !== "string") continue;
     const status = row.coverageStatus.trim();
-    if (status === '待覆盖') {
+    if (status === "待覆盖") {
       reasons.push(`RTM coverageStatus="待覆盖" 不允许（须回退重做，约束 #3）`);
       continue;
     }
     const rowComplete = !missingReqIds.has(row.requirementId);
-    if (status === '100%' && !rowComplete) {
+    if (status === "100%" && !rowComplete) {
       const fields = missingFieldsByReqId.get(row.requirementId) ?? [];
       reasons.push(
-        `RTM coverageStatus="100%" 但该行追溯不完整（缺少 ${fields.join('、')}），coverageStatus 与行级完整性不一致`,
+        `RTM coverageStatus="100%" 但该行追溯不完整（缺少 ${fields.join("、")}），coverageStatus 与行级完整性不一致`,
       );
-    } else if (status === '部分' && rowComplete) {
-      reasons.push(`RTM coverageStatus="部分" 但该行追溯完整，coverageStatus 与行级完整性不一致`);
+    } else if (status === "部分" && rowComplete) {
+      reasons.push(
+        `RTM coverageStatus="部分" 但该行追溯完整，coverageStatus 与行级完整性不一致`,
+      );
     }
   }
 
@@ -1276,11 +1544,16 @@ export function checkArtifactGate(
   // 仅对 NFR 类型行校验（requirementId 以 NFR 开头）；非 NFR 行跳过
   // 双字段都缺失才 fail，单字段缺失不 fail
   for (const row of matrix.rows) {
-    if (!row || typeof row.requirementId !== 'string') continue;
-    if (!row.requirementId.startsWith('NFR')) continue;
-    const hasTarget = 'targetValue' in row && typeof row.targetValue === 'string' && row.targetValue.trim() !== '';
+    if (!row || typeof row.requirementId !== "string") continue;
+    if (!row.requirementId.startsWith("NFR")) continue;
+    const hasTarget =
+      "targetValue" in row &&
+      typeof row.targetValue === "string" &&
+      row.targetValue.trim() !== "";
     const hasThreshold =
-      'testThreshold' in row && typeof row.testThreshold === 'string' && row.testThreshold.trim() !== '';
+      "testThreshold" in row &&
+      typeof row.testThreshold === "string" &&
+      row.testThreshold.trim() !== "";
     if (!hasTarget && !hasThreshold) {
       reasons.push(
         `NFR 行 ${row.requirementId} 缺 targetValue 与 testThreshold 双字段（性能基线须区分生产目标值与测试环境基线）`,
@@ -1292,8 +1565,13 @@ export function checkArtifactGate(
   for (const { name, layer, summary } of summaries) {
     // P1.1 阶段分层：未到的测试层跳过 pending/failed 校验（pending 合理）
     if (!phaseLayers.includes(layer)) continue;
-    if (!summary || typeof summary !== 'object') continue;
-    const values = [summary.total, summary.passed, summary.failed, summary.pending];
+    if (!summary || typeof summary !== "object") continue;
+    const values = [
+      summary.total,
+      summary.passed,
+      summary.failed,
+      summary.pending,
+    ];
     if (!values.every(isFiniteNonNegativeInteger)) {
       reasons.push(`${name}: total/passed/failed/pending 必须为非负整数`);
       continue;
@@ -1303,31 +1581,36 @@ export function checkArtifactGate(
     }
     if (summary.total === 0) reasons.push(`${name}: 无用例`);
     if (summary.failed > 0) reasons.push(`${name}: ${summary.failed} 个失败`);
-    if (summary.pending > 0) reasons.push(`${name}: ${summary.pending} 个待执行`);
+    if (summary.pending > 0)
+      reasons.push(`${name}: ${summary.pending} 个待执行`);
     if (
-      typeof summary.coverage !== 'number' ||
+      typeof summary.coverage !== "number" ||
       !Number.isFinite(summary.coverage) ||
       summary.coverage < 0 ||
       summary.coverage > 100
     ) {
       reasons.push(`${name}: coverage 必须为 [0,100] 范围内的有限数字`);
     }
-    if (name === '单元测试' && typeof summary.coverage === 'number' && Number.isFinite(summary.coverage)) {
+    if (
+      name === "单元测试" &&
+      typeof summary.coverage === "number" &&
+      Number.isFinite(summary.coverage)
+    ) {
       unitCoveragePercent = summary.coverage;
-      if (summary.coverage < 80) reasons.push(`单元测试代码覆盖率未达 80%（当前 ${summary.coverage}%）`);
+      if (summary.coverage < 80)
+        reasons.push(`单元测试代码覆盖率未达 80%（当前 ${summary.coverage}%）`);
     }
   }
 
-  // ==================== M07 测试证据绑定（E1-E4 + cutoff 吸收） ====================
+  // ==================== M07 测试证据绑定（E1-E4，严格模式） ====================
   // D-2 批准单元（2026-09-15）：阶段范围内 total>0 的测试层必须把摘要数字绑定到真实运行
   // （command + exitCode + observedAt，可选 rawOutputPath + rawOutputSha256）。四条规则：
   //   E1 配对：rawOutputPath 与 rawOutputSha256 要么都无、要么都有。
   //   E2 哈希核验（二者齐备）：以项目根解析（禁越出根）、文件须存在、sha256 须相符。
   //   E3 结果一致性：failed=0&&pending=0 ⇒ exitCode=0；failed>0 ⇒ exitCode≥1；
   //      failed=0&&pending>0 不约束（部分执行两种退出码都合理，如实不编码）。
-  //   E4 存在性 + cutoff：lastUpdated ≥ M07_TEST_EVIDENCE_CUTOFF（或缺失/不可解析，保守不吸收）
-  //      时，阶段范围内（PHASE_TEST_LAYERS）total>0 的层缺 evidence → 违规；早于 cutoff →
-  //      非阻断 LEGACY_TEST_EVIDENCE 诊断（结构照 run-log LEGACY_REVERT_EVIDENCE 先例）。
+  //   E4 存在性：阶段范围内（PHASE_TEST_LAYERS）total>0 的层缺 evidence → 违规；
+  //      lastUpdated 仅为元数据，不参与证据判定。
   const testEvidenceCounts: ArtifactGateTestEvidenceSummary = {
     checked: 0,
     withEvidence: 0,
@@ -1338,64 +1621,68 @@ export function checkArtifactGate(
     e3: 0,
     e4: 0,
   };
-  const legacyDiagnostics: string[] = [];
-  const cutoffMs = Date.parse(M07_TEST_EVIDENCE_CUTOFF);
-  // 仅当 lastUpdated 可解析且严格早于 cutoff 才吸收；缺失/不可解析一律按 cutoff 后处理
-  // （保守不吸收，与 run-log R10 timestamp 方向一致）。
-  const legacyTimestamp =
-    typeof matrix.lastUpdated === 'string' &&
-    Number.isFinite(Date.parse(matrix.lastUpdated)) &&
-    Date.parse(matrix.lastUpdated) < cutoffMs;
   const evidenceProjectRoot = options?.projectRoot;
   for (const { name, layer, summary } of summaries) {
-    if (!summary || typeof summary !== 'object') continue;
+    if (!summary || typeof summary !== "object") continue;
     const evidence = summary.evidence;
-    const hasEvidence = evidence !== null && typeof evidence === 'object';
-    const countsValid = [summary.total, summary.passed, summary.failed, summary.pending].every(
-      isFiniteNonNegativeInteger,
-    );
+    const hasEvidence = evidence !== null && typeof evidence === "object";
+    const countsValid = [
+      summary.total,
+      summary.passed,
+      summary.failed,
+      summary.pending,
+    ].every(isFiniteNonNegativeInteger);
     // ---- E4 存在性 + cutoff（阶段范围内、total>0 的层）----
-    if (phaseLayers.includes(layer) && isFiniteNonNegativeInteger(summary.total) && summary.total > 0) {
+    if (
+      phaseLayers.includes(layer) &&
+      isFiniteNonNegativeInteger(summary.total) &&
+      summary.total > 0
+    ) {
       testEvidenceCounts.checked++;
       if (hasEvidence) {
         testEvidenceCounts.withEvidence++;
-      } else if (legacyTimestamp) {
-        testEvidenceCounts.legacy++;
-        legacyDiagnostics.push(
-          `LEGACY_TEST_EVIDENCE: ${name} total=${summary.total}>0 缺 evidence，但 lastUpdated=${matrix.lastUpdated} 早于 ${M07_TEST_EVIDENCE_CUTOFF}（M07/D-2 生效前旧 RTM）; deferred`,
-        );
       } else {
         testEvidenceCounts.missing++;
         testEvidenceCounts.e4++;
         reasons.push(
-          `RTM 测试证据 E4: ${name} total=${summary.total}>0 但缺 evidence（lastUpdated ${typeof matrix.lastUpdated === 'string' ? `=${matrix.lastUpdated}` : '缺失或不可解析'}，M07/D-2 生效后必须绑定真实运行证据 command/exitCode/observedAt）`,
+          `RTM 测试证据 E4: ${name} total=${summary.total}>0 但缺 evidence（lastUpdated ${typeof matrix.lastUpdated === "string" ? `=${matrix.lastUpdated}` : "缺失或不可解析"}，M07/D-2 生效后必须绑定真实运行证据 command/exitCode/observedAt）`,
         );
       }
     }
     // E1-E3 仅在有 evidence 时强制（与阶段是否到该层无关：证据只要出现就必须自洽）
     if (!hasEvidence) continue;
     const ev = evidence as TestEvidenceShape;
-    const rawOutputPath = typeof ev.rawOutputPath === 'string' ? ev.rawOutputPath.trim() : '';
-    const rawOutputSha256 = typeof ev.rawOutputSha256 === 'string' ? ev.rawOutputSha256.trim() : '';
-    const hasPath = rawOutputPath !== '';
-    const hasSha = rawOutputSha256 !== '';
+    const rawOutputPath =
+      typeof ev.rawOutputPath === "string" ? ev.rawOutputPath.trim() : "";
+    const rawOutputSha256 =
+      typeof ev.rawOutputSha256 === "string" ? ev.rawOutputSha256.trim() : "";
+    const hasPath = rawOutputPath !== "";
+    const hasSha = rawOutputSha256 !== "";
     // ---- E1 配对 ----
     if (hasPath !== hasSha) {
       testEvidenceCounts.e1++;
       reasons.push(
-        `RTM 测试证据 E1: ${name} evidence.rawOutputPath 与 evidence.rawOutputSha256 必须成对出现（当前只有 ${hasPath ? 'rawOutputPath' : 'rawOutputSha256'}）`,
+        `RTM 测试证据 E1: ${name} evidence.rawOutputPath 与 evidence.rawOutputSha256 必须成对出现（当前只有 ${hasPath ? "rawOutputPath" : "rawOutputSha256"}）`,
       );
     }
     // ---- E2 哈希核验（其余二者齐备）----
     if (hasPath && hasSha) {
-      if (typeof evidenceProjectRoot !== 'string' || evidenceProjectRoot.trim() === '') {
+      if (
+        typeof evidenceProjectRoot !== "string" ||
+        evidenceProjectRoot.trim() === ""
+      ) {
         testEvidenceCounts.e2++;
-        reasons.push(`RTM 测试证据 E2: ${name} 无法核验 evidence.rawOutputPath（未提供项目根，fail-closed）`);
+        reasons.push(
+          `RTM 测试证据 E2: ${name} 无法核验 evidence.rawOutputPath（未提供项目根，fail-closed）`,
+        );
       } else {
-        const resolved = resolveTestEvidenceOutputPath(evidenceProjectRoot, rawOutputPath);
+        const resolved = resolveTestEvidenceOutputPath(
+          evidenceProjectRoot,
+          rawOutputPath,
+        );
         if (!resolved.ok) {
           testEvidenceCounts.e2++;
-          if (resolved.reason === 'missing') {
+          if (resolved.reason === "missing") {
             reasons.push(
               `RTM 测试证据 E2: ${name} evidence.rawOutputPath 指向的原始输出文件不存在或不可读（${rawOutputPath}）`,
             );
@@ -1424,7 +1711,9 @@ export function checkArtifactGate(
     if (countsValid && isFiniteNonNegativeInteger(ev.exitCode)) {
       if (summary.failed === 0 && summary.pending === 0 && ev.exitCode !== 0) {
         testEvidenceCounts.e3++;
-        reasons.push(`RTM 测试证据 E3: ${name} failed=0/pending=0（全绿）但 evidence.exitCode=${ev.exitCode}，须为 0`);
+        reasons.push(
+          `RTM 测试证据 E3: ${name} failed=0/pending=0（全绿）但 evidence.exitCode=${ev.exitCode}，须为 0`,
+        );
       } else if (summary.failed > 0 && ev.exitCode === 0) {
         testEvidenceCounts.e3++;
         reasons.push(
@@ -1437,7 +1726,7 @@ export function checkArtifactGate(
   // ==================== TLA+ 资产校验（spec §3.4.4，追加项） ====================
   // 1. TLA+ 资产存在性：manifestExists 显式为 false 时追加违反（未传时跳过，保持向后兼容）
   if (options && options.manifestExists === false) {
-    reasons.push('TLA+ 资产校验失败：tla-manifest.json 不存在或 specs 为空');
+    reasons.push("TLA+ 资产校验失败：tla-manifest.json 不存在或 specs 为空");
   }
   // 2. SD→codeModule 映射：graph 提供时执行（仅 phase >= 5 时校验，因为 codeModule 在 phase 5 才进入 RTM 追溯字段）
   if (options && options.graph && phase >= 5) {
@@ -1455,7 +1744,7 @@ export function checkArtifactGate(
   // 参数契约（计划 §0.1.4）：`--tickets` 缺省时**不触发**（既有调用方零影响）；
   // phase<5 给定 `--tickets`、以及文件不存在，均由 CLI 层在调用前判定为 exit 2，纯函数不读盘。
   let tickets: TicketContentSummary | undefined;
-  if (typeof options?.ticketsText === 'string') {
+  if (typeof options?.ticketsText === "string") {
     const ticketResult = checkTicketContent(options.ticketsText);
     for (const v of ticketResult.violations) reasons.push(v);
     tickets = ticketResult.summary;
@@ -1467,7 +1756,7 @@ export function checkArtifactGate(
     coveragePercent,
     missingItems,
     unitCoveragePercent,
-    ...(legacyDiagnostics.length > 0 ? { legacy: legacyDiagnostics } : {}),
+    legacy: [],
     testEvidence: testEvidenceCounts,
     ...(tickets !== undefined ? { tickets } : {}),
   };

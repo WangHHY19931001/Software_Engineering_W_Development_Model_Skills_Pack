@@ -22,28 +22,48 @@
       "passed": 3,
       "failed": 0,
       "pending": 0,
-      "coverage": 92
+      "coverage": 92,
+      "evidence": {
+        "command": "npm run test:unit",
+        "exitCode": 0,
+        "observedAt": "2026-09-16T10:00:00.000Z"
+      }
     },
     "integrationTest": {
       "total": 2,
       "passed": 2,
       "failed": 0,
       "pending": 0,
-      "coverage": 100
+      "coverage": 100,
+      "evidence": {
+        "command": "npm run test:integration",
+        "exitCode": 0,
+        "observedAt": "2026-09-16T10:01:00.000Z"
+      }
     },
     "systemTest": {
       "total": 2,
       "passed": 2,
       "failed": 0,
       "pending": 0,
-      "coverage": 0
+      "coverage": 0,
+      "evidence": {
+        "command": "npm run test:system",
+        "exitCode": 0,
+        "observedAt": "2026-09-16T10:02:00.000Z"
+      }
     },
     "acceptanceTest": {
       "total": 1,
       "passed": 1,
       "failed": 0,
       "pending": 0,
-      "coverage": 0
+      "coverage": 0,
+      "evidence": {
+        "command": "npm run test:acceptance",
+        "exitCode": 0,
+        "observedAt": "2026-09-16T10:03:00.000Z"
+      }
     }
   }
 }

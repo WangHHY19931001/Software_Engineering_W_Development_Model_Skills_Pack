@@ -7,15 +7,24 @@
   "additionalProperties": false,
   "required": ["rows", "executionSummary"],
   "properties": {
-    "schemaVersion": { "description": "RTM schema 版本标识（与 gate-logic.ts RTMMatrixShape 对齐）", "type": "string" },
-    "projectId": { "description": "项目 ID（与 project.json 的 id 一致）", "type": "string" },
+    "schemaVersion": {
+      "description": "RTM schema 版本标识（与 gate-logic.ts RTMMatrixShape 对齐）",
+      "type": "string"
+    },
+    "projectId": {
+      "description": "项目 ID（与 project.json 的 id 一致）",
+      "type": "string"
+    },
     "currentPhase": {
       "description": "当前所处阶段编号，取值 1-8（1=需求分析 … 8=验收测试；阶段门放行后推进）",
       "type": "integer",
       "minimum": 1,
       "maximum": 8
     },
-    "lastUpdated": { "description": "RTM 最后更新时间，ISO 8601 字符串（每次回填后刷新）", "type": "string" },
+    "lastUpdated": {
+      "description": "RTM 最后更新时间，ISO 8601 字符串（每次回填后刷新）",
+      "type": "string"
+    },
     "rows": {
       "description": "需求追溯行数组，每行对应一个需求（REQ-NNN / NFR-NNN / CON-NNN）的追溯记录；约束 #3：S 子代理产出后每阶段必须回填",
       "type": "array",
@@ -71,8 +80,14 @@
             "description": "覆盖率状态：\"100%\"=该行追溯完整（全部行完整时矩阵 coveragePercent=100）；\"部分\"=该行存在追溯缺失（coveragePercent 须<100）；\"待覆盖\"=违反约束 #3，不允许（须回退重做）",
             "type": "string"
           },
-          "targetValue": { "type": "string", "description": "NFR 生产目标值（NFR 类型时推荐填写）" },
-          "testThreshold": { "type": "string", "description": "NFR 测试环境基线（NFR 类型时推荐填写）" }
+          "targetValue": {
+            "type": "string",
+            "description": "NFR 生产目标值（NFR 类型时推荐填写）"
+          },
+          "testThreshold": {
+            "type": "string",
+            "description": "NFR 测试环境基线（NFR 类型时推荐填写）"
+          }
         }
       }
     },
@@ -80,15 +95,29 @@
       "description": "四级测试执行汇总（单元/集成/系统/验收），对应门禁 check-artifact-gate.ts 的四级测试校验（按阶段递进校验层）",
       "type": "object",
       "additionalProperties": false,
-      "required": ["unitTest", "integrationTest", "systemTest", "acceptanceTest"],
+      "required": [
+        "unitTest",
+        "integrationTest",
+        "systemTest",
+        "acceptanceTest"
+      ],
       "properties": {
         "unitTest": {
           "description": "单元测试执行汇总（阶段 5 起校验；覆盖率须 ≥80%）",
           "$ref": "#/definitions/testSummary"
         },
-        "integrationTest": { "description": "集成测试执行汇总（阶段 6 起校验）", "$ref": "#/definitions/testSummary" },
-        "systemTest": { "description": "系统测试执行汇总（阶段 7 起校验）", "$ref": "#/definitions/testSummary" },
-        "acceptanceTest": { "description": "验收测试执行汇总（阶段 8 终检校验）", "$ref": "#/definitions/testSummary" }
+        "integrationTest": {
+          "description": "集成测试执行汇总（阶段 6 起校验）",
+          "$ref": "#/definitions/testSummary"
+        },
+        "systemTest": {
+          "description": "系统测试执行汇总（阶段 7 起校验）",
+          "$ref": "#/definitions/testSummary"
+        },
+        "acceptanceTest": {
+          "description": "验收测试执行汇总（阶段 8 终检校验）",
+          "$ref": "#/definitions/testSummary"
+        }
       }
     }
   },
@@ -104,9 +133,21 @@
           "type": "integer",
           "minimum": 0
         },
-        "passed": { "description": "通过的测试数，非负整数", "type": "integer", "minimum": 0 },
-        "failed": { "description": "失败的测试数，非负整数", "type": "integer", "minimum": 0 },
-        "pending": { "description": "待执行/跳过的测试数，非负整数", "type": "integer", "minimum": 0 },
+        "passed": {
+          "description": "通过的测试数，非负整数",
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "description": "失败的测试数，非负整数",
+          "type": "integer",
+          "minimum": 0
+        },
+        "pending": {
+          "description": "待执行/跳过的测试数，非负整数",
+          "type": "integer",
+          "minimum": 0
+        },
         "coverage": {
           "description": "覆盖率百分比，取值 [0,100]（如 99.37 表示 99.37%）；单元测试覆盖率须 ≥80",
           "type": "number",
@@ -114,7 +155,7 @@
           "maximum": 100
         },
         "evidence": {
-          "description": "本级测试结果的可验证运行证据（M07 新增，可选；缺失时门禁按 cutoff 决定是否吸收）。绑定真实测试命令、退出码与观测时间，可选携带原始输出文件路径与 SHA-256，使测试摘要不再是可随意填写的数字",
+          "description": "本级测试结果的可验证运行证据（M07；阶段 5-8 当前层 total>0 时必需）。绑定真实测试命令、退出码与观测时间，可选携带原始输出文件路径与 SHA-256，使测试摘要不再是可随意填写的数字",
           "type": "object",
           "additionalProperties": false,
           "required": ["command", "exitCode", "observedAt"],
@@ -123,7 +164,7 @@
               "description": "产生本次测试摘要的真实命令（不含未受控的 shell 管道/重定向；禁 ; & | < > 与换行）",
               "type": "string",
               "minLength": 1,
-              "pattern": "^(?!.*[;&|<>\\r\\n]).+$"
+              "pattern": "^(?=.*\\S)(?!.*[;&|<>\\r\\n]).+$"
             },
             "exitCode": {
               "description": "真实进程退出码，非负整数；本字段是「测试结果与真实运行绑定」的锚点（有失败必须来自非零退出）",

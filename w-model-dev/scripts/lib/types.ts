@@ -5,7 +5,7 @@
  * - StructuredViolation / GateCheckResult：结构化违规双轨的结构化形态
  * - JsonReport：--json 输出摘要形态
  */
-export type { Phase } from './constants.js';
+export type { Phase } from "./constants.js";
 
 /** 结构化违规（rule/field/message 三要素） */
 export interface StructuredViolation {
@@ -42,10 +42,7 @@ export interface JsonReport {
   skippedRules?: string[];
   /** 阶段 5-8 外部校验 summary（check-artifact-gate --json，与 GATE_JSON external 同构；非 5-8 阶段为 null）。 */
   external?: unknown;
-  /**
-   * M07 非阻断 legacy 诊断（如 LEGACY_TEST_EVIDENCE：cutoff 前旧 RTM 缺测试证据）；
-   * 结构照 run-log diagnostics 先例，不影响 exitCode。check-artifact-gate --json 用。
-   */
+  /** M07 兼容字段；严格模式固定为空数组，不提供时间戳豁免诊断。 */
   legacy?: string[];
   /** M07 测试证据维度计数（checked/withEvidence/missing/legacy + E1-E4 违规计数）；结构失败早退时为 null。 */
   testEvidence?: unknown;
@@ -55,9 +52,13 @@ export interface JsonReport {
    * `buildabilityMissing`=Buildability 命中数；**键恒存在**——未给定 `--tickets` 时为 `null`。
    * 其它门禁不提供此字段（可选）。
    */
-  tickets?: { checked: number; criticalMissing: number; buildabilityMissing: number } | null;
+  tickets?: {
+    checked: number;
+    criticalMissing: number;
+    buildabilityMissing: number;
+  } | null;
   /** run-log lifecycle 状态；通过但有历史诊断时仍为 NOT_CLOSED_NOT_PROVEN。 */
-  lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
+  lifecycleStatus?: "CLOSED_UNDER_CURRENT_RULES" | "NOT_CLOSED_NOT_PROVEN";
   /** run-log exit 0 的语义边界说明。 */
   statusNote?: string;
   durationMs: number;
