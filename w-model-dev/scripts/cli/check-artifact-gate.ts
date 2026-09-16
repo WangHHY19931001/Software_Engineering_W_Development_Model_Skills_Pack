@@ -79,6 +79,7 @@ import { printGateReport, printJsonReport, buildViolationDistribution } from '..
 import { parsePhaseArg as parsePhaseArgLib } from '../lib/parse-phase.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { readJsonClassified } from '../lib/read-json-or-exit.js';
+import { SafeProjectPathError, resolveProjectRelativeRegularFile } from '../lib/safe-project-path.js';
 import { type ChangeScope } from '../lib/change-scope.js';
 import { loadCliScope } from '../lib/load-cli-scope.js';
 
@@ -363,9 +364,21 @@ async function main(): Promise<void> {
   let ticketsFile: string | undefined;
   let ticketsText: string | undefined;
   if (ticketsArg !== undefined) {
-    ticketsFile = path.resolve(projectDir, ticketsArg);
     try {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- ticketsFile 由 --tickets 参数经 path.resolve(projectDir, ...) 得到，仅只读
+      ticketsFile = resolveProjectRelativeRegularFile(projectDir, ticketsArg);
+    } catch (error) {
+      const detail = error instanceof SafeProjectPathError ? error.reason : '路径不可解析';
+      exitWithError({
+        category: detail === 'missing' ? 'FILE_NOT_FOUND' : 'ARG_INVALID',
+        rule: 'S18',
+        message: detail === 'missing' ? '票据文件不可读（--tickets）' : '参数非法 --tickets',
+        detail: detail === 'missing' ? 'ENOENT' : `仅接受项目内普通文件路径（${detail}）`,
+        exitCode: 2,
+      });
+      return;
+    }
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- ticketsFile 由安全项目相对路径 helper 验证为普通文件后得到，仅只读
       ticketsText = nodeFs.readFileSync(ticketsFile, 'utf-8');
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;

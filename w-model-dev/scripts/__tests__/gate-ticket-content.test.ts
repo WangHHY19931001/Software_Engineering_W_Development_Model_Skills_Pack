@@ -130,23 +130,17 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
   });
 
   it('黑名单第 6 条：跨票据仅参数名重叠不构成符号契约 → undefined-symbol', () => {
-    const r = checkTicketContent([
-      '# 01 — define',
-      'What to build: `Foo.run(job): Result`',
-      '# 02 — use',
-      '调用 `Other.call(job)`',
-    ].join('\n'));
+    const r = checkTicketContent(
+      ['# 01 — define', 'What to build: `Foo.run(job): Result`', '# 02 — use', '调用 `Other.call(job)`'].join('\n'),
+    );
     expect(r.passed).toBe(false);
     expect(r.violations.join('\n')).toMatch(/undefined-symbol[\s\S]*`Other\.call\(job\)`[\s\S]*S18 黑名单第 6 条/);
   });
 
   it('黑名单第 6 条正向边界：同一 Foo.run 仅参数名变化仍视为同一已定义符号', () => {
-    const r = checkTicketContent([
-      '# 01 — define',
-      'What to build: `Foo.run(job): Result`',
-      '# 02 — use',
-      '调用 `Foo.run(task)`',
-    ].join('\n'));
+    const r = checkTicketContent(
+      ['# 01 — define', 'What to build: `Foo.run(job): Result`', '# 02 — use', '调用 `Foo.run(task)`'].join('\n'),
+    );
     expect(r.passed).toBe(true);
     expect(r.violations).toEqual([]);
   });
@@ -451,10 +445,10 @@ describe('check-artifact-gate.ts --tickets 参数契约（子进程，S18 §0.1.
     }
   });
 
-  it('文件不存在 → exit 2 FILE_NOT_FOUND（不静默忽略）', async () => {
+  it('项目内不存在的相对文件 → exit 2 FILE_NOT_FOUND（不静默忽略）', async () => {
     const dir = await makeProject();
     try {
-      const { status, stdout } = runGate([dir, '--phase=8', `--tickets=${path.join(dir, 'nope-tickets.md')}`]);
+      const { status, stdout } = runGate([dir, '--phase=8', '--tickets=nope-tickets.md']);
       expect(status).toBe(2);
       expect(stdout).toContain('ERROR_JSON');
       expect(stdout).toMatch(/"category":"FILE_NOT_FOUND"/);
@@ -468,7 +462,7 @@ describe('check-artifact-gate.ts --tickets 参数契约（子进程，S18 §0.1.
     try {
       const file = path.join(dir, 'tickets.md');
       await fs.writeFile(file, VALID_TICKETS, 'utf-8');
-      const { status, stdout } = runGate([dir, '--phase=4', `--tickets=${file}`]);
+      const { status, stdout } = runGate([dir, '--phase=4', '--tickets=tickets.md']);
       expect(status).toBe(2);
       expect(stdout).toMatch(/"category":"ARG_INVALID"/);
     } finally {
@@ -490,12 +484,43 @@ describe('check-artifact-gate.ts --tickets 参数契约（子进程，S18 §0.1.
     }
   });
 
+  it('绝对、穿越、反斜杠、盘符、UNC、链接和目录 --tickets 均在读取前以 ARG_INVALID 拒绝', async () => {
+    const dir = await makeProject();
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-tickets-outside-'));
+    try {
+      await fs.writeFile(path.join(dir, 'tickets.md'), VALID_TICKETS, 'utf-8');
+      await fs.mkdir(path.join(dir, 'nested'));
+      await fs.writeFile(path.join(dir, 'nested', 'tickets.md'), VALID_TICKETS, 'utf-8');
+      await fs.mkdir(path.join(dir, 'tickets-dir'));
+      await fs.writeFile(path.join(outside, 'tickets.md'), VALID_TICKETS, 'utf-8');
+      await fs.symlink(path.join(outside, 'tickets.md'), path.join(dir, 'tickets-link.md'), 'file');
+
+      const candidates = [
+        path.join(dir, 'tickets.md'),
+        `../${path.basename(outside)}/tickets.md`,
+        'nested\\tickets.md',
+        'C:\\outside\\tickets.md',
+        '\\\\server\\share\\tickets.md',
+        'tickets-link.md',
+        'tickets-dir',
+      ];
+      for (const candidate of candidates) {
+        const result = runGate([dir, '--phase=8', `--tickets=${candidate}`]);
+        expect(result.status, candidate).toBe(2);
+        expect(result.stdout, candidate).toMatch(/"category":"ARG_INVALID"/);
+      }
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+      await fs.rm(outside, { recursive: true, force: true });
+    }
+  });
+
   it('校验失败 → exit 1（不新增 exit 码）且 GATE_JSON.tickets 计数可消费', async () => {
     const dir = await makeProject();
     try {
       const file = path.join(dir, 'tickets.md');
       await fs.writeFile(file, ticket(['- [ ] 加校验']), 'utf-8');
-      const { status, stdout } = runGate([dir, '--phase=8', `--tickets=${file}`]);
+      const { status, stdout } = runGate([dir, '--phase=8', '--tickets=tickets.md']);
       expect(status).toBe(1);
       const report = JSON.parse(stdout) as {
         tickets: { checked: number; criticalMissing: number; buildabilityMissing: number };
@@ -513,7 +538,7 @@ describe('check-artifact-gate.ts --tickets 参数契约（子进程，S18 §0.1.
     try {
       const file = path.join(dir, 'tickets.md');
       await fs.writeFile(file, VALID_TICKETS, 'utf-8');
-      const { status, stdout } = runGate([dir, '--phase=8', `--tickets=${file}`]);
+      const { status, stdout } = runGate([dir, '--phase=8', '--tickets=tickets.md']);
       expect(status).toBe(1); // phase 8 缺 --scope → 外部校验 fail-closed（与票据无关）
       const report = JSON.parse(stdout) as {
         tickets: { checked: number; criticalMissing: number; buildabilityMissing: number };

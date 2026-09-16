@@ -245,6 +245,8 @@ describe('M07 测试证据门禁规则（E1-E4 + cutoff）', () => {
     // 反斜杠分隔（跨平台路径歧义）
     expect(resolve(root, 'artifacts\\run.txt').ok).toBe(false);
     // 根内合法相对路径
+    mkdirSync(join(root, 'artifacts'), { recursive: true });
+    writeFileSync(join(root, 'artifacts', 'run.txt'), 'evidence\n', 'utf-8');
     const ok = resolve(root, 'artifacts/run.txt');
     expect(ok.ok).toBe(true);
     if (ok.ok) expect(ok.absPath.startsWith(root)).toBe(true);

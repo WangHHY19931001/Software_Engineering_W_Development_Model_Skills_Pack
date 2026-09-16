@@ -4,6 +4,7 @@ import * as path from 'node:path';
 
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { RTM_FIELDS } from '../lib/constants.js';
+import { SafeProjectPathError, resolveProjectRelativeRegularFile } from '../lib/safe-project-path.js';
 
 export interface RTMRowShape {
   requirementId: string;
@@ -101,28 +102,19 @@ export const M07_TEST_EVIDENCE_CUTOFF = '2026-09-15T00:00:00Z';
 export type EvidencePathResolution = { ok: true; absPath: string } | { ok: false; reason: string };
 
 /**
- * E2 路径解析：以项目根解析相对路径，拒绝绝对路径 / 盘符路径 / 反斜杠分隔 / NUL，
- * 并做根内包含性检查（lexical，`..` 归一化后仍须落在根内）。
- *
- * 说明：rtm.schema.json 的 `rawOutputPath.pattern` 已在前置 schema 校验拦截
- * `..` / 绝对路径 / 反斜杠；本函数是逻辑层的第二道防线（schema 被绕过或未来放宽时仍拒）。
+ * E2 路径解析：复用项目相对普通文件边界，逐段拒绝链接、junction 和根外规范路径。
+ * schema 是第一层过滤；这里保留逻辑层的 fail-closed 防线及既有返回结构。
  */
 export function resolveTestEvidenceOutputPath(projectRoot: string, rawOutputPath: string): EvidencePathResolution {
   if (typeof rawOutputPath !== 'string' || rawOutputPath.trim() === '') {
     return { ok: false, reason: '路径为空' };
   }
-  const rel = rawOutputPath.trim();
-  if (rel.includes('\u0000')) return { ok: false, reason: '路径含 NUL' };
-  if (path.isAbsolute(rel) || /^[A-Za-z]:[\\/]/.test(rel) || rel.includes('\\')) {
-    return { ok: false, reason: '须为相对路径（不得为绝对路径 / 盘符 / 反斜杠分隔）' };
+  try {
+    return { ok: true, absPath: resolveProjectRelativeRegularFile(projectRoot, rawOutputPath.trim()) };
+  } catch (error) {
+    if (error instanceof SafeProjectPathError) return { ok: false, reason: error.reason };
+    return { ok: false, reason: '路径不可解析' };
   }
-  const root = path.resolve(projectRoot);
-  const abs = path.resolve(root, rel);
-  const prefix = root.endsWith(path.sep) ? root : root + path.sep;
-  if (abs !== root && !abs.startsWith(prefix)) {
-    return { ok: false, reason: '越出项目根' };
-  }
-  return { ok: true, absPath: abs };
 }
 
 /** 计算文件 SHA-256（十六进制小写）；读取失败返回 undefined。 */
@@ -1403,9 +1395,15 @@ export function checkArtifactGate(
         const resolved = resolveTestEvidenceOutputPath(evidenceProjectRoot, rawOutputPath);
         if (!resolved.ok) {
           testEvidenceCounts.e2++;
-          reasons.push(
-            `RTM 测试证据 E2: ${name} evidence.rawOutputPath 非法（${resolved.reason}；须相对项目根且不得越出根）`,
-          );
+          if (resolved.reason === 'missing') {
+            reasons.push(
+              `RTM 测试证据 E2: ${name} evidence.rawOutputPath 指向的原始输出文件不存在或不可读（${rawOutputPath}）`,
+            );
+          } else {
+            reasons.push(
+              `RTM 测试证据 E2: ${name} evidence.rawOutputPath 非法（${resolved.reason}；须相对项目根且不得越出根）`,
+            );
+          }
         } else {
           const actual = sha256OfFile(resolved.absPath);
           if (actual === undefined) {
