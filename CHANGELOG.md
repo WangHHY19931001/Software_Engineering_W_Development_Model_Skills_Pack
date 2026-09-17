@@ -9,6 +9,20 @@
 
 ## [42.2.1] - 2026-09-01
 
+### 审查问题修复（review-remediation，2026-09-16 ~ 2026-09-17）
+
+> 计划与逐任务记录见 `docs/superpowers/plans/2026-09-16-review-remediation.md` 与 `.superpowers/sdd/2026-09-16-review-remediation/`（含 3 次独立 V 复审记录）。收口实测：`npm run prepush` 18/18 全绿。
+
+- **严格证据语义，删除时间戳豁免（M07 / R10）**：阶段 5–8 当前阶段层 `total>0` 缺合法 `evidence` **一律阻断**；`fix` / `emergency-fix` 缺合法 `revertEvidence.command` **一律阻断**（`timestamp` / `lastUpdated` 只作日志与 RTM 元数据，不参与信任判定）。`GATE_JSON.testEvidence.legacy` 与 `RUN_LOG_JSON.r10.legacy` 计数键保留但**恒为 0**（含义是「没有时间戳豁免」，不是「历史记录已被证明有效」）。旧数据迁移必须重跑真实命令、保存原始输出与 SHA-256，并经 `wm-verify-evidence-source` producer 记录当前 HEAD / source bundle / 运行身份。
+- **安全项目路径**：新增 `lib/safe-project-path.ts`（词法检查 → `lstat`/`realpath` containment → 普通文件判定）；`--tickets` 与 M07 E2 原始输出核验在**任何读取之前**拒绝绝对路径、盘符、UNC、反斜杠、NUL、`..`、symlink/junction 与目录。
+- **`review-package.ts`**：只接受等号形态参数（未知参数、空值、无值选项一律 `ARG_INVALID` / exit 2，不回退 cwd）、Git 范围与正文使用**完整 SHA** 与固定日志格式（不受 `core.abbrev` 影响）、同目录**原子写入**（写入失败保留既有目标，不做「先删后改名」降级）。
+- **S18 精确符号匹配**：定义与引用按 owner/member 头精确比对，参数名与返回类型不再参与匹配（未定义完整符号头即阻断）；空白 `command` 由 Schema 与逻辑层双重阻断。
+- **负向覆盖登记册可执行化（第 5 条规则）**：登记册四列语法严格化、机制枚举、每门禁恰一行、证据必须解析为 `文件:行号` 且在文件行数内；逐门禁**执行真实 exit-2 探针**（探针定义与 `check-docs-consistency` 中心探针共用 `lib/exit2-probe-registry.ts`，每个探针一个独立隔离根 + 有界并发），断言 exit 2 + 可解析 `ERROR_JSON` + 同类别人类错误行 + 探针根零漂移。
+- **活体文档一致性**：AGENTS §8 登记判据由**全文子串**收紧为**表格行精确匹配**（正文提及、代码块、相似前缀都不算登记）；新增 `w-model-dev/scripts/__tests__/README.md` 覆盖矩阵与在盘测试文件集合的**双向等价**检查；`check-pollution` 目录排序改为 locale 无关（同输入跨 `LANG`/`LC_ALL` 逐字节一致）。
+- **pre-commit 钩子**：判定只读 index 快照（不读工作树同名文件）、hook 内路径统一为当前 Bash 形态、超时按**进程树**终止并在 Git Bash 的 `ps -o` 不可用时探测回退 `ps -ef`（两者都不可用则 fail-closed）。
+- **快速车道（DX）**：新增 `npm run test:affected`——按改动映射选择测试文件（触及 `config/**`、`.githooks/**`、`schemas/**`、`references/**`、`samples/**`、`docs/**`、`eval/**`、根 `scripts/**` 与根活体文档时自动退回全量）；**验收必须全量**（`npm run prepush` 18 项）已写入 README「验证仓库」块、CONTRIBUTING「本地推送前门禁」节与 AGENTS §6。
+- **门禁自身的既有缺陷一并清偿**：`lint:security` 陈旧 baseline（83 项发现）在代码内逐处具名豁免、baseline 未改；严格 M07 下 `samples/gate/valid-phase6.json` 补真实 evidence；`run-sync` 台账校正行号并补登 10 处未登记的直接子进程调用；`gate-report` 的注释剥离器误报（代码字符串中的 `/*`）与 Windows 跳过的用例一并处置（全仓测试无 `skip`）。
+
 ### M 程序：外部技能采纳 P0–P6（expanded-external-skill-adoption，2026-09-14 ~ 2026-09-16）
 
 > 采纳判据与逐项验收见 `docs/superpowers/specs/2026-09-14-expanded-external-skill-adoption-design.md` §13（AC-0…AC-12）；各期提交序列、评审轮次与收口实测记于 `docs/superpowers/plans/2026-09-14-external-absorption-adjudication.md`、`2026-09-14-p1-meta-theory-absorption.md`、`2026-09-14-p2a-gate-negative-coverage-and-atomicity.md`、`2026-09-15-p2b-rule-loadbearing-and-completeness.md`、`2026-09-15-m07-rtm-test-evidence.md`、`2026-09-15-p3-role-independence-and-review.md`、`2026-09-15-p4-test-quality-and-design-rules.md`、`2026-09-16-p5-debug-ops-interaction.md`、`2026-09-16-p6-rejection-knowledge-base.md` 的收尾节。**本节计数一律取收口实测**，不沿用各期文档写作时的中间值（43 / 44 / 332 / 340 / 344）。

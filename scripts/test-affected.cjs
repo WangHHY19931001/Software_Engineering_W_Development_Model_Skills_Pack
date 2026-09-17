@@ -13,6 +13,8 @@
  *
  *   npm run test:affected                     # 只看未提交改动（含未跟踪文件）
  *   npm run test:affected -- --since <rev>    # 加上自 <rev> 起的已提交改动（如 --since origin/main）
+ *   npm run test:affected -- --dry-run        # 只打印选中的文件与理由，不执行 vitest
+ *   node scripts/test-affected.cjs --self-check   # 断言 porcelain 解析的固定格式契约（状态列含前导空格等 7 例）
  *   node scripts/test-affected.cjs --help
  *
  * ## 选择规则（并集，宁多勿少）
