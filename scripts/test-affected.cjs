@@ -86,25 +86,74 @@ const GATES_NOT_COVERED = [
 function gitLines(args) {
   const result = spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', timeout: 30_000 });
   if (result.error !== undefined || result.status !== 0) return [];
-  return String(result.stdout ?? '')
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line !== '');
+  return (
+    String(result.stdout ?? '')
+      .split('\n')
+      // 只剥行尾 CR：**不能 trim 行首**——`git status --porcelain` 的状态前缀本身含前导空格
+      // （` M path`），trim 掉会让下面按固定 3 列切片时切进路径，路径随即「不存在」。
+      .map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line))
+      .filter((line) => line !== '')
+  );
+}
+
+/** 剥掉 git 对含特殊字符路径加的双引号（含 `\"` 转义）。 */
+function unquotePath(value) {
+  if (!value.startsWith('"') || !value.endsWith('"')) return value;
+  return value.slice(1, -1).replace(/\\(.)/g, '$1');
+}
+
+/**
+ * 解析一行 `git status --porcelain`：固定 3 列状态前缀（含前导空格）+ 路径；rename/copy 取新路径。
+ * 纯函数（无 IO）以便 `--self-check` 直接断言。
+ */
+function parsePorcelainLine(line) {
+  if (line.length < 4) return null;
+  const rest = line.slice(3);
+  const arrow = rest.lastIndexOf(' -> ');
+  return unquotePath(arrow === -1 ? rest : rest.slice(arrow + 4));
 }
 
 /** 未提交改动（含未跟踪）+ 可选 `--since <rev>` 起已提交改动；只保留仍在盘上的路径。 */
 function collectChangedPaths(since) {
   const paths = new Set();
   for (const line of gitLines(['status', '--porcelain'])) {
-    if (line.length < 4) continue;
-    const rest = line.slice(3);
-    const arrow = rest.lastIndexOf(' -> ');
-    paths.add((arrow === -1 ? rest : rest.slice(arrow + 4)).replace(/^"(.*)"$/, '$1'));
+    const parsed = parsePorcelainLine(line);
+    if (parsed !== null && parsed !== '') paths.add(parsed);
   }
   if (since !== undefined) {
-    for (const p of gitLines(['diff', '--name-only', `${since}...HEAD`])) paths.add(p);
+    for (const p of gitLines(['diff', '--name-only', `${since}...HEAD`])) {
+      if (p !== '') paths.add(unquotePath(p));
+    }
   }
   return [...paths].filter((p) => fs.existsSync(path.join(REPO_ROOT, p)));
+}
+
+/**
+ * `--self-check`：断言 porcelain 解析的固定格式契约（前导空格状态列、未跟踪、rename、带引号路径）。
+ * 存在的意义：这类「按固定列切片」的解析最容易被「顺手 trim / 规范化」破坏，且破坏后表现为
+ * 「没有检测到改动」这种静默降级——正是本车道最危险的失败形态。
+ */
+function selfCheck() {
+  const cases = [
+    [' M w-model-dev/scripts/cli/check-pollution.ts', 'w-model-dev/scripts/cli/check-pollution.ts'],
+    ['?? scripts/test-affected.cjs', 'scripts/test-affected.cjs'],
+    ['A  w-model-dev/scripts/lib/exit2-probe-registry.ts', 'w-model-dev/scripts/lib/exit2-probe-registry.ts'],
+    ['R  old/name.ts -> new/name.ts', 'new/name.ts'],
+    ['R  "old name.ts" -> "new name.ts"', 'new name.ts'],
+    ['', null],
+    [' M ', null],
+  ];
+  const failures = cases.filter(([line, expected]) => parsePorcelainLine(line) !== expected);
+  if (failures.length > 0) {
+    for (const [line, expected] of failures) {
+      console.error(
+        `✗ parsePorcelainLine(${JSON.stringify(line)}) = ${JSON.stringify(parsePorcelainLine(line))}，期望 ${JSON.stringify(expected)}`,
+      );
+    }
+    return 1;
+  }
+  console.log(`✓ porcelain 解析自检通过（${cases.length} 例：状态列含前导空格 / 未跟踪 / rename / 带引号路径 / 空行）`);
+  return 0;
 }
 
 function readTestFiles() {
@@ -186,6 +235,7 @@ function main() {
     return 0;
   }
   const dryRun = argv.includes('--dry-run');
+  if (argv.includes('--self-check')) return selfCheck();
   const sinceIndex = argv.indexOf('--since');
   const since = sinceIndex === -1 ? undefined : argv[sinceIndex + 1];
   if (sinceIndex !== -1 && (since === undefined || since.startsWith('--'))) {
