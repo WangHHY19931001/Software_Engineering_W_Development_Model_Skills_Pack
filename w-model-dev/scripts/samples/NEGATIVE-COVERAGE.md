@@ -26,6 +26,11 @@
 > - **负向案例 / 证据位置**：`fixture` 行写 `` `samples/...` ``（相对 `w-model-dev/scripts/`），可附
 >   `（self-test.ts:<行>）`（描述性备注，不参与校验）；`invocation` / `mutated-copy` 行写 `文件:行号`（相对
 >   repo-root；文件与行号均由门禁校验）。
+> - **引用的判据边界（已知局限，勿误读为已证明）**：门禁只校验「文件存在 + 1 ≤ 行号 ≤ 文件总行数」。
+>   行号**语义**正确性（是否真指向那条断言）不在门禁能力内——同一次改动上方插入若干行就会让引用**仍在范围内
+>   但指向错处**，且门禁保持全绿。因此改动被引用测试文件的缩进/行数时必须回填行号；已发生过一次
+>   （check-pollution 行在新增 6 行后失效），由独立审查发现而非门禁。若要机器可查，需为每行登记引用行片段
+>   并比对（尚未实现）。
 > - **所防回归**：若该负向案例被删掉 / 放宽，会漏掉的那一个具体回归；禁止「防止出错」这类空话。
 
 ### A 组（含 B 组强化两行）：已有强负向 fixture（28）
@@ -71,12 +76,12 @@
 
 | 门禁脚本 | 负向机制 | 负向案例 / 证据位置 | 所防回归（一句话） |
 | --- | --- | --- | --- |
-| check-docs-consistency | mutated-copy | `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts:2347` | 去掉该计数变异断言后，script-registry 维度退化为空转/假绿，SKILL.md 的 `.ts` 计数改错（如 44→43）无人发现 |
-| check-samples-coverage | invocation | `w-model-dev/scripts/__tests__/check-samples-coverage.test.ts:228`（缺 NEGATIVE-COVERAGE.md → exit 2） | 缺失必需文件（清单本身）不再 exit 2 时，清单缺失会被当作通过，负向覆盖不变量静默失效 |
-| check-pollution | invocation | `w-model-dev/scripts/__tests__/check-pollution-cli.test.ts:222`（同测试 :226 断言项目目录快照逐字节不变） | 未知 flag 不在任何扫描前被拒时，污染定位会在非法参数下继续跑（半程结果被当作结论），「吞掉测试失败只看产物」的工具自己先吞掉输入错误 |
+| check-docs-consistency | mutated-copy | `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts:2352`（:2356 过滤 script-registry 违规） | 去掉该计数变异断言后，script-registry 维度退化为空转/假绿，SKILL.md 的 `.ts` 计数改错（如 44→43）无人发现 |
+| check-samples-coverage | invocation | `w-model-dev/scripts/__tests__/check-samples-coverage.test.ts:387`（:379 起的「缺 NEGATIVE-COVERAGE.md → exit 2」用例断言行） | 缺失必需文件（清单本身）不再 exit 2 时，清单缺失会被当作通过，负向覆盖不变量静默失效 |
+| check-pollution | invocation | `w-model-dev/scripts/__tests__/check-pollution-cli.test.ts:228`（同测试 :232 断言项目目录快照逐字节不变） | 未知 flag 不在任何扫描前被拒时，污染定位会在非法参数下继续跑（半程结果被当作结论），「吞掉测试失败只看产物」的工具自己先吞掉输入错误 |
 | code-health-archive | invocation | `w-model-dev/scripts/__tests__/code-health-archive-boundary.test.ts:710` | malformed produce 输入不被 exit 2 拒绝，归档会写入半成品证据 |
 | code-health-ledger | invocation | `w-model-dev/scripts/__tests__/code-health-cli.test.ts:696` | 未知子命令不再 exit 2，append-only ledger 可能被非法子命令破坏 |
-| doctor | invocation | `w-model-dev/scripts/__tests__/exit2-failure-atomicity.test.ts:290`（:273 起的逐门禁循环对 doctor 断言 exit 2） | doctor 对非法参数返回 0/1 而非 2，环境缺失会被误报为通过 |
+| doctor | invocation | `w-model-dev/scripts/__tests__/exit2-failure-atomicity.test.ts:291`（:273 起的逐门禁循环对 doctor 断言 exit 2） | doctor 对非法参数返回 0/1 而非 2，环境缺失会被误报为通过 |
 | ensure-codegraph-opsx | invocation | `w-model-dev/scripts/__tests__/cli-natural-exit.test.ts:293` | 非法/重复 phase 不再 exit 2，「重复值 flag」会以 last-wins 参数静默安装依赖 |
 | metrics-report | invocation | `w-model-dev/scripts/__tests__/cli-natural-exit.test.ts:176` | 非法 `--phase` 不再 exit 2，度量报告会在错误阶段上给出结论 |
 | plan-chunks | invocation | `w-model-dev/scripts/__tests__/cli-arg-unification.test.ts:139` | 重复 `--phase` 返回 0，分块规划会按 first-wins 的静默阶段执行 |
@@ -85,7 +90,7 @@
 | security-scan | invocation | `w-model-dev/scripts/__tests__/cli-natural-exit.test.ts:217` | baseline 缺失不再 exit 2，扫描会以「无新增」通过而实际未做比对 |
 | wm-export-evidence | invocation | `w-model-dev/scripts/__tests__/evidence-export-logic.test.ts:1191` | 非法参数不再 exit 2 且可能建出输出目录，导出会留下半成品证据包 |
 | wm-status | invocation | `w-model-dev/scripts/__tests__/cli-natural-exit.test.ts:231` | project.json 损坏不再 exit 2，状态快照会以默认值给出假状态 |
-| wm-verify-evidence-source | invocation | `w-model-dev/scripts/__tests__/exit2-failure-atomicity.test.ts:290`（:273 起的逐门禁循环对 wm-verify-evidence-source 断言 exit 2） | 非法参数不再 exit 2，provenance 会以 package-only 冒充 source-bound 证据 |
+| wm-verify-evidence-source | invocation | `w-model-dev/scripts/__tests__/exit2-failure-atomicity.test.ts:291`（:273 起的逐门禁循环对 wm-verify-evidence-source 断言 exit 2） | 非法参数不再 exit 2，provenance 会以 package-only 冒充 source-bound 证据 |
 | wm-write | invocation | `w-model-dev/scripts/__tests__/wm-write.test.ts:196` | 非法 `--lock-timeout`（负数/小数/非数字）不再 exit 2，锁超时会以未定义值执行 |
 
 > 重叠说明：`check-artifact-gate` / `check-preventive-review` 同属计划的 A、B 两组，本表只在 A 段各登记
