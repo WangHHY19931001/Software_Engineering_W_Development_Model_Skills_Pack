@@ -9,7 +9,7 @@
  *   - 引用 → 在盘：self-test.ts 引用的 file / sampleDir 路径必须真实存在（悬空 → reference-dangling / exit 1）；
  *   - 声明 → 矩阵行：README 覆盖矩阵按表行首列解析（正文反引号提及不算声明）。
  *
- * 第 4 条规则（M06 / S28，P2-A 任务 2）：负向覆盖不变量——`cli/*.ts` 减去 `self-test.ts` 的每个
+ * 第 4 条规则（M06 / S28，P2-A 任务 2）：负向覆盖不变量——`cli/ 下的 *.ts` 减去 `self-test.ts` 的每个
  * exit-2 门禁必须在 samples/NEGATIVE-COVERAGE.md 登记一条会失败的负向案例（fixture / invocation /
  * mutated-copy）。门禁集合从既有事实源（cli 目录）推导，不另写硬编码清单：
  *   - 未登记 → negative-coverage-missing（exit 1）。
@@ -328,7 +328,7 @@ function parseNegativeCoverage(content: string): NegativeParse {
 }
 
 /**
- * 门禁集合口径：`cli/*.ts` 减去 `self-test.ts`（与中心探针、exit2-failure-atomicity 同一口径，
+ * 门禁集合口径：`cli/ 下的 *.ts` 减去 `self-test.ts`（与中心探针、exit2-failure-atomicity 同一口径，
  * 由共享注册表 `lib/exit2-probe-registry.ts` 的 `listGateScripts` 定义）。
  * 返回**基名**（去掉 `.ts`）——与 NEGATIVE-COVERAGE.md 第 1 列同口径；探针注册表用文件名，二者在
  * 调用探针时按 `<基名>.ts` 映射。
@@ -611,7 +611,7 @@ async function main(): Promise<void> {
     if (!gateBaseNameSet.has(entry.name)) {
       unknownGateViolations.push({
         check: 'negative-coverage-unknown-gate',
-        message: `登记的门禁「${entry.name}」不在 exit-2 门禁集合内（cli/*.ts 减去 self-test.ts，第 ${entry.line} 行）`,
+        message: `登记的门禁「${entry.name}」不在 exit-2 门禁集合内（cli/ 下的 *.ts 减去 self-test.ts，第 ${entry.line} 行）`,
       });
     }
   }

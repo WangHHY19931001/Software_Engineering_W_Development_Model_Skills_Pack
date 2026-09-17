@@ -28,7 +28,7 @@ function getBashPathTool(): 'wslpath' | 'cygpath' | undefined {
       '-c',
       'if command -v wslpath >/dev/null 2>&1; then printf wslpath; elif command -v cygpath >/dev/null 2>&1; then printf cygpath; fi',
     ],
-    { encoding: 'utf8', input: '' },
+    { encoding: 'utf8', input: '', timeout: 15_000 },
   );
   const tool = String(result.stdout ?? '').trim();
   bashPathTool = tool === 'wslpath' || tool === 'cygpath' ? tool : null;
@@ -37,7 +37,7 @@ function getBashPathTool(): 'wslpath' | 'cygpath' | undefined {
 
 function getBashRuntimePath(): string {
   if (bashRuntimePath !== undefined) return bashRuntimePath;
-  const result = spawnSync('bash', ['-c', 'printenv PATH'], { encoding: 'utf8', input: '' });
+  const result = spawnSync('bash', ['-c', 'printenv PATH'], { encoding: 'utf8', input: '', timeout: 15_000 });
   bashRuntimePath = String(result.stdout ?? '').trim();
   return bashRuntimePath;
 }
@@ -54,7 +54,7 @@ function convertBashPaths(values: string[]): string[] {
       /^([A-Za-z]):\//.test(value) ? `${tool} -a -u ${shellQuote(value)}` : `printf '%s\\n' ${shellQuote(value)}`,
     )
     .join('; ');
-  const result = spawnSync('bash', ['-c', command], { encoding: 'utf8', input: '' });
+  const result = spawnSync('bash', ['-c', command], { encoding: 'utf8', input: '', timeout: 15_000 });
   const converted = String(result.stdout ?? '')
     .replace(/\r?\n$/, '')
     .split(/\r?\n/);

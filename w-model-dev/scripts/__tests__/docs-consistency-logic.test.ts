@@ -2781,7 +2781,7 @@ function toBashPath(value: string): string {
       '-c',
       `if command -v wslpath >/dev/null 2>&1; then wslpath -a -u ${shellQuote(normalized)}; elif command -v cygpath >/dev/null 2>&1; then cygpath -a -u ${shellQuote(normalized)}; else printf '%s\\n' ${shellQuote(normalized)}; fi`,
     ],
-    { encoding: 'utf8', input: '' },
+    { encoding: 'utf8', input: '', timeout: 15_000 },
   );
   const converted = String(result.stdout ?? '').trim();
   return result.status === 0 && converted !== '' ? converted : normalized;

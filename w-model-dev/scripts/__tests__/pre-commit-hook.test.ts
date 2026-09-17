@@ -35,7 +35,7 @@ function toBashPath(value: string): string {
       '-c',
       `if command -v wslpath >/dev/null 2>&1; then wslpath -a -u ${shellQuote(normalized)}; elif command -v cygpath >/dev/null 2>&1; then cygpath -a -u ${shellQuote(normalized)}; else printf '%s\\n' ${shellQuote(normalized)}; fi`,
     ],
-    { encoding: 'utf8', input: '' },
+    { encoding: 'utf8', input: '', timeout: 15_000 },
   );
   const converted = String(result.stdout ?? '').trim();
   return result.status === 0 && converted !== '' ? converted : normalized;
@@ -50,6 +50,7 @@ function getBashRuntimePath(): string {
   const result = spawnSync('bash', ['-c', 'printenv PATH'], {
     encoding: 'utf8',
     input: '',
+    timeout: 15_000,
   });
   bashRuntimePath = String(result.stdout ?? '').trim();
   return bashRuntimePath;
@@ -668,6 +669,7 @@ describe('pre-commit staged snapshot', () => {
     const processProbe = spawnSync('bash', ['-c', 'kill -0 "$1"', 'batch-process-probe', batchPid], {
       encoding: 'utf8',
       input: '',
+      timeout: 15_000,
     });
     expect(processProbe.status).not.toBe(0);
     expect(await fs.readFile(fixture.worktree, 'utf8')).toBe('VALID_STAGED\n');

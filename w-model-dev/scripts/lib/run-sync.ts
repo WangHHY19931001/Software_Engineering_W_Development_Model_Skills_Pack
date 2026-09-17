@@ -33,7 +33,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 117,
+    line: 118,
     symbol: 'detectScriptsChanges',
     reason:
       'B3 migrated git diff probe through runSync; retained as audit provenance with a 15-second timeout. 2026-09-04 archival-fixes: git args 前插 -c core.quotePath=false（与 change-scope.ts I-1 同款，非 ASCII 文件名按字面 UTF-8 收集）。',
@@ -43,7 +43,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 129,
+    line: 130,
     symbol: 'detectScriptsChanges',
     reason:
       'B3 migrated git status probe through runSync; retained as audit provenance with a 15-second timeout.（行号 2026-09-04 archival-fixes 随 diff 调用多行化下移 3 行）',
@@ -53,7 +53,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 497,
+    line: 443,
     symbol: 'currentCommitSha',
     reason:
       'B3 migrated the bounded git HEAD probe through runSync; retained as audit provenance.（行号 2026-09-06 audit-fixes task 5 随 ERROR_JSON detail 脱敏 helper 新增下移 17 行）',
@@ -63,7 +63,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 632,
+    line: 578,
     symbol: 'collectVitestMeasurements',
     reason:
       'B3 migrated direct Node Vitest execution through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (1800 s) timeout.（行号 2026-09-06 audit-fixes task 9 随 VITEST_SPAWN_TIMEOUT_MS 常量提取下移 7 行；2026-09-14 fileParallelism 抖动处置随该常量注释扩充再下移 2 行，600s→1800s 同步改值）',
@@ -73,7 +73,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 638,
+    line: 584,
     symbol: 'collectVitestMeasurements',
     reason:
       'B3 migrated the shell Vitest fallback through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (1800 s) timeout.（行号 2026-09-06 audit-fixes task 9 同上顺延；2026-09-14 同上再下移 2 行）',
@@ -208,7 +208,16 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2700,
+    line: 2778,
+    symbol: 'toBashPath wslpath/cygpath probe',
+    reason:
+      'Convert a Windows path to the running Bash form via wslpath/cygpath when the fixture runs on win32; explicit 15-second timeout.',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
+    file: '__tests__/docs-consistency-logic.test.ts',
+    line: 2819,
     symbol: 'withDocsConsistencyFixture git init',
     reason:
       'D5 creates a real temporary Git repository so provenance binds to an actual HEAD.（行号 2026-09-06 audit-fixes task 5 随 metrics 探针 rawErrorJson.detail 断言扩展下移 7 行；2026-09-12 code-health archive CLI 登记 +1 行；2026-09-15 p2b S31 随完整性审计双维度用例新增下移 159 行）',
@@ -217,7 +226,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2703,
+    line: 2822,
     symbol: 'withDocsConsistencyFixture git config email',
     reason:
       'D5 configures the isolated fixture Git identity before creating its commit.（行号 2026-09-06 audit-fixes task 5 同上顺延；2026-09-15 p2b S31 同上顺延 +159 行）',
@@ -226,7 +235,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2709,
+    line: 2828,
     symbol: 'withDocsConsistencyFixture git config name',
     reason:
       'D5 configures the isolated fixture Git identity before creating its commit.（行号 2026-09-15 p2b S31 同上顺延 +159 行）',
@@ -235,7 +244,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2712,
+    line: 2831,
     symbol: 'withDocsConsistencyFixture git config gpgSign',
     reason:
       'D5 disables inherited signing for the isolated provenance fixture.（行号 2026-09-15 p2b S31 同上顺延 +159 行）',
@@ -244,7 +253,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2719,
+    line: 2838,
     symbol: 'withDocsConsistencyFixture git add',
     reason:
       'D5 stages the copied fixture before creating its provenance-bound commit.（行号 2026-09-15 p2b S31 同上顺延 +159 行）',
@@ -253,7 +262,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2720,
+    line: 2839,
     symbol: 'withDocsConsistencyFixture git commit',
     reason:
       'D5 creates the real fixture HEAD with isolated hooks/signing/editor settings and a bounded timeout.（行号 2026-09-15 p2b S31 同上顺延 +159 行）',
@@ -262,7 +271,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2772,
+    line: 2891,
     symbol: 'fixtureCommitSha',
     reason:
       'D5 reads the isolated fixture HEAD for same-run provenance assertions.（行号 2026-09-15 p2b S31 同上顺延 +159 行）',
@@ -271,7 +280,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2795,
+    line: 2914,
     symbol: 'runDocsConsistencyCli',
     reason:
       'D5 keeps the real docs-consistency CLI boundary test with an explicit bounded timeout for exit-2 probes.（行号 2026-09-15 p2b S31 同上顺延 +159 行）',
@@ -333,6 +342,89 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     line: 162,
     symbol: 'runCli',
     reason: '2026-09-04 audit-gate-closure task 1 新增：archive checker CLI 边界测试，显式 90 秒超时。',
+    timeout: { required: true, status: 'present' },
+  },
+  // 2026-09-17 review-remediation task 8：task 5 的两个 hook 测试文件新增了直接同步调用但从未登记
+  // （该分支从未跑通全量 vitest，run-sync 审计一直是红的）。以下条目补登记，并给这些调用补显式 15 秒
+  // 超时——台账不允许 `missing-followup`（另一条守护要求全部 present）。
+  {
+    api: 'spawnSync',
+    file: '__tests__/platform-deps-hook.test.ts',
+    line: 25,
+    symbol: 'getBashPathTool',
+    reason: '探测 wslpath/cygpath 是否可用以决定 Bash 路径转换方式；显式 15 秒超时。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
+    file: '__tests__/platform-deps-hook.test.ts',
+    line: 40,
+    symbol: 'getBashRuntimePath',
+    reason: '读取 Bash 运行时 PATH 以便把测试注入的 bin 目录前置；显式 15 秒超时。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
+    file: '__tests__/platform-deps-hook.test.ts',
+    line: 57,
+    symbol: 'convertBashPaths',
+    reason: '把 Windows 路径批量转成当前 Bash 可识别形态（跨平台 hook 测试的前置）；显式 15 秒超时。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
+    file: '__tests__/pre-commit-hook.test.ts',
+    line: 32,
+    symbol: 'toBashPath',
+    reason: '把 fixture 路径转成当前 Bash 形态（win32 下经 wslpath/cygpath）；显式 15 秒超时。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
+    file: '__tests__/pre-commit-hook.test.ts',
+    line: 50,
+    symbol: 'getBashRuntimePath',
+    reason: '读取 Bash 运行时 PATH 以便把 fixture 的 test-bin 前置；显式 15 秒超时。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
+    file: '__tests__/pre-commit-hook.test.ts',
+    line: 196,
+    symbol: 'runGit',
+    reason: '在临时 fixture 仓上执行 git 断言命令（index/worktree 身份校验）；显式超时。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
+    file: '__tests__/pre-commit-hook.test.ts',
+    line: 243,
+    symbol: 'gitShow',
+    reason: '读取 staged 内容（git show :path）以断言 index 快照语义；显式超时。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
+    file: '__tests__/pre-commit-hook.test.ts',
+    line: 290,
+    symbol: 'runHook',
+    reason: '以受控环境变量启动真实 pre-commit hook 子进程（staged-only 语义的主探针）；显式超时。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
+    file: '__tests__/pre-commit-hook.test.ts',
+    line: 508,
+    symbol: 'staged symlink probe',
+    reason: '用 git ls-files --stage 断言暂存 symlink 记录的 mode/object 未被改写；显式超时。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
+    file: '__tests__/pre-commit-hook.test.ts',
+    line: 669,
+    symbol: 'batch process liveness probe',
+    reason: '超时用例里用 kill -0 断言 batch 后代进程已不可存活；显式 15 秒超时。',
     timeout: { required: true, status: 'present' },
   },
 ];
