@@ -131,6 +131,7 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 - **R 报告须 V 复审 + G 门禁**：R 报告必须经 V 复审 + G 门禁（`check-rootcause-report.ts` exitCode=0）才可分派 S-fix（命中反模式 #19）。返工循环：V/G→R→V→G→S-fix→V→G。
 - **修改前 codegraph 查询**（约束 #14）：阶段 5-8 任何代码/测试文件 `Edit`/`Write` 前，S-coding 须先调用 `codegraph_explore` 查询目标符号影响半径（callers/callees/blast radius）并落盘 `.w-model/codegraph-queries/`；未查询直接修改命中反模式 #38，回到当前阶段起点。OpenSpec opsx 用于规格驱动变更（explore/propose/apply/archive），S-tickets 只做任务拆解（反模式 #40）。
 - **回归测试强制钩子**（约束 #14）：任何 agent 改动代码后必须跑回归测试；详见 [w-model-dev/references/phase-5-coding.md](./w-model-dev/references/phase-5-coding.md)「增量集成纪律」节。
+- **迭代可走快速车道，验收必须全量**：本地迭代可用 `npm run test:affected`（只跑本次改动映射到的测试文件；触及 `config/**`、`.githooks/**`、`schemas/**`、`references/**`、`samples/**`、`docs/**`、`eval/**`、根 `scripts/**` 与根活体文档时自动退回全量）。但**任务收口 / 交付 / 合入前的最终审查必须跑全量**：`npm run prepush`（18 项，含全量 vitest + 覆盖率阈值）或至少 `npm test`。快速车道覆盖不到跨文件注册表类不变量（exit-2 登记册、活体文档与脚本计数一致、samples 覆盖闭环等），**不得**以其通过作为验收依据。用法与边界见 [README 的「验证仓库」](./README.md#验证仓库)。
 
 ## 7. 历史信息
 

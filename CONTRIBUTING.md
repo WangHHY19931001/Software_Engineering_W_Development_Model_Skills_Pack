@@ -83,6 +83,8 @@ npm run format
 为替代远程 CI，仓库内置一个 [`git pre-push`](./.githooks/pre-push) hook，
 在 `git push` 时自动跑 18 项检查；任一退出码不符预期即中止推送：
 
+**迭代车道 vs 验收车道（规则）**：本地迭代可以用快速车道 `npm run test:affected`——只跑「本次改动映射到的测试文件」，用法与边界见 [README 的「验证仓库」](./README.md#验证仓库)。但**任务收口、交付与合入前的验收必须跑全量**：`npm run prepush`（18 项）或至少 `npm test`（全量 vitest）。快速车道按文件名映射选测试，天然覆盖不到跨文件的注册表类不变量（「每个 exit-2 门禁都登记了负向案例」「活体文档与脚本计数一致」「samples 覆盖矩阵闭环」等），因此**不得**把它的通过结果当作验收依据；触及 `config/**`、`.githooks/**`、`schemas/**`、`references/**`、`samples/**`、`docs/**`、`eval/**`、根 `scripts/**` 与根活体文档时，该脚本会自动退回全量。
+
 **触发范围判定**：真实 push 以 git 写入 stdin 的 ref 行（每行 `<local ref> <local sha> <remote ref> <remote sha>` 四字段，多 ref 逐行聚合）为准——local sha 全零（删除远端 ref）跳过该行、remote sha 全零（新分支）经 `git merge-base --fork-point` / merge-base 建立可证明基线（基线为空或退化到推送尖本身时降级经 remote-tracking 排除集枚举证明——remote 名经白名单与 `git remote get-url` 验证后执行 `git log -m --name-only --pretty=format: <local_sha> --not --remotes=<remote>`，`-m` 确保合并提交按父逐个列出避免空 diff 漏检；三级全部失败才 → fail-closed 跑全部门禁）；任一 ref 行解析失败 → fail-closed；delete-only 推送放行；stdin 为空时回退 `HEAD@{push}`/`origin/HEAD` 范围判断，回退失败同样 fail-closed。变更命中 `w-model-dev/**`、根级活体文档/配置、`config/**`、`scripts/**`、`.githooks/**`、`eval/**` 或 `docs/*.md`（bash case 模式 `*` 跨 `/`，含 `docs/` 任意层级归档）才跑门禁，未命中放行。
 
 | #   | 检查                                                                                                                                                                                                                                   | 期望退出码 |

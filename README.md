@@ -50,6 +50,15 @@ npm run doctor
 
 Bash 和 PowerShell 7 可以用命令简写；`self-test` 与 `doctor` 在 PowerShell 或 Windows Terminal 都能跑，不要求 Git Bash。Git Bash 仅在运行 `pre-push` 或平台依赖检查时需要。
 
+**快速车道（本地迭代，不是验收）**：改了一两处实现后想立刻知道有没有踩到测试，用 `npm run test:affected`（只跑「本次改动映射到的测试文件」，并打印选了哪些、为什么、以及本次**没跑**哪些门禁）：
+
+```bash
+npm run test:affected                    # 只看未提交改动
+npm run test:affected -- --since origin/main   # 加上自基线起的已提交改动
+```
+
+> **验收必须全量**：任务收口、交付、合入前必须跑**全量**——`npm run prepush`（18 项门禁，含全量 vitest + 覆盖率阈值）或至少 `npm test`（全量 vitest）。快速车道按文件名映射选测试，**无法**替代它：它不跑 `self-test` / `security-scan` / `docs-consistency` / `samples 覆盖矩阵` / `prettier` / `tsc` / `eval`，也不保证覆盖跨文件的注册表类断言（例如「每个 exit-2 门禁都登记了负向案例」）。触及 `config/**`、`.githooks/**`、`schemas/**`、`references/**`、`samples/**`、`docs/**`、`eval/**`、根 `scripts/**` 或根活体文档时，该脚本会直接退回全量。
+
 > **注意：** `npm install` 的 postinstall 会在本仓库启用推送前门禁（等价于 `git config core.hooksPath .githooks`），这只是仓库验证的本地配置副作用，与 Skill 激活无关。如果你原本配置过自定义 hook 路径、担心被覆盖，安装前先备份：
 
 > Bash：

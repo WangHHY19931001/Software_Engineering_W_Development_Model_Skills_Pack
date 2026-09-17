@@ -15,6 +15,7 @@
     "check:docs-consistency": "tsx w-model-dev/scripts/cli/check-docs-consistency.ts",
     "//2 测试类": "单元测试与回归",
     "test": "vitest run --config config/vitest.config.ts",
+    "test:affected": "node scripts/test-affected.cjs",
     "self-test": "tsx w-model-dev/scripts/cli/self-test.ts",
     "eval": "tsx eval/runner.ts",
     "coverage": "vitest run --coverage --config config/vitest.config.ts",
