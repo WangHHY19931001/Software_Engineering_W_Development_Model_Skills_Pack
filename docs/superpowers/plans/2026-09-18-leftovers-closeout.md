@@ -300,7 +300,7 @@ git commit -m "feat(coverage): add rule-layer scope metrics over istanbul report
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { runSync } from 'node:child_process';
+import { runSync } from '../lib/run-sync.js';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const CLI = path.join(REPO_ROOT, 'w-model-dev/scripts/cli/check-coverage-scope.ts');
@@ -885,7 +885,7 @@ function blockEndIndex(source: string, anchorStart: number): number {
 }
 
 function rewriteRelativeImports(source: string, originalFile: string): string {
-  const fromRe = /^(\s*(?:import|export)\b[^'""]*?from\s*['"])([^'"]+)(['"])/gm;
+  const fromRe = /^(\s*(?:import|export)\b[^'"]*?from\s*['"])([^'"]+)(['"])/gm;
   const sideEffectRe = /^(\s*import\s*['"])([^'"]+)(['"])/gm;
   const rewrite = (whole: string, head: string, spec: string, tail: string): string => {
     if (!spec.startsWith('.')) return whole;
