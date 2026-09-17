@@ -66,6 +66,35 @@ function fakeNegativeCoverage(rows: Array<{ name: string; mechanism: string; evi
   ].join('\n');
 }
 
+/**
+ * 门禁 stub 的**真实 exit-2 契约**（第 5 条规则要求逐门禁真实探针）：
+ * 收到基础探针参数 `--d4-invalid-argument` 时按 `lib/cli-error.ts` 的输出形态
+ * （stderr 人类错误行 + stdout `ERROR_JSON`）以 exit 2 退出，且不写任何文件；
+ * 其余参数以 exit 0 退出（用于验证「探针失败」这一负向分支）。
+ */
+function fakeGateScriptSource(options: { exitTwo?: boolean } = {}): string {
+  if (options.exitTwo === false) {
+    return '// 不实现 exit-2 契约的门禁 stub：探针必须因此失败\nprocess.exitCode = 0;\n';
+  }
+  return [
+    "if (process.argv.slice(2).includes('--d4-invalid-argument')) {",
+    "  process.stderr.write('✗ [ARG_INVALID] 未知或无值参数\\n');",
+    '  process.stdout.write(\'ERROR_JSON {"category":"ARG_INVALID","message":"未知或无值参数","exitCode":2}\\n\');',
+    '  process.exitCode = 2;',
+    '} else {',
+    '  process.exitCode = 0;',
+    '}',
+    '',
+  ].join('\n');
+}
+
+/** 在临时仓内造一个可被 invocation / mutated-copy 证据引用的文件（恰 3 行） */
+async function putEvidenceFile(relPath: string): Promise<void> {
+  const absolute = path.join(tmpDir, relPath);
+  await fs.mkdir(path.dirname(absolute), { recursive: true });
+  await fs.writeFile(absolute, ['// line 1', '// line 2', '// line 3'].join('\n'), 'utf-8');
+}
+
 let tmpDir: string;
 
 beforeEach(async () => {
@@ -82,13 +111,19 @@ async function setupRepo(opts: {
   readme: string;
   /** 额外 cli/*.ts（非 self-test）用于构成 exit-2 门禁集合 */
   cliScripts?: string[];
+  /** 额外 cli/*.ts 是否实现 exit-2 契约（缺省实现；false 用于验证探针失败分支） */
+  cliExitTwo?: boolean;
   /** NEGATIVE-COVERAGE.md 内容；缺省为空登记表 */
   negative?: string;
 }): Promise<void> {
   await fs.mkdir(path.join(tmpDir, 'w-model-dev/scripts/cli'), { recursive: true });
   await fs.writeFile(path.join(tmpDir, 'w-model-dev/scripts/cli/self-test.ts'), fakeSelfTest(opts.refs), 'utf-8');
   for (const script of opts.cliScripts ?? []) {
-    await fs.writeFile(path.join(tmpDir, 'w-model-dev/scripts/cli', script), '// stub\n', 'utf-8');
+    await fs.writeFile(
+      path.join(tmpDir, 'w-model-dev/scripts/cli', script),
+      fakeGateScriptSource({ exitTwo: opts.cliExitTwo ?? true }),
+      'utf-8',
+    );
   }
   for (const rel of opts.onDisk) {
     const p = path.join(tmpDir, 'w-model-dev/scripts/samples', rel);
@@ -104,7 +139,9 @@ async function setupRepo(opts: {
 }
 
 function run(): { code: number | null; stdout: string; stderr: string } {
-  const r = runSync(process.execPath, [tsxCli, SCRIPT, tmpDir]);
+  // 第 5 条规则后门禁会真实 spawn exit-2 探针子进程（每门禁一次），单次调用明显超过 runSync 的
+  // 15s 默认超时；显式放宽（而非吞掉 status=null），避免把「探针慢」误判成断言失败。
+  const r = runSync(process.execPath, [tsxCli, SCRIPT, tmpDir], { timeout: 180_000 });
   return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
 }
 
@@ -215,14 +252,25 @@ describe('check-samples-coverage 双向闭环（F-G7-06/07）', () => {
 });
 
 describe('check-samples-coverage 负向覆盖不变量（M06 / S28）', () => {
-  it('RED：清单缺一个 exit-2 门禁 → exit 1 negative-coverage-missing', async () => {
+  const EVIDENCE_FILE = 'w-model-dev/scripts/__tests__/fake.test.ts';
+
+  /** 构造「一个 exit-2 门禁 + 给定登记行」的最小仓（逐项变异用） */
+  async function setupSingleGateRepo(
+    rows: Array<{ name: string; mechanism: string; evidence: string }>,
+    options: { cliExitTwo?: boolean; negative?: string } = {},
+  ): Promise<void> {
     await setupRepo({
       refs: [{ subdir: 'foo', file: 'a.json' }],
       onDisk: ['foo/a.json'],
       readme: fakeReadme(['foo']),
       cliScripts: ['check-foo.ts'],
-      negative: fakeNegativeCoverage([]),
+      ...(options.cliExitTwo === undefined ? {} : { cliExitTwo: options.cliExitTwo }),
+      negative: options.negative ?? fakeNegativeCoverage(rows),
     });
+  }
+
+  it('RED：清单缺一个 exit-2 门禁 → exit 1 negative-coverage-missing', async () => {
+    await setupSingleGateRepo([]);
     const r = run();
     expect(r.code).toBe(1);
     expect(r.stdout).toContain('negative-coverage-missing');
@@ -230,22 +278,86 @@ describe('check-samples-coverage 负向覆盖不变量（M06 / S28）', () => {
   });
 
   it('RED：fixture 机制行指向不存在的 fixture → exit 1 negative-coverage-dangling', async () => {
-    await setupRepo({
-      refs: [{ subdir: 'foo', file: 'a.json' }],
-      onDisk: ['foo/a.json'],
-      readme: fakeReadme(['foo']),
-      cliScripts: ['check-foo.ts'],
-      negative: fakeNegativeCoverage([
-        { name: 'check-foo', mechanism: 'fixture', evidence: '`samples/foo/ghost.json`（self-test.ts:1）' },
-      ]),
-    });
+    await setupSingleGateRepo([
+      { name: 'check-foo', mechanism: 'fixture', evidence: '`samples/foo/ghost.json`（self-test.ts:1）' },
+    ]);
     const r = run();
     expect(r.code).toBe(1);
     expect(r.stdout).toContain('negative-coverage-dangling');
     expect(r.stdout).toContain('samples/foo/ghost.json');
   });
 
-  it('正例：清单齐全且 fixture 在盘 + invocation 行不校验路径 → exit 0', async () => {
+  it('RED：登记集合外的门禁基名 → exit 1 negative-coverage-unknown-gate', async () => {
+    await setupSingleGateRepo([
+      { name: 'check-ghost', mechanism: 'fixture', evidence: '`samples/foo/a.json`（self-test.ts:1）' },
+    ]);
+    const r = run();
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('negative-coverage-unknown-gate');
+    expect(r.stdout).toContain('check-ghost');
+  });
+
+  it('RED：同一门禁登记两行 → exit 1 negative-coverage-duplicate', async () => {
+    await putEvidenceFile(EVIDENCE_FILE);
+    await setupSingleGateRepo([
+      { name: 'check-foo', mechanism: 'invocation', evidence: `${EVIDENCE_FILE}:2` },
+      { name: 'check-foo', mechanism: 'fixture', evidence: '`samples/foo/a.json`' },
+    ]);
+    const r = run();
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('negative-coverage-duplicate');
+    expect(r.stdout).toContain('check-foo');
+  });
+
+  it('RED：登记行缺列 → exit 1 negative-coverage-malformed（坏行不得被静默跳过）', async () => {
+    await setupSingleGateRepo([], {
+      negative: [
+        '| 门禁脚本 | 负向机制 | 负向案例 / 证据位置 | 所防回归（一句话） |',
+        '| --- | --- | --- | --- |',
+        '| check-foo | fixture | `samples/foo/a.json` |',
+      ].join('\n'),
+    });
+    const r = run();
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('negative-coverage-malformed');
+  });
+
+  it('RED：负向机制不在三值内 → exit 1 negative-coverage-unknown-mechanism', async () => {
+    await setupSingleGateRepo([{ name: 'check-foo', mechanism: 'whatever', evidence: '`samples/foo/a.json`' }]);
+    const r = run();
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('negative-coverage-unknown-mechanism');
+  });
+
+  it('RED：invocation 证据只有文字（无「文件:行号」）→ exit 1 negative-coverage-evidence-invalid', async () => {
+    await setupSingleGateRepo([{ name: 'check-foo', mechanism: 'invocation', evidence: '由某个任务提供' }]);
+    const r = run();
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('negative-coverage-evidence-invalid');
+  });
+
+  it('RED：invocation 证据行号超过文件总行数 → exit 1 negative-coverage-evidence-invalid（行号越界）', async () => {
+    await putEvidenceFile(EVIDENCE_FILE);
+    await setupSingleGateRepo([{ name: 'check-foo', mechanism: 'invocation', evidence: `${EVIDENCE_FILE}:99` }]);
+    const r = run();
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('negative-coverage-evidence-invalid');
+    expect(r.stdout).toContain('行号越界');
+  });
+
+  it('RED：门禁不实现 exit-2 契约 → exit 1 negative-coverage-probe-failed（探针是真执行，非纸面登记）', async () => {
+    await putEvidenceFile(EVIDENCE_FILE);
+    await setupSingleGateRepo([{ name: 'check-foo', mechanism: 'invocation', evidence: `${EVIDENCE_FILE}:2` }], {
+      cliExitTwo: false,
+    });
+    const r = run();
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('negative-coverage-probe-failed');
+    expect(r.stdout).toContain('exit code 应为 2');
+  });
+
+  it('正例：登记齐全、证据可解析、探针真实 exit 2 → exit 0（并报告探针数）', async () => {
+    await putEvidenceFile(EVIDENCE_FILE);
     await setupRepo({
       refs: [{ subdir: 'foo', file: 'a.json' }],
       onDisk: ['foo/a.json'],
@@ -253,13 +365,15 @@ describe('check-samples-coverage 负向覆盖不变量（M06 / S28）', () => {
       cliScripts: ['check-foo.ts', 'check-bar.ts'],
       negative: fakeNegativeCoverage([
         { name: 'check-foo', mechanism: 'fixture', evidence: '`samples/foo/a.json`（self-test.ts:1）' },
-        { name: 'check-bar', mechanism: 'invocation', evidence: 'w-model-dev/scripts/__tests__/x.test.ts:1' },
+        { name: 'check-bar', mechanism: 'invocation', evidence: `${EVIDENCE_FILE}:2` },
       ]),
     });
     const r = run();
     expect(r.code).toBe(0);
     expect(r.stdout).toContain('"negativeCoverageMissing":0');
     expect(r.stdout).toContain('"negativeCoverageDangling":0');
+    expect(r.stdout).toContain('"negativeCoverageProbes":2');
+    expect(r.stdout).toContain('"negativeCoverageProbeFailures":0');
   });
 
   it('缺 samples/NEGATIVE-COVERAGE.md → exit 2（与既有三必需文件同口径）', async () => {

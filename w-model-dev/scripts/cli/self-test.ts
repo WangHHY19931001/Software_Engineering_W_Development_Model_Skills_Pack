@@ -1418,8 +1418,7 @@ const RUN_LOG_CASES: RunLogCase[] = [
     file: 'bad-fix-missing-revert-evidence.jsonl',
     expectedPassed: false,
     expectedReasonPatterns: [/R10.*revertEvidence/],
-    description:
-      'cutoff 后 fix 无 revertEvidence，应被 R10 拦截（LEGACY_REVERT_EVIDENCE_CUTOFF 起强制，cutoff 前旧行按 LEGACY_REVERT_EVIDENCE 诊断吸收）',
+    description: 'fix 缺 revertEvidence，应被 R10 拦截（严格模式：无时间戳豁免，与 timestamp 早晚无关）',
   },
 ];
 

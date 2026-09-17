@@ -152,6 +152,11 @@ export interface DocConsistencyInput {
   schemas?: Record<string, unknown>;
   /** w-model-dev/scripts/cli/ 下全部 .ts 文件名（实测；script-registry 检查数据源） */
   cliScriptFiles: string[];
+  /**
+   * w-model-dev/scripts/__tests__/README.md 覆盖矩阵原文（缺失时为 null）+ 在盘 *.test.ts 文件名清单。
+   * tests-matrix 检查数据源；缺省（fixture 未注入）时跳过检查。
+   */
+  testsMatrix?: { readme: string | null; testFiles: string[] };
   /** 本地生成物与证据导出契约的逐文档输入；缺省时跳过，以保持旧调用方与 fixture 兼容。 */
   localEvidenceDocs?: Array<{ name: string; content: string }>;
   /** docs/ 根 6 份设计文档（活体引用） */
@@ -829,6 +834,7 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
   }
   violations.push(...checkOrphanReferences(input.orphanAuditDocs));
   violations.push(...checkAgentsNavCoverage(input.agentsNav));
+  violations.push(...checkTestsMatrixCoverage(input.testsMatrix));
   violations.push(...checkExit2ProbeResults(input.exit2ProbeResults));
   violations.push(
     ...checkRootCauseR10Contract({
@@ -1976,23 +1982,110 @@ export function checkOrphanReferences(
 }
 
 /**
- * S31 agents-nav-missing：每个 w-model-dev/scripts/cli/*.ts 基名（去 .ts 后缀）须以子串出现
- * 在 AGENTS.md——把「AGENTS.md §8 脚本导航表漂移」从散文债变成门禁强制：新增 cli 脚本而漏登记
- * §8 表即红。子串语义（不要求整词/整行）与 §8 表的 `脚本名.ts` 表格形态、散文提及均兼容，
- * 且不误伤 §3 的 npm 别名形态（wm:status ≠ wm-status，别名不满足子串，仍须表格行登记）。
+ * 解析 AGENTS.md **§8 脚本导航表**的行首单元格（脚本名），返回精确名集合。
+ * 只扫描 `## 8.` 标题到下一个 H2 之间的 Markdown 表格行；表头 / 分隔行 / 其余章节正文与代码块
+ * 一律不参与——「表里没有这一行」必须能被测到（旧实现用全文子串，等价于从没检查过 §8 表）。
+ */
+function parseAgentsNavRows(agents: string): Set<string> {
+  const declared = new Set<string>();
+  let inSection = false;
+  for (const line of agents.split('\n')) {
+    if (/^##\s*8\./.test(line)) {
+      inSection = true;
+      continue;
+    }
+    if (inSection && /^##\s/.test(line)) break; // 进入下一章即离开 §8
+    if (!inSection || !/^\s*\|/.test(line)) continue;
+    const firstCell = line
+      .slice(line.indexOf('|') + 1)
+      .split('|')[0]
+      ?.trim();
+    if (firstCell === undefined || firstCell === '' || firstCell === '脚本名' || /^-+$/.test(firstCell)) continue;
+    declared.add(firstCell.replace(/^`/, '').replace(/`$/, ''));
+  }
+  return declared;
+}
+
+/**
+ * tests-matrix：`w-model-dev/scripts/__tests__/README.md` 覆盖矩阵首列集合必须与在盘 `*.test.ts`
+ * 集合**双向相等**（任务 7）。旧状态只有 AGENTS.md 的「N 个测试文件」动态计数，它证明不了
+ * 「新增测试文件是否被登记进矩阵」——漏登的新文件不参与任何检查却照样让计数通过。
+ * 违规码：`tests-matrix-missing`（在盘未登记，或 README 整体缺失）/ `tests-matrix-orphan`
+ * （登记了在盘不存在的文件）/ `tests-matrix-duplicate`（同一文件多行）。
+ * 守卫：testsMatrix 缺省时跳过（fixture 未注入时不误报）。
+ */
+export function checkTestsMatrixCoverage(
+  matrix: { readme: string | null; testFiles: string[] } | undefined,
+): DocCheckViolation[] {
+  if (matrix === undefined) return [];
+  if (matrix.readme === null) {
+    return [
+      {
+        check: 'tests-matrix-missing',
+        message: 'w-model-dev/scripts/__tests__/README.md 缺失：测试覆盖矩阵无法核对（漏登检测失效）',
+      },
+    ];
+  }
+  const declared = new Map<string, number>();
+  for (const line of matrix.readme.split('\n')) {
+    if (!/^\s*\|/.test(line)) continue;
+    const firstCell = line
+      .slice(line.indexOf('|') + 1)
+      .split('|')[0]
+      ?.trim();
+    if (firstCell === undefined || firstCell === '' || firstCell === 'File' || /^-+$/.test(firstCell)) continue;
+    const name = firstCell.replace(/^`/, '').replace(/`$/, '');
+    declared.set(name, (declared.get(name) ?? 0) + 1);
+  }
+  const onDisk = new Set(matrix.testFiles);
+  const violations: DocCheckViolation[] = [];
+  for (const [name, count] of declared) {
+    if (!onDisk.has(name)) {
+      violations.push({
+        check: 'tests-matrix-orphan',
+        message: `测试覆盖矩阵登记了在盘不存在的测试文件：${name}（README 表格行与 __tests__/*.test.ts 必须双向相等）`,
+      });
+    }
+    if (count > 1) {
+      violations.push({
+        check: 'tests-matrix-duplicate',
+        message: `测试覆盖矩阵同一文件登记了 ${count} 行：${name}（每文件恰一行）`,
+      });
+    }
+  }
+  for (const file of matrix.testFiles) {
+    if (!declared.has(file)) {
+      violations.push({
+        check: 'tests-matrix-missing',
+        message: `测试文件未登记进 w-model-dev/scripts/__tests__/README.md 覆盖矩阵：${file}（新增测试文件须同步登记首列）`,
+      });
+    }
+  }
+  return violations;
+}
+
+/**
+ * S31 agents-nav-missing：每个 w-model-dev/scripts/cli/*.ts 基名须在 AGENTS.md **§8 脚本导航表的
+ * 脚本名单元格**里精确登记，把「§8 表漂移」从散文债变成门禁强制。
+ *
+ * 判据为**§8 表格行首单元格的精确名**（`<基名>.ts` 或 `<基名>`），不是全文子串（任务 7 收紧）：
+ * 子串语义会同时被 §8 之外的正文、代码块、相似前缀（`check-foo` 命中 `check-foo-bar`）以及
+ * §3 的 npm 别名满足——于是把 §8 整行删掉、只在正文里留一句提及，门禁照样全绿，而它声称防的
+ * 恰恰是 §8 表漂移。收紧后：正文提及不算登记，相似前缀不算登记，表格里没有该行即红。
  * 守卫：agentsNav 缺省时跳过（fixture 兼容；实测量来自 cli readdir + AGENTS.md 读取，零新增 spawn）。
  */
 export function checkAgentsNavCoverage(
   nav: { agents: string; cliScriptFiles: string[] } | undefined,
 ): DocCheckViolation[] {
   if (nav === undefined) return [];
+  const declared = parseAgentsNavRows(nav.agents);
   const violations: DocCheckViolation[] = [];
   for (const file of nav.cliScriptFiles) {
     const basename = file.replace(/\.ts$/, '');
-    if (!nav.agents.includes(basename)) {
+    if (!declared.has(`${basename}.ts`) && !declared.has(basename)) {
       violations.push({
         check: 'agents-nav-missing',
-        message: `AGENTS.md 未登记 cli 脚本基名 ${basename}（§8 脚本导航表漂移；新增 cli 脚本须同步登记 AGENTS.md §8 行）`,
+        message: `AGENTS.md §8 脚本导航表没有「${basename}.ts」行（§8 表漂移；新增 cli 脚本须同步登记 §8 表格行，仅在正文提及不算登记）`,
       });
     }
   }

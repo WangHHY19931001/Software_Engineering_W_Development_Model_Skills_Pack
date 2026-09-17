@@ -61,8 +61,14 @@ afterEach(async () => {
 function runCheckPollution(
   args: string[],
   cwd: string = REPO_ROOT,
+  localeEnv: NodeJS.ProcessEnv = {},
 ): { code: number | null; stdout: string; stderr: string } {
-  const result = runSync(process.execPath, [tsxCli, SCRIPT, ...args], { cwd, timeout: 60_000 });
+  const result = runSync(process.execPath, [tsxCli, SCRIPT, ...args], {
+    cwd,
+    timeout: 60_000,
+    // locale 相关变量按用例注入：排序必须是 locale 无关的，跨 LANG/LC_ALL 输出逐字节一致
+    env: { ...process.env, ...localeEnv },
+  });
   return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 
@@ -232,6 +238,32 @@ describe('check-pollution CLI（S24 污染源定位，按需工具）', () => {
     expect(run.code).toBe(2);
     expect(run.stderr).toContain('ARG_INVALID');
     expect(errorJson(run.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
+  });
+
+  it('非 ASCII 残留名跨 locale 稳定：不同 LANG/LC_ALL 下 POLLUTION_JSON 逐字节一致且按码元序', async () => {
+    // 这四个名字在 locale 排序（sv_SE/de_DE 把 Ä/Ö/ä 排在 z 之后）与 UTF-16 码元序下顺序不同，
+    // 因此旧实现 localeCompare 的漂移会被本用例直接抓到。
+    await putFile('zebra.lock', 'owner\n');
+    await putFile('Ärger.lock', 'owner\n');
+    await putFile('Öffnung.lock', 'owner\n');
+    await putFile('änderung.lock', 'owner\n');
+
+    const locales: NodeJS.ProcessEnv[] = [
+      { LANG: 'C', LC_ALL: 'C' },
+      { LANG: 'sv_SE.UTF-8', LC_ALL: 'sv_SE.UTF-8' },
+      { LANG: 'de_DE.UTF-8', LC_ALL: 'de_DE.UTF-8' },
+      { LANG: 'zh_CN.UTF-8', LC_ALL: 'zh_CN.UTF-8' },
+    ];
+    const outputs = locales.map((env) => runCheckPollution([`--project=${projectDir}`], REPO_ROOT, env));
+    for (const out of outputs) expect(out.code).toBe(1);
+    const baseline = outputs[0]!.stdout;
+    expect(baseline).toContain('POLLUTION_JSON');
+    for (const out of outputs) expect(out.stdout).toBe(baseline); // 跨 locale 逐字节一致
+
+    const payload = pollutionJson(baseline) as { findings: Array<{ path: string }> };
+    const paths = payload.findings.map((f) => f.path);
+    expect(paths).toEqual([...paths].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)));
+    expect(paths).toHaveLength(4);
   });
 
   it('--project 不存在 / 空值 / 裸 --project（空格形态）→ exit 2', async () => {

@@ -30,7 +30,7 @@
  */
 /* eslint-disable security/detect-non-literal-fs-filename -- Vitest artifacts are admitted only after controlled-root, sibling, provenance, current-HEAD, hash, and measurement checks. */
 
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -40,6 +40,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 import { exitWithError } from '../lib/cli-error.js';
+import { buildExit2Probes } from '../lib/exit2-probe-registry.js';
 import { runMain } from '../lib/run-main.js';
 import { runSync } from '../lib/run-sync.js';
 import { printGateReport, printJsonReport } from '../lib/gate-report.js';
@@ -141,14 +142,6 @@ export function detectScriptsChanges(root: string): boolean {
  * 读取根目录 .eslintsecurity-baseline.json 的指纹条目数。
  * 返回：-1 = 缺失或不可解析；0 = 存在但 entries 为空；>0 = 正常指纹条目数。
  */
-interface Exit2Probe {
-  script: string;
-  args: string[];
-  cwd?: string;
-  env?: NodeJS.ProcessEnv;
-  outputPath?: string;
-}
-
 interface Exit2ProbeResult {
   probeId: string;
   script: string;
@@ -216,12 +209,6 @@ function normalizeRawErrorJson(value: Record<string, unknown>, probeRoot: string
 
 async function collectExit2ScriptResults(root: string, cliScriptFiles: string[]): Promise<Exit2ProbeResult[]> {
   const probeRoot = join(tmpdir(), `w-model-exit2-probe-${process.pid}`);
-  const invalidStatusProject = join(probeRoot, 'invalid-status-project');
-  const metricsProbeProject = join(probeRoot, 'probe-project');
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- mktemp-owned probe fixture path
-  mkdirSync(join(invalidStatusProject, '.w-model'), { recursive: true });
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- mktemp-owned probe fixture path
-  writeFileSync(join(invalidStatusProject, '.w-model', 'project.json'), '{', 'utf-8');
 
   const require = createRequire(import.meta.url);
   let tsxCli: string;
@@ -230,50 +217,9 @@ async function collectExit2ScriptResults(root: string, cliScriptFiles: string[])
   } catch {
     return [];
   }
-  const probes = new Map<string, Exit2Probe>();
-  for (const file of cliScriptFiles) {
-    if (
-      file === 'self-test.ts' ||
-      file === 'security-scan.ts' ||
-      file === 'wm-export-evidence.ts' ||
-      file === 'wm-status.ts' ||
-      file === 'metrics-report.ts'
-    )
-      continue;
-    const probeId = `${file}#invalid-argument`;
-    probes.set(probeId, { script: file, args: ['--d4-invalid-argument'] });
-  }
-  probes.set('security-scan.ts#missing-path', {
-    script: 'security-scan.ts',
-    args: [],
-    env: { ...process.env, PATH: '', Path: '' },
-  });
-  probes.set('metrics-report.ts#invalid-phase', {
-    script: 'metrics-report.ts',
-    args: [metricsProbeProject, '--phase=0', '--json'],
-    cwd: probeRoot,
-  });
-  const exportProbeRoot = join(probeRoot, 'export-probes');
-  const exportProject = join(exportProbeRoot, 'project');
-  const exportOutput = join(exportProbeRoot, 'output');
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- mktemp-owned probe fixture path
-  mkdirSync(join(exportProject, '.w-model'), { recursive: true });
-  probes.set('wm-export-evidence.ts#no-args', {
-    script: 'wm-export-evidence.ts',
-    args: [],
-    outputPath: exportOutput,
-  });
-  probes.set('wm-export-evidence.ts#unknown-option', {
-    script: 'wm-export-evidence.ts',
-    args: ['--d4-invalid-argument'],
-    outputPath: exportOutput,
-  });
-  probes.set('wm-export-evidence.ts#verify-missing-path', {
-    script: 'wm-export-evidence.ts',
-    args: ['--verify'],
-    outputPath: exportOutput,
-  });
-  probes.set('wm-status.ts#invalid-project', { script: 'wm-status.ts', args: [invalidStatusProject] });
+  // 探针定义（含 4 个门禁的专用参数与 fixture）来自唯一登记处 lib/exit2-probe-registry.ts，
+  // 此处只提供探针工作根；本函数不再自行拼装探针，避免与 check-samples-coverage 的探针漂移。
+  const probes = buildExit2Probes({ cliScriptFiles, workRoot: probeRoot });
   try {
     const results = await Promise.all(
       [...probes.entries()].map(async ([probeId, probe]): Promise<Exit2ProbeResult> => {
@@ -730,6 +676,18 @@ async function main(): Promise<void> {
   const cliScriptFiles = readdirSync(join(root, 'w-model-dev/scripts/cli'))
     .filter((f) => f.endsWith('.ts'))
     .sort();
+  // tests-matrix 数据源：覆盖矩阵 README 原文（缺失记 null，供检查 fail-closed 报 tests-matrix-missing）
+  // + 在盘 *.test.ts 文件名清单。目录与 README 均为受控仓库相对路径，只读。
+  const testsReadmePath = join(root, 'w-model-dev/scripts/__tests__/README.md');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控仓库相对路径（repo-root 下 __tests__/README.md），仅作存在性探测
+  const testsReadme = existsSync(testsReadmePath) ? readFileSync(testsReadmePath, 'utf-8') : null;
+  const testsMatrix = {
+    readme: testsReadme,
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控仓库相对路径（repo-root 下 __tests__），仅列目录条目名、零写入
+    testFiles: readdirSync(join(root, 'w-model-dev/scripts/__tests__'))
+      .filter((f) => f.endsWith('.test.ts'))
+      .sort(),
+  };
   const exit2ProbeResults = await collectExit2ScriptResults(root, cliScriptFiles);
   const exit2ScriptCount = countValidExit2Scripts(exit2ProbeResults);
   const designDocs = DESIGN_DOC_NAMES.map((name) => ({ name, content: read(join('docs', name)) }));
@@ -864,6 +822,7 @@ async function main(): Promise<void> {
     skillPkgDocs: collectSkillPkgDocs(root),
     orphanAuditDocs,
     agentsNav: { agents: read('AGENTS.md'), cliScriptFiles },
+    testsMatrix,
     localEvidenceDocs: [
       { name: 'README.md', content: read('README.md') },
       { name: 'AGENTS.md', content: read('AGENTS.md') },

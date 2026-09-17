@@ -15,12 +15,14 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { runSync } from '../lib/run-sync.js';
 import * as gateLogic from '../logic/gate-logic.js';
 
 const AFTER_CUTOFF = '2026-09-15T10:00:00.000Z';
@@ -571,4 +573,59 @@ describe('M07 测试证据门禁规则（E1-E4，严格证据模式）', () => {
     expect(before.testEvidence?.legacy).toBe(0);
     expect(before.testEvidence?.e4).toBe(2);
   });
+});
+
+// ==================== CLI 三态链路（真实 check-artifact-gate.ts 子进程，任务 7 步骤 4） ====================
+
+/**
+ * 纯函数覆盖证明「规则算得对」，但不证明「CLI 把它接到了 stdout/退出码上」。
+ * 本组用真实子进程钉住可达到的两态（业务违规 exit 1 / 输入错误 exit 2）——
+ * exit 0 态需要一份能通过阶段 8 全部外检的完整项目（bdd-manifest、cucumber 报告、
+ * codegraph scope、opsx 制品…），仓库内不存在该 fixture，故未在此断言（见任务报告「未完成项」）。
+ */
+describe('M07 CLI 三态链路（真实子进程）', () => {
+  const tsxCli = createRequire(import.meta.url).resolve('tsx/cli');
+  const gateScript = join(import.meta.dirname, '../cli/check-artifact-gate.ts');
+  const validRtmSource = readFileSync(join(import.meta.dirname, '../samples/gate/valid-rtm.json'), 'utf-8');
+
+  function makeProject(mutate?: (rtm: Record<string, unknown>) => void): string {
+    const dir = mkdtempSync(join(tmpdir(), 'wm-m07-cli-'));
+    mkdirSync(join(dir, '.w-model'), { recursive: true });
+    const rtm = JSON.parse(validRtmSource) as Record<string, unknown>;
+    if (mutate !== undefined) mutate(rtm);
+    writeFileSync(join(dir, '.w-model', 'rtm.json'), JSON.stringify(rtm), 'utf-8');
+    return dir;
+  }
+
+  function runGate(args: readonly string[]): { status: number | null; stdout: string; stderr: string } {
+    const result = runSync(process.execPath, [tsxCli, gateScript, ...args, '--json'], { timeout: 120_000 });
+    return { status: result.status, stdout: String(result.stdout ?? ''), stderr: String(result.stderr ?? '') };
+  }
+
+  it('业务违规：阶段层 total>0 缺 evidence → exit 1，GATE_JSON reasons 含 M07 E4', () => {
+    const dir = makeProject((rtm) => {
+      const summary = rtm.executionSummary as Record<string, Record<string, unknown>>;
+      delete summary.systemTest!.evidence;
+    });
+    try {
+      const result = runGate([dir, '--phase=8']);
+      expect(result.status).toBe(1);
+      const report = JSON.parse(result.stdout) as { passed: boolean; reasons: string[] };
+      expect(report.passed).toBe(false);
+      expect(report.reasons.join('\n')).toMatch(/RTM 测试证据 E4/);
+      // 违规文案用层的显示名（阶段层键 systemTest → 「系统测试」），并带上 total 与「缺 evidence」事实
+      expect(report.reasons.join('\n')).toContain('系统测试 total=12>0 但缺 evidence');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  it('输入错误：项目目录不存在 → exit 2 且 stdout 为 ERROR_JSON（不产出 GATE_JSON）', () => {
+    const missing = join(tmpdir(), `wm-m07-missing-${String(Date.now())}`);
+    const result = runGate([missing, '--phase=8']);
+    expect(result.status).toBe(2);
+    expect(result.stdout).toContain('ERROR_JSON');
+    expect(result.stdout).not.toContain('"type":"artifact"');
+    expect(result.stderr).toMatch(/✗ \[/);
+  }, 120_000);
 });

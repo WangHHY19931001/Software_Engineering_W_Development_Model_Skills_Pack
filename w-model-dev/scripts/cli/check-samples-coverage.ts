@@ -12,8 +12,18 @@
  * 第 4 条规则（M06 / S28，P2-A 任务 2）：负向覆盖不变量——`cli/*.ts` 减去 `self-test.ts` 的每个
  * exit-2 门禁必须在 samples/NEGATIVE-COVERAGE.md 登记一条会失败的负向案例（fixture / invocation /
  * mutated-copy）。门禁集合从既有事实源（cli 目录）推导，不另写硬编码清单：
- *   - 未登记 → negative-coverage-missing（exit 1）；
- *   - fixture 机制行的证据路径在盘不存在 → negative-coverage-dangling（exit 1）。
+ *   - 未登记 → negative-coverage-missing（exit 1）。
+ *
+ * 第 5 条规则（M06 / S28 强化，本轮）：登记册必须**严格且可执行**——
+ *   - 语法严格：每行恰四列（门禁名 / 机制 / 证据 / 所防回归），缺列 / 空格 / 未知机制 / 未知门禁 /
+ *     重复门禁 / 空证据各自产出**具名** blocking 违规（旧实现静默跳过坏行，等于把「写坏」当「写全」）；
+ *   - 证据可解析：`fixture` 证据必须是项目内真实路径；`invocation` / `mutated-copy` 证据必须解析为
+ *     「文件:行号」且文件存在、行号为不超过文件总行数的正整数（正文里只写一句「由某任务提供」不算证据）；
+ *   - 真实 exit-2 探针：逐门禁**串行**执行 `lib/exit2-probe-registry.ts`（与 check-docs-consistency
+ *     中心探针同源）中的负向调用，断言 exit code = 2、stdout 含可解析的 `ERROR_JSON`（exitCode=2 且
+ *     category 属 exit-2 类别）、stderr 含同名类别的人类错误行，且隔离探针根在调用前后**逐项不变**
+ *     （门禁失败不得留下半成品）。探针异常即 negative-coverage-probe-failed（exit 1）——
+ *     探针不可用（tsx 无法解析）按失败处理，绝不静默跳过。
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts [repo-root] [--json]
@@ -23,8 +33,8 @@
  *   --json   机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
- *   0  全部覆盖（无未登记 fixture，矩阵声明齐全，引用无悬空，负向覆盖登记齐全）
- *   1  存在未登记 fixture / 引用悬空（dangling）/ 矩阵声明缺失 / 负向案例未登记或悬空（violations 列出）
+ *   0  全部覆盖（无未登记 fixture，矩阵声明齐全，引用无悬空，负向覆盖登记齐全且探针全部 exit 2）
+ *   1  存在未登记 fixture / 引用悬空（dangling）/ 矩阵声明缺失 / 负向登记册违规或探针失败（violations 列出）
  *   2  输入错误（repo-root 缺必需文件，含 samples/NEGATIVE-COVERAGE.md）
  *
  * 输出：
@@ -37,12 +47,23 @@
  * @module
  */
 
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, resolve as pathResolve } from 'node:path';
+import { execFile } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { isAbsolute, join, resolve as pathResolve } from 'node:path';
+import { promisify } from 'node:util';
 
 import { exitWithError } from '../lib/cli-error.js';
-import { runMain } from '../lib/run-main.js';
+import {
+  buildExit2Probes,
+  EXIT2_ERROR_CATEGORIES,
+  listGateScripts,
+  type Exit2Probe,
+} from '../lib/exit2-probe-registry.js';
 import { printGateReport, printJsonReport } from '../lib/gate-report.js';
+import { runMain } from '../lib/run-main.js';
+import { parseJsonSafe } from '../lib/safe-json.js';
 
 /**
  * 豁免子目录：不参与「fixture 被 self-test 引用」核对，仅要求 README 矩阵声明。
@@ -62,6 +83,12 @@ const SKIP_NAMES = new Set(['.w-model', 'states', 'README.md', 'NEGATIVE-COVERAG
 /** 负向案例机制（NEGATIVE-COVERAGE.md 第 2 列，只允许这三值） */
 const NEGATIVE_MECHANISMS = new Set(['fixture', 'invocation', 'mutated-copy']);
 
+/** 登记册表格列数（门禁脚本 / 负向机制 / 负向案例·证据位置 / 所防回归） */
+const NEGATIVE_COLUMNS = 4;
+
+/** 单次 exit-2 探针的子进程超时（与中心探针同量级；超时按探针失败处理） */
+const PROBE_TIMEOUT_MS = 60_000;
+
 /** NEGATIVE-COVERAGE.md 的一行登记 */
 interface NegativeEntry {
   /** 门禁基名（cli/<name>.ts 去掉 .ts） */
@@ -70,6 +97,38 @@ interface NegativeEntry {
   mechanism: string;
   /** 证据位置：fixture 为 `samples/...`；invocation / mutated-copy 为 文件:行号 */
   evidence: string;
+  /** 所防回归（第 4 列，必填非空） */
+  regression: string;
+  /** 登记行在 NEGATIVE-COVERAGE.md 内的 1-based 行号（违规定位用） */
+  line: number;
+}
+
+/** 登记册解析结果：合法行 + 语法坏行（坏行不得被静默丢弃） */
+interface NegativeParse {
+  entries: NegativeEntry[];
+  /** 语法坏行：`<描述>`（含行号），逐条转成 negative-coverage-malformed 违规 */
+  malformed: string[];
+}
+
+/** 单条登记的证据校验结果 */
+interface EvidenceIssue {
+  code: string;
+  message: string;
+}
+
+/** 一次 exit-2 探针的执行结果 */
+interface ProbeOutcome {
+  probeId: string;
+  gate: string;
+  status: number;
+  /** stdout 存在可解析 ERROR_JSON 且 exitCode=2、category 属 exit-2 类别 */
+  errorJsonOk: boolean;
+  /** stderr 存在与 ERROR_JSON 同类别的人类错误行 */
+  humanErrorOk: boolean;
+  /** 探针根在调用前后逐项相等的违反描述（为空表示未新增/未删除任何条目） */
+  treeDrift: string[];
+  /** 失败原因（为空表示该探针通过） */
+  reasons: string[];
 }
 
 /** 从 self-test.ts 提取的引用集合 */
@@ -223,26 +282,66 @@ function findUndeclaredDirs(samplesRoot: string, readmeContent: string): string[
   return undeclared;
 }
 
+/** 剥离单元格首尾反引号 */
+function stripBackticks(cell: string): string {
+  return cell.replace(/^`/, '').replace(/`$/, '');
+}
+
 /**
- * 解析 samples/NEGATIVE-COVERAGE.md 的表格行：首单元格 = 门禁基名，第 2 列 = 机制，第 3 列 = 证据。
- * 仅接受三值枚举机制且证据非空的行（表头 / 分隔行 / 空行跳过），避免「写了行但不构成负向案例」的假登记。
+ * 解析 samples/NEGATIVE-COVERAGE.md 的表格行（第 5 条规则，语法严格）：
+ * 每行恰 `NEGATIVE_COLUMNS` 列且四列均非空；表头（首列「门禁脚本」）/ 分隔行 / 非表行跳过。
+ * 列数不符或存在空列的行**不丢弃**，而是作为 malformed 记录（旧实现在此处 `continue`，
+ * 于是一行写坏的登记会被当作「没写」→ 只在门禁恰好也漏登记时才暴露，掩盖真实缺陷）。
  */
-function parseNegativeCoverage(content: string): NegativeEntry[] {
+function parseNegativeCoverage(content: string): NegativeParse {
   const entries: NegativeEntry[] = [];
-  for (const line of content.split('\n')) {
-    if (!/^\s*\|/.test(line)) continue;
-    const cells = line
+  const malformed: string[] = [];
+  const lines = content.split('\n');
+  for (let index = 0; index < lines.length; index++) {
+    // eslint-disable-next-line security/detect-object-injection -- 受控数组下标（0..lines.length-1），读的是本函数自己 split 出的登记册行
+    const raw = lines[index]!;
+    if (!/^\s*\|/.test(raw)) continue;
+    const lineNumber = index + 1;
+    const cells = raw
       .replace(/^\s*\|/, '')
+      .replace(/\|\s*$/, '')
       .split('|')
       .map((c) => c.trim());
-    const name = (cells[0] ?? '').replace(/^`/, '').replace(/`$/, '');
-    if (name === '' || name === '门禁脚本' || /^-+$/.test(name)) continue;
-    const mechanism = (cells[1] ?? '').replace(/^`/, '').replace(/`$/, '');
+    const name = stripBackticks(cells[0] ?? '');
+    if (name === '' || name === '门禁脚本' || /^-+$/.test(name)) continue; // 表头 / 分隔行
+    if (cells.length !== NEGATIVE_COLUMNS) {
+      malformed.push(`第 ${lineNumber} 行「${name}」列数为 ${cells.length}，应为 ${NEGATIVE_COLUMNS} 列`);
+      continue;
+    }
+    const mechanism = stripBackticks(cells[1] ?? '');
     const evidence = cells[2] ?? '';
-    if (!NEGATIVE_MECHANISMS.has(mechanism) || evidence === '') continue;
-    entries.push({ name, mechanism, evidence });
+    const regression = cells[3] ?? '';
+    if (mechanism === '' || evidence === '' || regression === '') {
+      malformed.push(
+        `第 ${lineNumber} 行「${name}」存在空列（机制=${mechanism === '' ? '空' : mechanism}，证据=${evidence === '' ? '空' : '有'}，所防回归=${regression === '' ? '空' : '有'}）`,
+      );
+      continue;
+    }
+    entries.push({ name, mechanism, evidence, regression, line: lineNumber });
   }
-  return entries;
+  return { entries, malformed };
+}
+
+/**
+ * 门禁集合口径：`cli/*.ts` 减去 `self-test.ts`（与中心探针、exit2-failure-atomicity 同一口径，
+ * 由共享注册表 `lib/exit2-probe-registry.ts` 的 `listGateScripts` 定义）。
+ * 返回**基名**（去掉 `.ts`）——与 NEGATIVE-COVERAGE.md 第 1 列同口径；探针注册表用文件名，二者在
+ * 调用探针时按 `<基名>.ts` 映射。
+ */
+function listGateBaseNames(cliScriptFiles: readonly string[]): string[] {
+  return listGateScripts(cliScriptFiles).map((file) => file.slice(0, -'.ts'.length));
+}
+
+/** cli/ 下的脚本文件名列表（含 `.ts`；探针注册表口径） */
+function listCliScriptFiles(root: string): string[] {
+  const cliDir = join(root, 'w-model-dev/scripts/cli');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控固定相对路径（repo-root 下 w-model-dev/scripts/cli），仅列目录条目名、不做任何写入
+  return readdirSync(cliDir).filter((f) => f.endsWith('.ts'));
 }
 
 /** fixture 机制行的证据路径（`samples/...`，相对 w-model-dev/scripts/）；无法解析返回 null */
@@ -253,32 +352,210 @@ function extractFixturePath(evidence: string): string | null {
   return trimmed === '' ? null : trimmed;
 }
 
-/** 门禁集合口径：w-model-dev/scripts/cli/*.ts 减去 self-test.ts（与 check-docs-consistency 中心探针一致） */
-function listGateNames(root: string): string[] {
-  const cliDir = join(root, 'w-model-dev/scripts/cli');
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控固定相对路径（repo-root 下 w-model-dev/scripts/cli），仅列目录条目名、不做任何写入
-  return readdirSync(cliDir)
-    .filter((f) => f.endsWith('.ts') && f !== 'self-test.ts')
-    .map((f) => f.slice(0, -'.ts'.length))
-    .sort();
-}
-
-/** 负向清单未登记的门禁（每个 exit-2 门禁须有会失败的负向案例） */
-function findMissingNegativeGates(root: string, entries: NegativeEntry[]): string[] {
-  const registered = new Set(entries.map((e) => e.name));
-  return listGateNames(root).filter((name) => !registered.has(name));
-}
-
-/** fixture 机制行中证据路径在盘不存在（或无法解析）的条目 */
-function findDanglingNegativeFixtures(root: string, entries: NegativeEntry[]): string[] {
-  const dangling: string[] = [];
-  for (const e of entries) {
-    if (e.mechanism !== 'fixture') continue;
-    const rel = extractFixturePath(e.evidence);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控清单条目（NEGATIVE-COVERAGE.md 内 samples/ 相对路径），仅作存在性探测
-    if (rel === null || !existsSync(join(root, 'w-model-dev/scripts', rel))) dangling.push(rel ?? e.evidence);
+/**
+ * `invocation` / `mutated-copy` 证据必须解析为「文件:行号」：文件相对 repo-root、
+ * 行号为 1..文件总行数 内的正整数。只写一句「由某任务提供」的正文描述**不是证据**。
+ */
+function validateFileLineEvidence(root: string, evidence: string): EvidenceIssue | null {
+  const match = evidence.match(/([A-Za-z0-9._@/-]+\.(?:ts|tsx|mts|cts|js|mjs|cjs|json|jsonl|md|sh)):(\d+)/);
+  if (match === null) {
+    return {
+      code: 'negative-coverage-evidence-invalid',
+      message: `证据未解析出「文件:行号」：${evidence}（invocation / mutated-copy 必须指向真实测试文件的具体行）`,
+    };
   }
-  return dangling;
+  const relPath = match[1]!;
+  const lineNumber = Number(match[2]);
+  const absolute = isAbsolute(relPath) ? relPath : join(root, relPath);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 登记册声明的受控仓库相对路径，仅作存在性探测
+  if (!existsSync(absolute)) {
+    return {
+      code: 'negative-coverage-evidence-invalid',
+      message: `证据文件不存在：${relPath}（相对 repo-root 解析）`,
+    };
+  }
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，只读计算行数
+  const lineCount = readFileSync(absolute, 'utf-8').split('\n').length;
+  if (lineNumber < 1 || lineNumber > lineCount) {
+    return {
+      code: 'negative-coverage-evidence-invalid',
+      message: `证据行号越界：${relPath}:${lineNumber}（文件共 ${lineCount} 行）`,
+    };
+  }
+  return null;
+}
+
+/** 逐条登记的证据校验（机制枚举 / 证据可解析 / fixture 在盘） */
+function validateEntries(root: string, entries: readonly NegativeEntry[]): Array<{ check: string; message: string }> {
+  const violations: Array<{ check: string; message: string }> = [];
+  for (const entry of entries) {
+    if (!NEGATIVE_MECHANISMS.has(entry.mechanism)) {
+      violations.push({
+        check: 'negative-coverage-unknown-mechanism',
+        message: `「${entry.name}」的负向机制不在 fixture/invocation/mutated-copy 内：${entry.mechanism}（第 ${entry.line} 行）`,
+      });
+      continue;
+    }
+    if (entry.mechanism === 'fixture') {
+      const rel = extractFixturePath(entry.evidence);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控清单条目（NEGATIVE-COVERAGE.md 内 samples/ 相对路径），仅作存在性探测
+      const onDisk = rel !== null && existsSync(join(root, 'w-model-dev/scripts', rel));
+      if (!onDisk) {
+        violations.push({
+          check: 'negative-coverage-dangling',
+          message: `负向案例指向不存在的 fixture：${rel ?? entry.evidence}（第 ${entry.line} 行）`,
+        });
+      }
+      continue;
+    }
+    const issue = validateFileLineEvidence(root, entry.evidence);
+    if (issue !== null) {
+      violations.push({ check: issue.code, message: `${issue.message}（第 ${entry.line} 行）` });
+    }
+  }
+  return violations;
+}
+
+/** 递归列举探针根下的相对条目（目录带尾斜杠），排序后用于前后逐项比对 */
+function listProbeTree(root: string): string[] {
+  const found: string[] = [];
+  const walk = (directory: string, prefix: string): void => {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 进程内 mkdtemp 探针根下的受控遍历，只读
+    const dirents = readdirSync(directory, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1));
+    for (const dirent of dirents) {
+      const child = prefix === '' ? dirent.name : `${prefix}/${dirent.name}`;
+      if (dirent.isDirectory()) {
+        found.push(`${child}/`);
+        walk(join(directory, dirent.name), child);
+      } else {
+        found.push(child);
+      }
+    }
+  };
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上
+  if (!existsSync(root)) return found;
+  walk(root, '');
+  return found.sort();
+}
+
+/**
+ * 逐门禁**串行**执行 exit-2 探针（第 5 条规则）：
+ * 每次调用前后比对隔离探针根的条目集合，断言 exit 2 + ERROR_JSON + 人类错误 + 无半成品。
+ * 返回逐探针结果；调用方把 `reasons` 非空的结果转成 negative-coverage-probe-failed。
+ */
+async function runExit2Probes(
+  root: string,
+  gateBaseNames: readonly string[],
+  cliScriptFiles: readonly string[],
+): Promise<{ outcomes: ProbeOutcome[]; setupFailure: string | null }> {
+  const require = createRequire(import.meta.url);
+  let tsxCli: string;
+  try {
+    tsxCli = require.resolve('tsx/cli');
+  } catch (error) {
+    // fail-closed：探针不可用不得退化成「没有失败」
+    return { outcomes: [], setupFailure: `tsx 不可用，无法执行 exit-2 探针：${(error as Error).message}` };
+  }
+  const execFileAsync = promisify(execFile);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 本进程拥有的 OS 临时探针根
+  const workRoot = mkdtempSync(join(tmpdir(), 'samples-coverage-probe-'));
+  const outcomes: ProbeOutcome[] = [];
+  try {
+    const probes = buildExit2Probes({ cliScriptFiles, workRoot });
+    const byGate = new Map<string, Array<{ probeId: string; probe: Exit2Probe }>>();
+    for (const [probeId, probe] of probes) {
+      const list = byGate.get(probe.script) ?? [];
+      list.push({ probeId, probe });
+      byGate.set(probe.script, list);
+    }
+    for (const gateBase of gateBaseNames) {
+      const gateProbes = byGate.get(`${gateBase}.ts`) ?? [];
+      if (gateProbes.length === 0) {
+        outcomes.push({
+          probeId: `${gateBase}#<registry-missing>`,
+          gate: gateBase,
+          status: -1,
+          errorJsonOk: false,
+          humanErrorOk: false,
+          treeDrift: [],
+          reasons: ['探针注册表中没有该门禁的负向调用定义（lib/exit2-probe-registry.ts）'],
+        });
+        continue;
+      }
+      for (const { probeId, probe } of gateProbes) {
+        const before = listProbeTree(workRoot);
+        let status = 0;
+        let stdout = '';
+        let stderr = '';
+        try {
+          const result = await execFileAsync(
+            process.execPath,
+            [tsxCli, join(root, 'w-model-dev/scripts/cli', probe.script), ...probe.args],
+            {
+              cwd: probe.cwd ?? workRoot,
+              ...(probe.env === undefined ? {} : { env: probe.env }),
+              encoding: 'utf8',
+              timeout: PROBE_TIMEOUT_MS,
+              maxBuffer: 64 * 1024 * 1024,
+            },
+          );
+          stdout = String(result.stdout ?? '');
+          stderr = String(result.stderr ?? '');
+        } catch (error) {
+          const childError = error as NodeJS.ErrnoException & {
+            stdout?: string;
+            stderr?: string;
+            code?: number | string;
+          };
+          stdout = String(childError.stdout ?? '');
+          stderr = String(childError.stderr ?? '');
+          status = typeof childError.code === 'number' ? childError.code : -1;
+        }
+        const after = listProbeTree(workRoot);
+        const beforeSet = new Set(before);
+        const afterSet = new Set(after);
+        const treeDrift = [
+          ...after.filter((p) => !beforeSet.has(p)).map((p) => `新增 ${p}`),
+          ...before.filter((p) => !afterSet.has(p)).map((p) => `丢失 ${p}`),
+        ];
+
+        const jsonLine = stdout.split(/\r?\n/).find((line) => line.startsWith('ERROR_JSON '));
+        let category: string | null = null;
+        let errorExitCode: number | null = null;
+        if (jsonLine !== undefined) {
+          const parsed = parseJsonSafe(jsonLine.slice('ERROR_JSON '.length)) as unknown;
+          if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            const record = parsed as Record<string, unknown>;
+            category = typeof record.category === 'string' ? record.category : null;
+            errorExitCode = typeof record.exitCode === 'number' ? record.exitCode : null;
+          }
+        }
+        const errorJsonOk =
+          jsonLine !== undefined &&
+          errorExitCode === 2 &&
+          category !== null &&
+          (EXIT2_ERROR_CATEGORIES as readonly string[]).includes(category);
+        const humanErrorOk = category !== null && stderr.includes(`✗ [${category}]`);
+
+        const reasons: string[] = [];
+        if (status !== 2) reasons.push(`exit code 应为 2，实际 ${status}`);
+        if (!errorJsonOk) {
+          reasons.push(
+            jsonLine === undefined
+              ? 'stdout 缺少 ERROR_JSON 单行'
+              : `ERROR_JSON 不合规（exitCode=${String(errorExitCode)}，category=${String(category)}）`,
+          );
+        }
+        if (!humanErrorOk) reasons.push(`stderr 缺少与 ERROR_JSON 同类别的人类错误行（${String(category)}）`);
+        if (treeDrift.length > 0) reasons.push(`隔离探针根被改动：${treeDrift.join('，')}`);
+        outcomes.push({ probeId, gate: gateBase, status, errorJsonOk, humanErrorOk, treeDrift, reasons });
+      }
+    }
+  } finally {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 本进程拥有的 OS 临时探针根
+    rmSync(workRoot, { recursive: true, force: true });
+  }
+  return { outcomes, setupFailure: null };
 }
 
 async function main(): Promise<void> {
@@ -309,10 +586,44 @@ async function main(): Promise<void> {
   const uncovered = findUncovered(samplesRoot, refs);
   const dangling = findDanglingRefs(samplesRoot, refs);
   const undeclared = findUndeclaredDirs(samplesRoot, readFileSync(readmePath, 'utf-8'));
+
+  // 第 4 / 5 条规则：负向覆盖登记册（严格语法 + 证据可解析 + 真实 exit-2 探针）
+  const cliScriptFiles = listCliScriptFiles(root);
+  const gateBaseNames = listGateBaseNames(cliScriptFiles);
+  const gateBaseNameSet = new Set(gateBaseNames);
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控固定文件名（repo-root 下 samples/NEGATIVE-COVERAGE.md），只读不写
-  const negativeEntries = parseNegativeCoverage(readFileSync(negativePath, 'utf-8'));
-  const missingNegative = findMissingNegativeGates(root, negativeEntries);
-  const danglingNegative = findDanglingNegativeFixtures(root, negativeEntries);
+  const negativeParse = parseNegativeCoverage(readFileSync(negativePath, 'utf-8'));
+  const registeredNames = new Set<string>();
+  const duplicateViolations: Array<{ check: string; message: string }> = [];
+  const unknownGateViolations: Array<{ check: string; message: string }> = [];
+  const firstSeenLine = new Map<string, number>();
+  for (const entry of negativeParse.entries) {
+    const previousLine = firstSeenLine.get(entry.name);
+    if (previousLine !== undefined) {
+      duplicateViolations.push({
+        check: 'negative-coverage-duplicate',
+        message: `门禁「${entry.name}」登记了多行（第 ${previousLine} 行与第 ${entry.line} 行）；每个 exit-2 门禁恰一行`,
+      });
+      continue;
+    }
+    firstSeenLine.set(entry.name, entry.line);
+    registeredNames.add(entry.name);
+    if (!gateBaseNameSet.has(entry.name)) {
+      unknownGateViolations.push({
+        check: 'negative-coverage-unknown-gate',
+        message: `登记的门禁「${entry.name}」不在 exit-2 门禁集合内（cli/*.ts 减去 self-test.ts，第 ${entry.line} 行）`,
+      });
+    }
+  }
+  const missingNegative = gateBaseNames.filter((name) => !registeredNames.has(name));
+  const evidenceViolations = validateEntries(root, negativeParse.entries);
+
+  const probeGateBaseNames = gateBaseNames.filter((name) => registeredNames.has(name));
+  const probeRun = await runExit2Probes(root, probeGateBaseNames, cliScriptFiles);
+  const probeFailures =
+    probeRun.setupFailure === null
+      ? probeRun.outcomes.filter((o) => o.reasons.length > 0)
+      : [{ probeId: '<setup>', gate: '<all>', status: -1, reasons: [probeRun.setupFailure] }];
 
   const violations: Array<{ check: string; message: string }> = [
     ...uncovered.map((rel) => ({
@@ -331,9 +642,16 @@ async function main(): Promise<void> {
       check: 'negative-coverage-missing',
       message: `samples/NEGATIVE-COVERAGE.md 未登记负向案例：${name}（每个 exit-2 门禁须有会失败的负向案例）`,
     })),
-    ...danglingNegative.map((rel) => ({
-      check: 'negative-coverage-dangling',
-      message: `负向案例指向不存在的 fixture：${rel}`,
+    ...negativeParse.malformed.map((detail) => ({
+      check: 'negative-coverage-malformed',
+      message: `负向覆盖登记行不合法：${detail}`,
+    })),
+    ...duplicateViolations,
+    ...unknownGateViolations,
+    ...evidenceViolations,
+    ...probeFailures.map((outcome) => ({
+      check: 'negative-coverage-probe-failed',
+      message: `exit-2 探针未通过：${outcome.probeId}（${outcome.reasons.join('；')}）`,
     })),
   ];
 
@@ -358,7 +676,8 @@ async function main(): Promise<void> {
   console.log('Samples Coverage Checker');
   console.log('─'.repeat(60));
   for (const v of violations) console.log(`✗ [${v.check}] ${v.message}`);
-  if (violations.length === 0) console.log('✓ 全部 fixture 已被 self-test.ts 引用，矩阵声明齐全');
+  if (violations.length === 0)
+    console.log('✓ 全部 fixture 已被 self-test.ts 引用，矩阵声明齐全，负向登记册与 exit-2 探针一致');
   printGateReport(
     'SAMPLES_COVERAGE',
     {
@@ -369,7 +688,10 @@ async function main(): Promise<void> {
       danglingRefs: dangling.length,
       undeclaredDirs: undeclared.length,
       negativeCoverageMissing: missingNegative.length,
-      negativeCoverageDangling: danglingNegative.length,
+      negativeCoverageDangling: evidenceViolations.filter((v) => v.check === 'negative-coverage-dangling').length,
+      negativeCoverageRows: negativeParse.entries.length,
+      negativeCoverageProbes: probeRun.outcomes.length,
+      negativeCoverageProbeFailures: probeFailures.length,
     },
     violations.length === 0 ? 0 : 1,
   );

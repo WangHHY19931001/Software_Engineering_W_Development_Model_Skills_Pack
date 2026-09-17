@@ -51,8 +51,10 @@ async function scanProject(root: string): Promise<PollutionFinding[]> {
   async function walk(absDir: string, relPrefix: string): Promise<void> {
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- absDir 为只读扫描根（--project 校验后）的受控递归，剪除 node_modules/.git，全程零写入
     const entries: Dirent[] = await fs.readdir(absDir, { withFileTypes: true });
-    // 排序保证发现顺序确定（同输入同输出，可复现二分）
-    entries.sort((a, b) => a.name.localeCompare(b.name));
+    // 排序保证发现顺序确定（同输入同输出，可复现二分）。
+    // 必须用 locale 无关的码元比较：localeCompare 的次序随 LANG/LC_ALL 变化（非 ASCII 名称尤其明显），
+    // 会让同一棵污染树在不同环境下给出不同的 findings 顺序与 POLLUTION_JSON 字节。
+    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
     for (const entry of entries) {
       const rel = relPrefix === '' ? entry.name : `${relPrefix}/${entry.name}`;
       if (entry.isDirectory()) {

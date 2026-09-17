@@ -21,6 +21,7 @@ import {
   checkSkillOutboundLinks,
   checkOrphanReferences,
   checkAgentsNavCoverage,
+  checkTestsMatrixCoverage,
   ORPHAN_REFERENCE_EXEMPTIONS,
   checkSchemaFieldDescriptions,
   type DocConsistencyInput,
@@ -2627,13 +2628,44 @@ describe('S31 完整性审计双维度（orphan-reference / agents-nav-missing�
     const v = runDocConsistencyChecks(
       baseInput({
         agentsNav: {
-          agents: '# AGENTS\n| wm-write.ts | 状态写 |',
+          agents: '# AGENTS\n## 8. 脚本导航表\n| wm-write.ts | 状态写 |',
           cliScriptFiles: ['wm-write.ts', 'check-tla-model.ts'],
         },
       }),
     ).filter((x) => x.check === 'agents-nav-missing');
     expect(v).toHaveLength(1);
     expect(v[0]!.message).toContain('check-tla-model');
+  });
+
+  it('§8 表外正文提及基名（表格行被删）→ 仍报 agents-nav-missing（子串不再算登记）', () => {
+    const agents = [
+      '# AGENTS',
+      '正文顺带提到 check-tla-model 这个名字，但 §8 表里没有它的行。',
+      '## 8. 脚本导航表',
+      '| wm-write.ts | 状态写 |',
+    ].join('\n');
+    const v = runDocConsistencyChecks(
+      baseInput({ agentsNav: { agents, cliScriptFiles: ['wm-write.ts', 'check-tla-model.ts'] } }),
+    ).filter((x) => x.check === 'agents-nav-missing');
+    expect(v).toHaveLength(1);
+    expect(v[0]!.message).toContain('check-tla-model');
+  });
+
+  it('相似前缀行（check-foo-bar.ts）不能让 check-foo.ts 通过（精确名匹配，非子串）', () => {
+    const agents = '## 8. 脚本导航表\n| check-foo-bar.ts | 别的门禁 |';
+    const v = runDocConsistencyChecks(baseInput({ agentsNav: { agents, cliScriptFiles: ['check-foo.ts'] } })).filter(
+      (x) => x.check === 'agents-nav-missing',
+    );
+    expect(v).toHaveLength(1);
+    expect(v[0]!.message).toContain('check-foo.ts');
+  });
+
+  it('§8 表外的同章节代码块不算登记（只认表格行首单元格）', () => {
+    const agents = '## 8. 脚本导航表\n\n```text\ncheck-tla-model.ts\n```\n';
+    const v = runDocConsistencyChecks(
+      baseInput({ agentsNav: { agents, cliScriptFiles: ['check-tla-model.ts'] } }),
+    ).filter((x) => x.check === 'agents-nav-missing');
+    expect(v).toHaveLength(1);
   });
 
   it('全部 cli 基名以子串出现（§8 表含 .ts 后缀形态）→ 零 agents-nav-missing 违规', () => {
@@ -2651,6 +2683,55 @@ describe('S31 完整性审计双维度（orphan-reference / agents-nav-missing�
 
   it('checkAgentsNavCoverage undefined 注入 → 跳过（零违规）', () => {
     expect(checkAgentsNavCoverage(undefined)).toEqual([]);
+  });
+
+  // ---- tests-matrix：__tests__/README.md 覆盖矩阵 ↔ 在盘 *.test.ts 集合双向相等（任务 7）----
+
+  it('checkTestsMatrixCoverage undefined 注入 → 跳过（零违规，fixture 兼容）', () => {
+    expect(checkTestsMatrixCoverage(undefined)).toEqual([]);
+  });
+
+  it('覆盖矩阵 README 缺失（null）→ tests-matrix-missing（不静默放行）', () => {
+    const v = checkTestsMatrixCoverage({ readme: null, testFiles: ['a.test.ts'] });
+    expect(v).toHaveLength(1);
+    expect(v[0]!.check).toBe('tests-matrix-missing');
+    expect(v[0]!.message).toContain('README.md');
+  });
+
+  it('在盘未登记 → tests-matrix-missing；表格行指向不存在文件 → tests-matrix-orphan', () => {
+    const readme = [
+      '| File | Area | What |',
+      '| --- | --- | --- |',
+      '| a.test.ts | A | x |',
+      '| ghost.test.ts | G | y |',
+    ].join('\n');
+    const v = checkTestsMatrixCoverage({ readme, testFiles: ['a.test.ts', 'b.test.ts'] });
+    expect(v.map((x) => x.check).sort()).toEqual(['tests-matrix-missing', 'tests-matrix-orphan']);
+    const joined = v.map((x) => x.message).join('\n');
+    expect(joined).toContain('b.test.ts');
+    expect(joined).toContain('ghost.test.ts');
+  });
+
+  it('同一测试文件登记多行 → tests-matrix-duplicate', () => {
+    const readme = [
+      '| File | Area | What |',
+      '| --- | --- | --- |',
+      '| a.test.ts | A | x |',
+      '| a.test.ts | A2 | y |',
+    ].join('\n');
+    const v = checkTestsMatrixCoverage({ readme, testFiles: ['a.test.ts'] });
+    expect(v).toHaveLength(1);
+    expect(v[0]!.check).toBe('tests-matrix-duplicate');
+  });
+
+  it('矩阵与在盘集合双向相等 → 零违规', () => {
+    const readme = [
+      '| File | Area | What |',
+      '| --- | --- | --- |',
+      '| a.test.ts | A | x |',
+      '| b.test.ts | B | y |',
+    ].join('\n');
+    expect(checkTestsMatrixCoverage({ readme, testFiles: ['a.test.ts', 'b.test.ts'] })).toEqual([]);
   });
 
   it('真实 CLI fixture：新增未登记 cli 脚本 + 孤儿 references → exit 1 且 reasons 含两违规码', async () => {
@@ -2738,7 +2819,10 @@ async function withDocsConsistencyFixture(
     const gitInit = spawnSync('git', ['init'], { cwd: fixtureRoot, encoding: 'utf-8', timeout: 15_000 });
     expect(gitInit.status, gitInit.stderr).toBe(0);
     expect(
-      spawnSync('git', ['config', '--local', 'user.email', 'fixture@example.invalid'], { cwd: fixtureRoot, timeout: 15_000 }).status,
+      spawnSync('git', ['config', '--local', 'user.email', 'fixture@example.invalid'], {
+        cwd: fixtureRoot,
+        timeout: 15_000,
+      }).status,
     ).toBe(0);
     expect(
       spawnSync('git', ['config', '--local', 'user.name', 'fixture'], { cwd: fixtureRoot, timeout: 15_000 }).status,
@@ -2751,9 +2835,7 @@ async function withDocsConsistencyFixture(
     await fs.mkdir(fixtureHooksPath, { recursive: true });
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture marker is inside the mkdtemp-owned test root
     await fs.writeFile(path.join(fixtureRoot, '.provenance-fixture'), 'fixture\n', 'utf8');
-    expect(
-      spawnSync('git', ['add', '.provenance-fixture'], { cwd: fixtureRoot, timeout: 15_000 }).status,
-    ).toBe(0);
+    expect(spawnSync('git', ['add', '.provenance-fixture'], { cwd: fixtureRoot, timeout: 15_000 }).status).toBe(0);
     const commit = spawnSync(
       'git',
       [
