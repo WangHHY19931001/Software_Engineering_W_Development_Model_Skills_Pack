@@ -74,4 +74,11 @@
 
 ## 5. 收口
 
-（待全量 prepush 结果补记。）
+**`npm run prepush` 18/18 全绿（`PREPUSH_EXIT=0`，末行「全部门禁通过，允许推送 ✓」）**，提交 `c5edcfc8`（39 文件，+447/−102）。
+
+转绿过程中另修三处（均由门禁抓出，非猜测）：
+1. **`docs-consistency-logic.test.ts` 8 项失败**：文档批把 `tool-gap` 行的说明写进了**矩阵表格单元格**，矩阵解析器把 `Schema` 的 `chema` 与 `capabilities` 当成候选人格 → 真实仓库出现 1 条 matrix 违规。两处同修：说明移出单元格 + 解析器按 5 类前缀限定 token。
+2. **security-scan 2 项新发现**：均在 R12 正则上（`detect-unsafe-regex` + `no-useless-escape`）→ 见 §1.3 第三轮返工。
+3. **L0 链接基线漂移 672 → 674**：文档批在 `hard-constraints.md` 与 `subagent-delegation.md` 各新增 1 条指向 `iceberg-sweep-guide.md` 的跨引用。用「逐文件回退到 HEAD 再跑审计 CLI」二分定位（回退任一文件即 −1；`l1Only` 仍 95、占位符 36、违规 0），按仓库惯例带 provenance 重定基线。
+
+**未修（如实记录）**：审查共 46 项发现，本批修 3 个优先级组共 30 余项。仍未处理的主要为「建议」级与超出本次范围者：`self-test.ts`（约 5000 行）逐条断言质量、`code-health` 6 个 CLI 的端到端语义、其余 36 个 logic 文件的规则负载性变异测试、coverage 口径（`include` 未生效 + statements 余量仅 ~1.9pp）、以及审计 D 维度的 J1/J2/J3/J4（约束 #11 无执行核验、信息密度阈值空档 [1,2)、两处检测信号引用不存在字段、强化节空括号残留）。
