@@ -65,6 +65,7 @@ function parseArgs(argv: string[]): ReviewPackageArgs {
     if (seen.has(name)) throw new Error(`重复的命令行参数 --${name}`);
     if (value.trim() === '') throw new Error(`--${name} 不能为空`);
     seen.add(name);
+    // eslint-disable-next-line security/detect-object-injection -- 写入本函数内新建的局部参数表；name 来自 KNOWN_FLAGS 白名单匹配（match[1]），非未校验输入
     args[name] = value;
   }
   return args;

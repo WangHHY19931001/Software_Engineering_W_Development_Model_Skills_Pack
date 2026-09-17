@@ -96,4 +96,3 @@
 
 - 若目标平台的 `ps` 既不支持 `-o` 也无法用 `ps -ef` 列出自身 PID，`terminate_child` 走 fail-closed 分支：只终止顶层进程、`cleanup_failed=1` 并非零退出，但**无法收回已孤儿化的后代**。该平台能力缺失会显式暴露为失败，而不是静默放行。
 - platform/docs 聚合、全量 Vitest 与 pre-push 仍 pending，留待任务 8 收口。
-

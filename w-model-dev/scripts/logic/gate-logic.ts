@@ -431,6 +431,7 @@ interface ParsedSymbolHead {
  * 解析符号的结构头，忽略泛型参数、调用参数和格式空格。
  * 只返回 owner/member（或无 owner 的函数名）作为 canonical key，避免参数/返回类型参与匹配。
  */
+/* eslint-disable security/detect-object-injection -- 本函数是对入参字符串做逐字符下标扫描（span[index]）与格式判定，下标由本函数自身推进、输入是本门禁自己提取的符号文本，不存在「外部键注入对象」的面；按行加注释会淹没实现，故按函数块豁免 */
 function parseSymbolHead(span: string): ParsedSymbolHead | null {
   let index = 0;
   const parts: string[] = [];
@@ -495,6 +496,7 @@ function parseSymbolHead(span: string): ParsedSymbolHead | null {
 
   return { head: span.slice(0, end), canonical: parts.join('.'), end, hasCall };
 }
+/* eslint-enable security/detect-object-injection */
 
 /** 符号 span 判定：整个 span 为「标识符 / 点分标识符（可带调用）」，其后可跟类型注解或状态转移。 */
 function isSymbolSpan(span: string): boolean {
@@ -1246,11 +1248,14 @@ function isValidTestEvidenceForE4(value: unknown): value is TestEvidenceShape {
   const hasPath = rawOutputPath !== '';
   const hasSha = rawOutputSha256 !== '';
   if (hasPath !== hasSha) return false;
-  if (
-    hasPath &&
-    !/^(?!\/)(?![A-Za-z]:[\\/])(?!.*\\)(?!.*(?:^|\/)\.\.(?:\/|$))(?!.*\/\/)(?!.*\/$)(?!.*\u0000).+$/.test(rawOutputPath)
-  )
-    return false;
+  if (hasPath) {
+    const pathFormOk =
+      // eslint-disable-next-line no-control-regex -- rawOutputPath 显式拒绝 NUL 字节（`\u0000` 在此是安全判据本身，非误用控制字符）
+      /^(?!\/)(?![A-Za-z]:[\\/])(?!.*\\)(?!.*(?:^|\/)\.\.(?:\/|$))(?!.*\/\/)(?!.*\/$)(?!.*\u0000).+$/.test(
+        rawOutputPath,
+      );
+    if (!pathFormOk) return false;
+  }
   return !hasSha || /^[0-9a-f]{64}$/.test(rawOutputSha256);
 }
 
@@ -1278,6 +1283,7 @@ function summarizeM07SchemaFailure(
   ];
   for (const { key, name } of layers) {
     if (!phaseLayers.includes(key) || !isRecord(executionSummary)) continue;
+    // eslint-disable-next-line security/detect-object-injection -- key 来自本函数上方字面量数组（layers），非外部输入；executionSummary 已过 isRecord 收窄
     const summary = executionSummary[key];
     if (!isRecord(summary) || !isFiniteNonNegativeInteger(summary.total) || summary.total <= 0) continue;
     testEvidence.checked++;

@@ -62,7 +62,9 @@ describe('resolveProjectRelativeRegularFile', () => {
     mkdirSync(join(project, 'evidence'));
     writeFileSync(join(project, 'evidence', 'result.json'), '{}\n', 'utf8');
 
-    expect(resolveProjectRelativeRegularFile(project, 'evidence/result.json')).toBe(resolve(project, 'evidence', 'result.json'));
+    expect(resolveProjectRelativeRegularFile(project, 'evidence/result.json')).toBe(
+      resolve(project, 'evidence', 'result.json'),
+    );
   });
 
   it('目录以 not-file 拒绝，普通文件的项目外 symlink 以 link 拒绝', () => {

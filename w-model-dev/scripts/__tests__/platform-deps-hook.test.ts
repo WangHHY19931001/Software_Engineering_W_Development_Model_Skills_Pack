@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 本文件在 os.tmpdir() 下自建临时仓与 hook fixture（mktemp/join 自生成路径），路径非外部输入；与 exit2-failure-atomicity.test.ts 同款豁免 */
 import { spawn, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import * as fs from 'node:fs/promises';
@@ -49,10 +50,14 @@ function convertBashPaths(values: string[]): string[] {
   const tool = getBashPathTool();
   if (tool === undefined) return normalized;
   const command = normalized
-    .map((value) => (/^([A-Za-z]):\//.test(value) ? `${tool} -a -u ${shellQuote(value)}` : `printf '%s\\n' ${shellQuote(value)}`))
+    .map((value) =>
+      /^([A-Za-z]):\//.test(value) ? `${tool} -a -u ${shellQuote(value)}` : `printf '%s\\n' ${shellQuote(value)}`,
+    )
     .join('; ');
   const result = spawnSync('bash', ['-c', command], { encoding: 'utf8', input: '' });
-  const converted = String(result.stdout ?? '').replace(/\r?\n$/, '').split(/\r?\n/);
+  const converted = String(result.stdout ?? '')
+    .replace(/\r?\n$/, '')
+    .split(/\r?\n/);
   return result.status === 0 && converted.length === normalized.length ? converted : normalized;
 }
 
@@ -66,9 +71,7 @@ function toBashPathList(value: string): string {
 }
 
 function prependBashPath(binDir: string): string {
-  return [toBashPath(binDir), getBashRuntimePath(), toBashPathList(process.env.PATH ?? '')]
-    .filter(Boolean)
-    .join(':');
+  return [toBashPath(binDir), getBashRuntimePath(), toBashPathList(process.env.PATH ?? '')].filter(Boolean).join(':');
 }
 
 function bashEnvironment(environment: Record<string, string>): NodeJS.ProcessEnv {
@@ -76,7 +79,9 @@ function bashEnvironment(environment: Record<string, string>): NodeJS.ProcessEnv
   const env = { ...environment };
   if (env.PATH !== undefined) env.PATH = toBashPathList(env.PATH);
   for (const key of ['BASH_ENV', 'CALLS', 'CLI_CALLS', 'WM_PREPUSH_CAPTURE', 'WM_PREPUSH_ARTIFACT_DIR']) {
+    // eslint-disable-next-line security/detect-object-injection -- key 来自本行字面量数组，env 是本函数内新建的环境副本
     const value = env[key];
+    // eslint-disable-next-line security/detect-object-injection -- 同上：key 为字面量白名单项
     if (value !== undefined && /^[A-Za-z]:[\\/]/.test(value)) env[key] = toBashPath(value);
   }
   return env;
@@ -118,6 +123,7 @@ async function run(
     const bashEnv = convertedEnvironment.BASH_ENV;
     const exportedEnvironment = Object.entries(environment).map(([key, value]) => {
       if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) throw new Error(`invalid test environment key: ${key}`);
+      // eslint-disable-next-line security/detect-object-injection -- key 已由上一行正则白名单校验（合法环境变量名），convertedEnvironment 为本函数内的环境副本
       return `export ${key}=${shellQuote(convertedEnvironment[key] ?? value)}`;
     });
     const command = [

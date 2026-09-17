@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 本文件在 os.tmpdir() 下自建临时仓与 hook fixture（mktemp/join 自生成路径 + 逐项 lstat/realpath 断言），路径非外部输入；与 exit2-failure-atomicity.test.ts 同款豁免 */
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, promises as fs, readFileSync, rmSync, symlinkSync } from 'node:fs';
@@ -659,7 +660,9 @@ describe('pre-commit staged snapshot', () => {
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(124);
     expect(Date.now() - startedAt).toBeLessThan(10_000);
     expect(result.stderr).toContain('批量物化 index snapshot 超时（2s）');
-    expect(result.stderr).toContain('终止进程树：批量物化 index snapshot');
+    // 后代数必须 ≥1：枚举返回空集正是上一轮在 Git Bash 上失效的原始缺陷（`ps -o` 不被支持 → 空表被当成「无后代」）。
+    // 只断言「有终止日志」不足以防回归——空枚举同样会打印该日志。
+    expect(result.stderr).toMatch(/终止进程树：批量物化 index snapshot（pid \d+，后代 [1-9]\d* 个）/);
     const batchPid = readFileSync(batchPidFile, 'utf8').trim();
     expect(batchPid).toMatch(/^\d+$/);
     const processProbe = spawnSync('bash', ['-c', 'kill -0 "$1"', 'batch-process-probe', batchPid], {
