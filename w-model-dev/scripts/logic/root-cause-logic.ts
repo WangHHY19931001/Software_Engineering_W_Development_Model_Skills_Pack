@@ -176,6 +176,7 @@ export const R_PERSONA_MATRIX: Readonly<Record<RootCauseCategory, readonly strin
   'tool-gap': ['engineering-autonomous-optimization-architect', 'testing-tool-evaluator'],
   'upstream-defect': [
     'engineering-incident-response-commander',
+    'engineering-codebase-onboarding-engineer',
     'testing-evidence-collector',
     'engineering-technical-writer',
   ],
@@ -191,11 +192,21 @@ export const R_PERSONA_MATRIX: Readonly<Record<RootCauseCategory, readonly strin
 export const R_PERSONA_SIGNAL_MATRIX: ReadonlyArray<{ signal: string; personas: readonly string[] }> = [
   {
     signal: '安全相关 Critical',
-    personas: ['engineering-threat-detection-engineer', 'engineering-code-reviewer', 'testing-reality-checker'],
+    personas: [
+      'engineering-security-engineer',
+      'engineering-threat-detection-engineer',
+      'engineering-code-reviewer',
+      'testing-reality-checker',
+    ],
   },
   {
     signal: '性能相关 Critical',
-    personas: ['engineering-database-optimizer', 'testing-performance-benchmarker', 'engineering-backend-architect'],
+    personas: [
+      'engineering-database-optimizer',
+      'engineering-sre',
+      'testing-performance-benchmarker',
+      'engineering-backend-architect',
+    ],
   },
   {
     signal: 'AI/LLM 相关',

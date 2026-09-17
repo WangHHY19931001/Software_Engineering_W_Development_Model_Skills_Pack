@@ -38,6 +38,20 @@
 - **fixture 校正 + 新负向样本**：`bad-r10-no-reality-checker.json` 的 personaSlice 由**不存在的人格名**（`engineering-testability` / `design-architect`）改为真实矩阵人格（保持「仅触发目标规则」的夹具原则，并新增单测钉住该性质）；新增 `bad-r11-unknown-persona.json`（矩阵外人格）与 `bad-r11-category-mismatch.json`（自述 category 与所选视角行无交集），`ROOTCAUSE_CASES` 14 → 16。
 - **门禁边界（如实陈述）**：数量约束（默认 3 / 上限 5）与 `incident-response-commander` 必含**不门禁强制**——它们是分派默认，由编排者按 `agent-personas.md` §4 与 token 预算（`budget-logic.ts` R4-A）执行；第二键因报告未声明信号字段亦不门禁强制，仅作分派指导。
 
+### 人格库上游核查与 5 份人格补充（persona-upstream-audit，2026-09-17）
+
+> 触发：核查人格来源仓库 [jnMetaCode/agency-agents-zh](https://github.com/jnMetaCode/agency-agents-zh) 是否有更新、是否有需要补充的人格。结论：**无内容级更新**；按 R/V 多角度价值补 5 份，人格库 **28 → 33**。
+
+- **上游核查结论（实测）**：对导入基线（`550a29fa`，2026-07-24）后的上游逐份比对——吸收的 28 份中 **20 份与上游当前内容逐字一致**；8 份有差异，其中 2 份是**本仓本地增强**（`engineering-code-reviewer` 的 Fowler 12 坏味道基线、`engineering-technical-writer` 的占位符与外链本地化），另 6 份仅上游把 frontmatter `color` 改为十六进制值（`product-manager` 另加「（PM）」后缀与 `tools:` 字段）——**无正文级更新，均未跟随**（本仓不渲染颜色、无 tools 契约）。
+- **新增 5 份人格（28 → 33，均按 §1.5 补四字段声明）**：
+  - `engineering-security-engineer` —— 应用安全（威胁建模 / 漏洞评估 / 安全代码审查 / 安全架构 / 事件响应），补矩阵缺失的 **AppSec 视角**（既有 `engineering-threat-detection-engineer` 是 SIEM / MITRE ATT&CK 检测向）；
+  - `engineering-sre` —— SLO / 错误预算 / 可观测性 / 混沌工程，补**可靠性视角**（原性能行只有数据库 + 基准 + 后端架构）；
+  - `engineering-minimal-change-engineer` —— 最小可行差异、拒绝范围蔓延，用于**返工修复评审**（防「修 bug 变重构雪崩」）；
+  - `engineering-codebase-onboarding-engineer` —— 只陈述基于代码的事实的追溯纪律，用于**上游回溯**；
+  - `testing-accessibility-auditor` —— WCAG + 辅助技术实测、默认立场是找问题，用于**无障碍审核**。
+- **接入矩阵**：R 第一键 `upstream-defect` 行 + 代码库入职引导；R 第二键「安全相关 Critical」+ 应用安全、「性能相关 Critical」+ SRE；V「系统设计评审」+ SRE、「代码评审」+ 应用安全、「测试评审」+ 无障碍审核；**新增 V 行**「返工修复评审（S-fix 产出）」= 最小变更 + code-reviewer + evidence-collector（3 候选）。`R_PERSONA_MATRIX` / `R_PERSONA_SIGNAL_MATRIX` 与 `agent-personas.md` §2 两张表同步（`rootcause-persona-matrix` 逐行对账，本轮实测 0 违规）。
+- **来源与收录策略入册**：`agent-personas.md` 新增「人格库来源与收录策略」节（来源 URL / 导入基线 / 收录判据 / 收录规模 / 本地契约 / 已知偏离）——此前仓库内除导入提交信息外**无任何来源记录**，无法判断上游是否更新。
+- **计数同步**：README / AGENTS / INSTALL / agent-personas 的人格数 28 → 33（README 的「N 个人格文件」是 `checkAssetCounts` 的解析点，改漏即 exit 1）。
 ### M 程序：外部技能采纳 P0–P6（expanded-external-skill-adoption，2026-09-14 ~ 2026-09-16）
 
 > 采纳判据与逐项验收见 `docs/superpowers/specs/2026-09-14-expanded-external-skill-adoption-design.md` §13（AC-0…AC-12）；各期提交序列、评审轮次与收口实测记于 `docs/superpowers/plans/2026-09-14-external-absorption-adjudication.md`、`2026-09-14-p1-meta-theory-absorption.md`、`2026-09-14-p2a-gate-negative-coverage-and-atomicity.md`、`2026-09-15-p2b-rule-loadbearing-and-completeness.md`、`2026-09-15-m07-rtm-test-evidence.md`、`2026-09-15-p3-role-independence-and-review.md`、`2026-09-15-p4-test-quality-and-design-rules.md`、`2026-09-16-p5-debug-ops-interaction.md`、`2026-09-16-p6-rejection-knowledge-base.md` 的收尾节。**本节计数一律取收口实测**，不沿用各期文档写作时的中间值（43 / 44 / 332 / 340 / 344）。

@@ -188,7 +188,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 - **TLA+ 层次化建模 + BDD 行为建模**：设计阶段用形式化方法把关键行为「讲清楚、可检查」，编码后用一致性回归守住（见 [tla-plus.md](./w-model-dev/references/tla-plus.md)、[bdd.md](./w-model-dev/references/bdd.md)）。
 - **负面知识库**：48 条流程反模式 + 8 条核心操作行为 + 失败模式，把踩过的坑变成纪律。
 - **代码健康治理（`/wm code-health`）**：Phase 1–4 只读发现 → 七维度 gap → 受保护测试 inventory → 重复簇与抽象 guard；发现不是结论、coverage 仅信号，删除/抽象必须有人类授权 + HEAD-tracked 证据 + 可回滚（见 [code-health-governance.md](./w-model-dev/references/code-health-governance.md)）。
-- **评审人格库**：内置 28 个人格文件（工程 / 测试 / 设计 / 产品 / 项目 5 类），每份含能力 / 输入 / 输出 / 边界四字段声明（frontmatter，由 docs-consistency 门禁强制），按 [agent-personas.md](./w-model-dev/references/agent-personas.md) 选型多角度评审；R-persona 两键选择矩阵与 R11 门禁见同文件「Persona 矩阵」节。
+- **评审人格库**：内置 33 个人格文件（工程 / 测试 / 设计 / 产品 / 项目 5 类），每份含能力 / 输入 / 输出 / 边界四字段声明（frontmatter，由 docs-consistency 门禁强制），按 [agent-personas.md](./w-model-dev/references/agent-personas.md) 选型多角度评审；R-persona 两键选择矩阵与 R11 门禁见同文件「Persona 矩阵」节。
 - **采用路径**：新项目从 Day 0 跑全流程，存量项目增量验证优先（见 [docs/adoption-guide.md](./docs/adoption-guide.md)）。
 - **状态持久化**：`.w-model/*.json` 跨多轮交互保持上下文，34 份 JSON Schema 约束文件保证格式一致。
 - **外部工具集成**：codegraph 修改前影响分析、OpenSpec 规格驱动变更、SkillOpt 方法论吸收（详见 [SSoT](./docs/skill-design-document_SSoT.md)）。
@@ -200,7 +200,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 ├── w-model-dev/                  # Skill 资产本体（纯 Markdown，可整目录拷贝分发）
 │   ├── SKILL.md                  # 技能定义：触发条件 + /wm 编排规则 + 版本号
 │   ├── references/               # 43 份阶段细则与规范（按需加载，禁止一次性全读）
-│   ├── subagent/                 # 28 个人格文件（评审视角预设，不调用 LLM；frontmatter 含能力/输入/输出/边界四字段）
+│   ├── subagent/                 # 33 个人格文件（评审视角预设，不调用 LLM；frontmatter 含能力/输入/输出/边界四字段）
 │   ├── templates/                # 各阶段产出文档模板
 │   ├── examples/                 # 交互示例
 │   ├── schemas/                  # 34 份 JSON Schema 约束文件

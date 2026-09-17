@@ -512,13 +512,13 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts \
 
 > 对应 spec §9.1（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） 现有人格库盘点。
 
-[`w-model-dev/subagent/`](../subagent/) 含 28 个人格文件，分 5 类（engineering 12 / testing 7 / design 3 / product 4 / project 2），供 R-lead / V-lead 在多角度分析时加载。本文件定义的 4 个 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）与 `subagent/` 人格库的关系：
+[`w-model-dev/subagent/`](../subagent/) 含 33 个人格文件，分 5 类（engineering 16 / testing 8 / design 3 / product 4 / project 2），供 R-lead / V-lead 在多角度分析时加载。本文件定义的 4 个 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）与 `subagent/` 人格库的关系：
 
 | 本文件 Persona | subagent/ 对应人格 | 关系 |
 |---|---|---|
 | code-reviewer | engineering-code-reviewer | 同源：本文件为 V 评审视角；subagent/ 为 R-persona / V-persona 多角度加载的视角文件 |
 | test-engineer | testing-api-tester + testing-performance-benchmarker | 拆分：本文件为综合 QA 视角；subagent/ 拆为 api-tester / performance-benchmarker 等专项 |
-| security-auditor | engineering-threat-detection-engineer | 同源 |
+| security-auditor | engineering-security-engineer（应用安全）+ engineering-threat-detection-engineer（检测规则） | 同源 + 补充 |
 | performance-auditor | testing-performance-benchmarker + engineering-database-optimizer | 拆分 |
 
 人格选择矩阵（R-persona / V-persona 按缺陷类型与阶段选择哪些人格）详见本文件 [「Persona 矩阵」](#persona-矩阵) 节。
@@ -574,7 +574,7 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 
 > **定位**：R-lead / V-lead 在多角度分析时选择 persona 的参考矩阵。
 > **关联 spec**：`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md` §9.3 + §9.4
-> **人格库**：[w-model-dev/subagent/](../subagent/) 含 28 个人格文件，分 5 类。
+> **人格库**：[w-model-dev/subagent/](../subagent/) 含 33 个人格文件，分 5 类。
 
 ---
 
@@ -582,19 +582,30 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 
 | 类别 | 数量 | 人格 | R/V 适用性 |
 |---|---|---|---|
-| **engineering** | 12 | code-reviewer, senior-developer, software-architect, backend-architect, frontend-developer, ai-engineer, data-engineer, database-optimizer, autonomous-optimization-architect, incident-response-commander, threat-detection-engineer, technical-writer | R + V |
-| **testing** | 7 | api-tester, performance-benchmarker, reality-checker, evidence-collector, test-results-analyzer, tool-evaluator, workflow-optimizer | R + V |
+| **engineering** | 16 | code-reviewer, senior-developer, software-architect, backend-architect, frontend-developer, ai-engineer, data-engineer, database-optimizer, autonomous-optimization-architect, incident-response-commander, threat-detection-engineer, security-engineer, sre, minimal-change-engineer, codebase-onboarding-engineer, technical-writer | R + V |
+| **testing** | 8 | api-tester, performance-benchmarker, reality-checker, evidence-collector, test-results-analyzer, tool-evaluator, workflow-optimizer, accessibility-auditor | R + V |
 | **design** | 3 | ui-designer, ux-architect, ux-researcher | V（阶段 2-3 设计评审） |
 | **product** | 4 | product-manager, feedback-synthesizer, trend-researcher, behavioral-nudge-engine | V（阶段 1 需求评审） |
 | **project** | 2 | project-manager-senior, experiment-tracker | V（阶段 1-2 流程评审） |
 
 ---
 
+### 1.2 人格库来源与收录策略
+
+> 最近核查（2026-09-17）：上游自导入以来**无内容级更新**；核查方法与结论见 CHANGELOG「人格库上游核查与 AppSec 人格补充」节。
+
+- **来源**：[jnMetaCode/agency-agents-zh](https://github.com/jnMetaCode/agency-agents-zh)（上游是多领域人格库，含 engineering / security / marketing / finance 等 20+ 类目录）。
+- **导入基线**：commit `550a29fa`（2026-07-24）首次导入；收录时取其中 engineering / testing / design / product / project-management 五类里与软件开发流程相关者。
+- **收录判据**：该人格能否成为 R（根因定位）或 V（评审）的一个有效视角。纯领域专属（嵌入式 / FPGA / IoT / 电商平台集成 / 云厂商专属等）与营销、财务、法务、人力等非软件开发流程角色不收录。
+- **收录规模**：33 份（2026-09-17 扩充 5 份：应用安全 / SRE / 最小变更 / 无障碍审核 / 代码库入职引导）。
+- **本地契约**：收录后一律按 §1.5 补 `capabilities` / `inputs` / `outputs` / `boundaries` 四字段（门禁强制）；正文默认保持上游原文，任何本地增强须在 CHANGELOG 留痕。
+- **已知偏离上游**：`engineering-code-reviewer` 增「Fowler 12 坏味道固定基线」；`engineering-technical-writer` 的占位符与外链本地化（L0 安全形态）；6 份未跟随上游把 frontmatter `color` 改为十六进制值（本仓不渲染颜色，无功能影响）。
+
 ### 1.5 persona 能力声明字段（门禁强制）
 
 > 吸收自 Agentic Design Patterns ch15「Agent 卡片」能力清单理念（不吸收 A2A 协议本身）。
 
-每个 `subagent/*.md` 的 YAML frontmatter **必须**含四项单行非空字段（28 份全覆盖，由 `check-docs-consistency.ts` 的 `persona-capability-declarations` 检查强制；缺一即 exit 1）：
+每个 `subagent/*.md` 的 YAML frontmatter **必须**含四项单行非空字段（33 份全覆盖，由 `check-docs-consistency.ts` 的 `persona-capability-declarations` 检查强制；缺一即 exit 1）：
 
 | 字段 | 内容 | 用途 |
 |---|---|---|
@@ -625,14 +636,14 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 | `test-gap` | 4-7 | testing-api-tester + testing-performance-benchmarker + testing-test-results-analyzer |
 | `process-missing` | 全阶段 | project-manager-senior + testing-workflow-optimizer + engineering-incident-response-commander |
 | `tool-gap` | 全阶段 | engineering-autonomous-optimization-architect + testing-tool-evaluator |
-| `upstream-defect` | 全阶段 | engineering-incident-response-commander + testing-evidence-collector + engineering-technical-writer |
+| `upstream-defect` | 全阶段 | engineering-incident-response-commander + engineering-codebase-onboarding-engineer + testing-evidence-collector + engineering-technical-writer |
 
 **第二键：风险域信号（叠加键，从 V/G 产出特征读出）**
 
 | 信号 | 阶段 | 叠加 persona |
 |---|---|---|
-| 安全相关 Critical | 5-7 | engineering-threat-detection-engineer + engineering-code-reviewer + testing-reality-checker |
-| 性能相关 Critical | 5-7 | engineering-database-optimizer + testing-performance-benchmarker + engineering-backend-architect |
+| 安全相关 Critical | 5-7 | engineering-security-engineer + engineering-threat-detection-engineer + engineering-code-reviewer + testing-reality-checker |
+| 性能相关 Critical | 5-7 | engineering-database-optimizer + engineering-sre + testing-performance-benchmarker + engineering-backend-architect |
 | AI/LLM 相关 | 5 | engineering-ai-engineer + engineering-code-reviewer + testing-reality-checker |
 
 **两键仲裁规则**：
@@ -649,10 +660,11 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 | 评审场景 | 阶段 | 加载的 V-persona |
 |---|---|---|
 | 需求规格评审 | 1 | product-manager + product-feedback-synthesizer + testing-reality-checker |
-| 系统设计评审 | 2 | engineering-software-architect + engineering-backend-architect + engineering-threat-detection-engineer + testing-reality-checker |
+| 系统设计评审 | 2 | engineering-software-architect + engineering-backend-architect + engineering-sre + engineering-threat-detection-engineer + testing-reality-checker |
 | 概要/详细设计评审 | 3-4 | engineering-software-architect + design-ux-architect + engineering-database-optimizer + testing-api-tester |
-| 代码评审 | 5 | engineering-code-reviewer + engineering-senior-developer + engineering-threat-detection-engineer + testing-evidence-collector |
-| 测试评审 | 6-7 | testing-api-tester + testing-performance-benchmarker + testing-reality-checker + testing-test-results-analyzer |
+| 代码评审 | 5 | engineering-code-reviewer + engineering-senior-developer + engineering-security-engineer + engineering-threat-detection-engineer + testing-evidence-collector |
+| 返工修复评审（S-fix 产出） | 返工 | engineering-minimal-change-engineer + engineering-code-reviewer + testing-evidence-collector |
+| 测试评审 | 6-7 | testing-api-tester + testing-accessibility-auditor + testing-performance-benchmarker + testing-reality-checker + testing-test-results-analyzer |
 | 根因报告复审（targetKind=rootcause） | 全阶段 | testing-reality-checker + engineering-incident-response-commander + testing-evidence-collector |
 
 ### 多评审分歧上缴人裁决
