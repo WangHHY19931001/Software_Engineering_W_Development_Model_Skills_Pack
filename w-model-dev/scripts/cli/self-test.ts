@@ -1621,6 +1621,19 @@ const ROOTCAUSE_CASES: RootCauseCase[] = [
     description:
       'R10 combined 方法 partialReports 缺失 canonical testing-reality-checker（legacy reality-checker fallback）personaSlice（E16）',
   },
+  {
+    file: 'bad-r11-unknown-persona.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R11.*矩阵外 persona.*engineering-testability/],
+    description:
+      'R11 多角度 partialReports 含 28 人格库中不存在的 persona（engineering-testability），应被矩阵内校验拦截',
+  },
+  {
+    file: 'bad-r11-category-mismatch.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R11.*与 rootCause\.category=coding-error 的矩阵行无交集/],
+    description: 'R11 自述 category=coding-error 但多角度视角取自 design-flaw 行，与第一键行无交集，应被拦截',
+  },
 ];
 
 // -------------------- Preventive Review --------------------

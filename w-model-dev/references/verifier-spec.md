@@ -123,7 +123,7 @@
 | `testcase` | `test` | 阶段 1~4 测试用例设计文档 + 阶段 6~8 测试执行报告统一用 `test` |
 | `file` | `code` | 阶段 5 源代码评审用 `code`，与 `code-tla-consistency` 维度命名对齐 |
 
-> `rootcause` 为 V 复审根因报告（RootCauseReport）的合法 `targetKind`（详见 §7.5）：`check-verifier-output.ts` 按 §7.5 子标准集合（correctness / completeness / falsifiability / actionability / prevention）校验该 VerifierOutput；RootCauseReport 本身（rootCauseChain / fixRecommendation / prevention 等字段）由 `check-rootcause-report.ts` 独立校验（R1-R10）。两者互补不互替。
+> `rootcause` 为 V 复审根因报告（RootCauseReport）的合法 `targetKind`（详见 §7.5）：`check-verifier-output.ts` 按 §7.5 子标准集合（correctness / completeness / falsifiability / actionability / prevention）校验该 VerifierOutput；RootCauseReport 本身（rootCauseChain / fixRecommendation / prevention 等字段）由 `check-rootcause-report.ts` 独立校验（R1-R11）。两者互补不互替。
 
 **校验**（由 [`verifier-logic.ts`](../scripts/logic/verifier-logic.ts) 强制执行）：
 

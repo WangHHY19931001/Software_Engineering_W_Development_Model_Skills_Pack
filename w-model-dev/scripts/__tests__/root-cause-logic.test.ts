@@ -1,5 +1,5 @@
 /**
- * root-cause-logic.ts 单元测试 —— R 报告校验 R1-R10 规则
+ * root-cause-logic.ts 单元测试 —— R 报告校验 R1-R11 规则
  *
  * 覆盖：
  *   - R1 Schema 完整性（必填字段非空）
@@ -12,6 +12,7 @@
  *   - R8 reportId 格式 ^RC-[a-z0-9]+-\d+-\d+$
  *   - R9 多角度场景 partialReports 非空
  *   - R10 多角度场景 testing-reality-checker canonical / reality-checker legacy confidence ≥ 0.5
+ *   - R11 多角度场景 personaSlice 须为矩阵内已知 persona，且与 rootCause.category 行有交集
  */
 
 import { promises as fs } from 'node:fs';
@@ -268,6 +269,46 @@ describe('R10 reality-checker confidence', () => {
 
     expect(result.passed).toBe(true);
     expect(result.reasons).toHaveLength(0);
+  });
+});
+
+describe('R11 多角度 persona 选择矩阵', () => {
+  it('partialReports 含矩阵外 persona 时失败', async () => {
+    const report = await loadSample('bad-r11-unknown-persona.json');
+    const result = checkRootCauseReport(report);
+    expect(result.passed).toBe(false);
+    expect(result.reasons.some((r) => /R11.*矩阵外 persona.*engineering-testability/.test(r))).toBe(true);
+  });
+
+  it('视角集合与 rootCause.category 矩阵行无交集时失败', async () => {
+    const report = await loadSample('bad-r11-category-mismatch.json');
+    const result = checkRootCauseReport(report);
+    expect(result.passed).toBe(false);
+    expect(result.reasons.some((r) => /R11.*与 rootCause\.category=coding-error 的矩阵行无交集/.test(r))).toBe(true);
+    // 视角本身都是已知 persona：不因「矩阵外」而失败，只命中交集规则
+    expect(result.reasons.some((r) => /R11.*矩阵外/.test(r))).toBe(false);
+  });
+
+  it('R10 样本不误报 R11（仅触发目标规则）', async () => {
+    const report = await loadSample('bad-r10-no-reality-checker.json');
+    const result = checkRootCauseReport(report);
+    expect(result.reasons.filter((r) => /^R11:/.test(r))).toHaveLength(0);
+    expect(result.reasons.filter((r) => /^R10:/.test(r))).toHaveLength(1);
+  });
+
+  it('legacy reality-checker 归一化后满足第一键行交集', async () => {
+    const report = await loadSample('bad-r10-reality-confidence.json');
+    const result = checkRootCauseReport(report);
+    // 该样本仅 R10 置信度不达标；R11 不应因 legacy 名称而报「矩阵外」
+    expect(result.reasons.some((r) => /R11/.test(r))).toBe(false);
+    expect(result.reasons.some((r) => /R10.*confidence/.test(r))).toBe(true);
+  });
+
+  it('noRootCause 分支无 category，不进入 R11', async () => {
+    const report = await loadSample('valid-no-root-cause.json');
+    const result = checkRootCauseReport(report);
+    expect(result.passed).toBe(true);
+    expect(result.reasons.filter((r) => /R11/.test(r))).toHaveLength(0);
   });
 });
 

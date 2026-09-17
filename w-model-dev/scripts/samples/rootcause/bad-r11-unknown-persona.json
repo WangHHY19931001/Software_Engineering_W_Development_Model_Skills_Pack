@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "meta": {
-    "reportId": "RC-phase5-1-02",
+    "reportId": "RC-phase5-1-03",
     "targetKind": "rootcause",
     "targetArtifact": "w-model-dev-demo/src/services/comment.service.ts",
     "targetPhase": "阶段 5 - 编码",
@@ -64,13 +64,18 @@
   "partialReports": [
     {
       "personaSlice": "engineering-software-architect",
-      "path": ".w-model/rootcause/partial/RC-phase5-1-02/engineering-software-architect.json",
+      "path": ".w-model/rootcause/partial/RC-phase5-1-03/engineering-software-architect.json",
       "confidence": 0.9
     },
     {
-      "personaSlice": "engineering-backend-architect",
-      "path": ".w-model/rootcause/partial/RC-phase5-1-02/engineering-backend-architect.json",
+      "personaSlice": "engineering-testability",
+      "path": ".w-model/rootcause/partial/RC-phase5-1-03/engineering-testability.json",
       "confidence": 0.85
+    },
+    {
+      "personaSlice": "testing-reality-checker",
+      "path": ".w-model/rootcause/partial/RC-phase5-1-03/testing-reality-checker.json",
+      "confidence": 0.9
     }
   ],
   "qualityLevel": "B",

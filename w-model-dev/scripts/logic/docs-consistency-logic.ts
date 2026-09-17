@@ -136,6 +136,12 @@ export interface DocConsistencyInput {
   rootCauseVerifierSpec: string;
   /** R10 command reference 原文（独立来源，虽与 commandReference 同文件仍单独登记） */
   rootCauseCommandReference: string;
+  /**
+   * subagent/ 人格文件清单（name + 原文，按文件名排序）。
+   * 数据源：能力声明四字段检查 + R-persona 矩阵 persona 存在性检查。
+   * 可选——缺省时跳过这两项（旧调用方/fixture 兼容）。
+   */
+  personaFiles?: Array<{ name: string; content: string }>;
   /** 根 package.json 原文（version 一致性检查数据源） */
   pkgJson: string;
   /** w-model-dev/skill-metadata.json 原文（version 一致性检查数据源） */
@@ -768,6 +774,237 @@ export function checkRootCauseR10Contract(sources: RootCauseR10ContractSources):
   return violations;
 }
 
+/**
+ * persona 能力声明四字段（agent-personas.md「Persona 矩阵」§1.5 契约，门禁强制面）。
+ *
+ * 契约：每个 `subagent/*.md` 的 YAML frontmatter 必须含四项单行非空字段
+ * `capabilities` / `inputs` / `outputs` / `boundaries`，供 R-lead / V-lead 在
+ * 分派时刻判断「何时适用、何时换人」——没有这四项，人格选择只能照抄矩阵，
+ * 「按需加载」退化为纪律而非可回归不变量。
+ */
+const PERSONA_DECLARATION_FIELDS = [
+  { key: 'capabilities', pattern: /^capabilities:[ \t]*\S/m },
+  { key: 'inputs', pattern: /^inputs:[ \t]*\S/m },
+  { key: 'outputs', pattern: /^outputs:[ \t]*\S/m },
+  { key: 'boundaries', pattern: /^boundaries:[ \t]*\S/m },
+] as const;
+const PERSONA_DECLARATION_CHECK = 'persona-capability-declarations';
+
+export function checkPersonaCapabilityDeclarations(
+  personaFiles: Array<{ name: string; content: string }>,
+): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  if (personaFiles.length === 0) {
+    violations.push({
+      check: PERSONA_DECLARATION_CHECK,
+      message: 'subagent/ 人格文件清单为空（能力声明检查 fail-closed）',
+    });
+    return violations;
+  }
+  for (const file of personaFiles) {
+    const frontmatter = file.content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (frontmatter === null) {
+      violations.push({
+        check: PERSONA_DECLARATION_CHECK,
+        message: `${file.name} 缺 YAML frontmatter（能力声明四字段无宿主）`,
+      });
+      continue;
+    }
+    const body = frontmatter[1] ?? '';
+    for (const field of PERSONA_DECLARATION_FIELDS) {
+      if (!field.pattern.test(body)) {
+        violations.push({
+          check: PERSONA_DECLARATION_CHECK,
+          message: `${file.name} frontmatter 缺非空「${field.key}」字段（能力声明契约见 agent-personas.md §1.5）`,
+        });
+      }
+    }
+  }
+  return violations;
+}
+
+export interface RootCausePersonaMatrixSources {
+  /** root-cause-logic.ts 原文（独立解析，禁止 import 被检查模块） */
+  checkerSource: string;
+  /** agent-personas.md 原文（R-persona 选择矩阵人类视图） */
+  authoritySpec: string;
+  /** subagent/ 人格文件清单（persona 存在性判据） */
+  personaFiles: Array<{ name: string; content: string }>;
+}
+
+const PERSONA_MATRIX_CHECK = 'rootcause-persona-matrix';
+
+interface PersonaMatrixSnapshot {
+  categories: Map<string, string[]>;
+  signals: Array<{ signal: string; personas: string[] }>;
+}
+
+/** 从 checker 源码文本独立求值两个矩阵常量（不 import 被检查模块）。 */
+function parsePersonaMatrixFromChecker(content: string): PersonaMatrixSnapshot | null {
+  const sourceFile = ts.createSourceFile('persona-matrix.ts', content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const values = new Map<string, unknown>();
+  const visit = (node: TsType.Node): void => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      (node.name.text === 'R_PERSONA_MATRIX' || node.name.text === 'R_PERSONA_SIGNAL_MATRIX') &&
+      node.initializer !== undefined
+    ) {
+      values.set(node.name.text, readR10TsValue(node.initializer));
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+
+  const matrix = values.get('R_PERSONA_MATRIX');
+  const signals = values.get('R_PERSONA_SIGNAL_MATRIX');
+  if (!isR10Record(matrix) || !Array.isArray(signals)) return null;
+
+  const categories = new Map<string, string[]>();
+  for (const [key, value] of Object.entries(matrix)) {
+    if (!Array.isArray(value) || !value.every((v): v is string => typeof v === 'string')) return null;
+    categories.set(key, value);
+  }
+  const signalRows: Array<{ signal: string; personas: string[] }> = [];
+  for (const row of signals) {
+    if (!isR10Record(row)) return null;
+    const signal = row['signal'];
+    const personas = row['personas'];
+    if (typeof signal !== 'string' || !Array.isArray(personas)) return null;
+    if (!personas.every((p): p is string => typeof p === 'string')) return null;
+    signalRows.push({ signal, personas });
+  }
+  return categories.size === 0 ? null : { categories, signals: signalRows };
+}
+
+/** 从 agent-personas.md §2 表格解析每个 matrix 行的 (key, persona 集合)。 */
+function parsePersonaMatrixFromMarkdown(content: string): PersonaMatrixSnapshot | null {
+  const lines = content.split(/\r?\n/);
+  const headerIndex = lines.findIndex((line) => line.startsWith('### 2. R-persona 选择矩阵'));
+  if (headerIndex < 0) return null;
+  const categories = new Map<string, string[]>();
+  const signals: Array<{ signal: string; personas: string[] }> = [];
+  for (let i = headerIndex + 1; i < lines.length; i++) {
+    const line = lines.at(i);
+    if (line === undefined) break;
+    if (line.startsWith('#') || line.startsWith('---')) break;
+    if (!line.startsWith('|')) continue;
+    // 表头行不是数据行：markdown 表格的表头下一行是分隔行（|---|---|），据此识别并跳过，
+    // 避免把两张表的表头（`rootCause.category 候选` / `信号`）当成矩阵行。
+    if (/^\|[\s|:-]+\|$/.test(lines.at(i + 1) ?? '')) continue;
+    const cells = line
+      .split('|')
+      .slice(1, -1)
+      .map((c) => c.trim());
+    if (cells.length < 3) continue;
+    const rawKey = cells[0]!;
+    if (/^-+$/.test(rawKey.replace(/[\s|]/g, ''))) continue;
+    const isCategoryRow = rawKey.includes('`');
+    const key = rawKey.replace(/`/g, '').trim();
+    if (key === '') continue;
+    const personas = (cells[2]!.match(/[a-z][a-z0-9-]*/g) ?? []).filter((t) => t.length > 3);
+    if (isCategoryRow) categories.set(key, personas);
+    else signals.push({ signal: key, personas });
+  }
+  return categories.size === 0 ? null : { categories, signals };
+}
+
+function samePersonaSet(a: readonly string[], b: readonly string[]): boolean {
+  const left = [...new Set(a)].sort();
+  const right = [...new Set(b)].sort();
+  return left.length === right.length && left.every((v, i) => v === right.at(i));
+}
+
+/**
+ * R-persona 矩阵一致性（R11 判据源的三方对账）：
+ *   1. root-cause-logic.ts 的两个矩阵常量与 agent-personas.md §2 表格逐行一致（键与候选集）；
+ *   2. 矩阵引用的每个 persona 必须存在于 `subagent/<name>.md`。
+ * 任一不成立即 exit 1，防止「门禁按代码里的矩阵判、文档里写的却是别的人格」。
+ */
+export function checkRootCausePersonaMatrix(sources: RootCausePersonaMatrixSources): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  const code = parsePersonaMatrixFromChecker(sources.checkerSource);
+  const doc = parsePersonaMatrixFromMarkdown(sources.authoritySpec);
+  if (code === null) {
+    violations.push({
+      check: PERSONA_MATRIX_CHECK,
+      message: 'root-cause-logic.ts 未能独立解析出 R_PERSONA_MATRIX / R_PERSONA_SIGNAL_MATRIX（fail-closed）',
+    });
+    return violations;
+  }
+  if (doc === null) {
+    violations.push({
+      check: PERSONA_MATRIX_CHECK,
+      message: 'agent-personas.md §2「R-persona 选择矩阵」表格未能解析（fail-closed）',
+    });
+    return violations;
+  }
+
+  for (const [category, personas] of code.categories) {
+    const docPersonas = doc.categories.get(category);
+    if (docPersonas === undefined) {
+      violations.push({
+        check: PERSONA_MATRIX_CHECK,
+        message: `agent-personas.md §2 缺 rootCause.category=${category} 行（代码矩阵有、文档无）`,
+      });
+    } else if (!samePersonaSet(personas, docPersonas)) {
+      violations.push({
+        check: PERSONA_MATRIX_CHECK,
+        message: `rootCause.category=${category} 行候选集不一致：代码 [${personas.join(', ')}] vs 文档 [${docPersonas.join(', ')}]`,
+      });
+    }
+  }
+  for (const category of doc.categories.keys()) {
+    if (!code.categories.has(category)) {
+      violations.push({
+        check: PERSONA_MATRIX_CHECK,
+        message: `agent-personas.md §2 多出 rootCause.category=${category} 行（文档有、代码矩阵无）`,
+      });
+    }
+  }
+
+  const docSignalByKey = new Map(doc.signals.map((row) => [row.signal, row]));
+  for (const row of code.signals) {
+    const docRow = docSignalByKey.get(row.signal);
+    if (docRow === undefined) {
+      violations.push({
+        check: PERSONA_MATRIX_CHECK,
+        message: `agent-personas.md §2「第二键」缺信号行「${row.signal}」（代码矩阵有、文档无）`,
+      });
+    } else if (!samePersonaSet(row.personas, docRow.personas)) {
+      violations.push({
+        check: PERSONA_MATRIX_CHECK,
+        message: `第二键信号「${row.signal}」候选集不一致：代码 [${row.personas.join(', ')}] vs 文档 [${docRow.personas.join(', ')}]`,
+      });
+    }
+  }
+  for (const row of doc.signals) {
+    if (!code.signals.some((codeRow) => codeRow.signal === row.signal)) {
+      violations.push({
+        check: PERSONA_MATRIX_CHECK,
+        message: `agent-personas.md §2「第二键」多出信号行「${row.signal}」（文档有、代码矩阵无）`,
+      });
+    }
+  }
+
+  const knownFiles = new Set(sources.personaFiles.map((f) => f.name.replace(/\.md$/, '')));
+  // 注意：code.categories 是 Map，必须取其 values()——Object.values(Map) 恒为空数组，
+  // 会把「persona 存在性」检查静默缩窄到只剩信号行（负向对照实测抓到的缺陷）。
+  const referenced = new Set<string>([
+    ...[...code.categories.values()].flat(),
+    ...code.signals.flatMap((row) => row.personas),
+  ]);
+  for (const persona of [...referenced].sort()) {
+    if (!knownFiles.has(persona)) {
+      violations.push({
+        check: PERSONA_MATRIX_CHECK,
+        message: `R-persona 矩阵引用了不存在的 persona「${persona}」（subagent/${persona}.md 不存在）`,
+      });
+    }
+  }
+  return violations;
+}
+
 export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsistencyReport {
   const violations: DocCheckViolation[] = [];
   violations.push(...checkSchemaList(input.schemaFiles, input.dataModels, input.schemaInventoryDocs));
@@ -847,6 +1084,16 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
       commandReference: input.rootCauseCommandReference,
     }),
   );
+  if (input.personaFiles !== undefined) {
+    violations.push(...checkPersonaCapabilityDeclarations(input.personaFiles));
+    violations.push(
+      ...checkRootCausePersonaMatrix({
+        checkerSource: input.rootCauseCheckerSource,
+        authoritySpec: input.rootCauseAuthoritySpec,
+        personaFiles: input.personaFiles,
+      }),
+    );
+  }
   return {
     violations,
     staticViolations: violations.filter((v) => !isDynamicViolation(v)),

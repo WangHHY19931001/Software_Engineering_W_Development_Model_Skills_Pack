@@ -590,22 +590,32 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 
 ---
 
-### 1.5 persona 能力声明字段
+### 1.5 persona 能力声明字段（门禁强制）
 
 > 吸收自 Agentic Design Patterns ch15「Agent 卡片」能力清单理念（不吸收 A2A 协议本身）。
 
-每个 persona 条目建议补充「能力声明」字段（随 persona 文件头或矩阵表注明）：
+每个 `subagent/*.md` 的 YAML frontmatter **必须**含四项单行非空字段（28 份全覆盖，由 `check-docs-consistency.ts` 的 `persona-capability-declarations` 检查强制；缺一即 exit 1）：
 
-- **能力**：该 persona 擅长/不擅长什么（如 code-reviewer：擅长类型/错误处理评审，不擅长性能调优）。
-- **输入模式**：接受什么输入（代码文件 / 设计文档 / JSON 产物）。
-- **输出模式**：产出什么（评审意见 / VerifierOutput 片段 / 分析结论）。
-- **使用边界**：何时适用 / 何时应换其它 persona（供 V-lead/R-lead 分派时判断，避免选错角色 = 协作评审 R16 角色-任务匹配）。
+| 字段 | 内容 | 用途 |
+|---|---|---|
+| `capabilities` | 擅长：<能力域>；不擅长：<边界外能力> | 判断该 persona 是否吃得下当前缺陷 |
+| `inputs` | 接受什么输入（代码文件 / 设计文档 / JSON 产物 / 证据链） | 判断上游产物是否够它开工 |
+| `outputs` | 产出什么（评审意见 / PartialReport / 分析结论） | 判断产出能否进聚合 |
+| `boundaries` | 适用：<何时加载>；换人：<何时应换其它 persona> | R-lead / V-lead 分派时刻的换人判据 |
+
+- **四字段是「按需加载」可执行的前提**：没有 `boundaries`，人格选择只能照抄矩阵，无法判断何时该换人（协作评审 R16 角色-任务匹配）。
+- **取值格式**：单行、无换行、内部只用全角标点（避免 YAML 结构歧义）；写入位置在 frontmatter 的 `description:` 之后。
+- **修改义务**：新增 persona 文件必须同时补四字段，否则门禁拒绝。
 
 ---
 
-### 2. R-persona 选择矩阵（按 rootCause.category 与阶段）
+### 2. R-persona 选择矩阵（第一键 rootCause.category + 第二键 风险域信号）
 
 > 分派方式：并行/串行均可（见 [root-cause-locator.md](root-cause-locator.md) §4.2）
+>
+> **两个键的分工**：第一键是 R 自述的 `rootCause.category`（schema 枚举，必选）；第二键是**从 V/G 产出特征读出的风险域信号**（不由 R 自述，避免「自己归类决定自己视角」的循环）。两键**并集**取人格，不互相替换。
+
+**第一键：`rootCause.category`（R 自述，必选）**
 
 | rootCause.category 候选 | 阶段 | 加载的 R-persona |
 |---|---|---|
@@ -616,9 +626,21 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 | `process-missing` | 全阶段 | project-manager-senior + testing-workflow-optimizer + engineering-incident-response-commander |
 | `tool-gap` | 全阶段 | engineering-autonomous-optimization-architect + testing-tool-evaluator |
 | `upstream-defect` | 全阶段 | engineering-incident-response-commander + testing-evidence-collector + engineering-technical-writer |
+
+**第二键：风险域信号（叠加键，从 V/G 产出特征读出）**
+
+| 信号 | 阶段 | 叠加 persona |
+|---|---|---|
 | 安全相关 Critical | 5-7 | engineering-threat-detection-engineer + engineering-code-reviewer + testing-reality-checker |
 | 性能相关 Critical | 5-7 | engineering-database-optimizer + testing-performance-benchmarker + engineering-backend-architect |
 | AI/LLM 相关 | 5 | engineering-ai-engineer + engineering-code-reviewer + testing-reality-checker |
+
+**两键仲裁规则**：
+
+1. **并集**：最终集合 = 第一键行 ∪ 命中的第二键行（可命中多个信号，全部并入）。
+2. **上限**：并集后仍受 §4 数量上限（R-persona 上限 5）约束；超限时**保留** `testing-reality-checker`（R10 必含）与第一键行成员，按「信号相关度」裁剪第二键叠加项，并在 `meta.persona` 或 `summary` 记明裁剪。
+3. **第一键分歧**：若第二键信号指向的第一键类别与 R 自述不同（如 R 报 `coding-error` 但信号显示证据链缺失），R 必须二选一——改 `rootCause.category`，或在 `rootCause.evidence` 中显式记录该分歧与理由；静默保留不一致选择视为选择漂移。
+4. **门禁边界（如实陈述）**：`check-rootcause-report.ts` 的 R11 只校验「personaSlice 是否在矩阵内」与「是否与第一键行有交集」；**数量 3/5 与 `incident-response-commander` 必含均不门禁强制**（`agent-personas.md` §4 的必含项是分派默认，不是门禁判据）。
 
 ---
 
@@ -657,11 +679,13 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 
 | 场景 | 默认 persona 数 | 上限 | 约束 |
 |---|---|---|---|
-| R-persona | 3 | 5 | 防止 token 爆炸；incident-response-commander 必含（5-Why 主导） |
+| R-persona | 3 | 5 | 防止 token 爆炸；incident-response-commander 必含（5-Why 主导）——**分派默认，非门禁判据**（见 §2 仲裁规则第 4 条） |
 | V-persona（评审产物） | 3 | 5 | reality-checker 必含（防幻想通过） |
 | V-persona（复审根因） | 2 | 3 | reality-checker + evidence-collector 必含 |
 
 > persona 数量约束与分派方式（并行/串行）无关：串行分派 3 个 persona 与并行分派 3 个 persona 在数量约束上等价。
+>
+> **门禁强制面**：多角度报告（`method=combined`）由 `check-rootcause-report.ts` 校验 `testing-reality-checker` 置信度（R10）与 persona 选择合法性（R11：矩阵内 + 与第一键行有交集）；数量与必含项不门禁强制，由编排者按本节约束和 token 预算（`budget-logic.ts` R4-A 单人格 token 上限）执行。
 
 ---
 

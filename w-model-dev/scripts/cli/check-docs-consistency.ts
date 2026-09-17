@@ -672,6 +672,11 @@ async function main(): Promise<void> {
     }
   }
   const personaCount = readdirSync(join(root, 'w-model-dev/subagent')).filter((f) => f.endsWith('.md')).length;
+  // 人格文件原文（能力声明四字段 + R-persona 矩阵 persona 存在性检查的数据源）
+  const personaFiles = readdirSync(join(root, 'w-model-dev/subagent'))
+    .filter((f) => f.endsWith('.md'))
+    .sort()
+    .map((f) => ({ name: f, content: read(join('w-model-dev/subagent', f)) }));
   const referencesCount = readdirSync(join(root, 'w-model-dev/references')).filter((f) => f.endsWith('.md')).length;
   const cliScriptFiles = readdirSync(join(root, 'w-model-dev/scripts/cli'))
     .filter((f) => f.endsWith('.ts'))
@@ -773,6 +778,7 @@ async function main(): Promise<void> {
     rootCauseLocator: read('w-model-dev/references/root-cause-locator.md'),
     rootCauseVerifierSpec: read('w-model-dev/references/verifier-spec.md'),
     rootCauseCommandReference: read('w-model-dev/references/command-reference.md'),
+    personaFiles,
     prePush: read('.githooks/pre-push'),
     gateCountDocs: [
       { name: 'README.md', content: read('README.md') },

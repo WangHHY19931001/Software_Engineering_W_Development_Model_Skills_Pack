@@ -234,7 +234,9 @@
 
 ### 4.3 persona 选择矩阵
 
-详见 [agent-personas.md](agent-personas.md)。
+矩阵（第一键 `rootCause.category` + 第二键风险域信号，叠加取并集）与两键仲裁规则详见 [agent-personas.md](agent-personas.md)「Persona 矩阵」§2。每个人格文件 frontmatter 的 `capabilities` / `inputs` / `outputs` / `boundaries` 四字段是「何时换人」的判据（§1.5）。
+
+**R11 门禁面**：多角度报告（`method=combined`）的 `partialReports[].personaSlice` 必须取自矩阵（矩阵外人格即失败），且与第一键行候选集有交集——自述 `category` 与所选视角不一致会被 `check-rootcause-report.ts` 判 exit 1。数量（默认 3 / 上限 5）与 `incident-response-commander` 必含不由门禁强制，按矩阵 §4 与 token 预算执行。
 
 ### 4.4 R-lead 聚合规则
 

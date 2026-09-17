@@ -23,6 +23,17 @@
 - **快速车道（DX）**：新增 `npm run test:affected`——按改动映射选择测试文件（触及 `config/**`、`.githooks/**`、`schemas/**`、`references/**`、`samples/**`、`docs/**`、`eval/**`、根 `scripts/**` 与根活体文档时自动退回全量）；**验收必须全量**（`npm run prepush` 18 项）已写入 README「验证仓库」块、CONTRIBUTING「本地推送前门禁」节与 AGENTS §6。
 - **门禁自身的既有缺陷一并清偿**：`lint:security` 陈旧 baseline（83 项发现）在代码内逐处具名豁免、baseline 未改；严格 M07 下 `samples/gate/valid-phase6.json` 补真实 evidence；`run-sync` 台账校正行号并补登 10 处未登记的直接子进程调用；`gate-report` 的注释剥离器误报（代码字符串中的 `/*`）与 Windows 跳过的用例一并处置（全仓测试无 `skip`）。
 
+### R-persona 选择可校验化与人格能力声明（r-persona-selection-auditability，2026-09-17）
+
+> 起因：对「R 是否应按需加载证据/定位/code-review 等人格」的分析。结论是 R **已在**按需加载（`subagent/` 28 人格 + 选择矩阵；「R 不调用 Persona」仅指不加载 `agent-personas.md` 的 4 个 V 评审 Persona，理由是 V 之后还要复审 R 的产出，需保持视角独立）。真正的缺口是「按需」不可校验，故本次把三处缺口补齐。
+
+- **新增 R11 校验规则**（`logic/root-cause-logic.ts`）：多角度报告（`method=combined`）的 `partialReports[].personaSlice` 必须为矩阵内已知 persona，且与 `rootCause.category` 第一键行候选集**有交集**；`partialReports` 缺失由 R9 判失败、`noRootCause` 分支无 category——两者跳过 R11。legacy `reality-checker` 归一化为 canonical 后参与比较。
+- **R-persona 两键矩阵**：第一键 `rootCause.category`（R 自述，7 行）+ 第二键风险域信号（安全 / 性能 / AI-LLM，**由 V/G 产出特征读出而非 R 自述**，命中即**叠加**不替换）；新增四条仲裁规则（并集 / 上限 5 时保留必含项与第一键行成员并记录裁剪 / 第一键分歧须改判或记录证据 / 门禁边界如实陈述）。矩阵以 `R_PERSONA_MATRIX`、`R_PERSONA_SIGNAL_MATRIX` 为 R11 判据源。
+- **persona 能力声明四字段强制**：28 份 `subagent/*.md` frontmatter 补 `capabilities` / `inputs` / `outputs` / `boundaries`（单行、值内只用全角标点）；`check-docs-consistency.ts` 新增 `persona-capability-declarations` 检查，任一文件缺一字段即 exit 1。`boundaries`（适用 / 换人）是「按需加载」可执行的前提——缺它则人格选择只能照抄矩阵。
+- **新增 `rootcause-persona-matrix` 一致性检查**：独立解析 `root-cause-logic.ts` 源码文本（TS AST，不 import 被检查模块）与 `agent-personas.md` §2 两张表的键与候选集**双向等价**，并断言矩阵引用的每个 persona 均存在于 `subagent/<name>.md`。
+- **fixture 校正 + 新负向样本**：`bad-r10-no-reality-checker.json` 的 personaSlice 由**不存在的人格名**（`engineering-testability` / `design-architect`）改为真实矩阵人格（保持「仅触发目标规则」的夹具原则，并新增单测钉住该性质）；新增 `bad-r11-unknown-persona.json`（矩阵外人格）与 `bad-r11-category-mismatch.json`（自述 category 与所选视角行无交集），`ROOTCAUSE_CASES` 14 → 16。
+- **门禁边界（如实陈述）**：数量约束（默认 3 / 上限 5）与 `incident-response-commander` 必含**不门禁强制**——它们是分派默认，由编排者按 `agent-personas.md` §4 与 token 预算（`budget-logic.ts` R4-A）执行；第二键因报告未声明信号字段亦不门禁强制，仅作分派指导。
+
 ### M 程序：外部技能采纳 P0–P6（expanded-external-skill-adoption，2026-09-14 ~ 2026-09-16）
 
 > 采纳判据与逐项验收见 `docs/superpowers/specs/2026-09-14-expanded-external-skill-adoption-design.md` §13（AC-0…AC-12）；各期提交序列、评审轮次与收口实测记于 `docs/superpowers/plans/2026-09-14-external-absorption-adjudication.md`、`2026-09-14-p1-meta-theory-absorption.md`、`2026-09-14-p2a-gate-negative-coverage-and-atomicity.md`、`2026-09-15-p2b-rule-loadbearing-and-completeness.md`、`2026-09-15-m07-rtm-test-evidence.md`、`2026-09-15-p3-role-independence-and-review.md`、`2026-09-15-p4-test-quality-and-design-rules.md`、`2026-09-16-p5-debug-ops-interaction.md`、`2026-09-16-p6-rejection-knowledge-base.md` 的收尾节。**本节计数一律取收口实测**，不沿用各期文档写作时的中间值（43 / 44 / 332 / 340 / 344）。

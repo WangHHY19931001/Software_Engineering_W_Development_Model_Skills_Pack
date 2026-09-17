@@ -13,6 +13,8 @@ import {
   A4_FORBIDDEN_AUTOMATIC_INSTALL_PATTERNS,
   A4_FORBIDDEN_MTIME_SAFETY_CLAIM_PATTERNS,
   checkRootCauseR10Contract,
+  checkRootCausePersonaMatrix,
+  checkPersonaCapabilityDeclarations,
   canonicalizeExit2ProbeIdentity,
   countValidExit2Scripts,
   runDocConsistencyChecks,
@@ -3533,3 +3535,166 @@ it('docs-consistency fixture copy excludes transient .d2-* files', async () => {
 function isD2Transient(source: string): boolean {
   return path.basename(source).startsWith('.d2-');
 }
+
+describe('R-persona 矩阵一致性与 persona 能力声明（R11 判据源）', () => {
+  const capabilities = 'capabilities: 擅长：x；不擅长：y\ninputs: z\noutputs: w\nboundaries: 适用：a；换人：b';
+  const personaFile = (name: string, extra = ''): { name: string; content: string } => ({
+    name: `${name}.md`,
+    content: `---\nname: ${name}\ndescription: d\n${capabilities}\n${extra}---\n\n# ${name}\n`,
+  });
+
+  const syntheticChecker = [
+    'export const R_PERSONA_MATRIX = {',
+    "  'coding-error': ['engineering-code-reviewer', 'testing-reality-checker'],",
+    '};',
+    'export const R_PERSONA_SIGNAL_MATRIX = [',
+    "  { signal: '安全相关 Critical', personas: ['engineering-threat-detection-engineer'] },",
+    '];',
+  ].join('\n');
+
+  const syntheticDoc = [
+    '### 2. R-persona 选择矩阵（第一键 rootCause.category + 第二键 风险域信号）',
+    '',
+    '| rootCause.category 候选 | 阶段 | 加载的 R-persona |',
+    '|---|---|---|',
+    '| `coding-error` | 5 | engineering-code-reviewer + testing-reality-checker |',
+    '',
+    '**第二键：风险域信号**',
+    '',
+    '| 信号 | 阶段 | 叠加 persona |',
+    '|---|---|---|',
+    '| 安全相关 Critical | 5-7 | engineering-threat-detection-engineer |',
+    '',
+    '---',
+    '',
+  ].join('\n');
+
+  const syntheticPersonas = [
+    personaFile('engineering-code-reviewer'),
+    personaFile('testing-reality-checker'),
+    personaFile('engineering-threat-detection-engineer'),
+  ];
+
+  it('真实仓库：矩阵三方对账零违规（代码常量 ↔ agent-personas.md §2 ↔ subagent/ 文件）', async () => {
+    const personaFiles = (await fs.readdir(path.join(REPO_ROOT, 'w-model-dev/subagent')))
+      .filter((f) => f.endsWith('.md'))
+      .sort();
+    const violations = checkRootCausePersonaMatrix({
+      checkerSource: await fs.readFile(path.join(REPO_ROOT, 'w-model-dev/scripts/logic/root-cause-logic.ts'), 'utf8'),
+      authoritySpec: await fs.readFile(path.join(REPO_ROOT, 'w-model-dev/references/agent-personas.md'), 'utf8'),
+      personaFiles: await Promise.all(
+        personaFiles.map(async (f) => ({
+          name: f,
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- subagent/ 为仓库受控目录，f 来自 readdir 且经 .md 过滤
+          content: await fs.readFile(path.join(REPO_ROOT, 'w-model-dev/subagent', f), 'utf8'),
+        })),
+      ),
+    });
+    expect(violations).toEqual([]);
+  });
+
+  it('真实仓库：全部人格文件能力声明四字段零违规', async () => {
+    // 人格文件数量与 README 声明的一致性由 checkAssetCounts（persona-count）单独强制，
+    // 本用例只负责「四字段全覆盖」这一维度，故按在盘清单动态取，不复制计数常量。
+    const names = (await fs.readdir(path.join(REPO_ROOT, 'w-model-dev/subagent'))).filter((f) => f.endsWith('.md'));
+    const violations = checkPersonaCapabilityDeclarations(
+      await Promise.all(
+        names.map(async (f) => ({
+          name: f,
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- subagent/ 为仓库受控目录，f 来自 readdir 且经 .md 过滤
+          content: await fs.readFile(path.join(REPO_ROOT, 'w-model-dev/subagent', f), 'utf8'),
+        })),
+      ),
+    );
+    expect(violations).toEqual([]);
+  });
+
+  it('合成：代码与文档一致时零违规', () => {
+    const violations = checkRootCausePersonaMatrix({
+      checkerSource: syntheticChecker,
+      authoritySpec: syntheticDoc,
+      personaFiles: syntheticPersonas,
+    });
+    expect(violations).toEqual([]);
+  });
+
+  it('合成：文档行少一个 persona 时报告候选集不一致', () => {
+    const violations = checkRootCausePersonaMatrix({
+      checkerSource: syntheticChecker,
+      authoritySpec: syntheticDoc.replace(
+        'engineering-code-reviewer + testing-reality-checker',
+        'engineering-code-reviewer',
+      ),
+      personaFiles: syntheticPersonas,
+    });
+    expect(violations).toHaveLength(1);
+    expect(violations[0]!.message).toMatch(/coding-error 行候选集不一致/);
+  });
+
+  it('合成：矩阵引用 subagent/ 中不存在的 persona 时报告（category 行与信号行都覆盖）', () => {
+    const categoryRow = checkRootCausePersonaMatrix({
+      checkerSource: syntheticChecker.replace("'testing-reality-checker'", "'testing-nonexistent-person'"),
+      authoritySpec: syntheticDoc.replace('testing-reality-checker', 'testing-nonexistent-person'),
+      personaFiles: syntheticPersonas,
+    });
+    expect(categoryRow.some((v) => /引用了不存在的 persona「testing-nonexistent-person」/.test(v.message))).toBe(true);
+
+    const signalRow = checkRootCausePersonaMatrix({
+      checkerSource: syntheticChecker.replace(
+        "'engineering-threat-detection-engineer'",
+        "'engineering-nonexistent-signal'",
+      ),
+      authoritySpec: syntheticDoc.replace('engineering-threat-detection-engineer', 'engineering-nonexistent-signal'),
+      personaFiles: syntheticPersonas,
+    });
+    expect(signalRow.some((v) => /引用了不存在的 persona「engineering-nonexistent-signal」/.test(v.message))).toBe(
+      true,
+    );
+  });
+
+  it('合成：文档多出代码矩阵没有的 category 行时报告', () => {
+    const violations = checkRootCausePersonaMatrix({
+      checkerSource: syntheticChecker,
+      authoritySpec: syntheticDoc.replace(
+        '| `coding-error` | 5 |',
+        '| `rogue-gap` | 5 | engineering-code-reviewer |\n| `coding-error` | 5 |',
+      ),
+      personaFiles: syntheticPersonas,
+    });
+    expect(violations.map((v) => v.message).join('\n')).toMatch(/§2 多出 rootCause\.category=rogue-gap 行/);
+  });
+
+  it('合成：矩阵常量缺失或文档无 §2 表格时 fail-closed', () => {
+    const noConst = checkRootCausePersonaMatrix({
+      checkerSource: 'export const X = 1;',
+      authoritySpec: syntheticDoc,
+      personaFiles: syntheticPersonas,
+    });
+    expect(noConst).toHaveLength(1);
+    expect(noConst[0]!.message).toMatch(/未能独立解析出 R_PERSONA_MATRIX/);
+
+    const noTable = checkRootCausePersonaMatrix({
+      checkerSource: syntheticChecker,
+      authoritySpec: '# 无矩阵的文档\n',
+      personaFiles: syntheticPersonas,
+    });
+    expect(noTable).toHaveLength(1);
+    expect(noTable[0]!.message).toMatch(/表格未能解析（fail-closed）/);
+  });
+
+  it('合成：人格缺任一能力声明字段即报告，清单为空 fail-closed', () => {
+    const missing = checkPersonaCapabilityDeclarations([
+      { name: 'a.md', content: '---\nname: a\ncapabilities: x\ninputs: y\noutputs: z\n---\n' },
+    ]);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]!.message).toMatch(/a\.md frontmatter 缺非空「boundaries」字段/);
+
+    const noFrontmatter = checkPersonaCapabilityDeclarations([{ name: 'b.md', content: '# b\n' }]);
+    expect(noFrontmatter).toHaveLength(1);
+    expect(noFrontmatter[0]!.message).toMatch(/b\.md 缺 YAML frontmatter/);
+
+    const empty = checkPersonaCapabilityDeclarations([]);
+    expect(empty).toHaveLength(1);
+    expect(empty[0]!.message).toMatch(/人格文件清单为空/);
+  });
+});

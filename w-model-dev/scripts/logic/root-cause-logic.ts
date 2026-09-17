@@ -1,7 +1,7 @@
 /**
  * RootCauseReport 校验纯逻辑（Root Cause Logic）—— 防止 R 子代理产出漂移
  *
- * 对应 spec §4 RootCauseReport Schema 与 R1-R10 校验规则。
+ * 对应 spec §4 RootCauseReport Schema 与 R1-R11 校验规则。
  *
  * 设计原则（与 verifier-logic.ts / graph-logic.ts / tla-logic.ts 一致）：
  *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块
@@ -148,6 +148,67 @@ const LEGACY_REALITY_CHECKER = 'reality-checker';
 const REPORT_ID_PATTERN = /^RC-[a-z0-9]+-\d+-\d+$/;
 const FALSIFIABILITY_PATTERN = /若.*则/;
 
+// ==================== R-persona 选择矩阵（R11 判据源） ====================
+
+/**
+ * R-persona 选择矩阵第一键：`rootCause.category` → 候选 persona 集合。
+ *
+ * 人类可读视图：`agent-personas.md`「Persona 矩阵」§2 的表格；本常量是 R11 的判定源，
+ * 两者的一致性由 docs-consistency 的 `rootcause-persona-matrix` 检查逐行断言
+ * （该检查独立解析本文件源码文本与 agent-personas.md 表格，不 import 本模块）。
+ * `design-flaw` 行的 engineering-frontend-developer 是「或」候选，故一并计入候选集。
+ */
+export const R_PERSONA_MATRIX: Readonly<Record<RootCauseCategory, readonly string[]>> = {
+  'coding-error': ['engineering-code-reviewer', 'engineering-senior-developer', 'testing-evidence-collector'],
+  'design-flaw': [
+    'engineering-software-architect',
+    'engineering-backend-architect',
+    'engineering-frontend-developer',
+    'testing-reality-checker',
+  ],
+  'requirement-gap': ['product-manager', 'product-feedback-synthesizer', 'testing-reality-checker'],
+  'test-gap': ['testing-api-tester', 'testing-performance-benchmarker', 'testing-test-results-analyzer'],
+  'process-missing': [
+    'project-manager-senior',
+    'testing-workflow-optimizer',
+    'engineering-incident-response-commander',
+  ],
+  'tool-gap': ['engineering-autonomous-optimization-architect', 'testing-tool-evaluator'],
+  'upstream-defect': [
+    'engineering-incident-response-commander',
+    'testing-evidence-collector',
+    'engineering-technical-writer',
+  ],
+};
+
+/**
+ * R-persona 选择矩阵第二键：风险域信号 → **叠加**候选 persona（并集，不替换第一键）。
+ *
+ * 信号来自 V/G 产出的缺陷特征（安全/性能/AI-LLM），不是 R 自述的 `category`；
+ * 叠加后仍受 `agent-personas.md` §4 的数量上限约束。第二键不在 R11 门禁范围内
+ * （报告未声明信号字段），仅作分派指导。
+ */
+export const R_PERSONA_SIGNAL_MATRIX: ReadonlyArray<{ signal: string; personas: readonly string[] }> = [
+  {
+    signal: '安全相关 Critical',
+    personas: ['engineering-threat-detection-engineer', 'engineering-code-reviewer', 'testing-reality-checker'],
+  },
+  {
+    signal: '性能相关 Critical',
+    personas: ['engineering-database-optimizer', 'testing-performance-benchmarker', 'engineering-backend-architect'],
+  },
+  {
+    signal: 'AI/LLM 相关',
+    personas: ['engineering-ai-engineer', 'engineering-code-reviewer', 'testing-reality-checker'],
+  },
+];
+
+/**
+ * 第一键的 Map 视图（R11 查表用）。用 `Map.get` 而非 `R_PERSONA_MATRIX[category]`：
+ * 前者对「类别来自 schema 校验值」这一事实无需豁免注释即可通过 security 扫描。
+ */
+const R_PERSONA_ROW_BY_CATEGORY: ReadonlyMap<string, readonly string[]> = new Map(Object.entries(R_PERSONA_MATRIX));
+
 // ==================== 工具函数 ====================
 
 function isNonEmptyString(x: unknown): x is string {
@@ -163,7 +224,7 @@ function isIso8601(value: unknown): value is string {
 /**
  * 校验外部 R 子代理产出的 RootCauseReport JSON 是否符合 spec §4 Schema。
  *
- * 校验项 R1-R10（见 spec §4.4）：
+ * 校验项 R1-R11（见 spec §4.4）：
  *   R1 Schema 完整性
  *   R2 rootCauseChain 长度 [2,5] + evidence 非空
  *   R3 falsifiabilityCheck 含「若...则」句式
@@ -174,6 +235,7 @@ function isIso8601(value: unknown): value is string {
  *   R8 reportId 格式
  *   R9 多角度场景 partialReports 非空
  *   R10 多角度场景 canonical testing-reality-checker confidence >= 0.5；legacy reality-checker 仅在 canonical 缺失时 fallback；同 artifact canonical-first 不重复计数；跨 artifact 冲突、canonical 重复、legacy 重复均 fail-closed
+ *   R11 多角度场景 personaSlice 必须为矩阵内已知 persona，且与 rootCause.category 对应矩阵行有交集（矩阵见 R_PERSONA_MATRIX）
  *   S13 noRootCause 仅允许 environmental|timing|external，且 investigation / mitigation 非空；该分支条件豁免 R2/R3 字段，常规分支判据不变
  *
  * R10 结构化契约节点见模块顶部的 R10_CONTRACT_NODES；关系与 prose 必须同节点一致。
@@ -187,7 +249,7 @@ export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
 
   // === Schema 前置校验 ===
   // 结构性约束（additionalProperties / required / type）由 schema 拦截，
-  // 通过后才进入下方 R1-R10 业务规则校验。
+  // 通过后才进入下方 R1-R11 业务规则校验。
   const schemaResult = validateBySchema('rootcause-report', input);
   if (!schemaResult.valid) {
     return {
@@ -410,6 +472,34 @@ export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
     const isCombined = r.meta?.method === 'combined';
     if (isCombined) {
       reasons.push('多角度场景（method=combined）partialReports 必须为非空数组');
+    }
+  }
+
+  // R11 多角度 persona 选择：personaSlice 必须落在矩阵内，且与 rootCause.category 行有交集。
+  // 作用域与豁免：仅 method=combined + 非 noRootCause + partialReports 非空的场景成立；
+  // partialReports 缺失由 R9 判失败，noRootCause 分支无 category 可判定——两者均不进入 R11。
+  // legacy reality-checker 归一化为 canonical 后参与比较（R10 已定义其 fallback 语义）。
+  if (hasPartialReports && r.meta?.method === 'combined' && !hasNoRootCause) {
+    const knownPersonas = new Set<string>([
+      ...Object.values(R_PERSONA_MATRIX).flat(),
+      ...R_PERSONA_SIGNAL_MATRIX.flatMap((signalRow) => signalRow.personas),
+      CANONICAL_REALITY_CHECKER,
+    ]);
+    const slices = r.partialReports!.map((p) =>
+      p?.personaSlice === LEGACY_REALITY_CHECKER ? CANONICAL_REALITY_CHECKER : String(p?.personaSlice ?? ''),
+    );
+    const unknownSlices = [...new Set(slices.filter((name) => !knownPersonas.has(name)))];
+    if (unknownSlices.length > 0) {
+      reasons.push(
+        `R11: 多角度场景 partialReports 含矩阵外 persona（${unknownSlices.join(', ')}），persona 选择须取自 agent-personas.md「Persona 矩阵」`,
+      );
+    }
+    const category = r.rootCause?.category;
+    const matrixRow = category === undefined ? undefined : R_PERSONA_ROW_BY_CATEGORY.get(category);
+    if (matrixRow !== undefined && !slices.some((name) => matrixRow.includes(name))) {
+      reasons.push(
+        `R11: 多角度场景 partialReports 与 rootCause.category=${category} 的矩阵行无交集（应含 ${matrixRow.join(' / ')} 之一）`,
+      );
     }
   }
 
