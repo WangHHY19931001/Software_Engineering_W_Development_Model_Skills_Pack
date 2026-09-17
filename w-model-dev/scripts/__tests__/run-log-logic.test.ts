@@ -1325,7 +1325,12 @@ describe('D8 lifecycle identity reducer', () => {
 
   it('keeps the committed fixture byte/hash contract independent of raw state', async () => {
     const fixture = await fs.readFile(identity2FixturePath);
-    const entries = fixture
+    // 字节/哈希契约必须先归一化行尾再比对：core.autocrlf=true 的 Windows 检出会把索引里的 LF 展开成 CRLF
+    // （14226 → 14244 字节），Linux/WSL 检出则是 LF——把落盘形态写进常量会让契约只在某台机器的字节形态下成立
+    // （本用例原先记录的是「17 CRLF + 末行无换行」= 14243，任何一次干净检出都对不上，只有原作者的工作区恰好相符）。
+    // 归一化到 git 存储形态（LF）后，跨平台、跨 checkout 比对的是**内容**，内容漂移仍会被下面的长度 + sha256 抓到。
+    const canonical = Buffer.from(fixture.toString('utf8').replace(/\r\n/g, '\n'), 'utf8');
+    const entries = canonical
       .toString('utf8')
       .trim()
       .split(/\r?\n/)
@@ -1333,9 +1338,9 @@ describe('D8 lifecycle identity reducer', () => {
       .map((line) => JSON.parse(line));
     checkRunLog(entries);
     expect(entries).toHaveLength(18);
-    expect(fixture.length).toBe(14243);
-    expect(createHash('sha256').update(fixture).digest('hex')).toBe(
-      '3e3c461490a0c5430f4d6ba4246cf51874ecdf4805debd427b68a27518daa204',
+    expect(canonical.length).toBe(14226);
+    expect(createHash('sha256').update(canonical).digest('hex')).toBe(
+      '17037cb7f71bc634fe13f9746269b374370f6f7297a4a1b58323cc69efbf7c02',
     );
   });
 
