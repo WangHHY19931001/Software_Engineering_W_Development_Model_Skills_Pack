@@ -425,6 +425,13 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **速查行**：`npx tsx w-model-dev/scripts/cli/check-requirement-coverage.ts <coverage.json> [--graph=<graph.json>] [--out-of-scope=<outOfScope.json>] [--exemptions=<granted.json>] [--json]`
 - **C7 降级语义**：不传 `--graph` 时：crossCuts 空 → C7b blocking；非空 → C7 降级 warning 并在 JSON `skippedRules` 标记。
 
+## 规则层覆盖口径门禁 CLI（check-coverage-scope）
+
+- **速查行**：`npx tsx w-model-dev/scripts/cli/check-coverage-scope.ts --report <coverage-final.json> --min-statements <n> --min-branches <n> --min-functions <n> --min-lines <n>`（五个值 flag 全部必需；`--flag=v` 与 `--flag v` 两形态等价；未知 / 重复 / 缺值 / 非负有限数值以外的阈值 → `ARG_INVALID` / exit 2）
+- **用途**：规则层覆盖口径门禁（B，2026-09-17 审计）——vitest v8 provider 对被 import 文件总是出报告，全量运行分母混入 cli/application/infrastructure 层；本门禁绕开报告器行为，对 istanbul-lib-coverage 格式的 `coverage/coverage-final.json` 按 logic+lib 白名单前缀（`/w-model-dev/scripts/logic/`、`/w-model-dev/scripts/lib/`）重算 statements/branches/functions/lines（计数口径与合并规则见 `logic/coverage-scope-logic.ts` 头注）并强制阈值，独立于 vitest 全分母阈值（pre-push 覆盖率项）。
+- **COVERAGE_SCOPE_JSON 字段**：`{fileCount, totals:{statements,branches,functions,lines}, files:[{file, statements|branches|functions|lines:{covered,total,pct}}], failures:[], passed, thresholds}`；`file` 为 `w-model-dev/scripts/` 之后的显示后缀（正斜杠），`files` 按 localeCompare 升序保证逐字节可复现；`totals` 为各文件 covered/total 求和后的加权 pct（两位小数，非百分比平均）。
+- **退出码**：0=达标（stdout 单行 `COVERAGE_SCOPE_JSON`）/ 1=阈值不达（`passed=false` 且 `failures` 逐指标列出 `实际 < 阈值`）/ 2=输入错误（报告不存在或不可读 `FILE_NOT_FOUND`、非法 JSON `FILE_PARSE`、报告畸形 `STRUCTURE_INVALID`、**白名单零命中**（`fileCount===0`，include 前缀失配或报告为空）`STRUCTURE_INVALID` → ERROR_JSON）。
+
 ## 阶段 5-8 codegraph/opsx/archive 门禁 CLI（ChangeScope 绑定）
 
 三个 checker 均接受同一套变更上下文参数（对应约束 #14 / 反模式 #38/#39/#40 与归档后置门）：

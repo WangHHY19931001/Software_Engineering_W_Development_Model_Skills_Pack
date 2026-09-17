@@ -116,6 +116,7 @@ function fileMetrics(file: string, raw: unknown): CoverageScopeFileReport {
     const line = (loc as { start?: { line?: unknown } } | undefined)?.start?.line;
     if (typeof line !== 'number') throw new CoverageScopeFormatError(`${file} statementMap[${id}] 无 start.line`);
     lineTotal.add(line);
+    // eslint-disable-next-line security/detect-object-injection -- id 取自 statementMap 的 Object.entries 键，s 已由 asRecord 校验为受控 Record
     const hit = s[id];
     if (typeof hit === 'number' && hit > 0) lineCovered.add(line);
   }
@@ -166,7 +167,9 @@ export function computeCoverageScope(report: unknown, thresholds: CoverageScopeT
   };
   const failures: string[] = [];
   for (const key of Object.keys(label) as Array<keyof CoverageScopeThresholds>) {
+    // eslint-disable-next-line security/detect-object-injection -- key 为 CoverageScopeThresholds 键字面量联合（label 常量派生），非注入
     if (totals[key] < thresholds[key]) {
+      // eslint-disable-next-line security/detect-object-injection -- 同上，受控键读取拼入 failure 消息
       failures.push(`${key} ${totals[key]} < 阈值 ${thresholds[key]}`);
     }
   }

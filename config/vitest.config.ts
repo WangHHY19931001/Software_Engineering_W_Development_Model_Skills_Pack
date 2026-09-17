@@ -31,6 +31,7 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'bdd-cli.test.ts',
   'change-scope.test.ts',
   'check-codegraph-queries.test.ts',
+  'check-coverage-scope.test.ts',
   'check-openspec-archive.test.ts',
   'check-opsx-artifacts.test.ts',
   'check-pollution-cli.test.ts',

@@ -1,5 +1,6 @@
 // w-model-dev/scripts/__tests__/coverage-scope-logic.test.ts
 import { describe, expect, it } from 'vitest';
+
 import {
   computeCoverageScope,
   CoverageScopeFormatError,

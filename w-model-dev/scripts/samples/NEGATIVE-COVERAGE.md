@@ -20,10 +20,10 @@
 >     独立根是并发的前提，同时把不变量加强为「本探针在自己根内不留半成品」（共享根只能做弱归因）；
 >     实测 47 探针由串行 71s 降至约 22s，断言一字未减。tsx 不可用等
 >     探针不可用情形按失败处理，不静默跳过。
-> - 口径与中心探针一致（45 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
+> - 口径与中心探针一致（46 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
 >   `metrics-report.ts` 使用特殊探针参数，但仍计入集合）。
 >
-> - **门禁脚本**：基名（`w-model-dev/scripts/cli/<name>.ts` 去掉 `.ts`）。全表 45 行，每门禁恰一行。
+> - **门禁脚本**：基名（`w-model-dev/scripts/cli/<name>.ts` 去掉 `.ts`）。全表 46 行，每门禁恰一行。
 > - **负向机制**：只允许 `fixture`（在盘 `samples/` fixture）/ `invocation`（CLI 参数或测试临时目录调用）/
 >   `mutated-copy`（测试内改写文本副本）三种。
 > - **负向案例 / 证据位置**：`fixture` 行写 `` `samples/...` ``（相对 `w-model-dev/scripts/`），可附
@@ -41,48 +41,49 @@
 
 | 门禁脚本 | 负向机制 | 负向案例 / 证据位置 | 所防回归（一句话） |
 | --- | --- | --- | --- |
-| check-verifier-output | fixture | `samples/verifier/bad-ranking-k.json`（self-test.ts:189） | 放宽分数与一致性不变量将漏掉 ranking.k=2.5 非整数、compositeScore≠Σ(score*weight) 仍判 passed 的漂移 |
-| check-artifact-gate | fixture | `samples/gate/valid-phase6.json`（self-test.ts:356，B 组强化后断言 /待执行/） | 去掉 /待执行/ 断言后 phase=8 终检会漏掉 system/acceptance 仍 pending 却被判合格 |
-| check-requirement-graph | fixture | `samples/graph/bad-isolated.json`（self-test.ts:531） | 放宽图谱结构门将漏掉孤立节点（无入边/出边）被当作合法需求图放行 |
-| check-tla-model | fixture | `samples/tla/bad-no-l1-root.json`（self-test.ts:1146） | 放宽 manifest 校验将漏掉缺 L1 根节点的规格仍被当作可建模通过 |
-| check-bdd-model | fixture | `samples/bdd/bad-schema.manifest.json`（self-test.ts:2026） | 放宽 BDD 校验将漏掉 manifest 缺必填字段仍通过 D1/D2 |
-| check-budget | fixture | `samples/budget/bad-stale.json`（self-test.ts:1275） | 放宽 R1 时效性将漏掉过期 budget 不再被拦截，预算约束形同虚设 |
-| check-run-log | fixture | `samples/run-log/bad-incomplete.jsonl`（self-test.ts:1323） | 放宽 R1 完整性将漏掉缺字段的 run-log 记录被静默接受 |
-| check-maturity | fixture | `samples/maturity/bad-stale.json`（self-test.ts:1275） | 放宽周期校验将漏掉 maturity 过期未降级导致的成熟度虚高 |
-| check-checkpoint | fixture | `samples/checkpoint/bad-empty-decisions.jsonl`（self-test.ts:1481） | 放宽 R1 决策非空将漏掉空决策的 CHECKPOINT 被判通过（人类确认被绕过） |
-| check-code-tla-consistency | fixture | `samples/code-tla/bad-sd-no-code-module.json`（self-test.ts:1508） | 放宽 SD→codeModule 将漏掉设计组件无对应实现仍通过一致性回归 |
-| check-rootcause-report | fixture | `samples/rootcause/bad-r1-missing-fields.json`（self-test.ts:1558） | 放宽 R1 将漏掉缺必填字段的 RootCauseReport 被 V/G 接受进入返工 |
-| check-preventive-review | fixture | `samples/preventive-review/valid-completeness.json`（self-test.ts:1654，B 组强化后断言 /R3 报告缺失/） | 去掉缺失维度断言后 reliability/security 缺二仍整体 passed=true |
-| check-iceberg-sweep | fixture | `samples/iceberg/bad-round-out-of-range.json`（self-test.ts:1702） | 放宽 R1-R5 将漏掉 iceberg round 越界（超过 maxIcebergRounds）仍被接受 |
-| check-role-dispatch | fixture | `samples/run-log/bad-missing-V-role.jsonl`（self-test.ts:1782） | 放宽角色分派完整性（约束 #8）将漏掉阶段缺 V 分派记录仍通过 |
-| check-state-machine-consistency | fixture | `samples/state-machine/bad-missing-transition.json`（self-test.ts:1812） | 放宽状态集/转移集一致将漏掉设计文档缺转移而代码存在该分支 |
-| check-codegraph-queries | fixture | `samples/codegraph-queries/bad-empty`（self-test.ts:1849） | 放宽查询落盘覆盖将漏掉未做 codegraph 查询（空目录）直接改代码（反模式 #38 逃逸） |
-| check-opsx-artifacts | fixture | `samples/opsx-artifacts/bad-missing-tickets`（self-test.ts:1888） | 放宽制品齐全性将漏掉缺 tickets 或 R3/V 审查产物的变更进入 apply（反模式 #39/#40） |
-| check-openspec-archive | fixture | `samples/openspec-archive/bad-no-archive`（self-test.ts:1921） | 放宽归档校验将漏掉未归档的 change 被判归档完成 |
-| check-requirement-coverage | fixture | `samples/coverage/bad-empty-stakeholder.json`（self-test.ts:2167） | 放宽 C1-C10 将漏掉 stakeholder 覆盖率缺口与 metrics 重算不一致 |
-| check-exemption | fixture | `samples/exemption/bad-s-self-approve.json`（self-test.ts:2231） | 放宽 E1-E9 将漏掉 S 自批（缺人类四阶段审批）的豁免被放行 |
-| check-design-contract-consistency | fixture | `samples/design-contract/bad-path-mismatch.json`（self-test.ts:2282） | 放宽 D1-D4 将漏掉设计路径/参数/状态码/响应字段与实现不一致 |
-| check-signature-chain | fixture | `samples/signature-chain/bad-missing-V.jsonl`（self-test.ts:2330） | 放宽 R1-R10 将漏掉缺 V 签名或被篡改的链条被判完整 |
-| check-archive-integrity | fixture | `samples/archive-integrity/bad-missing-phase1-docs.json`（self-test.ts:2440） | 放宽归档清单校验将漏掉引用缺失文件仍判归档成功 |
-| code-health-gap | fixture | `samples/code-health/phase2/missing-security.json`（self-test.ts:2870） | 放宽七维度 gap 将漏掉缺 security 维度却因 coverage=100% 被授权跳过 |
-| code-health-tests | fixture | `samples/code-health/phase3/bad-author-age-deletion.json`（self-test.ts:2956） | 放宽受保护测试 inventory 将漏掉以作者年龄作删除依据的受保护测试误删 |
-| code-health-apply | fixture | `samples/code-health/apply/approval-required.json`（self-test.ts:2821） | 放宽 approval gate 将漏掉无人类 approval 的删除提案被应用（scope 失控） |
-| code-health-duplicates | fixture | `samples/code-health/phase4/bad-test-only.json`（self-test.ts:3037） | 放宽 abstraction guard 将漏掉 test-only 调用点被当作可抽象权威而错误授权合并 |
-| code-health-phase1 | fixture | `samples/code-health/phase1/static/blocked.json`（self-test.ts:2757） | 放宽只读发现将漏掉源文件不可读时产出 dead 结论（把「未知」误判为「可删」） |
+| check-verifier-output | fixture | `samples/verifier/bad-ranking-k.json`（self-test.ts:190） | 放宽分数与一致性不变量将漏掉 ranking.k=2.5 非整数、compositeScore≠Σ(score*weight) 仍判 passed 的漂移 |
+| check-artifact-gate | fixture | `samples/gate/valid-phase6.json`（self-test.ts:357，B 组强化后断言 /待执行/） | 去掉 /待执行/ 断言后 phase=8 终检会漏掉 system/acceptance 仍 pending 却被判合格 |
+| check-requirement-graph | fixture | `samples/graph/bad-isolated.json`（self-test.ts:532） | 放宽图谱结构门将漏掉孤立节点（无入边/出边）被当作合法需求图放行 |
+| check-tla-model | fixture | `samples/tla/bad-no-l1-root.json`（self-test.ts:1147） | 放宽 manifest 校验将漏掉缺 L1 根节点的规格仍被当作可建模通过 |
+| check-bdd-model | fixture | `samples/bdd/bad-schema.manifest.json`（self-test.ts:2027） | 放宽 BDD 校验将漏掉 manifest 缺必填字段仍通过 D1/D2 |
+| check-budget | fixture | `samples/budget/bad-stale.json`（self-test.ts:1276） | 放宽 R1 时效性将漏掉过期 budget 不再被拦截，预算约束形同虚设 |
+| check-run-log | fixture | `samples/run-log/bad-incomplete.jsonl`（self-test.ts:1324） | 放宽 R1 完整性将漏掉缺字段的 run-log 记录被静默接受 |
+| check-maturity | fixture | `samples/maturity/bad-stale.json`（self-test.ts:1276） | 放宽周期校验将漏掉 maturity 过期未降级导致的成熟度虚高 |
+| check-checkpoint | fixture | `samples/checkpoint/bad-empty-decisions.jsonl`（self-test.ts:1482） | 放宽 R1 决策非空将漏掉空决策的 CHECKPOINT 被判通过（人类确认被绕过） |
+| check-code-tla-consistency | fixture | `samples/code-tla/bad-sd-no-code-module.json`（self-test.ts:1509） | 放宽 SD→codeModule 将漏掉设计组件无对应实现仍通过一致性回归 |
+| check-rootcause-report | fixture | `samples/rootcause/bad-r1-missing-fields.json`（self-test.ts:1559） | 放宽 R1 将漏掉缺必填字段的 RootCauseReport 被 V/G 接受进入返工 |
+| check-preventive-review | fixture | `samples/preventive-review/valid-completeness.json`（self-test.ts:1655，B 组强化后断言 /R3 报告缺失/） | 去掉缺失维度断言后 reliability/security 缺二仍整体 passed=true |
+| check-iceberg-sweep | fixture | `samples/iceberg/bad-round-out-of-range.json`（self-test.ts:1703） | 放宽 R1-R5 将漏掉 iceberg round 越界（超过 maxIcebergRounds）仍被接受 |
+| check-role-dispatch | fixture | `samples/run-log/bad-missing-V-role.jsonl`（self-test.ts:1783） | 放宽角色分派完整性（约束 #8）将漏掉阶段缺 V 分派记录仍通过 |
+| check-state-machine-consistency | fixture | `samples/state-machine/bad-missing-transition.json`（self-test.ts:1813） | 放宽状态集/转移集一致将漏掉设计文档缺转移而代码存在该分支 |
+| check-codegraph-queries | fixture | `samples/codegraph-queries/bad-empty`（self-test.ts:1850） | 放宽查询落盘覆盖将漏掉未做 codegraph 查询（空目录）直接改代码（反模式 #38 逃逸） |
+| check-opsx-artifacts | fixture | `samples/opsx-artifacts/bad-missing-tickets`（self-test.ts:1889） | 放宽制品齐全性将漏掉缺 tickets 或 R3/V 审查产物的变更进入 apply（反模式 #39/#40） |
+| check-openspec-archive | fixture | `samples/openspec-archive/bad-no-archive`（self-test.ts:1922） | 放宽归档校验将漏掉未归档的 change 被判归档完成 |
+| check-requirement-coverage | fixture | `samples/coverage/bad-empty-stakeholder.json`（self-test.ts:2168） | 放宽 C1-C10 将漏掉 stakeholder 覆盖率缺口与 metrics 重算不一致 |
+| check-exemption | fixture | `samples/exemption/bad-s-self-approve.json`（self-test.ts:2232） | 放宽 E1-E9 将漏掉 S 自批（缺人类四阶段审批）的豁免被放行 |
+| check-design-contract-consistency | fixture | `samples/design-contract/bad-path-mismatch.json`（self-test.ts:2283） | 放宽 D1-D4 将漏掉设计路径/参数/状态码/响应字段与实现不一致 |
+| check-signature-chain | fixture | `samples/signature-chain/bad-missing-V.jsonl`（self-test.ts:2331） | 放宽 R1-R10 将漏掉缺 V 签名或被篡改的链条被判完整 |
+| check-archive-integrity | fixture | `samples/archive-integrity/bad-missing-phase1-docs.json`（self-test.ts:2441） | 放宽归档清单校验将漏掉引用缺失文件仍判归档成功 |
+| code-health-gap | fixture | `samples/code-health/phase2/missing-security.json`（self-test.ts:2871） | 放宽七维度 gap 将漏掉缺 security 维度却因 coverage=100% 被授权跳过 |
+| code-health-tests | fixture | `samples/code-health/phase3/bad-author-age-deletion.json`（self-test.ts:2957） | 放宽受保护测试 inventory 将漏掉以作者年龄作删除依据的受保护测试误删 |
+| code-health-apply | fixture | `samples/code-health/apply/approval-required.json`（self-test.ts:2822） | 放宽 approval gate 将漏掉无人类 approval 的删除提案被应用（scope 失控） |
+| code-health-duplicates | fixture | `samples/code-health/phase4/bad-test-only.json`（self-test.ts:3038） | 放宽 abstraction guard 将漏掉 test-only 调用点被当作可抽象权威而错误授权合并 |
+| code-health-phase1 | fixture | `samples/code-health/phase1/static/blocked.json`（self-test.ts:2758） | 放宽只读发现将漏掉源文件不可读时产出 dead 结论（把「未知」误判为「可删」） |
 
 ### B 组：仅 B 覆盖的门禁（1）
 
 | 门禁脚本 | 负向机制 | 负向案例 / 证据位置 | 所防回归（一句话） |
 | --- | --- | --- | --- |
-| check-tla-bdd-sync | fixture | `samples/tla-bdd-sync/bad-transition-mismatch.json`（self-test.ts:1764，任务 1 强化后断言转移未找到） | 去掉转移等价断言后 TLA+ 转移在 BDD 中缺对应 When 步骤仍判等价 |
+| check-tla-bdd-sync | fixture | `samples/tla-bdd-sync/bad-transition-mismatch.json`（self-test.ts:1765，任务 1 强化后断言转移未找到） | 去掉转移等价断言后 TLA+ 转移在 BDD 中缺对应 When 步骤仍判等价 |
 
-### C 组：负向输入是参数或变异副本（16）
+### C 组：负向输入是参数或变异副本（17）
 
 | 门禁脚本 | 负向机制 | 负向案例 / 证据位置 | 所防回归（一句话） |
 | --- | --- | --- | --- |
 | check-docs-consistency | mutated-copy | `w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts:2356`（:2358 过滤 script-registry 违规） | 去掉该计数变异断言后，script-registry 维度退化为空转/假绿，SKILL.md 的 `.ts` 计数改错（如 44→43）无人发现 |
 | check-samples-coverage | invocation | `w-model-dev/scripts/__tests__/check-samples-coverage.test.ts:387`（:379 起的「缺 NEGATIVE-COVERAGE.md → exit 2」用例断言行） | 缺失必需文件（清单本身）不再 exit 2 时，清单缺失会被当作通过，负向覆盖不变量静默失效 |
 | check-pollution | invocation | `w-model-dev/scripts/__tests__/check-pollution-cli.test.ts:228`（同测试 :232 断言项目目录快照逐字节不变） | 未知 flag 不在任何扫描前被拒时，污染定位会在非法参数下继续跑（半程结果被当作结论），「吞掉测试失败只看产物」的工具自己先吞掉输入错误 |
+| check-coverage-scope | invocation | `w-model-dev/scripts/__tests__/check-coverage-scope.test.ts:84`（同测试 :101 断言 stdout ERROR_JSON + stderr `✗ [`） | 未知 flag 不在任何扫描前被拒时，覆盖口径门禁会以残缺参数继续跑并把半程结果当结论，白名单失配被静默掩盖 |
 | code-health-archive | invocation | `w-model-dev/scripts/__tests__/code-health-archive-boundary.test.ts:710` | malformed produce 输入不被 exit 2 拒绝，归档会写入半成品证据 |
 | code-health-ledger | invocation | `w-model-dev/scripts/__tests__/code-health-cli.test.ts:696` | 未知子命令不再 exit 2，append-only ledger 可能被非法子命令破坏 |
 | doctor | invocation | `w-model-dev/scripts/__tests__/exit2-failure-atomicity.test.ts:291`（:273 起的逐门禁循环对 doctor 断言 exit 2） | doctor 对非法参数返回 0/1 而非 2，环境缺失会被误报为通过 |

@@ -14,7 +14,7 @@
  *   0  所有样本的校验结果与期望一致
  *   1  至少一个样本不匹配
  *
- * 样本目录约定（samples/<area>/，27 个样本子目录（35+1 个用例数组），详见 samples/README.md 覆盖矩阵）：
+ * 样本目录约定（samples/<area>/，28 个样本子目录（36+1 个用例数组），详见 samples/README.md 覆盖矩阵）：
  *   verifier / gate / graph / tla / code-tla / bdd / coverage / exemption / budget /
  *   run-log / maturity / checkpoint / rootcause / preventive-review / iceberg /
  *   tla-bdd-sync / state-machine / design-contract / signature-chain /
@@ -57,6 +57,7 @@ import { checkRunLog } from '../logic/run-log-logic.js';
 import { checkMaturity } from '../logic/maturity-logic.js';
 import { checkCheckpoint } from '../logic/checkpoint-logic.js';
 import { checkRequirementCoverage, type CoverageCheckOptions } from '../logic/coverage-logic.js';
+import { computeCoverageScope, type CoverageScopeThresholds } from '../logic/coverage-scope-logic.js';
 import { checkExemption } from '../logic/exemption-logic.js';
 import { checkSignatureChain } from '../logic/signature-chain-logic.js';
 import { checkArchiveIntegrity } from '../logic/archive-integrity-logic.js';
@@ -4213,6 +4214,84 @@ async function runCoverageCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+// -------------------- CoverageScope（规则层覆盖口径：logic+lib 白名单分母，纯函数直测不 spawn） --------------------
+
+interface CoverageScopeCase {
+  /** 样本文件名（相对 samples/coverage-scope/） */
+  file: string;
+  /** 透传给 computeCoverageScope 的四指标阈值 */
+  thresholds: CoverageScopeThresholds;
+  /** 期望校验是否通过 */
+  expectedPassed: boolean;
+  /** 期望四指标合计 pct（写死样本构造值，防 logic 口径静默漂移） */
+  expectedTotals?: CoverageScopeThresholds;
+  /** 期望 failures 条数（缺省不校验） */
+  expectedFailureCount?: number;
+  /** 用例说明 */
+  description: string;
+}
+
+const COVERAGE_SCOPE_CASES: CoverageScopeCase[] = [
+  {
+    file: 'valid.json',
+    thresholds: { statements: 0, branches: 0, functions: 0, lines: 0 },
+    expectedPassed: true,
+    expectedTotals: { statements: 75, branches: 50, functions: 100, lines: 75 },
+    description:
+      'valid 样本 thresholds 全 0：passed=true、fileCount=2、合计 pct=75/50/100/75（小写盘符+正斜杠与大写盘符+反斜杠各一）',
+  },
+  {
+    file: 'valid.json',
+    thresholds: { statements: 100, branches: 100, functions: 100, lines: 100 },
+    expectedPassed: false,
+    // 严格小于比较（coverage-scope-logic.ts）：functions 合计恰为 100 不低于阈值，故 4 指标中 3 条 failure
+    expectedFailureCount: 3,
+    description: 'valid 样本 thresholds 全 100：passed=false 且 failures 逐指标列出（functions=100 不低于阈值不计入）',
+  },
+];
+
+async function runCoverageScopeCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  const coverageScopeSamplesDir = path.join(samplesDir, 'coverage-scope');
+  for (const c of COVERAGE_SCOPE_CASES) {
+    const abs = path.join(coverageScopeSamplesDir, c.file);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 样本路径由 samples/coverage-scope/ 与用例数组 file 字段拼出（仓库内受控 fixture）
+    const raw = await fs.readFile(abs, 'utf-8');
+    const parsed: unknown = parseJsonSafe(raw);
+    const r = computeCoverageScope(parsed, c.thresholds);
+
+    const details: string[] = [];
+    if (r.passed !== c.expectedPassed) {
+      details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+    }
+    if (c.expectedTotals !== undefined) {
+      const t = r.totals;
+      const mismatch = (Object.keys(c.expectedTotals) as Array<keyof CoverageScopeThresholds>).filter(
+        // eslint-disable-next-line security/detect-object-injection -- k 为 CoverageScopeThresholds 键字面量联合（Object.keys 类型收窄），两侧均受控对象
+        (k) => t[k] !== c.expectedTotals![k],
+      );
+      if (mismatch.length > 0) {
+        details.push(
+          `  - 期望 totals=${JSON.stringify(c.expectedTotals)}，实际 totals=${JSON.stringify(t)}（${mismatch.join('/')} 不符）`,
+        );
+      }
+    }
+    if (c.expectedFailureCount !== undefined && r.failures.length !== c.expectedFailureCount) {
+      details.push(
+        `  - 期望 failures=${c.expectedFailureCount} 条，实际 ${r.failures.length} 条（${JSON.stringify(r.failures)}）`,
+      );
+    }
+
+    results.push({
+      name: `coverage-scope/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 async function runExemptionCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of EXEMPTION_CASES) {
@@ -4807,6 +4886,7 @@ async function main(): Promise<void> {
   console.log(`CodeHealth Phase4 Duplicate 用例: ${CODE_HEALTH_PHASE4_CASES.length}`);
   console.log(`BDD 用例       : ${BDD_CASES.length}`);
   console.log(`Coverage 用例  : ${COVERAGE_CASES.length}`);
+  console.log(`CoverageScope 用例 : ${COVERAGE_SCOPE_CASES.length}`);
   console.log(`Exemption 用例 : ${EXEMPTION_CASES.length}`);
   console.log(`SignatureChain 用例 : ${SIGNATURE_CHAIN_CASES.length}`);
   console.log(`ArchiveIntegrity 用例: ${ARCHIVE_INTEGRITY_CASES.length}`);
@@ -4837,6 +4917,7 @@ async function main(): Promise<void> {
     schemaResults,
     bddResults,
     coverageResults,
+    coverageScopeResults,
     exemptionResults,
     signatureChainResults,
     archiveIntegrityResults,
@@ -4886,6 +4967,7 @@ async function main(): Promise<void> {
     runSchemaCases(samplesDir),
     runBddCases(samplesDir),
     runCoverageCases(samplesDir),
+    runCoverageScopeCases(samplesDir),
     runExemptionCases(samplesDir),
     runSignatureChainCases(samplesDir),
     runArchiveIntegrityCases(samplesDir),
@@ -4924,6 +5006,7 @@ async function main(): Promise<void> {
     ...codeHealthResults,
     ...bddResults,
     ...coverageResults,
+    ...coverageScopeResults,
     ...exemptionResults,
     ...signatureChainResults,
     ...archiveIntegrityResults,
