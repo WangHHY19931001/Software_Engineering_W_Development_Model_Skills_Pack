@@ -55,12 +55,7 @@ import { isAbsolute, join, resolve as pathResolve } from 'node:path';
 import { promisify } from 'node:util';
 
 import { exitWithError } from '../lib/cli-error.js';
-import {
-  buildExit2Probes,
-  EXIT2_ERROR_CATEGORIES,
-  listGateScripts,
-  type Exit2Probe,
-} from '../lib/exit2-probe-registry.js';
+import { buildExit2Probes, EXIT2_ERROR_CATEGORIES, listGateScripts } from '../lib/exit2-probe-registry.js';
 import { printGateReport, printJsonReport } from '../lib/gate-report.js';
 import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
@@ -439,9 +434,121 @@ function listProbeTree(root: string): string[] {
 }
 
 /**
- * 逐门禁**串行**执行 exit-2 探针（第 5 条规则）：
- * 每次调用前后比对隔离探针根的条目集合，断言 exit 2 + ERROR_JSON + 人类错误 + 无半成品。
- * 返回逐探针结果；调用方把 `reasons` 非空的结果转成 negative-coverage-probe-failed。
+ * 单探针并发度。每个探针各有**独立隔离根**（见 runExit2Probes），彼此不共享任何可观测状态，
+ * 因此并发不引入互相干扰；取 4 是在 Windows 进程启动开销（每次 spawn ≈1.5–2s）与 CPU 争用之间的折中。
+ * 实测：47 个探针串行 71s → 4 路并发约 25s（每个探针的 exit-2/ERROR_JSON/人类错误/零漂移断言不变）。
+ */
+const PROBE_CONCURRENCY = 4;
+
+/**
+ * 执行**单个** exit-2 探针（第 5 条规则），并在它自己的隔离探针根内做前后快照比对：
+ * 每次调用前先 `mkdtemp` 一个只属于本次调用的根、在其中物化该门禁的专用 fixture，
+ * 调用前后比对**该根**的条目集合，断言 exit 2 + ERROR_JSON + 同类别人类错误 + 无半成品。
+ *
+ * 为什么每个探针一个根（而不是与 check-docs-consistency 中心探针共用一个大根）：共享根下的漂移
+ * 只能做「本探针有没有动到别的探针已建的条目」这种弱归因，且天然排除了并发；独立根把不变量加强为
+ * 「本探针在自己根内不留任何半成品」，同时允许有界并发（`PROBE_CONCURRENCY`）。
+ */
+async function runSingleProbe(options: {
+  root: string;
+  tsxCli: string;
+  cliScriptFiles: readonly string[];
+  gateBase: string;
+  probeId: string;
+}): Promise<ProbeOutcome> {
+  const { root, tsxCli, cliScriptFiles, gateBase, probeId } = options;
+  const execFileAsync = promisify(execFile);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 本进程拥有的 OS 临时探针根（每探针一个）
+  const probeRoot = mkdtempSync(join(tmpdir(), 'samples-coverage-probe-'));
+  try {
+    const probe = buildExit2Probes({ cliScriptFiles, workRoot: probeRoot }).get(probeId);
+    if (probe === undefined) {
+      return {
+        probeId,
+        gate: gateBase,
+        status: -1,
+        errorJsonOk: false,
+        humanErrorOk: false,
+        treeDrift: [],
+        reasons: ['探针注册表未返回该 probeId 的定义（注册表与调用方漂移）'],
+      };
+    }
+    const before = listProbeTree(probeRoot);
+    let status = 0;
+    let stdout = '';
+    let stderr = '';
+    try {
+      const result = await execFileAsync(
+        process.execPath,
+        [tsxCli, join(root, 'w-model-dev/scripts/cli', probe.script), ...probe.args],
+        {
+          cwd: probe.cwd ?? probeRoot,
+          ...(probe.env === undefined ? {} : { env: probe.env }),
+          encoding: 'utf8',
+          timeout: PROBE_TIMEOUT_MS,
+          maxBuffer: 64 * 1024 * 1024,
+        },
+      );
+      stdout = String(result.stdout ?? '');
+      stderr = String(result.stderr ?? '');
+    } catch (error) {
+      const childError = error as NodeJS.ErrnoException & {
+        stdout?: string;
+        stderr?: string;
+        code?: number | string;
+      };
+      stdout = String(childError.stdout ?? '');
+      stderr = String(childError.stderr ?? '');
+      status = typeof childError.code === 'number' ? childError.code : -1;
+    }
+    const after = listProbeTree(probeRoot);
+    const beforeSet = new Set(before);
+    const afterSet = new Set(after);
+    const treeDrift = [
+      ...after.filter((p) => !beforeSet.has(p)).map((p) => `新增 ${p}`),
+      ...before.filter((p) => !afterSet.has(p)).map((p) => `丢失 ${p}`),
+    ];
+
+    const jsonLine = stdout.split(/\r?\n/).find((line) => line.startsWith('ERROR_JSON '));
+    let category: string | null = null;
+    let errorExitCode: number | null = null;
+    if (jsonLine !== undefined) {
+      const parsed = parseJsonSafe(jsonLine.slice('ERROR_JSON '.length)) as unknown;
+      if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const record = parsed as Record<string, unknown>;
+        category = typeof record.category === 'string' ? record.category : null;
+        errorExitCode = typeof record.exitCode === 'number' ? record.exitCode : null;
+      }
+    }
+    const errorJsonOk =
+      jsonLine !== undefined &&
+      errorExitCode === 2 &&
+      category !== null &&
+      (EXIT2_ERROR_CATEGORIES as readonly string[]).includes(category);
+    const humanErrorOk = category !== null && stderr.includes(`✗ [${category}]`);
+
+    const reasons: string[] = [];
+    if (status !== 2) reasons.push(`exit code 应为 2，实际 ${status}`);
+    if (!errorJsonOk) {
+      reasons.push(
+        jsonLine === undefined
+          ? 'stdout 缺少 ERROR_JSON 单行'
+          : `ERROR_JSON 不合规（exitCode=${String(errorExitCode)}，category=${String(category)}）`,
+      );
+    }
+    if (!humanErrorOk) reasons.push(`stderr 缺少与 ERROR_JSON 同类别的人类错误行（${String(category)}）`);
+    if (treeDrift.length > 0) reasons.push(`隔离探针根被改动：${treeDrift.join('，')}`);
+    return { probeId, gate: gateBase, status, errorJsonOk, humanErrorOk, treeDrift, reasons };
+  } finally {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 本进程拥有的 OS 临时探针根（每探针一个）
+    rmSync(probeRoot, { recursive: true, force: true });
+  }
+}
+
+/**
+ * 执行全部注册探针（有界并发，`PROBE_CONCURRENCY`），结果顺序固定为「门禁顺序 → 门禁内探针顺序」，
+ * 与串行实现逐项一致（同输入同输出，便于比对与审计）。调用方把 `reasons` 非空的结果转成
+ * negative-coverage-probe-failed。
  */
 async function runExit2Probes(
   root: string,
@@ -456,105 +563,55 @@ async function runExit2Probes(
     // fail-closed：探针不可用不得退化成「没有失败」
     return { outcomes: [], setupFailure: `tsx 不可用，无法执行 exit-2 探针：${(error as Error).message}` };
   }
-  const execFileAsync = promisify(execFile);
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 本进程拥有的 OS 临时探针根
-  const workRoot = mkdtempSync(join(tmpdir(), 'samples-coverage-probe-'));
-  const outcomes: ProbeOutcome[] = [];
+  // 先枚举「门禁 → 探针 id」清单（用一次性列出根），再为每个探针各自建根执行。
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 本进程拥有的 OS 临时探针根（仅用于枚举）
+  const listingRoot = mkdtempSync(join(tmpdir(), 'samples-coverage-probe-list-'));
+  let probeIdsByGate: Map<string, string[]>;
   try {
-    const probes = buildExit2Probes({ cliScriptFiles, workRoot });
-    const byGate = new Map<string, Array<{ probeId: string; probe: Exit2Probe }>>();
-    for (const [probeId, probe] of probes) {
-      const list = byGate.get(probe.script) ?? [];
-      list.push({ probeId, probe });
-      byGate.set(probe.script, list);
-    }
-    for (const gateBase of gateBaseNames) {
-      const gateProbes = byGate.get(`${gateBase}.ts`) ?? [];
-      if (gateProbes.length === 0) {
-        outcomes.push({
-          probeId: `${gateBase}#<registry-missing>`,
-          gate: gateBase,
-          status: -1,
-          errorJsonOk: false,
-          humanErrorOk: false,
-          treeDrift: [],
-          reasons: ['探针注册表中没有该门禁的负向调用定义（lib/exit2-probe-registry.ts）'],
-        });
-        continue;
-      }
-      for (const { probeId, probe } of gateProbes) {
-        const before = listProbeTree(workRoot);
-        let status = 0;
-        let stdout = '';
-        let stderr = '';
-        try {
-          const result = await execFileAsync(
-            process.execPath,
-            [tsxCli, join(root, 'w-model-dev/scripts/cli', probe.script), ...probe.args],
-            {
-              cwd: probe.cwd ?? workRoot,
-              ...(probe.env === undefined ? {} : { env: probe.env }),
-              encoding: 'utf8',
-              timeout: PROBE_TIMEOUT_MS,
-              maxBuffer: 64 * 1024 * 1024,
-            },
-          );
-          stdout = String(result.stdout ?? '');
-          stderr = String(result.stderr ?? '');
-        } catch (error) {
-          const childError = error as NodeJS.ErrnoException & {
-            stdout?: string;
-            stderr?: string;
-            code?: number | string;
-          };
-          stdout = String(childError.stdout ?? '');
-          stderr = String(childError.stderr ?? '');
-          status = typeof childError.code === 'number' ? childError.code : -1;
-        }
-        const after = listProbeTree(workRoot);
-        const beforeSet = new Set(before);
-        const afterSet = new Set(after);
-        const treeDrift = [
-          ...after.filter((p) => !beforeSet.has(p)).map((p) => `新增 ${p}`),
-          ...before.filter((p) => !afterSet.has(p)).map((p) => `丢失 ${p}`),
-        ];
-
-        const jsonLine = stdout.split(/\r?\n/).find((line) => line.startsWith('ERROR_JSON '));
-        let category: string | null = null;
-        let errorExitCode: number | null = null;
-        if (jsonLine !== undefined) {
-          const parsed = parseJsonSafe(jsonLine.slice('ERROR_JSON '.length)) as unknown;
-          if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
-            const record = parsed as Record<string, unknown>;
-            category = typeof record.category === 'string' ? record.category : null;
-            errorExitCode = typeof record.exitCode === 'number' ? record.exitCode : null;
-          }
-        }
-        const errorJsonOk =
-          jsonLine !== undefined &&
-          errorExitCode === 2 &&
-          category !== null &&
-          (EXIT2_ERROR_CATEGORIES as readonly string[]).includes(category);
-        const humanErrorOk = category !== null && stderr.includes(`✗ [${category}]`);
-
-        const reasons: string[] = [];
-        if (status !== 2) reasons.push(`exit code 应为 2，实际 ${status}`);
-        if (!errorJsonOk) {
-          reasons.push(
-            jsonLine === undefined
-              ? 'stdout 缺少 ERROR_JSON 单行'
-              : `ERROR_JSON 不合规（exitCode=${String(errorExitCode)}，category=${String(category)}）`,
-          );
-        }
-        if (!humanErrorOk) reasons.push(`stderr 缺少与 ERROR_JSON 同类别的人类错误行（${String(category)}）`);
-        if (treeDrift.length > 0) reasons.push(`隔离探针根被改动：${treeDrift.join('，')}`);
-        outcomes.push({ probeId, gate: gateBase, status, errorJsonOk, humanErrorOk, treeDrift, reasons });
-      }
+    const listing = buildExit2Probes({ cliScriptFiles, workRoot: listingRoot });
+    probeIdsByGate = new Map<string, string[]>();
+    for (const [probeId, probe] of listing) {
+      const list = probeIdsByGate.get(probe.script) ?? [];
+      list.push(probeId);
+      probeIdsByGate.set(probe.script, list);
     }
   } finally {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 本进程拥有的 OS 临时探针根
-    rmSync(workRoot, { recursive: true, force: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 本进程拥有的 OS 临时探针根（仅用于枚举）
+    rmSync(listingRoot, { recursive: true, force: true });
   }
+
+  const tasks: Array<() => Promise<ProbeOutcome>> = [];
+  for (const gateBase of gateBaseNames) {
+    const probeIds = probeIdsByGate.get(`${gateBase}.ts`) ?? [];
+    if (probeIds.length === 0) {
+      tasks.push(async () => ({
+        probeId: `${gateBase}#<registry-missing>`,
+        gate: gateBase,
+        status: -1,
+        errorJsonOk: false,
+        humanErrorOk: false,
+        treeDrift: [],
+        reasons: ['探针注册表中没有该门禁的负向调用定义（lib/exit2-probe-registry.ts）'],
+      }));
+      continue;
+    }
+    for (const probeId of probeIds) {
+      tasks.push(() => runSingleProbe({ root, tsxCli, cliScriptFiles, gateBase, probeId }));
+    }
+  }
+
+  const outcomes: ProbeOutcome[] = new Array<ProbeOutcome>(tasks.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.max(1, Math.min(PROBE_CONCURRENCY, tasks.length)) }, async () => {
+    for (;;) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= tasks.length) return;
+      // eslint-disable-next-line security/detect-object-injection -- index 是本函数内自增游标（0 ≤ index < tasks.length），下标与数组均由本函数自身构造，无外部键
+      outcomes[index] = await tasks[index]!();
+    }
+  });
+  await Promise.all(workers);
   return { outcomes, setupFailure: null };
 }
 
