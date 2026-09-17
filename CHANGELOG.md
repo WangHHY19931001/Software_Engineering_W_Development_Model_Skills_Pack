@@ -27,6 +27,10 @@
 
 > 起因：对「R 是否应按需加载证据/定位/code-review 等人格」的分析。结论是 R **已在**按需加载（`subagent/` 28 人格 + 选择矩阵；「R 不调用 Persona」仅指不加载 `agent-personas.md` 的 4 个 V 评审 Persona，理由是 V 之后还要复审 R 的产出，需保持视角独立）。真正的缺口是「按需」不可校验，故本次把三处缺口补齐。
 
+> 收口实测：`npm run prepush` **18/18 全绿**（`PREPUSH_EXIT=0`；经 3 轮才转绿——第 1 轮止于 security-scan 新增发现、第 2 轮止于 `run-sync` 台账行号 provenance 漂移，均按「改代码而非放宽门禁」处置，baseline 未改）。实现记录（含逐轮失败与处置、门禁边界裁定、遗留项）见 `docs/superpowers/plans/2026-09-17-r-persona-selection-auditability.md`。
+>
+> **兼容性（行为收紧）**：R11 对全部报告生效、**无时间戳豁免**（沿用本版本确立的严格证据语义）——此前可通过的「视角取自矩阵外」或「视角与自述 `category` 不相交」的多角度报告，现在 exit 1。
+
 - **新增 R11 校验规则**（`logic/root-cause-logic.ts`）：多角度报告（`method=combined`）的 `partialReports[].personaSlice` 必须为矩阵内已知 persona，且与 `rootCause.category` 第一键行候选集**有交集**；`partialReports` 缺失由 R9 判失败、`noRootCause` 分支无 category——两者跳过 R11。legacy `reality-checker` 归一化为 canonical 后参与比较。
 - **R-persona 两键矩阵**：第一键 `rootCause.category`（R 自述，7 行）+ 第二键风险域信号（安全 / 性能 / AI-LLM，**由 V/G 产出特征读出而非 R 自述**，命中即**叠加**不替换）；新增四条仲裁规则（并集 / 上限 5 时保留必含项与第一键行成员并记录裁剪 / 第一键分歧须改判或记录证据 / 门禁边界如实陈述）。矩阵以 `R_PERSONA_MATRIX`、`R_PERSONA_SIGNAL_MATRIX` 为 R11 判据源。
 - **persona 能力声明四字段强制**：28 份 `subagent/*.md` frontmatter 补 `capabilities` / `inputs` / `outputs` / `boundaries`（单行、值内只用全角标点）；`check-docs-consistency.ts` 新增 `persona-capability-declarations` 检查，任一文件缺一字段即 exit 1。`boundaries`（适用 / 换人）是「按需加载」可执行的前提——缺它则人格选择只能照抄矩阵。

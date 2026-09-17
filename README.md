@@ -120,7 +120,7 @@ flowchart LR
 | **S 产出**     | 实际写文档、写代码、写测试                                                     |
 | **V 评审**     | 按评审规范提示词对产出做 LLM 评审（由外部 Agent 执行）                         |
 | **G 门禁**     | 运行 `check-*.ts` 门禁脚本，采集退出码作为证据                                 |
-| **R 根因定位** | 门禁不通过时，先定位根因（5-Why / 鱼骨图 / 缺陷链 / 上游回溯）再返工           |
+| **R 根因定位** | 门禁不通过时，先定位根因（5-Why / 鱼骨图 / 缺陷链 / 上游回溯）再返工；多角度 persona 取自两键矩阵（受 R11 校验） |
 
 为什么要这样分？—— 干活和把关的人分开，评审不吃「自己写的东西自己觉得很对」的亏。角色与分派规则见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)，评审提示词见 [verifier-spec.md](./w-model-dev/references/verifier-spec.md)。
 
@@ -200,7 +200,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 ├── w-model-dev/                  # Skill 资产本体（纯 Markdown，可整目录拷贝分发）
 │   ├── SKILL.md                  # 技能定义：触发条件 + /wm 编排规则 + 版本号
 │   ├── references/               # 43 份阶段细则与规范（按需加载，禁止一次性全读）
-│   ├── subagent/                 # 28 个人格文件（评审视角预设，不调用 LLM）
+│   ├── subagent/                 # 28 个人格文件（评审视角预设，不调用 LLM；frontmatter 含能力/输入/输出/边界四字段）
 │   ├── templates/                # 各阶段产出文档模板
 │   ├── examples/                 # 交互示例
 │   ├── schemas/                  # 34 份 JSON Schema 约束文件
