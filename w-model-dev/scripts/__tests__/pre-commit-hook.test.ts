@@ -252,9 +252,12 @@ function runHook(
   root: string,
   indexFile: string,
   options: {
+    batchPidFile?: string;
+    batchResponse?: BatchResponse;
     bashEnv?: string;
     commandTimeoutSeconds?: number;
     prettierDelaySeconds?: number;
+    snapshotTimeoutSeconds?: number;
     tscDelaySeconds?: number;
   } = {},
 ): ReturnType<typeof spawnSync> {
@@ -272,8 +275,11 @@ function runHook(
     `export PRECOMMIT_PRETTIER_CAPTURE=${shellQuote(toBashPath(prettierCapture))}`,
     `export PRECOMMIT_TSC_CAPTURE=${shellQuote(toBashPath(tscCapture))}`,
     `export PRE_COMMIT_COMMAND_TIMEOUT_SECONDS=${shellQuote(String(options.commandTimeoutSeconds ?? 20))}`,
+    `export PRE_COMMIT_SNAPSHOT_TIMEOUT_SECONDS=${shellQuote(String(options.snapshotTimeoutSeconds ?? 45))}`,
     `export PRECOMMIT_PRETTIER_DELAY_SECONDS=${shellQuote(String(options.prettierDelaySeconds ?? ''))}`,
     `export PRECOMMIT_TSC_DELAY_SECONDS=${shellQuote(String(options.tscDelaySeconds ?? ''))}`,
+    `export PRECOMMIT_BATCH_RESPONSE=${shellQuote(options.batchResponse ?? 'happy')}`,
+    `export PRECOMMIT_BATCH_PID_FILE=${shellQuote(options.batchPidFile === undefined ? '' : toBashPath(options.batchPidFile))}`,
     `cd ${shellQuote(bashCwd)}`,
     options.bashEnv === undefined ? ':' : `source ${shellQuote(toBashPath(options.bashEnv))}`,
     options.bashEnv === undefined ? ':' : 'export -f git 2>/dev/null || true',
@@ -289,12 +295,27 @@ function runHook(
 }
 
 type FakeIndexRecord = { mode: string; object: string; path: string };
+type BatchResponse =
+  | 'bad-delimiter'
+  | 'happy'
+  | 'hang'
+  | 'malformed-header'
+  | 'missing'
+  | 'missing-delimiter'
+  | 'non-blob'
+  | 'short-header'
+  | 'short-payload';
 
 async function runWithFakeIndexRecords(
   fixture: { root: string; index: string },
   records: FakeIndexRecord[],
   blob: string,
-  options: { batchOnly?: boolean } = {},
+  options: {
+    batchOnly?: boolean;
+    batchPidFile?: string;
+    batchResponse?: BatchResponse;
+    snapshotTimeoutSeconds?: number;
+  } = {},
 ): Promise<ReturnType<typeof spawnSync>> {
   const bashEnv = path.join(fixture.root, 'test-bin', 'fake-git-env.sh');
   const recordArgs = records
@@ -309,7 +330,20 @@ async function runWithFakeIndexRecords(
       `    *'rev-parse --show-toplevel'*) printf '%s\\n' "${'$'}PWD" ;;`,
       `    *'diff --cached --name-only -z'*) printf '%s\\0' ${pathArgs} ;;`,
       `    *'ls-files --stage -z'*) printf '%s\\0' ${recordArgs} ;;`,
-      `    *'cat-file --batch'*) while IFS= read -r object; do printf '%s blob %s\\n' "${'$'}object" ${blob.length}; printf '%s' ${shellQuote(blob)}; printf '\\n'; done ;;`,
+      `    *'cat-file --batch'*)
+      case "${'$'}{PRECOMMIT_BATCH_RESPONSE-happy}" in
+        happy) while IFS= read -r object; do printf '%s blob %s\\n' "${'$'}object" ${blob.length}; printf '%s' ${shellQuote(blob)}; printf '\\n'; done ;;
+        missing) IFS= read -r object; printf '%s missing\\n' "${'$'}object"; exit 0 ;;
+        non-blob) IFS= read -r object; printf '%s tree 0\\n' "${'$'}object"; exit 0 ;;
+        malformed-header) IFS= read -r object; printf '%s blob nope\\n' "${'$'}object"; exit 0 ;;
+        short-header) IFS= read -r object; printf '%s blob 7' "${'$'}object"; exit 0 ;;
+        short-payload) IFS= read -r object; printf '%s blob 999\\nshort\\n' "${'$'}object"; exit 0 ;;
+        missing-delimiter) IFS= read -r object; printf '%s blob %s\\n' "${'$'}object" ${blob.length}; printf '%s' ${shellQuote(blob)}; exit 0 ;;
+        bad-delimiter) IFS= read -r object; printf '%s blob %s\\n' "${'$'}object" ${blob.length}; printf '%sX' ${shellQuote(blob)}; exit 0 ;;
+        hang) printf '%s\\n' "${'$'}$" > "${'$'}{PRECOMMIT_BATCH_PID_FILE}"; while :; do sleep 1; done ;;
+        *) return 88 ;;
+      esac
+      ;;`,
       options.batchOnly
         ? "    *'cat-file blob'*) return 91 ;;"
         : `    *'cat-file blob'*) printf '%s' ${shellQuote(blob)} ;;`,
@@ -320,7 +354,12 @@ async function runWithFakeIndexRecords(
     ].join('\n'),
     'utf8',
   );
-  return runHook(fixture.root, fixture.index, { bashEnv });
+  return runHook(fixture.root, fixture.index, {
+    bashEnv,
+    batchPidFile: options.batchPidFile,
+    batchResponse: options.batchResponse ?? (options.batchOnly ? 'happy' : 'happy'),
+    snapshotTimeoutSeconds: options.snapshotTimeoutSeconds,
+  });
 }
 
 async function initFixture(
@@ -548,6 +587,90 @@ describe('pre-commit staged snapshot', () => {
     expect(typecheckResult.stderr).toContain('TypeScript 检查 index snapshot');
     expect(typecheckResult.stderr).toContain('超时（3s）');
     expect(await temporaryHookDirs(typecheckFixture.root)).toEqual([]);
+  });
+
+  it.each([
+    { batchResponse: 'missing', label: 'missing object', message: '批量读取 index blob 缺失' },
+    { batchResponse: 'non-blob', label: 'non-blob response', message: '批量读取 index blob header 类型或 size 非法' },
+    {
+      batchResponse: 'malformed-header',
+      label: 'malformed header',
+      message: '批量读取 index blob header 类型或 size 非法',
+    },
+    { batchResponse: 'short-header', label: 'short header', message: '批量读取 index blob header 短流' },
+    { batchResponse: 'short-payload', label: 'short payload', message: '批量读取 index blob 短流' },
+    { batchResponse: 'missing-delimiter', label: 'missing delimiter', message: '批量读取 index blob 短流' },
+    { batchResponse: 'bad-delimiter', label: 'bad delimiter', message: '批量读取 index blob 分隔符非法或短流' },
+  ] as Array<{ batchResponse: Exclude<BatchResponse, 'happy' | 'hang'>; label: string; message: string }>)(
+    'fails closed for a batch $label response without changing the index or sentinel',
+    async ({ batchResponse, message }) => {
+      const fixture = await initFixture('VALID_STAGED\n');
+      const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-pre-commit-batch-sentinel-'));
+      tempRoots.push(outside);
+      const sentinel = path.join(outside, 'sentinel.txt');
+      await fs.writeFile(sentinel, 'DO NOT TOUCH\n', 'utf8');
+      const beforeHash = indexHash(fixture.index);
+      const records = [
+        {
+          mode: '100644',
+          object: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          path: 'src.ts',
+        },
+      ];
+
+      const result = await runWithFakeIndexRecords(fixture, records, 'payload', {
+        batchOnly: true,
+        batchResponse,
+      });
+
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
+      expect(result.stderr).toContain(message);
+      expect(await fs.readFile(sentinel, 'utf8')).toBe('DO NOT TOUCH\n');
+      expect(await fs.readFile(fixture.worktree, 'utf8')).toBe('VALID_STAGED\n');
+      expect(gitShow(fixture.root, ':src.ts')).toBe('VALID_STAGED\n');
+      expect(indexHash(fixture.index)).toBe(beforeHash);
+      expect(await temporaryHookDirs(fixture.root)).toEqual([]);
+    },
+  );
+
+  it('terminates the batch helper process tree on snapshot timeout and reclaims its temp dirs', async () => {
+    const fixture = await initFixture('VALID_STAGED\n');
+    const batchPidFile = path.join(fixture.root, 'batch.pid');
+    const beforeHash = indexHash(fixture.index);
+    const startedAt = Date.now();
+    const result = await runWithFakeIndexRecords(
+      fixture,
+      [
+        {
+          mode: '100644',
+          object: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          path: 'src.ts',
+        },
+      ],
+      'payload',
+      {
+        batchOnly: true,
+        batchPidFile,
+        batchResponse: 'hang',
+        snapshotTimeoutSeconds: 2,
+      },
+    );
+
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(124);
+    expect(Date.now() - startedAt).toBeLessThan(10_000);
+    expect(result.stderr).toContain('批量物化 index snapshot 超时（2s）');
+    expect(result.stderr).toContain('终止进程树：批量物化 index snapshot');
+    const batchPid = readFileSync(batchPidFile, 'utf8').trim();
+    expect(batchPid).toMatch(/^\d+$/);
+    const processProbe = spawnSync('bash', ['-c', 'kill -0 "$1"', 'batch-process-probe', batchPid], {
+      encoding: 'utf8',
+      input: '',
+    });
+    expect(processProbe.status).not.toBe(0);
+    expect(await fs.readFile(fixture.worktree, 'utf8')).toBe('VALID_STAGED\n');
+    expect(gitShow(fixture.root, ':src.ts')).toBe('VALID_STAGED\n');
+    expect(indexHash(fixture.index)).toBe(beforeHash);
+    expect(await temporaryHookDirs(fixture.root)).toEqual([]);
   });
 
   it.each([
