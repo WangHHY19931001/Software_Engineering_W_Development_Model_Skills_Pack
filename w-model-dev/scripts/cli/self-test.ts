@@ -4223,6 +4223,8 @@ interface CoverageScopeCase {
   thresholds: CoverageScopeThresholds;
   /** 期望校验是否通过 */
   expectedPassed: boolean;
+  /** 期望白名单命中文件数（简报步骤 6：fileCount===2） */
+  expectedFileCount?: number;
   /** 期望四指标合计 pct（写死样本构造值，防 logic 口径静默漂移） */
   expectedTotals?: CoverageScopeThresholds;
   /** 期望 failures 条数（缺省不校验） */
@@ -4236,6 +4238,7 @@ const COVERAGE_SCOPE_CASES: CoverageScopeCase[] = [
     file: 'valid.json',
     thresholds: { statements: 0, branches: 0, functions: 0, lines: 0 },
     expectedPassed: true,
+    expectedFileCount: 2,
     expectedTotals: { statements: 75, branches: 50, functions: 100, lines: 75 },
     description:
       'valid 样本 thresholds 全 0：passed=true、fileCount=2、合计 pct=75/50/100/75（小写盘符+正斜杠与大写盘符+反斜杠各一）',
@@ -4263,6 +4266,9 @@ async function runCoverageScopeCases(samplesDir: string): Promise<CaseResult[]> 
     const details: string[] = [];
     if (r.passed !== c.expectedPassed) {
       details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+    }
+    if (c.expectedFileCount !== undefined && r.fileCount !== c.expectedFileCount) {
+      details.push(`  - 期望 fileCount=${c.expectedFileCount}，实际 fileCount=${r.fileCount}`);
     }
     if (c.expectedTotals !== undefined) {
       const t = r.totals;
