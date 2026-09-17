@@ -17,7 +17,7 @@
 - [x] Task 5: fix pre-commit staged-only behavior and cross-platform execution.
 - [x] Task 6: make negative coverage real, complete, and auditable.
 - [x] Task 7: close documentation, test-matrix, and deterministic-order gaps (two deviations registered).
-- [ ] Task 8: run full verification, gates, and final review (in progress — see below).
+- [x] Task 8: run full verification, gates, and final review. **`npm run prepush` exit 0 — 18/18 items green** (self-test, security-scan, full vitest + coverage thresholds, docs-consistency, samples coverage, prettier, tsc, eval; npm audit skipped as network-unreachable, non-blocking). Six pre-existing blockers had to be cleared first: see task-8-report.md. Task 7's two deviations remain registered in task-7-report.md.
 
 ## Completed
 
