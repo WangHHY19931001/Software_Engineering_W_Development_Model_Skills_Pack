@@ -419,18 +419,24 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     }
   });
 
-  it.skipIf(process.platform === 'win32')('Unix 权限拒绝时保留既有 sentinel 文件', async () => {
+  it('写入被拒时保留既有 sentinel 文件（Unix 只读目录 / Windows 只读目标）', async () => {
+    // 两平台都执行同一契约：写入失败 → exit 2 + 结构化 ERROR_JSON + 既有目标内容不变。
+    // Unix 用只读目录（目录内无法建临时文件）；Windows 用只读目标文件（rename 覆盖只读文件 EPERM）。
+    // 不再 skipIf：被跳过的用例会让 vitest facts 的 passed ≠ total，docs-consistency 的
+    // vitest-results 守护（要求 passed === total）会因此判整轮不可采信。
     const readonlyDir = path.join(tmpDir, 'readonly');
     const out = path.join(readonlyDir, 'package.diff');
     await fs.mkdir(readonlyDir);
     await fs.writeFile(out, 'sentinel\n', 'utf8');
-    await fs.chmod(readonlyDir, 0o500);
+    await fs.chmod(readonlyDir, process.platform === 'win32' ? 0o700 : 0o500);
+    await fs.chmod(out, 0o400);
     try {
       const result = runReviewPackage([`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`]);
       expect(result.code).toBe(2);
       expect(errorJson(result.stdout)).toMatchObject({ exitCode: 2 });
       await expect(fs.readFile(out, 'utf8')).resolves.toBe('sentinel\n');
     } finally {
+      await fs.chmod(out, 0o600);
       await fs.chmod(readonlyDir, 0o700);
     }
   });
