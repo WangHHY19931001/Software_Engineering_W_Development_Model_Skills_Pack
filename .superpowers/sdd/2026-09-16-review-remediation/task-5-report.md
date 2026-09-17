@@ -96,3 +96,25 @@
 
 - 若目标平台的 `ps` 既不支持 `-o` 也无法用 `ps -ef` 列出自身 PID，`terminate_child` 走 fail-closed 分支：只终止顶层进程、`cleanup_failed=1` 并非零退出，但**无法收回已孤儿化的后代**。该平台能力缺失会显式暴露为失败，而不是静默放行。
 - platform/docs 聚合、全量 Vitest 与 pre-push 仍 pending，留待任务 8 收口。
+
+## 第九轮：独立 V 复审（第二轮）与机制订正
+
+- 复审范围 `5ce21cd7..fd387daa`，结论 **CLEAN**，记录见
+  `.superpowers/sdd/2026-09-16-review-remediation/task-5-rework-review-2.md`。
+- 复审独立复现三个 focused 终态（`pre-commit-hook` 22 passed / `platform-deps-hook` 87 passed /
+  `docs-consistency-logic` 190 passed，均 exit 0）与 `bash -n` exit 0，并以**反证**证明测试未被放宽：
+  把旧 hook blob（`6289d75e…` = `5ce21cd7:.githooks/pre-commit`）取出到仓库外的 fixture 后运行**新**测试文件
+  → `6 failed | 16 passed (22)`，同时复现了 18 分钟存活的孤儿 `bash -c git cat-file --batch`（ppid=1）与 EBUSY；
+  测试 diff 仅 3 行等价替换、无新增 skip/only、未触碰 200-blob `<20s` 阈值与 45s / 1–45 生产预算。
+- **机制订正（重要：本报告第八轮的表述言过其实）**：复审用隔离实验证明，MSYS `ps -ef` 把 node 经
+  `spawn('bash', ['-c', 'git cat-file --batch'])` 起的子进程报成 **PPID=1**，因此枚举闭包实际只有 `[node]`；
+  `git cat-file` 的回收**来自 node 死亡后 Windows/libuv 的作业对象语义**（只杀枚举出的 node 子进程 →
+  batch 在 <2s 内消失；只杀顶层包装进程 → batch 永远存活）。同理 Node helper 的
+  SIGTERM/SIGINT/SIGHUP 处理器在该平台上是**死代码**（MSYS `kill -TERM` 打原生 node 绕过 JS handler），
+  且 500ms SIGKILL 升级被 unref 定时器 + 立即 `process.exit` 抵消。正确表述是：
+  **修复对 Git Bash 有效，但机制是「枚举 + 终止 node，由其 OS 回收子进程」，不是「逐个终止每个后代」**；
+  该平台事实已写入 `.githooks/pre-commit` 注释，避免后续读者按第八轮文字误判覆盖范围。
+- 复审另指出 `git diff --check 5ce21cd7 fd387daa` 因已提交报告尾随空行 exit 2 → 已修（`957aa1fc`）。
+- 复审无法裁决项：真实 `git commit`（1075 文件快照、Prettier 与 tsc 通过、cleanup 通过）那一次运行的
+  **独立复现**——复现需产生真实提交，故记为已观测事实（原始输出见提交信息），不作为独立证据。
+

@@ -61,6 +61,11 @@ descendant_pids=()
 # Git Bash/MSYS 的 ps 不支持 -o（`ps: unknown option -- o`），此时 `ps -eo ...` 只会静默返回
 # 空表。若把空表当成“没有后代”，顶层包装进程被 TERM 后其子进程会被孤儿化并继续存活。
 # 因此必须探测真正可用的枚举格式；探测不到时按 fail-closed 处理，而不是当成空后代集。
+#
+# 平台事实（独立复审实测）：MSYS `ps -ef` 把 node 经 `spawn('bash', ['-c', 'git cat-file --batch'])`
+# 起的子进程报成 PPID=1，故在 Git Bash 上本函数的闭包通常只含 node；batch 子进程的回收实际来自
+# node 死亡后 Windows/libuv 的作业对象语义。不要据此认为“每个后代都被逐个 TERM”——
+# 完整后代闭包只在 Linux/WSL 上成立。
 ensure_process_table() {
   local probe
   if [ -n "$process_table_format" ]; then return 0; fi
