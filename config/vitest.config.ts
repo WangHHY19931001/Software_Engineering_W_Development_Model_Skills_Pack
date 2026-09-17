@@ -96,13 +96,19 @@ export default {
       },
     ],
   },
-  // 覆盖率门禁：仅统计门禁核心实现（logic/ + lib/），不包括 CLI 入口与 __tests__。
-  // include 与 test.include 一样相对仓库根解析（cwd=仓库根）。
-  // thresholds 基线 = 2026-08-12 实测（logic+lib 合并）：stmts 75.32 / branch 66.57 / funcs 85.5 / lines 76.62，
-  // 取实际值向下取整到 5 的倍数，随测试补充逐步上调。
+  // 覆盖率门禁：目标是统计门禁核心实现（logic/ + lib/），但**include 不足以限定分母**——
+  // 被测试 import 的文件总会进入报告。2026-09-17 审查实测与尝试记录（如实标注，勿读为已解决）：
+  //   · 全量运行报告实测 83 个文件（logic 37 / lib 30 / cli 10 / infrastructure 3 / application 2 / __tests__ 1），
+  //     合并值 stmts 76.83 / branch 71.64 / funcs 87.86 / lines 78.88 —— statements 距阈值仅约 1.8pp，
+  //     「新增一个低覆盖 CLI import 即假红」的风险真实存在，与产品回归无关。
+  //   · 已试两种 exclude 写法（相对路径与 `**/` 前缀）：**聚焦运行（单/双测试文件）实测生效**，
+  //     **全量运行实测均未生效**（报告仍含 cli/ 等层）；机制未查明，故不保留 exclude（避免发布不实声明）。
+  //   · 结论：口径问题**未解决**，仅完成测量与归因；阈值维持 75/65/85/75（不因口径未定而放宽或收紧）。
   coverage: {
     provider: 'v8',
     include: ['w-model-dev/scripts/logic/**', 'w-model-dev/scripts/lib/**'],
+    // thresholds 基线 = 2026-08-12 实测（logic+lib 合并）：stmts 75.32 / branch 66.57 / funcs 85.5 / lines 76.62，
+    // 取实际值向下取整到 5 的倍数，随测试补充逐步上调。
     thresholds: { statements: 75, branches: 65, functions: 85, lines: 75 },
   },
 };

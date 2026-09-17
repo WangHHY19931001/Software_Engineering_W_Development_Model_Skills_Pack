@@ -63,6 +63,13 @@ export interface JsonReport {
    * 便于审计区分「通过」与「未执行」）；`null`=阶段 5-8 不适用。**键恒存在**。
    */
   specStructure?: 'checked' | 'skipped' | null;
+  /**
+   * 成熟度分级（check-artifact-gate --json）：读自 `.w-model/maturity.json` 的 `level`；
+   * 缺失时为 `null`（不豁免）。`tlaBddWaived` 为 `true` 表示阶段 1-4 的 TLA+/BDD 资产要求
+   * 已按 L0/L1 成熟度豁免（键恒存在，供审计区分「通过」与「按成熟度豁免」）。
+   */
+  maturityLevel?: string | null;
+  tlaBddWaived?: boolean | null;
   /** run-log lifecycle 状态；通过但有历史诊断时仍为 NOT_CLOSED_NOT_PROVEN。 */
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
   /** run-log exit 0 的语义边界说明。 */

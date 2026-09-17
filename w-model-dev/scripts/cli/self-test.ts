@@ -2086,13 +2086,15 @@ const BDD_CASES: BddCase[] = [
     ],
   },
   {
-    manifestFile: 'bad-no-rtm-mapping.manifest.json',
+    // 该用例的「坏」由 rtmRows 参数注入（manifest 本身与 valid-manifest.json 逐字节相同）：
+    // 原先复制出 bad-no-rtm-mapping.manifest.json，使文件名声称的缺陷并不存在于文件中（2026-09-17 审查修复）。
+    manifestFile: 'valid-manifest.json',
     featureFiles: ['valid-l1.feature'],
     expectedPassed: false,
     expectedExitCode: 1,
     expectedReasonPatterns: [/feature id not in RTM row/],
     phase: 1,
-    description: 'feature id 未登记在 RTM test 字段中，应被 D7 RTM 映射校验拦截',
+    description: 'feature id 未登记在 RTM test 字段中（由 rtmRows 参数注入），应被 D7 RTM 映射校验拦截',
     rtmRows: [{ reqId: 'REQ-001', acceptanceTest: null, systemTest: null, integrationTest: null, unitTest: null }],
   },
   {

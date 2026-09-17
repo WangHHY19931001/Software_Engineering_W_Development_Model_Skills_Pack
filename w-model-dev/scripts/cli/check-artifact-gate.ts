@@ -306,6 +306,21 @@ export function aggregateExternalChecks(
   };
 }
 
+/**
+ * 读取 `.w-model/maturity.json` 的 level（成熟度分级，operational-recovery.md）。
+ * 文件缺失 / 解析失败 / level 非法 → undefined（**不豁免**，保持严格；豁免必须有显式声明）。
+ */
+async function readMaturityLevel(projectDir: string): Promise<string | undefined> {
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 由 CLI 参数解析并经既有 containment 校验
+    const raw = await nodeFs.promises.readFile(path.resolve(projectDir, '.w-model', 'maturity.json'), 'utf-8');
+    const parsed = JSON.parse(raw) as { level?: unknown };
+    return typeof parsed.level === 'string' ? parsed.level : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = hasFlag(process.argv.slice(2), 'json');
@@ -460,6 +475,14 @@ async function main(): Promise<void> {
     ? await readCucumberReport(cucumberReportFile, true)
     : { cucumberViolations: [] as string[] };
 
+  // 成熟度豁免（operational-recovery.md「成熟度分级」+ hard-constraints #13）：
+  // L0/L1（教学 / demo / 小工具）允许阶段 1-4 不产出 .tla/.cfg/tla-manifest.json 与
+  // .feature/bdd-manifest.json。此前文档有承诺但门禁无 maturity 输入，合法 L1 项目按文档走
+  // 会被 `[artifact:tla] tla-manifest.json missing` 阻断（2026-09-17 审查发现的规则-实现冲突）。
+  const maturityLevel = await readMaturityLevel(projectDir);
+  const tlaBddWaived =
+    (maturityLevel === 'L0' || maturityLevel === 'L1') && isProjectTlaBddEvidencePhase(effectivePhase);
+
   const syncPairs: TlaBddSyncPair[] = [];
   const syncPairViolations: string[] = [];
   let syncPairCoverageValid = false;
@@ -467,7 +490,7 @@ async function main(): Promise<void> {
   // independent file sync is enabled only after both manifests pass their own
   // schema/asset gates and their pair set has complete bidirectional coverage.
   const independentSyncContractPhase = isTlaBddSyncContractPhase(effectivePhase);
-  const syncRequired = independentSyncContractPhase;
+  const syncRequired = independentSyncContractPhase && !tlaBddWaived;
   if (syncRequired && tlaAsset.valid && bddManifestValid) {
     const pairResult = buildTlaBddSyncPairs({
       tlaManifest: tlaAsset.manifest as { basePath?: string; specs?: Array<{ id?: string; tlaPath?: string }> },
@@ -488,7 +511,7 @@ async function main(): Promise<void> {
   const result = checkArtifactGate(matrix, {
     graph,
     // TLA+ is a required project asset only for phases 1-4; phase 5-8 uses Cucumber evidence.
-    manifestExists: isProjectTlaBddEvidencePhase(effectivePhase) ? tlaAsset.valid : undefined,
+    manifestExists: !tlaBddWaived && isProjectTlaBddEvidencePhase(effectivePhase) ? tlaAsset.valid : undefined,
     phaseOption,
     specDir,
     projectRoot: projectDir,
@@ -499,24 +522,28 @@ async function main(): Promise<void> {
   // ==================== 终检调用 TLA+/BDD model 校验（设计文档 §3.3.8） ====================
   // phase 1 不依赖 graph；phase 2-4 在已有 graph 时叠加 graph 参数；phase 5-8 强制 Cucumber 证据。
   const graphPath = graphSource ? path.join(ingestionDir, graphSource) : '';
-  const modelCheckViolations = runModelChecks({
-    manifestExists,
-    manifestValid: tlaAsset.valid,
-    effectivePhase,
-    graphPath,
-    manifestFile,
-    bddManifestExists,
-    bddManifestSchemaValid,
-    bddManifestValid,
-    bddManifestFile,
-    cucumberReportFile,
-    syncRequired,
-    syncPairCoverageValid,
-    syncPairs,
-    syncPairViolations,
-  });
+  const modelCheckViolations = tlaBddWaived
+    ? []
+    : runModelChecks({
+        manifestExists,
+        manifestValid: tlaAsset.valid,
+        effectivePhase,
+        graphPath,
+        manifestFile,
+        bddManifestExists,
+        bddManifestSchemaValid,
+        bddManifestValid,
+        bddManifestFile,
+        cucumberReportFile,
+        syncRequired,
+        syncPairCoverageValid,
+        syncPairs,
+        syncPairViolations,
+      });
   // Phase 5-8 uses required Cucumber execution evidence; TLA manifest is not a phase-gate input there.
-  const tlaAssetViolations = isProjectTlaBddEvidencePhase(effectivePhase) ? tlaAsset.violations : [];
+  const tlaAssetViolations = !tlaBddWaived && isProjectTlaBddEvidencePhase(effectivePhase) ? tlaAsset.violations : [];
+  // BDD 资产违规同样受豁免（阶段 1-4 的 L0/L1 项目允许不产出 bdd-manifest.json）
+  const bddAssetViolations = tlaBddWaived ? [] : bddViolations;
 
   // uat-path-mapping 校验违反（计入终检结果；解析严格化 + 阶段 5/终检均校验）
   const uatMappingViolations = await collectUatMappingViolations(projectDir, phaseOption);
@@ -558,7 +585,7 @@ async function main(): Promise<void> {
     ...result.reasons,
     ...tlaAssetViolations,
     ...uatMappingViolations,
-    ...bddViolations,
+    ...bddAssetViolations,
     ...cucumberAsset.cucumberViolations,
     ...modelCheckViolations,
     ...externalReasons,
@@ -567,7 +594,7 @@ async function main(): Promise<void> {
     result.passed &&
     tlaAssetViolations.length === 0 &&
     uatMappingViolations.length === 0 &&
-    bddViolations.length === 0 &&
+    bddAssetViolations.length === 0 &&
     cucumberAsset.cucumberViolations.length === 0 &&
     modelCheckViolations.length === 0 &&
     (externalAggregate?.passed ?? true);
@@ -603,6 +630,10 @@ async function main(): Promise<void> {
               ? 'checked'
               : 'skipped'
             : null,
+        // 成熟度豁免（键恒存在）：L0/L1 + 阶段 1-4 时 TLA+/BDD 资产要求被豁免；
+        // null 表示未豁免。与 specStructure 同构，供审计区分「通过」与「按成熟度豁免」。
+        maturityLevel: maturityLevel ?? null,
+        tlaBddWaived: tlaBddWaived || null,
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -645,6 +676,11 @@ async function main(): Promise<void> {
     );
     console.log(
       `opsx 外部     : ${ext.opsx.passed ? '✓' : '✗'} 制品目录 ${ext.opsx.changesNames.join(', ') || '（无）'}（${ext.opsx.violationCount} 条违规）`,
+    );
+  }
+  if (tlaBddWaived) {
+    console.log(
+      `TLA+/BDD 资产 : ⏭ 豁免（maturity ${maturityLevel}，阶段 1-4 允许不产出 .tla/.cfg/tla-manifest.json 与 .feature/bdd-manifest.json；其余门禁照跑）`,
     );
   }
   const specStructureState =

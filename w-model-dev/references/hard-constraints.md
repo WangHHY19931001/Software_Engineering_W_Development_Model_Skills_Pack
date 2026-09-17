@@ -52,7 +52,7 @@
 
 ## #11 闭环机制强制校验 + R3 预防性审查
 
-`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`（无条件）5 脚本须在每个阶段门执行，`exitCode=0` 才可放行；任一脚本非 0 视为闭环未达成，回到当前阶段起点（SSoT §10C/§10D）。`check-preventive-review.ts` 支持 `--auto-trigger` 模式：从 run-log 读取当前阶段，自动校验对应阶段的 3 份 R3 报告（completeness/reliability/security），exitCode=0 方可进入 V 评审。
+`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`（无条件）5 脚本须在每个阶段门执行，`exitCode=0` 才可放行；任一脚本非 0 视为闭环未达成，回到当前阶段起点（SSoT §10C/§10D）。**执行核验边界（2026-09-17 审查如实标注）**：门禁侧**不校验**这 5 个脚本是否真的跑过（run-log 无「本阶段须出现这 5 个 gate 条目」规则）；执行责任在 G 的分派时序，若要机器核验需新增 run-log 规则（未实现）。`check-preventive-review.ts` 支持 `--auto-trigger` 模式：从 run-log 读取当前阶段，自动校验对应阶段的 3 份 R3 报告（completeness/reliability/security），exitCode=0 方可进入 V 评审。
 
 **R3 预防性审查强制**（原约束 #17 并入，无条件，覆盖所有 S 变体）：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。**无条件强制**，覆盖所有 S 变体（S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**），无 flag，无「启用时」措辞。S-fix 走 `<phase>-fix-{dim}.json` 路径，S-emergency-fix 走 `<phase>-emergency-{dim}.json` 路径，S-ingest-tla / S-ingest-bdd 走 `<phase>-ingest-{dim}.json` 路径。V 评审前 G 子代理须跑 [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts)（支持 `--variant=standard|fix|emergency|ingest`）校验报告完整性。`preventive-review.schema.json` 强制 `passed=false ⇒ findings ≥1`——无发现的失败审查不得以空 findings 通过 schema。跳过 R3 直接进入 V 评审命中反模式 #33；S-fix / emergency-fix 后跳过 R3+V 命中反模式 #42。阶段 5-8 opsx 三段式（S-explore → S-propose → S-coding）每段另有 stage 级 R3 审查：产出 `.w-model/r3-reviews/phase<N>-{explore,propose,coding}-{completeness,reliability,security}.md` ×9 + `.w-model/v-reviews/phase<N>-{explore,propose,coding}.md` ×3（与 `check-opsx-artifacts.ts` 一致）。详见 [subagent-delegation.md](subagent-delegation.md)「R3 预防性审查分派模板」。
 
@@ -68,7 +68,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 | 成熟度 | 适用 | TLA+ / BDD 强制级别 |
 |---|---|---|
-| L1 | 教学 / demo / 小工具 | 可选（其余门禁照跑） |
+| L1 | 教学 / demo / 小工具 | 可选（其余门禁照跑）；由 `check-artifact-gate.ts` 按 `.w-model/maturity.json` 的 `level` 强制豁免阶段 1-4 的 TLA+/BDD 资产要求（见 operational-recovery.md 成熟度分级） |
 | L2 | 生产小项目 | TLA+ L1 + BDD L1 必跑，其余可选 |
 | L3 | 生产中大型 | 全必跑 |
 
@@ -344,14 +344,14 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #33（跳过 R3 预防性审查） | [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts)（always-on）+ [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R8（S→V 间 R3 记录数） |
 | #34（编排者漏派角色） | [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts)（每阶段 S/V/G ≥1 + R3 三维度（role=R 的 r3-* success）各 ≥1 无条件，`--r3-enabled` no-op） |
 | #35（self-as-verifier 产物混合） | [`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) `--self-as-verifier`（V 产物与 S 产出路径不同）+ [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) |
-| #36（路由顺序错误） | 无自动脚本（V 评审 + G 门禁人工校验路由注册顺序表） |
+| #36（路由顺序错误） | 无自动脚本（V 评审人工核验路由注册顺序表——G 的允许动作仅「跑门禁 + 读 JSON + 产出证据摘要」，不含人工核验） |
 | #37（产物膨胀核心决策稀疏） | 无自动脚本（V 评审人工校验信息密度） |
 | #38（修改前未查询 codegraph） | [`check-codegraph-queries.ts`](../scripts/cli/check-codegraph-queries.ts)（查询落盘完整性，exitCode=1 命中） |
 | #39（跳过 opsx 产物审查） | [`check-opsx-artifacts.ts`](../scripts/cli/check-opsx-artifacts.ts)（opsx 制品 + R3×3 + V 审查齐全，exitCode=1 命中） |
 | #40（opsx/S-tickets 职责混淆） | [`check-opsx-artifacts.ts`](../scripts/cli/check-opsx-artifacts.ts)（tasks/tickets 职责校验，exitCode=1 命中） |
 | #41（加权平均掩盖单轴失败） | [`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) R13 单轴下限（subCriterion.score < 0.70 → exitCode=1） |
 | #42（S-fix 后跳过 R3+V） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R8（S(fix/emergency-fix)→V 间 R3 记录数）+ [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) `--variant=fix\|emergency` |
-| #43（敏感信息写入状态文件） | 无专用脚本（V/G 人工核验 + [`security-scan.ts`](../scripts/cli/security-scan.ts) 源码级扫描） |
+| #43（敏感信息写入状态文件） | 无专用脚本（V 评审人工核验 + [`security-scan.ts`](../scripts/cli/security-scan.ts) 源码级扫描；G 不做人工核验，见 #36 行说明） |
 | #44（跳过冰山扫掠直接放行） | [`check-iceberg-sweep.ts`](../scripts/cli/check-iceberg-sweep.ts)（IcebergSweepReport R1-R8 校验，含 R6/R7/R8 三视角对账（见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md) §8.4），exitCode=1 命中）；run-log `iceberg-sweep` / `iceberg-review` 动作缺失检测为软检测（编排者自查 + V/G 人工核验，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节） |
 | #45（为通过测试而修改断言/测试期望） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R10 revertEvidence 回滚证伪（fix/emergency-fix 记录须携带合法 `revertEvidence.command`，`LEGACY_REVERT_EVIDENCE_CUTOFF` 起强制，exitCode=1 命中）；断言与需求的语义对应仍由 V 评审人工核验 |
 | #46（只给审计权不给修正权） | 无专用脚本（CHECKPOINT 介入路径标注） |
@@ -432,7 +432,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 **检测信号**：到达 🔴 CHECKPOINT 节点后无「等待用户确认」记录直接推进。
 
-- `signature-chain.jsonl` 中 O checkpoint 签名 `signer` 为 O 角色 ID（代签检测，）
+- `signature-chain.jsonl` 中 O checkpoint 签名 `signer` 为 O 角色 ID（代签检测，R5 实现）
 
 **回退动作**：回到 CHECKPOINT 节点重新暂停，向用户展示放行判定并由用户确认。
 
@@ -442,7 +442,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 **检测信号**：编排者会话出现 `Write` / `Edit` 调用写阶段产物文件；或编排者直接产出 `VerifierOutput` JSON 内容；或编排者直接判定根因并分派 S-fix（无 R 报告路径作为 S-fix 输入）；或编排者自行填写 `acknowledgedDecisions`。
 
-- `signature-chain.jsonl` 中 O 角色 `action=produce/review/gate`（O 越权承担 S/V/G 职责，）
+- **无自动化检测（2026-09-17 审查更正）**：`signature-chain.jsonl` 中 O 角色的 `action` 白名单校验**未实现**——R4 允许 O 出现在任意位置（`allowedRoles` 含 O），R5/R9 只覆盖代签与越权消费两类形态。该反模式的完整判定依赖宿主会话的工具调用日志（会话中出现 `Write`/`Edit` 即命中），当前属**人工核验**项。
 
 **回退动作**：回到当前阶段起点：① 已越权产出的实体作废重做；② 重新分派 S 子代理产出；③ 重走 V → G；④ `acknowledgedDecisions` 清空并要求用户重新陈述决策。
 
@@ -484,7 +484,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 **检测信号**：`TLA_JSON.passed=false`（`deadlockViolations`/`invariantViolations`/`stateExplosionSpecs` 非空）但阶段已推进。
 
-- `signature-chain.jsonl` 中 G 签名 `action=gate` 但 `gateExitCode` 字段缺失（skip-tlc 无 GATE_JSON，）
+- `signature-chain.jsonl` 中 G 签名 `action=gate` 但 `gateExitCode` 字段缺失
 
 **回退动作**：回到当前阶段起点，分派 S 修正 TLA+ 规格（消除死锁/不变式违反）或拆解规格（缓解状态爆炸），重跑 `check-tla-model.ts`。
 
@@ -512,7 +512,9 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 > 详细描述见 [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节。子代理返回规划性内容而未调用任何执行工具，浪费 token + 轮次，任务无实际进展。
 
-**检测信号**（sig-008）：run-log 中存在 `action=plan` 但无后续 `action=implement`/`action=verify` 条目；规划产物（spec/plan）存在但无对应执行产物。
+**检测信号**（sig-008）：子代理响应中**无 `tool_use` 块且未附产物路径**（见 [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节的四条行为要求）；规划产物（spec/plan）存在但无对应执行产物。
+>
+> 2026-09-17 审查更正：原文写作「run-log 中存在 `action=plan` 但无后续 `action=implement`/`action=verify`」——该三值**不在 run-log 27 值 action 枚举内**（写入即 schema 违规），属伪字段信号。
 
 ### #21 阶段级门禁跳过（self-as-verifier 模式下跳过中间阶段门禁直接跑终检）
 
@@ -529,7 +531,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 **与 SKILL.md 阶段路由表的对应**：quality-standards.md「质量门检查清单」节已指引阶段 6/7/8 完成时必须跑对应 `--phase=6`/`--phase=7`/`--phase=8`，本反模式是 self-as-verifier 模式下的强制约束。
 
-**检测信号**（sig-008）：run-log 中阶段 6/7/8 的 GATE 条目缺 `--phase=N` 参数；或 gate JSON 输出中 phaseOption 字段缺失。
+**检测信号**（sig-008）：run-log 中阶段 6/7/8 的 GATE 条目缺 `--phase=N` 参数；或 GATE_JSON 缺 `type`/`passed`/`exitCode` 键集合。2026-09-17 审查更正：原文写「gate JSON 输出中 `phaseOption` 字段缺失」——`phaseOption` 是 CLI 局部变量，**不出现在 GATE_JSON 中**，属伪字段信号。
 
 ### C1（候选，pending V 复审）V 评审 summary 模板化
 
@@ -754,7 +756,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 **危害**：产物文件大小达标（1-2MB）但核心决策稀疏，大量内容为扩展点/附录/重复说明，稀释了产物的语义价值。
 
 **检测信号**：
-- 文件大小达标但实体引用密度 < 1/章节
+- 文件大小达标但实体引用密度 < 2/章节（与 quick-self-check 的「≥2/章节」达标线同阈值；原写 <1 造成 [1,2) 空档——既不判命中也不达标，2026-09-17 审查修复）
 - 大量内容为"扩展点详细补充"而非核心设计决策
 - 章节数多但每章引用的 SD-xxx / DD-xxx / REQ-xxx 等实体 ID 少
 - V 评审发现核心设计决策被大量非核心内容淹没

@@ -272,7 +272,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 | 成熟度（`maturity.json.level`） | 适用场景 | TLA+ / BDD 强制级别 |
 |---|---|---|
-| L0 / L1 | 教学 / demo / 小工具 | **可选**——阶段 1-4 可不产出 `.tla`/`.cfg`/`tla-manifest.json` 与 `.feature`/`bdd-manifest.json`；其余门禁照跑（图谱 / verifier / 闭环 5 脚本 / 工件质量门） |
+| L0 / L1 | 教学 / demo / 小工具 | **可选**——阶段 1-4 可不产出 `.tla`/`.cfg`/`tla-manifest.json` 与 `.feature`/`bdd-manifest.json`；其余门禁照跑（图谱 / verifier / 闭环 5 脚本 / 工件质量门）。**由门禁强制**：`check-artifact-gate.ts` 读取 `.w-model/maturity.json` 的 `level`，L0/L1 且阶段 1-4 时豁免该组资产要求（GATE_JSON 输出 `maturityLevel` / `tlaBddWaived` 供审计区分「通过」与「豁免」；缺 `maturity.json` 或 level 非法 → 不豁免，保持严格） |
 | L2 | 生产小项目 | **部分必跑**——TLA+ L1 + BDD L1 必跑（阶段 1 产出、G 跑行为门禁），L2-L4 层级可选 |
 | L3 | 生产中大型 | **全必跑**——阶段 1-4 产出全部对应层级 TLA+ 与 BDD 资产，G 每阶段门跑行为门禁 |
 

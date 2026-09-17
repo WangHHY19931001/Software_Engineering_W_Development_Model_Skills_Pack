@@ -207,7 +207,9 @@ describe('aggregateExternalChecks（artifact gate 外部校验聚合）', () => 
     // scope 已提供分支：provided=true
     expect(r.summary.codegraph.provided).toBe(true);
     expect(r.summary.opsx.provided).toBe(true);
-    expect(typeof r.summary.codegraph.coveredFileCount).toBe('number');
+    // 断言可证伪的关系而非类型：本 fixture 下须覆盖全集（2026-09-17 审查修复）。
+    expect(r.summary.codegraph.requiredFileCount).toBeGreaterThan(0);
+    expect(r.summary.codegraph.coveredFileCount).toBe(r.summary.codegraph.requiredFileCount);
   });
 
   it('E5/E6: gate-logic externalChecks 死字段清理 + 其余行为不变', () => {

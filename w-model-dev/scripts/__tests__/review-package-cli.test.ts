@@ -171,7 +171,9 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     expect(outLines[0]).toContain('REVIEW_PACKAGE_JSON ');
     const payload = JSON.parse(outLines[0]!.replace('REVIEW_PACKAGE_JSON ', '')) as Record<string, unknown>;
     expect(payload).toMatchObject({ path: out1, base: baseSha, head: headSha, commits: 1 });
-    expect(typeof payload.bytes).toBe('number');
+    // 与磁盘实际字节数比对（原仅断言类型，单行不钉任何数值；2026-09-17 审查修复）。
+    const onDiskBytes = (await fs.stat(out1)).size;
+    expect(payload.bytes).toBe(onDiskBytes);
 
     const run2 = runReviewPackage([...common, `--out=${out2}`]);
     expect(run2.code).toBe(0);

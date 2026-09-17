@@ -76,7 +76,8 @@ describe('vitest project 拆分：SUBPROCESS_TEST_FILES 双向守护', () => {
     expect(cli!.test.fileParallelism, 'cli-serial 必须 fileParallelism:false——子进程类互不重叠是本拆分的全部意义').toBe(
       false,
     );
-    expect(unit!.test.fileParallelism ?? true, 'unit-parallel 应保持并行').toBe(true);
+    // 显式断言「未被设为 false」：缺省即 true；写成 `?? true).toBe(true)` 会恒真（2026-09-17 审查修复）。
+    expect(unit!.test.fileParallelism, 'unit-parallel 不得显式 fileParallelism:false').not.toBe(false);
     for (const g of expectGlobs) {
       expect(unit!.test.exclude, `unit-parallel 排除清单缺 ${g}`).toContain(g);
     }

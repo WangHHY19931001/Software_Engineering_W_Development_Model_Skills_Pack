@@ -118,8 +118,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * 非空字符串判据（**trim 语义**，2026-09-17 审查修复）：
+ * 原先用 `value.length > 0`，使 `" "`（单空格）被当作合法非空路径/ID/candidateId——
+ * 与根因报告门禁（root-cause-logic）等模块的 `trim() !== ''` 语义不一致，
+ * 且导致 isHumanActor 等调用点各自打补丁（`|| value.trim() === ''`）。
+ * 统一为 trim 语义后，所有调用点（packageRoot / sourceProject / candidateId /
+ * campaignRoot / rollback.command …）自动拒绝纯空白输入。
+ */
 function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0;
+  return typeof value === 'string' && value.trim() !== '';
 }
 
 function isRepositoryRelativePath(value: unknown): value is string {
@@ -192,7 +200,7 @@ function declaredLevel(input: unknown, problems: string[]): VerificationLevel {
 
 /** Human identity check: agent/bot/automation/role identities never qualify as the human decision maker. */
 function isHumanActor(value: unknown): value is string {
-  if (!isNonEmptyString(value) || value.trim() === '') return false;
+  if (!isNonEmptyString(value)) return false;
   const normalized = value.toLowerCase();
   if (/(?:^|[-_\s])(?:agent|bot|automation|system|orchestrator|robot)(?:$|[-_\s])/.test(normalized)) return false;
   if (/(?:^|[-_\s])[oasvgr](?:$|[-_\s])/.test(normalized)) return false;

@@ -43,7 +43,10 @@ export const L0_BASELINE = {
   // subagent-delegation.md 各新增 1 条指向 iceberg-sweep-guide.md 的跨引用，用于统一
   // 「冰山放行判据」三口径并指向 §8.4 三视角对账；逐文件回退实验实测各 -1，l1Only 仍 95、
   // placeholders 仍 36、violations 仍 0）。
-  relativeLinkCount: 674,
+  // 675 = 674 + 1（同批规则层修正：hard-constraints.md 反模式 #20 检测信号改为指向
+  // subagent-delegation.md「反模式 #20」节的行为要求，新增 1 条跨引用；l1Only 仍 95、
+  // placeholders 仍 36、violations 仍 0）。
+  relativeLinkCount: 675,
   l1Only: 95,
   placeholders: 36,
 } as const;

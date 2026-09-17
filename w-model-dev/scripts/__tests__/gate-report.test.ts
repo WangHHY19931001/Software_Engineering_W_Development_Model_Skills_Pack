@@ -623,7 +623,8 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
       expect(parsed.passed).toBe(false);
       expect(parsed.reasons.length).toBeGreaterThan(0);
       expect(parsed.violations).toEqual([{ rule: 'violation', count: parsed.reasons.length }]);
-      expect(typeof parsed.durationMs).toBe('number');
+      // 有界断言（原仅断言类型，恒真）：整数、非负、且远小于任何真实运行时长（2026-09-17 审查修复）。
+      expect(Number.isInteger(parsed.durationMs) && parsed.durationMs >= 0 && parsed.durationMs < 600_000).toBe(true);
       expect(parsed.exitCode).toBe(1);
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
@@ -1046,6 +1047,95 @@ describe('check-artifact-gate.ts phase 1 evidence boundary', () => {
       // S46：--json 与 GATE_JSON 同构，external 键恒存在（非 5-8 阶段为 null）
       expect('external' in report).toBe(true);
       expect(report['external']).toBeNull();
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  // 成熟度豁免（2026-09-17 审查修复）：文档承诺 L0/L1 阶段 1-4 可不产出 TLA+/BDD 资产，
+  // 而门禁此前无 maturity 输入 → 合法 L1 项目必被阻断。三臂：豁免命中 / L2 不命中 / 阶段 5 不命中。
+  it('maturity L1 + 阶段 1 → TLA+/BDD 资产要求被豁免（其余门禁照跑）', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-artifact-maturity-l1-'));
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
+      await fs.mkdir(path.join(tmpDir, '.w-model'), { recursive: true });
+      const rtm = await fs.readFile(
+        path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/gate/valid-rtm.json'),
+        'utf-8',
+      );
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
+      await fs.writeFile(path.join(tmpDir, '.w-model/rtm.json'), rtm, 'utf-8');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
+      await fs.writeFile(
+        path.join(tmpDir, '.w-model/maturity.json'),
+        JSON.stringify({
+          level: 'L1',
+          history: [],
+          lastUpdated: '2026-09-17T00:00:00.000Z',
+        }),
+        'utf-8',
+      );
+      const r = runSync(process.execPath, [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, tmpDir, '--phase=1', '--json'], {});
+      const report = JSON.parse(r.stdout ?? '') as {
+        tlaBddWaived: boolean | null;
+        maturityLevel: string | null;
+        reasons: string[];
+      };
+      expect(report.maturityLevel).toBe('L1');
+      expect(report.tlaBddWaived).toBe(true);
+      expect(report.reasons.some((x) => x.includes('[artifact:tla]'))).toBe(false);
+      expect(report.reasons.some((x) => x.includes('[artifact:bdd'))).toBe(false);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('maturity L2 + 阶段 1 → 不豁免（TLA 资产缺失仍报）', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-artifact-maturity-l2-'));
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
+      await fs.mkdir(path.join(tmpDir, '.w-model'), { recursive: true });
+      const rtm = await fs.readFile(
+        path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/gate/valid-rtm.json'),
+        'utf-8',
+      );
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
+      await fs.writeFile(path.join(tmpDir, '.w-model/rtm.json'), rtm, 'utf-8');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
+      await fs.writeFile(
+        path.join(tmpDir, '.w-model/maturity.json'),
+        JSON.stringify({ level: 'L2', history: [], lastUpdated: '2026-09-17T00:00:00.000Z' }),
+        'utf-8',
+      );
+      const r = runSync(process.execPath, [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, tmpDir, '--phase=1', '--json'], {});
+      const report = JSON.parse(r.stdout ?? '') as { tlaBddWaived: boolean | null; reasons: string[] };
+      expect(report.tlaBddWaived).toBeNull();
+      expect(report.reasons.some((x) => x.includes('[artifact:tla]'))).toBe(true);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('maturity L1 + 阶段 5 → 不豁免（豁免只覆盖阶段 1-4）', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-artifact-maturity-p5-'));
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
+      await fs.mkdir(path.join(tmpDir, '.w-model'), { recursive: true });
+      const rtm = await fs.readFile(
+        path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/gate/valid-rtm.json'),
+        'utf-8',
+      );
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
+      await fs.writeFile(path.join(tmpDir, '.w-model/rtm.json'), rtm, 'utf-8');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
+      await fs.writeFile(
+        path.join(tmpDir, '.w-model/maturity.json'),
+        JSON.stringify({ level: 'L1', history: [], lastUpdated: '2026-09-17T00:00:00.000Z' }),
+        'utf-8',
+      );
+      const r = runSync(process.execPath, [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, tmpDir, '--phase=5', '--json'], {});
+      const report = JSON.parse(r.stdout ?? '') as { tlaBddWaived: boolean | null };
+      expect(report.tlaBddWaived).toBeNull();
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }

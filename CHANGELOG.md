@@ -38,6 +38,19 @@
 - **fixture 校正 + 新负向样本**：`bad-r10-no-reality-checker.json` 的 personaSlice 由**不存在的人格名**（`engineering-testability` / `design-architect`）改为真实矩阵人格（保持「仅触发目标规则」的夹具原则，并新增单测钉住该性质）；新增 `bad-r11-unknown-persona.json`（矩阵外人格）与 `bad-r11-category-mismatch.json`（自述 category 与所选视角行无交集），`ROOTCAUSE_CASES` 14 → 16。
 - **门禁边界（如实陈述）**：数量约束（默认 3 / 上限 5）与 `incident-response-commander` 必含**不门禁强制**——它们是分派默认，由编排者按 `agent-personas.md` §4 与 token 预算（`budget-logic.ts` R4-A）执行；第二键因报告未声明信号字段亦不门禁强制，仅作分派指导。
 
+### 审查修复第二批：成熟度豁免、覆盖率口径与规则层如实化（audit-remediation-2，2026-09-17）
+
+> 续第一批，处理审查清单中的「建议」级与超范围项；实施记录见 `docs/superpowers/plans/2026-09-17-skill-audit-remediation.md` §8。
+
+- **成熟度豁免落地（行为变更，本批唯一的门禁放宽）**：`check-artifact-gate.ts` 读 `.w-model/maturity.json` 的 `level`；L0/L1（教学 / demo / 小工具）且阶段 1-4 时豁免 TLA+/BDD 资产与同步要求。此前文档承诺该豁免但门禁无 maturity 输入 → 合法 L1 项目按文档走必被阻断。GATE_JSON 新增 `maturityLevel` / `tlaBddWaived`（键恒存在）+ 人类横幅；**缺文件或 level 非法 → 不豁免**（保持严格）。三臂回归：L1+阶段 1 命中豁免、L2+阶段 1 不豁免、L1+阶段 5 不豁免。
+- **覆盖率口径：完成测量与归因，问题未解决（如实记录）**。根因确认：**被测试 import 的文件总会进入报告**，`coverage.include` 只影响未被 import 的文件——全量实测 83 个文件（logic 37 / lib 30 / cli 10 / infrastructure 3 / application 2 / __tests__ 1），合并值 stmts **76.83** / branch 71.64 / funcs 87.86 / lines 78.88，statements 距阈值仅 **+1.83pp**。两种 `exclude` 写法（相对路径、`**/` 前缀）在**聚焦运行生效、全量运行均不生效**（机制未查明）→ **已回退配置改动**，不发布"已限定口径"的不实声明；阈值维持 75/65/85/75，风险与两次失败尝试如实写入 `config/vitest.config.ts` 注释。
+- **弱断言加固（4 处）**：`fileParallelism ?? true).toBe(true)`（恒真）→ `not.toBe(false)`；三处仅断言 `typeof` 的计数/字节/耗时改为可证伪断言（覆盖计数等于必需数、字节等于磁盘实际大小、耗时整数且有界）。
+- **fixture 去伪**：删除与 `valid-manifest.json` 逐字节相同的 `bad-no-rtm-mapping.manifest.json`（其「坏」由 `rtmRows` 参数注入），用例改为直接引用前者；samples/README 增「同字节复用」说明（两对 coverage fixture 的差异同样由参数注入，保留并文档化）。
+- **规则层如实化**：反模式 #10 的「signature-chain 检测 O 越权」**经复核实现不存在**（R4 允许 O 出现在任意位置）→ 改为标注「无自动化检测，属人工核验」；#36/#43 的「G 门禁人工校验」改为「V 评审人工核验」（G 的允许动作不含核验）；约束 #11 标注「门禁不校验 5 脚本是否执行」；信息密度阈值统一为「< 2/章节 即命中」（消除 [1,2) 空档）；#20 的伪 action 枚举与 #21 的 `phaseOption` 伪字段改为真实判据；清理 4 处悬空括号。
+- **自检断言强度：经复核无缺口（撤回本条初版结论）**。初版扫描称"23 条无断言"，两轮复核后证伪：各数组所用字段名不同（`expectedViolationPatterns` / `expectedRulesFailed` / `expectedReasonPatterns` / `expectedErrorPatterns`），用完整字段集重扫 213 条负向用例 → **无任何断言字段者 0 条**。相关插入已全部回退（`self-test.ts` 本批仅保留 BDD fixture 去重一处改动）。
+- **三处自我纠正（如实记录）**：① 自检断言强度的两轮误报（`expectedViolationPatterns` → 再是 `expectedRulesFailed`）——最终结论是**无缺口**，初版与二版结论均已撤回；② 锚点规则在编辑后立刻抓出登记册 10 条引用漂移（新增该规则的目的即在此）；L0 链接基线随之 674 → 675；③ 覆盖率 exclude 的"聚焦生效、全量失效"两种结果并存，未查明机制即回退，不保留不可靠的配置声明。
+- **未做（如实列出）**：`code-health` 6 个 CLI 的端到端语义（其规则层已由 self-test 43 条 `CODE_HEALTH_*_CASES` 覆盖）、其余 36 个 `logic/*.ts` 的规则负载性变异测试（建议按覆盖率最低者优先）。
+
 ### 全面审查修复：fail-open 治理 / 证据链 / 文档矛盾（audit-remediation，2026-09-17）
 
 > 触发：对技能包的四维度独立审计（门禁脚本 / 文档一致性 / 测试与样本 / 规则与角色），发现按优先级修三批；全部 fail-open 结论均由复现探针确认后再修。
