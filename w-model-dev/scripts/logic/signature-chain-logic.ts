@@ -60,6 +60,8 @@ export interface SignatureChainCheckResult {
   violations: string[];
   rulesPassed: string[];
   rulesFailed: string[];
+  /** 未执行的规则（缺对应输入）：不得计入 rulesPassed（"未运行" ≠ "通过"） */
+  rulesSkipped?: string[];
 }
 
 // ==================== 阶段角色清单 ====================
@@ -110,6 +112,7 @@ export function checkSignatureChain(
   const violations: string[] = [];
   const rulesPassed: string[] = [];
   const rulesFailed: string[] = [];
+  const rulesSkipped: string[] = [];
 
   // 入口 schema 校验（防反模式 #28）：逐条校验记录结构，违规以 [schema] 前缀报告
   for (const [i, e] of entries.entries()) {
@@ -326,7 +329,10 @@ export function checkSignatureChain(
       }
     }
   }
-  if (!rulesFailed.includes('R8')) {
+  if (!options?.existingPaths) {
+    // 未提供 existingPaths → R8 未执行，不得计入 rulesPassed
+    rulesSkipped.push('R8');
+  } else if (!rulesFailed.includes('R8')) {
     rulesPassed.push('R8');
   }
 
@@ -386,5 +392,6 @@ export function checkSignatureChain(
     violations,
     rulesPassed,
     rulesFailed,
+    rulesSkipped,
   };
 }

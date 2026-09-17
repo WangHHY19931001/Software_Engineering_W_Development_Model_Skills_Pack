@@ -594,6 +594,15 @@ async function main(): Promise<void> {
         testEvidence: testEvidenceSummary,
         // S18：票据内容校验计数（缺省不触发时为 null）
         tickets: ticketsSummary,
+        // 阶段 1-4 设计级结构校验（引用块/SSOT/DoD/§8）的执行态：
+        // checked=已传 --spec-dir 并执行；skipped=阶段 1-4 未传（整组跳过，必须可见）；
+        // null=阶段 5-8 不适用。键恒存在，便于编排消费与审计区分「通过」与「未执行」。
+        specStructure:
+          phaseOption === 1 || phaseOption === 2 || phaseOption === 3 || phaseOption === 4
+            ? specDir
+              ? 'checked'
+              : 'skipped'
+            : null,
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -637,6 +646,15 @@ async function main(): Promise<void> {
     console.log(
       `opsx 外部     : ${ext.opsx.passed ? '✓' : '✗'} 制品目录 ${ext.opsx.changesNames.join(', ') || '（无）'}（${ext.opsx.violationCount} 条违规）`,
     );
+  }
+  const specStructureState =
+    phaseOption === 1 || phaseOption === 2 || phaseOption === 3 || phaseOption === 4
+      ? specDir
+        ? 'checked'
+        : 'skipped'
+      : null;
+  if (specStructureState === 'skipped') {
+    console.log('设计级结构    : ⚠ 未执行（未提供 --spec-dir；阶段 1-4 的引用块/SSOT/DoD 校验被整组跳过）');
   }
   console.log(`校验结果      : ${overallPassed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));

@@ -71,12 +71,26 @@ describe('state-machine-logic', () => {
     expect(transitionKey({ from: 'draft', to: 'published' })).toBe('draft→published');
   });
 
-  it('缺省字段容错：空输入 → passed=true（缺省降级为空数组）', () => {
+  it('零证据守卫：空输入 → passed=false（缺省字段降级为空数组，但全空不得判通过）', () => {
+    // 语义变更（2026-09-17 审查修复）：原先空输入判 passed=true，
+    // 与 CLI 头注「不得按『全空合法图』放行」矛盾——抽取失败会表现为两侧都空而非差异，
+    // 属「零证据=通过」类 fail-open，已改为 fail-closed。
     const r = checkStateMachineConsistency({});
-    expect(r.passed).toBe(true);
-    expect(r.reasons).toEqual([]);
+    expect(r.passed).toBe(false);
+    expect(r.reasons.some((x) => /输入为空/.test(x))).toBe(true);
     expect(r.designStates).toEqual([]);
     expect(r.codeTransitions).toEqual([]);
+  });
+
+  it('零证据守卫：四数组显式全空同样不通过', () => {
+    const r = checkStateMachineConsistency({
+      designStates: [],
+      designTransitions: [],
+      codeStates: [],
+      codeTransitions: [],
+    });
+    expect(r.passed).toBe(false);
+    expect(r.reasons.some((x) => /输入为空/.test(x))).toBe(true);
   });
 
   it('返回结构完整性：含设计/代码两侧状态与转移的镜像字段', () => {

@@ -191,7 +191,12 @@ async function main(): Promise<void> {
   console.log('─'.repeat(60));
 
   if (result.passed) {
-    console.log(`签名链符合规范：R1-R10 全通过${stage === 'archive' ? ' + 跨阶段消费者校验通过' : ''}。`);
+    const skipped = result.rulesSkipped ?? [];
+    const passedText =
+      skipped.length > 0
+        ? `签名链符合规范：已执行规则全通过（未执行：${skipped.join(', ')}——缺对应输入，不计入通过）`
+        : '签名链符合规范：R1-R10 全通过';
+    console.log(`${passedText}${stage === 'archive' ? ' + 跨阶段消费者校验通过' : ''}。`);
     console.log(`通过规则：${result.rulesPassed.join(', ')}`);
   } else {
     console.log('未通过原因：');

@@ -6,7 +6,7 @@
 ## .tla 文件模板
 
 > 文件名：`<L级别>_<系统名>.tla`（如 `L1_blog_system.tla`、`L2_auth_subsystem.tla`）。
-> MODULE 名须与文件名一致（不含 `.tla` 后缀）；命名规范见 [tla-plus.md §2.0](../references/tla-plus.md#§20-命名规范)（禁止连字符/中文/特殊符号）。
+> MODULE 名须与文件名一致（不含 `.tla` 后缀）；命名规范见 [tla-plus.md §2.0](../references/tla-plus.md#20-命名规范)（禁止连字符/中文/特殊符号）。
 
 ```tla
 (*
@@ -261,7 +261,7 @@ BusinessInvariant ==
 
 ### 反例4：MODULE 名含连字符
 
-MODULE 名含连字符 `-` 违反命名规范（见 [tla-plus.md §2.0](../references/tla-plus.md#§20-命名规范)），SANY 报 `Fatal errors while parsing`（退出码 11）。
+MODULE 名含连字符 `-` 违反命名规范（见 [tla-plus.md §2.0](../references/tla-plus.md#20-命名规范)），SANY 报 `Fatal errors while parsing`（退出码 11）。
 
 **错误**：
 

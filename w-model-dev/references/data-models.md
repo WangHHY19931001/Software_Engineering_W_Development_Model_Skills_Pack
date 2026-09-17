@@ -867,7 +867,7 @@ interface TlaCheckRound {
   specId: string;
   /** SANY 语法检查是否通过 */
   syntaxCheck: boolean;
-  /** TLC 模型检查是否通过（--skip-tlc 时填 false 并备注） */
+  /** TLC 模型检查是否通过 */
   tlcCheck: boolean;
   /** 本轮违反详情列表（死锁 + 不变式违反 + 状态爆炸等合计，每条为具体违反描述） */
   violations: string[];

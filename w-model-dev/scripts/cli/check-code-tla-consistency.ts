@@ -58,7 +58,7 @@ import {
   type TlaSpec,
 } from '../logic/code-tla-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
-import { exitWithError } from '../lib/cli-error.js';
+import { exitWithError, HandledCliError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
@@ -154,15 +154,26 @@ async function loadTlaContents(manifest: TlaManifest, manifestFile: string): Pro
     if (!spec || (spec.level !== 'L2' && spec.level !== 'L3')) continue;
     if (typeof spec.tlaPath !== 'string' || spec.tlaPath.trim() === '') continue;
     const tlaAbs = path.resolve(manifestDir, spec.tlaPath);
+    const inlineContent = typeof spec.tlaContent === 'string' && spec.tlaContent.trim() !== '';
     try {
       spec.tlaContent = await fs.readFile(tlaAbs, 'utf-8');
     } catch (err) {
-      const e = err as NodeJS.ErrnoException;
-      if (e.code === 'ENOENT') {
-        // .tla 文件不存在时记录空字符串，校验逻辑会按"无 tlaContent"处理
-        spec.tlaContent = '';
-      } else {
-        spec.tlaContent = '';
+      // 规格文件读不到时必须 fail-closed：原先统一置空串会让维度 3（Next 分支）与维度 4（不变式）
+      // 因「零动作/零不变式」静默判通过——删文件即放行。
+      // manifest 内联 tlaContent 的自包含场景保留内联内容（samples/code-tla/*.json 即此形态）。
+      if (!inlineContent) {
+        const e = err as NodeJS.ErrnoException;
+        exitWithError({
+          category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
+          rule: 'D3/D4',
+          message: `TLA+ 规格文件不可读（spec=${spec.id ?? '?'}）`,
+          file: tlaAbs,
+          detail: `tlaPath=${spec.tlaPath}${e.code ? `（${e.code}）` : ''}；缺失规格会使 Next 分支与不变式覆盖校验静默跳过，故 fail-closed`,
+          exitCode: 2,
+        });
+        // exitWithError 只输出并设置 exitCode，不中断调用链；
+        // 不抛出则后续会照常算出 passed=true 并把退出码覆盖回 0（本修复首次实现即踩此坑，探针复现后补上）。
+        throw new HandledCliError();
       }
     }
   }

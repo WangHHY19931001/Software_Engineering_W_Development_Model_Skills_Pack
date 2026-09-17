@@ -210,6 +210,13 @@ export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptio
   // 收集 checkpoint success 记录（R1-R4 的校验对象）
   const checkpoints = valid.filter((e) => e.action === 'checkpoint' && e.outcome === 'success');
 
+  // R0 零证据守卫：无任何 checkpoint success 记录时不得判通过。
+  // 「没有发现违规」≠「验证通过」——本门禁是阶段放行的唯一凭据，
+  // 空 run-log 必须先证明「确实发生过放行」，否则 fail-closed（与 check-role-dispatch 同语义）。
+  if (checkpoints.length === 0) {
+    violations.push('run-log 无 checkpoint success 记录（无法证明阶段 CHECKPOINT 已放行；零证据不等于合规）');
+  }
+
   // R1 acknowledgedDecisions 非空
   // 每个 checkpoint success 须有 ≥1 条 acknowledgedDecisions，防空决策放行（O4 / D19）
   for (const e of checkpoints) {

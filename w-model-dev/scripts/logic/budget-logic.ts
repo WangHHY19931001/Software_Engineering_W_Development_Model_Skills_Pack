@@ -134,6 +134,9 @@ export function checkBudget(
   // R4-A：多角度 R 的 token 预算校验（不论并行/串行均累计，spec §9.9）
   const r4a = checkRootcauseBudget(b);
   violations.push(...r4a.violations);
+  // R4-A 的跳过说明（未配置字段/无 rounds）必须一并透传：原先只取 violations，
+  // 会把「R4-A 未校验」这条诊断静默丢掉，使跳过再次不可见。
+  warnings.push(...r4a.warnings);
 
   return { passed: violations.length === 0, violations, warnings };
 }
@@ -152,11 +155,19 @@ export function checkRootcauseBudget(b: Partial<BudgetConfig>): BudgetCheckResul
   const violations: string[] = [];
   const cfg = b.rootcauseParallelBudget;
   if (!cfg) {
-    // 未配置多角度预算时不校验（向后兼容）
-    return { passed: true, violations: [], warnings: [] };
+    // 未配置多角度预算时不校验（向后兼容）；跳过必须可见——不静默等于通过。
+    return {
+      passed: true,
+      violations: [],
+      warnings: ['R4-A 未校验：未配置 rootcauseParallelBudget（跳过不等于通过）'],
+    };
   }
   if (!Array.isArray(b.rootcauseRounds) || b.rootcauseRounds.length === 0) {
-    return { passed: true, violations: [], warnings: [] };
+    return {
+      passed: true,
+      violations: [],
+      warnings: ['R4-A 未校验：无 rootcauseRounds 记录（跳过不等于通过）'],
+    };
   }
 
   for (const round of b.rootcauseRounds) {

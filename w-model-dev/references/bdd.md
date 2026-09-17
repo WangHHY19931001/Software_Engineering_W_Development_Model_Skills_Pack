@@ -34,7 +34,7 @@
 | 状态机七要素 | @states/@initial-state/@terminal-states/@accepting-states/@rejecting-states/@transitions/@invariants | §3 |
 | BDD↔TLA+ 协作 | 独立门禁回退 + 等价性跨校验（D4）+ 不一致走 R→V | §4 |
 | 记叙性优先 | 测试断言不是金标准，失败先归因（呼应反模式 #45） | 「记叙性优先」节 |
-| 门禁脚本 | check-bdd-model.ts 8 维度（D1-D8）+ 退出码 | §5 |
+| 门禁脚本 | check-bdd-model.ts 7 维度（D1/D3-D8）+ 退出码；D2 由 V 评审人工核验 | §5 |
 | 阶段产出时序 | 阶段 1-4 设计 features，5-8 执行 | §6 |
 | 验收夹具 | World / 数据 fixture / setup-teardown / 快照 四类 | §7 |
 | 不符处理流程 | 反模式 #29 + R 子代理流程 + 联网调研约束 | §8 |
@@ -47,7 +47,7 @@
 | 产出 .feature 前（头标注/命名） | §2 |
 | 声明状态机七要素 | §3 |
 | BDD↔TLA+ 等价性 / 不一致处理 | §4 |
-| G 跑门禁脚本（8 维度） | §5 |
+| G 跑门禁脚本（7 维度；D2 由 V 评审人工核验） | §5 |
 | 各阶段产出时序 | §6 |
 | 设计验收夹具 | §7 |
 | 建模不符回退 | §8 |
@@ -380,12 +380,12 @@ R 子代理在判定「实质一致 vs 实质不一致」时允许联网搜索�
 | `check-bdd-model.ts` | `w-model-dev/scripts/cli/check-bdd-model.ts` | BDD features 静态结构门禁 | 0=通过 / 1=校验失败 / 2=输入错误 |
 | `bdd-logic.ts` | `w-model-dev/scripts/logic/bdd-logic.ts` | BDD 业务规则校验逻辑（被 check-bdd-model.ts 调用） | — |
 
-### §5.2 check-bdd-model.ts 8 个校验维度
+### §5.2 check-bdd-model.ts 7 个校验维度（D2 由 V 评审人工核验）
 
 | 维度 | 名称 | 校验内容 | 阶段边界 |
 |---|---|---|---|
 | D1 | headerCompleteness | features 文件头标注完整性 | 阶段 1-8 |
-| D2 | gherkinSyntax | Gherkin 语法（cucumber 静态加载校验） | 阶段 1-8 |
+| D2 | gherkinSyntax | Gherkin 语法（**未实装为脚本门禁**，由 V 评审人工核验；场景解析用手写正则，不引入 @cucumber 依赖） | 阶段 1-8 |
 | D3 | stateMachineCompleteness | Background 状态机七要素 | 阶段 1-8 |
 | D4 | tlaEquivalence | BDD↔TLA+ 等价性 | phase 1-4；项目阶段门传 `--require-tla-equivalence` 强制证据 |
 | D5 | stepBinding | step definitions 绑定完整性 | phase 5-8；项目阶段门传 `--require-cucumber-report` 强制证据 |
@@ -693,7 +693,7 @@ BDD 覆盖率数据由独立的 S-ingest-bdd 子代理回填，非 S-bdd 自填�
 
 > 本文件为 Gherkin 语法通用参考，覆盖 Cucumber.js 11.x 支持的全部关键字与语法结构。
 > **W 模型约束**：BDD features 文件头标注与 Background 节状态机七要素声明须遵循 [bdd.md](./bdd.md) §2-§3。
-> **加载时机**：S-bdd 子代理产出 .feature 文件时必读；V-bdd 子代理评审语法合规性、G 子代理排查 D2（gherkinSyntax）违规时参考。
+> **加载时机**：S-bdd 子代理产出 .feature 文件时必读；V-bdd 子代理评审语法合规性、G 子代理排查 D1/D3-D8 门禁违规时参考（D2 非脚本门禁，由 V 评审人工核验）。
 
 ### 文件结构
 

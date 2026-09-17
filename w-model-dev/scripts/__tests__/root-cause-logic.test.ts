@@ -304,6 +304,67 @@ describe('R11 多角度 persona 选择矩阵', () => {
     expect(result.reasons.some((r) => /R10.*confidence/.test(r))).toBe(true);
   });
 
+  // 全 7 行负载性（2026-09-17 审查修复）：此前仅 design-flaw / coding-error 两行被钉住，
+  // 变异实验证明把 tool-gap 行换成任意两个真实 persona 后 27 个用例仍全绿。
+  // 这里用「本行任一 persona + reality-checker」与「仅 reality-checker」两臂覆盖全部 7 行。
+  const ROW_PERSONAS: Array<[string, string[]]> = [
+    ['coding-error', ['engineering-code-reviewer', 'engineering-senior-developer', 'testing-evidence-collector']],
+    [
+      'design-flaw',
+      ['engineering-software-architect', 'engineering-backend-architect', 'engineering-frontend-developer'],
+    ],
+    ['requirement-gap', ['product-manager', 'product-feedback-synthesizer']],
+    ['test-gap', ['testing-api-tester', 'testing-performance-benchmarker', 'testing-test-results-analyzer']],
+    [
+      'process-missing',
+      ['project-manager-senior', 'testing-workflow-optimizer', 'engineering-incident-response-commander'],
+    ],
+    ['tool-gap', ['engineering-autonomous-optimization-architect', 'testing-tool-evaluator']],
+    [
+      'upstream-defect',
+      [
+        'engineering-incident-response-commander',
+        'engineering-codebase-onboarding-engineer',
+        'engineering-technical-writer',
+      ],
+    ],
+  ];
+
+  it.each(ROW_PERSONAS)('R11 第一键行 %s：含本行任一 persona 即通过', async (category, personas) => {
+    const report = await loadSample('bad-r10-reality-confidence.json');
+    (report.rootCause as { category: string }).category = category;
+    report.partialReports = [
+      { personaSlice: personas[0]!, path: `.w-model/rootcause/partial/RC-x/${personas[0]!}.json`, confidence: 0.9 },
+      {
+        personaSlice: 'testing-reality-checker',
+        path: '.w-model/rootcause/partial/RC-x/testing-reality-checker.json',
+        confidence: 0.9,
+      },
+    ];
+    const result = checkRootCauseReport(report);
+    expect(result.reasons.filter((r) => /R11/.test(r))).toEqual([]);
+  });
+
+  // 负向臂只取「行内本就含 reality-checker 之外、且不含 reality-checker」的 5 行：
+  // design-flaw 与 requirement-gap 的**矩阵行确实含 testing-reality-checker**（见 agent-personas.md §2），
+  // 故对这两行「仅 reality-checker」是合法视角，不应拦截（首版测试按错名单断言，已修正）。
+  it.each(['coding-error', 'test-gap', 'process-missing', 'tool-gap', 'upstream-defect'])(
+    'R11 第一键行 %s：仅 reality-checker（不在本行）即拦截',
+    async (category) => {
+      const report = await loadSample('bad-r10-reality-confidence.json');
+      (report.rootCause as { category: string }).category = category;
+      report.partialReports = [
+        {
+          personaSlice: 'testing-reality-checker',
+          path: '.w-model/rootcause/partial/RC-x/testing-reality-checker.json',
+          confidence: 0.9,
+        },
+      ];
+      const result = checkRootCauseReport(report);
+      expect(result.reasons.some((r) => /R11.*与 rootCause\.category=.*的矩阵行无交集/.test(r))).toBe(true);
+    },
+  );
+
   it('noRootCause 分支无 category，不进入 R11', async () => {
     const report = await loadSample('valid-no-root-cause.json');
     const result = checkRootCauseReport(report);

@@ -58,7 +58,20 @@ async function main(): Promise<void> {
   } catch (err) {
     const e = err as NodeJS.ErrnoException;
     if (e.code === 'ENOENT') {
-      console.error(`✗ 项目未初始化：未找到 ${projectFile}`);
+      // 未初始化不是错误（exit 0），但 --json 模式必须给出机器可读对象：
+      // 空 stdout 会让调用方无法区分「未初始化」与「正常空报告」。
+      if (json) {
+        console.log(
+          JSON.stringify({
+            type: 'status',
+            initialized: false,
+            projectFile,
+            message: '项目未初始化（未找到 project.json）',
+          }),
+        );
+      } else {
+        console.error(`✗ 项目未初始化：未找到 ${projectFile}`);
+      }
       process.exitCode = 0;
       return;
     }

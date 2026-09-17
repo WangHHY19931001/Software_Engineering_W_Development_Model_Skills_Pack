@@ -45,6 +45,11 @@ export function checkStateMachineConsistency(input: StateMachineConsistencyInput
   const designStates = Array.isArray(input.designStates) ? input.designStates : [];
   const codeStates = Array.isArray(input.codeStates) ? input.codeStates : [];
 
+  // 零证据守卫：四数组全空时不得判通过——抽取失败会表现为「两侧都空」而不是差异。
+  if (designTransitions.length + codeTransitions.length + designStates.length + codeStates.length === 0) {
+    reasons.push('输入为空：设计侧与代码侧均无状态/转移（无法证明一致性；零证据不等于合规）');
+  }
+
   const designStateSet = new Set(designStates);
   const codeStateSet = new Set(codeStates);
 

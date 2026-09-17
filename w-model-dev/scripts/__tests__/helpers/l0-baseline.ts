@@ -39,7 +39,11 @@ export const L0_BASELINE = {
   // 反模式 #45 的「门禁脚本」对照表行与正文行各新增 1 条指向 ../scripts/cli/check-run-log.ts
   // 的链接（R10 revertEvidence 回滚证伪挂点）；由 npm run audit:l0-links 实测 rebaseline，
   // placeholders 仍 36、violations 仍 0）。
-  relativeLinkCount: 672,
+  // 674 = 672 + 2（2026-09-17 audit-remediation 文档批：hard-constraints.md 与
+  // subagent-delegation.md 各新增 1 条指向 iceberg-sweep-guide.md 的跨引用，用于统一
+  // 「冰山放行判据」三口径并指向 §8.4 三视角对账；逐文件回退实验实测各 -1，l1Only 仍 95、
+  // placeholders 仍 36、violations 仍 0）。
+  relativeLinkCount: 674,
   l1Only: 95,
   placeholders: 36,
 } as const;

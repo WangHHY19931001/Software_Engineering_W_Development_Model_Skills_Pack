@@ -1,6 +1,6 @@
 # samples/ 覆盖矩阵
 
-> 本目录为 `self-test.ts`（352 条回归基线）与各 `check-*.ts` 门禁脚本的 fixture 样本集。
+> 本目录为 `self-test.ts`（354 条回归基线）与各 `check-*.ts` 门禁脚本的 fixture 样本集。
 > **每个 fixture 必须被 `w-model-dev/scripts/cli/self-test.ts` 用例数组引用**（`file` / `manifestFile` / `ticketsFile` / `sampleDir` 字段；
 > 配套产物文件用 `auxFiles` 数组字段登记，如 gate 的 M07 E2 原始输出产物），
 > 未登记的 fixture 不参与任何检查——由 `check-samples-coverage.ts` 门禁自动核对（新增样本后运行
@@ -44,7 +44,7 @@
 | `uat-path-mapping`     | check-artifact-gate（B4/B5）                                                       | UAT_PATH_MAPPING_CASES（5，sampleDir 形态）                                                                      | uat-path-mapping.md 解析与回填校验                                                                                                                                                                                                                                                                                                                                                             | 嵌套 `docs/uat-path-mapping.md`                                                         | 放宽 uat-path-mapping 解析将漏掉空表格/畸形行导致 UAT 路径回填缺失 |
 | `verifier-calibration` | **无（非门禁）**                                                                   | **无（非门禁，不登记 self-test）**                                                                               | Verifier 校准集（非门禁，人工标注正解）：带 `expectedVerdict`/`expectedRationale` 的锚定样本，用于离线诊断 V 的校准偏移（R18 分辨力下限）与标准偏移（R9 跨轮次不一致）。**无脚本读取，不阻断任何流程**——锚定正解由人标注且校准需真实跑 LLM，不符合「确定性门禁」定义；升级为门禁须走独立决策（见该目录 README 首段）                                                                           | 平铺 JSON（VerifierOutput 形态 + run-log 条目形态）                                     | 校准集被误当门禁登记进 self-test，会让需人工标注或真实 LLM 的样本伪装成确定性门禁 |
 
-**总计 352 条用例**（实测 `npm run self-test`，以 self-test.ts 为准）。上表各行 `..._CASES（N）` 实加合计 **351**，另有 **1 条**元数据用例（metadata/version-consistency，校验 SKILL.md 版本与 skill-metadata.json 一致；不属于任何样本目录），总计 **352**——各行实加 + 元数据恰好闭合，故元数据用例不在本表列出。用例数与「对应 check 脚本」列的数组条数不一致时以 self-test.ts 为准（数组条目数 = 实际执行数）。其中 `SPEC_STRUCTURE_OOS×8（8）` 为 **M08 §8 拒绝登记结构校验的内联用例**（主规格前缀由 runner 固定，`§8` 是唯一变量），**不落 fixture 文件**，故不参与 `check-samples-coverage.ts` 的「fixture 均被引用」规则。
+**总计 354 条用例**（实测 `npm run self-test` 的「总计」行；以 self-test.ts 为准）。上表各行 `..._CASES（N）` 实加合计 **353**，另有 **1 条**元数据用例（metadata/version-consistency，校验 SKILL.md 版本与 skill-metadata.json 一致；不属于任何样本目录），总计 **354**——各行实加 + 元数据恰好闭合，故元数据用例不在本表列出。用例数与「对应 check 脚本」列的数组条数不一致时以 self-test.ts 为准（数组条目数 = 实际执行数）。其中 `SPEC_STRUCTURE_OOS×8（8）` 为 **M08 §8 拒绝登记结构校验的内联用例**（主规格前缀由 runner 固定，`§8` 是唯一变量），**不落 fixture 文件**，故不参与 `check-samples-coverage.ts` 的「fixture 均被引用」规则。
 
 ## 排除项
 

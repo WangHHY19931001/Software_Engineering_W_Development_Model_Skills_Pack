@@ -62,7 +62,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 ## #13 行为门禁按成熟度分级（TLA+ + BDD）
 
-阶段 1–4 须产出对应层级的 TLA+ 状态机规格（L1 系统内外交互 → L2 子系统 → L3 原子行为 → L4 递归拆解按需，`.tla` + `.cfg` + `tla-manifest.json`）与对应层级 BDD features（L1/L2/L3/L4，`.feature` + `bdd-manifest.json`）；阶段 5-8 执行对应层级 cucumber scenarios 且 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) exitCode=0。G 子代理跑 [`check-tla-model.ts`](../scripts/cli/check-tla-model.ts)（语法 + TLC + 无死锁/不变式违反/状态爆炸）与 `check-bdd-model.ts`（D1 头标注 / D2 Gherkin 语法 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射 / D8 SD Coverage）。
+阶段 1–4 须产出对应层级的 TLA+ 状态机规格（L1 系统内外交互 → L2 子系统 → L3 原子行为 → L4 递归拆解按需，`.tla` + `.cfg` + `tla-manifest.json`）与对应层级 BDD features（L1/L2/L3/L4，`.feature` + `bdd-manifest.json`）；阶段 5-8 执行对应层级 cucumber scenarios 且 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) exitCode=0。G 子代理跑 [`check-tla-model.ts`](../scripts/cli/check-tla-model.ts)（语法 + TLC + 无死锁/不变式违反/状态爆炸）与 `check-bdd-model.ts`（7 维度：D1 头标注 / D3 状态机七要素 / D4 BDD↔TLA+ 等价 / D5 step 绑定 / D6 scenario 路径 / D7 RTM 映射 / D8 SD Coverage；D2 Gherkin 语法非脚本门禁，由 V 评审人工核验）。
 
 **强制级别按项目成熟度分级**：
 
@@ -228,7 +228,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | 41 | 加权平均掩盖单轴失败（compositeScore 达标但存在 subCriterion.score < 0.70） | 单轴缺陷被平均抹平，需求遗漏/分析缺失放行 | passed 判据收紧为 `(A\|\|B) && 所有 subCriterion.score ≥ 0.70`；`check-verifier-output.ts` R13 单轴下限校验 |
 | 42 | S-fix / emergency-fix 后跳过 R3+V | S-fix / S-emergency-fix 产出后未派 R3×3 + V 直接 G/放行，修复未经验证合入 | 回到 S-fix / emergency-fix 产出后起点，补跑 R3×3 + V |
 | 43 | 敏感信息写入状态文件/日志（`.w-model/*.json` / gate-logs / run-log / 模板示例含真实凭据） | 凭据泄露风险，随仓库分发/归档/CI 扩散 | 敏感配置统一环境变量注入，数据文件与模板只存引用名（如 `${JWT_SECRET}`）；V/G 人工核验 + `security-scan.ts` 源码级扫描 |
-| 44 | 跳过冰山扫掠直接放行（S-fix 后或阶段门放行前未分派 R-iceberg，或冰山新问题未经 V 复审直接放行） | 水面之下的同根因扩散/同缺陷类/修复引入回归/相邻逻辑隐患被掩盖，缺陷后移 | S-fix 完成 R3×3/预防审查/V/G 后必须 ICEBERG-A、阶段门前必须 ICEBERG-B；新问题须经 V 复审后走完整 R 报告复审、根因门禁、S-fix 后 R3×3/预防审查/V/G/CHECKPOINT 链；`newFindings=[]` 或达 maxIcebergRounds=5 才放行 |
+| 44 | 跳过冰山扫掠直接放行（S-fix 后或阶段门放行前未分派 R-iceberg，或冰山新问题未经 V 复审直接放行） | 水面之下的同根因扩散/同缺陷类/修复引入回归/相邻逻辑隐患被掩盖，缺陷后移 | S-fix 完成 R3×3/预防审查/V/G 后必须 ICEBERG-A、阶段门前必须 ICEBERG-B；新问题须经 V 复审后走完整 R 报告复审、根因门禁、S-fix 后 R3×3/预防审查/V/G/CHECKPOINT 链；`newFindings=[]` 且 R6/R7/R8 三视角对账通过才可放行；达 maxIcebergRounds=5 时走 🔴 CHECKPOINT 由用户裁定（继续深挖 / 接受剩余项并放行 / 阶段回退） |
 | 45 | subagent 为通过测试/门禁而修改测试断言、测试期望或验收判据（反指标游戏） | "通过"失去与需求的对应关系，覆盖率与断言语义脱节，Goodhart 击穿判据 | 测试断言修改必须先行报告；断言与需求不符走 R→V→G 归因，禁止擅自改断言凑通过 |
 | 46 | 只给审计权不给修正权（全自动流程把用户锁在"跑完再看"之外） | 你能诊断无法治疗；判据持有主体缺位，产物只是采样 | 人在回路最低标准=修正权：能在过程中间改产物而不用整体重跑；CHECKPOINT 显式标注介入路径 |
 | 47 | 大规模重构式改动（单次 diff 重写整个模块） | 变更量子无穷大，"这次改了什么"在结构上不可问 | 小步重构 + 每步保持可编译可测试（增量集成纪律）；一次性 diff 拆分为多个可审 slice |
@@ -352,7 +352,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #41（加权平均掩盖单轴失败） | [`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) R13 单轴下限（subCriterion.score < 0.70 → exitCode=1） |
 | #42（S-fix 后跳过 R3+V） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R8（S(fix/emergency-fix)→V 间 R3 记录数）+ [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) `--variant=fix\|emergency` |
 | #43（敏感信息写入状态文件） | 无专用脚本（V/G 人工核验 + [`security-scan.ts`](../scripts/cli/security-scan.ts) 源码级扫描） |
-| #44（跳过冰山扫掠直接放行） | [`check-iceberg-sweep.ts`](../scripts/cli/check-iceberg-sweep.ts)（IcebergSweepReport R1-R5 校验，exitCode=1 命中）；run-log `iceberg-sweep` / `iceberg-review` 动作缺失检测为软检测（编排者自查 + V/G 人工核验，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节） |
+| #44（跳过冰山扫掠直接放行） | [`check-iceberg-sweep.ts`](../scripts/cli/check-iceberg-sweep.ts)（IcebergSweepReport R1-R8 校验，含 R6/R7/R8 三视角对账（见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md) §8.4），exitCode=1 命中）；run-log `iceberg-sweep` / `iceberg-review` 动作缺失检测为软检测（编排者自查 + V/G 人工核验，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节） |
 | #45（为通过测试而修改断言/测试期望） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R10 revertEvidence 回滚证伪（fix/emergency-fix 记录须携带合法 `revertEvidence.command`，`LEGACY_REVERT_EVIDENCE_CUTOFF` 起强制，exitCode=1 命中）；断言与需求的语义对应仍由 V 评审人工核验 |
 | #46（只给审计权不给修正权） | 无专用脚本（CHECKPOINT 介入路径标注） |
 | #47（大规模重构式改动） | 无专用脚本（diff 可审性由评审人工核验 + 增量集成纪律约束） |
@@ -414,8 +414,8 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | `check-tla-model.ts` | 0 | TLA+ 行为门禁通过（文件头 + 层次 + 拆解 + SANY + TLC 全通过） | — | 可推进（阶段 4 通过即可进阶段 5 编码） |
 | `check-tla-model.ts` | 1 | TLA+ 校验失败（文件头缺失 / 层次不一致 / 拆解未完成 / SANY 语法错 / TLC 死锁 / 不变式违反 / 状态爆炸） | #14 / #15 / #16 | 先将问题记录为 R 定位线索；完成普通 V/G 失败链（见「普通 V/G 失败链」节）后，按 R 结论由 S-fix 修正规格或拆解，再重跑 `check-tla-model.ts` |
 | `check-tla-model.ts` | 2 | 输入错误（`tla-manifest.json` 缺失 / Java 未找到 / jar 缺失） | #14 | 修复环境或 manifest 后重跑 |
-| `check-iceberg-sweep.ts` | 0 | 冰山扫掠报告校验通过（R1-R5 全过） | — | 可放行（newFindings=[] 或 V 复审后返工闭环） |
-| `check-iceberg-sweep.ts` | 1 | 校验失败（schema / round 越界 / 去重 / 可证伪 / passed 不一致） | #44 | 先将问题记录为 R-iceberg 定位线索；完成普通 V/G 失败链（见「普通 V/G 失败链」节）后，按 R 结论由 S-fix 修复，再补跑 ICEBERG-A/B 与 V 复审 |
+| `check-iceberg-sweep.ts` | 0 | 冰山扫掠报告校验通过（R1-R8 全过） | — | 可放行（newFindings=[] 且 R6/R7/R8 三视角对账通过；达 maxIcebergRounds=5 走 🔴 CHECKPOINT 由用户裁定） |
+| `check-iceberg-sweep.ts` | 1 | 校验失败（schema / round 越界 / 去重 / 可证伪 / passed 不一致 / 三视角对账未通过（R6/R7/R8）） | #44 | 先将问题记录为 R-iceberg 定位线索；完成普通 V/G 失败链（见「普通 V/G 失败链」节）后，按 R 结论由 S-fix 修复，再补跑 ICEBERG-A/B 与 V 复审 |
 | `check-iceberg-sweep.ts` | 2 | 输入错误（报告 JSON 缺失 / 路径错误） | #44 | 仅修正输入后重新执行 R-iceberg 产出报告，不进入普通 S-fix 链 |
 
 > 退出码 1/2 一律不得放行；Agent 必须在交互中明示退出码数值与触发回退的反模式编号。
@@ -688,7 +688,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **检测信号**：
 - S 产出后未触发 R3 三阶段审查，直接进入 V 评审
-- run-log 中 S→V 之间缺少 3 条 R3 记录（completeness/reliability/security）
+- run-log 中 S 与 V 之间缺少 R3 记录（R8 只校验**首个** R3 落在 S 与 V 之间；三维度**齐全**由 `check-role-dispatch.ts` 按阶段无条件强制，见 §#11）
 - `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 文件缺失
 - V 评审未读取 R3 报告（reworkHints 未纳入 R3 发现）
 
@@ -696,7 +696,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **回退动作**：回到 S 产出后起点，补跑 R3 三阶段审查，产出三份 PreventiveReview JSON，再进入 V 评审。
 
-**门禁脚本**：`check-preventive-review.ts`（always-on，无 flag，支持 `--variant=standard|fix|emergency`）校验三份报告完整性；`check-run-log.ts` R8 无条件校验 S(任意变体)→V 间 R3 记录数。
+**门禁脚本**：`check-preventive-review.ts`（always-on，无 flag，支持 `--variant=standard|fix|emergency`）校验三份报告完整性；`check-run-log.ts` R8 无条件校验「S(任意变体) → 首个 R3 → V」的链序（**不**校验 R3 条数）；R3 三维度齐全与否则由 `check-role-dispatch.ts` 强制。
 
 ### #34 编排者漏派角色
 

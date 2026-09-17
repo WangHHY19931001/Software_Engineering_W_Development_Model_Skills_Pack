@@ -428,7 +428,7 @@ interface VerifierOutput {
   /** 评审元信息 */
   meta: {
     /** 评审目标类型 */
-    targetKind: 'requirement' | 'design' | 'code' | 'test'; // 4 值枚举（§2.2）；rootcause 由 check-rootcause-report.ts 独立校验
+    targetKind: 'requirement' | 'design' | 'code' | 'test' | 'rootcause'; // 5 值枚举（§2.2）；rootcause 为合法 targetKind（§2.2 / §7.5），RootCauseReport 本身由 check-rootcause-report.ts 独立校验
     /** 目标 ID 或文件路径 */
     target: string;
     /** 评审时间 ISO 8601 */

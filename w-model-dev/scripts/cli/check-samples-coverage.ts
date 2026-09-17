@@ -380,6 +380,38 @@ function validateFileLineEvidence(root: string, evidence: string): EvidenceIssue
   return null;
 }
 
+/**
+ * fixture 引用的「内容锚点」校验（2026-09-17 审查修复）：
+ * `（<文件>:<行>）` 中该行内容必须出现该 fixture 的名字（文件名或 sampleDir 相对路径）。
+ *
+ * 背景：原先只校验「文件存在 + 1 ≤ 行号 ≤ 文件总行数」，行号**语义**正确性不在门禁内。
+ * 实测 29 条 fixture 行号全部漂移（引用文件上方任意插入即偏移），而门禁保持全绿——
+ * 按登记册定位断言的独立审查会读到别的用例/类型声明。本规则把「指向那条断言」变成可强制的判据。
+ */
+function validateFixtureCitationAnchor(root: string, evidence: string, fixtureRel: string | null): string | null {
+  if (fixtureRel === null) return null; // 无 fixture 路径时由 dangling 规则负责
+  const citation = evidence.match(/([A-Za-z0-9._@/-]+\.(?:ts|tsx|mts|cts|js|mjs|cjs)):(\d+)/);
+  if (citation === null) {
+    return 'fixture 行缺「文件:行号」引用，内容锚点无法校验';
+  }
+  const rawFile = citation[1]!;
+  // fixture 行的引用写作裸名（`self-test.ts:<行>`，相对 cli/），C 组写作 repo-root 相对路径
+  const relFile = rawFile.includes('/') ? rawFile : `w-model-dev/scripts/cli/${rawFile}`;
+  const lineNumber = Number(citation[2]);
+  const absolute = isAbsolute(relFile) ? relFile : join(root, relFile);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 登记册声明的受控引用文件，仅读取指定行
+  if (!existsSync(absolute)) return `引用文件不存在：${relFile}`;
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，只读
+  const lines = readFileSync(absolute, 'utf-8').split('\n');
+  if (lineNumber < 1 || lineNumber > lines.length) {
+    return `引用行号越界：${relFile}:${lineNumber}（文件共 ${lines.length} 行）`;
+  }
+  const base = fixtureRel.split('/').pop() ?? fixtureRel;
+  const content = lines[lineNumber - 1] ?? '';
+  if (content.includes(base) || content.includes(fixtureRel)) return null;
+  return `引用行未指向该 fixture：${relFile}:${lineNumber} 内容不含「${base}」（fixture 引用须回填到确实引用它的用例行）`;
+}
+
 /** 逐条登记的证据校验（机制枚举 / 证据可解析 / fixture 在盘） */
 function validateEntries(root: string, entries: readonly NegativeEntry[]): Array<{ check: string; message: string }> {
   const violations: Array<{ check: string; message: string }> = [];
@@ -399,6 +431,13 @@ function validateEntries(root: string, entries: readonly NegativeEntry[]): Array
         violations.push({
           check: 'negative-coverage-dangling',
           message: `负向案例指向不存在的 fixture：${rel ?? entry.evidence}（第 ${entry.line} 行）`,
+        });
+      }
+      const anchorIssue = validateFixtureCitationAnchor(root, entry.evidence, rel);
+      if (anchorIssue !== null) {
+        violations.push({
+          check: 'negative-coverage-evidence-anchor',
+          message: `${anchorIssue}（第 ${entry.line} 行）`,
         });
       }
       continue;

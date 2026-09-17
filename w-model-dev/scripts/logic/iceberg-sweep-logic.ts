@@ -229,8 +229,13 @@ export function checkIcebergSweep(
     if (prevSet.has(f.findingId)) {
       reasons.push(`findingId 重复：${f.findingId} 已在上一轮发现`);
     }
-    // R4: 可证伪 + 证据非空
-    if (!f.hypothesis || !f.evidence) {
+    // R4: 可证伪 + 证据非空（空白字符不算证据——与 root-cause-logic 的 trim 语义一致）
+    if (
+      typeof f.hypothesis !== 'string' ||
+      f.hypothesis.trim() === '' ||
+      typeof f.evidence !== 'string' ||
+      f.evidence.trim() === ''
+    ) {
       reasons.push(`finding ${f.findingId} 缺 hypothesis 或 evidence（禁止空泛）`);
     }
   }

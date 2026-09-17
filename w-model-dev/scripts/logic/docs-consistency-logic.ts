@@ -902,7 +902,12 @@ function parsePersonaMatrixFromMarkdown(content: string): PersonaMatrixSnapshot 
     const isCategoryRow = rawKey.includes('`');
     const key = rawKey.replace(/`/g, '').trim();
     if (key === '') continue;
-    const personas = (cells[2]!.match(/[a-z][a-z0-9-]*/g) ?? []).filter((t) => t.length > 3);
+    // 只取人格库命名约定内的 slug（5 类前缀 + 小写连字符）：
+    // 单元格内若混入散文（如「Schema 校验缺口」「capabilities」），旧写法会把
+    // `chema` / `capabilities` 误当成候选人格（2026-09-17 审查后由 docs 编辑触发实测）。
+    const personas = (cells[2]!.match(/[a-z][a-z0-9-]*/g) ?? []).filter((t) =>
+      /^(?:engineering|testing|design|product|project)-/.test(t),
+    );
     if (isCategoryRow) categories.set(key, personas);
     else signals.push({ signal: key, personas });
   }

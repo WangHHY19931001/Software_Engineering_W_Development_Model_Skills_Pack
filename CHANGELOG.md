@@ -38,6 +38,36 @@
 - **fixture 校正 + 新负向样本**：`bad-r10-no-reality-checker.json` 的 personaSlice 由**不存在的人格名**（`engineering-testability` / `design-architect`）改为真实矩阵人格（保持「仅触发目标规则」的夹具原则，并新增单测钉住该性质）；新增 `bad-r11-unknown-persona.json`（矩阵外人格）与 `bad-r11-category-mismatch.json`（自述 category 与所选视角行无交集），`ROOTCAUSE_CASES` 14 → 16。
 - **门禁边界（如实陈述）**：数量约束（默认 3 / 上限 5）与 `incident-response-commander` 必含**不门禁强制**——它们是分派默认，由编排者按 `agent-personas.md` §4 与 token 预算（`budget-logic.ts` R4-A）执行；第二键因报告未声明信号字段亦不门禁强制，仅作分派指导。
 
+### 全面审查修复：fail-open 治理 / 证据链 / 文档矛盾（audit-remediation，2026-09-17）
+
+> 触发：对技能包的四维度独立审计（门禁脚本 / 文档一致性 / 测试与样本 / 规则与角色），发现按优先级修三批；全部 fail-open 结论均由复现探针确认后再修。
+> 实施记录见 `docs/superpowers/plans/2026-09-17-skill-audit-remediation.md`。
+
+**第 1 批 · 堵「零证据=通过」（6 处，逐条探针复现）**
+- `check-checkpoint`：run-log 无 checkpoint success 记录时由 exit 0 改为 **R0 零证据守卫** exit 1（原状态还打印「已跳过 R3 校验」，自证跳过）。
+- `check-state-machine-consistency`：四数组全空由 exit 0 改为 exit 1——CLI 头注本就写着「不得按全空合法图放行」，而单测固化了相反语义，单测已按新语义更新。
+- `check-code-tla-consistency`：manifest 指向的 `.tla` 不可读时由「置空串继续」改为 **exit 2 / FILE_NOT_FOUND**（`tlaContent` 内联的自包含 manifest 保留可用）；实现时踩到 `exitWithError` 只设退出码不中断调用链的坑，探针复现后补 `throw new HandledCliError()`。
+- `check-budget` R4-A：未配置 `rootcauseParallelBudget` 时改为**可见跳过**（warning，不再静默）；并修 `checkBudget` 只透传子结果 `violations`、丢弃 `warnings` 的缺陷。
+- `check-iceberg-sweep`：`evidence` / `hypothesis` 由真值判断改为 trim 语义（单空格不再算证据）。
+- `wm-status --json`：未初始化时输出机器可读对象（原为空 stdout，调用方无法区分「未初始化」与「正常空报告」）。
+
+**第 1 批 · 可见性（把静默跳过变成显式可查）**
+- `check-artifact-gate`：阶段 1-4 未传 `--spec-dir` 时 GATE_JSON 新增 `specStructure: checked|skipped|null` + 人类横幅提示（原先整组设计级校验静默不执行且输出侧不可分辨）。
+- `check-signature-chain`：未提供 `existingPaths` 时 R8 不再计入 `rulesPassed`，新增 `rulesSkipped` 并修正横幅（原先打印「R1-R10 全通过」）。
+- `check-verifier-output` R12：原 `!hasSpecificRef && e.length < 20` 放行「长而无引用」→ 改为**仅结构化引用**（文件路径 / §章节 / 第 N 章节行 / L 级 / 仓库 ID）；收紧时发现裸词根 `行/节/章` 会让「执行」「细节」「文章」误判为引用，故模式改为结构化形态。
+- R13：非数值 `score` 不再静默跳过，改为显式违规。
+
+**第 2 批 · 治理证据链**
+- 负向覆盖登记册：实测 **29 条 fixture 行号全部漂移**（门禁此前只校验「文件存在 + 行号在范围内」）→ 一次性回填（含 3 条 `sampleDir` 目录型），并给 `check-samples-coverage` 新增**内容锚点**规则（`negative-coverage-evidence-anchor`：引用行内容必须出现该 fixture 名）；正/负两臂验证（注入 +3 漂移即精确报出该行）。
+- `selfTestSamples` 与 6 处活体文档：352 → **354**（AST 实测：各 `*_CASES` 实加 353 + 1 元数据用例 = 354）。该常量位于 code-health 删除授权判定链上，诚实声明 354 的候选原先会被误判为矛盾。
+- R11 负载性：新增 7 行正向 + 5 行负向测试（此前仅 `design-flaw` / `coding-error` 两行被钉住——变异实验证明 `tool-gap` 行换成任意两个真实 persona 后仍全绿）。
+
+**第 3 批 · 文档矛盾（13 项）**
+- 冰山放行判据统一为「`newFindings=[]` **且** R6/R7/R8 三视角对账通过；达 `MAX_ICEBERG_ROUNDS` 走 🔴 CHECKPOINT 由用户裁定」（原 `hard-constraints` 的「或达上限即放行」与 guide「零发现不构成终止」冲突）；规则集号 R1-R5 → R1-R8。
+- BDD D2（gherkinSyntax）如实标注**未实装为脚本门禁**（门禁 7 维度，D2 由 V 评审人工核验）；`AGENTS.md` / `hard-constraints.md` 同步。
+- code-health 发现者角色三方对齐（CLI 由 O 只读 / G 执行，A 只解读并登记发现）；V 规则枚举 R1-R13 → R1-R18；`verifier-spec` targetKind 4 值 → 5 值；删除 `--skip-tlc` 残留描述；maturity L0 与交付层 L0 同名澄清；模板脆锚修正；examples 份数；**矩阵外 6 份人格入册**（V 可按需指定、R 受 R11 限制不可选）并修正指向它们的换人指针。
+- **run-log R8：经复核为规范措辞过度而非实现不足**——两条既有测试断言「无 R3 的 S→V→G→checkpoint」合法，且 R3 三维度齐全**已由 `check-role-dispatch` 阶段级无条件强制**，故按「改文档对齐实现」处置（R8 只校验首个 R3 落在 S 与 V 之间），未加码门禁。
+
 ### 人格库上游核查与 5 份人格补充（persona-upstream-audit，2026-09-17）
 
 > 触发：核查人格来源仓库 [jnMetaCode/agency-agents-zh](https://github.com/jnMetaCode/agency-agents-zh) 是否有更新、是否有需要补充的人格。结论：**无内容级更新**；按 R/V 多角度价值补 5 份，人格库 **28 → 33**。

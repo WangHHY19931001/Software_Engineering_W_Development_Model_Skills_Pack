@@ -79,7 +79,11 @@ describe('checkBudget 逐规则单测', () => {
     const b = await loadBudgetSample('bad-stale.json');
     const r = checkBudget(b);
     expect(r.passed).toBe(true);
-    expect(r.warnings).toEqual(['R1 未校验：未提供 --project']);
+    // R1 的降级说明必须可见（F-G2-04）；该样本未配置 rootcauseParallelBudget，
+    // 故 R4-A 的「未校验」说明同样必须可见（2026-09-17 审查修复：checkBudget 原先只透传
+    // 子结果的 violations，把 warnings 静默丢弃）。
+    expect(r.warnings).toContain('R1 未校验：未提供 --project');
+    expect(r.warnings).toContain('R4-A 未校验：未配置 rootcauseParallelBudget（跳过不等于通过）');
   });
 
   it('R2 死分支已删除：缺 perPhase 由 schema required 前置拦截 → [schema]（F-G2-05）', async () => {

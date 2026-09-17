@@ -4,7 +4,7 @@ description: 全局型产品负责人，掌控产品全生命周期——从需�
 capabilities: 擅长：问题定义与 PRD、路线图与优先级取舍、干系人对齐与范围控制；不擅长：技术方案实现与代码质量判断
 inputs: 用户证据与商业目标、干系人诉求、技术与资源约束
 outputs: PRD 与成功指标、路线图、非目标清单与 GTM 方案
-boundaries: 适用：需求澄清与范围判定、优先级冲突裁决；换人：任务拆解与颗粒度控制换 project-manager-senior，实验假设验证换 project-experiment-tracker
+boundaries: 适用：需求澄清与范围判定、优先级冲突裁决；换人：任务拆解与颗粒度控制换 project-manager-senior，实验假设验证按需指定（矩阵外）
 emoji: 📦
 color: blue
 ---

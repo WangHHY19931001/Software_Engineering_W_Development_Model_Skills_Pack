@@ -12,8 +12,8 @@
 
 | 角色        | 允许                                                                                                                                    | 禁止                                      |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| O 编排者    | 路由、读 ledger/状态、跑**只读** CLI（`code-health-phase1` / `code-health-gap` / `code-health-duplicates`）、在 CHECKPOINT 暂停、持久化 | 写/改代码与测试、产出候选结论、代人类批准 |
-| A 分析      | Phase 1 静态 inventory + 动态 trace、Phase 2 gap 生成（只产出发现，不产出结论）                                                         | 删除任何文件、跑 apply                    |
+| O 编排者    | 路由、读 ledger/状态、跑**只读** CLI（`code-health-phase1` / `code-health-gap` / `code-health-duplicates`；发现类 CLI 由 O（只读）/G 执行，A 只解读并登记发现）、在 CHECKPOINT 暂停、持久化 | 写/改代码与测试、产出候选结论、代人类批准 |
+| A 分析      | 解读 O（只读）/G 执行的 CLI 输出并登记 Phase 1 静态 inventory + 动态 trace、Phase 2 gap 发现（只产出发现，不产出结论）                    | 删除任何文件、跑 apply                    |
 | S 产出/修复 | 在人类批准 scope 内执行最小可逆改动（经 `code-health-apply`）；失败链中兼任修复                                                         | 越 scope 改动、绕过 apply 直接 `git rm`   |
 | V 评审      | 独立复核分类、等价证明、scope、回滚与未决问题（material ambiguity fail-closed）                                                         | 跑门禁脚本、改产物                        |
 | G 门禁      | 跑 code-health CLI 并回填真实退出码证据                                                                                                 | 修改产物                                  |

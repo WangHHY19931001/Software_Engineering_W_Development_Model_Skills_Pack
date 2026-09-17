@@ -291,7 +291,7 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 
 > 约束 #11：S-fix / S-emergency-fix 与标准 S 一视同仁，产出后须 R3×3 → V → G，不得跳过。跳过命中反模式 #42。事后 R 复核机制（emergencyFixReview 字段）已移除，由前置 R3+V+G 兜底。
 
-> 冰山扫掠（反模式 #44）：S-fix 完成 R3×3 / 预防审查 / V / G 后跑 ICEBERG-A、阶段门放行前跑 ICEBERG-B（`check-iceberg-sweep.ts` R1-R5）；`newFindings=[]` 或达 maxIcebergRounds=5 才放行，新发现须经 V 复审后走完整 R 报告复审、根因门禁、S-fix 后 R3×3 / 预防审查 / V / G / CHECKPOINT 链。
+> 冰山扫掠（反模式 #44）：S-fix 完成 R3×3 / 预防审查 / V / G 后跑 ICEBERG-A、阶段门放行前跑 ICEBERG-B（`check-iceberg-sweep.ts` R1-R8）；`newFindings=[]` 且 R6/R7/R8 三视角对账通过才可放行（三视角对账见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md) §8.4）；达 maxIcebergRounds=5 时走 🔴 CHECKPOINT 由用户裁定（继续深挖 / 接受剩余项并放行 / 阶段回退），新发现须经 V 复审后走完整 R 报告复审、根因门禁、S-fix 后 R3×3 / 预防审查 / V / G / CHECKPOINT 链。
 
 > 跳过 R 直接 S 返工命中反模式 #18；R 报告未 V 复审直接 S 修复命中反模式 #19。S-fix 之后那次 V 复审（第 6 步）与后续复审轮次按 §3.4「scoped re-review 契约」执行：只审 fix delta、逐 finding 给 `ADDRESSED` / `NOT ADDRESSED`、Minor 不进 loop、每任务最多 5 轮；该契约**不改变本前置**——复审不得成为跳过 R 的旁路。
 
@@ -340,11 +340,11 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 
 | 脚本                   | 用途                                                                                                                                                                                          | 触发时机                                             |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| check-verifier-output  | V 评审 JSON 校验（R1-R13，含 R13 单轴下限）                                                                                                                                                   | V 产出后 G 跑                                        |
+| check-verifier-output  | V 评审 JSON 校验（R1-R18，R14-R17 见 verifier-spec.md §3.3，R18 见 §14.2；单轴下限 <0.70 判失败）                                                                                            | V 产出后 G 跑                                        |
 | check-rootcause-report | RootCauseReport 校验（R1-R11：根因链 / 可证伪 / 修复建议 / 预防 / 上游缺陷 / 质量等级 / 报告 ID / 多角度 / reality-checker 置信度 / persona 选择矩阵合法性与第一键交集）                                                           | 返工循环：R 定位后 G 校验（见 §4 步骤 1/3）          |
 | check-role-dispatch    | 角色 S/V/G 各 ≥1 + R3 三维度（role=R 且 outcome=success 的 r3-completeness/r3-reliability/r3-security 各 ≥1）无条件校验（约束 #8/#11）；空或全无效输入 fail-closed；结果含 r3Missing 维度明细 | 每阶段门放行前                                       |
 | check-signature-chain  | 签名链 R1-R10（含 O 越权 / 代签检测）                                                                                                                                                         | 每阶段门放行前                                       |
-| check-iceberg-sweep    | 冰山扫掠报告校验（R1-R5，反模式 #44）                                                                                                                                                         | S-fix 通过后（ICEBERG-A）+ 阶段门放行前（ICEBERG-B） |
+| check-iceberg-sweep    | 冰山扫掠报告校验（R1-R8，反模式 #44）                                                                                                                                                         | S-fix 通过后（ICEBERG-A）+ 阶段门放行前（ICEBERG-B） |
 
 ### 6.3 阶段专属脚本
 
@@ -376,8 +376,8 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 | check-samples-coverage        | 元门禁                   | samples 覆盖矩阵门禁（五条规则：fixture 均被 self-test 引用 / 引用路径无悬空 / 子目录均在 samples/README 矩阵声明 / exit-2 门禁均在 NEGATIVE-COVERAGE 登记会失败的负向案例——未登记 missing、证据悬空 dangling 均 exit 1 / 登记册严格语法与证据行号校验 + 逐门禁真实串行 exit-2 探针（隔离探针根零漂移））                                                                                                                                         | 仓库维护（pre-push 第 15 项），非项目阶段门                                        |
 | audit-l0-links（application） | 工具                     | L0/L1 分发边界只读审计（Markdown 相对链接、模板占位、目标存在性、包外路径和 symlink/junction fail-closed）                                                                                                                                                                                       | 仓库维护者显式执行 `npm run audit:l0-links [-- --root=<skill-root>]`，非项目阶段门 |
 | check-tla-bdd-sync            | 阶段工具                 | TLA+ 与 BDD 配对文件的转移集 / 状态集 / 不变式等价同步校验                                                                                                                                                                                                                                       | 阶段 1-4 Artifact Gate pair sync                                                   |
-| code-health-phase1            | code-health 门禁（只读） | Phase 1 静态 inventory + 真实动态 trace + false-positive guard（候选只 `discovered` / `blocked`）；`--root/--output/--scenario`；未知/危险 flag exit 2                                                                                                                                           | `/wm code-health` Phase 1，O 只读执行（反模式 #44 冰山扫掠前）                     |
-| code-health-gap               | code-health 门禁（只读） | Phase 2 七维度 gap matrix + RED-GREEN 证据校验（coverage 仅信号）                                                                                                                                                                                                                                | `/wm code-health` Phase 2，O 只读执行                                              |
+| code-health-phase1            | code-health 门禁（只读） | Phase 1 静态 inventory + 真实动态 trace + false-positive guard（候选只 `discovered` / `blocked`）；`--root/--output/--scenario`；未知/危险 flag exit 2                                                                                                                                           | `/wm code-health` Phase 1，O 只读执行，A 只解读并登记发现（反模式 #44 冰山扫掠前） |
+| code-health-gap               | code-health 门禁（只读） | Phase 2 七维度 gap matrix + RED-GREEN 证据校验（coverage 仅信号）                                                                                                                                                                                                                                | `/wm code-health` Phase 2，O 只读执行，A 只解读并登记发现                          |
 | code-health-tests             | code-health 门禁         | Phase 3 受保护测试 inventory + 默认拒绝 + `--guard` 唯一删除路径（真实 pre/post suite 身份证据）                                                                                                                                                                                                 | `/wm code-health` Phase 3，G 跑 guard；删除仅经 `code-health-apply`                |
 | code-health-duplicates        | code-health 门禁（只读） | Phase 4 重复簇 + abstraction guard（11 维逐项等价证明，权威仅来自 HEAD-tracked ledger）                                                                                                                                                                                                          | `/wm code-health` Phase 4，O 只读执行                                              |
 | code-health-ledger            | code-health 门禁         | append-only ledger `init` / `append` / `validate`（拒绝覆盖、复用 id、非法转移、非单调时间戳）                                                                                                                                                                                                   | `/wm code-health` 全程，O 持久化                                                   |
@@ -419,7 +419,7 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 | #39 跳过 opsx 审查       | check-opsx-artifacts                                                       |
 | #41 单轴失败掩盖         | check-verifier-output R13                                                  |
 | #42 S-fix 跳过 R3+V      | check-preventive-review(--variant=fix/emergency) + check-run-log R8        |
-| #44 跳过冰山扫掠直接放行 | check-iceberg-sweep（R1-R5，ICEBERG-A/B 触发）+ V 复审新发现               |
+| #44 跳过冰山扫掠直接放行 | check-iceberg-sweep（R1-R8，ICEBERG-A/B 触发）+ V 复审新发现               |
 | #48 子代理越界实施       | check-run-log.ts（R5 role-action 配对）/ check-signature-chain.ts          |
 
 > 数据来源：SKILL.md + subagent-delegation.md + phase-1~8-*.md + hard-constraints.md；本矩阵随版本演进，以当前 SKILL.md 为准。
@@ -1272,7 +1272,7 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 
 子代理返回编排者的数据格式（结构化，便于编排者路由判定与 CHECKPOINT 展示）：
 
-> **前置约束（[文件落地交接协议](#文件落地交接协议)）**：启用文件落地模式时，下列结构化数据须写入 `handoff/<dispatch-id>/status.json` + `output.md`，子代理返回 O 的文本进一步降至 ≤ 5 行信标（`state` + `dispatchId` + `status.json` 路径 + 一句话）。O 只 `Read` `status.json`，不读 `output.md`。下文 JSON 结构即 `status.json` / `output.md` 的内容契约。
+> **前置约束（文件落地交接协议，见「文件落地交接协议与编排者状态日志」节）**：启用文件落地模式时，下列结构化数据须写入 `handoff/<dispatch-id>/status.json` + `output.md`，子代理返回 O 的文本进一步降至 ≤ 5 行信标（`state` + `dispatchId` + `status.json` 路径 + 一句话）。O 只 `Read` `status.json`，不读 `output.md`。下文 JSON 结构即 `status.json` / `output.md` 的内容契约。
 
 ### S 子代理返回
 

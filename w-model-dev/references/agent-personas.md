@@ -588,6 +588,8 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 | **product** | 4 | product-manager, feedback-synthesizer, trend-researcher, behavioral-nudge-engine | V（阶段 1 需求评审） |
 | **project** | 2 | project-manager-senior, experiment-tracker | V（阶段 1-2 流程评审） |
 
+> **矩阵外自由裁量（6 份）**：`design-ui-designer` / `design-ux-researcher` / `engineering-data-engineer` / `product-behavioral-nudge-engine` / `product-trend-researcher` / `project-experiment-tracker` 不在 R/V 矩阵任何行内——V-lead 可按需直接指定；R 多角度受 R11 限制不可选（矩阵外 persona 会 exit 1）。
+
 ---
 
 ### 1.2 人格库来源与收录策略
@@ -637,6 +639,8 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 | `process-missing` | 全阶段 | project-manager-senior + testing-workflow-optimizer + engineering-incident-response-commander |
 | `tool-gap` | 全阶段 | engineering-autonomous-optimization-architect + testing-tool-evaluator |
 | `upstream-defect` | 全阶段 | engineering-incident-response-commander + engineering-codebase-onboarding-engineer + testing-evidence-collector + engineering-technical-writer |
+
+> **`tool-gap` 行判据**：该行判据为**门禁脚本漏检 / Schema 校验缺口**定位；对应能力见 testing-tool-evaluator 与 engineering-autonomous-optimization-architect 的 capabilities。
 
 **第二键：风险域信号（叠加键，从 V/G 产出特征读出）**
 

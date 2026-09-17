@@ -33,7 +33,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 | 任务规模              | 适配形态                                                                     | 门禁强度                        |
 | --------------------- | ---------------------------------------------------------------------------- | ------------------------------- |
-| 极小任务（demo/教学） | L0 交付层 + self-as-verifier（仅限 demo，模式细则见 subagent-delegation.md） | TLA+/BDD 可选，其余照跑         |
+| 极小任务（demo/教学） | 交付层 L0-only 副本 + maturity L0/L1 + self-as-verifier（仅限 demo，模式细则见 subagent-delegation.md） | TLA+/BDD 可选，其余照跑         |
 | 生产小项目            | 完整 8 阶段 + maturity L2                                                    | TLA+ L1 + BDD L1 必跑，其余照跑 |
 | 常规生产功能          | 完整 8 阶段 + maturity L3                                                    | 全必跑                          |
 
@@ -80,7 +80,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 角色   | 职责                                                        | 关键不变式                       |
 | ------ | ----------------------------------------------------------- | -------------------------------- |
 | S 产出 | 阶段产物 + 同步测试设计 + 回填 RTM；F（修复）由 S 兼任      | 签名链 inputProvenance 来源证明  |
-| V 评审 | 按 agent-personas.md + verifier-spec.md 产出 VerifierOutput | R1-R13；单轴下限 <0.70 判失败    |
+| V 评审 | 按 agent-personas.md + verifier-spec.md 产出 VerifierOutput | R1-R18（R14-R17 见 verifier-spec.md §3.3，R18 见 §14.2；单轴下限 <0.70 判失败） |
 | G 门禁 | 独立跑 check-* 门禁 + 回填 exitCode 证据                    | run-log R6 用 gate-logs 交叉校验 |
 | A 分析 | 阶段 1–4 分块分析、合并建图                                 | 只产出 ingestion 中间产物        |
 | R 根因 | 定位根因产出 RootCauseReport；R3 预防性审查                 | 只产出报告，不实施修复           |
@@ -120,7 +120,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 每命令的输入、输出、失败动作见 [references/command-reference.md](references/command-reference.md)。门禁脚本 46 个 .ts，登记总览见 subagent-delegation.md「dispatch-matrix」节。
 
-> **`/wm code-health` 权限与 CHECKPOINT**：O 只路由 / 只读 / 持久化；A 产出 Phase 1–2 发现（发现不是结论）；S 仅在人类批准 scope 内经 `code-health-apply.ts` 执行最小可逆改动；V 独立复核分类 / 等价证明 / scope / 回滚；G 跑 code-health CLI 并回填真实退出码；R 定位 `blocked` 候选根因；**只有 human 能批准**（精确 candidate ID / action / files / symbols / scopeHash）。实现前与放行前均须 🔴 CHECKPOINT 等待人类决定；失败链 `gate-failure → blocked → R → V → G → S(rework) → evidenced` 顺序不可跳过。详见 [references/code-health-governance.md](references/code-health-governance.md)。
+> **`/wm code-health` 权限与 CHECKPOINT**：O 只路由 / 只读 / 持久化；A 只解读 O/G 执行的 Phase 1–2 CLI 输出并登记发现（发现不是结论）；S 仅在人类批准 scope 内经 `code-health-apply.ts` 执行最小可逆改动；V 独立复核分类 / 等价证明 / scope / 回滚；G 跑 code-health CLI 并回填真实退出码；R 定位 `blocked` 候选根因；**只有 human 能批准**（精确 candidate ID / action / files / symbols / scopeHash）。实现前与放行前均须 🔴 CHECKPOINT 等待人类决定；失败链 `gate-failure → blocked → R → V → G → S(rework) → evidenced` 顺序不可跳过。详见 [references/code-health-governance.md](references/code-health-governance.md)。
 
 ## 阶段路由
 

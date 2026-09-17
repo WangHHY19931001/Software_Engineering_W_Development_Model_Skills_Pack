@@ -180,13 +180,28 @@ function inRange(x: number, lo: number, hi: number, inclusive = true): boolean {
  * 防止 V 评审 evidence 字段空泛描述。每个子标准 evidence 须引用具体行号/文件路径。
  * 注：evidence 字段非空校验已在主循环 R4 实现，R12 增强为「引用具体片段」校验。
  */
+/**
+ * R12 具体引用的结构化判据（模块级常量，便于测试与复用）：
+ *   文件路径（带扩展名，可选 `:L45`/`:45` 行号）| §章节号 | 第 N[章节行] | L 级（L1-L4）| 仓库 ID 编号前缀
+ * 刻意**不含**裸「行」「节」「章」——见 checkR12EvidenceSpecificity 的判据演进注释。
+ */
+const R12_SPECIFIC_REF_PATTERN =
+  // 判据只需「出现具体引用」，故每个分支都以**字面锚点**起始（`.` + 已知扩展名 / `§` / `第` / `L` / `line` / ID 前缀），
+  // 且**不含「含量词的组再被量化」形态**（star height ≤1；`(?::L?\d+)?` 这类写法虽线性也会被
+  // security/detect-unsafe-regex 判为不安全，且对判据无贡献——`:L45` 前置必然已有 `.ts` 扩展名）。
+  /(?:\.(?:md|ts|tsx|js|jsx|mjs|cjs|json|ya?ml|py|java|go|rs|rb|php|sql|tla|cfg|feature|html|css|sh|txt|log|csv|xml|toml|ini)|§\s*[\d.]+|第\s*[\d.]+\s*[章节行]|\bL\d\b|\bline\s*\d+|\b(?:REQ|SD|DD|INTF|TC|UAT|RC|PUB|M|F|R)-\d+)/;
+
 export function checkR12EvidenceSpecificity(evidence: unknown, idx: number): string | null {
   if (typeof evidence !== 'string') return null; // 类型校验由 R4 负责
   const e = evidence.trim();
   if (e === '') return null; // 空校验由 R4 负责
-  // R12：evidence 须含具体引用（行号/文件路径/章节号），禁止纯描述
-  const hasSpecificRef = /(\.md|\.ts|\.json|§|L\d+|line|行|节|章|REQ-|SD-|DD-|INTF-|TC-|UAT-)/.test(e);
-  if (!hasSpecificRef && e.length < 20) {
+  // R12：evidence 须含**结构化**具体引用（文件路径+可选行号 / §章节 / L 级 / 第 N 章节行 / 仓库 ID 编号）。
+  // 判据演进（2026-09-17 审查修复，两处都曾放行）：
+  //   ① 原判据 `!hasSpecificRef && e.length < 20` → 「长而无引用」被放行；
+  //   ② 修 ① 后暴露裸词根误判：正则含裸「行」「节」「章」，使「执行」「细节」「文章」被当成引用。
+  // 故改为结构化形态匹配，不再接受裸词根。
+  const hasSpecificRef = R12_SPECIFIC_REF_PATTERN.test(e);
+  if (!hasSpecificRef) {
     return `subCriteria[${idx}].evidence "${e}" 缺具体引用（R12：须含行号/文件路径/章节号/ID，如「REQ-001 §3.2」「article.service.ts:L45」）`;
   }
   return null;
@@ -208,6 +223,9 @@ export function checkR13SingleAxisFloor(subCriteria: Array<Record<string, unknow
       if (sc.score < SINGLE_AXIS_MIN_SCORE) {
         violations.push(`子标准 ${name} 得分 ${sc.score} < ${SINGLE_AXIS_MIN_SCORE}（单轴下限，反模式 #41）`);
       }
+    } else {
+      // 非数值 score 不得静默跳过：无法参与下限判定的子标准必须显式暴露
+      violations.push(`子标准 ${name} 的 score 非有限数值（实际 ${JSON.stringify(sc.score)}），无法参与单轴下限校验`);
     }
   }
   return violations;

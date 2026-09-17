@@ -57,6 +57,12 @@ export interface JsonReport {
     criticalMissing: number;
     buildabilityMissing: number;
   } | null;
+  /**
+   * 阶段 1-4 设计级结构校验（引用块 / SSOT / DoD / §8 拒绝登记）的执行态（check-artifact-gate --json）：
+   * `checked`=已传 `--spec-dir` 并执行；`skipped`=阶段 1-4 未传 `--spec-dir`（整组跳过，必须可见，
+   * 便于审计区分「通过」与「未执行」）；`null`=阶段 5-8 不适用。**键恒存在**。
+   */
+  specStructure?: 'checked' | 'skipped' | null;
   /** run-log lifecycle 状态；通过但有历史诊断时仍为 NOT_CLOSED_NOT_PROVEN。 */
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
   /** run-log exit 0 的语义边界说明。 */

@@ -36,7 +36,7 @@
 
 ### 2.4 计数规则
 
-每次 R-iceberg 扫掠（无论 A/B）递增 icebergRound；修复不单独占轮次。maxIcebergRounds=5，达上限后 CHECKPOINT 升级由用户裁定。
+每次 R-iceberg 扫掠（无论 A/B）递增 icebergRound；修复不单独占轮次。上限为代码常量 `MAX_ICEBERG_ROUNDS`（见 `scripts/logic/iceberg-sweep-logic.ts`），达上限后 CHECKPOINT 升级由用户裁定。
 
 ## 3. 六类别深挖方法
 
