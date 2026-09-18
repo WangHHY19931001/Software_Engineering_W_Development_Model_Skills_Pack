@@ -546,6 +546,41 @@ git commit -m "feat(prepush): add rule-layer coverage gate as item 13, count 18-
 
 ---
 
+## 任务 3.5：负向登记证据寻址结构化（行号 → 唯一子串锚，用户裁定追加）
+
+**背景**：现行证据语法 `文件:行号` 是位置耦合——上方加行即全体漂移（本会话实测三次回填）。校验器已断言被引行内容，行号不提供额外防伪力。改为 `文件#锚`（锚=文件内恰好出现一次的唯一子串），四列语法与真实探针执行不动。
+
+**文件：**
+- 修改：`w-model-dev/scripts/cli/check-samples-coverage.ts`（证据校验函数）、`w-model-dev/scripts/samples/NEGATIVE-COVERAGE.md`（46 行证据列迁移）、`w-model-dev/scripts/__tests__/check-samples-coverage.test.ts`、`AGENTS.md`（§8 check-samples-coverage 行的语法描述）、`w-model-dev/references/command-reference.md` 与 `w-model-dev/scripts/samples/README.md`（如提及行号语法处）
+
+- [ ] **步骤 1：失败测试（追加到 check-samples-coverage.test.ts）**
+
+构造临时登记册（既有测试已具备 tmp 登记册构造 helper，沿用），新增四类断言：
+1. 新语法 `invocation-evidence.test.ts#exit 2 且 ERROR_JSON for gate-X`（锚唯一命中）→ 通过；
+2. 旧行号形态 `invocation-evidence.test.ts:12` → exit 1，违规消息具名（要求迁移到锚语法，不留双语法兼容）；
+3. 锚 0 次命中（`文件#不存在的子串`）→ exit 1 `negative-coverage-evidence-anchor`（0 命中语义）；
+4. 锚多次命中（同一子串在文件出现两处）→ exit 1，具名「锚不唯一」消息。
+fixture 机制行（`fixture` 证据）同步改锚语法：`#` 后为 fixture 相对路径基名+参数特征（保持「被引文件内唯一」同一语义）。
+
+- [ ] **步骤 2：运行验证失败 → 实现校验函数**
+
+改 `validateFixtureCitationAnchor` 一带的证据解析：拆 `文件#锚`（`#` 分隔，文件部分须为仓内真实普通文件），读全文断言锚出现次数恰为 1；`:数字` 形态直接判违规（消息含「行号语法已移除，改用 文件#唯一子串锚」）。违规码沿用 `negative-coverage-evidence-anchor`（0 命中/多命中/旧行号在消息文本中区分）。先跑步骤 1 测试确认新断言红、旧测试按预期调整，再实现转绿。
+
+- [ ] **步骤 3：迁移 46 行登记**
+
+对 `NEGATIVE-COVERAGE.md` 每行：按当前行号取出被引行的内容，截取**该文件内唯一**的特征子串作锚（fixture 行基名本就唯一；self-test.ts 行取该用例的 `file: '<样本名>'` 字面量或用例 description 片段；测试文件行取 `it('...')` 标题片段）。迁移后逐行自查唯一性（脚本辅助：对每锚 `grep -F -c` 恰 1）。
+
+- [ ] **步骤 4：文档语法描述同步 + oracle**
+
+`AGENTS.md` §8 该行的「证据 `文件:行号` 可解析（假路径/越界行号各自具名 exit 1）」改为「证据 `文件#唯一子串锚` 可解析（假路径/零命中/多命中各自具名 exit 1）」；command-reference / samples README 如有行号语法提及一并改。跑 `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（真实探针仍须全过）+ `npx vitest run --config config/vitest.config.ts check-samples-coverage` + `npm run --silent check:docs-consistency`，全绿收口。
+
+- [ ] **步骤 5：Commit**
+
+```bash
+git add w-model-dev/scripts/cli/check-samples-coverage.ts w-model-dev/scripts/samples/NEGATIVE-COVERAGE.md w-model-dev/scripts/__tests__/check-samples-coverage.test.ts AGENTS.md w-model-dev/references/command-reference.md w-model-dev/scripts/samples/README.md
+git commit -m "refactor(samples-coverage): evidence addressing file:line -> file#unique-substring anchor"
+```
+
 ## 任务 4：J1-logic run-log R11 闭环五脚本
 
 **文件：**

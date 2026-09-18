@@ -33,6 +33,14 @@
 
 **登记面（机械同步清单，docs-consistency 会兜底）**：AGENTS §1「18 项」文案与 §8 表格新增行、SKILL.md 资源清单与 AGENTS §8 的脚本计数按实际新增同步（新增 1 logic + 1 CLI；exit-2 清单 +1）、`subagent-delegation.md` dispatch-matrix 登记、`NEGATIVE-COVERAGE.md` 新增该门的 exit-2 负向登记行（探针机制真实串行执行，须给 fixture 或 invocation 证据）、`check-docs-consistency` 中 pre-push 项数断言 18→19、`__tests__/README.md` 与 self-test 补该 CLI 三态用例。
 
+## 2A. 负向登记证据寻址结构化（2026-09-18 追加，用户裁定）
+
+**背景**：`NEGATIVE-COVERAGE.md` 的证据语法为 `文件:行号`。行号是位置耦合——上方任意加行使全部登记集体漂移（本会话实测两次 +1/+2 回填、46 锚迁移一次）。虽然校验器已断言被引行的内容（内容锚），假证据从未穿透过，但「文件中存在唯一特征内容」与「第 N 行含 X」防伪力等价而前者更强（现实现不要求内容唯一），后者却引入纯维护税。
+
+**设计**：证据语法改为 `文件#锚`，锚 = 该文件内**恰好出现一次**的唯一子串（测试文件取 `it(...)` 标题片段或断言字面量，fixture 行取文件基名+关键参数）。校验 = 登记文件存在（仓内相对路径）+ 锚唯一命中（0 次或多次命中均 exit 1，各自具名违规消息；沿用 `negative-coverage-evidence-anchor` 违规码族）。**`:行号` 语法从登记册移除**：校验器遇旧形态行 → 具名违规要求迁移，不留双语法。四列严格语法、门禁/机制白名单、每门禁恰一行、真实串行 exit-2 探针执行全部不变。迁移面：46 条登记行 + `check-samples-coverage.ts` 校验函数与其测试 + AGENTS §8 该行描述 + 相关文档语法描述。验收：check-samples-coverage 全绿；假锚（0 命中/多命中/旧行号形态）负向测试齐备；探针机制照常。
+
+
+
 ## 3. 工作流 J1：run-log R11 闭环五脚本机器核验
 
 **现状**：`hard-constraints.md` #11 明文：「门禁侧不校验这 5 个脚本是否真的跑过……若要机器核验需新增 run-log 规则（未实现）」。五脚本权威清单：`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`。
