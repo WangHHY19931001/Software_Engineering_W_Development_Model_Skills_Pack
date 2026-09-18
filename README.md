@@ -28,7 +28,7 @@ AI 助手写代码很容易「差不多就行」：跳段、凭感觉、说不�
 | 门禁脚本单元测试（vitest）         | ✅ 以当前命令输出为准 |
 | TypeScript 类型检查（strict）      | ✅ 0 错误             |
 | 安全扫描（eslint-plugin-security） | ✅ baseline 一致      |
-| 推送前门禁（本地 CI，18 项）       | ✅ 全通过             |
+| 推送前门禁（本地 CI，19 项）       | ✅ 全通过             |
 
 ## 两条上手路径
 
@@ -57,7 +57,7 @@ npm run test:affected                    # 只看未提交改动
 npm run test:affected -- --since origin/main   # 加上自基线起的已提交改动
 ```
 
-> **验收必须全量**：任务收口、交付、合入前必须跑**全量**——`npm run prepush`（18 项门禁，含全量 vitest + 覆盖率阈值）或至少 `npm test`（全量 vitest）。快速车道按文件名映射选测试，**无法**替代它：它不跑 `self-test` / `security-scan` / `docs-consistency` / `samples 覆盖矩阵` / `prettier` / `tsc` / `eval`，也不保证覆盖跨文件的注册表类断言（例如「每个 exit-2 门禁都登记了负向案例」）。触及 `config/**`、`.githooks/**`、`schemas/**`、`references/**`、`samples/**`、`docs/**`、`eval/**`、根 `scripts/**` 或根活体文档时，该脚本会直接退回全量。
+> **验收必须全量**：任务收口、交付、合入前必须跑**全量**——`npm run prepush`（19 项门禁，含全量 vitest + 覆盖率阈值）或至少 `npm test`（全量 vitest）。快速车道按文件名映射选测试，**无法**替代它：它不跑 `self-test` / `security-scan` / `docs-consistency` / `samples 覆盖矩阵` / `prettier` / `tsc` / `eval`，也不保证覆盖跨文件的注册表类断言（例如「每个 exit-2 门禁都登记了负向案例」）。触及 `config/**`、`.githooks/**`、`schemas/**`、`references/**`、`samples/**`、`docs/**`、`eval/**`、根 `scripts/**` 或根活体文档时，该脚本会直接退回全量。
 
 > **注意：** `npm install` 的 postinstall 会在本仓库启用推送前门禁（等价于 `git config core.hooksPath .githooks`），这只是仓库验证的本地配置副作用，与 Skill 激活无关。如果你原本配置过自定义 hook 路径、担心被覆盖，安装前先备份：
 
@@ -214,7 +214,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 ├── eval/                         # 外部工具（darwin-skill）评估产物归档，不属技能包
 ├── config/                       # prettier / vitest / tsconfig / eslint 配置
 ├── scripts/setup-hooks.cjs       # 一次性启用本地推送门禁（npm run setup:hooks）
-├── .githooks/pre-push            # 本地 CI：18 项门禁（含 eval 语料断言），git push 时自动执行
+├── .githooks/pre-push            # 本地 CI：19 项门禁（含 eval 语料断言），git push 时自动执行
 ├── AGENTS.md                     # 面向 AI Agent 的仓库导航（与 README 互补）
 ├── package.json                  # tsx + devDeps 声明 + npm run 快捷脚本
 ├── CHANGELOG.md                  # 变更日志

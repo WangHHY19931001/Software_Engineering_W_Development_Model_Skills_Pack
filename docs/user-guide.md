@@ -117,7 +117,7 @@ violations / `rule` 字段中的编号前缀按门禁归属：
 
 | 命令 | 场景 |
 |---|---|
-| `npm audit --audit-level=high` | **安全漏洞巡检**：检出 high 以上漏洞（含修复建议）。pre-push 第 13 项已把同一命令升级为**阻断项**（推送前自动跑，high 以上阻断；网络瞬态错误（DNS 解析失败、连接被重置/拒绝、超时、HTTP 429/5xx、socket hang up 等）或 registry 不支持 audit endpoint 时自动跳过；漏洞报告、JSON 解析与权限错误仍然阻断）。人工巡检用于 pre-push 之外的时机（如升级依赖后、周期性巡检） |
+| `npm audit --audit-level=high` | **安全漏洞巡检**：检出 high 以上漏洞（含修复建议）。pre-push 第 14 项已把同一命令升级为**阻断项**（推送前自动跑，high 以上阻断；网络瞬态错误（DNS 解析失败、连接被重置/拒绝、超时、HTTP 429/5xx、socket hang up 等）或 registry 不支持 audit endpoint 时自动跳过；漏洞报告、JSON 解析与权限错误仍然阻断）。人工巡检用于 pre-push 之外的时机（如升级依赖后、周期性巡检） |
 | `npm outdated` | **版本滞后巡检**：列出落后于最新版的依赖。无安全告警但版本过老时用于规划升级，不阻断 |
 
 ### 6.2 处理流程

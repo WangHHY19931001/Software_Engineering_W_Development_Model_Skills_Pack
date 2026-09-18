@@ -245,7 +245,7 @@ export interface DocConsistencyInput {
 export const EXPECTED = {
   runLogActionCount: 27,
   maxAntiPattern: 48,
-  prePushCount: 18,
+  prePushCount: 19,
   /** 硬约束条数（14 条） */
   hardConstraintCount: 14,
 } as const;
@@ -1640,10 +1640,10 @@ function checkExit2ScriptCount(count: number, agents: string): DocCheckViolation
 }
 
 /**
- * pre-push 18 项强校验（F-G7-08，audit-fixes task 6）：解析真实编号检查块并断言连续
- * #1..#18 且恰 18 块——旧实现仅取「最大编号」+「N 项检查」声明文本（N 为当时 prePushCount），伪造 3 块检查的
- * pre-push（`# 1.` `# 2.` `# 18.`）可全绿；重写后中间删除任一块（编号断档）或减少
- * 块数均触发违规，再叠加「18 项检查」声明文本兜底。
+ * pre-push 19 项强校验（F-G7-08，audit-fixes task 6）：解析真实编号检查块并断言连续
+ * #1..#19 且恰 19 块——旧实现仅取「最大编号」+「N 项检查」声明文本（N 为当时 prePushCount），伪造 3 块检查的
+ * pre-push（`# 1.` `# 2.` `# 19.`）可全绿；重写后中间删除任一块（编号断档）或减少
+ * 块数均触发违规，再叠加「19 项检查」声明文本兜底。
  */
 export function checkPrePushCount(prePush: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
@@ -2005,7 +2005,7 @@ const GATE_COUNT_DOC_NAMES = ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'docs
  * 行含「门禁/检查」标记时，全部「N 项」计数引用须 == EXPECTED.prePushCount，防止门禁项数
  * N→N+1 后未测试 docs 文件（如 docs/troubleshooting.md）漏改。逐行 fresh 正则（无共享 lastIndex）：
  * 前缀捕获组 `((?:第)?\s*)`（m[1] 恒有值，裸「17 项」为 ''）——m[1] 含「第」即「第 N 项」序数
- * 引用（带/不带空格均覆盖，如「第 13 项 npm audit」）跳过，m[2] 为计数值；`(?!目)` 排除
+ * 引用（带/不带空格均覆盖，如「第 14 项 npm audit」）跳过，m[2] 为计数值；`(?!目)` 排除
  * 「N 项目」误匹配；仅 ASCII 数字（中文数字如「五项校验」天然不命中）。gateCountDocs 未注入
  * （缺省）时跳过。
  */

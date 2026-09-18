@@ -669,7 +669,7 @@ git() {
   // F-G5-03/04（audit-fixes task 7）：路径过滤包含口径防回归。bash case 的 * 可跨 /，
   // docs/*.md 命中 docs/ 任意层级的 *.md（含 docs/changes、docs/superpowers 深层，
   // 历史触发语义见 files_need_gate 注释，不做收窄）；根级清单文件、.githooks/**、
-  // 深层 w-model-dev/** 命中；eval/** 触发（评估资产是活体门禁第 18 项的触发面）；
+  // 深层 w-model-dev/** 命中；eval/** 触发（评估资产是活体门禁第 19 项的触发面）；
   // docs 非 .md 不触发。
   it.each([
     { changedPath: 'docs/changes/2026-09-06.md', expectGate: true },

@@ -43,7 +43,7 @@
     "testCount": 10,
     "passed": true,
     "coverageProvenance": "coverage/pre.json",
-    "governanceFacts": ["pre-push-order-18"]
+    "governanceFacts": ["pre-push-order-19"]
   },
   "postRegression": {
     "command": {
@@ -62,7 +62,7 @@
     "testCount": 10,
     "passed": true,
     "coverageProvenance": "coverage/post.json",
-    "governanceFacts": ["pre-push-order-18"]
+    "governanceFacts": ["pre-push-order-19"]
   },
   "coverageProvenance": {
     "path": "coverage/coverage-final.json",

@@ -374,7 +374,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 
 - **失败动作**：exit 1 走 code-health 失败链 `gate-failure → blocked → R(root-cause) → V(root-cause-review) → G(root-cause-gate) → S(rework) → evidenced`（顺序不可跳过，见 [code-health-governance.md](code-health-governance.md) §6）；失败的删除/抽象必须回滚（`git apply -R` + `git diff --exit-code`=0）。exit 2 修正参数后重跑，不写任何文件。
 - **CHECKPOINT**：候选进入实现前必须 🔴 CHECKPOINT 由 human 批准（精确 candidate ID / action / files / symbols / scopeHash）；工具或 LLM 输出不能授权。
-- **边界**：Phase 1–4 只读（P1 仅写外部 report + `.w-model/` 独占 raw output；`--guard` 删除仅经 `code-health-apply.ts`）；code-health CLI 不纳入 `.githooks/pre-push`，18 项检查不变。
+- **边界**：Phase 1–4 只读（P1 仅写外部 report + `.w-model/` 独占 raw output；`--guard` 删除仅经 `code-health-apply.ts`）；code-health CLI 不纳入 `.githooks/pre-push`，19 项检查不变。
 - **guide 链接**：[code-health-governance.md](code-health-governance.md)（Phase 1–4 操作参考）与 SSoT §10K（`docs/skill-design-document_SSoT.md`，权威定义）。
 
 ## Artifact Gate 项目阶段证据门
@@ -451,7 +451,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 ## 污染源定位 CLI（check-pollution，S24）
 
 - **速查行**：`npx tsx w-model-dev/scripts/cli/check-pollution.ts [--project=<dir>]`（`--project` 仅等号形态，缺省 cwd）
-- **按需工具声明**：S24 **只作按需工具，不得当门禁**（规格 :187/:305）——不进 pre-push 18 项（`prePushCount: 18` 不变）、不进任何阶段门；exit 1 仅供人工二分定位参考。
+- **按需工具声明**：S24 **只作按需工具，不得当门禁**（规格 :187/:305）——不进 pre-push 19 项（`prePushCount: 19` 不变）、不进任何阶段门；exit 1 仅供人工二分定位参考。
 - **检查对象**（规格 :206）：`.w-model/` 残留（`*.lock` 陈旧锁目录/文件）、`*.lock` 锁文件、`coverage/` 残留（含 `coverage/.tmp`）、vitest 语义污染形态（`--outputFile` JSON 残留等，项目根深度 1 名称白名单）；扫描剪除 `node_modules/` 与 `.git/`。判据纯函数在 `logic/pollution-logic.ts`。
 - **「吞掉测试失败只看产物」语义**：逐文件定位「存在测试失败痕迹（锁残留 / 覆盖率产物 / vitest 输出 JSON）但工作区产物却被判通过」的污染形态——失败信号被吞掉、只留下产物；本 CLI 把这些痕迹逐项列出，供污染源二分定位使用。
 - **退出码**：0=干净（stdout 单行 `POLLUTION_JSON {type,passed,project,findings,findingCount,exitCode}`）/ 1=发现污染源（逐项 `✗ [kind] path — reason` 列表 + `POLLUTION_JSON`）/ 2=输入错误（未知/重复 flag、`--project` 空值或不存在、多余位置参数 → `ARG_INVALID`/`FILE_NOT_FOUND`，在任何扫描前拒绝、零副作用）。

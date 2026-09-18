@@ -72,7 +72,7 @@ const CANDIDATE_ID_PATTERN = /^CHG-P[1-4]-[0-9]{8}-[0-9]{3,}$/;
 const HEX64_PATTERN = /^[0-9a-f]{64}$/;
 
 /** Repo-owned governance constants. Project-specific counts are supplied by the tracked manifest. */
-export const DEFAULT_GOVERNANCE_FACTS = { prePushItems: 18, fixtureReachability: 'all-referenced' } as const;
+export const DEFAULT_GOVERNANCE_FACTS = { prePushItems: 19, fixtureReachability: 'all-referenced' } as const;
 
 export interface ExpectedGovernanceFacts {
   /** Number of ordered pre-push gate items the repository owns. */
@@ -176,7 +176,7 @@ function factValues(entries: GovernanceFact[], key: string): string[] {
 
 /**
  * Evaluate the recorded deletion facts: the measured test count, the source-bound coverage
- * provenance, the 18-item pre-push gate count/order, and the self-test / docs-consistency /
+ * provenance, the 19-item pre-push gate count/order, and the self-test / docs-consistency /
  * fixture-reachability facts. Any change that is not explicitly explained blocks the deletion.
  *
  * When `expected` (repo-owned constants / the tracked governance manifest) is supplied, the declared

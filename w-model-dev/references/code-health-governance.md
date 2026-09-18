@@ -76,6 +76,6 @@ npx tsx w-model-dev/scripts/cli/code-health-archive.ts --verify <package-dir> [-
 ## 7. 脱敏与边界
 
 - 脱敏：`lib/code-health-redaction.ts` 输出 `status`（`not_reviewed` / `clean` / `blocked`）/ `rules` / `blockedReasons`；`blocked` 产物不得导出。
-- 18 项 pre-push 不变：code-health CLI 不纳入 `.githooks/pre-push`。
+- 19 项 pre-push 不变：code-health CLI 不纳入 `.githooks/pre-push`。
 - codegraph：进入阶段 5–8 代码修改前须做 codegraph 影响分析（约束 #14）；本仓库 checkout 无 `.codegraph/` 索引，Phase 1–4 不消费 codegraph，也不得伪造查询记录。
 - 参见：[command-reference.md](command-reference.md)（命令总览）、[subagent-delegation.md](subagent-delegation.md)（dispatch-matrix 登记）、[hard-constraints.md](hard-constraints.md)（反模式）。

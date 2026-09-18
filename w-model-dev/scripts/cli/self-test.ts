@@ -2969,7 +2969,7 @@ const CODE_HEALTH_TEST_CASES: CodeHealthTestInventoryCase[] = [
     file: 'bad-governance-drift.json',
     expectedPassed: false,
     expectedReasonPatterns: [/pre-push|self-test/i],
-    description: '18 项 pre-push 顺序/计数或 self-test facts 漂移未解释 → 阻塞',
+    description: '19 项 pre-push 顺序/计数或 self-test facts 漂移未解释 → 阻塞',
   },
   {
     file: 'bad-prepost-regression.json',

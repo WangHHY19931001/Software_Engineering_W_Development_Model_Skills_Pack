@@ -103,7 +103,7 @@
         "rehomed:coverage",
         "rehomed:docs-consistency",
         "rehomed:sample-matrix",
-        "pre-push:18"
+        "pre-push:19"
       ]
     },
     "postRegression": {
@@ -131,7 +131,7 @@
         "pre-test-count:3",
         "post-test-count:2",
         "coverage-provenance:coverage/post.json",
-        "pre-push:18",
+        "pre-push:19",
         "pre-push-order:sha256:aaaa",
         "post-push-order:sha256:aaaa",
         "pre-self-test:310",

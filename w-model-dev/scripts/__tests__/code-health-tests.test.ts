@@ -210,7 +210,7 @@ function deletionFactsFor(
       `pre-test-count:${preCount}`,
       `post-test-count:${postCount}`,
       `coverage-provenance:${coveragePath}`,
-      'pre-push:18',
+      'pre-push:19',
       'pre-push-order:sha256:aaaa',
       'post-push-order:sha256:aaaa',
       `pre-self-test:${selfTest}`,
@@ -343,7 +343,7 @@ describe('phase 3 protection classification and default-deny (R6/F-3)', () => {
       [{ scenarioClass: 'concurrency', stimulus: 'two concurrent lock acquisitions' }, 'concurrency'],
       [{ scenarioClass: 'platform', setup: 'Git Bash on Windows' }, 'platform'],
       [{ scenarioClass: 'migration', stimulus: 'rollback of the previous schema' }, 'migration-rollback'],
-      [{ scenarioClass: 'governance', governanceFacts: ['pre-push: 18 ordered gate items'] }, 'pre-push'],
+      [{ scenarioClass: 'governance', governanceFacts: ['pre-push: 19 ordered gate items'] }, 'pre-push'],
       [{ scenarioClass: 'governance', governanceFacts: ['self-test: sample-to-check matrix'] }, 'self-test'],
       [{ scenarioClass: 'governance', governanceFacts: ['docs-consistency: live counts'] }, 'docs-consistency'],
     ];
@@ -468,9 +468,9 @@ describe('phase 3 deletion facts against repo-owned expectations (R2/F-5)', () =
     expect(evaluateDeletion({ testCount: 1, coverageProvenance: '', governanceFacts: [] }).passed).toBe(false);
   });
 
-  it('an unexplained pre-push count/order drift blocks (18-item gate order protected)', () => {
+  it('an unexplained pre-push count/order drift blocks (19-item gate order protected)', () => {
     const countDrift = withGovernanceFacts(validDeletionFacts(), (entries) =>
-      entries.map((entry) => (entry === 'pre-push:18' ? 'pre-push:17' : entry)),
+      entries.map((entry) => (entry === 'pre-push:19' ? 'pre-push:17' : entry)),
     );
     expect(evaluateDeletion(countDrift).violations.join('; ')).toMatch(/pre-push/i);
     const orderDrift = withGovernanceFacts(validDeletionFacts(), (entries) =>
@@ -502,7 +502,7 @@ describe('phase 3 deletion facts against repo-owned expectations (R2/F-5)', () =
 
   it('a self-consistent declaration that contradicts the repo-owned values is refused unless explained', () => {
     const expected = {
-      prePushItems: 18,
+      prePushItems: 19,
       selfTestSamples: 999,
       docsConsistencyViolations: 9,
       fixtureReachability: 'all-referenced',
@@ -521,13 +521,13 @@ describe('phase 3 deletion facts against repo-owned expectations (R2/F-5)', () =
     expect(evaluateDeletion(explained, expected).passed).toBe(true);
   });
 
-  it('drift is explainable only through an explicit explained:<artifact> fact and pre-push stays 18', () => {
+  it('drift is explainable only through an explicit explained:<artifact> fact and pre-push stays 19', () => {
     const explained = withGovernanceFacts(validDeletionFacts(), (entries) => [
       ...entries.map((entry) => (entry === 'post-self-test:302' ? 'post-self-test:301' : entry)),
       'explained:self-test',
     ]);
     expect(evaluateDeletion(explained).passed).toBe(true);
-    expect(DEFAULT_GOVERNANCE_FACTS.prePushItems).toBe(18);
+    expect(DEFAULT_GOVERNANCE_FACTS.prePushItems).toBe(19);
   });
 });
 
@@ -896,7 +896,7 @@ async function createGuardedProject(
   await fs.writeFile(
     path.join(root, '.code-health-governance.json'),
     `${JSON.stringify(
-      { prePushItems: 18, selfTestSamples: 2, docsConsistencyViolations: 0, fixtureReachability: 'all-referenced' },
+      { prePushItems: 19, selfTestSamples: 2, docsConsistencyViolations: 0, fixtureReachability: 'all-referenced' },
       null,
       2,
     )}\n`,

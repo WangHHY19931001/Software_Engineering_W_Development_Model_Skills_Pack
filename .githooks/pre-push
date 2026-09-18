@@ -14,7 +14,7 @@
 #   - w-model-dev/**：case 模式 w-model-dev/*（bash case 模式中 * 可跨 /，命中任意层级文件）
 #   - 根级活体文档/配置：README.md / AGENTS.md / CONTRIBUTING.md / .gitignore / .eslintsecurity-baseline.json / package.json / package-lock.json
 #   - config/** / scripts/** / .githooks/**（同上，* 跨 /）
-#   - eval/**：评估资产（语料 / mappings / runner）——触发边界断言是活体门禁（第 18 项）
+#   - eval/**：评估资产（语料 / mappings / runner）——触发边界断言是活体门禁（第 19 项）
 #   - docs/*.md（* 跨 /：实际命中 docs/ 任意层级 *.md，含 docs/changes、docs/superpowers
 #     归档——保持历史触发语义，不做收窄）
 
@@ -60,8 +60,8 @@ is_pure_windows_shell() {
 
 if is_pure_windows_shell; then
   printf '[pre-push] \033[31m✗\033[0m 检测到纯 Windows cmd/PowerShell 环境（无 bash 解释器）\n' 2>/dev/null || true
-  printf '[pre-push] \033[31m✗\033[0m 本次推送未执行 18 项门禁（exit 0 放行）——推送未经任何校验\n' 2>/dev/null || true
-  printf '[pre-push] \033[31m✗\033[0m 关键门禁：self-test / vitest 全量 / docs-consistency / tsc 类型检查 等 18 项\n' 2>/dev/null || true
+  printf '[pre-push] \033[31m✗\033[0m 本次推送未执行 19 项门禁（exit 0 放行）——推送未经任何校验\n' 2>/dev/null || true
+  printf '[pre-push] \033[31m✗\033[0m 关键门禁：self-test / vitest 全量 / docs-consistency / tsc 类型检查 等 19 项\n' 2>/dev/null || true
   printf '[pre-push] \033[31m✗\033[0m 请安装 Git for Windows 并在 Git Bash 补跑：npm run prepush（全绿后再合入）\n' 2>/dev/null || true
   exit 0
 fi
@@ -292,7 +292,7 @@ if ! bash "$(dirname "$0")/ensure-platform-deps.sh" --check; then
 fi
 
 # ---------- 门禁用例 ----------
-# 全部门禁共 18 项检查（第 13 项 npm audit 为阻断项），退出码必须全部符合预期才放行。
+# 全部门禁共 19 项检查（第 14 项 npm audit 为阻断项），退出码必须全部符合预期才放行。
 
 tmp_log="$(mktemp)"
 tmp_vitest_dir="$(mktemp -d)"
@@ -361,14 +361,21 @@ run_expect "check-signature-chain 有效签名链样本退出 0" 0 \
 # 12. vitest 单元测试全量通过（文件数/用例数以同次 JSON facts 与 provenance 为准）+ coverage 阈值门禁（--coverage 启用 v8 插桩；
 #     logic/ + lib/ 阈值 stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest 会 exit 1 阻断推送；
 #     基线见 config/vitest.config.ts coverage.thresholds 注释）
-#     --reporter=json --outputFile 落盘实测用例总数，供第 14 项 check-docs-consistency 复用（避免 vitest 双跑）
+#     --reporter=json --outputFile 落盘实测用例总数，供第 15 项 check-docs-consistency 复用（避免 vitest 双跑）
 run_expect "vitest 单元测试 + coverage 阈值通过" 0 \
   npx vitest run --coverage --reporter=json --outputFile="$tmp_vitest_json" --config config/vitest.config.ts || exit 1
 
 # 将第 12 项同次 JSON 封装为受控 provenance，绑定当前 HEAD、运行 ID、相对 artifact 与完整 measurements。
 node -e 'const fs=require("fs"),crypto=require("crypto"),cp=require("child_process"),path=require("path"); const artifact=process.argv[1], provenance=process.argv[2], root=process.cwd(); const raw=fs.readFileSync(artifact,"utf8"), d=JSON.parse(raw), sha=crypto.createHash("sha256").update(raw,"utf8").digest("hex"), head=cp.execFileSync("git",["rev-parse","HEAD"],{cwd:root,encoding:"utf8"}).trim(), runId=crypto.randomBytes(8).toString("hex"); fs.writeFileSync(provenance, JSON.stringify({format:"w-model-vitest-provenance",version:1,commitSha:head,runId,artifactRelativePath:path.basename(artifact),artifactSha256:sha,measurements:d},null,2)+"\n");' "$tmp_vitest_json" "$tmp_vitest_provenance"
 
-# 13. npm audit：依赖漏洞扫描（high 以上阻断；仅明确网络不可达或 registry 不支持 endpoint 时跳过）
+# 13. check-coverage-scope：规则层覆盖口径门禁（logic+lib 白名单分母重算，独立于第 12 项全分母阈值）
+#     阈值 = 2026-09-18 实测（logic+lib）：stmts 84.25 / branch 77.87 / funcs 93.68 / lines 87.01，
+#     向下取整到 5 的倍数；出处：config/vitest.config.ts coverage 注释 + 本计划收尾记录
+run_expect "规则层覆盖口径 (logic+lib) 达阈值" 0 \
+  npx tsx w-model-dev/scripts/cli/check-coverage-scope.ts --report=coverage/coverage-final.json \
+  --min-statements=80 --min-branches=75 --min-functions=90 --min-lines=85 || exit 1
+
+# 14. npm audit：依赖漏洞扫描（high 以上阻断；仅明确网络不可达或 registry 不支持 endpoint 时跳过）
 #     skip 只接受 npm 明确前缀的网络错误、明确错误码，或明确 audit endpoint unsupported 信号；
 #     瞬态网络错误信号扩展（registry 服务端瞬态：socket hang up / 5xx / errno 形态网络错误码）
 #     同样可跳过；npm7 形态 `npm warn audit network ...` 亦属网络信号（network 词面前允许
@@ -412,7 +419,7 @@ else
   exit 1
 fi
 
-# 14. check-docs-consistency：活体文档一致性门禁（复用第 12 项 vitest JSON 用例数，不二次全量 vitest）
+# 15. check-docs-consistency：活体文档一致性门禁（复用第 12 项 vitest JSON 用例数，不二次全量 vitest）
 #     注意 1：run_expect 以 "$@" 展开命令，`VAR=x npm ...` 前缀语法不被识别为 env 赋值，须先 export；
 #     注意 2：Git Bash 的 mktemp 产出 MSYS 路径（/tmp/…），Node（Windows）无法直接解析——用 cygpath -w
 #     翻译成 Windows 路径；WSL / 无 cygpath 时保留原值（Node 在 POSIX 下能正确 resolve /tmp/…）。
@@ -421,22 +428,22 @@ export WM_VITEST_PROVENANCE_FILE="$(cygpath -w "$tmp_vitest_provenance" 2>/dev/n
 export WM_VITEST_PROVENANCE_ROOT="$(cygpath -w "$tmp_vitest_dir" 2>/dev/null || printf '%s' "$tmp_vitest_dir")"
 run_expect "docs-consistency 活体文档一致" 0 npm run check:docs-consistency || exit 1
 
-# 15. check-samples-coverage：samples 覆盖矩阵门禁
+# 16. check-samples-coverage：samples 覆盖矩阵门禁
 #     核对每个 fixture 被 self-test.ts 用例数组引用 + 每个子目录在 samples/README.md 矩阵声明，
 #     堵住「新增 fixture 遗忘登记」（未登记 fixture 不参与任何检查，self-test 仍全绿）
 run_expect "samples 覆盖矩阵一致（无未登记 fixture）" 0 npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts || exit 1
 
-# 16. prettier --check：格式一致性门禁（config/prettier.config.cjs，endOfLine=auto 双平台行尾兼容）
+# 17. prettier --check：格式一致性门禁（config/prettier.config.cjs，endOfLine=auto 双平台行尾兼容）
 #     堵住「npm run format 非幂等」回归——任何 .ts/.cjs 编辑未跑 format 即被阻断
 run_expect "prettier 格式一致性（--check）" 0 \
   npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs" || exit 1
 
-# 17. tsc 类型检查：TypeScript strict 0 错误，对齐 SSoT §10H.5 V1 验证门；
+# 18. tsc 类型检查：TypeScript strict 0 错误，对齐 SSoT §10H.5 V1 验证门；
 #     README 健康指标「tsc 0 错误」由手动验证升级为自动化门禁
 run_expect "tsc 类型检查 0 错误" 0 \
   npx tsc -p config/tsconfig.json || exit 1
 
-# 18. eval 语料断言：60 条触发边界语料 + coverageMatrix 五项校验全绿（触发边界 campaign 快追；
+# 19. eval 语料断言：60 条触发边界语料 + coverageMatrix 五项校验全绿（触发边界 campaign 快追；
 #     断言引擎 --self-check 由 eval/ 自身维护，此处跑全量断言）
 run_expect "eval 语料断言与覆盖矩阵全绿" 0 npx tsx eval/runner.ts || exit 1
 

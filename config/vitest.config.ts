@@ -104,10 +104,14 @@ export default {
   //     「新增一个低覆盖 CLI import 即假红」的风险真实存在，与产品回归无关。
   //   · 已试两种 exclude 写法（相对路径与 `**/` 前缀）：**聚焦运行（单/双测试文件）实测生效**，
   //     **全量运行实测均未生效**（报告仍含 cli/ 等层）；机制未查明，故不保留 exclude（避免发布不实声明）。
-  //   · 结论：口径问题**未解决**，仅完成测量与归因；阈值维持 75/65/85/75（不因口径未定而放宽或收紧）。
+  //   · 结论（B 项接线后双口径）：全量 vitest 阈值（本块）按全分母地板执行；规则层（logic+lib）
+  //     口径由第 13 项独立强制，阈值见 pre-push 注释。
   coverage: {
     provider: 'v8',
     include: ['w-model-dev/scripts/logic/**', 'w-model-dev/scripts/lib/**'],
+    // json reporter 产出 coverage/coverage-final.json，供 pre-push 第 13 项 check-coverage-scope
+    // 按 logic+lib 白名单分母重算口径（B 项设计：绕开 v8 provider「被 import 文件必入报告」行为）。
+    reporter: ['text', 'json'],
     // thresholds 基线 = 2026-08-12 实测（logic+lib 合并）：stmts 75.32 / branch 66.57 / funcs 85.5 / lines 76.62，
     // 取实际值向下取整到 5 的倍数，随测试补充逐步上调。
     thresholds: { statements: 75, branches: 65, functions: 85, lines: 75 },

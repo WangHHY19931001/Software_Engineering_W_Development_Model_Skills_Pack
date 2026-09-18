@@ -441,7 +441,7 @@ L0 文档（`SKILL.md` / `references/` / `templates/` / `examples/` / `subagent/
 
 - 数据源 = `eval/w-model-dev-test-prompts.json`（60 条，含 category/route 字段）；
 - 视图 = `w-model-dev/references/activation-guide.md`（13 个 `## <code> <canonical 名>` 节，示例行 `- id=N: <prompt 原文>`，每节另含判定理由与边界说明——何时升级为 ask/enable）；
-- 一致性 = `eval/mappings.json` 顶层 matrix 声明 + `eval/runner.ts` coverageMatrix 五项校验（route 对齐 / 总数符合声明 / 每类别 ≥ minPerCategory / guide 节示例数 == 语料条数 / 每负向类别 ≥1 组 notContains 守卫）。`npm run eval` 已纳入 pre-push 第 18 项门禁（触发边界快追，2026-09-07）。
+- 一致性 = `eval/mappings.json` 顶层 matrix 声明 + `eval/runner.ts` coverageMatrix 五项校验（route 对齐 / 总数符合声明 / 每类别 ≥ minPerCategory / guide 节示例数 == 语料条数 / 每负向类别 ≥1 组 notContains 守卫）。`npm run eval` 已纳入 pre-push 第 19 项门禁（触发边界快追，2026-09-07 纳入时为第 18 项，2026-09-18 插入第 13 项覆盖口径门后顺延）。
 
 **触发面分层**：SKILL.md frontmatter description 保留一句英文反例信号（作用于技能加载器的匹配面）；触发决策表"不启用"行含十类速览并链接 activation-guide.md；完整判定细则只在 activation-guide.md 按需加载——常驻面增量 ≤15 行。
 
@@ -1228,9 +1228,9 @@ flowchart TD
 
 **本地 pre-push 平台依赖与显式安装安全边界**：hook 缺少 `node_modules` 时以 exit 1 拒绝推送并提示开发者运行 `npm install`，不自动安装。它只调用 `ensure-platform-deps.sh --check`；默认/`--check` 始终只读，不进行网络下载、`npm pack`、解包或 `node_modules` 覆盖。开发者可在 Bash 中显式运行 `npm run platform-deps:check` 或 `npm run platform-deps:install`；显式 `--install` 在受支持的 Windows x64 / Linux x64 上使用当前 checkout 的 Node 标准库 CLI，在受控 staging 中校验并安装 lockfile 固定的平台包。
 
-**本地 pre-push 推送范围判定（真实 push stdin 语义）**：hook 触发范围判定以 **git push 写入 stdin 的 ref 行为准**（每行 `<local ref> <local sha> <remote ref> <remote sha>` 四字段，40 位十六进制 sha；全零 sha 合法——第 2 字段全零 = 删除远端 ref，第 4 字段全零 = 全新分支）。逐行聚合变更文件后再做路径命中判断，不再用全局 diff 先行短路（多 ref 推送逐行覆盖，不漏检）。删除 ref 行跳过收集；全新分支先用 `git merge-base --fork-point`、退化为普通 `merge-base` 建立可证明基线（基线为空或退化到推送尖本身时降级经 remote-tracking 排除集枚举证明——remote 名经白名单与 `git remote get-url` 验证后执行 `git log -m --name-only --pretty=format: <local_sha> --not --remotes=<remote>`，`-m` 确保合并提交按父逐个列出避免空 diff 漏检；三级全部失败 → fail-closed 跑全量门禁，绝不使用 `git log -n N` 截断）；常规更新按 `remote_sha..local_sha` 做 `git diff --name-only`（`--` 置于两 sha 之后，避免被当 pathspec 致空输出）。任一 ref 行解析失败 → fail-closed（无法证明变更范围就运行全部门禁）；全部行均为删除（delete-only）→ 放行跳过门禁；stdin 无 ref 行（非 git push 触发）→ 回退 `HEAD@{push}` 相对 HEAD 的 diff（不可用时回退 `origin/HEAD`），回退失败同样 fail-closed。路径命中保持 bash case 模式语义（`*` 可跨 `/`）：`w-model-dev/*`、根级 `README.md` / `AGENTS.md` / `CONTRIBUTING.md` / `.gitignore` / `.eslintsecurity-baseline.json` / `package.json` / `package-lock.json`、`config/*` / `scripts/*` / `.githooks/*`、`eval/*`（评估资产：语料 / mappings / runner，对应 pre-push 第 18 项）、`docs/*.md`（实测命中 `docs/` 任意层级 `*.md`，含 `docs/changes` 归档与 `docs/superpowers` 规划）。`npm run prepush` 以 `--force` 强制跑全部门禁，不读 stdin。
+**本地 pre-push 推送范围判定（真实 push stdin 语义）**：hook 触发范围判定以 **git push 写入 stdin 的 ref 行为准**（每行 `<local ref> <local sha> <remote ref> <remote sha>` 四字段，40 位十六进制 sha；全零 sha 合法——第 2 字段全零 = 删除远端 ref，第 4 字段全零 = 全新分支）。逐行聚合变更文件后再做路径命中判断，不再用全局 diff 先行短路（多 ref 推送逐行覆盖，不漏检）。删除 ref 行跳过收集；全新分支先用 `git merge-base --fork-point`、退化为普通 `merge-base` 建立可证明基线（基线为空或退化到推送尖本身时降级经 remote-tracking 排除集枚举证明——remote 名经白名单与 `git remote get-url` 验证后执行 `git log -m --name-only --pretty=format: <local_sha> --not --remotes=<remote>`，`-m` 确保合并提交按父逐个列出避免空 diff 漏检；三级全部失败 → fail-closed 跑全量门禁，绝不使用 `git log -n N` 截断）；常规更新按 `remote_sha..local_sha` 做 `git diff --name-only`（`--` 置于两 sha 之后，避免被当 pathspec 致空输出）。任一 ref 行解析失败 → fail-closed（无法证明变更范围就运行全部门禁）；全部行均为删除（delete-only）→ 放行跳过门禁；stdin 无 ref 行（非 git push 触发）→ 回退 `HEAD@{push}` 相对 HEAD 的 diff（不可用时回退 `origin/HEAD`），回退失败同样 fail-closed。路径命中保持 bash case 模式语义（`*` 可跨 `/`）：`w-model-dev/*`、根级 `README.md` / `AGENTS.md` / `CONTRIBUTING.md` / `.gitignore` / `.eslintsecurity-baseline.json` / `package.json` / `package-lock.json`、`config/*` / `scripts/*` / `.githooks/*`、`eval/*`（评估资产：语料 / mappings / runner，对应 pre-push 第 19 项）、`docs/*.md`（实测命中 `docs/` 任意层级 `*.md`，含 `docs/changes` 归档与 `docs/superpowers` 规划）。`npm run prepush` 以 `--force` 强制跑全部门禁，不读 stdin。
 
-`docs-consistency` 对 README.md / AGENTS.md / CONTRIBUTING.md / docs/troubleshooting.md 四份活体文档执行门禁项数引用扫描（`gate-count-docs`）：行含「门禁/检查」标记时，全部「N 项」计数引用须 == `EXPECTED.prePushCount`；「第 N 项」下标（如「第 13 项 npm audit」）与历史目录（CHANGELOG* / docs/changes / docs/superpowers）不在扫描范围（gate-count-stale-scan，2026-09-07）。
+`docs-consistency` 对 README.md / AGENTS.md / CONTRIBUTING.md / docs/troubleshooting.md 四份活体文档执行门禁项数引用扫描（`gate-count-docs`）：行含「门禁/检查」标记时，全部「N 项」计数引用须 == `EXPECTED.prePushCount`；「第 N 项」下标（如「第 14 项 npm audit」）与历史目录（CHANGELOG* / docs/changes / docs/superpowers）不在扫描范围（gate-count-stale-scan，2026-09-07）。
 
 显式安装把 tarball 字节及 UStar、PAX `x`/`g`、GNU `L`/`K` metadata 视为不可信输入。提取器在任何 extraction write 前完成整包解析与 canonical preflight，拒绝 absolute/drive-qualified、traversal、dot/empty/NUL 路径，拒绝 symlink、hardlink 和任何 `linkname`，拒绝重复 canonical path、file ancestor/descendant 冲突及既有类型/名称冲突；普通文件以独占创建写入，并按单一 path component 逐层建目录。SRI、registry allowlist、package name/version 和隔离加载全部验证成功后，安装器才从 repo 同卷 staging 受控提交；既有 `node_modules/<name>` 若不是同一 lockfile 包身份则以冲突失败，不覆盖。verification 临时目录、install staging 与 `npm pack` 临时目录均由调用者在 success/failure 的 `finally` 中整体清理，因此普通 I/O 或部分提取失败只允许污染本次私有 staging，不得污染既有 `node_modules`。
 
@@ -2140,7 +2140,7 @@ interface RunLogEntry {
 
 1. **CommandEvidence**：`command` / `cwd` / `environment` / `platform` / `toolVersions` / `startedAt` / `endedAt` / `exitCode`（真实数字；`null` 永不算 observed）/ `observation`（`observed` / `not_run` / `unavailable` / `unverified`）/ `rawOutputPath` / `rawOutputSha256`。跳过的环境不伪造 evidence，只进 `unexercisedScenarios`。
 2. **RevisionIdentity 与 EvidenceBinding**：candidate / scope / path / hash / revision 绑定；`lib/code-health-evidence-store.ts` 验证存在与 SHA-256，`lib/code-health-file-verifier.ts` 以 canonical 文件校验重算，`lib/code-health-revision-provider.ts` 提供受控 revision；任一不一致即 exit 1。
-3. **tracked repo-owned 事实源**：ledger、`.code-health-governance.json`（18 项 pre-push / self-test 样本数 / docs-consistency 违规数 / fixture reachability）与 suite argv 清单（默认 `.code-health-suite.json`）的工作区字节必须等于 HEAD blob；清单声明的计数与仓库期望冲突且无 `explained:<artifact>` 时拒绝。
+3. **tracked repo-owned 事实源**：ledger、`.code-health-governance.json`（19 项 pre-push / self-test 样本数 / docs-consistency 违规数 / fixture reachability）与 suite argv 清单（默认 `.code-health-suite.json`）的工作区字节必须等于 HEAD blob；清单声明的计数与仓库期望冲突且无 `explained:<artifact>` 时拒绝。
 4. **默认拒绝**：`proveTestRemoval` 把非保护候选一律视作 protected，只有 ledger 记录（candidate action 与精确 test identity 在 scope/tests 内）能正向建立非保护状态；`test-only`、生成代码、死副本、一次性实验、平台/lifecycle/安全/并发差异与「少几行 diff」均不构成删除或抽象依据。
 5. **`lib/code-health-tdd-harness.ts`**：RED-GREEN 证据的断言绑定与测试产物哈希；未绑定断言或未减少测试计数不通过。
 
@@ -2153,7 +2153,7 @@ interface RunLogEntry {
 ### 10K.5 脱敏、门禁与边界
 
 - **脱敏**：`lib/code-health-redaction.ts` 对 campaign artifact 输出 `status`（`not_reviewed` / `clean` / `blocked`）、`rules` 与 `blockedReasons`；`blocked` 的产物不得导出。
-- **18 项 pre-push 不变**：code-health CLI 不纳入 `.githooks/pre-push`，现有 18 项检查、顺序与 exit 语义原样保留。
+- **19 项 pre-push 不变**：code-health CLI 不纳入 `.githooks/pre-push`，现有 19 项检查、顺序与 exit 语义原样保留。
 - **codegraph 前置（约束 #14）**：进入阶段 5–8 的代码修改前须先做 codegraph 影响分析并落盘 `.w-model/codegraph-queries/`；本仓库 checkout 无 `.codegraph/` 索引，code-health Phase 1–4 不消费 codegraph，也不得伪造查询记录。
 
 ### 10K.6 campaign 归档（已实现）

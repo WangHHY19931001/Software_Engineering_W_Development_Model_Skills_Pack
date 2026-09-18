@@ -92,7 +92,7 @@
         "rehomed:coverage",
         "rehomed:docs-consistency",
         "rehomed:sample-matrix",
-        "pre-push:18"
+        "pre-push:19"
       ]
     },
     "postRegression": {

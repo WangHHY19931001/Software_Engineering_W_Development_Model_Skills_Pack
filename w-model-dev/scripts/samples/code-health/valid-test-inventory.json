@@ -49,7 +49,7 @@
     "testCount": 10,
     "passed": true,
     "coverageProvenance": "coverage/pre.json",
-    "governanceFacts": ["pre-push-order-18", "self-test-matrix"]
+    "governanceFacts": ["pre-push-order-19", "self-test-matrix"]
   },
   "postRegression": {
     "command": {
@@ -68,7 +68,7 @@
     "testCount": 10,
     "passed": true,
     "coverageProvenance": "coverage/post.json",
-    "governanceFacts": ["pre-push-order-18", "self-test-matrix"]
+    "governanceFacts": ["pre-push-order-19", "self-test-matrix"]
   },
   "coverageProvenance": {
     "path": "coverage/coverage-final.json",

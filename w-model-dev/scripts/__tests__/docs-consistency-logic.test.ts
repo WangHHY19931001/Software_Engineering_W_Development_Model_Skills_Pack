@@ -974,27 +974,29 @@ describe('runDocConsistencyChecks', () => {
     expect(vStale.some((x) => x.check === 'exit2-scripts' && x.message.includes('仍含过时「29 个脚本」'))).toBe(true);
   });
 
-  it('pre-push 编号最大值非 18 → 违规', () => {
+  it('pre-push 编号最大值非 19 → 违规', () => {
     const input = baseInput({
       prePush: '# 13. npm audit\n# 与原 CI 一致：13 项检查',
     });
     const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'pre-push' && x.message.includes('18'))).toBe(true);
+    expect(v.some((x) => x.check === 'pre-push' && x.message.includes('19'))).toBe(true);
   });
 
-  it('pre-push 伪造 3 块检查（# 1./# 2./# 18.）→ 违规（F-G7-08：连续块断言，非仅最大编号）', () => {
-    const forged = ['# 1. self-test', '# 2. check:verifier', '# 18. typecheck', '# 全部门禁共 18 项检查'].join('\n');
+  it('pre-push 伪造 3 块检查（# 1./# 2./# 19.）→ 违规（F-G7-08：连续块断言，非仅最大编号）', () => {
+    const forged = ['# 1. self-test', '# 2. check:verifier', '# 19. typecheck', '# 全部门禁共 19 项检查'].join('\n');
     const v = runDocConsistencyChecks(baseInput({ prePush: forged }));
     const hit = v.filter((x) => x.check === 'pre-push');
     expect(hit.length).toBeGreaterThan(0);
-    expect(hit.some((x) => x.message.includes('连续 #1..#18') && x.message.includes('实测 3 块'))).toBe(true);
+    expect(hit.some((x) => x.message.includes('连续 #1..#19') && x.message.includes('实测 3 块'))).toBe(true);
   });
 
   it('pre-push 中间删除一块（编号断档）→ 违规', () => {
-    const ids = Array.from({ length: 18 }, (_, i) => i + 1).filter((n) => n !== 9);
-    const text = [...ids.map((n) => `# ${n}. 第 ${n} 项`), '# 全部门禁共 18 项检查'].join('\n');
+    const ids = Array.from({ length: EXPECTED.prePushCount }, (_, i) => i + 1).filter((n) => n !== 9);
+    const text = [...ids.map((n) => `# ${n}. 第 ${n} 项`), `# 全部门禁共 ${EXPECTED.prePushCount} 项检查`].join('\n');
     const v = runDocConsistencyChecks(baseInput({ prePush: text }));
-    expect(v.some((x) => x.check === 'pre-push' && x.message.includes('实测 17 块'))).toBe(true);
+    expect(v.some((x) => x.check === 'pre-push' && x.message.includes(`实测 ${EXPECTED.prePushCount - 1} 块`))).toBe(
+      true,
+    );
   });
 
   it('glossary action 列表与 schema enum 漂移（缺值/多值）→ 违规（F-G7-05 逐值断言）', () => {
@@ -1419,7 +1421,7 @@ describe('runDocConsistencyChecks', () => {
       const troubleshootingPath = path.join(fixtureRoot, 'docs', 'troubleshooting.md');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled repository fixture path
       const content = await fs.readFile(troubleshootingPath, 'utf8');
-      const current = '本次推送未执行 18 项门禁';
+      const current = '本次推送未执行 19 项门禁';
       const stale = '本次推送未执行 17 项门禁';
       expect(content).toContain(current);
       const mutated = content.replace(current, stale);
@@ -2099,7 +2101,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('PR 模板项数与 EXPECTED 一致 → 零 pre-push 违规', () => {
     const input = baseInput({
-      prTemplate: '- [ ] `npm run prepush` 18 项通过',
+      prTemplate: `- [ ] \`npm run prepush\` ${EXPECTED.prePushCount} 项通过`,
     });
     expect(runDocConsistencyChecks(input).some((x) => x.check === 'pre-push')).toBe(false);
   });
@@ -3348,7 +3350,7 @@ describe('pre-push hook 源契约（stdin ref 解析与 fail-closed 范围）', 
   // fail-closed 真实断言）；本组是对 hook 源码的文本级补充防线——变量重命名即红属预期，
   // 用于防语义漂移的第二道闸，不承担行为验证职责。
   // 直接读取 .githooks/pre-push 源文本断言契约（hook 是 bash，不由 docs-consistency
-  // logic 校验；此处守住与 18 项门禁并列的触发语义防线，防回归旧「全局 diff 短路 /
+  // logic 校验；此处守住与 19 项门禁并列的触发语义防线，防回归旧「全局 diff 短路 /
   // -n 20 截断 / 空 changed_files 放行」实现）。
   const prePushSource = () => fs.readFile(path.join(REPO_ROOT, '.githooks', 'pre-push'), 'utf8');
 
@@ -3415,13 +3417,14 @@ describe('pre-push hook 源契约（stdin ref 解析与 fail-closed 范围）', 
 });
 
 describe('gate-count-docs（活体文档门禁项数引用扫描，F1 反哺）', () => {
-  it('clean：四份白名单文档全 18 项 → 0 违规', () => {
+  it('clean：四份白名单文档全 19 项 → 0 违规', () => {
+    const n = EXPECTED.prePushCount;
     const input = baseInput({
       gateCountDocs: [
-        { name: 'README.md', content: '本地 CI：18 项门禁（含 eval 语料断言）' },
-        { name: 'AGENTS.md', content: '手动跑推送前门禁（不实际推送，18 项门禁检查；' },
-        { name: 'CONTRIBUTING.md', content: '在 `git push` 时自动跑 18 项检查；' },
-        { name: 'docs/troubleshooting.md', content: '未执行 18 项门禁（exit 0 放行）' },
+        { name: 'README.md', content: `本地 CI：${n} 项门禁（含 eval 语料断言）` },
+        { name: 'AGENTS.md', content: `手动跑推送前门禁（不实际推送，${n} 项门禁检查；` },
+        { name: 'CONTRIBUTING.md', content: `在 \`git push\` 时自动跑 ${n} 项检查；` },
+        { name: 'docs/troubleshooting.md', content: `未执行 ${n} 项门禁（exit 0 放行）` },
       ],
     });
     expect(runDocConsistencyChecks(input).filter((v) => v.check === 'gate-count-docs')).toEqual([]);
