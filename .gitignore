@@ -20,6 +20,9 @@ eval/e2e/demo/
 # ZCode 客户端本地计划/会话产物
 .zcode/
 
+# Mimosa 安全插件本地状态（git 门禁记录 / 发现账本 / 会话 hook-state / reports，运行期生成，不入库）
+.mimosa/
+
 # IDE
 .vscode/
 .idea/
