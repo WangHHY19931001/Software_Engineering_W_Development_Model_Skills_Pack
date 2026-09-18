@@ -20,6 +20,7 @@ import {
   extractExitCode,
   inspectGateLogContent,
   buildGateLogKeys,
+  RUN_LOG_CLOSURE_SCRIPTS,
   type RunLogEntry,
 } from '../logic/run-log-logic.js';
 
@@ -2452,5 +2453,165 @@ describe('run-log R10: revertEvidence 回滚证伪（严格证据模式）', () 
       missing: 1,
       legacy: 0,
     });
+  });
+});
+
+// ==================== R11: 闭环五脚本机器核验（约束 #11） ====================
+//
+// 约束 #11（SSoT §10C）：每阶段门须以 5 个闭环脚本 exitCode=0 为前提才可放行。
+// R11 把该约束做成机器可核验判定：凡出现 checkpoint 放行（action=checkpoint 且
+// outcome=success）的阶段，放行前必须已有 5 个闭环脚本各自一条
+// role=G / outcome=success / gateExitCode=0 的 gate 记录；缺失或未严格早于放行
+// （同秒不算「早于」）均 blocking（无时间戳豁免）。触发域是「checkpoint 放行」，
+// 无放行的 run-log（如 fix 变体、blocked checkpoint）不受约束。
+
+describe('run-log R11: 闭环五脚本机器核验（约束 #11）', () => {
+  /**
+   * 阶段 5 最小合法前置（R1 分档：produce/review/gate/checkpoint）
+   */
+  const phaseLead = (phase = 5): RunLogEntry[] => [
+    makeEntry({
+      runId: `p${phase}`,
+      phase,
+      timestamp: '2026-09-18T01:00:00Z',
+      action: 'produce',
+      role: 'S',
+      outcome: 'success',
+    }),
+    makeEntry({
+      runId: `v${phase}`,
+      phase,
+      timestamp: '2026-09-18T02:00:00Z',
+      action: 'review',
+      role: 'V',
+      outcome: 'success',
+    }),
+  ];
+
+  const closureEntry = (script: string, timestamp: string, runId: string, phase = 5): RunLogEntry =>
+    makeEntry({
+      runId,
+      phase,
+      timestamp,
+      action: 'gate',
+      role: 'G',
+      outcome: 'success',
+      gateExitCode: 0,
+      script,
+    });
+
+  /** 5 条闭环记录，时间戳 03:00:00Z ~ 03:00:04Z（严格早于 05:00 的放行） */
+  const closureFive = (phase = 5): RunLogEntry[] =>
+    RUN_LOG_CLOSURE_SCRIPTS.map((script, index) =>
+      closureEntry(script, `2026-09-18T03:00:0${index}Z`, `g${phase}-${index}`, phase),
+    );
+
+  const checkpoint = (phase = 5): RunLogEntry =>
+    makeEntry({
+      runId: `c${phase}`,
+      phase,
+      timestamp: '2026-09-18T05:00:00Z',
+      action: 'checkpoint',
+      role: 'O',
+      outcome: 'success',
+      acknowledgedDecisions: ['阶段 5 放行：article-service 模块完成'],
+    });
+
+  const r11 = (result: { violations: string[] }): string[] => result.violations.filter((v) => v.startsWith('R11'));
+
+  it('五条闭环记录齐备且早于 checkpoint 放行 → 无 R11 违规', () => {
+    const result = checkRunLog([...phaseLead(), ...closureFive(), checkpoint()]);
+    expect(r11(result)).toEqual([]);
+    expect(result.passed).toBe(true);
+    expect(result.closure).toEqual({ checkedGates: 1, missing: 0 });
+  });
+
+  it('缺 check-maturity.ts 一条 → R11 blocking，消息含缺失脚本名', () => {
+    const partial = closureFive().filter((entry) => entry.script !== 'check-maturity.ts');
+    const result = checkRunLog([...phaseLead(), ...partial, checkpoint()]);
+    const hits = r11(result);
+    expect(hits.some((v) => v.includes('check-maturity.ts'))).toBe(true);
+    expect(hits.some((v) => v.includes('check-budget.ts'))).toBe(false);
+    expect(result.passed).toBe(false);
+    expect(result.closure).toEqual({ checkedGates: 1, missing: 1 });
+  });
+
+  it('闭环记录晚于 checkpoint 放行 → R11 blocking', () => {
+    const late = closureFive().map((entry) =>
+      entry.script === 'check-budget.ts' ? { ...entry, timestamp: '2026-09-18T06:00:00Z' } : entry,
+    );
+    const result = checkRunLog([...phaseLead(), ...late, checkpoint()]);
+    expect(r11(result).some((v) => v.includes('check-budget.ts'))).toBe(true);
+    expect(result.closure).toEqual({ checkedGates: 1, missing: 1 });
+  });
+
+  it('闭环 gate 与 checkpoint 放行同一时间戳（同秒）→ 不算「早于放行」，R11 blocking', () => {
+    // 边界钉死：schema 的 timestamp 是 RFC3339 date-time（允许小数秒），同一秒内的
+    // 先后不可判定，故「早于放行」取严格小于。把最后一条闭环记录移到与放行同一时刻
+    // （数组内时间戳仍非递减，不引入 R7 连带），断言该记录不充数。
+    const releaseAt = checkpoint().timestamp;
+    const sameSecond = closureFive().map((entry) =>
+      entry.script === 'check-preventive-review.ts' ? { ...entry, timestamp: releaseAt } : entry,
+    );
+    const result = checkRunLog([...phaseLead(), ...sameSecond, checkpoint()]);
+    const hits = r11(result);
+    expect(hits.some((v) => v.includes('check-preventive-review.ts'))).toBe(true);
+    expect(hits.some((v) => v.includes('check-budget.ts'))).toBe(false);
+    expect(result.closure).toEqual({ checkedGates: 1, missing: 1 });
+  });
+
+  it('无 checkpoint 放行的 run-log（如 fix 变体）不触发 R11，也不产出 closure 计数', () => {
+    const result = checkRunLog([...phaseLead(), closureEntry('check-budget.ts', '2026-09-18T03:00:00Z', 'g0')]);
+    expect(r11(result)).toEqual([]);
+    expect(result.closure).toBeUndefined();
+  });
+
+  it('checkpoint 记录存在但 outcome≠success（未放行）→ 同样不触发 R11', () => {
+    // 触发域的另一半：action=checkpoint 且 outcome=success 才算放行；
+    // blocked checkpoint 不产生闭环义务（bad-missing-G-role.jsonl 所依赖的过滤）。
+    const blocked = { ...checkpoint(), outcome: 'blocked' as const };
+    const result = checkRunLog([...phaseLead(), blocked]);
+    expect(r11(result)).toEqual([]);
+    expect(result.closure).toBeUndefined();
+  });
+
+  it('非 G 角色的同名脚本记录不充数', () => {
+    const fake = { ...closureEntry('check-budget.ts', '2026-09-18T03:00:00Z', 'g0'), role: 'S' as const };
+    const rest = closureFive().filter((entry) => entry.script !== 'check-budget.ts');
+    const result = checkRunLog([...phaseLead(), fake, ...rest, checkpoint()]);
+    expect(r11(result).some((v) => v.includes('check-budget.ts'))).toBe(true);
+  });
+
+  it('gateExitCode≠0 或 outcome≠success 的同名脚本记录不充数', () => {
+    const failedExit = { ...closureEntry('check-budget.ts', '2026-09-18T03:00:00Z', 'g0'), gateExitCode: 1 };
+    const failedOutcome = {
+      ...closureEntry('check-run-log.ts', '2026-09-18T03:00:01Z', 'g1'),
+      outcome: 'fail' as const,
+    };
+    const rest = closureFive().filter(
+      (entry) => entry.script !== 'check-budget.ts' && entry.script !== 'check-run-log.ts',
+    );
+    const result = checkRunLog([...phaseLead(), failedExit, failedOutcome, ...rest, checkpoint()]);
+    const hits = r11(result);
+    expect(hits.some((v) => v.includes('check-budget.ts'))).toBe(true);
+    expect(hits.some((v) => v.includes('check-run-log.ts'))).toBe(true);
+    expect(hits.some((v) => v.includes('check-maturity.ts'))).toBe(false);
+    expect(result.closure).toEqual({ checkedGates: 1, missing: 2 });
+  });
+
+  it('多阶段各自放行时逐阶段核验（缺一条的阶段单独报）', () => {
+    // 阶段 1 整体前移一天，保持 R7 append-only 单调（只隔离 R11 判定）
+    const shiftDay = (entries: RunLogEntry[]): RunLogEntry[] =>
+      entries.map((entry) => ({ ...entry, timestamp: entry.timestamp.replace('2026-09-18', '2026-09-17') }));
+    const phase1 = shiftDay([...phaseLead(1), ...closureFive(1), checkpoint(1)]);
+    const phase5 = [
+      ...phaseLead(5),
+      ...closureFive(5).filter((entry) => entry.script !== 'check-checkpoint.ts'),
+      checkpoint(5),
+    ];
+    const result = checkRunLog([...phase1, ...phase5]);
+    expect(r11(result)).toEqual(expect.arrayContaining([expect.stringMatching(/阶段 5.*check-checkpoint\.ts/)]));
+    expect(r11(result).some((v) => v.includes('阶段 1 '))).toBe(false);
+    expect(result.closure).toEqual({ checkedGates: 2, missing: 1 });
   });
 });

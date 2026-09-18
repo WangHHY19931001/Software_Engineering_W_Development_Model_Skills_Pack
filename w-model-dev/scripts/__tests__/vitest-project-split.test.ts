@@ -1,7 +1,8 @@
 /**
  * vitest 双 project 拆分守护（config/vitest.config.ts 的 SUBPROCESS_TEST_FILES 约定）。
  *
- * 背景：仓库 30 个测试文件会真实启动 CLI 子进程，子进程类文件**彼此并行**会互抢资源
+ * 背景：仓库里会真实启动 CLI 子进程的测试文件（成员名单 = 配置里的 SUBPROCESS_TEST_FILES
+ * 常量；2026-09-18 收口实测 40 个，拆分当时为 30 个）**彼此并行**会互抢资源
  * 产生偶发失败（docs/changes/vitest-parallel-flakiness-finding.md）。因此配置把测试拆为
  * unit-parallel（纯逻辑，并行）与 cli-serial（子进程类，fileParallelism:false）两个 project，
  * 成员名单来自配置里的 SUBPROCESS_TEST_FILES 常量。
@@ -14,10 +15,16 @@
  * 判定口径与拆分时的人工核实一致：
  *   spawn 证据 = 真实 import node:child_process（含经 lib/run-sync 间接调用）
  *             或调用 runSync/execSync/spawnSync/execFile（名称后紧跟左括号的真实调用）；
- *             且未被 vi.mock 替换。三个已知陷阱都曾真实发生，故口径收紧：
- *             注释里的词（doctor-logic 的"无真实 execFile 调用"）、正则的 .exec(
- *             （examples-contract）、以及 vi.mock 整体替换 child_process
- *             （artifact-gate-assets、run-sync）都不是真实 spawn。
+ *             且未被 vi.mock 替换。已知陷阱（口径收紧的由来）：
+ *             正则的 .exec(（examples-contract）、仅在字符串常量里出现的模块名
+ *             （dependency-boundaries）、以及 vi.mock 整体替换 child_process
+ *             （artifact-gate-assets）都不是真实 spawn，不登记。
+ *             已知盲点（HEAD 既存，非本轮引入）：run-sync.test.ts 顶部有同类 vi.mock，
+ *             但其 472-486 行用例经 vi.doUnmock + vi.resetModules() 后真实 spawn 子进程
+ *             并断言真实 ETIMEDOUT——文件级 mocked 判定使它既未登记也无红灯；
+ *             修正需把 mocked 改为逐调用点判定 + 登记 run-sync，留待收口后单独立项。
+ *             注：doctor-logic 自 2026-09-18 起含真实 CLI 子进程用例（D1 回归），
+ *             已登记，不再属「注释里的词」陷阱。
  * 本测试自身不真实启动任何子进程（纯 fs 读取），因此属于 unit-parallel 项目。
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';

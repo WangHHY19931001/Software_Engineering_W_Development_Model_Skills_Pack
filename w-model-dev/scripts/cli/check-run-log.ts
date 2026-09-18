@@ -6,8 +6,9 @@
  * 与 docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md §5.2。
  * 供 O 子代理在阶段推进前调用，校验运行日志完整性、tokens 合规、返工一致、
  * O 越权检测、exitCode 防伪交叉校验、append-only 时序、轨迹模板、跨轮次评审一致、
- * revertEvidence 回滚证伪（R1-R10）。
- * 摘要 JSON 的 r10 字段 = R10 revertEvidence 维度计数（checked/missing/legacy，严格模式 legacy=0）。
+ * revertEvidence 回滚证伪、闭环五脚本齐备（R1-R11）。
+ * 摘要 JSON 的 r10 字段 = R10 revertEvidence 维度计数（checked/missing/legacy，严格模式 legacy=0）；
+ * r11 字段 = R11 闭环五脚本核验计数（checkedGates/missing，仅在该 run-log 存在 checkpoint 放行时出现）。
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=<dir>] [--tla-manifest=<path>] [--json]
@@ -271,6 +272,8 @@ async function main(): Promise<void> {
     passed && diagnostics.length > 0
       ? 'exit 0 仅表示当前规则未产生 blocking diagnostics；不等于 lifecycle closed 或阶段放行。'
       : undefined;
+  // 性能计量（人类可读路径保留；机器通道 --json 不携带，见下）
+  const durationMs = Date.now() - startTime;
   const summary = {
     type: 'run-log',
     passed,
@@ -280,10 +283,14 @@ async function main(): Promise<void> {
     ...(statusNote ? { statusNote } : {}),
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
     ...(result.revertEvidence ? { r10: result.revertEvidence } : {}),
-    durationMs: Date.now() - startTime,
+    ...(result.closure ? { r11: result.closure } : {}),
   };
 
-  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置。
+  // D3（2026-09-18）：机器通道不携带 durationMs——该值每次运行不同（同输入三次 175/209/221ms），
+  // 进入 --json 即破坏「同输入同字节复现」；判定字段（passed/reasons/violations/r10/r11/exitCode）
+  // 保持不变。人类可读路径的 RUN_LOG_JSON 摘要按规格保留该字段
+  // （在 `summary` 之外追加，`printGateReport` 再追加 `exitCode`，故位于 `exitCode` 之前；见文件末尾）。
   if (jsonMode) {
     printJsonReport(summary, exitCode);
     process.exitCode = exitCode;
@@ -305,8 +312,12 @@ async function main(): Promise<void> {
   console.log('─'.repeat(60));
 
   if (passed) {
+    // R11 只在存在 checkpoint 放行时核验（result.closure 随之出现）；无放行的
+    // run-log（fix 变体 / blocked checkpoint）不得声称「闭环五脚本齐备」——
+    // 否则是与实际核验范围不符的误导性通过语。
+    const closureNote = result.closure ? '闭环五脚本齐备' : '闭环五脚本：不适用（无 checkpoint 放行）';
     console.log(
-      '运行日志符合 data-models.md RunLogEntry schema：动作完整 + tokens 合规 + 返工一致 + 无 O 越权 + exitCode 一致 + append-only + 轨迹符合。',
+      `运行日志符合 data-models.md RunLogEntry schema：动作完整 + tokens 合规 + 返工一致 + 无 O 越权 + exitCode 一致 + append-only + 轨迹符合 + ${closureNote}。`,
     );
   } else {
     console.log('未通过原因：');
@@ -325,7 +336,8 @@ async function main(): Promise<void> {
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exitCode 一致（门禁防伪造三层机制之一）
-  printGateReport('RUN_LOG', summary, exitCode);
+  // durationMs 仅在此人类可读通道出现（D3：机器通道 --json 已剔除该非确定性字段）
+  printGateReport('RUN_LOG', { ...summary, durationMs }, exitCode);
   process.exitCode = exitCode;
   return;
 }

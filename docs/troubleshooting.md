@@ -91,7 +91,7 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 
 ### 1.7a pre-push 第 12 项 vitest 抖动（**已按子进程类拆 project 串行消除**）
 
-> **状态：已处置（2026-09-12）。** `config/vitest.config.ts` 将测试拆为两个 project：`cli-serial`（30 个真实启动子进程的测试文件，`fileParallelism: false`，互不重叠）与 `unit-parallel`（其余纯逻辑文件，保持并行）。本节保留现象、根因与排除过程，供后续维护者理解**为何不能让子进程类文件彼此并行**。
+> **状态：已处置（2026-09-12）。** `config/vitest.config.ts` 将测试拆为两个 project：`cli-serial`（真实启动子进程的测试文件，`fileParallelism: false`，互不重叠）与 `unit-parallel`（其余纯逻辑文件，保持并行）。本节保留现象、根因与排除过程，供后续维护者理解**为何不能让子进程类文件彼此并行**。（清单条目数随新增子进程类测试增长——2026-09-18 收口实测 `SUBPROCESS_TEST_FILES` 为 **40** 个；「30」是拆分当时的条目数，不是设计常量。）
 
 **现象**（出现于拆分之前）：`npm run prepush` 第 12 项「vitest 单元测试 + coverage 阈值通过」exit 1，失败数为 1~2 条（极端时可达 20 条），且**每次落在不同文件**；失败形态为 `AssertionError: expected null to be 1`（子进程退出码读到 `null`，即子进程未真正运行）、`Error: STACK_TRACE_ERROR` 或 `Test timed out in 30000ms`。命中的都是 `execSync` / `spawnSync` 启动真实 CLI 子进程的测试文件（`cli-natural-exit` / `gate-report` / `evidence-export-logic` / `evidence-provenance-logic` / `bdd-cli` / `wm-write` / `platform-deps-*` 等）。
 
@@ -100,7 +100,7 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 **处置**：
 
 1. **现状**：cli-serial 串行 + unit-parallel 并行已生效，无需人工干预。若仍见失败，先隔离重跑可疑文件（`npx vitest run --config config/vitest.config.ts <file>`，应全绿）再全量重跑。
-2. **不得让子进程类文件回到并行**（全局放开或并入 unit-parallel 等价于恢复抖动）。新增会真实启动子进程的测试文件必须登记进配置里的 `SUBPROCESS_TEST_FILES`——`vitest-project-split.test.ts` 双向守护该清单（真实 spawn 未登记、无证据残留、文件不存在均红灯）。注意判定口径：`vi.mock('node:child_process')` 的文件（artifact-gate-assets、run-sync）、仅类型导入（dependency-boundaries）、注释/正则里的词（doctor-logic、examples-contract）都**不是**真实 spawn，不登记。
+2. **不得让子进程类文件回到并行**（全局放开或并入 unit-parallel 等价于恢复抖动）。新增会真实启动子进程的测试文件必须登记进配置里的 `SUBPROCESS_TEST_FILES`——`vitest-project-split.test.ts` 双向守护该清单（真实 spawn 未登记、无证据残留、文件不存在均红灯）。注意判定口径：`vi.mock('node:child_process')` 整体替换子进程的文件（artifact-gate-assets）、正则里的 `.exec(`（examples-contract）、仅在字符串常量里出现的模块名（dependency-boundaries）都**不是**真实 spawn，不登记；`doctor-logic.test.ts` 自 2026-09-18 起新增真实 CLI 子进程用例（D1 真实路径回归），**已登记**进清单。**已知守护盲点（HEAD 既存，非本轮引入）**：`run-sync.test.ts` 顶部虽有同类 `vi.mock`，但其 `472-486` 行用例经 `vi.doUnmock('node:child_process')` + `vi.resetModules()` 重新加载模块后**真实** spawn 子进程（`runSync(process.execPath, ['-e', 'setTimeout(() => {}, 5_000)'], { timeout: 250 })`，断言真实 `ETIMEDOUT`）——该文件**含真实 spawn 却未被登记**，因守护的 `mocked` 判定是文件级一刀切才不报红灯；修正需把 `mocked` 改为逐调用点判定并登记该文件，留待收口后单独立项。
 3. **不得**放宽断言、加重试掩盖或改写 coverage 阈值——抖动是环境暴露的真实现象，掩盖会同时掩盖真失败。
 4. 配套校准（均已随处置一并实施）：`check-docs-consistency.ts` 的 `VITEST_SPAWN_TIMEOUT_MS` 600s→1800s（standalone 自采集 spawn 的墙钟上限，600s 会把健康仓库误杀成 fail-closed），及 `lib/run-sync.ts` manifest 中两条 runSync 行号锚（随注释扩充 +2 行顺延）。若后续再改 `check-docs-consistency.ts` 前部行数，run-sync.test.ts 会以行级断言报错提示同步 manifest。
 5. **提速的诚实边界**：串行化后带 coverage 全量约 1055s（并行 457s 但 exit 1）；按子进程类拆分后全量约 974s——子进程文件的执行时间本身占大头，拆分的收益主要在**结构确定性**（并行集合与串行集合显式化、由守护测试锁定），而非大幅缩短全量墙钟。真正的提速方向是把子进程测试本身的耗时降下来（减少真实 spawn 次数、合并场景），而非调整并发结构。

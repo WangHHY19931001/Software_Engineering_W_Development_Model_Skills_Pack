@@ -12,7 +12,12 @@ export type DirectSyncApi = 'spawnSync' | 'execSync' | 'execFileSync';
 type SyncProcessException = {
   api: DirectSyncApi;
   file: string;
-  line: number;
+  /**
+   * 调用位置锚：该文件内唯一的调用特征子串（默认取调用起始行的 trim 后文本）。
+   * 2026-09-18 任务 3.5 取代行号——行号是位置（上方插行即全体漂移），锚是内容寻址。
+   * 允许非唯一（同一文件内多条字面相同的调用）时，台账须把每个命中行都各登记一条。
+   */
+  anchor: string;
   symbol: string;
   reason: string;
   /** Retained audit provenance for a call migrated through the centralized runSync wrapper. */
@@ -33,7 +38,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 118,
+    anchor: "const diff = runSync('git', ['-c', 'core.quotePath=false', 'diff', '--name-only', 'HEAD'], {",
     symbol: 'detectScriptsChanges',
     reason:
       'B3 migrated git diff probe through runSync; retained as audit provenance with a 15-second timeout. 2026-09-04 archival-fixes: git args 前插 -c core.quotePath=false（与 change-scope.ts I-1 同款，非 ASCII 文件名按字面 UTF-8 收集）。',
@@ -43,7 +48,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 130,
+    anchor: "const status = runSync('git', ['status', '--porcelain'], { cwd: root, timeout: 15_000 });",
     symbol: 'detectScriptsChanges',
     reason:
       'B3 migrated git status probe through runSync; retained as audit provenance with a 15-second timeout.（行号 2026-09-04 archival-fixes 随 diff 调用多行化下移 3 行）',
@@ -53,7 +58,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 443,
+    anchor: "const result = runSync('git', ['rev-parse', 'HEAD'], { cwd: root, timeout: 15_000 });",
     symbol: 'currentCommitSha',
     reason:
       'B3 migrated the bounded git HEAD probe through runSync; retained as audit provenance.（行号 2026-09-06 audit-fixes task 5 随 ERROR_JSON detail 脱敏 helper 新增下移 17 行）',
@@ -63,7 +68,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 578,
+    anchor: 'runSync(process.execPath, [vitestBin, ...vitestArgs], {',
     symbol: 'collectVitestMeasurements',
     reason:
       'B3 migrated direct Node Vitest execution through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (1800 s) timeout.（行号 2026-09-06 audit-fixes task 9 随 VITEST_SPAWN_TIMEOUT_MS 常量提取下移 7 行；2026-09-14 fileParallelism 抖动处置随该常量注释扩充再下移 2 行，600s→1800s 同步改值）',
@@ -73,7 +78,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-docs-consistency.ts',
-    line: 584,
+    anchor: 'runSync(`npx vitest ${vitestArgs.map((a) => (/[ "&=]/.test(a) ? `"${a}"` : a)).join(\' \')}`, [], {',
     symbol: 'collectVitestMeasurements',
     reason:
       'B3 migrated the shell Vitest fallback through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (1800 s) timeout.（行号 2026-09-06 audit-fixes task 9 同上顺延；2026-09-14 同上再下移 2 行）',
@@ -83,7 +88,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-tla-model.ts',
-    line: 109,
+    anchor: "const res = runSync('java', ['-version'], {",
     symbol: 'checkEnvironment',
     reason:
       'B3 migrated the Java environment probe through runSync with EXEC_LIMITS.shortTimeoutMs.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 6 行）',
@@ -93,7 +98,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/check-tla-model.ts',
-    line: 292,
+    anchor: "const res = runSync('java', ['-version'], {",
     symbol: 'main',
     reason:
       'B3 migrated the preflight Java probe through runSync with EXEC_LIMITS.shortTimeoutMs.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧下移 7 行）',
@@ -103,7 +108,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: 'cli/security-scan.ts',
-    line: 156,
+    anchor: 'const r = runSync(',
     symbol: 'main',
     reason: 'B3 migrated ESLint execution through runSync with a 300-second timeout and existing 10 MiB maxBuffer.',
     migratedToRunSync: true,
@@ -112,7 +117,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/check-tla-model.ts',
-    line: 189,
+    anchor: "const stdout = execFileSync('java', ['-cp', jarAbs, 'tla2sany.SANY', tlaAbs], {",
     symbol: 'runTools',
     reason:
       'B4 excludes check-tla-model; SANY uses a command-specific bounded timeout and SIGKILL.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 6 行）',
@@ -121,7 +126,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/check-tla-model.ts',
-    line: 216,
+    anchor: 'const stdout = execFileSync(',
     symbol: 'runTools',
     reason:
       'B4 excludes check-tla-model; TLC uses a command-specific bounded timeout and SIGKILL.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 6 行）',
@@ -130,7 +135,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 46,
+    anchor: "execFileSync(name, ['--version'], {",
     symbol: 'checkCli',
     reason:
       'Existing CLI version probe has an explicit 10-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
@@ -139,7 +144,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 67,
+    anchor: "execFileSync('npm', ['i', '-g', packageName], {",
     symbol: 'installCli',
     reason:
       'Existing npm installation command has an explicit 120-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
@@ -148,7 +153,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 91,
+    anchor: "execFileSync('codegraph', ['query', 'main'], {",
     symbol: 'checkMcpCodegraph',
     reason:
       'Existing codegraph probe has an explicit 15-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
@@ -157,7 +162,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 114,
+    anchor: "execFileSync('codegraph', ['install'], {",
     symbol: 'registerMcpCodegraph',
     reason:
       'Existing codegraph registration has an explicit 60-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
@@ -166,7 +171,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 135,
+    anchor: "execFileSync('codegraph', ['init'], {",
     symbol: 'initCodegraph',
     reason:
       'Existing codegraph initialization has an explicit 300-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
@@ -175,7 +180,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execFileSync',
     file: 'cli/ensure-codegraph-opsx.ts',
-    line: 157,
+    anchor: "execFileSync('openspec', ['init'], {",
     symbol: 'initOpenspec',
     reason:
       'Existing OpenSpec initialization has an explicit 60-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
@@ -184,7 +189,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/coverage-logic.test.ts',
-    line: 397,
+    anchor: 'execSync(`npx tsx ${scriptPath} ${coveragePath} --out-of-scope=${oosPath}`, {',
     symbol: 'C7 invalid out-of-scope fixture',
     reason: 'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it.',
     timeout: { required: true, status: 'present' },
@@ -192,7 +197,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/coverage-logic.test.ts',
-    line: 415,
+    anchor: 'execSync(`npx tsx ${scriptPath} ${coveragePath} --out-of-scope=${oosPath}`, {',
     symbol: 'C7 non-array items fixture',
     reason: 'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it.',
     timeout: { required: true, status: 'present' },
@@ -200,7 +205,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/coverage-logic.test.ts',
-    line: 433,
+    anchor: 'execSync(`npx tsx ${scriptPath} ${coveragePath} --out-of-scope=${oosPath}`, {',
     symbol: 'C7 valid out-of-scope fixture',
     reason: 'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it.',
     timeout: { required: true, status: 'present' },
@@ -208,7 +213,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2782,
+    anchor: 'const result = spawnSync(',
     symbol: 'toBashPath wslpath/cygpath probe',
     reason:
       'Convert a Windows path to the running Bash form via wslpath/cygpath when the fixture runs on win32; explicit 15-second timeout.（行号 2026-09-18 任务3-B 计数用例顺延 +2 行）',
@@ -217,7 +222,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2823,
+    anchor: "const gitInit = spawnSync('git', ['init'], { cwd: fixtureRoot, encoding: 'utf-8', timeout: 15_000 });",
     symbol: 'withDocsConsistencyFixture git init',
     reason:
       'D5 creates a real temporary Git repository so provenance binds to an actual HEAD.（行号 2026-09-06 audit-fixes task 5 随 metrics 探针 rawErrorJson.detail 断言扩展下移 7 行；2026-09-12 code-health archive CLI 登记 +1 行；2026-09-15 p2b S31 随完整性审计双维度用例新增下移 159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
@@ -226,7 +231,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2826,
+    anchor: "spawnSync('git', ['config', '--local', 'user.email', 'fixture@example.invalid'], {",
     symbol: 'withDocsConsistencyFixture git config email',
     reason:
       'D5 configures the isolated fixture Git identity before creating its commit.（行号 2026-09-06 audit-fixes task 5 同上顺延；2026-09-15 p2b S31 同上顺延 +159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
@@ -235,7 +240,8 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2832,
+    anchor:
+      "spawnSync('git', ['config', '--local', 'user.name', 'fixture'], { cwd: fixtureRoot, timeout: 15_000 }).status,",
     symbol: 'withDocsConsistencyFixture git config name',
     reason:
       'D5 configures the isolated fixture Git identity before creating its commit.（行号 2026-09-15 p2b S31 同上顺延 +159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
@@ -244,7 +250,8 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2835,
+    anchor:
+      "spawnSync('git', ['config', '--local', 'commit.gpgSign', 'false'], { cwd: fixtureRoot, timeout: 15_000 }).status,",
     symbol: 'withDocsConsistencyFixture git config gpgSign',
     reason:
       'D5 disables inherited signing for the isolated provenance fixture.（行号 2026-09-15 p2b S31 同上顺延 +159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
@@ -253,7 +260,8 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2842,
+    anchor:
+      "expect(spawnSync('git', ['add', '.provenance-fixture'], { cwd: fixtureRoot, timeout: 15_000 }).status).toBe(0);",
     symbol: 'withDocsConsistencyFixture git add',
     reason:
       'D5 stages the copied fixture before creating its provenance-bound commit.（行号 2026-09-15 p2b S31 同上顺延 +159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
@@ -262,7 +270,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2843,
+    anchor: 'const commit = spawnSync(',
     symbol: 'withDocsConsistencyFixture git commit',
     reason:
       'D5 creates the real fixture HEAD with isolated hooks/signing/editor settings and a bounded timeout.（行号 2026-09-15 p2b S31 同上顺延 +159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
@@ -271,7 +279,8 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2895,
+    anchor:
+      "const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: fixtureRoot, encoding: 'utf-8', timeout: 15_000 });",
     symbol: 'fixtureCommitSha',
     reason:
       'D5 reads the isolated fixture HEAD for same-run provenance assertions.（行号 2026-09-15 p2b S31 同上顺延 +159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
@@ -280,7 +289,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/docs-consistency-logic.test.ts',
-    line: 2918,
+    anchor: 'const result = spawnSync(process.execPath, [tsxCli, DOCS_CONSISTENCY_CLI, fixtureRoot, ...args], {',
     symbol: 'runDocsConsistencyCli',
     reason:
       'D5 keeps the real docs-consistency CLI boundary test with an explicit bounded timeout for exit-2 probes.（行号 2026-09-15 p2b S31 同上顺延 +159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
@@ -289,7 +298,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/evidence-export-logic.test.ts',
-    line: 170,
+    anchor: 'const result = spawnSync(process.execPath, [tsxCli, SCRIPT, ...args], {',
     symbol: 'runCli',
     reason:
       'D3 requires actual CLI child-process exit-code tests; execution uses the default 15-second process timeout.',
@@ -298,7 +307,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/wm-write.test.ts',
-    line: 36,
+    anchor: 'const result = spawnSync(process.execPath, [tsxCli, SCRIPT, ...args], {',
     symbol: 'runArgs',
     reason: 'B4 excludes state/wm-write; real CLI helper uses an explicit 15-second timeout.',
     timeout: { required: true, status: 'present' },
@@ -306,7 +315,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/eval-runner.test.ts',
-    line: 12,
+    anchor: "const stdout = execSync(`npx tsx \"${join(repoRoot, 'eval', 'runner.ts')}\" --self-check`, {",
     symbol: 'eval runner --self-check 退出码 0 断言',
     reason: 'eval/runner.ts --self-check 自检命令，显式 15 秒超时保护。',
     timeout: { required: true, status: 'present' },
@@ -314,7 +323,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/eval-runner.test.ts',
-    line: 21,
+    anchor: "const stdout = execSync(`npx tsx \"${join(repoRoot, 'eval', 'runner.ts')}\" --self-check`, {",
     symbol: 'eval runner --self-check JSON 可解析断言',
     reason: 'eval/runner.ts --self-check 自检命令，显式 15 秒超时保护。',
     timeout: { required: true, status: 'present' },
@@ -322,7 +331,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/check-codegraph-queries.test.ts',
-    line: 359,
+    anchor: 'const stdout = execSync(`npx tsx "${CLI}" ${args.join(\' \')}`, {',
     symbol: 'runCli',
     reason:
       '2026-09-04 audit-gate-closure task 1 新增：codegraph checker CLI 边界测试，显式 90 秒超时。（行号 2026-09-06 audit-fixes task 5 随 C12/C13/C10g 新用例下移 42 行）',
@@ -331,7 +340,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/check-opsx-artifacts.test.ts',
-    line: 152,
+    anchor: 'const stdout = execSync(`npx tsx "${CLI}" ${args.join(\' \')}`, {',
     symbol: 'runCli',
     reason: '2026-09-04 audit-gate-closure task 1 新增：opsx checker CLI 边界测试，显式 90 秒超时。',
     timeout: { required: true, status: 'present' },
@@ -339,7 +348,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/check-openspec-archive.test.ts',
-    line: 162,
+    anchor: 'const stdout = execSync(`npx tsx "${CLI}" ${args.join(\' \')}`, {',
     symbol: 'runCli',
     reason: '2026-09-04 audit-gate-closure task 1 新增：archive checker CLI 边界测试，显式 90 秒超时。',
     timeout: { required: true, status: 'present' },
@@ -350,7 +359,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/platform-deps-hook.test.ts',
-    line: 25,
+    anchor: 'const result = spawnSync(',
     symbol: 'getBashPathTool',
     reason: '探测 wslpath/cygpath 是否可用以决定 Bash 路径转换方式；显式 15 秒超时。',
     timeout: { required: true, status: 'present' },
@@ -358,7 +367,8 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/platform-deps-hook.test.ts',
-    line: 40,
+    anchor:
+      "const result = spawnSync('bash', ['-c', 'printenv PATH'], { encoding: 'utf8', input: '', timeout: 15_000 });",
     symbol: 'getBashRuntimePath',
     reason: '读取 Bash 运行时 PATH 以便把测试注入的 bin 目录前置；显式 15 秒超时。',
     timeout: { required: true, status: 'present' },
@@ -366,7 +376,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/platform-deps-hook.test.ts',
-    line: 57,
+    anchor: "const result = spawnSync('bash', ['-c', command], { encoding: 'utf8', input: '', timeout: 15_000 });",
     symbol: 'convertBashPaths',
     reason: '把 Windows 路径批量转成当前 Bash 可识别形态（跨平台 hook 测试的前置）；显式 15 秒超时。',
     timeout: { required: true, status: 'present' },
@@ -374,7 +384,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/pre-commit-hook.test.ts',
-    line: 32,
+    anchor: 'const result = spawnSync(',
     symbol: 'toBashPath',
     reason: '把 fixture 路径转成当前 Bash 形态（win32 下经 wslpath/cygpath）；显式 15 秒超时。',
     timeout: { required: true, status: 'present' },
@@ -382,7 +392,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/pre-commit-hook.test.ts',
-    line: 50,
+    anchor: "const result = spawnSync('bash', ['-c', 'printenv PATH'], {",
     symbol: 'getBashRuntimePath',
     reason: '读取 Bash 运行时 PATH 以便把 fixture 的 test-bin 前置；显式 15 秒超时。',
     timeout: { required: true, status: 'present' },
@@ -390,7 +400,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/pre-commit-hook.test.ts',
-    line: 196,
+    anchor: "const result = spawnSync('git', args, {",
     symbol: 'runGit',
     reason: '在临时 fixture 仓上执行 git 断言命令（index/worktree 身份校验）；显式超时。',
     timeout: { required: true, status: 'present' },
@@ -398,7 +408,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/pre-commit-hook.test.ts',
-    line: 243,
+    anchor: "const result = spawnSync('git', ['show', spec], {",
     symbol: 'gitShow',
     reason: '读取 staged 内容（git show :path）以断言 index 快照语义；显式超时。',
     timeout: { required: true, status: 'present' },
@@ -406,7 +416,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/pre-commit-hook.test.ts',
-    line: 290,
+    anchor: "return spawnSync('bash', ['-c', command], {",
     symbol: 'runHook',
     reason: '以受控环境变量启动真实 pre-commit hook 子进程（staged-only 语义的主探针）；显式超时。',
     timeout: { required: true, status: 'present' },
@@ -414,7 +424,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/pre-commit-hook.test.ts',
-    line: 508,
+    anchor: "const stagedLink = spawnSync('git', ['ls-files', '--stage', '--', 'link.ts'], {",
     symbol: 'staged symlink probe',
     reason: '用 git ls-files --stage 断言暂存 symlink 记录的 mode/object 未被改写；显式超时。',
     timeout: { required: true, status: 'present' },
@@ -422,7 +432,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'spawnSync',
     file: '__tests__/pre-commit-hook.test.ts',
-    line: 669,
+    anchor: "const processProbe = spawnSync('bash', ['-c', 'kill -0 \"$1\"', 'batch-process-probe', batchPid], {",
     symbol: 'batch process liveness probe',
     reason: '超时用例里用 kill -0 断言 batch 后代进程已不可存活；显式 15 秒超时。',
     timeout: { required: true, status: 'present' },

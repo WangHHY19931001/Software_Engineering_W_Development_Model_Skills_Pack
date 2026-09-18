@@ -74,5 +74,15 @@ export interface JsonReport {
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
   /** run-log exit 0 的语义边界说明。 */
   statusNote?: string;
-  durationMs: number;
+  /**
+   * 门禁自身耗时（毫秒）的性能计量：**非确定性**，不构成任何判定依据。
+   *
+   * D3（2026-09-18）：要求字节级复现的机器通道（`check-run-log.ts --json`）**不得携带**——
+   * 每次运行的毫秒值不同会破坏「同输入同字节可复现」（与 review-package.ts 同一哲学）；
+   * 该字段改由人类可读路径的 `<LABEL>_JSON` 摘要承载（由调用点在 `summary` 之外追加，
+   * `printGateReport` 再追加 `exitCode`，故 `durationMs` 位于 `exitCode` **之前**）。
+   * 其它调用方（各 check-*.ts 的 --json）沿用现状，本次收口不扩面；如需一并确定化，
+   * 应由 `printJsonReport` 提供显式选项而非静默改变所有门禁契约。
+   */
+  durationMs?: number;
 }

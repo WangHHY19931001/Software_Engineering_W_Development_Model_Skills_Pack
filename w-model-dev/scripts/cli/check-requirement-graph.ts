@@ -49,7 +49,7 @@
  */
 
 import * as path from 'node:path';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 
 import {
   checkDesignSpecEnhance,
@@ -78,19 +78,60 @@ import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
  *
  * 锚点按仓库/项目约定写作**项目根相对路径**（conventions.md 列定位约定），而
  * graph.json 通常位于 `<project>/.w-model/graph.json`——故基准不能简单取 graph.json
- * 所在目录。解析规则：从 graph.json 所在目录向上至多 8 层，取第一个含 `.w-model/`
- * 或 `.git/` 的目录为项目根；都不命中则退回 graph.json 所在目录（样本 fixture 场景）。
+ * 所在目录。解析规则：从 graph.json 所在目录向上至多 8 层，取第一个满足下列之一的目录：
+ *   1. 含 `.git/`（git 根是权威项目根）；或
+ *   2. 含**像项目状态目录**的 `.w-model/`（判据见 isProjectStateWModelDir）。
+ * 都不命中则退回 graph.json 所在目录（样本 fixture 场景）。
+ *
+ * D2 修复（2026-09-18）：原判据「含 `.w-model/` 即算根」对**任何** `.w-model/` 成立，
+ * 而技能运行期会把门禁日志写到 CWD 相邻的 gitignored `.w-model/gate-logs/`——这类残留
+ * 会抢先命中，把基准截断到错误目录，使按仓库根书写的 evidenceAnchor 被误报 R15c
+ * （同一样本因盘面残留不同而结论翻转）。残留只含目录（gate-logs/ 等），真实项目状态
+ * 是文件（graph.json / run-log.jsonl / project.json …），故以「含至少一个常规文件」区分。
+ * **不采用**「全局优先 `.git/`」方案：嵌套在外部 git 仓中的真实项目（自带 `.w-model/`）
+ * 会被判到外层仓根，属回归；就近判定 + 残留过滤可同时保住两种布局。
  */
 function resolveAnchorBaseDir(graphAbsPath: string): string {
   let dir = path.dirname(graphAbsPath);
   const start = dir;
   for (let i = 0; i < 8; i++) {
-    if (existsSync(path.join(dir, '.w-model')) || existsSync(path.join(dir, '.git'))) return dir;
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 祖先目录由 graph.json 路径逐级上溯得出，只读存在性探测
+    if (existsSync(path.join(dir, '.git')) || isProjectStateWModelDir(dir)) return dir;
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
   return start;
+}
+
+/**
+ * `<dir>/.w-model/` 是否像**真实项目状态目录**（而非技能运行期只写 gate-logs 的残留）。
+ *
+ * 判据：`.w-model/` 下含至少一个常规文件。W-Model 项目状态是文件（graph.json /
+ * run-log.jsonl / project.json / budget.json / maturity.json / signature-chain.jsonl …），
+ * 而运行期残留由 `gate-logs/`、`code-health/` 这类**目录**构成。
+ * `readdirSync` 抛 ENOENT/ENOTDIR = 没有 `.w-model/` → false；
+ * 其它错误（权限/竞态）→ 保守返回 true，保持修复前语义（不因一次读盘失败把基准改到更远层）。
+ *
+ * **已知边界（本轮只登记、不改行为）**：无 `.git/` 且 `.w-model/` **只含子目录**的真实项目
+ * （只跑过 code-health、或只落过 gate-logs 的项目）会被判为残留 → 基准退到 graph.json 所在
+ * 目录（或更外层 `.git`）；修复前（任何 `.w-model/` 即算根）会解析到该项目目录——这是本判据
+ * 收紧带来的**小概率回归面**。不选「含常规文件 **或** 含非 gate-logs 条目」的放宽方案：
+ * `.w-model/code-health/…`（code-health-* CLI 的默认写出位置）与 `gate-logs/` 同属技能运行期
+ * 写出的**目录**，放宽会把这类残留重新判成项目根、使 D2 复发。缓解事实：真实 W-Model 项目
+ * 必有状态文件（`/wm analyze` 初始化即写 `project.json`，与 check-signature-chain.ts 的
+ * `findProjectRoot` 判据一致）；本仓 `./.w-model`（只含 `code-health/`、`gate-logs/`）靠同层
+ * `.git` 命中。三处项目根解析器（本文件 / check-iceberg-sweep.ts / check-signature-chain.ts）
+ * 的统一抽 lib 属后续任务，本轮不做部分对齐。
+ */
+function isProjectStateWModelDir(dir: string): boolean {
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 祖先目录下的受控状态目录，仅列条目类型、零写入
+    return readdirSync(path.join(dir, '.w-model'), { withFileTypes: true }).some((entry) => entry.isFile());
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    return code !== 'ENOENT' && code !== 'ENOTDIR';
+  }
 }
 
 /**

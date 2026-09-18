@@ -128,13 +128,15 @@ async function createProject(name = 'project'): Promise<string> {
     path.resolve(process.cwd(), 'w-model-dev/scripts/samples/run-log/valid.jsonl'),
     'utf8',
   );
-  await fs.writeFile(
-    path.join(state, 'run-log.jsonl'),
-    runLog
-      .split(/\r?\n/)
-      .map((line) => (line.includes('"action":"gate"') ? line.replace(/\}$/, ',"gateLogPath":"gate.json"}') : line))
-      .join('\n'),
-  );
+  // 只有首个 gate 记录携带 gateLogPath：provenance 契约要求证据目录内每个 gate-log 文件
+  // 恰被 run-log 引用一次，而 valid.jsonl 迁移后含每阶段 5 条 R11 闭环 gate 记录——
+  // 给所有 gate 行都标注会让同一文件被引用多次（RUN_LOG_NOT_PASSED）。
+  const runLogLines = runLog.split(/\r?\n/);
+  const taggedGateIndex = runLogLines.findIndex((line) => line.includes('"action":"gate"'));
+  if (taggedGateIndex < 0) throw new Error('run-log fixture 缺少 gate 记录');
+  // eslint-disable-next-line security/detect-object-injection -- taggedGateIndex 由同一数组 findIndex 得出且上方已断言 >= 0（受控下标，非外部键）
+  runLogLines[taggedGateIndex] = runLogLines[taggedGateIndex]!.replace(/\}$/, ',"gateLogPath":"gate.json"}');
+  await fs.writeFile(path.join(state, 'run-log.jsonl'), runLogLines.join('\n'));
   for (const args of [
     ['init'],
     ['add', '.'],

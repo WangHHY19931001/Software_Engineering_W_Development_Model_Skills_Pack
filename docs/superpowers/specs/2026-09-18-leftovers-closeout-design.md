@@ -35,9 +35,9 @@
 
 ## 2A. 负向登记证据寻址结构化（2026-09-18 追加，用户裁定）
 
-**背景**：`NEGATIVE-COVERAGE.md` 的证据语法为 `文件:行号`。行号是位置耦合——上方任意加行使全部登记集体漂移（本会话实测两次 +1/+2 回填、46 锚迁移一次）。虽然校验器已断言被引行的内容（内容锚），假证据从未穿透过，但「文件中存在唯一特征内容」与「第 N 行含 X」防伪力等价而前者更强（现实现不要求内容唯一），后者却引入纯维护税。
+**背景**：`NEGATIVE-COVERAGE.md` 的证据语法为 `文件:行号`。行号是位置耦合——上方任意加行使全部登记集体漂移（本会话实测两次 +1/+2 回填、46 锚迁移一次）。旧校验器除行号外还断言被引行**内容**与本条 fixture 相关（基名或 fixtureRel 出现在被引行），故假证据未穿透过。迁移到锚寻址时该相关度断言必须显式补回：**「锚在被引文件内唯一」不蕴含「锚与本条 fixture 相关」**——唯一性只要求文件内不重复，不要求跨条目互异；且同名 fixture 使「条目内含基名」这类粗判据恒真（`samples/budget/bad-stale.json` 与 `samples/maturity/bad-stale.json` 的用例条目内都含 `bad-stale.json`；两条 fixture 行也可合法共用同一锚，实现自身即可构造该反例）。因此修复轮把相关度判据落到**用例条目粒度**（见下）。
 
-**设计**：证据语法改为 `文件#锚`，锚 = 该文件内**恰好出现一次**的唯一子串（测试文件取 `it(...)` 标题片段或断言字面量，fixture 行取文件基名+关键参数）。校验 = 登记文件存在（仓内相对路径）+ 锚唯一命中（0 次或多次命中均 exit 1，各自具名违规消息；沿用 `negative-coverage-evidence-anchor` 违规码族）。**`:行号` 语法从登记册移除**：校验器遇旧形态行 → 具名违规要求迁移，不留双语法。四列严格语法、门禁/机制白名单、每门禁恰一行、真实串行 exit-2 探针执行全部不变。迁移面：46 条登记行 + `check-samples-coverage.ts` 校验函数与其测试 + AGENTS §8 该行描述 + 相关文档语法描述。验收：check-samples-coverage 全绿；假锚（0 命中/多命中/旧行号形态）负向测试齐备；探针机制照常。
+**设计**：证据语法改为 `文件#锚`，锚 = 该文件内**恰好出现一次**的唯一子串（测试文件取 `it(...)` 标题片段或断言字面量，fixture 行取该 fixture 用例条目内的唯一行）。校验 = 登记文件存在且为普通文件（仓内相对路径）+ 锚非空 + 锚唯一命中（0 次或多次命中均 exit 1，各自具名违规消息；沿用 `negative-coverage-evidence-anchor` 违规码族）。**fixture 行另加相关度判据**（2026-09-18 修复轮补回被删掉的第三判据，violation code `negative-coverage-evidence-relevance`）：引用文件须为用例登记来源 `w-model-dev/scripts/cli/self-test.ts`，且锚必须落在该文件内**登记本条 fixture 的用例条目**内——条目 = `_CASES` 数组内的对象字面量（结构扫描跳过注释/字符串/正则后按括号配平切出），其登记的 `file` / `manifestFile` / `ticketsFile` / `featureFiles` / `auxFiles` / `sampleDir` 须覆盖该 fixture（精确命中或 sampleDir 前缀覆盖，与 rule 1 同口径）。条目粒度是必需而非加强：`budget` 与 `maturity` 的同名 `bad-stale.json` 分属不同条目（条目内基名相同），只有条目归属能区分。叠加第二条判据：同一 `引用文件#锚` 不得被两条指向**不同 fixture** 的 fixture 行共用（`negative-coverage-evidence-shared-anchor`）——互换锚时每条锚仍各自唯一，唯一性判据不报错，条目归属与共用锚两条互补覆盖。**`:行号` 语法从登记册移除**：校验器遇旧形态行 → 具名违规要求迁移，不留双语法。四列严格语法、门禁/机制白名单、每门禁恰一行、真实串行 exit-2 探针执行全部不变。迁移面：46 条登记行 + `check-samples-coverage.ts` 校验函数与其测试 + AGENTS §8 该行描述 + 相关文档语法描述。验收：check-samples-coverage 全绿；假锚负向测试齐备（0 命中 / 多命中 / 旧行号形态 / 锚落在别的 fixture 条目 / 两条行互换锚 / 两条行共用锚 / 锚指向非 self-test.ts 文件）；探针机制照常。
 
 
 
@@ -48,7 +48,7 @@
 **设计**：`run-log-logic.ts` 新增 **R11（阻断级）**，沿用既有匹配习惯（同文件已有 `entry.action === 'gate' && entry.script === 'check-rootcause-report.ts'` 先例）：
 
 - **触发域**：对 run-log 中每个出现 `action=checkpoint && outcome=success` 的阶段 P（有放行即有阶段门，无放行不苛求——fix/emergency 变体 run 无 checkpoint 自然不触发）；
-- **要求**：阶段 P 内存在 5 条 `action=gate && role=G && outcome=success && gateExitCode=0 && script ∈ 五脚本` 记录，且各自时间戳**不晚于**该次 checkpoint 记录（闭环在放行前完成）；任一缺失或晚于放行 → blocking，违规消息列出缺失脚本名；
+- **要求**：阶段 P 内存在 5 条 `action=gate && role=G && outcome=success && gateExitCode=0 && script ∈ 五脚本` 记录，且各自时间戳**严格早于**该次 checkpoint 记录（闭环须在放行前完成）；任一缺失或未严格早于放行（**同秒不算早于**：`run-log.schema.json` 的 `timestamp` 为 RFC3339 date-time，同秒内先后不可判定，故按严格早于判定）→ blocking，违规消息列出缺失脚本名；**（2026-09-18 控制者裁定：本节早期草稿与计划骨架曾写「不晚于」/`<=`，与本条「闭环在放行前完成」自相矛盾；一律以实现与 R11 违规消息文本为准，即严格早于。）**
 - **不搞 legacy 吸收**（沿用 R10 删除时间戳豁免的先例）：既有 fixture/self-test 用例缺 5 条目的，逐用例**真实迁移**（补齐带 `script` 字段的 gate 记录），不设豁免开关、不按日期放行；
 - `check-run-log.ts` 摘要行输出 R11 计数；与 R6（gate-logs 交叉校验）、R7（时序）不重复计数、不互相替代。
 

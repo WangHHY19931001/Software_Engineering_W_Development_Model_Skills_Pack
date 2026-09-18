@@ -59,7 +59,7 @@ git checkout -b fix/issue-xxx
 # 3.1 单元测试（vitest，文件数与用例数以当前命令输出为准，含各 *-logic.ts 纯逻辑与 CLI 集成测试）
 npx vitest run --config config/vitest.config.ts
 
-# 3.2 自检基线（354 条 self-test 运行用例，覆盖全部 check 脚本的通过 / 失败路径；samples/ 为 fixture 载体）
+# 3.2 自检基线（358 条 self-test 运行用例，覆盖全部 check 脚本的通过 / 失败路径；samples/ 为 fixture 载体）
 npm run self-test
 # 退出码 0=全部样本与期望一致 / 1=至少一条不匹配
 # 新增校验项时，必须同步增加 samples/ 下通过 / 失败各一条样本并在 self-test.ts 中声明期望
@@ -89,7 +89,7 @@ npm run format
 
 | #   | 检查                                                                                                                                                                                                                                   | 期望退出码 |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| 1   | `npm run self-test`（354 条样本回归基线）                                                                                                                                                                                              | 0          |
+| 1   | `npm run self-test`（358 条样本回归基线）                                                                                                                                                                                              | 0          |
 | 2   | `npm run check:verifier`（无参数）                                                                                                                                                                                                     | 2          |
 | 3   | `npm run check:gate -- /tmp/nonexistent`（输入错误）                                                                                                                                                                                   | 2          |
 | 4   | `npm run check:verifier -- samples/verifier/valid.json`（有效样本）                                                                                                                                                                    | 0          |
@@ -101,12 +101,13 @@ npm run format
 | 10  | `npm run check:exemption -- samples/exemption/valid-full-approval.json`（有效豁免样本）                                                                                                                                                | 0          |
 | 11  | `npx tsx w-model-dev/scripts/cli/check-signature-chain.ts samples/signature-chain/valid-all-roles.jsonl --phase=1`（有效签名链样本）                                                                                                   | 0          |
 | 12  | `npx vitest run --coverage --config config/vitest.config.ts`（单元测试全量 + 覆盖率阈值门禁：stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest exit 1；文件数/用例数以同次受控 JSON facts 与 provenance 为准）             | 0          |
-| 13  | `npm audit --audit-level=high`（依赖漏洞扫描，high 以上阻断；网络瞬态错误（DNS 解析失败、连接被重置/拒绝、超时、HTTP 429/5xx、socket hang up 等）或 registry 不支持 audit endpoint 时自动跳过；漏洞报告、JSON 解析与权限错误仍然阻断） | —          |
-| 14  | `npm run check:docs-consistency`（活体文档一致性门禁）                                                                                                                                                                                 | 0          |
-| 15  | `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（samples 覆盖矩阵门禁，五条规则：fixture 均被 self-test.ts 引用 / 引用路径无悬空 / 子目录均在 samples/README.md 矩阵声明 / exit-2 门禁均在 NEGATIVE-COVERAGE.md 登记会失败的负向案例 / 登记册严格语法与证据行号校验 + 逐门禁真实 exit-2 探针（隔离探针根零漂移））                                                                                              | 0          |
-| 16  | `npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs"`（格式一致性门禁：编辑未跑 `npm run format` 即阻断）                                                    | 0          |
-| 17  | `npx tsc -p config/tsconfig.json`（TypeScript strict 类型检查 0 错误，对齐 SSoT §10H.5）                                                                                                                                               | 0          |
-| 18  | `npx tsx eval/runner.ts`（触发边界语料断言 + coverageMatrix 五项校验）                                                                                                                                                                 | 0          |
+| 13  | `npx tsx w-model-dev/scripts/cli/check-coverage-scope.ts --report=coverage/coverage-final.json --min-statements=80 --min-branches=75 --min-functions=90 --min-lines=85`（规则层覆盖口径门禁：按 logic+lib 白名单分母重算，独立于第 12 项全分母阈值；阈值 80/75/90/85 = 2026-09-18 实测 stmts 84.25 / branch 77.87 / funcs 93.68 / lines 87.01 向下取整到 5 的倍数，不达 exit 1） | 0          |
+| 14  | `npm audit --audit-level=high`（依赖漏洞扫描，high 以上阻断；网络瞬态错误（DNS 解析失败、连接被重置/拒绝、超时、HTTP 429/5xx、socket hang up 等）或 registry 不支持 audit endpoint 时自动跳过；漏洞报告、JSON 解析与权限错误仍然阻断） | —          |
+| 15  | `npm run check:docs-consistency`（活体文档一致性门禁）                                                                                                                                                                                 | 0          |
+| 16  | `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（samples 覆盖矩阵门禁，五条规则：fixture 均被 self-test.ts 引用 / 引用路径无悬空 / 子目录均在 samples/README.md 矩阵声明 / exit-2 门禁均在 NEGATIVE-COVERAGE.md 登记会失败的负向案例 / 登记册严格语法与证据锚校验（`文件#唯一子串锚`）+ 逐门禁真实 exit-2 探针（隔离探针根零漂移））                                                                                              | 0          |
+| 17  | `npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs"`（格式一致性门禁：编辑未跑 `npm run format` 即阻断）                                                    | 0          |
+| 18  | `npx tsc -p config/tsconfig.json`（TypeScript strict 类型检查 0 错误，对齐 SSoT §10H.5）                                                                                                                                               | 0          |
+| 19  | `npx tsx eval/runner.ts`（触发边界语料断言 + coverageMatrix 五项校验）                                                                                                                                                                 | 0          |
 
 **启用方式**：仓库验证期间首次 `npm install` 即自动启用（`postinstall` 运行 `scripts/setup-hooks.cjs`，在当前 checkout 的本地 `.git/config` 设置 `core.hooksPath=.githooks`；失败仅 warn，不阻断 install）。这是仓库验证的本地 Git 配置副作用，不是 Agent Skill 激活必需。如需手动重置 / 确认，执行一次即可（配置写入本地 `.git/config`，不影响仓库内容）：
 
@@ -258,7 +259,7 @@ w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可�
 │   ├── security-scan.ts           # eslint-plugin-security 扫描 + baseline v2 指纹豁免
 │   ├── wm-status.ts / metrics-report.ts   # 只读报告脚本（状态快照 / 流程度量）
 │   ├── lib/cli-error.ts           # exit 2 错误结构统一（6 类错误码）
-│   ├── self-test.ts               # 校验逻辑自检（354 条样本，samples/ 驱动）
+│   ├── self-test.ts               # 校验逻辑自检（358 条样本，samples/ 驱动）
 │   ├── __tests__/                 # vitest 单元测试（文件数与用例数以当前命令输出为准 + README.md coverage 矩阵）
 │   └── samples/                   # 端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + bdd/ + signature-chain/ 等）
 ├── templates/          # 文档模板（需求/设计/测试/RTM 等，阶段 1-4 含主模板 + 6 独立子模板）

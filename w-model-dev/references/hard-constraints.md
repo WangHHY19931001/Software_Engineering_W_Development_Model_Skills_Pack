@@ -52,7 +52,7 @@
 
 ## #11 闭环机制强制校验 + R3 预防性审查
 
-`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`（无条件）5 脚本须在每个阶段门执行，`exitCode=0` 才可放行；任一脚本非 0 视为闭环未达成，回到当前阶段起点（SSoT §10C/§10D）。**执行核验边界（2026-09-17 审查如实标注）**：门禁侧**不校验**这 5 个脚本是否真的跑过（run-log 无「本阶段须出现这 5 个 gate 条目」规则）；执行责任在 G 的分派时序，若要机器核验需新增 run-log 规则（未实现）。`check-preventive-review.ts` 支持 `--auto-trigger` 模式：从 run-log 读取当前阶段，自动校验对应阶段的 3 份 R3 报告（completeness/reliability/security），exitCode=0 方可进入 V 评审。
+`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`（无条件）5 脚本须在每个阶段门执行，`exitCode=0` 才可放行；任一脚本非 0 视为闭环未达成，回到当前阶段起点（SSoT §10C/§10D）。**机器核验（2026-09-18 起由 `check-run-log.ts` R11 强制）**：凡 run-log 中出现 `checkpoint` 放行记录（`action=checkpoint` 且 `outcome=success`）的阶段，放行前必须已有本节 5 个脚本各自的 `role=G`、`outcome=success`、`gateExitCode=0` gate 记录，且时间戳**严格早于**放行时间（同秒不算「早于放行」，无时间戳豁免）；缺失任一或**未严格早于放行（含同秒）**即 blocking，违规消息列出缺失脚本名（同一阶段多次放行逐个核验，不合并）。无 checkpoint 放行的 run（如 fix/emergency 变体）不触发 R11。`check-preventive-review.ts` 支持 `--auto-trigger` 模式：从 run-log 读取当前阶段，自动校验对应阶段的 3 份 R3 报告（completeness/reliability/security），exitCode=0 方可进入 V 评审。
 
 **R3 预防性审查强制**（原约束 #17 并入，无条件，覆盖所有 S 变体）：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。**无条件强制**，覆盖所有 S 变体（S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**），无 flag，无「启用时」措辞。S-fix 走 `<phase>-fix-{dim}.json` 路径，S-emergency-fix 走 `<phase>-emergency-{dim}.json` 路径，S-ingest-tla / S-ingest-bdd 走 `<phase>-ingest-{dim}.json` 路径。V 评审前 G 子代理须跑 [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts)（支持 `--variant=standard|fix|emergency|ingest`）校验报告完整性。`preventive-review.schema.json` 强制 `passed=false ⇒ findings ≥1`——无发现的失败审查不得以空 findings 通过 schema。跳过 R3 直接进入 V 评审命中反模式 #33；S-fix / emergency-fix 后跳过 R3+V 命中反模式 #42。阶段 5-8 opsx 三段式（S-explore → S-propose → S-coding）每段另有 stage 级 R3 审查：产出 `.w-model/r3-reviews/phase<N>-{explore,propose,coding}-{completeness,reliability,security}.md` ×9 + `.w-model/v-reviews/phase<N>-{explore,propose,coding}.md` ×3（与 `check-opsx-artifacts.ts` 一致）。详见 [subagent-delegation.md](subagent-delegation.md)「R3 预防性审查分派模板」。
 
@@ -353,7 +353,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #42（S-fix 后跳过 R3+V） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R8（S(fix/emergency-fix)→V 间 R3 记录数）+ [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) `--variant=fix\|emergency` |
 | #43（敏感信息写入状态文件） | 无专用脚本（V 评审人工核验 + [`security-scan.ts`](../scripts/cli/security-scan.ts) 源码级扫描；G 不做人工核验，见 #36 行说明） |
 | #44（跳过冰山扫掠直接放行） | [`check-iceberg-sweep.ts`](../scripts/cli/check-iceberg-sweep.ts)（IcebergSweepReport R1-R8 校验，含 R6/R7/R8 三视角对账（见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md) §8.4），exitCode=1 命中）；run-log `iceberg-sweep` / `iceberg-review` 动作缺失检测为软检测（编排者自查 + V/G 人工核验，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节） |
-| #45（为通过测试而修改断言/测试期望） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R10 revertEvidence 回滚证伪（fix/emergency-fix 记录须携带合法 `revertEvidence.command`，`LEGACY_REVERT_EVIDENCE_CUTOFF` 起强制，exitCode=1 命中）；断言与需求的语义对应仍由 V 评审人工核验 |
+| #45（为通过测试而修改断言/测试期望） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R10 revertEvidence 回滚证伪（fix/emergency-fix 记录须携带合法 `revertEvidence.command`，**无时间戳豁免**：缺失或非法始终 blocking；`LEGACY_REVERT_EVIDENCE_CUTOFF` / `LEGACY_REVERT_EVIDENCE` 吸收路径已删除，exitCode=1 命中）；断言与需求的语义对应仍由 V 评审人工核验 |
 | #46（只给审计权不给修正权） | 无专用脚本（CHECKPOINT 介入路径标注） |
 | #47（大规模重构式改动） | 无专用脚本（diff 可审性由评审人工核验 + 增量集成纪律约束） |
 
@@ -898,7 +898,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **例外**：经用户/主刀明确批准的需求变更（走豁免或 S→R→V→人类四阶段），不视为违反。
 
-**门禁脚本**：[`check-run-log.ts`](../scripts/cli/check-run-log.ts) R10 revertEvidence 回滚证伪——fix/emergency-fix 记录须携带合法 `revertEvidence.command`（S-fix 复现测试的回滚证伪声明：执行 command 使复现测试回到失败态，AC-8；`LEGACY_REVERT_EVIDENCE_CUTOFF` 起强制，cutoff 前旧行按 LEGACY_REVERT_EVIDENCE 非阻断诊断吸收）；断言与需求的语义对应仍由 V 评审人工核验（软检测兜底）
+**门禁脚本**：[`check-run-log.ts`](../scripts/cli/check-run-log.ts) R10 revertEvidence 回滚证伪——fix/emergency-fix 记录须携带合法 `revertEvidence.command`（S-fix 复现测试的回滚证伪声明：执行 command 使复现测试回到失败态，AC-8；**无时间戳豁免**：缺失或非法始终 blocking，`LEGACY_REVERT_EVIDENCE_CUTOFF` / `LEGACY_REVERT_EVIDENCE` 吸收路径已删除）；断言与需求的语义对应仍由 V 评审人工核验（软检测兜底）
 
 **关联**：「改断言让测试通过」条目；"记叙性优先"（测试断言不是金标准，失败先归因，见 [bdd.md](bdd.md)「记叙性优先」节）
 

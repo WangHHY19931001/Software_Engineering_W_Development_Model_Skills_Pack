@@ -3440,16 +3440,16 @@ describe('gate-count-docs（活体文档门禁项数引用扫描，F1 反哺）'
     expect(v[0]!.message).toContain('17 项');
   });
 
-  it('index-exclusion：行含门禁标记的「第 13 项」下标引用不误报', () => {
+  it('index-exclusion：行含门禁标记的「第 14 项」下标引用不误报', () => {
     const input = baseInput({
-      gateCountDocs: [{ name: 'CONTRIBUTING.md', content: 'pre-push 第 13 项 npm audit warn 并跳过（门禁不阻断）' }],
+      gateCountDocs: [{ name: 'CONTRIBUTING.md', content: 'pre-push 第 14 项 npm audit warn 并跳过（门禁不阻断）' }],
     });
     expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
   });
 
-  it('index-exclusion：无空格「第13项」也不误报', () => {
+  it('index-exclusion：无空格「第14项」也不误报', () => {
     const input = baseInput({
-      gateCountDocs: [{ name: 'CONTRIBUTING.md', content: 'pre-push 第13项 npm audit（门禁不阻断）' }],
+      gateCountDocs: [{ name: 'CONTRIBUTING.md', content: 'pre-push 第14项 npm audit（门禁不阻断）' }],
     });
     expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
   });
@@ -3463,7 +3463,7 @@ describe('gate-count-docs（活体文档门禁项数引用扫描，F1 反哺）'
 
   it('mixed-line：同一行跳过序数但捕获过期计数', () => {
     const input = baseInput({
-      gateCountDocs: [{ name: 'README.md', content: '第 13 项 npm audit（门禁稳定）且 17 项门禁未同步' }],
+      gateCountDocs: [{ name: 'README.md', content: '第 14 项 npm audit（门禁稳定）且 17 项门禁未同步' }],
     });
     const violations = runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs');
     expect(violations).toHaveLength(1);

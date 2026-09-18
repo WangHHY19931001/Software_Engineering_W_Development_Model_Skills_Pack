@@ -1318,7 +1318,7 @@ const RUN_LOG_CASES: RunLogCase[] = [
   {
     file: 'valid.jsonl',
     expectedPassed: true,
-    description: '3 阶段各含 chunk/cross/gate/checkpoint，append-only 且 checkpoint tokens>0',
+    description: '3 阶段各含 chunk/cross/gate/checkpoint + 每阶段闭环五脚本，append-only 且 checkpoint tokens>0',
   },
   {
     file: 'bad-incomplete.jsonl',
@@ -1420,6 +1420,19 @@ const RUN_LOG_CASES: RunLogCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/R10.*revertEvidence/],
     description: 'fix 缺 revertEvidence，应被 R10 拦截（严格模式：无时间戳豁免，与 timestamp 早晚无关）',
+  },
+  // ---- J1: R11 闭环五脚本机器核验（约束 #11；触发域=checkpoint 放行） ----
+  {
+    file: 'bad-r11-missing-closure.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R11.*check-maturity\.ts/],
+    description: 'R11：阶段 1 缺 check-maturity.ts 闭环记录应被拦截（约束 #11 机器核验）',
+  },
+  {
+    file: 'bad-r11-late-closure.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R11.*check-budget\.ts/],
+    description: 'R11：闭环脚本记录晚于 checkpoint 放行应被拦截（无时间戳豁免）',
   },
 ];
 
@@ -1789,7 +1802,8 @@ const ROLE_DISPATCH_CASES: RoleDispatchCase[] = [
     file: 'bad-missing-G-role.jsonl',
     expectedPassed: false,
     expectedReasonPatterns: [/缺失 role=G/],
-    description: '阶段 1 缺 role=G 门禁记录，应被角色分派校验拦截（约束 #8）',
+    description:
+      '阶段 1 缺 role=G 门禁记录，应被角色分派校验拦截（约束 #8）；checkpoint 记 blocked（未放行）——未放行阶段无 R11 闭环义务，该样本只触发角色分派规则',
   },
   {
     file: 'bad-missing-R-role.jsonl',

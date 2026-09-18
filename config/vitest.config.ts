@@ -6,7 +6,8 @@
 // 单次子进程可能超过默认 5000ms 超时（Windows 原生无此问题）。调大上限不影响 Windows 表现。
 //
 // 为什么拆两个 project（背景：docs/changes/vitest-parallel-flakiness-finding.md）：
-//   仓库里 30 个测试文件会真实 execSync/spawnSync/runSync 启动 CLI 子进程。这些文件
+//   仓库里会真实 execSync/spawnSync/runSync 启动 CLI 子进程的测试文件（成员名单 = 下方
+//   SUBPROCESS_TEST_FILES 常量；2026-09-18 收口实测 40 个，拆分当时为 30 个）。这些文件
 //   **彼此并行**时子进程互相竞争，出现 `expected null to be N`（子进程未真正运行）、
 //   STACK_TRACE_ERROR、30s 超时，且每次落在不同文件——同一命令同一代码两次运行失败数
 //   可差 10 倍（实测 20 vs 2），量级跳动排除"断言写错"；基线 72081e2 同样复现。
@@ -16,8 +17,11 @@
 //   SUBPROCESS_TEST_FILES**（vitest-project-split.test.ts 会用源码证据强制此约定，
 //   漏登记即红灯）；反向地，不再 spawn 的文件也应从清单移除（该测试双向校验）。
 //   判定口径：真实 import node:child_process 或调用 runSync/execSync/spawnSync/execFile
-//   （后跟左括号）；vi.mock('node:child_process') 的文件（artifact-gate-assets、run-sync）
-//   子进程被替换为 mock、从不真实启动，**不算** spawn。
+//   （后跟左括号）；vi.mock('node:child_process') 整体替换子进程的文件（artifact-gate-assets）
+//   从不真实启动，**不算** spawn。
+//   已知盲点（HEAD 既存，非本轮引入）：run-sync.test.ts 顶部有同类 vi.mock，但其 472-486 行
+//   用例经 vi.doUnmock + vi.resetModules() 后真实 spawn 子进程并断言真实 ETIMEDOUT——
+//   文件级 mocked 判定使它既未登记也无红灯；修正留待收口后单独立项（逐调用点判定 + 登记）。
 
 const TEST_DIR = 'w-model-dev/scripts/__tests__';
 
@@ -40,6 +44,7 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'cli-natural-exit.test.ts',
   'code-health-cli.test.ts',
   'code-health-duplicates.test.ts',
+  'code-health-e2e.test.ts',
   'code-health-evidence.test.ts',
   'code-health-gap.test.ts',
   'code-health-ledger.test.ts',
@@ -48,6 +53,7 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'code-health-tests.test.ts',
   'coverage-logic.test.ts',
   'docs-consistency-logic.test.ts',
+  'doctor-logic.test.ts',
   'eval-runner.test.ts',
   'evidence-export-logic.test.ts',
   'evidence-provenance-logic.test.ts',
@@ -55,6 +61,7 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'gate-report.test.ts',
   'gate-test-evidence.test.ts',
   'gate-ticket-content.test.ts',
+  'graph-logic.test.ts',
   'l0-link-audit-cli.test.ts',
   'metrics-report.test.ts',
   'platform-deps-hook.test.ts',

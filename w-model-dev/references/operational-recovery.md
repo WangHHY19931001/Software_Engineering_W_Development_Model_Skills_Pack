@@ -459,7 +459,7 @@ G 子代理在每个阶段门按以下顺序调用，任一退出码 ≠ 0 → O
 | 脚本 | 关键校验项（对应修正设计规则表） |
 |---|---|
 | `check-budget.ts`（§5.1） | R1 时效性（`updatedAt` 滞后）· R2 schema 完整 · R3 onExceed 合法 · R4 killSwitch 合法 · R5 触发检测（返工次数 ≥ killSwitch 阈值但 run-log 无告警） |
-| `check-run-log.ts`（§5.2） | R1 阶段动作完整性（chunk/cross/gate/checkpoint 4 类）· R2 tokens 非负 · R3 返工记录一致 · R4 acknowledgedDecisions 非空 · R5 O 越权检测（交叉 `gate-logs/`）· R6 exitCode 一致（SSoT §10E）· R7 append-only · R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint；V 失败后须先 rootcause 再 S-fix（反模式 #18 轨迹检测），违例走返工循环；处置：补齐缺失动作 / 对齐理想轨迹后重跑） |
+| `check-run-log.ts`（§5.2） | R1 阶段动作完整性（chunk/cross/gate/checkpoint 4 类）· R2 tokens 非负 · R3 返工记录一致 · R4 acknowledgedDecisions 非空 · R5 O 越权检测（交叉 `gate-logs/`）· R6 exitCode 一致（SSoT §10E）· R7 append-only · R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint；V 失败后须先 rootcause 再 S-fix（反模式 #18 轨迹检测），违例走返工循环；处置：补齐缺失动作 / 对齐理想轨迹后重跑）· R9 跨轮次评审一致性（同一产物的 `qualityLevel` 跨轮次差 ≥2 档 → 评审者自身标准漂移，走高成熟度 CHECKPOINT 交人裁定，不走 R；见 [verifier-spec.md](verifier-spec.md) §14.1）· R10 revertEvidence 回滚证伪（fix/emergency-fix 须携带非空 `revertEvidence.command`，**无时间戳豁免**：缺失或非法始终 blocking；处置：由 S-fix 重跑真实回滚命令并补记后重跑）· R11 闭环五脚本齐备（凡有 `action=checkpoint` 且 `outcome=success` 放行的阶段，放行前须已有 `check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts` 各一条 `role=G` + `outcome=success` + `gateExitCode=0` 的 gate 记录，且时间戳**严格早于**放行（同秒不算，无时间戳豁免）；处置：补齐缺失的闭环脚本 gate 记录后重跑） |
 | `check-maturity.ts`（§5.3） | R1 schema 完整 · R2 level 合法 · R3 成功阶段计数更新（`completedCycles` 滞后）· R4 history 一致 · R5 降级触发 |
 | `check-checkpoint.ts`（§5.4） | R1 acknowledgedDecisions 非空 · R2 决策内容具体（泛化词黑名单）· R3 用户确认存在 · R4 决策与阶段匹配 · R5 跨阶段证据一致（SSoT §10.6 6.3） |
 

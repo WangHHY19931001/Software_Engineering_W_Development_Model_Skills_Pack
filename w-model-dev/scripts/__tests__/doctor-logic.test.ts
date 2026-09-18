@@ -3,13 +3,28 @@
  *
  * 覆盖：node 版本门 / tsx / ajv / java 版本解析（--with-tla 必需 vs 默认提示级）/
  *       tla2tools.jar 存在性 / codegraph+openspec 可选提示 / 汇总退出码派生。
- * 环境探测经 EnvProbe 注入，无真实 execFile 调用。
+ * 环境探测经 EnvProbe 注入（logic 级用例无真实 execFile 调用）；
+ * 末段另有**真实 CLI 子进程 + 真实文件系统**用例锁 TOOLS_DIR 路径解析（D1 回归）——
+ * 注入桩会让路径缺陷隐形，故该维度只能走真实解析路径。
  */
+
+import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
 import { checkEnvironment, deriveDoctorExitCode, type EnvProbe } from '../logic/doctor-logic.js';
 import { parseJavaMajor } from '../lib/java-version.js'; // 审计修复 P15：Java 版本解析单源化（自 lib 导入）
+import { runSync } from '../lib/run-sync.js';
+
+const require = createRequire(import.meta.url);
+const tsxCli = require.resolve('tsx/cli');
+/** 技能包根（本文件位于 w-model-dev/scripts/__tests__/） */
+const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const DOCTOR_SCRIPT = path.join(SKILL_ROOT, 'scripts', 'cli', 'doctor.ts');
+const TLA_JAR = path.join(SKILL_ROOT, 'tools', 'tla2tools.jar');
 
 /** 全绿探测桩：node 20 / 依赖全装 / java 11 / jar 存在 / codegraph+openspec 可用 */
 function greenProbe(): EnvProbe {
@@ -123,5 +138,45 @@ describe('checkEnvironment', () => {
 describe('deriveDoctorExitCode', () => {
   it('空结果 → 0', () => {
     expect(deriveDoctorExitCode([])).toBe(0);
+  });
+});
+
+describe('doctor.ts CLI 真实路径解析（D1 回归：TOOLS_DIR 必须解析到技能包 tools/）', () => {
+  /**
+   * 解析 --json 模式的 DOCTOR_JSON 行（stdout 单行摘要）。
+   * @param stdout doctor.ts --json 的完整 stdout
+   */
+  function parseDoctorJson(stdout: string): { checks: Array<{ name: string; status: string; detail: string }> } {
+    const line = stdout.split(/\r?\n/).find((l) => l.startsWith('DOCTOR_JSON '));
+    if (line === undefined) throw new Error(`未找到 DOCTOR_JSON 行；实际 stdout:\n${stdout}`);
+    return JSON.parse(line.slice('DOCTOR_JSON '.length)) as {
+      checks: Array<{ name: string; status: string; detail: string }>;
+    };
+  }
+
+  it('tools/tla2tools.jar 在盘 → 默认与 --with-tla 的 tla2tools 项均 ok（不得误报缺失）', () => {
+    // 显式区分「jar 缺失」与「路径解析错误」：jar 由 git 跟踪，缺失即仓库不完整。
+    // 此处直接失败并注明前置缺失（不跳过、不改弱断言）——跳过会让 D1 重新隐形。
+    if (!existsSync(TLA_JAR)) {
+      throw new Error(
+        `前置缺失：${TLA_JAR} 不在盘（tla2tools.jar 由 git 跟踪，git ls-files w-model-dev/tools/ 含它）→ 无法判定 TOOLS_DIR 路径解析正确性`,
+      );
+    }
+    expect(existsSync(TLA_JAR), `${TLA_JAR} 应存在于完整 checkout`).toBe(true);
+
+    for (const extraArgs of [[], ['--with-tla']] as const) {
+      const label = extraArgs.length === 0 ? '默认模式' : '--with-tla';
+      const r = runSync(process.execPath, [tsxCli, DOCTOR_SCRIPT, '--json', ...extraArgs], { cwd: SKILL_ROOT });
+      expect(r.status, `${label}：doctor.ts 子进程异常退出（stderr: ${r.stderr ?? ''}）`).not.toBeNull();
+      const parsed = parseDoctorJson(r.stdout ?? '');
+      const item = parsed.checks.find((c) => c.name === 'tla2tools');
+      expect(item, `${label}：检查项 tla2tools 缺失`).toBeDefined();
+      // 修复前：TOOLS_DIR 缺 dirname() → 探测 scripts/tools/ → 恒报缺失（warn/fail）
+      expect(
+        item!.status,
+        `${label}：tla2tools.jar 在盘时该项必须 ok（TOOLS_DIR 须经 dirname(fileURLToPath(...)) 解析）`,
+      ).toBe('ok');
+      expect(item!.detail).toBe('tools/tla2tools.jar 存在');
+    }
   });
 });

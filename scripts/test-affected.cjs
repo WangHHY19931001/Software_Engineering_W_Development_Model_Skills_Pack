@@ -5,7 +5,7 @@
  * ## 定位（务必先读）
  *
  * 这是**本地迭代**用的车道，**不是验收门禁**：
- *   - 验收（任务收口 / 交付 / 合入前）**必须跑全量**：`npm run prepush`（18 项门禁，含全量 vitest + 覆盖率阈值）
+ *   - 验收（任务收口 / 交付 / 合入前）**必须跑全量**：`npm run prepush`（19 项门禁，含全量 vitest + 覆盖率阈值）
  *     或至少 `npm test`（全量 vitest）。本脚本无法替代它——它只跑被选中的测试文件。
  *   - 因此本脚本会主动打印「选了哪些文件、为什么」以及「本次没有跑哪些门禁」，避免把快速车道误当验收。
  *
@@ -77,7 +77,7 @@ const REGISTRY_TESTS = [
 
 /** 本车道**不跑**的门禁（打印提醒用）：验收时必须由全量车道覆盖。 */
 const GATES_NOT_COVERED = [
-  'self-test（352 条样本）',
+  'self-test（358 条样本）',
   'security-scan（基线比对）',
   'docs-consistency（活体文档 / 注册表 / 探针计数）',
   'samples 覆盖矩阵（登记册 + 真实 exit-2 探针）',
@@ -207,7 +207,7 @@ function selectTests(changed, tests) {
 function printBanner() {
   console.log('─'.repeat(72));
   console.log('快速车道 test:affected —— 本地迭代用，**不是验收门禁**');
-  console.log('验收（任务收口 / 交付 / 合入前）必须跑全量：npm run prepush（18 项，含全量 vitest + 覆盖率阈值）');
+  console.log('验收（任务收口 / 交付 / 合入前）必须跑全量：npm run prepush（19 项，含全量 vitest + 覆盖率阈值）');
   console.log(`本车道不覆盖的门禁：${GATES_NOT_COVERED.join(' / ')}`);
   console.log('─'.repeat(72));
 }

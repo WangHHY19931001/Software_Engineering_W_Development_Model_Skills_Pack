@@ -135,9 +135,15 @@ async function inferPhaseFromRunLog(runLogPath: string): Promise<number | null> 
 }
 
 /**
- * 定位项目根（供三视角分母从上游已落盘产物实测）。与 `check-requirement-graph.ts`
- * 的 `resolveAnchorBaseDir` 同口径：自报告所在目录向上找 `.w-model/` 或 `.git`。
+ * 定位项目根（供三视角分母从上游已落盘产物实测）。自报告所在目录向上找 `.w-model/` 或 `.git`。
  * 报告常规落在 `.w-model/iceberg/<id>.json`，故上一级即项目根。
+ *
+ * **判据已与 `check-requirement-graph.ts` 的 `resolveAnchorBaseDir` 分叉（2026-09-18 起）**：
+ * 本函数仍是裸 `existsSync('.w-model')`——**任何** `.w-model/` 目录（含技能运行期只写
+ * `gate-logs/` 的 gitignored 残留）都算命中；graph 侧在 D2 修复后收紧为「`.w-model/` 须含
+ * 至少一个常规文件」（`isProjectStateWModelDir`），残留不再算根。故二者行为**未对齐**：
+ * 本函数对 CWD 相邻残留仍敏感（残留会抢先命中并把基准截断到错误目录）。统一三处项目根解析器
+ * （本文件 / check-requirement-graph.ts / check-signature-chain.ts）属后续任务，本轮只如实登记。
  */
 function resolveProjectRoot(reportAbsPath: string): string {
   let dir = path.dirname(reportAbsPath);

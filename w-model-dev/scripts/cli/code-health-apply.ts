@@ -19,7 +19,9 @@
  * Safety: real writes happen only beneath the explicit `--root`; `dry-run` writes nothing; `patch` writes
  * one controlled patch under `<root>/.w-model/code-health/apply/`; `commit` runs `git apply --check` then
  * `git apply` with an argv array (no shell string), reads the real status back, and refuses to claim
- * success when any path outside the exact approved scope changed.
+ * success when any path outside the exact approved scope changed. A refused commit is reverse-applied
+ * and the worktree is re-read against the pre-change snapshot, so a rollback that could not restore the
+ * tree is reported explicitly instead of being silently reported as clean.
  *
  * Exit codes: 0 proposal/applied, 1 fail-closed validation or write failure, 2 input error.
  */
@@ -266,18 +268,46 @@ function blockResult(
   mode: 'dry-run' | 'patch' | 'commit',
   reason: string,
   errorCode: CodeHealthError['code'],
+  record: { patchPath?: string | null; rollback?: RollbackPlan | null } = {},
 ): ApplyResult {
   return {
     kind: 'blocked',
     applied: false,
     errorCode,
     mode,
-    patchPath: null,
+    patchPath: record.patchPath ?? null,
     appliedFiles: [],
     unrelatedFiles: [],
-    rollback: null,
+    rollback: record.rollback ?? null,
     reason,
   };
+}
+
+/**
+ * Prove a refused application was rolled back to its pre-change worktree state (governance §6 /
+ * SSoT §10K.4). The controlled patch is reverse-applied with the real exit code, and the worktree is
+ * re-read with `git status --porcelain` and compared against the pre-change snapshot: on a worktree
+ * that was clean before the run this is exactly `git diff --exit-code` being zero, while a dirty
+ * worktree is compared against its own snapshot instead of being misreported as a failed rollback.
+ * Both a failed reverse application and a remaining residue are returned as explicit violations, so a
+ * rollback that could not restore the tree is never silently reported as clean.
+ *
+ * Exported for the refusal-path acceptance test: the forward `git apply` and the reverse application
+ * happen inside one CLI process, so a reverse-application failure is not reachable from outside.
+ */
+export function verifyRollbackRestored(root: string, patchPath: string, beforePaths: readonly string[]): string[] {
+  const patchArgument = path.isAbsolute(patchPath) ? patchPath : path.join(root, patchPath);
+  const reverted = git(root, ['apply', '-R', patchArgument]);
+  if (reverted.status !== 0) {
+    return [
+      `git apply -R failed (exit ${String(reverted.status)}): ${reverted.stderr.trim() || reverted.stdout.trim()}`,
+    ];
+  }
+  const beforeSet = new Set(beforePaths);
+  const residue = parseStatus(git(root, ['status', '--porcelain=v1', '-z', '--untracked-files=all']).stdout)
+    .filter((entry) => !beforeSet.has(entry))
+    .sort();
+  return residue.length === 0 ? [] : [`rollback left the worktree modified: ${residue.join(', ')}`];
 }
 
 function emit(exitCode: 0 | 1, payload: object): void {
@@ -641,10 +671,18 @@ async function main(): Promise<void> {
     appliedFiles.length === scope.size &&
     candidate.changeScope.files.every((file) => appliedFiles.includes(file));
   if (!exactScope) {
-    git(root, ['apply', '-R', path.isAbsolute(patchPath) ? patchPath : path.join(root, patchPath)]);
-    const reason = `commit touched scope ${JSON.stringify(appliedFiles)} with unrelated ${JSON.stringify(unrelatedFiles)}`;
+    // A refused application is only recoverable if the reverse application is verified: report the
+    // explicit rollback violations (failed reverse apply / remaining residue) instead of claiming the
+    // worktree is clean, and keep the controlled patch + rollback plan in the output as the record of
+    // what was reversed (governance §6 "无法回滚即显式失败").
+    const rollbackViolations = verifyRollbackRestored(root, patchPath, before);
+    const reason =
+      `commit touched scope ${JSON.stringify(appliedFiles)} with unrelated ${JSON.stringify(unrelatedFiles)}` +
+      (rollbackViolations.length > 0
+        ? `; rollback failed: ${rollbackViolations.join('; ')}; the worktree may be left modified`
+        : '; rollback restored the pre-change worktree');
     console.error(`✗ [SCOPE_MISMATCH] ${reason}`);
-    emit(1, blockResult(mode, reason, 'SCOPE_MISMATCH'));
+    emit(1, blockResult(mode, reason, 'SCOPE_MISMATCH', { patchPath, rollback }));
     process.exitCode = 1;
     return;
   }

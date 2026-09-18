@@ -7,15 +7,16 @@
  * prove it was never touched. The `GIT_ENV` recipe is reused from `code-health-evidence.test.ts`.
  */
 
-import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
+// Namespace import: the refusal-path rollback verifier is a real exported unit of the apply CLI
+// (importing the module has no side effect — `main` only runs when the file is the process entry).
+import * as codeHealthApplyCli from '../cli/code-health-apply.js';
 import {
   applyApproved,
   executeRollback,
@@ -26,132 +27,28 @@ import {
   type RevisionIdentity,
 } from '../logic/code-health-ledger-logic.js';
 import type { ApplyResult } from '../logic/code-health-contract.js';
-import { createCodeHealthGitRevisionProvider } from '../lib/code-health-revision-provider.js';
 import { runSync } from '../lib/run-sync.js';
 
-const require = createRequire(import.meta.url);
-const tsxCli = require.resolve('tsx/cli');
-const here = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(here, '../../..');
-const CLI_DIR = path.join(REPO_ROOT, 'w-model-dev/scripts/cli');
-const APPLY_SAMPLES = path.join(REPO_ROOT, 'w-model-dev/scripts/samples/code-health/apply');
+import {
+  bindRevision,
+  cleanupTempRoots,
+  createTempGitRepository,
+  createdRoots,
+  GIT_ENV,
+  git,
+  gitHead,
+  gitStatus,
+  jsonLine,
+  loadApplyFixture,
+  REPO_ROOT,
+  revisionProvider,
+  runCli,
+  tempRoot,
+  writeJson,
+  type ApplyFixture,
+} from './helpers/code-health-fixtures.js';
 
-const revisionProvider = createCodeHealthGitRevisionProvider();
-
-const GIT_ENV = {
-  GIT_CONFIG_NOSYSTEM: '1',
-  GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
-  GIT_TERMINAL_PROMPT: '0',
-  GIT_AUTHOR_NAME: 'code-health-cli',
-  GIT_AUTHOR_EMAIL: 'code-health-cli@example.test',
-  GIT_COMMITTER_NAME: 'code-health-cli',
-  GIT_COMMITTER_EMAIL: 'code-health-cli@example.test',
-  PATH: process.env.PATH,
-  PATHEXT: process.env.PATHEXT,
-  SYSTEMROOT: process.env.SYSTEMROOT,
-  SYSTEMDRIVE: process.env.SYSTEMDRIVE,
-  WINDIR: process.env.WINDIR,
-  COMSPEC: process.env.COMSPEC,
-  TEMP: process.env.TEMP,
-  TMP: process.env.TMP,
-  USERPROFILE: process.env.USERPROFILE,
-} as NodeJS.ProcessEnv;
-
-const createdRoots: string[] = [];
-
-afterEach(async () => {
-  await Promise.all(createdRoots.splice(0).map((root) => fs.rm(root, { recursive: true, force: true, maxRetries: 3 })));
-});
-
-interface CliResult {
-  code: number | null;
-  stdout: string;
-  stderr: string;
-}
-
-function runCli(script: string, args: string[], cwd: string = REPO_ROOT): CliResult {
-  const r = runSync(process.execPath, [tsxCli, path.join(CLI_DIR, script), ...args], {
-    cwd,
-    timeout: 90_000,
-    env: { ...process.env, ...GIT_ENV },
-  });
-  return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
-}
-
-function jsonLine<T>(stdout: string, prefix: string): T | null {
-  const line = stdout.split(/\r?\n/).find((entry) => entry.startsWith(`${prefix} `));
-  if (line === undefined) return null;
-  try {
-    return JSON.parse(line.slice(prefix.length + 1)) as T;
-  } catch {
-    return null;
-  }
-}
-
-async function git(root: string, args: string[]): Promise<CliResult> {
-  const r = runSync('git', args, { cwd: root, timeout: 30_000, env: GIT_ENV });
-  return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
-}
-
-async function gitStatus(root: string): Promise<string> {
-  return (await git(root, ['status', '--porcelain', '--untracked-files=all'])).stdout.trim();
-}
-
-async function gitHead(root: string): Promise<string> {
-  return (await git(root, ['rev-parse', 'HEAD'])).stdout.trim();
-}
-
-async function tempRoot(prefix: string): Promise<string> {
-  const root = await fs.mkdtemp(path.join(tmpdir(), prefix));
-  createdRoots.push(root);
-  return root;
-}
-
-async function createTempGitRepository(): Promise<string> {
-  const root = await tempRoot('code-health-cli-repo-');
-  await git(root, ['init', '--quiet']);
-  await fs.mkdir(path.join(root, 'src'), { recursive: true });
-  await fs.writeFile(path.join(root, 'src', 'unused.ts'), 'export const unusedFunction = 1;\n');
-  await fs.writeFile(path.join(root, '.gitignore'), '.w-model/\n');
-  await git(root, ['add', '--all']);
-  await git(root, ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'initial']);
-  return root;
-}
-
-interface ApplyFixture {
-  description: string;
-  mode: 'dry-run' | 'patch' | 'commit';
-  candidate: CodeHealthCandidate;
-  approval: ApprovalDecision | null;
-}
-
-async function loadApplyFixture(name: string): Promise<ApplyFixture> {
-  return JSON.parse(await fs.readFile(path.join(APPLY_SAMPLES, name), 'utf8')) as ApplyFixture;
-}
-
-async function writeJson(dir: string, name: string, value: unknown): Promise<string> {
-  const target = path.join(dir, name);
-  await fs.writeFile(target, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
-  return target;
-}
-
-/** Bind the fixture candidate/approval to the isolated repository's real revision. */
-function bindRevision(
-  fixture: ApplyFixture,
-  revision: RevisionIdentity,
-): { candidate: CodeHealthCandidate; approval: ApprovalDecision } {
-  const candidate: CodeHealthCandidate = structuredClone(fixture.candidate);
-  candidate.revision = revision;
-  candidate.evidenceBinding = { ...candidate.evidenceBinding, revision };
-  candidate.rollback = {
-    ...candidate.rollback,
-    preChangeRevision: revision.commitSha,
-    command: `git apply -R .w-model/code-health/apply/${candidate.candidateId}.patch`,
-    patchPath: `.w-model/code-health/apply/${candidate.candidateId}.patch`,
-  };
-  const approval: ApprovalDecision = { ...(fixture.approval as ApprovalDecision), revision };
-  return { candidate, approval };
-}
+afterEach(cleanupTempRoots);
 
 let validFixture: ApplyFixture;
 let approvalRequiredFixture: ApplyFixture;
@@ -449,6 +346,188 @@ describe('code-health-apply approval gate (R5/R7)', () => {
     expect(unapproved.stdout).toContain('HUMAN_APPROVAL_REQUIRED');
     expect(await gitStatus(root)).toBe(before);
   });
+});
+
+describe('code-health-apply refusal proves the rollback (SSoT §10K.4 / governance §6)', () => {
+  it('被拒绝的 commit 仍在输出中记录受控 patch 与回滚计划，并已还原工作树', async () => {
+    const root = await createTempGitRepository();
+    // The scope file leaves the index but stays in the worktree: deleting it changes no tracked status
+    // entry, so the real exact-scope read-back can never confirm the approved scope and the commit is
+    // refused after the forward `git apply`. The refusal must roll the deletion back and say so.
+    expect((await git(root, ['rm', '--cached', '--quiet', 'src/unused.ts'])).code).toBe(0);
+    expect(
+      (await git(root, ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'untrack the scope file'])).code,
+    ).toBe(0);
+    const revision = (await revisionProvider.current(root)) as RevisionIdentity;
+    const workDir = await tempRoot('code-health-cli-inputs-');
+    const { candidate, approval } = bindRevision(validFixture, revision);
+    const candidatePath = await writeJson(workDir, 'candidate.json', candidate);
+    const approvalPath = await writeJson(workDir, 'approval.json', approval);
+
+    const r = runCli('code-health-apply.ts', [
+      '--candidate',
+      candidatePath,
+      '--approval',
+      approvalPath,
+      '--root',
+      root,
+      '--mode',
+      'commit',
+    ]);
+    expect(r.code).toBe(1);
+    const summary = jsonLine<{
+      kind: string;
+      applied: boolean;
+      errorCode: string | null;
+      patchPath: string | null;
+      rollback: { executable: boolean; patchPath: string; patchSha256?: string } | null;
+      reason: string;
+    }>(r.stdout, 'APPLY_JSON');
+    expect(summary?.kind).toBe('blocked');
+    expect(summary?.errorCode).toBe('SCOPE_MISMATCH');
+    expect(summary?.applied).toBe(false);
+    // The controlled patch and the rollback plan are the record of the refused application: they must
+    // not be dropped just because the run failed.
+    expect(summary?.patchPath).toBe(`.w-model/code-health/apply/${candidate.candidateId}.patch`);
+    expect(summary?.rollback?.patchPath).toBe(summary?.patchPath);
+    expect(summary?.rollback?.executable).toBe(true);
+    expect(summary?.rollback?.patchSha256).toMatch(/^[0-9a-f]{64}$/);
+    // A successful rollback is reported as such; a failed one must never masquerade as clean. The
+    // positive assertion is load-bearing: dropping `verifyRollbackRestored` from the refusal path (and
+    // leaving a bare reverse application) would silently pass a negative-only assertion.
+    expect(summary?.reason).toContain('rollback restored the pre-change worktree');
+    expect(summary?.reason).not.toMatch(/rollback failed|could not be rolled back|may be left modified/);
+    // The refused deletion is really gone from the worktree again.
+    await expect(fs.stat(path.join(root, 'src', 'unused.ts'))).resolves.toBeTruthy();
+    await expect(fs.readFile(path.join(root, 'src', 'unused.ts'), 'utf8')).resolves.toBe(
+      'export const unusedFunction = 1;\n',
+    );
+    expect(await gitStatus(root)).toBe('?? src/unused.ts');
+  }, 120_000);
+
+  it('运行前已 dirty 的非 scope 文件不算回滚残留（快照比对不误报，字面 git diff 会误报）', async () => {
+    const root = await createTempGitRepository();
+    // A tracked NON-scope file that is already locally modified before the run. Its status path is in the
+    // pre-change snapshot, so the residue comparison must exclude it instead of reporting a failed
+    // rollback — this is the design reason for comparing against the pre-change snapshot rather than a
+    // literal `git diff --exit-code` (which would flag the pre-existing local change).
+    await fs.writeFile(path.join(root, 'notes.txt'), 'committed notes\n', 'utf8');
+    expect((await git(root, ['add', 'notes.txt'])).code).toBe(0);
+    expect(
+      (await git(root, ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'track non-scope file'])).code,
+    ).toBe(0);
+    await fs.writeFile(path.join(root, 'notes.txt'), 'locally modified notes\n', 'utf8');
+    // Same refusal trigger as the case above: the scope file left the index and stays in the worktree.
+    expect((await git(root, ['rm', '--cached', '--quiet', 'src/unused.ts'])).code).toBe(0);
+    expect(
+      (await git(root, ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'untrack the scope file'])).code,
+    ).toBe(0);
+    const revision = (await revisionProvider.current(root)) as RevisionIdentity;
+    const workDir = await tempRoot('code-health-cli-inputs-');
+    const { candidate, approval } = bindRevision(validFixture, revision);
+    const candidatePath = await writeJson(workDir, 'candidate.json', candidate);
+    const approvalPath = await writeJson(workDir, 'approval.json', approval);
+    const patchRelative = `.w-model/code-health/apply/${candidate.candidateId}.patch`;
+    const patchAbsolute = path.join(root, patchRelative);
+
+    const r = runCli('code-health-apply.ts', [
+      '--candidate',
+      candidatePath,
+      '--approval',
+      approvalPath,
+      '--root',
+      root,
+      '--mode',
+      'commit',
+    ]);
+    expect(r.code).toBe(1);
+    const summary = jsonLine<{ errorCode: string | null; reason: string }>(r.stdout, 'APPLY_JSON');
+    expect(summary?.errorCode).toBe('SCOPE_MISMATCH');
+    // The pre-existing dirty path must not surface as residue (a snapshot-less comparison would).
+    expect(summary?.reason).not.toContain('notes.txt');
+    expect(summary?.reason).toContain('rollback restored the pre-change worktree');
+
+    // The real pre-change snapshot is `?? src/unused.ts` + ` M notes.txt`; the comparison is path-set
+    // based, so the pre-existing dirty path is inside the snapshot and is not residue.
+    const preChange = ['notes.txt', 'src/unused.ts'];
+    // Re-create the transient post-forward-apply state (scope file deleted) through the recorded patch
+    // itself, then let the verifier reverse-apply it.
+    expect(runSync('git', ['apply', patchAbsolute], { cwd: root, timeout: 30_000, env: GIT_ENV }).status).toBe(0);
+    expect(codeHealthApplyCli.verifyRollbackRestored(root, patchAbsolute, preChange)).toEqual([]);
+    // The same state compared against an EMPTY snapshot (what a literal `git diff --exit-code` would
+    // report) must surface the pre-existing local change as residue — the false positive this snapshot
+    // comparison exists to avoid.
+    expect(runSync('git', ['apply', patchAbsolute], { cwd: root, timeout: 30_000, env: GIT_ENV }).status).toBe(0);
+    const emptySnapshot = codeHealthApplyCli.verifyRollbackRestored(root, patchAbsolute, []);
+    expect(emptySnapshot.join(' ')).toContain('rollback left the worktree modified: notes.txt');
+
+    // Scope file really restored; the pre-existing dirty file was never touched by the rollback.
+    await expect(fs.readFile(path.join(root, 'src', 'unused.ts'), 'utf8')).resolves.toBe(
+      'export const unusedFunction = 1;\n',
+    );
+    await expect(fs.readFile(path.join(root, 'notes.txt'), 'utf8')).resolves.toBe('locally modified notes\n');
+  }, 120_000);
+
+  it('回滚校验器：反向应用失败或仍有残留都必须显式报告（不静默），干净还原返回空', async () => {
+    const root = await createTempGitRepository();
+    const revision = (await revisionProvider.current(root)) as RevisionIdentity;
+    const workDir = await tempRoot('code-health-cli-inputs-');
+    const { candidate, approval } = bindRevision(validFixture, revision);
+    const candidatePath = await writeJson(workDir, 'candidate.json', candidate);
+    const approvalPath = await writeJson(workDir, 'approval.json', approval);
+    const patchRelative = `.w-model/code-health/apply/${candidate.candidateId}.patch`;
+    const patchAbsolute = path.join(root, patchRelative);
+
+    // Produce the real controlled patch through the CLI itself (never a hand-written patch).
+    expect(
+      runCli('code-health-apply.ts', [
+        '--candidate',
+        candidatePath,
+        '--approval',
+        approvalPath,
+        '--root',
+        root,
+        '--mode',
+        'patch',
+      ]).code,
+    ).toBe(0);
+
+    // (a) The patch was never applied → the reverse application cannot succeed → loud violation.
+    const notApplied = codeHealthApplyCli.verifyRollbackRestored(root, patchAbsolute, []);
+    expect(notApplied.join(' ')).toMatch(/git apply -R failed/);
+
+    // (b) The patch is applied and the reverse application restores the pre-change snapshot.
+    expect(
+      runCli('code-health-apply.ts', [
+        '--candidate',
+        candidatePath,
+        '--approval',
+        approvalPath,
+        '--root',
+        root,
+        '--mode',
+        'commit',
+      ]).code,
+    ).toBe(0);
+    expect(codeHealthApplyCli.verifyRollbackRestored(root, patchAbsolute, [])).toEqual([]);
+
+    // (c) A remaining unrelated path means the worktree did not return to the pre-change snapshot.
+    expect(
+      runCli('code-health-apply.ts', [
+        '--candidate',
+        candidatePath,
+        '--approval',
+        approvalPath,
+        '--root',
+        root,
+        '--mode',
+        'commit',
+      ]).code,
+    ).toBe(0);
+    await fs.writeFile(path.join(root, 'residue.txt'), 'unrelated\n', 'utf8');
+    const residue = codeHealthApplyCli.verifyRollbackRestored(root, patchAbsolute, []);
+    expect(residue.join(' ')).toMatch(/rollback left the worktree modified: residue\.txt/);
+  }, 120_000);
 });
 
 describe('applyApproved / executeRollback real result semantics (R1/R4/R9)', () => {

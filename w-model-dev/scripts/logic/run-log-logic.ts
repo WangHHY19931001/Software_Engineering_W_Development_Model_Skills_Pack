@@ -7,6 +7,8 @@
  *       + R4 acknowledgedDecisions 非空 + R5 O 越权检测 + R6 exitCode 一致
  *       + R7 append-only 时序。
  *       + R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint）
+ *       + R9 跨轮次评审一致性 + R10 revertEvidence 回滚证伪
+ *       + R11 闭环五脚本机器核验（约束 #11）
  *
  * 设计原则（与 budget-logic.ts / graph-logic.ts / tla-logic.ts 一致）：
  *   1. 仅依赖本文件类型形状 + lib/safe-json.js（parseJsonSafe）+ schema-loader.js（validateBySchema），无 I/O 副作用
@@ -41,6 +43,22 @@ export const REVIEW_LEVEL_ORDER: Record<string, number> = {
   C: 1,
   D: 0,
 };
+
+/**
+ * R11 闭环五脚本（约束 #11 / SSoT §10C）：每阶段门须以 5 个闭环脚本
+ * exitCode=0 为前提才可放行。R11 把该约束做成机器可核验判定——
+ * 凡出现 checkpoint 放行（action=checkpoint 且 outcome=success）的阶段，
+ * 放行前必须已有这 5 个脚本各自一条 role=G / outcome=success /
+ * gateExitCode=0 的 gate 记录；缺失或未严格早于放行（同秒不算）均 blocking
+ * （无时间戳豁免）。
+ */
+export const RUN_LOG_CLOSURE_SCRIPTS: readonly string[] = [
+  'check-budget.ts',
+  'check-run-log.ts',
+  'check-maturity.ts',
+  'check-checkpoint.ts',
+  'check-preventive-review.ts',
+] as const;
 
 // ==================== 自包含类型形状 ====================
 
@@ -157,6 +175,8 @@ export interface RunLogCheckResult {
   lifecycleStatus: RunLogLifecycleStatus;
   /** R10 revertEvidence 维度计数；legacy 保留兼容且严格模式固定为 0。 */
   revertEvidence?: { checked: number; missing: number; legacy: number };
+  /** R11 闭环五脚本核验计数（checkedGates=已核验的 checkpoint 放行数，missing=缺失/晚到记录数）；无 checkpoint 放行时不出现。 */
+  closure?: { checkedGates: number; missing: number };
 }
 
 interface LifecycleIdentity {
@@ -1337,12 +1357,49 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     );
   }
 
+  // R11: 闭环五脚本机器核验（约束 #11 / SSoT §10C）。
+  //
+  // 触发域是「checkpoint 放行」（action=checkpoint 且 outcome=success）——只有放行
+  // 过的阶段才有闭环义务，无放行的 run-log（如 fix 变体）不受约束。对每个放行，
+  // 统计放行前（timestamp < 放行 timestamp，严格早于放行）已存在的闭环脚本 gate
+  // 记录：action=gate + role=G + outcome=success + gateExitCode=0 +
+  // script ∈ RUN_LOG_CLOSURE_SCRIPTS。非 G 角色、exitCode≠0、outcome≠success 或
+  // 时间戳不早于放行的同名脚本记录一律不充数（无时间戳豁免；schema 的 timestamp 为
+  // RFC3339 date-time，同秒内先后不可判定，故同秒不算「早于放行」），缺失即
+  // blocking 并指明阶段与脚本名。同一阶段多次放行逐个核验（不合并）。
+  const closureReleases: Array<{ phase: number; proven: Set<string> }> = [];
+  let closureMissingCount = 0;
+  for (const e of valid) {
+    if (e.action !== 'checkpoint' || e.outcome !== 'success' || typeof e.phase !== 'number') continue;
+    const releaseAt = Date.parse(e.timestamp);
+    const proven = new Set<string>();
+    for (const g of valid) {
+      if (g.phase !== e.phase || g.action !== 'gate' || g.role !== 'G' || g.outcome !== 'success') continue;
+      if (g.gateExitCode !== 0) continue;
+      if (typeof g.script !== 'string' || !RUN_LOG_CLOSURE_SCRIPTS.includes(g.script)) continue;
+      if (Date.parse(g.timestamp) < releaseAt) proven.add(g.script);
+    }
+    closureReleases.push({ phase: e.phase, proven });
+  }
+  for (const release of closureReleases) {
+    for (const script of RUN_LOG_CLOSURE_SCRIPTS) {
+      if (release.proven.has(script)) continue;
+      closureMissingCount++;
+      violations.push(
+        `R11: 阶段 ${release.phase} 的 checkpoint 放行缺少闭环脚本 ${script} 的成功 gate 记录（须 role=G、gateExitCode=0 且早于放行；约束 #11：闭环五脚本每阶段门 exitCode=0）`,
+      );
+    }
+  }
+
   const passed = violations.length === 0;
   return {
     passed,
     violations,
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
     revertEvidence: r10Counts,
+    ...(closureReleases.length > 0
+      ? { closure: { checkedGates: closureReleases.length, missing: closureMissingCount } }
+      : {}),
     lifecycleStatus: passed && diagnostics.length === 0 ? 'CLOSED_UNDER_CURRENT_RULES' : 'NOT_CLOSED_NOT_PROVEN',
   };
 }

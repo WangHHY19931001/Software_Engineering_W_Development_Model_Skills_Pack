@@ -17,8 +17,15 @@
  * 第 5 条规则（M06 / S28 强化，本轮）：登记册必须**严格且可执行**——
  *   - 语法严格：每行恰四列（门禁名 / 机制 / 证据 / 所防回归），缺列 / 空格 / 未知机制 / 未知门禁 /
  *     重复门禁 / 空证据各自产出**具名** blocking 违规（旧实现静默跳过坏行，等于把「写坏」当「写全」）；
- *   - 证据可解析：`fixture` 证据必须是项目内真实路径；`invocation` / `mutated-copy` 证据必须解析为
- *     「文件:行号」且文件存在、行号为不超过文件总行数的正整数（正文里只写一句「由某任务提供」不算证据）；
+ *   - 证据可解析：`fixture` 证据必须是项目内真实路径；`invocation` / `mutated-copy` 与 fixture 行的
+ *     引用位置一律用**锚寻址** `文件#唯一子串锚`（锚在被引文件内恰出现一次；2026-09-18 任务 3.5 取代
+ *     「文件:行号」——行号是位置，上方插行即整表漂移，见 validateAnchorEvidence）。
+ *     旧行号语法一律判违规（不自留双语法兼容）；正文里只写一句「由某任务提供」不算证据；
+ *   - fixture 行相关度（2026-09-18 修复轮补回）：锚唯一只保证「在该文件内唯一」，**不**保证「与本条
+ *     fixture 相关」——故 fixture 行的锚必须落在 self-test.ts 内**登记该 fixture 的用例条目**上（条目 =
+ *     `_CASES` 数组内的对象字面量；`budget` 与 `maturity` 的同名 `bad-stale.json` 分属不同条目，故可
+ *     区分），且同一 `引用文件#锚` 不得被两条指向不同 fixture 的 fixture 行共用
+ *     （negative-coverage-evidence-relevance / negative-coverage-evidence-shared-anchor）；
  *   - 真实 exit-2 探针：逐门禁**串行**执行 `lib/exit2-probe-registry.ts`（与 check-docs-consistency
  *     中心探针同源）中的负向调用，断言 exit code = 2、stdout 含可解析的 `ERROR_JSON`（exitCode=2 且
  *     category 属 exit-2 类别）、stderr 含同名类别的人类错误行，且隔离探针根在调用前后**逐项不变**
@@ -81,6 +88,9 @@ const NEGATIVE_MECHANISMS = new Set(['fixture', 'invocation', 'mutated-copy']);
 /** 登记册表格列数（门禁脚本 / 负向机制 / 负向案例·证据位置 / 所防回归） */
 const NEGATIVE_COLUMNS = 4;
 
+/** 用例登记来源文件（rule 1 的引用事实源）：fixture 行的锚必须落在该文件的用例条目内 */
+const CASE_SOURCE_REL = 'w-model-dev/scripts/cli/self-test.ts';
+
 /** 单次 exit-2 探针的子进程超时（与中心探针同量级；超时按探针失败处理） */
 const PROBE_TIMEOUT_MS = 60_000;
 
@@ -90,7 +100,7 @@ interface NegativeEntry {
   name: string;
   /** 负向机制：fixture / invocation / mutated-copy */
   mechanism: string;
-  /** 证据位置：fixture 为 `samples/...`；invocation / mutated-copy 为 文件:行号 */
+  /** 证据位置：fixture 为 `samples/...`（可附 `（self-test.ts#锚）` 引用）；invocation / mutated-copy 为 `文件#唯一子串锚` */
   evidence: string;
   /** 所防回归（第 4 列，必填非空） */
   regression: string;
@@ -134,18 +144,27 @@ interface ReferenceSets {
   dirs: Set<string>;
 }
 
-/** 提取 self-test.ts 中所有用例数组对 samples/ 的引用（按行号区间切块，避免正则前瞻误吞） */
-function extractReferences(selfTestContent: string): ReferenceSets {
-  const files = new Set<string>();
-  const dirs = new Set<string>();
-  const lines = selfTestContent.split('\n');
+/** self-test.ts 内的一个用例条目（`_CASES` 数组内的对象字面量）及其登记的 samples/ 引用 */
+interface CaseEntry {
+  /** 所属用例数组名（诊断用，如 `BUDGET_CASES`） */
+  array: string;
+  /** 条目在 self-test.ts 源文本内的字符区间起始（含 `{`） */
+  start: number;
+  /** 条目在 self-test.ts 源文本内的字符区间结束（`}` 之后，不含） */
+  end: number;
+  /** 条目登记的 samples/ 相对引用（file / manifestFile / ticketsFile / featureFiles / auxFiles / sampleDir） */
+  refs: Set<string>;
+}
 
-  // 1) run 函数 → 子目录映射：runXxxCases 函数体（行号区间）内
-  //    path.join(<dirVar>, '<subdir>', <caseVar>.<field>) 与 for (const <v> of <CASES>) 配对，
-  //    得到「用例数组 → file 型子目录」映射。
-  //    兼容形态：三参 join（path.join(samplesDir, 'bdd', c.file)）、两参 join + 预定义目录变量
-  //    （const bddSamplesDir = path.join(samplesDir, 'bdd')）、循环变量非 c（for (const tc of ...)）、
-  //    bdd 用 manifestFile 字段。
+/**
+ * 用例数组 → 子目录映射：runXxxCases 函数体（行号区间）内
+ * path.join(<dirVar>, '<subdir>', <caseVar>.<field>) 与 for (const <v> of <CASES>) 配对，
+ * 得到「用例数组 → file 型子目录」映射。
+ * 兼容形态：三参 join（path.join(samplesDir, 'bdd', c.file)）、两参 join + 预定义目录变量
+ * （const bddSamplesDir = path.join(samplesDir, 'bdd')）、循环变量非 c（for (const tc of ...)）、
+ * bdd 用 manifestFile 字段。
+ */
+function mapCaseArraysToDirs(lines: readonly string[]): Map<string, string> {
   const runStarts: Array<{ name: string; start: number }> = [];
   lines.forEach((l, i) => {
     const m = l.match(/async function (run\w+Cases)\(/);
@@ -159,11 +178,180 @@ function extractReferences(selfTestContent: string): ReferenceSets {
     const dirMatch =
       dirVarMatch !== null ? dirVarMatch[2]! : block.match(/path\.join\(samplesDir, '([^']+)', \w+\.\w+\)/)?.[1];
     if (dirMatch === undefined) continue;
-    const dir = dirMatch;
     for (const m of block.matchAll(/for \(const \w+ of (\w+_CASES)\)/g)) {
-      casesToDir.set(m[1]!, dir);
+      casesToDir.set(m[1]!, dirMatch);
     }
   }
+  return casesToDir;
+}
+
+/** 跳过 `from` 处的引号字面量，返回闭合引号之后的下标（未闭合则返回源文本末尾） */
+function skipQuotedLiteral(source: string, from: number, quote: string): number {
+  let i = from + 1;
+  while (i < source.length) {
+    // eslint-disable-next-line security/detect-object-injection -- i 为本函数内受控字符游标（from+1 .. source.length-1），只读源码文本字符做转义判定，非外部键注入
+    if (source[i] === '\\') {
+      i += 2;
+      continue;
+    }
+    // eslint-disable-next-line security/detect-object-injection -- i 为同一受控字符游标，只读源码文本字符与闭合引号比较，非外部键注入
+    if (source[i] === quote) return i + 1;
+    i += 1;
+  }
+  return source.length;
+}
+
+/** `index` 处的 `/` 是否开启正则字面量（依据前一个有效字符；`return /re/` 形态单独放行） */
+function startsRegexLiteral(source: string, index: number): boolean {
+  let j = index - 1;
+  // eslint-disable-next-line security/detect-object-injection -- j 为受控字符游标（index-1 向前跳过空白），只读源码文本字符，非外部键注入
+  while (j >= 0 && /\s/.test(source[j]!)) j -= 1;
+  if (j < 0) return true;
+  // eslint-disable-next-line security/detect-object-injection -- j 同上受控游标，source[j] 只与字面量字符集比较，非外部键注入
+  if ('([{,;:=!&|?+-*<>'.includes(source[j]!)) return true;
+  return /\breturn\s*$/.test(source.slice(Math.max(0, index - 12), index));
+}
+
+/** 跳过 `from` 处的正则字面量，返回其后下标（未闭合 / 遇换行按普通字符处理，返回 from） */
+function skipRegexLiteral(source: string, from: number): number {
+  let i = from + 1;
+  let inClass = false;
+  while (i < source.length) {
+    // eslint-disable-next-line security/detect-object-injection -- i 为本函数内受控字符游标，只读正则字面量文本（字符类状态扫描），非外部键注入
+    const ch = source[i]!;
+    if (ch === '\\') {
+      i += 2;
+      continue;
+    }
+    if (ch === '\n') return from;
+    if (ch === '[') inClass = true;
+    else if (ch === ']') inClass = false;
+    else if (ch === '/' && !inClass) return i + 1;
+    i += 1;
+  }
+  return from;
+}
+
+/**
+ * 返回 `from` 起第一个**代码字符**（不在注释 / 字符串 / 模板 / 正则字面量内）的下标，无则 -1。
+ * 只服务于用例数组的结构扫描（括号配平），不追求完整 TS 语法；跳过字面量是必要的——
+ * 用例里的 `expectedReasonPatterns: [/\[schema\].*level/]` 正则含 `[`/`]`，按裸字符配平会错位。
+ */
+function nextCodeIndex(source: string, from: number): number {
+  let i = from;
+  while (i < source.length) {
+    // eslint-disable-next-line security/detect-object-injection -- i 为本函数内受控字符游标，只读源码文本字符做结构扫描，非外部键注入
+    const ch = source[i]!;
+    if (ch === '/' && source[i + 1] === '/') {
+      const nl = source.indexOf('\n', i);
+      i = nl === -1 ? source.length : nl + 1;
+      continue;
+    }
+    if (ch === '/' && source[i + 1] === '*') {
+      const close = source.indexOf('*/', i + 2);
+      i = close === -1 ? source.length : close + 2;
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === '`') {
+      i = skipQuotedLiteral(source, i, ch);
+      continue;
+    }
+    if (ch === '/' && startsRegexLiteral(source, i)) {
+      const next = skipRegexLiteral(source, i);
+      if (next > i) {
+        i = next;
+        continue;
+      }
+    }
+    return i;
+  }
+  return -1;
+}
+
+/** 从条目文本按 extractReferences 的同字段口径抽取 samples/ 引用，构造 CaseEntry */
+function makeCaseEntry(array: string, dir: string | undefined, text: string, start: number, end: number): CaseEntry {
+  const refs = new Set<string>();
+  if (dir !== undefined) {
+    for (const m of text.matchAll(/\b(?:file|manifestFile|ticketsFile): '([^']+)'/g)) refs.add(`${dir}/${m[1]!}`);
+    for (const m of text.matchAll(/(?:featureFiles|auxFiles): \[([^\]]*)\]/g)) {
+      for (const ff of m[1]!.matchAll(/'([^']+)'/g)) refs.add(`${dir}/${ff[1]!}`);
+    }
+  }
+  for (const m of text.matchAll(/sampleDir: '([^']+)'/g)) refs.add(m[1]!);
+  return { array, start, end, refs };
+}
+
+/**
+ * 采集 self-test.ts 的**用例条目**（`const <NAME>_CASES: T[] = [ {...}, ... ]` 数组内的对象字面量）：
+ * 每个条目给出源文本字符区间与它登记的 samples/ 引用（字段口径与 extractReferences 一致）。
+ *
+ * 用途（rule 5 的 fixture 行相关度判据，2026-09-18 修复轮补回）：fixture 行的锚必须落在**登记该
+ * fixture 的条目**内。只断言「锚在文件内唯一」不足以拦假证据——锚指到别的 fixture 的用例条目上
+ * 照样 exit 0；且同名 fixture 使「条目内含基名」这种粗判据对
+ * `samples/budget/bad-stale.json` / `samples/maturity/bad-stale.json` 恒真，必须落到条目粒度才能区分。
+ */
+function collectCaseEntries(selfTestContent: string): CaseEntry[] {
+  const lines = selfTestContent.split('\n');
+  const lineOffsets: number[] = [0];
+  for (let i = 0; i < selfTestContent.length; i++) {
+    // eslint-disable-next-line security/detect-object-injection -- i 为 for 循环受控游标（0 .. selfTestContent.length-1），只读源码文本字符，非外部键注入
+    if (selfTestContent[i] === '\n') lineOffsets.push(i + 1);
+  }
+  const casesToDir = mapCaseArraysToDirs(lines);
+  const entries: CaseEntry[] = [];
+  lines.forEach((line, index) => {
+    const decl = line.match(/const (\w+_CASES):/);
+    if (decl === null) return;
+    // eslint-disable-next-line security/detect-object-injection -- index 为 lines.forEach 的受控下标，lineOffsets 由本函数按同一文本构建（长度覆盖全部行首），非外部键注入
+    const arrayBracket = selfTestContent.indexOf('= [', lineOffsets[index]!);
+    if (arrayBracket === -1) return; // 声明行无数组字面量（理论上不存在）
+    const dir = casesToDir.get(decl[1]!);
+    let depth = 0;
+    let entryStart = -1;
+    for (
+      let i = nextCodeIndex(selfTestContent, arrayBracket + 3);
+      i !== -1;
+      i = nextCodeIndex(selfTestContent, i + 1)
+    ) {
+      // eslint-disable-next-line security/detect-object-injection -- i 为 nextCodeIndex 返回的受控字符下标（源码文本内位置），非外部键注入
+      const ch = selfTestContent[i]!;
+      if (ch === '[' || ch === '{' || ch === '(') {
+        depth += 1;
+        if (depth === 1 && ch === '{') entryStart = i;
+        continue;
+      }
+      if (ch !== ']' && ch !== '}' && ch !== ')') continue;
+      // 数组字面量在本层闭合（`depth === 0`）→ 该用例数组扫描结束
+      if (depth === 0) return;
+      depth -= 1;
+      if (depth === 0 && ch === '}' && entryStart !== -1) {
+        entries.push(makeCaseEntry(decl[1]!, dir, selfTestContent.slice(entryStart, i + 1), entryStart, i + 1));
+        entryStart = -1;
+      }
+    }
+  });
+  return entries;
+}
+
+/**
+ * 条目登记的引用是否覆盖该 fixture：精确命中，或被条目声明的 `sampleDir` 子树覆盖
+ * （与 findUncovered 的 isCovered 同口径，避免「fixture 由目录引用登记」的行被误判为不相关）。
+ */
+function entryCoversFixture(entry: CaseEntry, fixtureRel: string): boolean {
+  for (const ref of entry.refs) {
+    if (ref === fixtureRel || fixtureRel.startsWith(`${ref}/`)) return true;
+  }
+  return false;
+}
+
+/** 提取 self-test.ts 中所有用例数组对 samples/ 的引用（按行号区间切块，避免正则前瞻误吞） */
+function extractReferences(selfTestContent: string): ReferenceSets {
+  const files = new Set<string>();
+  const dirs = new Set<string>();
+  const lines = selfTestContent.split('\n');
+
+  // 1) 用例数组 → 子目录映射（与用例条目级校验共用同一口径，见 mapCaseArraysToDirs）
+  const casesToDir = mapCaseArraysToDirs(lines);
 
   // 2) 用例数组块（const <NAME>_CASES: ... 行号区间）→ file/manifestFile/ticketsFile 字段值，
   //    组合为 `<子目录>/<file>` 精确引用
@@ -339,6 +527,19 @@ function listCliScriptFiles(root: string): string[] {
   return readdirSync(cliDir).filter((f) => f.endsWith('.ts'));
 }
 
+/**
+ * 证据引用形态：`<文件>#<锚>`（内容寻址，2026-09-18 任务 3.5 取代 `文件:行号`）。
+ * 锚 = 被引行在**该文件内恰好出现一次**的特征子串；锚内不得含分隔字符（全角逗号 / 全角括号 /
+ * 全角分号 / `#` / 反引号），这些字符标志锚结束，其后的文字为描述性备注（不参与校验）。
+ * 登记册里整条引用写作 Markdown 行内代码（反引号包裹）——`w-model-dev/scripts/__tests__/...`
+ * 这类路径含 `__`，不裹代码会被 Markdown 渲染成强调（prettier 重排时实测被改写为 `**tests**`）。
+ */
+const ANCHOR_CITATION_PATTERN =
+  /([A-Za-z0-9._@/-]+\.(?:ts|tsx|mts|cts|js|mjs|cjs|json|jsonl|md|sh))#([^，（）；#`\n]+)/;
+
+/** 迁移前的行号引用形态（`<文件>:<行号>`）：仅供违规检测，用于强制一次性迁移，不做双语法兼容 */
+const LEGACY_LINE_CITATION_PATTERN = /([A-Za-z0-9._@/-]+\.(?:ts|tsx|mts|cts|js|mjs|cjs|json|jsonl|md|sh)):(\d+)/;
+
 /** fixture 机制行的证据路径（`samples/...`，相对 w-model-dev/scripts/）；无法解析返回 null */
 function extractFixturePath(evidence: string): string | null {
   const backticked = evidence.match(/`([^`]+)`/);
@@ -348,73 +549,119 @@ function extractFixturePath(evidence: string): string | null {
 }
 
 /**
- * `invocation` / `mutated-copy` 证据必须解析为「文件:行号」：文件相对 repo-root、
- * 行号为 1..文件总行数 内的正整数。只写一句「由某任务提供」的正文描述**不是证据**。
+ * 锚式证据校验（2026-09-18 任务 3.5，取代 `validateFileLineEvidence` / `validateFixtureCitationAnchor`）。
+ *
+ * 记法：`<文件>#<锚>`——文件相对 repo-root（fixture 行的 `self-test.ts` 等裸名解析为
+ * `w-model-dev/scripts/cli/<裸名>`，与旧实现同口径）；锚是该文件内**恰出现一次**的特征子串，
+ * 登记册中整条引用写作行内代码（`` `文件#锚` ``），锚后可用全角标点接描述性备注。
+ *
+ * 为什么放弃行号：行号是**位置**，而校验真正依赖的是**内容**。被引文件上方插入任意行即整表漂移
+ * （本仓 2026-09-17 / 09-18 实测三次回填），行号本身并不提供额外防伪力；锚是内容寻址，插行不漂移，
+ * 被指内容改写或搬走则立即「零命中」失败。锚的选取约定见 samples/NEGATIVE-COVERAGE.md 头注。
+ *
+ * 校验顺序（消息文本区分，违规码统一 `negative-coverage-evidence-anchor`）：
+ *   1. 旧行号语法 → 判违规（要求迁移到锚语法）；
+ *   2. 未解析出锚式引用 → `negative-coverage-evidence-invalid`（正文里只写「由某任务提供」不算证据）；
+ *   3. 引用文件须存在且为普通文件；
+ *   4. 锚非空，且在文件全文出现次数恰为 1（0 次 = 锚零命中，>1 次 = 锚不唯一）。
+ * 传 `relevance`（fixture 行）时另加第 5 步（违规码 `negative-coverage-evidence-relevance`）：
+ *   5. 引用文件须为用例登记来源（self-test.ts），且锚须落在**登记该 fixture 的用例条目**内
+ *      ——「锚唯一」只约束文件内唯一，不约束与本条 fixture 的相关性（修复轮补回被删掉的相关度判据）。
  */
-function validateFileLineEvidence(root: string, evidence: string): EvidenceIssue | null {
-  const match = evidence.match(/([A-Za-z0-9._@/-]+\.(?:ts|tsx|mts|cts|js|mjs|cjs|json|jsonl|md|sh)):(\d+)/);
-  if (match === null) {
+function validateAnchorEvidence(
+  root: string,
+  evidence: string,
+  relevance?: { fixtureRel: string; caseEntries: readonly CaseEntry[] },
+): EvidenceIssue | null {
+  const legacy = evidence.match(LEGACY_LINE_CITATION_PATTERN);
+  if (legacy !== null) {
     return {
-      code: 'negative-coverage-evidence-invalid',
-      message: `证据未解析出「文件:行号」：${evidence}（invocation / mutated-copy 必须指向真实测试文件的具体行）`,
+      code: 'negative-coverage-evidence-anchor',
+      message:
+        `证据仍是行号寻址（${legacy[1]} 后的冒号加数字）：行号是位置而非内容，` +
+        '行号语法已移除，改用「文件#唯一子串锚」（锚取被指行在该文件内恰好出现一次的特征子串）',
     };
   }
-  const relPath = match[1]!;
-  const lineNumber = Number(match[2]);
-  const absolute = isAbsolute(relPath) ? relPath : join(root, relPath);
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 登记册声明的受控仓库相对路径，仅作存在性探测
+  const citation = evidence.match(ANCHOR_CITATION_PATTERN);
+  if (citation === null) {
+    return {
+      code: 'negative-coverage-evidence-invalid',
+      message: `证据未解析出「文件#唯一子串锚」：${evidence}（invocation / mutated-copy 必须指向真实测试文件内的唯一子串）`,
+    };
+  }
+  const rawFile = citation[1]!;
+  const anchor = citation[2]!.trim();
+  const relFile = citationFileRel(rawFile);
+  const absolute = isAbsolute(relFile) ? relFile : join(root, relFile);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 登记册声明的受控引用文件，仅作存在性探测
   if (!existsSync(absolute)) {
+    return { code: 'negative-coverage-evidence-anchor', message: `引用文件不存在：${relFile}（相对 repo-root 解析）` };
+  }
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，只读校验锚是否唯一命中
+  if (!statSync(absolute).isFile()) {
+    return { code: 'negative-coverage-evidence-anchor', message: `引用路径不是普通文件：${relFile}` };
+  }
+  if (anchor === '') {
+    return { code: 'negative-coverage-evidence-anchor', message: `锚为空：${relFile}# 后须给出唯一子串` };
+  }
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，只读全文以统计锚命中次数
+  const content = readFileSync(absolute, 'utf-8');
+  const hits = content.split(anchor).length - 1;
+  if (hits === 0) {
     return {
-      code: 'negative-coverage-evidence-invalid',
-      message: `证据文件不存在：${relPath}（相对 repo-root 解析）`,
+      code: 'negative-coverage-evidence-anchor',
+      message: `锚零命中：${relFile}#${anchor}（该子串不在引用文件内；锚须取自被指行的真实内容，改内容即需换锚）`,
     };
   }
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，只读计算行数
-  const lineCount = readFileSync(absolute, 'utf-8').split('\n').length;
-  if (lineNumber < 1 || lineNumber > lineCount) {
+  if (hits > 1) {
     return {
-      code: 'negative-coverage-evidence-invalid',
-      message: `证据行号越界：${relPath}:${lineNumber}（文件共 ${lineCount} 行）`,
+      code: 'negative-coverage-evidence-anchor',
+      message: `锚不唯一：${relFile}#${anchor}（该子串在文件内出现 ${hits} 次；锚须唯一，可加长到足以区分）`,
     };
+  }
+  if (relevance !== undefined) {
+    if (relFile !== CASE_SOURCE_REL) {
+      return {
+        code: 'negative-coverage-evidence-relevance',
+        message:
+          `fixture 行的锚须指向用例登记来源 ${CASE_SOURCE_REL}，当前指向 ${relFile}：` +
+          '锚唯一只保证「在该文件内唯一」，不能证明与本条 fixture 相关',
+      };
+    }
+    const offset = content.indexOf(anchor);
+    const entry = relevance.caseEntries.find((e) => offset >= e.start && offset < e.end);
+    if (entry === undefined) {
+      return {
+        code: 'negative-coverage-evidence-relevance',
+        message: `锚未落在任何用例条目内：${relFile}#${anchor}（fixture 行的锚须取自登记该 fixture 的用例条目）`,
+      };
+    }
+    if (!entryCoversFixture(entry, relevance.fixtureRel)) {
+      return {
+        code: 'negative-coverage-evidence-relevance',
+        message:
+          `锚落在用例条目 ${entry.array} 内，但该条目未登记本条 fixture ${relevance.fixtureRel}` +
+          `（该条目登记的引用为 [${[...entry.refs].join(', ')}]）：锚指到了别的 fixture 的用例条目`,
+      };
+    }
   }
   return null;
 }
 
-/**
- * fixture 引用的「内容锚点」校验（2026-09-17 审查修复）：
- * `（<文件>:<行>）` 中该行内容必须出现该 fixture 的名字（文件名或 sampleDir 相对路径）。
- *
- * 背景：原先只校验「文件存在 + 1 ≤ 行号 ≤ 文件总行数」，行号**语义**正确性不在门禁内。
- * 实测 29 条 fixture 行号全部漂移（引用文件上方任意插入即偏移），而门禁保持全绿——
- * 按登记册定位断言的独立审查会读到别的用例/类型声明。本规则把「指向那条断言」变成可强制的判据。
- */
-function validateFixtureCitationAnchor(root: string, evidence: string, fixtureRel: string | null): string | null {
-  if (fixtureRel === null) return null; // 无 fixture 路径时由 dangling 规则负责
-  const citation = evidence.match(/([A-Za-z0-9._@/-]+\.(?:ts|tsx|mts|cts|js|mjs|cjs)):(\d+)/);
-  if (citation === null) {
-    return 'fixture 行缺「文件:行号」引用，内容锚点无法校验';
-  }
-  const rawFile = citation[1]!;
-  // fixture 行的引用写作裸名（`self-test.ts:<行>`，相对 cli/），C 组写作 repo-root 相对路径
-  const relFile = rawFile.includes('/') ? rawFile : `w-model-dev/scripts/cli/${rawFile}`;
-  const lineNumber = Number(citation[2]);
-  const absolute = isAbsolute(relFile) ? relFile : join(root, relFile);
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 登记册声明的受控引用文件，仅读取指定行
-  if (!existsSync(absolute)) return `引用文件不存在：${relFile}`;
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，只读
-  const lines = readFileSync(absolute, 'utf-8').split('\n');
-  if (lineNumber < 1 || lineNumber > lines.length) {
-    return `引用行号越界：${relFile}:${lineNumber}（文件共 ${lines.length} 行）`;
-  }
-  const base = fixtureRel.split('/').pop() ?? fixtureRel;
-  const content = lines[lineNumber - 1] ?? '';
-  if (content.includes(base) || content.includes(fixtureRel)) return null;
-  return `引用行未指向该 fixture：${relFile}:${lineNumber} 内容不含「${base}」（fixture 引用须回填到确实引用它的用例行）`;
+/** 引用文件写成 repo-root 相对路径（fixture 行的引用写作裸名 `self-test.ts#...`，相对 cli/） */
+function citationFileRel(rawFile: string): string {
+  return rawFile.includes('/') ? rawFile : `w-model-dev/scripts/cli/${rawFile}`;
 }
 
-/** 逐条登记的证据校验（机制枚举 / 证据可解析 / fixture 在盘） */
-function validateEntries(root: string, entries: readonly NegativeEntry[]): Array<{ check: string; message: string }> {
+/** 逐条登记的证据校验（机制枚举 / 证据可解析 / fixture 在盘 / fixture 行锚相关度） */
+function validateEntries(
+  root: string,
+  entries: readonly NegativeEntry[],
+  caseEntries: readonly CaseEntry[],
+): Array<{ check: string; message: string }> {
   const violations: Array<{ check: string; message: string }> = [];
+  /** `<引用文件>#<锚>` → 首个占用它的 fixture 行所指向的 fixture（fixtureRel），用于共用锚判据 */
+  const fixtureAnchorOwners = new Map<string, string>();
   for (const entry of entries) {
     if (!NEGATIVE_MECHANISMS.has(entry.mechanism)) {
       violations.push({
@@ -433,16 +680,35 @@ function validateEntries(root: string, entries: readonly NegativeEntry[]): Array
           message: `负向案例指向不存在的 fixture：${rel ?? entry.evidence}（第 ${entry.line} 行）`,
         });
       }
-      const anchorIssue = validateFixtureCitationAnchor(root, entry.evidence, rel);
+      // fixture 行的引用位置 = `<fixture 路径>`（`self-test.ts#锚`）：锚须落在**登记该 fixture 的用例
+      // 条目**内；同一 `引用文件#锚` 不得被两条指向不同 fixture 的 fixture 行共用（共用即至少一条指到
+      // 别的 fixture 的条目上——锚唯一只约束文件内唯一，同名 fixture 下无法据此判断相关性）。
+      const fixtureRel = rel === null ? entry.evidence : rel.replace(/^samples\//, '');
+      const citation = entry.evidence.match(ANCHOR_CITATION_PATTERN);
+      if (rel !== null && citation !== null) {
+        const key = `${citationFileRel(citation[1]!)}#${citation[2]!.trim()}`;
+        const owner = fixtureAnchorOwners.get(key);
+        if (owner !== undefined && owner !== fixtureRel) {
+          violations.push({
+            check: 'negative-coverage-evidence-shared-anchor',
+            message:
+              `两条 fixture 行共用同一锚：${key} 已被指向 ${owner} 的登记行占用，本条指向 ${fixtureRel}` +
+              `（第 ${entry.line} 行）；同名 fixture 必须各自锚到自己的用例条目`,
+          });
+        } else if (owner === undefined) {
+          fixtureAnchorOwners.set(key, fixtureRel);
+        }
+      }
+      const anchorIssue = validateAnchorEvidence(root, entry.evidence, { fixtureRel, caseEntries });
       if (anchorIssue !== null) {
         violations.push({
-          check: 'negative-coverage-evidence-anchor',
-          message: `${anchorIssue}（第 ${entry.line} 行）`,
+          check: anchorIssue.code,
+          message: `${anchorIssue.message}（第 ${entry.line} 行）`,
         });
       }
       continue;
     }
-    const issue = validateFileLineEvidence(root, entry.evidence);
+    const issue = validateAnchorEvidence(root, entry.evidence);
     if (issue !== null) {
       violations.push({ check: issue.code, message: `${issue.message}（第 ${entry.line} 行）` });
     }
@@ -475,7 +741,7 @@ function listProbeTree(root: string): string[] {
 /**
  * 单探针并发度。每个探针各有**独立隔离根**（见 runExit2Probes），彼此不共享任何可观测状态，
  * 因此并发不引入互相干扰；取 4 是在 Windows 进程启动开销（每次 spawn ≈1.5–2s）与 CPU 争用之间的折中。
- * 实测：47 个探针串行 71s → 4 路并发约 25s（每个探针的 exit-2/ERROR_JSON/人类错误/零漂移断言不变）。
+ * 实测：48 个探针串行 71s → 4 路并发约 25s（每个探针的 exit-2/ERROR_JSON/人类错误/零漂移断言不变）。
  */
 const PROBE_CONCURRENCY = 4;
 
@@ -678,10 +944,14 @@ async function main(): Promise<void> {
     });
     return;
   }
-  const refs = extractReferences(readFileSync(selfTestPath, 'utf-8'));
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- selfTestPath 为 repo-root 拼装的受控固定相对路径（'w-model-dev/scripts/cli/self-test.ts'），上方 existsSync 必需文件校验已通过，只读
+  const selfTestContent = readFileSync(selfTestPath, 'utf-8');
+  const refs = extractReferences(selfTestContent);
   const uncovered = findUncovered(samplesRoot, refs);
   const dangling = findDanglingRefs(samplesRoot, refs);
   const undeclared = findUndeclaredDirs(samplesRoot, readFileSync(readmePath, 'utf-8'));
+  // fixture 行锚相关度判据的事实源：self-test.ts 的用例条目（数组内对象字面量）及其登记的 samples/ 引用
+  const caseEntries = collectCaseEntries(selfTestContent);
 
   // 第 4 / 5 条规则：负向覆盖登记册（严格语法 + 证据可解析 + 真实 exit-2 探针）
   const cliScriptFiles = listCliScriptFiles(root);
@@ -712,7 +982,7 @@ async function main(): Promise<void> {
     }
   }
   const missingNegative = gateBaseNames.filter((name) => !registeredNames.has(name));
-  const evidenceViolations = validateEntries(root, negativeParse.entries);
+  const evidenceViolations = validateEntries(root, negativeParse.entries, caseEntries);
 
   const probeGateBaseNames = gateBaseNames.filter((name) => registeredNames.has(name));
   const probeRun = await runExit2Probes(root, probeGateBaseNames, cliScriptFiles);

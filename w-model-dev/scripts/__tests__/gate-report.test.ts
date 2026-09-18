@@ -596,7 +596,7 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     }
   });
 
-  it('schema 违规样本 → stdout 为单行 JSON（type/passed/reasons/violations/durationMs/exitCode），进程退出码与 exitCode 字段一致', async () => {
+  it('schema 违规样本 → stdout 为单行 JSON（type/passed/reasons/violations/exitCode，不含非确定性 durationMs），进程退出码与 exitCode 字段一致', async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-report-json-'));
     try {
       const logFile = path.join(tmpDir, 'run-log.jsonl');
@@ -616,22 +616,23 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
         passed: boolean;
         reasons: string[];
         violations: Array<{ rule: string; count: number }>;
-        durationMs: number;
         exitCode: number;
       };
       expect(parsed.type).toBe('run-log');
       expect(parsed.passed).toBe(false);
       expect(parsed.reasons.length).toBeGreaterThan(0);
       expect(parsed.violations).toEqual([{ rule: 'violation', count: parsed.reasons.length }]);
-      // 有界断言（原仅断言类型，恒真）：整数、非负、且远小于任何真实运行时长（2026-09-17 审查修复）。
-      expect(Number.isInteger(parsed.durationMs) && parsed.durationMs >= 0 && parsed.durationMs < 600_000).toBe(true);
+      // D3（2026-09-18）：性能计量字段退出机器通道——durationMs 每次运行都不同，进 --json 即破坏
+      // 「同输入同字节可复现」（与 review-package.ts 同哲学）；原「有界整数」断言随字段迁移到
+      // 人类可读路径用例（RUN_LOG_JSON 按规格保留该字段），此处改为断言它**不在**机器通道。
+      expect(Object.keys(parsed)).not.toContain('durationMs');
       expect(parsed.exitCode).toBe(1);
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
   });
 
-  it('默认路径（不带 --json）输出人类可读分隔线，行为不变', async () => {
+  it('默认路径（不带 --json）输出人类可读分隔线，行为不变；RUN_LOG_JSON 仍保留 durationMs（有界整数）', async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-report-json-'));
     try {
       const logFile = path.join(tmpDir, 'run-log.jsonl');
@@ -646,9 +647,47 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
       const stdout = r.stdout ?? '';
       expect(stdout).toContain('═');
       expect(stdout).toContain('RUN_LOG_JSON ');
+      const defaultLine = stdout.split(/\r?\n/).find((line) => line.startsWith('RUN_LOG_JSON '));
+      expect(defaultLine).toBeDefined();
+      const summary = JSON.parse(defaultLine!.slice('RUN_LOG_JSON '.length)) as { durationMs: number };
+      // 有界断言（2026-09-17 审查把「仅断言 typeof」收紧为有界值；D3 修复后该断言随字段移到人类通道）：
+      // 整数、非负、且远小于任何真实运行时长。键缺失时 Number.isInteger(undefined)=false → 仍然红。
+      expect(Number.isInteger(summary.durationMs) && summary.durationMs >= 0 && summary.durationMs < 600_000).toBe(
+        true,
+      );
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
+  });
+
+  it('D3：同输入两次 --json → stdout 逐字节相同，且判定字段仍在（剔除面只限性能计量）', async () => {
+    const sample = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/run-log/valid.jsonl');
+    const first = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', sample], {});
+    const second = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', sample], {});
+    expect(first.status).toBe(0);
+    expect(second.status).toBe(first.status);
+    // 字节级复现：同输入同输出（修复前 durationMs=175/209/221… → 三次哈希互异）
+    expect(second.stdout).toBe(first.stdout);
+    const parsed = JSON.parse(first.stdout ?? '') as Record<string, unknown>;
+    // 判定字段仍在（防「顺手删多了」）：结论 + 生命周期 + R10 维度计数（R11 见下，按 D3 面单独断言）
+    expect(parsed).toMatchObject({
+      type: 'run-log',
+      passed: true,
+      exitCode: 0,
+      lifecycleStatus: 'NOT_CLOSED_NOT_PROVEN',
+      r10: { checked: 0, missing: 0, legacy: 0 },
+    });
+    // r11 的 checkedGates 数值由 **任务 4/J1 在途改动**（logic/run-log-logic.ts 的 closure 维度）
+    // 与本次已改的 samples/run-log/valid.jsonl（放行条数）共同决定——此处只钉 D3 关心的
+    // 「R11 机器核验字段仍在且无缺失」，不锁 checkedGates 具体值，避免 J1 语义/样本调整连带本用例红。
+    const r11 = parsed.r11 as { checkedGates?: unknown; missing?: unknown } | undefined;
+    expect(r11).toBeDefined();
+    expect(r11?.missing).toBe(0);
+    expect(typeof r11?.checkedGates).toBe('number');
+    expect(Array.isArray(parsed.reasons)).toBe(true);
+    expect(Array.isArray(parsed.violations)).toBe(true);
+    expect(Array.isArray(parsed.diagnostics)).toBe(true);
+    expect(Object.keys(parsed)).not.toContain('durationMs');
   });
 
   it('默认 RUN_LOG_JSON 与 --json 一致：malformed 行并入 blocking violations（exit 1，非纯 diagnostics）', async () => {

@@ -30,7 +30,9 @@ export function printGateReport(label: string, summary: Record<string, unknown>,
  * 与 printGateReport 的区别：
  *   - 不打印分隔线，stdout 仅输出单行 JSON（可整体 JSON.parse）
  *   - 不调用 process.exit，进程退出码由调用方处理（设置 process.exitCode 后 return）
- * @param report   JsonReport（type/passed/reasons/violations 分布/durationMs）
+ * 调用方自行决定 summary 是否携带性能计量 `durationMs`：要求字节级复现的调用方必须省略
+ * （见 types.ts JsonReport.durationMs；人类可读路径经 printGateReport 保留该字段）。
+ * @param report   JsonReport（type/passed/reasons/violations 分布；durationMs 可选）
  * @param exitCode 追加到 JSON 末尾的退出码字段（0=通过 / 1=校验失败 / 2=输入错误）
  */
 export function printJsonReport(report: JsonReport, exitCode: number): void {

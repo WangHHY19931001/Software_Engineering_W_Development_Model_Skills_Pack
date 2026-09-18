@@ -53,6 +53,24 @@ async function findDirectSyncCalls() {
   return { calls, violations };
 }
 
+/**
+ * 锚定位（2026-09-18 任务 3.5）：返回锚在该文件全文的出现次数与命中行号（升序）。
+ *
+ * 台账用**锚**取代行号——行号是位置（上方插行即全体漂移，实测三次回填），锚是内容寻址。
+ * 同一文件内多条**字面相同**的调用无法用单行唯一锚区分（如 coverage-logic 的三条 execSync、
+ * check-tla-model 的两条 java 探针），此时台账须为每个命中行各登记一条：由
+ * 「occurrences ≥ 1」「命中行数 == 同锚条目数」「命中行集合 == AST 调用行集合」三重对账兜住，
+ * 新增一条字面相同的调用而漏登记时，命中行数会大于同锚条目数而立刻转红。
+ */
+function locateAnchor(source: string, anchor: string): { occurrences: number; lines: number[] } {
+  const occurrences = anchor === '' ? 0 : source.split(anchor).length - 1;
+  const lines = source
+    .split('\n')
+    .map((line, index) => (line.includes(anchor) ? index + 1 : 0))
+    .filter((line) => line !== 0);
+  return { occurrences, lines };
+}
+
 it('skips dot-prefixed transient fixtures created by parallel tests', async () => {
   const transient = path.join(SCRIPT_ROOT, 'logic', `.d2-boundary-fixture-${process.pid}-probe.ts`);
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- test fixture path is repository-controlled
@@ -332,15 +350,23 @@ describe('runSync', () => {
     expect(SYNC_PROCESS_EXCEPTIONS.filter((entry) => entry.timeout.status === 'missing-followup')).toEqual([]);
   });
 
-  it('retains line-accurate provenance for calls migrated through runSync', async () => {
+  it('retains anchor-accurate provenance for calls migrated through runSync', async () => {
     const migratedEntries = SYNC_PROCESS_EXCEPTIONS.filter((entry) => entry.migratedToRunSync === true);
     expect(migratedEntries).not.toHaveLength(0);
 
     for (const entry of migratedEntries) {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- manifest paths are repository-controlled
       const source = await fs.readFile(path.join(SCRIPT_ROOT, entry.file), 'utf-8');
-      const sourceLine = source.split('\n')[entry.line - 1] ?? '';
-      expect(sourceLine, `${entry.file}:${entry.line}`).toContain('runSync');
+      const located = locateAnchor(source, entry.anchor);
+      const peers = migratedEntries.filter((peer) => peer.file === entry.file && peer.anchor === entry.anchor);
+      const label = `${entry.file}#${entry.anchor}`;
+      expect(located.occurrences, label).toBeGreaterThanOrEqual(1);
+      // 命中行数须等于共用该锚的台账条目数：字面相同的调用被完整枚举，不靠位置区分
+      expect(located.lines, label).toHaveLength(peers.length);
+      const sourceLines = source.split('\n');
+      for (const line of located.lines) {
+        expect(sourceLines[line - 1], label).toContain('runSync');
+      }
       expect(entry.timeout.status).toBe('present');
     }
   });
@@ -396,34 +422,45 @@ describe('runSync', () => {
     expect(audit.calls.filter((call) => call.file === RUN_SYNC_FILE && call.api === 'spawnSync')).toHaveLength(1);
 
     const directExceptions = SYNC_PROCESS_EXCEPTIONS.filter((candidate) => candidate.migratedToRunSync !== true);
-    const remainingExceptions = [...directExceptions];
-    for (const call of directCalls) {
-      const exceptionIndex = remainingExceptions.findIndex(
-        (candidate) => candidate.api === call.api && candidate.file === call.file,
-      );
-      expect(exceptionIndex, `${call.file}:${call.line} ${call.api} must be reviewed`).toBeGreaterThanOrEqual(0);
-      const [exception] = remainingExceptions.splice(exceptionIndex, 1);
-      expect(exception?.line).toBe(call.line);
-      expect(exception?.symbol).not.toBe('');
-      expect(exception?.reason).not.toBe('');
-      expect(exception?.timeout.required).toBe(true);
+    expect(directExceptions).toHaveLength(directCalls.length);
 
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path comes from repository source scan
-      const sourceLines = await fs.readFile(path.join(SCRIPT_ROOT, call.file), 'utf-8');
-      const optionBlock = sourceLines
-        .split('\n')
-        .slice(call.line - 1, call.line + 20)
-        .join('\n');
-      const hasExplicitTimeout = /timeout\s*:/.test(optionBlock);
-      expect(exception?.timeout.status, `${call.file}:${call.line} ${call.api}`).toBe(
-        hasExplicitTimeout ? 'present' : 'missing-followup',
-      );
+    const loadLines = async (file: string): Promise<string[]> =>
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- file 取自本测试对仓库源码扫描得到的受控文件集合（SCRIPT_ROOT 下相对名），只读审计用途
+      (await fs.readFile(path.join(SCRIPT_ROOT, file), 'utf-8')).split('\n');
+
+    // 逐 (file, api) 分组对账：台账锚的命中行集合 == AST 扫描出的真实调用行集合（行号不再入库）
+    const keys = new Set<string>();
+    for (const call of directCalls) keys.add(`${call.file}|${call.api}`);
+    for (const entry of directExceptions) keys.add(`${entry.file}|${entry.api}`);
+
+    for (const key of [...keys].sort()) {
+      const [file, api] = key.split('|') as [string, string];
+      const calls = directCalls.filter((call) => call.file === file && call.api === api);
+      const entries = directExceptions.filter((entry) => entry.file === file && entry.api === api);
+      expect(entries, `${key} 台账条目数须等于真实调用数`).toHaveLength(calls.length);
+
+      const lines = await loadLines(file);
+      const source = lines.join('\n');
+      const anchoredLines = new Set<number>();
+      for (const entry of entries) {
+        const located = locateAnchor(source, entry.anchor);
+        const label = `${entry.file}#${entry.anchor} ${entry.api}`;
+        expect(located.occurrences, `${label} 锚须命中`).toBeGreaterThanOrEqual(1);
+        for (const line of located.lines) anchoredLines.add(line);
+        expect(entry.symbol).not.toBe('');
+        expect(entry.reason).not.toBe('');
+
+        const optionBlock = lines.slice(located.lines[0]! - 1, located.lines[0]! + 20).join('\n');
+        const hasExplicitTimeout = /timeout\s*:/.test(optionBlock);
+        expect(entry.timeout.required).toBe(true);
+        expect(entry.timeout.status, label).toBe(hasExplicitTimeout ? 'present' : 'missing-followup');
+      }
+      expect(
+        [...anchoredLines].sort((a, b) => a - b),
+        `${key} 锚命中行须与真实调用行一一对应`,
+      ).toEqual(calls.map((call) => call.line).sort((a, b) => a - b));
     }
 
-    expect(remainingExceptions).toHaveLength(0);
-    expect(SYNC_PROCESS_EXCEPTIONS.filter((entry) => entry.migratedToRunSync !== true)).toHaveLength(
-      directCalls.length,
-    );
     expect(SYNC_PROCESS_EXCEPTIONS.filter((entry) => entry.migratedToRunSync === true)).not.toHaveLength(0);
     expect(
       SYNC_PROCESS_EXCEPTIONS.filter((entry) => entry.migratedToRunSync === true).every(

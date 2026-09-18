@@ -46,7 +46,12 @@ export const L0_BASELINE = {
   // 675 = 674 + 1（同批规则层修正：hard-constraints.md 反模式 #20 检测信号改为指向
   // subagent-delegation.md「反模式 #20」节的行为要求，新增 1 条跨引用；l1Only 仍 95、
   // placeholders 仍 36、violations 仍 0）。
-  relativeLinkCount: 675,
+  // 676 = 675 + 1（2026-09-18 leftovers-closeout 任务 5 修复轮：references/operational-recovery.md
+  // 的 §门禁顺序表 `check-run-log.ts` 行为补 R9/R10/R11 摘要时新增 1 条同目录链接
+  // `[verifier-spec.md](verifier-spec.md)`（该文件 11 → 12 条；`git diff` 实测该文件只有
+  // 这一行改动、净 +1 条相对链接）；由 npm run audit:l0-links 实测 rebaseline，
+  // l1Only 仍 95、placeholders 仍 36、violations 仍 0）。
+  relativeLinkCount: 676,
   l1Only: 95,
   placeholders: 36,
 } as const;

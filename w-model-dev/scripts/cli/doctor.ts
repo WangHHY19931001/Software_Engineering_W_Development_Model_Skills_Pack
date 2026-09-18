@@ -24,7 +24,7 @@
  */
 import { execFile as execFileCb } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { promisify } from 'node:util';
@@ -35,7 +35,10 @@ import { checkEnvironment, deriveDoctorExitCode, type EnvProbe } from '../logic/
 
 const execFile = promisify(execFileCb);
 const nodeRequire = createRequire(import.meta.url);
-const TOOLS_DIR = join(fileURLToPath(import.meta.url), '..', '..', 'tools');
+// 审计修复 D1：import.meta.url 指向**文件本身**（…/scripts/cli/doctor.ts），
+// join 前必须先 dirname() 取目录，否则解析成 …/scripts/tools/（把 cli/doctor.ts 当目录段）
+// → tools/tla2tools.jar 在盘也恒报缺失（--with-tla 时误阻断）。
+const TOOLS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'tools');
 
 /** 真实环境探测：resolveModule 走 node_modules 解析；runCommand 用 execFile（字面量参数，无 shell 拼接） */
 const realProbe: EnvProbe = {

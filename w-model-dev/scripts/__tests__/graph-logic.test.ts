@@ -7,8 +7,18 @@
  *   R6     交叉边对称性与源/目标类型（conflicts-with / cross-cuts / precedes）
  *   扩展   reqHierarchy / crossLogic 填充正确性
  *
+ * 末段另有**真实目录树 + 真实 CLI 子进程**用例锁锚点基准解析（D2 回归：
+ * gitignored `.w-model/gate-logs` 残留不得截断项目根）——该维度发生在 CLI 层 I/O 解析，
+ * logic 层用例（注入 existingAnchorPaths）覆盖不到。
+ *
  * 约定：REQ→REQ parent 边方向 from=parent → to=child（与 R2 parentInCount / R3 toLevel=fromLevel+1 一致）。
  */
+
+import { promises as fs } from 'node:fs';
+import { createRequire } from 'node:module';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, it, expect } from 'vitest';
 
@@ -24,6 +34,10 @@ import {
   type GraphShape,
   type GraphCheckResult,
 } from '../logic/graph-logic.js';
+import { runSync } from '../lib/run-sync.js';
+
+const require = createRequire(import.meta.url);
+const tsxCli = require.resolve('tsx/cli');
 
 describe('R1-R6 四维识别校验', () => {
   // ==================== R1-R4: REQ 层级树 ====================
@@ -1551,5 +1565,158 @@ describe('R15a-e 证据锚点子项', () => {
       ],
     });
     expect(out.violations.some((v) => v.startsWith('R15e '))).toBe(false);
+  });
+});
+
+describe('check-requirement-graph CLI 锚点基准解析（D2 回归：gitignored .w-model 残留不得截断项目根）', () => {
+  const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/check-requirement-graph.ts');
+  // 该 fixture 的 evidenceAnchor 全部按**仓库根相对**书写（w-model-dev/references/graph-guide.md:§…），
+  // 故基准必须是含 .git/（或真实项目 .w-model/）的那一层，锚点才解析得到。
+  const FIXTURE = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '../samples/graph/valid-req-hierarchy.json',
+  );
+  const RESIDUE_LOG = '2026-08-07T05-16-27-682Z-bdd.json';
+  const ANCHOR_REL = path.join('w-model-dev', 'references', 'graph-guide.md');
+
+  interface TreeOptions {
+    /** 树根是否放 `.git/`（模拟真实仓库根） */
+    gitRoot: boolean;
+    /** 树根 `.w-model/` 是否放项目状态文件（模拟「只有 .w-model/、无 .git/」的真实项目） */
+    projectStateAtRoot: boolean;
+    /** 相对树根的残留目录：各自造 `.w-model/gate-logs/`（技能运行期残留，只有目录、无状态文件） */
+    residueDirs: string[];
+  }
+
+  /**
+   * 构建真实目录树（非 mock）：graph fixture 复制自 samples，锚点目标按 fixture 的
+   * evidenceAnchor 落在树根下（`w-model-dev/references/graph-guide.md`）。
+   * @param opts 盘面构成（.git/ 与 .w-model/ 残留/状态文件）
+   */
+  async function buildTree(opts: TreeOptions): Promise<{ root: string; graph: string }> {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-d2-anchor-'));
+    const graphDir = path.join(root, 'w-model-dev', 'scripts', 'samples', 'graph');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp 自有临时目录内的受控目录树
+    await fs.mkdir(graphDir, { recursive: true });
+    const graph = path.join(graphDir, 'valid-req-hierarchy.json');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp 自有临时目录内的受控样本复制
+    await fs.copyFile(FIXTURE, graph);
+    const anchorTarget = path.join(root, ANCHOR_REL);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp 自有临时目录内的受控目录树
+    await fs.mkdir(path.dirname(anchorTarget), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp 自有临时目录内的受控锚点目标
+    await fs.writeFile(anchorTarget, '# D2 回归锚点目标（内容无关，存在即可）\n', 'utf-8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp 自有临时目录内的受控目录树（模拟仓库根 .git/）
+    if (opts.gitRoot) await fs.mkdir(path.join(root, '.git'), { recursive: true });
+    if (opts.projectStateAtRoot) {
+      const stateDir = path.join(root, '.w-model');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp 自有临时目录内的受控状态目录
+      await fs.mkdir(stateDir, { recursive: true });
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp 自有临时目录内的受控状态文件
+      await fs.writeFile(path.join(stateDir, 'run-log.jsonl'), '{"runId":"d2-project-state"}\n', 'utf-8');
+    }
+    for (const rel of opts.residueDirs) {
+      const logsDir = path.join(root, rel, '.w-model', 'gate-logs');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp 自有临时目录内的受控残留目录
+      await fs.mkdir(logsDir, { recursive: true });
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp 自有临时目录内的受控残留日志
+      await fs.writeFile(path.join(logsDir, RESIDUE_LOG), '{"type":"bdd"}\n', 'utf-8');
+    }
+    return { root, graph };
+  }
+
+  /** 真实 CLI 子进程（--json 在 exit 0/1 时输出纯 JSON），返回退出码与解析后的摘要 */
+  function runCli(
+    graphAbs: string,
+    cwd: string,
+  ): {
+    exitCode: number | null;
+    passed: boolean | undefined;
+    reasons: string[];
+    violations: Array<{ rule: string; count: number }>;
+    stderr: string;
+  } {
+    const r = runSync(process.execPath, [tsxCli, CLI, graphAbs, '--phase=1', '--json'], { cwd });
+    const stdout = r.stdout ?? '';
+    let parsed: { passed?: boolean; reasons?: string[]; violations?: Array<{ rule: string; count: number }> };
+    try {
+      parsed = JSON.parse(stdout) as typeof parsed;
+    } catch {
+      throw new Error(
+        `--json 输出不是纯 JSON（exit=${String(r.status)}）；stdout:\n${stdout}\nstderr:\n${r.stderr ?? ''}`,
+      );
+    }
+    return {
+      exitCode: r.status,
+      passed: parsed.passed,
+      reasons: parsed.reasons ?? [],
+      violations: parsed.violations ?? [],
+      stderr: r.stderr ?? '',
+    };
+  }
+
+  it('① 仓库根有 .git/，子树内有两处仅含 gate-logs 的 .w-model 残留 → 仍解析到仓库根（R15c 通过，exit 0）', async () => {
+    const tree = await buildTree({
+      gitRoot: true,
+      projectStateAtRoot: false,
+      // 与真实机器盘面一致：w-model-dev/.w-model 与 w-model-dev/scripts/samples/.w-model 各一处残留
+      residueDirs: ['w-model-dev', path.join('w-model-dev', 'scripts', 'samples')],
+    });
+    try {
+      const r = runCli(tree.graph, tree.root);
+      expect(r.reasons, '修复前：残留被当作项目根 → 仓库根相对的 evidenceAnchor 解析失败 → R15c 误报').toEqual([]);
+      expect(r.passed).toBe(true);
+      expect(r.exitCode).toBe(0);
+    } finally {
+      await fs.rm(tree.root, { recursive: true, force: true });
+    }
+  });
+
+  it('② 只有 .w-model/ 的真实项目（无 .git/）→ 仍解析到该项目目录（含子树残留时亦然）', async () => {
+    const clean = await buildTree({ gitRoot: false, projectStateAtRoot: true, residueDirs: [] });
+    const withResidue = await buildTree({
+      gitRoot: false,
+      projectStateAtRoot: true,
+      residueDirs: [path.join('w-model-dev', 'scripts', 'samples')],
+    });
+    try {
+      const cases = [
+        { label: '无残留', tree: clean },
+        { label: '有子树残留', tree: withResidue },
+      ];
+      for (const c of cases) {
+        const r = runCli(c.tree.graph, c.tree.root);
+        expect(
+          r.reasons,
+          `${c.label}：无 .git/ 的真实项目仍须以自身 .w-model/ 为基准（不得退化到 graph 所在目录）`,
+        ).toEqual([]);
+        expect(r.exitCode, `${c.label}（stderr: ${r.stderr}）`).toBe(0);
+      }
+    } finally {
+      await fs.rm(clean.root, { recursive: true, force: true });
+      await fs.rm(withResidue.root, { recursive: true, force: true });
+    }
+  });
+
+  it('③ 同输入同结论：同一 fixture 在「有残留 / 无残留」两种盘面下 passed/reasons/exitCode 一致', async () => {
+    const withResidue = await buildTree({
+      gitRoot: true,
+      projectStateAtRoot: false,
+      residueDirs: ['w-model-dev', path.join('w-model-dev', 'scripts', 'samples')],
+    });
+    const clean = await buildTree({ gitRoot: true, projectStateAtRoot: false, residueDirs: [] });
+    try {
+      const a = runCli(withResidue.graph, withResidue.root);
+      const b = runCli(clean.graph, clean.root);
+      // 正向基线：一致不得建立在「两种盘面同样误红」之上
+      expect(a.exitCode, `有残留盘面（stderr: ${a.stderr}）`).toBe(0);
+      expect(b.exitCode, `无残留盘面（stderr: ${b.stderr}）`).toBe(0);
+      expect(a.passed).toBe(b.passed);
+      expect(a.reasons).toEqual(b.reasons);
+      expect(a.violations).toEqual(b.violations);
+    } finally {
+      await fs.rm(withResidue.root, { recursive: true, force: true });
+      await fs.rm(clean.root, { recursive: true, force: true });
+    }
   });
 });
