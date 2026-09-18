@@ -550,8 +550,15 @@ git commit -m "feat(prepush): add rule-layer coverage gate as item 13, count 18-
 
 **背景**：现行证据语法 `文件:行号` 是位置耦合——上方加行即全体漂移（本会话实测三次回填）。校验器已断言被引行内容，行号不提供额外防伪力。改为 `文件#锚`（锚=文件内恰好出现一次的唯一子串），四列语法与真实探针执行不动。
 
+**全仓同类扫描结论（2026-09-18，用户要求一并修）**——同问题共 3 处：
+1. `samples/NEGATIVE-COVERAGE.md` 46 行证据列（本任务主体）；
+2. `lib/run-sync.ts` `SYNC_PROCESS_EXCEPTIONS`：10 条 `line: N` 指向测试文件，`run-sync.test.ts:342` 以 `split('\n')[line-1]` 断言（即上会话 +2 漂移的当事者）→ `line` 字段改 `anchor`（唯一子串），测试改为「文件含唯一锚且锚行含 runSync」；
+3. 活体散文位置引用：`__tests__/README.md:114` 的 `gate-logic.ts:240-248`（改为符号引用：`checkRequirementSpecStructure` 的 `nodeFsAdapter` 注入点）、`references/data-models.md:563` 的 `run-log-logic.ts:23`（去行号，保留常量名 `LEGACY_VARIANT_CUTOFF` 引用）。
+
+**合法保留（扫描判定，不属本任务）**：自产 fixture 的行号（如 run-sync.test.ts 的 `fixtures/aliases.ts` line 3/4/5——测试自写自校，位置即契约）；reworkHints/票据示例中的 `src/....ts:42`（verifier-spec/phase-5-coding——领域数据示例，教如何引用缺陷位置）；聚合计数基线（L0 链接 675、exit-2 脚本数、self-test 样本数、pre-push 项数——数量不变量非寻址）；eval/mappings.json（无行号字段，干净）。
+
 **文件：**
-- 修改：`w-model-dev/scripts/cli/check-samples-coverage.ts`（证据校验函数）、`w-model-dev/scripts/samples/NEGATIVE-COVERAGE.md`（46 行证据列迁移）、`w-model-dev/scripts/__tests__/check-samples-coverage.test.ts`、`AGENTS.md`（§8 check-samples-coverage 行的语法描述）、`w-model-dev/references/command-reference.md` 与 `w-model-dev/scripts/samples/README.md`（如提及行号语法处）
+- 修改：`w-model-dev/scripts/cli/check-samples-coverage.ts`（证据校验函数）、`w-model-dev/scripts/samples/NEGATIVE-COVERAGE.md`（46 行证据列迁移）、`w-model-dev/scripts/__tests__/check-samples-coverage.test.ts`、`w-model-dev/scripts/lib/run-sync.ts`（manifest `line`→`anchor`）+ `w-model-dev/scripts/__tests__/run-sync.test.ts`（断言改锚）、`w-model-dev/scripts/__tests__/README.md`（:114 符号化）、`w-model-dev/references/data-models.md`（:563 去行号）、`AGENTS.md`（§8 check-samples-coverage 行的语法描述）、`w-model-dev/references/command-reference.md` 与 `w-model-dev/scripts/samples/README.md`（如提及行号语法处）
 
 - [ ] **步骤 1：失败测试（追加到 check-samples-coverage.test.ts）**
 
@@ -566,19 +573,21 @@ fixture 机制行（`fixture` 证据）同步改锚语法：`#` 后为 fixture �
 
 改 `validateFixtureCitationAnchor` 一带的证据解析：拆 `文件#锚`（`#` 分隔，文件部分须为仓内真实普通文件），读全文断言锚出现次数恰为 1；`:数字` 形态直接判违规（消息含「行号语法已移除，改用 文件#唯一子串锚」）。违规码沿用 `negative-coverage-evidence-anchor`（0 命中/多命中/旧行号在消息文本中区分）。先跑步骤 1 测试确认新断言红、旧测试按预期调整，再实现转绿。
 
-- [ ] **步骤 3：迁移 46 行登记**
+- [ ] **步骤 3：迁移 46 行登记 + run-sync manifest**
 
 对 `NEGATIVE-COVERAGE.md` 每行：按当前行号取出被引行的内容，截取**该文件内唯一**的特征子串作锚（fixture 行基名本就唯一；self-test.ts 行取该用例的 `file: '<样本名>'` 字面量或用例 description 片段；测试文件行取 `it('...')` 标题片段）。迁移后逐行自查唯一性（脚本辅助：对每锚 `grep -F -c` 恰 1）。
 
-- [ ] **步骤 4：文档语法描述同步 + oracle**
+`lib/run-sync.ts` 的 `SYNC_PROCESS_EXCEPTIONS`：每条 `line: N` 改为 `anchor: '<被指行特征子串>'`（取该行含 `runSync` 的调用片段，全文件唯一，迁移时 `grep -F -c` 自查）；`run-sync.test.ts` 的 line-accurate provenance 用例改为：读 `entry.file` 全文断言 `anchor` 恰出现一次、且锚所在行 `includes('runSync')`、`timeout.status === 'present'`。自产 fixture 用例（`fixtures/aliases.ts` 的 line 3/4/5）**不动**。
 
-`AGENTS.md` §8 该行的「证据 `文件:行号` 可解析（假路径/越界行号各自具名 exit 1）」改为「证据 `文件#唯一子串锚` 可解析（假路径/零命中/多命中各自具名 exit 1）」；command-reference / samples README 如有行号语法提及一并改。跑 `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（真实探针仍须全过）+ `npx vitest run --config config/vitest.config.ts check-samples-coverage` + `npm run --silent check:docs-consistency`，全绿收口。
+- [ ] **步骤 4：文档语法描述同步 + 散文位置引用符号化 + oracle**
+
+`AGENTS.md` §8 该行的「证据 `文件:行号` 可解析（假路径/越界行号各自具名 exit 1）」改为「证据 `文件#唯一子串锚` 可解析（假路径/零命中/多命中各自具名 exit 1）」；command-reference / samples README 如有行号语法提及一并改。`__tests__/README.md:114` 的 `gate-logic.ts:240-248` 改为符号引用（`checkRequirementSpecStructure` 的 `nodeFsAdapter` 注入点）；`references/data-models.md:563` 的 `（run-log-logic.ts:23）` 去行号保留常量名。跑 `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（真实探针仍须全过）+ `npx vitest run --config config/vitest.config.ts check-samples-coverage run-sync` + `npm run --silent check:docs-consistency`，全绿收口。
 
 - [ ] **步骤 5：Commit**
 
 ```bash
-git add w-model-dev/scripts/cli/check-samples-coverage.ts w-model-dev/scripts/samples/NEGATIVE-COVERAGE.md w-model-dev/scripts/__tests__/check-samples-coverage.test.ts AGENTS.md w-model-dev/references/command-reference.md w-model-dev/scripts/samples/README.md
-git commit -m "refactor(samples-coverage): evidence addressing file:line -> file#unique-substring anchor"
+git add w-model-dev/scripts/cli/check-samples-coverage.ts w-model-dev/scripts/samples/NEGATIVE-COVERAGE.md w-model-dev/scripts/__tests__/check-samples-coverage.test.ts w-model-dev/scripts/lib/run-sync.ts w-model-dev/scripts/__tests__/run-sync.test.ts w-model-dev/scripts/__tests__/README.md w-model-dev/references/data-models.md AGENTS.md w-model-dev/references/command-reference.md w-model-dev/scripts/samples/README.md
+git commit -m "refactor: replace positional line anchors with unique-substring anchors (register + run-sync manifest + prose)"
 ```
 
 ## 任务 4：J1-logic run-log R11 闭环五脚本
