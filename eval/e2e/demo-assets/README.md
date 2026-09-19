@@ -14,7 +14,8 @@
 
 ```bash
 cd eval/e2e/demo-assets
-python build_workspace.py --reset        # 重建工作区（唯一破坏性路径）
+python build_workspace.py --reset        # 整树清空的唯一路径；常规运行会重建 .w-model/tla/features/src/test/docs/archive
+                                         # 七个目录（同样受工作区判据保护：非本装配器工作区直接 exit，不静默删除）
 bash run_trajectory.sh                   # 期望末行：✓ 119/119 exit 0
 bash run_negative_probes.sh              # 期望末行：✓ 9/9 探针被拦截 + 恢复复绿
 ```

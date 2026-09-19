@@ -18,7 +18,9 @@ restore_all() {
   for f in "${BACKUPS[@]}"; do [ -f "$f.probe-orig" ] && mv "$f.probe-orig" "$f"; done
   BACKUPS=()
 }
-trap restore_all EXIT INT TERM
+# 信号（Ctrl-C / TERM）先恢复再中止：避免 restore_all 返回后循环继续跑完剩余探针
+trap restore_all EXIT
+trap 'restore_all; exit 1' INT TERM
 
 # JSON 变异：mutate <file> <python 语句，作用域内有 d（已解析对象）>
 mutate() {
@@ -51,10 +53,19 @@ probe() { # probe <id> <cmd...>；断言 exit 1 且输出命中 $EXPECT
   echo "[NP:$id] \$ $*" >> "$LOG"
   local out; out=$("$@" 2>&1); local c=$?
   printf '%s\n' "$out" | tail -4 >> "$LOG"
-  echo "[NP:$id] EXIT_CODE=$c（期望 1；命中期望词「$EXPECT」）" >> "$LOG"
-  if [ "$c" -ne 1 ]; then echo "✗ [$id] exit=$c 期望 1"; FAILED=1; return 1; fi
+  echo "[NP:$id] EXIT_CODE=$c（期望 1；期望词「$EXPECT」）" >> "$LOG"
+  if [ "$c" -ne 1 ]; then
+    echo "[NP:$id] EXPECT_MATCH=no（exit≠1，未执行期望词断言）" >> "$LOG"
+    echo "✗ [$id] exit=$c 期望 1"; FAILED=1; return 1
+  fi
   # -e：EXPECT 可能以 "-" 开头（如 "--- D5 Step Binding: …"），裸 PATTERN 会被 grep 当选项（exit 2）
-  printf '%s' "$out" | grep -q -e "$EXPECT" || { echo "✗ [$id] 未命中期望原因：$EXPECT"; FAILED=1; return 1; }
+  # 判定结果写回日志（断言之后），使归档日志自证「命中期望词」而非只回显期望
+  if printf '%s' "$out" | grep -q -e "$EXPECT"; then
+    echo "[NP:$id] EXPECT_MATCH=yes" >> "$LOG"
+  else
+    echo "[NP:$id] EXPECT_MATCH=no" >> "$LOG"
+    echo "✗ [$id] 未命中期望原因：$EXPECT"; FAILED=1; return 1
+  fi
   echo "✓ [$id] 被拦截（命中「$EXPECT」）"
   return 0
 }
@@ -153,6 +164,8 @@ for pair in "check-signature-chain.ts:.w-model/signature-chain.jsonl" "check-run
   echo "restore-check $s EXIT=$c" >> "$LOG"
   [ "$c" -eq 0 ] || { echo "✗ 恢复后 $s 未复绿（exit=$c）"; FAILED=1; }
 done
+# 恢复完整性自证：备份残留计数写入日志（0 = 所有 *.probe-orig 均已 mv 回原位）
+echo "probe-orig residue count=$(find . -name '*.probe-orig' | wc -l | tr -d ' ')" >> "$LOG"
 
 if [ "$FAILED" -eq 0 ]; then
   echo "✓ 9/9 探针被拦截 + 恢复复绿（日志：$LOG）"

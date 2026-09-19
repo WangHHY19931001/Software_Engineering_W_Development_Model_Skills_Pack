@@ -9,7 +9,7 @@ import argparse, json, os, shutil, stat, subprocess, sys, hashlib
 def rmtree_force(path):
     """删除目录树；Windows 上 git 对象/包文件为只读，需先解除只读再重试。"""
     def _on_exc(func, p, _exc):
-        os.chmod(p, stat.S_IWRITE)
+        os.chmod(p, stat.S_IWRITE | stat.S_IREAD)
         func(p)
     if sys.version_info >= (3, 12):
         shutil.rmtree(path, onexc=_on_exc)
@@ -20,6 +20,27 @@ ASSETS = os.path.dirname(os.path.abspath(__file__))  # eval/e2e/demo-assets（�
 # 工作区根 = gitignored 瞬态目录 eval/e2e/demo（可由 WORKSPACE 覆盖，与 run_trajectory.sh / run_negative_probes.sh 同契约）
 ROOT = os.environ.get('WORKSPACE') or os.path.join(os.path.dirname(ASSETS), 'demo')
 WM = os.path.join(ROOT, '.w-model')
+
+
+def is_own_workspace():
+    """工作区判据：ROOT 不存在或为空（首次构建）→ 是；含本装配器哨兵（SPEC.md 与 .w-model/project.json
+    同时存在）→ 是；否则否——防止 WORKSPACE 误指真实项目时静默删除其 .w-model/tla/features/src/test/docs/archive。"""
+    if not os.path.exists(ROOT):
+        return True
+    try:
+        if not os.listdir(ROOT):
+            return True
+    except OSError:
+        return False
+    return (os.path.isfile(os.path.join(ROOT, 'SPEC.md'))
+            and os.path.isfile(os.path.join(WM, 'project.json')))
+
+
+def require_own_workspace(action, hint):
+    if is_own_workspace():
+        return
+    sys.exit(f'✗ 拒绝在非本装配器工作区执行「{action}」：{ROOT} 既非空，也不含本装配器哨兵'
+             '（SPEC.md 与 .w-model/project.json 须同时存在）。' + hint)
 
 # ---------- 运行时事实：仓库根 + change-scope 区间（先于任何写盘，fail-fast） ----------
 _RP = subprocess.run(['git', '-C', ASSETS, 'rev-parse', '--show-toplevel'],
@@ -33,8 +54,10 @@ def _rev(ref):
                  '——请用 REPLAY_BASE / REPLAY_HEAD 指定可比较的两个 ref。')
 BASE_SHA = _rev(os.environ.get('REPLAY_BASE', 'HEAD~1'))
 HEAD_SHA = _rev(os.environ.get('REPLAY_HEAD', 'HEAD'))
-_SCOPE_DIFF = subprocess.run(['git', '-C', _RP, 'diff', '--name-only', f'{BASE_SHA}..{HEAD_SHA}'],
-                             capture_output=True, text=True, check=True).stdout.split()
+# core.quotePath=false：非 ASCII 路径不做 C 风格转义；splitlines 按行切分，含空格路径不被切碎
+_SCOPE_DIFF = [line for line in subprocess.run(
+    ['git', '-c', 'core.quotePath=false', '-C', _RP, 'diff', '--name-only', f'{BASE_SHA}..{HEAD_SHA}'],
+    capture_output=True, text=True, check=True).stdout.splitlines() if line.strip()]
 if not _SCOPE_DIFF:
     sys.exit('✗ REPLAY_BASE..REPLAY_HEAD 差异为空：change-scope 需要非空 changedFiles'
              f'（{BASE_SHA[:7]}..{HEAD_SHA[:7]}）；请指定有差异的区间。')
@@ -42,7 +65,9 @@ PHASE_FILES = {p: list(_SCOPE_DIFF) for p in (5, 6, 7, 8)}
 
 # ---------- 破坏性路径唯一入口（前置门，先于任何写盘） ----------
 parser = argparse.ArgumentParser(description='重建 e2e 调测工作区')
-parser.add_argument('--reset', action='store_true', help='先清空工作区（唯一破坏性路径）')
+parser.add_argument('--reset', action='store_true',
+                    help='先整树清空工作区（整树清空的唯一路径；常规运行会重建 .w-model/tla/features/src/test/docs/archive '
+                         '七个目录，同样受工作区判据保护）')
 args = parser.parse_args()
 _root_abs = os.path.normcase(os.path.realpath(ROOT)).rstrip('\\/')
 _repo_abs = os.path.normcase(os.path.realpath(_RP)).rstrip('\\/')
@@ -53,6 +78,9 @@ if os.path.exists(os.path.join(ROOT, '.git')) and not args.reset:
     sys.exit('✗ 工作区根存在 .git：它会让 --scope 的 headRef 绑到 demo 自身 HEAD 而使 p5–p8 门禁过期。'
              '请先移走/删除该目录，或显式传 --reset 清空重建。')
 if args.reset and os.path.exists(ROOT):
+    require_own_workspace('--reset 整树清空',
+                          '该目录不是本装配器的工作区（--reset 仍受既有护栏约束：工作区根须以 demo 结尾且不等于仓库根）——'
+                          '请移走/改名该目录，或把 WORKSPACE 指向本装配器实际构建的工作区。')
     rmtree_force(ROOT)
 
 def write(rel, content):
@@ -65,6 +93,9 @@ def write_json(rel, obj):
     write(rel, json.dumps(obj, ensure_ascii=False, indent=2) + '\n')
 
 # ---------- 清理重建 ----------
+# 常规运行的 7 目录重建同样受工作区判据保护：非本装配器工作区（无哨兵）→ exit，不静默删除
+require_own_workspace('常规清理重建 .w-model/tla/features/src/test/docs/archive',
+                      '请先移走该目录，或对确属本装配器的工作区显式传 --reset 清空重建。')
 for d in ('.w-model', 'tla', 'features', 'src', 'test', 'docs', 'archive'):
     p = os.path.join(ROOT, d)
     if os.path.exists(p):
