@@ -4,7 +4,17 @@
 产物：counter-api 最小项目（2 REQ + 1 NFR + 1 CON，TLA+ L1/L2 + BDD L1，真实 node:test 四级测试）。
 ID 全局一致：REQ-001/REQ-002/NFR-001/CON-001 ↔ SD-001 ↔ INTF-001 ↔ DD-001 ↔ L1_counter/L2_counter_service。
 """
-import argparse, json, os, shutil, subprocess, sys, hashlib
+import argparse, json, os, shutil, stat, subprocess, sys, hashlib
+
+def rmtree_force(path):
+    """删除目录树；Windows 上 git 对象/包文件为只读，需先解除只读再重试。"""
+    def _on_exc(func, p, _exc):
+        os.chmod(p, stat.S_IWRITE)
+        func(p)
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=_on_exc)
+    else:
+        shutil.rmtree(path, onerror=_on_exc)
 
 ASSETS = os.path.dirname(os.path.abspath(__file__))  # eval/e2e/demo-assets（受跟踪的可重放资产）
 # 工作区根 = gitignored 瞬态目录 eval/e2e/demo（可由 WORKSPACE 覆盖，与 run_trajectory.sh / run_negative_probes.sh 同契约）
@@ -43,7 +53,7 @@ if os.path.exists(os.path.join(ROOT, '.git')) and not args.reset:
     sys.exit('✗ 工作区根存在 .git：它会让 --scope 的 headRef 绑到 demo 自身 HEAD 而使 p5–p8 门禁过期。'
              '请先移走/删除该目录，或显式传 --reset 清空重建。')
 if args.reset and os.path.exists(ROOT):
-    shutil.rmtree(ROOT)
+    rmtree_force(ROOT)
 
 def write(rel, content):
     p = os.path.join(ROOT, rel)
@@ -58,7 +68,7 @@ def write_json(rel, obj):
 for d in ('.w-model', 'tla', 'features', 'src', 'test', 'docs', 'archive'):
     p = os.path.join(ROOT, d)
     if os.path.exists(p):
-        shutil.rmtree(p)
+        rmtree_force(p)
 os.makedirs(os.path.join(WM, 'gate-logs'), exist_ok=True)
 
 # ---------- SPEC.md（冻结规格） ----------
