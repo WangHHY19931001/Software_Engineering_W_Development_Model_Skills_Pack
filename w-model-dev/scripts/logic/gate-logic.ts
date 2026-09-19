@@ -1314,8 +1314,8 @@ export function computeRtmTraceCoverage(
   const missingItems: Array<{ requirementId: string; fields: string[] }> = [];
   const ids = new Set<string>();
   const list = Array.isArray(rows) ? rows : [];
-  for (let index = 0; index < list.length; index++) {
-    const row = list[index] as Record<string, unknown> | null | undefined;
+  for (const [index, rawRow] of list.entries()) {
+    const row = rawRow as Record<string, unknown> | null | undefined;
     if (!row || typeof row !== 'object') {
       rowReasons.push(`RTM 结构错误：rows[${index}] 非对象`);
       continue;
@@ -1437,7 +1437,7 @@ export function checkArtifactGate(
     reasons.push(`RTM 追溯不完整：${item.requirementId} 缺少 ${item.fields.join('、')}`);
   }
 
-  let coveragePercent = computedCoveragePercent;
+  const coveragePercent = computedCoveragePercent;
   if (coveragePercent < 100) reasons.push(`RTM 覆盖率未达 100%（当前 ${coveragePercent}%）`);
   if (matrix.rows.length === 0) reasons.push('RTM 无需求行');
 
