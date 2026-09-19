@@ -6,6 +6,8 @@
  * 设计：docs/superpowers/specs/2026-08-05-round31-wm-status-metrics-design.md §3.1
  */
 
+import { computeRtmTraceCoverage } from './gate-logic.js';
+
 /** 9 态 → 阶段号（与 project.schema.json status 枚举一致；项目完成=9，展示时收敛为 8） */
 export const STATUS_TO_PHASE: Record<string, number> = {
   需求分析: 1,
@@ -49,9 +51,9 @@ export interface TestTally {
   pending: number;
 }
 
-/** rtm.json 最小结构（容忍缺字段） */
+/** rtm.json 最小结构（容忍缺字段）；rows 元素形状不在此收窄——覆盖率按追溯字段重算（computeRtmTraceCoverage） */
 export interface RtmLike {
-  rows?: Array<{ coverageStatus?: string }>;
+  rows?: Array<Record<string, unknown>>;
   executionSummary?: {
     unitTest?: Partial<TestTally>;
     integrationTest?: Partial<TestTally>;
@@ -128,9 +130,8 @@ export function buildStatusReport(
   let rtmCoverage: StatusReport['rtmCoverage'] = null;
   if (rtm && Array.isArray(rtm.rows)) {
     const total = rtm.rows.length;
-    const covered = rtm.rows.filter((r) => r?.coverageStatus === '100%').length;
-    const percent = total === 0 ? 0 : Math.round((covered / total) * 1000) / 10;
-    rtmCoverage = { covered, total, percent };
+    const { missingItems, coveragePercent } = computeRtmTraceCoverage(rtm.rows, phase);
+    rtmCoverage = { covered: total - missingItems.length, total, percent: coveragePercent };
   }
 
   let testSummary: StatusReport['testSummary'] = null;

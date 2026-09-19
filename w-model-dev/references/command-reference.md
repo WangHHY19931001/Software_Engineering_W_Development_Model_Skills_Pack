@@ -356,7 +356,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 2. 校验失败列出字段路径和原因，退出码语义为 2，不写任何文件。
 3. `.w-model/` 已有数据时触发覆盖确认检查点；拒绝则不写入。
 4. 确认后编排者（O）原子写入 `project.json` 与 `rtm.json`，刷新 `updatedAt`。
-5. 输出项目名、阶段、需求数、测试用例数和 RTM 覆盖率。
+5. 输出项目名、阶段、需求数、测试用例数和 RTM 覆盖率。RTM 覆盖率与 `check-artifact-gate.ts` 同源（`computeRtmTraceCoverage`，按追溯字段重算）；`coverageStatus` 仅为展示字段，不参与计算。
 
 ## `/wm code-health <phase>`
 

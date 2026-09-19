@@ -1300,6 +1300,55 @@ function summarizeM07SchemaFailure(
   return { reasons, testEvidence };
 }
 
+/**
+ * RTM 行级完整性 + 覆盖率计算（单一事实来源，2026-09-19）：check-artifact-gate 与 wm-status 共用。
+ * 规则：REQ 行按当前阶段字段集（PHASE_TRACE_FIELDS[phase]）；NFR/CON 行按 description(+designDoc,+codeModule)；
+ * coveragePercent = 完整行 / 总行（存在缺失时封顶 99）。coverageStatus 为展示字段，不参与计算。
+ */
+export function computeRtmTraceCoverage(
+  rows: ReadonlyArray<unknown>,
+  phase: number,
+): { rowReasons: string[]; missingItems: Array<{ requirementId: string; fields: string[] }>; coveragePercent: number } {
+  const phaseFields = PHASE_TRACE_FIELDS[phase] ?? REQUIRED_TRACE_FIELDS;
+  const rowReasons: string[] = [];
+  const missingItems: Array<{ requirementId: string; fields: string[] }> = [];
+  const ids = new Set<string>();
+  const list = Array.isArray(rows) ? rows : [];
+  for (let index = 0; index < list.length; index++) {
+    const row = list[index] as Record<string, unknown> | null | undefined;
+    if (!row || typeof row !== 'object') {
+      rowReasons.push(`RTM 结构错误：rows[${index}] 非对象`);
+      continue;
+    }
+    if (typeof row.requirementId !== 'string' || row.requirementId.trim() === '') {
+      rowReasons.push(`RTM 结构错误：rows[${index}].requirementId 必须为非空字符串`);
+      continue;
+    }
+    const requirementId = row.requirementId;
+    if (ids.has(requirementId)) rowReasons.push(`RTM 结构错误：需求 ID 重复（${requirementId}）`);
+    ids.add(requirementId);
+    // P1.2 横切治理：NFR/CON 行只校验 designDoc（phase<5）或 designDoc+codeModule（phase>=5），
+    // 不强制要求 test 字段（横切测试通过 REQ 行的测试用例覆盖）
+    const isCrossCutting = requirementId.startsWith('NFR') || requirementId.startsWith('CON');
+    const fieldsToCheck = isCrossCutting
+      ? phase >= 5
+        ? (['description', 'designDoc', 'codeModule'] as const)
+        : (['description', 'designDoc'] as const)
+      : phaseFields;
+    const missing = fieldsToCheck.filter(
+      (field) => typeof row[field] !== 'string' || (row[field] as string).trim() === '',
+    );
+    if (missing.length > 0) missingItems.push({ requirementId, fields: missing });
+  }
+  const totalRows = list.length;
+  const coveredRows = totalRows - missingItems.length;
+  let coveragePercent = totalRows > 0 ? Math.round((coveredRows / totalRows) * 100) : 0;
+  // coveragePercent 与 missingItems 联动（约束 #3）：存在追溯缺失项时覆盖率强制 < 100，
+  // 防止 (total-1)/total 舍入边界（如 199/200=99.5→100）掩盖缺失
+  if (missingItems.length > 0 && coveragePercent >= 100) coveragePercent = 99;
+  return { rowReasons, missingItems, coveragePercent };
+}
+
 export function checkArtifactGate(
   matrix: RTMMatrixShape | null | undefined,
   options?: CheckArtifactGateOptions,
@@ -1326,7 +1375,6 @@ export function checkArtifactGate(
       testEvidence: m07.testEvidence,
     };
   }
-  const phaseFields = PHASE_TRACE_FIELDS[phase] ?? REQUIRED_TRACE_FIELDS;
 
   const reasons: string[] = [];
 
@@ -1378,48 +1426,20 @@ export function checkArtifactGate(
     summaries.push({ name, layer, summary });
   }
 
-  const missingItems: Array<{ requirementId: string; fields: string[] }> = [];
-  const ids = new Set<string>();
-  for (let index = 0; index < matrix.rows.length; index++) {
-    const row = matrix.rows[index];
-    if (!row || typeof row !== 'object') {
-      reasons.push(`RTM 结构错误：rows[${index}] 非对象`);
-      continue;
-    }
-    if (typeof row.requirementId !== 'string' || row.requirementId.trim() === '') {
-      reasons.push(`RTM 结构错误：rows[${index}].requirementId 必须为非空字符串`);
-      continue;
-    }
-    if (ids.has(row.requirementId)) {
-      reasons.push(`RTM 结构错误：需求 ID 重复（${row.requirementId}）`);
-    }
-    ids.add(row.requirementId);
-    // P1.2 横切治理：NFR/CON 行只校验 designDoc（phase<5）或 designDoc+codeModule（phase>=5），
-    // 不强制要求 test 字段（横切测试通过 REQ 行的测试用例覆盖）
-    const isCrossCutting = row.requirementId.startsWith('NFR') || row.requirementId.startsWith('CON');
-    const fieldsToCheck = isCrossCutting
-      ? phase >= 5
-        ? (['description', 'designDoc', 'codeModule'] as const)
-        : (['description', 'designDoc'] as const)
-      : phaseFields;
-    const missing = fieldsToCheck.filter(
-      (field) => typeof row[field] !== 'string' || (row[field] as string).trim() === '',
-    );
-    if (missing.length > 0) missingItems.push({ requirementId: row.requirementId, fields: missing });
-  }
+  const {
+    rowReasons,
+    missingItems,
+    coveragePercent: computedCoveragePercent,
+  } = computeRtmTraceCoverage(matrix.rows, phase);
+  reasons.push(...rowReasons);
 
   for (const item of missingItems) {
     reasons.push(`RTM 追溯不完整：${item.requirementId} 缺少 ${item.fields.join('、')}`);
   }
 
-  const totalRows = matrix.rows.length;
-  const coveredRows = totalRows - missingItems.length;
-  let coveragePercent = totalRows > 0 ? Math.round((coveredRows / totalRows) * 100) : 0;
-  // coveragePercent 与 missingItems 联动（约束 #3）：存在追溯缺失项时覆盖率强制 < 100，
-  // 防止 (total-1)/total 舍入边界（如 199/200=99.5→100）掩盖缺失
-  if (missingItems.length > 0 && coveragePercent >= 100) coveragePercent = 99;
+  let coveragePercent = computedCoveragePercent;
   if (coveragePercent < 100) reasons.push(`RTM 覆盖率未达 100%（当前 ${coveragePercent}%）`);
-  if (totalRows === 0) reasons.push('RTM 无需求行');
+  if (matrix.rows.length === 0) reasons.push('RTM 无需求行');
 
   // ==================== coverageStatus 字段一致性校验（P0，行级） ====================
   // 约束 #3：coverageStatus 须与该行自身完整性一致，不再与矩阵全局 coveragePercent 比较

@@ -140,7 +140,7 @@ async function main(): Promise<void> {
   console.log(`updatedAt     : ${report.updatedAt}`);
   if (report.rtmCoverage) {
     console.log(
-      `RTM 覆盖率    : ${report.rtmCoverage.covered}/${report.rtmCoverage.total}（${report.rtmCoverage.percent}%）`,
+      `RTM 覆盖率（按追溯字段重算）: ${report.rtmCoverage.covered}/${report.rtmCoverage.total}（${report.rtmCoverage.percent}%）`,
     );
   } else {
     console.log('RTM 覆盖率    : 未生成（.w-model/rtm.json 缺失或格式不符）');

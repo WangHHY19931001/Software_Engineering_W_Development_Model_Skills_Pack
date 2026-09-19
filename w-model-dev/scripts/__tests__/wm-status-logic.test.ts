@@ -39,17 +39,67 @@ describe('buildStatusReport', () => {
     expect(r.progress).toBe('1/8（12.5%）');
   });
 
-  it('RTM 覆盖计算（coverageStatus=100% 计数 + percent 保留 1 位小数）', () => {
+  it('RTM 覆盖按追溯字段重算（coverageStatus 仅展示，不参与计数）', () => {
+    const complete = {
+      description: 'd',
+      designDoc: 'docs/x.md#1',
+      codeModule: 'SD-001:src/counter.ts',
+      unitTest: 'TC-UNIT-001',
+      acceptanceTest: 'docs/y.md#UAT-001',
+      coverageStatus: '100%',
+    };
     const r = buildStatusReport(
       { status: '编码' },
-      { rows: [{ coverageStatus: '100%' }, { coverageStatus: '100%' }, { coverageStatus: '部分' }] },
+      {
+        rows: [
+          { requirementId: 'REQ-001', ...complete },
+          { requirementId: 'REQ-002', ...complete },
+          { requirementId: 'REQ-003', ...complete, codeModule: '', coverageStatus: '100%' },
+        ],
+      },
     );
-    expect(r.rtmCoverage).toEqual({ covered: 2, total: 3, percent: 66.7 });
+    expect(r.rtmCoverage).toEqual({ covered: 2, total: 3, percent: 67 });
   });
 
   it('RTM total=0 → percent=0', () => {
     const r = buildStatusReport({ status: '编码' }, { rows: [] });
     expect(r.rtmCoverage).toEqual({ covered: 0, total: 0, percent: 0 });
+  });
+
+  it('computes RTM coverage from trace fields, not from the display-only coverageStatus', () => {
+    const rows = ['REQ-001', 'REQ-002', 'NFR-001', 'CON-001'].map((requirementId) => ({
+      requirementId,
+      description: 'd',
+      designDoc: 'docs/x.md#1',
+      codeModule: 'SD-001:src/counter.ts',
+      unitTest: 'TC-UNIT-001',
+      integrationTest: 'TC-INT-001',
+      systemTest: 'TC-SYS-001',
+      acceptanceTest: 'docs/y.md#UAT-001',
+      coverageStatus: '完整',
+    }));
+    const report = buildStatusReport({ status: '项目完成' }, { rows }, null);
+    expect(report.rtmCoverage).toEqual({ covered: 4, total: 4, percent: 100 });
+  });
+
+  it('counts rows missing a trace field as uncovered', () => {
+    const base = {
+      description: 'd',
+      designDoc: 'docs/x.md#1',
+      unitTest: 'TC-UNIT-001',
+      integrationTest: 'TC-INT-001',
+      systemTest: 'TC-SYS-001',
+      acceptanceTest: 'docs/y.md#UAT-001',
+      coverageStatus: '完整',
+    } as Record<string, string>;
+    const rows = [
+      { requirementId: 'REQ-001', codeModule: 'SD-001:src/counter.ts', ...base },
+      { requirementId: 'REQ-002', codeModule: '', ...base },
+      { requirementId: 'REQ-003', codeModule: 'SD-002:src/x.ts', ...base },
+      { requirementId: 'REQ-004', codeModule: 'SD-003:src/y.ts', ...base },
+    ];
+    const report = buildStatusReport({ status: '项目完成' }, { rows }, null);
+    expect(report.rtmCoverage).toEqual({ covered: 3, total: 4, percent: 75 });
   });
 
   it('testSummary 透传 executionSummary 四级', () => {

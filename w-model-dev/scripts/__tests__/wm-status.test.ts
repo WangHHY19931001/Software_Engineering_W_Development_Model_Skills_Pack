@@ -25,7 +25,7 @@ const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cl
 const PROJECT_JSON =
   '{"id":"smoke","name":"Smoke","description":"","status":"编码","techStack":{"frontend":[],"backend":[],"database":[],"others":[]},"createdAt":"2026-08-05T00:00:00Z","updatedAt":"2026-08-05T01:00:00Z"}';
 const RTM_JSON =
-  '{"rows":[{"requirementId":"R1","coverageStatus":"100%"},{"requirementId":"R2","coverageStatus":"部分"}],"executionSummary":{"unitTest":{"total":10,"passed":9,"failed":1,"pending":0},"integrationTest":{"total":5,"passed":5,"failed":0,"pending":0},"systemTest":{"total":3,"passed":3,"failed":0,"pending":0},"acceptanceTest":{"total":8,"passed":8,"failed":0,"pending":0}}}';
+  '{"rows":[{"requirementId":"R1","description":"d","designDoc":"docs/x.md#1","codeModule":"SD-001:src/a.ts","unitTest":"TC-UNIT-001","acceptanceTest":"docs/y.md#UAT-001","coverageStatus":"100%"},{"requirementId":"R2","description":"d","designDoc":"docs/x.md#2","coverageStatus":"部分"}],"executionSummary":{"unitTest":{"total":10,"passed":9,"failed":1,"pending":0},"integrationTest":{"total":5,"passed":5,"failed":0,"pending":0},"systemTest":{"total":3,"passed":3,"failed":0,"pending":0},"acceptanceTest":{"total":8,"passed":8,"failed":0,"pending":0}}}';
 const RUN_LOG_JSONL =
   '{"runId":"a","timestamp":"t1","phase":5,"action":"produce","role":"S","outcome":"success","gateExitCode":null}\n' +
   '{"runId":"b","timestamp":"t2","phase":5,"action":"gate","role":"G","outcome":"success","gateExitCode":0}\n';
@@ -64,7 +64,7 @@ describe('wm-status CLI（正常路径）', () => {
     expect(r.stdout).toContain('项目状态      : 编码');
     expect(r.stdout).toContain('当前阶段      : 5 / 8');
     expect(r.stdout).toContain('完成进度      : 4/8（50%）');
-    expect(r.stdout).toContain('RTM 覆盖率    : 1/2（50%）');
+    expect(r.stdout).toContain('RTM 覆盖率（按追溯字段重算）: 1/2（50%）');
     expect(r.stdout).toContain('单元 9/10');
     expect(r.stdout).toContain('最近动作');
     expect(r.stdout).toContain('下一步建议');
