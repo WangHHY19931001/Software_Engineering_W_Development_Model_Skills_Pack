@@ -7,24 +7,25 @@
 
 - 日期 / 主机 / node / Java / HEAD：`date -Iseconds` · `uname -srm` · `node --version` · `java -version 2>&1 | head -1` · `git rev-parse HEAD`
 - 实测值：
-  - 日期：`2026-09-19T18:01:00+08:00`（首轮起始）→ `2026-09-19T18:28:59+08:00`（修复轮 1 记录落盘）
+  - 日期：`2026-09-19T19:05:52+08:00`（修复轮 2 重放起始，取自 `trajectory.log` 首行）→ `2026-09-19T19:13:14+08:00`（本轮证据采集）（历史：首轮起始 `2026-09-19T18:01:00+08:00` → 修复轮 1 记录落盘 `18:28:59+08:00`）
   - 主机：`MINGW64_NT-10.0-26200 3.6.7-fb42d713.x86_64 x86_64`（Windows 10.0.26200 x64 / Git Bash）
   - node：`v25.8.1`
   - Java：`openjdk version "17.0.4" 2022-07-19`
-  - 仓库 HEAD（本轮重放时）：`8ae12c5669ec9db2d95243be5d3ff518d0f19c6d`
-- **本证据基于 commit `8ae12c5669ec9db2d95243be5d3ff518d0f19c6d` 的资产**（该提交即 `eval/e2e/demo-assets/build_workspace.py` 的最新提交——修复轮 1 的 `--reset` 只读重试；`git status --porcelain eval/e2e/demo-assets/` 为空，无本地未提交改动）。
+  - 仓库 HEAD（本轮重放时）：`bf56f8587c629ecbf9683dd58cec7844baa1141e`
+- **本证据基于 commit `bf56f8587c629ecbf9683dd58cec7844baa1141e`（重放时 HEAD）的资产**；资产文件最后变更于 `bcea41d9`（修复轮 2：装配器工作区判据护栏 + 探针日志自证 + `quotePath`/`chmod`/`trap`），`bf56f858` 本身只改本记录文件。`git status --porcelain eval/e2e/demo-assets/` 为空（无本地未提交改动）。
   资产指纹（`git rev-parse HEAD:<path>`）：
 
   | 资产                                          | blob SHA                                   |
   | --------------------------------------------- | ------------------------------------------ |
-  | `eval/e2e/demo-assets/README.md`              | `dd77b06fc87014efe998588a6aebac57adf8f52b` |
-  | `eval/e2e/demo-assets/build_workspace.py`     | `364b5d9ee3b106a758443bdc55f2a741de2c6d6e` |
+  | `eval/e2e/demo-assets/README.md`              | `48241ffb07320196a397f0df983ccab8c1b4c077` |
+  | `eval/e2e/demo-assets/build_workspace.py`     | `0f6b5116cd075f8e8e78f42d53be1fc61f8dc420` |
   | `eval/e2e/demo-assets/run_trajectory.sh`      | `79b695123c9f716174fbdc048f02401b97a496e9` |
-  | `eval/e2e/demo-assets/run_negative_probes.sh` | `983fa51399179af837b5a50a09fc8caca17a0940` |
+  | `eval/e2e/demo-assets/run_negative_probes.sh` | `8659cc0eb09f5da55a2ad9ae2a5d22039c359277` |
 
-  **其后若资产文件再变更，须重跑并更新本记录。**（首轮记录基于 `0170e226`，本轮重放基于其上叠加 `--reset` 只读重试修复的 `8ae12c56`；重放数字两轮一致。）
+  **其后若资产文件再变更，须重跑并更新本记录。**（三轮重放数字一致：首轮基于 `0170e226`、修复轮 1 基于 `8ae12c56`、修复轮 2 基于 `bcea41d9`（资产）/`bf56f858`（重放 HEAD）。）
 
-- 前置条件：无并发写者（重放前 `Get-CimInstance Win32_Process` 过滤 `vitest|prepush` 为空）；重放期间未运行其他 vitest / `npm run prepush`，未向工作区外写入状态。
+- 前置条件：无并发写者（重放前与重放后各实测一次 `Get-CimInstance Win32_Process` 过滤 `vitest|prepush`（限 `node|npm` 进程）= 0；两轮重放之间未启动其他 vitest / `npm run prepush` / 长任务）；重放期间未向工作区外写入状态。
+- **工作树须干净（修复轮 2 实测新增）**：`--scope` 绑定的「实际变更集合」= `base..head` + staged + unstaged + untracked（`w-model-dev/scripts/lib/change-scope.ts` 的 `verifyScopeGitBinding`），任何 tracked 文件的未提交改动都会让 p5–p8 的 artifact-gate 报 `[scope] 实际变更未在 changedFiles 声明：<file>` 并 exit 1。修复轮 2 首跑（工作树里本记录文件的 A4/A5 改动未提交）即因此得到 `TOTAL_GATE_RUNS=119` / `NONZERO_EXIT_COUNT=4`；提交该文件后重跑即 119/119。untracked 文件不受影响：`git ls-files --others` 以项目根（`eval/e2e/demo`，已被 gitignore）为前缀过滤，看不到未跟踪的 `docs/debug/`。
 
 ## 结果
 
@@ -36,12 +37,12 @@
 | 负向探针                            | 9/9 被拦截 + 恢复复绿       | 9/9         |
 | `wm-status` RTM 覆盖率              | 4/4（100%，按追溯字段重算） | 4/4（100%） |
 
-原始日志（均为修复轮 1 在 `8ae12c56` 上的重放；两轮日志字节数完全相同）：
+原始日志（均为修复轮 2 在 `bf56f858`（工作树 = 该提交）上的重放）：
 
-- 轨迹：`eval/e2e/demo/.replay/trajectory.log`（170333 字节，mtime `2026-09-19 18:24:25`，末行 `TOTAL_GATE_RUNS=119` / `NONZERO_EXIT_COUNT=0`，脚本 stdout 末行 `✓ 119/119 exit 0`，退出码 0）
-- 探针：`eval/e2e/demo/.replay/negative-probes.log`（18815 字节，mtime `2026-09-19 18:27:20`，脚本 stdout 末行 `✓ 9/9 探针被拦截 + 恢复复绿`，退出码 0）
+- 轨迹：`eval/e2e/demo/.replay/trajectory.log`（170333 字节，mtime `2026-09-19 19:10:40`，末行 `TOTAL_GATE_RUNS=119` / `NONZERO_EXIT_COUNT=0`，脚本 stdout 末行 `✓ 119/119 exit 0`，退出码 0；字节数与修复轮 1 **完全相同**）
+- 探针：`eval/e2e/demo/.replay/negative-probes.log`（19141 字节，mtime `2026-09-19 19:13:11`，脚本 stdout 末行 `✓ 9/9 探针被拦截 + 恢复复绿`，退出码 0；比修复轮 1 的 18815 字节多 326 字节，即新增的 9 条 `EXPECT_MATCH` 判定行 + 1 条 `probe-orig residue count` 行）
 
-> 修复轮 1 重跑数字与首轮**完全一致**（119 / 0 / 89-29-1 / 9-9 / 4-4），故上表照写；`TOTAL_GATE_RUNS=119` 与 `NONZERO_EXIT_COUNT=0` 由 `run_trajectory.sh` 末段自断言（`[ "$TOTAL" -eq 119 ]` / `[ "$NONZERO" -eq 0 ]`），非脚本退出即为命中。
+> 三轮重放数字**完全一致**（119 / 0 / 89-29-1 / 9-9 / 4-4），故上表照写；`TOTAL_GATE_RUNS=119` 与 `NONZERO_EXIT_COUNT=0` 由 `run_trajectory.sh` 末段自断言（`[ "$TOTAL" -eq 119 ]` / `[ "$NONZERO" -eq 0 ]`），非脚本退出即为命中。
 
 命令序列（`eval/e2e/demo-assets/` 下执行）：
 
@@ -87,9 +88,11 @@ bash run_negative_probes.sh
 | 8   | `checkpoint-vague`       | CHECKPOINT 决策改泛化短句                  | 1      | `R2`                         |
 | 9   | `cucumber-failed`        | cucumber 步骤改 `failed`                   | 1      | `--- D5 Step Binding: [1-9]` |
 
-探针 3 的命中词要求报告块出现 `不变式违反 : N 条`（N ≥ 1），即真实 TLC 判定的不变式违反，**与「缺 Java/jar 导致的环境失败」可区分**（后者不打该计数）。本机 Java 17 + `w-model-dev/tools/tla2tools.jar` 就绪，故该命中为真实不变式违反，非环境缺失。
+探针 3 的命中词要求报告块出现 `不变式违反 : N 条`（N ≥ 1），即真实 TLC 判定的不变式违反，**与「缺 Java/jar 导致的环境失败」可区分**（后者不打该计数）。本轮日志另给更强的锚点：该条 `TLA_JSON` 报 `"checkedSpecs":2`、`"environmentOk":true`、`"invariantViolations":["规格 L2_counter_service 不变式违反（invariantsHold=false）"]`——两个规格都真跑了 TLC、环境就绪、违反来自判定而非环境。
 
-恢复复验：`restore-check check-signature-chain.ts EXIT=0`、`restore-check check-run-log.ts EXIT=0`；工作区内 `*.probe-orig` 残留计数 0。
+**判定自证（修复轮 2，B2）**：每条探针的期望词命中由 `probe()` 在 grep 断言**之后**写回日志——`negative-probes.log` 实测 `[NP:<id>] EXPECT_MATCH=yes` **9 条**、`EXPECT_MATCH=no` **0 条**（断言前的行只陈述期望，不再陈述结论）。
+
+恢复复验：`restore-check check-signature-chain.ts EXIT=0`、`restore-check check-run-log.ts EXIT=0`（日志末段）；`probe-orig residue count=0`（同段日志自证：全部 `*.probe-orig` 备份已 `mv` 回原位）。
 
 ## 与归档的差异（如实列出）
 
@@ -101,13 +104,14 @@ bash run_negative_probes.sh
 
 1. **`--reset` 护栏生效**：工作区残留 `eval/e2e/demo/.git` 时，不带 `--reset` 的装配器按设计 fail-closed 退出（退出码 1），输出：
    `✗ 工作区根存在 .git：它会让 --scope 的 headRef 绑到 demo 自身 HEAD 而使 p5–p8 门禁过期。请先移走/删除该目录，或显式传 --reset 清空重建。`
-2. **（首轮发现 → 修复轮 1 已修）`--reset` 在 Windows 上无法自行清空残留 `.git`**：首轮 `python build_workspace.py --reset` 曾以
+2. **工作区判据护栏（修复轮 2，B1）**：两处删除点（`--reset` 整树清空、常规 7 目录重建）前加同一条判据——`ROOT` 不存在或为空（首次构建），或含本装配器哨兵（`SPEC.md` 与 `.w-model/project.json` 同时存在）才允许删除；否则 exit 1 并打印处置指引（`--reset` 仍先过既有「以 demo 结尾且不等于仓库根」护栏，删除失败仍抛、不使用 `ignore_errors`）。临时目录实测 4 种形态：非工作区 + 不带 `--reset` → exit 1 且目标文件原样保留；非工作区 + `--reset` → exit 1（同样未删）；`ROOT` 不存在 → 首次构建 exit 0；本装配器工作区（含 `--reset`）→ exit 0。
+3. **（首轮发现 → 修复轮 1 已修）`--reset` 在 Windows 上无法自行清空残留 `.git`**：首轮 `python build_workspace.py --reset` 曾以
    `PermissionError: [WinError 5] 拒绝访问。: '...\eval\e2e\demo\.git\objects\pack\pack-aab165774297aa18e90a41b53a1e268156c947e2.idx'`
    失败（退出码 1）——git 把对象/pack 文件置为只读（`attrib` 显示 `R`），而 `shutil.rmtree` 在 Windows 上不解除只读即删除失败，导致护栏推荐的唯一自愈路径失效。
 
-   **修复（commit `8ae12c56`）**：`build_workspace.py` 新增 `rmtree_force(path)`——标准库实现，异常钩子先 `os.chmod(p, stat.S_IWRITE)` 再重试原操作（Python ≥ 3.12 走 `onexc=`，否则 `onerror=`）；`--reset` 全清路径与常规清理循环那 7 个目录**两处**调用点均改用该助手，删除入口未新增（仍只在 `--reset` 分支做整目录删除），且**不使用** `ignore_errors`，解除只读后仍删不掉即抛出（fail-closed 语义不变）。
+   **修复（commit `8ae12c56`）**：`build_workspace.py` 新增 `rmtree_force(path)`——标准库实现，异常钩子先 `os.chmod(p, stat.S_IWRITE)` 再重试原操作（Python ≥ 3.12 走 `onexc=`，否则 `onerror=`）；`--reset` 全清路径与常规清理循环那 7 个目录**两处**调用点均改用该助手，删除入口未新增（仍只在 `--reset` 分支做整目录删除），且**不使用** `ignore_errors`，解除只读后仍删不掉即抛出（fail-closed 语义不变）。修复轮 2（B4）把该行改为 `os.chmod(p, stat.S_IWRITE | stat.S_IREAD)`——POSIX 异常路径上不再把权限收窄为 `0o200`；本轮 `--reset` 全清重建仍 exit 0。
 
-   **修复后验证（本轮实测）**：
+   **修复后验证（修复轮 1 实测）**：
 
    | 步骤       | 命令                                                 | 实测结果                                                                                                                                                                            |
    | ---------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
