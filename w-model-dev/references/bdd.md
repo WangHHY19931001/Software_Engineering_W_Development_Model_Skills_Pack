@@ -293,12 +293,14 @@ scenario 可含多个 When 步骤（用 `And` 连接），按顺序构成状态�
 
 ```gherkin
 Given 状态 A        # 起始状态
-When 事件 e1         # A + e1 -> B
-And 事件 e2          # B + e2 -> C
+# A + e1 -> B
+When 事件 e1
+# B + e2 -> C
+And 事件 e2
 Then 状态 C          # 终态断言
 ```
 
-> **D6 事件提取约定（2026-09-19）**：D6 取 When 行**行末 ASCII 词**为事件名（正则 `.+?\b(\w+)\s*\)?\s*$`）。单 token 行（如 `When Inc`）会静默取不到事件，进而报成 end-state mismatch 而非「无事件」。When 行请写成「事件 + 目标」两段以上（如 `When Inc 计数器自增`）。
+> **D6 事件提取约定（2026-09-19）**：D6 对 `When` 与 `And` 行同规则——取行末 ASCII 词为事件名（完整式 `^\s*(?:When|And)\s+.+?\b(\w+)\s*\)?\s*$`，容忍行末 `)`）。行末不是 ASCII 词时（如 `When Inc`、`When Inc 计数器自增`）会静默取不到事件，进而报成 end-state mismatch 而非「无事件」。请在行末放事件名，例如 `When 计数器自增 (Inc)` 或 `When 计数器自增 IncCounter`。
 
 校验算法按链式查找：S0 + e1 -> S1, S1 + e2 -> S2, ... 最终 Sn 必须与 `Then` 声明的终态一致。
 
@@ -1176,7 +1178,7 @@ Scenario: 已登录用户登出
 }
 ```
 
-> **`basePath` 解析基准（2026-09-19）**：`check-bdd-model.ts` 采用多路径回退（含 manifest 目录基准），`check-artifact-gate.ts` 仅按 `resolve(projectDir, basePath)` 解析；`basePath: '..'` 在两处语义不同，跨工具复用 feature 路径时以两处门禁实测为准。
+> **`basePath` 解析基准（2026-09-19）**：本 manifest 内相对路径的解析基准：相对项目根目录（projectDir；约定本文件位于 .w-model/ 下）。两处消费方对 basePath 本身的锚点相同（均为 `resolve(projectDir, basePath)`），差异在兜底候选集：check-bdd-model.ts 在 basePath 解析失败后还会依次尝试 `.w-model/<filePath>`、`.w-model/bdd/<filePath>`、`<projectDir>/<filePath>`；check-artifact-gate.ts 无兜底（直接报 [artifact:bdd] feature file missing）。跨工具复用时以两处门禁实测为准。
 
 ### 状态机说明
 
