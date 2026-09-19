@@ -26,7 +26,7 @@
     "schemaVersion": { "description": "manifest schema 版本号，固定 \"1.0\"", "type": "string", "enum": ["1.0"] },
     "projectId": { "description": "项目 ID（与 project.json 一致）", "type": "string", "minLength": 1 },
     "basePath": {
-      "description": "本 manifest 内相对路径的解析基准：相对项目根目录（projectDir；约定本文件位于 .w-model/ 下）。两处消费方对 basePath 本身的锚点相同（均为 resolve(projectDir, basePath)），差异在兜底候选集：check-bdd-model.ts 在 basePath 解析失败后还会依次尝试 .w-model/<filePath>、.w-model/bdd/<filePath>、<projectDir>/<filePath>；check-artifact-gate.ts 无兜底（直接报 [artifact:bdd] feature file missing）。跨工具复用时以两处门禁实测为准。",
+      "description": "本 manifest 内相对路径的解析基准：相对项目根目录（projectDir；约定本文件位于 .w-model/ 下）。两处消费方对 basePath 本身的锚点相同（均为 resolve(projectDir, basePath)），差异在兜底候选集：check-bdd-model.ts 在首个候选 basePath/filePath 不存在时还会依次尝试 .w-model/<filePath>、.w-model/bdd/<filePath>、<projectDir>/<filePath>；check-artifact-gate.ts 无兜底（直接报 [artifact:bdd] feature file missing）。跨工具复用时以两处门禁实测为准。",
       "type": "string",
       "minLength": 1
     },

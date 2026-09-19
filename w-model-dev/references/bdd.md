@@ -301,6 +301,7 @@ Then 状态 C          # 终态断言
 ```
 
 > **D6 事件提取约定（2026-09-19）**：D6 对 `When` 与 `And` 行同规则——取行末 ASCII 词为事件名（完整式 `^\s*(?:When|And)\s+.+?\b(\w+)\s*\)?\s*$`，容忍行末 `)`）。行末不是 ASCII 词时（如 `When Inc`、`When Inc 计数器自增`）会静默取不到事件，进而报成 end-state mismatch 而非「无事件」。请在行末放事件名，例如 `When 计数器自增 (Inc)` 或 `When 计数器自增 IncCounter`。
+> 本指南部分历史示例（行末为中文）为示意，不参与 D6 校验；实际项目请以「行末 ASCII 事件名」为准。
 
 校验算法按链式查找：S0 + e1 -> S1, S1 + e2 -> S2, ... 最终 Sn 必须与 `Then` 声明的终态一致。
 
@@ -1178,7 +1179,7 @@ Scenario: 已登录用户登出
 }
 ```
 
-> **`basePath` 解析基准（2026-09-19）**：本 manifest 内相对路径的解析基准：相对项目根目录（projectDir；约定本文件位于 .w-model/ 下）。两处消费方对 basePath 本身的锚点相同（均为 `resolve(projectDir, basePath)`），差异在兜底候选集：check-bdd-model.ts 在 basePath 解析失败后还会依次尝试 `.w-model/<filePath>`、`.w-model/bdd/<filePath>`、`<projectDir>/<filePath>`；check-artifact-gate.ts 无兜底（直接报 [artifact:bdd] feature file missing）。跨工具复用时以两处门禁实测为准。
+> **`basePath` 解析基准（2026-09-19）**：本 manifest 内相对路径的解析基准：相对项目根目录（projectDir；约定本文件位于 .w-model/ 下）。两处消费方对 basePath 本身的锚点相同（均为 `resolve(projectDir, basePath)`），差异在兜底候选集：check-bdd-model.ts **在首个候选 `<basePath>/<filePath>` 不存在时**还会依次尝试 `.w-model/<filePath>`、`.w-model/bdd/<filePath>`、`<projectDir>/<filePath>`；check-artifact-gate.ts 无兜底（直接报 [artifact:bdd] feature file missing）。跨工具复用时以两处门禁实测为准。
 
 ### 状态机说明
 

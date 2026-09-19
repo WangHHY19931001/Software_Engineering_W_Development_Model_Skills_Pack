@@ -8,7 +8,7 @@
 
 **技术栈：** TypeScript（tsx runtime）+ vitest + Node 22/25 + Python 3（装配器/探针变异）+ Bash（轨迹与探针驱动）+ 真实 Java SANY/TLC（`w-model-dev/tools/tla2tools.jar`）。
 
-**权威规格：** [docs/superpowers/specs/2026-09-19-debug-report-corrections-design.md](../specs/2026-09-19-debug-report-corrections-design.md)（含用户裁定与 §5.3 修订 r1）。
+**权威规格：** [docs/superpowers/specs/2026-09-19-debug-report-corrections-design.md](../specs/2026-09-19-debug-report-corrections-design.md)（含用户裁定、§5.3 修订 r1、§5.4 修订 r2）。
 
 ---
 
@@ -27,9 +27,9 @@
 | `w-model-dev/scripts/__tests__/wm-status-logic.test.ts`（若不存在则加在既有 wm-status 用例文件） | 修改 | 红→绿：4 行齐全 → 100%；缺 `codeModule` → 75% |
 | `docs/skill-design-document_SSoT.md` | 修改 | §10.5（子进程预算与诊断）、§10.8 item 5（层次措辞）、RTM 覆盖率口径 |
 | `w-model-dev/references/tla-plus.md` | 修改 | 层次校验措辞同步（第 389 行附近） |
-| `w-model-dev/references/command-reference.md` | 修改 | wm-status 覆盖率口径（第 359 行） |
+| `w-model-dev/references/command-reference.md` | 修改 | wm-status 覆盖率口径（第 234 / 359 行） |
 | `w-model-dev/references/data-models.md` | 修改 | `coverageStatus` 仅展示 + 同源函数（第 242 行附近） |
-| `w-model-dev/schemas/bdd-manifest.schema.json` | 修改 | `basePath` description 补解析基准差异 |
+| `w-model-dev/schemas/bdd-manifest.schema.json` | 修改 | `basePath` description 补解析基准差异（**F-2 措辞以规格 §5.4 修订 r2 为准**：锚点相同、兜底候选集不同） |
 | `w-model-dev/references/bdd.md` | 修改 | F-2 解析基准注记 + F-3 `SM-` 前缀约定 + F-4 When 行 token 约定 |
 | `eval/e2e/demo-assets/README.md` | 创建 | 前置条件、重建/重放步骤、已知坑、断言 |
 | `eval/e2e/demo-assets/build_workspace.py` | 创建 | 由 `eval/e2e/demo/build_workspace.py` 迁移 + 运行时 SHA/`--reset` 改造 |
@@ -532,6 +532,8 @@ git commit -m "fix(wm-status): RTM 覆盖率与聚合门同源（computeRtmTrace
 "description": "本 manifest 内相对路径的解析基准（相对本文件所在目录）。注意两处消费方基准不同：check-bdd-model.ts 采用多路径回退（含 manifest 目录基准），check-artifact-gate.ts 仅按 resolve(projectDir, basePath) 解析；basePath='..' 在两处语义不一致，跨工具复用时须以两处门禁实测为准。"
 ```
 
+> **注意（F-2 措辞以规格 §5.4 修订 r2 为准）**：上面的示例文案是本任务初版（已被代码否证——两处锚点其实相同，均为 `resolve(projectDir, basePath)`；差异在首个候选不存在时的兜底候选集）。实际落地的 description 按规格 §5.4 修订 r2 的事实撰写（见 `w-model-dev/schemas/bdd-manifest.schema.json:29`）。
+
 - [ ] **步骤 2：`bdd.md` 三处补充**
 
 在 `w-model-dev/references/bdd.md` 第 163 行表格下方补 F-3：
@@ -1022,7 +1024,7 @@ grep -n "119 次门禁\|32 次\|48 条签名链\|8 个日志文件" docs/debug/2
 - **S1（聚合门子进程预算与诊断）**：`EXEC_LIMITS` 新增 `modelCheckChildTimeoutMs`（360s = SANY 60 + TLC 300 + 余量），`artifact-gate-assets.ts` 三处 `runSync` 显式传入——原实现落回 15s 默认值，负载下真实 TLC 子进程被杀只报「退出码 unknown：」（复核会话实测复现）；`appendProcessViolation` 现报出信号名与超时语义。
 - **S2（层次校验措辞）**：`checkHierarchy` 增可选 `filteredOutPaths/fullPhaseByPath/phase`，被 `--phase` 过滤掉的 child 报「属后续阶段（phase=N），当前校验 phase=M 不包含它」，不再误报「不在 manifest 中」——该误报是审计报告把「phase 形态错配」当成「不变式伪造被 TLC 拒绝」的成因。判定结果不变（仍拦截）。
 - **F-1（RTM 覆盖率单一事实来源）**：`gate-logic.ts` 抽出并导出 `computeRtmTraceCoverage(rows, phase)`，`wm-status` 与 `check-artifact-gate` 共用；原 `wm-status` 按展示字段字面量 `'100%'` 统计，导致全行 `coverageStatus='完整'` 的矩阵显示 0/4（artifact-gate 判 100%）——现同源，实测 4/4（100%）。
-- **F-2/F-3/F-4（BDD 约定文档化）**：`bdd-manifest.schema.json` 的 `basePath` description 写明 `check-bdd-model` 与 `check-artifact-gate` 的解析基准差异；`references/bdd.md` 补 D4 的 `SM-` 前缀配对约定、D6 的 When 行行末 token 提取约定、`basePath` 注记。
+- **F-2/F-3/F-4（BDD 约定文档化）**：`bdd-manifest.schema.json` 的 `basePath` description 写明 `check-bdd-model` 与 `check-artifact-gate` 的解析差异（F-2 措辞以规格 §5.4 修订 r2 为准：锚点相同、兜底候选集不同）；`references/bdd.md` 补 D4 的 `SM-` 前缀配对约定、D6 的 When 行行末 token 提取约定、`basePath` 注记。
 - **可重放资产交付**：`eval/e2e/demo-assets/`（装配器 + 轨迹驱动 + 9 项负向探针 + README）受跟踪；装配器改为运行时取 `REPLAY_BASE..REPLAY_HEAD` 真实差异、轨迹驱动去绝对路径并内置 `119/0` 计数自断言、工作区残留 `.git` 时 fail-closed（实测该残留会让 p5–p8 的 `--scope` 过期、只剩 114/119）。
 - **报告订正（未跟踪目录内）**：9 项（P1–P9）——探针归因拆分为「phase 错配」与「真实 TLC 拒绝伪造自报」两条、执行条数口径改为 89 门禁 + 29 wm-write + 1 wm-status、签名链 48→49、写入 32→29、日志文件 8→12、阶段 1 无 Verifier、F-7 残留措辞。
 ```

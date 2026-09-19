@@ -138,15 +138,19 @@ eval/e2e/demo-assets/
    ```
    规则**逐字保留**现有实现（行结构错误 reason、`isCrossCutting` 分支、`phaseFields`、`coveragePercent` 取整与 99 封顶），`checkArtifactGate` 改为调用它并按现有顺序 push `rowReasons` → `missingItems` 原因 → 覆盖率原因，**判定与 reasons 顺序不变**（既有 `artifact-gate-*.test.ts` + self-test 的 GATE_CASES 为安全网）。
 2. `wm-status-logic.ts` 改调同一函数（`phase` 取 `STATUS_TO_PHASE[status]`），删除 `=== '100%'` 字面量比较；输出标签改为「RTM 覆盖率（按追溯字段重算）」（`cli/wm-status.ts:143`）。
-3. 文档口径统一：`references/command-reference.md:359` 与 `references/data-models.md:242` 注明「wm-status 与 check-artifact-gate 同源（`computeRtmTraceCoverage`），`coverageStatus` 仅展示、不参与计算」。
+3. 文档口径统一：`references/command-reference.md:234`（`/wm status` 输出规格，另注明 `percent` 与聚合门同源后为整数百分比）与 `:359`（`/wm init` 输出说明）、`references/data-models.md:242` 注明「wm-status 与 check-artifact-gate 同源（`computeRtmTraceCoverage`），`coverageStatus` 仅展示、不参与计算」——四处口径即本清单 `command-reference.md:234` / `:359` / `data-models.md:242` / SSoT §10.5 RTM 覆盖率口径注记。
 4. 红→绿：`wm-status-logic` 测试新增两条用例——① 4 行齐全（含 `coverageStatus: '完整'`）→ `covered=4/percent=100`（改前为 0/0，红）；② `REQ` 行缺 `codeModule` → `covered=3/percent=75`；`gate-logic` 既有 RTM 用例必须全绿（证明抽取零行为变化）。
 5. 不改 `rtmCoverage` JSON 字段名与结构。
 
 > 偏离说明：用户裁定原文为「F-1 只改 wm-status 输出标签 + 文档写明两套语义（不动计算）」；本条修订把「标注两套语义」换成「消除第二套语义」。理由是新增证据显示差异源于 wm-status 信任展示字段，若只改标签则会把错数字保留下来。artifact-gate 判定不受影响。若用户不同意，回退方案为：仅改标签「（按 coverageStatus 展示字段统计）」+ 文档写明差异，不动计算。
 
-### 5.4 F-2：bdd-manifest `basePath` 解析基准
+### 5.4 F-2：bdd-manifest `basePath` 解析基准（修订 r2：由「基准不同」订正为「基准相同、兜底候选集不同」）
 
-- **改法**：`w-model-dev/schemas/bdd-manifest.schema.json:28` 的 `basePath` description 增补「本字段在 `check-bdd-model`（多路径回退，含 manifest 目录基准）与 `check-artifact-gate`（仅 `resolve(projectDir, basePath)`）下的解析基准不同，`basePath: '..'` 两处语义不一致」；`w-model-dev/references/bdd.md` 增同款注记。
+- **改法**：`w-model-dev/schemas/bdd-manifest.schema.json:28` 的 `basePath` description 增补两处消费方的解析差异；`w-model-dev/references/bdd.md` 增同款注记。
+- **修订 r2（代码事实订正）**：本节初版（及计划任务 4 的初版文案）写「两处解析基准不同，`basePath: '..'` 两处语义不一致」——**该表述错误**。代码事实是：
+  - 两处对 `basePath` 本身的锚点相同，均为 `resolve(projectDir, basePath)`：`w-model-dev/scripts/cli/check-bdd-model.ts:293-294`（`projectDir = resolve(manifestDir, '..')`，再 `resolve(projectDir, manifest.basePath)`）与 `w-model-dev/scripts/application/artifact-gate-assets.ts:327`（`bddBasePath = path.resolve(projectDir, typedManifest.basePath)`）。
+  - 真正的差异在**首个候选 `<basePath>/<filePath>` 不存在时的兜底候选集**：`check-bdd-model.ts:165-170`（`resolveFeatureFile`）还依次尝试 `.w-model/<filePath>`、`.w-model/bdd/<filePath>`、`<projectDir>/<filePath>`；聚合门无兜底，`<basePath>/<filePath>` 不存在即报 `[artifact:bdd] feature file missing`（`artifact-gate-assets.ts:329-333`）。
+  - 已落地的下游文档按此事实撰写：`w-model-dev/schemas/bdd-manifest.schema.json` 的 `basePath` description（「两处消费方对 basePath 本身的锚点相同…差异在兜底候选集」）与 `w-model-dev/references/bdd.md` 的 `basePath` 解析基准注记。
 - 不改解析行为。
 
 ### 5.5 F-3 / F-4：`bdd.md` 约定补齐
