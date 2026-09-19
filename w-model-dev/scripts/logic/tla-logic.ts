@@ -390,21 +390,51 @@ export function validateHeader(header: Record<string, string | null>, spec: TlaS
 // ==================== 层次一致性校验 ====================
 
 /**
+ * checkHierarchy 的可选入参：描述「存在于 manifest 但被本次 `--phase` 过滤掉」的路径。
+ * 仅影响**措辞**（把「校验范围收窄」与「manifest 未登记」区分开），不改变判定结果——
+ * 命中 `filteredOutPaths` 的引用仍计入 violations（仍拦截）。
+ */
+export interface HierarchyOptions {
+  /** 存在于 manifest 但被当前 phase 过滤掉的 tlaPath 集合（由调用方用「全量 ∖ 已校验」构造） */
+  filteredOutPaths?: ReadonlySet<string>;
+  /** 被过滤路径 → 其 manifest 声明 phase，用于措辞（查不到时只报「属后续阶段」） */
+  fullPhaseByPath?: ReadonlyMap<string, number>;
+  /** 本次校验的 phase，用于措辞 */
+  phase?: number;
+}
+
+/**
  * 校验层次一致性（设计文档 §3.1 步骤 3）：
  *   - parent/child 双向：A.parent=B ⇒ B.children 含 A；A.children 含 C ⇒ C.parent=A
  *   - sibling 双向：A.siblings 含 B ⇒ B.siblings 含 A
  *   - 有且仅有一个 L1 根规格（parent=null 且 level=L1）
  *   - 层级单调：子规格 level = 父规格 level + 1
  *
+ * 措辞约定（SSoT §10.8 步骤 5 / tla-plus.md「校验步骤」3）：引用路径命中
+ * `options.filteredOutPaths` 时（该路径在 manifest 中登记、只是 `spec.phase > 本次 phase`
+ * 被过滤掉），报「属后续阶段（phase=N；当前校验 phase=M 不包含它），不算 manifest 缺失」；
+ * 未命中（真正未登记）保持原文案「不在 manifest 中（…）」。缺省 `options` 时行为与文案不变。
+ *
  * @param specs 待校验的规格数组（通常为 phase 过滤后的子集）
+ * @param options 可选的过滤上下文（`filteredOutPaths` / `fullPhaseByPath` / `phase`），仅用于措辞
  * @returns 违反消息数组（空数组表示一致）
  */
-export function checkHierarchy(specs: TlaSpec[]): string[] {
+export function checkHierarchy(specs: TlaSpec[], options: HierarchyOptions = {}): string[] {
   const violations: string[] = [];
   if (!Array.isArray(specs)) {
     violations.push('checkHierarchy: specs 必须为数组');
     return violations;
   }
+  const filteredOut = options.filteredOutPaths ?? new Set<string>();
+  const phaseByPath = options.fullPhaseByPath ?? new Map<string, number>();
+  const currentPhase = options.phase;
+  /** 被 phase 过滤掉的引用路径的措辞：能查到声明 phase 时报具体值，否则退化为「后续阶段」。 */
+  const laterPhaseHint = (path: string): string => {
+    const declared = phaseByPath.get(path);
+    const currentText = currentPhase === undefined ? '当前校验 phase' : `当前校验 phase=${currentPhase}`;
+    const inner = declared === undefined ? `${currentText} 不包含它` : `phase=${declared}；${currentText} 不包含它`;
+    return `属后续阶段（${inner}）`;
+  };
   // 按 tlaPath 索引：manifest 的 parent/children/siblings 字段值均为 tlaPath（非 spec.id）
   const byPath = new Map<string, TlaSpec>();
   for (const s of specs) byPath.set(s.tlaPath, s);
@@ -426,9 +456,15 @@ export function checkHierarchy(specs: TlaSpec[]): string[] {
     if (s.parent != null) {
       const parent = byPath.get(s.parent);
       if (!parent) {
-        violations.push(
-          `层次校验失败：规格 ${s.id} 的 parent="${s.parent}" 不在 manifest 中（应填 manifest 中已登记规格的 tlaPath，示例：parent: "tla/L1-system.tla"）`,
-        );
+        if (filteredOut.has(s.parent)) {
+          violations.push(
+            `层次校验失败：规格 ${s.id} 的 parent="${s.parent}" ${laterPhaseHint(s.parent)}，不算 manifest 缺失`,
+          );
+        } else {
+          violations.push(
+            `层次校验失败：规格 ${s.id} 的 parent="${s.parent}" 不在 manifest 中（应填 manifest 中已登记规格的 tlaPath，示例：parent: "tla/L1-system.tla"）`,
+          );
+        }
       } else if (!(parent.children ?? []).includes(s.tlaPath)) {
         violations.push(
           `层次校验失败：规格 ${s.id} 声明 parent="${s.parent}"，但 parent.children 未包含 ${s.tlaPath}（应在 parent 规格的 children 数组中补登 "${s.tlaPath}"，保持双向一致）`,
@@ -448,9 +484,15 @@ export function checkHierarchy(specs: TlaSpec[]): string[] {
     for (const childPath of s.children ?? []) {
       const child = byPath.get(childPath);
       if (!child) {
-        violations.push(
-          `层次校验失败：规格 ${s.id} 的 child="${childPath}" 不在 manifest 中（应填 manifest 中已登记规格的 tlaPath，或删除该失效 child 引用）`,
-        );
+        if (filteredOut.has(childPath)) {
+          violations.push(
+            `层次校验失败：规格 ${s.id} 的 child="${childPath}" ${laterPhaseHint(childPath)}，不算 manifest 缺失`,
+          );
+        } else {
+          violations.push(
+            `层次校验失败：规格 ${s.id} 的 child="${childPath}" 不在 manifest 中（应填 manifest 中已登记规格的 tlaPath，或删除该失效 child 引用）`,
+          );
+        }
       } else if (child.parent !== s.tlaPath) {
         violations.push(
           `层次校验失败：规格 ${s.id} 声明 child="${childPath}"，但 ${childPath}.parent="${child.parent}" ≠ "${s.tlaPath}"（应将 ${childPath} 的 parent 修正为 "${s.tlaPath}"，保持双向一致）`,
@@ -462,9 +504,15 @@ export function checkHierarchy(specs: TlaSpec[]): string[] {
     for (const sibPath of s.siblings ?? []) {
       const sib = byPath.get(sibPath);
       if (!sib) {
-        violations.push(
-          `层次校验失败：规格 ${s.id} 的 sibling="${sibPath}" 不在 manifest 中（应填 manifest 中已登记规格的 tlaPath，或删除该失效 sibling 引用）`,
-        );
+        if (filteredOut.has(sibPath)) {
+          violations.push(
+            `层次校验失败：规格 ${s.id} 的 sibling="${sibPath}" ${laterPhaseHint(sibPath)}，不算 manifest 缺失`,
+          );
+        } else {
+          violations.push(
+            `层次校验失败：规格 ${s.id} 的 sibling="${sibPath}" 不在 manifest 中（应填 manifest 中已登记规格的 tlaPath，或删除该失效 sibling 引用）`,
+          );
+        }
       } else if (!(sib.siblings ?? []).includes(s.tlaPath)) {
         violations.push(
           `层次校验失败：规格 ${s.id} 声明 sibling="${sibPath}"，但 ${sibPath}.siblings 未包含 ${s.tlaPath}（应在 ${sibPath} 的 siblings 数组中补登 "${s.tlaPath}"，保持双向一致）`,
@@ -940,7 +988,18 @@ export function checkTlaModel(manifest: unknown, phase: number): TlaCheckResult 
   }
 
   // 4. 层次一致性
-  result.hierarchyViolations = checkHierarchy(checkedSpecs);
+  // 传入「全量 specs 的 tlaPath ∖ 已通过 phase 过滤的 specs 的 tlaPath」：被 --phase 过滤掉的
+  // 引用路径改报「属后续阶段」，避免把「校验范围收窄」误报成「manifest 未登记」（判定结果不变）。
+  const checkedPaths = new Set(checkedSpecs.map((s) => s.tlaPath));
+  const filteredOutPaths = new Set(
+    m.specs.map((s) => (s as TlaSpec).tlaPath).filter((p) => typeof p === 'string' && !checkedPaths.has(p)),
+  );
+  const fullPhaseByPath = new Map(
+    m.specs
+      .filter((s) => typeof (s as TlaSpec).tlaPath === 'string' && filteredOutPaths.has((s as TlaSpec).tlaPath))
+      .map((s) => [(s as TlaSpec).tlaPath, (s as TlaSpec).phase] as const),
+  );
+  result.hierarchyViolations = checkHierarchy(checkedSpecs, { filteredOutPaths, fullPhaseByPath, phase });
 
   // 5. 拆解决策（警告不导致失败，仅取 violations）
   const decomp = checkDecomposition(checkedSpecs);

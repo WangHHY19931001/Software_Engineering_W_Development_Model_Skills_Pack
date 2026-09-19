@@ -387,6 +387,7 @@ npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=
 1. **环境检查**：Java ≥ 11、jar 存在。
 2. **文件头校验**：8 个 `@` 字段齐全且与 manifest 一致。
 3. **层次一致性**：parent/child/sibling 双向、单 L1 根、层级单调。
+   `children` 指向后续阶段规格（`spec.phase > --phase`）时，报错措辞为「属后续阶段（phase=N；当前校验 phase=M 不包含它）」——这是校验范围收窄，不是 manifest 缺失。
 4. **拆解决策**：组合数 >1w 必须 `split-done`。
 5. **清理轨迹**：删除 `*.dump` / `*.out` / `states/`（硬约束，先清后跑；批次 1 安全加固双守卫：仅当目录含 `.tla` 文件才执行清理，且 `states/` 须含 TLC 产物特征——时间戳子目录或 `.st`/`.fp`/`.dump`/`.out` 文件——才删除，防误删同名业务目录）。
    - 实测 TLC 2.19 产物：`states/<YY-MM-DD-HH-MM-SS>/` 子目录下含 `<Module>.st` / `<Module>-0.st`（状态文件）+ `<Module>_0.fp` / `<Module>_1.fp`（指纹文件）。默认不产生 `.dump` / `.out`，但保留清理作为预防。

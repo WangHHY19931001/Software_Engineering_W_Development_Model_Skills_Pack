@@ -21,6 +21,7 @@ import {
   checkCoverage,
   checkCfgInvariantsConsistency,
   checkCfgStructure,
+  checkHierarchy,
   validateHeader,
   type TlaSpec,
 } from '../logic/tla-logic.js';
@@ -399,5 +400,144 @@ describe('checkCoverage sdCoverage 回填', () => {
     } as any;
     const result = checkTlaModel(manifest, 2);
     expect(result.coverageViolations).toEqual([]);
+  });
+});
+
+// ==================== S2：层次校验区分「属后续阶段」的 child ====================
+//
+// 缺陷：`--phase` 收窄校验范围后，被过滤掉的 child/parent/sibling 路径不在 `byPath` 中，
+// 原实现一律报「不在 manifest 中」——把「校验范围收窄」误报成「manifest 未登记」。
+// 裁定：命中 `filteredOutPaths` 时改报「属后续阶段（phase=N；当前校验 phase=M 不包含它），
+// 不算 manifest 缺失」；未命中一律保留原文案（判定结果不变，仍拦截）。
+
+describe('S2 checkHierarchy 区分 phase 过滤掉的 child/parent/sibling', () => {
+  it('reports children filtered out by phase as later-phase specs, not as unregistered paths', () => {
+    const l1 = {
+      id: 'L1_counter',
+      level: 'L1',
+      phase: 1,
+      tlaPath: 'tla/L1_counter.tla',
+      cfgPath: 'tla/L1_counter.cfg',
+      parent: null,
+      children: ['tla/L2_counter_service.tla'],
+      siblings: [],
+    } as unknown as TlaSpec;
+    const violations = checkHierarchy([l1], {
+      filteredOutPaths: new Set(['tla/L2_counter_service.tla']),
+      fullPhaseByPath: new Map([['tla/L2_counter_service.tla', 2]]),
+      phase: 1,
+    });
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain('属后续阶段');
+    expect(violations[0]).toContain('phase=2');
+    expect(violations[0]).not.toContain('不在 manifest 中');
+  });
+
+  it('still reports genuinely unregistered children as missing from the manifest', () => {
+    const l1 = {
+      id: 'L1_counter',
+      level: 'L1',
+      phase: 1,
+      tlaPath: 'tla/L1_counter.tla',
+      cfgPath: 'tla/L1_counter.cfg',
+      parent: null,
+      children: ['tla/L9_ghost.tla'],
+      siblings: [],
+    } as unknown as TlaSpec;
+    const violations = checkHierarchy([l1], {
+      filteredOutPaths: new Set<string>(),
+      fullPhaseByPath: new Map<string, number>(),
+      phase: 1,
+    });
+    expect(violations[0]).toContain('不在 manifest 中');
+  });
+
+  it('parent 分支同款：被 phase 过滤掉的 parent 报「属后续阶段」，不报 manifest 缺失', () => {
+    const root = {
+      id: 'L1_counter',
+      level: 'L1',
+      phase: 1,
+      tlaPath: 'tla/L1_counter.tla',
+      cfgPath: 'tla/L1_counter.cfg',
+      parent: null,
+      children: [],
+      siblings: [],
+    } as unknown as TlaSpec;
+    const child = {
+      id: 'L2_counter_service',
+      level: 'L2',
+      phase: 2,
+      tlaPath: 'tla/L2_counter_service.tla',
+      cfgPath: 'tla/L2_counter_service.cfg',
+      parent: 'tla/L4_counter_impl.tla',
+      children: [],
+      siblings: [],
+    } as unknown as TlaSpec;
+    const violations = checkHierarchy([root, child], {
+      filteredOutPaths: new Set(['tla/L4_counter_impl.tla']),
+      fullPhaseByPath: new Map([['tla/L4_counter_impl.tla', 4]]),
+      phase: 1,
+    });
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain('parent="tla/L4_counter_impl.tla"');
+    expect(violations[0]).toContain('属后续阶段');
+    expect(violations[0]).toContain('phase=4');
+    expect(violations[0]).not.toContain('不在 manifest 中');
+  });
+
+  it('sibling 分支同款：被 phase 过滤掉的 sibling 报「属后续阶段」，不报 manifest 缺失', () => {
+    const root = {
+      id: 'L1_counter',
+      level: 'L1',
+      phase: 1,
+      tlaPath: 'tla/L1_counter.tla',
+      cfgPath: 'tla/L1_counter.cfg',
+      parent: null,
+      children: [],
+      siblings: ['tla/L3_counter_deep.tla'],
+    } as unknown as TlaSpec;
+    const violations = checkHierarchy([root], {
+      filteredOutPaths: new Set(['tla/L3_counter_deep.tla']),
+      fullPhaseByPath: new Map([['tla/L3_counter_deep.tla', 3]]),
+      phase: 1,
+    });
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain('sibling="tla/L3_counter_deep.tla"');
+    expect(violations[0]).toContain('属后续阶段');
+    expect(violations[0]).toContain('phase=3');
+    expect(violations[0]).not.toContain('不在 manifest 中');
+  });
+
+  it('缺省 options 时行为与文案逐字不变（未命中 filteredOutPaths 仍报 manifest 缺失）', () => {
+    const l1 = {
+      id: 'L1_counter',
+      level: 'L1',
+      phase: 1,
+      tlaPath: 'tla/L1_counter.tla',
+      cfgPath: 'tla/L1_counter.cfg',
+      parent: null,
+      children: ['tla/L9_ghost.tla'],
+      siblings: ['tla/L8_ghost.tla'],
+    } as unknown as TlaSpec;
+    const violations = checkHierarchy([l1]);
+    expect(violations).toHaveLength(2);
+    expect(violations[0]).toBe(
+      '层次校验失败：规格 L1_counter 的 child="tla/L9_ghost.tla" 不在 manifest 中（应填 manifest 中已登记规格的 tlaPath，或删除该失效 child 引用）',
+    );
+    expect(violations[1]).toBe(
+      '层次校验失败：规格 L1_counter 的 sibling="tla/L8_ghost.tla" 不在 manifest 中（应填 manifest 中已登记规格的 tlaPath，或删除该失效 sibling 引用）',
+    );
+  });
+
+  it('checkTlaModel 以 phase=1 校验时，phase=2 的 child 报后续阶段（调用方传入过滤集合）', () => {
+    const m = makeValidManifestWithoutBasePath() as { basePath?: unknown };
+    m.basePath = '.';
+    const result = checkTlaModel(m, 1);
+    expect(result.hierarchyViolations).toHaveLength(1);
+    expect(result.hierarchyViolations[0]).toContain('属后续阶段');
+    expect(result.hierarchyViolations[0]).toContain('phase=2');
+    expect(result.hierarchyViolations[0]).not.toContain('不在 manifest 中');
+    // 判定结果不变：仍拦截（passed=false）
+    expect(result.passed).toBe(false);
   });
 });
