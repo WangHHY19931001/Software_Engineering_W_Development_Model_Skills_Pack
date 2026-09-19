@@ -28,7 +28,7 @@
 | 术语一致性校验 | conventions.md 术语表 + 阶段 1 glossary.md | 复用 |
 | Token 预算切分 | budget.json + check-budget.ts | 复用 |
 | 代码事实核对 | codegraph_explore 强制（约束 #14）+ check-code-tla-consistency.ts | 复用 |
-| **产出期证据锚点** | **graph.json nodes[].evidenceAnchor（阶段 1-4 全节点必填）+ nodes[].evidenceStatus + check-requirement-graph R15a/b/c/e 子项校验** | **新增（唯一增量；🟡 已获一等状态）** |
+| **产出期证据锚点** | **graph.json nodes[].evidenceAnchor（阶段 1-4 全节点必填）+ nodes[].evidenceStatus + check-requirement-graph R15a/b/c/e/f 子项校验** | **新增（唯一增量；🟡 已获一等状态）** |
 | EVIDENCE_GRAPH.md 血缘视图 | graph.json + run-log 决策摘要（人类可读视图可选用模板） | 轻量映射 |
 | 熔断判定树 Q1-Q4 | 反模式 #18/#19 + R 报告复审 / 根因门禁 / S-fix 后 R3×3 / 预防审查 / V / G / CHECKPOINT 链 | 复用（更强） |
 | 每 3 个叶子周期校验 | R3 预防性审查 ×3 + ICEBERG-A/B + 阶段门 | 复用（节奏更强） |
@@ -46,7 +46,7 @@
   两者必须如实填写：把 `pending` 直接标 `confirmed` 而无签名链 V 环，R15e 会失败（禁止「乐观标记」）。
 - **三处语义补齐**（本次由「方法论参照」升为门禁事实）：
   1. 🟡 Pending **获得一等状态**——不再是文档里的 emoji，而是 schema 枚举值，可被门禁读取与统计；
-  2. R15 由**单一格式校验**扩展为 **R15a/b/c/e 四个可独立定位的子项**（见下），报告不再笼统报 `[schema] required`；
+  2. R15 由**单一格式校验**扩展为 **R15a/b/c/e/f 五个可独立定位的子项**（见下），报告不再笼统报 `[schema] required`；
   3. V 侧 `evidence` 与锚点**交叉对账**——锚点声明"我依据这个"，评审证据须指向同一事实，二者矛盾即缺陷。
 - **R15 子项**（`check-requirement-graph.ts`，权威为实现）：
 
@@ -56,10 +56,13 @@
   | R15b | `evidenceStatus` 非法（缺失或不在枚举内） | 无（纯逻辑） |
   | R15c | 锚点 `path` 部分在磁盘不存在 | CLI 注入真实路径集合 |
   | R15e | `evidenceStatus=confirmed` 但签名链中无引用本节点的 V review 环 | CLI 注入 signature-chain 条目 |
+  | R15f | 行号锚点（`path:L42` / `path:L42-58`）区间非法（`start<1` / `end<start`）或 `end` 超出文件内容行数 | CLI 注入 `path → 内容行数` 表 |
 
-  > **R15d 已刻意不实现**：原设计意图是用 codegraph `--scope` 覆盖度对账锚点，但 `--scope` 的覆盖语义是 `ChangeScope.changedFiles` 上的**集合成员判定**，而 `check-codegraph-queries.ts` 被硬限制在 `--phase 5|6|7|8`（`parsePhaseArg(process.argv, { min: 5, max: 8 })`），阶段 1-4 按设计不产出 codegraph 查询，图谱节点又只存在于阶段 1-4——两者定义域不相交，无可解析的表达式。故 R15 落地为 **R15a/b/c/e 四项**；编号中的空缺是已决议项，不是遗漏。
+  > **R15d 已刻意不实现**：原设计意图是用 codegraph `--scope` 覆盖度对账锚点，但 `--scope` 的覆盖语义是 `ChangeScope.changedFiles` 上的**集合成员判定**，而 `check-codegraph-queries.ts` 被硬限制在 `--phase 5|6|7|8`（`parsePhaseArg(process.argv, { min: 5, max: 8 })`），阶段 1-4 按设计不产出 codegraph 查询，图谱节点又只存在于阶段 1-4——两者定义域不相交，无可解析的表达式。故 R15 落地为 **R15a/b/c/e/f**；R15d 编号中的空缺是已决议项，不是遗漏。
   >
-  > R15c/R15e 依赖外部产物，由 CLI 读盘后经注入面提供；未注入即跳过（纯单测无文件系统上下文；阶段 1 早期签名链尚未生成时不误红）。
+  > R15c/R15e/R15f 依赖外部产物，由 CLI 读盘后经注入面提供；未注入（纯单测无文件系统上下文；阶段 1 早期签名链尚未生成时不误红）或该 `path` 不在注入表中（文件不可读）即跳过。
+  >
+  > **R15f 只判可证伪的那一半**：它管「行号是否落在文件内」，不管「那一行的内容是否支持 `=statement`」——后者是语义判断，仍由 V 评审核验。修复前 `x.ts:L99999` 能通过门禁，锚点从"可证伪的证据"退化成"看起来像证据的字符串"；现在越界即 violation。
 - **与评审证据区别**：evidenceAnchor = 产出者声明"我依据这个"；VerifierOutput.evidence = 评审者证明"我核验过"。
 
 ## 4. 明确拒绝照搬的点（避免破坏 W 模型架构）

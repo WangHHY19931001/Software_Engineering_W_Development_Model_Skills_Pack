@@ -437,3 +437,35 @@ describe('C7: OOS 形状校验 (CLI exit 2)', () => {
     }).not.toThrow();
   });
 });
+
+// ==================== 空集维度显式化（vacuously true 不得静默当成真实 100%） ====================
+describe('空集维度可见性', () => {
+  it('四维均有条目 → vacuousDimensions 为空且无空集警告', () => {
+    const r = checkRequirementCoverage(makeValidCoverage(), {
+      graphCrossCuts: [{ from: 'NFR-001', to: 'REQ-001' }],
+    });
+    expect(r.vacuousDimensions).toEqual([]);
+    expect(r.warnings.some((w) => w.includes('空集维度'))).toBe(false);
+  });
+
+  it('crossCuts 为空且 graph 亦无 cross-cuts 边 → 记入 vacuousDimensions 并发警告', () => {
+    const coverage = makeValidCoverage();
+    coverage.crossCuts = [];
+    // 空集重算 100%（既有的 vacuous 语义不改），故 metrics 仍填 100 以隔离 C10
+    coverage.metrics.crossCut = 100;
+    const r = checkRequirementCoverage(coverage, { graphCrossCuts: [] });
+    expect(r.vacuousDimensions).toEqual(['crossCut']);
+    expect(r.warnings.some((w) => w.includes('空集维度') && w.includes('vacuously true'))).toBe(true);
+    // 不改判：空集维度不升级为 violation（非空约束由 C1/C3/C5/C7b 各自处置）
+    expect(r.passed).toBe(true);
+  });
+
+  it('多个空集维度一次报全', () => {
+    const coverage = makeValidCoverage();
+    coverage.crossCuts = [];
+    // stakeholders 空会被 C1 拦下，这里只验证「报全」本身：用豁免放行 C1 以隔离出空集维度集合
+    coverage.stakeholders = [];
+    const r = checkRequirementCoverage(coverage, { graphCrossCuts: [], exemptions: ['C1', 'C10'] });
+    expect(r.vacuousDimensions).toEqual(['stakeholder', 'crossCut']);
+  });
+});

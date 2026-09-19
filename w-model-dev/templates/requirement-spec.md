@@ -96,6 +96,7 @@ graph TD
 - **单根**：level=1 节点可有多个（每个 domain 一个根），但每个 level≥2 节点有且仅有一个 parent。
 - **reqGroup 一致**：level≥2 节点的 reqGroup 须指向其 level=1 祖先；level=1 节点的 reqGroup 指向自身。
 - **验收标准可量化**：level=4 节点须含可量化验收标准（禁止「快速」「友好」等主观词）。
+  **门禁强制**：`check-artifact-gate.ts --phase=1 --spec-dir=<dir>` 的 `acceptance` 桶逐行校验 §4.2 表——`类型=acceptance` 行的「验收标准」列不得为空，且任一行该列不得含不可测量表述（词表 = `gate-logic.ts` 的 `SUBJECTIVE_ACCEPTANCE_WORDS`，来源即本条与下方 NFR 提示点名的词）。**判据边界**：门禁只判字面命中，「标准是否真的可测」仍归 V 评审的 `testability` 轴。
 - **NFR/CON 入树**：NFR/CON 节点同样须标注 level 并挂入层级树（横切治理类可挂 level=1 domain 下）。
 
 ## 5. 候选子系统划分（REQ-group）【维度2】

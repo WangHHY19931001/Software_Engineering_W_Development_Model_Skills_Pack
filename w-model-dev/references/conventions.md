@@ -102,7 +102,8 @@
 ### evidenceAnchor
 
 - **规范定义**：图谱节点（graph.json nodes[]）结论的事实锚点，由 **A 子代理 ingestion 时**声明"该节点结论依据什么事实"（A-chunk 提取 REQ 节点时对来源声明，A-cross 合并保留），
-  格式遵循本文件「格式约定」§2.1（`path:§section=statement` / `path:L42=statement`）；未声明时省略该字段（可选，R15 不强制）。
+  格式遵循本文件「格式约定」§2.1（`path:§section=statement` / `path:L42=statement`）；**阶段 1-4 全节点必填**（41.7.0 起，缺失即 R15a 失败；权威见 [evidence-anchored-tree.md](evidence-anchored-tree.md) §3）。
+  行号形态的锚点另受 **R15f** 约束：`L42` / `L42-58` 须落在文件内容行数之内，越界即锚点失效（判据边界与例外见 [evidence-anchored-tree.md](evidence-anchored-tree.md) §3）。
   S 子代理产出需求规格 §4.2 时**只读 graph.json 同步呈现**，不改图谱节点（S 改图谱命中反模式 #11）。
   与 VerifierOutput.subCriteria[].evidence 的区别：evidence 是**评审者**证明"我核验过"的证据；
   evidenceAnchor 是**产出者（A）**声明"我依据这个"的前提，二者互补不互相替代。

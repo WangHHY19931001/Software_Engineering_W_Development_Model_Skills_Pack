@@ -78,6 +78,8 @@ export interface CoverageCheckResult {
   skippedRules?: string[];
   metrics: CoverageMetrics;
   exemptionsApplied: string[];
+  /** 重算为「空集」的覆盖率维度（vacuously true：空集与真实 100% 数值相同，须显式区分） */
+  vacuousDimensions: string[];
 }
 
 // ==================== 辅助函数 ====================
@@ -109,6 +111,7 @@ export function checkRequirementCoverage(coverage: unknown, options: CoverageChe
     skippedRules: [],
     metrics: { stakeholder: 0, scenario: 0, requirementType: 0, crossCut: 0 },
     exemptionsApplied: [],
+    vacuousDimensions: [],
   };
 
   // Schema 前置校验
@@ -245,6 +248,23 @@ export function checkRequirementCoverage(coverage: unknown, options: CoverageChe
         result.violations.push(`C10 ${label} metrics 重算不一致：声明 ${c.metrics[key]}% vs 重算 ${recalced[key]}%`);
       }
     }
+  }
+
+  // 空集维度显式化：空集的 recalcRate 为 100%（vacuously true），与「确实全覆盖」在数值上
+  // 完全不可分。这里不把它升级为 violation——非空约束已分别由 C1/C3/C5（数组非空）与 C7b
+  // （crossCuts 空且无 --graph 时 fail-closed）处置，改判会与既有语义冲突；但它必须**可见**：
+  // 报告里的 100% 若来自空集却被读成"已覆盖"，就是「零命中当通过」的静默假成功。
+  const dimEntries: Array<[string, readonly unknown[]]> = [
+    ['stakeholder', c.stakeholders],
+    ['scenario', c.scenarios],
+    ['requirementType', c.requirementTypes],
+    ['crossCut', c.crossCuts],
+  ];
+  result.vacuousDimensions = dimEntries.filter(([, entries]) => entries.length === 0).map(([name]) => name);
+  if (result.vacuousDimensions.length > 0) {
+    result.warnings.push(
+      `空集维度：${result.vacuousDimensions.join(', ')} 无条目，重算覆盖率 100% 系 vacuously true（非真实覆盖）`,
+    );
   }
 
   // 记录豁免

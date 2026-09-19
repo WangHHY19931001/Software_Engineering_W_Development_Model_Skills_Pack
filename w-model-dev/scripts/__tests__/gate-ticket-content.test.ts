@@ -595,3 +595,88 @@ describe('check-artifact-gate.ts --tickets 参数契约（子进程，S18 §0.1.
     }
   });
 });
+
+describe('check-artifact-gate.ts --spec-dir 参数契约（子进程，阶段专属 flag 不得静默忽略）', () => {
+  const rtmSource = require('node:fs').readFileSync(VALID_RTM, 'utf-8') as string;
+
+  async function makeProject(): Promise<string> {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-specdir-'));
+    await fs.mkdir(path.join(dir, '.w-model'), { recursive: true });
+    await fs.writeFile(path.join(dir, '.w-model/rtm.json'), rtmSource, 'utf-8');
+    return dir;
+  }
+
+  function runGate(args: string[]): { status: number | null; stdout: string } {
+    const r = runSync(process.execPath, [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, ...args, '--json'], {});
+    return { status: r.status, stdout: r.stdout ?? '' };
+  }
+
+  it('缺 --phase 时给定 --spec-dir → exit 2 ARG_INVALID（修复前：静默丢弃该参数，specStructure=null 且无任何提示）', async () => {
+    const dir = await makeProject();
+    try {
+      const { status, stdout } = runGate([dir, `--spec-dir=${dir}`]);
+      expect(status).toBe(2);
+      expect(stdout).toContain('ERROR_JSON');
+      expect(stdout).toMatch(/"category":"ARG_INVALID"/);
+      expect(stdout).toContain('参数非法 --spec-dir');
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('--phase=8 给定 --spec-dir → exit 2 ARG_INVALID（与 --tickets 同口径：阶段不适用即拒，不静默跳过）', async () => {
+    const dir = await makeProject();
+    try {
+      const { status, stdout } = runGate([dir, '--phase=8', `--spec-dir=${dir}`]);
+      expect(status).toBe(2);
+      expect(stdout).toContain('参数非法 --spec-dir');
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('空值 --spec-dir= → exit 2 ARG_INVALID（空值不是「未提供」，不得静默忽略）', async () => {
+    const dir = await makeProject();
+    try {
+      const { status, stdout } = runGate([dir, '--phase=1', '--spec-dir=']);
+      expect(status).toBe(2);
+      expect(stdout).toContain('参数非法 --spec-dir');
+      expect(stdout).toContain('仅接受等号形态且值非空');
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('空格形态 --spec-dir <dir> → exit 2 ARG_INVALID（修复前被当作「未提供」，提示反说未提供）', async () => {
+    const dir = await makeProject();
+    try {
+      const { status, stdout } = runGate([dir, '--phase=1', '--spec-dir', dir]);
+      expect(status).toBe(2);
+      expect(stdout).toContain('参数非法 --spec-dir');
+      expect(stdout).toContain('仅接受等号形态且值非空');
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('--phase=1 给定 --spec-dir → 该参数不被拒（正常进入设计级结构校验，不得误红）', async () => {
+    const dir = await makeProject();
+    try {
+      const { stdout } = runGate([dir, '--phase=1', `--spec-dir=${dir}`]);
+      expect(stdout).not.toContain('参数非法 --spec-dir');
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('缺省不触发：无 --spec-dir 时阶段 1-4 标记为 skipped（既有调用方零影响）', async () => {
+    const dir = await makeProject();
+    try {
+      const { stdout } = runGate([dir, '--phase=1']);
+      const report = JSON.parse(stdout) as { specStructure?: unknown };
+      expect(report.specStructure).toBe('skipped');
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+});

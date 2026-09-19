@@ -1140,6 +1140,7 @@ describe('recalculatePassed', () => {
       },
       dataflowViolations: { blackHoles: [], miracles: [], deadModules: [] },
       boundary: { extIn: 1, extOut: 1, complete: true },
+      duplicateNodeIds: [],
       violations: [],
     };
     recalculatePassed(result, false);
@@ -1367,8 +1368,8 @@ describe('R15 evidenceAnchor 格式校验', () => {
   });
 });
 
-// ==================== R15a-e 五子项（A-3c：锚点必填 + 状态 + 存在性 + 签名链对账） ====================
-describe('R15a-e 证据锚点子项', () => {
+// ==================== R15a-f 六子项（A-3c：锚点必填 + 状态 + 存在性 + 行号 + 签名链对账） ====================
+describe('R15a-f 证据锚点子项', () => {
   /**
    * 构造纯 REQ 图：默认两节点均带合法锚点 + confirmed，可逐项覆写。
    * r15Violation(out, 'a') 取回以 'R15a' 开头的 violation 文本。
@@ -1565,6 +1566,169 @@ describe('R15a-e 证据锚点子项', () => {
       ],
     });
     expect(out.violations.some((v) => v.startsWith('R15e '))).toBe(false);
+  });
+
+  /**
+   * R15f 行号锚点越界。修复前 `path:L42` 只验 path 存在、不验行号，
+   * 故 `x.md:L99999` 能通过门禁——锚点从"可证伪的证据"退化成"看起来像证据的字符串"。
+   */
+  it('R15f 行号超出文件行数 → violation（须注入 anchorLineCounts）', () => {
+    const g = makeGraph({
+      nodes: [
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: 't',
+          summary: 's',
+          level: 1,
+          evidenceAnchor: 'docs/req.md:L99999=不存在的行',
+          evidenceStatus: 'confirmed',
+        },
+      ],
+    });
+    // 未注入行数表 → R15f 不触发（纯函数不做 I/O，行数由 CLI 注入）
+    expect(r15(checkRequirementGraph(g, 1), 'f')).toBeUndefined();
+    // 注入行数表 → 越界触发
+    const out = checkRequirementGraph(g, 1, {
+      existingAnchorPaths: new Set(['docs/req.md']),
+      anchorLineCounts: new Map([['docs/req.md', 30]]),
+    });
+    expect(out.passed).toBe(false);
+    expect(r15(out, 'f')).toContain('行号锚点越界');
+    expect(r15(out, 'f')).toContain('超出文件 30 行');
+  });
+
+  it('R15f 区间倒置（end < start）→ violation', () => {
+    const g = makeGraph({
+      nodes: [
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: 't',
+          summary: 's',
+          level: 1,
+          evidenceAnchor: 'docs/req.md:L80-3=倒置区间',
+          evidenceStatus: 'confirmed',
+        },
+      ],
+    });
+    const out = checkRequirementGraph(g, 1, {
+      existingAnchorPaths: new Set(['docs/req.md']),
+      anchorLineCounts: new Map([['docs/req.md', 200]]),
+    });
+    expect(out.passed).toBe(false);
+    expect(r15(out, 'f')).toContain('区间非法');
+  });
+
+  it('R15f 行号在文件内 → 不触发', () => {
+    const g = makeGraph({
+      nodes: [
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: 't',
+          summary: 's',
+          level: 1,
+          evidenceAnchor: 'docs/req.md:L5-12=合法区间',
+          evidenceStatus: 'confirmed',
+        },
+      ],
+    });
+    const out = checkRequirementGraph(g, 1, {
+      existingAnchorPaths: new Set(['docs/req.md']),
+      anchorLineCounts: new Map([['docs/req.md', 30]]),
+    });
+    expect(r15(out, 'f')).toBeUndefined();
+  });
+
+  it('R15f path 不在行数表（不可读/未登记）→ 跳过，不误红', () => {
+    const g = makeGraph({
+      nodes: [
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: 't',
+          summary: 's',
+          level: 1,
+          evidenceAnchor: 'docs/req.md:L99999=越界但行数未知',
+          evidenceStatus: 'confirmed',
+        },
+      ],
+    });
+    const out = checkRequirementGraph(g, 1, {
+      existingAnchorPaths: new Set(['docs/req.md']),
+      anchorLineCounts: new Map([['other.md', 10]]),
+    });
+    expect(r15(out, 'f')).toBeUndefined();
+  });
+
+  it('R15f section 锚点无行号 → 不受行号校验', () => {
+    const g = makeGraph({});
+    const out = checkRequirementGraph(g, 1, {
+      existingAnchorPaths: new Set(['docs/req.md']),
+      anchorLineCounts: new Map([['docs/req.md', 1]]),
+    });
+    expect(r15(out, 'f')).toBeUndefined();
+  });
+});
+
+// ==================== R16 节点 id 全项目唯一（graph-guide §1「全局唯一」的机器强制） ====================
+describe('R16 节点 id 全项目唯一', () => {
+  /** 2 节点纯 REQ 图；`duplicate` 为 true 时追加一个与 REQ-002 同 id 的节点 */
+  function makeGraph(duplicate: boolean): Record<string, unknown> {
+    const nodes: Array<Record<string, unknown>> = [
+      {
+        id: 'REQ-001',
+        type: 'REQ',
+        phase: 1,
+        title: '根',
+        summary: 'level=1',
+        level: 1,
+        evidenceAnchor: 'docs/req.md:§4=x',
+        evidenceStatus: 'confirmed',
+      },
+      {
+        id: 'REQ-002',
+        type: 'REQ',
+        phase: 1,
+        title: '子',
+        summary: 'level=2',
+        level: 2,
+        reqGroup: 'REQ-001',
+        evidenceAnchor: 'docs/req.md:§4=x',
+        evidenceStatus: 'confirmed',
+      },
+    ];
+    if (duplicate) {
+      nodes.push({ ...nodes[1], title: '同 id 的另一个节点' });
+    }
+    return {
+      version: 1,
+      currentPhase: 1,
+      nodes,
+      edges: [{ from: 'REQ-001', to: 'REQ-002', type: 'parent' }],
+    };
+  }
+
+  it('id 唯一 → duplicateNodeIds 为空，不触发', () => {
+    const out = checkRequirementGraph(makeGraph(false), 1);
+    expect(out.duplicateNodeIds).toEqual([]);
+    expect(out.violations.some((v) => v.startsWith('R16 '))).toBe(false);
+    expect(out.passed).toBe(true);
+  });
+
+  it('重复 id → violation（修复前 Set 去重使两个节点被合并成一个判定单元）', () => {
+    const out = checkRequirementGraph(makeGraph(true), 1);
+    expect(out.totalNodes).toBe(3);
+    expect(out.duplicateNodeIds).toEqual(['REQ-002']);
+    expect(out.passed).toBe(false);
+    const r16 = out.violations.find((v) => v.startsWith('R16 '));
+    expect(r16).toContain('REQ-002');
+    expect(r16).toContain('全局唯一');
   });
 });
 

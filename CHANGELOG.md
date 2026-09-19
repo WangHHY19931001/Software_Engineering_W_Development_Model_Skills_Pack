@@ -9,6 +9,43 @@
 
 ## [42.2.1] - 2026-09-01
 
+### 门禁结构校验入口合并（`checkRequirementSpecStructure` → `checkPhaseSpecStructure`，2026-09-20）
+
+> 背景：第三源吸收收尾时登记的观察——阶段 1 规格结构校验存在**两套并行实现**，其中 `checkRequirementSpecStructure`（阶段 1 专用）只被 `self-test` 与单测调用、**不接任何 CLI**，门禁实际走 `checkPhaseSpecStructure`。两套实现判据集相同而措辞不同，属"改了 A 忘了 B"的结构性风险。版本保持 42.2.1，**不 bump**。
+
+- **删除重复实现**：`checkRequirementSpecStructure` 从 `logic/gate-logic.ts` 移除（-54 行）；其判据集经逐条比对确认已由 `checkPhaseSpecStructure(1, …)` 全覆盖——`PHASE_SPEC_LAYOUT[1].refs` 与旧硬编码的 6 个引用文件名逐字相同，SSOT 头四项、DoD ≥ 8、`checkOutOfScopeRegister` 三组判据的谓词与消息逐字一致（仅"引用块缺失"一处措辞不同，全仓无任何断言依赖它）。
+- **fs 注入契约随合并放宽**：`checkPhaseSpecStructure` 的 `fs.readdirSync` 改为**可选**——它只有 phase≥2 的「主文档 glob」需要，phase=1 走固定文件名，合并后 phase-1 调用方不必再为一个用不到的方法写桩。**缺省时 phase≥2 报 `refs` 违规**（fail-closed，不静默跳过整组校验），该分支有单测钉死。
+- **调用方重指向**：`cli/self-test.ts`（import + 2 处调用 + 3 处注释）与 `__tests__/gate-enhancement.test.ts`（import + 4 处调用 + 1 处注释）改调 `checkPhaseSpecStructure(1, dir, fs)`；全仓 `checkRequirementSpecStructure` 残留 **0**（`docs/superpowers/plans/` 内的历史规划记录按惯例不改写）。
+- **零面与等价性证据**：不新增 CLI/schema/fixture/references 文件；`self-test` 实测 **358/358**、`gate-enhancement` 实测 **75/75**（含新增 2 例 fs 注入契约）、security-scan 零新增、prettier/tsc 全绿。因旧实现的测试断言与门禁消息在新入口下逐字成立，合并**未弱化任何一条判据**。
+
+### 第三源吸收（《需求设计一体化流程》v6.0：§4.2 验收标准可量化 + §5 ADR 三列结构门禁，2026-09-19）
+
+> 吸收决策记录见 [`docs/changes/decision-log/absorptions.md`](./docs/changes/decision-log/absorptions.md)「第三源吸收（《需求设计一体化流程》v6.0 …）」节（含先决事实、逐项判定表、明确不吸收清单与理由、4 项带验证方法的候选）；权威定义见 SSoT §10.5.4。版本保持 42.2.1，**不 bump**。
+>
+> **来源形态与判据取舍**：源为 Python 栈多智能体协作规格（3116 行，R1–R16 十六角色 + 三循环 + YAML 编排 + SQLite + 补偿 + HITL + 引擎）。精读发现其**概念层与可执行层严重不对齐**——三循环状态名只出现在一张 ASCII 图里、`on_failure`/补偿注册表/死信表/错误分类器/HITL 请求对象**均无执行者**（导入未用或从不读取），设计门禁更由**产出者本人**自审。故其循环与运行时机制**不按"机制"吸收**，只吸收契约层，且**不吸收其任何数字阈值**（源文档内部自相矛盾：同一故事规模阈值 50 与 100 并存、两套技术词黑名单不一致、INVEST 的 Estimable/Testable 是恒真桩）。
+
+- **J1 §4.2 验收标准可量化校验（phase 1）**：`templates/requirement-spec.md` §4.3、§4.2 的 NFR 提示、`discipline-dod.md` 自检项、`phase-1-requirements.md` 禁止行为 #3 —— **四处写了「禁止主观词/不可测量表述」，`主观词` 在全仓脚本命中 0**。现 `check-artifact-gate.ts --phase=1 --spec-dir=<dir>` 新增 `acceptance` 桶逐行校验主规格 §4.2 表：`类型=acceptance` 行的「验收标准」列不得为空，任一行该列不得含 `SUBJECTIVE_ACCEPTANCE_WORDS`（= `快速`/`友好`/`性能良好`/`高可用`/`易扩展`，**单一事实源导出常量，词表来源限定为仓库既有文档自己点名的词，不外扩**）；`{{...}}` / `—` / `-` 视为未填。**判据边界如实声明**：只判字面命中，「标准是否真的可测」仍归 V 评审 `testability` 轴，门禁通过不等于验收标准合格。表不存在即整组跳过（表完整性不在本判据职责内，故无存量夹具受影响）。
+- **J2 §5 ADR 三列结构校验（phase 2）**：`templates/system-design/system-architecture.md` §5 写「强制：每条 ADR 有决策 + 上下文 + 后果（**缺则 FM-SD-02**）」，而 **FM-SD-02 在全仓脚本命中 0**——失败模式编号存在、判据不存在。现 `--phase=2` 新增 `adr` 桶逐行校验 `*-system-architecture.md` §5 表的三列非空。**只吸收确定性核**：源侧 ADR 另要 `状态` 与 `备选方案` 并规定「后果须含正负两面」，仓库**不吸收**——`备选方案` 已由阶段 3 `interface-contract.md`「备选方案」节与阶段 4 `class-design.md`「方案权衡」列承载，再加一列即 duplication。**判据边界**：**不判「是否该有 ADR」**（三问门槛是判断型准入，脚本判不了），故不强制条数 ≥1，表为空或缺节均不报。
+- **判据不越界**：阶段 1 不施加 ADR 判据、阶段 2 不施加验收判据（各有单测钉死）。
+- **端到端实证**：以临时项目实跑 `--phase=2 --spec-dir=…`（ADR-001 缺「后果」→ `GATE_JSON.reasons` 出现该桶、exit 1）与 `--phase=1 --spec-dir=…`（「页面响应快速」→ 主观词桶；「—」→ 空缺桶），两条判据均经门禁退出码生效，非仅单测。
+- **文档同步（SSoT 优先）**：SSoT 新增 §10.5.4（按 §10.5.3 M08 体例：落点表 + 零面承诺 + 能力分工 + 判据强化披露 + 判据不越界 + 反模式挂靠）；`templates/requirement-spec.md` §4.3 与 `templates/system-design/system-architecture.md` §5 补门禁指针与判据边界；`references/phase-1-requirements.md`（禁止行为表后补门禁强制注）、`references/phase-2-system-design.md`（FM 表后补「FM-SD-02 的 ADR 半边已门禁化、评分半边仍归 V」注）、`references/command-reference.md`（`--spec-dir` 补**六桶清单**与「读证据须数对应桶条数、不得只看整体退出码」）。
+- **刻意不做（避免计数面扩散）**：不新增 CLI（保持 48 个 `cli/*.ts`）、不新增 schema（34 份）、不新增 references 文件、不新增 samples fixture（11 例新单测以 vitest 内联 `mkFs` 表达，self-test 358 不变）、不新增反模式（仍 #48）、不改硬约束条数（仍 14）与 pre-push 项数（19）。两项落地均在既有门禁脚本内。
+
+### 第五源吸收（dsh-normify：R16 节点 id 唯一 + R15f 行号锚点越界 + 覆盖率空集维度显式化 + I4 `--spec-dir` 阶段契约，2026-09-19）
+
+> 吸收决策记录见 [`docs/changes/decision-log/absorptions.md`](./docs/changes/decision-log/absorptions.md)「第五源吸收（dsh-normify …）」节（§1–§7 逐项判定表 + 明确不吸收清单 + 5 项带验证方法的候选；**§8 为深读源码后对前文的订正**；§9 新增落地 I4；§10 同族缺陷定向审计登记）。版本保持 42.2.1，**不 bump**。
+>
+> **证据基础的自我订正**：§1–§7 最初写于仅读该仓库 `README.md` + `skills/normify-gen/SKILL.md` 两份文档之时。经质疑后补做 `git clone`（HEAD `ed404e5`）并派 5 路子代理精读 `src/`（实测 **7749 行**，其 README 自称 7168 行已过期）、`docs/SPEC.zh-CN.md`（701 行）、`tests/`（585 行）、`CHANGELOG.md`（241 行）与 4 份 release notes，据此订正 6 处不实陈述（K1–K6）——其中 **K1**：被列为一项机制的「几何自检 `check-geometry.mjs`」**在仓库中根本不存在**（`scripts/` 只有 `build.sh`；无删除记录；CI 从不运行；README 的「28 层线压线 0 处」无可用产物可复现），真实存在的只是渲染器内部一个写 3 次读 0 次的降级标志。
+
+- **R16 节点 id 全局唯一（`logic/graph-logic.ts` + `cli/check-requirement-graph.ts`）**：`graph-guide.md` 长期只以散文声明「节点 id 全局唯一」，实现零强制——重复 id 被 `Set` 静默合并后，连通性/孤立/父唯一/环/信息流全部在「多节点合并为一个判定单元」的语义上计算，两个节点各自的问题互相抵消（一个出度 0、另一个入度 0，合并后既非黑洞亦非奇迹）。**已实证复现**：`valid-warnings.json` 追加同 id 节点后 `totalNodes: 5` 而唯一 id 仅 4、`levelDistribution` 出现 `{"4": 2}`，门禁仍 `passed: true`、exit 0。现于构建 id 集合**之前**判重，命中即 violation 并在 `duplicateNodeIds` 暴露定位；新增 2 例回归（唯一/重复）。
+- **R15f 行号锚点越界（同上二文件）**：`evidenceAnchor` 此前只验 `path` 存在、不验行号，故 `x.ts:L99999=…` 能通过门禁——锚点在断言一个不存在的行，「证据」退化为「看起来像证据的字符串」。现校验 `1 ≤ start ≤ end ≤ 文件内容行数`（区间倒置与越界同为 violation），行数按**内容行**计（末尾换行不多算一行，否则 `:L<末尾+1>` 会被误放行）。logic 层不做 I/O，由 CLI 仅对行号锚点读盘注入 `anchorLineCounts`；未注入或 path 不可读即跳过（与既有 R15c/R15e 同构，不误红）。**判据边界如实声明**：只判行号是否落在文件内，不判该行内容是否支持 `=statement`（语义判断仍归 V 评审）。新增 5 例回归（越界/倒置/区间内/不可读跳过/section 锚点不受影响）。
+- **覆盖率空集维度显式化（`logic/coverage-logic.ts` + `cli/check-requirement-coverage.ts`）**：空集维度的重算覆盖率是 100%（`vacuously true`），与「确实全覆盖」数值不可分——报告里的 100% 若来自空集而被读成"已覆盖"即「零命中当通过」。现新增 `vacuousDimensions` 字段 + 警告项 + CLI 人类可读行；**不升级为 violation**（非空约束已由 C1/C3/C5 与 C7b 分别处置，改判会与既有语义冲突）。可达路径无需任何豁免：项目无横切需求且 graph 亦无 `cross-cuts` 边时 `crossCut` 即为空集。新增 3 例回归。
+- **I4 `--spec-dir` 阶段专属参数契约（`cli/check-artifact-gate.ts`）**：缺 `--phase` 时 `--spec-dir` 被**静默丢弃**（`specStructure` 记 `null`，而代码注释中 `null` 的语义是"阶段 5-8 不适用"）⇒ 调用方读不出那个绿是"校验通过"还是"根本没跑"；空格形态 `--spec-dir <dir>` 与空值 `--spec-dir=` 同样落成"未提供"，且人类可读段反过来提示「**未提供 `--spec-dir`**」——调用方明明传了。现与同文件 `--tickets` 的既有契约（其注释原文即「不在低阶段静默跳过参数」）及 `--scope` 条已写明的原则（「**不输出「未提供 --scope」误导文案**」）对齐：空格形态/空值 → `ARG_INVALID`；阶段 5-8 或缺 `--phase` 而给定 → `ARG_INVALID`；缺省不传行为完全不变（阶段 1-4 仍记 `skipped` 并打印「⚠ 未执行」，阶段 5-8 仍记 `null`）。`command-reference.md` 同步补该契约。`gate-ticket-content.test.ts` 新增 5 例（含 `--phase=1` 合法形态**不得误红**），实测 44/44 通过。**为何属吸收**：这正是源侧最严重缺陷「以可选输入为条件的门禁就是可选门禁」的同族实例，而修复依据是本仓库自己已写下的两条原则，非引入外部口味。
+- **文档同步（SSoT 优先）**：SSoT §10.10.1 新增「节点 id 全局唯一（R16）」（含「判据须在构建 id 集合之前」的成因与为何按 violation 而非 warning）、§10L.2 R15 子项表补 R15f 行 + 判据边界 + 外部依赖注入口径（`R15a/b/c/e` → `R15a/b/c/e/f`）；`references/evidence-anchored-tree.md`（§2 映射表 + §3 子项表 + R15d 段落措辞）、`references/graph-guide.md`（节点 id 唯一性的 R16 强制口径）、`references/conventions.md`（evidenceAnchor 词条：订正已过期的「可选，R15 不强制」为 41.7.0 起必填，并补 R15f 指针）、`references/command-reference.md`（覆盖分析 CLI 补 `vacuousDimensions` 语义 + artifact gate 补 `--spec-dir` 契约）。
+- **L0 链接基线 rebaseline**：`helpers/l0-baseline.ts` 的 `relativeLinkCount` **676 → 678**（`conventions.md` 的 `evidenceAnchor` 词条新增 2 条同目录链接；`npm run audit:l0-links` 实测 `l1Only` 仍 95、`placeholders` 仍 36、`violations` 仍 0）。
+- **同族缺陷定向审计（登记不修）**：以「文档保证而机制不保证」三族对本仓库脚本定向普查，登记 A 族（可选输入门禁）7 处、B 族（无人读取的契约字段；抽样 688 个 schema 属性名）4 处、C 族（先过滤再校验）3 处，逐条附 `file:line`。最重的两条登记项：**A2** `check-requirement-graph` 的 R9–R14 整组跳过时 `GRAPH_JSON` **连"未执行"标记都没有**；**B1** `budget.schema.json` 的 `perPhase.maxTokens` 等四个上限在 schema 里承诺「超过触发 onExceed」「强制 CHECKPOINT」，实际无任何门禁校验（四个字段名在非测试脚本中只出现在类型声明处）。判定与处置见决策记录 §10。
+- **刻意不做（避免计数面扩散）**：不新增 CLI（保持 46 个 exit-2 脚本）、不新增 schema（34 份）、不新增 references 文件、不新增 samples fixture（新判据用例以 vitest 内联对象表达）、不改 run-log action 枚举与 pre-push 项数（19）。全部落地均在既有门禁脚本内。
+
 ### 调测报告订正与技能包诊断修复（2026-09-19，来源：`docs/debug/2026-09-19-wm-8phase-full-debug/`）
 
 > 该目录为**未跟踪审计产物，不随本次提交交付**（同 2026-09-18 外部调测先例）。规格见 `docs/superpowers/specs/2026-09-19-debug-report-corrections-design.md`（含 §5.3 修订 r1、§5.4 修订 r2）、计划见 `docs/superpowers/plans/2026-09-19-debug-report-corrections.md`。版本保持 42.2.1，**不 bump**。

@@ -138,6 +138,8 @@ export interface GraphCheckResult {
   traceabilityViolations: TraceabilityViolations;
   dataflowViolations: DataflowViolations;
   boundary: BoundaryInfo;
+  /** R16 重复的节点 id（空数组即唯一）；totalNodes 与唯一 id 数不等时用它定位 */
+  duplicateNodeIds: string[];
   violations: string[];
   /** 警告列表（不影响 passed 判定：边数下限 + 语义来源占比） */
   warnings?: string[];
@@ -162,6 +164,28 @@ const BOUNDARY_TYPES = new Set<NodeType>(['EXT-IN', 'EXT-OUT']);
  */
 function isNfrConNode(node: GraphNode): boolean {
   return node.id.startsWith('NFR-') || node.id.startsWith('CON-');
+}
+
+/**
+ * 找出重复出现的 id（按首次出现顺序，每个重复 id 只报一次）——R16 的唯一性判据。
+ * 刻意不用 Set 的 size 差值（那只能得到"有没有重复"，无法定位是哪个 id），
+ * 因为 R16 的失败必须可定位到具体 id，否则与笼统 schema 报错无异。
+ */
+function findDuplicateIds(ids: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const duplicates: string[] = [];
+  const reported = new Set<string>();
+  for (const id of ids) {
+    if (seen.has(id)) {
+      if (!reported.has(id)) {
+        duplicates.push(id);
+        reported.add(id);
+      }
+    } else {
+      seen.add(id);
+    }
+  }
+  return duplicates;
 }
 
 /**
@@ -228,6 +252,8 @@ export interface GraphCheckExternalEvidence {
   existingAnchorPaths?: ReadonlySet<string>;
   /** signature-chain.jsonl 条目（CLI 读取）→ 启用 R15e 签名链对账 */
   signatureChainEntries?: readonly SignatureChainEntryLike[];
+  /** 锚点 path → 该文件内容行数（CLI 读取）→ 启用 R15f 行号越界校验；path 不在表中即跳过该项 */
+  anchorLineCounts?: ReadonlyMap<string, number>;
 }
 
 /** R15e 所需的最小签名链条目形状（结构子集，避免 logic 层跨模块依赖） */
@@ -241,32 +267,72 @@ export interface SignatureChainEntryLike {
 /** evidenceAnchor 格式正则（复用 verifier-logic EVIDENCE_PATTERN 语义，禁止定义第三套解析） */
 const EVIDENCE_ANCHOR_PATTERN = /^(?:[\w/.-]+:§[\w.-]+|[\w/.-]+:L\d+(?:-\d+)?)=.+$/;
 
+/**
+ * evidenceAnchor 的行号形态解析（`path:L42` / `path:L42-58`，`=statement` 之前的部分）。
+ * 导出给 CLI 层复用：CLI 需要知道「这个锚点是不是行号锚点、指向哪个 path」才能只对
+ * 行号锚点读文件算行数——若在 CLI 侧另写一套判断，两处的「什么叫行号锚点」会各自漂移。
+ *
+ * 刻意拆成「头部 + 尾部」两条正则，而不是一条 `(\d+)(?:-(\d+))?=`：后者是量词嵌套
+ * （可选组里再套量词），会被 eslint-plugin-security 的 detect-unsafe-regex 判为回溯
+ * 风险模式。锚点整体格式的合法性已由 EVIDENCE_ANCHOR_PATTERN 保证，此处只需切开。
+ */
+const LINE_ANCHOR_PATTERN = /^([\w/.-]+):L(\d+)/;
+
+/** 行号区间的尾部形态 `-<end>=`：仅出现在头部之后，独立解析以避免量词嵌套（见上） */
+const LINE_ANCHOR_TAIL_PATTERN = /^-(\d+)=/;
+
+/** 行号锚点的解析结果（startLine/endLine 为闭区间；裸 `L42` 的 endLine 等于 startLine） */
+export interface EvidenceLineAnchor {
+  path: string;
+  startLine: number;
+  endLine: number;
+  /** 锚点原文（用于报错时如实回显，避免把 `L42` 渲染成 `L42-42`） */
+  raw: string;
+}
+
+/** 解析行号锚点；非行号锚点（如 `path:§section=...`）或格式非法均返回 undefined */
+export function parseEvidenceLineAnchor(anchor: string): EvidenceLineAnchor | undefined {
+  const m = LINE_ANCHOR_PATTERN.exec(anchor);
+  if (!m) return undefined;
+  const startLine = Number(m[2]);
+  const tail = LINE_ANCHOR_TAIL_PATTERN.exec(anchor.slice(m[0].length));
+  const endLine = tail ? Number(tail[1]) : startLine;
+  return {
+    path: m[1] ?? '',
+    startLine,
+    endLine,
+    raw: `${m[1]}:L${m[2]}${tail ? `-${tail[1]}` : ''}`,
+  };
+}
+
 /** evidenceStatus 合法枚举（R15b） */
 const VALID_EVIDENCE_STATUS: readonly string[] = ['confirmed', 'pending'];
 
 /**
- * R15a/b/c/e 证据锚点子项校验（纯函数，无 I/O）；R15d 已决议不实现，编号空缺是决议项。
+ * R15a/b/c/e/f 证据锚点子项校验（纯函数，无 I/O）；R15d 已决议不实现，编号空缺是决议项。
  *
  * 独立于 schema 校验存在的原因：schema 的 `required` 会让缺锚点/缺状态一律报成
- * 笼统 `[schema] ... required`，子项名（R15a/R15b）将不可定位——而「拆五子项」的
+ * 笼统 `[schema] ... required`，子项名（R15a/R15b）将不可定位——而「拆子项」的
  * 全部意义就是失败可定位。故本函数在 schema 校验之前调用，两层各自独立成立。
  *
- * R15c/R15e 依赖外部产物（真实文件系统 / signature-chain.jsonl），本文件不做 I/O，
+ * R15c/R15e/R15f 依赖外部产物（真实文件系统 / signature-chain.jsonl），本文件不做 I/O，
  * 由 CLI 层读盘后经 externalEvidence 注入；未注入即跳过（不报错也不假红）：
  *   - 未注入 existingAnchorPaths → 跳过 R15c（纯单测无文件系统上下文）
  *   - 未注入 signatureChainEntries → 跳过 R15e（阶段 1 早期签名链文件可能尚不存在，
  *     规格 §5 风险表要求此时不得误红）
+ *   - 未注入 anchorLineCounts → 跳过 R15f（同上；仅行号锚点需要行数，section 锚点无此判据）
  */
 export function checkEvidenceAnchors(
   nodes: readonly GraphNode[],
   externalEvidence: GraphCheckExternalEvidence,
 ): string[] {
-  const { existingAnchorPaths, signatureChainEntries } = externalEvidence;
+  const { existingAnchorPaths, signatureChainEntries, anchorLineCounts } = externalEvidence;
   const violations: string[] = [];
   const missingAnchors: string[] = [];
   const badStatus: string[] = [];
   const badFormat: string[] = [];
   const missingPaths: string[] = [];
+  const badLineRanges: string[] = [];
   const noSignatureRing: string[] = [];
   for (const n of nodes) {
     const anchor = n.evidenceAnchor;
@@ -289,6 +355,22 @@ export function checkEvidenceAnchors(
     // R15c 路径存在性（仅在 CLI 注入存在集合时校验）
     if (existingAnchorPaths !== undefined && anchorPath !== '' && !existingAnchorPaths.has(anchorPath)) {
       missingPaths.push(`${n.id}（${anchorPath}）`);
+    }
+    // R15f 行号锚点越界（仅在 CLI 注入行数表时校验）。
+    // 行号锚点此前只验 path 存在、不验行号——`x.ts:L99999` 通过门禁即在断言一个
+    // 不存在的位置，锚点从"可证伪的证据"退化成"看起来像证据的字符串"。区间非法
+    // （start<1 或 end<start）与越界（end>文件行数）都在断言一个读不到的事实，故与
+    // R15c 同级按 violation 处理；path 不在行数表中（不可读/未注入）则跳过，不误红。
+    if (anchorLineCounts !== undefined) {
+      const lineAnchor = parseEvidenceLineAnchor(anchor);
+      if (lineAnchor) {
+        const lineCount = anchorLineCounts.get(lineAnchor.path);
+        if (lineAnchor.startLine < 1 || lineAnchor.endLine < lineAnchor.startLine) {
+          badLineRanges.push(`${n.id}（${lineAnchor.raw} 区间非法）`);
+        } else if (lineCount !== undefined && lineAnchor.endLine > lineCount) {
+          badLineRanges.push(`${n.id}（${lineAnchor.raw} 超出文件 ${lineCount} 行）`);
+        }
+      }
     }
     // R15e 签名链对账（仅 confirmed 触发；仅在注入签名链时校验）
     if (n.evidenceStatus === 'confirmed' && signatureChainEntries !== undefined) {
@@ -319,6 +401,11 @@ export function checkEvidenceAnchors(
   }
   if (missingPaths.length > 0) {
     violations.push(`R15c 证据路径不存在：${missingPaths.join(', ')}（引用的东西必须真实存在）`);
+  }
+  if (badLineRanges.length > 0) {
+    violations.push(
+      `R15f 行号锚点越界：${badLineRanges.join(', ')}（行号锚点须指向文件内真实存在的行，越界即锚点失效）`,
+    );
   }
   if (noSignatureRing.length > 0) {
     violations.push(
@@ -354,6 +441,7 @@ export function checkRequirementGraph(
       deadModules: [],
     },
     boundary: { extIn: 0, extOut: 0, complete: false },
+    duplicateNodeIds: [],
     violations: [],
   };
 
@@ -389,6 +477,19 @@ export function checkRequirementGraph(
   }
   result.totalNodes = g.nodes.length;
   result.totalEdges = g.edges.length;
+
+  // R16 节点 id 全项目唯一（graph-guide §1「节点 id 格式 <TYPE>-<NNN> 全局唯一」的机器强制）。
+  // 必须在构建 nodeIds 集合**之前**判：重复 id 会被 Set 静默吞掉，此后连通性、孤立节点、
+  // 父唯一性、环、信息流全部在「两个节点合并成一个判定单元」的语义上计算——两个节点各自
+  // 的问题会互相抵消（如一个出度为 0、另一个入度为 0，合并后既不是黑洞也不是奇迹），
+  // 门禁仍判 passed。这类"看起来校验了、其实合并了"的静默通过正是本项要堵的缺口。
+  const duplicateNodeIds = findDuplicateIds(g.nodes.map((n) => n.id));
+  result.duplicateNodeIds = duplicateNodeIds;
+  if (duplicateNodeIds.length > 0) {
+    result.violations.push(
+      `R16 节点 id 重复：${duplicateNodeIds.join(', ')}（节点 id 全局唯一；重复 id 会让多个节点被合并成一个判定单元）`,
+    );
+  }
 
   // 构建邻接表（无向，所有边类型参与连通性）
   const nodeIds = new Set(g.nodes.map((n) => n.id));

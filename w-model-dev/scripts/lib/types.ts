@@ -40,6 +40,8 @@ export interface JsonReport {
   warnings?: string[];
   /** 因输入不足降级为非阻断的规则 ID（如 check-requirement-coverage 未提供 --graph 时的 C7）。 */
   skippedRules?: string[];
+  /** 重算为「空集」的覆盖率维度（如 crossCut 无条目时 100% 系 vacuously true，非真实覆盖）。 */
+  vacuousDimensions?: string[];
   /** 阶段 5-8 外部校验 summary（check-artifact-gate --json，与 GATE_JSON external 同构；非 5-8 阶段为 null）。 */
   external?: unknown;
   /** M07 兼容字段；严格模式固定为空数组，不提供时间戳豁免诊断。 */

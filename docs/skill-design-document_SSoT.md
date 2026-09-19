@@ -1401,6 +1401,24 @@ npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>
 - **判据强化（AC-11 披露义务）**：本机制**不新增命令、不新增放行路径**，但**改变了「什么样的 phase-1 规格能过门」**——phase-1 规格从此**须含合规 §8 表格**，旧散文形态不再放行；属既有门禁的**数据要求收紧**，**不引入 legacy 时间豁免**（本仓零 `requirement-spec.md` 存量夹具、无迁移对象，时间豁免会给「忘了写表格」开永久后门）。
 - **反模式挂靠（不新增条目）**：#3（RTM 为事实源——本机制不改 RTM 即其正面证据）、#10（编排者边界——A-chunk 只读 §8，写盘是 S 的产出职责）与既有「禁止平行事实源」约束（`phase-5-coding.md` 同族纪律）。
 
+#### 10.5.4 §4.2 验收标准可量化 + §5 ADR 三列结构校验（第三源吸收，2026-09-19）
+
+**目标**：把两条**早已写在模板里、却无任何脚本实现**的规则升级为门禁判据——「模板写了规则没人执行」与「口头承诺」等价。来源为外部多智能体需求-设计流程规格（其 R4 明令「禁止 AC 中 Then 描述模糊」、R7 明令「每个 ADR 必须含备选方案与后果」），载体不可移植，**判据可移植**。
+
+| 面 | 落点与内容 | 实现位置 |
+| --- | --- | --- |
+| 事实源 1（验收标准） | `docs/phase1-requirements/requirement-spec.md` §4.2 层级节点表「验收标准」列（level=4 节点须含可量化标准） | `w-model-dev/templates/requirement-spec.md` §4.2/§4.3（规则原文自始存在，本轮只补门禁指针） |
+| 事实源 2（ADR） | `docs/phase2-design/*-system-architecture.md` §5 架构决策记录表（`决策` / `上下文` / `后果` 三列） | `w-model-dev/templates/system-design/system-architecture.md` §5（同上） |
+| 门禁 | `check-artifact-gate.ts --phase=1\|2 --spec-dir=<dir>` 的 `acceptance` / `adr` violation 桶，与既有 `refs` / `ssot` / `dod` / `outOfScope` 四桶并列（既有四组判据逐字未改） | `w-model-dev/scripts/logic/gate-logic.ts` `checkAcceptanceCriteria` / `checkAdrRows` |
+| 不可测量表述词表 | `SUBJECTIVE_ACCEPTANCE_WORDS` = `快速` / `友好` / `性能良好` / `高可用` / `易扩展`（**单一事实源，词表来源为仓库既有文档自己点名的词，不外扩**） | `w-model-dev/scripts/logic/gate-logic.ts` 导出常量 |
+| 门禁契约文档 | 两桶的判据边界、占位符语义（`{{...}}` / `—` 视为未填）、退出码语义（违规 → exit 1） | `w-model-dev/references/command-reference.md`「Artifact Gate 项目阶段证据门」节 |
+
+- **零面承诺**：**不新增 Schema**（`schemas/**` 零变更）、**不新增 CLI**（`cli/*.ts` 48 不变、exit-2 47 不变）、**不新增 samples fixture**（用例以 vitest 内联 `mkFs` 表达，self-test 358 不变）、**不新增 references 文件**、**不升版本号**、**反模式仍 48 条**。
+- **能力分工（不得夸大）**：门禁**只判可枚举的字面命中**——§4.2 表中 `类型=acceptance` 行的「验收标准」列非空且不含词表任一词；ADR 表每行三列非空（`{{...}}` / `—` / `-` 视为未填）。**「该标准是否真的可测」与「哪些决策算关键决策」由 V 评审承担**（`verifier-spec.md` 的 `testability` 轴；`phase-2-system-design.md` 的 ADR 三问准入）。「门禁通过」**不等于**「验收标准合格」。
+- **判据强化（AC-11 披露义务）**：本机制**不新增命令、不新增放行路径**，但**改变了「什么样的 phase-1/2 规格能过门」**——§4.2 表的 level=4 行凡用「快速/友好」等词者、ADR 表凡缺列者，**旧形态不再放行**；属既有门禁的**数据要求收紧**，**不引入 legacy 时间豁免**（表不存在即整组跳过，故无存量夹具受影响；时间豁免会给「忘了填表」开永久后门）。
+- **判据不越界**：阶段 1 不施加 ADR 判据、阶段 2 不施加验收判据（各自只见自己的表）；ADR 表为空或缺节**不报**——是否该有 ADR 属判断型准入，脚本判不了，故**不强制 ADR 条数 ≥1**。
+- **反模式挂靠（不新增条目）**：#3（本机制的事实源是项目产物本身，不引入平行事实源）、#12（门禁结论以退出码为据）。
+
 > **子进程预算与诊断（2026-09-19）**：本门禁以子进程方式调用 `check-tla-model` / `check-bdd-model` / `check-tla-bdd-sync` 做终检，三个子进程必须携带显式预算 `EXEC_LIMITS.modelCheckChildTimeoutMs`（= 单规格 SANY 60s + TLC 300s 的最坏情形之和；注意 SANY/TLC 限额按 **每个在检规格** 各计一次，N 个规格的最坏情形为 N×360s，故高负载或规格数多时父进程可能先于子进程内部限额终止它——此时违例消息须给出信号名与预算值以便归因），不得落回 `runSync` 的 15s 默认值；子进程被信号终止时，违例消息须报出信号名与超时语义，避免退化为无法诊断的「退出码 unknown」。
 
 ### 10.6 项目级 Definition of Done（每次变更的日常标准）
@@ -2196,14 +2214,19 @@ interface RunLogEntry {
 | R15b | `evidenceStatus` 非法（缺失或不在枚举内） | 无（纯逻辑） |
 | R15c | 锚点 `path` 部分在磁盘不存在 | CLI 注入真实路径集合 |
 | R15e | `confirmed` 但签名链中无引用本节点的 V review 环 | CLI 注入 signature-chain 条目 |
+| R15f | 行号锚点（`path:L42` / `path:L42-58`）区间非法（`start<1` 或 `end<start`），或 `end` 超出文件内容行数 | CLI 注入 `path → 内容行数` 表（仅对行号锚点读盘） |
 
 - **R15d 已决议不实现**：原设计意图为用 codegraph `--scope` 覆盖度对账锚点，但 `--scope` 的覆盖语义是
   `ChangeScope.changedFiles` 上的集合成员判定，而 `check-codegraph-queries.ts` 被硬限制在 `--phase 5|6|7|8`
   （`parsePhaseArg(process.argv, { min: 5, max: 8 })`）；阶段 1-4 按设计不产出 codegraph 查询，图谱节点又只存在于阶段 1-4，
-  两者定义域不相交，无可解析表达式。故 R15 落地为 **R15a/b/c/e**；**编号空缺是已决议项，不是遗漏**。
-- **外部依赖注入**：R15c/R15e 依赖真实文件系统与 `signature-chain.jsonl`，logic 层不做 I/O，
-  由 CLI 读盘后经 `externalEvidence` 注入（与 §10L.3 的 `viewSets` 同一约定）；未注入即**跳过**（不报错也不假红，
-  阶段早期产物/签名链尚不存在时不得误红）。
+  两者定义域不相交，无可解析表达式。故 R15 落地为 **R15a/b/c/e/f**；**R15d 编号空缺是已决议项，不是遗漏**。
+- **R15f 判据边界**：它把行号锚点从「路径存在即可」升级为「所指向的行真实存在」——修复前 `x.md:L99999` 能通过门禁，
+  等于用一个不存在的行断言事实，锚点退化成「看起来像证据的字符串」。判据只覆盖**可证伪的那一半**：行号是否落在文件内；
+  锚点所指向行的**内容**是否支持其 `=statement` 仍由 V 评审核验（脚本判不了语义），二者互补而非替代。
+  行数按**内容行**计（末尾换行不多算一行），否则 `:L<末尾+1>` 这类越界锚点会被误放行。
+- **外部依赖注入**：R15c/R15e/R15f 依赖真实文件系统与 `signature-chain.jsonl`，logic 层不做 I/O，
+  由 CLI 读盘后经 `externalEvidence` 注入（与 §10L.3 的 `viewSets` 同一约定）；未注入、或该 `path` 不在注入表中
+  （文件不可读）即**跳过**（不报错也不假红，阶段早期产物/签名链尚不存在时不得误红）。
 - **R15e 契约**：须存在**同一**签名链条目同时满足 —— `role=V` 且 `action=review`；其 `artifacts` 含该节点 id；
   其 `inputProvenance.sourceArtifacts[].path` 等于锚点 `path` 部分。"审过该节点"与"核验过该锚点"是两件事，二者须同时成立。
 
@@ -2275,6 +2298,8 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 - **子系统根 = SD 节点**，通过 `parent` 边依附系统根（`SD.parent → REQ` 系统根）。
 - **接口根 = INTF 节点**，通过 `parent` 边依附子系统根（`INTF.parent → SD` 子系统根）。
 - **层级单调**：`parent` 边（父→子）只能连接相邻层级，且 **子节点 Level = 父节点 Level + 1**（`REQ=L0` / `SD=L1` / `INTF=L2` / `DD=L3`，即边方向 L0→L1→L2→L3 单调递增），禁止跨层或逆向依附；违反 → `hierarchyTreeViolation`，`check-requirement-graph.ts` 退出码 1。
+- **节点 id 全局唯一（R16）**：`nodes[].id` 须为 `<TYPE>-<NNN>` 且在**全项目内唯一**；重复 → R16 violation，退出码 1。
+  **判据必须在构建 id 集合之前执行**：重复 id 会被 `Set` 静默吞掉，此后连通性、孤立节点、父唯一性、环检测、信息流全部在「多个节点合并为一个判定单元」的语义上计算——两个节点各自的问题会互相抵消（如一个出度 0、另一个入度 0，合并后既非黑洞亦非奇迹），门禁仍判 `passed=true`。这类「看起来校验了、其实被合并了」的静默通过与 §10L 的「形状合规 ≠ 实际正确」同源，故按 violation 而非 warning 处理。
 
 ### 10.10.2 多层图谱（7 层）
 

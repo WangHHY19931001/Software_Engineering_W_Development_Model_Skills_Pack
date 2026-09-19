@@ -6,6 +6,8 @@ import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { RTM_FIELDS } from '../lib/constants.js';
 import { SafeProjectPathError, resolveProjectRelativeRegularFile } from '../lib/safe-project-path.js';
 
+import { parseMarkdownTable } from './graph-logic.js';
+
 export interface RTMRowShape {
   requirementId: string;
   description: string;
@@ -807,6 +809,93 @@ export interface RequirementSpecStructureViolations {
   dod: string[];
   /** §8 Out of Scope 拒绝登记（M08）结构违规；判定见 checkOutOfScopeRegister。 */
   outOfScope: string[];
+  /** §4.2 层级节点表「验收标准」列的可量化校验（phase=1）；判定见 checkAcceptanceCriteria。 */
+  acceptance: string[];
+  /** §5 架构决策记录（ADR）三列结构校验（phase=2，FM-SD-02）；判定见 checkAdrRows。 */
+  adr: string[];
+}
+
+/**
+ * 验收标准「不可测量表述」黑名单（单一事实源）。
+ *
+ * 词表来源 = 本仓库既有文档**自己点名**的词，不外扩：
+ *   - `templates/requirement-spec.md` §4.3「禁止「快速」「友好」等主观词」
+ *   - `templates/requirement-spec.md` §4.2 NFR 提示「禁止「性能良好」「高可用」「易扩展」等不可测量表述」
+ *
+ * 文档写的是「等主观词」（一个类），而门禁只能判可枚举的字面命中——这个落差是**判据边界**，
+ * 不是遗漏：扩表等于放宽/收紧门禁，须改本常量并同步上述两处文档，不得由子代理自行扩写。
+ * 未列入的同义表述（如「稳定」「流畅」）仍由 V 评审按 `verifier-spec.md` 的 testability 轴核验。
+ */
+export const SUBJECTIVE_ACCEPTANCE_WORDS = ['快速', '友好', '性能良好', '高可用', '易扩展'] as const;
+
+/**
+ * 单元格是否「未填」：空串、破折号占位、模板占位符（`{{...}}`）一律视为空缺。
+ * 破折号是模板里 level 1-3 行表达「本列不适用」的正式写法（`| REP-001 | ... | — |`），
+ * 故不能把「有内容」等同于「非空串」——否则要么误报模板合法写法，要么放行 `{{决策}}` 占位。
+ */
+function isBlankCell(cell: string | undefined): boolean {
+  const t = (cell ?? '').trim();
+  return t === '' || t === '—' || t === '-' || t === '--' || t.includes('{{');
+}
+
+/**
+ * §4.2 层级节点表「验收标准」列校验（phase=1 专用）。
+ *
+ * 规则原文本早已在 `templates/requirement-spec.md` §4.3 与 `discipline-dod.md` 声明，
+ * 但此前**无任何脚本实现**——「写了规则没人执行」正是本项要堵的缺口（用户口头承诺与
+ * 门禁退出码是两件事）。
+ *
+ * 判据边界（如实声明）：
+ *   - 只判「表存在时逐行的字面命中」与「level=4 节点该列非空」；
+ *   - **不判**「标准本身是否真的可测」（如「响应 < 2s」是否够精确），那是语义判断，仍归 V 评审的 `testability` 轴；
+ *   - 表不存在即跳过（该表的完整性不在本函数职责内，由 phase-1 的图谱/追踪矩阵门禁另行覆盖）。
+ */
+function checkAcceptanceCriteria(spec: string, out: string[]): void {
+  for (const row of parseMarkdownTable(spec)) {
+    if (!('验收标准' in row) || !('类型' in row)) continue;
+    const id = (row['需求 ID'] ?? row['需求ID'] ?? '').trim() || '(无 ID)';
+    const type = (row['类型'] ?? '').trim();
+    const ac = (row['验收标准'] ?? '').trim();
+    if (type === 'acceptance' && isBlankCell(ac)) {
+      out.push(`structure: §4.2 表格 ${id} 为 level=4 验收节点但「验收标准」列为空（须含可量化验收标准）`);
+      continue;
+    }
+    const hit = SUBJECTIVE_ACCEPTANCE_WORDS.find((w) => ac.includes(w));
+    if (hit !== undefined) {
+      out.push(
+        `structure: §4.2 表格 ${id} 的验收标准含不可测量表述「${hit}」（须改写为可量化标准，如「响应 < 2s」「操作 ≤ 3 步」）`,
+      );
+    }
+  }
+}
+
+/**
+ * §5 架构决策记录（ADR）三列校验（phase=2 专用）。
+ *
+ * 模板 `templates/system-design/system-architecture.md` §5 声明「强制：每条 ADR 有决策 +
+ * 上下文 + 后果（缺则 FM-SD-02）」，但此前 FM-SD-02 在全仓脚本中零命中。
+ *
+ * 判据边界（如实声明）：
+ *   - 只判「ADR 表存在时每行的决策/上下文/后果三列非空」；
+ *   - **不判**「是否该有 ADR」——`phase-2-system-design.md` 的三问门槛（难逆 / 无上下文会困惑 / 真取舍）
+ *     是判断型准入，脚本判不了，故**不强制 ADR 条数 ≥1**（表为空或缺节均不报）。
+ */
+function checkAdrRows(archName: string, arch: string, out: string[]): void {
+  for (const row of parseMarkdownTable(arch)) {
+    if (!('ADR 编号' in row)) continue;
+    const id = (row['ADR 编号'] ?? '').trim() || '(无编号)';
+    // 三个键逐一显式取（不用 row[k] 动态键：动态键访问既触发 detect-object-injection，
+    // 也让「要校验哪三列」这件事散进数组字面量里，改列时容易漏改一处）
+    const missing: string[] = [];
+    if (isBlankCell(row['决策'])) missing.push('决策');
+    if (isBlankCell(row['上下文'])) missing.push('上下文');
+    if (isBlankCell(row['后果'])) missing.push('后果');
+    if (missing.length > 0) {
+      out.push(
+        `structure: ${archName} 的 ${id} 缺 ${missing.join('/')}（FM-SD-02：每条 ADR 须有决策 + 上下文 + 后果）`,
+      );
+    }
+  }
 }
 
 /** 真实 node:fs 适配（readFileSync 显式 utf-8 以满足 string 返回类型）。 */
@@ -992,58 +1081,6 @@ function checkOutOfScopeRegister(spec: string): string[] {
   return v;
 }
 
-/** Phase 1 需求规格结构校验：引用块完整性 + §0 SSOT 头 + DoD 清单 + §8 拒绝登记结构
- *  @param specDir  docs/phase1-requirements/ 目录（含 requirement-spec.md + 6 独立产物）
- *  @param fs       文件系统注入 { readFileSync(p): string; existsSync(p): boolean }，便于单测 mock
- */
-export function checkRequirementSpecStructure(
-  specDir: string,
-  fs: { readFileSync(p: string): string; existsSync(p: string): boolean },
-): RequirementSpecStructureViolations {
-  const v: RequirementSpecStructureViolations = {
-    refs: [],
-    ssot: [],
-    dod: [],
-    outOfScope: [],
-  };
-  const specPath = path.join(specDir, 'requirement-spec.md');
-  if (!fs.existsSync(specPath)) {
-    v.refs.push('structure: requirement-spec.md 不存在');
-    return v;
-  }
-  // 引用块完整性：6 个独立文件（主规格引用块 `> xxx详见 [name](./name.md)`）
-  // String() 兼容注入 fs 返回 Buffer 的场景（真实 node:fs 无编码 readFileSync 返回 Buffer）
-  const spec = String(fs.readFileSync(specPath));
-  const requiredRefs = [
-    'system-context.md',
-    'glossary.md',
-    'traceability-matrix.md',
-    'behavior-spec.md',
-    'discipline-dod.md',
-    'uml-modeling.md',
-  ];
-  for (const ref of requiredRefs) {
-    if (!spec.includes(`](./${ref})`)) v.refs.push(`structure: 主规格缺引用块 → ${ref}`);
-    if (!fs.existsSync(path.join(specDir, ref))) v.refs.push(`structure: 引用文件不存在 ${ref}`);
-  }
-  // §0 SSOT 头四项声明
-  for (const key of ['文档版本', 'SSOT 声明', '自身校验', '禁止占位词']) {
-    if (!spec.includes(key)) v.ssot.push(`structure: §0 SSOT 头缺「${key}」`);
-  }
-  // DoD 清单：discipline-dod.md - [ ] 项 ≥ 8
-  const dodPath = path.join(specDir, 'discipline-dod.md');
-  if (!fs.existsSync(dodPath)) {
-    v.dod.push('structure: discipline-dod.md 不存在');
-  } else {
-    const dod = String(fs.readFileSync(dodPath));
-    const checks = (dod.match(/- \[ \]/g) ?? []).length;
-    if (checks < 8) v.dod.push(`structure: discipline-dod.md DoD 清单仅 ${checks} 项（须 ≥ 8）`);
-  }
-  // §8 拒绝登记（Out of Scope）结构校验（M08）——只校验登记结构，不校验概念相似度
-  v.outOfScope.push(...checkOutOfScopeRegister(spec));
-  return v;
-}
-
 /** 各阶段独立产物布局（主文档后缀 + 6 独立文件）
  *  phase=1: requirement-spec.md 主文档 + 6 子文件（无前缀）
  *  phase=2: {module}-system-design.md 主文档 + 6 子文件（带 {module}- 前缀）
@@ -1074,10 +1111,13 @@ const PHASE_SPEC_LAYOUT: Record<number, { mainSuffix: string; refs: string[] }> 
   },
 };
 
-/** Phase N 设计/规格结构校验：引用块完整性 + §0 SSOT 头 + DoD 清单
+/** Phase N 设计/规格结构校验：引用块完整性 + §0 SSOT 头 + DoD 清单 + 阶段专属桶
  *  @param phase  1/2/3/4
  *  @param specDir  docs/phase{N}-{name}/ 目录
- *  @param fs       文件系统注入 { readFileSync; existsSync; readdirSync }，便于单测 mock
+ *  @param fs       文件系统注入 { readFileSync; existsSync; readdirSync? }，便于单测 mock。
+ *                  `readdirSync` 仅 phase≥2 的「主文档 glob」需要；phase=1 只走固定文件名
+ *                  （`PHASE_SPEC_LAYOUT[1]`），故可省——两个入口合并后 phase-1 调用方不必再
+ *                  为一个用不到的方法写桩。缺省时 phase≥2 报 refs 违规（fail-closed，不静默跳过该组校验）。
  */
 export function checkPhaseSpecStructure(
   phase: number,
@@ -1085,7 +1125,7 @@ export function checkPhaseSpecStructure(
   fs: {
     readFileSync(p: string): string;
     existsSync(p: string): boolean;
-    readdirSync(p: string): string[];
+    readdirSync?(p: string): string[];
   },
 ): RequirementSpecStructureViolations {
   const v: RequirementSpecStructureViolations = {
@@ -1093,6 +1133,8 @@ export function checkPhaseSpecStructure(
     ssot: [],
     dod: [],
     outOfScope: [],
+    acceptance: [],
+    adr: [],
   };
   const layout = PHASE_SPEC_LAYOUT[phase];
   if (!layout) {
@@ -1104,7 +1146,12 @@ export function checkPhaseSpecStructure(
   if (phase === 1) {
     mainPath = path.join(specDir, layout.mainSuffix);
   } else {
-    const mains = fs.readdirSync(specDir).filter((f) => f.endsWith(layout.mainSuffix));
+    const readdir = fs.readdirSync;
+    if (readdir === undefined) {
+      v.refs.push('structure: 注入的 fs 缺 readdirSync，无法定位主文档（fail-closed，不跳过整组校验）');
+      return v;
+    }
+    const mains = readdir(specDir).filter((f) => f.endsWith(layout.mainSuffix));
     if (mains.length !== 1) {
       v.refs.push(`structure: 主文档 glob *${layout.mainSuffix} 匹配 ${mains.length} 个（须恰 1 个）`);
       return v;
@@ -1140,6 +1187,14 @@ export function checkPhaseSpecStructure(
   // §8 拒绝登记（Out of Scope）结构校验：仅 phase=1 的 requirement-spec.md 含该固定节
   //（phase≥2 主文档的 §8 不是拒绝登记，故不施加该组判定）
   if (phase === 1) v.outOfScope.push(...checkOutOfScopeRegister(spec));
+  // §4.2 层级节点表「验收标准」列可量化校验（phase=1；规则原文早已在模板声明，此前无脚本）
+  if (phase === 1) checkAcceptanceCriteria(spec, v.acceptance);
+  // §5 架构决策记录（ADR）三列结构校验（phase=2；FM-SD-02 此前零实现）
+  if (phase === 2) {
+    const archName = `${modulePrefix}-system-architecture.md`;
+    const archPath = path.join(specDir, archName);
+    if (fs.existsSync(archPath)) checkAdrRows(archName, String(fs.readFileSync(archPath)), v.adr);
+  }
   return v;
 }
 
@@ -1394,6 +1449,8 @@ export function checkArtifactGate(
       ...specStructureViolations.ssot,
       ...specStructureViolations.dod,
       ...specStructureViolations.outOfScope,
+      ...specStructureViolations.acceptance,
+      ...specStructureViolations.adr,
     ]) {
       reasons.push(m);
     }

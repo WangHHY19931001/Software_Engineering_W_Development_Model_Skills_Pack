@@ -113,6 +113,7 @@ async function main(): Promise<void> {
         reasons: result.violations,
         warnings: result.warnings,
         skippedRules: result.skippedRules,
+        vacuousDimensions: result.vacuousDimensions,
         violations: buildViolationDistribution(result.violations.length),
         durationMs: Date.now() - startTime,
       },
@@ -130,6 +131,9 @@ async function main(): Promise<void> {
   console.log(
     `覆盖率指标: stakeholder=${result.metrics.stakeholder}% scenario=${result.metrics.scenario}% requirementType=${result.metrics.requirementType}% crossCut=${result.metrics.crossCut}%`,
   );
+  if (result.vacuousDimensions.length > 0) {
+    console.log(`空集维度: ${result.vacuousDimensions.join(', ')}（100% 系 vacuously true，非真实覆盖）`);
+  }
   if (result.exemptionsApplied.length > 0) {
     console.log(`已应用豁免: ${result.exemptionsApplied.join(', ')}`);
   }
@@ -157,6 +161,7 @@ async function main(): Promise<void> {
       metrics: result.metrics,
       exemptionsApplied: result.exemptionsApplied,
       skippedRules: result.skippedRules,
+      vacuousDimensions: result.vacuousDimensions,
       violations: result.violations,
       warnings: result.warnings,
     },

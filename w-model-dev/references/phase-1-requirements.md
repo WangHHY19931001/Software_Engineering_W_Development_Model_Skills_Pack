@@ -440,6 +440,8 @@ V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions �
 | 13 | 追踪矩阵字段与主规格 §4/§7/§12 不一致 | 步骤 9 须对齐 traceability-matrix.md 与主规格层级树/覆盖矩阵/RTM 登记（FM-3D-08） |
 | 14 | UML 图表与层级树/User Stories 脱节 | uml-modeling.md 三图须对应主规格 §4 REQ/§3 stakeholder/§3 正常场景（FM-3D-09） |
 
+> **门禁强制（第 3 条）**：`check-artifact-gate.ts --phase=1 --spec-dir=<dir>` 的 `acceptance` 桶逐行校验主规格 §4.2 表的「验收标准」列——`类型=acceptance` 行不得为空，任一行不得含不可测量表述（词表见 `w-model-dev/scripts/logic/gate-logic.ts` 的 `SUBJECTIVE_ACCEPTANCE_WORDS`，来源即本表第 3 条与 `templates/requirement-spec.md` §4.2 的 NFR 提示）。**判据边界**：脚本只判字面命中，「标准是否真的可测」仍由 V 评审 `testability` 轴承担。
+
 ## 返工路径
 
 阶段门评审不通过时，按以下路径返工：

@@ -371,6 +371,32 @@ async function main(): Promise<void> {
   // --spec-dir=<dir>（phase=1 需求规格独立产物目录，含 requirement-spec.md + 6 独立文件）
   // 全量 argv 扫描（与 parsePhaseArg 一致），避免 --spec-dir 出现在任意位置被静默忽略（false-pass 方向）
   const specDir = parseFlagValue(process.argv, 'spec-dir');
+  // 参数契约（与 --tickets 同口径）：1) 空格形态 / 空值 → ARG_INVALID（本 CLI 值 flag 一律等号形态）；
+  // 2) 阶段 1-4 之外给定 → ARG_INVALID。两条都堵的是「传了却什么都没发生」：
+  //    - `--spec-dir x`（空格）与 `--spec-dir=` 此前都落成「未提供」，检查跳过、提示还写着
+  //      「未提供 --spec-dir」——调用方明明传了，读到的却是「你没传」；
+  //    - 缺 --phase 时 phaseOption 为 undefined、下游按默认 8 处理，于是「传了 --spec-dir」与
+  //      「阶段 5-8 本就不适用」在 specStructure 标记上都是 null，那个绿是哪一个读不出来。
+  if (hasFlag(process.argv, 'spec-dir') || specDir === '') {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: '参数非法 --spec-dir',
+      detail: '仅接受等号形态且值非空：--spec-dir=<dir>（空格形态不解析，避免被静默忽略）',
+      exitCode: 2,
+    });
+    return;
+  }
+  if (specDir !== undefined && !(phaseOption === 1 || phaseOption === 2 || phaseOption === 3 || phaseOption === 4)) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: '参数非法 --spec-dir',
+      detail: `设计级结构校验仅适用于阶段 1-4（收到 --phase=${phaseOption ?? 8}）；阶段 5-8 不适用，不得静默忽略该参数`,
+      exitCode: 2,
+    });
+    return;
+  }
 
   // ==================== --tickets=<path> 参数契约（S18，计划 §0.1.4） ====================
   // 1) 缺省不触发（既有调用方零影响）；2) 空格形态 / 空值非静默忽略而是 ARG_INVALID

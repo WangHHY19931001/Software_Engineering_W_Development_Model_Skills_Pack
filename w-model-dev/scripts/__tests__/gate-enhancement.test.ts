@@ -23,7 +23,6 @@ import { checkVerifierOutput, type VerifierOutputShape } from '../logic/verifier
 import {
   checkArtifactGate,
   checkPhaseSpecStructure,
-  checkRequirementSpecStructure,
   checkTemplatesStructure,
   checkUatPathMappingBackfill,
   type GateGraph,
@@ -995,7 +994,7 @@ describe('gate-logic 修正', () => {
 });
 
 // ==================== Phase 1 需求规格结构校验 ====================
-// 内存 fs stub：文件键用 path.join 构造，与 checkRequirementSpecStructure 内部
+// 内存 fs stub：文件键用 path.join 构造，与 checkPhaseSpecStructure 内部
 // path.join 分隔符一致（Windows 反斜杠），保证 existsSync/readFileSync 命中。
 /** §8 拒绝登记固定列表格表头（五列，与 templates/requirement-spec.md §8 逐字一致）。 */
 const OOS_TABLE_HEADER = '| conceptKey | 拒绝理由 | Prior requests | 状态 | 来源 |\n| --- | --- | --- | --- | --- |';
@@ -1028,7 +1027,7 @@ describe('Phase 1 需求规格结构校验', () => {
     files[path.join(dir, 'requirement-spec.md')] = spec;
     for (const r of refs) files[path.join(dir, r)] = '';
     files[path.join(dir, 'discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
-    const v = checkRequirementSpecStructure(dir, mkFs(files));
+    const v = checkPhaseSpecStructure(1, dir, mkFs(files));
     expect([...v.refs, ...v.ssot, ...v.dod, ...v.outOfScope]).toEqual([]);
   });
 
@@ -1038,7 +1037,7 @@ describe('Phase 1 需求规格结构校验', () => {
     files[path.join(dir, 'requirement-spec.md')] =
       '> 详见 [x](./system-context.md)\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
     files[path.join(dir, 'discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
-    const v = checkRequirementSpecStructure(dir, mkFs(files));
+    const v = checkPhaseSpecStructure(1, dir, mkFs(files));
     expect(v.refs.length).toBeGreaterThan(0);
   });
 
@@ -1058,7 +1057,7 @@ describe('Phase 1 需求规格结构校验', () => {
     files[path.join(dir, 'requirement-spec.md')] = spec;
     for (const r of refs) files[path.join(dir, r)] = '';
     files[path.join(dir, 'discipline-dod.md')] = Array(5).fill('- [ ] x').join('\n');
-    const v = checkRequirementSpecStructure(dir, mkFs(files));
+    const v = checkPhaseSpecStructure(1, dir, mkFs(files));
     expect(v.dod.some((m) => m.includes('DoD 清单仅 5 项'))).toBe(true);
   });
 });
@@ -1094,7 +1093,7 @@ describe('Phase 1 §8 拒绝登记结构校验（M08）', () => {
     files[path.join(dir, 'requirement-spec.md')] = spec;
     for (const r of REFS) files[path.join(dir, r)] = '';
     files[path.join(dir, 'discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
-    const v = checkRequirementSpecStructure(dir, mkFs(files));
+    const v = checkPhaseSpecStructure(1, dir, mkFs(files));
     // 断言各桶计数：既锁定「恰好报该违规」，也证明未误伤其他桶
     return { v, counts: { refs: v.refs.length, ssot: v.ssot.length, dod: v.dod.length, oos: v.outOfScope.length } };
   };
@@ -1604,5 +1603,190 @@ describe('模板漂移校验（--validate-templates，C9）', () => {
       existsSync: (p) => fs.existsSync(p),
     });
     expect(v).toEqual([]);
+  });
+});
+
+// ==================== 验收标准可量化 + ADR 三列结构（模板已声明、此前无脚本实现） ====================
+describe('§4.2 验收标准可量化校验（phase 1）与 §5 ADR 三列校验（phase 2）', () => {
+  const mkFs = (files: Record<string, string>) => ({
+    readFileSync(p: string): string {
+      if (!(p in files)) throw new Error(`missing ${p}`);
+      return files[p] ?? '';
+    },
+    existsSync(p: string): boolean {
+      return p in files;
+    },
+    readdirSync(p: string): string[] {
+      const prefix = `${p}${path.sep}`;
+      return Object.keys(files)
+        .filter((k) => k.startsWith(prefix))
+        .map((k) => k.slice(prefix.length));
+    },
+  });
+
+  /** 阶段 1 spec-dir：主文档（含给定 §4.2 表）+ 6 引用 + DoD≥8 */
+  function phase1Files(tableBody: string): Record<string, string> {
+    const dir = path.join('docs', 'phase1-requirements');
+    const refs = [
+      'system-context.md',
+      'glossary.md',
+      'traceability-matrix.md',
+      'behavior-spec.md',
+      'discipline-dod.md',
+      'uml-modeling.md',
+    ];
+    let spec = refs.map((r) => `> 详见 [x](./${r})`).join('\n');
+    spec += '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    spec += `\n### 4.2 层级节点表\n\n${tableBody}\n`;
+    const files: Record<string, string> = {};
+    files[path.join(dir, 'requirement-spec.md')] = spec;
+    for (const r of refs) files[path.join(dir, r)] = '';
+    files[path.join(dir, 'discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+    return files;
+  }
+
+  const REQ_TABLE_HEADER =
+    '| 需求 ID | level | priority | reqGroup | parent | 类型 | 描述 | 验收标准 | evidenceAnchor |\n|---|---|---|---|---|---|---|---|---|';
+
+  it('level=4 行验收标准为空（—）→ acceptance violation', () => {
+    const files = phase1Files(
+      `${REQ_TABLE_HEADER}\n| REQ-004 | 4 | P1 | REQ-001 | REQ-003 | acceptance | 提交订单 | — | x |`,
+    );
+    const v = checkPhaseSpecStructure(1, path.join('docs', 'phase1-requirements'), mkFs(files));
+    expect(v.acceptance).toHaveLength(1);
+    expect(v.acceptance[0]).toMatch(/REQ-004.*level=4 验收节点/);
+  });
+
+  it('验收标准含主观词「快速」→ violation 且点名该词', () => {
+    const files = phase1Files(
+      `${REQ_TABLE_HEADER}\n| REQ-004 | 4 | P1 | REQ-001 | REQ-003 | acceptance | 提交订单 | 页面响应快速 | x |`,
+    );
+    const v = checkPhaseSpecStructure(1, path.join('docs', 'phase1-requirements'), mkFs(files));
+    expect(v.acceptance).toHaveLength(1);
+    expect(v.acceptance[0]).toContain('「快速」');
+  });
+
+  it('NFR 行的指标列含「高可用」→ violation（同一黑名单覆盖 NFR/CON 行）', () => {
+    const files = phase1Files(
+      `${REQ_TABLE_HEADER}\n| NFR-001 | 1 | P0 | NFR-001 | — | NFR | 系统可用性 | 高可用 | x |`,
+    );
+    const v = checkPhaseSpecStructure(1, path.join('docs', 'phase1-requirements'), mkFs(files));
+    expect(v.acceptance.some((m) => m.includes('「高可用」'))).toBe(true);
+  });
+
+  it('可量化标准 + 非验收行用 — 占位 → 不误红', () => {
+    const files = phase1Files(
+      `${REQ_TABLE_HEADER}\n` +
+        `| REQ-001 | 1 | P0 | REQ-001 | — | domain | 领域 | — | x |\n` +
+        `| REQ-004 | 4 | P1 | REQ-001 | REQ-003 | acceptance | 提交订单 | 响应 < 2s 且操作 ≤ 3 步 | x |`,
+    );
+    const v = checkPhaseSpecStructure(1, path.join('docs', 'phase1-requirements'), mkFs(files));
+    expect(v.acceptance).toEqual([]);
+  });
+
+  it('无 §4.2 表 → 跳过（不报，表完整性不由本判据承担）', () => {
+    const files = phase1Files('（本规格未含层级节点表）');
+    const v = checkPhaseSpecStructure(1, path.join('docs', 'phase1-requirements'), mkFs(files));
+    expect(v.acceptance).toEqual([]);
+  });
+
+  /** 阶段 2 spec-dir：主文档 + 6 引用（含 system-architecture.md 内容） */
+  function phase2Files(archBody: string): Record<string, string> {
+    const dir = path.join('docs', 'phase2-design');
+    const refs = [
+      'blog-system-system-architecture.md',
+      'blog-system-glossary.md',
+      'blog-system-traceability-matrix.md',
+      'blog-system-behavior-spec.md',
+      'blog-system-discipline-dod.md',
+      'blog-system-uml-modeling.md',
+    ];
+    let spec = refs.map((r) => `> 详见 [x](./${r})`).join('\n');
+    spec += '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    const files: Record<string, string> = {};
+    for (const r of refs) files[path.join(dir, r)] = r.includes('system-architecture') ? archBody : '';
+    files[path.join(dir, 'blog-system-system-design.md')] = spec;
+    files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+    return files;
+  }
+
+  const ADR_TABLE_HEADER = '| ADR 编号 | 决策 | 上下文 | 后果 |\n|---|---|---|---|';
+
+  it('ADR 行缺「后果」→ adr violation（FM-SD-02 此前零实现）', () => {
+    const files = phase2Files(`${ADR_TABLE_HEADER}\n| ADR-001 | 采用分布式锁 | 并发竞价冲突 | — |`);
+    const v = checkPhaseSpecStructure(2, path.join('docs', 'phase2-design'), mkFs(files));
+    expect(v.adr).toHaveLength(1);
+    expect(v.adr[0]).toContain('ADR-001');
+    expect(v.adr[0]).toContain('FM-SD-02');
+  });
+
+  it('ADR 行三列齐全 → 不报', () => {
+    const files = phase2Files(
+      `${ADR_TABLE_HEADER}\n| ADR-001 | 采用分布式锁 | 并发竞价冲突 | 正面：判定收敛；负面：运维成本上升 |`,
+    );
+    const v = checkPhaseSpecStructure(2, path.join('docs', 'phase2-design'), mkFs(files));
+    expect(v.adr).toEqual([]);
+  });
+
+  it('ADR 占位符 {{决策}} 视为未填 → violation（占位不得算通过）', () => {
+    const files = phase2Files(`${ADR_TABLE_HEADER}\n| ADR-{{xx}} | {{决策}} | {{上下文}} | {{后果}} |`);
+    const v = checkPhaseSpecStructure(2, path.join('docs', 'phase2-design'), mkFs(files));
+    expect(v.adr).toHaveLength(1);
+    expect(v.adr[0]).toContain('决策/上下文/后果');
+  });
+
+  it('ADR 表为空或缺节 → 不报（是否该有 ADR 属三问判断型准入，不强制条数 ≥1）', () => {
+    const files = phase2Files('## 4. 架构原则\n\n- 分层单向依赖\n');
+    const v = checkPhaseSpecStructure(2, path.join('docs', 'phase2-design'), mkFs(files));
+    expect(v.adr).toEqual([]);
+  });
+
+  it('阶段 1 不施加 ADR 判据、阶段 2 不施加验收判据（互不越界）', () => {
+    const p1 = checkPhaseSpecStructure(1, path.join('docs', 'phase1-requirements'), mkFs(phase1Files('')));
+    expect(p1.adr).toEqual([]);
+    const p2 = checkPhaseSpecStructure(2, path.join('docs', 'phase2-design'), mkFs(phase2Files('')));
+    expect(p2.acceptance).toEqual([]);
+  });
+});
+
+// ==================== 两入口合并后的 fs 注入契约（phase 1 免 readdirSync / phase≥2 缺即 fail-closed） ====================
+describe('checkPhaseSpecStructure fs 注入契约（合并 checkRequirementSpecStructure 后）', () => {
+  /** 只有 readFileSync/existsSync 的桩：合并前 phase-1 专用版就是这个形状 */
+  const fsNoReaddir = (files: Record<string, string>) => ({
+    readFileSync(p: string): string {
+      if (!(p in files)) throw new Error(`missing ${p}`);
+      return files[p] ?? '';
+    },
+    existsSync(p: string): boolean {
+      return p in files;
+    },
+  });
+
+  it('phase=1 不需要 readdirSync → 正常出结论（不再强迫调用方为空桩补方法）', () => {
+    const dir = 'docs/phase1-requirements';
+    const refs = [
+      'system-context.md',
+      'glossary.md',
+      'traceability-matrix.md',
+      'behavior-spec.md',
+      'discipline-dod.md',
+      'uml-modeling.md',
+    ];
+    let spec = refs.map((r) => `> 详见 [x](./${r})`).join('\n');
+    spec += '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    // §8 拒绝登记须有 ≥1 数据行；该判据由 outOfScope 桶自带（与本合并无关），此处填写只为让四桶全空
+    spec += `\n## 8. Out of Scope\n\n${OOS_TABLE_HEADER}\n| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | rejected | 阶段1 |\n`;
+    const files: Record<string, string> = {};
+    files[path.join(dir, 'requirement-spec.md')] = spec;
+    for (const r of refs) files[path.join(dir, r)] = '';
+    files[path.join(dir, 'discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+    const v = checkPhaseSpecStructure(1, dir, fsNoReaddir(files));
+    expect([...v.refs, ...v.ssot, ...v.dod, ...v.outOfScope]).toEqual([]);
+  });
+
+  it('phase=2 缺 readdirSync → refs 报 fail-closed（不静默跳过整组校验）', () => {
+    const dir = path.join('docs', 'phase2-design');
+    const v = checkPhaseSpecStructure(2, dir, fsNoReaddir({}));
+    expect(v.refs.some((m) => m.includes('缺 readdirSync'))).toBe(true);
   });
 });

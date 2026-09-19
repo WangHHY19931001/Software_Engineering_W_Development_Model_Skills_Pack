@@ -51,7 +51,12 @@ export const L0_BASELINE = {
   // `[verifier-spec.md](verifier-spec.md)`（该文件 11 → 12 条；`git diff` 实测该文件只有
   // 这一行改动、净 +1 条相对链接）；由 npm run audit:l0-links 实测 rebaseline，
   // l1Only 仍 95、placeholders 仍 36、violations 仍 0）。
-  relativeLinkCount: 676,
+  // 678 = 676 + 2（2026-09-19 第五源吸收（dsh-normify）：references/conventions.md 的
+  // `evidenceAnchor` 词条补 R15f 指针时新增 2 条同目录链接 `[evidence-anchored-tree.md](evidence-anchored-tree.md)`
+  // （该文件 1 → 3 条；`git diff` 实测该文件本次仅此一处新增链接，其余改动为订正过期的
+  // 「可选，R15 不强制」措辞，不含链接）；由 npm run audit:l0-links 实测 rebaseline，
+  // l1Only 仍 95、placeholders 仍 36、violations 仍 0）。
+  relativeLinkCount: 678,
   l1Only: 95,
   placeholders: 36,
 } as const;

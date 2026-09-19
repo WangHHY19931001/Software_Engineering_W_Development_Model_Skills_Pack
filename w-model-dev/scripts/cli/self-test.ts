@@ -38,12 +38,7 @@ import type * as TsType from 'typescript';
 
 import { checkVerifierOutput } from '../logic/verifier-logic.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
-import {
-  checkArtifactGate,
-  checkPhaseSpecStructure,
-  checkRequirementSpecStructure,
-  type GateGraph,
-} from '../logic/gate-logic.js';
+import { checkArtifactGate, checkPhaseSpecStructure, type GateGraph } from '../logic/gate-logic.js';
 import {
   checkDetailedSpecEnhance,
   checkDesignSpecEnhance,
@@ -799,7 +794,7 @@ const SPEC_ENHANCE_CASES: SpecEnhanceCase[] = [
 
 // ==================== Phase 1 需求规格结构校验 ====================
 // 样本字段（specContent/refFiles/dodContent）由 runSpecStructureCases
-// 用内存 fs stub 喂给 checkRequirementSpecStructure（注入式 fs）。
+// 用内存 fs stub 喂给 checkPhaseSpecStructure(1, ...)（注入式 fs；phase=1 不需要 readdirSync）。
 
 interface SpecStructureCase {
   file: string;
@@ -3286,7 +3281,7 @@ async function runSpecEnhanceCases(samplesDir: string): Promise<CaseResult[]> {
 }
 
 // ==================== Phase 1 需求规格结构校验 runner ====================
-// 内存 fs stub：键用 path.join 构造，与 checkRequirementSpecStructure 内部 path.join 一致
+// 内存 fs stub：键用 path.join 构造，与 checkPhaseSpecStructure 内部 path.join 一致
 //（Windows 下分隔符为反斜杠，避免模板字符串正斜杠导致 existsSync 查不到）。
 
 async function runSpecStructureCases(samplesDir: string): Promise<CaseResult[]> {
@@ -3308,7 +3303,7 @@ async function runSpecStructureCases(samplesDir: string): Promise<CaseResult[]> 
         return p in files;
       },
     };
-    const v = checkRequirementSpecStructure(dir, fsStub);
+    const v = checkPhaseSpecStructure(1, dir, fsStub);
     const violations = [...v.refs, ...v.ssot, ...v.dod, ...v.outOfScope];
     const actualPassed = violations.length === 0;
     const details: string[] = [];
@@ -3325,7 +3320,7 @@ async function runSpecStructureCases(samplesDir: string): Promise<CaseResult[]> 
   return results;
 }
 
-// 内存 fs stub（内联用例）：键用 path.join 构造，与 checkRequirementSpecStructure
+// 内存 fs stub（内联用例）：键用 path.join 构造，与 checkPhaseSpecStructure
 // 内部 path.join 一致（Windows 反斜杠）。§8 之前的 6 引用块 + §0 四项 + DoD 9 项
 // 由本 runner 统一补齐，使 §8 成为唯一变量。
 const OOS_REF_FILES = [
@@ -3354,7 +3349,7 @@ async function runSpecStructureOutOfScopeCases(): Promise<CaseResult[]> {
         return p in files;
       },
     };
-    const v = checkRequirementSpecStructure(dir, fsStub);
+    const v = checkPhaseSpecStructure(1, dir, fsStub);
     const violations = [...v.refs, ...v.ssot, ...v.dod, ...v.outOfScope];
     const actualCounts = {
       refs: v.refs.length,

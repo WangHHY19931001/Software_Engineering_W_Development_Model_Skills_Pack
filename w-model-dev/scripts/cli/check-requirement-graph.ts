@@ -58,6 +58,7 @@ import {
   checkRequirementGraph,
   checkRequirementSpecEnhance,
   extractRefTargets,
+  parseEvidenceLineAnchor,
   recalculatePassed,
   type DesignSpecEnhanceViolations,
   type DetailedSpecEnhanceViolations,
@@ -135,36 +136,59 @@ function isProjectStateWModelDir(dir: string): boolean {
 }
 
 /**
- * 构造 R15c/R15e 的外部证据注入面（CLI 层唯一读盘点；logic 层保持纯函数）。
+ * 构造 R15c/R15e/R15f 的外部证据注入面（CLI 层唯一读盘点；logic 层保持纯函数）。
  *
  * - existingAnchorPaths：对图中每个节点的 evidenceAnchor 取 `:` 之前的 path 部分，
  *   以项目根（见 resolveAnchorBaseDir）为基准按正斜杠相对路径解析，逐个 existsSync
  *   判定后收集。仅收集**存在**的 path，R15c 以「不在集合中」判缺失。
+ * - anchorLineCounts：仅对**行号锚点**（`path:L42` / `path:L42-58`）读文件算内容行数，
+ *   供 R15f 判越界。只读行号锚点指向的文件，section 锚点不读——避免为一条形式判据
+ *   把整图引用的每个文件都读进内存。文件不可读则不登记该 path（R15f 跳过，不误红）。
  * - signatureChainEntries：项目根 `.w-model/signature-chain.jsonl`；文件不存在
  *   （阶段 1 早期）→ 返回 undefined → R15e 跳过，符合规格 §5「签名链未完整时不得误红」。
  */
 function buildGraphExternalEvidence(
   graph: GraphShape,
   graphAbsPath: string,
-): { existingAnchorPaths: Set<string>; signatureChainEntries?: SignatureChainEntryLike[] } {
+): {
+  existingAnchorPaths: Set<string>;
+  anchorLineCounts: Map<string, number>;
+  signatureChainEntries?: SignatureChainEntryLike[];
+} {
   const baseDir = resolveAnchorBaseDir(graphAbsPath);
   const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
   const existingAnchorPaths = new Set<string>();
+  const anchorLineCounts = new Map<string, number>();
   for (const n of nodes) {
     const anchor = n?.evidenceAnchor;
     if (typeof anchor !== 'string' || anchor.trim() === '') continue;
     const anchorPath = anchor.split(':')[0];
     if (!anchorPath) continue;
-    if (existsSync(path.resolve(baseDir, anchorPath))) existingAnchorPaths.add(anchorPath);
+    const absAnchorPath = path.resolve(baseDir, anchorPath);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 锚点 path 来自受控 graph.json，且已按项目根解析（与下方 existingAnchorPaths 同信任模型）
+    if (!existsSync(absAnchorPath)) continue;
+    existingAnchorPaths.add(anchorPath);
+    // 行数表按 path 缓存：同一文件被多个节点锚定时只读一次
+    const lineAnchor = parseEvidenceLineAnchor(anchor);
+    if (lineAnchor && !anchorLineCounts.has(lineAnchor.path)) {
+      try {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- 锚点 path 来自 graph.json，仅读受控项目根内文件
+        const content = readFileSync(absAnchorPath, 'utf-8');
+        anchorLineCounts.set(lineAnchor.path, countContentLines(content));
+      } catch {
+        // 不可读（权限/目录/编码）：不登记 → R15f 跳过该 path，不把读失败当成越界
+      }
+    }
   }
 
   const chainPath = path.join(baseDir, '.w-model', 'signature-chain.jsonl');
-  if (!existsSync(chainPath)) return { existingAnchorPaths };
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 项目根下的固定相对路径（同 HEAD 版基线豁免项，仅因本行内容变更而需重述理由）
+  if (!existsSync(chainPath)) return { existingAnchorPaths, anchorLineCounts };
   let raw: string;
   try {
     raw = readFileSync(chainPath, 'utf-8');
   } catch {
-    return { existingAnchorPaths };
+    return { existingAnchorPaths, anchorLineCounts };
   }
   const entries: SignatureChainEntryLike[] = [];
   for (const line of raw.split('\n')) {
@@ -178,7 +202,18 @@ function buildGraphExternalEvidence(
       // 本处不重复其职责，避免把格式问题误报成 R15e）
     }
   }
-  return { existingAnchorPaths, signatureChainEntries: entries };
+  return { existingAnchorPaths, anchorLineCounts, signatureChainEntries: entries };
+}
+
+/**
+ * 文件内容行数（不含结尾换行造成的那一行空串）。
+ * 不能用 `split('\n').length`：末尾换行会多算一行，使 `:L<末尾+1>` 这类越界锚点
+ * 被误判为合法——R15f 的全部意义就是不让锚点指向不存在的行，这里放宽一行即失去判据。
+ */
+function countContentLines(content: string): number {
+  if (content === '') return 0;
+  const newlineCount = (content.match(/\n/g) ?? []).length;
+  return content.endsWith('\n') ? newlineCount : newlineCount + 1;
 }
 
 async function main(): Promise<void> {
@@ -546,6 +581,7 @@ async function main(): Promise<void> {
       phase: result.phase,
       totalNodes: result.totalNodes,
       totalEdges: result.totalEdges,
+      duplicateNodeIds: result.duplicateNodeIds,
       connectedComponents: result.connectedComponents,
       isolatedNodes: result.isolatedNodes,
       roots: result.roots,
