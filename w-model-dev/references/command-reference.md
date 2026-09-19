@@ -231,7 +231,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
   - 只读 `.w-model/project.json`（必读）、`.w-model/rtm.json` 与 `.w-model/run-log.jsonl`（缺失降级），输出：
     1. 当前阶段与 `updatedAt`；
     2. 已完成阶段数 / 8 与进度；
-    3. RTM 已覆盖需求数 / 总需求数（coverageStatus=100% 计数）；
+    3. RTM 已覆盖需求数 / 总需求数（按追溯字段重算，`phase` 取 `project.status` 对应阶段）；
     4. 四级测试 `total/passed/failed/pending`；
     5. 最近 3 条动作；
     6. 确定性下一步建议。
