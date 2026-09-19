@@ -9,6 +9,19 @@
 
 ## [42.2.1] - 2026-09-01
 
+### 调测报告订正与技能包诊断修复（2026-09-19，来源：`docs/debug/2026-09-19-wm-8phase-full-debug/`）
+
+> 该目录为**未跟踪审计产物，不随本次提交交付**（同 2026-09-18 外部调测先例）。规格见 `docs/superpowers/specs/2026-09-19-debug-report-corrections-design.md`（含 §5.3 修订 r1、§5.4 修订 r2）、计划见 `docs/superpowers/plans/2026-09-19-debug-report-corrections.md`。版本保持 42.2.1，**不 bump**。
+> 验收依据：全量 19 项 `npm run prepush` + 交付资产重放 **119/119**（89 次门禁脚本 + 29 次 wm-write + 1 次 wm-status，0 次非零退出）+ 负向探针 **9/9** 被真实拦截（记录 `eval/e2e/2026-09-19-8phase-debug-replay.md`，证据绑定资产提交 `8ae12c56`）。
+
+- **S1（聚合门子进程预算与诊断）**：`EXEC_LIMITS` 新增 `modelCheckChildTimeoutMs`（360s），`artifact-gate-assets.ts` 三处 `runSync` 显式传入——原实现落回 15s 默认值（既有用例甚至把该默认值写死在断言里），负载下真实 TLC 子进程被杀只报「退出码 unknown：」；`appendProcessViolation` 现报出信号名与超时语义，前缀形态保持不变。
+- **S2（层次校验措辞）**：`checkHierarchy` 增可选 `filteredOutPaths/fullPhaseByPath/phase`，被 `--phase` 过滤掉的 child 报「属后续阶段（phase=N；当前校验 phase=M 不包含它）」，不再误报「不在 manifest 中」——该误报正是审计报告把「phase 形态错配」当成「不变式伪造被 TLC 拒绝」的成因；判定结果不变（仍拦截），缺省入参行为与旧文案逐字不变。
+- **F-1（RTM 覆盖率单一事实来源）**：`gate-logic.ts` 抽出并导出 `computeRtmTraceCoverage(rows, phase)`，`wm-status` 与 `check-artifact-gate` 共用；原 `wm-status` 按展示字段字面量 `'100%'` 统计，导致全行 `coverageStatus="完整"` 的矩阵显示 0/4（聚合门判 100%）——现同源，实测 4/4（100%）。
+- **F-2/F-3/F-4（BDD 约定文档化，含一处事实订正）**：`bdd-manifest.schema.json` 的 `basePath` description 与 `references/bdd.md` 现写明**两处消费方对 `basePath` 的锚点相同（均 `resolve(projectDir, basePath)`），差异在兜底候选集**（`check-bdd-model` 另有 `.w-model/<filePath>`、`.w-model/bdd/<filePath>`、`<projectDir>/<filePath>` 三条；`check-artifact-gate` 无兜底，直接报 `[artifact:bdd] feature file missing`）——审计报告原写「解析基准不同」为误述，本轮按代码事实订正；同处补 D4 的 `SM-` 前缀配对约定与 D6 的 When/And 行「行末 ASCII 词为事件」约定（含经真实正则实测的可复现示例）。
+- **可重放资产交付**：`eval/e2e/demo-assets/`（受跟踪：装配器 + 轨迹驱动 + 9 项负向探针 + README）——装配器改为运行时取 `REPLAY_BASE..REPLAY_HEAD` 真实差异、轨迹驱动去绝对路径并内置 `119/0` 计数自断言、工作区残留 `.git` 时 fail-closed（实测该残留会让 p5–p8 的 `--scope` 过期、只剩 114/119）、`--reset` 在 Windows 上能自愈只读 git 对象；负向探针的期望词经加固（`失败规则：.*R6` / `不变式违反 *: *[1-9]` / `--- D5 Step Binding: [1-9]`），避免环境降级或旁因失败被误判为「真实拦截」。
+- **报告订正（未跟踪目录内）**：P1–P9 —— 探针归因拆分为「phase 形态错配」与「真实 TLC 拒绝伪造自报」两条（8→9 项）、执行条数口径改为 89+29+1、签名链 48→49、写入 32→29、日志文件 12→13、阶段 1 无 Verifier、F-7 残留措辞；新增 §6.1 如实登记报告自身 F-2/F-4 两处表述不准。
+- **登记不修（如实列出）**：`references/bdd.md` 全文 63/72 行 `When`/`And` 示例不符 D6 事件正则（既有文档风格，属独立事项）；探针 7 的 `codeModule` 词区分度偏宽（`codeModule` 类文案在多条规则中共用）；`rmtree_force` 在 POSIX 异常路径上把权限收窄为 `0o200`（与 CPython 文档范式一致）；`build_workspace.py` 的 `_RP` 解析无 try/except；探针脚本 `trap` handler 返回后循环继续（信号不中断）。
+
 ### 全部遗留事项收口（leftovers-closeout：B / J1 / N / O + 第三方调测 D1-D3，2026-09-18）
 
 > 计划与逐任务记录见 `docs/superpowers/plans/2026-09-18-leftovers-closeout.md`（文末新增「收尾记录」节：计数终值逐处来源、L0 rebaseline 实测、窄口径四值与阈值出处、O 的 5 文件普查、外部审计发现登记）与 `.superpowers/sdd/2026-09-18-leftovers-closeout/`（逐任务报告与审查 diff）。版本保持 42.2.1，**不 bump**。
