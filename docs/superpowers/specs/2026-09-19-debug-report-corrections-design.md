@@ -123,10 +123,26 @@ eval/e2e/demo-assets/
 - **SSoT-first**：`docs/skill-design-document_SSoT.md:1502`（§10.8 层次一致性校验条目）补措辞约定；`w-model-dev/references/tla-plus.md` 同步。
 - **测试**（`w-model-dev/scripts/__tests__/tla-logic.test.ts`，内联 fixture）：① 全量 manifest（L1 `children:[L2]`）+ `phase=1` → 报告含「属后续阶段」，不含「不在 manifest 中」；② 同名 child 指向真正未登记路径 → 仍报原文案。
 
-### 5.3 F-1：wm-status 的 RTM 覆盖率口径
+### 5.3 F-1：wm-status 的 RTM 覆盖率口径（修订 r1：由「只改标签」升为「共用同一纯函数」）
 
-- **改法**：`w-model-dev/scripts/cli/wm-status.ts:143` 输出标签改为「RTM 覆盖率（按 coverageStatus 字段）」；`w-model-dev/references/command-reference.md:359` 与 `w-model-dev/references/data-models.md` 的 RTM 节注明两套口径：wm-status 读 `coverageStatus` 字段，`check-artifact-gate` 按 RTM 行列完整性判定（100% 判定依据不同，不可互相反推）。
-- 不改计算逻辑、不改 JSON 字段名（`rtmCoverage` 保持）。
+**新增证据（2026-09-19 复核）**：`wm-status-logic.ts:131` 用 `r?.coverageStatus === '100%'` 计数；而 `rtm-guide.md:175` 明确「`coverageStatus` 仅用于展示，门禁脚本会从原始字段重算，不信任手工填写的状态」，`rtm.schema.json:80` 也只把 `coverageStatus` 描述为展示状态；权威行级规则在 `gate-logic.ts:1329`（`phaseFields = PHASE_TRACE_FIELDS[phase] ?? REQUIRED_TRACE_FIELDS`）与 `:1399-1420`（REQ 行按阶段字段、NFR/CON 行按 `description`(+`designDoc`,`codeModule`) 判定，`coveragePercent = 完整行/总行`）。实测后果：demo 的 4 行 `coverageStatus` 均为 `"完整"`（历史兼容值，`gate-logic.ts:1425` 注释确认该值不参与门禁一致性判定），wm-status 因字面量不匹配显示 **0/4（0%）**，而 artifact-gate 报 **100%**——显示的是**错数字**，不是两套合法口径。
+
+**改法（修订后）**：
+
+1. 从 `logic/gate-logic.ts` 抽取纯函数并导出：
+   ```ts
+   export function computeRtmTraceCoverage(
+     rows: ReadonlyArray<Record<string, unknown>>,
+     phase: number,
+   ): { rowReasons: string[]; missingItems: Array<{ requirementId: string; fields: string[] }>; coveragePercent: number }
+   ```
+   规则**逐字保留**现有实现（行结构错误 reason、`isCrossCutting` 分支、`phaseFields`、`coveragePercent` 取整与 99 封顶），`checkArtifactGate` 改为调用它并按现有顺序 push `rowReasons` → `missingItems` 原因 → 覆盖率原因，**判定与 reasons 顺序不变**（既有 `artifact-gate-*.test.ts` + self-test 的 GATE_CASES 为安全网）。
+2. `wm-status-logic.ts` 改调同一函数（`phase` 取 `STATUS_TO_PHASE[status]`），删除 `=== '100%'` 字面量比较；输出标签改为「RTM 覆盖率（按追溯字段重算）」（`cli/wm-status.ts:143`）。
+3. 文档口径统一：`references/command-reference.md:359` 与 `references/data-models.md:242` 注明「wm-status 与 check-artifact-gate 同源（`computeRtmTraceCoverage`），`coverageStatus` 仅展示、不参与计算」。
+4. 红→绿：`wm-status-logic` 测试新增两条用例——① 4 行齐全（含 `coverageStatus: '完整'`）→ `covered=4/percent=100`（改前为 0/0，红）；② `REQ` 行缺 `codeModule` → `covered=3/percent=75`；`gate-logic` 既有 RTM 用例必须全绿（证明抽取零行为变化）。
+5. 不改 `rtmCoverage` JSON 字段名与结构。
+
+> 偏离说明：用户裁定原文为「F-1 只改 wm-status 输出标签 + 文档写明两套语义（不动计算）」；本条修订把「标注两套语义」换成「消除第二套语义」。理由是新增证据显示差异源于 wm-status 信任展示字段，若只改标签则会把错数字保留下来。artifact-gate 判定不受影响。若用户不同意，回退方案为：仅改标签「（按 coverageStatus 展示字段统计）」+ 文档写明差异，不动计算。
 
 ### 5.4 F-2：bdd-manifest `basePath` 解析基准
 
