@@ -54,7 +54,7 @@ bash run_negative_probes.sh
 
 ### 轨迹产出（89 条门禁脚本退出码全 0）
 
-阶段 1–8 每阶段 `graph / tla / bdd / verifier / artifact-gate`（阶段 5–8 为 `artifact-gate --scope=.w-model/change-scope.p{5..8}.json`）+ 阶段 8 `archive-integrity`，以及每阶段 7 条闭环（`budget / run-log / maturity / checkpoint / preventive-review / role-dispatch / signature-chain`）；29 条 `wm-write` 为状态演化（`graph / tla-manifest / bdd-manifest / project`），1 条 `wm-status` 收尾。
+逐阶段构成：阶段 1–4 各 12 条、阶段 5–7 各 10 条、阶段 8 共 11 条（`graph` 与 `tla` 只在阶段 1–4 运行；`bdd / verifier / artifact-gate` 每阶段运行，其中阶段 5–8 的 `artifact-gate` 带 `--scope=.w-model/change-scope.p{5..8}.json`，阶段 8 另有 `archive-integrity`），每阶段另有 7 条闭环（`budget / run-log / maturity / checkpoint / preventive-review / role-dispatch / signature-chain`）；29 条 `wm-write` 为状态演化（`graph` ×8 / `bdd-manifest` ×8 / `project` ×8 / `tla-manifest` ×4 / 终态 `project` ×1），1 条 `wm-status` 收尾。
 
 终态 `STATUS_JSON`（节选；完整原文见 `trajectory.log` 末段）：
 
