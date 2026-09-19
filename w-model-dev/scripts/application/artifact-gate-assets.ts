@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { type GateGraph, type PhaseOption } from '../logic/gate-logic.js';
+import { EXEC_LIMITS } from '../lib/constants.js';
 import { runSync } from '../lib/run-sync.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 
@@ -480,13 +481,19 @@ function appendProcessViolation(
   violations: string[],
   label: string,
   script: string,
-  result: { status: number | null; stdout?: string | null; stderr?: string | null } | undefined,
+  result:
+    | { status: number | null; signal?: NodeJS.Signals | null; stdout?: string | null; stderr?: string | null }
+    | undefined,
 ): void {
   if (!result || result.status !== 0) {
-    const summary = result
+    const cause = result?.signal
+      ? `被信号 ${result.signal} 终止（很可能是执行超时：子进程预算 ${EXEC_LIMITS.modelCheckChildTimeoutMs}ms，SIGKILL 由 runSync 发出）`
+      : '';
+    const output = result
       ? `${result.stdout ?? ''}\n${result.stderr ?? ''}`.trim().split('\n').slice(-5).join(' | ')
       : '未返回进程结果';
-    violations.push(`[artifact:${label}] ${script} 退出码 ${result?.status ?? 'unknown'}：${summary}`);
+    const detail = [cause, output].filter((s) => s !== '').join('：');
+    violations.push(`[artifact:${label}] ${script} 退出码 ${result?.status ?? 'unknown'}：${detail}`);
   }
 }
 
@@ -536,7 +543,10 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
       modelCheckViolations,
       'tla-model',
       'check-tla-model',
-      runSync(process.execPath, tlaArgs, { stdio: ['ignore', 'pipe', 'pipe'] }),
+      runSync(process.execPath, tlaArgs, {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: EXEC_LIMITS.modelCheckChildTimeoutMs,
+      }),
     );
   }
 
@@ -558,7 +568,10 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
       modelCheckViolations,
       'bdd-model',
       'check-bdd-model',
-      runSync(process.execPath, bddArgs, { stdio: ['ignore', 'pipe', 'pipe'] }),
+      runSync(process.execPath, bddArgs, {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: EXEC_LIMITS.modelCheckChildTimeoutMs,
+      }),
     );
   }
 
@@ -580,7 +593,10 @@ export function runModelChecks(opts: ModelCheckOptions): string[] {
             pair.tlaFile,
             pair.featureFile,
           ],
-          { stdio: ['ignore', 'pipe', 'pipe'] },
+          {
+            stdio: ['ignore', 'pipe', 'pipe'],
+            timeout: EXEC_LIMITS.modelCheckChildTimeoutMs,
+          },
         );
         appendProcessViolation(modelCheckViolations, 'tla-bdd-sync', 'check-tla-bdd-sync', syncResult);
       }

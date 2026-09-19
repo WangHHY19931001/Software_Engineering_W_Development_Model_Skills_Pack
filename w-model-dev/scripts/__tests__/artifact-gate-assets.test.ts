@@ -19,6 +19,7 @@ const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 vi.mock('node:child_process', () => ({ spawnSync: spawnSyncMock }));
 
 import { checkTlaBddSync } from '../logic/tla-bdd-sync-logic.js';
+import { EXEC_LIMITS } from '../lib/constants.js';
 import {
   buildTlaBddSyncPairs,
   discoverGraphAsset,
@@ -591,7 +592,7 @@ describe('runModelChecks', () => {
     }
     for (const [, , options] of spawnSyncMock.mock.calls) {
       expect(options).toMatchObject({
-        timeout: 15_000,
+        timeout: EXEC_LIMITS.modelCheckChildTimeoutMs,
         killSignal: 'SIGKILL',
         encoding: 'utf-8',
         maxBuffer: 64 * 1024 * 1024,
@@ -693,5 +694,44 @@ describe('runModelChecks', () => {
     });
     expect(v).toHaveLength(0);
     expect(spawnSyncMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('passes the model-check child budget to the TLA child process', () => {
+    spawnSyncMock.mockReturnValue({ status: 0, stdout: '' });
+    runModelChecks({
+      manifestExists: true,
+      manifestValid: true,
+      effectivePhase: 1,
+      graphPath: '',
+      manifestFile: 'm.json',
+      bddManifestExists: false,
+      bddManifestValid: false,
+      bddManifestFile: 'b.json',
+    });
+    const call = spawnSyncMock.mock.calls.find((c) => {
+      const args = (c[1] ?? []) as string[];
+      return args.some((a) => typeof a === 'string' && a.endsWith('check-tla-model.ts'));
+    });
+    expect(call?.[2]).toMatchObject({ timeout: EXEC_LIMITS.modelCheckChildTimeoutMs });
+  });
+
+  it('reports signal termination with a timeout hint', () => {
+    spawnSyncMock
+      .mockReturnValueOnce({ status: null, signal: 'SIGKILL', stdout: '', stderr: '' })
+      .mockReturnValue({ status: 0, stdout: '' });
+    const violations = runModelChecks({
+      manifestExists: true,
+      manifestValid: true,
+      effectivePhase: 1,
+      graphPath: '',
+      manifestFile: 'm.json',
+      bddManifestExists: false,
+      bddManifestValid: false,
+      bddManifestFile: 'b.json',
+    });
+    const tla = violations.find((v) => v.includes('[artifact:tla-model]'));
+    expect(tla).toBeDefined();
+    expect(tla).toContain('SIGKILL');
+    expect(tla).toContain('超时');
   });
 });

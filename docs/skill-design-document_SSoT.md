@@ -1399,6 +1399,8 @@ npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>
 - **判据强化（AC-11 披露义务）**：本机制**不新增命令、不新增放行路径**，但**改变了「什么样的 phase-1 规格能过门」**——phase-1 规格从此**须含合规 §8 表格**，旧散文形态不再放行；属既有门禁的**数据要求收紧**，**不引入 legacy 时间豁免**（本仓零 `requirement-spec.md` 存量夹具、无迁移对象，时间豁免会给「忘了写表格」开永久后门）。
 - **反模式挂靠（不新增条目）**：#3（RTM 为事实源——本机制不改 RTM 即其正面证据）、#10（编排者边界——A-chunk 只读 §8，写盘是 S 的产出职责）与既有「禁止平行事实源」约束（`phase-5-coding.md` 同族纪律）。
 
+> **子进程预算与诊断（2026-09-19）**：本门禁以子进程方式调用 `check-tla-model` / `check-bdd-model` / `check-tla-bdd-sync` 做终检，三个子进程必须携带显式预算 `EXEC_LIMITS.modelCheckChildTimeoutMs`（= SANY 60s + TLC 300s + 余量），不得落回 `runSync` 的 15s 默认值；子进程被信号终止时，违例消息须报出信号名与超时语义，避免退化为无法诊断的「退出码 unknown」。
+
 ### 10.6 项目级 Definition of Done（每次变更的日常标准）
 
 > 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `references/definition-of-done.md`。
