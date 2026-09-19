@@ -6,8 +6,9 @@ REPO_ROOT="$(git -C "$HERE" rev-parse --show-toplevel)"
 CLI="$REPO_ROOT/w-model-dev/scripts/cli"
 WS="${WORKSPACE:-$REPO_ROOT/eval/e2e/demo}"
 LOG="${LOG:-$WS/.replay/negative-probes.log}"
+# cd 先于 mkdir：`mkdir -p` 会连带创建 $WS，若顺序相反则工作区缺失时 cd 仍成功，护栏失效
+cd "$WS" || { echo "✗ 工作区不存在或不可进入：$WS（先运行 python build_workspace.py --reset）"; exit 1; }
 mkdir -p "$(dirname "$LOG")"
-cd "$WS"
 FAILED=0
 BACKUPS=()
 
@@ -17,7 +18,7 @@ restore_all() {
   for f in "${BACKUPS[@]}"; do [ -f "$f.probe-orig" ] && mv "$f.probe-orig" "$f"; done
   BACKUPS=()
 }
-trap restore_all EXIT
+trap restore_all EXIT INT TERM
 
 # JSON 变异：mutate <file> <python 语句，作用域内有 d（已解析对象）>
 mutate() {
@@ -52,7 +53,8 @@ probe() { # probe <id> <cmd...>；断言 exit 1 且输出命中 $EXPECT
   printf '%s\n' "$out" | tail -4 >> "$LOG"
   echo "[NP:$id] EXIT_CODE=$c（期望 1；命中期望词「$EXPECT」）" >> "$LOG"
   if [ "$c" -ne 1 ]; then echo "✗ [$id] exit=$c 期望 1"; FAILED=1; return 1; fi
-  printf '%s' "$out" | grep -q "$EXPECT" || { echo "✗ [$id] 未命中期望原因：$EXPECT"; FAILED=1; return 1; }
+  # -e：EXPECT 可能以 "-" 开头（如 "--- D5 Step Binding: …"），裸 PATTERN 会被 grep 当选项（exit 2）
+  printf '%s' "$out" | grep -q -e "$EXPECT" || { echo "✗ [$id] 未命中期望原因：$EXPECT"; FAILED=1; return 1; }
   echo "✓ [$id] 被拦截（命中「$EXPECT」）"
   return 0
 }
@@ -61,7 +63,8 @@ probe() { # probe <id> <cmd...>；断言 exit 1 且输出命中 $EXPECT
 echo "### 负向篡改探针（9 项；绿色终态上最小突变，验后恢复）###" >> "$LOG"
 
 # ---------- 1 签名链第 6 条 sigHash 置零 → R6 篡改检测 ----------
-EXPECT='R6'
+# 区分度：要求 R6 出现在「失败规则：」行；R6 通过而别条规则失败时它只出现在「通过规则：」行，不命中
+EXPECT='失败规则：.*R6'
 mutate_jsonl .w-model/signature-chain.jsonl "recs[5]['sigHash'] = 'sha256:' + '0' * 64"
 probe sigchain-tamper npx tsx "$CLI/check-signature-chain.ts" .w-model/signature-chain.jsonl
 restore_all
@@ -73,7 +76,8 @@ probe runlog-missing-closure npx tsx "$CLI/check-run-log.ts" .w-model/run-log.js
 restore_all
 
 # ---------- 3 TLA 不变式真实违反 + manifest 自报全 true → 真实 TLC 拒绝 ----------
-EXPECT='不变式违反'
+# 区分度：报告块无条件打印「不变式违反    : 无|N 条」；要求 N ≥ 1，故缺 Java/jar 导致的环境失败（无 → exit 1）不命中
+EXPECT='不变式违反 *: *[1-9]'
 backup tla/L2_counter_service.tla
 python - <<'PY'
 p = 'tla/L2_counter_service.tla'
@@ -135,7 +139,8 @@ probe checkpoint-vague npx tsx "$CLI/check-checkpoint.ts" .w-model/run-log.jsonl
 restore_all
 
 # ---------- 9 cucumber 步骤改 failed → BDD D5 执行证据 ----------
-EXPECT='D5'
+# 区分度：报告块无条件打印「--- D5 Step Binding: N violations」；要求 N ≥ 1，故任何与 D5 无关的失败（0 violations）不命中
+EXPECT='--- D5 Step Binding: [1-9]'
 mutate .w-model/bdd/reports/report.json "d['elements'][0]['steps'][0]['result']['status'] = 'failed'"
 probe cucumber-failed npx tsx "$CLI/check-bdd-model.ts" .w-model/bdd-manifest.json --phase=5 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=.w-model/bdd/reports/report.json
 restore_all

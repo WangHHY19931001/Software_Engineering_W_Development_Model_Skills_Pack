@@ -11,10 +11,34 @@ ASSETS = os.path.dirname(os.path.abspath(__file__))  # eval/e2e/demo-assets（�
 ROOT = os.environ.get('WORKSPACE') or os.path.join(os.path.dirname(ASSETS), 'demo')
 WM = os.path.join(ROOT, '.w-model')
 
+# ---------- 运行时事实：仓库根 + change-scope 区间（先于任何写盘，fail-fast） ----------
+_RP = subprocess.run(['git', '-C', ASSETS, 'rev-parse', '--show-toplevel'],
+                     capture_output=True, text=True, check=True).stdout.strip()
+def _rev(ref):
+    try:
+        return subprocess.run(['git', '-C', _RP, 'rev-parse', ref],
+                              capture_output=True, text=True, check=True).stdout.strip()
+    except subprocess.CalledProcessError:
+        sys.exit(f'✗ 无法解析 rev "{ref}"（单提交仓库/浅克隆没有 HEAD~1？）'
+                 '——请用 REPLAY_BASE / REPLAY_HEAD 指定可比较的两个 ref。')
+BASE_SHA = _rev(os.environ.get('REPLAY_BASE', 'HEAD~1'))
+HEAD_SHA = _rev(os.environ.get('REPLAY_HEAD', 'HEAD'))
+_SCOPE_DIFF = subprocess.run(['git', '-C', _RP, 'diff', '--name-only', f'{BASE_SHA}..{HEAD_SHA}'],
+                             capture_output=True, text=True, check=True).stdout.split()
+if not _SCOPE_DIFF:
+    sys.exit('✗ REPLAY_BASE..REPLAY_HEAD 差异为空：change-scope 需要非空 changedFiles'
+             f'（{BASE_SHA[:7]}..{HEAD_SHA[:7]}）；请指定有差异的区间。')
+PHASE_FILES = {p: list(_SCOPE_DIFF) for p in (5, 6, 7, 8)}
+
 # ---------- 破坏性路径唯一入口（前置门，先于任何写盘） ----------
 parser = argparse.ArgumentParser(description='重建 e2e 调测工作区')
 parser.add_argument('--reset', action='store_true', help='先清空工作区（唯一破坏性路径）')
 args = parser.parse_args()
+_root_abs = os.path.normcase(os.path.realpath(ROOT)).rstrip('\\/')
+_repo_abs = os.path.normcase(os.path.realpath(_RP)).rstrip('\\/')
+if args.reset and (_root_abs == _repo_abs or os.path.basename(_root_abs) != 'demo'):
+    sys.exit('✗ 拒绝 --reset：工作区根须是以 demo 结尾的目录且不等于仓库根（默认 eval/e2e/demo）。'
+             f'当前解析为 {ROOT}——请用 WORKSPACE=<仓库>/eval/e2e/demo 指定正确工作区。')
 if os.path.exists(os.path.join(ROOT, '.git')) and not args.reset:
     sys.exit('✗ 工作区根存在 .git：它会让 --scope 的 headRef 绑到 demo 自身 HEAD 而使 p5–p8 门禁过期。'
              '请先移走/删除该目录，或显式传 --reset 清空重建。')
@@ -679,21 +703,10 @@ write_json('archive/2026-09-19-counter-api/archive-manifest.json', {
 
 
 # ---------- 阶段 5-8 变更上下文链（change-scope + codegraph 查询 + opsx 制品） ----------
-# 以运行时事实为准：base/head 经 git 解析（REPLAY_BASE/REPLAY_HEAD 可覆盖），changedFiles 取该区间真实差异。
+# 运行时事实（BASE_SHA / HEAD_SHA / _SCOPE_DIFF / PHASE_FILES）已在文件顶部解析（fail-fast，先于任何写盘）。
 # 边界如实登记：demo 工作区嵌于仓库内且被 gitignore，change-scope 的「实际变更」
 # 取仓库真实 BASE..HEAD 差异；demo 源码/测试不在 git 上下文内，
 # codegraph 覆盖义务对「scope 内 code/test 文件」为空集（vacuously satisfied）。
-_RP = subprocess.run(['git', '-C', ASSETS, 'rev-parse', '--show-toplevel'],
-                     capture_output=True, text=True, check=True).stdout.strip()
-def _rev(ref):
-    return subprocess.run(['git', '-C', _RP, 'rev-parse', ref],
-                          capture_output=True, text=True, check=True).stdout.strip()
-BASE_SHA = _rev(os.environ.get('REPLAY_BASE', 'HEAD~1'))
-HEAD_SHA = _rev(os.environ.get('REPLAY_HEAD', 'HEAD'))
-_SCOPE_DIFF = subprocess.run(['git', '-C', _RP, 'diff', '--name-only', f'{BASE_SHA}..{HEAD_SHA}'],
-                             capture_output=True, text=True, check=True).stdout.split()
-assert _SCOPE_DIFF, 'REPLAY_BASE..REPLAY_HEAD 差异为空：change-scope 需要非空 changedFiles'
-PHASE_FILES = {p: list(_SCOPE_DIFF) for p in (5, 6, 7, 8)}
 PHASE_SYMBOLS = {
   5: [('Counter', [], ['Counter.inc', 'Counter.reset', 'Counter.get'], 3)],
   6: [('Counter', [], ['Counter.inc', 'Counter.reset'], 2)],

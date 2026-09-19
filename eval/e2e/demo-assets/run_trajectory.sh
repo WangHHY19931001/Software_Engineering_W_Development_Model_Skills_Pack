@@ -6,9 +6,10 @@ REPO_ROOT="$(git -C "$HERE" rev-parse --show-toplevel)"
 CLI="$REPO_ROOT/w-model-dev/scripts/cli"
 WS="${WORKSPACE:-$REPO_ROOT/eval/e2e/demo}"
 LOG="${LOG:-$WS/.replay/trajectory.log}"
+# cd 先于 mkdir：`mkdir -p` 会连带创建 $WS，若顺序相反则工作区缺失时 cd 仍成功，护栏失效（跑完 119 条失败调用）
+cd "$WS" || { echo "✗ 工作区不存在或不可进入：$WS（先运行 python build_workspace.py --reset）"; exit 1; }
 mkdir -p "$(dirname "$LOG")"
 TMPD="$(dirname "$LOG")"
-cd "$WS"
 
 R() { # R <label> <cmd...>
   local label="$1"; shift
