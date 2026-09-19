@@ -26,7 +26,7 @@
     "schemaVersion": { "description": "manifest schema 版本号，固定 \"1.0\"", "type": "string", "enum": ["1.0"] },
     "projectId": { "description": "项目 ID（与 project.json 一致）", "type": "string", "minLength": 1 },
     "basePath": {
-      "description": "features 文件根路径（相对仓库根目录，如 features/）",
+      "description": "本 manifest 内相对路径的解析基准（相对本文件所在目录）。注意两处消费方基准不同：check-bdd-model.ts 采用多路径回退（含 manifest 目录基准），check-artifact-gate.ts 仅按 resolve(projectDir, basePath) 解析；basePath='..' 在两处语义不一致，跨工具复用时须以两处门禁实测为准。",
       "type": "string",
       "minLength": 1
     },

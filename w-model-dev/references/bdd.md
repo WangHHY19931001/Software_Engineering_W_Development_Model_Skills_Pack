@@ -166,6 +166,8 @@ Feature: 博客系统端到端用户场景
 | `@child-features` | L4 可填 `(none)`；L1-L3 必填 | 下级 features 文件名列表 | L1 的 child 须在 L2；L2 的 child 须在 L3；L3 的 child 须在 L4 |
 | `@scenario-id-prefix` | 是 | `BDD-L<level>` | 用于 scenario 内 TAG 命名 |
 
+> **D4 配对命名约定（2026-09-19）**：`@state-machine` 的值与 TLA+ `spec.id` 的配对是隐式约定「`SM-` 前缀之后的字符串 == `spec.id`」——`SM-L2_counter_service` ↔ `L2_counter_service`。前缀不一致（如 `SM_L2_…`）会导致 D4 报「no TLA+ snapshot」。
+
 ### @designIds 头标注（必填，第 10 个字段）
 
 `.feature` 文件头部须含 `@designIds` 字段，列出本 feature 覆盖的所有 SD 节点 ID（逗号分隔）。
@@ -295,6 +297,8 @@ When 事件 e1         # A + e1 -> B
 And 事件 e2          # B + e2 -> C
 Then 状态 C          # 终态断言
 ```
+
+> **D6 事件提取约定（2026-09-19）**：D6 取 When 行**行末 ASCII 词**为事件名（正则 `.+?\b(\w+)\s*\)?\s*$`）。单 token 行（如 `When Inc`）会静默取不到事件，进而报成 end-state mismatch 而非「无事件」。When 行请写成「事件 + 目标」两段以上（如 `When Inc 计数器自增`）。
 
 校验算法按链式查找：S0 + e1 -> S1, S1 + e2 -> S2, ... 最终 Sn 必须与 `Then` 声明的终态一致。
 
@@ -1171,6 +1175,8 @@ Scenario: 已登录用户登出
   ]
 }
 ```
+
+> **`basePath` 解析基准（2026-09-19）**：`check-bdd-model.ts` 采用多路径回退（含 manifest 目录基准），`check-artifact-gate.ts` 仅按 `resolve(projectDir, basePath)` 解析；`basePath: '..'` 在两处语义不同，跨工具复用 feature 路径时以两处门禁实测为准。
 
 ### 状态机说明
 
