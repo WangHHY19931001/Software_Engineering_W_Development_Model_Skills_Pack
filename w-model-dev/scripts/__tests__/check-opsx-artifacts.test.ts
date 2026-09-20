@@ -10,6 +10,10 @@
  *   O5  changeId 阶段前缀与 phase 不符 → violation（phase 归属一致性）
  *   O6  原全扫描 legacy 纯函数行为不变（self-test 兼容层）
  *   O7  CLI：阶段 5-8 无 --scope → exit 1；合法 scope → exit 0；缺 tickets → exit 1
+ *   O8-O11 归档位回退（D-7）：已归档态（活动位缺失 + archive 恰一匹配）按归档位同契约校验，
+ *          制品缺失仍 fail-closed；archive 多匹配 → fail-closed 且具名列出匹配目录；
+ *          活动位存在时优先活动位（回归）；archive 零匹配保持原早退文案
+ *   O7d CLI：已归档态 + 合法 scope → exit 0（D-7：归档前聚合门与归档后置门可同时绿）
  */
 
 import { execSync } from 'node:child_process';
@@ -42,22 +46,37 @@ afterEach(() => {
   }
 });
 
-/** 铺一个完整 opsx 制品树（changeName 目录 + R3×9 + V×3） */
-function writeOpsxTree(root: string, changeName: string): void {
-  mkdirSync(join(root, 'openspec', 'changes', changeName), { recursive: true });
+/** 铺一个完整 opsx 制品树到 openspec/changes/<...dirSegs>/（制品 + R3×9 + V×3），返回该制品目录 */
+function writeOpsxTreeAt(root: string, dirSegs: string[], phase: number): string {
+  const dir = join(root, 'openspec', 'changes', ...dirSegs);
+  mkdirSync(dir, { recursive: true });
   for (const art of ['proposal.md', 'design.md', 'tasks.md', 'tickets.md']) {
-    writeFileSync(join(root, 'openspec', 'changes', changeName, art), `# ${art}\n`);
+    writeFileSync(join(dir, art), `# ${art}\n`);
   }
-  mkdirSync(join(root, 'openspec', 'changes', changeName, 'specs'), { recursive: true });
-  writeFileSync(join(root, 'openspec', 'changes', changeName, 'specs', 'x.md'), '# x\n');
+  mkdirSync(join(dir, 'specs'), { recursive: true });
+  writeFileSync(join(dir, 'specs', 'x.md'), '# x\n');
   mkdirSync(join(root, '.w-model', 'r3-reviews'), { recursive: true });
   mkdirSync(join(root, '.w-model', 'v-reviews'), { recursive: true });
   for (const stage of ['explore', 'propose', 'coding']) {
     for (const dim of ['completeness', 'reliability', 'security']) {
-      writeFileSync(join(root, '.w-model', 'r3-reviews', `phase5-${stage}-${dim}.md`), `# phase5-${stage}-${dim}\n`);
+      writeFileSync(
+        join(root, '.w-model', 'r3-reviews', `phase${phase}-${stage}-${dim}.md`),
+        `# phase${phase}-${stage}-${dim}\n`,
+      );
     }
-    writeFileSync(join(root, '.w-model', 'v-reviews', `phase5-${stage}.md`), `# phase5-${stage}\n`);
+    writeFileSync(join(root, '.w-model', 'v-reviews', `phase${phase}-${stage}.md`), `# phase${phase}-${stage}\n`);
   }
+  return dir;
+}
+
+/** 铺一个完整 opsx 制品树（活动位 openspec/changes/<changeName>/ + R3×9 + V×3） */
+function writeOpsxTree(root: string, changeName: string, phase = 5): void {
+  writeOpsxTreeAt(root, [changeName], phase);
+}
+
+/** 铺一个完整 opsx 制品树到归档位 openspec/changes/archive/<dirName>/（dirName 形如 <日期>-<changeName>） */
+function writeArchivedOpsxTree(root: string, dirName: string, phase: number): string {
+  return writeOpsxTreeAt(root, ['archive', dirName], phase);
 }
 
 describe('checkOpsxArtifactsStrict（changeId 精确模式）', () => {
@@ -126,6 +145,73 @@ describe('checkOpsxArtifactsStrict（changeId 精确模式）', () => {
   });
 });
 
+describe('checkOpsxArtifactsStrict（归档位回退，D-7）', () => {
+  const PHASE = 7;
+  const ARCHIVED_DIR = '2026-01-01-phase7-x';
+
+  it('O8: 已归档态——活动位缺失、archive 恰一匹配 → 按归档位同契约校验且通过', () => {
+    const root = makeTmpDir();
+    writeArchivedOpsxTree(root, ARCHIVED_DIR, PHASE);
+    const r = checkOpsxArtifactsStrict(root, PHASE, 'phase7-x');
+    expect(r).toMatchObject({ passed: true, violations: [] });
+    // changesNames 语义不变（仍为 scope.changeId），归档位不泄漏进返回结构（check-artifact-gate 消费依赖）
+    expect(r.changesNames).toEqual(['phase7-x']);
+    expect(r.artifactsFound.length).toBe(5);
+    expect(r.reviewsFound.length).toBe(12);
+  });
+
+  it('O8b: 已归档态下制品缺失仍 fail-closed（同契约，不移除任何校验）', () => {
+    const root = makeTmpDir();
+    const archived = writeArchivedOpsxTree(root, ARCHIVED_DIR, PHASE);
+    rmSync(join(archived, 'tickets.md'), { force: true });
+    const r = checkOpsxArtifactsStrict(root, PHASE, 'phase7-x');
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.includes('tickets.md 缺失'))).toBe(true);
+  });
+
+  it('O9: archive 多匹配 → fail-closed，且违规具名列出全部匹配目录', () => {
+    const root = makeTmpDir();
+    writeArchivedOpsxTree(root, '2026-01-01-phase7-x', PHASE);
+    writeArchivedOpsxTree(root, '2026-01-02-phase7-x', PHASE);
+    const r = checkOpsxArtifactsStrict(root, PHASE, 'phase7-x');
+    expect(r.passed).toBe(false);
+    const multi = r.violations.find((v) => v.includes('多匹配'));
+    expect(multi).toBeDefined();
+    expect(multi).toContain('2026-01-01-phase7-x');
+    expect(multi).toContain('2026-01-02-phase7-x');
+    expect(r.changesNames).toEqual([]);
+  });
+
+  it('O10: 活动位存在时优先活动位（归档位残缺也不改判定）', () => {
+    const root = makeTmpDir();
+    writeOpsxTree(root, 'phase7-x', PHASE);
+    const archived = writeArchivedOpsxTree(root, ARCHIVED_DIR, PHASE);
+    rmSync(join(archived, 'tickets.md'), { force: true }); // 归档位残缺：若误走归档位则 tickets 缺失
+    const r = checkOpsxArtifactsStrict(root, PHASE, 'phase7-x');
+    expect(r).toMatchObject({ passed: true, violations: [] });
+    expect(r.changesNames).toEqual(['phase7-x']);
+  });
+
+  it('O11: 活动位缺失且 archive 零匹配 → 保持原早退文案（不新增含糊文案）', () => {
+    // 有同阶段其它活动目录：走「不在 active 候选」原文案
+    const root = makeTmpDir();
+    writeOpsxTree(root, 'phase7-other', PHASE);
+    writeArchivedOpsxTree(root, '2026-01-01-phase7-y', PHASE);
+    const r = checkOpsxArtifactsStrict(root, PHASE, 'phase7-x');
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => /不在.*候选/.test(v) && v.includes('phase7-other'))).toBe(true);
+    expect(r.violations.some((v) => v.includes('无 phase7-* 变更目录'))).toBe(false);
+
+    // 无任何活动目录（仅归档位且不匹配）：走「无 phase7-* 变更目录」原文案
+    const root2 = makeTmpDir();
+    writeArchivedOpsxTree(root2, '2026-01-01-phase7-y', PHASE);
+    const r2 = checkOpsxArtifactsStrict(root2, PHASE, 'phase7-x');
+    expect(r2.passed).toBe(false);
+    expect(r2.violations.some((v) => v.includes('无 phase7-* 变更目录'))).toBe(true);
+    expect(r2.violations.some((v) => v.includes('多匹配'))).toBe(false);
+  });
+});
+
 describe('check-opsx-artifacts.ts CLI', () => {
   /** prepare(root) 铺文件后统一提交为 base（保证工作树干净，scope changedFiles=[] 才一致） */
   function makeOpsxRepo(prepare: (root: string) => void): { root: string; head: string } {
@@ -185,6 +271,25 @@ describe('check-opsx-artifacts.ts CLI', () => {
     );
     const r = runCli([`"${root}"`, '--phase', '5', '--scope=.w-model/scope.json']);
     expect(r.status).toBe(0);
+  });
+
+  it('O7d: scope 合法 + 变更已归档（活动位缺失）→ exit 0（D-7 两门可同时绿）', () => {
+    const { root, head } = makeOpsxRepo((root) => writeArchivedOpsxTree(root, '2026-01-01-phase5-demo', 5));
+    writeFileSync(
+      join(root, '.w-model', 'scope.json'),
+      JSON.stringify({
+        changeId: CHANGE_ID,
+        phase: 5,
+        baseRef: head,
+        headRef: head,
+        scopeCreatedAt: new Date().toISOString(),
+        changedFiles: [],
+      }),
+    );
+    const r = runCli([`"${root}"`, '--phase', '5', '--scope=.w-model/scope.json']);
+    expect(r.status).toBe(0);
+    // 归档位回退在人类可读 stdout 显式可见（返回结构字段语义不变）
+    expect(r.stdout).toContain('archive/2026-01-01-phase5-demo');
   });
 
   it('O7c: scope 合法但 scope.changeId 无对应 active 目录 → exit 1', () => {

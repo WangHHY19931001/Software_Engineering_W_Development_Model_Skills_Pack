@@ -15,7 +15,9 @@
  *   --phase        校验阶段 5|6|7|8（支持 --phase N 与 --phase=N）
  *   --scope=FILE   变更上下文 manifest（schemas/change-scope.schema.json）；与
  *                  --change/--base/--head 互斥；阶段 5-8 必选（缺失 → exit 1）。
- *                  strict 模式只校验 openspec/changes/<changeId>/（changeId=scope.changeId），
+ *                  strict 模式只校验 scope.changeId 对应的一个变更目录——活动位
+ *                  openspec/changes/<changeId>/ 优先，活动位缺失时回退归档位
+ *                  openspec/changes/archive/<目录名>/（恰一匹配才继续；多匹配 fail-closed），
  *                  不再全扫描 phaseN-* 无 change 选择
  *   --change/--base/--head  薄封装：以实际 Git 变更集合生成等价 scope（免维护 manifest）
  *   --json         机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
@@ -69,6 +71,44 @@ function activeChangeDirs(changesDir: string, phase: number): string[] {
     .filter((e) => e.isDirectory() && prefixRegex.test(e.name) && e.name !== 'archive')
     .map((e) => e.name)
     .sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * 归档位候选目录名（D-7）：活动位缺失时的回退候选，匹配 `<changeId>` 或 `<日期>-<changeId>`
+ * （`<changeId>-extra` 等相似名不匹配）。只枚举候选，恰一匹配 / 多匹配 / 零匹配由调用方裁。
+ */
+function archiveChangeDirs(changesDir: string, changeId: string): string[] {
+  const archiveDir = path.join(changesDir, 'archive');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- archiveDir 由受控 changesDir（projectRoot/openspec/changes）拼接
+  if (!existsSync(archiveDir)) return [];
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- archive 目录来自项目受控 openspec/changes/archive/ 枚举
+  return readdirSync(archiveDir, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && (e.name === changeId || e.name.endsWith(`-${changeId}`)))
+    .map((e) => e.name)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+/** 变更目录解析结果（D-7 两态）：活动位 / 归档位回退 / 归档位多匹配 / 均不匹配 */
+type ChangeDirResolution =
+  | { kind: 'active' }
+  | { kind: 'archive'; dirName: string }
+  | { kind: 'ambiguous'; matches: string[] }
+  | { kind: 'none'; candidates: string[] };
+
+/**
+ * 解析 scope.changeId 对应的变更目录位置（D-7）：**活动位优先**——active 候选含 changeId 即用活动位；
+ * 活动位缺失时才回退归档位，且**恰一匹配**才可用（多匹配 → 'ambiguous' 由调用方 fail-closed；
+ * 零匹配 → 'none' 由调用方保持原早退文案）。
+ */
+function resolveChangeDirName(changesDir: string, phase: number, changeId: string): ChangeDirResolution {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- changesDir 由受控 projectRoot（openspec/changes）拼接
+  if (!existsSync(changesDir)) return { kind: 'none', candidates: [] };
+  const candidates = activeChangeDirs(changesDir, phase);
+  if (candidates.includes(changeId)) return { kind: 'active' };
+  const matches = archiveChangeDirs(changesDir, changeId);
+  if (matches.length === 1) return { kind: 'archive', dirName: matches[0]! };
+  if (matches.length > 1) return { kind: 'ambiguous', matches };
+  return { kind: 'none', candidates };
 }
 
 /** 校验单个变更目录制品齐全（proposal/design/tasks/tickets + specs/，反模式 #40） */
@@ -160,8 +200,11 @@ export function checkOpsxArtifacts(projectRoot: string, phase: number): CheckRes
 
 /**
  * strict 模式（2026-09-04 audit-gate-closure，Slice A）：给定 changeId 时只校验
- * `openspec/changes/<changeId>/` 这一个变更目录（不再全扫描 phaseN-* 无 change 选择）；
- * changeId 不在 active 候选内（单候选或多候选）→ violations 失败而非任意取一/跳换；
+ * scope.changeId 对应的这一个变更目录（不再全扫描 phaseN-* 无 change 选择）；
+ * 活动位优先，活动位缺失时回退归档位（D-7：`openspec/changes/archive/<目录名>/`，
+ * 恰一匹配才继续、多匹配 fail-closed），使本 pre-archive 聚合门与 archive 后置门
+ * （`check-openspec-archive.ts`）在归档态可同时通过；
+ * 活动位与归档位皆无匹配（单候选或多候选）→ violations 失败而非任意取一/跳换；
  * changeId 须含阶段前缀 phase<phase>-（phase 归属一致性）。制品/R3×9/V×3 校验逻辑保留。
  */
 export function checkOpsxArtifactsStrict(projectRoot: string, phase: number, changeId: string): CheckResult {
@@ -180,24 +223,33 @@ export function checkOpsxArtifactsStrict(projectRoot: string, phase: number, cha
     violations.push(`${changeId} 不含阶段前缀 phase${phase}-（scope.changeId 与当前阶段不符）`);
   }
 
-  const candidates = activeChangeDirs(changesDir, phase);
-  if (candidates.length === 0) {
-    violations.push(`阶段 ${phase}：openspec/changes/ 下无 phase${phase}-* 变更目录`);
-    return { passed: false, violations, changesNames: [], artifactsFound, reviewsFound };
-  }
-
-  const matched = candidates.includes(changeId);
-  if (!matched) {
+  const resolution = resolveChangeDirName(changesDir, phase, changeId);
+  // 传给 validateChangeDirArtifacts 的「相对 changesDir 的名字」：活动位为 changeId，归档位为 archive/<目录名>
+  let changeName = changeId;
+  if (resolution.kind === 'none') {
+    // 原两条早退文案保持（归档位零匹配不新增含糊文案）：空候选 / 不在 active 候选内
     violations.push(
-      `${changeId} 不在阶段 ${phase} active 变更目录中（候选：${candidates.join(', ')}；` +
-        `scope.changeId 须与 opsx 变更目录名精确一致，不允许任取其一或跳换）`,
+      resolution.candidates.length === 0
+        ? `阶段 ${phase}：openspec/changes/ 下无 phase${phase}-* 变更目录`
+        : `${changeId} 不在阶段 ${phase} active 变更目录中（候选：${resolution.candidates.join(', ')}；` +
+            `scope.changeId 须与 opsx 变更目录名精确一致，不允许任取其一或跳换）`,
     );
     return { passed: false, violations, changesNames: [], artifactsFound, reviewsFound };
   }
+  if (resolution.kind === 'ambiguous') {
+    violations.push(
+      `${changeId} 归档位多匹配（${resolution.matches.length}）：${resolution.matches.join(', ')} —— fail-closed`,
+    );
+    return { passed: false, violations, changesNames: [], artifactsFound, reviewsFound };
+  }
+  if (resolution.kind === 'archive') {
+    changeName = path.join('archive', resolution.dirName);
+  }
 
+  // changesNames 语义不变：恒为 scope.changeId（归档位不泄漏进返回结构，check-artifact-gate.ts 消费该字段）
   const changesNames = [changeId];
-  // 只校验 scope 对应这一个变更目录
-  validateChangeDirArtifacts(changesDir, changeId, violations, artifactsFound);
+  // 只校验 scope 对应这一个变更目录（已归档态下按归档位同契约校验，不放宽任何校验项）
+  validateChangeDirArtifacts(changesDir, changeName, violations, artifactsFound);
   validateStageReviews(projectRoot, phase, violations, reviewsFound);
 
   return {
@@ -207,6 +259,15 @@ export function checkOpsxArtifactsStrict(projectRoot: string, phase: number, cha
     artifactsFound,
     reviewsFound,
   };
+}
+
+/**
+ * 归档回退生效时的可读位置标签（D-7）：活动位缺失且归档位恰一匹配 → `archive/<目录名>`，
+ * 否则 undefined。仅供 CLI 人类可读 stdout 提示（返回结构字段语义不变）。
+ */
+function archivedFallbackLabel(projectRoot: string, phase: number, changeId: string): string | undefined {
+  const resolution = resolveChangeDirName(path.join(projectRoot, 'openspec', 'changes'), phase, changeId);
+  return resolution.kind === 'archive' ? `archive/${resolution.dirName}` : undefined;
 }
 
 async function main(): Promise<void> {
@@ -286,6 +347,9 @@ async function main(): Promise<void> {
     return;
   }
 
+  // 归档位回退提示（D-7）：人类可读段标出本次校验的是归档位（--json 单行契约不受影响）
+  const archivedFallback = loaded.kind === 'ok' ? archivedFallbackLabel(abs, phase, loaded.scope.changeId) : undefined;
+
   console.log('═'.repeat(60));
   console.log('opsx 制品与审查产物校验（Opsx Artifacts Checker，strict changeId 绑定）');
   console.log('═'.repeat(60));
@@ -293,6 +357,9 @@ async function main(): Promise<void> {
   console.log(`阶段          : ${phase}`);
   console.log(`变更上下文    : ${scopeLabel}`);
   console.log(`变更目录      : ${result.changesNames.join(', ') || '（未找到）'}`);
+  if (archivedFallback !== undefined) {
+    console.log(`变更目录位置  : ${archivedFallback}（活动位缺失，按归档位同契约校验）`);
+  }
   console.log(`制品          : ${result.artifactsFound.join(', ') || '（无）'}`);
   console.log(`审查产物      : ${result.reviewsFound.join(', ') || '（无）'}`);
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
