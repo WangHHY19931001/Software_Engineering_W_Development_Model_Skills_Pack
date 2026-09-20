@@ -9,6 +9,15 @@
 
 **技能包 8 阶段在本轮真实执行中端到端有效**：counter-api 演示项目走完阶段 1→8，**终局 12 项门禁全绿**（run-log / checkpoint / signature-chain / budget / maturity / role-dispatch / preventive×2 / artifact-gate 终检 / archive-integrity / openspec-archive×2），状态经 wm-write 原子演化至「项目完成 8/8」，RTM 覆盖率 100%，四级测试 9/9 真实通过。
 
+> **⚠️ 终局状态订正（2026-09-20 晚，修复分支复核时发现，原报告未如实反映）**
+>
+> 上句「终局 12 项门禁全绿」对应的是 **13:20Z 的终局电池快照**（`p8r2-*` 系列 gate-logs；其中 `p8r2-10-runlog.log` 记录 `exitCode: 0`、`r10.checked=13`、`r11.checkedGates=7`）。该电池**之后**本轮还执行了一次「归档时序 + 链环路径订正」的**放行后修复循环**：先写入阶段 8 的 checkpoint 放行记录（13:22:28Z），再追加 6 条记录（`p8-s-fix`/`p8-s-archive`/`p8-s-chainfix` 三条 fix 13:26–13:31Z、三条 13:34:03Z 的 R3(fix)、`p8-v-final` 13:42:53Z），**未再跑终局电池**。
+>
+> 因此**当前盘面**（321 条）的 `check-run-log.ts` 为 **exit 1**，两条原因：(1) 三条 R3(fix) 记录误用 `action:"r3-fix"`——schema 动作枚举无此值，正确形态应为 `r3-completeness`/`r3-reliability`/`r3-security` 之一 + `variant:"fix"`（同族记录在阶段 1-7 均已按此形态落盘）；(2) **R8**「阶段 8 checkpoint 非阶段最后记录」（放行后仍有 6 条动作）。
+>
+> 这是本轮调测的**簿记缺陷**（放行与修复的顺序写反 + 动作名笔误），不是门禁缺陷；原始数据保持原样未清洗，以便复核。修复分支 `fix/gate-contract-rework-chain` 的任务 10 将按披露口径复验并记录于 `gate-fix-replay.txt`。
+
+
 | 维度 | 结论 | 关键证据 |
 |---|---|---|
 | 端到端 | 成立 | 321 条 run-log（A 11 / S 25 / R 77 / V 37 / G 162 / O 9）· 125 环签名链 · 392 份 gate-logs · 8/8 阶段门放行 |
@@ -71,7 +80,9 @@ cd eval/e2e/demo            # 瞬态工作区（gitignored）
 npx tsx ../../w-model-dev/scripts/cli/wm-status.ts .            # 8/8 100%、四级 9/9、RTM 100%
 npx tsx ../../w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=8 --scope=.w-model/change-scope.p8.json
 npx tsx ../../w-model-dev/scripts/cli/check-signature-chain.ts .w-model/signature-chain.jsonl
-npx tsx ../../w-model-dev/scripts/cli/check-run-log.ts .w-model/run-log.jsonl
+npx tsx ../../w-model-dev/scripts/cli/check-run-log.ts .w-model/run-log.jsonl   # ⚠️ 现为 exit 1：见 §一 终局状态订正（放行后修复循环 6 条记录）
 wc -l .w-model/run-log.jsonl .w-model/signature-chain.jsonl      # 321 / 125
 ls .w-model/gate-logs | wc -l                                     # 392
 ```
+
+> 路径提示：`eval/e2e/demo` 下引用技能包脚本需**三层** `../../../w-model-dev/...`（两层会解析到不存在的 `eval/w-model-dev/`）。
