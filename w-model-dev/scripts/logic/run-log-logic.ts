@@ -460,6 +460,38 @@ function isLegacyMissingReworkHints(raw: RunLogEntry): boolean {
 }
 
 /**
+ * 共享谓词（D-5）：该条目的 schema 失败是否属可吸收的 legacy 形态。
+ * 与 checkRunLog 的两条吸收分支等价（reworkHints 族 + identity/variant 族），
+ * 供 check-checkpoint 复用，消除「同一记录两门裁定不一致」。
+ *
+ * 净语义（规格 §5「同一条记录，两门对 blocking vs 非阻断的裁定必须相同」）：
+ *   真 ⇔ checkRunLog 会吸收该条（不产生 [schema] blocking）。
+ * 谓词为真只表示「不按 [schema] 阻断」——吸收方**承接动作不同**：
+ *   - reworkHints 族（isFailedReviewMissingReworkHints 且其他 schema 错误为空/同为
+ *     legacy 可容忍，且 cutoff 前写入）→ 以 LEGACY_REWORK_HINTS 诊断吸收；
+ *   - 其余 → 以身份/variant 族（LEGACY_VARIANT 等）诊断吸收。
+ * 消费方按 `isFailedReviewMissingReworkHints(raw)` 分派承接动作即可：谓词为真且该族
+ * 成立时，必是上表第一行（此时谓词取值即 isLegacyMissingReworkHints）。
+ *
+ * errorMessages 须为该条目经 run-log schema 校验得到的原始消息（validateBySchema
+ * 的 errorMessages）；schema 通过（无消息）时谓词恒为假（无 schema 失败可吸收）。
+ */
+export function isLegacyAbsorbableEntry(raw: unknown, errorMessages: string[]): boolean {
+  if (isFailedReviewMissingReworkHints(raw)) {
+    const otherMessages = errorMessages.filter(
+      (message) =>
+        !message.includes('reworkHints') &&
+        !message.includes('must match "then" schema') &&
+        !message.includes('must match "if" schema'),
+    );
+    if (otherMessages.length === 0 || isLegacySchemaFailure(raw, otherMessages)) {
+      return isLegacyMissingReworkHints(raw as RunLogEntry);
+    }
+  }
+  return isLegacySchemaFailure(raw, errorMessages) && !isPostCutoffUndeclaredVariantEmergencyFix(raw);
+}
+
+/**
  * R10 判定：fix/emergency-fix 记录是否携带合法 revertEvidence.command（非空字符串）。
  * schema 层已保证出现时为 object 且 command 为 minLength 1 字符串；此处对仅空白
  * command（schema 可通过）按非法处理，与非空字符串判据（isNonEmptyString）对齐。
@@ -531,6 +563,9 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       // 诊断吸收，cutoff 后 [rework-hints] blocking。仅当其余 schema 错误为空或全部
       // 为 identity/variant legacy 可容忍时才分派；存在真实类型错误则回退通用
       // [schema] blocking（不吞错，fail-closed 方向不变）。
+      // D-5：吸收判定统一走共享谓词 isLegacyAbsorbableEntry（与 check-checkpoint 同谓词，
+      // 消除两门对同一条记录的裁定差异）；本块只负责 reworkHints 族的承接动作分派
+      // （absorb → LEGACY_REWORK_HINTS 诊断 / 不 absorb → [rework-hints] blocking）。
       if (isFailedReviewMissingReworkHints(raw)) {
         const otherMessages = schemaResult.errorMessages.filter(
           (message) =>
@@ -539,7 +574,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
             !message.includes('must match "if" schema'),
         );
         if (otherMessages.length === 0 || isLegacySchemaFailure(raw, otherMessages)) {
-          if (isLegacyMissingReworkHints(raw as RunLogEntry)) {
+          if (isLegacyAbsorbableEntry(raw, schemaResult.errorMessages)) {
             const withoutHints = Object.fromEntries(
               Object.entries(raw as Record<string, unknown>).filter(([field]) => field !== 'reworkHints'),
             );
@@ -555,7 +590,9 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
           continue;
         }
       }
-      if (isLegacySchemaFailure(raw, schemaResult.errorMessages) && !isPostCutoffUndeclaredVariantEmergencyFix(raw)) {
+      // D-5：身份/variant 族吸收判定同样走共享谓词（承接动作不变：
+      // LEGACY_VARIANT 诊断 + 裁剪缺失 required 字段后按 legacy 行继续消费）。
+      if (isLegacyAbsorbableEntry(raw, schemaResult.errorMessages)) {
         const missingFields = schemaResult.errorMessages
           .map((message) => message.match(/required property '([^']+)'/)?.[1])
           .filter((field): field is string => field !== undefined);
