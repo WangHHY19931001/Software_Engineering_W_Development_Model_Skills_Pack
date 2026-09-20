@@ -137,3 +137,103 @@ describe('signature-chain-logic R1-R10', () => {
     expect(result.violations.length).toBeGreaterThanOrEqual(1);
   });
 });
+
+// ==================== D-1 返工来源例外（role×action×targetKind 三元判定） ====================
+
+/**
+ * 构造带正确 sigHash 的单环条目（D-1 测试助手）。
+ * genesis 起点单条目：R1/R2 等链级规则必然失败，但 D-1 用例只聚焦 R9 断言（过滤 R9 前缀），
+ * 因此单环足够；sourceSigIds 指向 genesis 以免引入 R7 悬空来源噪声。
+ */
+function entry(over: {
+  sigId?: string;
+  role?: SignatureChainEntry['role'];
+  action?: string;
+  targetKind?: SignatureChainEntry['targetKind'];
+  sourceRoles?: SignatureChainEntry['inputProvenance']['sourceArtifacts'][number]['sourceRole'][];
+}): SignatureChainEntry {
+  const role = over.role ?? 'S';
+  const sourceRoles = over.sourceRoles ?? [];
+  const base: Omit<SignatureChainEntry, 'sigHash'> = {
+    sigId: over.sigId ?? `wm1-r001-${role}1`,
+    phase: 1,
+    role,
+    action: over.action ?? 'produce',
+    runId: 'wm1-r001',
+    artifacts: ['.w-model/artifact.md'],
+    prevSigId: 'genesis',
+    prevSigHash: '0',
+    signedAt: '2026-09-21T10:00:00.000Z',
+    signer: `${role.toLowerCase()}-agent-1`,
+    inputProvenance: {
+      sourceSigIds: sourceRoles.length > 0 ? ['genesis'] : [],
+      sourceArtifacts: sourceRoles.map((srcRole) => ({
+        path: `.w-model/upstream-${srcRole}.md`,
+        sourceSigId: 'genesis',
+        sourceRole: srcRole,
+      })),
+      transformDescription: 'D-1 测试构造的单环',
+    },
+    ...(over.targetKind !== undefined ? { targetKind: over.targetKind } : {}),
+  };
+  return { ...base, sigHash: computeSigHash(base) };
+}
+
+describe('signature-chain-logic D-1 返工来源例外', () => {
+  it('S + fix + 消费 R → 放行（D-1 例外，反模式 #18 守护的正面路径）', () => {
+    const r = checkSignatureChain([entry({ role: 'S', action: 'fix', sourceRoles: ['R'] })]);
+    expect(r.violations.filter((v) => v.startsWith('R9'))).toEqual([]);
+    expect(r.rulesFailed).not.toContain('R9');
+  });
+
+  it('S + produce + 消费 R → 仍拒（#18 守护：例外仅限 fix/emergency-fix）', () => {
+    const r = checkSignatureChain([entry({ role: 'S', action: 'produce', sourceRoles: ['R'] })]);
+    expect(r.violations).toEqual(expect.arrayContaining([expect.stringMatching(/R9: .*角色 S 不得消费 R/)]));
+    expect(r.rulesFailed).toContain('R9');
+  });
+
+  it('V + review + targetKind=rootcause + 消费 R → 放行（V 复审 RootCauseReport）', () => {
+    const r = checkSignatureChain([
+      entry({ role: 'V', action: 'review', sourceRoles: ['R'], targetKind: 'rootcause' }),
+    ]);
+    expect(r.violations.filter((v) => v.startsWith('[schema]'))).toEqual([]); // targetKind 须通过 schema
+    expect(r.violations.filter((v) => v.startsWith('R9'))).toEqual([]);
+    expect(r.rulesFailed).not.toContain('R9');
+  });
+
+  it('V + review + targetKind=standard + 消费 R → 仍拒', () => {
+    const r = checkSignatureChain([entry({ role: 'V', action: 'review', sourceRoles: ['R'], targetKind: 'standard' })]);
+    expect(r.violations).toEqual(expect.arrayContaining([expect.stringMatching(/R9: .*角色 V 不得消费 R/)]));
+    expect(r.rulesFailed).toContain('R9');
+  });
+
+  it('R + locate + targetKind=preventive + 消费 S → 放行（R3 预防性审查）', () => {
+    const r = checkSignatureChain([
+      entry({ role: 'R', action: 'locate', sourceRoles: ['S'], targetKind: 'preventive' }),
+    ]);
+    expect(r.violations.filter((v) => v.startsWith('[schema]'))).toEqual([]);
+    expect(r.violations.filter((v) => v.startsWith('R9'))).toEqual([]);
+    expect(r.rulesFailed).not.toContain('R9');
+  });
+
+  it('R + locate + targetKind=rootcause + 消费 S → 仍拒', () => {
+    const r = checkSignatureChain([
+      entry({ role: 'R', action: 'locate', sourceRoles: ['S'], targetKind: 'rootcause' }),
+    ]);
+    expect(r.violations).toEqual(expect.arrayContaining([expect.stringMatching(/R9: .*角色 R 不得消费 S/)]));
+    expect(r.rulesFailed).toContain('R9');
+  });
+
+  // 裁定 A：targetKind 是不入哈希的元数据——改哈希公式会让全部既有签名链（demo 125 环）失效
+  it('D-1: targetKind 不入 sigHash（带与不带 targetKind 的同环 sigHash 相同）', () => {
+    const withoutTk = entry({ role: 'V', action: 'review', sourceRoles: ['R'] });
+    const withTk: SignatureChainEntry = { ...withoutTk, targetKind: 'rootcause' };
+    // 除 targetKind 外字段全同（同一 helper 产物 + 显式展开），sigHash 不受 targetKind 影响：
+    // 给带 targetKind 的条目重算哈希，仍与不带时的 sigHash 一致 → targetKind 未参与哈希输入
+    expect(computeSigHash(withTk)).toBe(withoutTk.sigHash);
+    expect(withTk.sigHash).toBe(withoutTk.sigHash);
+    const r = checkSignatureChain([withTk]);
+    expect(r.violations.filter((v) => v.startsWith('[schema]'))).toEqual([]); // schema 接受 targetKind
+    expect(r.rulesFailed).not.toContain('R6'); // R6 重算仍一致
+  });
+});

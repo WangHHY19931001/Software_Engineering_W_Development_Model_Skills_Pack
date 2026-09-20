@@ -36,6 +36,8 @@ export interface SignatureChainEntry {
   phaseName?: string;
   role: Role;
   action: string;
+  /** 返工链语义分类（D-1）：rootcause=复审 R 报告 / preventive=预防性审查（R3） / iceberg=冰山扫掠 / standard=默认。可选元数据，不入 sigHash */
+  targetKind?: 'rootcause' | 'preventive' | 'iceberg' | 'standard';
   runId: string;
   artifacts: string[];
   prevSigId: string;
@@ -89,6 +91,24 @@ const FORBIDDEN_SOURCE_ROLES: Record<Role, Role[]> = {
   V: ['G', 'R'],
   G: ['S'],
 };
+
+/**
+ * D-1 返工来源例外：role×action×targetKind 三元判定。
+ * 在 FORBIDDEN_SOURCE_ROLES 基础上开三个具名例外（其余一律仍拒）：
+ *   1. S 消费 R：仅 action ∈ {fix, emergency-fix}（S-fix 必须消费 R 报告，反模式 #18 守护）
+ *   2. V 消费 R：仅 targetKind === 'rootcause'（V 复审 RootCauseReport）
+ *   3. R 消费 S：仅 targetKind === 'preventive'（R3 预防性审查消费 S 产物）
+ * targetKind 缺省视为 'standard'——既有签名链（无该字段）走 standard 路径，行为不变。
+ */
+function isAllowedSource(role: Role, entry: SignatureChainEntry, srcRole: Role): boolean {
+  const forbidden = FORBIDDEN_SOURCE_ROLES[role] ?? [];
+  if (!forbidden.includes(srcRole)) return true;
+  const tk = entry.targetKind ?? 'standard';
+  if (role === 'S' && srcRole === 'R') return entry.action === 'fix' || entry.action === 'emergency-fix';
+  if (role === 'V' && srcRole === 'R') return tk === 'rootcause';
+  if (role === 'R' && srcRole === 'S') return tk === 'preventive';
+  return false;
+}
 
 // ==================== sigHash 重算 ====================
 
@@ -343,9 +363,8 @@ export function checkSignatureChain(
     if (role === 'O' && (action === 'chunk' || action === 'checkpoint')) continue;
 
     const sourceRoles = (entry.inputProvenance?.sourceArtifacts ?? []).map((a) => a.sourceRole);
-    const forbidden = FORBIDDEN_SOURCE_ROLES[role] ?? [];
     for (const srcRole of sourceRoles) {
-      if (forbidden.includes(srcRole)) {
+      if (!isAllowedSource(role, entry, srcRole)) {
         violations.push(`R9: ${entry.sigId} 越权消费：角色 ${role} 不得消费 ${srcRole} 产物`);
         rulesFailed.push('R9');
       }

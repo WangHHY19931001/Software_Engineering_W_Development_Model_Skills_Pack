@@ -7,10 +7,12 @@
 每阶段每角色完成动作后产出签名记录，写入 `signature-chain.jsonl`（schema 见 SSoT §7.9 / `schemas/signature-chain.schema.json`）。
 
 **链式约束**：
+
 - `prevSigId` 指向同阶段前一环签名（形成链）
 - `sigHash = sha256(sigId + phase + role + action + runId + artifacts + prevSigHash + signedAt + signer + inputProvenance)`
 - 首环 `prevSigId = "genesis"`，`prevSigHash = "0"`（阶段起点）
 - 末环（G 签名）的 `sigHash` 作为该阶段签名链根 hash，写入 run-log checkpoint 条目
+- 可选字段 `targetKind`（返工链语义分类，D-1）是**不入哈希**的元数据：带与不带 `targetKind` 的同一环 sigHash 相同（否则 R6 重算会让全部既有签名链失效）；缺省语义为 `standard`
 
 ## 2. 阶段角色签名顺序（强制链）
 
@@ -22,72 +24,106 @@
 - **--phase=N 模式**：phase 内首条 `prevSigId` 允许指向上一阶段末条（从全链查找），其余条须等于 phase 内前条（使用列表索引 `phaseEntries[i-1]`）
 
 ### 阶段 1 签名链
+
 ```
 genesis → O(chunk) → A(cross) → S(produce) → V(review) → G(graph-gate) → G(tla-gate) → G(bdd-gate) → G(coverage-gate) → O(checkpoint-用户确认)
 ```
 
 ### 阶段 2-4 签名链
+
 ```
 genesis → O(chunk) → A(cross) → S(produce) → V(review) → G(graph-gate) → G(tla-gate) → G(bdd-gate) → O(checkpoint-用户确认)
 ```
 
 ### 阶段 5 签名链
+
 ```
 genesis → O(chunk) → S(produce) → V(review-code) → G(check-code-tla-consistency) → G(check-artifact-gate --phase=5) → O(checkpoint-用户确认)
 ```
 
 ### 阶段 6-7 签名链
+
 ```
 genesis → O(chunk) → S(produce) → V(review) → G(check-artifact-gate --phase=N) → O(checkpoint-用户确认)
 ```
 
 ### 阶段 8 签名链
+
 ```
 genesis → O(chunk) → S(produce) → V(review-acceptance) → G(check-artifact-gate --phase=8) → G(check-archive-integrity) → O(checkpoint-用户确认)
 ```
 
 ### 返工场景签名链子流程
+
 ```
 ... → V/G 不通过 → R(locate) → S(fix) → V(review-fix) → G(re-gate) → ...
 ```
 
 R 签名插入在 V/G 失败之后、S-fix 之前；S-fix 须包含 R 报告作为来源证明（反模式 #18 守护）。
 
+返工环上的 `targetKind` 填写约定（D-1）：
+
+- **S(fix)/S(emergency-fix)**：消费 R 报告是义务而非越权（action 即为例外判据，`targetKind` 可不填或填 `standard`）
+- **V(review-fix)**：复审 RootCauseReport 的环填 `targetKind: "rootcause"`
+- **R(locate) 做预防性审查（R3）**：消费 S 产物的环填 `targetKind: "preventive"`
+- 冰山扫掠（ICEBERG-A/B）环填 `targetKind: "iceberg"`；其余所有环不填（缺省即 `standard`）
+
 **关键约束**：
+
 - 每个角色签名须在前一环签名之后才能产出（时间戳单调递增）
 - 跳过任一角色即链断裂
 - O checkpoint 签名须包含用户确认标记（`signer` 字段须为用户 ID，非 O 角色）
 
 ## 3. 各角色来源正确性规则
 
-| 角色 | 动作 | 强制来源（sourceArtifacts 须包含） | 禁止来源 |
-|---|---|---|---|
-| **O** | chunk | 无（阶段起点） | — |
-| **A** | cross/evolve | 上一环 O chunk 签名 + chunk 产物 | S/V/G/R 产物 |
-| **S** | produce | A cross 签名 + A 产物 | V/G/R 产物 |
-| **R** | locate | V/G 失败信号 + 失败产物 | S 产物（R 须独立定位） |
-| **V** | review | S produce 签名 + S 产物 | G/R 产物（V 保持独立性） |
-| **G** | gate | V review 签名 + V 产物 | S 产物（G 须通过 V 评审） |
-| **O** | checkpoint | G gate 签名 + G 产物（GATE_JSON）+ 用户确认记录 | S/A 产物 |
+| 角色  | 动作         | 强制来源（sourceArtifacts 须包含）              | 禁止来源                  |
+| ----- | ------------ | ----------------------------------------------- | ------------------------- |
+| **O** | chunk        | 无（阶段起点）                                  | —                         |
+| **A** | cross/evolve | 上一环 O chunk 签名 + chunk 产物                | S/V/G/R 产物              |
+| **S** | produce      | A cross 签名 + A 产物                           | V/G/R 产物                |
+| **R** | locate       | V/G 失败信号 + 失败产物                         | S 产物（R 须独立定位）    |
+| **V** | review       | S produce 签名 + S 产物                         | G/R 产物（V 保持独立性）  |
+| **G** | gate         | V review 签名 + V 产物                          | S 产物（G 须通过 V 评审） |
+| **O** | checkpoint   | G gate 签名 + G 产物（GATE_JSON）+ 用户确认记录 | S/A 产物                  |
+
+### 返工例外（D-1：role×action×targetKind 三元判定）
+
+上表「禁止来源」在以下三种**具名例外**下放行（权威实现：`signature-chain-logic.ts` `isAllowedSource`；其余组合一律仍拒，违规文案不变）：
+
+| 例外               | 条件（三者须同时成立）                                   | 设计依据                                                         |
+| ------------------ | -------------------------------------------------------- | ---------------------------------------------------------------- |
+| S-fix 消费 R       | `role=S` ∧ `srcRole=R` ∧ `action ∈ {fix, emergency-fix}` | S-fix 必须携带 R 报告执行返工修复（反模式 #18 守护）             |
+| V 复审 R 报告      | `role=V` ∧ `srcRole=R` ∧ `targetKind=rootcause`          | V 复审 RootCauseReport（返工链 V→G 必经环节，反模式 #19 守护）   |
+| R 预防性审查消费 S | `role=R` ∧ `srcRole=S` ∧ `targetKind=preventive`         | R3 预防性审查须以 S 产物为输入（独立定位与预防性审查是两类动作） |
+
+`targetKind` 四值语义（schema `enum`，缺省即 `standard`）：
+
+- `rootcause` — 该环复审 R 报告（RootCauseReport）
+- `preventive` — 该环为预防性审查（R3 报告）
+- `iceberg` — 该环为冰山扫掠报告（ICEBERG-A/B）
+- `standard` — 默认/非返工语境（既有链无该字段时即此值，行为不变）
+
+> 注意：签名链 schema 的 `targetKind` 与 run-log schema 的同名 `targetKind`（requirement/design/code/test 等词表）是**不同 schema 中的不同词表**，重叠值仅 `rootcause` 且语义一致。`targetKind` 不参与 sigHash 计算（见 §1）。
 
 ## 4. G 角色校验职责（R1-R10）
 
 G 角色在跑门禁脚本前，**先调用 `check-signature-chain.ts` 校验签名链完整性 + 产出来源正确性**：
 
-| 规则 | 校验内容 | 失败后果 |
-|---|---|---|
-| R1 | 当前阶段所有强制角色签名齐全 | 门禁失败（exitCode=1），标注缺失角色 |
-| R2 | 签名链连续（prevSigHash 匹配）+ 跨阶段连续链语义 | 门禁失败，标注断裂点 |
-| R3 | 时间戳单调递增 | 门禁失败，标注时序异常 |
-| R4 | 签名角色与阶段角色清单匹配 | 门禁失败，标注越权角色 |
-| R5 | O checkpoint 签名 signer 为用户 ID | 门禁失败，标注代签（O4 命中） |
-| R6 | sigHash 重算一致（防篡改） | 门禁失败，标注篡改签名 |
-| R7 | 各角色 sourceSigIds 均存在于签名链中（--phase=N 模式来源并集 = 本阶段 ∪ 上一阶段） | 门禁失败，标注悬空来源 |
-| R8 | 各角色 sourceArtifacts 路径存在于磁盘 | 门禁失败，标注缺失产物 |
-| R9 | 各角色来源符合"强制来源/禁止来源"矩阵 | 门禁失败，标注越权消费 |
-| R10 | O checkpoint 的 sourceArtifacts 含 G gate 产物 + 用户确认记录 | 门禁失败，标注绕过门禁 |
+| 规则 | 校验内容                                                                           | 失败后果                             |
+| ---- | ---------------------------------------------------------------------------------- | ------------------------------------ |
+| R1   | 当前阶段所有强制角色签名齐全                                                       | 门禁失败（exitCode=1），标注缺失角色 |
+| R2   | 签名链连续（prevSigHash 匹配）+ 跨阶段连续链语义                                   | 门禁失败，标注断裂点                 |
+| R3   | 时间戳单调递增                                                                     | 门禁失败，标注时序异常               |
+| R4   | 签名角色与阶段角色清单匹配                                                         | 门禁失败，标注越权角色               |
+| R5   | O checkpoint 签名 signer 为用户 ID                                                 | 门禁失败，标注代签（O4 命中）        |
+| R6   | sigHash 重算一致（防篡改）                                                         | 门禁失败，标注篡改签名               |
+| R7   | 各角色 sourceSigIds 均存在于签名链中（--phase=N 模式来源并集 = 本阶段 ∪ 上一阶段） | 门禁失败，标注悬空来源               |
+| R8   | 各角色 sourceArtifacts 路径存在于磁盘                                              | 门禁失败，标注缺失产物               |
+| R9   | 各角色来源符合"强制来源/禁止来源"矩阵                                              | 门禁失败，标注越权消费               |
+| R10  | O checkpoint 的 sourceArtifacts 含 G gate 产物 + 用户确认记录                      | 门禁失败，标注绕过门禁               |
 
 **校验时机**：
+
 - G 跑每个 gate 脚本前：`check-signature-chain.ts --phase=N --stage=pre-gate`（R1-R10 全通过）
 - O 在 checkpoint 前：`check-signature-chain.ts --phase=N --stage=pre-checkpoint`（R1-R10 + R5 用户确认）
 - 归档时：`check-signature-chain.ts --phase=all --stage=archive`（全阶段链完整性 + 来源正确性）
@@ -98,12 +134,12 @@ G 角色在跑门禁脚本前，**先调用 `check-signature-chain.ts` 校验签
 
 后续阶段消费者须校验前一阶段产出来源正确性：
 
-| 消费者 | 校验内容 | 失败后果 |
-|---|---|---|
-| 阶段 N+1 的 O chunk | 阶段 N 的 G gate 签名存在 + O checkpoint 签名 signer 为用户 ID | 拒绝启动阶段 N+1，回退阶段 N |
-| 阶段 N+1 的 S produce | 阶段 N 的 S produce 签名 + V review 签名 + G gate 签名齐全 | 拒绝产出，回退阶段 N |
-| 阶段 5 的 S produce（编码） | 阶段 1-4 全部 G gate 签名齐全 + 签名链连续 | 拒绝编码，回退缺失阶段 |
-| 阶段 8 的 G gate（终检） | 阶段 1-7 全部签名链完整 + 来源正确 | 拒绝终检，回退缺失阶段 |
+| 消费者                      | 校验内容                                                       | 失败后果                     |
+| --------------------------- | -------------------------------------------------------------- | ---------------------------- |
+| 阶段 N+1 的 O chunk         | 阶段 N 的 G gate 签名存在 + O checkpoint 签名 signer 为用户 ID | 拒绝启动阶段 N+1，回退阶段 N |
+| 阶段 N+1 的 S produce       | 阶段 N 的 S produce 签名 + V review 签名 + G gate 签名齐全     | 拒绝产出，回退阶段 N         |
+| 阶段 5 的 S produce（编码） | 阶段 1-4 全部 G gate 签名齐全 + 签名链连续                     | 拒绝编码，回退缺失阶段       |
+| 阶段 8 的 G gate（终检）    | 阶段 1-7 全部签名链完整 + 来源正确                             | 拒绝终检，回退缺失阶段       |
 
 ## 6. 签名链篡改检测机制（sigHash 重算）
 
@@ -128,6 +164,7 @@ R6 校验规则：对每条签名记录，用上述公式重算 sigHash，与记
 （本战役的共同根因）。R15e 的整个意义就是把"已核验"从自报改为对账。
 
 **触发边界**：
+
 - 仅 `evidenceStatus === 'confirmed'` 触发；`pending` 不触发（pending 本来就是"尚未验证"，见 [evidence-anchored-tree.md](evidence-anchored-tree.md) §3 与 `exemption` 第 6 类）。
 - 仅在 CLI 注入签名链条目时校验。阶段 1 早期签名链文件可能尚不存在，此时**跳过**而非报错（规格 §5：不得误红）。
 - 锚点格式非法时跳过 R15e（path 部分不可信，避免二次噪声违规）。
