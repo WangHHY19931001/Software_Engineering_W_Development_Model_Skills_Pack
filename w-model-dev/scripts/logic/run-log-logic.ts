@@ -288,6 +288,34 @@ function isSuccessfulFix(entry: RunLogEntry): boolean {
   return entry.role === 'S' && ['fix', 'emergency-fix'].includes(entry.action) && entry.outcome === 'success';
 }
 
+/**
+ * V 自有产物目录前缀（D-2）：V 重发被修报告时落盘的评审产物均在 V 管辖目录下，
+ * artifacts 全部命中这些前缀才可视为「V 重发」的产物证据。
+ */
+const V_OWNED_PREFIXES = ['.w-model/verifier-outputs/', '.w-model/v-reviews/', '.w-model/preventive-reviews/'];
+
+/**
+ * D-2：V 以其自有产物重发被修报告，等价于一次修复记录。
+ * VerifierOutput / 预防性报告类缺陷只能由 V 修复（重发其自有产物），
+ * 此时 S-fix 记录不存在；以 review + role=V + basedOnReport + artifacts 全部
+ * V 自有前缀识别该形态，仅用于 R3/R7 的 rootcause 报告配对（非 phase-8 严格分支）。
+ */
+function isVRepairRecord(entry: RunLogEntry): boolean {
+  if (entry.action !== 'review' || entry.role !== 'V' || entry.outcome !== 'success') return false;
+  if (!isNonEmptyString(entry.basedOnReport)) return false;
+  const arts = entry.artifacts;
+  return (
+    Array.isArray(arts) &&
+    arts.length > 0 &&
+    arts.every((a) => typeof a === 'string' && V_OWNED_PREFIXES.some((p) => a.startsWith(p)))
+  );
+}
+
+/** R3/R7 rootcause 报告配对接受的「成功修复」记录：S-fix 或 V 重发（D-2）。 */
+function isSuccessfulRepair(entry: RunLogEntry): boolean {
+  return isSuccessfulFix(entry) || isVRepairRecord(entry);
+}
+
 function hasExactImplementationTargetEvidence(entry: RunLogEntry): boolean {
   const identity = lifecycleIdentity(entry);
   return (
@@ -865,8 +893,10 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   }
   for (const [legacyPhase, reportIds] of legacyReportsByPhase) {
     const coveredReportIds = new Set<string>();
-    for (const f of fixActions) {
-      if (f.phase !== legacyPhase || !isSuccessfulFix(f) || !isNonEmptyString(f.basedOnReport)) continue;
+    // D-2：扫全量 valid 而非 fixActions——V 重发记录是 review 条目，不在 fixActions 内；
+    // isSuccessfulRepair 同时接受 S-fix 与 V 重发（review + role=V + basedOnReport + V 自有 artifacts）。
+    for (const f of valid) {
+      if (f.phase !== legacyPhase || !isSuccessfulRepair(f) || !isNonEmptyString(f.basedOnReport)) continue;
       for (const rid of f.basedOnReport.split(/[;,]\s*/)) if (rid.trim()) coveredReportIds.add(rid.trim());
     }
     for (const rid of reportIds) {
@@ -1160,7 +1190,8 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       violations.push(`R7: rootcause 记录 ${curEntry.runId} 后须有 review(targetKind=rootcause)`);
       continue;
     }
-    const successfulFix = valid.slice(j + 1).find(isSuccessfulFix);
+    // D-2：V 重发记录（review + role=V + basedOnReport + V 自有 artifacts）同样视为修复证据。
+    const successfulFix = valid.slice(j + 1).find(isSuccessfulRepair);
     if (!successfulFix) violations.push(`R7: rootcause 记录 ${curEntry.runId} 后须有 successful fix 记录`);
   }
 

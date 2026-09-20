@@ -2784,3 +2784,95 @@ describe('run-log R11 阶段 1 自举豁免（D-6）', () => {
     expect(result.closure).toEqual({ checkedGates: 1, missing: 1 });
   });
 });
+
+// ==================== D-2：R3/R7 配对接受 V 重发记录 ====================
+
+describe('run-log D-2: R3/R7 配对接受 V 重发记录（V 自有产物重发 = 修复证据）', () => {
+  /** 最小 phase-3 run-log 条目构造（schema 必需字段 + 可覆盖字段）。 */
+  function entry(over: Partial<RunLogEntry>): RunLogEntry {
+    return {
+      runId: 'r-x',
+      timestamp: '2026-09-21T00:00:00Z',
+      phase: 3,
+      phaseName: '设计',
+      duration_s: 10,
+      tokens: 100,
+      estimated: false,
+      subagentSpawns: 0,
+      gateExitCode: null,
+      outcome: 'success',
+      ...over,
+    } as RunLogEntry;
+  }
+
+  /** V 重发记录：action=review + role=V + basedOnReport + artifacts 全部 V 自有前缀。 */
+  function vResend(over: Partial<RunLogEntry> = {}): RunLogEntry {
+    return entry({
+      runId: 'r-vresend',
+      action: 'review',
+      role: 'V',
+      basedOnReport: 'RC-p3-1',
+      artifacts: ['.w-model/verifier-outputs/phase-3.json'],
+      qualityLevel: 'A',
+      passed: true,
+      reworkHints: [],
+      ...over,
+    });
+  }
+
+  /** 最小返工链：rootcause → V 复审(targetKind=rootcause) → [被测重发记录] → R 报告门禁。 */
+  function reworkChain(resend: RunLogEntry): RunLogEntry[] {
+    return [
+      entry({
+        runId: 'r-rootcause',
+        action: 'rootcause',
+        role: 'R',
+        round: 1,
+        reportId: 'RC-p3-1',
+        rootCauseCategory: 'design-gap',
+        upstreamDefect: false,
+        rollbackRecommended: false,
+      }),
+      entry({
+        runId: 'r-review',
+        action: 'review',
+        role: 'V',
+        targetKind: 'rootcause',
+        target: 'RC-p3-1',
+        qualityLevel: 'A',
+        passed: true,
+        reworkHints: [],
+      }),
+      resend,
+      entry({ runId: 'r-gate', action: 'gate', role: 'G', script: 'check-rootcause-report.ts', gateExitCode: 0 }),
+    ];
+  }
+
+  const isPairingViolation = (v: string): boolean =>
+    v.startsWith('R3: rootcause 报告 RC-p3-1') || (v.startsWith('R7: rootcause 记录') && v.includes('successful fix'));
+
+  it('V 重发记录（review + basedOnReport + V 自有 artifacts）闭合 R3/R7 配对（正例）', () => {
+    const r = checkRunLog(reworkChain(vResend()));
+    expect(r.violations.filter(isPairingViolation)).toEqual([]);
+  });
+
+  it('V 重发缺 basedOnReport → 不充数（负例，R3/R7 配对违规仍在）', () => {
+    const resend = vResend();
+    delete (resend as Partial<RunLogEntry>).basedOnReport;
+    const r = checkRunLog(reworkChain(resend));
+    expect(r.violations.some((v) => v.startsWith('R3: rootcause 报告 RC-p3-1'))).toBe(true);
+    expect(r.violations.some((v) => v.startsWith('R7: rootcause 记录') && v.includes('successful fix'))).toBe(true);
+  });
+
+  it('V 重发 artifacts 指向非 V 前缀 → 不充数（负例）', () => {
+    const r = checkRunLog(reworkChain(vResend({ artifacts: ['src/counter.ts'] })));
+    expect(r.violations.some((v) => v.startsWith('R3: rootcause 报告 RC-p3-1'))).toBe(true);
+    expect(r.violations.some((v) => v.startsWith('R7: rootcause 记录') && v.includes('successful fix'))).toBe(true);
+  });
+
+  it("V 重发 outcome≠'success' → 不充数（边界负例）", () => {
+    const r = checkRunLog(reworkChain(vResend({ outcome: 'fail' })));
+    expect(r.violations.some((v) => v.startsWith('R3: rootcause 报告 RC-p3-1'))).toBe(true);
+    expect(r.violations.some((v) => v.startsWith('R7: rootcause 记录') && v.includes('successful fix'))).toBe(true);
+  });
+});

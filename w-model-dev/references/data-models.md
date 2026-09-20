@@ -557,6 +557,8 @@ interface RunLogEntry {
 ```
 
 > 多角度场景（R-lead 分派 N 个 R-persona，并行/串行均可）时，每份 PartialReport 各记一条 `rootcause` 动作（`role:"R"`，`note` 标注 personaSlice），聚合记一条 `rootcause` 动作（`note:"R-lead aggregation"`）。
+
+**V 重发 = 修复证据（D-2，2026-09-21）**：VerifierOutput / 预防性报告等 V 自有产物类缺陷由 V 重发其自有产物修复，无 S-fix 记录。run-log 以 `action=review` + `role=V` + `outcome=success` + `basedOnReport`（非空，引用被修 R 报告 `reportId`）+ `artifacts`（非空数组且每项均以 `.w-model/verifier-outputs/` / `.w-model/v-reviews/` / `.w-model/preventive-reviews/` 之一开头）识别该形态；R3 的 rootcause↔fix 一一对应与 R7 返工时序（legacy phase<8 路径）将其等价视为一次成功修复证据。缺 `basedOnReport`、artifacts 非 V 前缀或 `outcome≠success` 不充数；phase 8 严格分支仍只接受 S-fix 精确身份证据。
 >
 > **D8 lifecycle identity 约束（phase 8）：** reducer 使用完整 `(phase, round, reportId, targetKind, basedOnReport, implementationTarget)` 作为生命周期键；rootcause R/V/G 使用 `targetKind=rootcause` 与同一 `reportId`，rootcause 的 `basedOnReport` 明确为 `null/unknown`；fix/emergency-fix 只接受 `basedOnReport` 精确匹配的 reportId、`target===implementationTarget` 且非空 artifacts 包含 exact target。implementation V/G/R3 必须与对应 fix 保持同一 phase/round/reportId/targetKind/basedOnReport/implementationTarget，并满足 exact target/artifacts 关系。R3 completeness/reliability/security 只在同身份 `S-fix → R3×3 → implementation V` 窗口内计数，rootcause review 不计入。缺字段不得由首索引、最近记录或集合数量补齐，输出 `LEGACY_UNSCOPED`/deferred diagnostic；legacy evidence 不进入 R3/V/R8 credit；机器状态为 `CLOSED_UNDER_CURRENT_RULES` 或 `NOT_CLOSED_NOT_PROVEN`，exit 0 不单独证明 closed。raw JSONL 始终 append-only，不由 checker 改写。
 

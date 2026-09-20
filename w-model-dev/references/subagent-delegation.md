@@ -1316,6 +1316,8 @@ opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 st
 }
 ```
 
+**V 重发 = 修复证据（D-2，2026-09-21）**：VerifierOutput / 预防性报告等 V 自有产物类缺陷只能由 V 修复（重发其自有产物），此时不存在 S-fix 记录。V 须在 run-log 记一条重发记录：`action=review` + `role=V` + `outcome=success`，`basedOnReport` 非空（引用被修 R 报告的 `reportId`），`artifacts` 非空且**每一项**均以 V 自有目录前缀之一开头（`.w-model/verifier-outputs/` / `.w-model/v-reviews/` / `.w-model/preventive-reviews/`）。`checkRunLog` 的 R3 rootcause↔fix 配对与 R7 返工时序（legacy phase<8 路径）将该记录**等价视为一次成功修复证据**；缺 `basedOnReport`、artifacts 指向非 V 前缀或 `outcome≠success` 均不充数（配对违规照常报出）。phase 8 严格分支（exact identity 谓词路径）不受影响，仍只接受 S-fix 精确身份证据。
+
 ### G 子代理返回
 
 ```json
