@@ -16,6 +16,7 @@
  */
 
 import { validateBySchema } from '../infrastructure/schema-loader.js';
+
 import { isLegacyAbsorbableEntry } from './run-log-logic.js';
 
 // ==================== 自包含类型形状 ====================
