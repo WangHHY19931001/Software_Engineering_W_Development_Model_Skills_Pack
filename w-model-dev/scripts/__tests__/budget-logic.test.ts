@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { countReworks } from '../cli/check-budget.js';
 import { checkBudget, checkRootcauseBudget, type BudgetConfig } from '../logic/budget-logic.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -135,5 +136,58 @@ describe('checkBudget 逐规则单测', () => {
     const r = checkBudget(b, { tlaReworkCount: 3 });
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('TLA+ 返工'))).toBe(true);
+  });
+});
+
+/**
+ * countReworks（CLI 侧 run-log 返工统计口径，D-4a）
+ *
+ * 背景：真实 8 阶段调测的 run-log 中 action='rework' 一条都没有——返工以
+ * fix/emergency-fix 与 outcome='fail'/'rework' 落盘，旧口径（只认 action==='rework'）
+ * 使 reworkCount 恒为 0，R5 连续返工护栏（killSwitch）一次都没触发（护栏失灵）。
+ */
+describe('countReworks 返工计数口径（D-4a）', () => {
+  it('返工计数按真实事件（fix/outcome=fail|rework），不再只认 action=rework（D-4a）', () => {
+    const entries = [
+      { runId: 'a', phase: 3, action: 'fix', role: 'S', outcome: 'success' },
+      { runId: 'b', phase: 3, action: 'gate', role: 'G', outcome: 'fail' },
+      { runId: 'c', phase: 3, action: 'checkpoint', role: 'O', outcome: 'rework' },
+      { runId: 'd', phase: 4, action: 'fix', role: 'S', outcome: 'success' },
+    ];
+    const s = countReworks(entries, 3);
+    expect(s.reworkCount).toBe(3); // a+b+c（phase=3）
+  });
+
+  it('legacy action=rework 与 emergency-fix 均计入，且同一记录不重复计数', () => {
+    const entries = [
+      // 兼容项：旧记录的 action='rework' 仍计入（即使 outcome 也命中，只计一次）
+      { runId: 'a', phase: 5, action: 'rework', role: 'S', outcome: 'fail' },
+      { runId: 'b', phase: 5, action: 'emergency-fix', role: 'S', outcome: 'success' },
+      { runId: 'c', phase: 5, action: 'gate', role: 'G', outcome: 'success' },
+      { runId: 'd', phase: 5, action: 'review', role: 'V', outcome: 'success' },
+    ];
+    const s = countReworks(entries, 5);
+    expect(s.reworkCount).toBe(2); // a+b；c/d 无返工语义
+  });
+
+  it('tlaReworkCount 只在计入返工的记录里按 note/target 的 TLA 判据统计', () => {
+    const entries = [
+      { runId: 'a', phase: 6, action: 'fix', role: 'S', outcome: 'success', note: 'TLA+ 不变式回归' },
+      { runId: 'b', phase: 6, action: 'gate', role: 'G', outcome: 'fail', target: 'tla-manifest.json' },
+      // 非返工记录即使提及 TLA 也不计入（未扩大 tla 判据）
+      { runId: 'c', phase: 6, action: 'gate', role: 'G', outcome: 'success', note: 'TLA+ 门禁通过' },
+      { runId: 'd', phase: 6, action: 'fix', role: 'S', outcome: 'success' },
+    ];
+    const s = countReworks(entries, 6);
+    expect(s.reworkCount).toBe(3); // a+b+d
+    expect(s.tlaReworkCount).toBe(2); // a+b
+  });
+
+  it('phase=undefined 时不过滤，统计全部记录（过滤语义不变）', () => {
+    const entries = [
+      { runId: 'a', phase: 1, action: 'fix', role: 'S', outcome: 'success' },
+      { runId: 'b', phase: 2, action: 'gate', role: 'G', outcome: 'fail' },
+    ];
+    expect(countReworks(entries, undefined).reworkCount).toBe(2);
   });
 });

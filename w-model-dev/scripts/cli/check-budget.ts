@@ -14,6 +14,8 @@
  *   budget.json           budget.json 文件路径
  *   --project=<path>      project.json 路径（可选，用于读取 projectUpdatedAt 做 R1 时效性校验；读取侧经 project.schema.json 校验，缺失/非法/不符 schema → exit 2）
  *   --run-log=<path>      run-log.jsonl 路径（可选，用于统计返工次数做 R5 触发检测）
+ *                         返工口径（D-4a）：action ∈ {rework, fix, emergency-fix} 或 outcome ∈ {fail, rework}
+ *                         的条数；tlaReworkCount 再从中筛 note/target 含 TLA 的条数（详见 countReworks）
  *   --phase=N             当前阶段 1-8（可选，用于过滤 run-log 中本阶段的返工记录；支持 --phase=N 与 --phase N 两形态，重复传参即错）
  *   --json                机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse，含 warnings 非阻断警告字段）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
@@ -37,6 +39,7 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { checkBudget, type BudgetConfig } from '../logic/budget-logic.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
@@ -77,26 +80,46 @@ interface ReworkStats {
 }
 
 /**
- * 统计 run-log.jsonl 中的返工记录数。
- * - reworkCount     = action === 'rework' 且（若提供 phase）phase === N 的记录数
- * - tlaReworkCount  = action === 'rework' 且（note 或 target 含 'TLA/tla'）且（若提供 phase）phase === N 的记录数
+ * 统计 run-log.jsonl 中的返工记录数（D-4a：口径对齐真实事件）。
+ *
+ * 判据（命中任一即计入返工，同一记录只计一次）：
+ *   - action ∈ {'rework', 'fix', 'emergency-fix'}（'rework' 为旧记录兼容项，非新增语义）
+ *   - outcome ∈ {'fail', 'rework'}
+ * 对齐事实：真实 8 阶段调测的 run-log 中 action='rework' 一条都没有，返工以
+ * fix/emergency-fix 与 outcome='fail'/'rework' 落盘；旧口径使 reworkCount 恒为 0，
+ * R5 连续返工护栏（killSwitch）失灵。
+ *
+ * - reworkCount     = 命中上述判据且（若提供 phase）phase === N 的记录数
+ * - tlaReworkCount  = 计入 reworkCount 的记录中，note 或 target 含 'TLA/tla' 的记录数
+ *                     （未扩大 tla 判据：非返工记录即使提及 TLA 也不计入）
  *
  * 容错：文件读取与逐行解析由 readJsonlOrExit 负责（坏行 warn+skip），此处仅统计。
  */
-function countReworks(entries: unknown[], phase: number | undefined): ReworkStats {
+export function countReworks(entries: unknown[], phase: number | undefined): ReworkStats {
   let reworkCount = 0;
   let tlaReworkCount = 0;
   for (const entry of entries) {
-    const e = entry as { action?: string; phase?: number; note?: string; target?: string };
+    const e = entry as {
+      action?: string;
+      phase?: number;
+      note?: string;
+      target?: string;
+      outcome?: string;
+    };
     if (phase !== undefined && e.phase !== phase) continue;
-    if (e.action === 'rework') {
-      reworkCount++;
-      if (
-        (typeof e.note === 'string' && /TLA/i.test(e.note)) ||
-        (typeof e.target === 'string' && /TLA/i.test(e.target))
-      ) {
-        tlaReworkCount++;
-      }
+    const isRework =
+      e.action === 'rework' || // 兼容旧记录（保留原口径，非新增语义）
+      e.action === 'fix' ||
+      e.action === 'emergency-fix' ||
+      e.outcome === 'fail' ||
+      e.outcome === 'rework';
+    if (!isRework) continue;
+    reworkCount++;
+    if (
+      (typeof e.note === 'string' && /TLA/i.test(e.note)) ||
+      (typeof e.target === 'string' && /TLA/i.test(e.target))
+    ) {
+      tlaReworkCount++;
     }
   }
   return { reworkCount, tlaReworkCount };
@@ -257,4 +280,11 @@ async function main(): Promise<void> {
   return;
 }
 
-runMain(main);
+// isMain 守卫：仅直接执行时运行 main，被 __tests__ 等 import 时不触发
+// （countReworks 是本模块的导出统计函数，测试导入它不应产生 CLI 副作用）
+const entryArg = process.argv[1];
+const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
+
+if (isMain) {
+  runMain(main);
+}
