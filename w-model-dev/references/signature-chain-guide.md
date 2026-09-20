@@ -66,7 +66,7 @@ R 签名插入在 V/G 失败之后、S-fix 之前；S-fix 须包含 R 报告作�
 - **S(fix)/S(emergency-fix)**：消费 R 报告是义务而非越权（action 即为例外判据，`targetKind` 可不填或填 `standard`）
 - **V(review-fix)**：复审 RootCauseReport 的环填 `targetKind: "rootcause"`
 - **R(locate) 做预防性审查（R3）**：消费 S 产物的环填 `targetKind: "preventive"`
-- 冰山扫掠（ICEBERG-A/B）环填 `targetKind: "iceberg"`；其余所有环不填（缺省即 `standard`）
+- 冰山扫掠（ICEBERG-A/B）环填 `targetKind: "iceberg"`；其余所有环不填（缺省即 `standard`）。尾注：该值当前**不解锁 R9 例外**（R-iceberg 环消费 S 产物仍须按 §3 矩阵裁定；`isAllowedSource` 三例外不含 `iceberg`）
 
 **关键约束**：
 

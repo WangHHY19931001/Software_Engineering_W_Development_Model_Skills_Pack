@@ -9,6 +9,23 @@
 
 ## [42.2.1] - 2026-09-01
 
+### 门禁-返工链契约修复 D-1~D-8（2026-09-21）
+
+> 来源：8 阶段全流程真实调测（`docs/debug/2026-09-20-wm-8phase-live-run/README.md`，快照 main @ `fefd56fc`）披露的 8 项「门禁对合法返工链形态误报/漏报」契约缺口；规格见 `docs/superpowers/specs/2026-09-20-gate-contract-fixes-design.md`、计划见 `docs/superpowers/plans/2026-09-20-gate-contract-fixes.md`，逐任务报告与评审 diff 存 `.superpowers/sdd/2026-09-20-gate-contract-fixes/`。版本保持 42.2.1，**不 bump**。
+
+- **D-1 签名链返工来源例外（`logic/signature-chain-logic.ts`）**：`SignatureChainEntry` 新增可选 `targetKind`（`rootcause`/`preventive`/`iceberg`/`standard`，**不入 sigHash**，缺省即 `standard`——既有链行为不变），R9 在禁止来源矩阵之上开三个 role×action×targetKind 具名例外：S@fix/emergency-fix 消费 R（反模式 #18 守护）、V@rootcause 复审 R 报告（反模式 #19 守护）、R@preventive 消费 S（R3 预防性审查）；其余组合一律仍拒。`references/signature-chain-guide.md` §1/§2/§3 已同步（§2 注明 `iceberg` 当前不解锁 R9 例外）。
+- **D-2 run-log R3/R7 配对接受 V 重发记录（`logic/run-log-logic.ts`）**：VerifierOutput/预防性报告类缺陷由 V 重发其自有产物修复、无 S-fix 记录时，R3 rootcause↔fix 配对与 R7 返工时序（legacy phase<8 路径）将 `review + role=V + outcome=success + basedOnReport 非空 + artifacts 非空且全命中 V 自有前缀（`.w-model/verifier-outputs/` / `.w-model/v-reviews/` / `.w-model/preventive-reviews/`）`的记录等价视为一次成功修复证据；缺 `basedOnReport`、artifacts 非 V 前缀或 `outcome≠success` 不充数；phase 8 严格分支不变。`subagent-delegation.md` / `data-models.md` 已补段。
+- **D-3 code-tla 装载按 manifest.basePath 解析（`cli/check-code-tla-consistency.ts`）**：`tlaAbs = resolve(manifestDir, basePath ?? '.', tlaPath)`，与 `check-tla-model.ts` 同口径（basePath 空/缺省回退 `.`），消除同一 manifest 两门结论不一致；CLI 装载失败 exit 2 契约由回归用例锁定，`tla-plus.md` §2.1 已注。
+- **D-4a killSwitch 返工计数对齐真实事件（`cli/check-budget.ts`）**：`reworkCount` = `action ∈ {rework, fix, emergency-fix}` **或** `outcome ∈ {fail, rework}` 的**累计**条数（`countReworks` 导出供测试），替换「只数 `action=rework`」旧口径——真实调测 run-log 中该 action 一条都没有，旧护栏静默失灵；`tlaReworkCount` 仍为其中 note/target 含 TLA 的子集。
+- **D-4b budget 用量实效校验 R6 + burnRate 告警（`logic/budget-logic.ts`）**：新增 R6——Σtokens(阶段) 严格大于 `perPhase.maxTokens` 或 Σtokens(全量) 严格大于 `project.maxTokensTotal` → blocking（消息 `R6：` 前缀，附超限占比）；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` → killSwitch 用量告警（消息 `R5-b：` 前缀，R5 既有文案逐字不变）。tokens 由 CLI `sumTokens` 从 run-log 累计（NaN/Infinity/负数/非数字一律剔除，防 Σ=NaN 使判定恒假）；未提供 `--run-log` 时 R5 触发检测与 R6/R5-b 行为与新增前一字不变，Σtokens=0 时输出「R6 未生效」非阻断警告。`data-models.md` 与两文件头已注。
+- **D-5 checkpoint 门复用 run-log legacy 谓词（`logic/checkpoint-logic.ts` + `logic/run-log-logic.ts`）**：导出 `isLegacyAbsorbableEntry`，check-run-log 与 check-checkpoint 两门对同一条 legacy 记录复用**同一**吸收判定（此前 checkpoint 门持漂移副本，可能同行两门裁定不一）；真实 schema 错误仍 blocking。
+- **D-6 R11 阶段 1 自举豁免（`logic/run-log-logic.ts`）**：`check-checkpoint.ts` 自身要求 run-log 已有 checkpoint 记录才可能 exit 0，其成功 gate 记录必然晚于本阶段放行——严格「早于放行」在 phase 1 构成自举死锁。现 phase===1 该脚本允许后置：晚于本放行且早于下一放行（无下一放行则无上界；同秒不算；早于放行的记录照旧充数；记录仍须属本阶段）。其余四脚本与 phase≥2 判据不变。**已知边界**：后置 gate 记录与 R8 轨迹模板的同源张力未解（R11 豁免不放宽 R8），已在 `operational-recovery.md`「已知张力」如实登记。
+- **D-7 opsx 预归档门兼容归档位（`cli/check-opsx-artifacts.ts`）**：strict 解析活动位优先；活动位缺失且 `openspec/changes/archive/` 下恰有一个 `<changeId>` 或 `<日期>-<changeId>` 目录 → 按归档位**同契约**校验（不放宽任何项），多匹配 fail-closed——使本 pre-archive 聚合门与 `check-openspec-archive.ts` 后置门在归档态可同时通过。`command-reference.md` 已注明未归档/已归档两态双门期望。
+- **D-8 布局校验激活条件文档化（`logic/gate-logic.ts:1445`，零代码改动）**：设计级「主文档 + 6 子模板引用块 + §0 SSOT 头 + DoD 清单」布局校验（`checkPhaseSpecStructure`）仅在 `phase ∈ {1..4}` **且**显式传入 `--spec-dir` 时执行；未传参时整组跳过（`specStructure: 'skipped'`）。SSoT §10.5.2 与 `command-reference.md` 补该激活条件。
+- **超范围修复（并入叙述）**：`check-budget.ts` 增 isMain 守卫（导出 `countReworks` 供测试 import 不触发 CLI）；`checkpoint-logic.ts` import 顺序修复（lint:security 零新增）；`docs/debug/2026-09-20-wm-8phase-live-run/README.md` 订正终局状态披露（「12 项门禁全绿」仅对应 13:20Z 快照，放行后修复循环如实披露，非门禁缺陷）。
+- **验证**：每项修复均有单测正反例（RED→GREEN；如 D-1 三放行用例在旧矩阵下全红 + 未列组合仍拒、D-2 负例不充数、D-4b 超限/恰平/未提供/Σ=0 四态、D-5 同一条记录两门同判与真 schema 错仍红、D-6 phase≥2 不变回归 + phase 1 后置窗口、D-7 活动位/归档恰一/多匹配三态）；`self-test` 358 与 `lint:security` 零新增已在分支内实测，最终由本分支任务 10 全量 prepush 复核；demo 复验（移除 D-3 junction 绕过物后受影响门禁重跑 + 签名链新形态重放）由任务 10 执行，证据落 `docs/debug/2026-09-20-wm-8phase-live-run/gate-fix-replay.txt`。
+- **登记不修（如实列出）**：D-6 的 R8 同源张力（R8 侧豁免超出规格 §6 授权，登记交最终审查甄别）；D-4b CLI 接线无常驻回归锁定（删除 tokensUsed 传参单测其余仍绿，登记为后续任务候选）；R3(fix) 正确动作形态（`r3-{completeness,reliability,security}` + `variant:"fix"`）在文档中缺显式示例（真实执行写错动作名的候选文档改进项）。
+
 ### 门禁结构校验入口合并（`checkRequirementSpecStructure` → `checkPhaseSpecStructure`，2026-09-20）
 
 > 背景：第三源吸收收尾时登记的观察——阶段 1 规格结构校验存在**两套并行实现**，其中 `checkRequirementSpecStructure`（阶段 1 专用）只被 `self-test` 与单测调用、**不接任何 CLI**，门禁实际走 `checkPhaseSpecStructure`。两套实现判据集相同而措辞不同，属"改了 A 忘了 B"的结构性风险。版本保持 42.2.1，**不 bump**。
