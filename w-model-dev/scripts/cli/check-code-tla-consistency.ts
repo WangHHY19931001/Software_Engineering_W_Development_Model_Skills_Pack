@@ -44,6 +44,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 
 import type * as TsType from 'typescript';
 
@@ -58,7 +59,7 @@ import {
   type TlaSpec,
 } from '../logic/code-tla-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
-import { exitWithError, HandledCliError } from '../lib/cli-error.js';
+import { exitWithError, type CliError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
@@ -144,16 +145,36 @@ async function loadCodeFiles(srcDir: string): Promise<CodeFile[]> {
 // ==================== TLA+ 内容读取 ====================
 
 /**
- * 读取 manifest 中每个 L2/L3 spec 的 .tla 文件内容，注入 spec.tlaContent。
- * tlaPath 相对 manifest 文件所在目录解析。
+ * 规格文件不可读（fail-closed）：携带 CLI 层所需的错误字段，
+ * 由 `main()` 捕获后原字段转 `exitWithError`（保持 exit 2 契约）。
+ * 纯函数层抛普通 Error（可被单测直接断言），不自行输出/设置退出码。
  */
-async function loadTlaContents(manifest: TlaManifest, manifestFile: string): Promise<void> {
+export class TlaSpecUnreadableError extends Error {
+  readonly cliError: CliError;
+
+  constructor(cliError: CliError) {
+    super(cliError.message);
+    this.name = 'TlaSpecUnreadableError';
+    this.cliError = cliError;
+  }
+}
+
+/**
+ * 读取 manifest 中每个 L2/L3 spec 的 .tla 文件内容，注入 spec.tlaContent。
+ *
+ * 解析基准（D-3，与 check-tla-model.ts 同口径，避免同一 manifest 两门结论不一致）：
+ * `tlaAbs = resolve(manifestDir, basePath ?? '.', tlaPath)`——basePath 自身相对 manifest
+ * 文件所在目录。此前只按 manifest 目录解析，导致真实项目必须用 `.w-model/tla` 目录联结绕过。
+ */
+export async function loadTlaContents(manifest: TlaManifest, manifestFile: string): Promise<void> {
   const manifestDir = path.dirname(path.resolve(manifestFile));
+  // 缺省回退 '.'（与 check-tla-model.ts 一致；纯逻辑已对缺失 basePath 报违反）
+  const basePath = typeof manifest.basePath === 'string' && manifest.basePath.trim() !== '' ? manifest.basePath : '.';
   if (!Array.isArray(manifest.specs)) return;
   for (const spec of manifest.specs as TlaSpec[]) {
     if (!spec || (spec.level !== 'L2' && spec.level !== 'L3')) continue;
     if (typeof spec.tlaPath !== 'string' || spec.tlaPath.trim() === '') continue;
-    const tlaAbs = path.resolve(manifestDir, spec.tlaPath);
+    const tlaAbs = path.resolve(manifestDir, basePath, spec.tlaPath);
     const inlineContent = typeof spec.tlaContent === 'string' && spec.tlaContent.trim() !== '';
     try {
       spec.tlaContent = await fs.readFile(tlaAbs, 'utf-8');
@@ -163,7 +184,7 @@ async function loadTlaContents(manifest: TlaManifest, manifestFile: string): Pro
       // manifest 内联 tlaContent 的自包含场景保留内联内容（samples/code-tla/*.json 即此形态）。
       if (!inlineContent) {
         const e = err as NodeJS.ErrnoException;
-        exitWithError({
+        throw new TlaSpecUnreadableError({
           category: e.code === 'ENOENT' ? 'FILE_NOT_FOUND' : 'FILE_READ',
           rule: 'D3/D4',
           message: `TLA+ 规格文件不可读（spec=${spec.id ?? '?'}）`,
@@ -171,9 +192,6 @@ async function loadTlaContents(manifest: TlaManifest, manifestFile: string): Pro
           detail: `tlaPath=${spec.tlaPath}${e.code ? `（${e.code}）` : ''}；缺失规格会使 Next 分支与不变式覆盖校验静默跳过，故 fail-closed`,
           exitCode: 2,
         });
-        // exitWithError 只输出并设置 exitCode，不中断调用链；
-        // 不抛出则后续会照常算出 passed=true 并把退出码覆盖回 0（本修复首次实现即踩此坑，探针复现后补上）。
-        throw new HandledCliError();
       }
     }
   }
@@ -204,8 +222,17 @@ async function main(): Promise<void> {
   const graph = await readJsonOrExit<Graph>(graphFile);
   const rtm = await readJsonOrExit<Rtm>(rtmFile);
 
-  // 读取 L2/L3 spec 的 .tla 内容
-  await loadTlaContents(manifest, manifestFile);
+  // 读取 L2/L3 spec 的 .tla 内容（装载基准与 check-tla-model 对齐；不可读时 fail-closed）
+  try {
+    await loadTlaContents(manifest, manifestFile);
+  } catch (err) {
+    if (err instanceof TlaSpecUnreadableError) {
+      // 纯函数层只抛错，输出与退出码由 CLI 层承担；return 保证不会继续算出 passed=true 覆盖退出码。
+      exitWithError(err.cliError);
+      return;
+    }
+    throw err;
+  }
 
   // 加载源代码文件
   const codeFiles = await loadCodeFiles(srcDir);
@@ -320,4 +347,9 @@ async function main(): Promise<void> {
   return;
 }
 
-runMain(main);
+// isMain 守卫：仅直接执行时运行 main，被单测 import（loadTlaContents）时不触发
+const entryArg = process.argv[1];
+const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
+if (isMain) {
+  runMain(main);
+}

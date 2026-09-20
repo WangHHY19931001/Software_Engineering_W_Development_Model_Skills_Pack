@@ -170,6 +170,8 @@ w-model-dev-demo/
 
 > 路径基准混淆是高频返工点（jarPath 误按 cwd 解析、tlaPath 误按 cwd 解析）。P1.1 起所有 manifest 路径统一以 `basePath` 为基准，填路径前先确认 `basePath` 已声明。
 
+**两门同口径（D-3）**：阶段 5/8 的 `check-code-tla-consistency.ts` 装载 L2/L3 规格时使用与 `check-tla-model.ts` **完全相同的解析基准**——`tlaAbs = path.resolve(manifestDir, basePath ?? '.', tlaPath)`（`manifestDir` = manifest 文件所在目录，`basePath` 缺省回退 `'.'`）。两门对同一份 `tla-manifest.json` 必须得出同一结论；此前的「一门按 `basePath`、一门按 manifest 目录」不一致曾迫使调测在项目内建 `.w-model/tla` 目录联结（junction）绕过，该绕过物已不再需要（删除后两门均按 `basePath` 正确解析）。规格文件不可读时 `check-code-tla-consistency.ts` 仍 fail-closed（exit 2 / `FILE_NOT_FOUND` 或 `FILE_READ`），不会因缺规格把维度 3/4 静默判通过。
+
 ## §2.2 前置清单
 
 > S 子代理产出 .tla 前、G 子代理跑校验前的强制检查项。漏检 → 高概率返工。
