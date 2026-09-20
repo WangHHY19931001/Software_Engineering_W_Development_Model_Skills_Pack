@@ -2615,3 +2615,172 @@ describe('run-log R11: 闭环五脚本机器核验（约束 #11）', () => {
     expect(result.closure).toEqual({ checkedGates: 2, missing: 1 });
   });
 });
+
+// ==================== R11 阶段 1 自举豁免（D-6） ====================
+//
+// 阶段 1 的 `check-checkpoint.ts` 自身要求 run-log 中已存在 checkpoint 记录才可能 exit 0，
+// 故其成功记录必然晚于本阶段放行——严格「早于放行」判据在首阶段构成自举死锁（先跑门则
+// 门红，先放行则 R11 红）。D-6 给 `phase===1` 的 `check-checkpoint.ts` 开后置窗口：
+// 该记录**允许**晚于放行，但须早于「下一放行」（全部阶段中时间戳严格晚于本放行的最早一条
+// `action=checkpoint` + `outcome=success` 记录）；无下一放行时只要求晚于放行（无上界）。
+// 窗口只放宽时间轴：记录仍须属本阶段（`g.phase === e.phase`）。其余四脚本与 `phase>=2`
+// 的放行判据一字不变（回归用例锁定）。
+//
+// 与 R8 的已知张力：后置 gate 记录天然违反 R8 轨迹模板（gate 须在 checkpoint 之前、
+// checkpoint 为阶段终点）。D-6 的契约面只有 R11（裁定 C：其余规则不动），故本组用例的主
+// 断言是「R11 违规为空」，并在首例精确锁定残留的非 R11 违规仅为那三条 R8——不再放大。
+
+describe('run-log R11 阶段 1 自举豁免（D-6）', () => {
+  /** 单条闭环 gate 记录（shape 与 R11 充数条件一致：role=G / success / exitCode=0） */
+  const closureGateRecords = (phase: number, script: string, timestamp: string): RunLogEntry[] => [
+    makeEntry({
+      runId: `g${phase}-${script}`,
+      phase,
+      timestamp,
+      action: 'gate',
+      role: 'G',
+      outcome: 'success',
+      gateExitCode: 0,
+      script,
+    }),
+  ];
+
+  /** 放行记录（action=checkpoint + outcome=success） */
+  const cpRecord = (phase: number, timestamp: string): RunLogEntry =>
+    makeEntry({
+      runId: `c${phase}`,
+      phase,
+      timestamp,
+      action: 'checkpoint',
+      role: 'O',
+      outcome: 'success',
+      acknowledgedDecisions: [`阶段 ${phase} 放行：采用 REST + JWT 方案`],
+    });
+
+  /** 阶段前置（A chunk → S cross → S produce → V review；阶段 1-4 的 R1 动作完整性） */
+  const phaseLead = (phase: number, baseAt: string): RunLogEntry[] => {
+    const at = (minutes: number): string =>
+      new Date(Date.parse(baseAt) + minutes * 60_000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+    return [
+      makeEntry({ runId: `a${phase}`, phase, timestamp: at(0), action: 'chunk', role: 'A', outcome: 'success' }),
+      makeEntry({ runId: `x${phase}`, phase, timestamp: at(1), action: 'cross', role: 'S', outcome: 'success' }),
+      makeEntry({ runId: `p${phase}`, phase, timestamp: at(2), action: 'produce', role: 'S', outcome: 'success' }),
+      makeEntry({ runId: `v${phase}`, phase, timestamp: at(3), action: 'review', role: 'V', outcome: 'success' }),
+    ];
+  };
+
+  /**
+   * 阶段 1 夹具：前置 → 四条闭环记录（00:00:01~04）→ 放行（00:00:05）→ check-checkpoint。
+   * `post` 指定后置记录时点（`null` = 完全缺失）；`omit` 剔除指定的前置闭环脚本。
+   */
+  const phase1 = (opts: { post?: string | null; omit?: string[] } = {}): RunLogEntry[] => {
+    const post = opts.post === undefined ? '2026-01-01T00:00:06Z' : opts.post;
+    const omit = new Set(opts.omit ?? []);
+    const preAt: Array<[string, string]> = [
+      ['check-budget.ts', '2026-01-01T00:00:01Z'],
+      ['check-run-log.ts', '2026-01-01T00:00:02Z'],
+      ['check-maturity.ts', '2026-01-01T00:00:03Z'],
+      ['check-preventive-review.ts', '2026-01-01T00:00:04Z'],
+    ];
+    return [
+      ...phaseLead(1, '2025-12-31T23:50:00Z'),
+      ...preAt.filter(([script]) => !omit.has(script)).flatMap(([script, ts]) => closureGateRecords(1, script, ts)),
+      cpRecord(1, '2026-01-01T00:00:05Z'),
+      ...(post === null ? [] : closureGateRecords(1, 'check-checkpoint.ts', post)),
+    ];
+  };
+
+  /** 阶段 2：五条闭环记录齐备且均早于本阶段放行（00:10:00）——供「下一放行」上界使用 */
+  const phase2 = (): RunLogEntry[] => [
+    ...phaseLead(2, '2026-01-01T00:00:07Z'),
+    ...closureGateRecords(2, 'check-budget.ts', '2026-01-01T00:09:01Z'),
+    ...closureGateRecords(2, 'check-run-log.ts', '2026-01-01T00:09:02Z'),
+    ...closureGateRecords(2, 'check-maturity.ts', '2026-01-01T00:09:03Z'),
+    ...closureGateRecords(2, 'check-checkpoint.ts', '2026-01-01T00:09:04Z'),
+    ...closureGateRecords(2, 'check-preventive-review.ts', '2026-01-01T00:09:05Z'),
+    cpRecord(2, '2026-01-01T00:10:00Z'),
+  ];
+
+  const r11 = (result: { violations: string[] }): string[] => result.violations.filter((v) => v.startsWith('R11:'));
+
+  it('阶段 1：check-checkpoint 成功记录晚于放行、早于下一放行 → 通过（D-6）', () => {
+    // 下一放行取阶段 2 的 00:10:00 放行（阶段 2 自身闭环齐备，隔离阶段 1 的后置窗口判定）
+    const result = checkRunLog([...phase1(), ...phase2()]);
+    expect(r11(result)).toEqual([]);
+    expect(result.closure).toEqual({ checkedGates: 2, missing: 0 });
+    // 完整 violations 断言（裁定 E）：后置 gate 记录与 R8 轨迹模板天然冲突（R8-1 checkpoint
+    // 须为阶段终点 / R8-2 gate 须先于 checkpoint / 理想链顺序），D-6 的契约面只有 R11
+    // （裁定 C：其余规则不动），故残留的非 R11 违规须**恰为**阶段 1 的这三条 R8，
+    // 不得再有其他规则告警（R1 动作完整性 / R7 append-only 均已由夹具满足）。
+    const nonR11 = result.violations.filter((v) => !v.startsWith('R11:'));
+    expect(nonR11).toHaveLength(3);
+    expect(nonR11.every((v) => v.startsWith('R8: 阶段 1 '))).toBe(true);
+    expect(nonR11.some((v) => v.includes('checkpoint 非阶段最后记录'))).toBe(true);
+    expect(nonR11.some((v) => v.includes('gate 动作(gate)出现在 checkpoint 之后'))).toBe(true);
+    expect(nonR11.some((v) => v.includes('轨迹顺序倒置'))).toBe(true);
+  });
+
+  it('阶段 1：完全缺失 check-checkpoint 成功记录 → 阻断', () => {
+    const result = checkRunLog([...phase1({ post: null }), ...phase2()]);
+    const hits = r11(result);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toContain('阶段 1');
+    expect(hits[0]).toMatch(/R11.*check-checkpoint/);
+    expect(result.closure).toEqual({ checkedGates: 2, missing: 1 });
+  });
+
+  it('阶段 2 回归：后置 check-checkpoint 记录 → 仍阻断（phase>=2 行为不变）', () => {
+    const entries = [
+      ...closureGateRecords(2, 'check-budget.ts', '2026-01-01T00:00:01Z'),
+      ...closureGateRecords(2, 'check-run-log.ts', '2026-01-01T00:00:02Z'),
+      ...closureGateRecords(2, 'check-maturity.ts', '2026-01-01T00:00:03Z'),
+      ...closureGateRecords(2, 'check-preventive-review.ts', '2026-01-01T00:00:04Z'),
+      cpRecord(2, '2026-01-01T00:00:05Z'),
+      ...closureGateRecords(2, 'check-checkpoint.ts', '2026-01-01T00:00:06Z'), // 后置（阶段 2 不豁免）
+    ];
+    const result = checkRunLog([...phaseLead(2, '2025-12-31T22:00:00Z'), ...entries]);
+    const hits = r11(result);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toMatch(/R11.*check-checkpoint/);
+    expect(hits[0]).toContain('阶段 2');
+    expect(result.closure).toEqual({ checkedGates: 1, missing: 1 });
+  });
+
+  it('阶段 1：后置记录晚于下一放行 → 阻断（窗口上界）', () => {
+    const result = checkRunLog([
+      ...phase1({ post: null }),
+      ...phase2(),
+      ...closureGateRecords(1, 'check-checkpoint.ts', '2026-01-01T00:20:00Z'), // 晚于阶段 2 的 00:10:00 放行
+    ]);
+    const hits = r11(result);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toContain('阶段 1');
+    expect(hits[0]).toMatch(/R11.*check-checkpoint/);
+    expect(result.closure).toEqual({ checkedGates: 2, missing: 1 });
+  });
+
+  it('阶段 1：同秒不算晚于放行 → 阻断（窗口下界取严格大于）', () => {
+    const result = checkRunLog([...phase1({ post: '2026-01-01T00:00:05Z' }), ...phase2()]);
+    const hits = r11(result);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toMatch(/R11.*check-checkpoint/);
+  });
+
+  it('阶段 1：无下一放行时后置记录仅要求晚于放行 → 通过（无上界）', () => {
+    const result = checkRunLog(phase1());
+    expect(r11(result)).toEqual([]);
+    expect(result.closure).toEqual({ checkedGates: 1, missing: 0 });
+  });
+
+  it('阶段 1：后置窗口只给 check-checkpoint.ts，其余四脚本仍须早于放行', () => {
+    const result = checkRunLog([
+      ...phase1({ omit: ['check-budget.ts'] }),
+      ...closureGateRecords(1, 'check-budget.ts', '2026-01-01T00:00:07Z'), // 后置但不豁免
+    ]);
+    const hits = r11(result);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toContain('check-budget.ts');
+    expect(hits.some((v) => v.includes('check-checkpoint.ts'))).toBe(false);
+    expect(result.closure).toEqual({ checkedGates: 1, missing: 1 });
+  });
+});

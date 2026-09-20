@@ -50,7 +50,10 @@ export const REVIEW_LEVEL_ORDER: Record<string, number> = {
  * 凡出现 checkpoint 放行（action=checkpoint 且 outcome=success）的阶段，
  * 放行前必须已有这 5 个脚本各自一条 role=G / outcome=success /
  * gateExitCode=0 的 gate 记录；缺失或未严格早于放行（同秒不算）均 blocking
- * （无时间戳豁免）。
+ * （无时间戳豁免）。唯一例外是阶段 1 的 `check-checkpoint.ts`（D-6 自举豁免）：
+ * 该脚本自身要求 run-log 中已存在 checkpoint 记录才可能 exit 0，故 `phase===1`
+ * 时允许其记录晚于放行，但须早于下一放行（无下一放行时无上界）；其余四脚本与
+ * `phase>=2` 的放行判据不变。
  */
 export const RUN_LOG_CLOSURE_SCRIPTS: readonly string[] = [
   'check-budget.ts',
@@ -1404,6 +1407,19 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   // 时间戳不早于放行的同名脚本记录一律不充数（无时间戳豁免；schema 的 timestamp 为
   // RFC3339 date-time，同秒内先后不可判定，故同秒不算「早于放行」），缺失即
   // blocking 并指明阶段与脚本名。同一阶段多次放行逐个核验（不合并）。
+  //
+  // D-6 阶段 1 自举豁免（例外只此一处）：`check-checkpoint.ts` 自身要求 run-log 中
+  // 已存在 checkpoint 记录才可能 exit 0，故其成功记录必然晚于本阶段放行——严格「早于
+  // 放行」在首阶段构成自举死锁（先跑门则门红，先放行则 R11 红）。`phase===1` 时该脚本
+  // **新增**一个后置窗口 (releaseAt, nextReleaseAt)：nextReleaseAt 取全部阶段中时间戳
+  // 严格晚于本放行的最早一条放行记录，不存在下一放行时无上界（只要求晚于本放行）。
+  // 后置窗口是**增补**而非替换——早于放行的同脚本记录照旧充数（既有 run-log 不受影响）；
+  // 窗口只放宽时间轴，记录仍须属本阶段（phase 相同）。其余四脚本与 phase>=2 的放行
+  // 判据完全不变。
+  const releaseTimes = valid
+    .filter((e) => e.action === 'checkpoint' && e.outcome === 'success')
+    .map((e) => Date.parse(e.timestamp))
+    .sort((a, b) => a - b);
   const closureReleases: Array<{ phase: number; proven: Set<string> }> = [];
   let closureMissingCount = 0;
   for (const e of valid) {
@@ -1414,7 +1430,15 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       if (g.phase !== e.phase || g.action !== 'gate' || g.role !== 'G' || g.outcome !== 'success') continue;
       if (g.gateExitCode !== 0) continue;
       if (typeof g.script !== 'string' || !RUN_LOG_CLOSURE_SCRIPTS.includes(g.script)) continue;
-      if (Date.parse(g.timestamp) < releaseAt) proven.add(g.script);
+      const gateAt = Date.parse(g.timestamp);
+      if (g.script === 'check-checkpoint.ts' && e.phase === 1) {
+        const nextReleaseAt = releaseTimes.find((t) => t > releaseAt);
+        if (gateAt < releaseAt || (gateAt > releaseAt && (nextReleaseAt === undefined || gateAt < nextReleaseAt))) {
+          proven.add(g.script);
+        }
+        continue;
+      }
+      if (gateAt < releaseAt) proven.add(g.script);
     }
     closureReleases.push({ phase: e.phase, proven });
   }
