@@ -3,9 +3,21 @@
  *
  * 对应 w-model-dev/references/data-models.md BudgetConfig schema（§成本预算与运行日志）
  * 与 w-model-dev/references/operational-recovery.md §成本预算与运行日志。
- * 校验：时效性（R1）+ onExceed 合法（R3）+ killSwitch 触发检测（R5）+ 多角度 R token 预算（R4-A）。
+ * 校验：时效性（R1）+ onExceed 合法（R3）+ killSwitch 触发检测（R5）+ 多角度 R token 预算（R4-A）
+ *      + 用量实效（R6，D-4b：Σtokens(阶段/总量) 超上限 → blocking；≥ budgetBurnRate × maxTokens
+ *        → killSwitch 用量告警，文案以 `R5-b：` 开头以区别于 R5 的返工/TLA 触发文案）。
  * schema 完整（R2）与 killSwitch.budgetBurnRate 范围（R4）由 budget.schema.json 前置拦截
  * （required / minimum+maximum），逻辑层不再重复校验（audit-fixes task 5，F-G2-05 死分支清理）。
+ *
+ * 用量口径（D-4b）：R6/R5-b 只判定「实际用量 vs 上限」，用量由调用方从 run-log.jsonl 累计后
+ * 经 options.tokensUsed 传入（CLI 侧 sumTokens）；未提供时 R6/R5-b 整体跳过，行为与新增前**一字不变**
+ * （向后兼容硬线：既有 callers / samples / self-test 不受影响，跳过不等于通过由调用方保证可见）。
+ *
+ * 返工计数口径（D-4a 复审记录，D-4a 文档侧处置）：options.reworkCount 的语义是
+ * 「返工事件 + 未过门事件」的**累计**条数——run-log 中 action ∈ {rework, fix, emergency-fix}
+ * 或 outcome ∈ {fail, rework} 的记录均计入（详见 check-budget.ts countReworks）。因此
+ * killSwitch.consecutiveReworks 实际约束的是「本阶段返工/未过门事件累计阈值」，不是
+ * 「连续 N 轮返工」的滑动窗口（字段名沿用 schema，语义以本口径为准）。
  *
  * 设计原则（与 graph-logic.ts / verifier-logic.ts / tla-logic.ts 一致）：
  *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块
@@ -16,6 +28,20 @@
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 // ==================== 自包含类型形状 ====================
+
+/**
+ * 用量实效校验的 token 汇总（R6/R5-b 的输入）
+ *
+ * - `phase`：当前阶段的累计消耗（CLI 按 `--phase` 过滤 run-log 后累计）
+ * - `total`：全项目累计消耗（不过滤阶段）
+ *
+ * 由 CLI 侧 `sumTokens` 从 run-log.jsonl 累计（仅有限非负数计入），未经 schema 校验——
+ * 它是运行期用量而非 config 字段，故不属于 BudgetConfig。
+ */
+export interface TokenUsage {
+  phase: number;
+  total: number;
+}
 
 export interface BudgetConfig {
   schemaVersion: '1.0';
@@ -59,6 +85,18 @@ export interface BudgetCheckResult {
 
 // ==================== 校验入口 ====================
 
+/**
+ * 预算校验入口（纯函数）
+ *
+ * @param budget  budget.json 的解析结果（先经 budget.schema.json 校验，schema 不符即返回 [schema] violations）
+ * @param options 交叉校验的运行时上下文，全部可选；缺失的规则会以 warnings 显式声明「未校验」（不静默通过）：
+ *   - `projectUpdatedAt` / `budgetCreatedAt`：R1 时效性
+ *   - `reworkCount` / `tlaReworkCount`：R5 killSwitch 触发检测。口径见文件头「返工计数口径」——
+ *     `reworkCount` 是「返工事件 + 未过门事件」的累计条数，故 `consecutiveReworks` 实际约束的是
+ *     本阶段返工/未过门事件累计阈值
+ *   - `tokensUsed`：R6 用量实效 / R5-b burnRate 告警。**未提供时 R6/R5-b 不参与判定，
+ *     输出与新增前一字不变**（向后兼容硬线，见文件头「用量口径」）
+ */
 export function checkBudget(
   budget: unknown,
   options?: {
@@ -66,6 +104,7 @@ export function checkBudget(
     budgetCreatedAt?: string;
     reworkCount?: number;
     tlaReworkCount?: number;
+    tokensUsed?: TokenUsage;
   },
 ): BudgetCheckResult {
   // === Schema 前置校验 ===
@@ -129,6 +168,39 @@ export function checkBudget(
     options.tlaReworkCount >= ks.tlaReworks
   ) {
     violations.push(`killSwitch 应触发（TLA+ 返工 ${options.tlaReworkCount} >= ${ks.tlaReworks}）但未告警`);
+  }
+
+  // R6 用量实效 + R5-b burnRate 预警（D-4b）：预算配置合法 ≠ 用量在预算内。
+  // 真实 8 阶段调测消耗 580M subagent tokens 而门禁全程未红，正是因为原先只校验配置合法性、
+  // 没有任何「实际用量 vs 上限」判定——perPhase.maxTokens / project.maxTokensTotal 形同虚设。
+  // 边界：R6 用严格 `>`（恰等于上限不算超限）；R5-b 用 `>=`（达 burnRate 阈值即告警，与
+  // budgetBurnRate「≥ 此值暂停后续子代理」的 schema 语义一致）。
+  // 文案前缀 `R5-b：`：R5 的三条既有文案（返工/TLA）没有规则号前缀，用 `R5-b：` 而非 `R5：`
+  // 使 burnRate 用量告警在输出中可独立归属——既有 `killSwitch 应触发（返工 N >= M）但未告警`
+  // 逐字不变（被 samples/self-test 断言），新增文案不与任何既有正则/子串断言相撞。
+  const usage = options?.tokensUsed;
+  if (usage) {
+    const perPhaseMax = b.perPhase?.maxTokens;
+    const totalMax = b.project?.maxTokensTotal;
+    if (typeof perPhaseMax === 'number' && usage.phase > perPhaseMax) {
+      violations.push(
+        `R6：阶段 tokens ${usage.phase} > perPhase.maxTokens ${perPhaseMax}（${((usage.phase / perPhaseMax) * 100).toFixed(1)}%）`,
+      );
+    }
+    if (typeof totalMax === 'number' && usage.total > totalMax) {
+      violations.push(
+        `R6：总 tokens ${usage.total} > project.maxTokensTotal ${totalMax}（${((usage.total / totalMax) * 100).toFixed(1)}%）`,
+      );
+    }
+    if (
+      typeof perPhaseMax === 'number' &&
+      typeof ks?.budgetBurnRate === 'number' &&
+      usage.phase >= ks.budgetBurnRate * perPhaseMax
+    ) {
+      violations.push(
+        `R5-b：killSwitch 应触发（阶段消耗占比 ${(usage.phase / perPhaseMax).toFixed(2)} >= budgetBurnRate ${ks.budgetBurnRate}）`,
+      );
+    }
   }
 
   // R4-A：多角度 R 的 token 预算校验（不论并行/串行均累计，spec §9.9）

@@ -1,11 +1,13 @@
 /**
- * budget-logic.ts 单元测试 —— R4-A 多角度 R token 预算规则
+ * budget-logic.ts 单元测试 —— R4-A 多角度 R token 预算规则 + R6 用量实效
  *
  * 覆盖：
  *   - R4-A：每轮 persona 数 ≤ maxPersonasPerRound
  *   - R4-A：每个 persona tokens ≤ maxTokensPerPersona
  *   - R4-A：每轮总 tokens ≤ maxTotalTokensPerRound
  *   - 向后兼容：未配置 rootcauseParallelBudget 时不校验
+ *   - R6/R5-b（D-4b）：Σtokens(阶段/总量) 超上限 → blocking；≥ burnRate × maxTokens → killSwitch 告警
+ *   - sumTokens：run-log token 累计口径（有限非负数才计入）
  */
 
 import { promises as fs } from 'node:fs';
@@ -14,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { countReworks } from '../cli/check-budget.js';
+import { countReworks, sumTokens } from '../cli/check-budget.js';
 import { checkBudget, checkRootcauseBudget, type BudgetConfig } from '../logic/budget-logic.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -189,5 +191,114 @@ describe('countReworks 返工计数口径（D-4a）', () => {
       { runId: 'b', phase: 2, action: 'gate', role: 'G', outcome: 'fail' },
     ];
     expect(countReworks(entries, undefined).reworkCount).toBe(2);
+  });
+});
+
+/**
+ * R6 用量实效 + R5-b burnRate 预警（D-4b）
+ *
+ * 背景：预算门禁原先只校验「配置合法性」（时效 / schema / onExceed / killSwitch 合法），
+ * 没有任何「实际用量 vs 上限」判定——真实 8 阶段调测消耗 580M subagent tokens，
+ * `perPhase.maxTokens` / `project.maxTokensTotal` 形同虚设，门禁全程未红。
+ * 本组用例钉死用量实效判定，同时钉死「未提供 tokensUsed 时行为一字不变」（向后兼容硬线）。
+ */
+describe('R6 用量实效 + R5-b burnRate 预警（D-4b）', () => {
+  const T = '2026-09-20T00:00:00Z';
+
+  /** 极小上限预算：用两位数 tokens 即可触发超限，避免大数字噪声 */
+  function tinyBudget(): BudgetConfig {
+    return {
+      schemaVersion: '1.0',
+      projectId: 'x',
+      createdAt: T,
+      updatedAt: T,
+      perPhase: { maxTokens: 100, maxSubagentSpawns: 10, maxReworkRounds: 3 },
+      project: { maxTokensTotal: 1000, maxTokensPerSession: 1000 },
+      onExceed: 'pause',
+      killSwitch: { consecutiveReworks: 3, budgetBurnRate: 0.9, tlaReworks: 3 },
+    };
+  }
+
+  it('R6：阶段 tokens 超 perPhase.maxTokens → blocking', () => {
+    const r = checkBudget(tinyBudget(), { tokensUsed: { phase: 150, total: 150 } });
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => /R6.*阶段 tokens 150.*maxTokens 100/.test(v))).toBe(true);
+  });
+
+  it('R6：总 tokens 超 project.maxTokensTotal → blocking', () => {
+    const r = checkBudget(tinyBudget(), { tokensUsed: { phase: 0, total: 1200 } });
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => /R6.*总 tokens 1200.*maxTokensTotal 1000/.test(v))).toBe(true);
+  });
+
+  it('R5-b：阶段消耗 ≥ budgetBurnRate × maxTokens → killSwitch 告警（文案前缀 R5-b：，不与既有 R5 文案混同）', () => {
+    const r = checkBudget(tinyBudget(), { tokensUsed: { phase: 95, total: 95 } });
+    expect(r.passed).toBe(false);
+    expect(
+      r.violations.some((v) => /^R5-b：killSwitch 应触发（阶段消耗占比 0\.95 >= budgetBurnRate 0\.9）$/.test(v)),
+    ).toBe(true);
+  });
+
+  it('R6 边界：阶段 tokens 恰等于 maxTokens 不报 R6（严格 >），但仍达 burnRate 阈值 → 告警', () => {
+    const r = checkBudget(tinyBudget(), { tokensUsed: { phase: 100, total: 100 } });
+    expect(r.violations.some((v) => /R6/.test(v))).toBe(false);
+    expect(r.violations.some((v) => /^R5-b：killSwitch 应触发（阶段消耗占比/.test(v))).toBe(true);
+  });
+
+  it('R5 既有文案逐字不变（D-4b 只新增 R5-b/R6，不改 R5 返工/TLA 触发文案）', () => {
+    const r = checkBudget(tinyBudget(), { reworkCount: 3, tlaReworkCount: 3 });
+    expect(r.violations).toContain('killSwitch 应触发（返工 3 >= 3）但未告警');
+    expect(r.violations).toContain('killSwitch 应触发（TLA+ 返工 3 >= 3）但未告警');
+  });
+
+  it('R5（返工）与 R5-b（用量）并存时各自可归属，新增文案不遮蔽既有文案', () => {
+    const r = checkBudget(tinyBudget(), { reworkCount: 3, tokensUsed: { phase: 95, total: 95 } });
+    expect(r.violations).toContain('killSwitch 应触发（返工 3 >= 3）但未告警');
+    expect(r.violations.filter((v) => v.startsWith('R5-b：'))).toHaveLength(1);
+  });
+
+  it('未提供 tokensUsed → 不触发 R6/R5-b（向后兼容：行为一字不变）', () => {
+    const r = checkBudget(tinyBudget());
+    expect(r.passed).toBe(true);
+    expect(r.violations.filter((v) => /R6|阶段消耗占比/.test(v))).toHaveLength(0);
+  });
+});
+
+/**
+ * sumTokens（CLI 侧 run-log token 累计口径，D-4b）
+ *
+ * 口径：仅 `typeof tokens === 'number' && Number.isFinite(tokens) && tokens >= 0` 的记录计入——
+ * 坏值（NaN / Infinity / 负数 / 字符串 / 缺字段）若不剔除，会使 Σtokens 变 NaN，
+ * 而 `NaN > maxTokens` 恒为 false ⇒ R6 静默永不触发（与 D-4a 的「护栏失灵」同型）。
+ */
+describe('sumTokens token 累计口径（D-4b）', () => {
+  it('按阶段累计；total 为全量之和（不受 phase 过滤）', () => {
+    const entries = [
+      { runId: 'a', phase: 3, tokens: 100 },
+      { runId: 'b', phase: 3, tokens: 50.5 },
+      { runId: 'c', phase: 4, tokens: 200 },
+    ];
+    expect(sumTokens(entries, 3)).toEqual({ phase: 150.5, total: 350.5 });
+  });
+
+  it('坏值不计入（NaN / Infinity / 负数 / 非数字 / 缺字段），避免 NaN 传播使判定恒假', () => {
+    const entries = [
+      { runId: 'a', phase: 1, tokens: 10 },
+      { runId: 'b', phase: 1, tokens: -5 },
+      { runId: 'c', phase: 1, tokens: Number.POSITIVE_INFINITY },
+      { runId: 'd', phase: 1, tokens: Number.NaN },
+      { runId: 'e', phase: 1, tokens: '30' },
+      { runId: 'f', phase: 1 },
+      { runId: 'g', phase: 2, tokens: 7 },
+    ];
+    expect(sumTokens(entries, 1)).toEqual({ phase: 10, total: 17 });
+  });
+
+  it('phase=undefined 时不过滤，phase 与 total 口径一致', () => {
+    const entries = [
+      { runId: 'a', phase: 1, tokens: 1 },
+      { runId: 'b', phase: 2, tokens: 2 },
+    ];
+    expect(sumTokens(entries, undefined)).toEqual({ phase: 3, total: 3 });
   });
 });
