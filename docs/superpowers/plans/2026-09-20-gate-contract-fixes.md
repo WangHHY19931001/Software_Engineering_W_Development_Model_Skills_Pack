@@ -37,7 +37,7 @@
 **文件：**
 - 修改：`w-model-dev/scripts/cli/check-code-tla-consistency.ts:150-170`（`loadTlaContents`）
 - 测试：`w-model-dev/scripts/__tests__/check-code-tla-consistency.test.ts`（新建）
-- 文档：`w-model-dev/references/tla-plus.md` §10（解析基准一句）
+- 文档：`w-model-dev/references/tla-plus.md` §2.1「路径解析基准」（写「解析基准一句」；原计划写 §10 系笔误，§10 为「SD 覆盖率规则」）
 
 - [ ] **步骤 1：编写失败的测试**
 
@@ -113,7 +113,7 @@ git commit -m "fix(gates): check-code-tla 装载按 manifest.basePath 解析（D
 
 - tlaAbs = resolve(manifestDir, basePath ?? '.', tlaPath)，与 check-tla-model 对齐
 - loadTlaContents 导出并改为拒绝式错误传播，CLI 入口维持 exit 2 fail-closed
-- tla-plus.md §10 注明解析基准"
+- tla-plus.md §2.1 注明解析基准"
 ```
 
 ---
