@@ -111,6 +111,7 @@ import {
   validateGapMatrix,
   validateRedGreenEvidence,
 } from '../logic/code-health-ledger-logic.js';
+import { checkCodingPlan } from '../logic/coding-plan-logic.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
@@ -1949,6 +1950,42 @@ interface UatPathMappingCase {
   expectedViolationPatterns?: RegExp[];
   description: string;
 }
+
+interface CodingPlanCase {
+  sampleDir: string;
+  phase: number;
+  changeId: string;
+  expectedPassed: boolean;
+  expectedViolationPatterns?: RegExp[];
+  description: string;
+}
+
+const CODING_PLAN_CASES: CodingPlanCase[] = [
+  {
+    sampleDir: 'coding-plan/valid-phase5',
+    phase: 5,
+    changeId: 'phase5-demo',
+    expectedPassed: true,
+    description:
+      '编码计划制品契约全齐（plan 目标节+任务节验证命令 + 账本 complete 覆盖 + 三件套/review diff + R3×9/V×3 plan/execute/finalize），应通过',
+  },
+  {
+    sampleDir: 'coding-plan/bad-missing-ledger',
+    phase: 5,
+    changeId: 'phase5-demo',
+    expectedPassed: false,
+    expectedViolationPatterns: [/progress\.md 缺失/],
+    description: '执行账本缺失（.superpowers/sdd/<plan-基名>/progress.md 不在盘，R3），应未通过',
+  },
+  {
+    sampleDir: 'coding-plan/bad-task-missing-verify',
+    phase: 5,
+    changeId: 'phase5-demo',
+    expectedPassed: false,
+    expectedViolationPatterns: [/缺验证命令行/],
+    description: 'Task 2 任务节无「验证：」/「Verify:」验证命令行（R2：每任务节须 ≥1 条），应未通过',
+  },
+];
 
 const UAT_PATH_MAPPING_CASES: UatPathMappingCase[] = [
   {
@@ -4080,6 +4117,38 @@ async function runOpenspecArchiveCases(samplesDir: string): Promise<CaseResult[]
   return results;
 }
 
+async function runCodingPlanCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CODING_PLAN_CASES) {
+    const projectRoot = path.join(samplesDir, c.sampleDir);
+    const name = `${c.sampleDir}`;
+    const details: string[] = [];
+    try {
+      const r = checkCodingPlan(projectRoot, c.phase, c.changeId);
+      if (r.passed !== c.expectedPassed) {
+        details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+      }
+      if (!c.expectedPassed) {
+        details.push(...matchReasonPatterns(r.violations, c.expectedViolationPatterns));
+      }
+      results.push({
+        name,
+        passed: details.length === 0,
+        description: c.description,
+        details: details.length > 0 ? details : undefined,
+      });
+    } catch (err) {
+      results.push({
+        name,
+        passed: false,
+        description: c.description,
+        details: [`  - 异常: ${err instanceof Error ? err.message : String(err)}`],
+      });
+    }
+  }
+  return results;
+}
+
 async function runUatPathMappingCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of UAT_PATH_MAPPING_CASES) {
@@ -4915,6 +4984,7 @@ async function main(): Promise<void> {
   console.log(`CodegraphQuery 用例 : ${CODEGRAPH_QUERY_CASES.length}`);
   console.log(`OpsxArtifact 用例 : ${OPSX_ARTIFACT_CASES.length}`);
   console.log(`OpenspecArchive 用例 : ${OPENSPEC_ARCHIVE_CASES.length}`);
+  console.log(`CodingPlan 用例 : ${CODING_PLAN_CASES.length}`);
   console.log(`UatPathMapping 用例 : ${UAT_PATH_MAPPING_CASES.length}`);
   console.log('─'.repeat(60));
 
@@ -4945,6 +5015,7 @@ async function main(): Promise<void> {
     codegraphQueryResults,
     opsxArtifactResults,
     openspecArchiveResults,
+    codingPlanResults,
     uatPathMappingResults,
     icebergResults,
     specEnhanceResults,
@@ -4995,6 +5066,7 @@ async function main(): Promise<void> {
     runCodegraphQueryCases(samplesDir),
     runOpsxArtifactCases(samplesDir),
     runOpenspecArchiveCases(samplesDir),
+    runCodingPlanCases(samplesDir),
     runUatPathMappingCases(samplesDir),
     runIcebergCases(samplesDir),
     runCodeHealthPhase1StaticCases(samplesDir),
@@ -5034,6 +5106,7 @@ async function main(): Promise<void> {
     ...codegraphQueryResults,
     ...opsxArtifactResults,
     ...openspecArchiveResults,
+    ...codingPlanResults,
     ...uatPathMappingResults,
     ...icebergResults,
     ...specEnhanceResults,

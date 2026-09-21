@@ -36,6 +36,7 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'change-scope.test.ts',
   'check-code-tla-consistency.test.ts',
   'check-codegraph-queries.test.ts',
+  'check-coding-plan.test.ts',
   'check-coverage-scope.test.ts',
   'check-openspec-archive.test.ts',
   'check-opsx-artifacts.test.ts',
