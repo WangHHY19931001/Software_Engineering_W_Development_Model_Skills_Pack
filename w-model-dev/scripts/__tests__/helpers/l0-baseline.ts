@@ -56,7 +56,13 @@ export const L0_BASELINE = {
   // （该文件 1 → 3 条；`git diff` 实测该文件本次仅此一处新增链接，其余改动为订正过期的
   // 「可选，R15 不强制」措辞，不含链接）；由 npm run audit:l0-links 实测 rebaseline，
   // l1Only 仍 95、placeholders 仍 36、violations 仍 0）。
-  relativeLinkCount: 678,
-  l1Only: 95,
+  // 691 = 678 + 13；l1Only 96 = 95 + 1（2026-09-21 superpowers 替换 opsx 批次 1-4 的文档面改写：
+  // 逐文件实测净增——新增 vendor references/superpowers-adoption.md +6、references/phase-5-coding.md +2、
+  // SKILL.md / hard-constraints.md / phase-6-integration-test.md / phase-7-system-test.md /
+  // phase-8-acceptance-test.md 各 +1（同批对 28 条新增 / 15 条删除的链接改写后取净）；
+  // l1Only +1 = 新增指向 L1 的 `../scripts/cli/check-coding-plan.ts` 引用多于退役的旧 opsx 脚本引用；
+  // 由 npm run audit:l0-links 实测 rebaseline，placeholders 仍 36、violations 仍 0）。
+  relativeLinkCount: 691,
+  l1Only: 96,
   placeholders: 36,
 } as const;

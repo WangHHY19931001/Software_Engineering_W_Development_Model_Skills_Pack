@@ -507,9 +507,7 @@ describe('auditL0RelativeLinks', () => {
     const result = await auditL0RelativeLinks(SKILL_ROOT);
 
     // 基线三数单一事实来源见 helpers/l0-baseline.ts（npm run audit:l0-links 实测）。
-    // 当前解析值说明：647（42.2.1 基线）+ 2 条新引用（workflow.md「阶段 5-8 门禁顺序与
-    // ChangeScope」注记链接到 command-reference.md 与 subagent-delegation.md，
-    // 2026-09-04 gate-closure doc sync）= 649。
+    // 增量来历（含 649 → 691 的逐次 rebaseline 说明）全部记在该模块头部，本处不重复。
     expect(result.relativeLinkCount).toBe(L0_BASELINE.relativeLinkCount);
     expect(result.l1Only).toHaveLength(L0_BASELINE.l1Only);
     expect(result.templatePlaceholders).toHaveLength(L0_BASELINE.placeholders);
