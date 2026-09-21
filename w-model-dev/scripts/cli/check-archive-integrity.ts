@@ -8,8 +8,9 @@
  * 自 check-openspec-archive 退役起（superpowers 替换批次 1），本脚本并入「归档后置校验」：
  * 归档根含恰一 `*.plan.md` 时自动启用 codingPlanSnapshot 清单项（manifest 由
  * deriveArchiveIntegrityManifest 从归档内容推导），校验编码计划归档快照
- * （`<changeId>.plan.md` + `progress.md` + `Task N: complete` 三件套，语义与
- * check-coding-plan R3/R4 一致）；legacy 归档（无 *.plan.md）零行为变化。
+ * （`<changeId>.plan.md` + `progress.md` + `Task N: complete` 三件套；`Task N: complete` 判定与
+ * check-coding-plan 同源（共享纯函数 extractCompletedTaskNumbers），归档快照校验为其结构子集，
+ * 全量契约由 check-coding-plan R4/R6 承担）；legacy 归档（无 *.plan.md）零行为变化。
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir>

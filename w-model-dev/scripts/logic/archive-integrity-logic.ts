@@ -5,8 +5,10 @@
  * 供 check-archive-integrity.ts（CLI）调用，校验归档目录是否包含各阶段强制快照文件。
  *
  * 自 check-openspec-archive 退役起（superpowers 替换批次 1），本层通过可选 manifest 条件项
- * `codingPlanSnapshot` 并入「编码计划归档快照」校验（与 check-coding-plan R3/R4 三件套语义一致，
- * `Task N: complete` 判定 import `coding-plan-logic.ts` 的共享纯函数）。
+ * `codingPlanSnapshot` 并入「编码计划归档快照」校验：`Task N: complete` 判定与 check-coding-plan
+ * 同源（共享纯函数 `extractCompletedTaskNumbers`，import 自 `coding-plan-logic.ts`）；归档快照校验
+ * 为其结构子集（仅查 plan / progress.md / 三件套存在），全量契约（review-*.diff 存在性与非空、
+ * 账本首行身份）由 check-coding-plan R4/R6 承担。
  *
  * 单点事实源，不依赖任何 LLM。
  */
@@ -91,7 +93,8 @@ export function deriveArchiveIntegrityManifest(archiveDirContents: Set<string>):
  * codingPlanSnapshot 清单项（并入自 check-openspec-archive 退役）：
  * 编码计划归档快照要求 = 归档根存在 `<changeId>.plan.md` + `progress.md`，且归档账本内每个
  * `Task N: complete` 行存在对应 `task-<N>-brief.md` / `task-<N>-report.md`
- * （三件套语义与 check-coding-plan R3/R4 一致，`Task N: complete` 判定 import 共享纯函数）。
+ * （`Task N: complete` 判定与 check-coding-plan 同源（共享纯函数）；归档快照校验为其结构子集——
+ * 仅查存在性，全量契约由 check-coding-plan R4/R6 承担）。
  * 违规以 `[codingPlanSnapshot]` 前缀并入 missingFiles，fail-closed。
  */
 function checkCodingPlanSnapshot(
