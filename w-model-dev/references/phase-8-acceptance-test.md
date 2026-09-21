@@ -34,7 +34,7 @@
 
 **约束 #14 适用**：测试代码文件 `Edit`/`Write` 前同样须先经 **codegraph CLI**（`codegraph query <符号>`；宿主 MCP 工具若可用为可选加速）查询被测模块影响半径并落盘。
 
-> **门禁绑定（2026-09-04 audit-gate-closure）**：本阶段 `check-artifact-gate.ts`（终检默认 `--phase=8`）、`check-codegraph-queries.ts` 与 `check-coding-plan.ts` 均须以 `--scope=<change-scope.json>`（或 `--change/--base/--head` 薄封装）绑定实际变更——缺失 → exit 1（fail-closed）；S-coding 随变更维护/更新 scope（`headRef` 须等于当前 HEAD、`changedFiles` 与实际 Git 变更集合精确一致）。归档后置校验由 `check-archive-integrity.ts <archive-dir>` 承担（见「Archive 机制」节）。旧 opsx 制品门 `check-opsx-artifacts.ts` 与旧链路并存（退役随批次收尾）。
+> **门禁绑定（2026-09-04 audit-gate-closure）**：本阶段 `check-artifact-gate.ts`（终检默认 `--phase=8`）、`check-codegraph-queries.ts` 与 `check-coding-plan.ts` 均须以 `--scope=<change-scope.json>`（或 `--change/--base/--head` 薄封装）绑定实际变更——缺失 → exit 1（fail-closed）；S-coding 随变更维护/更新 scope（`headRef` 须等于当前 HEAD、`changedFiles` 与实际 Git 变更集合精确一致）。归档后置校验由 `check-archive-integrity.ts <archive-dir>` 承担（见「Archive 机制」节）。旧 opsx 制品门 `check-opsx-artifacts.ts` **已于 2026-09-21 退役**（语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）。
 
 ## 执行方法论
 
@@ -254,9 +254,21 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 项目级放行（acceptance-test-report.md §9 用户勾选 confirm）后，S 子代理执行 archive。
 
 ### Archive 路径
-`changes/archive/<YYYY-MM-DD>-<feature-slug>/`
+`docs/changes/archive/<YYYY-MM-DD>-<changeId>/`
+
+> 权威路径 = `logic/coding-plan-logic.ts` 的 `archiveRoot = docs/changes/archive` 下的 `<changeId>` 或 `<YYYY-MM-DD>-<changeId>` 目录（**恰一匹配**才可用，多匹配 fail-closed）。受控且被跟踪的历史归档目录即 `docs/changes/archive/`；不得另造第二个归档位。
 
 ### Archive 产物清单
+
+**编码计划归档快照**（阶段 5-8，由 `check-archive-integrity.ts` 的 `codingPlanSnapshot` 清单项校验，见「归档后置校验」注）：
+
+- `<changeId>.plan.md` ← 阶段 5 `docs/plans/<changeId>.plan.md` 的快照
+- `progress.md` ← `.superpowers/sdd/<plan-基名>/` 执行账本快照（首行身份 + 逐任务 `Task N: complete`）
+- `task-<N>-brief.md` / `task-<N>-report.md` ← 每个已完成任务的三件套快照（非空）
+- `review-*.diff` ← 任务评审包 diff 证据（账本目录内至少一个）
+
+**文档归档产物**（同目录并存，属既有文档归档约定）：
+
 - `proposal.md` ← 阶段 1 需求规格的「问题陈述 + 解决方案 + User Stories + Out of Scope」节抽取
 - `specs.md` ← RTM 需求行 + 验收测试用例（UAT-xxx）合并
 - `design.md` ← 阶段 2-4 设计产物的技术决策摘要（不含具体文件路径）
@@ -281,7 +293,7 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 - archive 路径写入 `project.json.archivePath` 字段（可选字段，默认空字符串，向后兼容）
 - check-artifact-gate.ts 不校验 archivePath（保持纯文档吸收，不新增脚本校验）
 
-> **归档后置校验 · 编码计划归档快照（2026-09-21 superpowers 替换批次 1 起）**：原 `check-openspec-archive.ts`（`opsx:archive` 后置门）已**退役**，归档动作 = 把阶段 5-8 编码计划制品沉淀进归档目录（`docs/changes/archive/<日期>-<changeId>/`，S-finalize 子代理执行），归档完成后 G **单独**跑 `npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir>`（`<archive-dir>` 即该变更的归档目录，可选 `--json`）。归档根含**恰一** `*.plan.md` 时 `deriveArchiveIntegrityManifest` 自动启用 **codingPlanSnapshot** 条件项（零匹配 = legacy 归档零行为变化；多匹配 = fail-closed 不猜 changeId），校验归档根 `<changeId>.plan.md` + `progress.md`，并按归档账本的 `Task N: complete` 逐任务核 `task-<N>-{brief,report}.md` 存在性；违规以 `[codingPlanSnapshot]` 前缀并入 missingFiles（fail-closed）。`Task N: complete` 判定与 `check-coding-plan.ts` 同源（共享纯函数），归档快照校验是其**结构子集**（仅查存在性），全量契约（R1-R6）由 `check-coding-plan.ts` 承担；它不在 `check-artifact-gate.ts` pre-archive gate 内强制。本节的 changes/archive 文档产物清单（specs.md / tla-summary.md / rtm-snapshot.json 等）与 `check-archive-integrity.ts` 归档完整性门禁是既有文档归档约定，两者并存、互不替代。
+> **归档后置校验 · 编码计划归档快照（2026-09-21 superpowers 替换批次 1 起）**：原 `check-openspec-archive.ts`（`opsx:archive` 后置门）已**退役**，归档动作 = 把阶段 5-8 编码计划制品沉淀进归档目录（`docs/changes/archive/<YYYY-MM-DD>-<changeId>/`，S-finalize 子代理执行），归档完成后 G **单独**跑 `npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir> --change-id=<changeId>`（`<archive-dir>` 即该变更的归档目录；`--json` 可选）。**推荐显式传 `--change-id`**（2026-09-21 最终评审 I-4）：该开关无条件启用 **codingPlanSnapshot** 条件项，使「该不该查快照」不再取决于生产者摆放（plan 快照被摆到子目录也不会静默放过）；未传时按 `deriveArchiveIntegrityManifest` 自动派生——归档根含**恰一** `*.plan.md` 时启用（零匹配 = legacy 归档零行为变化；多匹配 = fail-closed 不猜 changeId）。两个入口都在输出注明**判定依据**（人类可读 `快照判定依据` 行 + `--json` 的 `snapshotSource`）。校验归档根 `<changeId>.plan.md` + `progress.md`，并按归档账本的 `Task N: complete` 逐任务核 `task-<N>-{brief,report}.md` 存在性；违规以 `[codingPlanSnapshot]` 前缀并入 missingFiles（fail-closed）。`Task N: complete` 判定与 `check-coding-plan.ts` 同源（共享纯函数），归档快照校验是其**结构子集**（仅查存在性），全量契约（R1-R6）由 `check-coding-plan.ts` 承担；它不在 `check-artifact-gate.ts` pre-archive gate 内强制。本节的 changes/archive 文档产物清单（specs.md / tla-summary.md / rtm-snapshot.json 等）与 `check-archive-integrity.ts` 归档完整性门禁是既有文档归档约定，两者并存、互不替代。
 
 ## 退出状态
 

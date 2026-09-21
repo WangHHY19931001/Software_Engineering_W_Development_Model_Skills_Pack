@@ -708,10 +708,14 @@ describe('BDD project-gate command contract', () => {
     const content = read('w-model-dev/examples/stage8-acceptance-test.md');
     expect(content).toContain('check-coding-plan.ts . --phase=8');
     // 原 check-openspec-archive.ts（opsx:archive 后置门）已于 2026-09-21 退役，
-    // 归档快照改由 check-archive-integrity.ts 的 codingPlanSnapshot 条件项覆盖
-    expect(content).toContain('check-archive-integrity.ts docs/archive');
+    // 归档快照改由 check-archive-integrity.ts 的 codingPlanSnapshot 条件项覆盖；
+    // 归档路径统一为 docs/changes/archive/<YYYY-MM-DD>-<changeId>（= coding-plan-logic 的 archiveRoot）
+    expect(content).toContain('check-archive-integrity.ts docs/changes/archive/2026-09-21-phase8-counter-api');
     // 退役脚本不得再出现在可执行命令行（历史说明/注释行保留）
     expect(content).not.toMatch(/^\s*npx\s+tsx[^\n]*check-openspec-archive\.ts/m);
+    expect(content).not.toMatch(/^\s*npx\s+tsx[^\n]*check-opsx-artifacts\.ts/m);
+    // 旧归档路径 `docs/archive/` 不得再作为归档根出现（权威路径 = docs/changes/archive/）
+    expect(content).not.toMatch(/^\s*npx\s+tsx[^\n]*check-archive-integrity\.ts docs\/archive/m);
   });
 
   it('does not describe valid phase 6 or 7 as an invalid argument', () => {

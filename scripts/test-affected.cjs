@@ -77,7 +77,7 @@ const REGISTRY_TESTS = [
 
 /** 本车道**不跑**的门禁（打印提醒用）：验收时必须由全量车道覆盖。 */
 const GATES_NOT_COVERED = [
-  'self-test（360 条样本）',
+  'self-test（357 条样本）',
   'security-scan（基线比对）',
   'docs-consistency（活体文档 / 注册表 / 探针计数）',
   'samples 覆盖矩阵（登记册 + 真实 exit-2 探针）',

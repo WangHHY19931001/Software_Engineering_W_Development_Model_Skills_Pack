@@ -34,7 +34,7 @@ W 模型 8 阶段**串行**推进。每阶段先经 🔴 CHECKPOINT 进入确认
 | 7 系统测试 | 系统测试执行结果、性能/安全报告、RTM systemTest | `check-artifact-gate.ts --phase=7 --scope=.w-model/change-scope.json`、`check-bdd-model.ts --phase=7 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/system.json` | [stage7-system-test.md](stage7-system-test.md) |
 | 8 验收测试 | 验收测试执行结果、归档产物（含编码计划归档快照）、RTM acceptanceTest | `check-artifact-gate.ts`（终检，默认 `--phase=8`，须 `--scope=.w-model/change-scope.json`）、`check-archive-integrity.ts`（含 codingPlanSnapshot 归档快照条件项）、`check-bdd-model.ts --phase=8 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/acceptance.json`、`check-design-contract-consistency.ts`、`check-coding-plan.ts --phase=8 --scope=.w-model/change-scope.json` | [stage8-acceptance-test.md](stage8-acceptance-test.md) |
 
-> 每阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-coding-plan.ts`（与 artifact gate 一样以 `--scope` 绑定变更上下文；归档快照由 `check-archive-integrity.ts` 的 `codingPlanSnapshot` 条件项在归档后单独校验；旧 opsx 制品门 `check-opsx-artifacts.ts` 仍在盘并仍在 pre-push 路径，退役随批次收尾）。完整分派矩阵见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）。
+> 每阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-coding-plan.ts`（与 artifact gate 一样以 `--scope` 绑定变更上下文；归档快照由 `check-archive-integrity.ts` 的 `codingPlanSnapshot` 条件项在归档后单独校验；旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役，语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）。完整分派矩阵见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）。
 
 ## 串联执行顺序
 
@@ -86,7 +86,7 @@ npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=7 --scope=.w-mo
 
 # 阶段 8（验收测试 + 终检 + 归档）
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --scope=.w-model/change-scope.json
-npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/archive
+npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/changes/archive/2026-09-21-phase8-counter-api
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=8 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/acceptance.json
 npx tsx w-model-dev/scripts/cli/check-coding-plan.ts . --phase=8 --scope=.w-model/change-scope.json
 ```

@@ -102,4 +102,4 @@
 - [ ] 交付文档完整
 - [ ] 系统可正常部署和运行
 - [ ] RTM 需求覆盖率 100%
-- [ ] 归档（`confirm` 后）：S 子代理执行 archive，产物入 `changes/archive/<YYYY-MM-DD>-<feature-slug>/`，`project.json.status` 回填「项目完成 + 已归档」
+- [ ] 归档（`confirm` 后）：S 子代理执行 archive，产物入 `docs/changes/archive/<YYYY-MM-DD>-<changeId>/`（编码计划归档快照 `<changeId>.plan.md` + `progress.md` + `task-<N>-{brief,report}.md` + `review-*.diff` 与文档归档产物并存），`project.json.status` 回填「项目完成 + 已归档」

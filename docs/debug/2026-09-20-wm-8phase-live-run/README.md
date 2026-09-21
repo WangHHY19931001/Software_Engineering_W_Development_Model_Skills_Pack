@@ -75,6 +75,12 @@
 
 ## 六、可复核入口
 
+> **⚠️ 对应历史态**：本节命令与下方计数针对 **2026-09-20 当时**的 demo 工作区（旧 opsx 链路契约、
+> 归档位 `archive/`）。该工作区已于 **2026-09-21** 由 `eval/e2e/demo-assets/build_workspace.py` 重建为
+> **新契约**（`docs/plans/<cid>.plan.md` + `.superpowers/sdd/` + R3/V stage 词表 plan/execute/finalize；
+> `check-opsx-artifacts.ts` 本体也已退役），因此直接照抄本节命令会得到与当时不同的结果；
+> 需要当前态复现请从 [../2026-09-21-superpowers-replace-replay/replay.txt](../2026-09-21-superpowers-replace-replay/replay.txt) 进入。
+
 ```bash
 cd eval/e2e/demo            # 瞬态工作区（gitignored）
 npx tsx ../../w-model-dev/scripts/cli/wm-status.ts .            # 8/8 100%、四级 9/9、RTM 100%

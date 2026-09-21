@@ -21,7 +21,7 @@
 | BDD 验收层 features | `.w-model/bdd-manifest.json` | L1 features，D5 step 绑定校验 |
 | cucumber 报告 | `reports/cucumber/acceptance.json` | 真实测试运行器输出 |
 | RTM | `.w-model/rtm.json` | `acceptanceTest` 列待回填（四级全齐） |
-| 归档目录 | `docs/archive/` | 各阶段强制快照文件 |
+| 归档目录 | `docs/changes/archive/<YYYY-MM-DD>-<changeId>/` | 各阶段强制快照文件 + 编码计划归档快照 |
 
 产出：验收测试报告（套用 `templates/test-report.md`，含用户确认区 `confirm` / `confirm-with-comments` / `reject`）、RTM acceptanceTest 回填、归档产物。
 
@@ -36,7 +36,7 @@ npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --scope=.w-model/change
 
 # 2) 归档完整性：校验归档目录包含各阶段强制快照文件；归档根含恰一 *.plan.md 时自动启用
 #    codingPlanSnapshot 条件项（<changeId>.plan.md + progress.md + Task N: complete 三件套）
-npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/archive
+npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/changes/archive/2026-09-21-phase8-counter-api
 
 # 3) BDD 验收层校验（D5 step 绑定，cucumber 报告驱动）
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=8 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/acceptance.json
@@ -46,7 +46,7 @@ npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --
 npx tsx w-model-dev/scripts/cli/check-coding-plan.ts . --phase=8 --scope=.w-model/change-scope.json
 ```
 
-> 阶段 8 附加门禁：`check-codegraph-queries.ts` / `check-coding-plan.ts`（与 artifact gate 一样带 `--scope` 绑定实际变更；scope 过期/与实际变更不符即 fail-closed）；旧 opsx 制品门 `check-opsx-artifacts.ts` 仍在盘并仍在 pre-push 路径（本批次不退役，按 LEGACY 制品门保留，规格级规划层门禁是 `check-coding-plan.ts`）；评审证据经 `check-verifier-output.ts` 回填。
+> 阶段 8 附加门禁：`check-codegraph-queries.ts` / `check-coding-plan.ts`（与 artifact gate 一样带 `--scope` 绑定实际变更；scope 过期/与实际变更不符即 fail-closed）；旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役（语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）；评审证据经 `check-verifier-output.ts` 回填。
 
 ## 预期输出（示例输出）
 
@@ -74,8 +74,8 @@ ARCHIVE_INTEGRITY_JSON {"type":"archive-integrity","passed":true,"checkedFiles":
 ✗ 验收测试回填缺失：executionSummary.acceptanceTest 不存在（UAT-001~050 未回填）
 GATE_JSON {"type":"artifact","passed":false,"coveragePercent":100,"reasons":["acceptanceTest 未回填"]}
 
-✗ 归档缺失：docs/archive/phase1-requirement-spec.md 不存在
-ARCHIVE_INTEGRITY_JSON {"type":"archive-integrity","passed":false,"checkedFiles":14,"missingFiles":["docs/archive/phase1-requirement-spec.md"]}
+✗ 归档缺失：docs/changes/archive/2026-09-21-phase8-counter-api/phase1-requirement-spec.md 不存在
+ARCHIVE_INTEGRITY_JSON {"type":"archive-integrity","passed":false,"checkedFiles":14,"missingFiles":["docs/changes/archive/2026-09-21-phase8-counter-api/phase1-requirement-spec.md"]}
 ```
 
 → 退出码 1：普通 V/G 失败必须走 `V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。若真实 UAT 用例失败，S 先按运行器输出回填 `/wm test type=验收 result=fail`；R 报告经 V/G 通过后才由 S-fix 修改。归档缺失也由 S-fix 补齐后重走 R3/G/V/G。O 展示最新证据后等待用户在 🔴 CHECKPOINT 决定返工或交付。
