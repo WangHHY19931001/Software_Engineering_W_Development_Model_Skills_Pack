@@ -381,30 +381,35 @@ Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支�
 
 调测明细（各轮指标、缺陷清单 L1~L4 沉淀、门禁验证数据）见各归档目录 README 与 [CHANGELOG.md](../CHANGELOG.md)。
 
-## codegraph + OpenSpec 自动安装
+## codegraph CLI 依赖 + superpowers 方法论检测
 
-> 阶段 5-8 依赖两个外部工具。技能包通过 `ensure-codegraph-opsx.ts` 自动检测并安装，仅自动失败时需用户手动介入。
+> 阶段 5-8 依赖 codegraph（修改前符号级影响分析）与 superpowers 方法论（规格驱动变更工作流）。
+> 技能包通过 `ensure-codegraph.ts` 自动检测：**codegraph CLI 缺失会自动安装**；MCP 与 superpowers
+> 三层**只检测不安装**，缺失项以 CHECKPOINT 交用户处置。
 
-### 自动安装
+### 自动检测
 
 技能包在阶段 5 进入 CHECKPOINT 时自动运行：
 
 ```bash
-npx tsx w-model-dev/scripts/cli/ensure-codegraph-opsx.ts --phase 5 --project-root . --mode full
+npx tsx w-model-dev/scripts/cli/ensure-codegraph.ts --phase 5 --project-root . --mode full
 ```
 
-脚本执行三层检测+自动处置：
+脚本执行三层检测 + 自动处置（`--mode full` 全量检测 / `quick` 复检 L1+L3 / `light` 仅 L1 健康检查）：
 
-1. **L1 CLI**：`codegraph --version` / `openspec --version` → 缺失则 `npm i -g`
-2. **L2 MCP 注册**：codegraph 探针查询 → 失败则 `codegraph install --yes`
-3. **L3 项目**：`.codegraph/` / `openspec/` 目录 → 缺失则 `codegraph init` / `openspec init`
+1. **L1 CLI 与宿主技能**：`codegraph --version` → 缺失则 `npm i -g @colbymchenry/codegraph`；宿主技能目录（`~/.agents/skills`、`~/.claude/skills`）含 ≥3 个关键技能（brainstorming / writing-plans / subagent-driven-development / executing-plans / test-driven-development，子目录内含 `SKILL.md` 即算）
+2. **L2 技能包资产**：`references/superpowers-adoption.md` 已 vendor；**MCP 为可选加速（非依赖）——不再自动注册，未注册不算缺失、不出 CHECKPOINT**
+3. **L3 项目目录**：`.codegraph/`（缺失则 `codegraph init`）与 `docs/superpowers/`
 
-### 手动安装（自动失败时）
+退出码：`0` 全部就绪 / `1` 存在 CHECKPOINT 项（需人工介入）/ `2` 输入错误。
+
+### 手动处置（CHECKPOINT 项）
 
 ```bash
-npm i -g @colbymchenry/codegraph
-npm i -g @fission-ai/openspec@latest
-codegraph install          # 交互式注册 MCP（自动失败时手动跑）
-codegraph init             # 项目图谱初始化
-openspec init              # OpenSpec 工作区初始化
+npm i -g @colbymchenry/codegraph   # L1 自动安装失败时
+codegraph init                     # L3 项目图谱初始化（自动失败时）
+codegraph install                  # 可选加速：手动把 MCP 注册到宿主（技能包不自动改写宿主配置）
 ```
+
+superpowers 三层缺失项由用户补齐：宿主技能按宿主 Agent 的技能安装流程装（技能包只检测，不下载、不安装、
+不写宿主配置）；项目内缺 `docs/superpowers/` 时自行创建该目录。

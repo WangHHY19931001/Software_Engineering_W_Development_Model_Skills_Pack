@@ -22,20 +22,18 @@
  *
  * @module
  */
-import { execFile as execFileCb } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { promisify } from 'node:util';
 
+import { probeCliCommand } from '../lib/cli-probe.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { resolveVendoredAdoptionPath, scanHostSuperpowersSkills } from '../lib/superpowers-detect.js';
 import { checkEnvironment, deriveDoctorExitCode, type EnvProbe } from '../logic/doctor-logic.js';
 
-const execFile = promisify(execFileCb);
 const nodeRequire = createRequire(import.meta.url);
 // 审计修复 D1：import.meta.url 指向**文件本身**（…/scripts/cli/doctor.ts），
 // join 前必须先 dirname() 取目录，否则解析成 …/scripts/tools/（把 cli/doctor.ts 当目录段）
@@ -45,7 +43,7 @@ const TOOLS_DIR = join(CLI_DIR, '..', '..', 'tools');
 // superpowers L3 项目目录（doctor 运行于技能包所在仓库：cli/ → 上三级 = 仓库根）
 const PROJECT_SUPERPOWERS_DIR = resolve(CLI_DIR, '..', '..', '..', 'docs', 'superpowers');
 
-/** 真实环境探测：resolveModule 走 node_modules 解析；runCommand 用 execFile（字面量参数，无 shell 拼接） */
+/** 真实环境探测：resolveModule 走 node_modules 解析；runCommand 经 lib/cli-probe 受控派发（字面量参数，无用户输入） */
 const realProbe: EnvProbe = {
   nodeVersion: process.version,
   resolveModule: (name: string) => {
@@ -58,16 +56,14 @@ const realProbe: EnvProbe = {
   },
   fileExists: (rel: string) => existsSync(join(TOOLS_DIR, rel)),
   runCommand: async (cmd: string, args: string[]) => {
-    try {
-      const { stdout, stderr } = await execFile(cmd, args, { timeout: 15_000 });
-      return { ok: true, output: `${stdout}${stderr}` };
-    } catch (err) {
-      const e = err as { stdout?: string; stderr?: string; code?: unknown };
-      // java -version 输出在 stderr 且以退出码非 0 结束的情况不存在；ENOENT / 超时统一按不可用处理
-      const partial = `${e.stdout ?? ''}${e.stderr ?? ''}`;
-      if (partial.includes('version "')) return { ok: true, output: partial };
-      return { ok: false, output: partial };
-    }
+    // 2026-09-21 修复轮 1（评审裁定 2）：改走与 ensure-codegraph.ts 同一派发实现——原 async
+    // execFile 直投在 Windows 下解析不了 npm 全局 CLI 的 .cmd shim（ENOENT），doctor 报
+    // 「未安装」而 ensure 报 ready。受控字面量即参数安全前提，超时由探针注入（15s，SIGKILL）。
+    const result = probeCliCommand(cmd, args, { timeoutMs: 15_000 });
+    const partial = `${result.stdout}${result.stderr}`;
+    // java -version 输出在 stderr 且以退出码非 0 结束的情况不存在；ENOENT / 超时统一按不可用处理
+    if (result.ok || partial.includes('version "')) return { ok: true, output: partial };
+    return { ok: false, output: partial };
   },
   // superpowers 三层（与 ensure-codegraph.ts 同判据的轻量版）：宿主技能 / vendored 副本 / 项目目录
   superpowersProbe: () => ({

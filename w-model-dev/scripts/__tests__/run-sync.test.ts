@@ -323,14 +323,18 @@ describe('runSync', () => {
   it('keeps production direct child-process calls fully bounded and observable', async () => {
     const sources = new Map(
       await Promise.all(
-        ['cli/check-tla-model.ts', 'cli/ensure-codegraph.ts'].map(async (file) => {
+        // 生产侧 = 非 __tests__ 的直接同步调用：cli/check-tla-model.ts（java 探针）与
+        // lib/run-sync.ts（本聚合原语）。2026-09-21 修复轮 1：受控 CLI 派发收敛到
+        // lib/cli-probe.ts 并改走 runSync 后，仓内直接同步调用只剩这两处；
+        // 筛选口径为「非测试文件」，新增生产直接调用若漏进本列表会立即红灯。
+        ['cli/check-tla-model.ts', 'lib/run-sync.ts'].map(async (file) => {
           // eslint-disable-next-line security/detect-non-literal-fs-filename -- file is a fixed repository-relative audit target
           return [file, await fs.readFile(path.join(SCRIPT_ROOT, file), 'utf-8')] as const;
         }),
       ),
     );
     const audit = await findDirectSyncCalls();
-    const productionCalls = audit.calls.filter((call) => call.file.startsWith('cli/'));
+    const productionCalls = audit.calls.filter((call) => !call.file.startsWith('__tests__/'));
 
     for (const call of productionCalls) {
       const source = sources.get(call.file);

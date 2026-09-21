@@ -27,13 +27,15 @@
  *   2  输入错误（参数缺失/非法）
  */
 
-import { execFileSync } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { exitWithError } from '../lib/cli-error.js';
+// 受控 CLI 派发（win32 .cmd shim 经 cmd.exe）与 cli/doctor.ts 共用同一实现——两消费者对
+// 「同一依赖是否可用」必须结论一致（2026-09-21 修复轮 1 评审裁定 2，见 lib/cli-probe.ts 头注）
+import { probeCliCommand, type CliProbeResult } from '../lib/cli-probe.js';
 import { runMain } from '../lib/run-main.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 import { DuplicateFlagError } from '../lib/parse-args.js';
@@ -57,62 +59,33 @@ interface CheckResult {
 /** 技能包内 vendored 方法论文件（脚本相对解析，模块级常量） */
 const VENDORED_ADOPTION_PATH = resolveVendoredAdoptionPath(path.dirname(fileURLToPath(import.meta.url)));
 
-/**
- * 受控 CLI 子进程封装（同步 + 全量限额）。
- *
- * Windows 下 npm 全局安装的 CLI 是 .cmd shim：无 shell 直 spawn 会被 Node 拒绝（EINVAL，
- * CVE-2024-27980 收紧后的行为），导致 L1 检测在 Windows 恒失败——故 win32 经
- * `cmd.exe /d /s /c` 派发（实参均为本脚本受控字面量，无用户输入，无注入面），POSIX 直 spawn。
- */
-function spawnCliCapture(file: string, args: string[], opts: { cwd?: string; timeoutMs: number }): string {
-  if (process.platform === 'win32') {
-    return execFileSync('cmd.exe', ['/d', '/s', '/c', file, ...args], {
-      cwd: opts.cwd,
-      stdio: 'pipe',
-      timeout: opts.timeoutMs,
-      killSignal: 'SIGKILL',
-      encoding: 'utf-8',
-      maxBuffer: 16 * 1024 * 1024,
-    });
-  }
-  return execFileSync(file, args, {
-    cwd: opts.cwd,
-    stdio: 'pipe',
-    timeout: opts.timeoutMs,
-    killSignal: 'SIGKILL',
-    encoding: 'utf-8',
-    maxBuffer: 16 * 1024 * 1024,
-  });
+/** 失败摘要：优先 stderr/spawn 错误文本，退化为退出码（保证 ⚠ 日志始终有可读原因） */
+function probeFailureText(result: CliProbeResult): string {
+  const text = result.stderr.trim();
+  if (text !== '') return text;
+  return result.status === null ? '进程未能启动或超时' : `退出码 ${result.status}`;
 }
 
 /**
  * 检测 CLI 是否可用（L1）
  */
 function checkCli(name: string): boolean {
-  try {
-    spawnCliCapture(name, ['--version'], { timeoutMs: 10_000 });
-    return true;
-  } catch (err) {
-    console.error(
-      `⚠ [ensure-codegraph] CLI 版本探测（${name}）失败: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    return false;
+  const result = probeCliCommand(name, ['--version'], { timeoutMs: 10_000 });
+  if (!result.ok) {
+    console.error(`⚠ [ensure-codegraph] CLI 版本探测（${name}）失败: ${probeFailureText(result)}`);
   }
+  return result.ok;
 }
 
 /**
  * npm 全局安装 CLI
  */
 function installCli(packageName: string): boolean {
-  try {
-    spawnCliCapture('npm', ['i', '-g', packageName], { timeoutMs: 120_000 });
-    return true;
-  } catch (err) {
-    console.error(
-      `⚠ [ensure-codegraph] npm 全局安装（${packageName}）失败: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    return false;
+  const result = probeCliCommand('npm', ['i', '-g', packageName], { timeoutMs: 120_000 });
+  if (!result.ok) {
+    console.error(`⚠ [ensure-codegraph] npm 全局安装（${packageName}）失败: ${probeFailureText(result)}`);
   }
+  return result.ok;
 }
 
 /**
@@ -121,31 +94,23 @@ function installCli(packageName: string): boolean {
  * 注意：探针须在 L3 codegraph init 之后执行，否则会出现"未初始化"假阴性
  */
 function probeCliQuery(projectRoot: string): boolean {
-  try {
-    // query 是位置参数，非 --symbol 选项
-    spawnCliCapture('codegraph', ['query', 'main'], { cwd: projectRoot, timeoutMs: 15_000 });
-    return true;
-  } catch (err) {
-    console.error(
-      `⚠ [ensure-codegraph] codegraph 探针查询（CLI）失败: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    return false;
+  // query 是位置参数，非 --symbol 选项
+  const result = probeCliCommand('codegraph', ['query', 'main'], { cwd: projectRoot, timeoutMs: 15_000 });
+  if (!result.ok) {
+    console.error(`⚠ [ensure-codegraph] codegraph 探针查询（CLI）失败: ${probeFailureText(result)}`);
   }
+  return result.ok;
 }
 
 /**
  * codegraph 项目初始化（L3）
  */
 function initCodegraph(projectRoot: string): boolean {
-  try {
-    spawnCliCapture('codegraph', ['init'], { cwd: projectRoot, timeoutMs: 300_000 });
-    return true;
-  } catch (err) {
-    console.error(
-      `⚠ [ensure-codegraph] codegraph 项目初始化（init）失败: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    return false;
+  const result = probeCliCommand('codegraph', ['init'], { cwd: projectRoot, timeoutMs: 300_000 });
+  if (!result.ok) {
+    console.error(`⚠ [ensure-codegraph] codegraph 项目初始化（init）失败: ${probeFailureText(result)}`);
   }
+  return result.ok;
 }
 
 /**

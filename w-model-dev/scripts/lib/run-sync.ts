@@ -132,24 +132,9 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
       'B4 excludes check-tla-model; TLC uses a command-specific bounded timeout and SIGKILL.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 6 行）',
     timeout: { required: true, status: 'present' },
   },
-  {
-    api: 'execFileSync',
-    file: 'cli/ensure-codegraph.ts',
-    anchor: "execFileSync('cmd.exe', ['/d', '/s', '/c', file, ...args], {",
-    symbol: 'spawnCliCapture',
-    reason:
-      'Windows 下 npm 全局 CLI 是 .cmd shim，无 shell 直 spawn 会 EINVAL（CVE-2024-27980 收紧）；经 cmd.exe /d /s /c 派发（实参均为脚本受控字面量），超时由调用方注入（10s 版本探测 / 120s 安装 / 15s 探针 / 300s init）。（2026-09-21 superpowers 替换批次 1 任务 5：openspec 半边删除、MCP 自动注册退役后，全脚本仅存此 helper 的 win32/POSIX 两个直接调用点）',
-    timeout: { required: true, status: 'present' },
-  },
-  {
-    api: 'execFileSync',
-    file: 'cli/ensure-codegraph.ts',
-    anchor: 'return execFileSync(file, args, {',
-    symbol: 'spawnCliCapture',
-    reason:
-      'POSIX 直 spawn 受控 CLI（codegraph/npm），超时由调用方注入（10s 版本探测 / 120s 安装 / 15s 探针 / 300s init）。（2026-09-21 superpowers 替换批次 1 任务 5：与 win32 分支同源收敛，全脚本仅存此 helper 两个直接调用点）',
-    timeout: { required: true, status: 'present' },
-  },
+  // 2026-09-21 修复轮 1（评审裁定 2）：`cli/ensure-codegraph.ts` 的两条 execFileSync 台账随受控
+  // CLI 派发抽到 `lib/cli-probe.ts` 并改走本模块的 runSync 而摘除——直接同步调用归零即台账归零
+  // （runSync 是受控原语：SIGKILL / utf-8 / 有限 timeout 与 maxBuffer 由本模块统一强制）。
   {
     api: 'execSync',
     file: '__tests__/coverage-logic.test.ts',

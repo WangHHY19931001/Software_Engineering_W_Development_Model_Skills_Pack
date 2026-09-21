@@ -9,8 +9,9 @@
  * 注入桩会让路径缺陷隐形，故该维度只能走真实解析路径。
  */
 
-import { existsSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -246,6 +247,43 @@ describe('doctor.ts CLI 真实路径解析（D1 回归：TOOLS_DIR 必须解析�
         `${label}：tla2tools.jar 在盘时该项必须 ok（TOOLS_DIR 须经 dirname(fileURLToPath(...)) 解析）`,
       ).toBe('ok');
       expect(item!.detail).toBe('tools/tla2tools.jar 存在');
+    }
+  });
+
+  it('受控 PATH 下的 codegraph shim → codegraph 项 ok（win32 .cmd shim 派发回归，修复轮 1 裁定 2）', () => {
+    // 背景（2026-09-21 修复轮 1）：修复前 doctor 用 async execFile 直投，Windows 下解析不了
+    // npm 全局安装 CLI 的 .cmd shim（ENOENT）→ 报「未安装或不在 PATH」，而同一台机器上
+    // ensure-codegraph.ts --mode light 报 ready——两个消费者对同一依赖结论相反。
+    // 本用例用受控 shim（win32 .cmd / POSIX 可执行脚本）钉死「可用即 ok」，并锁住共享派发。
+    const binDir = mkdtempSync(path.join(tmpdir(), 'wmodel-doctor-codegraph-'));
+    try {
+      if (process.platform === 'win32') {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- binDir 由 mkdtempSync 生成，测试自有夹具
+        writeFileSync(path.join(binDir, 'codegraph.cmd'), '@echo off\r\necho 1.5.0\r\nexit /b 0\r\n', 'utf8');
+      } else {
+        const shim = path.join(binDir, 'codegraph');
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- binDir 由 mkdtempSync 生成，测试自有夹具
+        writeFileSync(shim, '#!/bin/sh\necho 1.5.0\nexit 0\n', 'utf8');
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上；POSIX 直 spawn 需可执行位（win32 无此概念）
+        chmodSync(shim, 0o755);
+      }
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
+        // win32：cmd.exe /d /s /c 经 PATHEXT 解析 shim，显式钉住 .CMD 以免宿主环境剔掉它
+        ...(process.platform === 'win32' ? { PATHEXT: '.COM;.EXE;.BAT;.CMD' } : {}),
+      };
+      const r = runSync(process.execPath, [tsxCli, DOCTOR_SCRIPT, '--json'], { cwd: SKILL_ROOT, env });
+      expect(r.status, `doctor.ts 子进程异常退出（stderr: ${r.stderr ?? ''}）`).not.toBeNull();
+      const item = parseDoctorJson(r.stdout ?? '').checks.find((c) => c.name === 'codegraph');
+      expect(item, '检查项 codegraph 缺失').toBeDefined();
+      expect(
+        item!.status,
+        'codegraph 可用时该项必须 ok——doctor 与 ensure 必须走同一派发（win32 .cmd shim 经 cmd.exe），不得报「未安装或不在 PATH」',
+      ).toBe('ok');
+      expect(item!.detail).toContain('1.5.0');
+    } finally {
+      rmSync(binDir, { recursive: true, force: true });
     }
   });
 });
