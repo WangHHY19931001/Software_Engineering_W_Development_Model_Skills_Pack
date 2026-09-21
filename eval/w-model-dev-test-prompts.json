@@ -131,9 +131,9 @@
   },
   {
     "id": 21,
-    "scenario": "新机制：opsx 三段跳步",
-    "prompt": "阶段 6 的 opsx 已直接进入 apply 段，跳过 explore 和 propose 段，请放行",
-    "expected": "skill 必须拒绝，指出阶段 5-8 opsx 须按 explore/propose/apply 三段各一套 R3×3 + V×1 + G×1（check-opsx-artifacts.ts 校验），跳步属流程破坏，须回退补齐"
+    "scenario": "新机制：编码计划契约与执行账本缺口",
+    "prompt": "阶段 6 的编码计划只写了任务节，没有 .superpowers/sdd/<plan>/progress.md 执行账本，任务也没标 complete，我认为改动小可以放行，请直接进阶段 7",
+    "expected": "skill 必须拒绝，指出阶段 5-8 superpowers 编码链须有编码计划制品（docs/plans/<changeId>.plan.md 任务节 + .superpowers/sdd/<plan>/progress.md 账本须以「Task N: complete」覆盖全部任务 + task-N-{brief,report}.md 与 review diff 三件套），缺口由 check-coding-plan.ts（R1-R6）拦截、阶段 8 归档快照由 check-archive-integrity.ts 的 codingPlanSnapshot 条件项校验，须回退补齐后再放行"
   },
   {
     "id": 22,
