@@ -33,6 +33,7 @@ const TEST_DIR = 'w-model-dev/scripts/__tests__';
  */
 export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'bdd-cli.test.ts',
+  'budget-cli-wiring.test.ts',
   'change-scope.test.ts',
   'check-code-tla-consistency.test.ts',
   'check-codegraph-queries.test.ts',
