@@ -121,11 +121,13 @@
         { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "MAX_ROUNDS" }
       ],
       "evidence": { "type": "selfTestSource", "substring": "bad-round-exceeded" } },
-    { "id": 21, "scenario": "opsx 三段式产物完整性", "layer": "L2",
+    { "id": 21, "scenario": "编码计划制品契约与执行账本完整性", "layer": "L2",
       "assertions": [
-        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "opsx" }
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "编码计划契约" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "superpowers-adoption.md" },
+        { "type": "fileExists", "target": "w-model-dev/scripts/cli/check-coding-plan.ts" }
       ],
-      "evidence": { "type": "selfTestSource", "substring": "bad-missing-tickets" } },
+      "evidence": { "type": "selfTestSource", "substring": "bad-missing-ledger" } },
     { "id": 22, "scenario": "代码改动前 codegraph 影响分析", "layer": "L2",
       "assertions": [
         { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "codegraph" }
