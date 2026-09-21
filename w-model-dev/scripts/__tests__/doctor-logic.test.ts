@@ -2,7 +2,8 @@
  * logic/doctor-logic.ts 单元测试（审计修复 B1b：环境自检）
  *
  * 覆盖：node 版本门 / tsx / ajv / java 版本解析（--with-tla 必需 vs 默认提示级）/
- *       tla2tools.jar 存在性 / codegraph+openspec 可选提示 / 汇总退出码派生。
+ *       tla2tools.jar 存在性 / codegraph 可选提示 / superpowers 三层提示（openspec 项已随
+ *       superpowers 替换批次 1 退役）/ 汇总退出码派生。
  * 环境探测经 EnvProbe 注入（logic 级用例无真实 execFile 调用）；
  * 末段另有**真实 CLI 子进程 + 真实文件系统**用例锁 TOOLS_DIR 路径解析（D1 回归）——
  * 注入桩会让路径缺陷隐形，故该维度只能走真实解析路径。
@@ -26,7 +27,7 @@ const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 const DOCTOR_SCRIPT = path.join(SKILL_ROOT, 'scripts', 'cli', 'doctor.ts');
 const TLA_JAR = path.join(SKILL_ROOT, 'tools', 'tla2tools.jar');
 
-/** 全绿探测桩：node 20 / 依赖全装 / java 11 / jar 存在 / codegraph+openspec 可用 */
+/** 全绿探测桩：node 20 / 依赖全装 / java 11 / jar 存在 / codegraph 可用 / superpowers 三层齐备 */
 function greenProbe(): EnvProbe {
   return {
     nodeVersion: 'v20.11.0',
@@ -36,6 +37,17 @@ function greenProbe(): EnvProbe {
       cmd === 'java'
         ? Promise.resolve({ ok: true, output: 'openjdk version "11.0.21" 2023-10-17' })
         : Promise.resolve({ ok: true, output: '1.2.3' }),
+    superpowersProbe: () => ({
+      hostSkillsFound: [
+        'brainstorming',
+        'writing-plans',
+        'subagent-driven-development',
+        'executing-plans',
+        'test-driven-development',
+      ],
+      vendoredAdoption: true,
+      projectDir: true,
+    }),
   };
 }
 
@@ -123,15 +135,67 @@ describe('checkEnvironment', () => {
     expect(r2.find((r) => r.name === 'tla2tools')!.status).toBe('fail');
   });
 
-  it('codegraph / openspec 缺失 → warn（可选依赖，不阻断）', async () => {
+  it('codegraph 缺失 → warn（可选依赖，不阻断）', async () => {
     const probe: EnvProbe = {
       ...greenProbe(),
       runCommand: () => Promise.resolve({ ok: false, output: 'not found' }),
     };
     const results = await checkEnvironment(probe, { withTla: false });
     expect(results.find((r) => r.name === 'codegraph')!.status).toBe('warn');
-    expect(results.find((r) => r.name === 'openspec')!.status).toBe('warn');
+    expect(results.some((r) => r.name === 'openspec')).toBe(false); // openspec 项已退役
     expect(deriveDoctorExitCode(results)).toBe(0);
+  });
+
+  it('superpowers 三层齐备 → ok；任一层缺失 → warn（提示级，不阻断）', async () => {
+    const okResults = await checkEnvironment(greenProbe(), { withTla: false });
+    const spOk = okResults.find((r) => r.name === 'superpowers')!;
+    expect(spOk.status).toBe('ok');
+    expect(deriveDoctorExitCode(okResults)).toBe(0);
+
+    // 宿主关键技能 <3
+    const sparseHost = await checkEnvironment(
+      {
+        ...greenProbe(),
+        superpowersProbe: () => ({ hostSkillsFound: ['brainstorming'], vendoredAdoption: true, projectDir: true }),
+      },
+      { withTla: false },
+    );
+    const spHost = sparseHost.find((r) => r.name === 'superpowers')!;
+    expect(spHost.status).toBe('warn');
+    expect(spHost.detail).toContain('宿主');
+    expect(spHost.hint).toContain('ensure-codegraph');
+    expect(deriveDoctorExitCode(sparseHost)).toBe(0);
+
+    // vendor 文件缺失
+    const noVendor = await checkEnvironment(
+      {
+        ...greenProbe(),
+        superpowersProbe: () => ({
+          hostSkillsFound: ['brainstorming', 'writing-plans', 'executing-plans'],
+          vendoredAdoption: false,
+          projectDir: true,
+        }),
+      },
+      { withTla: false },
+    );
+    expect(noVendor.find((r) => r.name === 'superpowers')!.status).toBe('warn');
+
+    // 项目 docs/superpowers/ 缺失
+    const noProjectDir = await checkEnvironment(
+      {
+        ...greenProbe(),
+        superpowersProbe: () => ({
+          hostSkillsFound: ['brainstorming', 'writing-plans', 'executing-plans'],
+          vendoredAdoption: true,
+          projectDir: false,
+        }),
+      },
+      { withTla: false },
+    );
+    const spDir = noProjectDir.find((r) => r.name === 'superpowers')!;
+    expect(spDir.status).toBe('warn');
+    expect(spDir.detail).toContain('docs/superpowers');
+    expect(deriveDoctorExitCode(noProjectDir)).toBe(0);
   });
 });
 
@@ -169,6 +233,11 @@ describe('doctor.ts CLI 真实路径解析（D1 回归：TOOLS_DIR 必须解析�
       const r = runSync(process.execPath, [tsxCli, DOCTOR_SCRIPT, '--json', ...extraArgs], { cwd: SKILL_ROOT });
       expect(r.status, `${label}：doctor.ts 子进程异常退出（stderr: ${r.stderr ?? ''}）`).not.toBeNull();
       const parsed = parseDoctorJson(r.stdout ?? '');
+      // openspec 项已随 superpowers 替换批次 1 退役：真实 CLI 输出不得再出现
+      expect(
+        parsed.checks.some((c) => c.name === 'openspec'),
+        'openspec 项应已从 doctor 移除',
+      ).toBe(false);
       const item = parsed.checks.find((c) => c.name === 'tla2tools');
       expect(item, `${label}：检查项 tla2tools 缺失`).toBeDefined();
       // 修复前：TOOLS_DIR 缺 dirname() → 探测 scripts/tools/ → 恒报缺失（warn/fail）

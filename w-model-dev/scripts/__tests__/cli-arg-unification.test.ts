@@ -4,7 +4,7 @@
  *
  * 覆盖（F-G3-01/02/03/04 的 CLI 面）：
  *   - I-4 静默组：check-budget `--phase 99`（空格形态非法值）→ exit 2 ARG_INVALID（原静默 exit 0）
- *   - I-3 重复值 flag：check-budget / plan-chunks / ensure-codegraph-opsx / check-code-tla-consistency
+ *   - I-3 重复值 flag：check-budget / plan-chunks / ensure-codegraph / check-code-tla-consistency
  *     重复 `--phase`（任意形态）→ exit 2 ARG_INVALID「重复」（原 first/last-wins 放行）
  *   - I-5 结构门：check-state-machine-consistency 顶层非对象（数组/标量）→ exit 2 STRUCTURE_INVALID
  *     （原「全空合法图」exit 0 放行）；合法对象 → exit 0 不变
@@ -150,24 +150,16 @@ describe('plan-chunks 重复 --phase（D3/I-3 + 报错值与生效值一致）',
   });
 });
 
-describe('ensure-codegraph-opsx 重复 --phase（D3/I-3）', () => {
+describe('ensure-codegraph 重复 --phase（D3/I-3）', () => {
   it('--phase 5 --phase=6 重复 → exit 2「重复」（原等号 last-wins）', () => {
-    const r = runCli('ensure-codegraph-opsx.ts', [
-      '--phase',
-      '5',
-      '--phase=6',
-      '--project-root',
-      tmpDir,
-      '--mode',
-      'light',
-    ]);
+    const r = runCli('ensure-codegraph.ts', ['--phase', '5', '--phase=6', '--project-root', tmpDir, '--mode', 'light']);
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('ARG_INVALID');
     expect(r.stderr).toContain('重复');
   });
 
   it('重复 --mode → exit 2「重复」（原 last-wins）', () => {
-    const r = runCli('ensure-codegraph-opsx.ts', [
+    const r = runCli('ensure-codegraph.ts', [
       '--phase=5',
       '--project-root',
       tmpDir,

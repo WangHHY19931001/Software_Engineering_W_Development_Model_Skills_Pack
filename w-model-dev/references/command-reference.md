@@ -31,7 +31,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 
 | 脚本                       | 适用结果状态 | 退出实现                                                                |
 | -------------------------- | ------------ | ----------------------------------------------------------------------- |
-| `ensure-codegraph-opsx.ts` | 0 / 1 / 2    | 外部依赖检测结束后设置 `process.exitCode`，自然返回                     |
+| `ensure-codegraph.ts`      | 0 / 1 / 2    | 外部依赖检测结束后设置 `process.exitCode`，自然返回                     |
 | `metrics-report.ts`        | 0 / 2        | 报告输出完成后设置 `process.exitCode=0`，自然返回                       |
 | `security-scan.ts`         | 0 / 1 / 2    | 扫描/重生成结果设置 `process.exitCode`，自然返回                        |
 | `self-test.ts`             | 0 / 1        | 汇总或未预期异常设置 `process.exitCode`，自然返回                       |

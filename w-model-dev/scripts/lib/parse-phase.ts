@@ -6,7 +6,7 @@
  *   - 消费方（12 个 CLI）：check-artifact-gate / check-bdd-model / check-budget /
  *     check-codegraph-queries / check-opsx-artifacts /
  *     check-preventive-review / check-requirement-graph / check-signature-chain /
- *     check-tla-model / ensure-codegraph-opsx / metrics-report / plan-chunks
+ *     check-tla-model / ensure-codegraph / metrics-report / plan-chunks
  *   - 支持两种形态：`--phase=N`（等号内联）与 `--phase N`（空格分离）；另有位置参数
  *     （opts.positional 指定下标；目前仅测试使用，plan-chunks 为 --phase= 形态不启用）。
  *

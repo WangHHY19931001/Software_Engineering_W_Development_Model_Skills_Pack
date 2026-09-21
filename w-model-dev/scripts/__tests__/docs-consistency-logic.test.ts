@@ -128,7 +128,7 @@ const CLI_SCRIPT_NAMES = [
   'code-health-phase1',
   'code-health-tests',
   'doctor',
-  'ensure-codegraph-opsx',
+  'ensure-codegraph',
   'metrics-report',
   'plan-chunks',
   'platform-deps-install',

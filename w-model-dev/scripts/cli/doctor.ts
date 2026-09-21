@@ -13,7 +13,7 @@
  *   --json        机器可读输出：stdout 单行 DOCTOR_JSON {checks:[...],exitCode}
  *
  * 检查项：node>=18 / tsx / ajv+ajv-formats / java>=11（--with-tla 必需）/ tools/tla2tools.jar /
- *         codegraph / openspec（后两者可选，恒为提示级）
+ *         codegraph / superpowers（后两者可选，恒为提示级）
  *
  * 退出码：
  *   0  环境就绪（允许 warn 级提示项）
@@ -24,13 +24,15 @@
  */
 import { execFile as execFileCb } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { promisify } from 'node:util';
 
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
+import { resolveVendoredAdoptionPath, scanHostSuperpowersSkills } from '../lib/superpowers-detect.js';
 import { checkEnvironment, deriveDoctorExitCode, type EnvProbe } from '../logic/doctor-logic.js';
 
 const execFile = promisify(execFileCb);
@@ -38,7 +40,10 @@ const nodeRequire = createRequire(import.meta.url);
 // 审计修复 D1：import.meta.url 指向**文件本身**（…/scripts/cli/doctor.ts），
 // join 前必须先 dirname() 取目录，否则解析成 …/scripts/tools/（把 cli/doctor.ts 当目录段）
 // → tools/tla2tools.jar 在盘也恒报缺失（--with-tla 时误阻断）。
-const TOOLS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'tools');
+const CLI_DIR = dirname(fileURLToPath(import.meta.url));
+const TOOLS_DIR = join(CLI_DIR, '..', '..', 'tools');
+// superpowers L3 项目目录（doctor 运行于技能包所在仓库：cli/ → 上三级 = 仓库根）
+const PROJECT_SUPERPOWERS_DIR = resolve(CLI_DIR, '..', '..', '..', 'docs', 'superpowers');
 
 /** 真实环境探测：resolveModule 走 node_modules 解析；runCommand 用 execFile（字面量参数，无 shell 拼接） */
 const realProbe: EnvProbe = {
@@ -64,6 +69,12 @@ const realProbe: EnvProbe = {
       return { ok: false, output: partial };
     }
   },
+  // superpowers 三层（与 ensure-codegraph.ts 同判据的轻量版）：宿主技能 / vendored 副本 / 项目目录
+  superpowersProbe: () => ({
+    hostSkillsFound: scanHostSuperpowersSkills(homedir()),
+    vendoredAdoption: existsSync(resolveVendoredAdoptionPath(CLI_DIR)),
+    projectDir: existsSync(PROJECT_SUPERPOWERS_DIR),
+  }),
 };
 
 const ICON: Record<string, string> = { ok: '✅', fail: '❌', warn: '⚠️' };

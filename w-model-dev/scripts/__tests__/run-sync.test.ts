@@ -323,7 +323,7 @@ describe('runSync', () => {
   it('keeps production direct child-process calls fully bounded and observable', async () => {
     const sources = new Map(
       await Promise.all(
-        ['cli/check-tla-model.ts', 'cli/ensure-codegraph-opsx.ts'].map(async (file) => {
+        ['cli/check-tla-model.ts', 'cli/ensure-codegraph.ts'].map(async (file) => {
           // eslint-disable-next-line security/detect-non-literal-fs-filename -- file is a fixed repository-relative audit target
           return [file, await fs.readFile(path.join(SCRIPT_ROOT, file), 'utf-8')] as const;
         }),

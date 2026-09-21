@@ -699,7 +699,7 @@
       "hash": "d6e233349df73b9c6c29af5ace7f8cb4abaad8c27ac89ef5c67f6324b760d879",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/check-archive-integrity.ts",
-      "line": 53,
+      "line": 54,
       "reason": "Found readdir from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -1063,42 +1063,49 @@
       "hash": "95518a2e5e911540b971bea632b078ec40a1967b3dba5a8a8fa7b7430d02c22a",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/cli/doctor.ts",
-      "line": 54,
+      "line": 59,
       "reason": "Found existsSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
-      "hash": "8c8b5dfadf3ffe71601ed2b5d28af9de3bf05f9f23523542970f47a650de671c",
+      "hash": "2a49e9103fdc974950bdd06a6098552a48302f8f8f5d63c9f3027da1a3ea69bf",
       "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/cli/ensure-codegraph-opsx.ts",
-      "line": 247,
+      "file": "w-model-dev/scripts/cli/doctor.ts",
+      "line": 75,
       "reason": "Found existsSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
-      "hash": "a83c3075df5f59d027bb497a12035b1c342ec996e07f609f0ad44b904df7ad75",
+      "hash": "a03c8ee9292800b917a0b3fcdc02880e0a9dd6a3759c351c05f98cf1c9456bb6",
       "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/cli/ensure-codegraph-opsx.ts",
-      "line": 250,
+      "file": "w-model-dev/scripts/cli/ensure-codegraph.ts",
+      "line": 217,
       "reason": "Found existsSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
-      "hash": "dc6df35fbb458e9277aa653bc2aebf633c200b32e46f4c1e8fbbdf7e386adb76",
+      "hash": "4a46e24df224f7f183d8b291cd61b64fe44d7cb73a0f431016543ec25be256ea",
       "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/cli/ensure-codegraph-opsx.ts",
-      "line": 283,
+      "file": "w-model-dev/scripts/cli/ensure-codegraph.ts",
+      "line": 237,
       "reason": "Found existsSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
-      "hash": "2387475a022a28e36ff4c7b42c2193d943772547848349a2a39d007f736e27ce",
+      "hash": "3322e335c2d837cb288d3cf347275eaa0ef14e22ba87761e0ffde1df98c97932",
       "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/cli/ensure-codegraph-opsx.ts",
-      "line": 286,
+      "file": "w-model-dev/scripts/cli/ensure-codegraph.ts",
+      "line": 240,
       "reason": "Found existsSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
-      "hash": "a71da28077e117d93c4053dfe493cbd1c0ddfe9f657eb62a1e89a7b9c72183f4",
+      "hash": "d78ff382bca4d88bf3bb194ed8fa8cd14f8635ad58b3fd8dad61c88452ec8a03",
       "rule_id": "security/detect-non-literal-fs-filename",
-      "file": "w-model-dev/scripts/cli/ensure-codegraph-opsx.ts",
-      "line": 361,
+      "file": "w-model-dev/scripts/cli/ensure-codegraph.ts",
+      "line": 273,
+      "reason": "Found existsSync from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "67c662a2546893bfd5b1fe9e009fc93592634186c19c3149ff734f04b35b4c64",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/cli/ensure-codegraph.ts",
+      "line": 346,
       "reason": "Found existsSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
@@ -1315,7 +1322,7 @@
       "hash": "cd7ad65c3bc5ce9f8297db9a23b927d51ccf7933eb3a779f9b468714ff5d9758",
       "rule_id": "security/detect-object-injection",
       "file": "w-model-dev/scripts/logic/archive-integrity-logic.ts",
-      "line": 165,
+      "line": 168,
       "reason": "Generic Object Injection Sink"
     },
     {

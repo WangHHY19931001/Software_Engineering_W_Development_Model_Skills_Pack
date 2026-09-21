@@ -17,6 +17,7 @@ import ts from 'typescript';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { runSync } from '../lib/run-sync.js';
+import { SUPERPOWERS_KEY_SKILLS } from '../lib/superpowers-detect.js';
 
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
@@ -26,8 +27,10 @@ const CLI_ROOT = path.join(SCRIPTS_ROOT, 'cli');
 const METRICS_SCRIPT = path.join(CLI_ROOT, 'metrics-report.ts');
 const SECURITY_SCRIPT = path.join(CLI_ROOT, 'security-scan.ts');
 const SELF_TEST_SCRIPT = path.join(CLI_ROOT, 'self-test.ts');
-const ENSURE_SCRIPT = path.join(CLI_ROOT, 'ensure-codegraph-opsx.ts');
+const ENSURE_SCRIPT = path.join(CLI_ROOT, 'ensure-codegraph.ts');
 const STATUS_SCRIPT = path.join(CLI_ROOT, 'wm-status.ts');
+/** 任务 6 落地后的 L2 vendored 副本（落地前缺失 → ensure full 模式 L2 checkpoint 属预期中间态） */
+const VENDORED_ADOPTION = path.resolve(TEST_DIR, '..', '..', 'references', 'superpowers-adoption.md');
 
 const temporaryDirectories: string[] = [];
 
@@ -82,15 +85,15 @@ function envWithPath(directory: string, preload?: string): NodeJS.ProcessEnv {
   return env;
 }
 
-async function makeEnsureBinary(directory: string, name: string): Promise<string | undefined> {
+async function makeEnsureBinary(directory: string): Promise<string | undefined> {
   if (process.platform !== 'win32') return undefined;
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- directory is a test-owned temporary command root
-  await fs.copyFile(process.execPath, path.join(directory, `${name}.exe`));
+  await fs.copyFile(process.execPath, path.join(directory, 'codegraph.exe'));
   const shim = path.join(directory, 'ensure-command-shim.cjs');
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- shim is beneath the test-owned temporary command root
   await fs.writeFile(
     shim,
-    `const fs = require('node:fs');\nconst path = require('node:path');\nconst command = path.basename(process.execPath).toLowerCase().replace('.exe', '');\nif (command !== 'node') {\n  const args = process.argv.slice(1);\n  const action = path.basename(args[0] ?? '').toLowerCase();\n  const checkpoint = process.env.WM_NATURAL_ENSURE_MODE === 'checkpoint' && command === 'codegraph' && action === 'install';\n  if (!checkpoint && action === 'init') fs.mkdirSync(path.join(process.cwd(), command === 'codegraph' ? '.codegraph' : 'openspec'), { recursive: true });\n  process.exit(checkpoint ? 1 : 0);\n}\n`,
+    `const fs = require('node:fs');\nconst path = require('node:path');\nconst command = path.basename(process.execPath).toLowerCase().replace('.exe', '');\nif (command !== 'node') {\n  const args = process.argv.slice(1);\n  const action = path.basename(args[0] ?? '').toLowerCase();\n  if (action === 'init') fs.mkdirSync(path.join(process.cwd(), '.codegraph'), { recursive: true });\n  process.exit(0);\n}\n`,
     'utf8',
   );
   return shim;
@@ -132,6 +135,32 @@ const PROJECT_JSON =
 
 async function makeSecurityNpx(directory: string): Promise<void> {
   await makeCommand(directory, 'npx', 'type findings.json\r\nexit /b 0', 'cat findings.json\nexit 0');
+}
+
+/** 在受控夹具 home 的 .agents/skills 下放置前 count 个关键技能（各含 SKILL.md），模拟宿主技能目录 */
+async function makeFakeHome(home: string, count: number): Promise<void> {
+  for (const skill of SUPERPOWERS_KEY_SKILLS.slice(0, count)) {
+    const skillDir = path.join(home, '.agents', 'skills', skill);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- skill dirs are beneath the test-owned fake home
+    await fs.mkdir(skillDir, { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- SKILL.md fixture beneath the test-owned fake home
+    await fs.writeFile(path.join(skillDir, 'SKILL.md'), `# ${skill}\n`, 'utf8');
+  }
+}
+
+/** 解析 ensure-codegraph 的 stdout 单行 ENSURE_DEPS_JSON 摘要 */
+function parseEnsureJson(stdout: string): {
+  passed: boolean;
+  exitCode: number;
+  results: Array<{ layer: string; item: string; status: string; detail: string }>;
+} {
+  const line = stdout.split(/\r?\n/).find((l) => l.startsWith('ENSURE_DEPS_JSON '));
+  if (line === undefined) throw new Error(`未找到 ENSURE_DEPS_JSON 行；实际 stdout:\n${stdout}`);
+  return JSON.parse(line.slice('ENSURE_DEPS_JSON '.length)) as {
+    passed: boolean;
+    exitCode: number;
+    results: Array<{ layer: string; item: string; status: string; detail: string }>;
+  };
 }
 
 describe('production CLI static natural-exit contract', () => {
@@ -232,7 +261,7 @@ describe('production CLI real subprocess exit semantics', () => {
     expect(invalid.stdout).toContain('ERROR_JSON');
   });
 
-  it('ensure-codegraph-opsx preserves exit 0, checkpoint exit 1, and argument exit 2', async () => {
+  it('ensure-codegraph preserves exit 0, checkpoint exit 1, and argument exit 2', async () => {
     const directory = await makeTempDirectory('wm-natural-ensure-');
     const binDirectory = path.join(directory, 'bin');
     const projectRoot = path.join(directory, 'project');
@@ -242,50 +271,90 @@ describe('production CLI real subprocess exit semantics', () => {
     await fs.mkdir(projectRoot, { recursive: true });
     let env: NodeJS.ProcessEnv;
     if (process.platform === 'win32') {
-      const shim = await makeEnsureBinary(binDirectory, 'codegraph');
-      await makeEnsureBinary(binDirectory, 'openspec');
+      const shim = await makeEnsureBinary(binDirectory);
       env = envWithPath(binDirectory, shim);
     } else {
       await makeCommand(
         binDirectory,
         'codegraph',
-        'if "%1"=="--version" exit /b 0\r\nif "%1"=="install" exit /b 0\r\nif "%1"=="init" mkdir .codegraph 2>nul\r\nif "%1"=="init" exit /b 0\r\nif "%1"=="query" exit /b 0\r\nexit /b 0',
-        'case "$1" in --version|install|query) exit 0;; init) mkdir -p .codegraph; exit 0;; esac\nexit 0',
-      );
-      await makeCommand(
-        binDirectory,
-        'openspec',
-        'if "%1"=="--version" exit /b 0\r\nif "%1"=="init" mkdir openspec 2>nul\r\nif "%1"=="init" exit /b 0\r\nexit /b 0',
-        'case "$1" in --version) exit 0;; init) mkdir -p openspec; exit 0;; esac\nexit 0',
+        'if "%1"=="--version" exit /b 0\r\nif "%1"=="init" mkdir .codegraph 2>nul\r\nif "%1"=="init" exit /b 0\r\nif "%1"=="query" exit /b 0\r\nexit /b 0',
+        'case "$1" in --version|query) exit 0;; init) mkdir -p .codegraph; exit 0;; esac\nexit 0',
       );
       env = envWithPath(binDirectory);
     }
+    // superpowers L1 宿主技能检测经 os.homedir() 读取 HOME/USERPROFILE——测试指向受控夹具 home
+    const goodHome = path.join(directory, 'home-good');
+    const sparseHome = path.join(directory, 'home-sparse');
+    await makeFakeHome(goodHome, 3);
+    await makeFakeHome(sparseHome, 1);
+    env.HOME = goodHome;
+    env.USERPROFILE = goodHome;
 
+    // 1) light（仅 L1）：codegraph CLI ready + superpowers 宿主技能齐备 → exit 0；无 openspec 项、无 L2/L3 项
     const passed = runScript(ENSURE_SCRIPT, ['--phase', '5', '--project-root', projectRoot, '--mode', 'light'], {
       env,
     });
     expect(passed.status, `${passed.stdout}\n${passed.stderr}`).toBe(0);
+    const passedJson = parseEnsureJson(passed.stdout ?? '');
+    expect(passedJson.results.some((r) => r.item.toLowerCase().includes('openspec'))).toBe(false);
+    expect(passedJson.results.every((r) => r.layer === 'L1')).toBe(true);
+    expect(passedJson.results.find((r) => r.item === 'codegraph CLI')?.status).toBe('ready');
+    expect(passedJson.results.find((r) => r.item.startsWith('superpowers'))?.status).toBe('ready');
 
-    await fs.rm(path.join(projectRoot, '.codegraph'), { recursive: true, force: true });
-    await fs.rm(path.join(projectRoot, 'openspec'), { recursive: true, force: true });
-    if (process.platform === 'win32') {
-      env.WM_NATURAL_ENSURE_MODE = 'checkpoint';
-    } else {
-      await makeCommand(
-        binDirectory,
-        'codegraph',
-        'if "%1"=="--version" exit /b 0\r\nif "%1"=="install" exit /b 1\r\nif "%1"=="query" exit /b 0\r\nexit /b 0',
-        'case "$1" in --version|query) exit 0;; install) exit 1;; esac\nexit 0',
-      );
-    }
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- project fixtures are created beneath the test-owned temporary directory
-    await fs.mkdir(path.join(projectRoot, '.codegraph'), { recursive: true });
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- project fixtures are created beneath the test-owned temporary directory
-    await fs.mkdir(path.join(projectRoot, 'openspec'), { recursive: true });
-    const checkpoint = runScript(ENSURE_SCRIPT, ['--phase', '5', '--project-root', projectRoot, '--mode', 'full'], {
+    // 2) light + 宿主关键技能 <3 → exit 1（L1 superpowers checkpoint；只检测不安装）
+    const sparse = runScript(ENSURE_SCRIPT, ['--phase', '5', '--project-root', projectRoot, '--mode', 'light'], {
+      env: { ...env, HOME: sparseHome, USERPROFILE: sparseHome },
+    });
+    expect(sparse.status, `${sparse.stdout}\n${sparse.stderr}`).toBe(1);
+    const sparseCheckpoints = parseEnsureJson(sparse.stdout ?? '').results.filter((r) => r.status === 'checkpoint');
+    expect(sparseCheckpoints).toHaveLength(1);
+    expect(sparseCheckpoints[0]!.layer).toBe('L1');
+    expect(sparseCheckpoints[0]!.item).toContain('superpowers');
+
+    // 3) quick（L1+L3）：.codegraph 由 shim init 落地 + 探针 ready；docs/superpowers 缺失 → 唯一
+    //    checkpoint 在 L3 superpowers 项目目录（quick 无 L2 项，与任务 6 vendor 落地与否无关，判定确定性）
+    const quick = runScript(ENSURE_SCRIPT, ['--phase', '6', '--project-root', projectRoot, '--mode', 'quick'], {
       env,
     });
-    expect(checkpoint.status, `${checkpoint.stdout}\n${checkpoint.stderr}`).toBe(1);
+    expect(quick.status, `${quick.stdout}\n${quick.stderr}`).toBe(1);
+    const quickJson = parseEnsureJson(quick.stdout ?? '');
+    expect(quickJson.results.some((r) => r.layer === 'L2')).toBe(false);
+    expect(quickJson.results.find((r) => r.item === '.codegraph/ 图谱')?.status).toBe('installed');
+    expect(quickJson.results.find((r) => r.item.includes('探针'))?.status).toBe('ready');
+    const quickCheckpoints = quickJson.results.filter((r) => r.status === 'checkpoint');
+    expect(quickCheckpoints).toHaveLength(1);
+    expect(quickCheckpoints[0]!.layer).toBe('L3');
+    expect(quickCheckpoints[0]!.item).toContain('superpowers');
+
+    // 4) full（L1→L2→L3）：.mcp.json 已注册 codegraph → MCP 说明行恒 ready（可选加速，非依赖，
+    //    不再自动注册、不出 checkpoint）；docs/superpowers 就绪；唯一条件分支 = L2 vendor 文件
+    //    （任务 6 落地前缺失 → L2 checkpoint 属预期中间态，落地后全绿 exit 0）
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- docs/superpowers beneath the test-owned project root
+    await fs.mkdir(path.join(projectRoot, 'docs', 'superpowers'), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- .mcp.json beneath the test-owned project root
+    await fs.writeFile(
+      path.join(projectRoot, '.mcp.json'),
+      JSON.stringify({ mcpServers: { codegraph: { command: 'codegraph' } } }),
+      'utf8',
+    );
+    const full = runScript(ENSURE_SCRIPT, ['--phase', '5', '--project-root', projectRoot, '--mode', 'full'], {
+      env,
+    });
+    const fullJson = parseEnsureJson(full.stdout ?? '');
+    const mcpRow = fullJson.results.find((r) => r.item.includes('MCP'));
+    expect(mcpRow, 'full 模式应有 L2 MCP 可选加速说明行').toBeDefined();
+    expect(mcpRow!.status).toBe('ready');
+    expect(mcpRow!.detail).toContain('可选加速');
+    expect(fullJson.results.find((r) => r.layer === 'L3' && r.item.includes('superpowers'))?.status).toBe('ready');
+    const fullCheckpoints = fullJson.results.filter((r) => r.status === 'checkpoint');
+    if (fsSync.existsSync(VENDORED_ADOPTION)) {
+      expect(full.status, `${full.stdout}\n${full.stderr}`).toBe(0);
+      expect(fullCheckpoints).toHaveLength(0);
+    } else {
+      expect(full.status, `${full.stdout}\n${full.stderr}`).toBe(1);
+      expect(fullCheckpoints.length).toBeGreaterThanOrEqual(1);
+      expect(fullCheckpoints.every((r) => r.layer === 'L2')).toBe(true);
+    }
 
     const invalid = runScript(ENSURE_SCRIPT, ['--phase', '4', '--project-root', projectRoot, '--mode', 'light'], {
       env,

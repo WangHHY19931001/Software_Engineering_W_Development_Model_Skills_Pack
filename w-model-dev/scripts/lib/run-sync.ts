@@ -134,56 +134,20 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   },
   {
     api: 'execFileSync',
-    file: 'cli/ensure-codegraph-opsx.ts',
-    anchor: "execFileSync(name, ['--version'], {",
-    symbol: 'checkCli',
+    file: 'cli/ensure-codegraph.ts',
+    anchor: "execFileSync('cmd.exe', ['/d', '/s', '/c', file, ...args], {",
+    symbol: 'spawnCliCapture',
     reason:
-      'Existing CLI version probe has an explicit 10-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
+      'Windows 下 npm 全局 CLI 是 .cmd shim，无 shell 直 spawn 会 EINVAL（CVE-2024-27980 收紧）；经 cmd.exe /d /s /c 派发（实参均为脚本受控字面量），超时由调用方注入（10s 版本探测 / 120s 安装 / 15s 探针 / 300s init）。（2026-09-21 superpowers 替换批次 1 任务 5：openspec 半边删除、MCP 自动注册退役后，全脚本仅存此 helper 的 win32/POSIX 两个直接调用点）',
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'execFileSync',
-    file: 'cli/ensure-codegraph-opsx.ts',
-    anchor: "execFileSync('npm', ['i', '-g', packageName], {",
-    symbol: 'installCli',
+    file: 'cli/ensure-codegraph.ts',
+    anchor: 'return execFileSync(file, args, {',
+    symbol: 'spawnCliCapture',
     reason:
-      'Existing npm installation command has an explicit 120-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
-    timeout: { required: true, status: 'present' },
-  },
-  {
-    api: 'execFileSync',
-    file: 'cli/ensure-codegraph-opsx.ts',
-    anchor: "execFileSync('codegraph', ['query', 'main'], {",
-    symbol: 'checkMcpCodegraph',
-    reason:
-      'Existing codegraph probe has an explicit 15-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
-    timeout: { required: true, status: 'present' },
-  },
-  {
-    api: 'execFileSync',
-    file: 'cli/ensure-codegraph-opsx.ts',
-    anchor: "execFileSync('codegraph', ['install'], {",
-    symbol: 'registerMcpCodegraph',
-    reason:
-      'Existing codegraph registration has an explicit 60-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
-    timeout: { required: true, status: 'present' },
-  },
-  {
-    api: 'execFileSync',
-    file: 'cli/ensure-codegraph-opsx.ts',
-    anchor: "execFileSync('codegraph', ['init'], {",
-    symbol: 'initCodegraph',
-    reason:
-      'Existing codegraph initialization has an explicit 300-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
-    timeout: { required: true, status: 'present' },
-  },
-  {
-    api: 'execFileSync',
-    file: 'cli/ensure-codegraph-opsx.ts',
-    anchor: "execFileSync('openspec', ['init'], {",
-    symbol: 'initOpenspec',
-    reason:
-      'Existing OpenSpec initialization has an explicit 60-second timeout.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 1 行）',
+      'POSIX 直 spawn 受控 CLI（codegraph/npm），超时由调用方注入（10s 版本探测 / 120s 安装 / 15s 探针 / 300s init）。（2026-09-21 superpowers 替换批次 1 任务 5：与 win32 分支同源收敛，全脚本仅存此 helper 两个直接调用点）',
     timeout: { required: true, status: 'present' },
   },
   {
@@ -343,6 +307,17 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     anchor: 'const stdout = execSync(`npx tsx "${CLI}" ${args.join(\' \')}`, {',
     symbol: 'runCli',
     reason: '2026-09-04 audit-gate-closure task 1 新增：opsx checker CLI 边界测试，显式 90 秒超时。',
+    timeout: { required: true, status: 'present' },
+  },
+  // 2026-09-21 superpowers 替换批次 1 任务 5：任务 1（check-coding-plan 编码计划制品门）新增了直接
+  // 同步调用但从未登记（该分支尚未跑通全量 vitest，run-sync 审计一直是红的，与本文件下方 2026-09-17
+  // 同类补登记同理）。以下条目补登记。
+  {
+    api: 'execSync',
+    file: '__tests__/check-coding-plan.test.ts',
+    anchor: 'const stdout = execSync(`npx tsx "${CLI}" ${cmdArgs.join(\' \')}`, {',
+    symbol: 'runCli',
+    reason: '2026-09-21 任务 1 新增：编码计划 CLI 边界测试，显式 90 秒超时。',
     timeout: { required: true, status: 'present' },
   },
   // 2026-09-17 review-remediation task 8：task 5 的两个 hook 测试文件新增了直接同步调用但从未登记

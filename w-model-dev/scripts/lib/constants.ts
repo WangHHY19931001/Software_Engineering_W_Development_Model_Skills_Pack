@@ -43,7 +43,7 @@ export const MAX_GRAPH_ROUNDS = 5 as const;
 
 /**
  * 子进程执行限额（审计修复 P3/P15：SANY/TLC 无超时可致门禁永久挂死；限额集中单点定义）。
- * SANY 语法检查快速失败 60s；TLC 状态爆炸时 300s 防挂死（对齐 ensure-codegraph-opsx.ts 上限）。
+ * SANY 语法检查快速失败 60s；TLC 状态爆炸时 300s 防挂死（对齐 ensure-codegraph.ts 上限）。
  * modelCheckChildTimeoutMs：聚合门以子进程调用模型检查时的预算，须 ≥ 其内部 SANY+TLC 限额之和。
  */
 export const EXEC_LIMITS = {

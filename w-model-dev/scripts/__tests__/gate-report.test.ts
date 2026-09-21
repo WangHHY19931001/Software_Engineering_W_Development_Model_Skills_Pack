@@ -1373,7 +1373,7 @@ describe('D8 I2 natural-exit contract', () => {
   const logicRoot = path.join(scriptsRoot, 'logic');
   const contractDoc = path.resolve(scriptsRoot, '../../w-model-dev/references/command-reference.md');
   const naturalExitTargets: Record<string, string> = {
-    'ensure-codegraph-opsx.ts': '外部依赖检测结束后设置 `process.exitCode`，自然返回',
+    'ensure-codegraph.ts': '外部依赖检测结束后设置 `process.exitCode`，自然返回',
     'metrics-report.ts': '报告输出完成后设置 `process.exitCode=0`，自然返回',
     'security-scan.ts': '扫描/重生成结果设置 `process.exitCode`，自然返回',
     'self-test.ts': '汇总或未预期异常设置 `process.exitCode`，自然返回',

@@ -10,9 +10,10 @@
  */
 
 import { parseJavaMajor } from '../lib/java-version.js'; // 审计修复 P15：Java 版本解析单源化（单点维护）
+import { MIN_HOST_SUPERPOWERS_SKILLS } from '../lib/superpowers-detect.js'; // superpowers 三层判据单源（与 ensure-codegraph.ts 共用）
 
 export interface DoctorCheckResult {
-  /** 检查项名：node / tsx / ajv / java / tla2tools / codegraph / openspec */
+  /** 检查项名：node / tsx / ajv / java / tla2tools / codegraph / superpowers */
   name: string;
   /** ok=就绪；fail=阻断级缺失；warn=提示级缺失（--with-tla 可升级为 fail）；skip=跳过 */
   status: 'ok' | 'fail' | 'warn';
@@ -20,6 +21,16 @@ export interface DoctorCheckResult {
   detail: string;
   /** 缺失时的修复指引（status=ok 时省略） */
   hint?: string;
+}
+
+/** superpowers 方法论三层探测结果（与 ensure-codegraph.ts 同判据的轻量版） */
+export interface SuperpowersProbeResult {
+  /** 宿主技能目录（~/.agents/skills 与 ~/.claude/skills 并集去重）中发现的关键技能名 */
+  hostSkillsFound: string[];
+  /** 技能包内 vendored 方法论文件（references/superpowers-adoption.md）是否存在 */
+  vendoredAdoption: boolean;
+  /** 项目 docs/superpowers/ 目录是否存在 */
+  projectDir: boolean;
 }
 
 export interface EnvProbe {
@@ -31,6 +42,8 @@ export interface EnvProbe {
   fileExists: (absPath: string) => boolean;
   /** 执行外部命令取版本输出（execFile 包装；java -version 输出在 stderr，调用方拼接） */
   runCommand: (cmd: string, args: string[]) => Promise<{ ok: boolean; output: string }>;
+  /** superpowers 方法论三层探测（宿主技能 / vendored 副本 / 项目目录；只检测不安装） */
+  superpowersProbe: () => SuperpowersProbeResult;
 }
 
 export interface DoctorOptions {
@@ -60,7 +73,7 @@ async function checkCommandVersion(
 
 /**
  * 逐项环境检查。顺序即输出顺序：运行时（node）→ 依赖（tsx/ajv）→ TLA+（java/tla2tools）
- * → 可选集成（codegraph/openspec）。
+ * → 可选集成（codegraph/superpowers）。
  */
 export async function checkEnvironment(probe: EnvProbe, opts: DoctorOptions): Promise<DoctorCheckResult[]> {
   const results: DoctorCheckResult[] = [];
@@ -154,24 +167,30 @@ export async function checkEnvironment(probe: EnvProbe, opts: DoctorOptions): Pr
           name: 'codegraph',
           status: 'warn',
           detail: '未安装或不在 PATH',
-          hint: '可选：阶段 5-8 符号级影响分析用；ensure-codegraph-opsx.ts 可自动安装（详见 references/phase-5-coding.md）',
+          hint: '可选：阶段 5-8 符号级影响分析用；ensure-codegraph.ts 可自动安装（详见 references/phase-5-coding.md）',
         },
   );
 
-  // 7. openspec（可选集成）
-  const osOut = await checkCommandVersion(probe, 'openspec', ['--version']);
+  // 7. superpowers 方法论三层（可选集成；与 ensure-codegraph.ts 同判据的轻量版，恒为提示级）
+  const sp = probe.superpowersProbe();
+  const spMissing: string[] = [];
+  if (sp.hostSkillsFound.length < MIN_HOST_SUPERPOWERS_SKILLS) {
+    spMissing.push(`宿主关键技能 ${sp.hostSkillsFound.length}/${MIN_HOST_SUPERPOWERS_SKILLS}`);
+  }
+  if (!sp.vendoredAdoption) spMissing.push('references/superpowers-adoption.md 未 vendor');
+  if (!sp.projectDir) spMissing.push('docs/superpowers/ 目录缺失');
   results.push(
-    osOut.ok
+    spMissing.length === 0
       ? {
-          name: 'openspec',
+          name: 'superpowers',
           status: 'ok',
-          detail: osOut.output.trim().split('\n')[0] ?? '',
+          detail: `三层齐备（宿主关键技能 ${sp.hostSkillsFound.length} + vendor + 项目目录）`,
         }
       : {
-          name: 'openspec',
+          name: 'superpowers',
           status: 'warn',
-          detail: '未安装或不在 PATH',
-          hint: '可选：规格驱动变更工作流（opsx）用；ensure-codegraph-opsx.ts 可自动安装',
+          detail: `缺失：${spMissing.join('；')}`,
+          hint: '可选：superpowers 方法论三层检测（宿主技能目录 ≥3 关键技能 / 技能包 references/superpowers-adoption.md / 项目 docs/superpowers/）；ensure-codegraph.ts 可输出逐层明细（只检测不安装）',
         },
   );
 
