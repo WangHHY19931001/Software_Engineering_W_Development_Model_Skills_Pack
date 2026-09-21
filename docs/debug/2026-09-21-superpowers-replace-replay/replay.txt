@@ -1,0 +1,519 @@
+================================================================================
+e2e demo 重建 + 阶段 5-8 门禁重放记录（superpowers 替换 opsx 批次 3）
+================================================================================
+分支       : feat/superpowers-replace-opsx
+运行 HEAD  : 50c1531afcd3aa0f3fdb5cda66e846dd18f7e4d0（父 04d16d1a；本文件的入库提交为该 HEAD 的下一
+             次提交——即本文件随「重放证据入库」提交落盘，故重放时的 HEAD ≠ 最终 HEAD，见 §四）
+执行日     : 2026-09-21
+任务       : 2026-09-21-superpowers-replace-opsx 任务 9（demo 重建 + 新链路端到端重放）
+重建命令   : cd eval/e2e/demo-assets && python build_workspace.py --reset
+             （工作区 eval/e2e/demo 为 gitignored 瞬态目录；本文件是本次重建/重放唯一入库产物）
+采集方式   : 重建后的**干净工作树**上按 §二 顺序逐条执行（`npx tsx ../../../w-model-dev/scripts/cli/<gate>`
+             …；cwd=eval/e2e/demo），命令 + 关键输出 + 退出码由 run 脚本捕获；`*_JSON` 摘要行为
+             CLI stdout 原文（超长行按 §二 标注截断，完整行用同命令重跑即可复得）。
+
+边界声明（先把代价与前提说清）：
+  1. 装配器的 `--reset` 与「常规运行」都会**删除并重建 `.w-model/`**，装配器没有任何保留既有运行态的
+     模式。因此任务上下文记录的「run-log 315 行 / 签名链 125 环 / changeId=phase<N>-counter-api」
+     （2026-09-20 live-run 留下的运行态）在本次重建后变为 run-log 104 行 / 签名链 49 环 /
+     changeId=phase<N>-demo（装配器基准态）。这是裁定 B1 重建命令的必然后果，逐项差异见 §三-3、§三-4；
+     重建前 live-run 状态的证据仍在 docs/debug/2026-09-20-wm-8phase-live-run/（未受影响）。
+  2. `--scope` 的清单形态要求「headRef == 当前 HEAD」且「实际变更集合（commit 区间 + 暂存 + 未暂存 +
+     未跟踪）与 scope.changedFiles 精确相等」（lib/change-scope.ts verifyScopeGitBinding）。因此资产
+     改动必须**先提交**（50c1531a），重放才可能在清单形态下全绿；本文件入库使 HEAD 再前移一次，
+     重放前须按 README「重建 + 重放」重新 `--reset` 重建。
+
+--------------------------------------------------------------------------------
+§一 与旧 opsx 形态的差异（本次重建改了什么）
+--------------------------------------------------------------------------------
+
+装配器 eval/e2e/demo-assets/build_workspace.py 的阶段 5-8 构造段（原 L746-778）改写如下；
+每阶段 cid 仍为 `phase<N>-demo`（scope / codegraph 查询 / 计划 / 账本 / openspec 全链同一值）。
+
+  新增（编码计划契约，门禁 check-coding-plan.ts R1-R6）：
+    R1/R2  docs/plans/phase<N>-demo.plan.md
+           —— 「## 目标」节 + 3 个「## 任务 N：…」节，每节含 1 条行首「验证：」命令行；
+              命令体不含 `;` / `&` / `|`（与 RTM evidence command 同规）
+    R3/R4  .superpowers/sdd/phase<N>-demo.plan/（8 文件/阶段）
+           —— progress.md（首行 `# SDD ledger — plan: docs/plans/phase<N>-demo.plan.md`
+              + 3 行 `Task N: complete (commits <确定性 7 位伪提交号>)`）
+              + task-<N>-brief.md / task-<N>-report.md（N=1..3）
+              + review-phase<N>-demo-t1.diff（任务评审包 diff）
+    R5     .w-model/r3-reviews/phase<N>-{plan,execute,finalize}-{completeness,reliability,security}.md ×9
+           + .w-model/v-reviews/phase<N>-{plan,execute,finalize}.md ×3
+           —— stage 词表由旧 opsx 的 {explore, propose, coding} **迁徙**为编码链三段式
+              {plan, execute, finalize}（旧词表不再生成；详见下方「保留项」）
+
+  保持不变：
+    .w-model/change-scope.p<N>.json（changeId=phase<N>-demo，baseRef/headRef=重建时 HEAD~1..HEAD）
+    .w-model/codegraph-queries/phase<N>-demo-Counter.json（targetFiles 同 scope 变更文件列表）
+
+  保留项（旧 opsx 链路制品仍在生成，裁定 A4）：openspec/changes/phase<N>-demo/{proposal,design,
+  tasks,tickets}.md + specs/.gitkeep。理由：check-opsx-artifacts.ts 仍在 pre-push 路径上、其契约由
+  w-model-dev/scripts/samples/ 的 fixture 覆盖。**已知后果**：stage 审查文件名已随 R5 迁徙，旧门禁若
+  单独对 demo 运行会在 R5 报缺失——旧链路不在 demo 电池 / 轨迹 / 9 项探针内运行（已写入
+  eval/e2e/demo-assets/README.md），其本体退役见批次 4。
+
+  清理面同步（裁定 A5）：常规运行与 `--reset` 的目录清单加入 `.superpowers/`（`docs/plans` 随 `docs/`
+  一并清理）；脚本头注 / `--help` / 工作区判据提示文案的「七目录」改为「八目录」；README 同步。
+
+  计划样例（阶段 5，docs/plans/phase5-demo.plan.md，节选）：
+      # phase5-demo 编码计划（counter-api e2e 调测）
+      ## 目标
+      阶段 5：让 counter-api 的变更集（N 个文件）在阶段 5 门禁下可验证地推进；
+      ## 任务 1：实现计数器状态机（Counter.inc / reset / get）
+      验证：npx tsx --test test/unit/counter.test.ts
+      ## 任务 3：评审包与账本收口
+      验证：npx tsx ../../../w-model-dev/scripts/cli/check-coding-plan.ts . --phase=5 --scope=.w-model/change-scope.p5.json
+
+  账本样例（.superpowers/sdd/phase5-demo.plan/progress.md，节选）：
+      # SDD ledger — plan: docs/plans/phase5-demo.plan.md
+      任务账本（superpowers SDD）：逐任务一行 `Task N: complete`（附提交号）；
+      Task 1: complete (commits 126443d)
+      Task 2: complete (commits 143af86)
+      Task 3: complete (commits e92aad8)
+
+  重建后制品清点（每阶段，共 4 阶段）：docs/plans/*.plan.md 4 份；.superpowers/sdd/ 4 个账本目录
+  ×8 文件 = 32 文件；.w-model/r3-reviews/ 36 文件（9×4）；.w-model/v-reviews/ 12 文件（3×4）；
+  openspec/changes/ 4 个变更目录（各 5 文件）；.w-model/codegraph-queries/ 4 份查询。
+
+--------------------------------------------------------------------------------
+§二 门禁电池（18 条 = 10 项；B5 / B6 各记「字面 / 清单 / 薄封装」双形态，如实两种形态都留证）
+--------------------------------------------------------------------------------
+
+汇总（重建后干净工作树，HEAD=50c1531a）：
+
+  B1  check-run-log.ts                  exit 0   （LEGACY_UNSCOPED 诊断 70 条 = p1-p7 各 10 条，非阻断）
+  B2  check-checkpoint.ts               exit 0
+  B3  check-signature-chain.ts          exit 0   （49 条签名，R1-R10 全通过）
+  B4  check-code-tla-consistency.ts     exit 1   ← 与预期不符，见 §三-1
+  B5  check-coding-plan.ts  ×4 阶段
+        字面形态（无 --scope）           exit 1   ← 与预期不符（裁定命令漏写 scope），见 §三-2
+        清单形态（--scope）              exit 0   ★ 本任务核心新门禁 R1-R6 全绿
+  B6  check-artifact-gate.ts --phase=8
+        清单形态（--scope）              exit 0
+        薄封装形态（--change/--base/--head）exit 0
+  B7  check-archive-integrity.ts         exit 0   （manifest 无 codingPlanSnapshot，走 legacy 清单，见 §四-4）
+  B8  check-budget.ts                    exit 0   ← 与预期不符（预期红），见 §三-3
+  B9  wm-status.ts                       exit 0
+  B10 ensure-codegraph.ts --mode light   exit 0   （L1 codegraph CLI + superpowers 宿主技能 5/5 ready）
+
+逐条原始记录：
+
+------------------------------------------------------------------------------
+[B1 run-log]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-run-log.ts .w-model/run-log.jsonl
+  ════════════════════════════════════════════════════════════
+  运行日志校验（Run-Log Checker）
+  ════════════════════════════════════════════════════════════
+  输入文件        : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo\.w-model\run-log.jsonl
+  条目数          : 104
+  --gate-logs     : 未提供
+  --tla-manifest  : 未提供
+  校验结果        : ✓ 通过
+  生命周期状态    : NOT_CLOSED_NOT_PROVEN
+  ────────────────────────────────────────────────────────────
+  运行日志符合 data-models.md RunLogEntry schema：动作完整 + tokens 合规 + 返工一致 + 无 O 越权 + exitCode 一致 + append-only + 轨迹符合 + 闭环五脚本齐备。
+  生命周期诊断（非阻断）：
+  RUN_LOG_JSON {"type":"run-log","passed":true,"reasons":[],"violations":[],"lifecycleStatus":"NOT_CLOSED_NOT_PROVEN","statusNote":"exit 0 仅表示当前规则未产生 blocking diagnostics；不等于 lifecycle closed 或阶段放行。","diagnostics":["LEGACY_UNSCOPED: r3-completeness p1-r3c identity missing round, reportId, targetKind, basedOnReport, implementationTarget; deferred","LEGACY_UNSCOPED: r3-reliability p1-r3r identity missing round, reportId, targetKind, basedOnReport, implementationTarget; deferred","LEGACY_UNSCOPED: r3-security p1-r3s identity missing round, reportId, targetKind, basedOnReport, implementationTarget;  …（本行超长已截断，完整 JSON 由 CLI stdout 重跑可得）
+  EXIT=0
+
+------------------------------------------------------------------------------
+[B2 checkpoint]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-checkpoint.ts .w-model/run-log.jsonl --checkpoint-log=.w-model/checkpoint-log
+  ════════════════════════════════════════════════════════════
+  Checkpoint 校验（Checkpoint Checker）
+  ════════════════════════════════════════════════════════════
+  输入文件          : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo\.w-model\run-log.jsonl
+  条目数            : 104
+  --checkpoint-log  : .w-model/checkpoint-log（已加载 8 个 phase 确认文件）
+  校验结果          : ✓ 通过
+  ────────────────────────────────────────────────────────────
+  checkpoint 记录符合规范：决策非空 + 内容具体 + 用户确认存在 + 决策与阶段匹配 + 跨阶段证据一致。
+  ────────────────────────────────────────────────────────────
+  CHECKPOINT_JSON {"type":"checkpoint","passed":true,"violations":[],"exitCode":0}
+  EXIT=0
+
+------------------------------------------------------------------------------
+[B3 signature-chain]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-signature-chain.ts .w-model/signature-chain.jsonl
+  ════════════════════════════════════════════════════════════
+  签名链校验（Signature Chain Checker）
+  ════════════════════════════════════════════════════════════
+  输入文件          : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo\.w-model\signature-chain.jsonl
+  条目数            : 49
+  --phase           : 全部
+  --stage           : 未指定
+  校验结果          : ✓ 通过
+  ────────────────────────────────────────────────────────────
+  签名链符合规范：R1-R10 全通过。
+  通过规则：R1, R2, R3, R4, R5, R6, R7, R8, R9, R10
+  ────────────────────────────────────────────────────────────
+  SIGNATURE_CHAIN_JSON {"type":"signature-chain","passed":true,"violations":[],"rulesPassed":["R1","R2","R3","R4","R5","R6","R7","R8","R9","R10"],"rulesFailed":[],"exitCode":0}
+  EXIT=0
+
+------------------------------------------------------------------------------
+[B4 code-tla-consistency]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-code-tla-consistency.ts --manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json --rtm=.w-model/rtm.json --src=src
+  ════════════════════════════════════════════════════════════
+  代码-TLA+ 一致性校验（Code-TLA Consistency Checker）
+  ════════════════════════════════════════════════════════════
+  manifest      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo\.w-model\tla-manifest.json
+  graph         : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo\.w-model\ingestion\graph.json
+  rtm           : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo\.w-model\rtm.json
+  src           : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo\src
+  代码文件数    : 1
+  ────────────────────────────────────────────────────────────
+  维度校验结果：
+  维度1 SD→codeModule   : ✓ 通过（1 项）
+  维度2 代码状态转移    : ✓ 通过（2 项）
+  CODE_TLA_JSON {"type":"code-tla-consistency","passed":false,"dimensions":{"sdToCodeModule":{"passed":true,"checked":1,"violations":[]},"codeStateTransfer":{"passed":true,"checked":2,"violations":[]},"nextBranchCoverage":{"passed":true,"checked":2,"violations":[]},"invariantCoverage":{"passed":false,"checked":1,"violations":["规格 L2_counter_service: 代码中未抽取到任何断言（assert/invariant/require），无法覆盖 TLA+ BusinessInvariant 的 1 个子不变式"]}},"violations":[{"dimension":"invariantCoverage","message":"规格 L2_counter_service: 代码中未抽取到任何断言（assert/invariant/require），无法覆盖 TLA+ BusinessInvariant 的 1 个子不变式"}],"codeFileC …（本行超长已截断，完整 JSON 由 CLI stdout 重跑可得）
+  EXIT=1
+
+------------------------------------------------------------------------------
+[B5.5 coding-plan 字面形态（无 --scope）]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-coding-plan.ts . --phase=5
+  ════════════════════════════════════════════════════════════
+  编码计划制品校验（Coding Plan Checker，strict changeId 绑定）
+  ════════════════════════════════════════════════════════════
+  项目根        : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo
+  阶段          : 5
+  变更上下文    : （未提供）
+  编码计划      : （未找到）
+  执行账本      : （未找到）
+  任务覆盖      : 0/0
+  三件套/评审包 : （无）
+  审查产物      : （无）
+  校验结果      : ✗ 未通过
+  CODING_PLAN_JSON {"type":"coding-plan","passed":false,"phase":5,"planPath":null,"ledgerPath":null,"tasksTotal":0,"tasksCompleted":0,"artifactsFound":[],"reviewsFound":[],"violations":["阶段 5：未提供 --scope=<change-scope.json> 或 --change=<id> --base=<ref> --head=<ref>，无法绑定变更上下文（无变更上下文的相关查询/制品不得放行；--scope 仅支持等号形态 --scope=<file>，空格形态按未提供处理）"],"exitCode":1}
+  EXIT=1
+
+------------------------------------------------------------------------------
+[B5.5 coding-plan 清单形态（--scope）]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-coding-plan.ts . --phase=5 --scope=.w-model/change-scope.p5.json
+  ════════════════════════════════════════════════════════════
+  编码计划制品校验（Coding Plan Checker，strict changeId 绑定）
+  ════════════════════════════════════════════════════════════
+  项目根        : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo
+  阶段          : 5
+  变更上下文    : phase5-demo（base=04d16d1a7cc6a16df05ea3526a26882d70be2177..head=50c1531afcd3aa0f3fdb5cda66e846dd18f7e4d0，声明 2 个变更文件）
+  编码计划      : docs/plans/phase5-demo.plan.md
+  执行账本      : .superpowers/sdd/phase5-demo.plan/progress.md
+  任务覆盖      : 3/3
+  审查产物      : plan-completeness, plan-reliability, plan-security, plan-V, execute-completeness, execute-reliability, execute-security, execute-V, finalize-completeness, finalize-reliability, finalize-security, finalize-V
+  校验结果      : ✓ 通过
+  ────────────────────────────────────────────────────────────
+  CODING_PLAN_JSON {"type":"coding-plan","passed":true,"phase":5,"changeId":"phase5-demo","planPath":"docs/plans/phase5-demo.plan.md","ledgerPath":".superpowers/sdd/phase5-demo.plan/progress.md","tasksTotal":3,"tasksCompleted":3,"artifactsFound":[".superpowers/sdd/phase5-demo.plan/task-1-brief.md",".superpowers/sdd/phase5-demo.plan/task-1-report.md",".superpowers/sdd/phase5-demo.plan/task-2-brief.md",".superpowers/sdd/phase5-demo.plan/task-2-report.md",".superpowers/sdd/phase5-demo.plan/task-3-brief.md",".superpowers/sdd/phase5-demo.plan/task-3-report.md",".superpowers/sdd/phase5-demo.plan/revie …（本行超长已截断，完整 JSON 由 CLI stdout 重跑可得）
+  EXIT=0
+
+------------------------------------------------------------------------------
+[B5.6 coding-plan 字面形态（无 --scope）]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-coding-plan.ts . --phase=6
+  ════════════════════════════════════════════════════════════
+  编码计划制品校验（Coding Plan Checker，strict changeId 绑定）
+  ════════════════════════════════════════════════════════════
+  项目根        : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo
+  阶段          : 6
+  变更上下文    : （未提供）
+  编码计划      : （未找到）
+  执行账本      : （未找到）
+  任务覆盖      : 0/0
+  三件套/评审包 : （无）
+  审查产物      : （无）
+  校验结果      : ✗ 未通过
+  CODING_PLAN_JSON {"type":"coding-plan","passed":false,"phase":6,"planPath":null,"ledgerPath":null,"tasksTotal":0,"tasksCompleted":0,"artifactsFound":[],"reviewsFound":[],"violations":["阶段 6：未提供 --scope=<change-scope.json> 或 --change=<id> --base=<ref> --head=<ref>，无法绑定变更上下文（无变更上下文的相关查询/制品不得放行；--scope 仅支持等号形态 --scope=<file>，空格形态按未提供处理）"],"exitCode":1}
+  EXIT=1
+
+------------------------------------------------------------------------------
+[B5.6 coding-plan 清单形态（--scope）]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-coding-plan.ts . --phase=6 --scope=.w-model/change-scope.p6.json
+  ════════════════════════════════════════════════════════════
+  编码计划制品校验（Coding Plan Checker，strict changeId 绑定）
+  ════════════════════════════════════════════════════════════
+  项目根        : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo
+  阶段          : 6
+  变更上下文    : phase6-demo（base=04d16d1a7cc6a16df05ea3526a26882d70be2177..head=50c1531afcd3aa0f3fdb5cda66e846dd18f7e4d0，声明 2 个变更文件）
+  编码计划      : docs/plans/phase6-demo.plan.md
+  执行账本      : .superpowers/sdd/phase6-demo.plan/progress.md
+  任务覆盖      : 3/3
+  审查产物      : plan-completeness, plan-reliability, plan-security, plan-V, execute-completeness, execute-reliability, execute-security, execute-V, finalize-completeness, finalize-reliability, finalize-security, finalize-V
+  校验结果      : ✓ 通过
+  ────────────────────────────────────────────────────────────
+  CODING_PLAN_JSON {"type":"coding-plan","passed":true,"phase":6,"changeId":"phase6-demo","planPath":"docs/plans/phase6-demo.plan.md","ledgerPath":".superpowers/sdd/phase6-demo.plan/progress.md","tasksTotal":3,"tasksCompleted":3,"artifactsFound":[".superpowers/sdd/phase6-demo.plan/task-1-brief.md",".superpowers/sdd/phase6-demo.plan/task-1-report.md",".superpowers/sdd/phase6-demo.plan/task-2-brief.md",".superpowers/sdd/phase6-demo.plan/task-2-report.md",".superpowers/sdd/phase6-demo.plan/task-3-brief.md",".superpowers/sdd/phase6-demo.plan/task-3-report.md",".superpowers/sdd/phase6-demo.plan/revie …（本行超长已截断，完整 JSON 由 CLI stdout 重跑可得）
+  EXIT=0
+
+------------------------------------------------------------------------------
+[B5.7 coding-plan 字面形态（无 --scope）]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-coding-plan.ts . --phase=7
+  ════════════════════════════════════════════════════════════
+  编码计划制品校验（Coding Plan Checker，strict changeId 绑定）
+  ════════════════════════════════════════════════════════════
+  项目根        : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo
+  阶段          : 7
+  变更上下文    : （未提供）
+  编码计划      : （未找到）
+  执行账本      : （未找到）
+  任务覆盖      : 0/0
+  三件套/评审包 : （无）
+  审查产物      : （无）
+  校验结果      : ✗ 未通过
+  CODING_PLAN_JSON {"type":"coding-plan","passed":false,"phase":7,"planPath":null,"ledgerPath":null,"tasksTotal":0,"tasksCompleted":0,"artifactsFound":[],"reviewsFound":[],"violations":["阶段 7：未提供 --scope=<change-scope.json> 或 --change=<id> --base=<ref> --head=<ref>，无法绑定变更上下文（无变更上下文的相关查询/制品不得放行；--scope 仅支持等号形态 --scope=<file>，空格形态按未提供处理）"],"exitCode":1}
+  EXIT=1
+
+------------------------------------------------------------------------------
+[B5.7 coding-plan 清单形态（--scope）]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-coding-plan.ts . --phase=7 --scope=.w-model/change-scope.p7.json
+  ════════════════════════════════════════════════════════════
+  编码计划制品校验（Coding Plan Checker，strict changeId 绑定）
+  ════════════════════════════════════════════════════════════
+  项目根        : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo
+  阶段          : 7
+  变更上下文    : phase7-demo（base=04d16d1a7cc6a16df05ea3526a26882d70be2177..head=50c1531afcd3aa0f3fdb5cda66e846dd18f7e4d0，声明 2 个变更文件）
+  编码计划      : docs/plans/phase7-demo.plan.md
+  执行账本      : .superpowers/sdd/phase7-demo.plan/progress.md
+  任务覆盖      : 3/3
+  审查产物      : plan-completeness, plan-reliability, plan-security, plan-V, execute-completeness, execute-reliability, execute-security, execute-V, finalize-completeness, finalize-reliability, finalize-security, finalize-V
+  校验结果      : ✓ 通过
+  ────────────────────────────────────────────────────────────
+  CODING_PLAN_JSON {"type":"coding-plan","passed":true,"phase":7,"changeId":"phase7-demo","planPath":"docs/plans/phase7-demo.plan.md","ledgerPath":".superpowers/sdd/phase7-demo.plan/progress.md","tasksTotal":3,"tasksCompleted":3,"artifactsFound":[".superpowers/sdd/phase7-demo.plan/task-1-brief.md",".superpowers/sdd/phase7-demo.plan/task-1-report.md",".superpowers/sdd/phase7-demo.plan/task-2-brief.md",".superpowers/sdd/phase7-demo.plan/task-2-report.md",".superpowers/sdd/phase7-demo.plan/task-3-brief.md",".superpowers/sdd/phase7-demo.plan/task-3-report.md",".superpowers/sdd/phase7-demo.plan/revie …（本行超长已截断，完整 JSON 由 CLI stdout 重跑可得）
+  EXIT=0
+
+------------------------------------------------------------------------------
+[B5.8 coding-plan 字面形态（无 --scope）]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-coding-plan.ts . --phase=8
+  ════════════════════════════════════════════════════════════
+  编码计划制品校验（Coding Plan Checker，strict changeId 绑定）
+  ════════════════════════════════════════════════════════════
+  项目根        : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo
+  阶段          : 8
+  变更上下文    : （未提供）
+  编码计划      : （未找到）
+  执行账本      : （未找到）
+  任务覆盖      : 0/0
+  三件套/评审包 : （无）
+  审查产物      : （无）
+  校验结果      : ✗ 未通过
+  CODING_PLAN_JSON {"type":"coding-plan","passed":false,"phase":8,"planPath":null,"ledgerPath":null,"tasksTotal":0,"tasksCompleted":0,"artifactsFound":[],"reviewsFound":[],"violations":["阶段 8：未提供 --scope=<change-scope.json> 或 --change=<id> --base=<ref> --head=<ref>，无法绑定变更上下文（无变更上下文的相关查询/制品不得放行；--scope 仅支持等号形态 --scope=<file>，空格形态按未提供处理）"],"exitCode":1}
+  EXIT=1
+
+------------------------------------------------------------------------------
+[B5.8 coding-plan 清单形态（--scope）]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-coding-plan.ts . --phase=8 --scope=.w-model/change-scope.p8.json
+  ════════════════════════════════════════════════════════════
+  编码计划制品校验（Coding Plan Checker，strict changeId 绑定）
+  ════════════════════════════════════════════════════════════
+  项目根        : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo
+  阶段          : 8
+  变更上下文    : phase8-demo（base=04d16d1a7cc6a16df05ea3526a26882d70be2177..head=50c1531afcd3aa0f3fdb5cda66e846dd18f7e4d0，声明 2 个变更文件）
+  编码计划      : docs/plans/phase8-demo.plan.md
+  执行账本      : .superpowers/sdd/phase8-demo.plan/progress.md
+  任务覆盖      : 3/3
+  审查产物      : plan-completeness, plan-reliability, plan-security, plan-V, execute-completeness, execute-reliability, execute-security, execute-V, finalize-completeness, finalize-reliability, finalize-security, finalize-V
+  校验结果      : ✓ 通过
+  ────────────────────────────────────────────────────────────
+  CODING_PLAN_JSON {"type":"coding-plan","passed":true,"phase":8,"changeId":"phase8-demo","planPath":"docs/plans/phase8-demo.plan.md","ledgerPath":".superpowers/sdd/phase8-demo.plan/progress.md","tasksTotal":3,"tasksCompleted":3,"artifactsFound":[".superpowers/sdd/phase8-demo.plan/task-1-brief.md",".superpowers/sdd/phase8-demo.plan/task-1-report.md",".superpowers/sdd/phase8-demo.plan/task-2-brief.md",".superpowers/sdd/phase8-demo.plan/task-2-report.md",".superpowers/sdd/phase8-demo.plan/task-3-brief.md",".superpowers/sdd/phase8-demo.plan/task-3-report.md",".superpowers/sdd/phase8-demo.plan/revie …（本行超长已截断，完整 JSON 由 CLI stdout 重跑可得）
+  EXIT=0
+
+------------------------------------------------------------------------------
+[B6 artifact-gate p8 清单形态（--scope）]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=8 --scope=.w-model/change-scope.p8.json
+  ════════════════════════════════════════════════════════════
+  工件质量门校验（Artifact Gate）
+  ════════════════════════════════════════════════════════════
+  项目目录      : .
+  RTM 文件      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo\.w-model\rtm.json
+  校验阶段      : phase=8（阶段级）
+  RTM 覆盖率    : 100%
+  单元覆盖率    : 100%
+  TLA+ 资产     : ✓ manifest schema 通过且 specs 非空
+  BDD 资产      : ✓ bdd-manifest.json 存在且 schema 通过
+  Model 校验    : ✓ TLA+/BDD model 校验通过
+  graph 资产    : ✓ graph.json（9 节点）
+  GATE_JSON {"type":"artifact","passed":true,"coveragePercent":100,"unitCoveragePercent":100,"missingItems":[],"reasons":[],"bddManifestExists":true,"external":{"codegraph":{"passed":true,"violationCount":0,"provided":true,"changeId":"phase8-demo","requiredFileCount":0,"coveredFileCount":0},"codingPlan":{"passed":true,"violationCount":0,"provided":true,"changeId":"phase8-demo","changesNames":["phase8-demo"]}},"testEvidence":{"checked":4,"withEvidence":4,"missing":0,"legacy":0,"e1":0,"e2":0,"e3":0,"e4":0},"tickets":null,"exitCode":0}
+  EXIT=0
+
+------------------------------------------------------------------------------
+[B6 artifact-gate p8 薄封装形态（--change/--base/--head）]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=8 --change=phase8-demo --base=04d16d1a7cc6a16df05ea3526a26882d70be2177 --head=50c1531afcd3aa0f3fdb5cda66e846dd18f7e4d0
+  ════════════════════════════════════════════════════════════
+  工件质量门校验（Artifact Gate）
+  ════════════════════════════════════════════════════════════
+  项目目录      : .
+  RTM 文件      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo\.w-model\rtm.json
+  校验阶段      : phase=8（阶段级）
+  RTM 覆盖率    : 100%
+  单元覆盖率    : 100%
+  TLA+ 资产     : ✓ manifest schema 通过且 specs 非空
+  BDD 资产      : ✓ bdd-manifest.json 存在且 schema 通过
+  Model 校验    : ✓ TLA+/BDD model 校验通过
+  graph 资产    : ✓ graph.json（9 节点）
+  GATE_JSON {"type":"artifact","passed":true,"coveragePercent":100,"unitCoveragePercent":100,"missingItems":[],"reasons":[],"bddManifestExists":true,"external":{"codegraph":{"passed":true,"violationCount":0,"provided":true,"changeId":"phase8-demo","requiredFileCount":0,"coveredFileCount":0},"codingPlan":{"passed":true,"violationCount":0,"provided":true,"changeId":"phase8-demo","changesNames":["phase8-demo"]}},"testEvidence":{"checked":4,"withEvidence":4,"missing":0,"legacy":0,"e1":0,"e2":0,"e3":0,"e4":0},"tickets":null,"exitCode":0}
+  EXIT=0
+
+------------------------------------------------------------------------------
+[B7 archive-integrity]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-archive-integrity.ts archive/2026-09-19-counter-api
+  ════════════════════════════════════════════════════════════
+  归档完整性校验（Archive Integrity Checker）
+  ════════════════════════════════════════════════════════════
+  归档目录          : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo\archive\2026-09-19-counter-api
+  文件数            : 27
+  校验阶段          : 1, 2, 3, 4, 5, 6, 7, 8, global
+  校验结果          : ✓ 通过
+  ────────────────────────────────────────────────────────────
+  归档完整性清单全部通过。
+  ────────────────────────────────────────────────────────────
+  ARCHIVE_INTEGRITY_JSON {"type":"archive-integrity","passed":true,"missingFiles":[],"checkedPhases":["1","2","3","4","5","6","7","8","global"],"exitCode":0}
+  EXIT=0
+
+------------------------------------------------------------------------------
+[B8 budget]
+$ npx tsx ../../../w-model-dev/scripts/cli/check-budget.ts .w-model/budget.json --project=.w-model/project.json --run-log=.w-model/run-log.jsonl --phase=8
+  ════════════════════════════════════════════════════════════
+  预算校验（Budget Checker）
+  ════════════════════════════════════════════════════════════
+  输入文件      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo\.w-model\budget.json
+  projectId     : counter-api
+  schemaVersion : 1.0
+  onExceed      : pause
+  --project     : 2026-09-19T03:00:00+08:00
+  --run-log     : .w-model/run-log.jsonl（rework=0, tla-rework=0, tokens=阶段/全量 24000/208000）
+  --phase       : 8
+  校验结果      : ✓ 通过
+  ────────────────────────────────────────────────────────────
+  BUDGET_JSON {"type":"budget","passed":true,"violations":[],"warnings":["R4-A 未校验：未配置 rootcauseParallelBudget（跳过不等于通过）"],"exitCode":0}
+  EXIT=0
+
+------------------------------------------------------------------------------
+[B9 wm-status]
+$ npx tsx ../../../w-model-dev/scripts/cli/wm-status.ts .
+  ════════════════════════════════════════════════════════════
+  /wm status（项目状态快照）
+  ════════════════════════════════════════════════════════════
+  项目状态      : 需求分析
+  当前阶段      : 1 / 8
+  完成进度      : 0/8（0%）
+  updatedAt     : 2026-09-19T03:00:00+08:00
+  RTM 覆盖率（按追溯字段重算）: 4/4（100%）
+  四级测试      :
+  单元 3/3（failed=0, pending=0）
+  集成 2/2（failed=0, pending=0）
+  系统 2/2（failed=0, pending=0）
+  STATUS_JSON {"phase":1,"completedPhases":0,"progress":"0/8（0%）","status":"需求分析","updatedAt":"2026-09-19T03:00:00+08:00","rtmCoverage":{"covered":4,"total":4,"percent":100},"testSummary":{"unit":{"total":3,"passed":3,"failed":0,"pending":0},"integration":{"total":2,"passed":2,"failed":0,"pending":0},"system":{"total":2,"passed":2,"failed":0,"pending":0},"acceptance":{"total":2,"passed":2,"failed":0,"pending":0}},"recentActions":[{"runId":"p8-c-c","timestamp":"2026-09-19T05:42:00Z","phase":8,"action":"gate","role":"G","outcome":"success","gateExitCode":0},{"runId":"p8-c-pr","timestamp":"2026-09- …（本行超长已截断，完整 JSON 由 CLI stdout 重跑可得）
+  EXIT=0
+
+------------------------------------------------------------------------------
+[B10 ensure-codegraph light]
+$ npx tsx ../../../w-model-dev/scripts/cli/ensure-codegraph.ts --phase 5 --project-root . --mode light
+  ════════════════════════════════════════════════════════════
+  codegraph（CLI 依赖）+ superpowers 方法论检测
+  ════════════════════════════════════════════════════════════
+  阶段          : 5
+  项目根        : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\eval\e2e\demo
+  模式          : light
+  校验结果      : ✓ 就绪
+  ────────────────────────────────────────────────────────────
+  ✓ [L1] codegraph CLI: ready — codegraph --version OK
+  ✓ [L1] superpowers 宿主技能: ready — 关键技能 5/5：brainstorming / writing-plans / subagent-driven-development / executing-plans / test-driven-development
+  ────────────────────────────────────────────────────────────
+  ### 汇总
+  ENSURE_DEPS_JSON {"type":"ensure-deps","phase":5,"mode":"light","passed":true,"exitCode":0,"results":[{"layer":"L1","item":"codegraph CLI","status":"ready","detail":"codegraph --version OK"},{"layer":"L1","item":"superpowers 宿主技能","status":"ready","detail":"关键技能 5/5：brainstorming / writing-plans / subagent-driven-development / executing-plans / test-driven-development"}]}
+  EXIT=0
+
+--------------------------------------------------------------------------------
+§三 与预期的差异（4 项；含 1 项命名登记）
+--------------------------------------------------------------------------------
+
+1) B4 check-code-tla-consistency → exit 1（裁定 B4 期望 0）
+   实测（唯一违规行）：
+     - [CODE_TLA_D4 codeFiles[*].assertions] 规格 L2_counter_service: 代码中未抽取到任何断言
+       （assert/invariant/require），无法覆盖 TLA+ BusinessInvariant 的 1 个子不变式
+   四维度中 sdToCodeModule / codeStateTransfer / nextBranchCoverage 三维通过（checked 1 / 2 / 2），
+   仅 invariantCoverage（D4）红。
+   归因：demo 源码 src/counter.ts（装配器生成）不含任何断言，是装配器 fixture 的**既有缺口**；
+   本次重建未触碰 src/、tla/、rtm.json（裁定 D 明示「不改 demo 源码/测试」），与本批次的编码链
+   改造无因果。
+   处置：按裁定 D/E 不放宽门禁、也不改 demo 源码；登记为候选（若要把 D4 纳入 demo 覆盖，需在装配器
+   为 counter.ts 补不变式断言）。
+
+2) B5 check-coding-plan 字面形态 → exit 1（裁定 B5 期望 0）
+   实测：`check-coding-plan.ts . --phase=N`（无 scope）→ violations「未提供 --scope=<change-scope.json>
+   或 --change/--base/--head … 无法绑定变更上下文」→ exit 1。这是 CLI 头注与 command-reference 已
+   声明的 fail-closed：阶段 5-8 的 coding-plan 校验必须绑定变更上下文（反模式 #39/#40 谱系）。
+   等价清单形态 `--scope=.w-model/change-scope.p<N>.json` 四阶段全部 exit 0：任务覆盖 3/3、三件套
+   7 项在盘、R5 12 项齐备（plan/execute/finalize × 3 维度 × R3 + 3 项 V）。
+   归因：裁定 B5 的命令形态漏写 `--scope=`（对照 B6 可见），非门禁缺陷；两种形态均已留证于 §二。
+
+3) B8 check-budget → exit 0（裁定 B8 期望 1）
+   实测：R1-R5 通过，仅告警 `⚠ R4-A 未校验：未配置 rootcauseParallelBudget（跳过不等于通过）`；
+   run-log 统计 rework=0、tla-rework=0、Σtokens(阶段/全量)=24000/208000，均未超
+   perPhase.maxTokens=200000 / project.maxTokensTotal=2000000，killSwitch.consecutiveReworks=3、
+   budgetBurnRate=0.9 均未触发 → D-4a（killSwitch 返工计数）/D-4b（Σtokens 用量 R6 + R5-b）分支
+   不被触发（这正是「按真实事件计数」的另一侧：不再静默失灵，本例确实没有返工事件）。
+   归因：裁定 B8 的期望值来自**重建前** live-run 工作区——docs/debug/2026-09-20-wm-8phase-live-run/
+   gate-fix-replay.txt §二 B7 记录该态为「返工 7 ≥ 3、阶段消耗占比 2.75 ≥ budgetBurnRate 0.9」；
+   而同一裁定 B1 命令 `--reset` 重建会删除并重建 `.w-model/`（装配器无保留态模式），二者不可同时
+   成立。本次按 B1 执行，故 B8 呈现装配器基准态下的绿。
+   处置：不放宽也不收紧门禁；不把装配器 run-log 改成「返工 7 / 超大 tokens」（会污染其余门禁口径，
+   且裁定 D 禁止改 run-log）。如需 D-4a/D-4b 的 demo 实证，应由 live-run 状态或专门负向 fixture 承担。
+
+4) cid 命名差异（登记）：任务上下文写 `<cid> = phase<N>-counter-api`；装配器当前写法与重建后全链
+   （scope / codegraph 查询 / 计划 / 账本 / openspec）均为 `phase<N>-demo`，故按 `-demo` 执行——
+   保证 scope.changeId ↔ 计划文件名 ↔ 账本目录名一致（R1 的 `phase<phase>-` 前缀在两侧命名下都成立）。
+
+--------------------------------------------------------------------------------
+§四 复现须知与裁定登记
+--------------------------------------------------------------------------------
+
+1. 复现顺序（不可换）：`cd eval/e2e/demo-assets && python build_workspace.py --reset` →
+   确认干净工作树（`git status --porcelain` 为空；唯一可接受的未跟踪项是本仓既有的
+   docs/debug/2026-09-19-wm-8phase-full-debug/）→ 在 eval/e2e/demo 下按 §二 逐条执行。
+2. HEAD 与 scope 的强绑定：scope.headRef 必须等于当前 HEAD，且实际变更集合必须与
+   scope.changedFiles 精确相等。任何未提交改动（含本目录的装配器改动）或 HEAD 前移，都会让清单形态
+   报「headRef 过期」/「实际变更未在 changedFiles 声明」——**这不是回归，是设计**（已写入 README）。
+3. 两种 scope 形态均留证（裁定 B6）：清单形态 `--scope=.w-model/change-scope.p8.json` 与薄封装形态
+   `--change=phase8-demo --base=04d16d1a… --head=50c1531a…`；本次两者均 exit 0，故无需依赖「已过期」
+   回退路径。
+4. 归档门的编码计划快照条件项**未被本次重放激活**：`archive/2026-09-19-counter-api/
+   archive-manifest.json` 未含 `codingPlanSnapshot`（schema 可选 boolean，缺省 false）→ 走 legacy
+   清单路径（exit 0）；`[codingPlanSnapshot]` 仅在归档根含恰一 `*.plan.md` 时启用
+   （logic/archive-integrity-logic.ts）。把该条件项纳入 demo 覆盖需在装配器的归档构造里加
+   plan/账本快照——超出裁定 A 的构造范围，登记为候选。
+5. 与旧链路的关系：demo 不再保证 `check-opsx-artifacts.ts` 绿（R5 stage 词表已迁徙为
+   plan/execute/finalize，旧词表 explore/propose/coding 不再生成）。该旧门禁不在 demo 电池 / 119 项
+   轨迹 / 9 项探针内运行，其契约由 w-model-dev/scripts/samples/ 的 fixture 覆盖；本体退役见批次 4。
+   该已知后果已同步写入 eval/e2e/demo-assets/README.md。
+6. 本文件的性质：重放证据（含退出码与关键输出），不是门禁结论的替代——最终验收仍以
+   `npm run prepush`（19 项）与任务 10 的全量复核为准。
+
+--------------------------------------------------------------------------------
+§五 附：全量 8 阶段轨迹（run_trajectory.sh，119 门禁；补充证据，非裁定 B 电池）
+--------------------------------------------------------------------------------
+
+命令（cwd=eval/e2e/demo；重建后同一工作树、同一 HEAD=50c1531a；先跑 §二 电池、再跑本轨迹）：
+  bash ../demo-assets/run_trajectory.sh
+结论（末行原文）：
+  ### 轨迹执行完毕 2026-09-21T18:07:13+08:00 ###
+  TOTAL_GATE_RUNS=119 / NONZERO_EXIT_COUNT=0 → ✓ 119/119 exit 0（日志：eval/e2e/demo/.replay/trajectory.log，
+  该日志在 gitignored 工作区内，故关键行摘录如下）
+
+意义：这 119 条包含阶段 5-8 的 artifact-gate（`--scope=.w-model/change-scope.p5|6|7|8.json`），即本次
+新契约在 `check-artifact-gate` 聚合路径（`external.codingPlan`）上的端到端实证：
+
+  [p5-G-artifact-gate] $ … check-artifact-gate.ts . --phase=5 --scope=.w-model/change-scope.p5.json
+  GATE_JSON {…"external":{"codegraph":{"passed":true,…},"codingPlan":{"passed":true,"violationCount":0,
+              "provided":true,"changeId":"phase5-demo","changesNames":["phase5-demo"]}},…
+              "testEvidence":{"checked":1,"withEvidence":1,"missing":0,…},"exitCode":0}
+  [p5-G-artifact-gate] EXIT_CODE=0
+
+  [p8-G-artifact-gate-final] $ … check-artifact-gate.ts . --phase=8 --scope=.w-model/change-scope.p8.json
+  GATE_JSON {…"external":{"codegraph":{"passed":true,…},"codingPlan":{"passed":true,"violationCount":0,
+              "provided":true,"changeId":"phase8-demo","changesNames":["phase8-demo"]}},…
+              "testEvidence":{"checked":4,"withEvidence":4,"missing":0,…},"exitCode":0}
+  [p8-G-artifact-gate-final] EXIT_CODE=0
+
+  同批还包含 [p8-G-archive-integrity] EXIT_CODE=0（归档门 legacy 路径，见 §四-4）与 8 个阶段的闭环脚本
+  （budget / run-log / maturity / checkpoint / preventive / role-dispatch / signature-chain）全绿。
+
+说明：轨迹会继续演化工作区状态（wm-write 写 graph/tla/bdd/project，末态 status=项目完成），这是轨迹脚本
+的设计行为；§二 电池的 18 条记录取自轨迹之前、重建后的基准态。重放（§二 + §五）前须先 `--reset` 重建。
