@@ -23,6 +23,8 @@
 - **`eval/` 边界**：`eval/` 目录承载评估资产与基线记录——**仓内评估资产**（`eval/mappings.json` 60 条提示词→资产锚点（v2，含 matrix 覆盖矩阵） + `eval/runner.ts` 断言引擎 + `npm run eval` 入口，批次 1 起随仓交付）与 **e2e 记录**（`eval/e2e/2026-08-28-baseline.md` 基线终值 + `eval/e2e/2026-08-28-final.md` 批次 3 终值 + `eval/w-model-dev-results.tsv` 逐轮结果）。非技能包运行时代码：不参与 `/wm` 编排、门禁脚本不读取；`eval/e2e/demo/` 为 gitignored 瞬态 e2e 工作区。技能包修改常规情况下无需关注 eval/，但三维度优化批次内的评估任务（Task 1.x-3.x）须同步维护 mappings/runner/TSV。
 
 > **本地生成物与审计证据**：`coverage/`、`.zcode/` 与 `.w-model/` 是 **Git 忽略** 的本地生成物，不应强制提交；`.w-model/` 可含运行期状态与审计证据，默认不随 Git 交付。需要交付时先运行 `npm run wm:verify-evidence-source -- <project-dir>` 由 producer 重建并写入 source-bound provenance，再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；导出只允许 `.w-model/gate-logs/`、`verifier-outputs/`、`signature-chains/`、`codegraph-queries/` 与 `run-log.jsonl`，不包含项目源码、`.zcode/`、`coverage/`、未白名单运行时文件或 `docs/changes/archive/`；JSON/JSONL/Markdown 的敏感字段与绝对路径会脱敏，CLI 成功输出使用占位路径。`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；导出后仍须按项目安全策略审阅，导出和 producer+verify 都不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
+>
+> **销毁前证据保全**：凡对 gitignored 工作区执行破坏性重建/清理（含 `build_workspace.py --reset` 与常规运行——两者都会删 `.w-model`），若该态可能是唯一证据载体（存在真实调测/运行的 `.w-model` 态），必须先完成证据分级裁定并保全（快照入库 `docs/debug/` 或走导出链；注意导出链 source-bound 对无 `.git` 工作区不可用），再销毁。
 
 权威设计决策以 [docs/skill-design-document_SSoT.md](./docs/skill-design-document_SSoT.md) 为单一事实来源（SSoT）。
 

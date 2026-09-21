@@ -35,6 +35,17 @@ bash run_negative_probes.sh              # 期望末行：✓ 9/9 探针被拦�
 
 旧 opsx 链路制品（`openspec/changes/<changeId>/`）在 demo 工作区中仍被生成（装配器未删除），但**对应的门禁已在 2026-09-21 退役**：`check-opsx-artifacts.ts` 与其 fixture（`w-model-dev/scripts/samples/opsx-artifacts/`）已 `git rm`，语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3（stage 词表 `plan/execute/finalize`，旧词表 `explore/propose/coding` 不充数）。该目录现在只是留作历史对照的静态样本，没有任何门禁读取它。
 
+## 销毁前证据保全
+
+`--reset` 与常规运行都会删 `.w-model`（run-log / signature-chain / budget 等运行时状态随之清空）。若当前工作区态可能是某次真实调测/运行的**唯一证据载体**，销毁前必须先完成证据分级裁定并保全，再重建。证据按「类别 × 粒度 × 保全手段」分级：
+
+| 证据类别 | 粒度                                                                              | 保全手段                                                                                                                                                                            |
+| -------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 结论层   | 调测/运行结论与经验教训（本文档与「已实测的坑」即其产物）                         | 入库文档（如 `docs/debug/<日期>-<主题>/` 下的报告 Markdown）                                                                                                                        |
+| 制品层   | `.w-model/` 运行时产物（run-log / signature-chain / gate-logs 等）                | 整树快照入库 `docs/debug/<日期>-<主题>/`；或走导出链（`npm run wm:verify-evidence-source` + `npm run wm:export-evidence`）——注意导出链 source-bound 强制 git HEAD，对无 `.git` 工作区（含本 demo 工作区）结构性不可用，此形态下以快照入库为准 |
+
+本节为规则成文，**不新增反模式编号**（成本收益裁定，见 RC-2 报告）。
+
 ## 已实测的坑（务必遵守）
 
 1. **工作区里不能有 `.git`**：残留 `eval/e2e/demo/.git` 会让 `--scope` 的 `headRef` 绑到 demo 自身 HEAD，p5–p8 的 artifact-gate 全部报「headRef 过期」（实测只剩 114/119）。脚本会在这种情形 fail-closed 退出；只有 `--reset` 会清空**全部**（含残留 `.git`/`openspec/`），不带 `--reset` 的常规运行也会重建 `.w-model/.superpowers/tla/features/src/test/docs/archive` 八个目录（`.w-model` 含 run-log / signature-chain / budget 等运行时状态，重建即回到装配器的基准态）。
