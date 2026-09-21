@@ -66,8 +66,8 @@ PHASE_FILES = {p: list(_SCOPE_DIFF) for p in (5, 6, 7, 8)}
 # ---------- 破坏性路径唯一入口（前置门，先于任何写盘） ----------
 parser = argparse.ArgumentParser(description='重建 e2e 调测工作区')
 parser.add_argument('--reset', action='store_true',
-                    help='先整树清空工作区（整树清空的唯一路径；常规运行会重建 .w-model/tla/features/src/test/docs/archive '
-                         '七个目录，同样受工作区判据保护）')
+                    help='先整树清空工作区（整树清空的唯一路径；常规运行会重建 .w-model/.superpowers/tla/features/src/test/docs/archive '
+                         '八个目录，同样受工作区判据保护）')
 args = parser.parse_args()
 _root_abs = os.path.normcase(os.path.realpath(ROOT)).rstrip('\\/')
 _repo_abs = os.path.normcase(os.path.realpath(_RP)).rstrip('\\/')
@@ -93,10 +93,11 @@ def write_json(rel, obj):
     write(rel, json.dumps(obj, ensure_ascii=False, indent=2) + '\n')
 
 # ---------- 清理重建 ----------
-# 常规运行的 7 目录重建同样受工作区判据保护：非本装配器工作区（无哨兵）→ exit，不静默删除
-require_own_workspace('常规清理重建 .w-model/tla/features/src/test/docs/archive',
+# 常规运行的 8 目录重建同样受工作区判据保护：非本装配器工作区（无哨兵）→ exit，不静默删除
+# .superpowers/ = 编码链执行账本目录（docs/plans 随 docs/ 一并清理，见阶段 5-8 构造段）
+require_own_workspace('常规清理重建 .w-model/.superpowers/tla/features/src/test/docs/archive',
                       '请先移走该目录，或对确属本装配器的工作区显式传 --reset 清空重建。')
-for d in ('.w-model', 'tla', 'features', 'src', 'test', 'docs', 'archive'):
+for d in ('.w-model', '.superpowers', 'tla', 'features', 'src', 'test', 'docs', 'archive'):
     p = os.path.join(ROOT, d)
     if os.path.exists(p):
         rmtree_force(p)
@@ -743,19 +744,72 @@ write_json('archive/2026-09-19-counter-api/archive-manifest.json', {
 })
 
 
-# ---------- 阶段 5-8 变更上下文链（change-scope + codegraph 查询 + opsx 制品） ----------
+# ---------- 阶段 5-8 变更上下文链（change-scope + codegraph 查询 + 编码计划制品/账本/审查） ----------
 # 运行时事实（BASE_SHA / HEAD_SHA / _SCOPE_DIFF / PHASE_FILES）已在文件顶部解析（fail-fast，先于任何写盘）。
 # 边界如实登记：demo 工作区嵌于仓库内且被 gitignore，change-scope 的「实际变更」
 # 取仓库真实 BASE..HEAD 差异；demo 源码/测试不在 git 上下文内，
 # codegraph 覆盖义务对「scope 内 code/test 文件」为空集（vacuously satisfied）。
+#
+# 编码链制品（superpowers 替换批次 3；门禁 check-coding-plan.ts R1-R6）：
+#   R1/R2  docs/plans/<cid>.plan.md——目标节 + 任务节，每个任务节含一条行首「验证：」命令行
+#          （命令体禁 `;` / `&` / `|`，与 RTM evidence command 同规）
+#   R3/R4  .superpowers/sdd/<cid>.plan/progress.md（首行身份 + 逐任务 `Task N: complete`）
+#          + task-<N>-{brief,report}.md + review-*.diff
+#   R5     .w-model/r3-reviews/phase<p>-{plan,execute,finalize}-{completeness,reliability,security}.md ×9
+#          + .w-model/v-reviews/phase<p>-{plan,execute,finalize}.md ×3
+#          （stage 词表 = 编码链三段式，由旧 opsx 词表 explore/propose/coding 迁徙而来）
+# 旧 opsx 链路制品（openspec/changes/<cid>/）保留在盘：check-opsx-artifacts.ts 仍在 pre-push 路径上、
+# 且其 fixture 在 w-model-dev/scripts/samples/ 内服务旧契约。注意 stage 审查文件名已随 R5 迁徙，
+# 故旧门禁若单独对 demo 运行会报 R5 缺失——旧链路不在 demo 电池 / 轨迹 / 探针内运行（见 README.md）。
 PHASE_SYMBOLS = {
   5: [('Counter', [], ['Counter.inc', 'Counter.reset', 'Counter.get'], 3)],
   6: [('Counter', [], ['Counter.inc', 'Counter.reset'], 2)],
   7: [('Counter', [], ['Counter.inc', 'Counter.reset', 'Counter.get'], 2)],
   8: [('Counter', [], ['Counter.inc', 'Counter.reset'], 2)],
 }
+# 编码计划任务节（标题, 验证命令行）：验证命令行为**文档级证据**（门禁只校验文法：行首「验证：」+ 禁 ; & |），
+# 但取真实可跑的形态，便于人工按计划复验。
+_PLAN_CLI = '../../../w-model-dev/scripts/cli'  # demo 工作区 → 仓库根（相对路径仅出现在计划文本内）
+PLAN_TASKS = {
+  5: [
+    ('实现计数器状态机（Counter.inc / reset / get）', 'npx tsx --test test/unit/counter.test.ts'),
+    ('对齐代码状态转移与 TLA+ 规范（L1/L2 状态机）',
+     f'npx tsx {_PLAN_CLI}/check-code-tla-consistency.ts --manifest=.w-model/tla-manifest.json '
+     '--graph=.w-model/ingestion/graph.json --rtm=.w-model/rtm.json --src=src'),
+    ('评审包与账本收口',
+     f'npx tsx {_PLAN_CLI}/check-coding-plan.ts . --phase=5 --scope=.w-model/change-scope.p5.json'),
+  ],
+  6: [
+    ('补齐 HTTP 层集成测试（/counter/inc + /counter/reset）',
+     'npx tsx --test test/integration/counter-flow.test.ts'),
+    ('对齐 codegraph 查询覆盖与变更范围',
+     f'npx tsx {_PLAN_CLI}/check-codegraph-queries.ts . --phase=6 --scope=.w-model/change-scope.p6.json'),
+    ('评审包与账本收口',
+     f'npx tsx {_PLAN_CLI}/check-coding-plan.ts . --phase=6 --scope=.w-model/change-scope.p6.json'),
+  ],
+  7: [
+    ('补齐系统测试（端到端时序 + NFR-001 证据）', 'npx tsx --test test/system/counter-sys.test.ts'),
+    ('回归代码-TLA+ 一致性（L2 状态机）',
+     f'npx tsx {_PLAN_CLI}/check-code-tla-consistency.ts --manifest=.w-model/tla-manifest.json '
+     '--graph=.w-model/ingestion/graph.json --rtm=.w-model/rtm.json --src=src'),
+    ('评审包与账本收口',
+     f'npx tsx {_PLAN_CLI}/check-coding-plan.ts . --phase=7 --scope=.w-model/change-scope.p7.json'),
+  ],
+  8: [
+    ('补齐验收测试与 UAT 路径映射回填', 'npx tsx --test test/acceptance/counter-uat.test.ts'),
+    ('终检：归档清单与 RTM 覆盖',
+     f'npx tsx {_PLAN_CLI}/check-artifact-gate.ts . --phase=8 --scope=.w-model/change-scope.p8.json'),
+    ('评审包与账本收口',
+     f'npx tsx {_PLAN_CLI}/check-coding-plan.ts . --phase=8 --scope=.w-model/change-scope.p8.json'),
+  ],
+}
+def _fake_sha(seed):
+  """确定性伪提交号（同输入同字节可重放：不引入时间戳 / 随机源）。"""
+  return hashlib.sha1(seed.encode('utf-8')).hexdigest()[:7]
+
 for _p in (5, 6, 7, 8):
   _cid = f'phase{_p}-demo'
+  _tasks = PLAN_TASKS[_p]
   write_json(f'.w-model/change-scope.p{_p}.json', {
     'changeId': _cid, 'phase': _p, 'baseRef': BASE_SHA, 'headRef': HEAD_SHA,
     'scopeCreatedAt': '2026-09-19T03:30:00.000Z', 'changedFiles': PHASE_FILES[_p],
@@ -766,15 +820,55 @@ for _p in (5, 6, 7, 8):
       'callers': _callers, 'callees': _callees, 'blastRadius': _radius,
       'queryTimestamp': '2026-09-19T03:20:00.000Z',
     })
-  for _stage_name in ('explore', 'propose', 'coding'):
+  # R5：编码链 stage 审查（plan / execute / finalize × completeness / reliability / security + V×3）
+  for _stage_name in ('plan', 'execute', 'finalize'):
     for _dim in ('completeness', 'reliability', 'security'):
       write(f'.w-model/r3-reviews/phase{_p}-{_stage_name}-{_dim}.md',
-            '# ' + _stage_name + ' ' + _dim + chr(10) + chr(10) + f'阶段 {_p} opsx {_stage_name} 环节 R3 {_dim} 审查（e2e 调测）：通过，无 Required 发现。' + chr(10))
+            '# ' + _stage_name + ' ' + _dim + chr(10) + chr(10) + f'阶段 {_p} 编码链 {_stage_name} 环节 R3 {_dim} 审查（e2e 调测）：通过，无 Required 发现。' + chr(10))
     write(f'.w-model/v-reviews/phase{_p}-{_stage_name}.md',
-          '# V ' + _stage_name + chr(10) + chr(10) + f'阶段 {_p} opsx {_stage_name} 环节 V 审查（e2e 调测）：通过。' + chr(10))
+          '# V ' + _stage_name + chr(10) + chr(10) + f'阶段 {_p} 编码链 {_stage_name} 环节 V 审查（e2e 调测）：通过。' + chr(10))
+  # R1/R2：编码计划（目标节 + 任务节；任务节内逐条「验证：」命令行）
+  _plan_lines = [
+    f'# {_cid} 编码计划（counter-api e2e 调测）', '',
+    '来源：superpowers writing-plans（编码计划制品契约，门禁 `check-coding-plan.ts` R1-R6）；',
+    f'执行账本：`.superpowers/sdd/{_cid}.plan/progress.md`；任务三件套与评审包同目录。', '',
+    '## 目标', '',
+    f'阶段 {_p}：让 counter-api 的变更集（{len(PHASE_FILES[_p])} 个文件）在阶段 {_p} 门禁下可验证地推进；',
+    '任务颗粒度 = 单次可验证的改动；每个任务节内给出一条行首「验证：」命令行（散文行不参与解析）。', '',
+  ]
+  for _n, (_title, _verify) in enumerate(_tasks, 1):
+    _plan_lines += [f'## 任务 {_n}：{_title}', '', f'验证：{_verify}', '']
+  write(f'docs/plans/{_cid}.plan.md', '\n'.join(_plan_lines))
+  # R3/R4：执行账本 + 任务三件套 + 评审包 diff
+  _ledger_dir = f'.superpowers/sdd/{_cid}.plan'
+  _ledger_lines = [
+    f'# SDD ledger — plan: docs/plans/{_cid}.plan.md', '',
+    '任务账本（superpowers SDD）：逐任务一行 `Task N: complete`（附提交号）；',
+    '三件套 task-<N>-brief.md / task-<N>-report.md 与评审包 review-*.diff 与账本同目录。', '',
+  ]
+  for _n, (_title, _verify) in enumerate(_tasks, 1):
+    _ledger_lines.append(f'Task {_n}: complete (commits {_fake_sha(f"{_cid}-task{_n}")})')
+  write(f'{_ledger_dir}/progress.md', '\n'.join(_ledger_lines) + '\n')
+  for _n, (_title, _verify) in enumerate(_tasks, 1):
+    _sha = _fake_sha(f'{_cid}-task{_n}')
+    write(f'{_ledger_dir}/task-{_n}-brief.md',
+          f'# 任务 {_n} 简报：{_title}' + chr(10) + chr(10) +
+          f'变更：{_cid}（阶段 {_p}）；输入：上游阶段门产物 + 编码计划 docs/plans/{_cid}.plan.md。' + chr(10) +
+          f'验收：{_verify}' + chr(10))
+    write(f'{_ledger_dir}/task-{_n}-report.md',
+          f'# 任务 {_n} 回执：{_title}' + chr(10) + chr(10) +
+          f'提交：{_sha}；结果：完成，验证命令退出码 0（e2e 调测）；未偏离编码计划。' + chr(10))
+  write(f'{_ledger_dir}/review-{_cid}-t1.diff',
+        'diff --git a/src/counter.ts b/src/counter.ts' + chr(10) +
+        '--- a/src/counter.ts' + chr(10) +
+        '+++ b/src/counter.ts' + chr(10) +
+        f'@@ -1,3 +1,6 @@  // 任务 1 评审包（{_cid}，e2e 调测占位 diff）' + chr(10) +
+        '+  inc(): CounterState { return this.transition("inc"); }' + chr(10) +
+        '+  reset(): CounterState { return this.transition("reset"); }' + chr(10))
+  # 旧链路制品（openspec/changes/<cid>/）保留：旧门禁仍在 pre-push 路径上，其契约由 samples fixture 覆盖
   for _doc in ('proposal.md', 'design.md', 'tasks.md', 'tickets.md'):
     write(f'openspec/changes/{_cid}/{_doc}',
-          '# ' + _doc[:-3] + chr(10) + chr(10) + f'{_cid} 变更{_doc[:-3]}（counter-api e2e 调测）：变更文件 ' + ', '.join(PHASE_FILES[_p]) + '。' + chr(10))
+          '# ' + _doc[:-3] + chr(10) + chr(10) + f'{_cid} 变更{_doc[:-3]}（counter-api e2e 调测，旧 opsx 链路制品）：变更文件 ' + ', '.join(PHASE_FILES[_p]) + '。' + chr(10))
   write(f'openspec/changes/{_cid}/specs/.gitkeep', '')
 
 print('workspace built at', ROOT)
