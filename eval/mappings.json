@@ -123,7 +123,7 @@
       "evidence": { "type": "selfTestSource", "substring": "bad-round-exceeded" } },
     { "id": 21, "scenario": "编码计划制品契约与执行账本完整性", "layer": "L2",
       "assertions": [
-        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "编码计划契约" },
+        { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "编码计划契约", "scopeAnchor": "phase-5-coding.md" },
         { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "superpowers-adoption.md" },
         { "type": "fileExists", "target": "w-model-dev/scripts/cli/check-coding-plan.ts" }
       ],

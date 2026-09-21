@@ -129,8 +129,8 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 1   | 需求分析 | 验收测试设计  | User Stories       | phase-1-requirements.md     |
 | 2   | 系统设计 | 系统测试设计  | seam               | phase-2-system-design.md    |
 | 3   | 概要设计 | 集成测试设计  | Tracer-bullet      | phase-3-outline-design.md   |
-| 4   | 详细设计 | 单元测试设计  | 编码计划契约       | phase-4-detailed-design.md  |
-| 5   | 编码实现 | 单元测试执行  | 归档+编码计划      | phase-5-coding.md           |
+| 4   | 详细设计 | 单元测试设计  | —                  | phase-4-detailed-design.md  |
+| 5   | 编码实现 | 单元测试执行  | 编码计划契约       | phase-5-coding.md           |
 | 6   | 集成测试 | 集成测试执行  | —                  | phase-6-integration-test.md |
 | 7   | 系统测试 | 系统测试执行  | —                  | phase-7-system-test.md      |
 | 8   | 验收测试 | 验收测试执行  | —                  | phase-8-acceptance-test.md  |
