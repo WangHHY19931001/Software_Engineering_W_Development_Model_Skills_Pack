@@ -17,15 +17,15 @@
 | 2 系统设计 | §1 + §2 + §3（阶段 2 行）+ §6.3（阶段 2 门）             | §3 阶段 2 系统设计三行；§6.3 阶段 2 门禁                           |
 | 3 概要设计 | §1 + §2 + §3（阶段 3 行）+ §6.3（阶段 3 门）             | §3 阶段 3 概要设计三行；§6.3 阶段 3 门禁                           |
 | 4 详细设计 | §1 + §2 + §3（阶段 4 行）+ §6.3（阶段 4 门）             | §3 阶段 4 详细设计三行；§6.3 阶段 4 门禁                           |
-| 5 编码     | §1 + §2 + §3（阶段 5 行）+ §5 三段式 + §6.3（阶段 5 门） | §3 阶段 5 编码三行；§5 explore/propose/coding 表；§6.3 阶段 5 门禁 |
-| 6 集成测试 | §1 + §2 + §3（阶段 6 行）+ §5 三段式 + §6.3（阶段 6 门） | §3 阶段 6 集成测试三行；§5 三段式表；§6.3 阶段 6 门禁              |
-| 7 系统测试 | §1 + §2 + §3（阶段 7 行）+ §5 三段式 + §6.3（阶段 7 门） | §3 阶段 7 系统测试三行；§5 三段式表；§6.3 阶段 7 门禁              |
-| 8 验收测试 | §1 + §2 + §3（阶段 8 行）+ §5 三段式 + §6.3（阶段 8 门） | §3 阶段 8 验收测试三行；§5 三段式表；§6.3 阶段 8 门禁              |
+| 5 编码     | §1 + §2 + §3（阶段 5 行）+ §5 编码链 + §6.3（阶段 5 门） | §3 阶段 5 编码三行；§5 plan/execute/finalize 表；§6.3 阶段 5 门禁 |
+| 6 集成测试 | §1 + §2 + §3（阶段 6 行）+ §5 编码链 + §6.3（阶段 6 门） | §3 阶段 6 集成测试三行；§5 编码链表；§6.3 阶段 6 门禁              |
+| 7 系统测试 | §1 + §2 + §3（阶段 7 行）+ §5 编码链 + §6.3（阶段 7 门） | §3 阶段 7 系统测试三行；§5 编码链表；§6.3 阶段 7 门禁              |
+| 8 验收测试 | §1 + §2 + §3（阶段 8 行）+ §5 编码链 + §6.3（阶段 8 门） | §3 阶段 8 验收测试三行；§5 编码链表；§6.3 阶段 8 门禁              |
 | 返工循环   | §4 返工循环分派 + §1（R 角色）+ §6.2                     | §4 返工循环表 + S-emergency-fix 表                                 |
 | 全阶段通用 | §1 角色速查 + §7 反模式→check 映射                       | §1 角色表 + §7 反模式映射表                                        |
 
 > 阶段 1-4 的 A 子代理 ingestion 子流程见 §2 注（A-chunk/A-cross/A-evolve 分别加载 ingestion-chunk/ingestion-cross/graph-guide）。
-> 阶段 5-8 进入 CHECKPOINT 时另跑 ensure-codegraph（见 §5 依赖引导）。
+> 阶段 5-8 进入 CHECKPOINT 时另跑 `ensure-codegraph.ts`（L1 codegraph CLI 必需 + superpowers 宿主技能目录（≥3 关键技能，只检测不安装）/ L2 技能包 `references/superpowers-adoption.md` / L3 项目 `docs/superpowers/`；codegraph CLI 缺失自动安装、superpowers 只检测不安装；MCP 注册仅可选加速、未注册不出 CHECKPOINT；superpowers 三层缺失 → CHECKPOINT）。详见 §5 依赖引导。
 
 ### 1. 角色速查
 
@@ -38,11 +38,11 @@
 | A    | 分析   | 阶段 1-4 分块 / 合并 / 图谱演进                           | 不跑图谱门禁 / 不写正式产物  |
 | R    | 根因   | 返工时定位根因 + R3 预防性审查                            | 不实施修复 / 不跨阶段        |
 
-> S 变体（10 种）：S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd（阶段 1-4 拆分）/ S-explore / S-propose / S-coding（阶段 5-8 三段式）/ S-fix / S-emergency-fix（返工）。
+> S 变体（10 种）：S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd（阶段 1-4 拆分）/ S-plan / S-coding / S-finalize（阶段 5-8 superpowers 编码链）/ S-fix / S-emergency-fix（返工）。
 
 ### 1.1 S 变体 × R3/V/G 触发矩阵（消歧）
 
-> 事实基准（check-preventive-review.ts 已确认）：R3 变体按**工作类型** 4 种（standard / fix / emergency / ingest），**不按 S 角色拆分**——S-doc / S-tla / S-bdd 共享同一套 standard R3×3。每阶段每变体一套 R3×3 + V×1 + G×1；阶段 5-8 opsx 按段（explore / propose / apply）各一套。消除 18→30 分派漂移歧义。
+> 事实基准（check-preventive-review.ts 已确认）：R3 变体按**工作类型** 4 种（standard / fix / emergency / ingest），**不按 S 角色拆分**——S-doc / S-tla / S-bdd 共享同一套 standard R3×3。每阶段每变体一套 R3×3 + V×1 + G×1；阶段 5-8 编码链按段（plan / execute / finalize）各一套。消除 18→30 分派漂移歧义。
 
 | 工作类型 variant | 触发场景                                      | R3 报告前缀                    | R3×3 | V×1 | G×1 |
 | ---------------- | --------------------------------------------- | ------------------------------ | ---- | --- | --- |
@@ -51,13 +51,13 @@
 | emergency        | S-emergency-fix 紧急修复后                    | `<phase>-emergency-{dim}.json` | ✅   | ✅  | ✅  |
 | ingest           | S-ingest-tla / S-ingest-bdd 后                | `<phase>-ingest-{dim}.json`    | ✅   | ✅  | ✅  |
 
-阶段 5-8 opsx 三段式（每段各一套 R3×3 + V×1 + G×1）：
+阶段 5-8 superpowers 编码链（每段各一套 R3×3 + V×1 + G×1）：
 
-| 段      | S 变体    | R3×3 | V×1 | G×1 |
-| ------- | --------- | ---- | --- | --- |
-| explore | S-explore | ✅   | ✅  | ✅  |
-| propose | S-propose | ✅   | ✅  | ✅  |
-| apply   | S-coding  | ✅   | ✅  | ✅  |
+| 段       | S 变体     | R3×3 | V×1 | G×1 |
+| -------- | ---------- | ---- | --- | --- |
+| plan     | S-plan     | ✅   | ✅  | ✅  |
+| execute  | S-coding   | ✅   | ✅  | ✅  |
+| finalize | S-finalize | ✅   | ✅  | ✅  |
 
 ### 2. 每阶段分派时序
 
@@ -66,7 +66,7 @@
 ```
 O: 路由 + 读状态 + 检查前置产物 + 加载最小引用集
 O: 🔴 CHECKPOINT · 阶段进入确认
-  ↓ 分派 S 产出（阶段 1-4 可拆 S-doc→S-tla→S-bdd；阶段 5-8 拆 S-explore→S-propose→S-coding）
+  ↓ 分派 S 产出（阶段 1-4 可拆 S-doc→S-tla→S-bdd；阶段 5-8 拆 S-plan→S-coding→S-finalize）
 S: 产出阶段产物 + 同步测试设计 + 回填 RTM
   ↓ 分派 R3 ×3（completeness / reliability / security，可并行）
 R3: 三份 PreventiveReview JSON
@@ -104,22 +104,25 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 | 4 详细设计 | S-tla  | L4 TLA+ 规格（L3 + 按需 L4）+ tla-manifest.json                          | tla-plus                                                                             | check-tla-model(--phase=4, --graph 强制) + project pair sync（两份 manifest 真实有效且双向配对后）                |
 | 4 详细设计 | S-bdd  | L4 BDD features（parent→L3）+ bdd-manifest.json + RTM unitTest 列        | bdd                                                                                  | check-bdd-model(--phase=4, --graph 强制)                                                                          |
 
-### 阶段 5-8（编码/测试执行阶段，S 三段式：S-explore / S-propose / S-coding）
+### 阶段 5-8（编码/测试执行阶段，superpowers 编码链：S-plan / S-coding / S-finalize）
 
-| 阶段       | S 变体    | 产出物                                                                                    | 加载的 reference                                    | 触发的 check 脚本                                                                                                                                                                                                        |
-| ---------- | --------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 5 编码     | S-explore | exploration-analysis.md（方案对比 + codegraph 影响初判）                                  | phase-5-coding / rtm-guide                          | check-codegraph-queries / check-opsx-artifacts                                                                                                                                                                           |
-| 5 编码     | S-propose | opsx 产物（proposal/specs/design/tasks）+ tickets.md                                      | phase-5-coding / rtm-guide                          | check-opsx-artifacts                                                                                                                                                                                                     |
-| 5 编码     | S-coding  | 代码 + 单元测试 + codegraph-queries 落盘 + code-TLA 校验报告 + RTM codeModule 回填        | phase-5-coding / rtm-guide / quality-standards      | check-code-tla-consistency / check-design-contract-consistency / check-state-machine-consistency / check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=5 cucumber) / check-artifact-gate(--phase=5) |
-| 6 集成测试 | S-explore | exploration-analysis.md（测试策略 + codegraph 查被测模块）                                | phase-6-integration-test / rtm-guide                | check-codegraph-queries / check-opsx-artifacts                                                                                                                                                                           |
-| 6 集成测试 | S-propose | opsx 产物 + tickets.md（测试代码切片）                                                    | phase-6-integration-test / rtm-guide                | check-opsx-artifacts                                                                                                                                                                                                     |
-| 6 集成测试 | S-coding  | 集成测试代码 + codegraph-queries 落盘 + 测试报告 + RTM integrationTest 回填               | phase-6-integration-test / rtm-guide                | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=6 cucumber) / check-artifact-gate(--phase=6)                                                                                                    |
-| 7 系统测试 | S-explore | exploration-analysis.md（测试策略 + codegraph 查被测模块）                                | phase-7-system-test / rtm-guide / quality-standards | check-codegraph-queries / check-opsx-artifacts                                                                                                                                                                           |
-| 7 系统测试 | S-propose | opsx 产物 + tickets.md（测试代码切片）                                                    | phase-7-system-test / rtm-guide / quality-standards | check-opsx-artifacts                                                                                                                                                                                                     |
-| 7 系统测试 | S-coding  | 系统测试代码 + codegraph-queries 落盘 + 性能/安全/兼容性报告 + RTM systemTest 回填        | phase-7-system-test / rtm-guide / quality-standards | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=7 cucumber) / check-artifact-gate(--phase=7)                                                                                                    |
-| 8 验收测试 | S-explore | exploration-analysis.md（测试策略 + codegraph 查被测模块）                                | phase-8-acceptance-test / rtm-guide                 | check-codegraph-queries / check-opsx-artifacts                                                                                                                                                                           |
-| 8 验收测试 | S-propose | opsx 产物 + tickets.md（测试代码切片）                                                    | phase-8-acceptance-test / rtm-guide                 | check-opsx-artifacts                                                                                                                                                                                                     |
-| 8 验收测试 | S-coding  | 验收测试代码 + codegraph-queries 落盘 + 验收报告 + Archive 产物 + RTM acceptanceTest 回填 | phase-8-acceptance-test / rtm-guide                 | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-archive-integrity / check-design-contract-consistency                  |
+| 阶段       | S 变体     | 产出物                                                                                                          | 加载的 reference                                    | 触发的 check 脚本                                                                                                                                                                                                          |
+| ---------- | ---------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 5 编码     | S-plan     | `docs/plans/<changeId>.plan.md`（目标节 + 任务节 + 逐任务「验证：」命令行）+ codegraph 影响初判                | phase-5-coding / rtm-guide                          | check-coding-plan / check-codegraph-queries                                                                                                                                                                                |
+| 5 编码     | S-coding   | 代码 + 单元测试 + 账本 `.superpowers/sdd/<plan-基名>/progress.md` + 三件套 + review-*.diff + codegraph-queries 落盘 + code-TLA 校验报告 + RTM codeModule 回填 | phase-5-coding / rtm-guide / quality-standards      | check-code-tla-consistency / check-design-contract-consistency / check-state-machine-consistency / check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=5 cucumber) / check-artifact-gate(--phase=5) |
+| 5 编码     | S-finalize | 阶段收口（账本完成覆盖 + 三件套齐备 + stage 级 R3×9/V×3）                                                       | phase-5-coding / rtm-guide                          | check-coding-plan / check-artifact-gate(--phase=5)                                                                                                                                                                         |
+| 6 集成测试 | S-plan     | `docs/plans/<changeId>.plan.md`（测试代码任务节）+ codegraph 查被测模块                                          | phase-6-integration-test / rtm-guide                | check-coding-plan / check-codegraph-queries                                                                                                                                                                                |
+| 6 集成测试 | S-coding   | 集成测试代码 + 账本 + 三件套 + codegraph-queries 落盘 + 测试报告 + RTM integrationTest 回填                     | phase-6-integration-test / rtm-guide                | check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=6 cucumber) / check-artifact-gate(--phase=6)                                                                                                          |
+| 6 集成测试 | S-finalize | 阶段收口（账本完成覆盖 + 三件套齐备 + stage 级 R3×9/V×3）                                                       | phase-6-integration-test / rtm-guide                | check-coding-plan / check-artifact-gate(--phase=6)                                                                                                                                                                         |
+| 7 系统测试 | S-plan     | `docs/plans/<changeId>.plan.md`（测试代码任务节）+ codegraph 查被测模块                                          | phase-7-system-test / rtm-guide / quality-standards | check-coding-plan / check-codegraph-queries                                                                                                                                                                                |
+| 7 系统测试 | S-coding   | 系统测试代码 + 账本 + 三件套 + codegraph-queries 落盘 + 性能/安全/兼容性报告 + RTM systemTest 回填              | phase-7-system-test / rtm-guide / quality-standards | check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=7 cucumber) / check-artifact-gate(--phase=7)                                                                                                          |
+| 7 系统测试 | S-finalize | 阶段收口（账本完成覆盖 + 三件套齐备 + stage 级 R3×9/V×3）                                                       | phase-7-system-test / rtm-guide / quality-standards | check-coding-plan / check-artifact-gate(--phase=7)                                                                                                                                                                         |
+| 8 验收测试 | S-plan     | `docs/plans/<changeId>.plan.md`（测试代码任务节）+ codegraph 查被测模块                                          | phase-8-acceptance-test / rtm-guide                 | check-coding-plan / check-codegraph-queries                                                                                                                                                                                |
+| 8 验收测试 | S-coding   | 验收测试代码 + 账本 + 三件套 + codegraph-queries 落盘 + 验收报告 + RTM acceptanceTest 回填                      | phase-8-acceptance-test / rtm-guide                 | check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-design-contract-consistency                                                                          |
+| 8 验收测试 | S-finalize | 归档快照（`<changeId>.plan.md` + `progress.md` + 三件套）→ `docs/changes/archive/<日期>-<changeId>/`            | phase-8-acceptance-test / rtm-guide                 | check-archive-integrity（codingPlanSnapshot）/ check-coding-plan / check-artifact-gate(终检)                                                                                                                              |
+
+> 旧 OpenSpec opsx 制品门 `check-opsx-artifacts.ts` 仍在盘并仍在 pre-push 执行路径上（与本表新链路并存，退役随批次收尾）；新链路不再读取 `openspec/changes/`。
+
 
 > A 子代理（阶段 1-4 ingestion）：A-chunk 加载 ingestion-chunk / graph-guide；A-cross 加载 ingestion-cross / graph-guide；A-evolve 加载 ingestion-cross / graph-guide。A 不跑 check 脚本（G 负责）。
 
@@ -295,34 +298,35 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 
 > 跳过 R 直接 S 返工命中反模式 #18；R 报告未 V 复审直接 S 修复命中反模式 #19。S-fix 之后那次 V 复审（第 6 步）与后续复审轮次按 §3.4「scoped re-review 契约」执行：只审 fix delta、逐 finding 给 `ADDRESSED` / `NOT ADDRESSED`、Minor 不进 loop、每任务最多 5 轮；该契约**不改变本前置**——复审不得成为跳过 R 的旁路。
 
-### 5. 阶段 5-8 三段式 S 分派（opsx + codegraph）
+### 5. 阶段 5-8 编码链 S 分派（superpowers + codegraph）
 
 > 约束 #14。每段产物须跑 R3×3 + V 审查（反模式 #39）。
-> 依赖引导：阶段 5 进入 CHECKPOINT 时另跑 `ensure-codegraph.ts`（L1 CLI 与宿主技能 / L2 技能包资产 / L3 项目目录三层检测；codegraph CLI 缺失自动安装，MCP 仅可选加速，superpowers 只检测不安装）；阶段 6-8 复检（--mode quick）。
+> 依赖引导：阶段 5 进入 CHECKPOINT 时另跑 `ensure-codegraph.ts`（L1 codegraph CLI 必需 + superpowers 宿主技能目录（≥3 关键技能）/ L2 技能包资产 `references/superpowers-adoption.md` / L3 项目 `docs/superpowers/` 三层检测；codegraph CLI 缺失自动安装，MCP 注册仅可选加速，superpowers 只检测不安装）；阶段 6-8 复检（--mode quick）。判据单源 `lib/superpowers-detect.ts`（ensure 与 doctor 共用）。
 
-| 段      | S 变体    | 产物                                                                                       | reference                                             | check 脚本                                                    |
-| ------- | --------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------- |
-| explore | S-explore | exploration-analysis.md（方案对比 / 推荐 / codegraph 影响初判）                            | phase-N-*.md + rtm-guide                              | check-codegraph-queries / check-opsx-artifacts                |
-| propose | S-propose | opsx 产物（proposal/specs/design/tasks）+ tickets.md（tracer-bullet + blocking edges DAG） | phase-N-*.md + rtm-guide                              | check-opsx-artifacts                                          |
-| coding  | S-coding  | 代码 + 测试 + codegraph-queries 落盘 + TLA 校验报告                                        | phase-N-*.md + rtm-guide + quality-standards(阶段5/7) | check-codegraph-queries + check-opsx-artifacts + 原阶段 check |
+| 段       | S 变体     | 产物                                                                                                                            | reference                                             | check 脚本                                                        |
+| -------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------- |
+| plan     | S-plan     | `docs/plans/<changeId>.plan.md`（目标节 / 任务节 / 逐任务验证命令行）+ tickets.md（tracer-bullet + blocking edges DAG）          | phase-N-*.md + rtm-guide                              | check-coding-plan / check-codegraph-queries                       |
+| execute  | S-coding   | 代码 + 测试 + 账本 `.superpowers/sdd/<plan-基名>/progress.md`（`Task N: complete`）+ 三件套 + review-*.diff + codegraph-queries 落盘 + TLA 校验报告 | phase-N-*.md + rtm-guide + quality-standards(阶段5/7) | check-codegraph-queries + check-coding-plan + 原阶段 check         |
+| finalize | S-finalize | 阶段收口（账本完成覆盖 + 三件套齐备）；阶段 8 另沉淀归档快照 → `docs/changes/archive/<日期>-<changeId>/`                         | phase-N-*.md + rtm-guide                              | check-coding-plan + （阶段 8）check-archive-integrity              |
 
-### stage 级 R3 + V 产物（阶段 5-8 opsx 三段式专属）
+### stage 级 R3 + V 产物（阶段 5-8 编码链专属）
 
-| 产物类型 | 路径                                                                                           | 数量 |
-| -------- | ---------------------------------------------------------------------------------------------- | ---- |
-| R3 报告  | `.w-model/r3-reviews/phase<N>-{explore,propose,coding}-{completeness,reliability,security}.md` | 9 份 |
-| V 评审   | `.w-model/v-reviews/phase<N>-{explore,propose,coding}.md`                                      | 3 份 |
+| 产物类型 | 路径                                                                                                     | 数量 |
+| -------- | -------------------------------------------------------------------------------------------------------- | ---- |
+| R3 报告  | `.w-model/r3-reviews/phase<N>-{plan,execute,finalize}-{completeness,reliability,security}.md`             | 9 份 |
+| V 评审   | `.w-model/v-reviews/phase<N>-{plan,execute,finalize}.md`                                                  | 3 份 |
 
-> 缺失任一文件命中反模式 #39（跳过 opsx 产物审查），由 check-opsx-artifacts.ts 校验。
+> 缺失任一文件命中反模式 #39（跳过编码计划审查），由 `check-coding-plan.ts` R5 校验（stage 词表 plan/execute/finalize；旧词表 explore/propose/coding 不充数）。旧 opsx 制品门 `check-opsx-artifacts.ts` 仍在盘并与本链并存（退役随批次收尾）。
 
-### opsx 与 S-tickets 职责边界（反模式 #40）
+### plan 任务与账本 / 切片职责边界（反模式 #40）
 
-| 制品       | 产出者                      | 内容                               | 职责       |
-| ---------- | --------------------------- | ---------------------------------- | ---------- |
-| tasks.md   | opsx:propose                | 高层任务清单（what/why）           | 规格级规划 |
-| tickets.md | S-tickets（S-propose 兼任） | 代码垂直切片（how，端到端可 demo） | 代码级切片 |
+| 制品                                                     | 产出者                  | 内容                                | 职责           |
+| -------------------------------------------------------- | ----------------------- | ----------------------------------- | -------------- |
+| `docs/plans/<changeId>.plan.md` 任务节                   | S-plan（writing-plans） | 高层任务清单（what/why），执行单元  | 规格级规划     |
+| `.superpowers/sdd/<plan-基名>/progress.md`               | S-coding（SDD 执行）    | 逐任务完成证明（`Task N: complete`） | 完成证据       |
+| tickets.md                                               | S-tickets（S-plan 兼任） | 代码垂直切片（how，端到端可 demo）  | 代码级切片     |
 
-> S-coding 不做拆解，只按 tickets.md frontier 执行。每片 Edit/Write 前须 codegraph_explore（约束 #14，反模式 #38）。
+> S-coding 按 plan 任务节逐任务执行（任务内以 tickets.md frontier 切片）；每片 Edit/Write 前须经 codegraph CLI 查询（`codegraph query <符号>`；宿主 MCP 工具为可选加速），约束 #14，反模式 #38。账本 `Task N: complete` 与 plan 任务节、任务三件套的绑定由 `check-coding-plan.ts` R2/R3/R4 校验。
 
 ### 6. 每阶段门禁脚本清单
 
@@ -354,10 +358,12 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 | 2 系统设计 | 同上                                                                         | check-requirement-graph(--phase=2) / check-tla-model(--phase=2, --graph 强制) / check-bdd-model(--phase=2, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖）                            |
 | 3 概要设计 | 同上                                                                         | check-requirement-graph(--phase=3) / check-tla-model(--phase=3, --graph 强制) / check-bdd-model(--phase=3, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖）                            |
 | 4 详细设计 | 同上                                                                         | check-requirement-graph(--phase=4，零违反硬约束) / check-tla-model(--phase=4, --graph 强制) / check-bdd-model(--phase=4, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖）              |
-| 5 编码     | 同上                                                                         | check-code-tla-consistency / check-design-contract-consistency / check-state-machine-consistency / check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=5 cucumber) / check-artifact-gate(--phase=5)       |
-| 6 集成测试 | 同上                                                                         | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=6 cucumber) / check-artifact-gate(--phase=6)                                                                                                          |
-| 7 系统测试 | 同上                                                                         | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=7 cucumber) / check-artifact-gate(--phase=7)                                                                                                          |
-| 8 验收测试 | 同上                                                                         | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-archive-integrity / check-design-contract-consistency                        |
+| 5 编码     | 同上                                                                         | check-code-tla-consistency / check-design-contract-consistency / check-state-machine-consistency / check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=5 cucumber) / check-artifact-gate(--phase=5)       |
+| 6 集成测试 | 同上                                                                         | check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=6 cucumber) / check-artifact-gate(--phase=6)                                                                                                          |
+| 7 系统测试 | 同上                                                                         | check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=7 cucumber) / check-artifact-gate(--phase=7)                                                                                                          |
+| 8 验收测试 | 同上                                                                         | check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-archive-integrity（codingPlanSnapshot 条件项） / check-design-contract-consistency                        |
+
+> 旧 opsx 制品门 `check-opsx-artifacts.ts` 仍在盘并仍在 pre-push 执行路径（与本表新链路并存，退役随批次收尾）。
 
 > 阶段 4 硬约束：check-requirement-graph.ts --phase=4 + check-tla-model.ts --phase=4 退出码必须为 0（零违反），否则不放行进阶段 5 编码。
 
@@ -366,7 +372,7 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 ### 6.4 工具与元门禁脚本（门禁脚本权威登记表收尾）
 
 > 本小节补全非阶段门触发的工具类 CLI、code-health 门禁 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 47 个 .ts
-> 一一对应（27 个 check-* + 7 个 code-health 门禁 CLI + 13 个工具：ensure-codegraph 见 §5 / 其余见下表；其中 46 个为 exit-2 脚本，self-test.ts 为 exit 0/1 回归基线，与 conventions.md「= 46（27 个 check-* + 19 个工具 CLI，不含 self-test；19 = 7 个 code-health 门禁 CLI + 12 个工具 CLI）」口径互补）。
+> 一一对应（28 个 check-* + 7 个 code-health 门禁 CLI + 11 个工具 CLI + self-test.ts：ensure-codegraph 见 §5 / 其余见下表；其中 46 个为 exit-2 脚本，self-test.ts 为 exit 0/1 回归基线不计入，与 conventions.md「= 46（28 个 check-* + 18 个工具 CLI，不含 self-test；18 = 7 个 code-health 门禁 CLI + 11 个工具 CLI）」口径互补）。
 > **新增 / 改名门禁脚本时登记点为本表 + SKILL.md/AGENTS.md 计数句（由 checkScriptRegistry 与计数检查双向兜底）**——`check-docs-consistency.ts` 的 checkScriptRegistry
 > 核对全部 47 个 cli 脚本名均出现于本文件，SKILL.md「N 个 .ts」/ AGENTS.md「N 个脚本」/ conventions.md 计数句由计数检查同步核对（漏登记即门禁失败，pre-push 第 15 项拦截）。
 
@@ -418,7 +424,7 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 | #33 跳过 R3              | check-preventive-review（--variant=standard                                | fix | emergency | ingest）+ check-run-log R8 |
 | #34 漏派角色             | check-role-dispatch（S/V/G 各 ≥1 + R3 三维度无条件，`--r3-enabled` no-op） |
 | #38 codegraph 未查询     | check-codegraph-queries                                                    |
-| #39 跳过 opsx 审查       | check-opsx-artifacts                                                       |
+| #39 跳过编码计划审查     | check-coding-plan                                                          |
 | #41 单轴失败掩盖         | check-verifier-output R13                                                  |
 | #42 S-fix 跳过 R3+V      | check-preventive-review(--variant=fix/emergency) + check-run-log R8        |
 | #44 跳过冰山扫掠直接放行 | check-iceberg-sweep（R1-R8，ICEBERG-A/B 触发）+ V 复审新发现               |
@@ -606,7 +612,7 @@ phase: <N - 名称>
 
 每个子代理任务须满足**全部**，否则 O 必须先拆分再分派：
 
-- **单一产出类型**：doc / tla / bdd / code / review / gate / rootcause 之一；混合产出 → 用既有变体拆分（S-doc / S-tla / S-bdd、S-explore / S-propose / S-coding、R-lead / R-persona）。
+- **单一产出类型**：doc / tla / bdd / code / review / gate / rootcause 之一；混合产出 → 用既有变体拆分（S-doc / S-tla / S-bdd、S-plan / S-coding / S-finalize、R-lead / R-persona）。
 - **单一阶段**：越阶段 → 拆分。
 - **输入文件 ≤ 5 个**：超出 → 用 `brief.md` 聚合路径列表，子代理按需 `Read`，禁止全量塞入 brief。
 - **产出文件 ≤ 3 个**：超出 → 拆分为多次分派。
@@ -687,7 +693,7 @@ O: 若通过 → 🔴 CHECKPOINT · 发布放行（展示 GATE_JSON 给用户）
 O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完成
 ```
 
-> **阶段 5-8 门禁顺序与 ChangeScope（2026-09-04 audit-gate-closure）**：阶段 5-8 的 G 侧执行顺序为 **codegraph/opsx strict 校验 → artifact gate（聚合）→（阶段 8）opsx:archive → check-archive-integrity.ts（归档完整性 + 编码计划归档快照后置校验，2026-09-21 自 check-openspec-archive 退役并入）→ CHECKPOINT**。`check-artifact-gate.ts --phase=5..8` 与 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts` 均须绑定变更上下文：`--scope=<change-scope.json>`（或 `--change=<changeId> --base=<ref> --head=<ref>` 薄封装），缺失 → exit 1（fail-closed；S-coding 须随阶段产物产出并更新 scope，`headRef` 过期或 `changedFiles` 与实际 Git 变更集合不符同样 fail-closed）。artifact gate 把两个 strict checker 的 violations 并入 reasons/exitCode（不得被 RTM 通过掩盖），`GATE_JSON` 含 external summary；归档后置校验已并入 `check-archive-integrity.ts`（codingPlanSnapshot 清单项，自动派生），不在 pre-archive 的 artifact gate 内强制。
+> **阶段 5-8 门禁顺序与 ChangeScope（2026-09-04 audit-gate-closure）**：阶段 5-8 的 G 侧执行顺序为 **codegraph/coding-plan strict 校验 → artifact gate（聚合）→（阶段 8）编码计划归档快照 → check-archive-integrity.ts（归档完整性 + 编码计划归档快照后置校验；2026-09-21 自 check-openspec-archive 退役并入）→ CHECKPOINT**。`check-artifact-gate.ts --phase=5..8` 与 `check-codegraph-queries.ts` / `check-coding-plan.ts` 均须绑定变更上下文：`--scope=<change-scope.json>`（或 `--change=<changeId> --base=<ref> --head=<ref>` 薄封装），缺失 → exit 1（fail-closed；S-coding 须随阶段产物产出并更新 scope，`headRef` 过期或 `changedFiles` 与实际 Git 变更集合不符同样 fail-closed）。artifact gate 把两个 strict checker 的 violations 并入 reasons/exitCode（不得被 RTM 通过掩盖；coding-plan violations 以 `[coding-plan]` 前缀、`GATE_JSON.external.codingPlan` 计数），`GATE_JSON` 含 external summary；归档后置校验已并入 `check-archive-integrity.ts`（codingPlanSnapshot 清单项，自动派生），不在 pre-archive 的 artifact gate 内强制。旧 opsx 制品门 `check-opsx-artifacts.ts` 仍在盘并仍在 pre-push 执行路径（退役随批次收尾）。
 
 ## 子代理分派模板
 
@@ -767,11 +773,12 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
   - 阶段 5~7 门：
     1. npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<verifier-output.json>"
     2. npx tsx w-model-dev/scripts/cli/check-bdd-model.ts "<bdd-manifest.json>" --phase=<N> --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=<真实报告路径>
-    3. npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N> --scope=<change-scope.json>（内部先跑 codegraph/opsx strict 校验并聚合 violations；scope 亦可 --change=<id> --base=<ref> --head=<ref>）
+    3. npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N> --scope=<change-scope.json>（内部先跑 codegraph/coding-plan strict 校验并聚合 violations；scope 亦可 --change=<id> --base=<ref> --head=<ref>）
     4. npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts [project-dir] --phase=<N> --scope=<change-scope.json>（定位 codegraph 覆盖问题时单独跑）
-    5. npx tsx w-model-dev/scripts/cli/check-opsx-artifacts.ts [project-dir] --phase=<N> --scope=<change-scope.json>（定位 opsx 制品问题时单独跑）
-  - 阶段 8 终检：npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --scope=<change-scope.json>（默认 phase=8，同样聚合 codegraph/opsx strict；终检后另运行 `check-bdd-model.ts` 的 phase 8 graph + required Cucumber report 组合）
-  - 阶段 8 归档后置校验：S-coding 执行归档后，G 单独跑 npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/changes/archive/<changeId 或 日期-changeId 目录>（归档完整性清单 + 编码计划归档快照 codingPlanSnapshot 自动派生校验）
+    5. npx tsx w-model-dev/scripts/cli/check-coding-plan.ts [project-dir] --phase=<N> --scope=<change-scope.json>（定位编码计划/账本/三件套问题时单独跑）
+  - 阶段 8 终检：npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --scope=<change-scope.json>（默认 phase=8，同样聚合 codegraph/coding-plan strict；终检后另运行 `check-bdd-model.ts` 的 phase 8 graph + required Cucumber report 组合）
+  - 阶段 8 归档后置校验：S-finalize 沉淀归档快照后，G 单独跑 npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/changes/archive/<changeId 或 日期-changeId 目录>（归档完整性清单 + 编码计划归档快照 codingPlanSnapshot 自动派生校验）
+  - 旧 opsx 制品门：npx tsx w-model-dev/scripts/cli/check-opsx-artifacts.ts [project-dir] --phase=<N> --scope=<change-scope.json>（仍在盘并仍在 pre-push 路径，与新链路并存；退役随批次收尾）
   - 各阶段还须运行 `check-preventive-review.ts`、其余闭环脚本和 phase-N 定义的专属门禁
 产出契约：
   1. 退出码（0 / 1 / 2）
@@ -956,32 +963,32 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
   - designCoverage.uncoveredSdNodes 须与 graph.json SD 节点比对结果一致
 ```
 
-### 阶段 5-8 S 三段式变体
+### 阶段 5-8 S 编码链变体
 
-> 阶段 5-8 opsx 工作流。阶段 5-8 引入 codegraph + OpenSpec opsx 后，S 角色拆分为三段式变体。每段产物须跑 R3×3 + V 审查。
+> 阶段 5-8 superpowers 编码链（writing-plans → subagent-driven-development → 收口）。阶段 5-8 引入 codegraph + 编码计划制品契约后，S 角色按 stage 拆分为 plan / execute / finalize 三个变体。每段产物须跑 R3×3 + V 审查。
 
-#### S-explore 子代理分派模板
+#### S-plan 子代理分派模板
 
 - **输入**：当前阶段 spec + 上游产物 + codegraph 图谱（已 init）
-- **调用**：`/opsx:explore` + `codegraph_explore`（影响初判）
-- **产出**：`exploration-analysis.md`（方案对比 / 推荐方案 / codegraph 影响初判）
+- **调用**：superpowers `writing-plans`（规格级规划）+ `codegraph query <符号>`（影响初判，CLI 优先；宿主 MCP 工具为可选加速）；任务内可兼任 S-tickets 拆解 → tickets.md（tracer-bullet + blocking edges DAG）
+- **产出**：`docs/plans/<changeId>.plan.md`（目标节 + 任务节，每任务节 ≥1 条「验证：/Verify:」命令行；changeId 须含 `phase<N>-` 前缀）+ `tickets.md`
 - **审查**：R3×3（completeness/reliability/security）→ V 评审 → 不合格打回
-
-#### S-propose 子代理分派模板
-
-- **输入**：S-explore 产物（exploration-analysis.md）+ R3/V 审查通过
-- **调用**：`/opsx:propose <change>` → 产 proposal.md / specs/ / design.md / tasks.md；随后 S-tickets 拆解 → tickets.md（tracer-bullet + blocking edges DAG）
-- **产出**：`openspec/changes/<change>/{proposal,specs,design,tasks}.md` + `tickets.md`
-- **审查**：R3×3 → V 评审 → 不合格打回
-- **职责边界**：opsx:propose 产 tasks.md（what/why），S-tickets 产 tickets.md（how）。反模式 #40 禁止混淆。
+- **职责边界**：plan 任务节（what/why，编码链执行单元）与 tickets.md（how，代码级垂直切片）职责分离。反模式 #40 禁止混淆。
 
 #### S-coding 子代理分派模板
 
-- **输入**：S-propose 产物（tickets.md）+ R3/V 审查通过
-- **调用**：按 tickets.md frontier 逐片执行；每片 `codegraph_explore(目标符号)` → 落盘 `.w-model/codegraph-queries/` → `opsx:apply` 推进 → `Edit`/`Write` 代码 + 单元测试 →该片 code-TLA+ 一致性校验
-- **产出**：代码 + 测试 + `.w-model/codegraph-queries/` + TLA 校验报告
-- **审查**：R3×3 → V 评审 → 不合格打回（指定返工票据）
-- **约束 #14**：任何 Edit/Write 前须 codegraph_explore，否则命中反模式 #38
+- **输入**：S-plan 产物（`docs/plans/<changeId>.plan.md` 任务节）+ R3/V 审查通过
+- **调用**：按 plan 任务节逐任务执行（`subagent-driven-development`）+ TDD 红-绿-重构；每任务 `Edit`/`Write` 前先 `codegraph query <目标符号>` → 落盘 `.w-model/codegraph-queries/` → 代码 + 单元测试 → 该任务 code-TLA+ 一致性校验；任务完成写账本 `Task N: complete`（`.superpowers/sdd/<plan-基名>/progress.md`）
+- **产出**：代码 + 测试 + `.w-model/codegraph-queries/` + TLA 校验报告 + 账本 + 任务三件套（`task-<N>-{brief,report}.md`）+ `review-*.diff`
+- **审查**：R3×3 → V 评审 → 不合格打回（指定返工任务）
+- **约束 #14**：任何 Edit/Write 前须经 codegraph CLI 查询（`codegraph query <符号>`；宿主 MCP 工具为可选加速），否则命中反模式 #38
+
+#### S-finalize 子代理分派模板
+
+- **输入**：S-coding 产物（账本 + 三件套 + review diff）+ R3/V 审查通过
+- **调用**：收口校验——跑 `check-coding-plan.ts <project-root> --phase=<N> --scope=<change-scope.json>`（R1-R6，exit 0）核验 plan / 账本完成覆盖 / 三件套 / stage 级 R3×9+V×3；阶段 8 另把编码计划制品沉淀为归档快照（`docs/changes/archive/<日期>-<changeId>/` 内 `<changeId>.plan.md` + `progress.md` + 三件套）后跑 `check-archive-integrity.ts <archive-dir>`
+- **产出**：收口证据（CODING_PLAN_JSON 摘要）+ （阶段 8）归档快照 + ARCHIVE_INTEGRITY_JSON 摘要
+- **审查**：R3×3 → V 评审 → 不合格打回（回 S-coding 补任务产物）
 
 ### R 子代理分派模板
 
@@ -1033,7 +1040,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 
 > S 产出后、V 评审前触发。R3 复用 R 子代理机制，但目的为预防性审查而非根因定位。
 >
-> **无条件强制**：R3 覆盖**所有 S 变体**：S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**。任意 S 派遣后必须 R3×3 + V，无 flag，无「启用时」措辞。违反字面即违反精神。
+> **无条件强制**：R3 覆盖**所有 S 变体**：S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-plan / S-coding / S-finalize / **S-fix** / **S-emergency-fix**。任意 S 派遣后必须 R3×3 + V，无 flag，无「启用时」措辞。违反字面即违反精神。
 
 **分派时序**：S 产出（任意变体）→ R3-completeness / R3-reliability / R3-security（可并行）→ V 评审
 
@@ -1056,14 +1063,14 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 
 **R3 子代理产出**：`.w-model/preventive-reviews/<phase>[-fix|-emergency]-{completeness,reliability,security}.json`
 
-**阶段 5-8 opsx 三段式 stage 级 R3+V 产物**：
+**阶段 5-8 编码链 stage 级 R3+V 产物**：
 
-opsx 三段式（S-explore → S-propose → S-coding）每段须额外产出 stage 级审查产物：
+superpowers 编码链（S-plan → S-coding → S-finalize）每段须额外产出 stage 级审查产物：
 
-- **R3（9 份）**：`.w-model/r3-reviews/phase<N>-{explore,propose,coding}-{completeness,reliability,security}.md`
-- **V 评审（3 份）**：`.w-model/v-reviews/phase<N>-{explore,propose,coding}.md`
+- **R3（9 份）**：`.w-model/r3-reviews/phase<N>-{plan,execute,finalize}-{completeness,reliability,security}.md`
+- **V 评审（3 份）**：`.w-model/v-reviews/phase<N>-{plan,execute,finalize}.md`
 
-这些 stage 级产物与 `check-opsx-artifacts.ts` 校验口径一致；缺失任一文件命中反模式 #39（跳过 opsx 产物审查）。
+这些 stage 级产物与 `check-coding-plan.ts` R5 校验口径一致（stage 词表 plan/execute/finalize，旧词表 explore/propose/coding 不充数）；缺失任一文件命中反模式 #39（跳过编码计划审查）。
 
 **PreventiveReview schema**：见 `schemas/preventive-review.schema.json`
 

@@ -271,9 +271,9 @@ if (subCriteria.length !== expected.length) {
   任一子标准低于该值即视为该维度不达标，`passed=false`——即使其余子标准高分将
   `compositeScore` 加权平均拉至 ≥ 0.70 也不放行（防止加权平均掩盖单轴失败，
   对应外部 code-review 双轴报告永不合并原则；详见 §6.3 与反模式 #41）。
-- **多子代理协作评审维度（R14-R17）**：当评审对象由多个角色/子代理共同产出（如 S-doc/S-tla/S-bdd 组合、ingestion A-chunk 合并、opsx 三段式产物），V 评审须额外回答协作质量四问（Agentic Design Patterns ch7+ch19）：
+- **多子代理协作评审维度（R14-R17）**：当评审对象由多个角色/子代理共同产出（如 S-doc/S-tla/S-bdd 组合、ingestion A-chunk 合并、superpowers 编码链 plan/execute/finalize 三段产物），V 评审须额外回答协作质量四问（Agentic Design Patterns ch7+ch19）：
   - **R14 交接完整性**：角色间交接的信息是否传对/传全（对照 signature-chain inputProvenance）。
-  - **R15 计划坚持度**：产出是否偏离既定计划/票据（对照 tickets.md frontier / opsx propose）。
+  - **R15 计划坚持度**：产出是否偏离既定计划/任务切片（对照 `docs/plans/<changeId>.plan.md` 任务节与 `.superpowers/sdd/<plan-基名>/progress.md` 账本 / tickets.md frontier）。
   - **R16 角色-任务匹配**：是否为任务选对了角色/persona（对照 agent-personas.md「Persona 矩阵」节）。
   - **R17 增量价值**：新增角色/子代理是否带来增量价值（无价值则提示精简）。
   - 实现：R14-R17 为评审附加检查项，四问结论以固定前缀写入 VerifierOutput 的 `summary` 文本

@@ -23,18 +23,18 @@
 - **验收测试用例执行**：按用户场景验证
 - **用户需求匹配验证**：逐条比对原始需求与系统功能
 
-## opsx 三段式 S 分派 + codegraph 影响分析
+## superpowers 编码链 S 分派 + codegraph 影响分析
 
-> 本阶段（验收测试）产出测试代码，同样适用 opsx 三段式 + codegraph 修改前查询。
+> 本阶段（验收测试）产出测试代码，同样适用编码链分派 + codegraph 修改前查询（契约与制品路径见 [phase-5-coding.md](phase-5-coding.md)「superpowers 编码链 S 分派」节）。
 
-**三段式分派**（与阶段 5 一致）：
-- S-explore：opsx:explore 探索测试策略 + codegraph 查被测模块影响
-- S-propose：opsx:propose 规划测试用例 + S-tickets 拆解测试代码切片
-- S-coding：按 tickets.md frontier 逐片编写测试，每片 codegraph_explore 查被测模块影响半径
+**编码链分派**（与阶段 5 一致）：
+- S-plan：writing-plans 产出 `docs/plans/<changeId>.plan.md`（目标节 + 任务节，每任务节含验证命令行）+ codegraph 查被测模块影响
+- S-coding：subagent-driven-development 逐任务执行 + TDD；执行账本 `.superpowers/sdd/<plan-基名>/progress.md`（逐任务 `Task N: complete`）+ 任务三件套 + `review-*.diff`
+- V/G：任务级 V 评审 → `check-coding-plan.ts --phase=8 --scope=<change-scope.json>`（R1-R6）+ artifact gate 终检聚合 + 归档后 `check-archive-integrity.ts <archive-dir>`（codingPlanSnapshot）
 
-**约束 #14 适用**：测试代码文件 `Edit`/`Write` 前同样须先 codegraph_explore 查询并落盘。
+**约束 #14 适用**：测试代码文件 `Edit`/`Write` 前同样须先经 **codegraph CLI**（`codegraph query <符号>`；宿主 MCP 工具若可用为可选加速）查询被测模块影响半径并落盘。
 
-> **门禁绑定（2026-09-04 audit-gate-closure）**：本阶段 `check-artifact-gate.ts`（终检默认 `--phase=8`）、`check-codegraph-queries.ts`、`check-opsx-artifacts.ts` 与归档后置门 `check-openspec-archive.ts` 均须以 `--scope=<change-scope.json>`（或 `--change/--base/--head` 薄封装）绑定实际变更——缺失 → exit 1（fail-closed）；S-coding 随变更维护/更新 scope（`headRef` 须等于当前 HEAD、`changedFiles` 与实际 Git 变更集合精确一致）。
+> **门禁绑定（2026-09-04 audit-gate-closure）**：本阶段 `check-artifact-gate.ts`（终检默认 `--phase=8`）、`check-codegraph-queries.ts` 与 `check-coding-plan.ts` 均须以 `--scope=<change-scope.json>`（或 `--change/--base/--head` 薄封装）绑定实际变更——缺失 → exit 1（fail-closed）；S-coding 随变更维护/更新 scope（`headRef` 须等于当前 HEAD、`changedFiles` 与实际 Git 变更集合精确一致）。归档后置校验由 `check-archive-integrity.ts <archive-dir>` 承担（见「Archive 机制」节）。旧 opsx 制品门 `check-opsx-artifacts.ts` 与旧链路并存（退役随批次收尾）。
 
 ## 执行方法论
 
@@ -42,7 +42,7 @@
 |---|---|---|
 | UAT-001~003 验收测试 | 按阶段 1 产出验收测试用例手动/半自动执行 | 每条验收标准通过 |
 | UAT-004 文档完整性 | 对照 `templates/` 13 个模板逐一核验 | 文件存在 + 内容与模板结构匹配 |
-| RTM 终检 | `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --scope=<change-scope.json>` | 退出码 0（RTM 100% + 四级测试全通过 + codegraph/opsx strict 聚合通过；终检默认 `--phase=8`，scope 缺失/过期 fail-closed exit 1） |
+| RTM 终检 | `npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --scope=<change-scope.json>` | 退出码 0（RTM 100% + 四级测试全通过 + codegraph/coding-plan strict 聚合通过；终检默认 `--phase=8`，scope 缺失/过期 fail-closed exit 1） |
 | 用户确认 | 在验收测试报告「用户确认」区记录 | `confirm` / `confirm-with-comments` / `reject` |
 
 ## 测试用例设计（执行）
@@ -248,7 +248,7 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 
 ## Archive 机制
 
-> 吸收 OpenSpec archive 机制。项目级放行后，S 子代理执行 archive，沉淀产物到只读目录。
+> 吸收归档快照机制（原吸收自 OpenSpec archive，2026-09-21 编码链改写为 superpowers 编码计划归档快照）。项目级放行后，S 子代理执行 archive，沉淀产物到只读目录。
 
 ### 触发时机
 项目级放行（acceptance-test-report.md §9 用户勾选 confirm）后，S 子代理执行 archive。
@@ -260,7 +260,7 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 - `proposal.md` ← 阶段 1 需求规格的「问题陈述 + 解决方案 + User Stories + Out of Scope」节抽取
 - `specs.md` ← RTM 需求行 + 验收测试用例（UAT-xxx）合并
 - `design.md` ← 阶段 2-4 设计产物的技术决策摘要（不含具体文件路径）
-- `tasks.md` ← 阶段 5 tickets.md 的票据清单 + 完成状态
+- `tasks.md` ← 阶段 5 `docs/plans/<changeId>.plan.md` 的任务节 + 执行账本完成状态
 - `tla-summary.md` ← TLA+ 规格清单（L1/L2/L3/L4 ID + 不变式列表）
 - `rtm-snapshot.json` ← RTM 最终快照（requirementId → {designDoc, codeModule, tests}）
 - `verifier-summary.md` ← 8 阶段 V 评审 qualityLevel + compositeScore 摘要
@@ -269,7 +269,7 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 - 由 S 子代理执行（编排者不越权，反模式 #10 不变）
 - archive 后 `.w-model/` 原始产物保留（不删除，作为可追溯证据）
 - archive 产物只读，后续项目引用时只读取不修改
-- archive 产物禁止具体文件路径（OpenSpec 与 to-spec 共识）
+- archive 产物禁止具体文件路径（归档 durability 共识）
 - **tickets.md 源路径无关性**：阶段 5 票据产出位置（`.w-model/tickets.md` 或 `docs/tickets.md`）不影响 archive——archive 时 S 子代理从源路径读取内容，写入 archive 的 `tasks.md`，源文件保留不动
 - **worktree 收尾归属（S23）**：归档/收尾时按 `phase-5-coding.md`「worktree 纪律（S23）」的**拥有权判定**处置 worktree：
   - 仅清理**本次自建**且位于 `.worktrees/` / `worktrees/` 下的 worktree；**非自建的一律不清理**，交还用户处置；
@@ -281,7 +281,7 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 - archive 路径写入 `project.json.archivePath` 字段（可选字段，默认空字符串，向后兼容）
 - check-artifact-gate.ts 不校验 archivePath（保持纯文档吸收，不新增脚本校验）
 
-> **opsx:archive 后置门（2026-09-04 audit-gate-closure）**：OpenSpec 集成语境下归档动作 = `opsx:archive`（`openspec/changes/<changeId>/` 迁至 `openspec/changes/archive/<日期>-<changeId>/`，日期前缀锚定 `<YYYY-MM-DD>-`）。归档完成后 G **单独**跑 `npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts <project-root> --phase=8 --scope=<change-scope.json>`（缺 scope exit 1；严格锚定恰一个 `<changeId>` 或 `<日期>-<changeId>` 目录、多匹配失败，制品 proposal.md/design.md/tasks.md/tickets.md + specs/ 齐全）；它不在 `check-artifact-gate.ts` pre-archive gate 内强制。本节的 changes/archive 文档产物清单（specs.md / tla-summary.md / rtm-snapshot.json 等）与 `check-archive-integrity.ts` 归档完整性门禁是既有文档归档约定，两者并存、互不替代。
+> **归档后置校验 · 编码计划归档快照（2026-09-21 superpowers 替换批次 1 起）**：原 `check-openspec-archive.ts`（`opsx:archive` 后置门）已**退役**，归档动作 = 把阶段 5-8 编码计划制品沉淀进归档目录（`docs/changes/archive/<日期>-<changeId>/`，S-finalize 子代理执行），归档完成后 G **单独**跑 `npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir>`（`<archive-dir>` 即该变更的归档目录，可选 `--json`）。归档根含**恰一** `*.plan.md` 时 `deriveArchiveIntegrityManifest` 自动启用 **codingPlanSnapshot** 条件项（零匹配 = legacy 归档零行为变化；多匹配 = fail-closed 不猜 changeId），校验归档根 `<changeId>.plan.md` + `progress.md`，并按归档账本的 `Task N: complete` 逐任务核 `task-<N>-{brief,report}.md` 存在性；违规以 `[codingPlanSnapshot]` 前缀并入 missingFiles（fail-closed）。`Task N: complete` 判定与 `check-coding-plan.ts` 同源（共享纯函数），归档快照校验是其**结构子集**（仅查存在性），全量契约（R1-R6）由 `check-coding-plan.ts` 承担；它不在 `check-artifact-gate.ts` pre-archive gate 内强制。本节的 changes/archive 文档产物清单（specs.md / tla-summary.md / rtm-snapshot.json 等）与 `check-archive-integrity.ts` 归档完整性门禁是既有文档归档约定，两者并存、互不替代。
 
 ## 退出状态
 

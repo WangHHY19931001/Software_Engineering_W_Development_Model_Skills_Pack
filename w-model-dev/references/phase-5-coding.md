@@ -66,11 +66,11 @@
 
 ## codegraph 修改前影响分析
 
-> 对应约束 #14 + 反模式 #38。阶段 5-8 任何代码/测试文件 `Edit`/`Write` 前，S-coding 须先调用宿主 Agent 的 `codegraph_explore` MCP 工具。
+> 对应约束 #14 + 反模式 #38。阶段 5-8 任何代码/测试文件 `Edit`/`Write` 前，S-coding 须先经 **codegraph CLI** 查询目标符号影响半径（`codegraph query <符号>`；宿主 MCP 工具若可用为可选加速，非依赖）。
 
 **修改前流程**（ChangeScope 绑定，2026-09-04 audit-gate-closure）：
 1. **变更上下文**：阶段 5-8 门禁要求 codegraph 查询与实际变更绑定——S-coding 须维护 ChangeScope manifest（`schemas/change-scope.schema.json`，落盘如 `.w-model/change-scope.json`：`changeId` 含 `phaseN-` 前缀 / `phase` / `baseRef` / `headRef` / `scopeCreatedAt` / `changedFiles`），保证 `headRef=当前 HEAD`、`changedFiles` 与实际 Git 变更集合精确一致（门禁重算比对，不符 fail-closed）
-2. `codegraph_explore(目标符号)` → 查询 callers / callees / blast radius
+2. `codegraph query <目标符号>`（codegraph CLI，宿主 MCP 工具为可选加速）→ 查询 callers / callees / blast radius
 3. 落盘结果到 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`：除 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp 外，strict 模式（阶段 5-8 CLI）**必须含 `changeId`（精确等于 scope.changeId）与 `targetFiles`（本次查询服务的变更文件，全部属于 scope.changedFiles；每条查询至少声明一个目标文件）**；`queryTimestamp` 不得晚于 scopeCreatedAt。记录结构见 `schemas/codegraph-query.schema.json`
 4. 评估：修改是否波及 callers？是否需同步改 callees？
 5. 安全确认后 `Edit`/`Write` 代码
@@ -78,40 +78,44 @@
 
 **覆盖义务**：scope 中每个须覆盖的 code/test 变更文件（`docs/`、`schemas/`、`config/`、`eval/`、`.w-model/`、`openspec/` 等顶层段、dotfile 与 `*.md` 之外，按工程源码/测试扩展名判定，分类函数 `lib/change-scope.ts` `isCodeOrTestFile`）至少被一个合法查询的 `targetFiles` 覆盖——门禁校验的是**实际覆盖**而非目录存在；未查询/未绑定的变更文件逐文件 violation。`.githooks/` 下无扩展名脚本（如 pre-push）按 code 文件计，改动须被查询覆盖。
 
-**门禁调用**：G 侧 `check-codegraph-queries.ts <project-root> --phase 5|6|7|8 --scope=<change-scope.json>`（或薄封装 `--change=<id> --base=<ref> --head=<ref>`；缺 scope → exit 1 fail-closed；文件/JSON/schema 非法 → exit 2）；阶段 5-8 artifact gate（`check-artifact-gate.ts --phase=N --scope=<file>`）把本 checker 与 opsx strict 校验聚合进 reasons/exitCode。
+**门禁调用**：G 侧 `check-codegraph-queries.ts <project-root> --phase 5|6|7|8 --scope=<change-scope.json>`（或薄封装 `--change=<id> --base=<ref> --head=<ref>`；缺 scope → exit 1 fail-closed；文件/JSON/schema 非法 → exit 2）；阶段 5-8 artifact gate（`check-artifact-gate.ts --phase=N --scope=<file>`）把本 checker 与 coding-plan strict 校验聚合进 reasons/exitCode——`GATE_JSON.external` 含 `codegraph` 与 `codingPlan` 两键，coding-plan violations 以 `[coding-plan]` 前缀并入 reasons。
 
 **与 code-TLA+ 一致性校验的关系**：codegraph = 修改前预防，code-TLA+ = 修改后回归，互补不冲突。
 
-## OpenSpec opsx 三段式 S 分派
+## superpowers 编码链 S 分派
 
-> 阶段 5-8 引入 opsx 工作流做规格级规划，与 S-tickets（代码级切片）共存。
+> 阶段 5-8 以 superpowers 编码链做规格级规划与执行（superpowers 替换 opsx 批次 2；方法论见 [superpowers-adoption.md](superpowers-adoption.md)）。旧 OpenSpec opsx 制品链路（`check-opsx-artifacts.ts`）仍在盘、仍在 pre-push 执行路径上，与本链并存；新链路不再读取 `openspec/changes/`，其退役随批次收尾。
 
-**三段式分派**：
+**编码链分派**（制品契约由 [`check-coding-plan.ts`](../scripts/cli/check-coding-plan.ts) R1-R6 强制）：
 ```
-S-explore  → opsx:explore + codegraph 影响初判 → 产物 exploration-analysis.md → R3×3 + V
-S-propose  → opsx:propose（产 proposal/specs/design/tasks）+ S-tickets 拆解（产 tickets）→ R3×3 + V
-S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore → R3×3 + V
+S-plan     → writing-plans 产出 docs/plans/<changeId>.plan.md（目标节 + 任务节，每任务节含验证命令行）→ R3×3 + V
+S-coding   → subagent-driven-development（SDD）逐任务执行 + TDD 红-绿-重构；
+             账本与三件套随任务落盘 → R3×3 + V
+V          → 任务级 V 评审（stage ∈ plan / execute / finalize）
+G          → check-coding-plan.ts <project-root> --phase=<5|6|7|8> --scope=<change-scope.json>（exit 0）
+收口       → 阶段 8 归档后由 check-archive-integrity.ts 的 codingPlanSnapshot 清单项校验归档快照
 ```
 
-**opsx 与 S-tickets 共存边界**（统一由 S-propose 产出）：
-- `opsx:propose` 的 **tasks.md** = 高层任务清单（what/why）
-- `S-tickets` 的 **tickets.md** = 代码垂直切片（how，端到端可 demo）
-- **S-coding 不做拆解**，只按 tickets.md frontier 执行
+**制品路径契约**（逐项与 `logic/coding-plan-logic.ts` 的 R1-R6 对应）：
+- **编码计划**（R1/R2）：`docs/plans/<changeId>.plan.md`——`changeId` 须含 `phase<N>-` 前缀；计划须含目标节（标题文本含「目标」）+ ≥1 个任务节（标题含 `Task N` / `任务 N`），每个任务节含 ≥1 条行首「`验证：`」/「`Verify:`」命令行，命令体非空且禁 `;` `&` `|`。
+- **执行账本**（R3）：`.superpowers/sdd/<plan-基名>/progress.md`（plan-基名 = plan 文件名去扩展名）——首行身份为 `# SDD ledger — plan: <计划文件路径>`（路径须以 plan 文件名结尾），`Task N: complete` 行须具名覆盖 plan 全部任务节。
+- **任务三件套**（R4）：账本目录内每个已完成任务 N 的 `task-<N>-brief.md` 与 `task-<N>-report.md` 存在且非空，且至少一个 `review-*.diff`（任务评审包证据）。
+- **归档快照**（R6）：`docs/changes/archive/<changeId>/` 或 `<日期>-<changeId>/`（**恰一匹配**才可用，多匹配 fail-closed）内的 `<changeId>.plan.md` + `progress.md` + 三件套按同契约校验；活动位存在时优先活动位。
 
-**每段 R3×3 + V 审查**：每段产物须跑 R3 三维度（completeness/reliability/security）+ V 评审，不合格打回重做（反模式 #39）。
+**每段 R3×3 + V 审查**：每段产物须跑 R3 三维度（completeness/reliability/security）+ V 评审，产出 `.w-model/r3-reviews/phase<N>-{plan,execute,finalize}-{completeness,reliability,security}.md` ×9 与 `.w-model/v-reviews/phase<N>-{plan,execute,finalize}.md` ×3（R5；旧 stage 词表 explore/propose/coding 不充数）；不合格打回重做（反模式 #39）。
 
 ## Tracer-bullet 票据拆解
 
-> 吸收 to-tickets tracer-bullet 垂直切片 + blocking edges + wide refactor expand-contract 方法论。S 子代理编码前兼任 S-tickets 角色，产出 `tickets.md` 作为 S-coding 执行单元。
+> 吸收 to-tickets tracer-bullet 垂直切片 + blocking edges + wide refactor expand-contract 方法论。编码链执行单元 = plan 的任务节（账本逐任务 `Task N: complete`）；S 子代理在任务内兼任 S-tickets 角色，产出 `tickets.md` 作为任务内的代码级切片。
 
 ### 时序
 
 ```
 原时序: O 路由 → CHECKPOINT → S-coding（直接编码）→ V → G
-新时序: O 路由 → CHECKPOINT → S-tickets（票据拆解）→ S-coding（按票据执行）→ V → G
+新时序: O 路由 → CHECKPOINT → S-plan（编码计划）→ S-coding（按 plan 任务 + 票据切片执行）→ V → G(check-coding-plan) → 收口
 ```
 
-- S-tickets 由 S 子代理兼任（不新增角色）
+- S-tickets 由 S 子代理（S-plan）兼任（不新增角色）
 - S-tickets 产出 `tickets.md`（位于 `.w-model/tickets.md` 或 `docs/tickets.md`，由用户选择）
 - S-tickets 必须在 S-coding 前完成，V/G 不单独评审 tickets.md（合并到阶段 5 V/G 评审）
 
@@ -147,7 +151,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 - 每批大小按 blast radius（按目录/按包）
 - **兜底（扩展期跨多个部署单元 / 多批次时）**：当同一机械改动的 blast radius 横跨多个部署单元，使任何单独 migrate 批次都无法自证 CI 绿时，**保持 expand → migrate → contract 序列不变**，但让全部 migrate 批次**共享一条 integration 分支**；「绿」只在最后一张 **integrate-and-verify 票**上承诺，各 migrate 批次自身不再单独承诺绿。该票不改变 expand / migrate / contract 三阶段语义，只改变「绿在哪里被承诺」。
 - **integrate-and-verify 票的内容契约**（沿用「票据内容契约」节三字段，一律符号级）：
-  - **What to build**：在共享 integration 分支上合并全部 migrate 批次并完成验证——给出该宽重构的**符号级终态**（被重命名 / 被重类型的符号名及其新接口签名、类型约束或状态转移）与验证动作（跑全量回归 + 该符号全部调用点的契约测试）；不写文件路径与行号（位置由 `codegraph_explore` 查询决定）。
+  - **What to build**：在共享 integration 分支上合并全部 migrate 批次并完成验证——给出该宽重构的**符号级终态**（被重命名 / 被重类型的符号名及其新接口签名、类型约束或状态转移）与验证动作（跑全量回归 + 该符号全部调用点的契约测试）；不写文件路径与行号（位置由 codegraph 查询决定（`codegraph query`，宿主 MCP 工具为可选加速））。
   - **Blocked by**：全部 migrate 批次票据；本票不反向阻塞任何 migrate 批次，各票既有 `Blocked by` 关系与 expand → migrate → contract 序列均不变，本票仅作为「绿」的唯一承诺点。
   - **验收标准**：integration 分支全量测试绿（含每批次的独立测试与该宽重构的回归测试）；被改符号的新旧两种形式在分支上均已通过契约测试；符号级检查确认无残留旧形式调用点（新形式调用点计数与调用点迁移清单一致）。
 
@@ -173,7 +177,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 > 对应外部 implement-* 系列 SKILL.md 的 Agent Brief durability 原则：票据主体是**符号级契约**（接口 / 类型 / 行为），不是**文件路径 / 行号**（fragile reference，重构即失效）。
 
 - **票据主体 = 符号级契约**：目标行为的接口签名 / 类型约束 / 状态转移（与 TLA+ 状态机 Action 对齐），如「实现 `ArticleService.create` 契约：入参 `{title, content}`，返回 `Article`，触发状态 `draft → published`」——而非「改 `src/services/article-service.ts:42`」
-- **位置信息交给 codegraph**（约束 #14）：文件路径由 `codegraph_explore` 查询获得，票据不预设路径。票据只写「实现 `XX` 符号契约」，位置由查询结果落盘的 `.w-model/codegraph-queries/` 决定
+- **位置信息交给 codegraph**（约束 #14）：文件路径由 codegraph CLI 查询（`codegraph query`；宿主 MCP 工具为可选加速）获得，票据不预设路径。票据只写「实现 `XX` 符号契约」，位置由查询结果落盘的 `.w-model/codegraph-queries/` 决定
 - **与评审 evidence 的边界**：评审 evidence 须路径 + 行号（[verifier-spec.md](verifier-spec.md) §6.2.1，可追溯性）；实施票据**不**须——二者定位不同：evidence 是「评审时证明我看过哪」，票据是「实现时做什么契约」
 - 票据引用术语统一用 [conventions.md](conventions.md) 术语表规范名（如 `codeModule` / `mappingType`），不得自造别名
 
@@ -188,7 +192,7 @@ S-coding   → 按 tickets.md frontier 逐片编码，每片 codegraph_explore �
 
 ### Preflight 成对冲突扫描表（开工前）
 
-> 吸收 subagent-driven-development 的 preflight 扫描：分派第 1 张票据**之前**把票据清单整体扫一遍，扫描产物是**表**而不是结论——「扫描干净」而无对应行，即等于没扫。本表一律**符号级**表述（接口签名 / 类型约束 / 状态转移 / 类型与事件字段），与「票据内容 durability」节一致：不写具体文件路径与行号（位置由 `codegraph_explore` 查询决定），也不内联代码片段。
+> 吸收 subagent-driven-development 的 preflight 扫描：分派第 1 张票据**之前**把票据清单整体扫一遍，扫描产物是**表**而不是结论——「扫描干净」而无对应行，即等于没扫。本表一律**符号级**表述（接口签名 / 类型约束 / 状态转移 / 类型与事件字段），与「票据内容 durability」节一致：不写具体文件路径与行号（位置由 codegraph 查询决定（`codegraph query`，宿主 MCP 工具为可选加速）），也不内联代码片段。
 
 - **时机**：S-tickets 完成票据拆解与 `Blocked by` 依赖图之后、S-coding 分派第 1 张票据之前，逐对扫一遍；扫描表写入 `tickets.md`。
 - **覆盖面（缺任一类行即视为未执行扫描）**：① 每对**共享同一符号**（同名接口 / 类型 / 状态机 Action / 事件字段）的票据各一行；② 每张票据自身一行（它声明的验收标准与其声明的符号契约是否自洽）；③ 票据与阶段全局约束（阶段 1-4 需求 / spec / RTM / TLA+ 不变式）相抵触的，各一行。

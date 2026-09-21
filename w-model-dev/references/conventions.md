@@ -89,10 +89,10 @@
 - **规范定义**：签名链条目输入来源证明（上游产物路径 + 角色），S 子代理产出时强制回填（反模式 #32 守护）。
 - **_Avoid_**：来源/inputSource/provenance（字段名固定「inputProvenance」）。
 
-### tickets.md vs tasks.md
+### plan 任务 vs 执行账本 vs tickets.md
 
-- **规范定义**：`tickets.md` = S-tickets 的代码垂直切片（how，tracer-bullet + blocking edges DAG）；`tasks.md` = opsx:propose 的高层任务清单（what/why）。职责不同，不可互替（反模式 #40）。
-- **_Avoid_**：互替/混用（二者在阶段 5 共存，S-propose 分派时先后产出）。
+- **规范定义**：`docs/plans/<changeId>.plan.md` 的任务节 = 编码链执行单元（what/why，由 S-plan 经 writing-plans 产出，逐任务带「验证：」命令行）；`.superpowers/sdd/<plan-基名>/progress.md` 的 `Task N: complete` = 逐任务完成证据；`tickets.md` = S-tickets 的代码垂直切片（how，tracer-bullet + blocking edges DAG）。三者职责不同，不可互替（反模式 #40；校验见 `check-coding-plan.ts` R2/R3/R4）。
+- **_Avoid_**：互替/混用（三者在阶段 5 共存，S-plan 分派时先后产出）。
 
 ### R3 预防性审查
 
@@ -116,7 +116,7 @@
 
 ### exit-2 脚本口径
 
-- **规范定义**：`scripts/cli/` 下全部脚本除 `self-test.ts`（回归基线，exit 0/1）外均为 exit 2 结构化错误脚本：= 46（27 个 check-* + 19 个工具 CLI（含 7 个 code-health 门禁 CLI），不含 self-test；含 review-package.ts / wm-export-evidence.ts / wm-verify-evidence-source.ts / check-pollution.ts / check-coverage-scope.ts）；计数由 docs-consistency 的真实输入错误契约探针得出（AGENTS.md「46 个脚本」与本句由 checkConventionsExit2Count 双向兜底），不维护固定补数。
+- **规范定义**：`scripts/cli/` 下全部脚本除 `self-test.ts`（回归基线，exit 0/1）外均为 exit 2 结构化错误脚本：= 46（28 个 check-* + 18 个工具 CLI（含 7 个 code-health 门禁 CLI），不含 self-test；含 review-package.ts / wm-export-evidence.ts / wm-verify-evidence-source.ts / check-pollution.ts / check-coverage-scope.ts）；计数由 docs-consistency 的真实输入错误契约探针得出（AGENTS.md「46 个脚本」与本句由 checkConventionsExit2Count 双向兜底），不维护固定补数。
 - **_Avoid_**：称 self-test 为 exit-2 脚本 / “31 个脚本”之类过期计数（见 [docs-consistency-logic.ts](../scripts/logic/docs-consistency-logic.ts) 的 EXPECTED）。
 
 ### 普通 V/G 失败链

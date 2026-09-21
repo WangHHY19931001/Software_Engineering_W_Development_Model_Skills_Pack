@@ -212,7 +212,7 @@
 **规则**：
 - Implementation Decisions 与现有「设计假设」互补：假设是「未确认的前提」，决策是「已选定的方向」
 - Testing Decisions 与阶段 1 同步验收测试设计互补：本节是「为什么这样测」，验收测试设计是「测什么」
-- 禁止具体文件路径（OpenSpec 与 to-spec 共识：路径易过期）
+- 禁止具体文件路径（to-spec 与编码计划 durability 共识：路径易过期）
 
 ## 执行方法论
 
