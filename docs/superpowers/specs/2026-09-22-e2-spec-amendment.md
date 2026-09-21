@@ -15,7 +15,9 @@ checkpoint 放行记录被赋予两个时序不可兼得的角色（R0/R11 的�
 
 现行为：`checkpoints.length === 0` → 一律违规「run-log 无 checkpoint success 记录（无法证明阶段 CHECKPOINT 已放行…）」。
 
-改为：`checkpoints.length === 0` 且 **`--checkpoint-log` 已提供且目录加载含至少一条用户确认**（Map 非空）时，R0 不违规，改为输出**非阻断 diagnostic**（建议前缀 `BOOTSTRAP_VALIDATION:`，注明「首阶段自举校验：以 checkpoint-log 用户确认为初级证据；放行记录将于闭环门后写入」），并正常通过（R1-R4 对空记录集空转，语义不变）。
+改为：`checkpoints.length === 0` 且 **`--checkpoint-log` 已提供且目录加载含 `phase-1` 条目**（即下一次放行必为首放行；`get('1')` 非空白）时，R0 不违规，改为输出**非阻断 diagnostic**（建议前缀 `BOOTSTRAP_VALIDATION:`，注明「首阶段自举校验：以 checkpoint-log 用户确认为初级证据；放行记录将于闭环门后写入」），并正常通过（R1-R4 对空记录集空转，语义不变）。
+
+> **勘误（2026-09-22，修复轮 1）**：本节初版文案「目录加载含至少一条用户确认（Map 非空）」存在相位缝隙——零记录 + 目录仅含 `phase-2.txt` 时首放行初级证据为零却可 exit 0（审查实跑复现）。按根因报告 §6-B 收紧为「Map 含 `phase-1`（即下一次放行必为首放行）条目」：零放行记录 ⇒ 下一次放行必为首放行，仅首放行确认可支撑自举；加载器既有宽松（任意 `*-<数字>.txt` 计入 Map）由此由 `get('1')` 兜住。
 
 - 未提供 `--checkpoint-log` 或目录为空/不可读 → **维持现行违规**（fail-closed 方向不变：零证据仍不等于合规）。
 - 该形态只覆盖「零记录」态；一旦放行记录写入，后续校验走既有全量路径（R1-R5 不变）。

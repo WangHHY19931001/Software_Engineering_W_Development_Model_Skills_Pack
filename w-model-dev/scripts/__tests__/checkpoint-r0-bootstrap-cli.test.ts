@@ -10,7 +10,10 @@
  *   3. 零记录态 + checkpoint-log 用户确认在场 → check-checkpoint.ts exit 0 且
  *      --json 携带 BOOTSTRAP_VALIDATION 非阻断诊断（旧 R0 一律违规的唯一阻塞点转绿）；
  *   4. 零记录态 + checkpoint-log 目录无 phase-N 匹配 → check-checkpoint.ts exit 1
- *      且 R0 文案保留（fail-closed 回归）。
+ *      且 R0 文案保留（fail-closed 回归）；
+ *   5. 零记录态 + checkpoint-log 仅含 phase-2 确认 → check-checkpoint.ts exit 1 且
+ *      R0 文案保留（修复轮 1 相位缝隙负例：自举条件收紧为 get('1') 非空白，加载器
+ *      既有宽松使任意 `*-<数字>.txt` 计入 Map，由 get('1') 兜住）。
  *
  * 夹具文法参照 run-log-logic.test.ts「R11 阶段 1 自举豁免（D-6）」组的 phase-1 形态
  * （phaseLead → 四门 gate → checkpoint / check-checkpoint gate 位置两态）。
@@ -209,6 +212,23 @@ describe('E-2 方案 B：phase-1 自举时序端到端（真实子进程）', ()
     ]);
     const emptyClog = await writeCheckpointLog([]);
     const run = runCli(CHECKPOINT_CLI, [preLog, `--checkpoint-log=${emptyClog}`, '--json']);
+    expect(run.code, `stderr=${run.stderr}\nstdout=${run.stdout}`).toBe(1);
+    const report = parseJsonReport(run.stdout);
+    expect(report.passed).toBe(false);
+    expect(report.reasons.some((v) => v.includes('零证据不等于合规'))).toBe(true);
+    expect((report.diagnostics ?? []).some((d) => d.startsWith('BOOTSTRAP_VALIDATION:'))).toBe(false);
+  });
+
+  it('零记录态 + checkpoint-log 仅含 phase-2 确认（无 phase-1）→ exit 1 且 R0 文案保留（相位缝隙负例，修复轮 1）', async () => {
+    // 审查复现态：加载器既有宽松（任意 `*-<数字>.txt` 计入 Map）使仅含 phase-2.txt 的目录
+    // 加载为非空 Map——初版「Map 非空」在此 exit 0，穿透「零证据不等于合规」。收紧为
+    // `get('1')` 非空白后，此态维持违规（零放行记录 ⇒ 下一次放行必为首放行，仅首放行
+    // 确认可支撑自举）。
+    const preLog = await writeRunLog('pre-phase2only.jsonl', [
+      JSON.stringify(entry({ runId: 'a1', action: 'chunk', role: 'A' })),
+    ]);
+    const phase2Clog = await writeCheckpointLog(['phase-2.txt']);
+    const run = runCli(CHECKPOINT_CLI, [preLog, `--checkpoint-log=${phase2Clog}`, '--json']);
     expect(run.code, `stderr=${run.stderr}\nstdout=${run.stdout}`).toBe(1);
     const report = parseJsonReport(run.stdout);
     expect(report.passed).toBe(false);

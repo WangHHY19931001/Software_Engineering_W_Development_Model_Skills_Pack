@@ -223,20 +223,24 @@ export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptio
   // 收集 checkpoint success 记录（R1-R4 的校验对象）
   const checkpoints = valid.filter((e) => e.action === 'checkpoint' && e.outcome === 'success');
 
-  // E-2 方案 B（R0 首阶段自举形态，2026-09-22 规格修正案）：零记录 + `--checkpoint-log`
-  // 已提供且加载含至少一条用户确认（Map 非空）→ R0 不违规，改推非阻断 BOOTSTRAP_VALIDATION
-  // 诊断——首阶段放行的初级证据是 checkpoint-log 用户确认原文（与 R3 防代签同锚）；自然时序
-  // 「确认落盘 → 闭环五门 → 最后写放行记录」下 check-checkpoint 运行时放行记录尚未写入，
-  // 属预期形态，放行记录内容校验（R1/R2/R4）由下一阶段 check-checkpoint 的全局回溯完成
-  // （与阶段 ≥2 的既有语义一致）。未提供 / 空 Map / 不可读（checkpointLogMissingReason 两态）
+  // E-2 方案 B（R0 首阶段自举形态，2026-09-22 规格修正案；修复轮 1 收紧）：零记录 +
+  // `--checkpoint-log` 已提供且加载含 **phase-1 用户确认**（`get('1')` 非空白）→ R0 不违规，
+  // 改推非阻断 BOOTSTRAP_VALIDATION 诊断——首阶段放行的初级证据是 checkpoint-log 的
+  // phase-1 用户确认原文（与 R3 防代签同锚）；收紧依据：零放行记录 ⇒ 下一次放行必为首放行，
+  // 故仅首放行确认可支撑自举——仅含 phase-2+ 确认时零记录态仍违规（评审发现的相位缝隙，
+  // 原草稿「Map 非空」会放行「无任何首放行证据」的态）。自然时序「确认落盘 → 闭环五门 →
+  // 最后写放行记录」下 check-checkpoint 运行时放行记录尚未写入，属预期形态，放行记录内容
+  // 校验（R1/R2/R4）由下一阶段 check-checkpoint 的全局回溯完成（与阶段 ≥2 的既有语义一致）。
+  // 未提供 / 空 Map / 无 phase-1 条目 / phase-1 空白 / 不可读（checkpointLogMissingReason 两态）
   // → 维持原违规（fail-closed 不变）；一旦放行记录写入，走既有全量路径（R1-R5 不变）。
-  // 规格见 docs/superpowers/specs/2026-09-22-e2-spec-amendment.md；根因见
-  // docs/debug/2026-09-22-e2-r8-r0-rootcause/README.md。
+  // 规格见 docs/superpowers/specs/2026-09-22-e2-spec-amendment.md（§2.1 勘误注）；根因见
+  // docs/debug/2026-09-22-e2-r8-r0-rootcause/README.md（§6-B）。
   // R0 零证据守卫：无任何 checkpoint success 记录时不得判通过。
   // 「没有发现违规」≠「验证通过」——本门禁是阶段放行的唯一凭据，
   // 空 run-log 必须先证明「确实发生过放行」，否则 fail-closed（与 check-role-dispatch 同语义）。
   if (checkpoints.length === 0) {
-    if (options?.checkpointLog !== undefined && options.checkpointLog.size > 0) {
+    const phase1Confirmation = options?.checkpointLog?.get('1');
+    if (phase1Confirmation !== undefined && phase1Confirmation.trim() !== '') {
       diagnostics.push(
         'BOOTSTRAP_VALIDATION: 首阶段自举校验：以 checkpoint-log 用户确认为初级证据；放行记录将于闭环门后写入',
       );
