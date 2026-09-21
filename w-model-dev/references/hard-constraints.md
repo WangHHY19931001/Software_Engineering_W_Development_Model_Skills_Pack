@@ -54,7 +54,7 @@
 
 `check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`（无条件）5 脚本须在每个阶段门执行，`exitCode=0` 才可放行；任一脚本非 0 视为闭环未达成，回到当前阶段起点（SSoT §10C/§10D）。**机器核验（2026-09-18 起由 `check-run-log.ts` R11 强制）**：凡 run-log 中出现 `checkpoint` 放行记录（`action=checkpoint` 且 `outcome=success`）的阶段，放行前必须已有本节 5 个脚本各自的 `role=G`、`outcome=success`、`gateExitCode=0` gate 记录，且时间戳**严格早于**放行时间（同秒不算「早于放行」，无时间戳豁免）；缺失任一或**未严格早于放行（含同秒）**即 blocking，违规消息列出缺失脚本名（同一阶段多次放行逐个核验，不合并）。无 checkpoint 放行的 run（如 fix/emergency 变体）不触发 R11。`check-preventive-review.ts` 支持 `--auto-trigger` 模式：从 run-log 读取当前阶段，自动校验对应阶段的 3 份 R3 报告（completeness/reliability/security），exitCode=0 方可进入 V 评审。
 
-**R3 预防性审查强制**（原约束 #17 并入，无条件，覆盖所有 S 变体）：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。**无条件强制**，覆盖所有 S 变体（S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**），无 flag，无「启用时」措辞。S-fix 走 `<phase>-fix-{dim}.json` 路径，S-emergency-fix 走 `<phase>-emergency-{dim}.json` 路径，S-ingest-tla / S-ingest-bdd 走 `<phase>-ingest-{dim}.json` 路径。V 评审前 G 子代理须跑 [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts)（支持 `--variant=standard|fix|emergency|ingest`）校验报告完整性。`preventive-review.schema.json` 强制 `passed=false ⇒ findings ≥1`——无发现的失败审查不得以空 findings 通过 schema。跳过 R3 直接进入 V 评审命中反模式 #33；S-fix / emergency-fix 后跳过 R3+V 命中反模式 #42。阶段 5-8 opsx 三段式（S-explore → S-propose → S-coding）每段另有 stage 级 R3 审查：产出 `.w-model/r3-reviews/phase<N>-{explore,propose,coding}-{completeness,reliability,security}.md` ×9 + `.w-model/v-reviews/phase<N>-{explore,propose,coding}.md` ×3（与 `check-opsx-artifacts.ts` 一致）。详见 [subagent-delegation.md](subagent-delegation.md)「R3 预防性审查分派模板」。
+**R3 预防性审查强制**（原约束 #17 并入，无条件，覆盖所有 S 变体）：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。**无条件强制**，覆盖所有 S 变体（S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-plan / S-coding / S-finalize / **S-fix** / **S-emergency-fix**），无 flag，无「启用时」措辞。S-fix 走 `<phase>-fix-{dim}.json` 路径，S-emergency-fix 走 `<phase>-emergency-{dim}.json` 路径，S-ingest-tla / S-ingest-bdd 走 `<phase>-ingest-{dim}.json` 路径。V 评审前 G 子代理须跑 [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts)（支持 `--variant=standard|fix|emergency|ingest`）校验报告完整性。`preventive-review.schema.json` 强制 `passed=false ⇒ findings ≥1`——无发现的失败审查不得以空 findings 通过 schema。跳过 R3 直接进入 V 评审命中反模式 #33；S-fix / emergency-fix 后跳过 R3+V 命中反模式 #42。阶段 5-8 superpowers 编码链（S-plan → S-coding → S-finalize，stage ∈ plan/execute/finalize）每段另有 stage 级 R3 审查：产出 `.w-model/r3-reviews/phase<N>-{plan,execute,finalize}-{completeness,reliability,security}.md` ×9 + `.w-model/v-reviews/phase<N>-{plan,execute,finalize}.md` ×3（与 `check-coding-plan.ts` 的 R5 一致）。详见 [subagent-delegation.md](subagent-delegation.md)「R3 预防性审查分派模板」。
 
 ## #12 返工必经根因定位
 
@@ -76,7 +76,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 ## #14 代码改动前后门禁（codegraph + 回归）
 
-**codegraph 修改前强制查询**（原约束 #20 并入）：阶段 5-8 任何代码/测试文件 `Edit`/`Write` 前，S-coding 子代理须先调用宿主 Agent 的 `codegraph_explore` MCP 工具查询目标符号影响半径（callers/callees/blast radius），并将查询结果落盘到 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`（含 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp）。**门禁校验实际覆盖而非目录存在**（2026-09-04 audit-gate-closure）：阶段 5-8 CLI 以 `--scope=<change-scope.json>`（或薄封装 `--change/--base/--head`）绑定查询与实际变更——查询记录须含 `changeId`（精确等于 scope.changeId）与 `targetFiles`（属于 scope.changedFiles），scope 中每个须覆盖的 code/test 变更文件至少被一个查询覆盖，`queryTimestamp` 不得晚于 scopeCreatedAt；缺 scope → exit 1（fail-closed），查询与实际 Git 变更集合不符同样 fail-closed。`check-artifact-gate.ts --phase=5..8` 聚合该 strict 校验进 reasons/exitCode。未查询直接修改命中反模式 #38，回到当前阶段起点。codegraph 与 code-TLA+ 一致性校验（修改后回归）互补：前者预防、后者回归。
+**codegraph 修改前强制查询**（原约束 #20 并入）：阶段 5-8 任何代码/测试文件 `Edit`/`Write` 前，S-coding 子代理须先经 **codegraph CLI** 查询目标符号影响半径（`codegraph query <符号>` → callers/callees/blast radius；宿主 MCP 工具若可用为可选加速、非依赖，`ensure-codegraph.ts` 只检测 CLI 与项目 `.codegraph/`），并将查询结果落盘到 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`（含 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp）。**门禁校验实际覆盖而非目录存在**（2026-09-04 audit-gate-closure）：阶段 5-8 CLI 以 `--scope=<change-scope.json>`（或薄封装 `--change/--base/--head`）绑定查询与实际变更——查询记录须含 `changeId`（精确等于 scope.changeId）与 `targetFiles`（属于 scope.changedFiles），scope 中每个须覆盖的 code/test 变更文件至少被一个查询覆盖，`queryTimestamp` 不得晚于 scopeCreatedAt；缺 scope → exit 1（fail-closed），查询与实际 Git 变更集合不符同样 fail-closed。`check-artifact-gate.ts --phase=5..8` 聚合该 strict 校验进 reasons/exitCode。未查询直接修改命中反模式 #38，回到当前阶段起点。codegraph 与 code-TLA+ 一致性校验（修改后回归）互补：前者预防、后者回归。
 
 **回归测试强制钩子**（原约束 #21 并入）：任何 agent 改动代码后必须跑回归测试（修复引入新 bug 概率 20-50%）；禁止"改动代码但不跑回归"的工作流。
 
@@ -145,10 +145,10 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | 阶段 2 | #2、#11、#12、#13、#14、#15、#16、#17、#27、#28、#29、#37 | 测试设计后置；ingestion 图谱校验/收敛/信息流失守；TLA+ 语法/行为/占位/不符未回退；调测者简化；schema 前置校验缺失；BDD 建模不符未回退；产物膨胀核心决策稀疏 |
 | 阶段 3 | #2、#11、#12、#13、#14、#15、#16、#17、#23、#27、#28、#29、#37 | 测试设计后置；ingestion 图谱校验/收敛/信息流失守；TLA+ 语法/行为/占位/不符未回退；跨模块 store 误用；调测者简化；schema 前置校验缺失；BDD 建模不符未回退；产物膨胀核心决策稀疏 |
 | 阶段 4 | #2、#11、#12、#13、#14、#15、#16、#17、#23、#27、#28、#29、#37 | 测试设计后置；ingestion 图谱校验/收敛/信息流失守；TLA+ 语法/行为/占位/不符未回退；跨模块 store 误用；调测者简化；schema 前置校验缺失；BDD 建模不符未回退；产物膨胀核心决策稀疏 |
-| 阶段 5（编码） | #3、#7、#22、#24、#25、#27、#28、#36、#38、#39、#40、#47 | 估算质量门 / 退出码 1/2 放行；角色越权；副作用时序不一致；JSON 用 PowerShell 写入；调测者简化；schema 前置校验缺失；路由顺序错误；修改前未查询 codegraph；跳过 opsx 产物审查 / 职责混淆；大规模重构式改动 |
-| 阶段 6 | #3、#7、#21、#25、#26、#27、#28、#36、#38、#39、#40 | 估算质量门 / 退出码 1/2 放行；阶段级门禁跳过；JSON 用 PowerShell 写入；RunLog 与 EventIngress 字段混用；调测者简化；schema 前置校验缺失；路由顺序错误；修改前未查询 codegraph；跳过 opsx 产物审查 / 职责混淆 |
-| 阶段 7（系统测试） | #3、#6、#7、#21、#25、#26、#27、#28、#38、#39、#40 | 估算质量门 / RTM 覆盖率 / 退出码 1/2 放行；阶段级门禁跳过；JSON 用 PowerShell 写入；RunLog 与 EventIngress 字段混用；调测者简化；schema 前置校验缺失；修改前未查询 codegraph；跳过 opsx 产物审查 / 职责混淆 |
-| 阶段 8（验收测试） | #6、#21、#25、#26、#27、#28、#31、#38、#39、#40 | 估算 RTM 覆盖率；阶段级门禁跳过；JSON 用 PowerShell 写入；RunLog 与 EventIngress 字段混用；调测者简化；schema 前置校验缺失；归档完整性缺失；修改前未查询 codegraph；跳过 opsx 产物审查 / 职责混淆 |
+| 阶段 5（编码） | #3、#7、#22、#24、#25、#27、#28、#36、#38、#39、#40、#47 | 估算质量门 / 退出码 1/2 放行；角色越权；副作用时序不一致；JSON 用 PowerShell 写入；调测者简化；schema 前置校验缺失；路由顺序错误；修改前未查询 codegraph；跳过编码计划审查 / plan 任务与账本职责混淆；大规模重构式改动 |
+| 阶段 6 | #3、#7、#21、#25、#26、#27、#28、#36、#38、#39、#40 | 估算质量门 / 退出码 1/2 放行；阶段级门禁跳过；JSON 用 PowerShell 写入；RunLog 与 EventIngress 字段混用；调测者简化；schema 前置校验缺失；路由顺序错误；修改前未查询 codegraph；跳过编码计划审查 / plan 任务与账本职责混淆 |
+| 阶段 7（系统测试） | #3、#6、#7、#21、#25、#26、#27、#28、#38、#39、#40 | 估算质量门 / RTM 覆盖率 / 退出码 1/2 放行；阶段级门禁跳过；JSON 用 PowerShell 写入；RunLog 与 EventIngress 字段混用；调测者简化；schema 前置校验缺失；修改前未查询 codegraph；跳过编码计划审查 / plan 任务与账本职责混淆 |
+| 阶段 8（验收测试） | #6、#21、#25、#26、#27、#28、#31、#38、#39、#40 | 估算 RTM 覆盖率；阶段级门禁跳过；JSON 用 PowerShell 写入；RunLog 与 EventIngress 字段混用；调测者简化；schema 前置校验缺失；归档完整性缺失；修改前未查询 codegraph；跳过编码计划审查 / plan 任务与账本职责混淆 |
 
 ### 目录
 
@@ -222,9 +222,9 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | 35 | self-as-verifier 模式下 V/G/R 产物混合（含 R3 三份报告与 S 产出同路径） | 评审独立性失守，结论可能被 S 产出污染或覆盖 | 各角色独立产物文件且路径互不相同；`check-verifier-output.ts --self-as-verifier` 校验 V 产物与 S 产出路径不同 |
 | 36 | 路由顺序错误（参数路径先于静态路径注册，如 `/users/:id` 拦截 `/users/me`；鉴权路由在公开路由之后） | 路由匹配错误、鉴权失效，越权缺陷带入运行时 | 静态路径先于参数路径注册，鉴权中间件在公开路由前；修正后重跑集成测试（无自动脚本，V/G 人工校验） |
 | 37 | 产物膨胀但核心决策稀疏（文件达标但实体引用密度低、核心决策被扩展点淹没） | 稀释产物语义价值，评审难以聚焦 | 精简扩展点/附录，实体引用密度 ≥ 2/章节（V 评审人工校验信息密度） |
-| 38 | 修改前未查询 codegraph（阶段 5-8 S-coding 直接修改代码/测试文件） | 误改被广泛依赖符号，引入隐蔽回归 | 修改前先 `codegraph_explore` 查询影响半径并落盘 `.w-model/codegraph-queries/`（记录须含 changeId/targetFiles 与实际变更绑定，覆盖全部须覆盖 code/test 文件）；`check-codegraph-queries.ts --scope=` 校验实际覆盖（约束 #14） |
-| 39 | 跳过 opsx 产物审查（opsx 三段式任一 stage 产物未 R3×3 + V 即进入下一步） | 规划缺陷 / 实现偏差未被发现 | 每段产物补跑 R3×3 + V；`check-opsx-artifacts.ts` 校验（约束 #11） |
-| 40 | opsx/S-tickets 职责混淆（tasks.md 与 tickets.md 互相替代或内容错位） | 破坏规格级规划（what/why）与代码级切片（how）职责边界 | tasks.md（opsx:propose）与 tickets.md（S-tickets vertical-slice）职责分离；`check-opsx-artifacts.ts` 校验 |
+| 38 | 修改前未查询 codegraph（阶段 5-8 S-coding 直接修改代码/测试文件） | 误改被广泛依赖符号，引入隐蔽回归 | 修改前先经 **codegraph CLI**（`codegraph query <符号>`；宿主 MCP 工具为可选加速）查询影响半径并落盘 `.w-model/codegraph-queries/`（记录须含 changeId/targetFiles 与实际变更绑定，覆盖全部须覆盖 code/test 文件）；`check-codegraph-queries.ts --scope=` 校验实际覆盖（约束 #14） |
+| 39 | 跳过编码计划审查（编码链任一 stage 产物未 R3×3 + V，或 plan / 账本 / 三件套缺项即进入下一步） | 规划缺陷 / 实现偏差未被发现 | 每段产物补跑 R3×3 + V；`check-coding-plan.ts` R1-R6 校验（约束 #11） |
+| 40 | plan 任务与执行账本 / 切片职责混淆（plan 任务节、账本完成行、tickets 切片互相替代或内容错位） | 破坏编码计划执行单元（plan 任务节）与代码级切片（how）职责边界 | plan 任务节（writing-plans）+ 账本 `Task N: complete` 与 tickets.md（S-tickets vertical-slice）职责分离；`check-coding-plan.ts` R2/R3/R4 校验 |
 | 41 | 加权平均掩盖单轴失败（compositeScore 达标但存在 subCriterion.score < 0.70） | 单轴缺陷被平均抹平，需求遗漏/分析缺失放行 | passed 判据收紧为 `(A\|\|B) && 所有 subCriterion.score ≥ 0.70`；`check-verifier-output.ts` R13 单轴下限校验 |
 | 42 | S-fix / emergency-fix 后跳过 R3+V | S-fix / S-emergency-fix 产出后未派 R3×3 + V 直接 G/放行，修复未经验证合入 | 回到 S-fix / emergency-fix 产出后起点，补跑 R3×3 + V |
 | 43 | 敏感信息写入状态文件/日志（`.w-model/*.json` / gate-logs / run-log / 模板示例含真实凭据） | 凭据泄露风险，随仓库分发/归档/CI 扩散 | 敏感配置统一环境变量注入，数据文件与模板只存引用名（如 `${JWT_SECRET}`）；V/G 人工核验 + `security-scan.ts` 源码级扫描 |
@@ -299,8 +299,8 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #36（路由顺序错误） | 阶段 5/6 | [phase-5-coding.md](phase-5-coding.md) + 集成测试用例 |
 | #37（产物膨胀核心决策稀疏） | 阶段 1-4 | 各 phase-N「产物要求」节 |
 | #38（修改前未查询 codegraph） | 阶段 5-8 | 约束 #14 + [`check-codegraph-queries.ts`](../scripts/cli/check-codegraph-queries.ts) |
-| #39（跳过 opsx 产物审查） | 阶段 5-8 | 约束 #11 + [`check-opsx-artifacts.ts`](../scripts/cli/check-opsx-artifacts.ts) |
-| #40（opsx/S-tickets 职责混淆） | 阶段 5-8 | [phase-5-coding.md](phase-5-coding.md)「OpenSpec opsx 三段式 S 分派」节 |
+| #39（跳过编码计划审查） | 阶段 5-8 | 约束 #11 + [`check-coding-plan.ts`](../scripts/cli/check-coding-plan.ts) |
+| #40（plan 任务与执行账本/切片职责混淆） | 阶段 5-8 | [phase-5-coding.md](phase-5-coding.md)「superpowers 编码链 S 分派」节 |
 | #41（加权平均掩盖单轴失败） | 全阶段（V 评审） | [verifier-spec.md](verifier-spec.md) §3.3 / §6.3 |
 | #42（S-fix 后跳过 R3+V） | 全阶段（返工） | 约束 #11/#8 + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) `--variant=fix\|emergency` |
 | #43（敏感信息写入状态文件） | 全阶段 | [operational-recovery.md](operational-recovery.md)「敏感信息禁令」节 |
@@ -347,8 +347,8 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #36（路由顺序错误） | 无自动脚本（V 评审人工核验路由注册顺序表——G 的允许动作仅「跑门禁 + 读 JSON + 产出证据摘要」，不含人工核验） |
 | #37（产物膨胀核心决策稀疏） | 无自动脚本（V 评审人工校验信息密度） |
 | #38（修改前未查询 codegraph） | [`check-codegraph-queries.ts`](../scripts/cli/check-codegraph-queries.ts)（查询落盘完整性，exitCode=1 命中） |
-| #39（跳过 opsx 产物审查） | [`check-opsx-artifacts.ts`](../scripts/cli/check-opsx-artifacts.ts)（opsx 制品 + R3×3 + V 审查齐全，exitCode=1 命中） |
-| #40（opsx/S-tickets 职责混淆） | [`check-opsx-artifacts.ts`](../scripts/cli/check-opsx-artifacts.ts)（tasks/tickets 职责校验，exitCode=1 命中） |
+| #39（跳过编码计划审查） | [`check-coding-plan.ts`](../scripts/cli/check-coding-plan.ts)（plan 结构 / 账本覆盖 / 三件套 / R3×3 + V 审查齐全 R1-R6，exitCode=1 命中） |
+| #40（plan 任务与执行账本/切片职责混淆） | [`check-coding-plan.ts`](../scripts/cli/check-coding-plan.ts)（plan 任务节 ↔ 账本 `Task N: complete` ↔ 任务三件套绑定校验 R2/R3/R4，exitCode=1 命中） |
 | #41（加权平均掩盖单轴失败） | [`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) R13 单轴下限（subCriterion.score < 0.70 → exitCode=1） |
 | #42（S-fix 后跳过 R3+V） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R8（S(fix/emergency-fix)→V 间 R3 记录数）+ [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) `--variant=fix\|emergency` |
 | #43（敏感信息写入状态文件） | 无专用脚本（V 评审人工核验 + [`security-scan.ts`](../scripts/cli/security-scan.ts) 源码级扫描；G 不做人工核验，见 #36 行说明） |
@@ -514,7 +514,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 **检测信号**（sig-008）：子代理响应中**无 `tool_use` 块且未附产物路径**（见 [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节的四条行为要求）；规划产物（spec/plan）存在但无对应执行产物。
 >
-> 2026-09-17 审查更正：原文写作「run-log 中存在 `action=plan` 但无后续 `action=implement`/`action=verify`」——该三值**不在 run-log 27 值 action 枚举内**（写入即 schema 违规），属伪字段信号。
+> 2026-09-17 审查更正：原文写作「run-log 中存在 `action=plan` 但无后续 `action=implement`/`action=verify`」——该三值**不在 run-log 30 值 action 枚举内**（写入即 schema 违规），属伪字段信号。
 
 ### #21 阶段级门禁跳过（self-as-verifier 模式下跳过中间阶段门禁直接跑终检）
 
@@ -694,7 +694,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 - `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 文件缺失
 - V 评审未读取 R3 报告（reworkHints 未纳入 R3 发现）
 
-**无条件强制**：R3 为「**无条件强制**」，覆盖**所有 S 变体**：S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-explore / S-propose / S-coding / **S-fix** / **S-emergency-fix**。任意 S 派遣后必须 R3×3 + V，无 flag，无「启用时」措辞。违反字面即违反精神：R3 不得以「修复就是小改不用审」「紧急救援优先」「self-as-verifier 模式简化」等理由跳过。`check-preventive-review.ts` 报告路径扩展支持 `<phase>-fix-{dim}.json` / `<phase>-emergency-{dim}.json` / `<phase>-ingest-{dim}.json`。
+**无条件强制**：R3 为「**无条件强制**」，覆盖**所有 S 变体**：S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-plan / S-coding / S-finalize / **S-fix** / **S-emergency-fix**。任意 S 派遣后必须 R3×3 + V，无 flag，无「启用时」措辞。违反字面即违反精神：R3 不得以「修复就是小改不用审」「紧急救援优先」「self-as-verifier 模式简化」等理由跳过。`check-preventive-review.ts` 报告路径扩展支持 `<phase>-fix-{dim}.json` / `<phase>-emergency-{dim}.json` / `<phase>-ingest-{dim}.json`。
 
 **回退动作**：回到 S 产出后起点，补跑 R3 三阶段审查，产出三份 PreventiveReview JSON，再进入 V 评审。
 
@@ -776,42 +776,44 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 - 代码修改的 ticket 在 codegraph-queries/ 下无对应 `phase<N>-<ticket>-<symbol>.json` 落盘文件
 - run-log 中阶段 5-8 有 action=produce（代码产出）但无 action=codegraph_query 记录
 
-**回退动作**：撤销未查询的修改，补跑 codegraph_explore 查询并落盘，重新评估影响半径后重做修改。
+**回退动作**：撤销未查询的修改，补跑 codegraph CLI 查询（`codegraph query <符号>`）并落盘，重新评估影响半径后重做修改。
 
 **门禁脚本**：`check-codegraph-queries.ts`（exitCode=1 命中本反模式）。
 
 **关联**：约束 #14
 
-### #39 跳过 opsx 产物审查
+### #39 跳过编码计划审查
 
-**危害**：opsx:explore/propose/apply 工作流步骤产物未经 R3×3（completeness/reliability/security）+ V 评审即进入下一步，导致规划缺陷或实现偏差未被发现。
+**危害**：编码链任一 stage 的产物（plan / 执行账本 / 任务三件套）未经 R3×3（completeness/reliability/security）+ V 评审即进入下一步，或 plan / 账本 / 三件套本身缺项，导致规划缺陷或实现偏差未被发现。
 
-**检测信号**：
-- `.w-model/r3-reviews/` 下缺少 opsx 三段式中任一 stage 的 3 份 R3 报告：`phase<N>-explore-{completeness,reliability,security}.md` / `phase<N>-propose-{completeness,reliability,security}.md` / `phase<N>-coding-{completeness,reliability,security}.md`（共 9 份）
-- `.w-model/v-reviews/` 下缺少对应段 V 评审文件：`phase<N>-explore.md` / `phase<N>-propose.md` / `phase<N>-coding.md`（共 3 份）
-- `openspec/changes/` 下任一 `phase<N>-*` 变更目录制品不齐（proposal/design/tasks/tickets/specs）
+**检测信号**（`check-coding-plan.ts` R1-R6 逐项）：
+- **R1**：`docs/plans/<changeId>.plan.md` 缺失，或 `scope.changeId` 不含 `phase<N>-` 前缀。
+- **R2**：plan 缺目标节 / 缺任务节，或任务节缺「`验证：`/`Verify:`」命令行（含命令体为空、命令体含 `;` / `&` / `|`）。
+- **R3**：`.superpowers/sdd/<plan-基名>/progress.md` 缺失、首行身份不符（非 `# SDD ledger — plan: <计划文件路径>`）或 `Task N: complete` 未具名覆盖 plan 全部任务节。
+- **R4**：已完成任务的三件套缺失或为空（`task-<N>-brief.md` / `task-<N>-report.md`），或账本目录内无任何 `review-*.diff`。
+- **R5**：`.w-model/r3-reviews/phase<N>-{plan,execute,finalize}-{completeness,reliability,security}.md` ×9 或 `.w-model/v-reviews/phase<N>-{plan,execute,finalize}.md` ×3 缺项（共 12 份）。
+- **R6**：活动位 plan 缺失且归档位 `docs/changes/archive/<changeId>/` 或 `<日期>-<changeId>/` 快照按同契约校验不齐（恰一匹配才可用，多匹配 fail-closed）。
 
-**回退动作**：回退到缺失审查的 opsx 步骤，补跑 R3×3 + V 评审后重做后续步骤。
+**回退动作**：回退到缺失审查 / 缺失制品的编码链 stage，补跑 R3×3 + V 评审并补齐 plan / 账本 / 三件套后重做后续步骤。
 
-**门禁脚本**：`check-opsx-artifacts.ts`（exitCode=1 命中本反模式）。
+**门禁脚本**：`check-coding-plan.ts`（exitCode=1 命中本反模式）；阶段 5-8 artifact gate 以 `external.codingPlan` + `[coding-plan]` 前缀把 violations 并入 reasons/exitCode。
 
 **关联**：约束 #11（R3 预防性审查强制）
 
-### #40 opsx/S-tickets 职责混淆
+### #40 plan 任务与执行账本 / 切片职责混淆
 
-**危害**：用 opsx:propose 的 tasks.md 替代 S-tickets 的 tickets.md（或反之），破坏规格级规划（what/why）与代码级切片（how）的职责边界，导致切片缺失端到端可 demo 性或规划缺失设计依据。
+**危害**：用 plan 任务节替代账本完成行（或反之）、用 tickets 切片替代 plan 任务节，破坏编码计划执行单元（what/why）与代码级切片（how）的职责边界，导致账本无法证明任务完成、切片缺失端到端可 demo 性或规划缺失依据。
 
 **检测信号**：
-- `openspec/changes/<change>/` 目录下有 tasks.md 但无 tickets.md（S-tickets 拆解被跳过）
-- tickets.md 存在但 tasks.md 缺失（opsx:propose 被跳过）
-- tickets.md 内容是高层任务清单而非 vertical-slice 切片（职责错位）
-- tasks.md 内容含 tracer-bullet/blocking-edges 代码切片细节（职责错位）
+- 有 `docs/plans/<changeId>.plan.md` 任务节但账本无对应 `Task N: complete`（账本未承担完成证明职责）
+- 账本声明 `Task N: complete` 但任务三件套缺失（完成声明无产物支撑，R3/R4 并集判定）
+- `tickets.md` 内容是高层任务清单而非 vertical-slice 切片（职责错位），或用 tickets.md 充当 plan 任务节
 
 **回退动作**：补齐缺失的制品，修正职责错位的内容，重审 R3×3 + V。
 
-**门禁脚本**：`check-opsx-artifacts.ts`（exitCode=1 命中本反模式）。
+**门禁脚本**：`check-coding-plan.ts`（exitCode=1 命中本反模式）。
 
-**关联**：
+**关联**：[phase-5-coding.md](phase-5-coding.md)「superpowers 编码链 S 分派」节
 
 ### #41 加权平均掩盖单轴失败
 

@@ -23,7 +23,8 @@
  *                 --change/--base/--head 互斥）：聚合 codegraph/coding-plan strict 校验，
  *                 violations 并入 reasons/exitCode（不被 RTM 通过掩盖）；
  *                 缺失 → fail-closed（exit 1）；文件/JSON/schema 非法 → exit 2。
- *                 archive（check-openspec-archive.ts）是 phase 8 opsx:archive 后置门，
+ *                 archive（原 check-openspec-archive.ts）后置门已于 2026-09-21 退役，
+ *                 归档快照由 check-archive-integrity.ts 的 codingPlanSnapshot 条件项覆盖，
  *                 不在本 pre-archive gate 内强制
  *   --json        机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *   --validate-templates  模板漂移校验（C9）：按 PHASE_SPEC_LAYOUT 校验技能包 templates/ 资产
@@ -231,8 +232,8 @@ export interface ExternalChecksAggregate {
  *     "未提供 --scope" 误导文案（真实原因在 scopeViolations，纠正动作是更新过期 scope）
  *   - scopeViolations（ChangeScope Git 绑定失败等）并入 reasons
  *   - 两 checker violations 并入 reasons（codegraph/coding-plan 失败不得被 RTM 通过掩盖）
- * openspecArchived 不作为本 gate 输入：archive 是 phase 8 opsx:archive 后置门，
- * 单独跑 check-openspec-archive.ts。
+ * openspecArchived 不作为本 gate 输入：原 phase 8 opsx:archive 后置门 check-openspec-archive.ts
+ * 已于 2026-09-21 退役，归档后置校验 = check-archive-integrity.ts 的 codingPlanSnapshot 条件项（单独跑）。
  */
 export function aggregateExternalChecks(
   projectRoot: string,
@@ -581,8 +582,8 @@ async function main(): Promise<void> {
   // --change/--base/--head 薄封装；缺失 → aggregate 内 fail-closed violations；
   // scope 文件/JSON/schema 非法 → exit 2（输入错误，helper 内部处理）；Git 绑定失败 →
   // violations（与两 checker violations 一并并入 reasons，不被 RTM 通过掩盖）。
-  // openspecArchived 不作为本 gate 输入（archive 是 phase 8 opsx:archive 后置门，单独跑
-  // check-openspec-archive.ts）。
+  // openspecArchived 不作为本 gate 输入（原 phase 8 opsx:archive 后置门 check-openspec-archive.ts
+  // 已于 2026-09-21 退役，归档后置校验 = 单独跑 check-archive-integrity.ts 的 codingPlanSnapshot 条件项）。
   // 阶段 5-8 外部校验聚合（Slice B）：复用前面已定的 effectivePhase（phaseOption ?? 8）
   const externalPhase: number = phaseOption ?? 8;
   let externalAggregate: ExternalChecksAggregate | undefined;
