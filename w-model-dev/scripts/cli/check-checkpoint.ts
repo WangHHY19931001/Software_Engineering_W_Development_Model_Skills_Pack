@@ -173,6 +173,9 @@ async function main(): Promise<void> {
         passed: result.passed,
         reasons: result.violations,
         violations: buildViolationDistribution(result.violations.length),
+        ...(result.diagnostics !== undefined && result.diagnostics.length > 0
+          ? { diagnostics: result.diagnostics }
+          : {}),
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -195,6 +198,13 @@ async function main(): Promise<void> {
 
   if (result.passed) {
     console.log('checkpoint 记录符合规范：决策非空 + 内容具体 + 用户确认存在 + 决策与阶段匹配 + 跨阶段证据一致。');
+    // 非阻断诊断（E-2 方案 B：R0 首阶段自举形态留痕；通过但走自举形态时可见可审计）
+    if (result.diagnostics !== undefined && result.diagnostics.length > 0) {
+      console.log('非阻断诊断：');
+      for (const diagnostic of result.diagnostics) {
+        console.log(`  - ${diagnostic}`);
+      }
+    }
   } else {
     console.log('未通过原因：');
     for (const r of result.violations) {
@@ -215,6 +225,7 @@ async function main(): Promise<void> {
       type: 'checkpoint',
       passed: result.passed,
       violations: result.violations,
+      ...(result.diagnostics !== undefined && result.diagnostics.length > 0 ? { diagnostics: result.diagnostics } : {}),
     },
     exitCode,
   );

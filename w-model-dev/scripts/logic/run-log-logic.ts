@@ -1442,14 +1442,19 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   // RFC3339 date-time，同秒内先后不可判定，故同秒不算「早于放行」），缺失即
   // blocking 并指明阶段与脚本名。同一阶段多次放行逐个核验（不合并）。
   //
-  // D-6 阶段 1 自举豁免（例外只此一处）：`check-checkpoint.ts` 自身要求 run-log 中
-  // 已存在 checkpoint 记录才可能 exit 0，故其成功记录必然晚于本阶段放行——严格「早于
-  // 放行」在首阶段构成自举死锁（先跑门则门红，先放行则 R11 红）。`phase===1` 时该脚本
-  // **新增**一个后置窗口 (releaseAt, nextReleaseAt)：nextReleaseAt 取全部阶段中时间戳
-  // 严格晚于本放行的最早一条放行记录，不存在下一放行时无上界（只要求晚于本放行）。
-  // 后置窗口是**增补**而非替换——早于放行的同脚本记录照旧充数（既有 run-log 不受影响）；
-  // 窗口只放宽时间轴，记录仍须属本阶段（phase 相同）。其余四脚本与 phase>=2 的放行
-  // 判据完全不变。
+  // D-6 阶段 1 后置窗口（**历史日志兼容形态**——E-2 方案 B 落地后的重定性，判据零变化）：
+  // `phase===1` 的 `check-checkpoint.ts` 允许落在后置窗口 (releaseAt, nextReleaseAt)：
+  // nextReleaseAt 取全部阶段中时间戳严格晚于本放行的最早一条放行记录，不存在下一放行时
+  // 无上界（只要求晚于本放行）。后置窗口是**增补**而非替换——早于放行的同脚本记录照旧
+  // 充数（既有 run-log 不受影响）；窗口只放宽时间轴，记录仍须属本阶段（phase 相同）。
+  // 其余四脚本与 phase>=2 的放行判据完全不变。
+  // 定性沿革：本窗口合入时（D-6，2026-09-21）用于绕开「check-checkpoint 自身要求 run-log
+  // 已有放行记录才可能 exit 0」与 R11 严格早于判据的首阶段自举死锁（先跑门则门红，先放行
+  // 则 R11 红）。E-2 方案 B（2026-09-22 规格修正案，R0 首阶段自举形态：run-log 零放行记录
+  // 时以 checkpoint-log 用户确认为初级证据，见 checkpoint-logic.ts）使自然时序「确认落盘 →
+  // 闭环五门 → 最后写放行记录」合法——新建项目常态满足上方严格判据，不再产生后置形态；
+  // 本窗口仅保留用于兼容以旧时序写入的历史 run-log（删除会使其变红）。注意：后置形态仍
+  // 违反 R8 轨迹模板（R8 零改动，后置记录照常报 R8 三条），新建项目不应产生该形态。
   const releaseTimes = valid
     .filter((e) => e.action === 'checkpoint' && e.outcome === 'success')
     .map((e) => Date.parse(e.timestamp))

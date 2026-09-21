@@ -66,6 +66,8 @@ export interface CheckpointCheckOptions {
 export interface CheckpointCheckResult {
   passed: boolean;
   violations: string[];
+  /** 非阻断诊断（E-2 方案 B：R0 首阶段自举形态的 BOOTSTRAP_VALIDATION 留痕）；不改写 passed。 */
+  diagnostics?: string[];
 }
 
 // ==================== R2 规则常量 ====================
@@ -173,6 +175,8 @@ const NEGATION_KEYWORDS = [
 
 export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptions): CheckpointCheckResult {
   const violations: string[] = [];
+  // 非阻断诊断（E-2 方案 B 自举形态留痕；与 run-log-logic 同形态：空则不产出键）
+  const diagnostics: string[] = [];
 
   // 输入校验（先做）：非法输入返回 violations 而非抛 TypeError
   if (!entries || !Array.isArray(entries)) {
@@ -219,11 +223,26 @@ export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptio
   // 收集 checkpoint success 记录（R1-R4 的校验对象）
   const checkpoints = valid.filter((e) => e.action === 'checkpoint' && e.outcome === 'success');
 
+  // E-2 方案 B（R0 首阶段自举形态，2026-09-22 规格修正案）：零记录 + `--checkpoint-log`
+  // 已提供且加载含至少一条用户确认（Map 非空）→ R0 不违规，改推非阻断 BOOTSTRAP_VALIDATION
+  // 诊断——首阶段放行的初级证据是 checkpoint-log 用户确认原文（与 R3 防代签同锚）；自然时序
+  // 「确认落盘 → 闭环五门 → 最后写放行记录」下 check-checkpoint 运行时放行记录尚未写入，
+  // 属预期形态，放行记录内容校验（R1/R2/R4）由下一阶段 check-checkpoint 的全局回溯完成
+  // （与阶段 ≥2 的既有语义一致）。未提供 / 空 Map / 不可读（checkpointLogMissingReason 两态）
+  // → 维持原违规（fail-closed 不变）；一旦放行记录写入，走既有全量路径（R1-R5 不变）。
+  // 规格见 docs/superpowers/specs/2026-09-22-e2-spec-amendment.md；根因见
+  // docs/debug/2026-09-22-e2-r8-r0-rootcause/README.md。
   // R0 零证据守卫：无任何 checkpoint success 记录时不得判通过。
   // 「没有发现违规」≠「验证通过」——本门禁是阶段放行的唯一凭据，
   // 空 run-log 必须先证明「确实发生过放行」，否则 fail-closed（与 check-role-dispatch 同语义）。
   if (checkpoints.length === 0) {
-    violations.push('run-log 无 checkpoint success 记录（无法证明阶段 CHECKPOINT 已放行；零证据不等于合规）');
+    if (options?.checkpointLog !== undefined && options.checkpointLog.size > 0) {
+      diagnostics.push(
+        'BOOTSTRAP_VALIDATION: 首阶段自举校验：以 checkpoint-log 用户确认为初级证据；放行记录将于闭环门后写入',
+      );
+    } else {
+      violations.push('run-log 无 checkpoint success 记录（无法证明阶段 CHECKPOINT 已放行；零证据不等于合规）');
+    }
   }
 
   // R1 acknowledgedDecisions 非空
@@ -326,5 +345,9 @@ export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptio
     }
   }
 
-  return { passed: violations.length === 0, violations };
+  return {
+    passed: violations.length === 0,
+    violations,
+    ...(diagnostics.length > 0 ? { diagnostics } : {}),
+  };
 }

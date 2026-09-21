@@ -100,6 +100,85 @@ describe('R3 目录已提供但无匹配记录的 reason 文案（S18）', () =>
 });
 
 /**
+ * E-2 规格修正案（方案 B：R0 首阶段自举形态，2026-09-22）：
+ * 零 checkpoint 记录态下 R0 的证据源扩展——run-log 零放行记录 + `--checkpoint-log`
+ * 已提供且加载含至少一条用户确认（Map 非空）→ R0 不违规，改推非阻断
+ * `BOOTSTRAP_VALIDATION:` 诊断（首阶段放行的初级证据 = checkpoint-log 用户确认原文，
+ * 与 R3 防代签同锚）；未提供 / 空 Map / 不可读（checkpointLogMissingReason 两态）→
+ * 维持原违规（fail-closed 不变）。有记录路径零变化。
+ *
+ * 背景：阶段 1 自举死锁（R0 × R11/D-6 × R8 三批规则联合）——自然时序「确认落盘 →
+ * 闭环五门 → 最后写放行记录」下 check-checkpoint 运行时 run-log 尚无放行记录，
+ * 旧 R0 一律违规使其成为该时序的唯一阻塞点。规格见
+ * `docs/superpowers/specs/2026-09-22-e2-spec-amendment.md`；根因见
+ * `docs/debug/2026-09-22-e2-r8-r0-rootcause/README.md`。
+ */
+describe('R0 首阶段自举形态（E-2 方案 B）', () => {
+  it('① 零记录 + checkpointLog 非空 → passed=true，含 BOOTSTRAP_VALIDATION 诊断，无 R0 违规', () => {
+    const result = checkCheckpoint([], {
+      checkpointLog: new Map([['1', '用户确认：放行进入阶段 2（user-id: alice）']]),
+    });
+    expect(result.passed).toBe(true);
+    expect(result.violations).toEqual([]);
+    expect(result.violations.some((v) => v.includes('零证据不等于合规'))).toBe(false);
+    expect((result.diagnostics ?? []).some((d) => d.startsWith('BOOTSTRAP_VALIDATION:'))).toBe(true);
+    const diagnostic = (result.diagnostics ?? []).find((d) => d.startsWith('BOOTSTRAP_VALIDATION:')) ?? '';
+    expect(diagnostic).toContain('首阶段自举校验');
+    expect(diagnostic).toContain('checkpoint-log 用户确认为初级证据');
+    expect(diagnostic).toContain('放行记录将于闭环门后写入');
+  });
+
+  it('② 零记录 + 未提供 checkpointLog → R0 违规仍在（fail-closed 回归）', () => {
+    for (const options of [undefined, { checkpointLog: undefined }]) {
+      const result = checkCheckpoint([], options);
+      expect(result.passed).toBe(false);
+      expect(result.violations.some((v) => v.includes('零证据不等于合规'))).toBe(true);
+      expect(result.diagnostics).toBeUndefined();
+    }
+  });
+
+  it('③ 零记录 + checkpointLog 空语义（missingReason 两态 / 空 Map）→ R0 违规仍在（fail-closed 回归）', () => {
+    // 目录已提供但无 phase-N 匹配（S18 语义：CLI 传 undefined + missingReason）
+    const noMatch = checkCheckpoint([], { checkpointLog: undefined, checkpointLogMissingReason: 'no-phase-match' });
+    expect(noMatch.passed).toBe(false);
+    expect(noMatch.violations.some((v) => v.includes('零证据不等于合规'))).toBe(true);
+    expect(noMatch.violations.some((v) => v.includes('checkpoint-log 无 phase-N 匹配记录（目录已提供）'))).toBe(false); // 零记录时 R3 空转，reason 不出现
+    // 目录已提供但不可读
+    const unreadable = checkCheckpoint([], { checkpointLog: undefined, checkpointLogMissingReason: 'dir-unreadable' });
+    expect(unreadable.passed).toBe(false);
+    expect(unreadable.violations.some((v) => v.includes('零证据不等于合规'))).toBe(true);
+    // 目录已提供但加载结果为空 Map → 不走自举形态，原违规保留
+    const emptyMap = checkCheckpoint([], { checkpointLog: new Map() });
+    expect(emptyMap.passed).toBe(false);
+    expect(emptyMap.violations.some((v) => v.includes('零证据不等于合规'))).toBe(true);
+    expect(emptyMap.diagnostics).toBeUndefined();
+  });
+
+  it('④ 有记录路径零变化：放行记录在场时不产生 BOOTSTRAP_VALIDATION 诊断（既有用例零回归）', () => {
+    const checkpointEntry = {
+      runId: 'cp1',
+      timestamp: '2026-07-10T04:00:00Z',
+      phase: 1,
+      phaseName: '需求与范围',
+      action: 'checkpoint',
+      role: 'O',
+      duration_s: 10,
+      tokens: 2000,
+      estimated: false,
+      subagentSpawns: 0,
+      gateExitCode: null,
+      outcome: 'success',
+      acknowledgedDecisions: ['需求 REQ-1.1：采用 REST + JWT 认证方案'],
+    };
+    const confirmed = { checkpointLog: new Map([['1', '用户确认：放行进入阶段 2（user-id: alice）']]) };
+    const result = checkCheckpoint([checkpointEntry], confirmed);
+    expect(result.passed).toBe(true);
+    expect(result.violations).toEqual([]);
+    expect(result.diagnostics).toBeUndefined();
+  });
+});
+
+/**
  * D-5（2026-09-20 门禁契约修复 · 任务 2）：legacy 吸收谓词两消费者口径统一。
  *
  * 背景：`check-run-log` 对「variant / reworkHints 规则引入前写入的旧记录」（缺
