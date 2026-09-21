@@ -125,7 +125,8 @@
       "assertions": [
         { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "编码计划契约", "scopeAnchor": "phase-5-coding.md" },
         { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "superpowers-adoption.md" },
-        { "type": "fileExists", "target": "w-model-dev/scripts/cli/check-coding-plan.ts" }
+        { "type": "fileExists", "target": "w-model-dev/scripts/cli/check-coding-plan.ts" },
+        { "type": "contains", "target": "w-model-dev/scripts/logic/archive-integrity-logic.ts", "substring": "codingPlanSnapshot" }
       ],
       "evidence": { "type": "selfTestSource", "substring": "bad-missing-ledger" } },
     { "id": 22, "scenario": "代码改动前 codegraph 影响分析", "layer": "L2",
