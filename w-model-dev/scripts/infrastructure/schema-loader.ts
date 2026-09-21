@@ -28,7 +28,7 @@ import { readSchemasDirSync } from './schema-fs.js';
 
 const SCHEMAS_DIR = join(fileURLToPath(import.meta.url), '..', '..', '..', 'schemas');
 
-/** 同步 require（ESM 下加载 CJS 依赖；保持 validateBySchema 同步语义，26 个 check 脚本调用链不变） */
+/** 同步 require（ESM 下加载 CJS 依赖；保持 validateBySchema 同步语义，28 个 check 脚本调用链不变） */
 const nodeRequire = createRequire(import.meta.url);
 
 let ajv: AjvDefault | null = null;

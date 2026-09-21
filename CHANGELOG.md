@@ -9,6 +9,23 @@
 
 ## [42.2.1] - 2026-09-01
 
+### superpowers 替换 opsx（编码计划契约 + codegraph CLI 收敛，批次 1-2）（2026-09-21）
+
+> 背景：阶段 5-8 的规格级规划原依赖 OpenSpec opsx（`/opsx:*` 四段式 + `openspec/changes/` 制品目录），其**制品格式与门禁不在本仓**、且外部工具缺位时整条链路无可执行契约。现以 [obra/superpowers](https://github.com/obra/superpowers) v6.3.0（commit `b36e082`，MIT）的编码链方法论替代：方法论 vendor 为 `references/superpowers-adoption.md`（只在仓内，不要求宿主安装），机器可查的部分改由本仓脚本承担。规格见 `docs/superpowers/specs/2026-09-21-superpowers-replace-opsx-design.md`、计划见 `docs/superpowers/plans/2026-09-21-superpowers-replace-opsx.md`，逐任务报告与评审 diff 存 `.superpowers/sdd/2026-09-21-superpowers-replace-opsx/`。版本保持 42.2.1，**不 bump**。
+>
+> **本条目覆盖批次 1（脚本层核心替换，任务 1-5）与批次 2（方法论 vendor 与文档面，任务 6-8）**；批次 3（demo 新链路重放）与批次 4（openspec 残留清理 + 全量 prepush）完成后另行登记。
+
+- **新门禁 `check-coding-plan.ts`（`logic/coding-plan-logic.ts` 纯函数 + CLI，R1-R6）**：R1 plan 存在且 `<changeId>.plan.md` 命名合规 → R2 目标节与任务节「行首 `验证：`/`Verify:`、命令体禁分号/AND/竖线」→ R3 账本首行身份与 `Task N: complete` 覆盖 plan 全部任务 → R4 任务三件套（`task-N-{brief,report}.md`）非空 + `review-*.diff` → R5 stage 级 `R3×9 + V×3`（stage ∈ `plan`/`execute`/`finalize`）→ R6 归档态 plan + 账本快照 fail-closed。全部 R 判据由单测正反例锁定（含「删掉一条 complete 即红」的负例）。
+- **run-log action 词表 27 → 30**：新增 `plan_propose` / `plan_task` / `plan_review`（S-plan 计划提案 / 计划任务推进 / V 任务评审）；`opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive` 位置不动、转为 **LEGACY**（历史记录仍可解析，新流程不再产生）。词表四方同步（`run-log.schema.json` ↔ `conventions.md` ↔ `data-models.md` ↔ `docs-consistency-logic.ts` 的 `runLogActionCount`），`ACTION_ROLE_PAIRING` 未随新增动作放宽。**计数口径**：`check-*` 统一按 `cli/check-*.ts` 文件名 glob 实测（28 个），全套 exit-2 = 46。
+- **artifact gate 阶段 5-8 聚合切换**：`aggregateExternalChecks` 由 `checkOpsxArtifactsStrict` 改为 `checkCodingPlan`，`GATE_JSON.external` 键为 `{ codegraph, codingPlan }`，违规行前缀 `[coding-plan]`；scope 缺失仍两 checker 各自 fail-closed，`scopeProvidedButFailed` 抑制误导文案的行为不变。
+- **`check-openspec-archive.ts` 退役，归档快照并入 `check-archive-integrity.ts`**：归档根含恰一 `*.plan.md` 时自动启用 `codingPlanSnapshot` 清单项（`<changeId>.plan.md` + `progress.md` + `Task N: complete` 三件套），违规以 `[codingPlanSnapshot]` 前缀并入 `missingFiles`；零/多匹配分别走「不启用」与「fail-closed」，legacy 归档零行为变化。退出码契约与 self-test 基线随退役同步回拨（self-test 361 → 360）。
+- **`ensure-codegraph-opsx.ts` → `ensure-codegraph.ts`（codegraph 收敛为 CLI 依赖 + superpowers 三层检测）**：codegraph 判据为 L1 CLI + L3 项目 `.codegraph/`；L2 MCP 注册降级为「可选加速（非依赖）」，**未注册不出 CHECKPOINT**；新增 superpowers 三层检测（L1 宿主技能目录 / L2 技能包 `references/superpowers-adoption.md` / L3 项目 `docs/superpowers/`），**只检测不安装**，缺失 → CHECKPOINT。判据单源化（`lib/superpowers-detect.ts`，ensure 与 doctor 共用）；`doctor` 的 codegraph 探针改经统一 CLI 派发（`lib/cli-probe.ts`，Windows `.cmd` shim 经 `cmd.exe`），消除「同机 doctor 报未安装、ensure 报 ready」的两消费者结论相反；openspec 检查项整体删除。
+- **文档面同步（SSoT 优先）**：SSoT §3.1 架构图边界（`OPSX[OpenSpec]` → `SP[Superpowers 方法论]`）、§3.3.1 外部工具表与 `ensure-codegraph` 检测语义、§3.3.1 ChangeScope 段（`openspec/` 顶层段仍在 `lib/change-scope.ts` 的 `EXCLUDED_ROOT_SEGMENTS` 中，文档与代码逐字一致）、§8.2.4 doctor 行、§10.5.2 聚合与归档后置门、§10D.3 action 词表片段的 `plan_*` 三值与 LEGACY 口径、§10D.8 R3 矩阵「编码链 stage（9+3 文件）」、§10.5.2/§10D.8 摘要表行、§11A.5 brownfield 吸收句；AGENTS.md 集成段与约束 #14（CLI 优先 + 编码计划契约）及 §8 两行；README.md 阶段门附加项、外部工具集成、references 计数 43 → 44；`references/superpowers-adoption.md` 为新增 vendor 资产（技能路由表与资源计数同步 43 → 44 个 .md）。
+- **文档计数与配置漂移收口（本批实测订正）**：`schema-loader.ts` / `schema-fs.ts` 注释「26 个 check 脚本调用链」→ 28；`docs/INSTALL.md` 结构树 `logic/` 36 → 39 个 .ts（38 个 `*-logic.ts` + `code-health-contract.ts`）、`lib/` 29 → 33 个共享工具（均为注释/文案，零行为改动）。
+- **eval 语料**：`eval/w-model-dev-test-prompts.json` id=21 由「opsx 三段跳步」负向用例改写为「编码计划契约与执行账本缺口」（期望文案点名 `check-coding-plan.ts` R1-R6 与归档快照条件项），`eval/README.md` 新机制类别清单同步；`npm run eval` 60/60 通过。
+- **与上一节 D-1~D-8 修复的关系（本替换后的存续状态，如实登记）**：D-1（签名链返工来源例外）、D-2（run-log R3/R7 接受 V 重发）、D-3（code-tla 按 `manifest.basePath` 装载）、D-4a/4b（killSwitch 返工计数口径与预算用量 R6/R5-b）、D-5（两门共用 legacy 谓词）、D-6（R11 阶段 1 自举豁免）、D-8（设计级布局校验激活条件）**均不受本替换影响**，其判据、测试与文档段落原样保留；**D-7**（`check-opsx-artifacts.ts` 归档回退两态）中「预归档聚合门半边」随旧链路继续在盘生效（仍在 pre-push 路径），「后置门半边」因 `check-openspec-archive.ts` 退役而改由 `check-archive-integrity.ts` 的归档快照条件项承担；该旧链路与其 self-test / samples 登记的**本体退役属批次 4**，在此之前按旧目录约定执行。
+- **未完成（显式登记，不视为已完成）**：批次 3 demo 端到端复验、批次 4 openspec 残留清理（`check-opsx-artifacts.ts` 本体 + self-test 用例 + `samples/NEGATIVE-COVERAGE.md` 条目 + `scripts/__tests__/README.md` 覆盖矩阵）、全量 19 项 prepush 复核均未执行。
+
 ### 门禁-返工链契约修复 D-1~D-8（2026-09-21）
 
 > 来源：8 阶段全流程真实调测（`docs/debug/2026-09-20-wm-8phase-live-run/README.md`，快照 main @ `fefd56fc`）披露的 8 项「门禁对合法返工链形态误报/漏报」契约缺口；规格见 `docs/superpowers/specs/2026-09-20-gate-contract-fixes-design.md`、计划见 `docs/superpowers/plans/2026-09-20-gate-contract-fixes.md`，逐任务报告与评审 diff 存 `.superpowers/sdd/2026-09-20-gate-contract-fixes/`。版本保持 42.2.1，**不 bump**。

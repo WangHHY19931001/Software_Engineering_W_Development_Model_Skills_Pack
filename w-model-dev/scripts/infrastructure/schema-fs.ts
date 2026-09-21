@@ -7,7 +7,7 @@
  * 逻辑层恢复纯函数（不做 fs / 不 process.exit）。本模块是全脚本唯一的 schema 目录 IO 宿主：
  *   - readSchemasDir：异步读取目录下全部 .schema.json，返回 { basename: parsedSchema }
  *   - readSchemasDirSync：同步变体，供 infrastructure/schema-loader 的 validateBySchema 首次调用
- *     以同步惰性构建 Ajv 单例（26 个 check 脚本同步调用链不变，不改变签名与行为）。
+ *     以同步惰性构建 Ajv 单例（28 个 check 脚本同步调用链不变，不改变签名与行为）。
  */
 
 import * as fsSync from 'node:fs';
