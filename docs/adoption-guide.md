@@ -126,12 +126,12 @@
 
 ## Brownfield 阶段级适配
 
-> 吸收 OpenSpec brownfield 优先理念，对路径 B 补充阶段级适配细则。权威定义见 SSoT [§11A.5](./skill-design-document_SSoT.md)。
+> 吸收 OpenSpec brownfield 优先理念（该外部工具已于 2026-09-21 由 superpowers 编码链替代退役，本节理念作为路径 B 的阶段级适配保留），对路径 B 补充阶段级适配细则。权威定义见 SSoT [§11A.5](./skill-design-document_SSoT.md)。
 
 ### 适用场景
 - 已有代码库引入 W 模型管理后续迭代
 - 历史代码无 RTM/无 TLA+ 规格，需要补建追溯
-- OpenSpec 风格的 brownfield 项目迁移到 W 模型
+- 规格驱动（spec-first，原 OpenSpec 形态）风格的 brownfield 项目迁移到 W 模型
 
 ### 阶段 1 Brownfield 入口
 S 子代理在阶段 1 产出需求规格前，先执行 codebase survey：

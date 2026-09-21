@@ -1635,7 +1635,7 @@ const ROOTCAUSE_CASES: RootCauseCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/R11.*矩阵外 persona.*engineering-testability/],
     description:
-      'R11 多角度 partialReports 含 28 人格库中不存在的 persona（engineering-testability），应被矩阵内校验拦截',
+      'R11 多角度 partialReports 含 33 人格库中不存在的 persona（engineering-testability），应被矩阵内校验拦截',
   },
   {
     file: 'bad-r11-category-mismatch.json',

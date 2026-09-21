@@ -202,8 +202,9 @@ export function checkOpsxArtifacts(projectRoot: string, phase: number): CheckRes
  * strict 模式（2026-09-04 audit-gate-closure，Slice A）：给定 changeId 时只校验
  * scope.changeId 对应的这一个变更目录（不再全扫描 phaseN-* 无 change 选择）；
  * 活动位优先，活动位缺失时回退归档位（D-7：`openspec/changes/archive/<目录名>/`，
- * 恰一匹配才继续、多匹配 fail-closed），使本 pre-archive 聚合门与 archive 后置门
- * （`check-openspec-archive.ts`）在归档态可同时通过；
+ * 恰一匹配才继续、多匹配 fail-closed），使本 pre-archive 聚合门在归档态不误报
+ * （archive 后置门 `check-openspec-archive.ts` 已于 2026-09-21 退役，归档态校验改由
+ * `check-archive-integrity.ts` 的 codingPlanSnapshot 条件项承担）；
  * 活动位与归档位皆无匹配（单候选或多候选）→ violations 失败而非任意取一/跳换；
  * changeId 须含阶段前缀 phase<phase>-（phase 归属一致性）。制品/R3×9/V×3 校验逻辑保留。
  */

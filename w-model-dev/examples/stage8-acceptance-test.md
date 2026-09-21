@@ -46,7 +46,7 @@ npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --
 npx tsx w-model-dev/scripts/cli/check-coding-plan.ts . --phase=8 --scope=.w-model/change-scope.json
 ```
 
-> 阶段 8 附加门禁：`check-codegraph-queries.ts` / `check-coding-plan.ts`（与 artifact gate 一样带 `--scope` 绑定实际变更；scope 过期/与实际变更不符即 fail-closed）；旧 opsx 制品门 `check-opsx-artifacts.ts` 仍在盘并仍在 pre-push 路径（退役随批次收尾）；评审证据经 `check-verifier-output.ts` 回填。
+> 阶段 8 附加门禁：`check-codegraph-queries.ts` / `check-coding-plan.ts`（与 artifact gate 一样带 `--scope` 绑定实际变更；scope 过期/与实际变更不符即 fail-closed）；旧 opsx 制品门 `check-opsx-artifacts.ts` 仍在盘并仍在 pre-push 路径（本批次不退役，按 LEGACY 制品门保留，规格级规划层门禁是 `check-coding-plan.ts`）；评审证据经 `check-verifier-output.ts` 回填。
 
 ## 预期输出（示例输出）
 
