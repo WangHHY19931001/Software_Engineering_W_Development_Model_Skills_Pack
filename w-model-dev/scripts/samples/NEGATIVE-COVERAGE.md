@@ -23,10 +23,10 @@
 >     独立根是并发的前提，同时把不变量加强为「本探针在自己根内不留半成品」（共享根只能做弱归因）；
 >     实测 48 探针由串行 71s 降至约 22s，断言一字未减。tsx 不可用等
 >     探针不可用情形按失败处理，不静默跳过。
-> - 口径与中心探针一致（47 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
+> - 口径与中心探针一致（46 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
 >   `metrics-report.ts` 使用特殊探针参数，但仍计入集合）。
 >
-> - **门禁脚本**：基名（`w-model-dev/scripts/cli/<name>.ts` 去掉 `.ts`）。全表 47 行，每门禁恰一行。
+> - **门禁脚本**：基名（`w-model-dev/scripts/cli/<name>.ts` 去掉 `.ts`）。全表 46 行，每门禁恰一行。
 > - **负向机制**：只允许 `fixture`（在盘 `samples/` fixture）/ `invocation`（CLI 参数或测试临时目录调用）/
 >   `mutated-copy`（测试内改写文本副本）三种。
 > - **负向案例 / 证据位置**：`fixture` 行写 `` `samples/...` ``（相对 `w-model-dev/scripts/`），并附
@@ -84,7 +84,6 @@
 | check-codegraph-queries           | fixture  | `samples/codegraph-queries/bad-empty`（`self-test.ts#sampleDir: 'codegraph-queries/bad-empty'`）                                    | 放宽查询落盘覆盖将漏掉未做 codegraph 查询（空目录）直接改代码（反模式 #38 逃逸）                     |
 | check-opsx-artifacts              | fixture  | `samples/opsx-artifacts/bad-missing-tickets`（`self-test.ts#sampleDir: 'opsx-artifacts/bad-missing-tickets'`）                      | 放宽制品齐全性将漏掉缺 tickets 或 R3/V 审查产物的变更进入 apply（反模式 #39/#40）                    |
 | check-coding-plan                 | fixture  | `samples/coding-plan/bad-missing-ledger`（`self-test.ts#sampleDir: 'coding-plan/bad-missing-ledger'`）                      | 放宽账本/三件套/验证命令齐全性将漏掉无账本或未 complete 的编码变更被放行（编码链形态的反模式 #39 谱系） |
-| check-openspec-archive            | fixture  | `samples/openspec-archive/bad-no-archive`（`self-test.ts#sampleDir: 'openspec-archive/bad-no-archive'`）                            | 放宽归档校验将漏掉未归档的 change 被判归档完成                                                       |
 | check-requirement-coverage        | fixture  | `samples/coverage/bad-empty-stakeholder.json`（`self-test.ts#file: 'bad-empty-stakeholder.json'`）                                  | 放宽 C1-C10 将漏掉 stakeholder 覆盖率缺口与 metrics 重算不一致                                       |
 | check-exemption                   | fixture  | `samples/exemption/bad-s-self-approve.json`（`self-test.ts#file: 'bad-s-self-approve.json'`）                                       | 放宽 E1-E9 将漏掉 S 自批（缺人类四阶段审批）的豁免被放行                                             |
 | check-design-contract-consistency | fixture  | `samples/design-contract/bad-path-mismatch.json`（`self-test.ts#file: 'bad-path-mismatch.json'`）                                   | 放宽 D1-D4 将漏掉设计路径/参数/状态码/响应字段与实现不一致                                           |

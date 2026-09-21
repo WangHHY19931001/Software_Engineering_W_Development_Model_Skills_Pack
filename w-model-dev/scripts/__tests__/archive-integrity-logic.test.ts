@@ -3,7 +3,12 @@ import * as path from 'node:path';
 
 import { describe, it, expect } from 'vitest';
 
-import { checkArchiveIntegrity, ARCHIVE_INTEGRITY_CHECKLIST } from '../logic/archive-integrity-logic.js';
+import {
+  checkArchiveIntegrity,
+  deriveArchiveIntegrityManifest,
+  ARCHIVE_INTEGRITY_CHECKLIST,
+  type ArchiveIntegrityManifest,
+} from '../logic/archive-integrity-logic.js';
 
 const SAMPLES_DIR = path.join(__dirname, '..', 'samples', 'archive-integrity');
 
@@ -55,3 +60,183 @@ describe('archive-integrity-logic', () => {
     expect(result.missingFiles.some((f) => f.includes('verifier-output-'))).toBe(true);
   });
 });
+
+// ==================== codingPlanSnapshot 清单项（并入自 check-openspec-archive 退役） ====================
+
+/** valid-full 全集（既有 fixture 的基线清单，零改动复用） */
+function loadFullContents(): Set<string> {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- SAMPLES_DIR 为测试文件相对固定路径，仅读取仓内 fixture
+  const content = readFileSync(path.join(SAMPLES_DIR, 'valid-full.json'), 'utf-8');
+  return new Set(JSON.parse(content) as string[]);
+}
+
+/** 编码计划归档快照层：plan 快照 + 账本快照 + Task 1/2 三件套 */
+function addCodingPlanSnapshot(contents: Set<string>): void {
+  contents.add('phase5-demo.plan.md');
+  contents.add('progress.md');
+  contents.add('task-1-brief.md');
+  contents.add('task-1-report.md');
+  contents.add('task-2-brief.md');
+  contents.add('task-2-report.md');
+}
+
+const VALID_PROGRESS_MD =
+  '# SDD ledger — plan: docs/plans/phase5-demo.plan.md\n\nTask 1: complete (commit abc1234)\nTask 2: complete\n';
+
+describe('archive-integrity-logic codingPlanSnapshot 清单项', () => {
+  it('缺省（无 manifest / codingPlanSnapshot 缺省 false）→ 零行为变化（既有 fixture 硬判据）', () => {
+    // valid-full 全集不含任何编码计划快照文件：缺省路径下不得新增任何违规
+    const contents = loadFullContents();
+    expect(checkArchiveIntegrity(contents).passed).toBe(true);
+    expect(checkArchiveIntegrity(contents, undefined, {}).passed).toBe(true);
+    expect(checkArchiveIntegrity(contents, undefined, { codingPlanSnapshot: false }).passed).toBe(true);
+  });
+
+  it('codingPlanSnapshot=true 且快照齐备 → 通过', () => {
+    const contents = loadFullContents();
+    addCodingPlanSnapshot(contents);
+    const result = checkArchiveIntegrity(contents, undefined, {
+      codingPlanSnapshot: true,
+      changeId: 'phase5-demo',
+      progressMdContent: VALID_PROGRESS_MD,
+    });
+    expect(result.passed).toBe(true);
+    expect(result.missingFiles).toHaveLength(0);
+  });
+
+  it('缺 <changeId>.plan.md → fail-closed 且缺失条目具名到文件', () => {
+    const contents = loadFullContents();
+    contents.add('progress.md');
+    contents.add('task-1-brief.md');
+    contents.add('task-1-report.md');
+    const result = checkArchiveIntegrity(contents, undefined, {
+      codingPlanSnapshot: true,
+      changeId: 'phase5-demo',
+      progressMdContent: 'Task 1: complete\n',
+    });
+    expect(result.passed).toBe(false);
+    expect(result.missingFiles.some((f) => f.includes('phase5-demo.plan.md') && f.includes('归档计划快照缺失'))).toBe(
+      true,
+    );
+  });
+
+  it('缺 progress.md → fail-closed（归档账本快照缺失）', () => {
+    const contents = loadFullContents();
+    contents.add('phase5-demo.plan.md');
+    contents.add('task-1-brief.md');
+    contents.add('task-1-report.md');
+    const result = checkArchiveIntegrity(contents, undefined, {
+      codingPlanSnapshot: true,
+      changeId: 'phase5-demo',
+    });
+    expect(result.passed).toBe(false);
+    expect(result.missingFiles.some((f) => f.includes('progress.md') && f.includes('归档账本快照缺失'))).toBe(true);
+  });
+
+  it('progress.md 在清单但未提供内容 → fail-closed（调用方契约，不得静默跳过三件套核对）', () => {
+    const contents = loadFullContents();
+    addCodingPlanSnapshot(contents);
+    const result = checkArchiveIntegrity(contents, undefined, { codingPlanSnapshot: true, changeId: 'phase5-demo' });
+    expect(result.passed).toBe(false);
+    expect(result.missingFiles.some((f) => f.includes('progress.md') && f.includes('内容未提供'))).toBe(true);
+  });
+
+  it('每个 Task N: complete 行缺三件套 → 逐文件具名（brief/report 独立报缺）', () => {
+    const contents = loadFullContents();
+    contents.add('phase5-demo.plan.md');
+    contents.add('progress.md');
+    contents.add('task-1-brief.md');
+    contents.add('task-1-report.md');
+    // Task 2 声明 complete 但三件套双双缺失
+    const result = checkArchiveIntegrity(contents, undefined, {
+      codingPlanSnapshot: true,
+      changeId: 'phase5-demo',
+      progressMdContent: VALID_PROGRESS_MD,
+    });
+    expect(result.passed).toBe(false);
+    expect(result.missingFiles.some((f) => f.includes('task-2-brief.md'))).toBe(true);
+    expect(result.missingFiles.some((f) => f.includes('task-2-report.md'))).toBe(true);
+    expect(result.missingFiles.filter((f) => f.includes('task-2-'))).toHaveLength(2);
+  });
+
+  it('changeId 缺省时由归档根恰一 *.plan.md 推导', () => {
+    const contents = loadFullContents();
+    addCodingPlanSnapshot(contents);
+    const result = checkArchiveIntegrity(contents, undefined, {
+      codingPlanSnapshot: true,
+      progressMdContent: VALID_PROGRESS_MD,
+    });
+    expect(result.passed).toBe(true);
+    expect(result.missingFiles).toHaveLength(0);
+  });
+
+  it('changeId 缺省且归档根 *.plan.md 多匹配 → fail-closed（恰一语义，平移 check-coding-plan R6）', () => {
+    const contents = loadFullContents();
+    contents.add('phase5-demo.plan.md');
+    contents.add('phase5-demo2.plan.md');
+    contents.add('progress.md');
+    const result = checkArchiveIntegrity(contents, undefined, {
+      codingPlanSnapshot: true,
+      progressMdContent: VALID_PROGRESS_MD,
+    });
+    expect(result.passed).toBe(false);
+    expect(result.missingFiles.some((f) => f.includes('多匹配') && f.includes('phase5-demo.plan.md'))).toBe(true);
+  });
+
+  it('changeId 缺省且归档根零 *.plan.md → fail-closed（归档计划快照缺失）', () => {
+    const contents = loadFullContents();
+    contents.add('progress.md');
+    const result = checkArchiveIntegrity(contents, undefined, {
+      codingPlanSnapshot: true,
+      progressMdContent: VALID_PROGRESS_MD,
+    });
+    expect(result.passed).toBe(false);
+    expect(result.missingFiles.some((f) => f.includes('.plan.md') && f.includes('归档计划快照缺失'))).toBe(true);
+  });
+});
+
+describe('deriveArchiveIntegrityManifest（CLI 清单自动派生）', () => {
+  it('归档根恰一 *.plan.md → codingPlanSnapshot=true + changeId 推导', () => {
+    const manifest = deriveArchiveIntegrityManifest(new Set(['phase5-demo.plan.md', 'progress.md']));
+    expect(manifest.codingPlanSnapshot).toBe(true);
+    expect(manifest.changeId).toBe('phase5-demo');
+  });
+
+  it('归档根零 *.plan.md → codingPlanSnapshot=false（legacy 归档零行为变化）', () => {
+    const manifest = deriveArchiveIntegrityManifest(new Set(['requirements.md', 'progress.md']));
+    expect(manifest.codingPlanSnapshot).toBe(false);
+    expect(manifest.changeId).toBeUndefined();
+  });
+
+  it('归档根多 *.plan.md → codingPlanSnapshot=true 且不猜 changeId（由清单校验侧多匹配 fail-closed 兜底）', () => {
+    const manifest = deriveArchiveIntegrityManifest(
+      new Set(['phase5-demo.plan.md', 'phase5-demo2.plan.md', 'progress.md']),
+    );
+    expect(manifest.codingPlanSnapshot).toBe(true);
+    expect(manifest.changeId).toBeUndefined();
+  });
+
+  it('子目录下的 *.plan.md 不参与推导（快照须在归档根）', () => {
+    const manifest = deriveArchiveIntegrityManifest(new Set(['nested/dir/phase5-demo.plan.md']));
+    expect(manifest.codingPlanSnapshot).toBe(false);
+  });
+
+  it('推导结果直接喂给 checkArchiveIntegrity：齐备通过 / 残缺 fail-closed（端到端闭环）', () => {
+    const full = loadFullContents();
+    addCodingPlanSnapshot(full);
+    const derived = deriveArchiveIntegrityManifest(full);
+    expect(checkArchiveIntegrity(full, undefined, { ...derived, progressMdContent: VALID_PROGRESS_MD }).passed).toBe(
+      true,
+    );
+
+    const broken = loadFullContents();
+    broken.add('progress.md');
+    const derivedBroken = deriveArchiveIntegrityManifest(broken);
+    expect(derivedBroken.codingPlanSnapshot).toBe(false);
+    expect(checkArchiveIntegrity(broken, undefined, derivedBroken).passed).toBe(true);
+  });
+});
+
+// 类型层面守卫：manifest 三字段均可选（编译期断言，防止误改为必填破坏既有 fixture 形态）
+const _manifestTypeProbe: ArchiveIntegrityManifest = {};
+void _manifestTypeProbe;

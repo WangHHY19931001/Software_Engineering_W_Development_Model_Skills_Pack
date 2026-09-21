@@ -179,8 +179,13 @@ function parsePlanStructure(planContent: string): {
   return { hasGoalSection, sections, tasksWithoutVerify, forbiddenCommandLines };
 }
 
-/** 提取账本内 distinct `Task N: complete` 任务号集合（R3） */
-function extractCompletedTaskNumbers(ledgerContent: string): Set<number> {
+/**
+ * 提取账本内 distinct `Task N: complete` 任务号集合（R3）。
+ *
+ * 共享纯函数：`logic/archive-integrity-logic.ts` 的 `codingPlanSnapshot` 清单项（并入自
+ * check-openspec-archive 退役）import 同一实现，保证「Task N: complete」判定口径全仓单点。
+ */
+export function extractCompletedTaskNumbers(ledgerContent: string): Set<number> {
   const completed = new Set<number>();
   for (const line of ledgerContent.split('\n')) {
     const m = line.match(/^Task\s+(\d+):\s*complete\b/);

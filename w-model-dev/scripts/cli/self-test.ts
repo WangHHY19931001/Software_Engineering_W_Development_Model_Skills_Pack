@@ -19,7 +19,7 @@
  *   run-log / maturity / checkpoint / rootcause / preventive-review / iceberg /
  *   tla-bdd-sync / state-machine / design-contract / signature-chain /
  *   archive-integrity / schema / code-health / codegraph-queries / opsx-artifacts /
- *   openspec-archive / uat-path-mapping（tla-e2e 为需 Java 的手动 fixture，豁免）
+ *   uat-path-mapping（tla-e2e 为需 Java 的手动 fixture，豁免）
  *
  * 注意：self-test 是纯逻辑回归基线，**不依赖 Java/jar**。TLA+ 的 SANY/TLC 端到端测试
  *   在 samples/tla-e2e/ 下提供 fixture，需 Java 才能跑（见该目录 README）。
@@ -55,7 +55,7 @@ import { checkRequirementCoverage, type CoverageCheckOptions } from '../logic/co
 import { computeCoverageScope, type CoverageScopeThresholds } from '../logic/coverage-scope-logic.js';
 import { checkExemption } from '../logic/exemption-logic.js';
 import { checkSignatureChain } from '../logic/signature-chain-logic.js';
-import { checkArchiveIntegrity } from '../logic/archive-integrity-logic.js';
+import { checkArchiveIntegrity, type ArchiveIntegrityManifest } from '../logic/archive-integrity-logic.js';
 import { checkDesignContractConsistency, type DesignContractCheckInput } from '../logic/design-contract-logic.js';
 import {
   checkCodeTlaConsistency,
@@ -116,7 +116,6 @@ import { parseJsonSafe } from '../lib/safe-json.js';
 
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
 import { checkOpsxArtifacts } from './check-opsx-artifacts.js';
-import { checkOpenspecArchive } from './check-openspec-archive.js';
 import { checkUatPathMappingContent } from './check-artifact-gate.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
@@ -1912,38 +1911,6 @@ const OPSX_ARTIFACT_CASES: OpsxArtifactCase[] = [
   },
 ];
 
-interface OpenspecArchiveCase {
-  sampleDir: string;
-  phase: number;
-  expectedPassed: boolean;
-  expectedViolationPatterns?: RegExp[];
-  description: string;
-}
-
-const OPENSPEC_ARCHIVE_CASES: OpenspecArchiveCase[] = [
-  {
-    sampleDir: 'openspec-archive/valid',
-    phase: 5,
-    expectedPassed: true,
-    description:
-      'openspec 归档目录含完整制品（proposal/design/tasks/tickets/specs），应通过（legacy 未锚定 entries[0] 兼容层样本；strict 锚定见 check-openspec-archive.test.ts）',
-  },
-  {
-    sampleDir: 'openspec-archive/bad-no-archive',
-    phase: 5,
-    expectedPassed: false,
-    expectedViolationPatterns: [/archive\/ 目录不存在/],
-    description: 'openspec/changes/archive/ 不存在（opsx:archive 未执行），应未通过（legacy 兼容层样本）',
-  },
-  {
-    sampleDir: 'openspec-archive/bad-missing-tickets',
-    phase: 5,
-    expectedPassed: false,
-    expectedViolationPatterns: [/tickets\.md 缺失/],
-    description: '归档目录含 proposal/design/tasks 但缺 tickets.md，应未通过（legacy 兼容层样本）',
-  },
-];
-
 interface UatPathMappingCase {
   sampleDir: string; // samples/uat-path-mapping/<dir>/docs/uat-path-mapping.md
   expectedPassed: boolean;
@@ -2468,7 +2435,7 @@ const SIGNATURE_CHAIN_CASES: SignatureChainCase[] = [
   },
 ];
 
-// -------------------- ArchiveIntegrity（归档完整性：4 样本，1 valid + 3 bad） --------------------
+// -------------------- ArchiveIntegrity（归档完整性：6 样本，2 valid + 4 bad，含 codingPlanSnapshot 条件项 1+1） --------------------
 
 interface ArchiveIntegrityCase {
   /** 样本文件名（相对 samples/archive-integrity/） */
@@ -2477,6 +2444,12 @@ interface ArchiveIntegrityCase {
   expectedPassed: boolean;
   /** 期望 missingFiles 中至少一条匹配以下每个正则（全部匹配才算通过） */
   expectedReasonPatterns?: RegExp[];
+  /**
+   * 配套归档目录树（相对 samples/；对象形态 fixture 的 progress.md 内容源）。
+   * 声明本字段 = 用例经 sampleDir 子树引用登记该树（check-samples-coverage 规则 1）；
+   * 仅 valid-coding-plan-snapshot 需要（与 CLI 实读归档账本的生产路径同源），其余 fixture 内嵌自足。
+   */
+  sampleDir?: string;
   /** 用例说明 */
   description: string;
 }
@@ -2500,6 +2473,20 @@ const ARCHIVE_INTEGRITY_CASES: ArchiveIntegrityCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/gate-logs\//],
     description: '归档完整性：缺 gate-logs/ 目录',
+  },
+  {
+    file: 'valid-coding-plan-snapshot.json',
+    expectedPassed: true,
+    sampleDir: 'archive-integrity/valid-coding-plan-snapshot',
+    description:
+      '归档完整性：codingPlanSnapshot=true 且编码计划归档快照齐备（phase5-demo.plan.md + progress.md + Task 1/2 三件套；账本内容实读配套目录树，与 CLI 生产路径同源），应通过（并入自 check-openspec-archive 退役）',
+  },
+  {
+    file: 'bad-missing-plan-snapshot.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/归档计划快照缺失/],
+    description:
+      '归档完整性：codingPlanSnapshot=true 但归档根缺 phase5-demo.plan.md 计划快照，应未通过（并入自 check-openspec-archive 退役）',
   },
 ];
 
@@ -4085,38 +4072,6 @@ async function runOpsxArtifactCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
-async function runOpenspecArchiveCases(samplesDir: string): Promise<CaseResult[]> {
-  const results: CaseResult[] = [];
-  for (const c of OPENSPEC_ARCHIVE_CASES) {
-    const projectRoot = path.join(samplesDir, c.sampleDir);
-    const name = `${c.sampleDir}`;
-    const details: string[] = [];
-    try {
-      const r = checkOpenspecArchive(projectRoot, c.phase);
-      if (r.passed !== c.expectedPassed) {
-        details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
-      }
-      if (!c.expectedPassed) {
-        details.push(...matchReasonPatterns(r.violations, c.expectedViolationPatterns));
-      }
-      results.push({
-        name,
-        passed: details.length === 0,
-        description: c.description,
-        details: details.length > 0 ? details : undefined,
-      });
-    } catch (err) {
-      results.push({
-        name,
-        passed: false,
-        description: c.description,
-        details: [`  - 异常: ${err instanceof Error ? err.message : String(err)}`],
-      });
-    }
-  }
-  return results;
-}
-
 async function runCodingPlanCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of CODING_PLAN_CASES) {
@@ -4481,8 +4436,34 @@ async function runArchiveIntegrityCases(samplesDir: string): Promise<CaseResult[
   for (const c of ARCHIVE_INTEGRITY_CASES) {
     const abs = path.join(samplesDir, 'archive-integrity', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const contents = new Set<string>(parseJsonSafe<string[]>(raw));
-    const r = checkArchiveIntegrity(contents);
+    const parsed: unknown = parseJsonSafe(raw);
+    let contents: Set<string>;
+    let manifest: ArchiveIntegrityManifest | undefined;
+    if (Array.isArray(parsed)) {
+      // 既有数组形态：归档内容路径清单，manifest 全缺省（零行为变化）
+      contents = new Set(parsed as string[]);
+    } else {
+      // 对象形态：manifest 条件项 + contents 路径清单（codingPlanSnapshot 并入自 check-openspec-archive 退役）
+      const m = parsed as {
+        codingPlanSnapshot?: boolean;
+        changeId?: string;
+        progressMd?: string;
+        contents?: string[];
+      };
+      contents = new Set(m.contents ?? []);
+      let progressMdContent = m.progressMd;
+      if (progressMdContent === undefined && c.sampleDir !== undefined) {
+        // 配套归档目录树实读 progress.md（与 CLI deriveArchiveIntegrityManifest + 实读账本的生产路径同源）
+        try {
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- samplesDir/c.sampleDir 均为受控常量拼接的 fixture 路径
+          progressMdContent = await fs.readFile(path.join(samplesDir, c.sampleDir, 'progress.md'), 'utf-8');
+        } catch {
+          // 树内账本缺失 → 留空，由清单校验 fail-closed 报违规
+        }
+      }
+      manifest = { codingPlanSnapshot: m.codingPlanSnapshot, changeId: m.changeId, progressMdContent };
+    }
+    const r = checkArchiveIntegrity(contents, undefined, manifest);
 
     const details: string[] = [];
     if (r.passed !== c.expectedPassed) {
@@ -4983,7 +4964,6 @@ async function main(): Promise<void> {
   console.log(`DesignContract 用例 : ${DESIGN_CONTRACT_CASES.length} 条`);
   console.log(`CodegraphQuery 用例 : ${CODEGRAPH_QUERY_CASES.length}`);
   console.log(`OpsxArtifact 用例 : ${OPSX_ARTIFACT_CASES.length}`);
-  console.log(`OpenspecArchive 用例 : ${OPENSPEC_ARCHIVE_CASES.length}`);
   console.log(`CodingPlan 用例 : ${CODING_PLAN_CASES.length}`);
   console.log(`UatPathMapping 用例 : ${UAT_PATH_MAPPING_CASES.length}`);
   console.log('─'.repeat(60));
@@ -5014,7 +4994,6 @@ async function main(): Promise<void> {
     stateMachineResults,
     codegraphQueryResults,
     opsxArtifactResults,
-    openspecArchiveResults,
     codingPlanResults,
     uatPathMappingResults,
     icebergResults,
@@ -5065,7 +5044,6 @@ async function main(): Promise<void> {
     runStateMachineCases(samplesDir),
     runCodegraphQueryCases(samplesDir),
     runOpsxArtifactCases(samplesDir),
-    runOpenspecArchiveCases(samplesDir),
     runCodingPlanCases(samplesDir),
     runUatPathMappingCases(samplesDir),
     runIcebergCases(samplesDir),
@@ -5105,7 +5083,6 @@ async function main(): Promise<void> {
     ...stateMachineResults,
     ...codegraphQueryResults,
     ...opsxArtifactResults,
-    ...openspecArchiveResults,
     ...codingPlanResults,
     ...uatPathMappingResults,
     ...icebergResults,

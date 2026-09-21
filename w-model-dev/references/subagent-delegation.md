@@ -119,7 +119,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 | 7 系统测试 | S-coding  | 系统测试代码 + codegraph-queries 落盘 + 性能/安全/兼容性报告 + RTM systemTest 回填        | phase-7-system-test / rtm-guide / quality-standards | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=7 cucumber) / check-artifact-gate(--phase=7)                                                                                                    |
 | 8 验收测试 | S-explore | exploration-analysis.md（测试策略 + codegraph 查被测模块）                                | phase-8-acceptance-test / rtm-guide                 | check-codegraph-queries / check-opsx-artifacts                                                                                                                                                                           |
 | 8 验收测试 | S-propose | opsx 产物 + tickets.md（测试代码切片）                                                    | phase-8-acceptance-test / rtm-guide                 | check-opsx-artifacts                                                                                                                                                                                                     |
-| 8 验收测试 | S-coding  | 验收测试代码 + codegraph-queries 落盘 + 验收报告 + Archive 产物 + RTM acceptanceTest 回填 | phase-8-acceptance-test / rtm-guide                 | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-archive-integrity / check-design-contract-consistency / check-openspec-archive                  |
+| 8 验收测试 | S-coding  | 验收测试代码 + codegraph-queries 落盘 + 验收报告 + Archive 产物 + RTM acceptanceTest 回填 | phase-8-acceptance-test / rtm-guide                 | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-archive-integrity / check-design-contract-consistency                  |
 
 > A 子代理（阶段 1-4 ingestion）：A-chunk 加载 ingestion-chunk / graph-guide；A-cross 加载 ingestion-cross / graph-guide；A-evolve 加载 ingestion-cross / graph-guide。A 不跑 check 脚本（G 负责）。
 
@@ -357,7 +357,7 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 | 5 编码     | 同上                                                                         | check-code-tla-consistency / check-design-contract-consistency / check-state-machine-consistency / check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=5 cucumber) / check-artifact-gate(--phase=5)       |
 | 6 集成测试 | 同上                                                                         | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=6 cucumber) / check-artifact-gate(--phase=6)                                                                                                          |
 | 7 系统测试 | 同上                                                                         | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=7 cucumber) / check-artifact-gate(--phase=7)                                                                                                          |
-| 8 验收测试 | 同上                                                                         | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-archive-integrity / check-design-contract-consistency / check-openspec-archive                        |
+| 8 验收测试 | 同上                                                                         | check-codegraph-queries / check-opsx-artifacts / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-archive-integrity / check-design-contract-consistency                        |
 
 > 阶段 4 硬约束：check-requirement-graph.ts --phase=4 + check-tla-model.ts --phase=4 退出码必须为 0（零违反），否则不放行进阶段 5 编码。
 
@@ -365,7 +365,7 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 
 ### 6.4 工具与元门禁脚本（门禁脚本权威登记表收尾）
 
-> 本小节补全非阶段门触发的工具类 CLI、code-health 门禁 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 48 个 .ts
+> 本小节补全非阶段门触发的工具类 CLI、code-health 门禁 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 47 个 .ts
 > 一一对应（28 个 check-* + 7 个 code-health 门禁 CLI + 13 个工具：ensure-codegraph-opsx 见 §5 / 其余见下表；其中 47 个为 exit-2 脚本，self-test.ts 为 exit 0/1 回归基线，与 conventions.md「= 47（28 个 check-* + 19 个工具 CLI，不含 self-test；19 = 7 个 code-health 门禁 CLI + 12 个工具 CLI）」口径互补）。
 > **新增 / 改名门禁脚本时登记点为本表 + SKILL.md/AGENTS.md 计数句（由 checkScriptRegistry 与计数检查双向兜底）**——`check-docs-consistency.ts` 的 checkScriptRegistry
 > 核对全部 48 个 cli 脚本名均出现于本文件，SKILL.md「N 个 .ts」/ AGENTS.md「N 个脚本」/ conventions.md 计数句由计数检查同步核对（漏登记即门禁失败，pre-push 第 15 项拦截）。
@@ -386,7 +386,7 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 | code-health-apply             | code-health 门禁         | 人类批准后的最小可逆应用（`dry-run` / `patch` / `commit`）；scope 外变更即拒；记录可执行 rollback                                                                                                                                                                                                | `/wm code-health` 应用；S 执行、human 授权                                         |
 | code-health-archive           | code-health 门禁         | campaign 证据归档：人类批准 + V/G + 真实命令证据 + 可执行 rollback + 脱敏 clean 才可归档；`--verify` 无 `--source-project` 只能 package-only，绝不表述为 verified source；原子写 + 拒绝覆盖 + 篡改检测 | `/wm code-health` 归档；O 只读执行 / human 授权 |
 | security-scan                 | 工具                     | eslint-plugin-security 扫描 + baseline v2 内容敏感指纹豁免                                                                                                                                                                                                                                       | 仓库维护（pre-push 第 6 项），非项目阶段门                                         |
-| self-test                     | 工具                     | 361 条样本回归基线（全部 check 逻辑通过/失败/输入错误三态）                                                                                                                                                                                                                                      | 仓库维护（pre-push 第 1 项），非项目阶段门                                         |
+| self-test                     | 工具                     | 360 条样本回归基线（全部 check 逻辑通过/失败/输入错误三态）                                                                                                                                                                                                                                      | 仓库维护（pre-push 第 1 项），非项目阶段门                                         |
 | wm-status                     | 工具                     | 状态快照（只读）                                                                                                                                                                                                                                                                                 | O 只读查询，不分派子代理                                                           |
 | metrics-report                | 工具                     | 流程度量报告（只读）                                                                                                                                                                                                                                                                             | O 只读查询，不分派子代理                                                           |
 | plan-chunks                   | 工具                     | ingestion 分块规划（O 只读 stdout 输出分块建议）                                                                                                                                                                                                                                                 | 阶段 1-4 ingestion 子流程入口（O 执行，见 §5）                                     |
@@ -687,7 +687,7 @@ O: 若通过 → 🔴 CHECKPOINT · 发布放行（展示 GATE_JSON 给用户）
 O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完成
 ```
 
-> **阶段 5-8 门禁顺序与 ChangeScope（2026-09-04 audit-gate-closure）**：阶段 5-8 的 G 侧执行顺序为 **codegraph/opsx strict 校验 → artifact gate（聚合）→（阶段 8）opsx:archive → check-openspec-archive.ts（归档后置门）→ CHECKPOINT**。`check-artifact-gate.ts --phase=5..8` 与 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts` / `check-openspec-archive.ts` 均须绑定变更上下文：`--scope=<change-scope.json>`（或 `--change=<changeId> --base=<ref> --head=<ref>` 薄封装），缺失 → exit 1（fail-closed；S-coding 须随阶段产物产出并更新 scope，`headRef` 过期或 `changedFiles` 与实际 Git 变更集合不符同样 fail-closed）。artifact gate 把两个 strict checker 的 violations 并入 reasons/exitCode（不得被 RTM 通过掩盖），`GATE_JSON` 含 external summary；archive checker 是 `opsx:archive` 后置门，不在 pre-archive 的 artifact gate 内强制。
+> **阶段 5-8 门禁顺序与 ChangeScope（2026-09-04 audit-gate-closure）**：阶段 5-8 的 G 侧执行顺序为 **codegraph/opsx strict 校验 → artifact gate（聚合）→（阶段 8）opsx:archive → check-archive-integrity.ts（归档完整性 + 编码计划归档快照后置校验，2026-09-21 自 check-openspec-archive 退役并入）→ CHECKPOINT**。`check-artifact-gate.ts --phase=5..8` 与 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts` 均须绑定变更上下文：`--scope=<change-scope.json>`（或 `--change=<changeId> --base=<ref> --head=<ref>` 薄封装），缺失 → exit 1（fail-closed；S-coding 须随阶段产物产出并更新 scope，`headRef` 过期或 `changedFiles` 与实际 Git 变更集合不符同样 fail-closed）。artifact gate 把两个 strict checker 的 violations 并入 reasons/exitCode（不得被 RTM 通过掩盖），`GATE_JSON` 含 external summary；归档后置校验已并入 `check-archive-integrity.ts`（codingPlanSnapshot 清单项，自动派生），不在 pre-archive 的 artifact gate 内强制。
 
 ## 子代理分派模板
 
@@ -771,7 +771,7 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
     4. npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts [project-dir] --phase=<N> --scope=<change-scope.json>（定位 codegraph 覆盖问题时单独跑）
     5. npx tsx w-model-dev/scripts/cli/check-opsx-artifacts.ts [project-dir] --phase=<N> --scope=<change-scope.json>（定位 opsx 制品问题时单独跑）
   - 阶段 8 终检：npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --scope=<change-scope.json>（默认 phase=8，同样聚合 codegraph/opsx strict；终检后另运行 `check-bdd-model.ts` 的 phase 8 graph + required Cucumber report 组合）
-  - 阶段 8 opsx:archive 后置门：S-coding 执行 opsx:archive 归档后，G 单独跑 npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts [project-dir] --phase=8 --scope=<change-scope.json>（严格锚定 <changeId> 或 <日期>-<changeId> 归档目录）
+  - 阶段 8 归档后置校验：S-coding 执行归档后，G 单独跑 npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/changes/archive/<changeId 或 日期-changeId 目录>（归档完整性清单 + 编码计划归档快照 codingPlanSnapshot 自动派生校验）
   - 各阶段还须运行 `check-preventive-review.ts`、其余闭环脚本和 phase-N 定义的专属门禁
 产出契约：
   1. 退出码（0 / 1 / 2）

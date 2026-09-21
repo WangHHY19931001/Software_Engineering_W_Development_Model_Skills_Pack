@@ -5,6 +5,12 @@
  * 归档完整性强制快照清单由本脚本校验（清单定义见 archive-integrity-logic.ts）。
  * 供阶段 8 归档时调用，校验归档目录是否包含各阶段强制快照文件。
  *
+ * 自 check-openspec-archive 退役起（superpowers 替换批次 1），本脚本并入「归档后置校验」：
+ * 归档根含恰一 `*.plan.md` 时自动启用 codingPlanSnapshot 清单项（manifest 由
+ * deriveArchiveIntegrityManifest 从归档内容推导），校验编码计划归档快照
+ * （`<changeId>.plan.md` + `progress.md` + `Task N: complete` 三件套，语义与
+ * check-coding-plan R3/R4 一致）；legacy 归档（无 *.plan.md）零行为变化。
+ *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir>
  *
@@ -33,7 +39,7 @@
 import { promises as fs, type Dirent } from 'node:fs';
 import * as path from 'node:path';
 
-import { checkArchiveIntegrity } from '../logic/archive-integrity-logic.js';
+import { checkArchiveIntegrity, deriveArchiveIntegrityManifest } from '../logic/archive-integrity-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
@@ -97,7 +103,18 @@ async function main(): Promise<void> {
   }
 
   const contents = await walkDir(archiveAbs, archiveAbs);
-  const result = checkArchiveIntegrity(contents);
+  // 编码计划归档快照条件项自动派生（归档根恰一 *.plan.md 才启用；legacy 归档零行为变化）
+  const manifest = deriveArchiveIntegrityManifest(contents);
+  if (manifest.codingPlanSnapshot === true) {
+    // 归档账本快照实读：Task N: complete 三件套核对的内容源；不可读即留空，由清单校验 fail-closed 报违规
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path 由受控 archiveAbs（main 入参 resolve 后）拼接的固定子路径
+      manifest.progressMdContent = await fs.readFile(path.join(archiveAbs, 'progress.md'), 'utf-8');
+    } catch {
+      // progress.md 缺失或不可读 → 不设 progressMdContent，清单校验按缺失/未提供内容报违规
+    }
+  }
+  const result = checkArchiveIntegrity(contents, undefined, manifest);
   const exitCode = result.passed ? 0 : 1;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置

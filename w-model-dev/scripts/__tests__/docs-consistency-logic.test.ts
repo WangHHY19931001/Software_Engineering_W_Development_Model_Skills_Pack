@@ -1648,8 +1648,8 @@ describe('runDocConsistencyChecks', () => {
       expect(report.dynamicMeasurements).toMatchObject({
         // 34 = 25 existing schemas + 9 code-health campaign schemas
         schemaCount: 34,
-        cliScriptCount: 48,
-        exit2ScriptCount: 47,
+        cliScriptCount: 47,
+        exit2ScriptCount: 46,
         testFileCount: (coverage.testResults as unknown[]).length,
         vitestTestCount: 1002,
         numPassedTests: 1002,
@@ -1664,7 +1664,7 @@ describe('runDocConsistencyChecks', () => {
       expect(report.dynamicMeasurements.vitestRunId).toMatch(/^[0-9a-f]{16}$/);
       expect(report.dynamicMeasurements.vitestArtifactSha256).toMatch(/^[0-9a-f]{64}$/);
       expect(report.dynamicMeasurements.vitestCommitSha).toMatch(/^[0-9a-f]{40}$/);
-      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(49);
+      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(48);
       expect(
         report.dynamicMeasurements.exit2ProbeResults?.every(
           (probe) =>
@@ -1751,12 +1751,12 @@ describe('runDocConsistencyChecks', () => {
           };
         });
       expect(stable(withStateReport)).toEqual(stable(withoutStateReport));
-      expect(withoutStateReport.dynamicMeasurements.exit2ScriptCount).toBe(47);
-      expect(withStateReport.dynamicMeasurements.exit2ScriptCount).toBe(47);
+      expect(withoutStateReport.dynamicMeasurements.exit2ScriptCount).toBe(46);
+      expect(withStateReport.dynamicMeasurements.exit2ScriptCount).toBe(46);
     });
   }, 120_000);
 
-  it('AGENTS=34 与 INSTALL=25+9 的旧资产声明在同一真实 fixture 中失败', async () => {
+  it('AGENTS=34 与 INSTALL=24 的旧资产声明在同一真实 fixture 中失败', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       await writeVitestCount(fixtureRoot, 1002);
       const agentsPath = path.join(fixtureRoot, 'AGENTS.md');
@@ -1766,15 +1766,9 @@ describe('runDocConsistencyChecks', () => {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
       const install = await fs.readFile(installPath, 'utf8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
-      await fs.writeFile(agentsPath, agents.replace('全仓 47 个脚本 exit 2', '全仓 34 个脚本 exit 2'), 'utf8');
+      await fs.writeFile(agentsPath, agents.replace('全仓 46 个脚本 exit 2', '全仓 34 个脚本 exit 2'), 'utf8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
-      await fs.writeFile(
-        installPath,
-        install
-          .replace('29 个 check-*.ts', '25 个 check-*.ts')
-          .replace('26 个 check + 9 个工具', '25 个 check + 9 个工具'),
-        'utf8',
-      );
+      await fs.writeFile(installPath, install.replace('28 个 check-*.ts', '24 个 check-*.ts'), 'utf8');
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(result.code).toBe(1);
       expect(result.stdout).toContain('exit2-scripts');
@@ -1971,8 +1965,8 @@ describe('runDocConsistencyChecks', () => {
         };
       };
       expect(report.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
-      expect(report.dynamicMeasurements.exit2ScriptCount).toBe(47);
-      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(49);
+      expect(report.dynamicMeasurements.exit2ScriptCount).toBe(46);
+      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(48);
       expect(
         report.dynamicMeasurements.exit2ProbeResults?.every((probe) => probe.status === 2 && probe.errorExitCode === 2),
       ).toBe(true);

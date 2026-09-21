@@ -345,14 +345,6 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     reason: '2026-09-04 audit-gate-closure task 1 新增：opsx checker CLI 边界测试，显式 90 秒超时。',
     timeout: { required: true, status: 'present' },
   },
-  {
-    api: 'execSync',
-    file: '__tests__/check-openspec-archive.test.ts',
-    anchor: 'const stdout = execSync(`npx tsx "${CLI}" ${args.join(\' \')}`, {',
-    symbol: 'runCli',
-    reason: '2026-09-04 audit-gate-closure task 1 新增：archive checker CLI 边界测试，显式 90 秒超时。',
-    timeout: { required: true, status: 'present' },
-  },
   // 2026-09-17 review-remediation task 8：task 5 的两个 hook 测试文件新增了直接同步调用但从未登记
   // （该分支从未跑通全量 vitest，run-sync 审计一直是红的）。以下条目补登记，并给这些调用补显式 15 秒
   // 超时——台账不允许 `missing-followup`（另一条守护要求全部 present）。

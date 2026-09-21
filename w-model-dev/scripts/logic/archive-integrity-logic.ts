@@ -4,8 +4,14 @@
  * 归档完整性强制快照清单（单点定义于本文件）。
  * 供 check-archive-integrity.ts（CLI）调用，校验归档目录是否包含各阶段强制快照文件。
  *
+ * 自 check-openspec-archive 退役起（superpowers 替换批次 1），本层通过可选 manifest 条件项
+ * `codingPlanSnapshot` 并入「编码计划归档快照」校验（与 check-coding-plan R3/R4 三件套语义一致，
+ * `Task N: complete` 判定 import `coding-plan-logic.ts` 的共享纯函数）。
+ *
  * 单点事实源，不依赖任何 LLM。
  */
+
+import { extractCompletedTaskNumbers } from './coding-plan-logic.js';
 
 // ==================== 归档完整性清单 ====================
 
@@ -31,6 +37,22 @@ export const ARCHIVE_INTEGRITY_CHECKLIST: Record<string, string[]> = {
 
 // ==================== 类型定义 ====================
 
+/**
+ * 归档清单 manifest 条件项（全部可选；既有数组形态 fixture = 全缺省 = 零行为变化）。
+ *
+ * - `codingPlanSnapshot`：编码计划归档快照要求开关（缺省 false，不追加任何校验项）。
+ * - `changeId`：变更标识；codingPlanSnapshot=true 时用于定位归档根 `<changeId>.plan.md`；
+ *   缺省时由归档根恰一 `*.plan.md` 推导（多匹配 → fail-closed，平移 check-coding-plan R6 恰一语义）。
+ * - `progressMdContent`：归档账本 `progress.md` 文本；codingPlanSnapshot=true 时供
+ *   `Task N: complete` 提取与三件套核对（CLI 从归档目录实读；清单声明了 progress.md 却未提供
+ *   内容 → fail-closed，不得静默跳过三件套核对）。
+ */
+export interface ArchiveIntegrityManifest {
+  codingPlanSnapshot?: boolean;
+  changeId?: string;
+  progressMdContent?: string;
+}
+
 export interface ArchiveIntegrityCheckResult {
   passed: boolean;
   missingFiles: string[];
@@ -40,15 +62,99 @@ export interface ArchiveIntegrityCheckResult {
 
 // ==================== 主校验函数 ====================
 
+/** 归档根级 `*.plan.md` 快照（不含子目录）；localeCompare 排序保证违规条目顺序稳定 */
+function rootPlanSnapshots(archiveDirContents: Set<string>): string[] {
+  return Array.from(archiveDirContents)
+    .filter((p) => !p.includes('/') && p.endsWith('.plan.md'))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * 从归档目录内容集推导清单 manifest（CLI 自动派生入口，纯函数）。
+ *
+ * 归档根含**恰一** `*.plan.md` → 编码计划归档快照要求自动启用并推导 changeId；
+ * 零匹配 → codingPlanSnapshot=false（legacy 归档零行为变化）；
+ * 多匹配 → codingPlanSnapshot=true 且不猜 changeId（由 checkArchiveIntegrity 的多匹配
+ * fail-closed 违规兜底，不静默任取其一）。
+ */
+export function deriveArchiveIntegrityManifest(archiveDirContents: Set<string>): ArchiveIntegrityManifest {
+  const planSnapshots = rootPlanSnapshots(archiveDirContents);
+  if (planSnapshots.length === 1) {
+    const planFile = planSnapshots[0]!;
+    return { codingPlanSnapshot: true, changeId: planFile.slice(0, -'.plan.md'.length) };
+  }
+  if (planSnapshots.length > 1) return { codingPlanSnapshot: true };
+  return { codingPlanSnapshot: false };
+}
+
+/**
+ * codingPlanSnapshot 清单项（并入自 check-openspec-archive 退役）：
+ * 编码计划归档快照要求 = 归档根存在 `<changeId>.plan.md` + `progress.md`，且归档账本内每个
+ * `Task N: complete` 行存在对应 `task-<N>-brief.md` / `task-<N>-report.md`
+ * （三件套语义与 check-coding-plan R3/R4 一致，`Task N: complete` 判定 import 共享纯函数）。
+ * 违规以 `[codingPlanSnapshot]` 前缀并入 missingFiles，fail-closed。
+ */
+function checkCodingPlanSnapshot(
+  archiveDirContents: Set<string>,
+  manifest: ArchiveIntegrityManifest,
+  missingFiles: string[],
+  presentFiles: string[],
+): void {
+  const planSnapshots = rootPlanSnapshots(archiveDirContents);
+  let changeId = manifest.changeId;
+  if (changeId === undefined || changeId === '') {
+    if (planSnapshots.length === 1) {
+      changeId = planSnapshots[0]!.slice(0, -'.plan.md'.length);
+    } else if (planSnapshots.length === 0) {
+      missingFiles.push('[codingPlanSnapshot] *.plan.md（归档计划快照缺失：归档根须含 <changeId>.plan.md）');
+    } else {
+      missingFiles.push(`[codingPlanSnapshot] 归档根 *.plan.md 多匹配（${planSnapshots.join(', ')}）——fail-closed`);
+    }
+  }
+  if (changeId !== undefined && changeId !== '') {
+    const planFile = `${changeId}.plan.md`;
+    if (archiveDirContents.has(planFile)) {
+      presentFiles.push(`[codingPlanSnapshot] ${planFile}`);
+    } else {
+      missingFiles.push(`[codingPlanSnapshot] ${planFile}（归档计划快照缺失）`);
+    }
+  }
+
+  if (!archiveDirContents.has('progress.md')) {
+    missingFiles.push('[codingPlanSnapshot] progress.md（归档账本快照缺失）');
+  } else {
+    presentFiles.push('[codingPlanSnapshot] progress.md');
+    if (typeof manifest.progressMdContent === 'string') {
+      const completed = Array.from(extractCompletedTaskNumbers(manifest.progressMdContent)).sort((a, b) => a - b);
+      for (const n of completed) {
+        for (const kind of ['brief', 'report'] as const) {
+          const artifact = `task-${n}-${kind}.md`;
+          if (archiveDirContents.has(artifact)) {
+            presentFiles.push(`[codingPlanSnapshot] ${artifact}`);
+          } else {
+            missingFiles.push(`[codingPlanSnapshot] ${artifact}（Task ${n}: complete 的三件套缺失）`);
+          }
+        }
+      }
+    } else {
+      missingFiles.push(
+        '[codingPlanSnapshot] progress.md 内容未提供（codingPlanSnapshot=true 时调用方须提供归档账本文本以提取 Task N: complete）',
+      );
+    }
+  }
+}
+
 /**
  * 校验归档目录是否包含各阶段强制快照文件。
  *
  * @param archiveDirContents 归档目录下所有文件/子目录的相对路径集合
  * @param phasesToCheck 须校验的阶段列表（默认 1-8 + global）
+ * @param manifest 归档清单条件项（缺省 undefined = 仅既有阶段清单，零行为变化）
  */
 export function checkArchiveIntegrity(
   archiveDirContents: Set<string>,
   phasesToCheck: string[] = ['1', '2', '3', '4', '5', '6', '7', '8', 'global'],
+  manifest?: ArchiveIntegrityManifest,
 ): ArchiveIntegrityCheckResult {
   const missingFiles: string[] = [];
   const presentFiles: string[] = [];
@@ -88,6 +194,11 @@ export function checkArchiveIntegrity(
         }
       }
     }
+  }
+
+  // 编码计划归档快照条件项（缺省 false = 零行为变化，既有 fixture 硬判据）
+  if (manifest?.codingPlanSnapshot === true) {
+    checkCodingPlanSnapshot(archiveDirContents, manifest, missingFiles, presentFiles);
   }
 
   return {

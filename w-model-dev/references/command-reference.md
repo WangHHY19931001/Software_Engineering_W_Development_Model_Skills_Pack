@@ -438,20 +438,22 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **COVERAGE_SCOPE_JSON 字段**：`{fileCount, totals:{statements,branches,functions,lines}, files:[{file, statements|branches|functions|lines:{covered,total,pct}}], failures:[], passed, thresholds}`；`file` 为 `w-model-dev/scripts/` 之后的显示后缀（正斜杠），`files` 按 localeCompare 升序保证逐字节可复现；`totals` 为各文件 covered/total 求和后的加权 pct（两位小数，非百分比平均）。
 - **退出码**：0=达标（stdout 单行 `COVERAGE_SCOPE_JSON`）/ 1=阈值不达（`passed=false` 且 `failures` 逐指标列出 `实际 < 阈值`）/ 2=输入错误（报告不存在或不可读 `FILE_NOT_FOUND`、非法 JSON `FILE_PARSE`、报告畸形 `STRUCTURE_INVALID`、**白名单零命中**（`fileCount===0`，include 前缀失配或报告为空）`STRUCTURE_INVALID` → ERROR_JSON）。
 
-## 阶段 5-8 codegraph/opsx/archive 门禁 CLI（ChangeScope 绑定）
+## 阶段 5-8 codegraph/opsx 门禁 CLI（ChangeScope 绑定）
 
-三个 checker 均接受同一套变更上下文参数（对应约束 #14 / 反模式 #38/#39/#40 与归档后置门）：
+两个 checker 均接受同一套变更上下文参数（对应约束 #14 / 反模式 #38/#39；归档后置校验已并入 check-archive-integrity，见本节「归档后置校验（阶段 8）」）：
 
 - **速查行**（阶段 5-8 均必选 scope，缺失 → exit 1；文件/JSON/schema/参数冲突 → exit 2；`--scope` 仅支持等号形态 `--scope=<file>`，空格形态按未提供处理）：
   - `npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts <project-root> --phase <5|6|7|8> --scope=<change-scope.json> [--json]`
   - `npx tsx w-model-dev/scripts/cli/check-opsx-artifacts.ts <project-root> --phase <5|6|7|8> --scope=<change-scope.json> [--json]`
-  - `npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts <project-root> --phase <5|6|7|8> --scope=<change-scope.json> [--json]`
   - 薄封装：`--change=<changeId> --base=<ref> --head=<ref>`（须三者同时给出，与 `--scope` 互斥）以实际 Git 变更集合生成等价 scope，免维护 manifest。
 - **codegraph checker**：校验 `.w-model/codegraph-queries/` 下 phase 前缀 = scope.phase 的查询记录（`codegraph-query.schema.json` 结构前置校验）——`changeId` 精确等于 scope.changeId（同 changeId 异 phase 前缀文件违规）、`targetFiles` 全部属于 scope.changedFiles 且非空、`queryTimestamp` 合法 ISO date-time 且不晚于 `scopeCreatedAt`；scope 中每个须覆盖的 code/test 变更文件至少被一个合法查询覆盖（未覆盖逐文件 violation）。缺 changeId/targetFiles 的既有查询逐文件 violation（不允许 silent skip）。
 - **opsx checker**：strict 只校验 `openspec/changes/<changeId>/` 一个变更目录（制品 proposal/design/tasks/tickets + specs/）+ `.w-model/r3-reviews/phase<N>-<stage>-<dim>.md` ×9 + `.w-model/v-reviews/phase<N>-<stage>.md` ×3（stage ∈ explore/propose/coding）；**活动位缺失时回退归档位** `openspec/changes/archive/<目录名>/`（目录名 = `<changeId>` 或 `<日期>-<changeId>`；**恰一匹配**才继续，多匹配 exit 1 并具名列出全部匹配目录，零匹配仍按原早退文案失败）——同一变更在某一时刻只可能处于活动位或归档位之一，回退使归档前后两态都可校验（D-7）；`changeId` 不匹配任何 active 候选（多候选时按 `scope.changeId` 精确选择其一，不再任取第一项）→ 转入归档位回退，活动位与归档位皆无匹配才 violation；活动位存在时**永远**优先活动位；changeId 须含 `phase<phase>-` 前缀。返回结构 `changesNames` 语义不变（恒为 `scope.changeId`，归档位不泄漏进 `GATE_JSON`），归档回退仅在人类可读 stdout 以「变更目录位置」行显式标出。strict 模式只校验 scope 选定的变更目录；同阶段其它半成品兄弟目录不在本 gate 扫描范围，每个 change 须各自执行 gate（与 SSoT §10.5.2 取舍一致）。
-- **archive checker**：`openspec/changes/archive/` 下精确匹配 `<changeId>` 或 `<日期>-<changeId>`（日期前缀锚定 `<YYYY-MM-DD>-`，不再用未锚定正则），多匹配 → violation；制品 `proposal.md`/`design.md`/`tasks.md`/`tickets.md` + `specs/` 齐全；changeId 须含阶段前缀。archive 为阶段 8 `opsx:archive` 后置门（在归档完成后由 G 单独跑，不在 `check-artifact-gate.ts` pre-archive gate 内强制）。
-- **GATE_JSON / 摘要**：codegraph 收尾 `CODEGRAPH_QUERIES_JSON`、opsx 收尾 `OPSX_ARTIFACTS_JSON`、archive 收尾 `OPENSPEC_ARCHIVE_JSON`（均含 passed/violations/exitCode，phase 5-8 strict 模式下额外含 changeId 与覆盖/制品计数）。
-- **legacy 兼容层**：三脚本保留无 scope 的 legacy 纯逻辑入口（`checkCodegraphQueries` / `checkOpsxArtifacts` / `checkOpenspecArchive`，仅做目录/字段完整性或全扫描 entries[0] 判定），供 self-test 与 fixture 回归；CLI 阶段 5-8 一律走 strict（resolveCliScope → strict 函数）。
+- **归档后置校验（阶段 8）**：原 check-openspec-archive（opsx:archive 后置门）已于 2026-09-21 退役（superpowers 替换批次 1），归档后置校验并入 **check-archive-integrity**（codingPlanSnapshot 清单项，自动派生；不在 `check-artifact-gate.ts` pre-archive gate 内强制，由 G 在归档完成后单独跑）：
+  - 速查行：`npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/changes/archive/<changeId 或 <日期>-<changeId> 目录>`（支持 `--json`；退出码 0=通过 / 1=缺失 / 2=输入错误）
+  - codingPlanSnapshot 条件项：归档根含恰一 `*.plan.md` 时自动启用（legacy 归档零行为变化）——要求归档根存在 `<changeId>.plan.md` + `progress.md`，且归档账本内每个 `Task N: complete` 行存在对应 `task-<N>-brief.md`/`task-<N>-report.md`（三件套语义与 check-coding-plan R3/R4 一致；`*.plan.md` 多匹配 → fail-closed 具名列出）
+  - 各阶段强制快照清单（1-8 + global）见 `logic/archive-integrity-logic.ts` 的 `ARCHIVE_INTEGRITY_CHECKLIST`（单点事实源）。
+- **GATE_JSON / 摘要**：codegraph 收尾 `CODEGRAPH_QUERIES_JSON`、opsx 收尾 `OPSX_ARTIFACTS_JSON`（均含 passed/violations/exitCode，phase 5-8 strict 模式下额外含 changeId 与覆盖/制品计数）；`OPENSPEC_ARCHIVE_JSON` 随 check-openspec-archive 退役不再有新 producer，run-log-logic 的 `GATE_JSON_PATTERNS` 保留该模式仅用于解析历史 gate-logs / run-log。
+- **legacy 兼容层**：两脚本保留无 scope 的 legacy 纯逻辑入口（`checkCodegraphQueries` / `checkOpsxArtifacts`，仅做目录/字段完整性或全扫描 entries[0] 判定），供 self-test 与 fixture 回归；CLI 阶段 5-8 一律走 strict（resolveCliScope → strict 函数）。
 - **退出码判别**：CLI 参数互斥矛盾（如 `--change` 前缀与 `--phase` 不符）为 `ARG_INVALID`/exit 2；scope 文件内容与 Git 实际/CLI flag 冲突为校验失败 exit 1。重复值 flag（如 `--scope` 两次）为 `ARG_INVALID`/exit 2（值 flag 只允许出现一次，旧「取第一个/最后一个」语义已废除）；该语义 2026-09-06（D3/I-3）起全 CLI 生效——`--phase` 的重复与两形态（`--phase=N` / `--phase N`）校验由 `lib/parse-phase.ts` 统一检测，重复即错、非法值 ARG_INVALID，`check-bdd-model` / `check-preventive-review` 仍仅接受等号形态（裸 `--phase` → ARG_INVALID 并提示「--phase 仅支持等号形态 --phase=N」）。
 
 ## 污染源定位 CLI（check-pollution，S24）
