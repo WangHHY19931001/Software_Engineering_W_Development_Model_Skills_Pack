@@ -21,7 +21,7 @@
 | RTM | `.w-model/rtm.json` | `codeModule` 列待回填 |
 | 技术栈要求 | `.w-model/project.json` | 已登记技术栈 |
 
-产出：实现代码（`src/`）、单元测试（`tests/unit/`）、覆盖率报告、codegraph 查询落盘（`.w-model/codegraph-queries/`，含 changeId/targetFiles 绑定）、opsx 制品（`opsx/`）、RTM codeModule 回填。
+产出：实现代码（`src/`）、单元测试（`tests/unit/`）、覆盖率报告、codegraph 查询落盘（`.w-model/codegraph-queries/`，含 changeId/targetFiles 绑定）、编码计划制品（`docs/plans/<changeId>.plan.md` + 账本 `.superpowers/sdd/<plan-基名>/progress.md` + 任务三件套）、RTM codeModule 回填。
 
 ## 门禁脚本与命令行
 
@@ -41,11 +41,11 @@ npx tsx w-model-dev/scripts/cli/check-design-contract-consistency.ts .
 # 3) BDD 单元测试层校验：phase 5 强制真实 Cucumber 执行证据 + SD Coverage
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=5 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/unit.json
 
-# 4) 阶段 5 工件质量门：单元测试通过 + 覆盖率 ≥ 80% + codeModule 回填 + codegraph/opsx strict 聚合（--scope 绑定实际变更）
+# 4) 阶段 5 工件质量门：单元测试通过 + 覆盖率 ≥ 80% + codeModule 回填 + codegraph/coding-plan strict 聚合（--scope 绑定实际变更）
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=5 --scope=.w-model/change-scope.json
 ```
 
-> 阶段 5-8 附加门禁：`check-codegraph-queries.ts`（约束 #14：改码前必须 codegraph 查询）与 `check-opsx-artifacts.ts`（opsx 三段式制品完整）——两个 checker 与 artifact gate 均须带 `--scope=.w-model/change-scope.json`（或 `--change/--base/--head` 薄封装）绑定实际变更，缺 scope 即 fail-closed（exit 1）；评审证据经 `check-verifier-output.ts` 回填。
+> 阶段 5-8 附加门禁：`check-codegraph-queries.ts`（约束 #14：改码前必须经 codegraph CLI 查询）与 `check-coding-plan.ts`（编码计划契约 R1-R6）——两个 checker 与 artifact gate 均须带 `--scope=.w-model/change-scope.json`（或 `--change/--base/--head` 薄封装）绑定实际变更，缺 scope 即 fail-closed（exit 1）；评审证据经 `check-verifier-output.ts` 回填。旧 opsx 制品门 `check-opsx-artifacts.ts` 仍在盘并仍在 pre-push 路径（退役随批次收尾）。
 
 ## 预期输出（示例输出）
 
@@ -84,7 +84,7 @@ ERROR_JSON {"category":"ARG_INVALID","rule":"P0-1","message":"参数缺失 --man
 
 ## 编排说明
 
-- 阶段 5 采用 opsx 三段式 S 分派（S-explore → S-propose → S-coding），每片代码 `Write`/`Edit` 前须 codegraph_explore 查询并落盘。
+- 阶段 5 采用 superpowers 编码链 S 分派（S-plan → S-coding → S-finalize），每个 plan 任务/切片 `Write`/`Edit` 前须经 codegraph CLI 查询（`codegraph query <符号>`；宿主 MCP 工具为可选加速）并落盘。
 - 单元测试覆盖率 < 80% 或代码审查（V，`targetKind=code` 五轴评审）未通过，均留在阶段 5 返工。
 - 单元测试**执行**（阶段 5）、集成（阶段 6）、系统（阶段 7）、验收（阶段 8）四级测试逐步回填 RTM，阶段 5 质量门仅校验单元层。
 

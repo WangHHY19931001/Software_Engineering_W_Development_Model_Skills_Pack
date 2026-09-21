@@ -9,7 +9,7 @@
 - 执行阶段 1 设计的验收测试用例（UAT-001~050），按用户场景验证需求匹配度。
 - 由真实测试运行器（端到端 UI 自动化 / 用户场景脚本）执行，**禁止 LLM 估算**结果。
 - RTM 终检：所有需求 → 设计 → 代码 → 四级测试全部建立映射，覆盖率 100%。
-- 项目归档：归档目录完整性 + openspec 归档校验，用户确认后完成交付。
+- 项目归档：归档目录完整性 + 编码计划归档快照（`codingPlanSnapshot` 条件项）校验，用户确认后完成交付。
 
 ## 输入工件清单
 
@@ -34,17 +34,19 @@
 #    --scope 绑定变更上下文（缺失 → exit 1，fail-closed）
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --scope=.w-model/change-scope.json
 
-# 2) 归档完整性：校验归档目录包含各阶段强制快照文件
+# 2) 归档完整性：校验归档目录包含各阶段强制快照文件；归档根含恰一 *.plan.md 时自动启用
+#    codingPlanSnapshot 条件项（<changeId>.plan.md + progress.md + Task N: complete 三件套）
 npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/archive
 
 # 3) BDD 验收层校验（D5 step 绑定，cucumber 报告驱动）
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=8 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/acceptance.json
 
-# 4) openspec 归档校验（阶段 8 opsx:archive 后置门：S-coding 执行 opsx:archive 后由 G 单独跑）
-npx tsx w-model-dev/scripts/cli/check-openspec-archive.ts . --phase=8 --scope=.w-model/change-scope.json
+# 4) 编码计划制品门（阶段 8：plan / 执行账本 / 任务三件套 / R3×9+V×3 齐全，exit 0 才放行）
+#    原 check-openspec-archive.ts（opsx:archive 后置门）已于 2026-09-21 退役，归档快照由上面第 2 步覆盖
+npx tsx w-model-dev/scripts/cli/check-coding-plan.ts . --phase=8 --scope=.w-model/change-scope.json
 ```
 
-> 阶段 8 附加门禁：`check-codegraph-queries.ts` / `check-opsx-artifacts.ts`（与 artifact gate 一样带 `--scope` 绑定实际变更；scope 过期/与实际变更不符即 fail-closed）；评审证据经 `check-verifier-output.ts` 回填。
+> 阶段 8 附加门禁：`check-codegraph-queries.ts` / `check-coding-plan.ts`（与 artifact gate 一样带 `--scope` 绑定实际变更；scope 过期/与实际变更不符即 fail-closed）；旧 opsx 制品门 `check-opsx-artifacts.ts` 仍在盘并仍在 pre-push 路径（退役随批次收尾）；评审证据经 `check-verifier-output.ts` 回填。
 
 ## 预期输出（示例输出）
 
@@ -95,5 +97,5 @@ ERROR_JSON {"category":"FILE_NOT_FOUND","rule":"P0-2","message":"目录不存在
 ## 要点
 
 - 终检 `check-artifact-gate.ts` 不传 `--phase`（默认 8）——这是与阶段 6/7 `--phase=N` 的区别，阶段级门禁不得用终检替代（反模式 #21 的逆向）。
-- `check-archive-integrity` 与 `check-openspec-archive` 仅在阶段 8 归档时运行。
+- `check-archive-integrity`（含 `codingPlanSnapshot` 归档快照条件项）与 `check-coding-plan` 的 phase 8 校验仅在阶段 8 归档时运行。
 - 全部门禁退出码 0 + 用户确认，RTM 四级测试列全 ✅，项目完成。

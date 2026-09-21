@@ -704,8 +704,14 @@ describe('BDD project-gate command contract', () => {
     }
   });
 
-  it('uses canonical --phase=8 OpenSpec archive syntax', () => {
-    expect(read('w-model-dev/examples/stage8-acceptance-test.md')).toContain('check-openspec-archive.ts . --phase=8');
+  it('uses canonical --phase=8 coding-plan gate syntax', () => {
+    const content = read('w-model-dev/examples/stage8-acceptance-test.md');
+    expect(content).toContain('check-coding-plan.ts . --phase=8');
+    // 原 check-openspec-archive.ts（opsx:archive 后置门）已于 2026-09-21 退役，
+    // 归档快照改由 check-archive-integrity.ts 的 codingPlanSnapshot 条件项覆盖
+    expect(content).toContain('check-archive-integrity.ts docs/archive');
+    // 退役脚本不得再出现在可执行命令行（历史说明/注释行保留）
+    expect(content).not.toMatch(/^\s*npx\s+tsx[^\n]*check-openspec-archive\.ts/m);
   });
 
   it('does not describe valid phase 6 or 7 as an invalid argument', () => {

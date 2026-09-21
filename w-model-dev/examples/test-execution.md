@@ -7,14 +7,14 @@
 
 ## 共用角色闭环
 
-阶段 6-8 均先由 O 检查上游放行状态和 codegraph/OpenSpec 依赖，再在 🔴 CHECKPOINT 等待用户确认进入阶段。需要新增或修改测试代码时，按以下顺序分派：
+阶段 6-8 均先由 O 检查上游放行状态和 codegraph CLI / superpowers 三层检测依赖，再在 🔴 CHECKPOINT 等待用户确认进入阶段。需要新增或修改测试代码时，按以下顺序分派：
 
 ```text
-S-explore(OpenSpec explore + codegraph 查询)
+S-plan(writing-plans 产出 docs/plans/<changeId>.plan.md + codegraph 查询)
 → R3×3 → G(check-preventive-review, exit 0) → V → G
-→ S-propose(OpenSpec propose + tickets)
+→ S-plan 任务内兼任 S-tickets(产出 tickets.md)
 → R3×3 → G(check-preventive-review, exit 0) → V → G
-→ S-coding(OpenSpec apply；改测试前 codegraph 查询；真实运行器执行)
+→ S-coding(subagent-driven-development 逐任务执行；改测试前 codegraph 查询；真实运行器执行)
 → 按真实输出回填 result=pass 或 result=fail
 → R3×3 → G(check-preventive-review, exit 0) → V → G(阶段专属门禁)
 → O 展示证据 → 🔴 CHECKPOINT
@@ -76,7 +76,7 @@ G: 在 R3 预防审查门禁和 V 评审通过后，运行阶段 7 中间质量�
 
 O: 仅展示该命令当次真实 stdout、GATE_JSON 和退出码。
    `--phase=7` 只检查到系统测试层；不得使用默认 phase 8，也不得宣称尚未执行的验收测试通过。
-   （阶段 5-8 的 artifact gate 与 codegraph/opsx checker 均须绑定 --scope，缺失即 exit 1。）
+   （阶段 5-8 的 artifact gate 与 codegraph/coding-plan checker 均须绑定 --scope，缺失即 exit 1。）
 O: 🔴 CHECKPOINT · 阶段 7 放行
    只有真实系统测试 result=pass、V/G 通过且用户确认，才进入阶段 8。
 ```
