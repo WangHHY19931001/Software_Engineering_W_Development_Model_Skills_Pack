@@ -29,8 +29,8 @@ import {
   type DocConsistencyInput,
 } from '../logic/docs-consistency-logic.js';
 
-/** run-log.schema.json action.enum 27 值（与 schema 逐值一致、同序；审计修复 P2 同步源） */
-const ACTION_ENUM_27 = [
+/** run-log.schema.json action.enum 30 值（与 schema 逐值一致、同序；审计修复 P2 同步源） */
+const ACTION_ENUM_30 = [
   'chunk',
   'cross',
   'evolve',
@@ -58,11 +58,14 @@ const ACTION_ENUM_27 = [
   'ensure_deps',
   'iceberg-sweep',
   'iceberg-review',
+  'plan_propose',
+  'plan_task',
+  'plan_review',
 ];
 
-/** data-models.md RunLogEntry.action 联合类型（27 值，与 ACTION_ENUM_27 一致） */
-const ACTION_UNION_27 =
-  "  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'emergency-fix' | 'escalate' | 'r3-completeness' | 'r3-reliability' | 'r3-security' | 'codegraph_query' | 'opsx_explore' | 'opsx_propose' | 'opsx_apply' | 'opsx_archive' | 'ensure_deps' | 'iceberg-sweep' | 'iceberg-review';";
+/** data-models.md RunLogEntry.action 联合类型（30 值，与 ACTION_ENUM_30 一致） */
+const ACTION_UNION_30 =
+  "  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'emergency-fix' | 'escalate' | 'r3-completeness' | 'r3-reliability' | 'r3-security' | 'codegraph_query' | 'opsx_explore' | 'opsx_propose' | 'opsx_apply' | 'opsx_archive' | 'ensure_deps' | 'iceberg-sweep' | 'iceberg-review' | 'plan_propose' | 'plan_task' | 'plan_review';";
 
 /** 合法 pre-push 文本（连续 #1..#N 检查块 + 「N 项检查」声明，F-G7-08 强校验基线；N 派生自 EXPECTED.prePushCount） */
 const VALID_PRE_PUSH = [
@@ -70,10 +73,10 @@ const VALID_PRE_PUSH = [
   `# 全部门禁共 ${EXPECTED.prePushCount} 项检查`,
 ].join('\n');
 
-/** 合法 conventions.md 术语表 fixture（action 27 值逐值列表 + exit-2 计数句，F-G7-04/05 基线） */
+/** 合法 conventions.md 术语表 fixture（action 30 值逐值列表 + exit-2 计数句，F-G7-04/05 基线） */
 const CONVENTIONS_GLOSSARY = [
   '### action（RunLogEntry）',
-  `- **规范定义**：run-log 动作类型枚举（共 27 值，以 \`run-log.schema.json\` 为准）：${ACTION_ENUM_27.map((v) => `\`${v}\``).join(' / ')}。`,
+  `- **规范定义**：run-log 动作类型枚举（共 30 值，以 \`run-log.schema.json\` 为准）：${ACTION_ENUM_30.map((v) => `\`${v}\``).join(' / ')}。`,
   '- **_Avoid_**：operation/op/行为/事件。',
   '### exit-2 脚本口径',
   '- **规范定义**：scripts/cli/ 下除 self-test 外均为 exit 2 脚本：= 43（26 个 check-* + 17 个工具 CLI，不含 self-test）；计数由探针得出。',
@@ -159,12 +162,12 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     dataModels: [
       '### Schema 清单（5 份）',
       '| `verifier-output` | `verifier-output.schema.json` | ... |',
-      '| `run-log` | `run-log.schema.json` | ... | action enum（27 类） |',
+      '| `run-log` | `run-log.schema.json` | ... | action enum（30 类） |',
       '| `gate-log` | `gate-log.schema.json` | ... | append-only gate-logs 审计记录 |',
       '| `iceberg-sweep` | `iceberg-sweep.schema.json` | ... |',
       '| `evidence-manifest` | `evidence-manifest.schema.json` | ... |',
       '## RunLogEntry',
-      ACTION_UNION_27,
+      ACTION_UNION_30,
     ].join('\n'),
     verifierSpec: 'targetKind 枚举：requirement / design / code / test / rootcause。',
     commandReference: 'UAT-/ST-/IT-/UT- → test；否则为 code',
@@ -176,7 +179,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
       '反模式清单（#1~#48；\n## 反模式清单\n| # | 反模式（不要做） | 危害 | 正确做法 |\n| 1 | 跳过阶段门评审 | 缺陷后移 | 走完评审 |\n| 48 | 大规模重构式改动 | 变更量子无穷大 | 小步重构 |',
     glossary: CONVENTIONS_GLOSSARY,
     runLogSchema: JSON.stringify({
-      properties: { action: { enum: ACTION_ENUM_27 } },
+      properties: { action: { enum: ACTION_ENUM_30 } },
     }),
     skill:
       '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（53 个 .md） | 按需加载 |\n| `scripts/cli/`（44 个 .ts） | 仅 G 子代理执行 |',
@@ -808,23 +811,23 @@ describe('runDocConsistencyChecks', () => {
     );
   });
 
-  it('run-log action 枚举长度非 27 → 违规', () => {
+  it('run-log action 枚举长度非 30 → 违规', () => {
     const input = baseInput({
       runLogSchema: JSON.stringify({
         properties: { action: { enum: ['a', 'b'] } },
       }),
     });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'run-log-action' && x.message.includes('27'))).toBe(
+    expect(runDocConsistencyChecks(input).some((x) => x.check === 'run-log-action' && x.message.includes('30'))).toBe(
       true,
     );
   });
 
-  it('data-models run-log 行非 27 类 → 违规', () => {
+  it('data-models run-log 行非 30 类 → 违规', () => {
     const input = baseInput({
       dataModels: '### Schema 清单（21 份）\n| `run-log` | ... | action enum（15 类） |',
     });
     expect(
-      runDocConsistencyChecks(input).some((x) => x.check === 'run-log-action' && x.message.includes('27 类')),
+      runDocConsistencyChecks(input).some((x) => x.check === 'run-log-action' && x.message.includes('30 类')),
     ).toBe(true);
   });
 
@@ -1001,8 +1004,8 @@ describe('runDocConsistencyChecks', () => {
 
   it('glossary action 列表与 schema enum 漂移（缺值/多值）→ 违规（F-G7-05 逐值断言）', () => {
     const drift = CONVENTIONS_GLOSSARY.replace('`gate` / `tla-gate`', '`gate`').replace(
-      '`iceberg-review`。',
-      '`iceberg-review` / `ghost-action`。',
+      '`plan_review`。',
+      '`plan_review` / `ghost-action`。',
     );
     const v = runDocConsistencyChecks(baseInput({ glossary: drift }));
     const hit = v.find((x) => x.check === 'glossary-action' && x.message.includes('漂移'));
@@ -1013,7 +1016,7 @@ describe('runDocConsistencyChecks', () => {
 
   it('glossary 缺逐值列表行 → 违规（F-G7-05）', () => {
     const noList =
-      '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 27 值，以 `run-log.schema.json` 为准）\n其余文本';
+      '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 30 值，以 `run-log.schema.json` 为准）\n其余文本';
     const v = runDocConsistencyChecks(baseInput({ glossary: noList }));
     expect(v.some((x) => x.check === 'glossary-action' && x.message.includes('逐值列表行'))).toBe(true);
   });
@@ -2369,10 +2372,10 @@ describe('runDocConsistencyChecks', () => {
 
 describe('run-log action 枚举语义同步（data-models.md interface vs schema enum）', () => {
   it('interface 联合类型缺值时应报 run-log-action 漂移 violation', () => {
-    // dataModels 含「action enum（27 类）」文本但 interface 只有 15 值（复刻当前漂移）
+    // dataModels 含「action enum（30 类）」文本但 interface 只有 15 值（复刻当前漂移）
     const drifted = [
       '### Schema 清单（4 份）',
-      '| `run-log` | ... | action enum（27 类） |',
+      '| `run-log` | ... | action enum（30 类） |',
       '## RunLogEntry',
       "  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'escalate';",
     ].join('\n');
@@ -2384,9 +2387,9 @@ describe('run-log action 枚举语义同步（data-models.md interface vs schema
   it('interface 与 enum 完全一致时无漂移 violation', () => {
     const synced = [
       '### Schema 清单（4 份）',
-      '| `run-log` | ... | action enum（27 类） |',
+      '| `run-log` | ... | action enum（30 类） |',
       '## RunLogEntry',
-      ACTION_UNION_27,
+      ACTION_UNION_30,
     ].join('\n');
     const input = baseInput({ dataModels: synced });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'run-log-action');
@@ -2394,12 +2397,12 @@ describe('run-log action 枚举语义同步（data-models.md interface vs schema
   });
 
   it('interface 含 enum 之外的额外值时应报带「多」的 run-log-action 漂移 violation', () => {
-    // 在 27 值基础上追加 enum 之外的多余值
+    // 在 30 值基础上追加 enum 之外的多余值
     const drifted = [
       '### Schema 清单（4 份）',
-      '| `run-log` | ... | action enum（27 类） |',
+      '| `run-log` | ... | action enum（30 类） |',
       '## RunLogEntry',
-      ACTION_UNION_27.replace("'iceberg-review';", "'iceberg-review' | 'bogus-action';"),
+      ACTION_UNION_30.replace("'plan_review';", "'plan_review' | 'bogus-action';"),
     ].join('\n');
     const input = baseInput({ dataModels: drifted });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'run-log-action');

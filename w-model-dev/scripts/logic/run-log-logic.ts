@@ -100,7 +100,10 @@ export interface RunLogEntry {
     | 'opsx_archive'
     | 'ensure_deps'
     | 'iceberg-sweep'
-    | 'iceberg-review';
+    | 'iceberg-review'
+    | 'plan_propose'
+    | 'plan_task'
+    | 'plan_review';
   role: 'O' | 'A' | 'S' | 'V' | 'G' | 'R';
   duration_s: number;
   tokens: number;
@@ -1517,6 +1520,7 @@ const GATE_JSON_PATTERNS: RegExp[] = [
   /CONTRACT_JSON[:\s]+(\{.*\})/,
   /OPSX_ARTIFACTS_JSON\s+(\{.*\})/,
   /OPENSPEC_ARCHIVE_JSON\s+(\{.*\})/,
+  /CODING_PLAN_JSON\s+(\{.*\})/,
   /CODEGRAPH_QUERIES_JSON\s+(\{.*\})/,
   /BDD_JSON\s+(\{.*\})/,
   /PREVENTIVE_REVIEW_JSON\s+(\{.*\})/,

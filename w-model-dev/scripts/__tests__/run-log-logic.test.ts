@@ -2026,6 +2026,18 @@ describe('run-log action-role 配对（blocking，logic 层强制）', () => {
     const result = checkRunLog(entries);
     expect(result.violations.some((v) => v.startsWith('action-role 配对'))).toBe(false);
   });
+
+  it('plan_propose（S）/plan_task（S）/plan_review（V）通过 schema 校验且不触发新违规（superpowers 替换 opsx 批次 1）', () => {
+    const entries = [
+      baseEntry('plan_propose', 'S', 'plan-p1'),
+      baseEntry('plan_task', 'S', 'plan-t1'),
+      baseEntry('plan_review', 'V', 'plan-v1'),
+    ];
+    const result = checkRunLog(entries);
+    expect(result.violations.some((v) => v.includes('[schema]'))).toBe(false);
+    expect(result.violations.some((v) => v.startsWith('action-role 配对'))).toBe(false);
+    expect(result.violations.some((v) => v.includes('plan_'))).toBe(false);
+  });
 });
 
 /**

@@ -243,7 +243,7 @@ export interface DocConsistencyInput {
  * 一律从活体文档解析，不在此硬编码；Vitest 文件数/用例数属于受控动态 facts，不由文档声明。
  */
 export const EXPECTED = {
-  runLogActionCount: 27,
+  runLogActionCount: 30,
   maxAntiPattern: 48,
   prePushCount: 19,
   /** 硬约束条数（14 条） */
