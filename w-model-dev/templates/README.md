@@ -47,6 +47,7 @@
 | `test-case.md` | 通用测试用例模板 |
 | `test-report.md` | 测试报告模板 |
 | `coding.md` | 编码规范/编码任务模板 |
+| `coding-plan.md` | 编码计划制品模板（superpowers 编码链，`check-coding-plan.ts` R1-R6 消费） |
 | `review-report.md` | 评审报告模板 |
 | `rtm.md` | 需求追踪矩阵模板 |
 | `tla-spec-template.md` | TLA+ 规格模板 |
