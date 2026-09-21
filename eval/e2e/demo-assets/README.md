@@ -46,6 +46,24 @@ bash run_negative_probes.sh              # 期望末行：✓ 9/9 探针被拦�
 
 本节为规则成文，**不新增反模式编号**（成本收益裁定，见 RC-2 报告）。
 
+## 非基准态检测与证据快照（装配器机制位）
+
+上节规则由装配器机制强制：`build_workspace.py` 在删除 `.w-model` 的两条路径（`--reset` 整树清空与常规八目录重建）上**同管**同一个前置检测，命中任一信号即按「该态可能是真实运行/调测的唯一证据载体」处理：
+
+| 信号 | 判据（子串匹配，不解析 JSON）                                                                                        |
+| ---- | -------------------------------------------------------------------------------------------------------------------- |
+| a    | `.w-model/run-log.jsonl` 行数 ≠ 装配器基准 104 行（基准由装配器写出后自测校验，轨迹改动会 fail-fast 提示同步常量）    |
+| b    | `.w-model/` 递归存在 `*.bak.*`（wm-write 备份残留）                                                                   |
+| c    | run-log 存在装配器基准之外（runId 非 `p1-cp`…`p8-cp`）的 `"action": "checkpoint"` + `"outcome": "success"` 放行记录   |
+
+命中后的行为（fail-closed）：
+
+1. 先把 `run-log.jsonl`、`signature-chain.jsonl`、`checkpoint-log/`、`gate-logs/` 拷入 **gitignored** 的 `eval/e2e/demo-snapshots/<UTC时间戳>/`（单文件 `copy2`、目录 `copytree`，源缺失跳过、目标已存在复用）；
+2. 未传 `--accept-state-loss` → print 快照路径与命中信号后 `exit 1`，不销毁——先人工核阅快照或按上节完成证据分级裁定；
+3. 传了 `--accept-state-loss` → 快照仍执行，随后继续销毁重建（显式接受状态丢失的唯一通道）。
+
+`.w-model` 不存在（首次装配）或为干净基准态时检测静默通过，重建行为与既往完全一致（零行为变化路径）。
+
 ## 已实测的坑（务必遵守）
 
 1. **工作区里不能有 `.git`**：残留 `eval/e2e/demo/.git` 会让 `--scope` 的 `headRef` 绑到 demo 自身 HEAD，p5–p8 的 artifact-gate 全部报「headRef 过期」（实测只剩 114/119）。脚本会在这种情形 fail-closed 退出；只有 `--reset` 会清空**全部**（含残留 `.git`/`openspec/`），不带 `--reset` 的常规运行也会重建 `.w-model/.superpowers/tla/features/src/test/docs/archive` 八个目录（`.w-model` 含 run-log / signature-chain / budget 等运行时状态，重建即回到装配器的基准态）。

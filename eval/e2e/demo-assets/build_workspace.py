@@ -4,7 +4,7 @@
 产物：counter-api 最小项目（2 REQ + 1 NFR + 1 CON，TLA+ L1/L2 + BDD L1，真实 node:test 四级测试）。
 ID 全局一致：REQ-001/REQ-002/NFR-001/CON-001 ↔ SD-001 ↔ INTF-001 ↔ DD-001 ↔ L1_counter/L2_counter_service。
 """
-import argparse, json, os, shutil, stat, subprocess, sys, hashlib
+import argparse, glob, json, os, re, shutil, stat, subprocess, sys, hashlib, time
 
 def rmtree_force(path):
     """删除目录树；Windows 上 git 对象/包文件为只读，需先解除只读再重试。"""
@@ -42,6 +42,76 @@ def require_own_workspace(action, hint):
     sys.exit(f'✗ 拒绝在非本装配器工作区执行「{action}」：{ROOT} 既非空，也不含本装配器哨兵'
              '（SPEC.md 与 .w-model/project.json 须同时存在）。' + hint)
 
+# ---------- WS-B 非基准态检测（删除 .w-model 前的 fail-closed 证据保全；机制说明见 demo-assets/README.md） ----------
+SNAPSHOT_ROOT = os.path.join(os.path.dirname(ASSETS), 'demo-snapshots')  # eval/e2e/demo-snapshots（gitignored）
+# 装配器基准 run-log 行数（p1-4 每阶段 14 条 + p5-8 每阶段 12 条 = 104）。写出后自测校验（见 run-log 写出处），
+# 轨迹改动导致行数漂移会 fail-fast 提示同步本常量。
+BASELINE_RUN_LOG_LINES = 104
+# 装配器自身基准 checkpoint 放行记录的 runId 集合；run-log 中 runId 不在此集合的 checkpoint+success
+# 记录 = 装配器没写过的真实放行残留（信号 c 的判据主体，避免基准轨迹自身的伪造放行误报）。
+BASELINE_CHECKPOINT_RUN_IDS = frozenset(f'p{p}-cp' for p in range(1, 9))
+# 命中非基准态时销毁前快照的证据清单（文件 copy2 / 目录 copytree，源缺失跳过）
+SNAPSHOT_ITEMS = ('run-log.jsonl', 'signature-chain.jsonl', 'checkpoint-log', 'gate-logs')
+
+def detect_non_baseline_state(wm_dir):
+    """检测 .w-model 是否为非装配器基准态（可能是真实运行残留），返回命中信号描述列表（空列表 = 基准态）。"""
+    hits = []
+    if not os.path.isdir(wm_dir):
+        return hits  # 首次装配（.w-model 不存在）不是非基准态，检测跳过
+    content = None
+    run_log = os.path.join(wm_dir, 'run-log.jsonl')
+    if os.path.isfile(run_log):
+        with open(run_log, encoding='utf-8') as f:
+            content = f.read()
+        n_lines = len([ln for ln in content.splitlines() if ln.strip()])
+        if n_lines != BASELINE_RUN_LOG_LINES:
+            hits.append(f'信号 a：run-log.jsonl 行数 {n_lines} ≠ 装配器基准 {BASELINE_RUN_LOG_LINES}')
+    baks = glob.glob(os.path.join(glob.escape(wm_dir), '**', '*.bak.*'), recursive=True)
+    if baks:
+        hits.append(f'信号 b：存在 wm-write 备份残留 *.bak.* ×{len(baks)}（如 {os.path.basename(baks[0])}）')
+    if content is not None:
+        for ln in content.splitlines():
+            norm = ln.replace(' ', '')  # 子串匹配不解析 JSON；去空格以兼容紧凑/带空格两种序列化
+            if '"action":"checkpoint"' in norm and '"outcome":"success"' in norm:
+                m = re.search(r'"runId":"([^"]*)"', norm)
+                if m is None or m.group(1) not in BASELINE_CHECKPOINT_RUN_IDS:
+                    hits.append('信号 c：存在装配器基准之外的 checkpoint 放行记录（真实运行残留）')
+                    break
+    return hits
+
+def snapshot_evidence(wm_dir):
+    """销毁前把 SNAPSHOT_ITEMS 拷入 eval/e2e/demo-snapshots/<UTC时间戳>/，返回 (快照目录, 已拷贝清单)。"""
+    ts = time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())
+    dest = os.path.join(SNAPSHOT_ROOT, ts)
+    os.makedirs(dest, exist_ok=True)
+    copied = []
+    for name in SNAPSHOT_ITEMS:
+        src = os.path.join(wm_dir, name)
+        dst = os.path.join(dest, name)
+        if os.path.isdir(src):
+            shutil.copytree(src, dst, dirs_exist_ok=True)  # 目录已存在则复用不报错
+            copied.append(name + '/')
+        elif os.path.isfile(src):
+            shutil.copy2(src, dst)
+            copied.append(name)
+    return dest, copied
+
+def guard_non_baseline(wm_dir, action, accept_state_loss):
+    """删除 .w-model 路径的前置门（--reset 与常规路径同管）：命中即先快照证据；未显式 --accept-state-loss 则拒绝。"""
+    hits = detect_non_baseline_state(wm_dir)
+    if not hits:
+        return
+    dest, copied = snapshot_evidence(wm_dir)
+    print(f'⚠ 「{action}」前检测到非基准态——当前 .w-model 可能是真实运行/调测的唯一证据载体：')
+    for h in hits:
+        print(f'  - {h}')
+    print(f'  证据已快照到 {dest}（拷贝：{", ".join(copied) if copied else "无（源均不存在）"}）')
+    if accept_state_loss:
+        print('  --accept-state-loss 已显式接受状态丢失：快照保全如上，继续重建。')
+        return
+    sys.exit(f'✗ 拒绝{action}：请先人工核阅上述快照或按 README「销毁前证据保全」完成分级裁定；'
+             f'确认可丢弃该状态时，显式加 --accept-state-loss 重跑（证据仍会先快照到 {SNAPSHOT_ROOT}/<UTC时间戳>/）。')
+
 # ---------- 运行时事实：仓库根 + change-scope 区间（先于任何写盘，fail-fast） ----------
 _RP = subprocess.run(['git', '-C', ASSETS, 'rev-parse', '--show-toplevel'],
                      capture_output=True, text=True, check=True).stdout.strip()
@@ -68,6 +138,10 @@ parser = argparse.ArgumentParser(description='重建 e2e 调测工作区')
 parser.add_argument('--reset', action='store_true',
                     help='先整树清空工作区（整树清空的唯一路径；常规运行会重建 .w-model/.superpowers/tla/features/src/test/docs/archive '
                          '八个目录，同样受工作区判据保护）')
+parser.add_argument('--accept-state-loss', action='store_true',
+                    help='检测到非基准态（真实运行残留，可能是唯一证据载体）时显式接受状态丢失：'
+                         '证据仍会先快照到 eval/e2e/demo-snapshots/<UTC时间戳>/，随后继续销毁重建'
+                         '（不带此参数时快照后 exit 1 拒绝销毁）')
 args = parser.parse_args()
 _root_abs = os.path.normcase(os.path.realpath(ROOT)).rstrip('\\/')
 _repo_abs = os.path.normcase(os.path.realpath(_RP)).rstrip('\\/')
@@ -81,6 +155,7 @@ if args.reset and os.path.exists(ROOT):
     require_own_workspace('--reset 整树清空',
                           '该目录不是本装配器的工作区（--reset 仍受既有护栏约束：工作区根须以 demo 结尾且不等于仓库根）——'
                           '请移走/改名该目录，或把 WORKSPACE 指向本装配器实际构建的工作区。')
+    guard_non_baseline(WM, '--reset 整树清空', args.accept_state_loss)
     rmtree_force(ROOT)
 
 def write(rel, content):
@@ -97,6 +172,7 @@ def write_json(rel, obj):
 # .superpowers/ = 编码链执行账本目录（docs/plans 随 docs/ 一并清理，见阶段 5-8 构造段）
 require_own_workspace('常规清理重建 .w-model/.superpowers/tla/features/src/test/docs/archive',
                       '请先移走该目录，或对确属本装配器的工作区显式传 --reset 清空重建。')
+guard_non_baseline(WM, '常规清理重建 .w-model 等八目录', args.accept_state_loss)
 for d in ('.w-model', '.superpowers', 'tla', 'features', 'src', 'test', 'docs', 'archive'):
     p = os.path.join(ROOT, d)
     if os.path.exists(p):
@@ -616,7 +692,15 @@ for p in range(1, 9):
   for tag, script in (('b', 'check-budget.ts'), ('rl', 'check-run-log.ts'), ('m', 'check-maturity.ts'), ('c', 'check-checkpoint.ts'), ('pr', 'check-preventive-review.ts')):
     add('gate', 'G', p, runId=f'p{p}-c-{tag}', gateExitCode=0, script=script, **p8)
   add('checkpoint', 'O', p, runId=f'p{p}-cp', acknowledgedDecisions=DECISIONS[p])
-write('.w-model/run-log.jsonl', '\n'.join(json.dumps(e, ensure_ascii=False) for e in entries) + '\n')
+_run_log_content = '\n'.join(json.dumps(e, ensure_ascii=False) for e in entries) + '\n'
+write('.w-model/run-log.jsonl', _run_log_content)
+# WS-B 基准自测：写出后实测行数必须等于 BASELINE_RUN_LOG_LINES（非基准态检测的防漂移锚；
+# run-log 轨迹改动后若行数变化，此处 fail-fast 提示同步更新该常量）。
+_baseline_actual = len([ln for ln in _run_log_content.splitlines() if ln.strip()])
+if _baseline_actual != BASELINE_RUN_LOG_LINES:
+    sys.exit(f'✗ 装配器基准自测失败：run-log.jsonl 实写 {_baseline_actual} 行 ≠ '
+             f'BASELINE_RUN_LOG_LINES={BASELINE_RUN_LOG_LINES}——run-log 轨迹改动后请同步更新该常量'
+             '（非基准态检测基准，见 detect_non_baseline_state）。')
 
 # ---------- checkpoint-log（用户确认记录；e2e 判据代行，见报告声明） ----------
 for p in range(1, 9):
