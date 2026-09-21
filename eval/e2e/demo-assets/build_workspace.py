@@ -855,9 +855,14 @@ for _p in (5, 6, 7, 8):
           f'# 任务 {_n} 简报：{_title}' + chr(10) + chr(10) +
           f'变更：{_cid}（阶段 {_p}）；输入：上游阶段门产物 + 编码计划 docs/plans/{_cid}.plan.md。' + chr(10) +
           f'验收：{_verify}' + chr(10))
+    # 回执**不预置执行结论**：计划里的验证命令并非都对该 fixture 为绿（如 check-code-tla-consistency 的
+    # D4 断言覆盖在 demo 源码上为红，见 docs/debug/2026-09-21-superpowers-replace-replay/replay.txt §三-1），
+    # 写死「退出码 0」会与门禁结论打架且无门禁能拦住；结论一律由 G 门禁复核（门禁日志落 .w-model/gate-logs/）。
     write(f'{_ledger_dir}/task-{_n}-report.md',
           f'# 任务 {_n} 回执：{_title}' + chr(10) + chr(10) +
-          f'提交：{_sha}；结果：完成，验证命令退出码 0（e2e 调测）；未偏离编码计划。' + chr(10))
+          f'提交：{_sha}；结果：完成（未偏离编码计划）。' + chr(10) +
+          f'验证命令见编码计划 docs/plans/{_cid}.plan.md 的「任务 {_n}」节；' +
+          '执行结论以 G 门禁复核为准（门禁日志落 .w-model/gate-logs/）。' + chr(10))
   write(f'{_ledger_dir}/review-{_cid}-t1.diff',
         'diff --git a/src/counter.ts b/src/counter.ts' + chr(10) +
         '--- a/src/counter.ts' + chr(10) +
