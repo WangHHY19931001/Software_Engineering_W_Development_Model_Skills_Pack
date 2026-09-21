@@ -248,8 +248,11 @@ function validateLedgerAndArtifacts(
       violations.push(`${ledgerRel} 缺 Task ${n}: complete 行（R3：complete 覆盖须 ≥ plan 任务节数，缺任务 ${n}）`);
     }
   }
-  // R4 三件套：每个已完成任务 N 的 brief/report 存在且非空
-  for (const n of taskNumbers) {
+  // R4 三件套：N 取「plan 任务节序号 ∪ 账本 complete 任务号」**并集**（契约逐字：「N = 账本 complete
+  // 的任务号」；R3 只保证 plan ⊆ completed，堵不住反方向——账本声明 complete 超出 plan 任务节时
+  // （如 Task 5: complete 而 plan 无 Task 5 节），task-5 三件套若不查即成证据链缺口，fail-open）。
+  const checkedTaskNumbers = new Set<number>([...taskNumbers, ...completed]);
+  for (const n of checkedTaskNumbers) {
     for (const kind of ['brief', 'report'] as const) {
       const artifactRel = toRel(ledgerRelDir, `task-${n}-${kind}.md`);
       const artifactPath = path.join(ledgerDir, `task-${n}-${kind}.md`);

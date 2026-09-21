@@ -259,6 +259,43 @@ describe('checkCodingPlan（R4 任务三件套）', () => {
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('review-') && v.includes('.diff'))).toBe(true);
   });
+
+  it('R4: 账本 complete 超出 plan 任务节（Task 5）而三件套缺 → 并集语义仍须查（修复轮 1 负例）', () => {
+    const root = writeValidTree(makeTmpDir());
+    const ledgerDir = join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`);
+    writeFileSync(
+      join(ledgerDir, 'progress.md'),
+      `${ledgerText(CHANGE_ID)}Task 5: complete (commits d..e, review clean)\n`,
+    );
+    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    expect(r.passed).toBe(false);
+    expect(r.tasksCompleted).toBe(3);
+    // plan 无 Task 5 节（R3 不报），但 R4 以「plan 序号 ∪ complete 号」并集查三件套
+    expect(r.violations.some((v) => v.includes('task-5-brief.md'))).toBe(true);
+    expect(r.violations.some((v) => v.includes('task-5-report.md'))).toBe(true);
+    expect(r.violations.some((v) => v.includes('Task 5') && v.includes('complete 行'))).toBe(false);
+  });
+
+  it('R4（伴例）: 账本 complete 超出 plan 任务节但 task-5 三件套齐备 → 不假阳性', () => {
+    const root = writeValidTree(makeTmpDir());
+    const ledgerDir = join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`);
+    writeFileSync(
+      join(ledgerDir, 'progress.md'),
+      `${ledgerText(CHANGE_ID)}Task 5: complete (commits d..e, review clean)\n`,
+    );
+    writeFileSync(join(ledgerDir, 'task-5-brief.md'), '# task 5 brief\n');
+    writeFileSync(join(ledgerDir, 'task-5-report.md'), '# task 5 report\n');
+    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    expect(r.passed).toBe(true);
+    expect(r.violations).toEqual([]);
+    expect(r.tasksCompleted).toBe(3);
+    expect(r.artifactsFound).toEqual(
+      expect.arrayContaining([
+        '.superpowers/sdd/phase5-demo.plan/task-5-brief.md',
+        '.superpowers/sdd/phase5-demo.plan/task-5-report.md',
+      ]),
+    );
+  });
 });
 
 describe('checkCodingPlan（R5 审查产物，stage 词表 plan/execute/finalize）', () => {
