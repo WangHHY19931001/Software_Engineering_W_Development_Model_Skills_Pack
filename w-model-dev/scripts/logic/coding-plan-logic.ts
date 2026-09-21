@@ -165,6 +165,21 @@ function toRel(...segments: string[]): string {
   return segments.join('/');
 }
 
+/**
+ * CRLF → LF 行尾归一化（内容解析边界单点）。
+ *
+ * 背景（autocrlf 工作树假红修复）：仓库 blob 为 LF，但 `core.autocrlf=true` 检出使工作树
+ * 文本文件行尾为 CRLF；本模块的内容解析按 `split('\n')` + 行尾敏感正则（如 `headingTitle`
+ * 的 `(.+)$` 无 m 标志）工作，未归一化的行尾 `\r` 会使所有标题行判空、`Task N: complete`
+ * 失配、首行身份失配 → R2「缺目标节+缺任务节」等全量假红（合成 vitest 夹具用 LF 故从未暴露，
+ * 由 prepush 验收环境的 autocrlf 工作树暴露）。归一化集中在**读入边界**——本模块两处
+ * `readFileSync` 之后与共享纯函数 `extractCompletedTaskNumbers` 入口（其内容来源不可控，
+ * `archive-integrity-logic` 复用）——不散在逐处正则。
+ */
+function normalizeLineEndings(content: string): string {
+  return content.replace(/\r\n/g, '\n');
+}
+
 /** plan 文本的一行是否为 Markdown 标题（1-6 级），返回标题文本；非标题返回 null */
 function headingTitle(line: string): string | null {
   const m = line.match(/^#{1,6}\s+(.*)$/);
@@ -255,7 +270,7 @@ function parsePlanStructure(planContent: string): {
  */
 export function extractCompletedTaskNumbers(ledgerContent: string): Set<number> {
   const completed = new Set<number>();
-  for (const line of ledgerContent.split('\n')) {
+  for (const line of normalizeLineEndings(ledgerContent).split('\n')) {
     const m = line.match(/^Task\s+(\d+):\s*complete\b/);
     if (m !== null) completed.add(Number(m[1]));
   }
@@ -305,7 +320,7 @@ function validateLedgerAndArtifacts(
     return 0;
   }
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，只读
-  const ledgerContent = readFileSync(ledgerPath, 'utf-8');
+  const ledgerContent = normalizeLineEndings(readFileSync(ledgerPath, 'utf-8'));
   const firstLine = ledgerContent.split('\n').find((l) => l.trim() !== '') ?? '';
   const LEDGER_IDENTITY_PREFIX = '# SDD ledger — plan: ';
   if (!firstLine.startsWith(LEDGER_IDENTITY_PREFIX)) {
@@ -460,7 +475,7 @@ export function checkCodingPlan(projectRoot: string, phase: number, changeId: st
     };
   }
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，只读
-  const planContent = readFileSync(planAbs, 'utf-8');
+  const planContent = normalizeLineEndings(readFileSync(planAbs, 'utf-8'));
 
   // R2 计划结构
   const structure = parsePlanStructure(planContent);

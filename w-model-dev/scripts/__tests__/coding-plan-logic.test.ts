@@ -19,7 +19,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { checkCodingPlan } from '../logic/coding-plan-logic.js';
+import { checkCodingPlan, extractCompletedTaskNumbers } from '../logic/coding-plan-logic.js';
 
 const CHANGE_ID = 'phase5-demo';
 
@@ -185,6 +185,67 @@ describe('checkCodingPlan（R2 任务节与验证命令行）', () => {
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('任务节'))).toBe(true);
     expect(r.tasksTotal).toBe(0);
+  });
+});
+
+/**
+ * CRLF 行尾归一化（autocrlf 工作树假红修复）：
+ * 仓库 blob 为 LF，但 `core.autocrlf=true` 检出使工作树文本（含 `samples/coding-plan/**`
+ * 与 `docs/plans/**` 制品）行尾为 CRLF；内容解析此前按 `split('\n')` + 行尾敏感正则
+ * （`headingTitle` 的 `(.+)$` 无 m 标志）工作，行尾 `\r` 使所有标题行判空 → R2 报
+ * 「缺目标节+缺任务节」全量假红（self-test 2 例实测复现；合成 vitest 夹具用 LF 故从未暴露）。
+ * 修复：归一化集中在读入边界——`checkCodingPlan` 的 plan / ledger 两处 `readFileSync` 之后
+ * 与共享纯函数 `extractCompletedTaskNumbers` 入口（`archive-integrity-logic` 复用、内容来源
+ * 不可控）。本组用例钉死：CRLF 内容判绿能力不丢、判红判别力也不丢。
+ */
+describe('checkCodingPlan（CRLF 行尾归一化，autocrlf 工作树假红修复）', () => {
+  const toCrLf = (text: string): string => text.replace(/\n/g, '\r\n');
+
+  it('CRLF plan → R2 全绿（目标节/任务节/验证命令全识别）', () => {
+    const root = writeValidTree(makeTmpDir());
+    const planFile = join(root, 'docs', 'plans', `${CHANGE_ID}.plan.md`);
+    writeFileSync(planFile, toCrLf(validPlanText()));
+    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    expect(r.passed).toBe(true);
+    expect(r.violations).toEqual([]);
+    expect(r.tasksTotal).toBe(2);
+  });
+
+  it('CRLF ledger → R3/R4 全绿（首行身份 + Task N: complete 覆盖识别）', () => {
+    const root = writeValidTree(makeTmpDir());
+    const ledger = join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`, 'progress.md');
+    writeFileSync(ledger, toCrLf(ledgerText(CHANGE_ID)));
+    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    expect(r.passed).toBe(true);
+    expect(r.violations).toEqual([]);
+    expect(r.tasksCompleted).toBe(2);
+    expect(r.violations.some((v) => v.includes('首行'))).toBe(false);
+  });
+
+  it('CRLF plan 的 Task 2 缺验证行 → 仍报缺验证（判别力不因归一化丢失）', () => {
+    const root = writeValidTree(makeTmpDir());
+    const planFile = join(root, 'docs', 'plans', `${CHANGE_ID}.plan.md`);
+    const crlfPlan = toCrLf(
+      validPlanText().replace(
+        'Verify: npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/coding-plan-logic.test.ts\n',
+        '',
+      ),
+    );
+    writeFileSync(planFile, crlfPlan);
+    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.includes('缺目标节'))).toBe(false);
+    expect(r.violations.some((v) => v.includes('缺任务节'))).toBe(false);
+    expect(r.violations.some((v) => v.includes('Task 2') && v.includes('缺验证命令行'))).toBe(true);
+    expect(r.tasksTotal).toBe(2);
+  });
+
+  it('extractCompletedTaskNumbers 对 CRLF 账本内容同样识别 complete 行（共享纯函数入口归一化）', () => {
+    expect(extractCompletedTaskNumbers('Task 1: complete\r\nTask 2: complete\r\nTask 3: in progress\r\n')).toEqual(
+      new Set([1, 2]),
+    );
+    // 混合行尾（CRLF 与 LF 共存）同样归一
+    expect(extractCompletedTaskNumbers('Task 1: complete\r\nTask 4: complete\n')).toEqual(new Set([1, 4]));
   });
 });
 
