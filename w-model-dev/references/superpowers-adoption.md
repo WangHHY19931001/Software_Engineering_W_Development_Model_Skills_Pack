@@ -125,5 +125,6 @@ L1 的关键技能集（源码常量 `SUPERPOWERS_KEY_SKILLS`，最低 3 个）�
 - 归档快照校验并入 check-archive-integrity（原 check-openspec-archive 已退役，不新增第二归档门）。
 - run-log：`opsx_explore / opsx_propose / opsx_apply / opsx_archive` 转为 **LEGACY**（历史记录仍可解析，不再由新流程产生）；新动作 `plan_propose / plan_task / plan_review` 与 S-plan / S-coding / V 任务评审配对。
 - 归档快照而非改 gitignore：`.superpowers/sdd/` 仍是 gitignored 瞬态工作区，账本与三件套通过归档复制变成可查证据，避免把瞬态工作区变成被跟踪面。
+- 双账本注：`.superpowers/sdd/` 同时承载方法论账本（plan 指向 `docs/superpowers/plans/**`）与新契约账本（plan 指向 `docs/plans/**`），以 plan 路径区分，勿混用。
 
 **迁移边界**：`--scope` / change-scope 契约绑定 git 区间，与 opsx 无关，替换不触及；新链路（`check-coding-plan.ts` + check-archive-integrity 的 `codingPlanSnapshot`）不再读取 `openspec/changes/<changeId>/` 目录——该目录的活体引用（`check-opsx-artifacts.ts` 本体、`self-test.ts` 用例、vitest SUBPROCESS 登记、AGENTS / README 的对外声明等）**已于 2026-09-21 全部退役**（`git rm`：脚本 + 用例 + `samples/opsx-artifacts/` fixture + 全部登记与计数回拨）；superpowers 本身无制品格式，因此「机器可查」的部分一律由上述 W-Model 脚本承担，不把门禁建立在上游文本或宿主安装状态之上。

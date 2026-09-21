@@ -92,7 +92,7 @@
 ### plan 任务 vs 执行账本 vs tickets.md
 
 - **规范定义**：`docs/plans/<changeId>.plan.md` 的任务节 = 编码链执行单元（what/why，由 S-plan 经 writing-plans 产出，逐任务带「验证：」命令行）；`.superpowers/sdd/<plan-基名>/progress.md` 的 `Task N: complete` = 逐任务完成证据；`tickets.md` = S-tickets 的代码垂直切片（how，tracer-bullet + blocking edges DAG）。三者职责不同，不可互替（反模式 #40；校验见 `check-coding-plan.ts` R2/R3/R4）。
-- **_Avoid_**：互替/混用（三者在阶段 5 共存，S-plan 分派时先后产出）。
+- **_Avoid_**：互替/混用（三者在阶段 5 共存，由 S-plan（plan 任务节 + tickets）与 S-coding（账本 `Task N: complete`）先后产出）。
 
 ### R3 预防性审查
 
