@@ -35,6 +35,7 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'bdd-cli.test.ts',
   'budget-cli-wiring.test.ts',
   'change-scope.test.ts',
+  'check-archive-integrity-cli.test.ts',
   'check-code-tla-consistency.test.ts',
   'check-codegraph-queries.test.ts',
   'check-coding-plan.test.ts',

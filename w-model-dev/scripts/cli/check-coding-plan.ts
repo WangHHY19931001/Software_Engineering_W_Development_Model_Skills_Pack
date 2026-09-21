@@ -19,8 +19,9 @@
  *                  --change/--base/--head 互斥；阶段 5-8 必选（缺失 → exit 1）。
  *                  strict 模式只校验 scope.changeId 对应的编码计划制品：
  *                  活动位 docs/plans/<changeId>.plan.md 优先，活动位缺失时回退归档位
- *                  docs/changes/archive/<changeId>/ 或 <日期>-<changeId>/（恰一匹配才继续；
- *                  多匹配 fail-closed），归档态按同契约校验 plan/账本快照（fail-closed）
+ *                  docs/changes/archive/<changeId>/ 或 <YYYY-MM-DD>-<changeId>/（**锚定匹配** + 日期
+ *                  前缀日历回读校验；恰一匹配才继续；多匹配 fail-closed；非法日历日独立成态），
+ *                  归档态按同契约校验 plan/账本快照（fail-closed）
  *   --change/--base/--head  薄封装：以实际 Git 变更集合生成等价 scope（免维护 manifest）
  *   --json         机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
@@ -79,7 +80,7 @@ async function main(): Promise<void> {
     return;
   }
   if (phaseParsed === undefined) {
-    // 复刻 check-opsx-artifacts 分支语义：空格形态数字越界 → '参数非法 --phase=N'；非数字 / 缺值 / 等号形态 → '参数缺失'
+    // 沿用已退役 check-opsx-artifacts 的分支语义（该脚本退出码契约由本脚本承接）：空格形态数字越界 → '参数非法 --phase=N'；非数字 / 缺值 / 等号形态 → '参数缺失'
     const phaseIdx = args.indexOf('--phase');
     const phaseRaw = phaseIdx >= 0 ? args[phaseIdx + 1] : undefined;
     if (phaseRaw !== undefined && /^\d+$/.test(phaseRaw)) {

@@ -12,11 +12,17 @@
  * check-coding-plan 同源（共享纯函数 extractCompletedTaskNumbers），归档快照校验为其结构子集，
  * 全量契约由 check-coding-plan R4/R6 承担）；legacy 归档（无 *.plan.md）零行为变化。
  *
+ * 显式入口（2026-09-21 最终评审 I-4）：自动派生以「归档根恰一 *.plan.md」为判据，生产者把 plan
+ * 快照摆到子目录即可把该项静默关成 no-op（fail-open）。`--change-id=<id>` 让调用方**显式声明**
+ * 「本归档属于哪个 changeId」，从而不依赖生产者摆放：显式声明时无条件启用 codingPlanSnapshot 并
+ * 锚定 `<changeId>.plan.md`（缺失即 exit 1）。未传时维持既有自动派生行为，并在输出注明判定依据。
+ *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir>
+ *   npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir> [--change-id=<id>]
  *
  * 参数：
  *   archive-dir   归档目录路径
+ *   --change-id=<id>  显式声明本归档目录所属 changeId（仅等号形态）；与自动派生互斥，显式优先
  *   --json        机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
@@ -43,6 +49,7 @@ import * as path from 'node:path';
 import { checkArchiveIntegrity, deriveArchiveIntegrityManifest } from '../logic/archive-integrity-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
+import { parseFlagValue } from '../lib/parse-args.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 
 // ==================== 目录遍历 ====================
@@ -75,15 +82,43 @@ async function walkDir(dirAbs: string, baseDir: string): Promise<Set<string>> {
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
-  const jsonMode = process.argv.slice(2).includes('--json');
+  const argv = process.argv.slice(2);
+  const jsonMode = argv.includes('--json');
   const startTime = Date.now();
-  const archiveDir = process.argv.slice(2).find((a) => !a.startsWith('--'));
+  const archiveDir = argv.find((a) => !a.startsWith('--'));
   if (!archiveDir) {
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: '参数缺失 <archive-dir>',
-      detail: '用法: npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir>',
+      detail:
+        '用法: npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir> [--change-id=<id>] [--json]',
+      exitCode: 2,
+    });
+    return;
+  }
+
+  // 裸 `--change-id`（空格形态）会让值被位置参数扫描吞掉（被当作 <archive-dir>），必须显式拒绝
+  if (argv.includes('--change-id')) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: '--change-id 仅支持等号形态（--change-id=<id>）',
+      detail: '空格形态会把值当作 <archive-dir> 位置参数，故拒绝；用法: --change-id=<changeId>',
+      exitCode: 2,
+    });
+    return;
+  }
+
+  // 显式 changeId（I-4）：不依赖生产者摆放，无条件启用 codingPlanSnapshot 并锚定 <changeId>.plan.md。
+  // 值 flag 只允许等号形态；重复出现由 parseFlagValue 抛 DuplicateFlagError（runMain → ARG_INVALID / exit 2）。
+  const explicitChangeId = parseFlagValue(argv, 'change-id');
+  if (explicitChangeId !== undefined && explicitChangeId.trim() === '') {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: '--change-id 取值不得为空',
+      detail: '用法: --change-id=<changeId>（如 --change-id=phase5-demo）',
       exitCode: 2,
     });
     return;
@@ -104,8 +139,21 @@ async function main(): Promise<void> {
   }
 
   const contents = await walkDir(archiveAbs, archiveAbs);
-  // 编码计划归档快照条件项自动派生（归档根恰一 *.plan.md 才启用；legacy 归档零行为变化）
-  const manifest = deriveArchiveIntegrityManifest(contents);
+  // 编码计划归档快照条件项：显式 --change-id 优先（无条件启用）；未传时按归档根恰一 *.plan.md 自动派生
+  const manifest =
+    explicitChangeId === undefined
+      ? deriveArchiveIntegrityManifest(contents)
+      : { codingPlanSnapshot: true, changeId: explicitChangeId };
+  const snapshotSource =
+    explicitChangeId === undefined
+      ? `自动派生（归档根 *.plan.md ${
+          manifest.codingPlanSnapshot === true
+            ? manifest.changeId === undefined
+              ? '多匹配 → changeId 不猜、fail-closed'
+              : `恰一 → changeId=${manifest.changeId}`
+            : '零匹配 → 本项不适用（legacy 归档零行为变化）'
+        }）`
+      : `显式 --change-id=${explicitChangeId}（无条件启用，不依赖生产者摆放）`;
   if (manifest.codingPlanSnapshot === true) {
     // 归档账本快照实读：Task N: complete 三件套核对的内容源；不可读即留空，由清单校验 fail-closed 报违规
     try {
@@ -126,6 +174,7 @@ async function main(): Promise<void> {
         passed: result.passed,
         reasons: result.missingFiles,
         violations: buildViolationDistribution(result.missingFiles.length),
+        snapshotSource,
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -140,6 +189,7 @@ async function main(): Promise<void> {
   console.log(`归档目录          : ${archiveAbs}`);
   console.log(`文件数            : ${contents.size}`);
   console.log(`校验阶段          : ${result.checkedPhases.join(', ')}`);
+  console.log(`快照判定依据      : ${snapshotSource}`);
   console.log(`校验结果          : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
@@ -162,6 +212,7 @@ async function main(): Promise<void> {
       passed: result.passed,
       missingFiles: result.missingFiles,
       checkedPhases: result.checkedPhases,
+      snapshotSource,
     },
     exitCode,
   );

@@ -74,6 +74,13 @@ export interface JsonReport {
   tlaBddWaived?: boolean | null;
   /** run-log lifecycle 状态；通过但有历史诊断时仍为 NOT_CLOSED_NOT_PROVEN。 */
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
+  /**
+   * 编码计划归档快照项的**判定依据**（check-archive-integrity --json）：
+   * 显式 `--change-id=<id>` 还是按归档根 `*.plan.md` 自动派生（零匹配 / 恰一 / 多匹配）。
+   * 供审计区分「快照项已执行」与「本项不适用」——自动零匹配会让该条件项整体不适用（no-op），
+   * 显式声明则无条件启用。其它门禁不提供此字段（可选）。
+   */
+  snapshotSource?: string;
   /** run-log exit 0 的语义边界说明。 */
   statusNote?: string;
   /**

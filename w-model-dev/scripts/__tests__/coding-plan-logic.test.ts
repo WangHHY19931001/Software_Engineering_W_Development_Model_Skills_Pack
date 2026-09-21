@@ -413,3 +413,113 @@ describe('checkCodingPlan（R6 归档态回退，D-7）', () => {
     expect(r.planPath).toBe(`docs/plans/${CHANGE7}.plan.md`);
   });
 });
+
+describe('checkCodingPlan（R6 归档位锚定化 + 日历校验，2026-09-21 最终评审 I-2）', () => {
+  const PHASE = 7;
+  const CHANGE7 = 'phase7-x';
+
+  /** 铺一个「活动位缺失 + 归档位快照齐」的树；dirName 为归档目录名，返回项目根 */
+  function archiveOnlyTree(dirName: string): string {
+    const root = writeValidTree(makeTmpDir(), PHASE, CHANGE7);
+    const archiveDir = join(root, 'docs', 'changes', 'archive', dirName);
+    mkdirSync(archiveDir, { recursive: true });
+    writeFileSync(
+      join(archiveDir, `${CHANGE7}.plan.md`),
+      readFileSync(join(root, 'docs', 'plans', `${CHANGE7}.plan.md`)),
+    );
+    writeFileSync(join(archiveDir, 'progress.md'), ledgerText(CHANGE7));
+    for (const f of [
+      'task-1-brief.md',
+      'task-1-report.md',
+      'task-2-brief.md',
+      'task-2-report.md',
+      'review-abc1234.diff',
+    ]) {
+      writeFileSync(join(archiveDir, f), readFileSync(join(root, '.superpowers', 'sdd', `${CHANGE7}.plan`, f)));
+    }
+    rmSync(join(root, 'docs', 'plans', `${CHANGE7}.plan.md`), { force: true });
+    rmSync(join(root, '.superpowers', 'sdd', `${CHANGE7}.plan`), { recursive: true, force: true });
+    return root;
+  }
+
+  it('锚定三态 0：直名 `<changeId>` 归档 → 通过（旧实现能过，新实现不得回归）', () => {
+    const r = checkCodingPlan(archiveOnlyTree(CHANGE7), PHASE, CHANGE7);
+    expect(r).toMatchObject({ passed: true, violations: [] });
+    expect(r.planPath).toBe(`docs/changes/archive/${CHANGE7}/${CHANGE7}.plan.md`);
+  });
+
+  it('锚定三态 0：`<YYYY-MM-DD>-<changeId>` 归档 → 通过', () => {
+    const r = checkCodingPlan(archiveOnlyTree('2026-01-01-phase7-x'), PHASE, CHANGE7);
+    expect(r).toMatchObject({ passed: true, violations: [] });
+  });
+
+  it('锚定三态 1（多匹配）：直名 + 日期名同时存在 → fail-closed 具名列出两者', () => {
+    const root = archiveOnlyTree(CHANGE7);
+    const second = join(root, 'docs', 'changes', 'archive', '2026-01-01-phase7-x');
+    mkdirSync(second, { recursive: true });
+    writeFileSync(
+      join(second, `${CHANGE7}.plan.md`),
+      readFileSync(join(root, 'docs', 'changes', 'archive', CHANGE7, `${CHANGE7}.plan.md`)),
+    );
+    const r = checkCodingPlan(root, PHASE, CHANGE7);
+    expect(r.passed).toBe(false);
+    const multi = r.violations.find((v) => v.includes('多匹配'));
+    expect(multi).toContain(CHANGE7);
+    expect(multi).toContain('2026-01-01-phase7-x');
+  });
+
+  it('锚定：未锚定后缀名不匹配（`<changeId>-extra` 不得被当作归档位）', () => {
+    const root = archiveOnlyTree('phase7-x-extra');
+    const r = checkCodingPlan(root, PHASE, CHANGE7);
+    expect(r.passed).toBe(false);
+    // 不得命中归档位：错配目录名只作为「近失」诊断出现，仍报 plan 缺失
+    expect(r.violations.some((v) => v.includes('近失'))).toBe(true);
+    expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
+    // 命中归档位会走 R6 快照文案——这里必须没有
+    expect(r.violations.some((v) => v.includes('R6：归档目录须含 plan 快照'))).toBe(false);
+  });
+
+  it('锚定：非日期前缀名不匹配（`foo-bar-<changeId>` 不得被当作归档位）', () => {
+    const root = archiveOnlyTree('foo-bar-phase7-x');
+    const r = checkCodingPlan(root, PHASE, CHANGE7);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
+    // 命中归档位会报「plan 快照缺失」以外的路径——这里必须仍是 R1 缺失文案
+    expect(r.violations.some((v) => v.includes('R6：归档目录须含 plan 快照'))).toBe(false);
+  });
+
+  it('锚定：多个 changeId 通配/前缀不得互相误配（同阶段兄弟 change 的归档不冒充本 change）', () => {
+    const root = archiveOnlyTree('2026-01-01-phase7-x-two');
+    const r = checkCodingPlan(root, PHASE, CHANGE7);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
+  });
+
+  it('日历校验：`2026-13-45-<changeId>`（形状合法但非真实日历日）→ 独立 fail-closed 文案', () => {
+    const root = archiveOnlyTree('2026-13-45-phase7-x');
+    const r = checkCodingPlan(root, PHASE, CHANGE7);
+    expect(r.passed).toBe(false);
+    const violation = r.violations.find((v) => v.includes('非真实日历日'));
+    expect(violation).toBeDefined();
+    expect(violation).toContain('2026-13-45-phase7-x');
+  });
+
+  it('日历校验：`2026-02-30-<changeId>`（当月无该日）同样被拒', () => {
+    const r = checkCodingPlan(archiveOnlyTree('2026-02-30-phase7-x'), PHASE, CHANGE7);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.includes('非真实日历日'))).toBe(true);
+  });
+
+  it('日历校验：闰年真实日 `2024-02-29-<changeId>` → 通过（不得过度拒绝）', () => {
+    const r = checkCodingPlan(archiveOnlyTree('2024-02-29-phase7-x'), PHASE, CHANGE7);
+    expect(r).toMatchObject({ passed: true, violations: [] });
+  });
+
+  it('日历校验：非法日期名与合法直名并存 → 合法匹配优先（直名恰一匹配即用）', () => {
+    const root = archiveOnlyTree(CHANGE7);
+    mkdirSync(join(root, 'docs', 'changes', 'archive', '2026-13-45-phase7-x'), { recursive: true });
+    const r = checkCodingPlan(root, PHASE, CHANGE7);
+    expect(r).toMatchObject({ passed: true, violations: [] });
+    expect(r.planPath).toBe(`docs/changes/archive/${CHANGE7}/${CHANGE7}.plan.md`);
+  });
+});
