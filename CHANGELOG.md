@@ -9,6 +9,15 @@
 
 ## [42.2.1] - 2026-09-01
 
+### E-2 规格修正案落地：R0 首阶段自举形态（方案 B，2026-09-22）
+
+> 来源：阶段 1 自举死锁（E-2，`docs/debug/2026-09-20-wm-8phase-live-run` 披露、`docs/debug/2026-09-22-e2-r8-r0-rootcause/README.md` 根因定位证实）——放行记录被同时当「放行事件凭证」（R0/R11：先写供门验）与「阶段终点轨迹标记」（R8：最后写），三批独立合入的规则在阶段 1 零记录态联合成死锁；根因实测证实自然时序（确认落盘 → 闭环五门 → 最后写放行记录）在现行 R8/R11 下已 exit 0，R0 是唯一阻塞。用户已批准方案 B（规格 `docs/superpowers/specs/2026-09-22-e2-spec-amendment.md`）。版本保持 42.2.1，**不 bump**。
+
+- **R0 首阶段自举形态（`logic/checkpoint-logic.ts` + `cli/check-checkpoint.ts`）**：run-log 零 checkpoint success 记录且 `--checkpoint-log` 已提供、加载含至少一条用户确认（Map 非空）时，R0 不再违规，改推**非阻断** `BOOTSTRAP_VALIDATION:` 诊断（首阶段放行以 checkpoint-log 用户确认为初级证据，与 R3 防代签同锚；放行记录将于闭环门后写入，其内容校验由下一阶段全局回溯完成）——自然时序自此合法。未提供 / 空 Map / 目录不可读（`checkpointLogMissingReason` 两态）→ **维持原违规**（fail-closed 不变：零证据不等于合规）；有记录路径零变化（R1-R5 判据一字未动）。`CheckpointCheckResult` 新增可选 `diagnostics`，CLI 人类可读与 `--json` 输出均透传。
+- **D-6 后置窗口降级为历史日志兼容（`logic/run-log-logic.ts`，零行为变化）**：R11 全域严格判据（五门严格早于放行）恢复为新建项目常态可满足；`phase===1` × `check-checkpoint.ts` 后置窗口判据、测试、文案不改，仅注释与文档重定性为「历史日志兼容形态」（删除会红掉以旧时序写入的历史 run-log，故保留）。R8 零改动——后置形态仍报 R8 三条（反伪造语义，新建项目不应产生该形态）。
+- **测试与登记**：`__tests__/checkpoint-logic.test.ts` 新增 R0 自举形态四例（零记录+确认在场 → passed + `BOOTSTRAP_VALIDATION` 诊断 / 零记录+未提供 → R0 违规仍在 / 零记录+missingReason 两态与空 Map → R0 违规仍在 / 有记录路径零变化）；新增 `__tests__/checkpoint-r0-bootstrap-cli.test.ts`（真实 tsx 子进程端到端：自然时序 `check-run-log.ts` exit 0 且无 R8/R11、D-6 时序 exit 1 恰 3 条 R8、零记录态 `check-checkpoint.ts` exit 0 含诊断、无 phase-N 匹配 exit 1 保留 R0 文案；已登记 `SUBPROCESS_TEST_FILES` 与 `__tests__/README.md` 覆盖矩阵）。负载性登记锚与禁语保留（`checkpoint-logic-rule-loadbearing.test.ts` 三态全绿）。
+- **文档销项（SSoT 优先）**：SSoT §10.6 新增 6.0「零记录态的首阶段自举语义」、§10C D-6 段「已知张力」改写为已消解定性；`references/operational-recovery.md`「阶段 1 自举豁免」节改写（自然时序调用约定 + D-6 历史兼容定性 + 已知张力销项）；`references/hard-constraints.md` 约束 #11 补首阶段自举语义一句。**本条即下方批次 3-4 登记「仍未完成」①（E-2）的销项记录**：E-2 已裁定并实施（本节），该①为登记时点状态、按历史可发现性保留原文。
+
 ### superpowers 替换 opsx（编码计划契约 + codegraph CLI 收敛，批次 1-2）（2026-09-21）
 
 > 背景：阶段 5-8 的规格级规划原依赖 OpenSpec opsx（`/opsx:*` 四段式 + `openspec/changes/` 制品目录），其**制品格式与门禁不在本仓**、且外部工具缺位时整条链路无可执行契约。现以 [obra/superpowers](https://github.com/obra/superpowers) v6.3.0（commit `b36e082`，MIT）的编码链方法论替代：方法论 vendor 为 `references/superpowers-adoption.md`（只在仓内，不要求宿主安装），机器可查的部分改由本仓脚本承担。规格见 `docs/superpowers/specs/2026-09-21-superpowers-replace-opsx-design.md`、计划见 `docs/superpowers/plans/2026-09-21-superpowers-replace-opsx.md`，逐任务报告与评审 diff 存 `.superpowers/sdd/2026-09-21-superpowers-replace-opsx/`。版本保持 42.2.1，**不 bump**。

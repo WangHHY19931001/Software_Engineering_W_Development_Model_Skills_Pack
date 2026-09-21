@@ -459,7 +459,7 @@ G 子代理在每个阶段门按以下顺序调用，任一退出码 ≠ 0 → O
 | 脚本 | 关键校验项（对应修正设计规则表） |
 |---|---|
 | `check-budget.ts`（§5.1） | R1 时效性（`updatedAt` 滞后）· R2 schema 完整 · R3 onExceed 合法 · R4 killSwitch 合法 · R5 触发检测（返工次数 ≥ killSwitch 阈值但 run-log 无告警） |
-| `check-run-log.ts`（§5.2） | R1 阶段动作完整性（chunk/cross/gate/checkpoint 4 类）· R2 tokens 非负 · R3 返工记录一致 · R4 acknowledgedDecisions 非空 · R5 O 越权检测（交叉 `gate-logs/`）· R6 exitCode 一致（SSoT §10E）· R7 append-only · R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint；V 失败后须先 rootcause 再 S-fix（反模式 #18 轨迹检测），违例走返工循环；处置：补齐缺失动作 / 对齐理想轨迹后重跑）· R9 跨轮次评审一致性（同一产物的 `qualityLevel` 跨轮次差 ≥2 档 → 评审者自身标准漂移，走高成熟度 CHECKPOINT 交人裁定，不走 R；见 [verifier-spec.md](verifier-spec.md) §14.1）· R10 revertEvidence 回滚证伪（fix/emergency-fix 须携带非空 `revertEvidence.command`，**无时间戳豁免**：缺失或非法始终 blocking；处置：由 S-fix 重跑真实回滚命令并补记后重跑）· R11 闭环五脚本齐备（凡有 `action=checkpoint` 且 `outcome=success` 放行的阶段，放行前须已有 `check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts` 各一条 `role=G` + `outcome=success` + `gateExitCode=0` 的 gate 记录，且时间戳**严格早于**放行（同秒不算，无时间戳豁免）；处置：补齐缺失的闭环脚本 gate 记录后重跑。**唯一例外**：阶段 1 的 `check-checkpoint.ts` 允许后置——该脚本自身要求 run-log 已存在 checkpoint 记录才可能 exit 0，见下「阶段 1 自举豁免（R11 后置窗口，D-6）」节） |
+| `check-run-log.ts`（§5.2） | R1 阶段动作完整性（chunk/cross/gate/checkpoint 4 类）· R2 tokens 非负 · R3 返工记录一致 · R4 acknowledgedDecisions 非空 · R5 O 越权检测（交叉 `gate-logs/`）· R6 exitCode 一致（SSoT §10E）· R7 append-only · R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint；V 失败后须先 rootcause 再 S-fix（反模式 #18 轨迹检测），违例走返工循环；处置：补齐缺失动作 / 对齐理想轨迹后重跑）· R9 跨轮次评审一致性（同一产物的 `qualityLevel` 跨轮次差 ≥2 档 → 评审者自身标准漂移，走高成熟度 CHECKPOINT 交人裁定，不走 R；见 [verifier-spec.md](verifier-spec.md) §14.1）· R10 revertEvidence 回滚证伪（fix/emergency-fix 须携带非空 `revertEvidence.command`，**无时间戳豁免**：缺失或非法始终 blocking；处置：由 S-fix 重跑真实回滚命令并补记后重跑）· R11 闭环五脚本齐备（凡有 `action=checkpoint` 且 `outcome=success` 放行的阶段，放行前须已有 `check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts` 各一条 `role=G` + `outcome=success` + `gateExitCode=0` 的 gate 记录，且时间戳**严格早于**放行（同秒不算，无时间戳豁免）；处置：补齐缺失的闭环脚本 gate 记录后重跑。**历史日志兼容例外**：阶段 1 的 `check-checkpoint.ts` 允许后置——仅用于兼容以旧时序写入的历史 run-log；E-2 方案 B 落地后新建项目走自然时序（见下「阶段 1 自举豁免（R11 后置窗口，D-6）」节）即满足严格判据，不应产生后置形态） |
 | `check-maturity.ts`（§5.3） | R1 schema 完整 · R2 level 合法 · R3 成功阶段计数更新（`completedCycles` 滞后）· R4 history 一致 · R5 降级触发 |
 | `check-checkpoint.ts`（§5.4） | R1 acknowledgedDecisions 非空 · R2 决策内容具体（泛化词黑名单）· R3 用户确认存在 · R4 决策与阶段匹配 · R5 跨阶段证据一致（SSoT §10.6 6.3） |
 
@@ -467,11 +467,11 @@ G 子代理在每个阶段门按以下顺序调用，任一退出码 ≠ 0 → O
 
 `check-run-log.ts` 交叉校验 `gate-logs/` 存档与 run-log `gateExitCode` 一致（SSoT §10E.3）；`check-checkpoint.ts` 依赖 run-log 中 checkpoint 记录；`check-budget.ts` / `check-maturity.ts` 交叉 run-log 统计返工/成功阶段数。四脚本须在阶段门一并跑完，不得跳过；CLI 用法与退出码语义（0 通过 / 1 校验失败 / 2 输入错误）见修正设计 §5.1-5.4。（依赖关系与执行顺序见修正设计 §5.5）
 
-### 阶段 1 自举豁免（R11 后置窗口，D-6）
+### 阶段 1 自举豁免（R11 后置窗口，D-6；E-2 方案 B 后为历史日志兼容形态）
 
-> R11 的严格判据是「五条闭环记录须**早于**放行」，但 `check-checkpoint.ts` 自身要求 run-log 中已存在 checkpoint 记录才可能 exit 0——阶段 1 的该记录必然晚于本阶段放行，构成首阶段自举死锁（先跑门则门红，先放行则 R11 红）。D-6 给首阶段开后置窗口，例外仅此一处，不放宽其余任何判据。
+> R11 的严格判据是「五条闭环记录须**严格早于**放行」。本节描述的 `phase===1` × `check-checkpoint.ts` 后置窗口（D-6，2026-09-21）是其唯一例外。**定性沿革（E-2 方案 B，2026-09-22）**：该窗口合入时用于绕开首阶段自举死锁（旧 R0 要求 run-log 已有放行记录 check-checkpoint 才可能 exit 0——先跑门则门红，先放行则 R11 红）；E-2 方案 B（R0 首阶段自举形态：零放行记录时以 checkpoint-log 用户确认为初级证据，SSoT §10.6 6.0）使自然时序「确认落盘 → 闭环五门 → 最后写放行记录」合法，新建项目常态满足严格判据、**不应产生后置形态**。窗口判据保留，仅用于兼容以旧时序写入的历史 run-log（删除会使其变红）。
 
-| 项 | 判据 |
+| 项 | 判据（保留不变，历史日志兼容） |
 |---|---|
 | 适用域 | 仅 `phase === 1` 的放行 × `check-checkpoint.ts`（记录仍须属本阶段，即 `phase` 相同） |
 | 后置窗口 | 时间戳 **> 放行时刻** 且 **< 下一放行时刻**；下一放行 = 全部阶段中时间戳**严格晚于**本放行的最早一条 `action=checkpoint` + `outcome=success` 记录 |
@@ -481,4 +481,4 @@ G 子代理在每个阶段门按以下顺序调用，任一退出码 ≠ 0 → O
 | 其余四脚本 | `check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-preventive-review.ts` 一律仍须严格早于放行 |
 | `phase >= 2` | 行为**完全不变**：后置的 `check-checkpoint.ts` 记录仍 R11 blocking |
 
-**调用约定**：阶段 1 门仍按「调用时机」表顺序执行；`check-checkpoint.ts` 若因 run-log 中尚无 checkpoint 记录而红，在用户放行后**立即重跑**并在 run-log 追加该条成功 gate 记录，随后按常规进入阶段 2 的门。**已知张力**：该后置 gate 记录与 R8 轨迹模板（gate 须先于 checkpoint、checkpoint 为阶段终点）在轨迹层仍冲突——R11 豁免不放宽 R8，`check-run-log.ts` 会同时报 R8；这是 D-6 的契约边界，不得据此回退、改写记录或伪造时间戳。
+**调用约定（E-2 方案 B 后的自然时序）**：阶段 1 门按「调用时机」表顺序执行——用户确认先行落盘（checkpoint-log `phase-1` 文件），随后 G 子代理串行跑闭环五门（此时 run-log 尚无放行记录，`check-checkpoint.ts` 以 R0 首阶段自举形态通过并输出非阻断 `BOOTSTRAP_VALIDATION:` 诊断；未提供/空/不可读 checkpoint-log 仍违规，零证据不等于合规），五条 gate 记录均严格早于放行；五门全绿后才由 O 写入放行记录（阶段末条，R8 轨迹终点）。放行记录的内容校验（R1/R2/R4）由下一阶段 `check-checkpoint.ts` 的全局回溯完成（与阶段 ≥2 既有语义一致）。**原「已知张力（R8 同源）」销项（2026-09-22）**：旧时序（写放行记录 → 后补 check-checkpoint 成功记录）依赖 D-6 窗口、且与 R8 轨迹模板冲突（`check-run-log.ts` 同时报 R8 三条）——该张力随自然时序合法化而消解：R8 零改动，后置形态仍被 R8 拦截（这正是反伪造语义：新建项目不应产生该形态），不得据此回退、改写记录或伪造时间戳。

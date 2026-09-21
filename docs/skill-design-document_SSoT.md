@@ -1455,6 +1455,7 @@ DoD 不替代阶段产物的验收标准（见各 [`phase-N-*.md`](../w-model-de
 
 第六维度「理解证据」细化子项（6.1~6.3，由 `check-checkpoint.ts` 强制校验）：
 
+- **6.0 零记录态的首阶段自举语义（E-2 方案 B，2026-09-22）**：run-log 无任何 checkpoint success 记录时，`check-checkpoint.ts` 的 R0 零证据守卫 fail-closed（零证据不等于合规）——**唯一例外**：`--checkpoint-log` 已提供且加载含至少一条用户确认（Map 非空）时，R0 不违规、改推非阻断 `BOOTSTRAP_VALIDATION:` 诊断。语义：首阶段放行的初级证据是 checkpoint-log 用户确认原文（与 R3 防代签同锚），自然时序「确认落盘 → 闭环五门 → 最后写放行记录」下 check-checkpoint 运行时放行记录尚未写入属预期形态，放行记录的内容校验（R1/R2/R4）由下一阶段 check-checkpoint 的全局回溯完成（与阶段 ≥2 既有语义一致）。未提供 / 空 Map / 目录不可读 → 维持违规；一旦放行记录写入，走既有全量路径。依据：`docs/superpowers/specs/2026-09-22-e2-spec-amendment.md`（根因 `docs/debug/2026-09-22-e2-r8-r0-rootcause/README.md`）。
 - **6.1 acknowledgedDecisions 非空且含具体技术决策**：`acknowledgedDecisions` 数组须非空，且每条须为具体技术决策摘要（如「选用 JWT 而非 session」「数据模型增加 `deletedAt` 软删字段」），不得为「继续」「确认」「同意」「无意见」等泛化词——泛化词命中 `check-checkpoint.ts` R2 黑名单 → 视为 O4 命中，拒绝放行。
 - **6.2 evidence 可追溯**：评审 `VerifierOutput` 的 `subCriteria[].evidence` 字段引用产物时须标注「路径+行号」（如 `docs/system-design.md#L42-L58`），不得仅引用文件名或泛指「见设计文档」；无行号定位 → `check-checkpoint.ts` 视为证据不可追溯，拒绝放行。
 - **6.3 跨阶段证据一致性**：后阶段 `evidence` 不得否定前阶段已放行项——若阶段 N 评审 evidence 与阶段 N-1 已放行决策矛盾（如阶段 2 设计否定了阶段 1 已确认的 REQ 优先级），须显式回退修正前阶段产物并重跑，不得在后阶段静默推翻；`check-checkpoint.ts` 交叉比对历史 checkpoint 记录，发现矛盾未回退 → 拒绝放行。
@@ -1887,7 +1888,7 @@ interface RunLogEntry {
 
 **legacy 吸收共享谓词（D-5，2026-09-21）**：`run-log-logic.ts` 导出 `isLegacyAbsorbableEntry`，`check-run-log` 与 `check-checkpoint` 两门对同一条 legacy 记录复用**同一**吸收判定（此前 checkpoint 门持有一份漂移副本，可能对同一行一台 absorbing、另一台 blocking）；真实 schema 错误仍 blocking，吸收只覆盖可容忍缺失。
 
-**R11 阶段 1 自举豁免（D-6，2026-09-21）**：`check-checkpoint.ts` 自身要求 run-log 中已存在 checkpoint 记录才可能 exit 0，故其成功 gate 记录必然晚于本阶段放行——严格「早于放行」在首阶段构成自举死锁（先跑门则门红，先放行则 R11 红）。`phase===1` 时该脚本**新增**后置窗口 `(releaseAt, nextReleaseAt)`：成功记录须晚于本放行且早于下一放行（下一放行 = 全部阶段中时间戳**严格晚于**本放行的最早一条 `action=checkpoint` + `outcome=success` 记录；不存在下一放行时窗口无上界）；同秒不算合格（前后窗口均为严格比较）。后置窗口是**增补**而非替换——早于放行的同脚本记录照旧充数（既有 run-log 不受影响）；窗口只放宽时间轴，记录仍须属本阶段（phase 相同、`role=G`、`gateExitCode=0`）。其余四脚本与 phase≥2 的放行判据完全不变（例外只此一处）。**已知张力（契约边界）**：该后置 gate 记录与 R8 轨迹模板（gate 须先于 checkpoint、checkpoint 为阶段终点）在轨迹层仍冲突——R11 豁免不放宽 R8，`check-run-log.ts` 会同时报 R8；这是已知边界，不得据此回退、改写记录或伪造时间戳（详见 [`operational-recovery.md`](../w-model-dev/references/operational-recovery.md)「阶段 1 自举豁免（R11 后置窗口，D-6）」节）。
+**R11 阶段 1 自举豁免（D-6，2026-09-21）**：`check-checkpoint.ts` 自身要求 run-log 中已存在 checkpoint 记录才可能 exit 0，故其成功 gate 记录必然晚于本阶段放行——严格「早于放行」在首阶段构成自举死锁（先跑门则门红，先放行则 R11 红）。`phase===1` 时该脚本**新增**后置窗口 `(releaseAt, nextReleaseAt)`：成功记录须晚于本放行且早于下一放行（下一放行 = 全部阶段中时间戳**严格晚于**本放行的最早一条 `action=checkpoint` + `outcome=success` 记录；不存在下一放行时窗口无上界）；同秒不算合格（前后窗口均为严格比较）。后置窗口是**增补**而非替换——早于放行的同脚本记录照旧充数（既有 run-log 不受影响）；窗口只放宽时间轴，记录仍须属本阶段（phase 相同、`role=G`、`gateExitCode=0`）。其余四脚本与 phase≥2 的放行判据完全不变（例外只此一处）。**E-2 修正案后的定性（2026-09-22，历史日志兼容）**：E-2 方案 B（R0 首阶段自举形态，§10.6 6.0）使自然时序「确认落盘 → 闭环五门 → 最后写放行记录」合法，新建项目常态满足五门严格早于放行、不再产生后置形态——本窗口降级为**历史日志兼容形态**（删除会使以旧时序写入的历史 run-log 变红，故保留判据）。原「已知张力（契约边界）」（后置 gate 记录与 R8 轨迹模板冲突，R11 豁免不放宽 R8，`check-run-log.ts` 会同时报 R8 三条）就此消解为预期反伪造语义：后置形态仍被 R8 拦截，不得据此回退、改写记录或伪造时间戳（详见 [`operational-recovery.md`](../w-model-dev/references/operational-recovery.md)「阶段 1 自举豁免（R11 后置窗口，D-6）」节）。
 
 ### 10D.4 编排者维护职责（O 角色扩展，不改 S/V/G 边界）
 
