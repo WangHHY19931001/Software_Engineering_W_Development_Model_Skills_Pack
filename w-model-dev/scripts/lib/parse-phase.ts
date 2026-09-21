@@ -4,7 +4,7 @@
  * 12 个 cli/*.ts 脚本（含 cli/plan-chunks.ts）的 --phase 解析/校验统一由本模块实现（spec §3.2；
  * 2026-09-06 audit-fixes D3 收敛为准确契约）：
  *   - 消费方（12 个 CLI）：check-artifact-gate / check-bdd-model / check-budget /
- *     check-codegraph-queries / check-opsx-artifacts /
+ *     check-codegraph-queries / check-coding-plan /
  *     check-preventive-review / check-requirement-graph / check-signature-chain /
  *     check-tla-model / ensure-codegraph / metrics-report / plan-chunks
  *   - 支持两种形态：`--phase=N`（等号内联）与 `--phase N`（空格分离）；另有位置参数

@@ -24,7 +24,7 @@ AI 助手写代码很容易「差不多就行」：跳段、凭感觉、说不�
 
 | 指标                               | 结果                  |
 | ---------------------------------- | --------------------- |
-| Self-test（360 条样本回归基线）    | ✅ 360/360            |
+| Self-test（357 条样本回归基线）    | ✅ 357/357            |
 | 门禁脚本单元测试（vitest）         | ✅ 以当前命令输出为准 |
 | TypeScript 类型检查（strict）      | ✅ 0 错误             |
 | 安全扫描（eslint-plugin-security） | ✅ baseline 一致      |
@@ -145,7 +145,7 @@ flowchart LR
 | 7 系统测试 | 系统测试执行结果 + 性能/安全报告                         | `check-verifier-output.ts`、`check-artifact-gate.ts --phase=7`、`check-bdd-model.ts --phase=7`                                          |
 | 8 验收测试 | 验收测试执行结果 + 归档产物                              | `check-verifier-output.ts`、`check-artifact-gate.ts`（终检）、`check-archive-integrity.ts`                                              |
 
-> 阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-coding-plan.ts`（编码计划制品契约 R1-R6，由 `check-artifact-gate.ts` 以 `--scope` 聚合，阶段 8 归档快照由 `check-archive-integrity.ts` 覆盖）；旧链路 `check-opsx-artifacts.ts` 仍在盘并保留在 pre-push 路径上，其退役随 superpowers 替换批次 4 的残留清理进行。完整分派矩阵见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)。
+> 阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-coding-plan.ts`（编码计划制品契约 R1-R6，由 `check-artifact-gate.ts` 以 `--scope` 聚合，阶段 8 归档快照由 `check-archive-integrity.ts` 覆盖）；旧链路 `check-opsx-artifacts.ts` **已于 2026-09-21 退役**（语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3，不再在 pre-push 路径上）。完整分派矩阵见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)。
 
 ### 常用命令（在 Agent 会话里使用）
 

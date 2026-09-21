@@ -34,7 +34,7 @@ npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=7
 ```
 
-> 阶段 7 附加门禁：`check-codegraph-queries.ts` / `check-coding-plan.ts`；旧 opsx 制品门 `check-opsx-artifacts.ts` 仍在盘并仍在 pre-push 路径（退役随批次收尾）；评审证据经 `check-verifier-output.ts` 回填。
+> 阶段 7 附加门禁：`check-codegraph-queries.ts` / `check-coding-plan.ts`；旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役（语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）；评审证据经 `check-verifier-output.ts` 回填。
 
 ## 预期输出（示例输出）
 

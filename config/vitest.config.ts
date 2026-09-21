@@ -39,7 +39,6 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'check-codegraph-queries.test.ts',
   'check-coding-plan.test.ts',
   'check-coverage-scope.test.ts',
-  'check-opsx-artifacts.test.ts',
   'check-pollution-cli.test.ts',
   'check-samples-coverage.test.ts',
   'cli-arg-unification.test.ts',

@@ -758,9 +758,8 @@ write_json('archive/2026-09-19-counter-api/archive-manifest.json', {
 #   R5     .w-model/r3-reviews/phase<p>-{plan,execute,finalize}-{completeness,reliability,security}.md ×9
 #          + .w-model/v-reviews/phase<p>-{plan,execute,finalize}.md ×3
 #          （stage 词表 = 编码链三段式，由旧 opsx 词表 explore/propose/coding 迁徙而来）
-# 旧 opsx 链路制品（openspec/changes/<cid>/）保留在盘：check-opsx-artifacts.ts 仍在 pre-push 路径上、
-# 且其 fixture 在 w-model-dev/scripts/samples/ 内服务旧契约。注意 stage 审查文件名已随 R5 迁徙，
-# 故旧门禁若单独对 demo 运行会报 R5 缺失——旧链路不在 demo 电池 / 轨迹 / 探针内运行（见 README.md）。
+# 旧 opsx 链路制品（openspec/changes/<cid>/）保留在盘仅作历史对照：对应门禁 check-opsx-artifacts.ts
+# 与其 fixture 已于 2026-09-21 退役（语义并入 check-coding-plan.ts R5），无任何门禁读取该目录。
 PHASE_SYMBOLS = {
   5: [('Counter', [], ['Counter.inc', 'Counter.reset', 'Counter.get'], 3)],
   6: [('Counter', [], ['Counter.inc', 'Counter.reset'], 2)],

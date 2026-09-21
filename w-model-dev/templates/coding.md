@@ -77,7 +77,7 @@
 - `check-code-tla-consistency.ts`：codeModule↔TLA+ 一致性回归，退出码 0
 - `check-bdd-model.ts --phase=5 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/unit.json`（L4 features 时）：退出码 0
 - `check-artifact-gate.ts --phase=5 --scope=<change-scope.json>`：阶段级校验（codeModule 格式 + NFR/CON 回填 + codegraph/coding-plan strict 聚合），退出码 0
-- `check-codegraph-queries.ts` / `check-coding-plan.ts`（阶段 5-8 门禁，均带 `--phase=5 --scope=<change-scope.json>`，缺 scope 即 fail-closed）：退出码 0（旧 opsx 制品门 `check-opsx-artifacts.ts` 仍在盘并与新链路并存，退役随批次收尾）
+- `check-codegraph-queries.ts` / `check-coding-plan.ts`（阶段 5-8 门禁，均带 `--phase=5 --scope=<change-scope.json>`，缺 scope 即 fail-closed）：退出码 0（旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役，语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）
 - 门禁脚本 stdout 末尾 5 行须贴出作为放行证据（约束 #9）
 
 ## 8. 结论

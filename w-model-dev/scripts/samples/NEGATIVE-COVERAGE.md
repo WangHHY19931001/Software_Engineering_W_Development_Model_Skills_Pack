@@ -21,12 +21,12 @@
 >     断言 exit code=2、stdout 含可解析 `ERROR_JSON`（`exitCode=2` 且 category 属 exit-2 类别）、
 >     stderr 含同类别人类错误行、且**该探针自己的**隔离根调用前后逐项不变（不得留下半成品）。
 >     独立根是并发的前提，同时把不变量加强为「本探针在自己根内不留半成品」（共享根只能做弱归因）；
->     实测 48 探针由串行 71s 降至约 22s，断言一字未减。tsx 不可用等
+>     实测 47 探针由串行 71s 降至约 22s，断言一字未减。tsx 不可用等
 >     探针不可用情形按失败处理，不静默跳过。
-> - 口径与中心探针一致（46 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
+> - 口径与中心探针一致（45 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
 >   `metrics-report.ts` 使用特殊探针参数，但仍计入集合）。
 >
-> - **门禁脚本**：基名（`w-model-dev/scripts/cli/<name>.ts` 去掉 `.ts`）。全表 46 行，每门禁恰一行。
+> - **门禁脚本**：基名（`w-model-dev/scripts/cli/<name>.ts` 去掉 `.ts`）。全表 45 行，每门禁恰一行。
 > - **负向机制**：只允许 `fixture`（在盘 `samples/` fixture）/ `invocation`（CLI 参数或测试临时目录调用）/
 >   `mutated-copy`（测试内改写文本副本）三种。
 > - **负向案例 / 证据位置**：`fixture` 行写 `` `samples/...` ``（相对 `w-model-dev/scripts/`），并附
@@ -62,7 +62,7 @@
 >   「同一 `引用文件#锚` 不得被两条指向不同 fixture 的 fixture 行共用」。
 > - **所防回归**：若该负向案例被删掉 / 放宽，会漏掉的那一个具体回归；禁止「防止出错」这类空话。
 
-### A 组（含 B 组强化两行）：已有强负向 fixture（28）
+### A 组（含 B 组强化两行）：已有强负向 fixture（27）
 
 | 门禁脚本                          | 负向机制 | 负向案例 / 证据位置                                                                                                                 | 所防回归（一句话）                                                                                   |
 | --------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -82,7 +82,6 @@
 | check-role-dispatch               | fixture  | `samples/run-log/bad-missing-V-role.jsonl`（`self-test.ts#file: 'bad-missing-V-role.jsonl'`）                                       | 放宽角色分派完整性（约束 #8）将漏掉阶段缺 V 分派记录仍通过                                           |
 | check-state-machine-consistency   | fixture  | `samples/state-machine/bad-missing-transition.json`（`self-test.ts#file: 'bad-missing-transition.json'`）                           | 放宽状态集/转移集一致将漏掉设计文档缺转移而代码存在该分支                                            |
 | check-codegraph-queries           | fixture  | `samples/codegraph-queries/bad-empty`（`self-test.ts#sampleDir: 'codegraph-queries/bad-empty'`）                                    | 放宽查询落盘覆盖将漏掉未做 codegraph 查询（空目录）直接改代码（反模式 #38 逃逸）                     |
-| check-opsx-artifacts              | fixture  | `samples/opsx-artifacts/bad-missing-tickets`（`self-test.ts#sampleDir: 'opsx-artifacts/bad-missing-tickets'`）                      | 放宽制品齐全性将漏掉缺 tickets 或 R3/V 审查产物的变更进入 apply（反模式 #39/#40）                    |
 | check-coding-plan                 | fixture  | `samples/coding-plan/bad-missing-ledger`（`self-test.ts#sampleDir: 'coding-plan/bad-missing-ledger'`）                      | 放宽账本/三件套/验证命令齐全性将漏掉无账本或未 complete 的编码变更被放行（编码链形态的反模式 #39 谱系） |
 | check-requirement-coverage        | fixture  | `samples/coverage/bad-empty-stakeholder.json`（`self-test.ts#file: 'bad-empty-stakeholder.json'`）                                  | 放宽 C1-C10 将漏掉 stakeholder 覆盖率缺口与 metrics 重算不一致                                       |
 | check-exemption                   | fixture  | `samples/exemption/bad-s-self-approve.json`（`self-test.ts#file: 'bad-s-self-approve.json'`）                                       | 放宽 E1-E9 将漏掉 S 自批（缺人类四阶段审批）的豁免被放行                                             |

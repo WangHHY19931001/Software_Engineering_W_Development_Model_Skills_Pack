@@ -379,7 +379,7 @@ function extractReferences(selfTestContent: string): ReferenceSets {
     }
   }
 
-  // 3) sampleDir: 目录引用（覆盖子树，如 opsx-artifacts/valid-phase5）
+  // 3) sampleDir: 目录引用（覆盖子树，如 coding-plan/bad-missing-ledger）
   for (const m of selfTestContent.matchAll(/sampleDir: '([^']+)'/g)) {
     dirs.add(m[1]!);
   }
@@ -741,7 +741,7 @@ function listProbeTree(root: string): string[] {
 /**
  * 单探针并发度。每个探针各有**独立隔离根**（见 runExit2Probes），彼此不共享任何可观测状态，
  * 因此并发不引入互相干扰；取 4 是在 Windows 进程启动开销（每次 spawn ≈1.5–2s）与 CPU 争用之间的折中。
- * 实测：48 个探针串行 71s → 4 路并发约 25s（每个探针的 exit-2/ERROR_JSON/人类错误/零漂移断言不变）。
+ * 实测：47 个探针串行 71s → 4 路并发约 25s（每个探针的 exit-2/ERROR_JSON/人类错误/零漂移断言不变）。
  */
 const PROBE_CONCURRENCY = 4;
 

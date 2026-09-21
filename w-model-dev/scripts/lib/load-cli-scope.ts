@@ -1,7 +1,7 @@
 /**
  * CLI ChangeScope 装载共享 helper（lib/load-cli-scope.ts）
  *
- * 消除两个 checker（check-codegraph-queries.ts / check-opsx-artifacts.ts）与
+ * 消除两个 checker（check-codegraph-queries.ts / check-coding-plan.ts）与
  * check-artifact-gate.ts main() 中复制的
  * resolveCliScope 装载样板：
  * CLI 参数（--scope / --change/--base/--head）→ resolveCliScope → 三态处理：

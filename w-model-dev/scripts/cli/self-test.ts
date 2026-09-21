@@ -14,11 +14,11 @@
  *   0  所有样本的校验结果与期望一致
  *   1  至少一个样本不匹配
  *
- * 样本目录约定（samples/<area>/，28 个样本子目录（36+1 个用例数组），详见 samples/README.md 覆盖矩阵）：
+ * 样本目录约定（samples/<area>/，27 个样本子目录（35+1 个用例数组），详见 samples/README.md 覆盖矩阵）：
  *   verifier / gate / graph / tla / code-tla / bdd / coverage / exemption / budget /
  *   run-log / maturity / checkpoint / rootcause / preventive-review / iceberg /
  *   tla-bdd-sync / state-machine / design-contract / signature-chain /
- *   archive-integrity / schema / code-health / codegraph-queries / opsx-artifacts /
+ *   archive-integrity / schema / code-health / codegraph-queries /
  *   uat-path-mapping（tla-e2e 为需 Java 的手动 fixture，豁免）
  *
  * 注意：self-test 是纯逻辑回归基线，**不依赖 Java/jar**。TLA+ 的 SANY/TLC 端到端测试
@@ -115,7 +115,6 @@ import { checkCodingPlan } from '../logic/coding-plan-logic.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
-import { checkOpsxArtifacts } from './check-opsx-artifacts.js';
 import { checkUatPathMappingContent } from './check-artifact-gate.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
@@ -1875,39 +1874,6 @@ const CODEGRAPH_QUERY_CASES: CodegraphQueryCase[] = [
     expectedPassed: false,
     expectedViolationPatterns: [/缺 blastRadius 字段/],
     description: '查询文件有 callers/callees 但缺 blastRadius 字段，应未通过（legacy 无 scope 兼容层样本）',
-  },
-];
-
-interface OpsxArtifactCase {
-  sampleDir: string;
-  phase: number;
-  expectedPassed: boolean;
-  expectedViolationPatterns?: RegExp[];
-  description: string;
-}
-
-const OPSX_ARTIFACT_CASES: OpsxArtifactCase[] = [
-  {
-    sampleDir: 'opsx-artifacts/valid-phase5',
-    phase: 5,
-    expectedPassed: true,
-    description:
-      'opsx 制品齐全（proposal/design/tasks/tickets/specs）+ R3×9 + V×3，应通过（legacy 全扫描兼容层样本；strict changeId 见 check-opsx-artifacts.test.ts）',
-  },
-  {
-    sampleDir: 'opsx-artifacts/bad-missing-tickets',
-    phase: 5,
-    expectedPassed: false,
-    expectedViolationPatterns: [/tickets\.md 缺失/],
-    description: 'opsx 变更目录缺 tickets.md（反模式 #40），应未通过（legacy 全扫描兼容层样本）',
-  },
-  {
-    sampleDir: 'opsx-artifacts/bad-multi-dir-missing',
-    phase: 5,
-    expectedPassed: false,
-    expectedViolationPatterns: [/phase5-extra\/tickets\.md 缺失/],
-    description:
-      '多变更目录（phase5-demo + phase5-extra）中 phase5-extra 缺 tickets.md，列出全部缺失（legacy 全扫描兼容层样本）',
   },
 ];
 
@@ -4040,38 +4006,6 @@ async function runCodegraphQueryCases(samplesDir: string): Promise<CaseResult[]>
   return results;
 }
 
-async function runOpsxArtifactCases(samplesDir: string): Promise<CaseResult[]> {
-  const results: CaseResult[] = [];
-  for (const c of OPSX_ARTIFACT_CASES) {
-    const projectRoot = path.join(samplesDir, c.sampleDir);
-    const name = `${c.sampleDir}`;
-    const details: string[] = [];
-    try {
-      const r = checkOpsxArtifacts(projectRoot, c.phase);
-      if (r.passed !== c.expectedPassed) {
-        details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
-      }
-      if (!c.expectedPassed) {
-        details.push(...matchReasonPatterns(r.violations, c.expectedViolationPatterns));
-      }
-      results.push({
-        name,
-        passed: details.length === 0,
-        description: c.description,
-        details: details.length > 0 ? details : undefined,
-      });
-    } catch (err) {
-      results.push({
-        name,
-        passed: false,
-        description: c.description,
-        details: [`  - 异常: ${err instanceof Error ? err.message : String(err)}`],
-      });
-    }
-  }
-  return results;
-}
-
 async function runCodingPlanCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of CODING_PLAN_CASES) {
@@ -4963,7 +4897,6 @@ async function main(): Promise<void> {
   console.log(`StateMachine 用例 : ${STATE_MACHINE_CASES.length}`);
   console.log(`DesignContract 用例 : ${DESIGN_CONTRACT_CASES.length} 条`);
   console.log(`CodegraphQuery 用例 : ${CODEGRAPH_QUERY_CASES.length}`);
-  console.log(`OpsxArtifact 用例 : ${OPSX_ARTIFACT_CASES.length}`);
   console.log(`CodingPlan 用例 : ${CODING_PLAN_CASES.length}`);
   console.log(`UatPathMapping 用例 : ${UAT_PATH_MAPPING_CASES.length}`);
   console.log('─'.repeat(60));
@@ -4993,7 +4926,6 @@ async function main(): Promise<void> {
     roleDispatchResults,
     stateMachineResults,
     codegraphQueryResults,
-    opsxArtifactResults,
     codingPlanResults,
     uatPathMappingResults,
     icebergResults,
@@ -5043,7 +4975,6 @@ async function main(): Promise<void> {
     runRoleDispatchCases(samplesDir),
     runStateMachineCases(samplesDir),
     runCodegraphQueryCases(samplesDir),
-    runOpsxArtifactCases(samplesDir),
     runCodingPlanCases(samplesDir),
     runUatPathMappingCases(samplesDir),
     runIcebergCases(samplesDir),
@@ -5082,7 +5013,6 @@ async function main(): Promise<void> {
     ...roleDispatchResults,
     ...stateMachineResults,
     ...codegraphQueryResults,
-    ...opsxArtifactResults,
     ...codingPlanResults,
     ...uatPathMappingResults,
     ...icebergResults,

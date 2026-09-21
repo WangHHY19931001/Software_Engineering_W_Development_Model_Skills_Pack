@@ -34,7 +34,7 @@
 
 **约束 #14 适用**：测试代码文件 `Edit`/`Write` 前同样须先经 **codegraph CLI**（`codegraph query <符号>`；宿主 MCP 工具若可用为可选加速）查询被测模块影响半径并落盘。
 
-> **门禁绑定（2026-09-04 audit-gate-closure）**：本阶段 `check-artifact-gate.ts --phase=6`、`check-codegraph-queries.ts` 与 `check-coding-plan.ts` 均须以 `--scope=<change-scope.json>`（或 `--change/--base/--head` 薄封装）绑定实际变更——缺失 → exit 1（fail-closed）；S-coding 随变更维护/更新 scope（`headRef` 须等于当前 HEAD、`changedFiles` 与实际 Git 变更集合精确一致），artifact gate 聚合两个 strict checker 的 violations，`GATE_JSON` 含 external summary（`codegraph` + `codingPlan`）。旧 opsx 制品门 `check-opsx-artifacts.ts` 与旧链路并存（退役随批次收尾）。
+> **门禁绑定（2026-09-04 audit-gate-closure）**：本阶段 `check-artifact-gate.ts --phase=6`、`check-codegraph-queries.ts` 与 `check-coding-plan.ts` 均须以 `--scope=<change-scope.json>`（或 `--change/--base/--head` 薄封装）绑定实际变更——缺失 → exit 1（fail-closed）；S-coding 随变更维护/更新 scope（`headRef` 须等于当前 HEAD、`changedFiles` 与实际 Git 变更集合精确一致），artifact gate 聚合两个 strict checker 的 violations，`GATE_JSON` 含 external summary（`codegraph` + `codingPlan`）。旧 opsx 制品门 `check-opsx-artifacts.ts` **已于 2026-09-21 退役**（语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）。
 
 ## 测试用例设计（执行）
 

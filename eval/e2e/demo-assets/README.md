@@ -33,7 +33,7 @@ bash run_negative_probes.sh              # 期望末行：✓ 9/9 探针被拦�
 | 任务三件套 | 同目录 `task-<N>-brief.md` / `task-<N>-report.md` + `review-*.diff`                                                                                            | R4    |
 | stage 审查 | `.w-model/r3-reviews/phase<N>-{plan,execute,finalize}-{completeness,reliability,security}.md` ×9 + `.w-model/v-reviews/phase<N>-{plan,execute,finalize}.md` ×3 | R5    |
 
-旧 opsx 链路制品（`openspec/changes/<changeId>/`）**仍在生成**：`check-opsx-artifacts.ts` 仍在 pre-push 路径上，其契约由 `w-model-dev/scripts/samples/` 的 fixture 覆盖。但 stage 审查文件名已随 R5 迁徙为 `plan/execute/finalize`（旧词表 `explore/propose/coding` 不再生成），故旧门禁若**单独对 demo 运行**会在 R5 报缺失——这是词表迁徙的已知后果，不是回归：旧链路不在 demo 电池 / 轨迹 / 探针内运行，其本体退役见 superpowers 替换批次 4。
+旧 opsx 链路制品（`openspec/changes/<changeId>/`）在 demo 工作区中仍被生成（装配器未删除），但**对应的门禁已在 2026-09-21 退役**：`check-opsx-artifacts.ts` 与其 fixture（`w-model-dev/scripts/samples/opsx-artifacts/`）已 `git rm`，语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3（stage 词表 `plan/execute/finalize`，旧词表 `explore/propose/coding` 不充数）。该目录现在只是留作历史对照的静态样本，没有任何门禁读取它。
 
 ## 已实测的坑（务必遵守）
 

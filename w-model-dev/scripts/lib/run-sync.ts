@@ -286,14 +286,6 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
       '2026-09-04 audit-gate-closure task 1 新增：codegraph checker CLI 边界测试，显式 90 秒超时。（行号 2026-09-06 audit-fixes task 5 随 C12/C13/C10g 新用例下移 42 行）',
     timeout: { required: true, status: 'present' },
   },
-  {
-    api: 'execSync',
-    file: '__tests__/check-opsx-artifacts.test.ts',
-    anchor: 'const stdout = execSync(`npx tsx "${CLI}" ${args.join(\' \')}`, {',
-    symbol: 'runCli',
-    reason: '2026-09-04 audit-gate-closure task 1 新增：opsx checker CLI 边界测试，显式 90 秒超时。',
-    timeout: { required: true, status: 'present' },
-  },
   // 2026-09-21 superpowers 替换批次 1 任务 5：任务 1（check-coding-plan 编码计划制品门）新增了直接
   // 同步调用但从未登记（该分支尚未跑通全量 vitest，run-sync 审计一直是红的，与本文件下方 2026-09-17
   // 同类补登记同理）。以下条目补登记。

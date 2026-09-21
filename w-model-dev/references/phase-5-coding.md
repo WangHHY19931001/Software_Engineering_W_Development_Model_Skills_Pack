@@ -84,7 +84,7 @@
 
 ## superpowers 编码链 S 分派
 
-> 阶段 5-8 以 superpowers 编码链做规格级规划与执行（superpowers 替换 opsx 批次 2；方法论见 [superpowers-adoption.md](superpowers-adoption.md)）。旧 OpenSpec opsx 制品链路（`check-opsx-artifacts.ts`）仍在盘、仍在 pre-push 执行路径上，与本链并存；新链路不再读取 `openspec/changes/`，其退役随批次收尾。
+> 阶段 5-8 以 superpowers 编码链做规格级规划与执行（superpowers 替换 opsx 批次 2；方法论见 [superpowers-adoption.md](superpowers-adoption.md)）。旧 OpenSpec opsx 制品链路（`check-opsx-artifacts.ts`）**已于 2026-09-21 退役**（含 self-test 用例与 `samples/opsx-artifacts/` fixture；语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）；新链路不再读取 `openspec/changes/`。
 
 **编码链分派**（制品契约由 [`check-coding-plan.ts`](../scripts/cli/check-coding-plan.ts) R1-R6 强制）：
 ```
@@ -100,7 +100,7 @@ G          → check-coding-plan.ts <project-root> --phase=<5|6|7|8> --scope=<ch
 - **编码计划**（R1/R2）：`docs/plans/<changeId>.plan.md`——`changeId` 须含 `phase<N>-` 前缀；计划须含目标节（标题文本含「目标」）+ ≥1 个任务节（标题含 `Task N` / `任务 N`），每个任务节含 ≥1 条行首「`验证：`」/「`Verify:`」命令行，命令体非空且禁 `;` `&` `|`。
 - **执行账本**（R3）：`.superpowers/sdd/<plan-基名>/progress.md`（plan-基名 = plan 文件名去扩展名）——首行身份为 `# SDD ledger — plan: <计划文件路径>`（路径须以 plan 文件名结尾），`Task N: complete` 行须具名覆盖 plan 全部任务节。
 - **任务三件套**（R4）：账本目录内每个已完成任务 N 的 `task-<N>-brief.md` 与 `task-<N>-report.md` 存在且非空，且至少一个 `review-*.diff`（任务评审包证据）。
-- **归档快照**（R6）：`docs/changes/archive/<changeId>/` 或 `<日期>-<changeId>/`（**恰一匹配**才可用，多匹配 fail-closed）内的 `<changeId>.plan.md` + `progress.md` + 三件套按同契约校验；活动位存在时优先活动位。
+- **归档快照**（R6）：`docs/changes/archive/<changeId>/` 或 `<YYYY-MM-DD>-<changeId>/`（**锚定匹配**：`<changeId>-extra` / 非日期前缀名不匹配、非法日历日独立成态 fail-closed；**恰一匹配**才可用，多匹配 fail-closed）内的 `<changeId>.plan.md` + `progress.md` + 三件套按同契约校验；活动位存在时优先活动位。归档后置校验单独跑 `check-archive-integrity.ts <archive-dir> --change-id=<changeId>`（显式开关无条件启用 `codingPlanSnapshot`，不依赖生产者摆放）。
 
 **每段 R3×3 + V 审查**：每段产物须跑 R3 三维度（completeness/reliability/security）+ V 评审，产出 `.w-model/r3-reviews/phase<N>-{plan,execute,finalize}-{completeness,reliability,security}.md` ×9 与 `.w-model/v-reviews/phase<N>-{plan,execute,finalize}.md` ×3（R5；旧 stage 词表 explore/propose/coding 不充数）；不合格打回重做（反模式 #39）。
 

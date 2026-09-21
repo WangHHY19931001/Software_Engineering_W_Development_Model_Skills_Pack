@@ -45,7 +45,7 @@ npx tsx w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --
 npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts . --phase=5 --scope=.w-model/change-scope.json
 ```
 
-> 阶段 5-8 附加门禁：`check-codegraph-queries.ts`（约束 #14：改码前必须经 codegraph CLI 查询）与 `check-coding-plan.ts`（编码计划契约 R1-R6）——两个 checker 与 artifact gate 均须带 `--scope=.w-model/change-scope.json`（或 `--change/--base/--head` 薄封装）绑定实际变更，缺 scope 即 fail-closed（exit 1）；评审证据经 `check-verifier-output.ts` 回填。旧 opsx 制品门 `check-opsx-artifacts.ts` 仍在盘并仍在 pre-push 路径（退役随批次收尾）。
+> 阶段 5-8 附加门禁：`check-codegraph-queries.ts`（约束 #14：改码前必须经 codegraph CLI 查询）与 `check-coding-plan.ts`（编码计划契约 R1-R6）——两个 checker 与 artifact gate 均须带 `--scope=.w-model/change-scope.json`（或 `--change/--base/--head` 薄封装）绑定实际变更，缺 scope 即 fail-closed（exit 1）；评审证据经 `check-verifier-output.ts` 回填。旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役（语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）。
 
 ## 预期输出（示例输出）
 
