@@ -68,7 +68,11 @@ export const L0_BASELINE = {
   // ../scripts/logic/coding-plan-logic.ts），其中指向 L1 scripts 的 1 条计为 l1Only、
   // 其余计入 relativeLinkCount；由 npm run audit:l0-links 实测 rebaseline，
   // placeholders 仍 36、violations 仍 0）。
-  relativeLinkCount: 694,
+  // 695 = 694 + 1（2026-09-22 rc-closeout 任务 9（WS-A 收尾）：references/subagent-delegation.md
+  // 角色划分表 S 行允许动作补第 ⑤ 项（logic 层零 node:fs 的 IO 形态约定交叉引用）时新增
+  // 1 条同目录链接 `[asset-authoring.md](asset-authoring.md)`；由 npm run audit:l0-links
+  // 实测 rebaseline，l1Only 仍 97、placeholders 仍 36、violations 仍 0）。
+  relativeLinkCount: 695,
   l1Only: 97,
   placeholders: 36,
 } as const;

@@ -2,11 +2,11 @@
  * 编码计划制品校验纯逻辑层（Coding Plan Logic）
  *
  * 校验 superpowers 编码链（writing-plans → SDD → TDD → code-review）的「编码计划制品契约」
- * （superpowers 替换 opsx 批次 1，SSoT §10M / docs/superpowers/specs/2026-09-21-superpowers-replace-opsx-design.md §4.2）。
+ * （superpowers 替换 opsx 批次 1，docs/superpowers/specs/2026-09-21-superpowers-replace-opsx-design.md §4.2）。
  * 供 `cli/check-coding-plan.ts`（CLI 壳）与 `cli/self-test.ts`（CODING_PLAN_CASES）调用；
  * 本层零 IO——文件访问全部经注入的结构化端口 `CodingPlanFs`（`checkCodingPlan` 第 4 必选参；
- * Node 适配器 `lib/coding-plan-fs.ts`，gate-logic 注入式同型先例），不直连 Node fs 模块、
- * 不 import CLI 层、不调用 LLM。
+ * Node 适配器外置 `lib/coding-plan-fs.ts`；`l0-link-audit-logic` 为 logic 层直连形态先例），
+ * 不直连 Node fs 模块、不 import CLI 层、不调用 LLM。
  *
  * 制品契约与校验规则（R1-R6）：
  *   R1  编码计划存在：`docs/plans/<changeId>.plan.md`；changeId 须含 `phase<phase>-` 前缀
@@ -43,7 +43,8 @@
 import * as path from 'node:path';
 
 /**
- * 结构化文件系统端口（logic 层零 fs 直连；gate-logic 注入式适配器同型先例）。
+ * 结构化文件系统端口（logic 层零 fs 直连；注入必选参 + 适配器外置 `lib/coding-plan-fs.ts` 形态，
+ * `l0-link-audit-logic` 为直连形态先例）。
  *
  * 只声明本模块实际消费的四个只读方法（结构化类型，不引 Node 类型）：
  * - `existsSync` / `statSync`：存在性与类型/大小判定（plan / 账本 / 三件套非空）；

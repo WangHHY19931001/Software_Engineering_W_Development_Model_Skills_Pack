@@ -60,10 +60,6 @@ const ALLOWED_LOGIC_NODE_BOUNDARY_IMPORTS = new Map([
   ['logic/state-write-logic.ts:node:fs/promises', 'state-write-logic is the state persistence implementation.'],
   ['logic/state-write-logic.ts:node:path', 'state-write-logic normalizes state persistence paths.'],
   [
-    'logic/coding-plan-logic.ts:node:fs',
-    'coding-plan-logic reads the coding plan artifacts (plan / SDD ledger / task triples) as a file-graph gate.',
-  ],
-  [
     'logic/coding-plan-logic.ts:node:path',
     'coding-plan-logic normalizes coding plan artifact and archive snapshot paths.',
   ],
@@ -322,10 +318,6 @@ describe('scripts runtime dependency boundaries', () => {
       ],
       ['logic/state-write-logic.ts:node:fs/promises', 'state-write-logic is the state persistence implementation.'],
       ['logic/state-write-logic.ts:node:path', 'state-write-logic normalizes state persistence paths.'],
-      [
-        'logic/coding-plan-logic.ts:node:fs',
-        'coding-plan-logic reads the coding plan artifacts (plan / SDD ledger / task triples) as a file-graph gate.',
-      ],
       [
         'logic/coding-plan-logic.ts:node:path',
         'coding-plan-logic normalizes coding plan artifact and archive snapshot paths.',
