@@ -135,7 +135,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 7   | 系统测试 | 系统测试执行  | —                  | phase-7-system-test.md      |
 | 8   | 验收测试 | 验收测试执行  | —                  | phase-8-acceptance-test.md  |
 
-所有阶段另读 rtm-guide.md；TLA+（阶段 1-4）→ tla-plus.md；BDD → bdd.md；评审 → verifier-spec.md；状态 Schema → data-models.md；异常恢复 → operational-recovery.md；分派 → subagent-delegation.md；路径不确定/需求模糊 → evidence-anchored-tree.md；代码健康治理（`/wm code-health`，Phase 1–4）→ code-health-governance.md；编码链方法论（阶段 5-8，superpowers v6.3.0 vendor）→ [references/superpowers-adoption.md](references/superpowers-adoption.md)。按需加载契约见 [references/subagent-delegation.md](references/subagent-delegation.md) 与 [references/toolbox.md](references/toolbox.md)。
+所有阶段另读 rtm-guide.md；TLA+（阶段 1-4）→ tla-plus.md；BDD → bdd.md；评审 → verifier-spec.md；状态 Schema → data-models.md；异常恢复 → operational-recovery.md；分派 → subagent-delegation.md；路径不确定/需求模糊 → evidence-anchored-tree.md；代码健康治理（`/wm code-health`，Phase 1–4）→ code-health-governance.md；编码链方法论（跨阶段采用：brainstorming→阶段 1 … finishing→阶段 8，阶段 5-8 承载编码计划制品，superpowers v6.3.0 vendor）→ [references/superpowers-adoption.md](references/superpowers-adoption.md)。按需加载契约见 [references/subagent-delegation.md](references/subagent-delegation.md) 与 [references/toolbox.md](references/toolbox.md)。
 
 ## 门禁契约与资源清单
 

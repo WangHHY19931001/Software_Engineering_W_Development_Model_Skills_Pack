@@ -145,7 +145,7 @@ flowchart LR
 | 7 系统测试 | 系统测试执行结果 + 性能/安全报告                         | `check-verifier-output.ts`、`check-artifact-gate.ts --phase=7`、`check-bdd-model.ts --phase=7`                                          |
 | 8 验收测试 | 验收测试执行结果 + 归档产物                              | `check-verifier-output.ts`、`check-artifact-gate.ts`（终检）、`check-archive-integrity.ts`                                              |
 
-> 阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-opsx-artifacts.ts`。完整分派矩阵见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)。
+> 阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-coding-plan.ts`（编码计划制品契约 R1-R6，由 `check-artifact-gate.ts` 以 `--scope` 聚合，阶段 8 归档快照由 `check-archive-integrity.ts` 覆盖）；旧链路 `check-opsx-artifacts.ts` 仍在盘并保留在 pre-push 路径上，其退役随 superpowers 替换批次 4 的残留清理进行。完整分派矩阵见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)。
 
 ### 常用命令（在 Agent 会话里使用）
 
@@ -191,7 +191,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 - **评审人格库**：内置 33 个人格文件（工程 / 测试 / 设计 / 产品 / 项目 5 类），每份含能力 / 输入 / 输出 / 边界四字段声明（frontmatter，由 docs-consistency 门禁强制），按 [agent-personas.md](./w-model-dev/references/agent-personas.md) 选型多角度评审；R-persona 两键选择矩阵与 R11 门禁见同文件「Persona 矩阵」节。
 - **采用路径**：新项目从 Day 0 跑全流程，存量项目增量验证优先（见 [docs/adoption-guide.md](./docs/adoption-guide.md)）。
 - **状态持久化**：`.w-model/*.json` 跨多轮交互保持上下文，34 份 JSON Schema 约束文件保证格式一致。
-- **外部工具集成**：codegraph 修改前影响分析、OpenSpec 规格驱动变更、SkillOpt 方法论吸收（详见 [SSoT](./docs/skill-design-document_SSoT.md)）。
+- **外部工具集成**：codegraph CLI 修改前影响分析、superpowers 编码链方法论（`references/superpowers-adoption.md`，替代原 OpenSpec opsx）、SkillOpt 方法论吸收（详见 [SSoT](./docs/skill-design-document_SSoT.md)）。
 
 ## 项目结构
 
@@ -199,7 +199,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 .
 ├── w-model-dev/                  # Skill 资产本体（纯 Markdown，可整目录拷贝分发）
 │   ├── SKILL.md                  # 技能定义：触发条件 + /wm 编排规则 + 版本号
-│   ├── references/               # 43 份阶段细则与规范（按需加载，禁止一次性全读）
+│   ├── references/               # 44 份阶段细则与规范（按需加载，禁止一次性全读）
 │   ├── subagent/                 # 33 个人格文件（评审视角预设，不调用 LLM；frontmatter 含能力/输入/输出/边界四字段）
 │   ├── templates/                # 各阶段产出文档模板
 │   ├── examples/                 # 交互示例
