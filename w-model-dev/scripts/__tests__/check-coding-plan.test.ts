@@ -9,7 +9,7 @@
  *   C4  合法 scope + 账本缺失（R3）→ exit 1，violations 具名
  *   C5  --json 模式：stdout 单行纯 JSON 可整体 parse
  *   C6  归档态回退（R6/D-7）：活动位缺失 + 归档快照齐 → exit 0 且人类可读段标出归档快照位置
- *   C7  scope.changeId 前缀与 phase 不符 → exit 1（R1）
+ *   C7  scope.changeId 前缀与 phase 不符 → exit 2（scope 装载即拒；gate R1 前缀校验为纵深防御）
  *   C8  --phase=99 非法值 → exit 2（ARG_INVALID）；重复值 flag --scope → exit 2（ARG_INVALID）
  */
 

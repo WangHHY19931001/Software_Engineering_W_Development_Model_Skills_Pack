@@ -242,7 +242,7 @@ export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptio
     const phase1Confirmation = options?.checkpointLog?.get('1');
     if (phase1Confirmation !== undefined && phase1Confirmation.trim() !== '') {
       diagnostics.push(
-        'BOOTSTRAP_VALIDATION: 首阶段自举校验：以 checkpoint-log 用户确认为初级证据；放行记录将于闭环门后写入',
+        'BOOTSTRAP_VALIDATION: 首阶段自举校验：以 checkpoint-log 的 phase-1 用户确认为初级证据；放行记录将于闭环门后写入',
       );
     } else {
       violations.push('run-log 无 checkpoint success 记录（无法证明阶段 CHECKPOINT 已放行；零证据不等于合规）');

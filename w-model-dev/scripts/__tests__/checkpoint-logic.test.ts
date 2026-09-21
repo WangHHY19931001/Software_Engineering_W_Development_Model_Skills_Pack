@@ -131,7 +131,7 @@ describe('R0 首阶段自举形态（E-2 方案 B）', () => {
     expect((result.diagnostics ?? []).some((d) => d.startsWith('BOOTSTRAP_VALIDATION:'))).toBe(true);
     const diagnostic = (result.diagnostics ?? []).find((d) => d.startsWith('BOOTSTRAP_VALIDATION:')) ?? '';
     expect(diagnostic).toContain('首阶段自举校验');
-    expect(diagnostic).toContain('checkpoint-log 用户确认为初级证据');
+    expect(diagnostic).toContain('checkpoint-log 的 phase-1 用户确认为初级证据');
     expect(diagnostic).toContain('放行记录将于闭环门后写入');
   });
 
