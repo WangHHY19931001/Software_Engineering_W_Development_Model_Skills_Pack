@@ -986,8 +986,8 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 #### S-finalize 子代理分派模板
 
 - **输入**：S-coding 产物（账本 + 三件套 + review diff）+ R3/V 审查通过
-- **调用**：收口校验——跑 `check-coding-plan.ts <project-root> --phase=<N> --scope=<change-scope.json>`（R1-R6，exit 0）核验 plan / 账本完成覆盖 / 三件套 / stage 级 R3×9+V×3；阶段 8 另把编码计划制品沉淀为归档快照（`docs/changes/archive/<日期>-<changeId>/` 内 `<changeId>.plan.md` + `progress.md` + 三件套）后跑 `check-archive-integrity.ts <archive-dir>`
-- **产出**：收口证据（CODING_PLAN_JSON 摘要）+ （阶段 8）归档快照 + ARCHIVE_INTEGRITY_JSON 摘要
+- **调用**：收口沉淀——只读核验 plan / 账本完成覆盖 / 任务三件套 / stage 级 R3×9+V×3 制品齐备（**S 不跑门禁**，门禁由 G 执行）；阶段 8 另把编码计划制品沉淀为归档快照（`docs/changes/archive/<日期>-<changeId>/` 内 `<changeId>.plan.md` + `progress.md` + 三件套）
+- **产出**：收口产物（制品齐备声明 + （阶段 8）归档快照）；门禁结论与证据摘要由 **G** 产出——`check-coding-plan.ts <project-root> --phase=<N> --scope=<change-scope.json>`（R1-R6，exit 0）→ `CODING_PLAN_JSON`，阶段 8 归档后 `check-archive-integrity.ts <archive-dir>` → `ARCHIVE_INTEGRITY_JSON`
 - **审查**：R3×3 → V 评审 → 不合格打回（回 S-coding 补任务产物）
 
 ### R 子代理分派模板
