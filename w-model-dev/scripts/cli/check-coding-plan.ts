@@ -41,6 +41,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { exitWithError } from '../lib/cli-error.js';
+import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
 import { runMain } from '../lib/run-main.js';
 import { hasFlag } from '../lib/parse-args.js';
 import { loadCliScope } from '../lib/load-cli-scope.js';
@@ -118,7 +119,7 @@ async function main(): Promise<void> {
   } else {
     scopeLabel = loaded.scopeLabel;
     changeId = loaded.scope.changeId;
-    result = checkCodingPlan(abs, phase, loaded.scope.changeId);
+    result = checkCodingPlan(abs, phase, loaded.scope.changeId, nodeCodingPlanFs);
   }
   const exitCode = result.passed ? 0 : 1;
 

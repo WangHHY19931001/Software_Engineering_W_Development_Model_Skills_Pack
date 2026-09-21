@@ -112,6 +112,7 @@ import {
   validateRedGreenEvidence,
 } from '../logic/code-health-ledger-logic.js';
 import { checkCodingPlan } from '../logic/coding-plan-logic.js';
+import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
@@ -4013,7 +4014,7 @@ async function runCodingPlanCases(samplesDir: string): Promise<CaseResult[]> {
     const name = `${c.sampleDir}`;
     const details: string[] = [];
     try {
-      const r = checkCodingPlan(projectRoot, c.phase, c.changeId);
+      const r = checkCodingPlan(projectRoot, c.phase, c.changeId, nodeCodingPlanFs);
       if (r.passed !== c.expectedPassed) {
         details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
       }

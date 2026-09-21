@@ -4,7 +4,9 @@
  * 校验 superpowers 编码链（writing-plans → SDD → TDD → code-review）的「编码计划制品契约」
  * （superpowers 替换 opsx 批次 1，SSoT §10M / docs/superpowers/specs/2026-09-21-superpowers-replace-opsx-design.md §4.2）。
  * 供 `cli/check-coding-plan.ts`（CLI 壳）与 `cli/self-test.ts`（CODING_PLAN_CASES）调用；
- * 本层直接读取 projectRoot 下的制品文件（gate-logic.ts 同型先例），不 import CLI 层、不调用 LLM。
+ * 本层零 IO——文件访问全部经注入的结构化端口 `CodingPlanFs`（`checkCodingPlan` 第 4 必选参；
+ * Node 适配器 `lib/coding-plan-fs.ts`，gate-logic 注入式同型先例），不直连 Node fs 模块、
+ * 不 import CLI 层、不调用 LLM。
  *
  * 制品契约与校验规则（R1-R6）：
  *   R1  编码计划存在：`docs/plans/<changeId>.plan.md`；changeId 须含 `phase<phase>-` 前缀
@@ -38,8 +40,24 @@
  * @module
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import * as path from 'node:path';
+
+/**
+ * 结构化文件系统端口（logic 层零 fs 直连；gate-logic 注入式适配器同型先例）。
+ *
+ * 只声明本模块实际消费的四个只读方法（结构化类型，不引 Node 类型）：
+ * - `existsSync` / `statSync`：存在性与类型/大小判定（plan / 账本 / 三件套非空）；
+ * - `readFileSync`：文本读入（UTF-8 解码由适配器固定；CRLF → LF 归一化仍在本层内容边界做）；
+ * - `readdirSync({ withFileTypes: true })`：目录枚举（归档位锚定匹配 + review-*.diff 探测）。
+ *
+ * 生产注入 `lib/coding-plan-fs.ts` 的 `nodeCodingPlanFs`；测试注入内存 stub。
+ */
+export interface CodingPlanFs {
+  existsSync(p: string): boolean;
+  readFileSync(p: string): string;
+  statSync(p: string): { isFile(): boolean; size: number };
+  readdirSync(p: string, opts: { withFileTypes: true }): Array<{ name: string; isDirectory(): boolean }>;
+}
 
 /** R3×9 三维度（词表沿袭已退役的 check-opsx-artifacts） */
 const REQUIRED_R3_DIMENSIONS = ['completeness', 'reliability', 'security'] as const;
@@ -115,11 +133,10 @@ function matchesArchiveDirName(name: string, changeId: string): boolean {
 }
 
 /** 归档位锚定候选目录名（仅匹配项；localeCompare 排序保证违规条目顺序稳定） */
-function archivePlanDirs(archiveRoot: string, changeId: string): string[] {
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- archiveRoot 由受控 projectRoot（docs/changes/archive）拼接
-  if (!existsSync(archiveRoot)) return [];
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- archive 目录来自项目受控 docs/changes/archive/ 枚举
-  return readdirSync(archiveRoot, { withFileTypes: true })
+function archivePlanDirs(archiveRoot: string, changeId: string, fs: CodingPlanFs): string[] {
+  if (!fs.existsSync(archiveRoot)) return [];
+  return fs
+    .readdirSync(archiveRoot, { withFileTypes: true })
     .filter((e) => e.isDirectory() && matchesArchiveDirName(e.name, changeId))
     .map((e) => e.name)
     .sort((a, b) => a.localeCompare(b));
@@ -129,15 +146,14 @@ function archivePlanDirs(archiveRoot: string, changeId: string): string[] {
  * 活动位 / 归档位解析：活动位 plan 存在即 active；否则回退归档位。
  * 归档位的三个判定面（锚定命中 / 日期非法 / 近失名）各自成态，任何一态都不静默放过。
  */
-function resolvePlanLocation(projectRoot: string, changeId: string): PlanResolution {
+function resolvePlanLocation(projectRoot: string, changeId: string, fs: CodingPlanFs): PlanResolution {
   const plansDir = path.join(projectRoot, 'docs', 'plans');
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- plansDir 由受控 projectRoot 拼接
-  if (existsSync(path.join(plansDir, `${changeId}.plan.md`))) return { kind: 'active' };
+  if (fs.existsSync(path.join(plansDir, `${changeId}.plan.md`))) return { kind: 'active' };
   const archiveRoot = path.join(projectRoot, 'docs', 'changes', 'archive');
-  const matches = archivePlanDirs(archiveRoot, changeId);
+  const matches = archivePlanDirs(archiveRoot, changeId, fs);
   if (matches.length === 1) return { kind: 'archive', dirName: matches[0]! };
   if (matches.length > 1) return { kind: 'ambiguous', matches };
-  const archived = listArchiveDirNames(archiveRoot);
+  const archived = listArchiveDirNames(archiveRoot, fs);
   // 形状锚定命中但日期前缀非法：独立成态 fail-closed（不得退化成「未归档」）
   const invalidDates = archived.filter((name) => {
     if (name.length <= ARCHIVE_DATE_PREFIX_LENGTH) return false;
@@ -150,11 +166,10 @@ function resolvePlanLocation(projectRoot: string, changeId: string): PlanResolut
 }
 
 /** 归档根下的目录名（仅诊断用；排序稳定） */
-function listArchiveDirNames(archiveRoot: string): string[] {
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- archiveRoot 由受控 projectRoot（docs/changes/archive）拼接
-  if (!existsSync(archiveRoot)) return [];
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，仅列目录条目名、不做任何写入
-  return readdirSync(archiveRoot, { withFileTypes: true })
+function listArchiveDirNames(archiveRoot: string, fs: CodingPlanFs): string[] {
+  if (!fs.existsSync(archiveRoot)) return [];
+  return fs
+    .readdirSync(archiveRoot, { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .map((e) => e.name)
     .sort((a, b) => a.localeCompare(b));
@@ -279,14 +294,19 @@ export function extractCompletedTaskNumbers(ledgerContent: string): Set<number> 
 }
 
 /** 校验 R3×9 + V×3 审查产物（project 级；文件命名与 validateStageReviews 相同，stage 词表换新） */
-function validateStageReviews(projectRoot: string, phase: number, violations: string[], reviewsFound: string[]): void {
+function validateStageReviews(
+  projectRoot: string,
+  phase: number,
+  fs: CodingPlanFs,
+  violations: string[],
+  reviewsFound: string[],
+): void {
   const r3Dir = path.join(projectRoot, '.w-model', 'r3-reviews');
   const vDir = path.join(projectRoot, '.w-model', 'v-reviews');
   for (const stage of CODING_PLAN_STAGES) {
     for (const dim of REQUIRED_R3_DIMENSIONS) {
       const r3File = path.join(r3Dir, `phase${phase}-${stage}-${dim}.md`);
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- r3File 由受控 projectRoot/.w-model 拼接
-      if (existsSync(r3File)) {
+      if (fs.existsSync(r3File)) {
         reviewsFound.push(`${stage}-${dim}`);
       } else {
         violations.push(
@@ -295,8 +315,7 @@ function validateStageReviews(projectRoot: string, phase: number, violations: st
       }
     }
     const vFile = path.join(vDir, `phase${phase}-${stage}.md`);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- vFile 由受控 projectRoot/.w-model 拼接
-    if (existsSync(vFile)) {
+    if (fs.existsSync(vFile)) {
       reviewsFound.push(`${stage}-V`);
     } else {
       violations.push(`${toRel('.w-model', 'v-reviews', `phase${phase}-${stage}.md`)} 缺失（R5：编码链 V 评审须齐备）`);
@@ -310,18 +329,17 @@ function validateLedgerAndArtifacts(
   ledgerRelDir: string,
   planFileName: string,
   taskNumbers: number[],
+  fs: CodingPlanFs,
   violations: string[],
   artifactsFound: string[],
 ): number {
   const ledgerPath = path.join(ledgerDir, 'progress.md');
   const ledgerRel = toRel(ledgerRelDir, 'progress.md');
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- ledgerPath 由受控 projectRoot 子路径拼接
-  if (!existsSync(ledgerPath) || !statSync(ledgerPath).isFile()) {
+  if (!fs.existsSync(ledgerPath) || !fs.statSync(ledgerPath).isFile()) {
     violations.push(`${ledgerRel} 缺失（R3：执行账本须随编码计划落盘）`);
     return 0;
   }
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，只读
-  const ledgerContent = normalizeLineEndings(readFileSync(ledgerPath, 'utf-8'));
+  const ledgerContent = normalizeLineEndings(fs.readFileSync(ledgerPath));
   // 首行身份严格取文件第一行（前导空行不回退到首个非空行——身份行退居第二行即判不符）
   const firstLine = ledgerContent.split('\n')[0] ?? '';
   const LEDGER_IDENTITY_PREFIX = '# SDD ledger — plan: ';
@@ -346,8 +364,7 @@ function validateLedgerAndArtifacts(
     for (const kind of ['brief', 'report'] as const) {
       const artifactRel = toRel(ledgerRelDir, `task-${n}-${kind}.md`);
       const artifactPath = path.join(ledgerDir, `task-${n}-${kind}.md`);
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- artifactPath 由受控账本目录拼接
-      if (!existsSync(artifactPath) || statSync(artifactPath).size === 0) {
+      if (!fs.existsSync(artifactPath) || fs.statSync(artifactPath).size === 0) {
         violations.push(`${artifactRel} 缺失或为空（R4：已完成任务三件套须齐备非空）`);
       } else {
         artifactsFound.push(artifactRel);
@@ -356,10 +373,11 @@ function validateLedgerAndArtifacts(
   }
   // R4：至少一个 review-*.diff（任务评审包证据）
   let reviewDiffs: string[] = [];
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 账本目录来自受控解析路径（projectRoot/.superpowers/sdd 或受控归档目录），仅作存在性探测
-  if (existsSync(ledgerDir)) {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，仅列目录条目名、不做任何写入
-    reviewDiffs = readdirSync(ledgerDir)
+  if (fs.existsSync(ledgerDir)) {
+    // withFileTypes 枚举后取条目名（与无参 readdirSync 的纯名字列表同集：文件 + 目录）
+    reviewDiffs = fs
+      .readdirSync(ledgerDir, { withFileTypes: true })
+      .map((e) => e.name)
       .filter((f) => /^review-.+\.diff$/.test(f))
       .sort((a, b) => a.localeCompare(b));
   }
@@ -377,8 +395,15 @@ function validateLedgerAndArtifacts(
  * @param projectRoot 项目根目录（绝对路径）
  * @param phase       校验阶段（CLI 侧限定 5-8）
  * @param changeId    变更标识（须含 `phase<phase>-` 前缀）
+ * @param fs          文件系统端口（必选；生产传 `lib/coding-plan-fs.ts` 的 `nodeCodingPlanFs`，
+ *                    测试传内存 stub——本层零 fs 直连，未注入无法编译）
  */
-export function checkCodingPlan(projectRoot: string, phase: number, changeId: string): CodingPlanCheckResult {
+export function checkCodingPlan(
+  projectRoot: string,
+  phase: number,
+  changeId: string,
+  fs: CodingPlanFs,
+): CodingPlanCheckResult {
   const violations: string[] = [];
   const artifactsFound: string[] = [];
   const reviewsFound: string[] = [];
@@ -391,7 +416,7 @@ export function checkCodingPlan(projectRoot: string, phase: number, changeId: st
   const planFileName = `${changeId}.plan.md`;
   const activePlanRel = toRel('docs', 'plans', planFileName);
   const ledgerBaseName = `${changeId}.plan`;
-  const resolution = resolvePlanLocation(projectRoot, changeId);
+  const resolution = resolvePlanLocation(projectRoot, changeId, fs);
   if (resolution.kind === 'ambiguous') {
     violations.push(
       `${changeId} 归档位多匹配（${resolution.matches.length}）：${resolution.matches.join(', ')} —— fail-closed（R6）`,
@@ -461,8 +486,7 @@ export function checkCodingPlan(projectRoot: string, phase: number, changeId: st
   }
 
   // R1 plan 存在性（归档态：plan 快照缺失即 fail-closed）
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- planAbs 由受控 projectRoot 子路径拼接
-  if (!existsSync(planAbs) || !statSync(planAbs).isFile()) {
+  if (!fs.existsSync(planAbs) || !fs.statSync(planAbs).isFile()) {
     // 走到这里必然是归档态（活动位存在性已在 resolvePlanLocation 判过）
     violations.push(`${planRel} 缺失（R6：归档目录须含 plan 快照 ${planFileName}）`);
     return {
@@ -476,8 +500,7 @@ export function checkCodingPlan(projectRoot: string, phase: number, changeId: st
       reviewsFound,
     };
   }
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，只读
-  const planContent = normalizeLineEndings(readFileSync(planAbs, 'utf-8'));
+  const planContent = normalizeLineEndings(fs.readFileSync(planAbs));
 
   // R2 计划结构
   const structure = parsePlanStructure(planContent);
@@ -504,12 +527,13 @@ export function checkCodingPlan(projectRoot: string, phase: number, changeId: st
     ledgerRelDir,
     planFileName,
     taskNumbers,
+    fs,
     violations,
     artifactsFound,
   );
 
   // R5 审查产物（project 级，活动位/归档态同查）
-  validateStageReviews(projectRoot, phase, violations, reviewsFound);
+  validateStageReviews(projectRoot, phase, fs, violations, reviewsFound);
 
   return {
     passed: violations.length === 0,

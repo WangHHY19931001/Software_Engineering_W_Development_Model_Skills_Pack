@@ -1,8 +1,7 @@
-/* eslint-disable security/detect-non-literal-fs-filename -- 构造 mkdtemp 临时项目树（join(root, ...) 路径由测试自生成） */
 /**
  * coding-plan-logic.test.ts —— 编码计划制品门纯逻辑单元测试（check-coding-plan.ts 的 logic 层）
  *
- * 覆盖（superpowers 替换 opsx 批次 1 任务 1）：
+ * 覆盖（superpowers 替换 opsx 批次 1 任务 1；WS-A fs 注入改造后全量 stub 化）：
  *   R1  plan 存在 + changeId 须含 phase<phase>- 前缀
  *   R2  计划含目标节 + ≥1 任务节；每个任务节含 ≥1 条验证命令行
  *       （行首「验证：」/「Verify:」；命令体禁 ; & | ——与 RTM evidence command 同规）
@@ -11,33 +10,92 @@
  *   R5  R3×9 + V×3 审查产物（stage ∈ plan/execute/finalize）
  *   R6  归档态回退（D-7）：活动位缺失 → docs/changes/archive/<日期>-<changeId>/ 快照
  *       （plan 快照 + 账本快照 + 三件套），恰一匹配；多匹配 fail-closed；零匹配保持缺失文案
+ *   注入契约（WS-A 新增）：空 stub fail-closed（缺 plan → R1）、缺 ledger → R3；
+ *   真适配器集成：`nodeCodingPlanFs` 直打 samples/coding-plan 三 fixture（只读）。
+ *
+ * IO 语义（WS-A）：logic 层零 `node:fs`，`checkCodingPlan` 第 4 参必选注入 `CodingPlanFs`——
+ * 本文件用内存 stub（mkFs 工厂）驱动全部判定；CRLF 归一化保留在 logic 层内容边界
+ * （stub 内容直接含 `\r\n` 验证）；适配器行为一致性由真适配器集成例钉死。
  */
 
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join, sep } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { checkCodingPlan, extractCompletedTaskNumbers } from '../logic/coding-plan-logic.js';
+import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
+import { checkCodingPlan, extractCompletedTaskNumbers, type CodingPlanFs } from '../logic/coding-plan-logic.js';
 
 const CHANGE_ID = 'phase5-demo';
 
-const tmpDirs: string[] = [];
-function makeTmpDir(prefix = 'wmodel-coding-plan-'): string {
-  const dir = mkdtempSync(join(tmpdir(), prefix));
-  tmpDirs.push(dir);
-  return dir;
+/** 内存根（logic 层零 IO 后 projectRoot 只是 stub 的键前缀，无需真实 mkdtemp 临时目录） */
+const ROOT = join('stub-projects', 'coding-plan');
+
+/**
+ * 内存 fs stub 工厂（仿 gate-enhancement.test.ts 风格）：
+ * - `files`：path.join 键 → 文件内容（CRLF 用例直接写含 `\r\n` 的内容——归一化在 logic 层内容边界）；
+ * - `dirs`：显式空目录（如「空归档目录」用例）；文件键的父目录自动登记。
+ * stat 语义由内容派生：文件 size = UTF-8 字节数（R4 非空判据的 stub 语义）、目录 isFile=false；
+ * 未登记路径 existsSync=false，readFileSync/statSync/readdirSync 抛错（同真实 fs fail-fast，
+ * 若 logic 层未先 existsSync 即裸调会在测试中显形）。
+ */
+function mkFs({ files = {}, dirs = [] }: { files?: Record<string, string>; dirs?: string[] } = {}): CodingPlanFs {
+  const fileMap = new Map<string, string>(Object.entries(files));
+  const dirSet = new Set<string>();
+  const registerDir = (dir: string): void => {
+    if (dir === ROOT || dirSet.has(dir) || fileMap.has(dir) || !dir.startsWith(ROOT)) return;
+    dirSet.add(dir);
+    registerDir(dirname(dir));
+  };
+  for (const key of fileMap.keys()) registerDir(dirname(key));
+  for (const dir of dirs) registerDir(dir);
+  return {
+    existsSync(p) {
+      return fileMap.has(p) || dirSet.has(p);
+    },
+    readFileSync(p) {
+      const content = fileMap.get(p);
+      if (content === undefined) throw new Error(`stub: readFileSync 未登记路径 ${p}`);
+      return content;
+    },
+    statSync(p) {
+      const content = fileMap.get(p);
+      if (content !== undefined)
+        return {
+          isFile: () => true,
+          size: Buffer.byteLength(content, 'utf-8'),
+        };
+      if (dirSet.has(p)) return { isFile: () => false, size: 0 };
+      throw new Error(`stub: statSync 未登记路径 ${p}`);
+    },
+    readdirSync(p) {
+      if (!dirSet.has(p)) throw new Error(`stub: readdirSync 未登记目录 ${p}`);
+      const entries: Array<{ name: string; isDirectory(): boolean }> = [];
+      for (const dir of dirSet) {
+        if (dirname(dir) === p) entries.push({ name: basename(dir), isDirectory: () => true });
+      }
+      for (const file of fileMap.keys()) {
+        if (dirname(file) === p) entries.push({ name: basename(file), isDirectory: () => false });
+      }
+      return entries;
+    },
+  };
 }
-afterEach(() => {
-  for (const dir of tmpDirs.splice(0)) {
-    try {
-      rmSync(dir, { recursive: true, force: true });
-    } catch {
-      // 清理失败不影响断言
-    }
+
+/** 覆盖/新增单个文件键（stub 版 writeFileSync） */
+function withFile(files: Record<string, string>, key: string, content: string): Record<string, string> {
+  return { ...files, [key]: content };
+}
+
+/** 浅拷贝并删除精确键或前缀子树（stub 版 rmSync 单文件 / 递归目录） */
+function withoutKeys(files: Record<string, string>, ...dropped: string[]): Record<string, string> {
+  const next: Record<string, string> = {};
+  for (const [k, v] of Object.entries(files)) {
+    if (dropped.some((d) => k === d || k.startsWith(d + sep))) continue;
+    // eslint-disable-next-line security/detect-object-injection -- k 来自本文件自构造 Record 的 Object.entries（非外部输入）
+    next[k] = v;
   }
-});
+  return next;
+}
 
 /** 合法 plan 文本（目标节 + 2 个任务节，各含一条验证命令行） */
 function validPlanText(): string {
@@ -82,37 +140,39 @@ function ledgerText(changeId: string): string {
   );
 }
 
-/** 铺一个完整合法的编码计划制品树（活动位 + R3×9 + V×3），返回项目根 */
-function writeValidTree(root: string, phase = 5, changeId = CHANGE_ID): string {
+const PLAN_KEY = join(ROOT, 'docs', 'plans', `${CHANGE_ID}.plan.md`);
+const LEDGER_KEY = join(ROOT, '.superpowers', 'sdd', `${CHANGE_ID}.plan`, 'progress.md');
+const LEDGER_DIR = join(ROOT, '.superpowers', 'sdd', `${CHANGE_ID}.plan`);
+
+/**
+ * 铺一个完整合法的编码计划制品树（活动位 + R3×9 + V×3）的内存模型（path.join 键 → 内容）。
+ * 行为与改造前的 writeValidTree（真实 mkdtemp + writeFileSync）逐键等价。
+ */
+function validTreeFiles(root = ROOT, phase = 5, changeId = CHANGE_ID): Record<string, string> {
   const planDir = join(root, 'docs', 'plans');
   const ledgerDir = join(root, '.superpowers', 'sdd', `${changeId}.plan`);
-  mkdirSync(planDir, { recursive: true });
-  mkdirSync(ledgerDir, { recursive: true });
-  writeFileSync(join(planDir, `${changeId}.plan.md`), validPlanText());
-  writeFileSync(join(ledgerDir, 'progress.md'), ledgerText(changeId));
-  for (const n of [1, 2]) {
-    writeFileSync(join(ledgerDir, `task-${n}-brief.md`), `# task ${n} brief\n`);
-    writeFileSync(join(ledgerDir, `task-${n}-report.md`), `# task ${n} report\n`);
-  }
-  writeFileSync(join(ledgerDir, 'review-abc1234.diff'), 'diff --git a/x b/x\n');
-  mkdirSync(join(root, '.w-model', 'r3-reviews'), { recursive: true });
-  mkdirSync(join(root, '.w-model', 'v-reviews'), { recursive: true });
+  const files: Record<string, string> = {
+    [join(planDir, `${changeId}.plan.md`)]: validPlanText(),
+    [join(ledgerDir, 'progress.md')]: ledgerText(changeId),
+    [join(ledgerDir, 'task-1-brief.md')]: '# task 1 brief\n',
+    [join(ledgerDir, 'task-1-report.md')]: '# task 1 report\n',
+    [join(ledgerDir, 'task-2-brief.md')]: '# task 2 brief\n',
+    [join(ledgerDir, 'task-2-report.md')]: '# task 2 report\n',
+    [join(ledgerDir, 'review-abc1234.diff')]: 'diff --git a/x b/x\n',
+  };
   for (const stage of ['plan', 'execute', 'finalize']) {
     for (const dim of ['completeness', 'reliability', 'security']) {
-      writeFileSync(
-        join(root, '.w-model', 'r3-reviews', `phase${phase}-${stage}-${dim}.md`),
-        `# phase${phase}-${stage}-${dim}\n`,
-      );
+      files[join(root, '.w-model', 'r3-reviews', `phase${phase}-${stage}-${dim}.md`)] =
+        `# phase${phase}-${stage}-${dim}\n`;
     }
-    writeFileSync(join(root, '.w-model', 'v-reviews', `phase${phase}-${stage}.md`), `# phase${phase}-${stage}\n`);
+    files[join(root, '.w-model', 'v-reviews', `phase${phase}-${stage}.md`)] = `# phase${phase}-${stage}\n`;
   }
-  return root;
+  return files;
 }
 
 describe('checkCodingPlan（活动位正例）', () => {
   it('R1-R5 全齐 → passed，计数与产物清单正确', () => {
-    const root = writeValidTree(makeTmpDir());
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files: validTreeFiles() }));
     expect(r.passed).toBe(true);
     expect(r.violations).toEqual([]);
     expect(r.planPath).toBe('docs/plans/phase5-demo.plan.md');
@@ -134,16 +194,14 @@ describe('checkCodingPlan（活动位正例）', () => {
 
 describe('checkCodingPlan（R1 plan 存在 + 前缀）', () => {
   it('R1: 活动位 plan 缺失 → violation（计划缺失）', () => {
-    const root = makeTmpDir();
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs());
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('phase5-demo.plan.md') && v.includes('缺失'))).toBe(true);
     expect(r.planPath).toBeNull();
   });
 
   it('R1: changeId 不含 phase<phase>- 前缀 → violation（先于存在性检查）', () => {
-    const root = makeTmpDir();
-    const r = checkCodingPlan(root, 5, 'demo-nophase');
+    const r = checkCodingPlan(ROOT, 5, 'demo-nophase', mkFs());
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('不含阶段前缀 phase5-'))).toBe(true);
   });
@@ -151,55 +209,47 @@ describe('checkCodingPlan（R1 plan 存在 + 前缀）', () => {
 
 describe('checkCodingPlan（R2 任务节与验证命令行）', () => {
   it('R2: 任务节缺验证命令行 → violation（含任务节标题）', () => {
-    const root = writeValidTree(makeTmpDir());
-    const planFile = join(root, 'docs', 'plans', `${CHANGE_ID}.plan.md`);
-    writeFileSync(planFile, validPlanText().replace('验证：npm test\n', ''));
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withFile(validTreeFiles(), PLAN_KEY, validPlanText().replace('验证：npm test\n', ''));
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('Task 1') && v.includes('验证命令行'))).toBe(true);
   });
 
   it('R2: 验证命令体含禁用字符（; & |）→ violation（RTM evidence command 同规）', () => {
-    const root = writeValidTree(makeTmpDir());
-    const planFile = join(root, 'docs', 'plans', `${CHANGE_ID}.plan.md`);
-    writeFileSync(planFile, validPlanText().replace('验证：npm test', '验证：npm test && npm run lint'));
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withFile(
+      validTreeFiles(),
+      PLAN_KEY,
+      validPlanText().replace('验证：npm test', '验证：npm test && npm run lint'),
+    );
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('命令体'))).toBe(true);
   });
 
   it('R2: 全角冒号「Verify：」前缀的验证行被识别（VERIFY_PREFIXES 全角形态，2026-09-22 打磨）', () => {
-    const root = writeValidTree(makeTmpDir());
-    const planFile = join(root, 'docs', 'plans', `${CHANGE_ID}.plan.md`);
-    writeFileSync(planFile, validPlanText().replace('验证：npm test', 'Verify：npm test'));
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withFile(validTreeFiles(), PLAN_KEY, validPlanText().replace('验证：npm test', 'Verify：npm test'));
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(true);
     expect(r.violations).toEqual([]);
   });
 
   it('R2: 缺目标节 → violation', () => {
-    const root = writeValidTree(makeTmpDir());
-    const planFile = join(root, 'docs', 'plans', `${CHANGE_ID}.plan.md`);
-    writeFileSync(planFile, validPlanText().replace('## 目标', '## 背景说明'));
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withFile(validTreeFiles(), PLAN_KEY, validPlanText().replace('## 目标', '## 背景说明'));
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('目标节'))).toBe(true);
   });
 
   it('R2: 仅有「非目标」节不充数目标节 → 仍报缺目标节（判据排除非目标/不是目标，2026-09-22 打磨）', () => {
-    const root = writeValidTree(makeTmpDir());
-    const planFile = join(root, 'docs', 'plans', `${CHANGE_ID}.plan.md`);
-    writeFileSync(planFile, validPlanText().replace('## 目标', '## 非目标'));
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withFile(validTreeFiles(), PLAN_KEY, validPlanText().replace('## 目标', '## 非目标'));
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('缺目标节'))).toBe(true);
   });
 
   it('R2: 零任务节 → violation', () => {
-    const root = writeValidTree(makeTmpDir());
-    const planFile = join(root, 'docs', 'plans', `${CHANGE_ID}.plan.md`);
-    writeFileSync(planFile, '# phase5-demo 编码计划\n\n## 目标\n\n只有目标。\n');
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withFile(validTreeFiles(), PLAN_KEY, '# phase5-demo 编码计划\n\n## 目标\n\n只有目标。\n');
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('任务节'))).toBe(true);
     expect(r.tasksTotal).toBe(0);
@@ -207,33 +257,25 @@ describe('checkCodingPlan（R2 任务节与验证命令行）', () => {
 });
 
 /**
- * CRLF 行尾归一化（autocrlf 工作树假红修复）：
- * 仓库 blob 为 LF，但 `core.autocrlf=true` 检出使工作树文本（含 `samples/coding-plan/**`
- * 与 `docs/plans/**` 制品）行尾为 CRLF；内容解析此前按 `split('\n')` + 行尾敏感正则
- * （`headingTitle` 的 `(.+)$` 无 m 标志）工作，行尾 `\r` 使所有标题行判空 → R2 报
- * 「缺目标节+缺任务节」全量假红（self-test 2 例实测复现；合成 vitest 夹具用 LF 故从未暴露）。
- * 修复：归一化集中在读入边界——`checkCodingPlan` 的 plan / ledger 两处 `readFileSync` 之后
- * 与共享纯函数 `extractCompletedTaskNumbers` 入口（`archive-integrity-logic` 复用、内容来源
- * 不可控）。本组用例钉死：CRLF 内容判绿能力不丢、判红判别力也不丢。
+ * CRLF 行尾归一化（autocrlf 工作树假红修复；WS-A 后保持内容级）：
+ * 归一化集中在 logic 层读入边界——`checkCodingPlan` 的 plan / ledger 两处 `fs.readFileSync`
+ * 之后与共享纯函数 `extractCompletedTaskNumbers` 入口。stub 直接注入含 `\r\n` 的内容，
+ * 钉死：CRLF 内容判绿能力不丢、判红判别力也不丢、归一化不随 fs 适配器迁走。
  */
-describe('checkCodingPlan（CRLF 行尾归一化，autocrlf 工作树假红修复）', () => {
+describe('checkCodingPlan（CRLF 行尾归一化，内容级保持）', () => {
   const toCrLf = (text: string): string => text.replace(/\n/g, '\r\n');
 
   it('CRLF plan → R2 全绿（目标节/任务节/验证命令全识别）', () => {
-    const root = writeValidTree(makeTmpDir());
-    const planFile = join(root, 'docs', 'plans', `${CHANGE_ID}.plan.md`);
-    writeFileSync(planFile, toCrLf(validPlanText()));
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withFile(validTreeFiles(), PLAN_KEY, toCrLf(validPlanText()));
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(true);
     expect(r.violations).toEqual([]);
     expect(r.tasksTotal).toBe(2);
   });
 
   it('CRLF ledger → R3/R4 全绿（首行身份 + Task N: complete 覆盖识别）', () => {
-    const root = writeValidTree(makeTmpDir());
-    const ledger = join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`, 'progress.md');
-    writeFileSync(ledger, toCrLf(ledgerText(CHANGE_ID)));
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withFile(validTreeFiles(), LEDGER_KEY, toCrLf(ledgerText(CHANGE_ID)));
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(true);
     expect(r.violations).toEqual([]);
     expect(r.tasksCompleted).toBe(2);
@@ -241,16 +283,14 @@ describe('checkCodingPlan（CRLF 行尾归一化，autocrlf 工作树假红修�
   });
 
   it('CRLF plan 的 Task 2 缺验证行 → 仍报缺验证（判别力不因归一化丢失）', () => {
-    const root = writeValidTree(makeTmpDir());
-    const planFile = join(root, 'docs', 'plans', `${CHANGE_ID}.plan.md`);
     const crlfPlan = toCrLf(
       validPlanText().replace(
         'Verify: npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/coding-plan-logic.test.ts\n',
         '',
       ),
     );
-    writeFileSync(planFile, crlfPlan);
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withFile(validTreeFiles(), PLAN_KEY, crlfPlan);
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('缺目标节'))).toBe(false);
     expect(r.violations.some((v) => v.includes('缺任务节'))).toBe(false);
@@ -269,55 +309,52 @@ describe('checkCodingPlan（CRLF 行尾归一化，autocrlf 工作树假红修�
 
 describe('checkCodingPlan（R3 账本）', () => {
   it('R3: 账本缺失 → violation（bad-missing-ledger 形态）', () => {
-    const root = writeValidTree(makeTmpDir());
-    rmSync(join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`), { recursive: true, force: true });
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withoutKeys(validTreeFiles(), LEDGER_DIR);
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('progress.md') && v.includes('缺失'))).toBe(true);
   });
 
   it('R3: 账本首行身份不符 → violation', () => {
-    const root = writeValidTree(makeTmpDir());
-    const ledger = join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`, 'progress.md');
-    writeFileSync(ledger, `${VALID_LEDGER_LINES.join('\n')}\n`.replace('# SDD ledger — plan: ', '# 随手记: '));
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withFile(
+      validTreeFiles(),
+      LEDGER_KEY,
+      `${VALID_LEDGER_LINES.join('\n')}\n`.replace('# SDD ledger — plan: ', '# 随手记: '),
+    );
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('首行'))).toBe(true);
   });
 
   it('R3: 首行为空行（身份行退居第二行）→ 仍报首行身份不符（严格取文件第一行，不回退首个非空行，2026-09-22 打磨）', () => {
-    const root = writeValidTree(makeTmpDir());
-    const ledger = join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`, 'progress.md');
-    writeFileSync(ledger, `\n${VALID_LEDGER_LINES.join('\n')}\n`);
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withFile(validTreeFiles(), LEDGER_KEY, `\n${VALID_LEDGER_LINES.join('\n')}\n`);
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('首行身份不符'))).toBe(true);
   });
 
   it('R3: 账本缺某任务 complete 行 → violation 具名到任务号', () => {
-    const root = writeValidTree(makeTmpDir());
-    const ledger = join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`, 'progress.md');
-    writeFileSync(
-      ledger,
+    const files = withFile(
+      validTreeFiles(),
+      LEDGER_KEY,
       `${VALID_LEDGER_LINES.join('\n')}\n`.replace(
         'Task 2: complete (commits b..c, review clean)',
         'Task 2: in progress',
       ),
     );
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.tasksCompleted).toBe(1);
     expect(r.violations.some((v) => v.includes('Task 2') && v.includes('complete'))).toBe(true);
   });
 
   it('R3: 首行身份指向别的 plan → violation（基名绑定）', () => {
-    const root = writeValidTree(makeTmpDir());
-    const ledger = join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`, 'progress.md');
-    writeFileSync(
-      ledger,
+    const files = withFile(
+      validTreeFiles(),
+      LEDGER_KEY,
       `${VALID_LEDGER_LINES.join('\n')}\n`.replace('docs/plans/phase5-demo.plan.md', 'docs/plans/phase5-other.plan.md'),
     );
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('首行'))).toBe(true);
   });
@@ -325,37 +362,33 @@ describe('checkCodingPlan（R3 账本）', () => {
 
 describe('checkCodingPlan（R4 任务三件套）', () => {
   it('R4: 已完成任务的 report 缺失 → violation', () => {
-    const root = writeValidTree(makeTmpDir());
-    rmSync(join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`, 'task-2-report.md'), { force: true });
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withoutKeys(validTreeFiles(), join(LEDGER_DIR, 'task-2-report.md'));
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('task-2-report.md'))).toBe(true);
   });
 
-  it('R4: 已完成任务的 brief 为 0 字节 → violation（非空判据）', () => {
-    const root = writeValidTree(makeTmpDir());
-    writeFileSync(join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`, 'task-1-brief.md'), '');
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+  it('R4: 已完成任务的 brief 为 0 字节 → violation（非空判据；stub statSync.size 按内容字节派生）', () => {
+    const files = withFile(validTreeFiles(), join(LEDGER_DIR, 'task-1-brief.md'), '');
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('task-1-brief.md'))).toBe(true);
   });
 
   it('R4: 无 review-*.diff → violation', () => {
-    const root = writeValidTree(makeTmpDir());
-    rmSync(join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`, 'review-abc1234.diff'), { force: true });
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withoutKeys(validTreeFiles(), join(LEDGER_DIR, 'review-abc1234.diff'));
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('review-') && v.includes('.diff'))).toBe(true);
   });
 
   it('R4: 账本 complete 超出 plan 任务节（Task 5）而三件套缺 → 并集语义仍须查（修复轮 1 负例）', () => {
-    const root = writeValidTree(makeTmpDir());
-    const ledgerDir = join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`);
-    writeFileSync(
-      join(ledgerDir, 'progress.md'),
+    const files = withFile(
+      validTreeFiles(),
+      LEDGER_KEY,
       `${ledgerText(CHANGE_ID)}Task 5: complete (commits d..e, review clean)\n`,
     );
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.tasksCompleted).toBe(3);
     // plan 无 Task 5 节（R3 不报），但 R4 以「plan 序号 ∪ complete 号」并集查三件套
@@ -365,15 +398,14 @@ describe('checkCodingPlan（R4 任务三件套）', () => {
   });
 
   it('R4（伴例）: 账本 complete 超出 plan 任务节但 task-5 三件套齐备 → 不假阳性', () => {
-    const root = writeValidTree(makeTmpDir());
-    const ledgerDir = join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`);
-    writeFileSync(
-      join(ledgerDir, 'progress.md'),
+    let files = withFile(
+      validTreeFiles(),
+      LEDGER_KEY,
       `${ledgerText(CHANGE_ID)}Task 5: complete (commits d..e, review clean)\n`,
     );
-    writeFileSync(join(ledgerDir, 'task-5-brief.md'), '# task 5 brief\n');
-    writeFileSync(join(ledgerDir, 'task-5-report.md'), '# task 5 report\n');
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    files = withFile(files, join(LEDGER_DIR, 'task-5-brief.md'), '# task 5 brief\n');
+    files = withFile(files, join(LEDGER_DIR, 'task-5-report.md'), '# task 5 report\n');
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(true);
     expect(r.violations).toEqual([]);
     expect(r.tasksCompleted).toBe(3);
@@ -388,29 +420,70 @@ describe('checkCodingPlan（R4 任务三件套）', () => {
 
 describe('checkCodingPlan（R5 审查产物，stage 词表 plan/execute/finalize）', () => {
   it('R5: 缺一份 R3 报告 → violation 具名文件', () => {
-    const root = writeValidTree(makeTmpDir());
-    rmSync(join(root, '.w-model', 'r3-reviews', 'phase5-execute-security.md'), { force: true });
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withoutKeys(validTreeFiles(), join(ROOT, '.w-model', 'r3-reviews', 'phase5-execute-security.md'));
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('phase5-execute-security.md'))).toBe(true);
     expect(r.reviewsFound).toHaveLength(11);
   });
 
   it('R5: 缺一份 V 评审 → violation 具名文件', () => {
-    const root = writeValidTree(makeTmpDir());
-    rmSync(join(root, '.w-model', 'v-reviews', 'phase5-finalize.md'), { force: true });
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    const files = withoutKeys(validTreeFiles(), join(ROOT, '.w-model', 'v-reviews', 'phase5-finalize.md'));
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('phase5-finalize.md'))).toBe(true);
   });
 
   it('R5: 旧 stage 词表（explore）不充数——R3×9 须为 plan/execute/finalize', () => {
-    const root = writeValidTree(makeTmpDir());
-    rmSync(join(root, '.w-model', 'r3-reviews', 'phase5-plan-reliability.md'), { force: true });
-    writeFileSync(join(root, '.w-model', 'r3-reviews', 'phase5-explore-reliability.md'), '# 旧词表\n');
-    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    let files = withoutKeys(validTreeFiles(), join(ROOT, '.w-model', 'r3-reviews', 'phase5-plan-reliability.md'));
+    files = withFile(files, join(ROOT, '.w-model', 'r3-reviews', 'phase5-explore-reliability.md'), '# 旧词表\n');
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('phase5-plan-reliability.md'))).toBe(true);
+  });
+});
+
+describe('checkCodingPlan（fs 注入契约，WS-A 新增）', () => {
+  it('注入负例①: 空 stub（缺 plan）→ R1，注入的空文件系统不得假绿（fail-closed）', () => {
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs());
+    expect(r.passed).toBe(false);
+    expect(r.planPath).toBeNull();
+    expect(r.ledgerPath).toBeNull();
+    expect(r.violations.some((v) => v.includes('phase5-demo.plan.md') && v.includes('缺失'))).toBe(true);
+  });
+
+  it('注入负例②: stub 有 plan 无 ledger → R3（文件键缺失精确传导到账本判定）', () => {
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files: { [PLAN_KEY]: validPlanText() } }));
+    expect(r.passed).toBe(false);
+    expect(r.planPath).toBe('docs/plans/phase5-demo.plan.md');
+    expect(r.violations.some((v) => v.includes('progress.md') && v.includes('缺失'))).toBe(true);
+  });
+});
+
+describe('checkCodingPlan（真适配器 nodeCodingPlanFs 集成，直打 samples/coding-plan 三 fixture，只读）', () => {
+  const SAMPLES_CODING_PLAN = join(__dirname, '..', 'samples', 'coding-plan');
+
+  it('valid-phase5 fixture + nodeCodingPlanFs → 通过（适配器行为与 stub 语义一致）', () => {
+    const r = checkCodingPlan(join(SAMPLES_CODING_PLAN, 'valid-phase5'), 5, 'phase5-demo', nodeCodingPlanFs);
+    expect(r.passed).toBe(true);
+    expect(r.violations).toEqual([]);
+    expect(r.planPath).toBe('docs/plans/phase5-demo.plan.md');
+    expect(r.ledgerPath).toBe('.superpowers/sdd/phase5-demo.plan/progress.md');
+    expect(r.tasksTotal).toBe(2);
+    expect(r.tasksCompleted).toBe(2);
+    expect(r.reviewsFound).toHaveLength(12);
+  });
+
+  it('bad-missing-ledger fixture + nodeCodingPlanFs → R3 progress.md 缺失（负例按预期失败）', () => {
+    const r = checkCodingPlan(join(SAMPLES_CODING_PLAN, 'bad-missing-ledger'), 5, 'phase5-demo', nodeCodingPlanFs);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.includes('progress.md') && v.includes('缺失'))).toBe(true);
+  });
+
+  it('bad-task-missing-verify fixture + nodeCodingPlanFs → R2 缺验证命令行（负例按预期失败）', () => {
+    const r = checkCodingPlan(join(SAMPLES_CODING_PLAN, 'bad-task-missing-verify'), 5, 'phase5-demo', nodeCodingPlanFs);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.includes('缺验证命令行'))).toBe(true);
   });
 });
 
@@ -419,64 +492,64 @@ describe('checkCodingPlan（R6 归档态回退，D-7）', () => {
   const CHANGE7 = 'phase7-x';
   const ARCHIVED = '2026-01-01-phase7-x';
 
-  it('R6: 活动位缺失 + 归档快照齐（plan 快照 + 账本快照 + 三件套）→ 按归档位同契约通过', () => {
-    const root = makeTmpDir();
-    writeValidTree(root, PHASE, CHANGE7);
-    // 迁移为归档态：活动位删除，快照复制进 docs/changes/archive/<日期>-<changeId>/
-    const archiveDir = join(root, 'docs', 'changes', 'archive', ARCHIVED);
-    mkdirSync(archiveDir, { recursive: true });
-    writeFileSync(
-      join(archiveDir, `${CHANGE7}.plan.md`),
-      readFileSync(join(root, 'docs', 'plans', `${CHANGE7}.plan.md`)),
-    );
-    writeFileSync(join(archiveDir, 'progress.md'), ledgerText(CHANGE7));
-    for (const f of [
-      'task-1-brief.md',
-      'task-1-report.md',
-      'task-2-brief.md',
-      'task-2-report.md',
-      'review-abc1234.diff',
-    ]) {
-      writeFileSync(join(archiveDir, f), readFileSync(join(root, '.superpowers', 'sdd', `${CHANGE7}.plan`, f)));
+  /**
+   * 铺「活动位缺失 + 归档位快照齐」的内存树；dirName 为归档目录名。
+   * 与改造前的 archiveOnlyTree（writeValidTree → 复制 → rmSync）逐键等价：
+   * 活动位 plan 删除、账本目录整体迁入归档位、R3×9/V×3 保留在 projectRoot。
+   */
+  function archiveOnlyFiles(dirName: string): Record<string, string> {
+    const active = validTreeFiles(ROOT, PHASE, CHANGE7);
+    const archiveDir = join(ROOT, 'docs', 'changes', 'archive', dirName);
+    const activeLedgerDir = join(ROOT, '.superpowers', 'sdd', `${CHANGE7}.plan`);
+    const moved: Record<string, string> = {};
+    for (const [k, v] of Object.entries(active)) {
+      if (k === join(activeLedgerDir, 'progress.md')) {
+        moved[join(archiveDir, 'progress.md')] = v;
+      } else if (k.startsWith(activeLedgerDir + sep)) {
+        // eslint-disable-next-line security/detect-object-injection -- k 来自本文件自构造 Record 的 Object.entries（非外部输入）
+        moved[join(archiveDir, basename(k))] = v;
+      } else if (k !== join(ROOT, 'docs', 'plans', `${CHANGE7}.plan.md`)) {
+        // eslint-disable-next-line security/detect-object-injection -- k 来自本文件自构造 Record 的 Object.entries（非外部输入）
+        moved[k] = v;
+      }
     }
-    // 删除活动位
-    rmSync(join(root, 'docs', 'plans', `${CHANGE7}.plan.md`), { force: true });
-    rmSync(join(root, '.superpowers', 'sdd', `${CHANGE7}.plan`), { recursive: true, force: true });
-    const r = checkCodingPlan(root, PHASE, CHANGE7);
+    moved[join(archiveDir, `${CHANGE7}.plan.md`)] = validPlanText();
+    return moved;
+  }
+
+  it('R6: 活动位缺失 + 归档快照齐（plan 快照 + 账本快照 + 三件套）→ 按归档位同契约通过', () => {
+    const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles(ARCHIVED) }));
     expect(r.passed).toBe(true);
     expect(r.planPath).toBe(`docs/changes/archive/${ARCHIVED}/${CHANGE7}.plan.md`);
     expect(r.ledgerPath).toBe(`docs/changes/archive/${ARCHIVED}/progress.md`);
   });
 
   it('R6: 归档目录缺 plan 快照 → fail-closed violation', () => {
-    const root = makeTmpDir();
-    const archiveDir = join(root, 'docs', 'changes', 'archive', ARCHIVED);
-    mkdirSync(archiveDir, { recursive: true });
-    writeFileSync(join(archiveDir, 'progress.md'), '# SDD ledger — plan: x\n');
-    const r = checkCodingPlan(root, PHASE, CHANGE7);
+    const files = {
+      [join(ROOT, 'docs', 'changes', 'archive', ARCHIVED, 'progress.md')]: '# SDD ledger — plan: x\n',
+    };
+    const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
   });
 
   it('R6: 归档目录缺账本快照 progress.md → fail-closed violation', () => {
-    const root = makeTmpDir();
-    const archiveDir = join(root, 'docs', 'changes', 'archive', ARCHIVED);
-    mkdirSync(archiveDir, { recursive: true });
-    writeFileSync(join(archiveDir, `${CHANGE7}.plan.md`), validPlanText());
-    const r = checkCodingPlan(root, PHASE, CHANGE7);
+    const files = {
+      [join(ROOT, 'docs', 'changes', 'archive', ARCHIVED, `${CHANGE7}.plan.md`)]: validPlanText(),
+    };
+    const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('progress.md'))).toBe(true);
   });
 
   it('R6: 归档位多匹配 → fail-closed 且具名列出全部匹配目录', () => {
-    const root = makeTmpDir();
+    const files: Record<string, string> = {};
     for (const dir of ['2026-01-01-phase7-x', '2026-01-02-phase7-x']) {
-      const archiveDir = join(root, 'docs', 'changes', 'archive', dir);
-      mkdirSync(archiveDir, { recursive: true });
-      writeFileSync(join(archiveDir, `${CHANGE7}.plan.md`), validPlanText());
-      writeFileSync(join(archiveDir, 'progress.md'), '# SDD ledger — plan: x\n');
+      const archiveDir = join(ROOT, 'docs', 'changes', 'archive', dir);
+      files[join(archiveDir, `${CHANGE7}.plan.md`)] = validPlanText();
+      files[join(archiveDir, 'progress.md')] = '# SDD ledger — plan: x\n';
     }
-    const r = checkCodingPlan(root, PHASE, CHANGE7);
+    const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files }));
     expect(r.passed).toBe(false);
     const multi = r.violations.find((v) => v.includes('多匹配'));
     expect(multi).toBeDefined();
@@ -485,129 +558,103 @@ describe('checkCodingPlan（R6 归档态回退，D-7）', () => {
   });
 
   it('R6: 活动位缺失且归档零匹配 → 保持缺失文案（不新增含糊文案）', () => {
-    const root = makeTmpDir();
-    const r = checkCodingPlan(root, PHASE, CHANGE7);
+    const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs());
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
     expect(r.violations.some((v) => v.includes('多匹配'))).toBe(false);
   });
 
-  it('R6: 活动位存在时优先活动位（归档残缺不改判定）', () => {
-    const root = writeValidTree(makeTmpDir(), PHASE, CHANGE7);
-    const archiveDir = join(root, 'docs', 'changes', 'archive', ARCHIVED);
-    mkdirSync(archiveDir, { recursive: true }); // 空归档目录：若误走归档位则快照缺失
-    const r = checkCodingPlan(root, PHASE, CHANGE7);
+  it('R6: 活动位存在时优先活动位（归档残缺不改判定；显式空目录 stub）', () => {
+    const r = checkCodingPlan(
+      ROOT,
+      PHASE,
+      CHANGE7,
+      mkFs({
+        files: validTreeFiles(ROOT, PHASE, CHANGE7),
+        dirs: [join(ROOT, 'docs', 'changes', 'archive', ARCHIVED)], // 空归档目录：若误走归档位则快照缺失
+      }),
+    );
     expect(r).toMatchObject({ passed: true, violations: [] });
     expect(r.planPath).toBe(`docs/plans/${CHANGE7}.plan.md`);
   });
-});
 
-describe('checkCodingPlan（R6 归档位锚定化 + 日历校验，2026-09-21 最终评审 I-2）', () => {
-  const PHASE = 7;
-  const CHANGE7 = 'phase7-x';
+  describe('R6 归档位锚定化 + 日历校验，2026-09-21 最终评审 I-2', () => {
+    it('锚定三态 0：直名 `<changeId>` 归档 → 通过（旧实现能过，新实现不得回归）', () => {
+      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles(CHANGE7) }));
+      expect(r).toMatchObject({ passed: true, violations: [] });
+      expect(r.planPath).toBe(`docs/changes/archive/${CHANGE7}/${CHANGE7}.plan.md`);
+    });
 
-  /** 铺一个「活动位缺失 + 归档位快照齐」的树；dirName 为归档目录名，返回项目根 */
-  function archiveOnlyTree(dirName: string): string {
-    const root = writeValidTree(makeTmpDir(), PHASE, CHANGE7);
-    const archiveDir = join(root, 'docs', 'changes', 'archive', dirName);
-    mkdirSync(archiveDir, { recursive: true });
-    writeFileSync(
-      join(archiveDir, `${CHANGE7}.plan.md`),
-      readFileSync(join(root, 'docs', 'plans', `${CHANGE7}.plan.md`)),
-    );
-    writeFileSync(join(archiveDir, 'progress.md'), ledgerText(CHANGE7));
-    for (const f of [
-      'task-1-brief.md',
-      'task-1-report.md',
-      'task-2-brief.md',
-      'task-2-report.md',
-      'review-abc1234.diff',
-    ]) {
-      writeFileSync(join(archiveDir, f), readFileSync(join(root, '.superpowers', 'sdd', `${CHANGE7}.plan`, f)));
-    }
-    rmSync(join(root, 'docs', 'plans', `${CHANGE7}.plan.md`), { force: true });
-    rmSync(join(root, '.superpowers', 'sdd', `${CHANGE7}.plan`), { recursive: true, force: true });
-    return root;
-  }
+    it('锚定三态 0：`<YYYY-MM-DD>-<changeId>` 归档 → 通过', () => {
+      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles('2026-01-01-phase7-x') }));
+      expect(r).toMatchObject({ passed: true, violations: [] });
+    });
 
-  it('锚定三态 0：直名 `<changeId>` 归档 → 通过（旧实现能过，新实现不得回归）', () => {
-    const r = checkCodingPlan(archiveOnlyTree(CHANGE7), PHASE, CHANGE7);
-    expect(r).toMatchObject({ passed: true, violations: [] });
-    expect(r.planPath).toBe(`docs/changes/archive/${CHANGE7}/${CHANGE7}.plan.md`);
-  });
+    it('锚定三态 1（多匹配）：直名 + 日期名同时存在 → fail-closed 具名列出两者', () => {
+      const files = archiveOnlyFiles(CHANGE7);
+      files[join(ROOT, 'docs', 'changes', 'archive', '2026-01-01-phase7-x', `${CHANGE7}.plan.md`)] = validPlanText();
+      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files }));
+      expect(r.passed).toBe(false);
+      const multi = r.violations.find((v) => v.includes('多匹配'));
+      expect(multi).toContain(CHANGE7);
+      expect(multi).toContain('2026-01-01-phase7-x');
+    });
 
-  it('锚定三态 0：`<YYYY-MM-DD>-<changeId>` 归档 → 通过', () => {
-    const r = checkCodingPlan(archiveOnlyTree('2026-01-01-phase7-x'), PHASE, CHANGE7);
-    expect(r).toMatchObject({ passed: true, violations: [] });
-  });
+    it('锚定：未锚定后缀名不匹配（`<changeId>-extra` 不得被当作归档位）', () => {
+      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles('phase7-x-extra') }));
+      expect(r.passed).toBe(false);
+      // 不得命中归档位：错配目录名只作为「近失」诊断出现，仍报 plan 缺失
+      expect(r.violations.some((v) => v.includes('近失'))).toBe(true);
+      expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
+      // 命中归档位会走 R6 快照文案——这里必须没有
+      expect(r.violations.some((v) => v.includes('R6：归档目录须含 plan 快照'))).toBe(false);
+    });
 
-  it('锚定三态 1（多匹配）：直名 + 日期名同时存在 → fail-closed 具名列出两者', () => {
-    const root = archiveOnlyTree(CHANGE7);
-    const second = join(root, 'docs', 'changes', 'archive', '2026-01-01-phase7-x');
-    mkdirSync(second, { recursive: true });
-    writeFileSync(
-      join(second, `${CHANGE7}.plan.md`),
-      readFileSync(join(root, 'docs', 'changes', 'archive', CHANGE7, `${CHANGE7}.plan.md`)),
-    );
-    const r = checkCodingPlan(root, PHASE, CHANGE7);
-    expect(r.passed).toBe(false);
-    const multi = r.violations.find((v) => v.includes('多匹配'));
-    expect(multi).toContain(CHANGE7);
-    expect(multi).toContain('2026-01-01-phase7-x');
-  });
+    it('锚定：非日期前缀名不匹配（`foo-bar-<changeId>` 不得被当作归档位）', () => {
+      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles('foo-bar-phase7-x') }));
+      expect(r.passed).toBe(false);
+      expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
+      // 命中归档位会报「plan 快照缺失」以外的路径——这里必须仍是 R1 缺失文案
+      expect(r.violations.some((v) => v.includes('R6：归档目录须含 plan 快照'))).toBe(false);
+    });
 
-  it('锚定：未锚定后缀名不匹配（`<changeId>-extra` 不得被当作归档位）', () => {
-    const root = archiveOnlyTree('phase7-x-extra');
-    const r = checkCodingPlan(root, PHASE, CHANGE7);
-    expect(r.passed).toBe(false);
-    // 不得命中归档位：错配目录名只作为「近失」诊断出现，仍报 plan 缺失
-    expect(r.violations.some((v) => v.includes('近失'))).toBe(true);
-    expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
-    // 命中归档位会走 R6 快照文案——这里必须没有
-    expect(r.violations.some((v) => v.includes('R6：归档目录须含 plan 快照'))).toBe(false);
-  });
+    it('锚定：多个 changeId 通配/前缀不得互相误配（同阶段兄弟 change 的归档不冒充本 change）', () => {
+      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles('2026-01-01-phase7-x-two') }));
+      expect(r.passed).toBe(false);
+      expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
+    });
 
-  it('锚定：非日期前缀名不匹配（`foo-bar-<changeId>` 不得被当作归档位）', () => {
-    const root = archiveOnlyTree('foo-bar-phase7-x');
-    const r = checkCodingPlan(root, PHASE, CHANGE7);
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
-    // 命中归档位会报「plan 快照缺失」以外的路径——这里必须仍是 R1 缺失文案
-    expect(r.violations.some((v) => v.includes('R6：归档目录须含 plan 快照'))).toBe(false);
-  });
+    it('日历校验：`2026-13-45-<changeId>`（形状合法但非真实日历日）→ 独立 fail-closed 文案', () => {
+      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles('2026-13-45-phase7-x') }));
+      expect(r.passed).toBe(false);
+      const violation = r.violations.find((v) => v.includes('非真实日历日'));
+      expect(violation).toBeDefined();
+      expect(violation).toContain('2026-13-45-phase7-x');
+    });
 
-  it('锚定：多个 changeId 通配/前缀不得互相误配（同阶段兄弟 change 的归档不冒充本 change）', () => {
-    const root = archiveOnlyTree('2026-01-01-phase7-x-two');
-    const r = checkCodingPlan(root, PHASE, CHANGE7);
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
-  });
+    it('日历校验：`2026-02-30-<changeId>`（当月无该日）同样被拒', () => {
+      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles('2026-02-30-phase7-x') }));
+      expect(r.passed).toBe(false);
+      expect(r.violations.some((v) => v.includes('非真实日历日'))).toBe(true);
+    });
 
-  it('日历校验：`2026-13-45-<changeId>`（形状合法但非真实日历日）→ 独立 fail-closed 文案', () => {
-    const root = archiveOnlyTree('2026-13-45-phase7-x');
-    const r = checkCodingPlan(root, PHASE, CHANGE7);
-    expect(r.passed).toBe(false);
-    const violation = r.violations.find((v) => v.includes('非真实日历日'));
-    expect(violation).toBeDefined();
-    expect(violation).toContain('2026-13-45-phase7-x');
-  });
+    it('日历校验：闰年真实日 `2024-02-29-<changeId>` → 通过（不得过度拒绝）', () => {
+      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles('2024-02-29-phase7-x') }));
+      expect(r).toMatchObject({ passed: true, violations: [] });
+    });
 
-  it('日历校验：`2026-02-30-<changeId>`（当月无该日）同样被拒', () => {
-    const r = checkCodingPlan(archiveOnlyTree('2026-02-30-phase7-x'), PHASE, CHANGE7);
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('非真实日历日'))).toBe(true);
-  });
-
-  it('日历校验：闰年真实日 `2024-02-29-<changeId>` → 通过（不得过度拒绝）', () => {
-    const r = checkCodingPlan(archiveOnlyTree('2024-02-29-phase7-x'), PHASE, CHANGE7);
-    expect(r).toMatchObject({ passed: true, violations: [] });
-  });
-
-  it('日历校验：非法日期名与合法直名并存 → 合法匹配优先（直名恰一匹配即用）', () => {
-    const root = archiveOnlyTree(CHANGE7);
-    mkdirSync(join(root, 'docs', 'changes', 'archive', '2026-13-45-phase7-x'), { recursive: true });
-    const r = checkCodingPlan(root, PHASE, CHANGE7);
-    expect(r).toMatchObject({ passed: true, violations: [] });
-    expect(r.planPath).toBe(`docs/changes/archive/${CHANGE7}/${CHANGE7}.plan.md`);
+    it('日历校验：非法日期名与合法直名并存 → 合法匹配优先（直名恰一匹配即用；非法目录为显式空目录）', () => {
+      const r = checkCodingPlan(
+        ROOT,
+        PHASE,
+        CHANGE7,
+        mkFs({
+          files: archiveOnlyFiles(CHANGE7),
+          dirs: [join(ROOT, 'docs', 'changes', 'archive', '2026-13-45-phase7-x')],
+        }),
+      );
+      expect(r).toMatchObject({ passed: true, violations: [] });
+      expect(r.planPath).toBe(`docs/changes/archive/${CHANGE7}/${CHANGE7}.plan.md`);
+    });
   });
 });

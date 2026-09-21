@@ -74,6 +74,7 @@ import {
   type RTMMatrixShape,
 } from '../logic/gate-logic.js';
 import { checkCodingPlan } from '../logic/coding-plan-logic.js';
+import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
 import { exitWithError, type CliError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { ARTIFACT_PATHS } from '../lib/constants.js';
@@ -281,7 +282,7 @@ export function aggregateExternalChecks(
   }
 
   const codegraph = checkCodegraphQueriesStrict(projectRoot, ctx.scope);
-  const codingPlan = checkCodingPlan(projectRoot, ctx.scope.phase, ctx.scope.changeId);
+  const codingPlan = checkCodingPlan(projectRoot, ctx.scope.phase, ctx.scope.changeId, nodeCodingPlanFs);
   for (const v of codegraph.violations) reasons.push(`[codegraph] ${v}`);
   for (const v of codingPlan.violations) reasons.push(`[coding-plan] ${v}`);
   return {
