@@ -62,7 +62,13 @@ export const L0_BASELINE = {
   // phase-8-acceptance-test.md 各 +1（同批对 28 条新增 / 15 条删除的链接改写后取净）；
   // l1Only +1 = 新增指向 L1 的 `../scripts/cli/check-coding-plan.ts` 引用多于退役的旧 opsx 脚本引用；
   // 由 npm run audit:l0-links 实测 rebaseline，placeholders 仍 36、violations 仍 0）。
-  relativeLinkCount: 691,
-  l1Only: 96,
+  // 694 = 691 + 3；l1Only 97 = 96 + 1（2026-09-22 rc-closeout 任务 7（WS-D.5）：新增
+  // templates/coding-plan.md——编码计划制品模板，正文含 3 条包内相对链接
+  // （../references/superpowers-adoption.md、../references/phase-5-coding.md、
+  // ../scripts/logic/coding-plan-logic.ts），其中指向 L1 scripts 的 1 条计为 l1Only、
+  // 其余计入 relativeLinkCount；由 npm run audit:l0-links 实测 rebaseline，
+  // placeholders 仍 36、violations 仍 0）。
+  relativeLinkCount: 694,
+  l1Only: 97,
   placeholders: 36,
 } as const;
