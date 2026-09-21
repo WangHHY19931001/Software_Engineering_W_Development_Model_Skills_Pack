@@ -273,6 +273,14 @@ describe('R6 用量实效 + R5-b burnRate 预警（D-4b）', () => {
     expect(r6.some((v) => v.includes('%'))).toBe(false);
   });
 
+  it('R5-b：perPhase.maxTokens=0（阈值退化为恒真）→ R5-b 不触发且输出无 Infinity/NaN（正数守卫，控制者裁定补修）', () => {
+    const b = tinyBudget();
+    b.perPhase.maxTokens = 0;
+    const r = checkBudget(b, { tokensUsed: { phase: 5, total: 5 } });
+    expect(r.violations.some((v) => v.startsWith('R5-b'))).toBe(false);
+    expect(r.violations.some((v) => /Infinity|NaN/.test(v))).toBe(false);
+  });
+
   it('R6/R5-b：tokensUsed 为 NaN（phase/total 均 NaN）→ 视同未提供：不触发且不抛错（非法输入防御，2026-09-22 打磨）', () => {
     expect(() => checkBudget(tinyBudget(), { tokensUsed: { phase: Number.NaN, total: Number.NaN } })).not.toThrow();
     const r = checkBudget(tinyBudget(), { tokensUsed: { phase: Number.NaN, total: Number.NaN } });

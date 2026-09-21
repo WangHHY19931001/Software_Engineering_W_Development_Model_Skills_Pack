@@ -197,6 +197,9 @@ export function checkBudget(
     }
     if (
       typeof perPhaseMax === 'number' &&
+      // 正数守卫（控制者裁定补修）：maxTokens=0（或非正）时阈值退化为 `phase >= 0` 恒真、占比无定义
+      // （Infinity/NaN），不触发 R5-b 用量告警（与 R6 除零守卫同款语义）
+      perPhaseMax > 0 &&
       typeof ks?.budgetBurnRate === 'number' &&
       usage.phase >= ks.budgetBurnRate * perPhaseMax
     ) {
