@@ -53,6 +53,18 @@ BASELINE_CHECKPOINT_RUN_IDS = frozenset(f'p{p}-cp' for p in range(1, 9))
 # 命中非基准态时销毁前快照的证据清单（文件 copy2 / 目录 copytree，源缺失跳过）
 SNAPSHOT_ITEMS = ('run-log.jsonl', 'signature-chain.jsonl', 'checkpoint-log', 'gate-logs')
 
+def _checkpoint_release_run_ids(run_log_content):
+    """抽取 run-log 内容中全部 checkpoint+success 放行记录的 runId（信号 c 判据的单一来源，
+    供 detect_non_baseline_state 与写出处基准自测锚共用）：子串匹配不解析 JSON，去空格归一
+    以兼容紧凑/带空格两种序列化；runId 提取失败记为 None，调用方一律按 fail-closed 处理。"""
+    ids = []
+    for ln in run_log_content.splitlines():
+        norm = ln.replace(' ', '')
+        if '"action":"checkpoint"' in norm and '"outcome":"success"' in norm:
+            m = re.search(r'"runId":"([^"]*)"', norm)
+            ids.append(m.group(1) if m else None)
+    return ids
+
 def detect_non_baseline_state(wm_dir):
     """检测 .w-model 是否为非装配器基准态（可能是真实运行残留），返回命中信号描述列表（空列表 = 基准态）。"""
     hits = []
@@ -70,13 +82,10 @@ def detect_non_baseline_state(wm_dir):
     if baks:
         hits.append(f'信号 b：存在 wm-write 备份残留 *.bak.* ×{len(baks)}（如 {os.path.basename(baks[0])}）')
     if content is not None:
-        for ln in content.splitlines():
-            norm = ln.replace(' ', '')  # 子串匹配不解析 JSON；去空格以兼容紧凑/带空格两种序列化
-            if '"action":"checkpoint"' in norm and '"outcome":"success"' in norm:
-                m = re.search(r'"runId":"([^"]*)"', norm)
-                if m is None or m.group(1) not in BASELINE_CHECKPOINT_RUN_IDS:
-                    hits.append('信号 c：存在装配器基准之外的 checkpoint 放行记录（真实运行残留）')
-                    break
+        for rid in _checkpoint_release_run_ids(content):
+            if rid is None or rid not in BASELINE_CHECKPOINT_RUN_IDS:
+                hits.append('信号 c：存在装配器基准之外的 checkpoint 放行记录（真实运行残留）')
+                break
     return hits
 
 def snapshot_evidence(wm_dir):
@@ -701,6 +710,14 @@ if _baseline_actual != BASELINE_RUN_LOG_LINES:
     sys.exit(f'✗ 装配器基准自测失败：run-log.jsonl 实写 {_baseline_actual} 行 ≠ '
              f'BASELINE_RUN_LOG_LINES={BASELINE_RUN_LOG_LINES}——run-log 轨迹改动后请同步更新该常量'
              '（非基准态检测基准，见 detect_non_baseline_state）。')
+# WS-B 基准自测（对称锚）：基准轨迹全部 checkpoint+success 放行记录的 runId 须 ⊆ BASELINE_CHECKPOINT_RUN_IDS。
+# runId 模式改动（如 p{p}-cp → phase{p}-cp）行数不变、行数锚测不到；若不同步该集合，干净基准态会被
+# 信号 c 永久误报并诱导习惯性携带 --accept-state-loss（侵蚀护栏），故此处 fail-fast。
+for _rid in _checkpoint_release_run_ids(_run_log_content):
+    if _rid is None or _rid not in BASELINE_CHECKPOINT_RUN_IDS:
+        sys.exit(f'✗ 装配器基准自测失败：run-log.jsonl 基准轨迹含集合外 checkpoint 放行 runId（{_rid}）'
+                 '——checkpoint runId 模式改动后请同步更新 BASELINE_CHECKPOINT_RUN_IDS'
+                 '（非基准态检测基准，见 detect_non_baseline_state）。')
 
 # ---------- checkpoint-log（用户确认记录；e2e 判据代行，见报告声明） ----------
 for p in range(1, 9):

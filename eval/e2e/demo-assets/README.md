@@ -56,6 +56,8 @@ bash run_negative_probes.sh              # 期望末行：✓ 9/9 探针被拦�
 | b    | `.w-model/` 递归存在 `*.bak.*`（wm-write 备份残留）                                                                   |
 | c    | run-log 存在装配器基准之外（runId 非 `p1-cp`…`p8-cp`）的 `"action": "checkpoint"` + `"outcome": "success"` 放行记录   |
 
+两处基准（104 行与 runId 集合 `p1-cp`…`p8-cp`）都有写出后自测锚：run-log 轨迹改动若引起行数或 runId 模式漂移，装配器 fail-fast 提示同步常量，防基准漂移造成误报、侵蚀护栏。
+
 命中后的行为（fail-closed）：
 
 1. 先把 `run-log.jsonl`、`signature-chain.jsonl`、`checkpoint-log/`、`gate-logs/` 拷入 **gitignored** 的 `eval/e2e/demo-snapshots/<UTC时间戳>/`（单文件 `copy2`、目录 `copytree`，源缺失跳过、目标已存在复用）；
