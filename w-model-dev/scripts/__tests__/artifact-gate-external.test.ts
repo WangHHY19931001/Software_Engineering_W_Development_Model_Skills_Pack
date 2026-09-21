@@ -2,9 +2,12 @@
 /**
  * artifact-gate-external.test.ts —— artifact gate 外部校验聚合 + externalChecks 死字段清理
  *
- * 覆盖（2026-09-04 audit-gate-closure task 1，Slice A + B 前置）：
- *   E1  aggregateExternalChecks：codegraph + opsx violations 并入 reasons，passed 联动
- *       （codegraph/opsx 失败不得被 RTM 通过掩盖——本层与 RTM 解耦验证）
+ * 覆盖（2026-09-04 audit-gate-closure task 1，Slice A + B 前置；2026-09-21 superpowers
+ * 替换 opsx 批次 1：阶段 5-8 外部聚合第二 checker 由 checkOpsxArtifactsStrict 切至
+ * checkCodingPlan——键 external.opsx → external.codingPlan、violations 前缀 [opsx] →
+ * [coding-plan]，changesNames 语义保持 [scope.changeId]）：
+ *   E1  aggregateExternalChecks：codegraph + coding-plan violations 并入 reasons，passed 联动
+ *       （codegraph/coding-plan 失败不得被 RTM 通过掩盖——本层与 RTM 解耦验证）
  *   E2  scope 为 null（未提供）→ 两 checker 各产生变更上下文 violation（fail-closed）
  *   E3  scopeViolations（Git 绑定失败等）并入 reasons
  *   E4  summary 携带两 checker passed/violations 计数与相对路径计数
@@ -63,16 +66,47 @@ function queryJson(changeId: string, targetFiles: string[]): string {
   });
 }
 
-function opsxTree(root: string, changeName: string): void {
-  mkdirSync(join(root, 'openspec', 'changes', changeName), { recursive: true });
-  for (const art of ['proposal.md', 'design.md', 'tasks.md', 'tickets.md']) {
-    writeFileSync(join(root, 'openspec', 'changes', changeName, art), `# ${art}\n`);
+/**
+ * 构造通过 coding-plan 门的制品树（契约对齐 samples/coding-plan/valid-phase5）：
+ * R1 plan（目标节 + 任务节 + 逐任务验证命令行）/ R3 账本 + complete 覆盖 /
+ * R4 三件套非空 + review diff / R5 审查产物（stage 词表 plan/execute/finalize）。
+ */
+function codingPlanTree(root: string, changeId: string): void {
+  const plansDir = join(root, 'docs', 'plans');
+  mkdirSync(plansDir, { recursive: true });
+  writeFileSync(
+    join(plansDir, `${changeId}.plan.md`),
+    [
+      `# ${changeId} 编码计划`,
+      '',
+      '## 目标',
+      '',
+      '测试夹具：目标节 + 两个任务节 + 逐任务验证命令行。',
+      '',
+      '## Task 1: 实现示例模块',
+      '',
+      '验证：npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/artifact-gate-external.test.ts',
+      '',
+      '## Task 2: 接线 CLI 壳',
+      '',
+      'Verify: npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/artifact-gate-external.test.ts',
+      '',
+    ].join('\n'),
+  );
+  const ledgerDir = join(root, '.superpowers', 'sdd', `${changeId}.plan`);
+  mkdirSync(ledgerDir, { recursive: true });
+  writeFileSync(
+    join(ledgerDir, 'progress.md'),
+    [`# SDD ledger — plan: docs/plans/${changeId}.plan.md`, '', 'Task 1: complete', 'Task 2: complete', ''].join('\n'),
+  );
+  for (const n of [1, 2]) {
+    writeFileSync(join(ledgerDir, `task-${n}-brief.md`), `# task ${n} brief\n`);
+    writeFileSync(join(ledgerDir, `task-${n}-report.md`), `# task ${n} report\n`);
   }
-  mkdirSync(join(root, 'openspec', 'changes', changeName, 'specs'), { recursive: true });
-  writeFileSync(join(root, 'openspec', 'changes', changeName, 'specs', 'x.md'), '# x\n');
+  writeFileSync(join(ledgerDir, 'review-abc1234.diff'), 'diff --git a/src/main.ts b/src/main.ts\n');
   mkdirSync(join(root, '.w-model', 'r3-reviews'), { recursive: true });
   mkdirSync(join(root, '.w-model', 'v-reviews'), { recursive: true });
-  for (const stage of ['explore', 'propose', 'coding']) {
+  for (const stage of ['plan', 'execute', 'finalize']) {
     for (const dim of ['completeness', 'reliability', 'security']) {
       writeFileSync(join(root, '.w-model', 'r3-reviews', `phase5-${stage}-${dim}.md`), `# r3\n`);
     }
@@ -87,20 +121,20 @@ function fullPassProject(): { root: string } {
     join(root, '.w-model', 'codegraph-queries', 'phase5-a.json'),
     queryJson('phase5-demo', ['src/main.ts']),
   );
-  opsxTree(root, 'phase5-demo');
+  codingPlanTree(root, 'phase5-demo');
   return { root };
 }
 
 describe('aggregateExternalChecks（artifact gate 外部校验聚合）', () => {
-  it('E1: codegraph+opsx 全通过 → aggregate passed，无 reasons', () => {
+  it('E1: codegraph+coding-plan 全通过 → aggregate passed，无 reasons', () => {
     const { root } = fullPassProject();
     const r = aggregateExternalChecks(root, 5, { scope: makeScope(), scopeViolations: [] });
     expect(r).toMatchObject({ passed: true, reasons: [] });
     expect(r.summary.codegraph.passed).toBe(true);
-    expect(r.summary.opsx.passed).toBe(true);
+    expect(r.summary.codingPlan.passed).toBe(true);
   });
 
-  it('E1b: codegraph 覆盖缺失不被 opsx/RTM 通过掩盖 → aggregate failed + 逐文件 reason', () => {
+  it('E1b: codegraph 覆盖缺失不被 coding-plan/RTM 通过掩盖 → aggregate failed + 逐文件 reason', () => {
     const { root } = fullPassProject();
     // 变更里新增 src/forgotten.ts 但无查询覆盖它
     const scope = makeScope({ changedFiles: ['src/main.ts', 'src/forgotten.ts'] });
@@ -113,20 +147,20 @@ describe('aggregateExternalChecks（artifact gate 外部校验聚合）', () => 
     expect(r.summary.codegraph.coveredFileCount).toBe(1);
   });
 
-  it('E1c: opsx 缺 tickets.md 不被 codegraph 通过掩盖 → aggregate failed', () => {
+  it('E1c: coding-plan 缺账本不被 codegraph 通过掩盖 → aggregate failed', () => {
     const root = makeTmpDir();
     mkdirSync(join(root, '.w-model', 'codegraph-queries'), { recursive: true });
     writeFileSync(
       join(root, '.w-model', 'codegraph-queries', 'phase5-a.json'),
       queryJson('phase5-demo', ['src/main.ts']),
     );
-    opsxTree(root, 'phase5-demo');
-    rmSync(join(root, 'openspec', 'changes', 'phase5-demo', 'tickets.md'), { force: true });
+    codingPlanTree(root, 'phase5-demo');
+    rmSync(join(root, '.superpowers', 'sdd', 'phase5-demo.plan', 'progress.md'), { force: true });
     const r = aggregateExternalChecks(root, 5, { scope: makeScope(), scopeViolations: [] });
     expect(r.passed).toBe(false);
-    expect(r.reasons.some((v) => v.includes('tickets.md 缺失'))).toBe(true);
-    expect(r.summary.opsx.passed).toBe(false);
-    expect(r.summary.opsx.violationCount).toBeGreaterThan(0);
+    expect(r.reasons.some((v) => v.includes('progress.md 缺失'))).toBe(true);
+    expect(r.summary.codingPlan.passed).toBe(false);
+    expect(r.summary.codingPlan.violationCount).toBeGreaterThan(0);
   });
 
   it('E2: scope 为 null → 两 checker fail-closed（须提供变更上下文）且 summary 标记未提供', () => {
@@ -134,12 +168,15 @@ describe('aggregateExternalChecks（artifact gate 外部校验聚合）', () => 
     const r = aggregateExternalChecks(root, 5, { scope: null, scopeViolations: [] });
     expect(r.passed).toBe(false);
     expect(r.summary.codegraph.passed).toBe(false);
-    expect(r.summary.opsx.passed).toBe(false);
+    expect(r.summary.codingPlan.passed).toBe(false);
     // scope 缺失分支：provided=false、changeId=null（不再用空串占位）
     expect(r.summary.codegraph.provided).toBe(false);
-    expect(r.summary.opsx.provided).toBe(false);
+    expect(r.summary.codingPlan.provided).toBe(false);
     expect(r.summary.codegraph.changeId).toBeNull();
-    expect(r.summary.opsx.changeId).toBeNull();
+    expect(r.summary.codingPlan.changeId).toBeNull();
+    // coding-plan 维度违规前缀与 fail-closed 文案（反模式 #39/#40 保留）
+    expect(r.reasons.some((v) => v.startsWith('[coding-plan]') && v.includes('未提供 --scope'))).toBe(true);
+    expect(r.reasons.some((v) => v.includes('反模式 #39/#40'))).toBe(true);
     expect(r.reasons.some((v) => /--scope|ChangeScope/.test(v))).toBe(true);
   });
 
@@ -167,7 +204,7 @@ describe('aggregateExternalChecks（artifact gate 外部校验聚合）', () => 
     expect(r.reasons.some((v) => v.includes('未提供 --scope'))).toBe(false);
     // summary 计数归零（未进入 strict 校验）
     expect(r.summary.codegraph.violationCount).toBe(0);
-    expect(r.summary.opsx.violationCount).toBe(0);
+    expect(r.summary.codingPlan.violationCount).toBe(0);
     // 控制组：未提供 scope 且未给 scopeProvidedButFailed 标志时仍输出"未提供"消息（既有语义）
     const r2 = aggregateExternalChecks(root, 5, { scope: null, scopeViolations: [] });
     expect(r2.reasons.some((v) => v.includes('未提供 --scope'))).toBe(true);
@@ -191,25 +228,38 @@ describe('aggregateExternalChecks（artifact gate 外部校验聚合）', () => 
     expect(r.summary.codegraph.provided).toBe(true);
     expect(r.summary.codegraph.changeId).toBe(attemptedChangeId);
     expect(r.summary.codegraph.passed).toBe(false);
-    expect(r.summary.opsx.provided).toBe(true);
-    expect(r.summary.opsx.changeId).toBe(attemptedChangeId);
-    expect(r.summary.opsx.passed).toBe(false);
+    expect(r.summary.codingPlan.provided).toBe(true);
+    expect(r.summary.codingPlan.changeId).toBe(attemptedChangeId);
+    expect(r.summary.codingPlan.passed).toBe(false);
     // violationCount 保持既有 [scope] 语义：计数归零（未进入 strict 校验）
     expect(r.summary.codegraph.violationCount).toBe(0);
-    expect(r.summary.opsx.violationCount).toBe(0);
+    expect(r.summary.codingPlan.violationCount).toBe(0);
   });
 
   it('E4: summary 携带 changeId 与相对路径计数', () => {
     const { root } = fullPassProject();
     const r = aggregateExternalChecks(root, 5, { scope: makeScope(), scopeViolations: [] });
     expect(r.summary.codegraph.changeId).toBe('phase5-demo');
-    expect(r.summary.opsx.changeId).toBe('phase5-demo');
+    expect(r.summary.codingPlan.changeId).toBe('phase5-demo');
     // scope 已提供分支：provided=true
     expect(r.summary.codegraph.provided).toBe(true);
-    expect(r.summary.opsx.provided).toBe(true);
+    expect(r.summary.codingPlan.provided).toBe(true);
     // 断言可证伪的关系而非类型：本 fixture 下须覆盖全集（2026-09-17 审查修复）。
     expect(r.summary.codegraph.requiredFileCount).toBeGreaterThan(0);
     expect(r.summary.codegraph.coveredFileCount).toBe(r.summary.codegraph.requiredFileCount);
+  });
+
+  it('E4b: external.codingPlan 键存在（external.opsx 键删除）且 changesNames 恒为 [scope.changeId]', () => {
+    const { root } = fullPassProject();
+    const r = aggregateExternalChecks(root, 5, { scope: makeScope(), scopeViolations: [] });
+    // 新键存在 + 旧键删除（键名是消费方契约，防拼写漂移）
+    expect(Object.prototype.hasOwnProperty.call(r.summary, 'codingPlan')).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(r.summary, 'opsx')).toBe(false);
+    // strict 绑定语义：changesNames 恒为 scope.changeId（人类可读行「制品目录」与 GATE_JSON 消费该字段）
+    expect(r.summary.codingPlan.changesNames).toEqual(['phase5-demo']);
+    // 控制组：scope 缺失分支 changesNames 归空数组（不占位）
+    const r2 = aggregateExternalChecks(root, 5, { scope: null, scopeViolations: [] });
+    expect(r2.summary.codingPlan.changesNames).toEqual([]);
   });
 
   it('E5/E6: gate-logic externalChecks 死字段清理 + 其余行为不变', () => {

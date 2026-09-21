@@ -20,7 +20,7 @@
  *                 （`--phase<5` 给定 → exit 2 ARG_INVALID，不静默忽略）；文件不存在 → exit 2
  *                 FILE_NOT_FOUND；只接受等号形态，路径相对 project-dir 解析
  *   --scope=FILE  阶段 5-8 变更上下文 manifest（schemas/change-scope.schema.json；与
- *                 --change/--base/--head 互斥）：聚合 codegraph/opsx strict 校验，
+ *                 --change/--base/--head 互斥）：聚合 codegraph/coding-plan strict 校验，
  *                 violations 并入 reasons/exitCode（不被 RTM 通过掩盖）；
  *                 缺失 → fail-closed（exit 1）；文件/JSON/schema 非法 → exit 2。
  *                 archive（check-openspec-archive.ts）是 phase 8 opsx:archive 后置门，
@@ -72,6 +72,7 @@ import {
   type PhaseOption,
   type RTMMatrixShape,
 } from '../logic/gate-logic.js';
+import { checkCodingPlan } from '../logic/coding-plan-logic.js';
 import { exitWithError, type CliError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { ARTIFACT_PATHS } from '../lib/constants.js';
@@ -84,7 +85,6 @@ import { type ChangeScope } from '../lib/change-scope.js';
 import { loadCliScope } from '../lib/load-cli-scope.js';
 
 import { checkCodegraphQueriesStrict } from './check-codegraph-queries.js';
-import { checkOpsxArtifactsStrict } from './check-opsx-artifacts.js';
 export { checkUatPathMappingContent }; // self-test 兼容：UAT 映射内容校验保持从本入口导出
 
 export type TicketsArgResult = { ok: true; value: string | undefined } | { ok: false; error: CliError };
@@ -193,7 +193,7 @@ function parseProjectDir(argv: string[]): string {
   return process.cwd();
 }
 
-// ==================== 外部校验聚合（Slice B：codegraph/opsx violations 并入 artifact gate） ====================
+// ==================== 外部校验聚合（Slice B：codegraph/coding-plan violations 并入 artifact gate） ====================
 
 /** GATE_JSON external summary 的单个 checker 计数（含相对路径计数；字段稳定，始终输出） */
 export interface ExternalCheckerSummary {
@@ -215,7 +215,7 @@ export interface ExternalCodegraphSummary extends ExternalCheckerSummary {
 
 export interface ExternalSummary {
   codegraph: ExternalCodegraphSummary;
-  opsx: ExternalCheckerSummary & { changesNames: string[] };
+  codingPlan: ExternalCheckerSummary & { changesNames: string[] };
 }
 
 export interface ExternalChecksAggregate {
@@ -225,12 +225,12 @@ export interface ExternalChecksAggregate {
 }
 
 /**
- * 聚合 codegraph + opsx strict 校验（阶段 5-8 artifact gate 用）：
+ * 聚合 codegraph + coding-plan strict 校验（阶段 5-8 artifact gate 用）：
  *   - scope 为 null（CLI 未提供）→ 两 checker 各自 fail-closed（须提供变更上下文）；
  *     若 scopeProvidedButFailed=true（scope 已提供但 Git 绑定失败），则不输出
  *     "未提供 --scope" 误导文案（真实原因在 scopeViolations，纠正动作是更新过期 scope）
  *   - scopeViolations（ChangeScope Git 绑定失败等）并入 reasons
- *   - 两 checker violations 并入 reasons（codegraph/opsx 失败不得被 RTM 通过掩盖）
+ *   - 两 checker violations 并入 reasons（codegraph/coding-plan 失败不得被 RTM 通过掩盖）
  * openspecArchived 不作为本 gate 输入：archive 是 phase 8 opsx:archive 后置门，
  * 单独跑 check-openspec-archive.ts。
  */
@@ -258,7 +258,7 @@ export function aggregateExternalChecks(
         requiredFileCount: 0,
         coveredFileCount: 0,
       },
-      opsx: {
+      codingPlan: {
         passed: false,
         violationCount: 0,
         provided: boundProvided,
@@ -272,17 +272,17 @@ export function aggregateExternalChecks(
           `（codegraph 覆盖绑定 fail-closed，反模式 #38）`,
       );
       reasons.push(
-        `[opsx] 阶段 ${phase}：未提供 --scope=<change-scope.json> 或 --change/--base/--head 变更上下文` +
-          `（opsx 制品校验须绑定变更目录，反模式 #39/#40）`,
+        `[coding-plan] 阶段 ${phase}：未提供 --scope=<change-scope.json> 或 --change/--base/--head 变更上下文` +
+          `（coding-plan 制品校验须绑定变更目录，反模式 #39/#40）`,
       );
     }
     return { passed: false, reasons, summary };
   }
 
   const codegraph = checkCodegraphQueriesStrict(projectRoot, ctx.scope);
-  const opsx = checkOpsxArtifactsStrict(projectRoot, ctx.scope.phase, ctx.scope.changeId);
+  const codingPlan = checkCodingPlan(projectRoot, ctx.scope.phase, ctx.scope.changeId);
   for (const v of codegraph.violations) reasons.push(`[codegraph] ${v}`);
-  for (const v of opsx.violations) reasons.push(`[opsx] ${v}`);
+  for (const v of codingPlan.violations) reasons.push(`[coding-plan] ${v}`);
   return {
     passed: reasons.length === 0,
     reasons,
@@ -295,12 +295,14 @@ export function aggregateExternalChecks(
         requiredFileCount: codegraph.requiredFileCount,
         coveredFileCount: codegraph.coveredFileCount,
       },
-      opsx: {
-        passed: opsx.passed,
-        violationCount: opsx.violations.length,
+      codingPlan: {
+        passed: codingPlan.passed,
+        violationCount: codingPlan.violations.length,
         provided: true,
         changeId: ctx.scope.changeId,
-        changesNames: opsx.changesNames,
+        // strict 绑定语义：changesNames 恒为 scope.changeId，归档位不泄漏进返回结构
+        // （人类可读行「制品目录」与 GATE_JSON 消费该字段）
+        changesNames: [ctx.scope.changeId],
       },
     },
   };
@@ -574,7 +576,7 @@ async function main(): Promise<void> {
   // uat-path-mapping 校验违反（计入终检结果；解析严格化 + 阶段 5/终检均校验）
   const uatMappingViolations = await collectUatMappingViolations(projectDir, phaseOption);
 
-  // ==================== 外部校验聚合（Slice B：codegraph/opsx strict，阶段 5-8） ====================
+  // ==================== 外部校验聚合（Slice B：codegraph/coding-plan strict，阶段 5-8） ====================
   // scope 解析统一走 loadCliScope（与三 checker 同一装载路径）：--scope=<file> 或
   // --change/--base/--head 薄封装；缺失 → aggregate 内 fail-closed violations；
   // scope 文件/JSON/schema 非法 → exit 2（输入错误，helper 内部处理）；Git 绑定失败 →
@@ -698,10 +700,10 @@ async function main(): Promise<void> {
   if (externalAggregate !== undefined) {
     const ext = externalAggregate.summary;
     console.log(
-      `codegraph 外部 : ${ext.codegraph.passed ? '✓' : '✗'} 覆盖 ${ext.codegraph.coveredFileCount}/${ext.codegraph.requiredFileCount} 须覆盖文件（${ext.codegraph.violationCount} 条违规）`,
+      `codegraph 外部   : ${ext.codegraph.passed ? '✓' : '✗'} 覆盖 ${ext.codegraph.coveredFileCount}/${ext.codegraph.requiredFileCount} 须覆盖文件（${ext.codegraph.violationCount} 条违规）`,
     );
     console.log(
-      `opsx 外部     : ${ext.opsx.passed ? '✓' : '✗'} 制品目录 ${ext.opsx.changesNames.join(', ') || '（无）'}（${ext.opsx.violationCount} 条违规）`,
+      `coding-plan 外部 : ${ext.codingPlan.passed ? '✓' : '✗'} 制品目录 ${ext.codingPlan.changesNames.join(', ') || '（无）'}（${ext.codingPlan.violationCount} 条违规）`,
     );
   }
   if (tlaBddWaived) {
