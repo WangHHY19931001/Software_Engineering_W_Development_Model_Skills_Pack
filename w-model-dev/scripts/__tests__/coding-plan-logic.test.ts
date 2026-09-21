@@ -168,6 +168,15 @@ describe('checkCodingPlan（R2 任务节与验证命令行）', () => {
     expect(r.violations.some((v) => v.includes('命令体'))).toBe(true);
   });
 
+  it('R2: 全角冒号「Verify：」前缀的验证行被识别（VERIFY_PREFIXES 全角形态，2026-09-22 打磨）', () => {
+    const root = writeValidTree(makeTmpDir());
+    const planFile = join(root, 'docs', 'plans', `${CHANGE_ID}.plan.md`);
+    writeFileSync(planFile, validPlanText().replace('验证：npm test', 'Verify：npm test'));
+    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    expect(r.passed).toBe(true);
+    expect(r.violations).toEqual([]);
+  });
+
   it('R2: 缺目标节 → violation', () => {
     const root = writeValidTree(makeTmpDir());
     const planFile = join(root, 'docs', 'plans', `${CHANGE_ID}.plan.md`);
@@ -175,6 +184,15 @@ describe('checkCodingPlan（R2 任务节与验证命令行）', () => {
     const r = checkCodingPlan(root, 5, CHANGE_ID);
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('目标节'))).toBe(true);
+  });
+
+  it('R2: 仅有「非目标」节不充数目标节 → 仍报缺目标节（判据排除非目标/不是目标，2026-09-22 打磨）', () => {
+    const root = writeValidTree(makeTmpDir());
+    const planFile = join(root, 'docs', 'plans', `${CHANGE_ID}.plan.md`);
+    writeFileSync(planFile, validPlanText().replace('## 目标', '## 非目标'));
+    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.includes('缺目标节'))).toBe(true);
   });
 
   it('R2: 零任务节 → violation', () => {
@@ -265,6 +283,15 @@ describe('checkCodingPlan（R3 账本）', () => {
     const r = checkCodingPlan(root, 5, CHANGE_ID);
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('首行'))).toBe(true);
+  });
+
+  it('R3: 首行为空行（身份行退居第二行）→ 仍报首行身份不符（严格取文件第一行，不回退首个非空行，2026-09-22 打磨）', () => {
+    const root = writeValidTree(makeTmpDir());
+    const ledger = join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`, 'progress.md');
+    writeFileSync(ledger, `\n${VALID_LEDGER_LINES.join('\n')}\n`);
+    const r = checkCodingPlan(root, 5, CHANGE_ID);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.includes('首行身份不符'))).toBe(true);
   });
 
   it('R3: 账本缺某任务 complete 行 → violation 具名到任务号', () => {

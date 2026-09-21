@@ -16,8 +16,8 @@
  *       换行按行解析天然排除）。
  *   R3  执行账本：`.superpowers/sdd/<plan-基名>/progress.md`（plan-基名 = plan 文件名去
  *       扩展名，如 `<changeId>.plan`）存在；首行身份 `# SDD ledger — plan: <计划文件路径>`
- *       （路径须以 plan 文件名结尾）；`Task N: complete` 行对 plan 每个任务节具名覆盖
- *       （覆盖数 < 任务节数即违规，具名到任务号）。
+ *       （严格取文件第一行，前导空行不回退；路径须以 plan 文件名结尾）；`Task N: complete`
+ *       行对 plan 每个任务节具名覆盖（覆盖数 < 任务节数即违规，具名到任务号）。
  *   R4  任务三件套：每个已完成任务 N 的 `task-<N>-brief.md` 与 `task-<N>-report.md` 存在且
  *       非空（>0 字节）；账本目录内须存在至少一个 `review-*.diff`（任务评审包 diff 证据）。
  *   R5  审查产物：`.w-model/r3-reviews/phase<phase>-<stage>-<dim>.md` ×9 +
@@ -195,8 +195,8 @@ interface PlanSection {
   bodyLines: string[];
 }
 
-/** 验证命令行前缀（行首；全半角冒号均接受） */
-const VERIFY_PREFIXES = ['验证：', '验证:', 'Verify:', 'Verify:'] as const;
+/** 验证命令行前缀（行首；全半角冒号均接受——Verify 的全角冒号形态曾误写成 ASCII 重复项） */
+const VERIFY_PREFIXES = ['验证：', '验证:', 'Verify:', 'Verify：'] as const;
 
 /** 提取一行内的验证命令体；非验证命令行返回 null；命令体含禁用字符返回 { command, forbidden } */
 function extractVerifyCommand(line: string): { command: string; forbidden: string[] | null } | null {
@@ -230,7 +230,8 @@ function parsePlanStructure(planContent: string): {
     const line = lines[i]!;
     const title = headingTitle(line);
     if (title === null) continue;
-    if (title.includes('目标')) hasGoalSection = true;
+    // 目标节判据：标题含「目标」且不为「非目标/不是目标」（「非目标」节只是子串命中，不充数目标节）
+    if (title.includes('目标') && !/非目标|不是目标/.test(title)) hasGoalSection = true;
     const taskMatch = title.match(/^(?:task|任务)\s*(\d+)/i);
     if (taskMatch === null) continue;
     const bodyLines: string[] = [];
@@ -321,7 +322,8 @@ function validateLedgerAndArtifacts(
   }
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，只读
   const ledgerContent = normalizeLineEndings(readFileSync(ledgerPath, 'utf-8'));
-  const firstLine = ledgerContent.split('\n').find((l) => l.trim() !== '') ?? '';
+  // 首行身份严格取文件第一行（前导空行不回退到首个非空行——身份行退居第二行即判不符）
+  const firstLine = ledgerContent.split('\n')[0] ?? '';
   const LEDGER_IDENTITY_PREFIX = '# SDD ledger — plan: ';
   if (!firstLine.startsWith(LEDGER_IDENTITY_PREFIX)) {
     violations.push(`${ledgerRel} 首行身份不符（R3：首行须为「${LEDGER_IDENTITY_PREFIX}<计划文件路径>」）`);

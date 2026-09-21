@@ -11,7 +11,8 @@
  *
  * 用量口径（D-4b）：R6/R5-b 只判定「实际用量 vs 上限」，用量由调用方从 run-log.jsonl 累计后
  * 经 options.tokensUsed 传入（CLI 侧 sumTokens）；未提供时 R6/R5-b 整体跳过，行为与新增前**一字不变**
- * （向后兼容硬线：既有 callers / samples / self-test 不受影响，跳过不等于通过由调用方保证可见）。
+ * （向后兼容硬线：既有 callers / samples / self-test 不受影响，跳过不等于通过由调用方保证可见）；
+ * phase/total 任一非有限数（NaN/Infinity）同样视同未提供（非法输入防御，整体跳过、不抛错）。
  *
  * 返工计数口径（D-4a 复审记录，D-4a 文档侧处置）：options.reworkCount 的语义是
  * 「返工事件 + 未过门事件」的**累计**条数——run-log 中 action ∈ {rework, fix, emergency-fix}
@@ -179,18 +180,20 @@ export function checkBudget(
   // 使 burnRate 用量告警在输出中可独立归属——既有 `killSwitch 应触发（返工 N >= M）但未告警`
   // 逐字不变（被 samples/self-test 断言），新增文案不与任何既有正则/子串断言相撞。
   const usage = options?.tokensUsed;
-  if (usage) {
+  // 非法输入防御（2026-09-22 打磨）：phase/total 任一非有限数（NaN/Infinity）视同「未提供」——
+  // 整体跳过 R6/R5-b 用量校验路径（与未传 --run-log 行为对齐），不产生 violation/warning、不抛错。
+  if (usage && Number.isFinite(usage.phase) && Number.isFinite(usage.total)) {
     const perPhaseMax = b.perPhase?.maxTokens;
     const totalMax = b.project?.maxTokensTotal;
     if (typeof perPhaseMax === 'number' && usage.phase > perPhaseMax) {
-      violations.push(
-        `R6：阶段 tokens ${usage.phase} > perPhase.maxTokens ${perPhaseMax}（${((usage.phase / perPhaseMax) * 100).toFixed(1)}%）`,
-      );
+      // 除零守卫：上限为 0 时百分比无定义（Infinity），文案省略百分比段
+      const pct = perPhaseMax > 0 ? `（${((usage.phase / perPhaseMax) * 100).toFixed(1)}%）` : '';
+      violations.push(`R6：阶段 tokens ${usage.phase} > perPhase.maxTokens ${perPhaseMax}${pct}`);
     }
     if (typeof totalMax === 'number' && usage.total > totalMax) {
-      violations.push(
-        `R6：总 tokens ${usage.total} > project.maxTokensTotal ${totalMax}（${((usage.total / totalMax) * 100).toFixed(1)}%）`,
-      );
+      // 同上：totalMax=0 时省略百分比段（NaN/Infinity 不得进入文案）
+      const pct = totalMax > 0 ? `（${((usage.total / totalMax) * 100).toFixed(1)}%）` : '';
+      violations.push(`R6：总 tokens ${usage.total} > project.maxTokensTotal ${totalMax}${pct}`);
     }
     if (
       typeof perPhaseMax === 'number' &&

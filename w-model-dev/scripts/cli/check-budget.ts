@@ -237,7 +237,7 @@ async function main(): Promise<void> {
         runLogReadable = true;
       } catch (err) {
         if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-        console.error(`⚠ --run-log 文件读取失败，跳过 R5 触发检测: ${runLogAbs}（ENOENT）`);
+        console.error(`⚠ --run-log 文件读取失败，跳过 R5/R6/R5-b 触发检测: ${runLogAbs}（ENOENT）`);
       }
       const entries = await readJsonlOptional(runLogAbs, 'run-log');
       const stats = countReworks(entries, phase);
@@ -246,7 +246,7 @@ async function main(): Promise<void> {
       tokensUsed = sumTokens(entries, phase);
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
-      console.error(`⚠ --run-log 文件读取失败，跳过 R5 触发检测: ${runLogAbs}（${e.code ?? e.message}）`);
+      console.error(`⚠ --run-log 文件读取失败，跳过 R5/R6/R5-b 触发检测: ${runLogAbs}（${e.code ?? e.message}）`);
     }
   }
 

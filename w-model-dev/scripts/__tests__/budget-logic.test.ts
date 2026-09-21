@@ -262,6 +262,39 @@ describe('R6 用量实效 + R5-b burnRate 预警（D-4b）', () => {
     expect(r.passed).toBe(true);
     expect(r.violations.filter((v) => /R6|阶段消耗占比/.test(v))).toHaveLength(0);
   });
+
+  it('R6：perPhase.maxTokens=0 → 仍触发但文案省略百分比段（不含 NaN/Infinity，除零守卫，2026-09-22 打磨）', () => {
+    const b = tinyBudget();
+    b.perPhase.maxTokens = 0;
+    const r = checkBudget(b, { tokensUsed: { phase: 5, total: 5 } });
+    const r6 = r.violations.filter((v) => v.startsWith('R6'));
+    expect(r6.some((v) => v.includes('阶段 tokens 5 > perPhase.maxTokens 0'))).toBe(true);
+    expect(r6.some((v) => /NaN|Infinity/.test(v))).toBe(false);
+    expect(r6.some((v) => v.includes('%'))).toBe(false);
+  });
+
+  it('R6/R5-b：tokensUsed 为 NaN（phase/total 均 NaN）→ 视同未提供：不触发且不抛错（非法输入防御，2026-09-22 打磨）', () => {
+    expect(() => checkBudget(tinyBudget(), { tokensUsed: { phase: Number.NaN, total: Number.NaN } })).not.toThrow();
+    const r = checkBudget(tinyBudget(), { tokensUsed: { phase: Number.NaN, total: Number.NaN } });
+    expect(r.passed).toBe(true);
+    expect(r.violations.filter((v) => /^R6|^R5-b/.test(v))).toHaveLength(0);
+    // 与「未提供 tokensUsed」逐字段对齐（跳过路径等价：不产生额外 violation，也不新增 warning）
+    expect(r).toEqual(checkBudget(tinyBudget()));
+  });
+
+  it('R6 边界：total 恰等于 maxTokensTotal → R6 不触发（严格 >，2026-09-22 打磨钉死）', () => {
+    const r = checkBudget(tinyBudget(), { tokensUsed: { phase: 0, total: 1000 } });
+    expect(r.violations.some((v) => /R6/.test(v))).toBe(false);
+    expect(r.violations.some((v) => /^R5-b/.test(v))).toBe(false);
+  });
+
+  it('R5-b：killSwitch.budgetBurnRate 缺失 → R5-b 不触发（typeof 守卫，不因字段缺失误报，2026-09-22 打磨钉死）', () => {
+    const b = tinyBudget();
+    delete (b.killSwitch as Partial<BudgetConfig['killSwitch']>).budgetBurnRate;
+    const r = checkBudget(b, { tokensUsed: { phase: 95, total: 95 } });
+    expect(r.violations.some((v) => v.startsWith('R5-b'))).toBe(false);
+    expect(r.violations.some((v) => /R6/.test(v))).toBe(false);
+  });
 });
 
 /**
