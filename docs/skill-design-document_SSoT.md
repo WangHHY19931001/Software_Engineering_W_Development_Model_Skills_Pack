@@ -1838,6 +1838,7 @@ interface RunLogEntry {
     | 'rootcause'
     | 'fix'
     | 'emergency-fix'
+    | 'escalate'
     | 'r3-completeness'
     | 'r3-reliability'
     | 'r3-security'
