@@ -1,0 +1,143 @@
+================================================================================
+rc-closeout 批次全量验收记录（任务 11）
+================================================================================
+验收时间：2026-09-22 09:11:03 +0800
+分支：feat/rc-closeout
+HEAD：ef8e3bba2556730ad8d7b04f3083d73cdb6292d5
+范围：prepush 19 项门禁 + 活性面退役名 grep + self-test CRLF 回归锚
+说明：本文件为 rc-closeout 批次（基线 63029f5d，任务 1-10 已逐任务过审）的
+      全量验收证据。grep 先于本文件落盘执行，故结果不含本文件自身引用。
+
+--------------------------------------------------------------------------------
+[1] prepush 19 项门禁（npm run prepush，后台执行，日志 .rc-prepush.log 全文要点）
+--------------------------------------------------------------------------------
+npm warn Unknown user config "home". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> w-model-dev-skill@42.2.1 prepush
+> bash .githooks/pre-push --force
+
+[pre-push] 检测到校验脚本相关变更，启动推送前门禁...
+[pre-push] 平台依赖检查（ensure-platform-deps --check）...
+[ensure-deps] [32m✓[0m 平台依赖齐备（win32-x64）
+[pre-push] [32m✓[0m self-test 全部样本匹配期望（exit 0）
+[pre-push] [32m✓[0m check:verifier 无参数退出 2（exit 2）
+[pre-push] [32m✓[0m check:gate 不存在目录退出 2（exit 2）
+[pre-push] [32m✓[0m check:verifier 有效样本退出 0（exit 0）
+[pre-push] [32m✓[0m check:verifier 无效样本退出 1（exit 1）
+[pre-push] [32m✓[0m security-scan 无新增风险（exit 0）
+[pre-push] [32m✓[0m check-bdd-model 有效 BDD 样本退出 0（exit 0）
+[pre-push] [32m✓[0m check-bdd-model schema 不合规 BDD 样本退出 2（exit 2）
+[pre-push] [32m✓[0m check:coverage 有效覆盖样本退出 0（exit 0）
+[pre-push] [32m✓[0m check:exemption 有效豁免样本退出 0（exit 0）
+[pre-push] [32m✓[0m check-signature-chain 有效签名链样本退出 0（exit 0）
+[pre-push] [32m✓[0m vitest 单元测试 + coverage 阈值通过（exit 0）
+[pre-push] [32m✓[0m 规则层覆盖口径 (logic+lib) 达阈值（exit 0）
+[pre-push] npm audit 依赖漏洞扫描（high 以上阻断）...
+[pre-push] [32m✓[0m npm audit 未发现 high 以上漏洞
+[pre-push] [32m✓[0m docs-consistency 活体文档一致（exit 0）
+[pre-push] [32m✓[0m samples 覆盖矩阵一致（无未登记 fixture）（exit 0）
+[pre-push] [32m✓[0m prettier 格式一致性（--check）（exit 0）
+[pre-push] [32m✓[0m tsc 类型检查 0 错误（exit 0）
+[pre-push] [32m✓[0m eval 语料断言与覆盖矩阵全绿（exit 0）
+[pre-push] 全部门禁通过，允许推送 ✓
+
+--------------------------------------------------------------------------------
+[2] 活性面退役名 grep（先于本文件落盘执行）
+--------------------------------------------------------------------------------
+命令原文（简报版，Windows 路径分隔符注意点见下）：
+grep -rn "退役随批次\|check-opsx-artifacts\|check-openspec-archive\|ensure-codegraph-opsx" --include="*" . 2>/dev/null | grep -v "docs/changes/" | grep -v "docs/superpowers/plans/\|docs/superpowers/specs/" | grep -v "CHANGELOG" | grep -v "docs/debug/" | grep -v ".superpowers/" | grep -v "node_modules\|coverage\|.git/"
+
+原始结果：259 行命中。
+注意：Windows 下 grep -rn 输出反斜杠路径（docs\changes\...），简报命令的
+"docs/changes/" 等正斜杠排除规则未命中这些行；将路径分隔符归一为正斜杠后
+重新套用同一组排除规则，得到残余 46 行（259 = 213 简报意图排除目录内行 + 46 残余；
+归一化本身零丢失）。46 行残余逐条核验分类如下：
+
+README.md:148:> 阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-coding-plan.ts`（编码计划制品契约 R1-R6，由 `check-artifact-gate.ts` 以 `--scope` 聚合，阶段 8 归档快照由 `check-archive-integrity.ts` 覆盖）；旧链路 `check-opsx-artifacts.ts` **已于 2026-09-21 退役**（语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3，由 pre-push 的 self-test / vitest 间接覆盖）。完整分派矩阵见 [subagent-delegation.md](./w-model-dev/references/subagent-delegation.md)。
+docs/skill-design-document_SSoT.md:2425:| 10.5.2 阶段 5-8 外部校验聚合                 | ChangeScope 绑定 + codegraph/coding-plan strict 校验聚合进 artifact gate（violations 并入 reasons/exitCode、GATE_JSON external summary、scopeProvidedButFailed 抑制误导文案）+ 归档快照为 phase 8 后置门（codingPlanSnapshot 条件项）                                                                                                     | `w-model-dev/references/command-reference.md`（Artifact Gate 节）+ `w-model-dev/scripts/lib/change-scope.ts` + `check-codegraph-queries.ts` / `check-coding-plan.ts` / `check-archive-integrity.ts` / `check-artifact-gate.ts`（CLI，strict 一律经 resolveCliScope）                                                                  | 完整（`gate-logic.ts` externalChecks 透传已删除；`check-opsx-artifacts.ts` 旧链路与其 legacy 纯逻辑已于 2026-09-21 一并退役，语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）                                          |
+w-model-dev/examples/stage7-system-test.md:37:> 阶段 7 附加门禁：`check-codegraph-queries.ts` / `check-coding-plan.ts`；旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役（语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）；评审证据经 `check-verifier-output.ts` 回填。
+w-model-dev/examples/README.md:37:> 每阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-coding-plan.ts`（与 artifact gate 一样以 `--scope` 绑定变更上下文；归档快照由 `check-archive-integrity.ts` 的 `codingPlanSnapshot` 条件项在归档后单独校验；旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役，语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）。完整分派矩阵见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）。
+eval/README.md:81:- 记录中的门禁/脚本名以**记录时点**为准，退役名不作回改，遇到时以后继门语义为准（举例：`check-openspec-archive` → `check-archive-integrity` 的 `codingPlanSnapshot`）；
+w-model-dev/examples/stage5-coding.md:48:> 阶段 5-8 附加门禁：`check-codegraph-queries.ts`（约束 #14：改码前必须经 codegraph CLI 查询）与 `check-coding-plan.ts`（编码计划契约 R1-R6）——两个 checker 与 artifact gate 均须带 `--scope=.w-model/change-scope.json`（或 `--change/--base/--head` 薄封装）绑定实际变更，缺 scope 即 fail-closed（exit 1）；评审证据经 `check-verifier-output.ts` 回填。旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役（语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）。
+w-model-dev/examples/stage8-acceptance-test.md:45:#    原 check-openspec-archive.ts（opsx:archive 后置门）已于 2026-09-21 退役，归档快照由上面第 2 步覆盖
+w-model-dev/examples/stage8-acceptance-test.md:49:> 阶段 8 附加门禁：`check-codegraph-queries.ts` / `check-coding-plan.ts`（与 artifact gate 一样带 `--scope` 绑定实际变更；scope 过期/与实际变更不符即 fail-closed）；旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役（语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）；评审证据经 `check-verifier-output.ts` 回填。
+eval/e2e/demo-assets/build_workspace.py:862:# 旧 opsx 链路制品（openspec/changes/<cid>/）保留在盘仅作历史对照：对应门禁 check-opsx-artifacts.ts
+w-model-dev/examples/stage6-integration-test.md:38:> 阶段 6 附加门禁：`check-codegraph-queries.ts` / `check-coding-plan.ts`（测试代码同受约束 #14（代码改动前后门禁）约束）；旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役（语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）；评审证据经 `check-verifier-output.ts` 回填。
+w-model-dev/references/phase-7-system-test.md:38:> **门禁绑定（2026-09-04 audit-gate-closure）**：本阶段 `check-artifact-gate.ts --phase=7`、`check-codegraph-queries.ts` 与 `check-coding-plan.ts` 均须以 `--scope=<change-scope.json>`（或 `--change/--base/--head` 薄封装）绑定实际变更——缺失 → exit 1（fail-closed）；S-coding 随变更维护/更新 scope（`headRef` 须等于当前 HEAD、`changedFiles` 与实际 Git 变更集合精确一致），artifact gate 聚合两个 strict checker 的 violations，`GATE_JSON` 含 external summary（`codegraph` + `codingPlan`）。旧 opsx 制品门 `check-opsx-artifacts.ts` **已于 2026-09-21 退役**（语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）。
+w-model-dev/references/phase-8-acceptance-test.md:37:> **门禁绑定（2026-09-04 audit-gate-closure）**：本阶段 `check-artifact-gate.ts`（终检默认 `--phase=8`）、`check-codegraph-queries.ts` 与 `check-coding-plan.ts` 均须以 `--scope=<change-scope.json>`（或 `--change/--base/--head` 薄封装）绑定实际变更——缺失 → exit 1（fail-closed）；S-coding 随变更维护/更新 scope（`headRef` 须等于当前 HEAD、`changedFiles` 与实际 Git 变更集合精确一致）。归档后置校验由 `check-archive-integrity.ts <archive-dir>` 承担（见「Archive 机制」节）。旧 opsx 制品门 `check-opsx-artifacts.ts` **已于 2026-09-21 退役**（语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）。
+w-model-dev/references/phase-5-coding.md:87:> 阶段 5-8 以 superpowers 编码链做规格级规划与执行（superpowers 替换 opsx 批次 2；方法论见 [superpowers-adoption.md](superpowers-adoption.md)）。旧 OpenSpec opsx 制品链路（`check-opsx-artifacts.ts`）**已于 2026-09-21 退役**（含 self-test 用例与 `samples/opsx-artifacts/` fixture；语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）；新链路不再读取 `openspec/changes/`。
+w-model-dev/references/superpowers-adoption.md:125:- 归档快照校验并入 check-archive-integrity（原 check-openspec-archive 已退役，不新增第二归档门）。
+w-model-dev/references/superpowers-adoption.md:130:**迁移边界**：`--scope` / change-scope 契约绑定 git 区间，与 opsx 无关，替换不触及；新链路（`check-coding-plan.ts` + check-archive-integrity 的 `codingPlanSnapshot`）不再读取 `openspec/changes/<changeId>/` 目录——该目录的活体引用（`check-opsx-artifacts.ts` 本体、`self-test.ts` 用例、vitest SUBPROCESS 登记、AGENTS / README 的对外声明等）**已于 2026-09-21 全部退役**（`git rm`：脚本 + 用例 + `samples/opsx-artifacts/` fixture + 全部登记与计数回拨）；superpowers 本身无制品格式，因此「机器可查」的部分一律由上述 W-Model 脚本承担，不把门禁建立在上游文本或宿主安装状态之上。
+w-model-dev/references/subagent-delegation.md:124:> 旧 OpenSpec opsx 制品门 `check-opsx-artifacts.ts` **已于 2026-09-21 退役**（`git rm`，含其 self-test 用例与 `samples/opsx-artifacts/` fixture；语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）；新链路不再读取 `openspec/changes/`。
+w-model-dev/references/subagent-delegation.md:319:> 缺失任一文件命中反模式 #39（跳过编码计划审查），由 `check-coding-plan.ts` R5 校验（stage 词表 plan/execute/finalize；旧词表 explore/propose/coding 不充数）。旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役（语义即本节的 R3×9 + V×3 校验）。
+w-model-dev/references/subagent-delegation.md:366:> 旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役（不再在 pre-push 执行路径上；由本表新链路的 `check-coding-plan.ts` 承担）。
+w-model-dev/references/subagent-delegation.md:696:> **阶段 5-8 门禁顺序与 ChangeScope（2026-09-04 audit-gate-closure）**：阶段 5-8 的 G 侧执行顺序为 **codegraph/coding-plan strict 校验 → artifact gate（聚合）→（阶段 8）编码计划归档快照 → check-archive-integrity.ts（归档完整性 + 编码计划归档快照后置校验；2026-09-21 自 check-openspec-archive 退役并入）→ CHECKPOINT**。`check-artifact-gate.ts --phase=5..8` 与 `check-codegraph-queries.ts` / `check-coding-plan.ts` 均须绑定变更上下文：`--scope=<change-scope.json>`（或 `--change=<changeId> --base=<ref> --head=<ref>` 薄封装），缺失 → exit 1（fail-closed；S-coding 须随阶段产物产出并更新 scope，`headRef` 过期或 `changedFiles` 与实际 Git 变更集合不符同样 fail-closed）。artifact gate 把两个 strict checker 的 violations 并入 reasons/exitCode（不得被 RTM 通过掩盖；coding-plan violations 以 `[coding-plan]` 前缀、`GATE_JSON.external.codingPlan` 计数），`GATE_JSON` 含 external summary；归档后置校验已并入 `check-archive-integrity.ts`（codingPlanSnapshot 清单项，自动派生），不在 pre-archive 的 artifact gate 内强制。旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役（不在 pre-push 路径上；规格级规划层门禁是 `check-coding-plan.ts`）。
+w-model-dev/scripts/cli/check-archive-integrity.ts:8: * 自 check-openspec-archive 退役起（superpowers 替换批次 1），本脚本并入「归档后置校验」：
+w-model-dev/scripts/cli/check-coding-plan.ts:84:    // 沿用已退役 check-opsx-artifacts 的分支语义（该脚本退出码契约由本脚本承接）：空格形态数字越界 → '参数非法 --phase=N'；非数字 / 缺值 / 等号形态 → '参数缺失'
+w-model-dev/scripts/cli/check-artifact-gate.ts:26: *                 archive（原 check-openspec-archive.ts）后置门已于 2026-09-21 退役，
+w-model-dev/scripts/cli/check-artifact-gate.ts:237: * openspecArchived 不作为本 gate 输入：原 phase 8 opsx:archive 后置门 check-openspec-archive.ts
+w-model-dev/scripts/cli/check-artifact-gate.ts:587:  // openspecArchived 不作为本 gate 输入（原 phase 8 opsx:archive 后置门 check-openspec-archive.ts
+w-model-dev/scripts/cli/self-test.ts:2449:      '归档完整性：codingPlanSnapshot=true 且编码计划归档快照齐备（phase5-demo.plan.md + progress.md + Task 1/2 三件套；账本内容实读配套目录树，与 CLI 生产路径同源），应通过（并入自 check-openspec-archive 退役）',
+w-model-dev/scripts/cli/self-test.ts:2456:      '归档完整性：codingPlanSnapshot=true 但归档根缺 phase5-demo.plan.md 计划快照，应未通过（并入自 check-openspec-archive 退役）',
+w-model-dev/scripts/cli/self-test.ts:4381:      // 对象形态：manifest 条件项 + contents 路径清单（codingPlanSnapshot 并入自 check-openspec-archive 退役）
+w-model-dev/scripts/logic/archive-integrity-logic.ts:7: * 自 check-openspec-archive 退役起（superpowers 替换批次 1），本层通过可选 manifest 条件项
+w-model-dev/scripts/logic/archive-integrity-logic.ts:93: * codingPlanSnapshot 清单项（并入自 check-openspec-archive 退役）：
+w-model-dev/scripts/samples/README.md:34:| `archive-integrity`    | check-archive-integrity                                                            | ARCHIVE_INTEGRITY_CASES（6）                                                                                     | 归档完整性（清单 + 文件存在性 + codingPlanSnapshot 编码计划归档快照条件项：plan/progress.md + Task N: complete 三件套，2026-09-21 自 check-openspec-archive 退役并入）；valid-coding-plan-snapshot 配套归档目录树提供账本实读内容                                                                                                                                                                                | 平铺 JSON（数组=既有清单；对象=含 codingPlanSnapshot 清单项）                                           | 放宽归档完整性将漏掉清单引用缺失文件或编码计划归档快照残缺仍判归档成功 |
+w-model-dev/scripts/logic/coding-plan-logic.ts:13: *       （phase 归属一致性，先于存在性检查；顺序与已退役的 check-opsx-artifacts 一致）。
+w-model-dev/scripts/logic/coding-plan-logic.ts:27: *       dim ∈ {completeness, reliability, security}（文件命名规则沿袭已退役的 check-opsx-artifacts
+w-model-dev/scripts/logic/coding-plan-logic.ts:63:/** R3×9 三维度（词表沿袭已退役的 check-opsx-artifacts） */
+w-model-dev/scripts/logic/coding-plan-logic.ts:88: * 变更目录解析结果（D-7 五态，与已退役 check-opsx-artifacts 的 resolveChangeDirName 同构 + 日历校验态）
+w-model-dev/scripts/logic/coding-plan-logic.ts:286: * check-openspec-archive 退役）import 同一实现，保证「Task N: complete」判定口径全仓单点。
+w-model-dev/scripts/logic/coding-plan-logic.ts:412:  // R1 前缀一致性（先于存在性检查，便于定位归属错误——顺序沿用已退役的 check-opsx-artifacts）
+eval/e2e/demo-assets/README.md:36:旧 opsx 链路制品（`openspec/changes/<changeId>/`）在 demo 工作区中仍被生成（装配器未删除），但**对应的门禁已在 2026-09-21 退役**：`check-opsx-artifacts.ts` 与其 fixture（`w-model-dev/scripts/samples/opsx-artifacts/`）已 `git rm`，语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3（stage 词表 `plan/execute/finalize`，旧词表 `explore/propose/coding` 不充数）。该目录现在只是留作历史对照的静态样本，没有任何门禁读取它。
+w-model-dev/references/command-reference.md:451:- **归档后置校验（阶段 8）**：原 check-openspec-archive（opsx:archive 后置门）已于 2026-09-21 退役（superpowers 替换批次 1），归档后置校验并入 **check-archive-integrity**（codingPlanSnapshot 清单项；不在 `check-artifact-gate.ts` pre-archive gate 内强制，由 G 在归档完成后单独跑）：
+w-model-dev/references/command-reference.md:455:- **GATE_JSON / 摘要**：codegraph 收尾 `CODEGRAPH_QUERIES_JSON`、coding-plan 收尾 `CODING_PLAN_JSON`（均含 passed/violations/exitCode，phase 5-8 strict 模式下额外含 changeId 与覆盖/制品计数）；`OPSX_ARTIFACTS_JSON`（check-opsx-artifacts）与 `OPENSPEC_ARCHIVE_JSON`（check-openspec-archive）两个 producer 均已退役、不再有新产物——run-log-logic 的 `GATE_JSON_PATTERNS` 保留这两个模式仅用于解析历史 gate-logs / run-log（`CODING_PLAN_JSON` 为新链路实读模式）。
+w-model-dev/references/phase-6-integration-test.md:37:> **门禁绑定（2026-09-04 audit-gate-closure）**：本阶段 `check-artifact-gate.ts --phase=6`、`check-codegraph-queries.ts` 与 `check-coding-plan.ts` 均须以 `--scope=<change-scope.json>`（或 `--change/--base/--head` 薄封装）绑定实际变更——缺失 → exit 1（fail-closed）；S-coding 随变更维护/更新 scope（`headRef` 须等于当前 HEAD、`changedFiles` 与实际 Git 变更集合精确一致），artifact gate 聚合两个 strict checker 的 violations，`GATE_JSON` 含 external summary（`codegraph` + `codingPlan`）。旧 opsx 制品门 `check-opsx-artifacts.ts` **已于 2026-09-21 退役**（语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）。
+w-model-dev/scripts/__tests__/archive-integrity-logic.test.ts:64:// ==================== codingPlanSnapshot 清单项（并入自 check-openspec-archive 退役） ====================
+w-model-dev/scripts/__tests__/examples-contract.test.ts:710:    // 原 check-openspec-archive.ts（opsx:archive 后置门）已于 2026-09-21 退役，
+w-model-dev/scripts/__tests__/examples-contract.test.ts:715:    expect(content).not.toMatch(/^/s*npx/s+tsx[^/n]*check-openspec-archive/.ts/m);
+w-model-dev/scripts/__tests__/examples-contract.test.ts:716:    expect(content).not.toMatch(/^/s*npx/s+tsx[^/n]*check-opsx-artifacts/.ts/m);
+w-model-dev/scripts/__tests__/docs-consistency-logic.test.ts:98: * 2026-09-21 最终评审 C-1：随 `check-opsx-artifacts` 退役去掉该项；补登此前漏登的
+w-model-dev/templates/coding.md:80:- `check-codegraph-queries.ts` / `check-coding-plan.ts`（阶段 5-8 门禁，均带 `--phase=5 --scope=<change-scope.json>`，缺 scope 即 fail-closed）：退出码 0（旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役，语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）
+
+分类结论：46 行残余全部为——
+  (a) 退役墓碑注记（「已于 2026-09-21 退役（语义并入 check-coding-plan.ts R5 ...）」）：
+      README.md、docs/skill-design-document_SSoT.md、references/phase-5~8、
+      references/subagent-delegation.md、references/command-reference.md、
+      references/superpowers-adoption.md、examples/stage5~8、examples/README.md、
+      templates/coding.md、scripts/samples/README.md、eval/README.md、
+      eval/e2e/demo-assets/{README.md,build_workspace.py}；
+  (b) 代码注释中的来源/沿袭说明（「沿袭已退役的 check-opsx-artifacts」「并入自
+      check-openspec-archive 退役」）：coding-plan-logic.ts、archive-integrity-logic.ts、
+      self-test.ts、check-artifact-gate.ts、check-archive-integrity.ts、check-coding-plan.ts；
+  (c) 反向守卫断言中的 retired 名（examples-contract.test.ts 的
+      expect(content).not.toMatch(/check-opsx-artifacts\.ts/) 等负向正则，
+      以及 docs-consistency-logic.test.ts 的退役说明注释）。
+活性命中（脚本调用、分派矩阵登记、门禁实读、对外 functional 引用）：0。
+结论：活性面退役名 grep 通过（零活性命中）。
+
+--------------------------------------------------------------------------------
+[3] self-test CRLF 回归锚（npx tsx w-model-dev/scripts/cli/self-test.ts，后台执行）
+--------------------------------------------------------------------------------
+✓ code-health/phase4/bad-lifecycle-mismatch.json lifecycle/resource 差异 → 不授权
+✓ code-health/phase4/bad-maintenance-only.json 维护收益仅“少几行/更短 diff” → 不构成收益，不授权
+✓ code-health/phase4/bad-generated.json    tracked record 标记 generated copy → 排除，绝不计为稳定生产调用点
+✓ code-health/phase4/bad-oneoff.json       tracked record 标记 one-off experiment → 排除，绝不授权
+✓ code-health/phase4/bad-deadcopy.json     tracked record 标记 dead copy → 排除，绝不授权
+✓ code-health/phase4/bad-prose-views.json  三个结构视图均为自由文本 → typed 结构证据不足，deferred
+────────────────────────────────────────────────────────────
+总计 357 条用例：357 通过，0 失败
+
+coding-plan 用例（3 条，实际存在数）：valid-phase5 / bad-missing-ledger / bad-task-missing-verify 均 ✓；
+archive-integrity codingPlanSnapshot 用例 1 条 ✓（并入自 check-openspec-archive 退役）。
+结论：self-test 通过（357/357，0 失败）。
+
+--------------------------------------------------------------------------------
+[4] 验收结论
+--------------------------------------------------------------------------------
+prepush：19 项全 ✓（含 self-test、vitest 全量+coverage 阈值、规则层覆盖口径、
+npm audit、docs-consistency、samples 覆盖矩阵、prettier、tsc、eval 语料），
+结语「全部门禁通过，允许推送 ✓」，无失败项、无修复项。
+grep：零活性命中（46 行残余均为墓碑/来源注释/负向守卫）。
+self-test：357/357 通过。
+验收判定：PASS。
