@@ -225,7 +225,7 @@ async function main(): Promise<void> {
   let reworkCount: number | undefined;
   let tlaReworkCount: number | undefined;
   let tokensUsed: TokenUsage | undefined;
-  // 只有文件确实存在（读到内容）才把「Σtokens=0」解释为「无用量字段」；读取失败时
+  // 只有文件确实存在（fs.access 成功即置位，空文件同样算存在）才把「Σtokens=0」解释为「无用量字段」；读取失败时
   // 已由下方 warning 说明跳过原因，不再追加 R6 未生效警告（避免把「没读到」说成「没用量」）
   let runLogReadable = false;
   if (runLogFile) {
@@ -259,7 +259,7 @@ async function main(): Promise<void> {
     tokensUsed,
   });
 
-  // R6 可见性（D-4b，与 R1/R4-A 的「跳过不等于通过」同口径）：--run-log 读到了内容但 Σtokens=0
+  // R6 可见性（D-4b，与 R1/R4-A 的「跳过不等于通过」同口径）：--run-log 文件存在但 Σtokens=0
   // （无 tokens 字段或全为 0）时，R6 无实际约束力——显式警告而非静默通过。
   // 未提供 --run-log 时不追加（该路径整体不校验 R5/R6，行为与新增前一致）；
   // --run-log 读取失败时也不追加（上一条 warning 已说明跳过原因，避免把「没读到」说成「没用量」）。

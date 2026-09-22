@@ -44,7 +44,7 @@ bash run_negative_probes.sh              # 期望末行：✓ 9/9 探针被拦�
 | 结论层   | 调测/运行结论与经验教训（本文档与「已实测的坑」即其产物）                         | 入库文档（如 `docs/debug/<日期>-<主题>/` 下的报告 Markdown）                                                                                                                        |
 | 制品层   | `.w-model/` 运行时产物（run-log / signature-chain / gate-logs 等）                | 整树快照入库 `docs/debug/<日期>-<主题>/`；或走导出链（`npm run wm:verify-evidence-source` + `npm run wm:export-evidence`）——注意导出链 source-bound 强制 git HEAD，对无 `.git` 工作区（含本 demo 工作区）结构性不可用，此形态下以快照入库为准 |
 
-本节为规则成文，**不新增反模式编号**（成本收益裁定，见 RC-2 报告）。
+本节为规则成文，**不新增反模式编号**（成本收益裁定，见 RC-2 报告 `docs/debug/2026-09-22-rc2-demo-rebuild-loss/README.md`）。
 
 ## 非基准态检测与证据快照（装配器机制位）
 

@@ -9,6 +9,15 @@
 
 ## [42.2.1] - 2026-09-01
 
+### R 三项采纳 + 打磨项清扫（2026-09-22）
+
+> 来源：用户裁定「R 三项全部按推荐进行，打磨项也做」（2026-09-22）。**批次范围**：落地三份根因报告推荐（RC-1 coding-plan fs 注入 / RC-2 销毁前证据保全规则与装配器护栏 / RC-3 eval 基线不可变成文）+ 全量打磨项清扫 + isMain 统一加固；规格见 `docs/superpowers/specs/2026-09-22-rc-closeout-spec.md`、计划见 `docs/superpowers/plans/2026-09-22-rc-closeout.md`，逐任务报告与评审 diff 存 `.superpowers/sdd/2026-09-22-rc-closeout/`（gitignored 账本）。验收：全量 19 项 `npm run prepush` exit 0（记录 `docs/debug/2026-09-22-rc-closeout-acceptance/acceptance.txt`）。版本保持 42.2.1，**不 bump**。
+>
+> 本小节为终审修复追加：批次期间两项与规格/计划原文有出入的裁定（下述裁定 A/B）此前只存于上述 untracked 账本——按本批 RC-3 自修的规则「处置结论须落在 tracked 面」，现落 CHANGELOG。
+
+- **裁定 A（tokensUsed 判据较规格 WS-D.1 收窄）**：规格 WS-D.1 原文要求「`tokensUsed` 非有限**非负**时 logic 层防御（跳过 + warning，**不静默**）」；实现收窄为「仅非有限（NaN/Infinity）**静默视同未提供**」——`logic/budget-logic.ts` 的守卫为 `usage && Number.isFinite(usage.phase) && Number.isFinite(usage.total)`，非有限时整体跳过 R6/R5-b，不产生 violation/warning、不抛错，与未传 `--run-log` 行为对齐（任务 4 报告 §3 第 6 项；测试⑤「tokensUsed 为 NaN（phase/total 均 NaN）→ 视同未提供：不触发且不抛错」钉死）。与规格原文的两处偏差及收窄理由：①**负数语义**——规格字面含「非负」，实现守卫不拒负数：CLI 侧 `sumTokens` 只累计有限非负数（NaN/Infinity/负数/非数字一律剔除，D-4b 口径），负数无从到达 logic 层（任务 4 报告 §7 裁定 2 记载「CLI 侧 sumTokens 只产有限非负数」）；②**warning 静默**——实现按「视同未提供」语义不输出告警，未按规格原文输出 warning。规格文件 WS-D.1 条目处已补勘误注指向本条（双向可寻）。
+- **裁定 B（run-sync 台账登记不适用）**：`lib/is-main.ts` 的 `realpathSync` 未登记进 `lib/run-sync.ts` 台账——实读确认该台账（`SYNC_PROCESS_EXCEPTIONS`）实为**同步 child_process 专用**（`DirectSyncApi = 'spawnSync' | 'execSync' | 'execFileSync'`，审计函数只扫描 `node:child_process` 导入），**无 fs 调用登记机制**；且 `run-sync.test.ts` 对台账做「条目数 == AST 真实调用数」双向对账，强行登记不存在的同步调用条目会类型报错 + 对账红灯。审计痕迹落在 `lib/is-main.ts` 头注（加固语义）与 `realpathSync` 行内 eslint 豁免理由（同 `safe-project-path.ts` 惯例）（任务 10 报告 §3 记载；若需制度化 fs 台账属独立任务，另行立规格）。
+
 ### E-2 规格修正案落地：R0 首阶段自举形态（方案 B，2026-09-22）
 
 > 来源：阶段 1 自举死锁（E-2，`docs/debug/2026-09-20-wm-8phase-live-run` 披露、`docs/debug/2026-09-22-e2-r8-r0-rootcause/README.md` 根因定位证实）——放行记录被同时当「放行事件凭证」（R0/R11：先写供门验）与「阶段终点轨迹标记」（R8：最后写），三批独立合入的规则在阶段 1 零记录态联合成死锁；根因实测证实自然时序（确认落盘 → 闭环五门 → 最后写放行记录）在现行 R8/R11 下已 exit 0，R0 是唯一阻塞。用户已批准方案 B（规格 `docs/superpowers/specs/2026-09-22-e2-spec-amendment.md`）。版本保持 42.2.1，**不 bump**。

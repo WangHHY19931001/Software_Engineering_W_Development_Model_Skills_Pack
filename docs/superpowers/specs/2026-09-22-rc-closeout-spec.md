@@ -44,6 +44,7 @@
 
 **代码/测试面：**
 1. `coding-plan-logic.ts`：`VERIFY_PREFIXES` 第 4 项改为全角冒号真变体（'Verify：'）或删除并改注释；R3 账本首行身份改**严格第一行**（非首个非空行）；目标节判据排除「非目标/不是目标」前缀；`maxTokens=0` 时 R6/R5-b 文案除零防护；`tokensUsed` 非有限非负时 logic 层防御（跳过 + warning，不静默）；`check-budget.ts` 读取失败警告文案「跳过 R5 触发检测」→「跳过 R5/R6/R5-b」；补 `total === maxTokensTotal` 边界与 `budgetBurnRate` 缺失不触发两用例。（WS-A 注入不改内容归一化，CRLF 语义保持。）
+   > 注（终审）：tokensUsed 判据实现较本条原文收窄为「仅非有限静默视同未提供」，裁定记录见 CHANGELOG 2026-09-22 批次小节。
 2. `check-archive-integrity.ts` / `coding-plan-logic.ts`：归档零匹配/非法日期文案信息量核对（I-2 已加 invalid-date 态，确认排障信息量）；`BOOTSTRAP_VALIDATION` 诊断文案点名 phase-1（E-2 遗留）。
 3. `cli/check-budget.ts`：Σ=0「R6 未生效」与 data-models 措辞一致核对（「文件存在 + Σ=0」条件）。
 4. `cli/check-artifact-gate.ts`：注释面退役脚本残留 grep 复核归零（任务 7 已改——复核）。
