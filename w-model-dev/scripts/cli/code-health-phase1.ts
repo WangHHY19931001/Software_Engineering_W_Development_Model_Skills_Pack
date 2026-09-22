@@ -26,7 +26,6 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import type {
@@ -57,6 +56,7 @@ import { createCodeHealthGitRevisionProvider } from '../lib/code-health-revision
 import { resolveControlledRelativePath } from '../lib/code-health-file-verifier.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 
 const DEFAULT_RAW_OUTPUT_ROOT = '.w-model/code-health/phase1/raw';
@@ -646,8 +646,7 @@ async function main(): Promise<void> {
   process.exitCode = result.exitCode;
 }
 
-const entryArg = process.argv[1];
-const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
-if (isMain) {
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main
+if (isDirectInvocation(import.meta.url)) {
   runMain(main);
 }

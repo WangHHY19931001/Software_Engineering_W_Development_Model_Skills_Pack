@@ -36,11 +36,11 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve as pathResolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 import { exitWithError } from '../lib/cli-error.js';
 import { buildExit2Probes } from '../lib/exit2-probe-registry.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { runSync } from '../lib/run-sync.js';
 import { printGateReport, printJsonReport } from '../lib/gate-report.js';
@@ -907,12 +907,7 @@ async function main(): Promise<void> {
   return;
 }
 
-// Windows 兼容的 main 模块判断：
-//   - import.meta.url 是 file:///D:/... URL 格式
-//   - process.argv[1] 是 Windows 路径 D:\... 或 POSIX 路径
-//   用 fileURLToPath + pathResolve 归一化两端再比较，避免斜杠方向 / 盘符大小写差异。
-const entryArg = process.argv[1];
-const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === pathResolve(entryArg);
-if (isMain) {
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main，防 symlink/盘符大小写/8.3 短名 fail-open
+if (isDirectInvocation(import.meta.url)) {
   runMain(main);
 }

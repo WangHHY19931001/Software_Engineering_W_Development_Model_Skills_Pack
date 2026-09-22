@@ -44,7 +44,6 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
 
 import type * as TsType from 'typescript';
 
@@ -60,6 +59,7 @@ import {
 } from '../logic/code-tla-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError, type CliError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
@@ -347,9 +347,7 @@ async function main(): Promise<void> {
   return;
 }
 
-// isMain 守卫：仅直接执行时运行 main，被单测 import（loadTlaContents）时不触发
-const entryArg = process.argv[1];
-const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
-if (isMain) {
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main，被单测 import（loadTlaContents）时不触发
+if (isDirectInvocation(import.meta.url)) {
   runMain(main);
 }

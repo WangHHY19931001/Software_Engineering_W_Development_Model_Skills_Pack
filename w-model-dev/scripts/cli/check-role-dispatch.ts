@@ -32,10 +32,10 @@
  */
 
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { checkRoleDispatch, type RoleDispatchEntry } from '../logic/role-dispatch-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { readJsonlOrExitDetailed } from '../lib/read-json-or-exit.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
@@ -144,12 +144,7 @@ async function main(): Promise<void> {
   return;
 }
 
-// Windows 兼容的 main 模块判断：
-//   - import.meta.url 是 file:///D:/... URL 格式
-//   - process.argv[1] 是 Windows 路径 D:\... 或 POSIX 路径
-//   用 fileURLToPath + path.resolve 归一化两端再比较，避免斜杠方向 / 盘符大小写差异。
-const entryArg = process.argv[1];
-const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
-if (isMain) {
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main
+if (isDirectInvocation(import.meta.url)) {
   runMain(main);
 }

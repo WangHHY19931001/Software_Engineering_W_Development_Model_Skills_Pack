@@ -35,10 +35,10 @@
  */
 
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { hasFlag } from '../lib/parse-args.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
@@ -149,15 +149,7 @@ async function main(): Promise<void> {
   return;
 }
 
-// isMain 守卫：仅在直接执行时运行 main，被 import 时不触发
-const isMain = (() => {
-  try {
-    return process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
-  } catch {
-    return false;
-  }
-})();
-
-if (isMain) {
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main，被 import 时不触发
+if (isDirectInvocation(import.meta.url)) {
   runMain(main);
 }

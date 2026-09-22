@@ -36,6 +36,7 @@ import { exitWithError } from '../lib/cli-error.js';
 // 受控 CLI 派发（win32 .cmd shim 经 cmd.exe）与 cli/doctor.ts 共用同一实现——两消费者对
 // 「同一依赖是否可用」必须结论一致（2026-09-21 修复轮 1 评审裁定 2，见 lib/cli-probe.ts 头注）
 import { probeCliCommand, type CliProbeResult } from '../lib/cli-probe.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 import { DuplicateFlagError } from '../lib/parse-args.js';
@@ -353,8 +354,7 @@ async function main(): Promise<void> {
   process.exitCode = exitCode;
 }
 
-const entryArg = process.argv[1];
-const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
-if (isMain) {
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main
+if (isDirectInvocation(import.meta.url)) {
   runMain(main);
 }

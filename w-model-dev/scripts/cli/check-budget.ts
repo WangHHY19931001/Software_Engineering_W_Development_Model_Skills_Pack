@@ -47,12 +47,12 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { checkBudget, type BudgetConfig, type TokenUsage } from '../logic/budget-logic.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 import { readJsonOrExit, readJsonlOptional } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { loadAndValidate, LOAD_AND_VALIDATE_SENTINEL_PREFIX } from '../lib/load-and-validate.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
@@ -337,11 +337,8 @@ async function main(): Promise<void> {
   return;
 }
 
-// isMain 守卫：仅直接执行时运行 main，被 __tests__ 等 import 时不触发
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main，被 __tests__ 等 import 时不触发
 // （countReworks 是本模块的导出统计函数，测试导入它不应产生 CLI 副作用）
-const entryArg = process.argv[1];
-const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
-
-if (isMain) {
+if (isDirectInvocation(import.meta.url)) {
   runMain(main);
 }

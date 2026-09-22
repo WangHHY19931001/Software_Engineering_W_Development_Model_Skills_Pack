@@ -19,7 +19,6 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import type {
   ApprovalDecision,
@@ -32,6 +31,7 @@ import { canArchiveCandidate, validateCodeHealthCandidate } from '../logic/code-
 import { ARCHIVE_MANIFEST_NAME, createTask1ArchiveBoundary } from '../lib/code-health-archive-boundary.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 
 const VALUE_FLAGS = ['campaign', 'output', 'source-project', 'verification-level', 'verify', 'manifest'] as const;
@@ -301,8 +301,7 @@ async function main(): Promise<void> {
   return runProduce(parsed);
 }
 
-const entryArg = process.argv[1];
-const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
-if (isMain) {
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main
+if (isDirectInvocation(import.meta.url)) {
   runMain(main);
 }

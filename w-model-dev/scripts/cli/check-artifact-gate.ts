@@ -76,6 +76,7 @@ import {
 import { checkCodingPlan } from '../logic/coding-plan-logic.js';
 import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
 import { exitWithError, type CliError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { ARTIFACT_PATHS } from '../lib/constants.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
@@ -765,9 +766,7 @@ async function main(): Promise<void> {
   return;
 }
 
-// isMain 守卫：仅直接执行时运行 main，被 self-test 等 import 时不触发
-const entryArg = process.argv[1];
-const isMain = entryArg !== undefined && fileURLToPath(import.meta.url) === path.resolve(entryArg);
-if (isMain) {
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main，被 self-test 等 import 时不触发
+if (isDirectInvocation(import.meta.url)) {
   runMain(main);
 }
