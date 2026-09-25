@@ -235,6 +235,27 @@ describe('wm-append-runlog：非法输入（exit 2）', () => {
     expect(await sha256(runLogPath)).toBe(before);
   });
 
+  it('单破折号未知选项 → exit 2 ARG_INVALID（不得被当作目标路径）', async () => {
+    const r = run(['-x', '--stdin'], line(record({ runId: 'b', timestamp: undefined })));
+    expect(r.code).toBe(2);
+    expect(r.stderr).toContain('✗ [ARG_INVALID]');
+    expect(await fs.stat(runLogPath).catch(() => null)).toBeNull();
+  });
+
+  it('注册路径全文件重校：历史行不符 schema → exit 1 SCHEMA_INVALID，文件未被修改', async () => {
+    // 历史行带 schema 未登记字段（additionalProperties:false 违规）但语法合法：本工具的追加判定放行，
+    // 由 writeStateJson 的注册路径逐行重校拒绝写入（目标未修改）
+    const legacy = { ...record(), unexpectedLegacyField: true };
+    await seed(`${line(legacy)}
+`);
+    const before = await sha256(runLogPath);
+    const r = run([runLogPath, '--stdin'], line(record({ runId: 'b', timestamp: undefined })));
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain('✗ [WRITE_REJECTED]');
+    expect(r.stdout).toMatch(/"reason":"SCHEMA_INVALID"/);
+    expect(await sha256(runLogPath)).toBe(before);
+  });
+
   it('--stdin 与 --from 互斥 → exit 2 ARG_INVALID', async () => {
     const payload = path.join(tmpDir, 'payload.jsonl');
     await fs.writeFile(payload, `${line(record())}\n`, 'utf-8');

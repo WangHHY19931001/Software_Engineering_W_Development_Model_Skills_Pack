@@ -134,7 +134,7 @@ function parseArgs(args: readonly string[]): CliArgs {
   for (let index = 0; index < args.length; index++) {
     const arg = args.at(index)!;
     if (!arg.startsWith('--')) {
-      if (arg === '-h') continue; // `-h` 已在 main 顶部处理
+      if (arg.startsWith('-')) exitArgInvalid(`未知选项: ${arg}`);
       if (parsed.targetArg !== undefined) exitArgInvalid(`未知额外位置参数: ${arg}`);
       parsed.targetArg = arg;
       continue;
@@ -272,17 +272,8 @@ function structuralValidationCopies(records: readonly RunLogRecord[], fallbackTi
 
 function emitRejection(plan: AppendPlan, absTarget: string, existingLines: number): void {
   const inputCode = plan.violationCodes.find((code) => inputErrorCategory(code) !== undefined);
-  const summary = {
-    ok: false,
-    reason: plan.violationCodes[0] ?? 'APPEND_REJECTED',
-    lines: existingLines,
-    appended: 0,
-    violations: plan.violations,
-    diagnostics: plan.diagnostics,
-    writtenPath: absTarget,
-  };
-  console.log('RUNLOG_APPEND_JSON ' + JSON.stringify(summary));
   if (inputCode !== undefined) {
+    // 输入错误按仓库 exit-2 口径输出：stderr 人类可读 + stdout 单行 ERROR_JSON（不再叠加工具摘要行）
     exitWithError({
       category: inputErrorCategory(inputCode)!,
       rule: 'P0-3',
@@ -292,6 +283,18 @@ function emitRejection(plan: AppendPlan, absTarget: string, existingLines: numbe
     });
     return;
   }
+  console.log(
+    'RUNLOG_APPEND_JSON ' +
+      JSON.stringify({
+        ok: false,
+        reason: plan.violationCodes[0] ?? 'APPEND_REJECTED',
+        lines: existingLines,
+        appended: 0,
+        violations: plan.violations,
+        diagnostics: plan.diagnostics,
+        writtenPath: absTarget,
+      }),
+  );
   console.error(`✗ [WRITE_REJECTED] ${plan.violations.join('；')}: ${absTarget}`);
   process.exitCode = 1;
 }
@@ -358,7 +361,7 @@ async function main(): Promise<void> {
   const read = await readRunLogFile(absTarget);
   if (!read.ok) {
     exitWithError({
-      category: read.message.includes('JSON') ? 'FILE_PARSE' : 'STRUCTURE_INVALID',
+      category: read.category,
       rule: 'P0-3',
       message: read.message,
       file: absTarget,

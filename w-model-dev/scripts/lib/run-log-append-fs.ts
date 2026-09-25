@@ -35,9 +35,10 @@ export interface RunLogFileContent {
   rawLines: string[];
 }
 
-/** 读取结果：解析失败以 `ok:false` 返回（含行号），由 CLI 转 exit 2，不抛异常 */
+/** 读取结果：解析失败以 `ok:false` 返回（含行号 + exit-2 类别），由 CLI 转 ERROR_JSON，不抛异常 */
 export type RunLogFileReadResult =
-  { ok: true; content: RunLogFileContent } | { ok: false; line: number; message: string };
+  | { ok: true; content: RunLogFileContent }
+  | { ok: false; line: number; message: string; category: 'FILE_PARSE' | 'STRUCTURE_INVALID' };
 
 /**
  * 读取 run-log 文件并逐行解析。
@@ -67,10 +68,15 @@ export async function readRunLogFile(absPath: string): Promise<RunLogFileReadRes
     try {
       parsed = parseJsonSafe(rawLine);
     } catch {
-      return { ok: false, line: index + 1, message: '既有 run-log 行不是合法 JSON' };
+      return { ok: false, line: index + 1, message: '既有 run-log 行不是合法 JSON', category: 'FILE_PARSE' };
     }
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      return { ok: false, line: index + 1, message: '既有 run-log 行不是 JSON 对象' };
+      return {
+        ok: false,
+        line: index + 1,
+        message: '既有 run-log 行不是 JSON 对象',
+        category: 'STRUCTURE_INVALID',
+      };
     }
     entries.push(parsed as RunLogRecord);
     rawLines.push(rawLine);

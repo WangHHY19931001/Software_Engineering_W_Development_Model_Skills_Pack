@@ -141,6 +141,7 @@ const CLI_SCRIPT_NAMES = [
   'review-package',
   'security-scan',
   'self-test',
+  'wm-append-runlog',
   'wm-export-evidence',
   'wm-status',
   'wm-verify-evidence-source',
@@ -189,7 +190,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
       properties: { action: { enum: ACTION_ENUM_30 } },
     }),
     skill:
-      '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（53 个 .md） | 按需加载 |\n| `scripts/cli/`（46 个 .ts） | 仅 G 子代理执行 |',
+      '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 核心操作行为\n见 [references/operation-behaviors.md](references/operation-behaviors.md)。\n## 不可违反的约束\n见 [references/hard-constraints.md](references/hard-constraints.md)。\n| `references/`（53 个 .md） | 按需加载 |\n| `scripts/cli/`（47 个 .ts） | 仅 G 子代理执行 |',
     operationBehaviors: '## 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
     hardConstraints: Array.from({ length: 14 }, (_, i) => `## #${i + 1} 约束${i + 1}标题`).join('\n'),
     agents:
@@ -1655,8 +1656,8 @@ describe('runDocConsistencyChecks', () => {
       expect(report.dynamicMeasurements).toMatchObject({
         // 34 = 25 existing schemas + 9 code-health campaign schemas
         schemaCount: 34,
-        cliScriptCount: 46,
-        exit2ScriptCount: 45,
+        cliScriptCount: 47,
+        exit2ScriptCount: 46,
         testFileCount: (coverage.testResults as unknown[]).length,
         vitestTestCount: 1002,
         numPassedTests: 1002,
@@ -1671,7 +1672,7 @@ describe('runDocConsistencyChecks', () => {
       expect(report.dynamicMeasurements.vitestRunId).toMatch(/^[0-9a-f]{16}$/);
       expect(report.dynamicMeasurements.vitestArtifactSha256).toMatch(/^[0-9a-f]{64}$/);
       expect(report.dynamicMeasurements.vitestCommitSha).toMatch(/^[0-9a-f]{40}$/);
-      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(47);
+      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(48);
       expect(
         report.dynamicMeasurements.exit2ProbeResults?.every(
           (probe) =>
@@ -1758,8 +1759,8 @@ describe('runDocConsistencyChecks', () => {
           };
         });
       expect(stable(withStateReport)).toEqual(stable(withoutStateReport));
-      expect(withoutStateReport.dynamicMeasurements.exit2ScriptCount).toBe(45);
-      expect(withStateReport.dynamicMeasurements.exit2ScriptCount).toBe(45);
+      expect(withoutStateReport.dynamicMeasurements.exit2ScriptCount).toBe(46);
+      expect(withStateReport.dynamicMeasurements.exit2ScriptCount).toBe(46);
     });
   }, 120_000);
 
@@ -1773,7 +1774,7 @@ describe('runDocConsistencyChecks', () => {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
       const install = await fs.readFile(installPath, 'utf8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
-      await fs.writeFile(agentsPath, agents.replace('全仓 45 个脚本 exit 2', '全仓 34 个脚本 exit 2'), 'utf8');
+      await fs.writeFile(agentsPath, agents.replace('全仓 46 个脚本 exit 2', '全仓 34 个脚本 exit 2'), 'utf8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
       await fs.writeFile(installPath, install.replace('27 个 check-*.ts', '24 个 check-*.ts'), 'utf8');
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
@@ -1972,8 +1973,8 @@ describe('runDocConsistencyChecks', () => {
         };
       };
       expect(report.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
-      expect(report.dynamicMeasurements.exit2ScriptCount).toBe(45);
-      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(47);
+      expect(report.dynamicMeasurements.exit2ScriptCount).toBe(46);
+      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(48);
       expect(
         report.dynamicMeasurements.exit2ProbeResults?.every((probe) => probe.status === 2 && probe.errorExitCode === 2),
       ).toBe(true);
@@ -2359,10 +2360,10 @@ describe('runDocConsistencyChecks', () => {
 
   it('SKILL.md 声明 .ts 计数与实测不符 → script-registry 违规', () => {
     const input = baseInput({
-      skill: baseInput().skill.replace('（46 个 .ts）', '（43 个 .ts）'),
+      skill: baseInput().skill.replace('（47 个 .ts）', '（43 个 .ts）'),
     });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'script-registry');
-    expect(v.some((x) => x.message.includes('43') && x.message.includes('46'))).toBe(true);
+    expect(v.some((x) => x.message.includes('43') && x.message.includes('47'))).toBe(true);
   });
 
   it('cliScriptFiles 为空 → script-registry 守卫跳过（零违规）', () => {
