@@ -2256,22 +2256,28 @@ interface RunLogEntry {
 - **R15e 契约**：须存在**同一**签名链条目同时满足 —— `role=V` 且 `action=review`；其 `artifacts` 含该节点 id；
   其 `inputProvenance.sourceArtifacts[].path` 等于锚点 `path` 部分。"审过该节点"与"核验过该锚点"是两件事，二者须同时成立。
 
-### 10L.3 冰山扫掠分母对账（三视角平权）
+### 10L.3 冰山扫掠分母对账（设计 ID 分池）
 
 - **分母来源**：`newFindings: []` 此前即可通过，且 `sweptArtifacts` 允许空数组，导致「最省事的报告」与
   「最彻底的报告」不可区分。分母（该扫多少）改由 checker 从**上游已放行产物实测**，不由 R 声明——
   声明式分母只是把自证从"自报发现了什么"换成"自报该发现多少"。
 - **注入约定**：`check-iceberg-sweep.ts` 读盘后经 `externalEvidence.viewSets` 注入（与 §10L.2 的 R15c/R15e 同构）；
   `iceberg-sweep-logic.ts` 保持纯函数。
-- **派生口径**：三份产物的**最窄公共命名空间** `SD-NNN / DD-NNN / INTF-NNN`——
-  graph 取节点 `id`、tla 取 `sdCoverage.coveredSdNodes`、rtm 取各行 `designDoc` 解析值；
-  阶段 5-8 的 `scope` 视角取 `change-scope.json` 的 `changedFiles`。**刻意不含 REQ/NFR/CON**（TLA 侧无此命名空间，混入制造结构性假阳性）。
+- **派生口径（分池，D-1/N-1）**：视角命名空间宽度不同，故按 `VIEW_NAMESPACE` 分池而非同池精确比对——
+  **宽池 `design-wide`**（graph 取节点 `id`、rtm 取各行 `designDoc` 解析值）抽 `SD-NNN / DD-NNN / INTF-NNN` 全量，两两精确相等；
+  **窄池 `design-sd`**（tla 取 `sdCoverage.coveredSdNodes`）只要求与宽视角的 **SD 切片**相等：跨命名空间的 DD/INTF 宽度差不构成差异，
+  但窄池漏 SD 仍失败（phase≥2 由 `check-tla-model` 强制 `sdCoverage.uncoveredSdNodes` 为空并与 `graphSdNodes` 交叉校验，
+  故真实跑批的 tla SD 集恰等于 SD 切片，漏 SD 指向真实缺口）；
+  **path 命名空间**（阶段 5-8 的 `scope` 取 `change-scope.json` 的 `changedFiles`）**不参与** R6/R8 的集合比对
+  （与设计 ID 同池比对时，change-scope 在盘即结构性必红）。**刻意不含 REQ/NFR/CON**（TLA 侧无此命名空间，混入制造结构性假阳性）。
 - **在场表**：`ICEBERG_VIEW_PRESENCE`（**代码常量，非文档**——写文档会与实现漂移，先例见 `subagent-delegation.md` 计数漂移）。
   取值待端到端调测按各阶段实际产出物核定。
-- **三视角平权**：graph / TLA / RTM 等权，两两比对，任一差异即刻失败；**无主视角、不仲裁、不取并集后放行**
-  （取并集会把真实缺口洗成"已覆盖"）。
-- **三类失败信号**：R6 视角间差异（→ 普通 V/G 失败链由 R 定位）/ R7 视角缺席未在 `sweepCoverage.absentViews` 显式声明
-  （**禁止静默跳过**；产物缺失时**不合成空集合**，空集合会被当作"真的一致"放行）/ R8 零发现但收敛集合为空或 `sweptArtifacts` 未覆盖。
+- **分池对账**：宽池等权（graph / RTM），池内任一差异即刻失败；**无主视角、不仲裁、不取并集后放行**
+  （取并集会把真实缺口洗成"已覆盖"）；窄池（TLA）按 SD 切片相等，两个方向（超出宽集 / 漏 SD）均报。
+- **三类失败信号**：R6 视角间差异（分池后池内差异，标注 `R6[design-wide]` / `R6[design-sd]` → 普通 V/G 失败链由 R 定位）/
+  R7 视角缺席未在 `sweepCoverage.absentViews` 显式声明
+  （**禁止静默跳过**；产物缺失时**不合成空集合**，空集合会被当作"真的一致"放行）/
+  R8 零发现但收敛集合为空或 `sweptArtifacts` 未覆盖（**收敛集只取设计 ID 视角的并集**，`scope` 的文件路径不进入）。
 - **schema 强化**：`sweepCoverage.sweptArtifacts` 加 `minItems: 1`；新增可选 `sweepCoverage.absentViews`。
 
 ### 10L.4 三类评审偏移检测（权威定义）

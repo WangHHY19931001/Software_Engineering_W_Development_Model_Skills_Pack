@@ -67,6 +67,31 @@ export const ICEBERG_VIEW_PRESENCE: Record<number, readonly IcebergView[]> = {
 };
 
 /**
+ * 视角命名空间（R6 分池依据，D-1/N-1）：`design-wide` 两两精确相等；`design-sd` 只对宽视角的
+ * **SD 切片**相等（tla 取 `sdCoverage.coveredSdNodes`，SD-only 是 TLA+ 规约语义——要求它含
+ * DD/INTF 是把命名空间宽度差报成缺口）；`path`（scope 的 `changedFiles` 文件路径）不参与
+ * R6/R8 的集合比对（与设计 ID 同池比对时，阶段 5-8 只要 change-scope 在盘即结构性必红）。
+ */
+const VIEW_NAMESPACE: Record<IcebergView, 'design-wide' | 'design-sd' | 'path'> = {
+  graph: 'design-wide',
+  rtm: 'design-wide',
+  tla: 'design-sd',
+  scope: 'path',
+};
+
+/** 设计 ID 是否属于 SD 命名空间（tla 视角的规约覆盖范围；宽视角 SD 切片按此过滤） */
+function isSdDesignId(id: string): boolean {
+  return id.startsWith('SD-');
+}
+
+/** 对称差（a 独有在前、b 独有在后，稳定顺序便于 R 逐条定位；输入各自去重） */
+function symmetricDiff(a: readonly string[], b: readonly string[]): string[] {
+  const sa = new Set(a);
+  const sb = new Set(b);
+  return [...sa].filter((x) => !sb.has(x)).concat([...sb].filter((x) => !sa.has(x)));
+}
+
+/**
  * 三视角对账的外部产物注入面（本文件不做 I/O；CLI 层读盘后注入，与 `graph-logic.ts`
  * 的 `GraphCheckExternalEvidence` 同一约定）。
  *
@@ -75,10 +100,12 @@ export const ICEBERG_VIEW_PRESENCE: Record<number, readonly IcebergView[]> = {
  * 故分母由 checker 从上游已放行产物实测。未注入即跳过 R6/R7/R8（纯单测无文件系统
  * 上下文；阶段早期上游产物缺失时不得误红，规格 §5）。
  *
- * 各视角的标识符口径（实施期核定，规格 §5 已登记该风险）：取三份产物共有的
- * **设计 ID 命名空间**——graph.json 节点 id / tla-manifest `designIds` /
- * rtm 行经 `designDoc` 解析出的设计 ID / change-scope 的 `changedFiles`。
- * 这是最窄的公共命名空间，差异因此指向真实缺口而非命名空间结构性噪声。
+ * 各视角的标识符口径（实施期核定，规格 §5 已登记该风险）：含设计 ID 命名空间的视角取
+ * graph.json 节点 id / tla-manifest `sdCoverage.coveredSdNodes` / rtm 行经 `designDoc`
+ * 解析出的设计 ID，`scope` 取 change-scope 的 `changedFiles`（文件路径命名空间）。
+ * 视角命名空间宽度不同，故 R6 **分池比对**（见 `VIEW_NAMESPACE`）：宽池精确相等、
+ * 窄池对 SD 切片相等、path 命名空间不参与集合比对——同池两两比对会把结构性宽度差
+ * 报成缺口（D-1/N-1：阶段 3-8 结构性必红）。
  */
 export interface IcebergCheckExternalEvidence {
   /** 已落盘上游产物按视角独立算出的"应扫集合"；缺该键即该视角不在场 */
@@ -108,10 +135,10 @@ export function parseIcebergPhase(phase: unknown): number | undefined {
 }
 
 /**
- * 设计 ID 提取（三视角公共命名空间）：SD-NNN / DD-NNN / INTF-NNN。
+ * 设计 ID 提取（宽视角命名空间）：SD-NNN / DD-NNN / INTF-NNN。
  *
  * 刻意不含 REQ/NFR/CON：需求命名空间只有 graph 与 rtm 视角有，TLA 侧只有设计 ID，
- * 混入会制造结构性差异（假阳性），违背"最窄公共命名空间"口径（规格 §5 的实施期核定项）。
+ * 混入会制造结构性差异（假阳性）（规格 §5 的实施期核定项）。
  */
 const DESIGN_ID_PATTERN = /\b(?:SD|DD|INTF)-[A-Z0-9]+(?:-\d+)*(?:\.\d+)*/g;
 
@@ -123,12 +150,11 @@ export function extractDesignIds(text: string): string[] {
 /**
  * 各视角"应扫集合"的派生（纯函数；I/O 由 CLI 层完成后注入，D7：分母不由 R 声明）。
  *
- * 口径（实施期核定，规格 §5 已登记）：取三份产物共有的**设计 ID 命名空间**
- * （SD-NNN / DD-NNN / INTF-NNN）——
- *   - graph → graph.json 节点 id 中的设计 ID
- *   - tla   → tla-manifest.json `sdCoverage.coveredSdNodes`（已由 S-ingest-tla 从 .tla @designIds 回填）
- *   - rtm   → rtm.json 各行的 `designDoc` 引用中解析出的设计 ID
- *   - scope → change-scope 的 `changedFiles`（阶段 5-8，变更范围视角，非 ID 命名空间）
+ * 口径（实施期核定，规格 §5 已登记；分池见 D-1/N-1）：设计 ID 视角与 path 视角分别派生——
+ *   - graph → graph.json 节点 id 中的设计 ID（宽池，SD/DD/INTF 全量）
+ *   - tla   → tla-manifest.json `sdCoverage.coveredSdNodes`（窄池，SD-only；已由 S-ingest-tla 从 .tla @designIds 回填）
+ *   - rtm   → rtm.json 各行的 `designDoc` 引用中解析出的设计 ID（宽池，SD/DD/INTF 全量）
+ *   - scope → change-scope 的 `changedFiles`（阶段 5-8，**文件路径命名空间**，不参与 R6/R8 集合比对）
  *
  * 产物不存在或形状非法 → 该视角键**缺席**，不合成空集合：空集合会被 R6 当成"真的一致"
  * 从而放行，正是下一个"空即合规"。缺席由 R7 要求显式记入 `sweepCoverage.absentViews`。
@@ -245,9 +271,10 @@ export function checkIcebergSweep(
     reasons.push(`passed 不一致：newFindings=${report.newFindings.length} 但 passed=${report.passed}`);
   }
 
-  // === R6-R8: 三视角平权对账（D5/D7/D8）===
-  // 分母由 checker 从上游产物实测（经 externalEvidence 注入），非 R 自报；三视角平权，
-  // 无主分母、不归一化、不取并集后放行，任意两视角差异即刻失败（D8：不允许"已说明"豁免）。
+  // === R6-R8: 三视角对账（D5/D7/D8 + D-1/N-1 分池）===
+  // 分母由 checker 从上游产物实测（经 externalEvidence 注入），非 R 自报；
+  // R6 分池比对（宽池精确相等 / 窄池对 SD 切片相等 / path 命名空间不参与），
+  // 不归一化、不取并集后放行；池内差异即刻失败（D8：不允许"已说明"豁免）。
   // 未注入 viewSets 即整块跳过（纯单测无文件系统上下文；阶段早期上游产物缺失时不误红，规格 §5）。
   const viewSets = externalEvidence?.viewSets;
   if (viewSets !== undefined) {
@@ -266,23 +293,40 @@ export function checkIcebergSweep(
         else absentViews.push(v);
       }
 
-      // R6 视角间差异（两两比对，逐条列出差异项；不归一化、不取并集后放行）
+      // R6 视角间差异（分池比对，逐条列出差异项；不归一化、不取并集后放行）
+      const designViews = activeViews.filter((v) => VIEW_NAMESPACE[v] !== 'path');
+      const wide = designViews.filter((v) => VIEW_NAMESPACE[v] === 'design-wide');
       const disagreements: string[] = [];
-      for (let i = 0; i < activeViews.length; i++) {
-        for (let j = i + 1; j < activeViews.length; j++) {
-          const vi = activeViews[i]!;
-          const vj = activeViews[j]!;
-          const a = new Set(viewSets[vi]!);
-          const b = new Set(viewSets[vj]!);
-          const diff = [...a].filter((x) => !b.has(x)).concat([...b].filter((x) => !a.has(x)));
+      for (let i = 0; i < wide.length; i++) {
+        for (let j = i + 1; j < wide.length; j++) {
+          const vi = wide[i]!;
+          const vj = wide[j]!;
+          const diff = symmetricDiff(viewSets[vi] ?? [], viewSets[vj] ?? []);
           if (diff.length > 0) {
-            disagreements.push(`${vi}↔${vj} 差异项：${diff.join(', ')}`);
+            disagreements.push(`R6[design-wide] ${vi}↔${vj} 差异项：${diff.join(', ')}`);
           }
+        }
+      }
+      const wideUnion = new Set(wide.flatMap((v) => viewSets[v] ?? []));
+      const wideSdUnion = new Set([...wideUnion].filter(isSdDesignId));
+      for (const v of designViews.filter((x) => VIEW_NAMESPACE[x] === 'design-sd')) {
+        const narrow = viewSets[v] ?? [];
+        const narrowSet = new Set(narrow);
+        const extra = narrow.filter((id) => !wideUnion.has(id));
+        if (extra.length > 0) {
+          disagreements.push(`R6[design-sd] ${v} 超出宽视角设计 ID 集：${extra.join(', ')}`);
+        }
+        // 漏 SD 方向：窄池须含宽视角的全部 SD 项。跨命名空间（DD/INTF）豁免，SD 缺口不豁免——
+        // phase>=2 由 check-tla-model 强制 `sdCoverage.uncoveredSdNodes` 为空并与 `graphSdNodes`
+        // 交叉校验，故真实跑批的 tla SD 集恰等于宽视角 SD 切片，漏 SD 是真实缺口而非宽度差。
+        const missing = [...wideSdUnion].filter((id) => !narrowSet.has(id));
+        if (missing.length > 0) {
+          disagreements.push(`R6[design-sd] 宽视角 SD 项未进入 ${v}：${missing.join(', ')}`);
         }
       }
       if (disagreements.length > 0) {
         reasons.push(
-          `R6 视角间存在未对账差异：${disagreements.join('；')}（三视角平权，差异即刻失败，走普通 V/G 失败链由 R 定位）`,
+          `R6 视角间存在未对账差异：${disagreements.join('；')}（设计 ID 分池对账，差异即刻失败，走普通 V/G 失败链由 R 定位）`,
         );
       }
 
@@ -298,8 +342,10 @@ export function checkIcebergSweep(
       }
 
       // R8 分母未覆盖 / 零发现但覆盖不足
-      if (activeViews.length > 0 && disagreements.length === 0) {
-        const converged = new Set(activeViews.flatMap((v) => viewSets[v]!));
+      // 收敛集只用**设计 ID 视角**的并集（graph/rtm/tla）：path 命名空间（scope 的文件路径）
+      // 不参与，否则收敛集混入文件项后 sweptArtifacts 永远无法覆盖（N-1）。
+      if (designViews.length > 0 && disagreements.length === 0) {
+        const converged = new Set(designViews.flatMap((v) => viewSets[v]!));
         const swept = new Set(report.sweepCoverage.sweptArtifacts);
         const uncovered = [...converged].filter((x) => !swept.has(x));
         if (uncovered.length > 0 && report.newFindings.length === 0) {

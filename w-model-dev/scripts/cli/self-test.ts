@@ -1736,7 +1736,7 @@ const ICEBERG_CASES: IcebergCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/R6/, /视角间存在未对账差异/, /视角间存在未对账差异[\s\S]*SD-002/],
     injectViewSets: { graph: ['SD-001', 'SD-002'], tla: ['SD-001'], rtm: ['SD-001', 'SD-002'] },
-    description: 'graph/rtm 视角含 SD-002 而 tla 不含，两两对账差异即刻失败（R6，三视角平权）',
+    description: 'graph/rtm 含 SD-002 而 tla 不含，窄池漏 SD 即刻失败（R6[design-sd]，SD 命名空间内差异不豁免）',
   },
   {
     file: 'bad-view-absent-silent.json',
@@ -1751,6 +1751,21 @@ const ICEBERG_CASES: IcebergCase[] = [
     expectedReasonPatterns: [/R8/, /零发现但 sweptArtifacts 未覆盖收敛集合/],
     injectViewSets: { graph: ['SD-007'], tla: ['SD-007'], rtm: ['SD-007'] },
     description: '三视角收敛于 SD-007 但 sweptArtifacts 未覆盖，newFindings=[] 无法证明扫掠发生（R8）',
+  },
+  {
+    file: 'bad-r6-wide-dd-drift.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R6/, /design-wide/, /graph↔rtm[\s\S]*DD-003/],
+    injectViewSets: { graph: ['SD-001', 'DD-003'], tla: ['SD-001'], rtm: ['SD-001'] },
+    description:
+      '宽池 graph↔rtm 的 DD 漂移（DD-003 仅 graph 有）仍被检出（R6[design-wide]：分池只豁免跨命名空间宽度差）',
+  },
+  {
+    file: 'valid-phase5-scope-present.json',
+    expectedPassed: true,
+    injectViewSets: { graph: ['SD-001'], tla: ['SD-001'], rtm: ['SD-001'], scope: ['src/counter.ts'] },
+    description:
+      '阶段 5 scope 视角在盘且为文件路径命名空间：不参与 R6 集合比对与 R8 收敛集，零发现报告可放行（D-1/N-1 分池）',
   },
 ];
 

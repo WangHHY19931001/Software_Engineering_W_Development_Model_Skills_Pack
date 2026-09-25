@@ -184,7 +184,7 @@
 | R | V/G 不通过后 | 定位已暴露问题的根因 | 单一问题根因链 |
 | R-iceberg | S-fix 后 + V/G 通过后 | 主动深挖隐藏问题 | 多视角全产物扫掠 |
 
-## 8. 三视角平权对账（分母校验）
+## 8. 设计 ID 分池对账（分母校验）
 
 > **为什么需要**：在本次修复前，`newFindings=[]` 就能通过——「最省事的报告」与「最彻底的报告」不可区分，
 > 且 `sweptArtifacts` 允许空数组，零发现因此无法对账。分母（该扫多少）若由 R 自己声明，仍属自证，
@@ -194,14 +194,17 @@
 
 `iceberg-sweep-logic.ts` 不做 I/O；CLI（`check-iceberg-sweep.ts`）读盘后经 `externalEvidence.viewSets`
 注入每个视角的「应扫集合」（与 `graph-logic.ts` 的 `GraphCheckExternalEvidence` 同一约定）。派生口径
-（`deriveViewSets`）取三份产物共有的**最窄设计 ID 命名空间** `SD-NNN / DD-NNN / INTF-NNN`：
+（`deriveViewSets`）按视角命名空间分池，**不同池不互相精确比对**（D-1/N-1：同池比对会让阶段 3-8 结构性必红）：
 
-| 视角 | 集合来源 |
-|---|---|
-| graph | `graph.json` 各节点 `id` 中的设计 ID |
-| tla | `tla-manifest.json` 的 `sdCoverage.coveredSdNodes` |
-| rtm | `rtm.json` 各行 `designDoc` 解析出的设计 ID |
-| scope | 阶段 5-8 用 `change-scope.json` 的 `changedFiles`（变更范围视角，非 ID 命名空间） |
+| 视角 | 集合来源 | 命名空间（池） | 判据 |
+|---|---|---|---|
+| graph | `graph.json` 各节点 `id` 中的设计 ID | `design-wide`（SD/DD/INTF 全量） | 与 rtm 精确相等 |
+| rtm | `rtm.json` 各行 `designDoc` 解析出的设计 ID | `design-wide`（SD/DD/INTF 全量） | 与 graph 精确相等 |
+| tla | `tla-manifest.json` 的 `sdCoverage.coveredSdNodes` | `design-sd`（SD-only 是规约语义） | 与宽视角的 **SD 切片**相等（超出报、漏 SD 也报） |
+| scope | 阶段 5-8 用 `change-scope.json` 的 `changedFiles` | `path`（文件路径） | **不参与** R6/R8 的集合比对 |
+
+窄池漏 SD 仍是违规而非宽度差：phase≥2 由 `check-tla-model` 强制 `sdCoverage.uncoveredSdNodes` 为空并与
+`graphSdNodes` 交叉校验，故真实跑批的 tla SD 集恰等于宽视角 SD 切片，漏 SD 指向真实缺口。
 
 刻意**不含** REQ/NFR/CON：需求命名空间只有 graph 与 rtm 视角有，混入会制造结构性差异（假阳性）。
 
@@ -210,19 +213,22 @@
 各阶段参与哪些视角由 `ICEBERG_VIEW_PRESENCE`（代码常量，非本文档）裁定——写进文档会与实现漂移
 （先例：`subagent-delegation.md` 的计数漂移）。**本文件不复制该表数值**；需要时读实现。
 
-### 8.3 三视角**平权**：无主分母、不取并集
+### 8.3 分池对账：池内无主分母、不取并集
 
-graph / TLA / RTM 三视角等权，两两比对，任一方向存在差异即刻失败。**不设主视角、不做仲裁、
+宽池（graph / RTM）等权，两两精确比对，任一方向存在差异即刻失败。**不设主视角、不做仲裁、
 不取并集后放行**——取并集会把真实缺口洗成"已覆盖"，取交集会把噪声洗成"一致"。
-差异项会逐条列在 `reasons` 里（如 `graph↔tla 差异项：SD-002`）供 R 定位。
+窄池（TLA）按宽视角的 SD 切片相等，两个方向都报（`超出宽视角设计 ID 集` / `宽视角 SD 项未进入 tla`）；
+`path` 命名空间（scope 的 `changedFiles`）不参与集合比对，只保留 R7 的「视角在场」声明语义。
+差异项会逐条列在 `reasons` 里（如 `R6[design-wide] graph↔rtm 差异项：DD-003`、
+`R6[design-sd] 宽视角 SD 项未进入 tla：SD-002`）供 R 定位。
 
 ### 8.4 三类失败信号
 
 | 信号 | 判据 | 含义 |
 |---|---|---|
-| R6 视角间存在未对账差异 | 两个在场视角的集合不相等 | 三份产物对"应扫集合"口径不一致 → 走普通 V/G 失败链由 R 定位 |
+| R6 视角间存在未对账差异 | 宽池两视角集合不相等；或窄池与宽视角 SD 切片不相等（两个方向） | 产物对"应扫集合"口径不一致或真实缺口 → 走普通 V/G 失败链由 R 定位 |
 | R7 视角缺席未显式声明 | 按在场表应在场、但注入面缺该键，且未记入 `sweepCoverage.absentViews` | **禁止静默跳过**。产物在盘但不派生、或产物缺失，都须显式声明缺席 |
-| R8 零发现但覆盖不足 | `newFindings=[]` 且（收敛集合为空 或 `sweptArtifacts` 未覆盖收敛集合） | 「零发现」无法证明扫掠真的发生 |
+| R8 零发现但覆盖不足 | `newFindings=[]` 且（收敛集合为空 或 `sweptArtifacts` 未覆盖收敛集合）；收敛集**只取设计 ID 视角的并集** | 「零发现」无法证明扫掠真的发生 |
 
 **缺席不静默的理由**：`check-signature-chain.ts` R8 在找不到 `project.json` 时静默跳过，正是同一类陷阱——
 "检查没跑"和"检查通过"在输出上不可区分。产物不存在时**不合成空集合**：空集合会被当作"真的一致"从而放行。
