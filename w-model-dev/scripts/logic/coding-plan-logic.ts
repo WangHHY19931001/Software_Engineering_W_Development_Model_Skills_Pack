@@ -347,9 +347,15 @@ function stageReviewEntries(projectRoot: string, phase: number): StageReviewEntr
 
 /**
  * R5 行级证据锚判据（**非阻断诊断**用）：行首（允许前置空白）为 `path:Lnn=` / `path:Lnn-mm=` /
- * `path:§sec=` 形态。控制者裁定 O-4 逐字给定，不阻断、不进聚合。
+ * `path:§sec=` 形态。控制者裁定 O-4 逐字给定该形态（下文正则的**接受语言**与其逐字等价），
+ * 不阻断、不进聚合。
+ *
+ * 正则写法：原 `L\d+(?:-\d+)?` 是「含量词组再被量化」形态（star height 2），虽为线性回溯，
+ * 仍会被 `security/detect-unsafe-regex` 判为不安全（同仓先例：verifier-logic.ts R12 判据、
+ * pollution-logic.ts 残留名判据）。故平铺为 `L(?:\d+-\d+|\d+)`——两分支共享 `L` 字面锚、
+ * 均为顺序量词（star height 1），`Lnn` / `Lnn-mm` 两个形态与原文法逐字等价。
  */
-const REVIEW_ANCHOR_RE = /(?:^|\n)\s*[\w/.-]+:(?:§[\w.-]+|L\d+(?:-\d+)?)=/;
+const REVIEW_ANCHOR_RE = /(?:^|\n)\s*[\w/.-]+:(?:§[\w.-]+|L(?:\d+-\d+|\d+))=/;
 
 /**
  * 校验 R3×9 + V×3 审查产物（project 级）；阻断下限 = 存在 + **普通文件** + 非空

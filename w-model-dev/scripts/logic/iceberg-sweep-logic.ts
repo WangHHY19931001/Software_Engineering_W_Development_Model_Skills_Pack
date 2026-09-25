@@ -71,13 +71,16 @@ export const ICEBERG_VIEW_PRESENCE: Record<number, readonly IcebergView[]> = {
  * **SD 切片**相等（tla 取 `sdCoverage.coveredSdNodes`，SD-only 是 TLA+ 规约语义——要求它含
  * DD/INTF 是把命名空间宽度差报成缺口）；`path`（scope 的 `changedFiles` 文件路径）不参与
  * R6/R8 的集合比对（与设计 ID 同池比对时，阶段 5-8 只要 change-scope 在盘即结构性必红）。
+ *
+ * 以 `ReadonlyMap` 承载（键集仍为 `IcebergView` 四值闭集）：查询走 `Map.get` 而非 `obj[key]`，
+ * 后者即便键受控也是 `security/detect-object-injection` 的触发形态（键是变量而非字面量）。
  */
-const VIEW_NAMESPACE: Record<IcebergView, 'design-wide' | 'design-sd' | 'path'> = {
-  graph: 'design-wide',
-  rtm: 'design-wide',
-  tla: 'design-sd',
-  scope: 'path',
-};
+const VIEW_NAMESPACE: ReadonlyMap<IcebergView, 'design-wide' | 'design-sd' | 'path'> = new Map([
+  ['graph', 'design-wide'],
+  ['rtm', 'design-wide'],
+  ['tla', 'design-sd'],
+  ['scope', 'path'],
+]);
 
 /** 设计 ID 是否属于 SD 命名空间（tla 视角的规约覆盖范围；宽视角 SD 切片按此过滤） */
 function isSdDesignId(id: string): boolean {
@@ -294,22 +297,25 @@ export function checkIcebergSweep(
       }
 
       // R6 视角间差异（分池比对，逐条列出差异项；不归一化、不取并集后放行）
-      const designViews = activeViews.filter((v) => VIEW_NAMESPACE[v] !== 'path');
-      const wide = designViews.filter((v) => VIEW_NAMESPACE[v] === 'design-wide');
+      const designViews = activeViews.filter((v) => VIEW_NAMESPACE.get(v) !== 'path');
+      const wide = designViews.filter((v) => VIEW_NAMESPACE.get(v) === 'design-wide');
       const disagreements: string[] = [];
-      for (let i = 0; i < wide.length; i++) {
-        for (let j = i + 1; j < wide.length; j++) {
-          const vi = wide[i]!;
-          const vj = wide[j]!;
+      // 配对语义与双层下标等价：只遍历 i<j 的唯一组合（entries 取下标 + slice(i+1) 取其后项），
+      // 顺序亦与 `for i / for j=i+1` 逐项一致，差异项文案顺序不漂移。
+      for (const [i, vi] of wide.entries()) {
+        for (const vj of wide.slice(i + 1)) {
+          // eslint-disable-next-line security/detect-object-injection -- 键 vi/vj 取自 wide（由 ICEBERG_VIEW_PRESENCE 常量表枚举经 activeViews 过滤而来，IcebergView 四值闭集），viewSets 为 checker 注入的 Partial<Record<IcebergView, string[]>>，越界键不可能出现，非外部可控输入
           const diff = symmetricDiff(viewSets[vi]!, viewSets[vj]!);
           if (diff.length > 0) {
             disagreements.push(`R6[design-wide] ${vi}↔${vj} 差异项：${diff.join(', ')}`);
           }
         }
       }
+      // eslint-disable-next-line security/detect-object-injection -- 键 v 同取自 wide（ICEBERG_VIEW_PRESENCE 常量表枚举，IcebergView 四值闭集），非外部可控输入
       const wideUnion = new Set(wide.flatMap((v) => viewSets[v]!));
       const wideSdUnion = new Set([...wideUnion].filter(isSdDesignId));
-      for (const v of designViews.filter((x) => VIEW_NAMESPACE[x] === 'design-sd')) {
+      for (const v of designViews.filter((x) => VIEW_NAMESPACE.get(x) === 'design-sd')) {
+        // eslint-disable-next-line security/detect-object-injection -- 键 v 取自 designViews（常量表枚举，IcebergView 四值闭集），非外部可控输入
         const narrow = viewSets[v]!;
         const narrowSet = new Set(narrow);
         const extra = [...narrowSet].filter((id) => !wideUnion.has(id));
@@ -346,6 +352,7 @@ export function checkIcebergSweep(
       // 收敛集只用**设计 ID 视角**的并集（graph/rtm/tla）：path 命名空间（scope 的文件路径）
       // 不参与，否则收敛集混入文件项后 sweptArtifacts 永远无法覆盖（N-1）。
       if (designViews.length > 0 && disagreements.length === 0) {
+        // eslint-disable-next-line security/detect-object-injection -- 键 v 取自 designViews（ICEBERG_VIEW_PRESENCE 常量表枚举，IcebergView 四值闭集），非外部可控输入
         const converged = new Set(designViews.flatMap((v) => viewSets[v]!));
         const swept = new Set(report.sweepCoverage.sweptArtifacts);
         const uncovered = [...converged].filter((x) => !swept.has(x));
