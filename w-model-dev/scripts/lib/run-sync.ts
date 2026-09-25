@@ -265,7 +265,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     api: 'spawnSync',
     file: '__tests__/wm-append-runlog-cli.test.ts',
     anchor: 'const result = spawnSync(process.execPath, [tsxCli, SCRIPT, ...args], {',
-    symbol: 'runArgs',
+    symbol: 'run',
     reason: 'run-log 追加器 CLI 子进程用例真实 spawn tsx，显式 20 秒超时（D-5①/N-5 三态取证）。',
     timeout: { required: true, status: 'present' },
   },

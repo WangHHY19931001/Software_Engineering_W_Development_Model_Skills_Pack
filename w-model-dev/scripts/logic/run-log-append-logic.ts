@@ -19,9 +19,15 @@
  *     `allowClockAdjust`（对应 `--allow-clock-adjust=<reason>`），此时步进到末条 +1ms
  *     并在记录 `note` 追加 `clock-adjust:<reason>`；
  *   - `--timestamp` 注入成功时在记录 `note` 追加 `clock-injected:<iso>`；
- *   - 无条件来源（无显式时间戳）用 `now` 派生；`now` ≤ 末条时间时步进到末条 +1ms，
- *     返回的 `diagnostics` 明示「时钟调整 +Nms」，记录 `note` 追加 `clock-adjust:auto+<N>ms`
- *     （与显式路径同口径：调整必留痕迹）；
+ *   - 无条件来源（无显式时间戳）用 `now` 派生，判据分三层（裁定 A + 控制者裁定 F）：
+ *     ① `now` **早于**末条历史时间（时钟真倒退：曾注入未来时间戳 / NTP 回拨 / 跨机拷贝）→ 默认拒绝
+ *        （TIMESTAMP_NOT_INCREASING，文案含末条时间 + 建议）；仅显式 `allowClockAdjust` 时步进到
+ *        末条 +1ms 并留痕 `clock-adjust:auto+<N>ms:<reason>`；
+ *     ② `now` 与末条**同毫秒**（良性）→ 步进末条 +1ms，`note` 追加 `clock-adjust:auto+<N>ms`；
+ *     ③ 仅与**本次批内**已规划记录冲突 → 同样 +1ms 步进（不涉历史改写）；
+ *     ②③ 均在 `diagnostics` 明示「时钟调整 +Nms」（与显式路径同口径：调整必留痕迹）；
+ *   - 历史末条扫描用宽容口径 `Number.isFinite(Date.parse(v))`（schema 的 `format: date-time` 对大小写 /
+ *     分隔符宽容，严格正则只用于新注入 / 新记录），避免历史行时间戳被跳过导致单调性下界失真；
  *   - `--correct=<runId>` 只**新增**一条更正记录（`note` 含 `correction-of:<runId>`），
  *     历史行不删不改；runId 不存在即拒绝（UNKNOWN_RUN_ID，调用方按输入错误 exit 2 处理）。
  *
@@ -93,10 +99,19 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '';
 }
 
+/**
+ * 历史行的宽容时间戳解析（裁定：历史末条扫描用 `Number.isFinite(Date.parse())` 口径）。
+ *
+ * run-log schema 的 `format: date-time` 对大小写与分隔符宽容（`2026-01-02t10:00:00z`、
+ * `2026-01-02 10:00:00Z` 均合法），历史行因此可能带非严格形态的时间戳。若历史扫描用严格正则，
+ * 这类行会被当作「无时间戳」跳过 → 单调性下界失真。严格正则（`isIsoTimestamp`）只保留给
+ * **新注入 / 新记录**（工具自己产出的时间戳必须规范）。
+ */
 function timestampMsOf(record: RunLogRecord): number | null {
   const value = record.timestamp;
-  if (!isNonEmptyString(value) || !isIsoTimestamp(value)) return null;
-  return Date.parse(value);
+  if (!isNonEmptyString(value)) return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : null;
 }
 
 /** 末条有效时间戳（从尾部扫描；无有效时间戳返回 null） */
@@ -162,7 +177,11 @@ function resolveTimestamp(
           `时钟调整 +${stepped - ms}ms（${label}的显式时间戳 ${explicit} 不递增且不晚于末条历史时间 ${historyLast.text}，` +
             `按 --allow-clock-adjust=${reason} 步进到末条 +1ms）`,
         );
-        return { ms: stepped, text: new Date(stepped).toISOString(), traces: [`clock-adjust:${reason}`] };
+        return {
+          ms: stepped,
+          text: new Date(stepped).toISOString(),
+          traces: [...injectionTraces, `clock-adjust:${reason}`],
+        };
       }
       collector.violate(
         'TIMESTAMP_NOT_INCREASING',
@@ -186,10 +205,34 @@ function resolveTimestamp(
   }
 
   const nowMs = Date.parse(opts.now);
+  // 裁定 A/F：系统时间**早于**末条历史时间 = 时钟真倒退（曾注入未来时间戳 / NTP 回拨 / 跨机拷贝）
+  // → 默认拒绝；只有显式 --allow-clock-adjust=<reason> 才按末条 +1ms 步进并留痕（绝不静默抹平时间线）。
+  // 同毫秒（nowMs === historyLast.ms）与**批内**重复属良性，走下面的有界 +1ms 步进。
+  if (historyLast !== null && nowMs < historyLast.ms) {
+    const reason = opts.allowClockAdjust;
+    if (!isNonEmptyString(reason)) {
+      collector.violate(
+        'TIMESTAMP_NOT_INCREASING',
+        `now=${opts.now} 早于末条时间 ${historyLast.text}（时钟倒退：append-only 禁止时间线回退）；` +
+          '建议：校正系统时间后重试，或改用 --timestamp=<iso> 显式声明，或显式声明小步进 --allow-clock-adjust=<reason>',
+      );
+      return null;
+    }
+    const stepped = (floor?.ms ?? historyLast.ms) + 1;
+    collector.diagnostics.push(
+      `时钟调整 +${stepped - nowMs}ms（now=${opts.now} 早于末条时间 ${historyLast.text}，` +
+        `按 --allow-clock-adjust=${reason} 步进到末条 +1ms）`,
+    );
+    return {
+      ms: stepped,
+      text: new Date(stepped).toISOString(),
+      traces: [`clock-adjust:auto+${stepped - nowMs}ms:${reason}`],
+    };
+  }
   if (floor !== null && nowMs <= floor.ms) {
     const stepped = floor.ms + 1;
     collector.diagnostics.push(
-      `时钟调整 +${stepped - nowMs}ms（now=${opts.now} ≤ 末条时间 ${floor.text}，按末条 +1ms 步进）`,
+      `时钟调整 +${stepped - nowMs}ms（now=${opts.now} ≤ 末条时间 ${floor.text}，按末条/批内 +1ms 步进）`,
     );
     return { ms: stepped, text: new Date(stepped).toISOString(), traces: [`clock-adjust:auto+${stepped - nowMs}ms`] };
   }

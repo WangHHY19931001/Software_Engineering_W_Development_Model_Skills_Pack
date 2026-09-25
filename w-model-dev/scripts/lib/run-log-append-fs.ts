@@ -95,6 +95,19 @@ export function composeAppendedText(existingText: string, appended: readonly unk
   return `${existingText}${separator}${appendedText}\n`;
 }
 
+/**
+ * 下一条追加记录将落在的**物理行号**（1-based），与 `composeAppendedText` 的组装规则严格一致：
+ *   - 空文本 → 1；
+ *   - 文本以 LF 结尾 → `\n` 计数 + 1；
+ *   - 文本不以 LF 结尾 → `\n` 计数 + 2（组装时先补一个分隔 LF）。
+ * 该行号即 `writeStateJson` 的 `appendFromLine`：其前的物理行均为「已存在历史行」，只做非阻断诊断。
+ */
+export function firstAppendedLineNumber(existingText: string): number {
+  if (existingText === '') return 1;
+  const newlineCount = existingText.split('\n').length - 1;
+  return existingText.endsWith('\n') ? newlineCount + 1 : newlineCount + 2;
+}
+
 /** 文本内非空行数（追加后的记录行数，用于 stdout 摘要的 `lines`） */
 export function countRecordLines(text: string): number {
   return text.split(/\r?\n/).filter((line) => line.trim() !== '').length;

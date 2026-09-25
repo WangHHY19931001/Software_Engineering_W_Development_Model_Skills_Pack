@@ -80,7 +80,13 @@ function run(args: string[], input?: string): { code: number | null; stdout: str
   return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 
-function appendPayload(stdout: string): { lines: number; appended: number; digest: string; ok?: boolean } {
+function appendPayload(stdout: string): {
+  lines: number;
+  appended: number;
+  digest: string;
+  ok?: boolean;
+  legacyInvalidLines?: number[];
+} {
   const prefix = 'RUNLOG_APPEND_JSON ';
   const lineOut = stdout.split('\n').find((l) => l.startsWith(prefix));
   expect(lineOut, `stdout 缺少 RUNLOG_APPEND_JSON 行: ${stdout}`).toBeDefined();
@@ -242,18 +248,57 @@ describe('wm-append-runlog：非法输入（exit 2）', () => {
     expect(await fs.stat(runLogPath).catch(() => null)).toBeNull();
   });
 
-  it('注册路径全文件重校：历史行不符 schema → exit 1 SCHEMA_INVALID，文件未被修改', async () => {
-    // 历史行带 schema 未登记字段（additionalProperties:false 违规）但语法合法：本工具的追加判定放行，
-    // 由 writeStateJson 的注册路径逐行重校拒绝写入（目标未修改）
+  it('legacy 历史行（不符当前 schema）不阻断追加：exit 0 + 非阻断诊断 + 历史前缀逐字节不变', async () => {
+    // 历史行带 schema 未登记字段（additionalProperties:false 违规）但语法合法：append 口径只强制校验
+    // **新增**行；历史行与盘上逐字节相同（本工具从不重写），不符 schema 属 legacy 形态（读侧
+    // check-run-log 亦为吸收语义）→ 只输出非阻断诊断，不改退出码
     const legacy = { ...record(), unexpectedLegacyField: true };
-    await seed(`${line(legacy)}
-`);
+    const existingText = `${line(legacy)}\n`;
+    await seed(existingText);
+    const r = run([runLogPath, '--stdin', '--json'], line(record({ runId: 'b', timestamp: undefined })));
+    expect(r.code).toBe(0);
+    expect(r.stderr).not.toContain('✗');
+    expect(r.stderr).toMatch(/历史行不符当前 run-log schema（非阻断，未改写）：第 1 行/);
+    const summary = appendPayload(r.stdout);
+    expect(summary.appended).toBe(1);
+    expect(summary.legacyInvalidLines).toEqual([1]);
+    const raw = await fs.readFile(runLogPath, 'utf-8');
+    expect(raw.startsWith(existingText)).toBe(true);
+    expect(raw).toMatch(/unexpectedLegacyField/);
+  });
+
+  it('legacy 行 + 空行混合：边界行号按物理行计算，历史行全部只作诊断', async () => {
+    const legacy1 = { ...record({ runId: 'l1' }), unexpectedLegacyField: true };
+    const legacy2 = { ...record({ runId: 'l2', timestamp: '2026-01-02T10:01:00.000Z' }), anotherLegacyField: true };
+    const existingText = `${line(legacy1)}\n\n${line(legacy2)}\n`;
+    await seed(existingText);
+    const r = run([runLogPath, '--stdin', '--json'], line(record({ runId: 'b', timestamp: undefined })));
+    expect(r.code).toBe(0);
+    const summary = appendPayload(r.stdout);
+    expect(summary.legacyInvalidLines).toEqual([1, 3]);
+    const raw = await fs.readFile(runLogPath, 'utf-8');
+    expect(raw.startsWith(existingText)).toBe(true);
+  });
+
+  it('now 早于末条时间（时钟倒退）→ exit 1 且目标 sha256 不变', async () => {
+    // 末条时间戳取未来时刻，保证 now < 末条（不依赖墙钟）
+    await seed(`${line(record({ timestamp: '2099-01-01T00:00:00.000Z' }))}\n`);
     const before = await sha256(runLogPath);
     const r = run([runLogPath, '--stdin'], line(record({ runId: 'b', timestamp: undefined })));
     expect(r.code).toBe(1);
-    expect(r.stderr).toContain('✗ [WRITE_REJECTED]');
-    expect(r.stdout).toMatch(/"reason":"SCHEMA_INVALID"/);
+    expect(r.stderr).toMatch(/早于末条时间 2099-01-01T00:00:00\.000Z/);
+    expect(r.stderr).toMatch(/--allow-clock-adjust/);
     expect(await sha256(runLogPath)).toBe(before);
+  });
+
+  it('now 早于末条时间 + --allow-clock-adjust：追加成功且留理由痕迹', async () => {
+    await seed(`${line(record({ timestamp: '2099-01-01T00:00:00.000Z' }))}\n`);
+    const r = run(
+      [runLogPath, '--stdin', '--allow-clock-adjust=ntp-rollback'],
+      line(record({ runId: 'b', timestamp: undefined })),
+    );
+    expect(r.code).toBe(0);
+    expect(await fs.readFile(runLogPath, 'utf-8')).toMatch(/clock-adjust:auto\+\d+ms:ntp-rollback/);
   });
 
   it('--stdin 与 --from 互斥 → exit 2 ARG_INVALID', async () => {

@@ -34,10 +34,13 @@
  *
  * 写盘（复用 wm-write 同款机制，不另造）：`logic/state-write-logic.ts` 的 `<target>.lock` 跨进程锁 +
  * 备份 + tmp/rename + 回读；历史行按原文本**逐字节**保留（不经 JSON 再序列化），只追加新行。
- * 读取与写入之间用 `expectMtimeMs` 兜住「读后被他人追加」的并发窗口（MTIME_CONFLICT → exit 1，
- * 宁可拒绝不可丢记录）；残余窗口仅为「读取时目标不存在、写入前被他方创建」的创建竞争。
- * 目标为已注册状态路径（`.w-model/run-log.jsonl`）时，原子写会对**全文件**逐行重校 schema：
- * 历史行若不符当前 schema（如更早版本写入的 legacy 形状）→ exit 1 SCHEMA_INVALID（目标未修改）。
+ * 并发窗口：mtime 在**读取之前**取样并以 `expectMtimeMs` 交给原子写（MTIME_CONFLICT → exit 1，
+ * 宁可拒绝不可丢记录）——覆盖「读取后、写前」的他人提交；残余窗口仅为「读取时目标不存在、
+ * 写入前被他方创建」的创建竞争（既有机制无法表达「目标必须仍不存在」）。
+ * 目标为已注册状态路径（`.w-model/run-log.jsonl`）时采用 **append 校验口径**（`validateLines:'appended'`）：
+ * 只强制校验**新增**行；其前历史行与盘上逐字节相同（从不重写），不符当前 schema 属 legacy 形态
+ * （读侧 check-run-log 亦为吸收语义）→ 只输出非阻断诊断（`legacyInvalidLines`，stderr ⚠ + `--json` 字段），
+ * **不**改变退出码。
  *
  * 退出码：
  *   0  追加成功（stdout 单行 RUNLOG_APPEND_JSON {lines, appended, digest}；`--json` 附扩展键）
@@ -57,7 +60,13 @@ import { exitWithError, HandledCliError } from '../lib/cli-error.js';
 import { DuplicateFlagError } from '../lib/parse-args.js';
 import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
-import { composeAppendedText, countRecordLines, digestOf, readRunLogFile } from '../lib/run-log-append-fs.js';
+import {
+  composeAppendedText,
+  countRecordLines,
+  digestOf,
+  firstAppendedLineNumber,
+  readRunLogFile,
+} from '../lib/run-log-append-fs.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 import {
   planAppend,
@@ -358,6 +367,14 @@ async function main(): Promise<void> {
     assertRecordsValid(structuralValidationCopies(incoming, parsed.timestamp ?? now), sourceLabel, '载荷');
   }
 
+  // M3（审查裁定）：mtime 必须在**读取之前**取样——读取与写入之间用 mtime 兜住并发追加窗口；
+  // 反向顺序会漏掉「读取后、写前」的他人提交（静默丢记录）。取样失败（不存在）→ null（不做 mtime 校验）。
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 目标路径来自 CLI 参数并用 path.resolve 归一（追加目标即调用方指定文件）
+  const preReadMtimeMs = await fs.stat(absTarget).then(
+    (stat) => stat.mtimeMs,
+    () => null,
+  );
+
   const read = await readRunLogFile(absTarget);
   if (!read.ok) {
     exitWithError({
@@ -394,13 +411,14 @@ async function main(): Promise<void> {
   const lines = countRecordLines(text);
   const digest = digestOf(text);
 
-  // 读取与写入之间用 mtime 兜住并发追加窗口（读取时不存在则不做 mtime 校验）
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 目标路径来自 CLI 参数并用 path.resolve 归一（追加目标即调用方指定文件）
-  const expectMtimeMs = content.exists ? (await fs.stat(absTarget)).mtimeMs : null;
   const result = await writeStateJson(absTarget, text, {
     backup: true,
     allowImplicitStaleRecovery: false,
-    expectMtimeMs,
+    expectMtimeMs: preReadMtimeMs,
+    // M2（审查裁定 E）：只强制校验**新增**行；其前历史行与盘上逐字节相同，不符当前 schema 属 legacy
+    // 形态（读侧 check-run-log 亦为吸收语义），改由 result.legacyInvalidLines 作非阻断诊断上报。
+    validateLines: 'appended',
+    appendFromLine: firstAppendedLineNumber(content.text),
     ...(parsed.lockTimeoutMs !== undefined ? { lockTimeoutMs: parsed.lockTimeoutMs } : {}),
   });
 
@@ -424,15 +442,23 @@ async function main(): Promise<void> {
     return;
   }
 
+  const legacyLines = result.legacyInvalidLines ?? [];
   const summary: Record<string, unknown> = { lines, appended: plan.appended, digest };
   if (parsed.json) {
     summary.ok = true;
     summary.writtenPath = absTarget;
     summary.diagnostics = plan.diagnostics;
+    summary.legacyInvalidLines = legacyLines;
     if (result.backupPath !== undefined) summary.backupPath = result.backupPath;
   }
   console.log('RUNLOG_APPEND_JSON ' + JSON.stringify(summary));
   for (const diagnostic of plan.diagnostics) console.error(`⚠ ${diagnostic}`);
+  if (legacyLines.length > 0) {
+    console.error(
+      `⚠ 历史行不符当前 run-log schema（非阻断，未改写）：第 ${legacyLines.join('、')} 行；` +
+        '追加已成功，历史字节保持不变',
+    );
+  }
 }
 
 runMain(main);

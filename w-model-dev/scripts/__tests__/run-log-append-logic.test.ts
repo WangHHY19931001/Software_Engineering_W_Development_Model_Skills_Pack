@@ -122,7 +122,51 @@ describe('planAppend：时间戳严格递增（裁定 A）', () => {
     expect(r.accepted).toBe(true);
     expect(Date.parse(r.entries[1]!.timestamp!)).toBe(Date.parse('2026-09-25T10:00:00.001Z'));
     expect(r.entries[1]!.note).toMatch(/clock-adjust:live-run-replay/);
+    // 两条痕迹都必须保留：注入来源 + 小步进声明（裁定 A「绝不静默」）
+    expect(r.entries[1]!.note).toMatch(/clock-injected:2026-09-25T09:00:00\.000Z/);
     expect(r.diagnostics.join()).toMatch(/时钟调整 \+\d+ms/);
+  });
+
+  it('now 早于末条时间（时钟真倒退）默认拒绝：文案点名末条时间与建议', () => {
+    const existing = [mkEntry({ runId: 'a', timestamp: '2026-09-25T10:00:00.000Z' })];
+    const r = planAppend(existing, [mkEntry({ runId: 'b' })], { now: '2026-09-25T09:00:00.000Z' });
+    expect(r.accepted).toBe(false);
+    expect(codesOf(r)).toContain('TIMESTAMP_NOT_INCREASING');
+    const text = r.violations.join(' ');
+    expect(text).toMatch(/now=2026-09-25T09:00:00\.000Z 早于末条时间 2026-09-25T10:00:00\.000Z/);
+    expect(text).toMatch(/--allow-clock-adjust/);
+    expect(r.appended).toBe(0);
+  });
+
+  it('now 早于末条时间 + --allow-clock-adjust：步进末条 +1ms 且 note 留理由痕迹', () => {
+    const existing = [mkEntry({ runId: 'a', timestamp: '2026-09-25T10:00:00.000Z' })];
+    const r = planAppend(existing, [mkEntry({ runId: 'b' })], {
+      allowClockAdjust: 'ntp-rollback',
+      now: '2026-09-25T09:00:00.000Z',
+    });
+    expect(r.accepted).toBe(true);
+    expect(Date.parse(r.entries[1]!.timestamp!)).toBe(Date.parse('2026-09-25T10:00:00.001Z'));
+    expect(r.entries[1]!.note).toMatch(/clock-adjust:auto\+\d+ms:ntp-rollback/);
+    expect(r.diagnostics.join()).toMatch(/时钟调整 \+\d+ms/);
+  });
+
+  it('历史末条用宽容口径：小写 t/z 时间戳仍作为单调下界（不被跳过）', () => {
+    const existing = [mkEntry({ runId: 'a', timestamp: '2026-09-25t10:00:00z' })];
+    const lower = planAppend(existing, [mkEntry({ runId: 'b', timestamp: '2026-09-25T09:00:00.000Z' })], {
+      now: '2026-09-25T11:00:00.000Z',
+    });
+    expect(lower.accepted).toBe(false);
+    expect(codesOf(lower)).toContain('TIMESTAMP_NOT_INCREASING');
+    const sameMs = planAppend(existing, [mkEntry({ runId: 'c' })], { now: '2026-09-25T10:00:00.000Z' });
+    expect(sameMs.accepted).toBe(true);
+    expect(Date.parse(sameMs.entries[1]!.timestamp!)).toBe(Date.parse('2026-09-25T10:00:00.001Z'));
+  });
+
+  it('now 与末条同毫秒仍属良性（步进 +1ms 不拒绝）', () => {
+    const existing = [mkEntry({ runId: 'a', timestamp: '2026-09-25T10:00:00.000Z' })];
+    const r = planAppend(existing, [mkEntry({ runId: 'b' })], { now: '2026-09-25T10:00:00.000Z' });
+    expect(r.accepted).toBe(true);
+    expect(r.entries[1]!.note).toMatch(/clock-adjust:auto\+1ms/);
   });
 
   it('记录自带时间戳与 --timestamp 同时出现即拒绝（绝不静默覆盖）', () => {
