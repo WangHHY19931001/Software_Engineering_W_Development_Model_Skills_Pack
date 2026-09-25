@@ -116,6 +116,9 @@ import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
+// R5 真值通道样本（D-7）：复用 check-maturity.ts 导出的计数/词法收集/诊断组装三函数，
+// 使 self-test 的样本口径与 CLI 接线单点一致（该文件尾部有 isDirectInvocation 入口守卫，import 不触发 main）
+import { buildR5Diagnostics, collectLexicalMentions, countOperationalFailures } from './check-maturity.js';
 import { checkUatPathMappingContent } from './check-artifact-gate.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
@@ -1464,6 +1467,51 @@ const MATURITY_CASES: MaturityCase[] = [
     expectedReasonPatterns: [/R3.*8 阶段.*1 完整周期.*completedCycles=0/],
     options: { completedPhases: 8 },
     description: 'P2.1 R3 单位修正：completedPhases=8（1 完整周期）但 completedCycles=0，应触发 R3 违规',
+  },
+];
+
+// -------------------- Maturity run-log（R5 真值通道，D-7） --------------------
+
+interface MaturityRunLogCase {
+  /** 样本文件名（相对 samples/run-log/，JSONL 格式） */
+  file: string;
+  /** 期望 check-maturity R5 判定是否通过 */
+  expectedPassed: boolean;
+  /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedViolationPatterns?: RegExp[];
+  /** 期望非阻断诊断中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedDiagnosticPatterns?: RegExp[];
+  /** 用例说明 */
+  description: string;
+}
+
+/**
+ * R5 真值通道样本（D-7）：喂给 check-maturity 的 `--run-log` 输入（基准成熟度模型取
+ * `samples/maturity/valid.json`，其 downgradeTriggers.operationalFailureStreak=3）。
+ * 计数与诊断经 check-maturity.ts 导出的三函数（与 CLI 接线单点一致）；CLI 三态的真实子进程
+ * 端到端另有 `__tests__/maturity-logic.test.ts` 覆盖。
+ * 注意：本数组只登记 R5 判定口径，不参与 RUN_LOG_CASES（check-run-log 的 R1/R7/R8 等）校验。
+ */
+const MATURITY_RUN_LOG_CASES: MaturityRunLogCase[] = [
+  {
+    file: 'valid-o3-mention-only.jsonl',
+    expectedPassed: true,
+    expectedDiagnosticPatterns: [
+      /疑似引用 3 处（含规则编号引用，非运维失败）/,
+      /operationalFailureModes 标注：p1-G-verifier-16, p3-G-verifier-03/,
+    ],
+    description: 'note 中 O3/O4 字样共 3 处全为规则编号引用 → R5 不违规（exit 0）+ 非阻断引用诊断',
+  },
+  {
+    file: 'bad-operational-modes-3x.jsonl',
+    expectedPassed: false,
+    expectedViolationPatterns: [/R5: O 系列失败模式命中 3 次/],
+    expectedDiagnosticPatterns: [
+      /疑似引用 1 处（含规则编号引用，非运维失败）/,
+      /operationalFailureModes 标注：p5-G-maturity-01/,
+    ],
+    description:
+      'operationalFailureModes 字段标注 3 次（真值通道）≥ streak=3 → R5 违规；note 词法仅 1 处引用，证明判据取自字段而非词法（诊断并存且不阻断）',
   },
 ];
 
@@ -3729,6 +3777,55 @@ async function runMaturityCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+/**
+ * R5 真值通道样本（D-7）：run-log fixture × check-maturity 逻辑层 + CLI 导出的计数/诊断函数。
+ * 判定口径与 `cli/check-maturity.ts` 主流程一致：operationalFailureCount 只来自
+ * countOperationalFailures（operationalFailureModes 字段），词法命中只进 diagnostics。
+ */
+async function runMaturityRunLogCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  // 基准成熟度模型：samples/maturity/valid.json（L1，streak=3）；schema 前置校验要求全 required 字段
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- samples/maturity/valid.json 为仓库内受控 fixture（基准成熟度模型），只读
+  const baseMaturity = parseJsonSafe(await fs.readFile(path.join(samplesDir, 'maturity', 'valid.json'), 'utf-8'));
+  for (const c of MATURITY_RUN_LOG_CASES) {
+    const abs = path.join(samplesDir, 'run-log', c.file);
+    const name = `maturity-run-log/${c.file}`;
+    const details: string[] = [];
+    try {
+      const raw = await fs.readFile(abs, 'utf-8');
+      const entries: unknown[] = raw
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0)
+        .map((l) => parseJsonSafe(l) as unknown);
+      const diagnostics = buildR5Diagnostics(true, collectLexicalMentions(entries));
+      const r = checkMaturity(baseMaturity, {
+        operationalFailureCount: countOperationalFailures(entries),
+        diagnostics,
+      });
+      if (r.passed !== c.expectedPassed) {
+        details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+      }
+      details.push(...matchReasonPatterns(r.violations, c.expectedViolationPatterns));
+      details.push(...matchReasonPatterns(r.diagnostics, c.expectedDiagnosticPatterns));
+      results.push({
+        name,
+        passed: details.length === 0,
+        description: c.description,
+        details: details.length > 0 ? details : undefined,
+      });
+    } catch (err) {
+      results.push({
+        name,
+        passed: false,
+        description: c.description,
+        details: [`  - 异常: ${err instanceof Error ? err.message : String(err)}`],
+      });
+    }
+  }
+  return results;
+}
+
 async function runCheckpointCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   // valid 样本须提供 checkpointLog（含用户确认记录）
@@ -4912,6 +5009,7 @@ async function main(): Promise<void> {
   console.log(`Budget 用例   : ${BUDGET_CASES.length}`);
   console.log(`RunLog 用例   : ${RUN_LOG_CASES.length}`);
   console.log(`Maturity 用例 : ${MATURITY_CASES.length}`);
+  console.log(`MaturityRunLog 用例 : ${MATURITY_RUN_LOG_CASES.length}`);
   console.log(`Checkpoint 用例: ${CHECKPOINT_CASES.length}`);
   console.log(`Code-TLA 用例 : ${CODE_TLA_CASES.length}`);
   console.log(`RootCause 用例 : ${ROOTCAUSE_CASES.length}`);
@@ -4950,6 +5048,7 @@ async function main(): Promise<void> {
     budgetResults,
     runLogResults,
     maturityResults,
+    maturityRunLogResults,
     checkpointResults,
     codeTlaResults,
     rootcauseResults,
@@ -4999,6 +5098,7 @@ async function main(): Promise<void> {
     runBudgetCases(samplesDir),
     runRunLogCases(samplesDir),
     runMaturityCases(samplesDir),
+    runMaturityRunLogCases(samplesDir),
     runCheckpointCases(samplesDir),
     runCodeTlaCases(samplesDir),
     runRootCauseCases(samplesDir),
@@ -5036,6 +5136,7 @@ async function main(): Promise<void> {
     ...budgetResults,
     ...runLogResults,
     ...maturityResults,
+    ...maturityRunLogResults,
     ...checkpointResults,
     ...codeTlaResults,
     ...rootcauseResults,

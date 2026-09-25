@@ -72,6 +72,11 @@
 - **规范定义**：CHECKPOINT 用户确认的决策数组，须含 ID 模式（REQ-NNN / INTF-NNN）或技术关键词（接口/状态机/不变式等），「同意」「确认」视为空（check-checkpoint R2）。
 - **_Avoid_**：decisions/确认项/决策列表（字段名必须为「acknowledgedDecisions」）。
 
+### operationalFailureModes（RunLogEntry）
+
+- **规范定义**：RunLogEntry 的可选字段，O 系列运维失败模式（`O1`~`O6`）的**机器可读标注**数组（枚举取值、`uniqueItems`）；`check-maturity.ts` R5 的唯一真值通道。`note` 中的 O1~O6 字样视为引用（含评审规则编号同名情形，如 O3 既是运维失败模式也是 V 门禁 evidence 扣分规则名），不计入 R5，仅触发非阻断引用诊断。
+- **_Avoid_**：note 标注/O 命中/失败模式列表（字段名必须为「operationalFailureModes」；不得用 note 词法命中作为 R5 判据）。
+
 ### 3. 工程资产相关
 
 ### codeModule

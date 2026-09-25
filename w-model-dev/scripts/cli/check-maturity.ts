@@ -13,16 +13,17 @@
  * 参数：
  *   maturity.json        maturity.json 文件路径
  *   --project=<path>     project.json 路径（可选，R3/R4 交叉校验；读取侧经 project.schema.json 校验，缺失/非法/不符 schema → exit 2）
- *   --run-log=<path>     run-log.jsonl 路径（可选，R5 O 失败模式统计）
- *   --json               机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse，含 warnings 非阻断警告字段）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
+ *   --run-log=<path>     run-log.jsonl 路径（可选，R5 真值通道：只统计每条记录的 operationalFailureModes 字段；
+ *                        note 中的 O1..O6 字样视为引用，仅作非阻断诊断。未提供时输出「R5 未生效」非阻断诊断）
+ *   --json               机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse，含 warnings 非阻断警告字段与 diagnostics 非阻断诊断字段）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
- *   0  校验通过
+ *   0  校验通过（含仅有非阻断 warning / 非阻断 diagnostic 的情形）
  *   1  校验失败（violations 列出具体原因）
  *   2  输入错误（文件不存在 / 非法 JSON / schema 不符 / 参数非法；含 --project 读取侧 schema 校验失败）
  *
  * 输出：
- *   stdout 打印结构化校验报告（人类可读 + 收尾 MATURITY_JSON 摘要，便于 Agent 正则截取）
+ *   stdout 打印结构化校验报告（人类可读 + 非阻断诊断 + 收尾 MATURITY_JSON 摘要，便于 Agent 正则截取）
  *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出进 ERROR_JSON）
  *
  * 错误字段（ERROR_JSON）：
@@ -40,6 +41,7 @@ import * as path from 'node:path';
 import { checkMaturity, type MaturityConfig } from '../logic/maturity-logic.js';
 import { readJsonOrExit, readJsonlOptional } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { loadAndValidate, LOAD_AND_VALIDATE_SENTINEL_PREFIX } from '../lib/load-and-validate.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
@@ -76,27 +78,71 @@ const STATUS_TO_PHASES: Record<string, number> = {
   项目完成: 8,
 };
 
-// ==================== run-log O 系列失败模式统计 ====================
+// ==================== run-log O 系列失败模式统计（R5，D-7） ====================
 
-// 匹配 note 字段中的 O1~O6 失败模式标注（如 "O1 Token Burn"、"O3 Verifier Theater"），词边界防止 O100 误命中
+// 词法命中的降级诊断正则（\b 词边界防 O100 误命中）。**不参与 R5 判定**：
+// O1~O6 同时是评审规则编号（如 O3 = Verifier Theater 也是 V 门禁 evidence 扣分规则名），
+// 扫 note 会把引用误计为运维失败（实测 demo run-log 17 处全为引用）。
 const O_PATTERN = /\bO[1-6]\b/g;
 
+/** 词法命中记录缺 runId 时的占位符（保留「命中位置」语义，不丢事实） */
+const MISSING_RUN_ID = '<无 runId>';
+
 /**
- * 统计 run-log.jsonl 中 O 系列失败模式命中次数。
- * 扫描每条记录的 note 字段，匹配 /O[1-6]/ 即记一次。
+ * R5 真值通道（D-7）：统计 run-log 中 `operationalFailureModes` 字段的标注条目数。
+ *
+ * 口径：只读该字段，存在即累加数组长度（枚举合法性由 run-log.schema.json 强制；
+ * 非数组形态按未标注处理，不按字符数误计）。note 中的 O1..O6 字样一律不计入。
  *
  * 容错：文件读取与逐行解析由 readJsonlOrExit 负责（坏行 warn+skip），此处仅统计。
  */
-function countOperationalFailures(entries: unknown[]): number {
+export function countOperationalFailures(entries: unknown[]): number {
   let count = 0;
   for (const entry of entries) {
-    const e = entry as { note?: string };
-    if (typeof e.note === 'string') {
-      const matches = e.note.match(O_PATTERN);
-      if (matches) count += matches.length;
-    }
+    const e = entry as { operationalFailureModes?: unknown };
+    if (Array.isArray(e.operationalFailureModes)) count += e.operationalFailureModes.length;
   }
   return count;
+}
+
+/**
+ * 词法降级（D-7）：按命中次数收集 note 中 O1~O6 字样的所在 runId（可重复；缺 runId 记占位符）。
+ *
+ * 只服务非阻断诊断「疑似引用 N 处」（N = 返回数组长度，去重后的 runId 列表进文案），
+ * **不参与 R5 判定**——收紧词表会让 R5 形同虚设，故保留扫描并把结论降级为可见诊断。
+ */
+export function collectLexicalMentions(entries: unknown[]): string[] {
+  const mentions: string[] = [];
+  for (const entry of entries) {
+    const e = entry as { note?: unknown; runId?: unknown };
+    if (typeof e.note !== 'string') continue;
+    const matches = e.note.match(O_PATTERN);
+    if (matches === null) continue;
+    const runId = typeof e.runId === 'string' && e.runId !== '' ? e.runId : MISSING_RUN_ID;
+    mentions.push(...new Array<string>(matches.length).fill(runId));
+  }
+  return mentions;
+}
+
+/**
+ * 组装 R5 非阻断诊断（CLI 与 self-test 共用，避免文案双写）：
+ *   1. 未提供 --run-log → 「R5 未生效：未提供 --run-log（O 系列失败模式未校验）」——堵隐性规避通道
+ *      （省略 --run-log 不再等于静默跳过），退出码语义不变（仍 exit 0）。
+ *   2. 词法命中非空 → 「疑似引用 N 处（含规则编号引用，非运维失败）…」——指引确为运维失败时改用
+ *      `operationalFailureModes` 机器可读标注。
+ */
+export function buildR5Diagnostics(runLogProvided: boolean, lexicalMentionRunIds: readonly string[]): string[] {
+  const diagnostics: string[] = [];
+  if (!runLogProvided) {
+    diagnostics.push('R5 未生效：未提供 --run-log（O 系列失败模式未校验）');
+  }
+  if (lexicalMentionRunIds.length > 0) {
+    const runIds = [...new Set(lexicalMentionRunIds)].join(', ');
+    diagnostics.push(
+      `疑似引用 ${lexicalMentionRunIds.length} 处（含规则编号引用，非运维失败）；若确为运维失败请在记录中以 operationalFailureModes 标注：${runIds}`,
+    );
+  }
+  return diagnostics;
 }
 
 // ==================== 主流程 ====================
@@ -146,6 +192,7 @@ async function main(): Promise<void> {
 
   // 可选输入：--run-log（读失败只警告不 exit；ENOENT→[] 降级复用 readJsonlOptional）
   let operationalFailureCount: number | undefined;
+  const r5Diagnostics: string[] = [];
   if (runLogFile) {
     const runLogAbs = path.resolve(runLogFile);
     try {
@@ -157,11 +204,16 @@ async function main(): Promise<void> {
         console.error(`⚠ --run-log 文件读取失败，跳过 R5 降级触发检测: ${runLogAbs}（ENOENT）`);
       }
       const entries = await readJsonlOptional(runLogAbs, 'run-log');
+      // R5 真值通道（D-7）：只统计 operationalFailureModes 字段；note 词法命中降级为诊断
       operationalFailureCount = countOperationalFailures(entries);
+      r5Diagnostics.push(...buildR5Diagnostics(true, collectLexicalMentions(entries)));
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
       console.error(`⚠ --run-log 文件读取失败，跳过 R5 降级触发检测: ${runLogAbs}（${e.code ?? e.message}）`);
     }
+  } else {
+    // 未接线可见化（D-7）：省略 --run-log 不再静默跳过 R5，以非阻断诊断显式登记（exit 0 语义不变）
+    r5Diagnostics.push(...buildR5Diagnostics(false, []));
   }
 
   // 构建 options 并调用纯逻辑校验
@@ -169,10 +221,12 @@ async function main(): Promise<void> {
     completedPhases,
     projectCreatedAt,
     operationalFailureCount,
+    diagnostics: r5Diagnostics,
   });
   const exitCode = result.passed ? 0 : 1;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置；warnings 透传（F-G2-04 可见性）
+  // diagnostics 仅在非空时出现（与 check-checkpoint.ts 同族口径；D-7 契约变化已登记）
   if (jsonMode) {
     printJsonReport(
       {
@@ -181,6 +235,7 @@ async function main(): Promise<void> {
         reasons: result.violations,
         violations: buildViolationDistribution(result.violations.length),
         warnings: result.warnings,
+        ...(result.diagnostics.length > 0 ? { diagnostics: result.diagnostics } : {}),
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -201,7 +256,7 @@ async function main(): Promise<void> {
     `--project     : ${projectFile ? (completedPhases !== undefined ? `已读取（status→completedPhases=${completedPhases}, createdAt=${projectCreatedAt ?? 'N/A'}）` : '已读取（status 无对应阶段映射）') : '未提供'}`,
   );
   console.log(
-    `--run-log     : ${runLogFile ? `${runLogFile}（O 系列命中=${operationalFailureCount ?? 'N/A'}）` : '未提供'}`,
+    `--run-log     : ${runLogFile ? `${runLogFile}（O 系列标注=${operationalFailureCount ?? 'N/A'}）` : '未提供'}`,
   );
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
@@ -222,6 +277,15 @@ async function main(): Promise<void> {
     console.log('  w-model-dev/references/data-models.md §自主成熟度模型');
   }
 
+  // 非阻断诊断（D-7：R5 未接线 / note 词法疑似引用）：不影响 exit code，但须可见
+  // （通过与否都打印——exit 0 时正是「为何未触发 R5」需要被解释的场景）
+  if (result.diagnostics.length > 0) {
+    console.log('非阻断诊断：');
+    for (const d of result.diagnostics) {
+      console.log(`  - ${d}`);
+    }
+  }
+
   // 非阻断警告（如 R3 未校验：未提供 --project）：不影响 exit code，但须可见
   for (const w of result.warnings) {
     console.error(`⚠ ${w}`);
@@ -229,6 +293,7 @@ async function main(): Promise<void> {
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exitCode 一致（门禁防伪造三层机制之一）
+  // diagnostics 仅在非空时出现（与 check-checkpoint.ts 同族口径）
   printGateReport(
     'MATURITY',
     {
@@ -236,6 +301,7 @@ async function main(): Promise<void> {
       passed: result.passed,
       violations: result.violations,
       warnings: result.warnings,
+      ...(result.diagnostics.length > 0 ? { diagnostics: result.diagnostics } : {}),
     },
     exitCode,
   );
@@ -243,4 +309,8 @@ async function main(): Promise<void> {
   return;
 }
 
-runMain(main);
+// 入口守卫（lib/is-main.ts）：仅直接执行时运行 main，被 __tests__ / self-test 等 import 时不触发
+// （countOperationalFailures / collectLexicalMentions / buildR5Diagnostics 是本模块的导出函数）
+if (isDirectInvocation(import.meta.url)) {
+  runMain(main);
+}

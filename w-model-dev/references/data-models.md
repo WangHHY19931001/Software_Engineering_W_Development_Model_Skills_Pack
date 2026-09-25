@@ -463,8 +463,10 @@ interface RunLogEntry {
   outcome: 'success' | 'fail' | 'rework' | 'escalate' | 'blocked' | 'cancelled';
   /** 阶段门放行时（action=checkpoint & outcome=success），用户填写的理解证据（见 §10.6 第六维度） */
   acknowledgedDecisions?: string[];
-  /** 备注（rework 原因 / escalation 上下文 / 阻塞说明 / O 系列失败模式标注如 "O1 Token Burn"） */
+  /** 备注（rework 原因 / escalation 上下文 / 阻塞说明；O1~O6 字样按引用处理，真值标注见 operationalFailureModes） */
   note?: string;
+  /** O 系列运维失败模式的机器可读标注（O1~O6，每项至多一次；check-maturity.ts R5 的唯一真值通道，D-7） */
+  operationalFailureModes?: ('O1' | 'O2' | 'O3' | 'O4' | 'O5' | 'O6')[];
   /** 本条记录涉及的产物路径（如有） */
   artifacts?: string[];
   /** 决策置信度（可选，0.0-1.0；agentic Ch18 结构化思维链日志，供 Loop 4 劣化分析） */
@@ -517,7 +519,8 @@ interface RunLogEntry {
 - `run-log.jsonl` 是 append-only：不得修改历史记录；运行时读取可跳过损坏行并记录 note，但 `check-run-log.ts` 门禁对空/坏行 **fail-closed**（空/空白/malformed-only/valid+malformed 一律 exit 1，parseErrors 并入 blocking，消息保留 `PARSE_INCOMPLETE` 前缀），不得把坏行当作可放行的证据缺失。
 - 编排者 O 在以下时机 append：子代理分派返回后 / 门禁脚本执行后 / 🔴 CHECKPOINT 放行后 / 返工回退后。
 - `acknowledgedDecisions` 在阶段门放行时由用户填写（≥1 关键决策摘要，非"确认"/"同意"）；为空视为 O4（Comprehension Debt）命中，拒绝放行。
-- `note` 字段用于标注 O 系列失败模式命中（如 "O1 Token Burn"、"O3 Verifier Theater"）。
+- O 系列失败模式的机器可读标注为 `operationalFailureModes`（可选，`O1`~`O6` 枚举数组，`uniqueItems`）；`check-maturity.ts` R5 只统计该字段（存在即累加长度）。`note` 中的 O1~O6 字样视为**引用**（含评审规则编号同名情形，如 O3 既是运维失败模式也是 V 门禁 evidence 扣分规则名），不计入 R5；词法命中仅作非阻断诊断，并指引「确为运维失败时改用 `operationalFailureModes` 标注」。
+- 未提供 `--run-log` 时 `check-maturity.ts` 输出「R5 未生效」非阻断诊断（省略该参数不再等于静默跳过 R5），退出码语义不变（仍 exit 0）。
 - **禁止字段混用**：不得用 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`）写 `run-log.jsonl`（注：`decisions` 非任何 schema 的合法字段名，正确字段名为 RunLogEntry 的 `acknowledgedDecisions`）。详见下方「RunLogEntry vs EventIngress Schema 边界对照表」节。
 - `decisionConfidence` 为可选字段：评审/门禁/返工等关键决策时可记录置信度（0.0-1.0）；低置信度高频出现是 Loop 4 劣化分析信号。
 

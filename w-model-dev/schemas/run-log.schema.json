@@ -260,8 +260,18 @@
       "items": { "type": "string" }
     },
     "note": {
-      "description": "备注：rework 原因 / escalation 上下文 / 阻塞说明 / O 系列失败模式标注（如 \"O1 Token Burn\"）",
+      "description": "备注：rework 原因 / escalation 上下文 / 阻塞说明。其中出现的 O1..O6 字样按引用处理（含评审规则编号同名情形，如 O3 既是运维失败模式也是 V 门禁 evidence 扣分规则），不计入 check-maturity.ts R5——运维失败模式须用 operationalFailureModes 机器可读标注",
       "type": "string"
+    },
+    "operationalFailureModes": {
+      "description": "O 系列运维失败模式的机器可读标注（check-maturity.ts R5 的唯一真值通道）：O1=Token Burn / O2=State Rot / O3=Verifier Theater / O4=Comprehension Debt Spiral / O5=Cognitive Surrender / O6=Escalation Failure（定义见 SSoT §4A.2a）；每条记录内同一取值至多出现一次。R5 只统计本字段（存在即累加数组长度），note 中的 O1..O6 字样视为引用、不计入。可选字段：缺失表示本条无 O 系列命中（向后兼容历史记录）",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "description": "运维失败模式编号：O1 / O2 / O3 / O4 / O5 / O6（枚举合法性由本 schema 强制；R5 按数组长度计数，不另行校验取值）",
+        "type": "string",
+        "enum": ["O1", "O2", "O3", "O4", "O5", "O6"]
+      }
     },
     "artifacts": {
       "description": "本条记录涉及的产物路径数组（fix 动作须为非空）",

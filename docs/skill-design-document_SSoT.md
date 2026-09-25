@@ -660,7 +660,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 
 > 吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/failure-modes.md`，适配 W 模型语境。
 > 与 48 条流程反模式（#1~#48）+ 10 条行为退化（F1~~F10）互补：反模式是流程破坏，失败模式是行为退化，运维失败模式是运行健康问题。
-> O 系列命中**不触发脚本回退**（与 F1~~F10 同级），但应在 run-log 的 note 字段标注，并在阶段产物「备注」节或评审报告 reworkHints 中记录。
+> O 系列命中**不触发脚本回退**（与 F1~~F10 同级），但应在 run-log 的 `operationalFailureModes` 字段做**机器可读标注**（取值 `O1`~`O6`，`check-maturity.ts` R5 的唯一真值通道；`note` 中的 `O1`~`O6` 字样视为引用、不计入），并在阶段产物「备注」节或评审报告 reworkHints 中记录。未提供 `--run-log` 时 R5 输出「未生效」非阻断诊断（不静默跳过）。
 
 | #   | 失败模式                                             | 症状                                                              | 与现有反模式/失败模式的关系                                         | 缓解措施                                                                                                                       |
 | --- | ---------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -671,7 +671,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 | O5  | Cognitive Surrender（"循环处理了"无设计意见）        | 用户放弃对设计/架构的意见；全权委托 Agent                         | 与 §4A.1 第 3 条（Push Back）对立面                                 | 阶段 2/4 设计 CHECKPOINT 强制用户提出 ≥1 修改意见或替代方案；无意见视为 O5 命中                                                |
 | O6  | Escalation Failure（attempt cap 触发但无人被通知）   | 返工达 maxReworkRounds 但用户未被告知；循环卡死                   | 与 #8（越过 CHECKPOINT）互补：#8 是显式越过，O6 是隐式卡死          | attempt cap 触发 → run-log append escalate 记录 + 强制 🔴 CHECKPOINT 展示返工历史                                              |
 
-> O 系列命中不回退，但应在 run-log 的 note 字段标注（如 note="O1 Token Burn"），并在阶段产物「备注」节或评审报告 reworkHints 中记录。O4/O5 直接关联 CHECKPOINT 有效性，命中时拒绝放行。
+> O 系列命中不回退，但应在 run-log 的 `operationalFailureModes` 字段标注（如 `"operationalFailureModes": ["O1"]`；`note` 中的 O1~O6 字样按引用处理——如 O3 同时是评审规则编号，不计入 R5），并在阶段产物「备注」节或评审报告 reworkHints 中记录。O4/O5 直接关联 CHECKPOINT 有效性，命中时拒绝放行。
 
 ### 4A.2b 返工循环反模式扩展（#18/#19）
 
