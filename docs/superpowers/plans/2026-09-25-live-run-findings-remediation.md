@@ -18,7 +18,7 @@
 | 文件 | 动作 | 职责 |
 | --- | --- | --- |
 | `w-model-dev/scripts/logic/iceberg-sweep-logic.ts` | 修改 | 视角命名空间声明 + R6 分池比对 + R8 收敛集限定设计 ID 视角 |
-| `w-model-dev/scripts/logic/coding-plan-logic.ts` | 修改 | R5 内容下限（非空 + 行级证据锚）+ 新增 `preflightCodingPlan` 纯函数 |
+| `w-model-dev/scripts/logic/coding-plan-logic.ts` | 修改 | R5 内容下限（非空为阻断；行级证据锚为非阻断诊断）+ 新增 `preflightCodingPlan` 纯函数 |
 | `w-model-dev/scripts/cli/check-coding-plan.ts` | 修改 | 新增只读 `--preflight` 参数与 `CODING_PLAN_PREFLIGHT_JSON` 输出 |
 | `w-model-dev/scripts/cli/check-codegraph-queries.ts` | 修改 | 索引探测 + `evidenceKind` 三态判据（cli 强制 / artifact 须带降级证据 / 未声明即违规） |
 | `w-model-dev/scripts/cli/check-maturity.ts` | 修改 | R5 真值通道改读 `operationalFailureModes`；词法与未接线改为非阻断诊断 |
@@ -130,7 +130,7 @@ describe('R6 命名空间分池', () => {
 在 `iceberg-sweep-logic.ts` 增加视角命名空间常量与分池判据：
 
 ```ts
-// 视角命名空间：design-wide 走精确相等；design-sd 只要求子集（tla 的 SD-only 是规约语义）；
+// 视角命名空间：design-wide 走精确相等；design-sd 与宽视角的 SD 切片双向相等（见控制者裁定 R-1）；
 // path 命名空间（scope 的文件路径）不参与 R6/R8 收敛集的集合比对。
 const VIEW_NAMESPACE: Record<string, 'design-wide' | 'design-sd' | 'path'> = {
   graph: 'design-wide', rtm: 'design-wide', tla: 'design-sd', scope: 'path',
@@ -145,14 +145,21 @@ const wide = designViews.filter((v) => VIEW_NAMESPACE[v] === 'design-wide');
 for (let i = 0; i < wide.length; i++) {
   for (let j = i + 1; j < wide.length; j++) {
     const [vi, vj] = [wide[i]!, wide[j]!];
-    const diff = symmetricDiff(viewSets[vi] ?? [], viewSets[vj] ?? []);
+    const diff = symmetricDiff(viewSets[vi]!, viewSets[vj]!);
     if (diff.length > 0) reasons.push(`R6[design-wide] ${vi}↔${vj} 差异项：${diff.join(', ')}`);
   }
 }
-const wideUnion = new Set(wide.flatMap((v) => viewSets[v] ?? []));
+// 控制者裁定 R-1：窄池与宽视角的 SD 切片双向相等（超出/漏项都报）——
+// 反向由 check-tla-model 的 uncoveredSdNodes 在阶段 1-4 承担，阶段 5-8 该门不复检，故 R6 一并守护。
+const wideUnion = new Set(wide.flatMap((v) => viewSets[v]!));
+const isSd = (id: string) => /^SD-/.test(id);
+const wideSdUnion = new Set([...wideUnion].filter(isSd));
 for (const v of designViews.filter((x) => VIEW_NAMESPACE[x] === 'design-sd')) {
-  const extra = (viewSets[v] ?? []).filter((id) => !wideUnion.has(id));
+  const narrowSet = new Set(viewSets[v]!);
+  const extra = [...narrowSet].filter((id) => !wideUnion.has(id));
   if (extra.length > 0) reasons.push(`R6[design-sd] ${v} 超出宽视角设计 ID 集：${extra.join(', ')}`);
+  const missing = [...wideSdUnion].filter((id) => !narrowSet.has(id));
+  if (missing.length > 0) reasons.push(`R6[design-sd] 宽视角 SD 项未进入 ${v}：${missing.join(', ')}`);
 }
 ```
 
@@ -191,23 +198,23 @@ git commit -m "fix(iceberg): R6 三视角改命名空间分池，修结构性不
 
 ```ts
 // 复用该文件既有 helper：writeValidTree（:86-110，写 ~19 个文件的合规树）。
-// 新增两个可选项：blankR3/ r3NoAnchor = 指定某份 R3 文件写空 / 写无锚内容。
+// 新增可选项 blankR3 = 指定某份 R3 文件写空。
 const { checkCodingPlan, preflightCodingPlan } = await import('../logic/coding-plan-logic.js');
 const mkFs = () => nodeCodingPlanFs; // 适配器来自 lib/coding-plan-fs.ts（真盘；树由 writeValidTree 落临时目录）
 
-it('R5：R3 审查文件为空 → 违规（内容下限）', () => {
+it('R5：R3 审查文件为空 → 违规（内容下限，阻断）', () => {
   const tree = writeValidTree({ blankR3: 'phase5-plan-completeness' });
   const r = checkCodingPlan(tree, 5, 'phase5-demo', mkFs());
   expect(r.violations.some((v) => v.includes('phase5-plan-completeness.md') && v.includes('空'))).toBe(true);
 });
-it('R5：R3 审查文件无行级证据锚 → 违规', () => {
+it('R5：无行级证据锚但非空 → 不违规（诊断项，见 CLI 侧）', () => {
   const tree = writeValidTree({ r3NoAnchor: 'phase5-plan-security' });
   const r = checkCodingPlan(tree, 5, 'phase5-demo', mkFs());
-  expect(r.violations.some((v) => v.includes('phase5-plan-security.md') && v.includes('证据锚'))).toBe(true);
+  expect(r.violations.some((v) => v.includes('phase5-plan-security.md'))).toBe(false);
 });
-it('preflight 列出 12 份必需产物与缺失项', () => {
+it('preflight 列出固定必需产物与缺失项', () => {
   const r = preflightCodingPlan(writeValidTree({ omit: 'phase5-finalize-reliability' }), 5, 'phase5-demo', mkFs());
-  expect(r.required).toHaveLength(16); // 12 份审查 + plan + 账本 + 三件套（按实际实现口径核对）
+  expect(r.required).toHaveLength(14); // 固定项 = 12 份审查（9 R3 + 3 V）+ plan + 账本；三件套为变长项，单列 artifacts
   expect(r.missing).toContain('.w-model/r3-reviews/phase5-finalize-reliability.md');
 });
 ```
@@ -215,27 +222,31 @@ it('preflight 列出 12 份必需产物与缺失项', () => {
 - [ ] **步骤 2：运行测试验证失败**
 
 运行：`npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/coding-plan-logic.test.ts -t "内容下限"`
-预期：FAIL——`preflightCodingPlan is not a function`；空文件用例失败（现判据仅 `existsSync`）。
+预期：FAIL——`preflightCodingPlan is not a function`；空文件用例失败（现判据仅 `existsSync`）；「无锚但非空」用例当前也红（现判据无此维度，会通过吗？不会——它断言的是**不该有**该违规，现行代码同样不报，故该例在实现前即绿，属回归锁定用例）。
 
 - [ ] **步骤 3：实现内容下限与 preflight**
 
-`validateStageReviews` 内，对 `r3File`/`vFile` 的存在性分支后追加：
+`validateStageReviews` 内，对 `r3File`/`vFile` 的存在性分支后追加（**只有非空是阻断判据**）：
 
 ```ts
-const anchorRe = /(?:^|\n)\s*[\w/.-]+:(?:§[\w.-]+|L\d+(?:-\d+)?)=/;
 const size = fs.statSync(file).size;
 if (size === 0) violations.push(`${rel} 为空文件（R5：stage 审查产物须含实质内容）`);
-else if (!anchorRe.test(fs.readFileSync(file))) violations.push(`${rel} 未含行级证据锚（R5：至少 1 条 path:Lnn=… 或 path:§sec=…）`);
 ```
+
+行级证据锚改为**非阻断诊断**（不进 `result`，不改 `GATE_JSON`）：`validateStageReviews` 收集缺失锚的相对路径，经 CLI 侧 `cli/check-coding-plan.ts` 在 stderr 打印一行提示，例如
+`○ R5 诊断：3 份审查产物未含行级证据锚（建议 path:Lnn=… 或 path:§sec=…）：<rel 列表>`。
+锚判据正则：`/(?:^|\n)\s*[\w/.-]+:(?:§[\w.-]+|L\d+(?:-\d+)?)=/`。**理由（控制者裁定 O-4）**：实测 demo 15 份既有 review 产物锚命中为 0，阻断化会打红历史项目与既有证据——规格 §3 WS-2 已据此改写，§6 登记为后续可升级项。
 
 新增导出纯函数（同文件，复用既有 `resolvePlanLocation` 等）：
 
 ```ts
-export interface PreflightResult { required: string[]; missing: string[]; invalid: string[] }
+export interface PreflightResult { required: string[]; missing: string[]; invalid: string[]; artifacts: string[] }
 export function preflightCodingPlan(projectRoot: string, phase: number, changeId: string, fs: CodingPlanFs): PreflightResult;
 ```
 
-`cli/check-coding-plan.ts`：`--preflight` 进 allowlist；命中则只打印 `CODING_PLAN_PREFLIGHT_JSON {required, missing, invalid}` 并以 `missing.length + invalid.length === 0 ? 0 : 1` 退出（**不改**既有非 preflight 路径的任何判据与文案）。
+`required` = **固定 14 项**（9 份 `r3-reviews/phase<N>-<stage>-<dim>.md` + 3 份 `v-reviews/phase<N>-<stage>.md` + `docs/plans/<changeId>.plan.md` + `.superpowers/sdd/<changeId>.plan/progress.md`）；`artifacts` = 变长的任务三件套（`task-N-{brief,report}.md` + `review-*.diff`），只列出不计数——这是控制者裁定（原计划写 `toHaveLength(16)` 把变长项塞进计数，语义不成立）。
+
+`cli/check-coding-plan.ts`：`--preflight` 进 allowlist；命中则只打印 `CODING_PLAN_PREFLIGHT_JSON {required, missing, invalid, artifacts}` 并以 `missing.length + invalid.length === 0 ? 0 : 1` 退出（**不改**既有非 preflight 路径的任何判据与文案）；非 preflight 路径在扫描到缺失锚时向 stderr 打一行非阻断诊断。
 
 - [ ] **步骤 4：运行测试验证通过**
 
@@ -244,11 +255,11 @@ export function preflightCodingPlan(projectRoot: string, phase: number, changeId
 
 - [ ] **步骤 5：样本与文案**
 
-三个既有样本目录的 12 份 MD 补真实内容（非空 + ≥1 行级锚）；新增 `bad-review-empty` 与 `bad-review-no-anchor`（后者登记 `NEGATIVE-COVERAGE.md` 的 check-coding-plan 行，锚 `文件#唯一子串锚`）。
+三个既有样本目录的 12 份 MD 补真实内容（**非空即可**；带锚更好，但不登记为判据）；新增负样本 `bad-review-empty`（空文件 → exit 1）并登记 `NEGATIVE-COVERAGE.md` 的 check-coding-plan 行（锚 `文件#唯一子串锚`）。**不要**新增 `bad-review-no-anchor`（锚为非阻断诊断，不构成负例）。
 
 - [ ] **步骤 6：文档同步（SSoT 优先）**
 
-`SSoT:1947` → `hard-constraints.md:57,794` → `templates/coding-plan.md:54` → `phase-5-coding.md:105` → `subagent-delegation.md:316,1069`：把「**每阶段 12 份 MD（9 `r3-reviews/phase<N>-<stage>-<dim>.md` + 3 `v-reviews/phase<N>-<stage>.md`，含非空与证据锚下限）+ 3 份 `preventive-reviews/<N>-<dim>.json`（phase 级，schema 校验）** 的分工」写成清单化约定，并注明两门互不替代。
+`SSoT:1947` → `hard-constraints.md:57,794` → `templates/coding-plan.md:54` → `phase-5-coding.md:105` → `subagent-delegation.md:316,1069`：把「**每阶段 12 份 MD（9 `r3-reviews/phase<N>-<stage>-<dim>.md` + 3 `v-reviews/phase<N>-<stage>.md`，**非空**为阻断下限，行级证据锚为建议项/诊断）+ 3 份 `preventive-reviews/<N>-<dim>.json`（phase 级，schema 校验）** 的分工」写成清单化约定，并注明两门互不替代。
 
 - [ ] **步骤 7：Commit**
 
@@ -995,7 +1006,7 @@ git commit -m "docs(changelog): live run 调测发现全量修复登记 + 未解
 | 规格条 | 验收动作 | 期望 |
 | --- | --- | --- |
 | WS-1 | samples 3 例 + demo 阶段 2-8 复跑 | R6 分池正例 exit 0；DD 漂移负例 exit 1；scope 在盘不违规 |
-| WS-2 | 新样本 2 例 + `--preflight` | 空/无锚 → exit 1；preflight 打印 12 份清单；既有 35 例零回归 |
+| WS-2 | 新样本 1 例 + `--preflight` | 空文件 → exit 1；无锚但非空 → exit 0 + stderr 诊断；preflight 打印固定 14 项清单；既有 35 例零回归 |
 | WS-3 | 新样本 2 例 | 未声明降级 → exit 1；无索引 + 降级 + 替代证据 → exit 0；有索引 + artifact → exit 1 |
 | WS-4 | 新样本 2 例 + demo 复跑 | 引用性 O3 → exit 0 + 诊断；字段 3 次 → exit 1 |
 | WS-5 | 五类突变探针 + 归档前缀探针 | 前四类 exit 1、正确追加 exit 0；归档非前缀 → exit 1 |

@@ -95,12 +95,13 @@
 | **C 保持双轨 + 契约固化 + 前置自检（选定）** | 与 `hard-constraints.md:57` 设计-of-record 一致；成本转向「防漏」与「内容下限」 |
 
 **选定 C**，三项落地：
-1. **R5 内容下限**（补 N-2）：12 份 MD 由「文件存在」升级为「**非空 + 至少 1 条行级证据锚**」（锚形态沿用 verifier 的 `path:Lnn` / `path:§sec` 家族，作为**下限**而非质量评审——质量仍属 V/R3 职责）。
+1. **R5 内容下限**（补 N-2）：12 份 MD 由「文件存在」升级为「**非空（`statSync(...).size > 0`）**」——这一项是**阻断**判据；「含行级证据锚（`path:Lnn=` / `path:§sec=`）」**降级为非阻断诊断**（CLI stderr 一行提示，不改退出码、不进 `GATE_JSON`/聚合结果）。
+   **降级理由（实测证据，控制者裁定 O-4）**：`eval/e2e/demo/.w-model/r3-reviews/phase5-*.md` 与 `v-reviews/phase5-*.md` 共 15 份既有 review 产物的行级锚命中数为 **0**（grep 实测）——若把锚设为阻断，全部历史项目与既有调测证据会立即变红，违背 §2.1 原则 6「历史 fixture 不改即绿」。该增强登记为后续可升级项（见 §6 不修项）。
 2. **前置自检**：`cli/check-coding-plan.ts` 新增只读 `--preflight` 模式——打印本阶段必需清单（plan / 账本 / 三件套 / R3×9 / V×3 / scope / codegraph 记录）与缺失项，**不改 R5 判据、不影响退出码语义**（缺失即 exit 1，但输出清单化，供 O 在电池前一次性对齐）。
 3. **契约成文**：把「12 份 MD + 3 份 JSON 的分工与路径」写进 `templates/coding-plan.md:54`、`subagent-delegation.md:316,1069`（派发清单）、`phase-5-coding.md:105`、`hard-constraints.md:57,794`、`SSoT:1947`。
 
-**同步面**：`samples/coding-plan/{valid-phase5,bad-missing-ledger,bad-task-missing-verify}` 各补 R3/V 文件内容（非空 + 锚）；新增负样本 `bad-review-empty`（空文件 → exit 1）与 `bad-review-no-anchor`（无锚 → exit 1）；`__tests__/coding-plan-logic.test.ts:421-445` + `check-coding-plan.test.ts:80-86` + `artifact-gate-external.test.ts:107-113` helper；`samples/README.md:43`、`NEGATIVE-COVERAGE.md`（check-coding-plan 行）。
-**验收**：`--preflight` 对 demo 阶段 5 plan 打印全清单且 exit 0/1 语义不变；空文件与无锚样本双双 exit 1；demo 既有 12 份产物（含内容）在新判据下仍绿。
+**同步面**：`samples/coding-plan/{valid-phase5,bad-missing-ledger,bad-task-missing-verify}` 各补 R3/V 文件内容（**非空即可**，锚为可选诊断项）；新增负样本 `bad-review-empty`（空文件 → exit 1）；`__tests__/coding-plan-logic.test.ts:421-445` + `check-coding-plan.test.ts:80-86` + `artifact-gate-external.test.ts:107-113` helper；`samples/README.md:43`、`NEGATIVE-COVERAGE.md`（check-coding-plan 行）。
+**验收**：`--preflight` 对 demo 阶段 5 plan 打印全清单且 exit 0/1 语义不变；空文件样本 exit 1；无锚但非空 → exit 0 + stderr 诊断；**demo 既有 15 份 review 产物在非空判据下仍绿**（size 均 > 2KB，实测）。
 
 ### WS-3 · codegraph 真实性与显式降级（D-6）
 
@@ -214,6 +215,7 @@
 | budget Σtokens 去重字段（`parentDispatchId`） | 去重键在 legacy 记录上不可靠（阶段 1-4 `reportId` 为空；`timestamp` 等值误并并发分派），登记为后续可选（WS-7） |
 | 新增反模式编号（伪造时序） | 48 条计数四方同步成本收益不匹配；改为约束 #11 补充句（沿用 RC-2 裁定口径） |
 | 删除 R11 的 phase-1 后置窗口 | 会打红历史 run-log；R11「严格早于」语义正确（WS-6） |
+| R5 的行级证据锚**阻断化**（本版只做非阻断诊断） | 实测 demo 15 份既有 review 产物锚命中 0 → 阻断化会立刻打红全部历史项目与既有证据（违 §2.1 原则 6）；先以诊断观察，后续版本按适配情况评估升级为阻断 |
 
 ---
 
@@ -234,5 +236,5 @@
 | O-1 | D-3 完整性机制深度 | L1+L2+L3+L4 全做（含新 CLI） | 只做 L1+L4（省 schema 字段与链规则） |
 | O-2 | ⑥(a) 无 git provenance | 实现 `provenanceKind:'no-git'` + 永久 package-only 护栏 | 仅文档明示（零代码） |
 | O-3 | 版本号 | bump `42.3.0` | 保持 42.2.1（沿用 rc-closeout 惯例） |
-| O-4 | R5 内容下限强度 | 非空 + ≥1 行级证据锚 | 仅非空（更保守） |
+| O-4 | R5 内容下限强度 | **已裁定**：非空（阻断）+ 行级证据锚（非阻断诊断）——锚阻断化实测会打红历史产物，降级并登记（见 §3 WS-2 理由与 §6 不修项） | 无 |
 | O-5 | 波次划分 | 三波（A/B/C） | 单批全量 |
