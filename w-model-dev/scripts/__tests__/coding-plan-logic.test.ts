@@ -519,6 +519,75 @@ describe('checkCodingPlan（R5 内容下限，2026-09-25 任务 2）', () => {
 });
 
 /**
+ * 修复轮 1 / 发现 1：R5 非阻断诊断的**异常不变量**——`collectMissingAnchorReviews` 是诊断，
+ * 任何读盘异常都不得冒泡（冒泡会经 runMain 升级为 UNEXPECTED / exit 2，把裁定 A 的
+ * 「诊断不改退出码」打成假象）；`validateStageReviews` 的判据须与 preflight 同口径先判 isFile。
+ * 用例一律用注入 stub 制造确定性失败（不依赖 win32/Linux 的目录 size 差异）。
+ */
+describe('checkCodingPlan（R5 诊断异常不变量与 isFile 守卫，修复轮 1 / 发现 1）', () => {
+  const R3_DIR = join(ROOT, '.w-model', 'r3-reviews');
+
+  it('诊断收集器：单份产物读盘抛错（EACCES/EISDIR 形态）→ 不冒泡、按「无锚」计入列表', () => {
+    const base = mkFs({ files: validTreeFiles() });
+    const target = join(R3_DIR, 'phase5-plan-security.md');
+    const throwingFs: CodingPlanFs = {
+      ...base,
+      readFileSync: (p: string) => {
+        if (p === target) throw new Error('EACCES: permission denied, open 审查产物');
+        return base.readFileSync(p);
+      },
+    };
+    // checkCodingPlan 只 stat 审查产物、不读其内容 → 注入的抛错夹具不影响既有判定
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, throwingFs);
+    expect(r.passed).toBe(true);
+    expect(r.violations).toEqual([]);
+    expect(r.reviewsFound).toHaveLength(12);
+    expect(() => collectMissingAnchorReviews(ROOT, 5, throwingFs)).not.toThrow();
+    expect(collectMissingAnchorReviews(ROOT, 5, throwingFs)).toEqual(['.w-model/r3-reviews/phase5-plan-security.md']);
+  });
+
+  it('诊断收集器：statSync 抛错（竞态删除形态）→ 同样不冒泡、按「无锚」计入列表', () => {
+    const base = mkFs({ files: validTreeFiles() });
+    const target = join(R3_DIR, 'phase5-execute-reliability.md');
+    const throwingFs: CodingPlanFs = {
+      ...base,
+      statSync: (p: string) => {
+        if (p === target) throw new Error('ENOENT: no such file or directory (竞态删除)');
+        return base.statSync(p);
+      },
+    };
+    expect(() => collectMissingAnchorReviews(ROOT, 5, throwingFs)).not.toThrow();
+    expect(collectMissingAnchorReviews(ROOT, 5, throwingFs)).toEqual([
+      '.w-model/r3-reviews/phase5-execute-reliability.md',
+    ]);
+  });
+
+  it('R5 判据：审查产物路径上是目录（非普通文件）→ violation（先判 isFile，不进读盘分支）', () => {
+    const dirPath = join(R3_DIR, 'phase5-finalize-security.md');
+    // stub 语义：同键的文件优先于目录，故须先摘掉该路径的文件键再登记目录（模拟「同名目录占位」）
+    const files = withoutKeys(validTreeFiles(), dirPath);
+    const fs = mkFs({ files, dirs: [dirPath] });
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, fs);
+    expect(r.passed).toBe(false);
+    expect(r.violations).toEqual([
+      '.w-model/r3-reviews/phase5-finalize-security.md 非普通文件（R5：stage 审查产物须为文件）',
+    ]);
+    expect(r.reviewsFound).toHaveLength(11); // 非普通文件不计入有效审查产物
+    // 诊断侧：非普通文件按「无锚」计入，且不尝试读盘（不依赖平台目录 size）
+    expect(collectMissingAnchorReviews(ROOT, 5, fs)).toEqual(['.w-model/r3-reviews/phase5-finalize-security.md']);
+  });
+
+  it('回归：0 字节产物仍走「为空文件」文案（发现 1 的 isFile 前插不得改写既有判据）', () => {
+    const files = withFile(validTreeFiles(), join(R3_DIR, 'phase5-plan-completeness.md'), '');
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
+    expect(r.violations).toEqual([
+      '.w-model/r3-reviews/phase5-plan-completeness.md 为空文件（R5：stage 审查产物须含实质内容）',
+    ]);
+    expect(r.reviewsFound).toHaveLength(11);
+  });
+});
+
+/**
  * 电池前清单自检（N-2）：`required` 恒 14 项（9 R3 + 3 V + plan + 账本）为**固定项**；
  * 任务三件套 / `review-*.diff` 为**变长项**，单列 `artifacts` 只列出、不计数、不参与退出判定。
  */

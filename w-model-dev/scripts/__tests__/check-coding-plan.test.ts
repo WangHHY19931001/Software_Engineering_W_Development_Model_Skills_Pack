@@ -260,6 +260,23 @@ describe('check-coding-plan.ts CLI', () => {
     expect(r.stdout).toContain('phase6-');
   });
 
+  it('C11: 审查产物路径上是目录（非普通文件）→ exit 1（R5 违规 + 诊断），不得冒泡为 exit 2 脚本异常', () => {
+    // 修复轮 1 / 发现 1 的端到端回归：诊断读盘异常若冒泡会经 runMain 变 UNEXPECTED / exit 2。
+    // 用「同名目录」制造确定性触发（Windows/Linux 判据一致，不依赖目录 size 的平台差异）。
+    const { root, head } = makeCodingPlanRepo((r) => {
+      writeValidTree(r);
+      rmSync(join(r, '.w-model', 'r3-reviews', 'phase5-plan-security.md'), { force: true });
+      mkdirSync(join(r, '.w-model', 'r3-reviews', 'phase5-plan-security.md'), { recursive: true });
+    });
+    writeScope(root, head);
+    const r = runCli([`"${root}"`, '--phase=5', '--scope=.w-model/scope.json']);
+    expect(r.status).toBe(1); // 不是 2：诊断与 R5 判据都不得抛
+    expect(r.stdout).toContain('非普通文件（R5：stage 审查产物须为文件）');
+    expect(r.stdout).toMatch(/CODING_PLAN_JSON /);
+    expect(r.stderr).toContain('○ R5 诊断');
+    expect(r.stderr).toContain('.w-model/r3-reviews/phase5-plan-security.md');
+  });
+
   /**
    * C9 组：`--preflight` 只读电池前自检（N-2，2026-09-25 任务 2）——
    * required 恒为固定 14 项（9 R3 + 3 V + plan + 账本），三件套/review diff 为变长 `artifacts` 只列出；

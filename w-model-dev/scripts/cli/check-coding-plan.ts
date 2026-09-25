@@ -158,7 +158,9 @@ async function main(): Promise<void> {
   }
 
   // R5 非阻断诊断（裁定 A）：在盘非空但无行级证据锚的审查产物 → stderr 一行提示，
-  // 不改退出码、不进 CODING_PLAN_JSON / GATE_JSON / artifact-gate 聚合
+  // 不改退出码、不进 CODING_PLAN_JSON / GATE_JSON / artifact-gate 聚合。
+  // 本调用绝不抛：collectMissingAnchorReviews 内逐条 try/catch（读盘失败按「无锚」计），
+  // 否则诊断异常会经 runMain 升级为 UNEXPECTED / exit 2，把「诊断不改退出码」打成假象（修复轮 1 / 发现 1）
   const anchorGaps = collectMissingAnchorReviews(abs, phase, nodeCodingPlanFs);
   if (anchorGaps.length > 0) {
     process.stderr.write(

@@ -26,10 +26,11 @@
  *       `.w-model/v-reviews/phase<phase>-<stage>.md` ×3，stage ∈ {plan, execute, finalize}、
  *       dim ∈ {completeness, reliability, security}（文件命名规则沿袭已退役的 check-opsx-artifacts
  *       的 validateStageReviews，仅 stage 词表换新；旧词表不充数）。
- *       阻断下限 = 文件**存在且非空**（`statSync(file).size > 0`，2026-09-25 任务 2 / D-2）；
+ *       阻断下限 = 文件**存在、为普通文件且非空**（`isFile() && size > 0`，2026-09-25 任务 2 / D-2）；
  *       「含行级证据锚」（`path:Lnn=` / `path:§sec=`）只是**非阻断诊断**——由 `collectMissingAnchorReviews`
  *       单独收集、经 CLI stderr 一行提示，不进本模块返回结构、不改退出码、不进 GATE_JSON 聚合
- *       （控制者裁定：实测历史 review 产物锚命中为 0，阻断化会打红全部既有项目与证据）。
+ *       （控制者裁定：实测历史 review 产物锚命中为 0，阻断化会打红全部既有项目与证据）；
+ *       该诊断函数**读盘异常一律不外抛**（按「无锚」计），保证「诊断不改退出码」不是假象。
  *   前置自检（N-2）：`preflightCodingPlan` 只读列出本阶段固定 14 项必需产物（9 R3 + 3 V + plan + 账本）
  *       与 missing/invalid，变长任务三件套单列 `artifacts` 不计数——供 O 在电池前一次性对齐。
  *   R6  归档态回退（D-7 平移）：活动位 plan 缺失时回退归档位
@@ -350,7 +351,11 @@ function stageReviewEntries(projectRoot: string, phase: number): StageReviewEntr
  */
 const REVIEW_ANCHOR_RE = /(?:^|\n)\s*[\w/.-]+:(?:§[\w.-]+|L\d+(?:-\d+)?)=/;
 
-/** 校验 R3×9 + V×3 审查产物（project 级）；阻断下限 = 存在 + 非空（0 字节判违规，不计入 reviewsFound） */
+/**
+ * 校验 R3×9 + V×3 审查产物（project 级）；阻断下限 = 存在 + **普通文件** + 非空
+ * （`!isFile() || size === 0` 判违规——与同文件 `preflightCodingPlan` 及 R3 账本/plan 的 isFile 守卫同口径；
+ * 非普通文件（目录等）不再进入读盘分支，跨平台行为一致：Linux 目录 size=4096 不得因此被判「通过」）。
+ */
 function validateStageReviews(
   projectRoot: string,
   phase: number,
@@ -363,7 +368,14 @@ function validateStageReviews(
       violations.push(`${entry.rel} 缺失（R5：${entry.missingNote}）`);
       continue;
     }
-    if (fs.statSync(entry.abs).size === 0) {
+    // 先判 isFile（再判 size）：非普通文件在 win32 上 size 可能为 0、在 Linux 上为 4096，
+    // 单一 size 判据会跨平台不一致；非普通文件也不得进入后续任何读盘
+    const stat = fs.statSync(entry.abs);
+    if (!stat.isFile()) {
+      violations.push(`${entry.rel} 非普通文件（R5：stage 审查产物须为文件）`);
+      continue;
+    }
+    if (stat.size === 0) {
       violations.push(`${entry.rel} 为空文件（R5：stage 审查产物须含实质内容）`);
       continue;
     }
@@ -372,17 +384,34 @@ function validateStageReviews(
 }
 
 /**
- * R5 非阻断诊断收集器：列出「在盘且非空、但未含行级证据锚」的审查产物（projectRoot 相对 POSIX 路径，
+ * R5 非阻断诊断收集器：列出「在盘且可读、但未含行级证据锚」的审查产物（projectRoot 相对 POSIX 路径，
  * 呈 `stageReviewEntries` 顺序）。缺失 / 0 字节文件不进本列表——它们已由阻断判据具名报出，
  * 重复诊断只会稀释信号。调用方（`cli/check-coding-plan.ts`）据此向 stderr 打一行提示；
  * **不参与** `checkCodingPlan` 返回结构、退出码、GATE_JSON 聚合（控制者裁定 A）。
+ *
+ * **异常不变量（修复轮 1 / 发现 1）**：本函数是**非阻断诊断**，其任何读盘异常都不得冒泡——
+ * `readFileSync` 对「目录 / 权限不足 / 竞态删除」会抛 `EISDIR` / `EACCES` / `ENOENT`，冒泡即经
+ * CLI → `runMain` 升级为 `UNEXPECTED` / exit 2，会把裁定 A 的「诊断不改退出码」打成假象
+ * （Linux 下目录 size=4096 更能穿透 R5 判据直抵读盘）。故逐条 `try/catch`：读失败 / 非普通文件
+ * 一律按「无锚」计入诊断列表并继续，函数**任何输入下都只返回 `string[]`**。
  */
 export function collectMissingAnchorReviews(projectRoot: string, phase: number, fs: CodingPlanFs): string[] {
   const gaps: string[] = [];
   for (const entry of stageReviewEntries(projectRoot, phase)) {
     if (!fs.existsSync(entry.abs)) continue;
-    if (fs.statSync(entry.abs).size === 0) continue;
-    if (!REVIEW_ANCHOR_RE.test(fs.readFileSync(entry.abs))) gaps.push(entry.rel);
+    try {
+      const stat = fs.statSync(entry.abs);
+      if (!stat.isFile()) {
+        // 非普通文件：无有效锚可言（且不读盘，跨平台行为一致）
+        gaps.push(entry.rel);
+        continue;
+      }
+      if (stat.size === 0) continue; // 0 字节：已由 R5 阻断判据具名报出，不重复诊断
+      if (!REVIEW_ANCHOR_RE.test(fs.readFileSync(entry.abs))) gaps.push(entry.rel);
+    } catch {
+      // 读盘失败（EISDIR / EACCES / 竞态等）：按「无锚」计，绝不冒泡（裁定 A）
+      gaps.push(entry.rel);
+    }
   }
   return gaps;
 }
