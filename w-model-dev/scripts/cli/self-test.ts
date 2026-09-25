@@ -1934,6 +1934,15 @@ const CODING_PLAN_CASES: CodingPlanCase[] = [
     expectedViolationPatterns: [/缺验证命令行/],
     description: 'Task 2 任务节无「验证：」/「Verify:」验证命令行（R2：每任务节须 ≥1 条），应未通过',
   },
+  {
+    sampleDir: 'coding-plan/bad-review-empty',
+    phase: 5,
+    changeId: 'phase5-demo',
+    expectedPassed: false,
+    expectedViolationPatterns: [/phase5-plan-completeness\.md 为空文件/],
+    description:
+      'stage 审查产物为 0 字节（R5 内容下限：文件存在但无实质内容；行级证据锚降为非阻断诊断后不在此列），应未通过（2026-09-25 任务 2 / D-2）',
+  },
 ];
 
 const UAT_PATH_MAPPING_CASES: UatPathMappingCase[] = [

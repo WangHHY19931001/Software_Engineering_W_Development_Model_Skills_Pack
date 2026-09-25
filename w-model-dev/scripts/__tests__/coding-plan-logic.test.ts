@@ -23,7 +23,13 @@ import { basename, dirname, join, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
-import { checkCodingPlan, extractCompletedTaskNumbers, type CodingPlanFs } from '../logic/coding-plan-logic.js';
+import {
+  checkCodingPlan,
+  collectMissingAnchorReviews,
+  extractCompletedTaskNumbers,
+  preflightCodingPlan,
+  type CodingPlanFs,
+} from '../logic/coding-plan-logic.js';
 
 const CHANGE_ID = 'phase5-demo';
 
@@ -162,10 +168,12 @@ function validTreeFiles(root = ROOT, phase = 5, changeId = CHANGE_ID): Record<st
   };
   for (const stage of ['plan', 'execute', 'finalize']) {
     for (const dim of ['completeness', 'reliability', 'security']) {
+      // 非空（R5 阻断下限）+ 行级证据锚（R5 非阻断诊断的「无缺口」正例形态）
       files[join(root, '.w-model', 'r3-reviews', `phase${phase}-${stage}-${dim}.md`)] =
-        `# phase${phase}-${stage}-${dim}\n`;
+        `# phase${phase}-${stage}-${dim}\n\nsrc/phase${phase}-${stage}.ts:L1=…\n`;
     }
-    files[join(root, '.w-model', 'v-reviews', `phase${phase}-${stage}.md`)] = `# phase${phase}-${stage}\n`;
+    files[join(root, '.w-model', 'v-reviews', `phase${phase}-${stage}.md`)] =
+      `# phase${phase}-${stage}\n\nsrc/phase${phase}-${stage}.ts:L1=…\n`;
   }
   return files;
 }
@@ -440,6 +448,122 @@ describe('checkCodingPlan（R5 审查产物，stage 词表 plan/execute/finalize
     const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('phase5-plan-reliability.md'))).toBe(true);
+  });
+});
+
+/**
+ * R5 内容下限与非阻断诊断（2026-09-25 任务 2，D-2 + N-2）：
+ * 阻断判据 = 12 份 stage 审查产物**非空**（`statSync(file).size > 0`）；
+ * 「含行级证据锚」只是 CLI 侧非阻断诊断（不进 `checkCodingPlan` 返回结构、不改退出码），
+ * 理由见 `coding-plan-logic.ts` R5 节与控制者裁定（实测历史 review 产物锚命中为 0）。
+ */
+describe('checkCodingPlan（R5 内容下限，2026-09-25 任务 2）', () => {
+  const R3_DIR = join(ROOT, '.w-model', 'r3-reviews');
+  const V_DIR = join(ROOT, '.w-model', 'v-reviews');
+
+  it('R5: R3 审查文件为 0 字节 → violation（内容下限阻断，具名文件）', () => {
+    const files = withFile(validTreeFiles(), join(R3_DIR, 'phase5-plan-completeness.md'), '');
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.includes('phase5-plan-completeness.md') && v.includes('空'))).toBe(true);
+    expect(r.reviewsFound).toHaveLength(11); // 0 字节文件不算有效审查产物
+  });
+
+  it('R5: V 评审为 0 字节 → violation（V×3 同受非空下限约束）', () => {
+    const files = withFile(validTreeFiles(), join(V_DIR, 'phase5-finalize.md'), '');
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.includes('phase5-finalize.md') && v.includes('空'))).toBe(true);
+  });
+
+  it('R5: 非空但无行级证据锚 → 不违规（锚是非阻断诊断，不构成判据；回归锁定）', () => {
+    const files = withFile(
+      validTreeFiles(),
+      join(R3_DIR, 'phase5-plan-security.md'),
+      '# 无锚审查记录\n\n本文件非空但无行级锚。\n',
+    );
+    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
+    expect(r.passed).toBe(true);
+    expect(r.violations).toEqual([]);
+    expect(r.reviewsFound).toHaveLength(12);
+  });
+
+  it('R5 诊断收集器：列出「非空但无锚」产物；缺失与 0 字节不进诊断（已由阻断判据报出）', () => {
+    let files = withFile(validTreeFiles(), join(R3_DIR, 'phase5-plan-security.md'), '# 无锚\n');
+    files = withFile(files, join(V_DIR, 'phase5-execute.md'), '# 无锚\n');
+    files = withoutKeys(files, join(R3_DIR, 'phase5-finalize-security.md'));
+    files = withFile(files, join(R3_DIR, 'phase5-execute-reliability.md'), '');
+    expect(collectMissingAnchorReviews(ROOT, 5, mkFs({ files }))).toEqual([
+      '.w-model/r3-reviews/phase5-plan-security.md',
+      '.w-model/v-reviews/phase5-execute.md',
+    ]);
+  });
+
+  it('R5 诊断收集器：默认合法树（每份带锚）→ 空列表（零诊断）', () => {
+    expect(collectMissingAnchorReviews(ROOT, 5, mkFs({ files: validTreeFiles() }))).toEqual([]);
+  });
+
+  it('R5 锚判据：接受 Lnn= / Lnn-mm= / §sec= 三形态（含 CRLF 行尾）；裸行号（无 L 前缀）不充数', () => {
+    let files = withFile(
+      validTreeFiles(),
+      join(R3_DIR, 'phase5-plan-completeness.md'),
+      '# r3\r\n\r\nsrc/a.ts:L12=偏差\r\n',
+    );
+    files = withFile(files, join(R3_DIR, 'phase5-plan-reliability.md'), '# r3\n\ndocs/b.md:L12-18=区间锚\n');
+    files = withFile(files, join(R3_DIR, 'phase5-plan-security.md'), '# r3\n\ndocs/c.md:§goal=节锚\n');
+    files = withFile(files, join(R3_DIR, 'phase5-execute-completeness.md'), '# r3\n\nsrc/a.ts:12=裸行号\n');
+    expect(collectMissingAnchorReviews(ROOT, 5, mkFs({ files }))).toEqual([
+      '.w-model/r3-reviews/phase5-execute-completeness.md',
+    ]);
+  });
+});
+
+/**
+ * 电池前清单自检（N-2）：`required` 恒 14 项（9 R3 + 3 V + plan + 账本）为**固定项**；
+ * 任务三件套 / `review-*.diff` 为**变长项**，单列 `artifacts` 只列出、不计数、不参与退出判定。
+ */
+describe('preflightCodingPlan（电池前清单自检，2026-09-25 任务 2）', () => {
+  const LEDGER_REL = '.superpowers/sdd/phase5-demo.plan';
+
+  it('列出固定 14 项必需产物 + 具名缺失项；三件套为变长 artifacts（不计数）', () => {
+    const files = withoutKeys(validTreeFiles(), join(ROOT, '.w-model', 'r3-reviews', 'phase5-finalize-reliability.md'));
+    const r = preflightCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
+    expect(r.required).toHaveLength(14);
+    expect(r.required).toEqual(
+      expect.arrayContaining([
+        'docs/plans/phase5-demo.plan.md',
+        '.superpowers/sdd/phase5-demo.plan/progress.md',
+        '.w-model/r3-reviews/phase5-finalize-reliability.md',
+        '.w-model/v-reviews/phase5-finalize.md',
+      ]),
+    );
+    expect(r.missing).toEqual(['.w-model/r3-reviews/phase5-finalize-reliability.md']);
+    expect(r.invalid).toEqual([]);
+    expect(r.artifacts).toEqual([
+      `${LEDGER_REL}/review-abc1234.diff`,
+      `${LEDGER_REL}/task-1-brief.md`,
+      `${LEDGER_REL}/task-1-report.md`,
+      `${LEDGER_REL}/task-2-brief.md`,
+      `${LEDGER_REL}/task-2-report.md`,
+    ]);
+    // 变长项不参与计数：required 恒 14，三件套不出现在 required
+    expect(r.required.some((p) => p.includes('task-1-brief.md'))).toBe(false);
+  });
+
+  it('必需产物在盘但 0 字节 → 记入 invalid（与 missing 分列；两者都使 preflight 非 0 退出）', () => {
+    const files = withFile(validTreeFiles(), join(ROOT, '.w-model', 'v-reviews', 'phase5-plan.md'), '');
+    const r = preflightCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
+    expect(r.required).toHaveLength(14);
+    expect(r.missing).toEqual([]);
+    expect(r.invalid).toEqual(['.w-model/v-reviews/phase5-plan.md']);
+  });
+
+  it('空树（零产物）→ 14 项全 missing、artifacts 空列表（清单口径与产物状态无关）', () => {
+    const r = preflightCodingPlan(ROOT, 5, CHANGE_ID, mkFs());
+    expect(r.required).toHaveLength(14);
+    expect(r.missing).toHaveLength(14);
+    expect(r.invalid).toEqual([]);
+    expect(r.artifacts).toEqual([]);
   });
 });
 

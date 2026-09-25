@@ -26,6 +26,12 @@
  *       `.w-model/v-reviews/phase<phase>-<stage>.md` ×3，stage ∈ {plan, execute, finalize}、
  *       dim ∈ {completeness, reliability, security}（文件命名规则沿袭已退役的 check-opsx-artifacts
  *       的 validateStageReviews，仅 stage 词表换新；旧词表不充数）。
+ *       阻断下限 = 文件**存在且非空**（`statSync(file).size > 0`，2026-09-25 任务 2 / D-2）；
+ *       「含行级证据锚」（`path:Lnn=` / `path:§sec=`）只是**非阻断诊断**——由 `collectMissingAnchorReviews`
+ *       单独收集、经 CLI stderr 一行提示，不进本模块返回结构、不改退出码、不进 GATE_JSON 聚合
+ *       （控制者裁定：实测历史 review 产物锚命中为 0，阻断化会打红全部既有项目与证据）。
+ *   前置自检（N-2）：`preflightCodingPlan` 只读列出本阶段固定 14 项必需产物（9 R3 + 3 V + plan + 账本）
+ *       与 missing/invalid，变长任务三件套单列 `artifacts` 不计数——供 O 在电池前一次性对齐。
  *   R6  归档态回退（D-7 平移）：活动位 plan 缺失时回退归档位
  *       `docs/changes/archive/<changeId>/` 或 `docs/changes/archive/<YYYY-MM-DD>-<changeId>/`
  *       （**锚定匹配**：目录名恰为 `<changeId>`，或 `<YYYY-MM-DD>-` 定长前缀 + 恰为 `<changeId>`
@@ -294,7 +300,57 @@ export function extractCompletedTaskNumbers(ledgerContent: string): Set<number> 
   return completed;
 }
 
-/** 校验 R3×9 + V×3 审查产物（project 级；文件命名与 validateStageReviews 相同，stage 词表换新） */
+/** R3×9 + V×3 清单项（stage × dim 展开的**唯一命名源**；校验、诊断、preflight 三处共用） */
+interface StageReviewEntry {
+  /** projectRoot 相对 POSIX 路径（violations / preflight 展示用） */
+  rel: string;
+  /** 绝对路径（fs 端口键） */
+  abs: string;
+  /** 短名（`reviewsFound` 用：R3 为 `<stage>-<dim>`，V 为 `<stage>-V`） */
+  label: string;
+  /** R3 / V（preflight 的 required 分组顺序 + 缺失文案分支） */
+  kind: 'r3' | 'v';
+  /** 缺失文案后半句（R3 与 V 的既有文案逐字保留） */
+  missingNote: string;
+}
+
+/**
+ * 展开 R3×9 + V×3 审查产物清单（**零 IO**，只拼路径）。
+ * 顺序 = stage 主序（plan → execute → finalize），每 stage 内 3 个 dim 再 V，
+ * 与既有 `reviewsFound` 顺序逐项一致（C3 等既有断言不因重构漂移）。
+ */
+function stageReviewEntries(projectRoot: string, phase: number): StageReviewEntry[] {
+  const entries: StageReviewEntry[] = [];
+  for (const stage of CODING_PLAN_STAGES) {
+    for (const dim of REQUIRED_R3_DIMENSIONS) {
+      const fileName = `phase${phase}-${stage}-${dim}.md`;
+      entries.push({
+        rel: toRel('.w-model', 'r3-reviews', fileName),
+        abs: path.join(projectRoot, '.w-model', 'r3-reviews', fileName),
+        label: `${stage}-${dim}`,
+        kind: 'r3',
+        missingNote: '编码链 stage 审查产物须齐备',
+      });
+    }
+    const vFileName = `phase${phase}-${stage}.md`;
+    entries.push({
+      rel: toRel('.w-model', 'v-reviews', vFileName),
+      abs: path.join(projectRoot, '.w-model', 'v-reviews', vFileName),
+      label: `${stage}-V`,
+      kind: 'v',
+      missingNote: '编码链 V 评审须齐备',
+    });
+  }
+  return entries;
+}
+
+/**
+ * R5 行级证据锚判据（**非阻断诊断**用）：行首（允许前置空白）为 `path:Lnn=` / `path:Lnn-mm=` /
+ * `path:§sec=` 形态。控制者裁定 O-4 逐字给定，不阻断、不进聚合。
+ */
+const REVIEW_ANCHOR_RE = /(?:^|\n)\s*[\w/.-]+:(?:§[\w.-]+|L\d+(?:-\d+)?)=/;
+
+/** 校验 R3×9 + V×3 审查产物（project 级）；阻断下限 = 存在 + 非空（0 字节判违规，不计入 reviewsFound） */
 function validateStageReviews(
   projectRoot: string,
   phase: number,
@@ -302,26 +358,112 @@ function validateStageReviews(
   violations: string[],
   reviewsFound: string[],
 ): void {
-  const r3Dir = path.join(projectRoot, '.w-model', 'r3-reviews');
-  const vDir = path.join(projectRoot, '.w-model', 'v-reviews');
-  for (const stage of CODING_PLAN_STAGES) {
-    for (const dim of REQUIRED_R3_DIMENSIONS) {
-      const r3File = path.join(r3Dir, `phase${phase}-${stage}-${dim}.md`);
-      if (fs.existsSync(r3File)) {
-        reviewsFound.push(`${stage}-${dim}`);
-      } else {
-        violations.push(
-          `${toRel('.w-model', 'r3-reviews', `phase${phase}-${stage}-${dim}.md`)} 缺失（R5：编码链 stage 审查产物须齐备）`,
-        );
-      }
+  for (const entry of stageReviewEntries(projectRoot, phase)) {
+    if (!fs.existsSync(entry.abs)) {
+      violations.push(`${entry.rel} 缺失（R5：${entry.missingNote}）`);
+      continue;
     }
-    const vFile = path.join(vDir, `phase${phase}-${stage}.md`);
-    if (fs.existsSync(vFile)) {
-      reviewsFound.push(`${stage}-V`);
-    } else {
-      violations.push(`${toRel('.w-model', 'v-reviews', `phase${phase}-${stage}.md`)} 缺失（R5：编码链 V 评审须齐备）`);
+    if (fs.statSync(entry.abs).size === 0) {
+      violations.push(`${entry.rel} 为空文件（R5：stage 审查产物须含实质内容）`);
+      continue;
     }
+    reviewsFound.push(entry.label);
   }
+}
+
+/**
+ * R5 非阻断诊断收集器：列出「在盘且非空、但未含行级证据锚」的审查产物（projectRoot 相对 POSIX 路径，
+ * 呈 `stageReviewEntries` 顺序）。缺失 / 0 字节文件不进本列表——它们已由阻断判据具名报出，
+ * 重复诊断只会稀释信号。调用方（`cli/check-coding-plan.ts`）据此向 stderr 打一行提示；
+ * **不参与** `checkCodingPlan` 返回结构、退出码、GATE_JSON 聚合（控制者裁定 A）。
+ */
+export function collectMissingAnchorReviews(projectRoot: string, phase: number, fs: CodingPlanFs): string[] {
+  const gaps: string[] = [];
+  for (const entry of stageReviewEntries(projectRoot, phase)) {
+    if (!fs.existsSync(entry.abs)) continue;
+    if (fs.statSync(entry.abs).size === 0) continue;
+    if (!REVIEW_ANCHOR_RE.test(fs.readFileSync(entry.abs))) gaps.push(entry.rel);
+  }
+  return gaps;
+}
+
+/**
+ * 电池前自检结果（`cli/check-coding-plan.ts --preflight` 的单行 JSON 载荷）。
+ *
+ * - `required`：**固定 14 项**（9 份 `r3-reviews` + 3 份 `v-reviews` + plan + 账本；活动位路径）；
+ * - `missing` / `invalid`：在 `required` 上单遍分类（不存在 = missing；在盘但非普通文件或 0 字节 = invalid），
+ *   两者都使 preflight 退出码非 0（`missing.length + invalid.length === 0 ? 0 : 1`）；
+ * - `artifacts`：**变长项**（账本目录内实际在盘的 `task-<N>-{brief,report}.md` 与 `review-*.diff`）
+ *   只列出、不计数、不参与退出判定（三件套号数随任务推进而变，塞进「固定必需项」语义不成立）。
+ */
+export interface PreflightResult {
+  /** 固定 14 项必需产物（projectRoot 相对 POSIX 路径） */
+  required: string[];
+  /** 必需产物中不在盘的（保持 required 相对顺序） */
+  missing: string[];
+  /** 必需产物中在盘但非普通文件或 0 字节的（保持 required 相对顺序） */
+  invalid: string[];
+  /** 变长项：账本目录内在盘的三件套与评审包 diff（仅列出） */
+  artifacts: string[];
+}
+
+/** R4 口径的任务三件套文件名（与 `validateLedgerAndArtifacts` 同规：`task-<N>-brief|report.md`） */
+const TASK_ARTIFACT_RE = /^task-\d+-(?:brief|report)\.md$/;
+/** R4 口径的评审包 diff 名（`review-*.diff`） */
+const REVIEW_DIFF_RE = /^review-.+\.diff$/;
+
+/**
+ * 电池前清单自检（只读）：列出本阶段**固定 14 项**必需产物与 missing/invalid，单列变长 `artifacts`。
+ *
+ * 语义边界（与 `checkCodingPlan` 的关系）：
+ * - 只看**活动位** `docs/plans/<changeId>.plan.md` + `.superpowers/sdd/<changeId>.plan/progress.md`——
+ *   归档态回退（R6）是门禁内的收口语义，不是「电池前对齐」的场景；
+ * - 只判「在盘与否 / 是否 0 字节」，不判 plan 结构、账本身份、任务覆盖等内容判据（那是门的职责，
+ *   本函数不改任何门的判据与退出码语义）——所以它能在 S 产出**之前**给出对齐清单。
+ */
+export function preflightCodingPlan(
+  projectRoot: string,
+  phase: number,
+  changeId: string,
+  fs: CodingPlanFs,
+): PreflightResult {
+  const entries = stageReviewEntries(projectRoot, phase);
+  const ledgerDir = path.join(projectRoot, '.superpowers', 'sdd', `${changeId}.plan`);
+  const ledgerRelDir = toRel('.superpowers', 'sdd', `${changeId}.plan`);
+  const requiredEntries = [
+    // 9 份 R3 + 3 份 V（分组顺序与契约表述一致：R3×9 在前、V×3 在后）
+    ...entries.filter((e) => e.kind === 'r3'),
+    ...entries.filter((e) => e.kind === 'v'),
+    {
+      rel: toRel('docs', 'plans', `${changeId}.plan.md`),
+      abs: path.join(projectRoot, 'docs', 'plans', `${changeId}.plan.md`),
+    },
+    { rel: toRel(ledgerRelDir, 'progress.md'), abs: path.join(ledgerDir, 'progress.md') },
+  ];
+  const required = requiredEntries.map((e) => e.rel);
+
+  const missing: string[] = [];
+  const invalid: string[] = [];
+  for (const entry of requiredEntries) {
+    if (!fs.existsSync(entry.abs)) {
+      missing.push(entry.rel);
+      continue;
+    }
+    const stat = fs.statSync(entry.abs);
+    if (!stat.isFile() || stat.size === 0) invalid.push(entry.rel);
+  }
+
+  let artifacts: string[] = [];
+  if (fs.existsSync(ledgerDir)) {
+    artifacts = fs
+      .readdirSync(ledgerDir, { withFileTypes: true })
+      .map((e) => e.name)
+      .filter((name) => TASK_ARTIFACT_RE.test(name) || REVIEW_DIFF_RE.test(name))
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => toRel(ledgerRelDir, name));
+  }
+
+  return { required, missing, invalid, artifacts };
 }
 
 /** 校验账本（R3）+ 三件套（R4）；plan 上下文用于首行身份绑定 */

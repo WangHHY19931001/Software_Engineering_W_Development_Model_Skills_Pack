@@ -1944,7 +1944,13 @@ interface RunLogEntry {
 | ---------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | standard（阶段级）                             | 常规 S 产出（produce / 各阶段产物）                    | 该阶段 run-log 含 role=R + outcome=success 的 `r3-completeness`/`r3-reliability`/`r3-security` 各 ≥1 条（每条维度唯一，重复维度不充数）+ 三份 preventive-review JSON 齐备 | `check-role-dispatch.ts`（三维度缺口即 fail）+ `check-preventive-review.ts`            |
 | fix / emergency-fix（run-log identity window） | S-fix 返工 / 紧急修复通道                              | run-log 同身份窗口内（`S-fix → R3×3 → implementation V/G`，§10D.3 D8）role=R 三维度各 ≥1 条 success + 对应 variant（fix / emergency-fix）的 preventive-review JSON        | `check-run-log.ts` R8 段内校验 + `check-preventive-review.ts --variant=fix\|emergency` |
-| 编码链 stage（9+3 文件）                       | superpowers 编码链三段式（plan/execute/finalize）项目级 stage 审查 | `.w-model/r3-reviews/phase<N>-<stage>-{completeness,reliability,security}.md` 9 份 + `.w-model/v-reviews/phase<N>-<stage>.md` 3 份                                        | `check-coding-plan.ts` R5（strict 绑定 changeId 时一并校验）                           |
+| 编码链 stage（9+3 文件）                       | superpowers 编码链三段式（plan/execute/finalize）项目级 stage 审查 | `.w-model/r3-reviews/phase<N>-<stage>-{completeness,reliability,security}.md` 9 份 + `.w-model/v-reviews/phase<N>-<stage>.md` 3 份（**非空为阻断下限**，0 字节即违规；行级证据锚 `path:Lnn=` / `path:§sec=` 为**非阻断诊断**，不阻断历史产物） | `check-coding-plan.ts` R5（strict 绑定 changeId 时一并校验；`--preflight` 只读列出固定 14 项清单，不改判据） |
+
+**编码链双轨契约（2026-09-25 任务 2 / D-2 + N-2，清单化约定——两门互不替代）**：
+
+- **stage 级 12 份 MD**（`check-coding-plan.ts` R5，`--phase=5|6|7|8` strict 绑定 changeId）：9 份 `.w-model/r3-reviews/phase<N>-<stage>-<dim>.md`（stage ∈ plan/execute/finalize，dim ∈ completeness/reliability/security）+ 3 份 `.w-model/v-reviews/phase<N>-<stage>.md`；每份**非空**（`size > 0`）为阻断下限，行级证据锚仅为 CLI stderr 诊断；缺失/0 字节即 exit 1，无降级形态。
+- **phase 级三份 JSON**（按 `preventive-review.schema.json`，由 `check-preventive-review.ts` 校验）：`.w-model/preventive-reviews/<N>-<dim>.json`（standard；S-fix / emergency / ingest 走 `-fix-` / `-emergency-` / `-ingest-` 变体路径）；`passed=false ⇒ findings ≥1` 由 schema 强制。
+- **不可互替**：stage 级 MD 证「每段审查跑过」（内容下限 + 命名锚定），phase 级 JSON 证「三维度结论与 findings」（schema 校验）；前者不校验 findings 结构，后者不承载 stage 粒度（合并双轨会丢 `passed=false ⇒ findings ≥1` 与反模式 #33 的机器挂点，已被 §3 WS-2 方案 B 否决）。生产者在 S 产出前可用 `check-coding-plan.ts --preflight` 一次性对齐固定 14 项清单（9 R3 + 3 V + plan + 账本；变长任务三件套/review diff 单列 `artifacts` 不计数）。
 
 **role-dispatch 精确语义**（`check-role-dispatch.ts` / `role-dispatch-logic.ts`）：
 

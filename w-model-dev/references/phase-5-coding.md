@@ -102,7 +102,7 @@ G          → check-coding-plan.ts <project-root> --phase=<5|6|7|8> --scope=<ch
 - **任务三件套**（R4）：账本目录内每个已完成任务 N 的 `task-<N>-brief.md` 与 `task-<N>-report.md` 存在且非空，且至少一个 `review-*.diff`（任务评审包证据）。
 - **归档快照**（R6）：`docs/changes/archive/<changeId>/` 或 `<YYYY-MM-DD>-<changeId>/`（**锚定匹配**：`<changeId>-extra` / 非日期前缀名不匹配、非法日历日独立成态 fail-closed；**恰一匹配**才可用，多匹配 fail-closed）内的 `<changeId>.plan.md` + `progress.md` + 三件套按同契约校验；活动位存在时优先活动位。归档后置校验单独跑 `check-archive-integrity.ts <archive-dir> --change-id=<changeId>`（显式开关无条件启用 `codingPlanSnapshot`，不依赖生产者摆放）。
 
-**每段 R3×3 + V 审查**：每段产物须跑 R3 三维度（completeness/reliability/security）+ V 评审，产出 `.w-model/r3-reviews/phase<N>-{plan,execute,finalize}-{completeness,reliability,security}.md` ×9 与 `.w-model/v-reviews/phase<N>-{plan,execute,finalize}.md` ×3（R5；旧 stage 词表 explore/propose/coding 不充数）；不合格打回重做（反模式 #39）。
+**每段 R3×3 + V 审查（双轨契约，互不替代）**：每段产物须跑 R3 三维度（completeness/reliability/security）+ V 评审，产出 stage 级 12 份 MD——`.w-model/r3-reviews/phase<N>-{plan,execute,finalize}-{completeness,reliability,security}.md` ×9 与 `.w-model/v-reviews/phase<N>-{plan,execute,finalize}.md` ×3（R5；旧 stage 词表 explore/propose/coding 不充数）；**非空（`size > 0`）为阻断下限**（0 字节即 exit 1），行级证据锚 `path:Lnn=` / `path:§sec=` 仅为 CLI stderr 非阻断诊断（不改退出码、不进 GATE_JSON）。phase 级三份 `.w-model/preventive-reviews/<N>-{completeness,reliability,security}.json`（`check-preventive-review.ts` + schema）另行强制：stage 级 MD 证「每段审查跑过」，phase 级 JSON 证「结论与 findings（`passed=false ⇒ findings ≥1`）」，二者路径、判据、门禁各不相同，不可互替。不合格打回重做（反模式 #39）。**产出前对齐**：`check-coding-plan.ts <project-root> --phase=<5|6|7|8> --scope=<change-scope.json> --preflight` 只读列出固定 14 项清单（9 R3 + 3 V + plan + 账本）与 missing/invalid（变长三件套/review diff 单列 `artifacts` 不计数），供 O 在电池前一次性分派补齐。
 
 ## Tracer-bullet 票据拆解
 

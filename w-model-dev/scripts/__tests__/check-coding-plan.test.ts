@@ -11,6 +11,8 @@
  *   C6  归档态回退（R6/D-7）：活动位缺失 + 归档快照齐 → exit 0 且人类可读段标出归档快照位置
  *   C7  scope.changeId 前缀与 phase 不符 → exit 2（scope 装载即拒；gate R1 前缀校验为纵深防御）
  *   C8  --phase=99 非法值 → exit 2（ARG_INVALID）；重复值 flag --scope → exit 2（ARG_INVALID）
+ *   C9  --preflight 只读电池前自检（N-2）：required 恒 14 + missing/invalid 退出语义 + artifacts 单列；
+ *       无 --scope → exit 2；C10 非 preflight 路径的 R5 无锚诊断走 stderr 且不改退出码/stdout 判据
  */
 
 import { execSync } from 'node:child_process';
@@ -256,5 +258,91 @@ describe('check-coding-plan.ts CLI', () => {
     expect(r.status).toBe(2);
     expect(r.stdout).toMatch(/STRUCTURE_INVALID/);
     expect(r.stdout).toContain('phase6-');
+  });
+
+  /**
+   * C9 组：`--preflight` 只读电池前自检（N-2，2026-09-25 任务 2）——
+   * required 恒为固定 14 项（9 R3 + 3 V + plan + 账本），三件套/review diff 为变长 `artifacts` 只列出；
+   * 退出码 = `missing.length + invalid.length === 0 ? 0 : 1`；该分支不执行 R1-R6。
+   */
+  function runPreflight(cmdArgs: string[]): {
+    status: number;
+    stdout: string;
+    stderr: string;
+    payload: { required: string[]; missing: string[]; invalid: string[]; artifacts: string[] };
+  } {
+    const r = runCli(cmdArgs);
+    const line = r.stdout.split(/\r?\n/).find((l) => l.startsWith('CODING_PLAN_PREFLIGHT_JSON '));
+    expect(line).toBeDefined();
+    const payload = JSON.parse((line ?? '').slice('CODING_PLAN_PREFLIGHT_JSON '.length)) as {
+      required: string[];
+      missing: string[];
+      invalid: string[];
+      artifacts: string[];
+    };
+    return { ...r, payload };
+  }
+
+  it('C9: --preflight 全齐 → exit 0，required 恒 14，artifacts 单列三件套 + review diff', () => {
+    const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
+    writeScope(root, head);
+    const r = runPreflight([`"${root}"`, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
+    expect(r.status).toBe(0);
+    expect(r.payload.required).toHaveLength(14);
+    expect(r.payload.missing).toEqual([]);
+    expect(r.payload.invalid).toEqual([]);
+    expect(r.payload.artifacts).toEqual([
+      `.superpowers/sdd/${CHANGE_ID}.plan/review-abc1234.diff`,
+      `.superpowers/sdd/${CHANGE_ID}.plan/task-1-brief.md`,
+      `.superpowers/sdd/${CHANGE_ID}.plan/task-1-report.md`,
+      `.superpowers/sdd/${CHANGE_ID}.plan/task-2-brief.md`,
+      `.superpowers/sdd/${CHANGE_ID}.plan/task-2-report.md`,
+    ]);
+    // 只打印 preflight 载荷：不得同时输出常规 CODING_PLAN_JSON 报告
+    expect(r.stdout).not.toContain('CODING_PLAN_JSON ');
+  });
+
+  it('C9b: --preflight 缺一份 R3 审查 → exit 1 且 missing 具名（固定项不因变长项漂移）', () => {
+    const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
+    rmSync(join(root, '.w-model', 'r3-reviews', 'phase5-finalize-reliability.md'), { force: true });
+    writeScope(root, head);
+    const r = runPreflight([`"${root}"`, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
+    expect(r.status).toBe(1);
+    expect(r.payload.required).toHaveLength(14);
+    expect(r.payload.missing).toEqual(['.w-model/r3-reviews/phase5-finalize-reliability.md']);
+    expect(r.payload.invalid).toEqual([]);
+  });
+
+  it('C9c: --preflight 产物在盘但 0 字节 → exit 1 且记入 invalid（与 missing 分列）', () => {
+    const { root, head } = makeCodingPlanRepo((r) => {
+      writeValidTree(r);
+      writeFileSync(join(r, '.w-model', 'v-reviews', 'phase5-plan.md'), '');
+    });
+    writeScope(root, head);
+    const r = runPreflight([`"${root}"`, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
+    expect(r.status).toBe(1);
+    expect(r.payload.missing).toEqual([]);
+    expect(r.payload.invalid).toEqual(['.w-model/v-reviews/phase5-plan.md']);
+  });
+
+  it('C9d: --preflight 无 --scope/--change → exit 2 ARG_INVALID（清单无法确定 changeId）', () => {
+    const { root } = makeCodingPlanRepo((r) => writeValidTree(r));
+    const r = runCli([`"${root}"`, '--phase=5', '--preflight']);
+    expect(r.status).toBe(2);
+    expect(r.stdout).toMatch(/ERROR_JSON \{.*ARG_INVALID/);
+    expect(r.stderr).toContain('--preflight');
+  });
+
+  it('C10: 非 preflight 路径的 R5 诊断走 stderr（无锚非空产物具名列出）且不改退出码/stdout 判据', () => {
+    // writeValidTree 的 12 份审查产物为 `# r3\n`（非空、无行级证据锚）→ 诊断应列出全部 12 份
+    const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
+    // 另造 exit 1（账本缺失）以便捕获 stderr：execSync 成功分支不返回 stderr
+    rmSync(join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`), { recursive: true, force: true });
+    writeScope(root, head);
+    const r = runCli([`"${root}"`, '--phase=5', '--scope=.w-model/scope.json']);
+    expect(r.status).toBe(1); // 诊断不阻断、不改退出码（此例的 exit 1 来自 R3 账本缺失）
+    expect(r.stderr).toContain('○ R5 诊断：12 份审查产物未含行级证据锚');
+    expect(r.stderr).toContain('.w-model/r3-reviews/phase5-plan-completeness.md');
+    expect(r.stdout).toContain('CODING_PLAN_JSON '); // 常规报告与判据不受诊断影响
   });
 });
