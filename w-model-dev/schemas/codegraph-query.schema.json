@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/codegraph-query.schema.json",
   "title": "CodegraphQueryRecord",
-  "description": "codegraph 查询落盘记录 schema（对应约束 #14 / 反模式 #38）。基础字段（querySymbol/queryTimestamp/callers/callees/blastRadius）为原 5 字段完整性要求；strict 覆盖模式（阶段 5-8 + ChangeScope）额外要求 changeId/targetFiles 必填（changeId 精确等于 scope.changeId，targetFiles 全部属于 scope.changedFiles 且覆盖全部须覆盖的 code/test 变更文件）。strict 模式字段缺省不阻断 legacy 校验，但 strict 判定视为不满足。对应 cli/check-codegraph-queries.ts checkCodegraphQueriesStrict。",
+  "description": "codegraph 查询落盘记录 schema（对应约束 #14 / 反模式 #38）。基础字段（querySymbol/queryTimestamp/callers/callees/blastRadius）为原 5 字段完整性要求；strict 覆盖模式（阶段 5-8 + ChangeScope）额外要求 changeId/targetFiles 必填（changeId 精确等于 scope.changeId，targetFiles 全部属于 scope.changedFiles 且覆盖全部须覆盖的 code/test 变更文件）。strict 模式字段缺省不阻断 legacy 校验，但 strict 判定视为不满足。证据声明族（evidenceKind/degradationReason/alternativeEvidence）为可选结构字段：schema 只约束形状，语义判据（索引在盘必须 'cli'、无索引必须显式降级）由 cli/check-codegraph-queries.ts 的索引探测按项目实际状态强制，故两处须同步理解。对应 cli/check-codegraph-queries.ts checkCodegraphQueriesStrict。",
   "type": "object",
   "additionalProperties": false,
   "required": ["querySymbol", "callers", "callees", "blastRadius", "queryTimestamp"],
@@ -50,6 +50,42 @@
       "description": "查询执行时刻（ISO date-time），不得晚于 ChangeScope.scopeCreatedAt。TS 层（isIsoDateTimeString）较 ajv-formats date-time 更严（拒小写 t/z），以 TS 层为准。",
       "type": "string",
       "format": "date-time"
+    },
+    "evidenceKind": {
+      "description": "证据形态声明（显式口径，禁止隐形默认）：'cli' = 本次查询经 codegraph CLI 真实执行；'artifact' = 无索引等情形下的显式降级（制品级替代证据）。语义判据：项目根存在 .codegraph/ 索引时只允许 'cli'（缺声明或 'artifact' 均违规）；无索引时必须为 'artifact' 并同时给出 degradationReason 与 alternativeEvidence。未声明一律视为不满足（由 cli/check-codegraph-queries.ts 按实际索引状态判定）。",
+      "type": "string",
+      "enum": ["cli", "artifact"]
+    },
+    "degradationReason": {
+      "description": "降级原因（evidenceKind='artifact' 时必填非空）：说明为何无法用 codegraph CLI 真实执行查询（如项目无 .codegraph/ 索引、codegraph 未初始化或 CLI 不可用）。空串或全空白视为未声明。",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "alternativeEvidence": {
+      "description": "替代证据（evidenceKind='artifact' 时至少 1 条）：每条给出替代命令与证据落盘位置，说明 callers/callees/blastRadius 的制品级来源。",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "description": "单条替代证据：给出采集命令与证据落盘位置（两者均须非空），共同说明降级后 callers/callees/blastRadius 的制品级来源。",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "evidencePath"],
+        "properties": {
+          "command": {
+            "description": "替代证据的采集命令（如 codegraph query <symbol> 的探测调用，或其替代的只读检索命令）",
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "evidencePath": {
+            "description": "替代证据的落盘位置（项目根相对路径或可定位的制品路径）",
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        }
+      }
     }
   }
 }

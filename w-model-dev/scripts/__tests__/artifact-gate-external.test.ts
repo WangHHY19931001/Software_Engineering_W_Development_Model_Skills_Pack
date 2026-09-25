@@ -63,6 +63,10 @@ function queryJson(changeId: string, targetFiles: string[]): string {
     queryTimestamp: '2026-09-03T00:00:00Z',
     changeId,
     targetFiles,
+    // D-6（2026-09-25）：临时项目树无 .codegraph/ 索引 → 须显式降级声明，否则记录不合法
+    evidenceKind: 'artifact',
+    degradationReason: '临时项目树无 .codegraph/ 索引（codegraph CLI 未初始化），以制品级查询记录替代',
+    alternativeEvidence: [{ command: 'codegraph query Sym', evidencePath: '.w-model/codegraph-queries/probe.log' }],
   });
 }
 

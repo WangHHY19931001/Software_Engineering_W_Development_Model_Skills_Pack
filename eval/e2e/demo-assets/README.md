@@ -20,7 +20,7 @@ bash run_trajectory.sh                   # 期望末行：✓ 119/119 exit 0
 bash run_negative_probes.sh              # 期望末行：✓ 9/9 探针被拦截 + 恢复复绿
 ```
 
-`change-scope` 的 `baseRef/headRef` 取运行时 `HEAD~1..HEAD`（可用 `REPLAY_BASE` / `REPLAY_HEAD` 覆盖），`changedFiles` 取该区间真实差异；`codegraph-queries`、编码计划制品（`docs/plans/` + `.superpowers/sdd/`）与 `openspec/changes/` 按同一文件列表生成，故 scope 校验恒成立。
+`change-scope` 的 `baseRef/headRef` 取运行时 `HEAD~1..HEAD`（可用 `REPLAY_BASE` / `REPLAY_HEAD` 覆盖），`changedFiles` 取该区间真实差异；`codegraph-queries`、编码计划制品（`docs/plans/` + `.superpowers/sdd/`）与 `openspec/changes/` 按同一文件列表生成，故 scope 校验恒成立。查询记录按 D-6（2026-09-25）显式声明证据形态：demo 工作区无 `.codegraph/` 索引 → 一律写 `evidenceKind:'artifact'` + `degradationReason` + ≥1 条 `alternativeEvidence`（判据见 `check-codegraph-queries.ts` 的索引探测；索引在盘时须改为 `'cli'`）。
 
 **注意 `--scope` 的干净工作树前提**：`verifyScopeGitBinding` 把「commit 区间 + 暂存 + 未暂存 + 未跟踪（限 cwd）」与实际变更精确比对，且 `headRef` 必须等于当前 HEAD。因此任何未提交改动都会让 p5–p8 的 `--scope` 校验失败——先提交改动，再重建 + 重放；工作区重建后 HEAD 一旦前移（如证据入库的新提交），也须重建后方可再跑（这是设计，不是缺陷）。
 

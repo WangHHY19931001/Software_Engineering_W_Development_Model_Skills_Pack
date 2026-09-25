@@ -1868,7 +1868,7 @@ const CODEGRAPH_QUERY_CASES: CodegraphQueryCase[] = [
     phase: 5,
     expectedPassed: true,
     description:
-      '有效的 codegraph 查询落盘（含 querySymbol/callers/callees/blastRadius/timestamp），应通过（legacy 无 scope 兼容层样本；strict 覆盖绑定见 check-codegraph-queries.test.ts）',
+      '有效的 codegraph 查询落盘（含 querySymbol/callers/callees/blastRadius/timestamp + 显式降级声明），应通过（legacy 无 scope 兼容层样本；strict 覆盖绑定见 check-codegraph-queries.test.ts）',
   },
   {
     sampleDir: 'codegraph-queries/bad-empty',
@@ -1890,6 +1890,22 @@ const CODEGRAPH_QUERY_CASES: CodegraphQueryCase[] = [
     expectedPassed: false,
     expectedViolationPatterns: [/缺 blastRadius 字段/],
     description: '查询文件有 callers/callees 但缺 blastRadius 字段，应未通过（legacy 无 scope 兼容层样本）',
+  },
+  {
+    sampleDir: 'codegraph-queries/bad-degraded-without-evidence',
+    phase: 5,
+    expectedPassed: false,
+    expectedViolationPatterns: [/degradationReason/, /alternativeEvidence/],
+    description:
+      '无 .codegraph/ 索引却只声明 evidenceKind:artifact（缺 degradationReason/alternativeEvidence），应未通过（D-6：降级须显式且带替代证据）',
+  },
+  {
+    sampleDir: 'codegraph-queries/bad-cli-kind-without-index',
+    phase: 5,
+    expectedPassed: false,
+    expectedViolationPatterns: [/无 \.codegraph\/ 索引时须显式降级/],
+    description:
+      '无 .codegraph/ 索引却声明 evidenceKind:cli（claim CLI 真实执行），应未通过（D-6：索引不在盘不得声称 CLI 出处）',
   },
 ];
 

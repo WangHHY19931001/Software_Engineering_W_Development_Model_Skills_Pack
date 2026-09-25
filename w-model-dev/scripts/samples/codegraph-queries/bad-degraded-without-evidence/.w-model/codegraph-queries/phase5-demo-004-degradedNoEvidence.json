@@ -1,0 +1,10 @@
+{
+  "querySymbol": "CacheService.invalidate",
+  "callers": ["ArticleController.handleUpdate"],
+  "callees": [],
+  "blastRadius": 2,
+  "queryTimestamp": "2026-07-30T12:00:00Z",
+  "changeId": "phase5-demo",
+  "targetFiles": ["src/services/CacheService.ts"],
+  "evidenceKind": "artifact"
+}

@@ -915,10 +915,21 @@ for _p in (5, 6, 7, 8):
     'scopeCreatedAt': '2026-09-19T03:30:00.000Z', 'changedFiles': PHASE_FILES[_p],
   })
   for _sym, _callers, _callees, _radius in PHASE_SYMBOLS[_p]:
+    # D-6（2026-09-25）：查询记录须显式声明证据形态。demo 瞬态工作区无 .codegraph/ 索引
+    # （codegraph CLI 探测 CodeGraph not initialized）→ 唯一合法形态是显式降级
+    # （evidenceKind='artifact' + degradationReason + ≥1 条 alternativeEvidence）；
+    # 判据见 w-model-dev/scripts/cli/check-codegraph-queries.ts 的索引探测。
     write_json(f'.w-model/codegraph-queries/{_cid}-{_sym.replace(".", "-")}.json', {
       'querySymbol': _sym, 'changeId': _cid, 'targetFiles': PHASE_FILES[_p],
       'callers': _callers, 'callees': _callees, 'blastRadius': _radius,
       'queryTimestamp': '2026-09-19T03:20:00.000Z',
+      'evidenceKind': 'artifact',
+      'degradationReason': 'demo 瞬态工作区无 .codegraph/ 索引（codegraph CLI 探测 CodeGraph not initialized），'
+                           '按授权以制品级查询记录替代',
+      'alternativeEvidence': [
+        {'command': f'codegraph query {_sym}',
+         'evidencePath': f'.w-model/codegraph-queries/{_cid}-{_sym.replace(".", "-")}.json'},
+      ],
     })
   # R5：编码链 stage 审查（plan / execute / finalize × completeness / reliability / security + V×3）
   for _stage_name in ('plan', 'execute', 'finalize'):
