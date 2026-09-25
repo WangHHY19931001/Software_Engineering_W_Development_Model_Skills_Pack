@@ -49,6 +49,7 @@ import {
 import { checkTlaModel } from '../logic/tla-logic.js';
 import { checkBudget } from '../logic/budget-logic.js';
 import { checkRunLog } from '../logic/run-log-logic.js';
+import { planAppend, planCorrection, type AppendOptions, type RunLogRecord } from '../logic/run-log-append-logic.js';
 import { checkMaturity } from '../logic/maturity-logic.js';
 import { checkCheckpoint } from '../logic/checkpoint-logic.js';
 import { checkRequirementCoverage, type CoverageCheckOptions } from '../logic/coverage-logic.js';
@@ -3751,6 +3752,186 @@ async function runRunLogCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+// -------------------- RunLog append（D-5①/N-5 追加器纯逻辑，内联用例不落 fixture） --------------------
+
+interface RunLogAppendCase {
+  /** 用例说明 */
+  description: string;
+  /** 既有记录（历史行；追加器必须保持其逐字段不变——禁止回溯改写） */
+  existing: RunLogRecord[];
+  /** 待追加记录 */
+  incoming: RunLogRecord[];
+  /** planAppend / planCorrection 选项（now 固定注入，不依赖墙钟） */
+  options: AppendOptions;
+  /** 期望 accepted */
+  expectedAccepted: boolean;
+  /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedViolationPatterns?: RegExp[];
+  /** 期望 diagnostics 中至少一条匹配以下每个正则 */
+  expectedDiagnosticPatterns?: RegExp[];
+  /** 期望末条新记录 note 匹配以下每个正则 */
+  expectedNotePatterns?: RegExp[];
+  /** 更正用例：--correct 的 runId（存在时走 planCorrection） */
+  correctRunId?: string;
+  /** 更正用例的 patch */
+  patch?: RunLogRecord;
+}
+
+/** 追加器内联用例的基准记录：缺 timestamp 时由追加器按严格递增契约填充 */
+function appendCaseRecord(patch: Partial<RunLogRecord> = {}): RunLogRecord {
+  return {
+    runId: 'a',
+    phase: 1,
+    phaseName: '需求分析',
+    action: 'produce',
+    role: 'S',
+    duration_s: 1,
+    tokens: 10,
+    estimated: false,
+    subagentSpawns: 0,
+    gateExitCode: null,
+    outcome: 'success',
+    ...patch,
+  };
+}
+
+const APPEND_CASE_NOW = '2026-01-05T00:00:00.000Z';
+
+const RUN_LOG_APPEND_CASES: RunLogAppendCase[] = [
+  {
+    description: 'now 派生：与末条同毫秒时步进 +1ms 且 diagnostics 明示「时钟调整 +Nms」（绝不静默）',
+    existing: [appendCaseRecord({ runId: 'h1', timestamp: APPEND_CASE_NOW })],
+    incoming: [appendCaseRecord({ runId: 'n1' })],
+    options: { now: APPEND_CASE_NOW },
+    expectedAccepted: true,
+    expectedDiagnosticPatterns: [/时钟调整 \+\d+ms/],
+    expectedNotePatterns: [/clock-adjust:auto\+\d+ms/],
+  },
+  {
+    description: '显式时间戳倒退（≤ 末条时间）即拒绝，violation 含「时间戳不递增」',
+    existing: [appendCaseRecord({ runId: 'h1', timestamp: APPEND_CASE_NOW })],
+    incoming: [appendCaseRecord({ runId: 'n1', timestamp: '2026-01-04T23:59:59.000Z' })],
+    options: { now: APPEND_CASE_NOW },
+    expectedAccepted: false,
+    expectedViolationPatterns: [/时间戳不递增/],
+  },
+  {
+    description: '--timestamp 注入成功：生效时间戳取注入值且 note 留 clock-injected 痕迹',
+    existing: [appendCaseRecord({ runId: 'h1', timestamp: '2026-01-04T00:00:00.000Z' })],
+    incoming: [appendCaseRecord({ runId: 'n1' })],
+    options: { now: APPEND_CASE_NOW, timestamp: '2026-01-04T12:00:00.000Z' },
+    expectedAccepted: true,
+    expectedNotePatterns: [/clock-injected:2026-01-04T12:00:00\.000Z/],
+  },
+  {
+    description: '--allow-clock-adjust 显式声明小步进：步进到末条 +1ms 且 note 留 clock-adjust 理由',
+    existing: [appendCaseRecord({ runId: 'h1', timestamp: APPEND_CASE_NOW })],
+    incoming: [appendCaseRecord({ runId: 'n1', timestamp: '2026-01-04T00:00:00.000Z' })],
+    options: { now: APPEND_CASE_NOW, allowClockAdjust: 'live-run-replay' },
+    expectedAccepted: true,
+    expectedDiagnosticPatterns: [/时钟调整 \+\d+ms/],
+    expectedNotePatterns: [/clock-adjust:live-run-replay/],
+  },
+  {
+    description: '批内三条 now 派生逐条 +1ms 严格递增（同毫秒不再产生并列时间戳）',
+    existing: [],
+    incoming: [appendCaseRecord({ runId: 'n1' }), appendCaseRecord({ runId: 'n2' }), appendCaseRecord({ runId: 'n3' })],
+    options: { now: APPEND_CASE_NOW },
+    expectedAccepted: true,
+    expectedDiagnosticPatterns: [/时钟调整 \+1ms/],
+  },
+  {
+    description: '重复 runId 拒绝（禁止以追加方式覆盖既有记录身份）',
+    existing: [appendCaseRecord({ runId: 'h1', timestamp: APPEND_CASE_NOW })],
+    incoming: [appendCaseRecord({ runId: 'h1' })],
+    options: { now: APPEND_CASE_NOW },
+    expectedAccepted: false,
+    expectedViolationPatterns: [/runId=h1 与既有记录重复/],
+  },
+  {
+    description: '空载荷拒绝（追加器不接受「无记录」的空追加）',
+    existing: [],
+    incoming: [],
+    options: { now: APPEND_CASE_NOW },
+    expectedAccepted: false,
+    expectedViolationPatterns: [/待追加记录为空/],
+  },
+  {
+    description: '--correct 只新增更正记录（note 含 correction-of:<runId>），历史行逐字段不变',
+    existing: [appendCaseRecord({ runId: 'h1', timestamp: APPEND_CASE_NOW, note: '错值 4' })],
+    incoming: [],
+    options: { now: '2026-01-05T00:01:00.000Z' },
+    correctRunId: 'h1',
+    patch: { note: '更正为 5' },
+    expectedAccepted: true,
+    expectedNotePatterns: [/更正为 5 correction-of:h1/],
+  },
+  {
+    description: '--correct 引用不存在的 runId 拒绝（调用方按输入错误 exit 2 处理）',
+    existing: [appendCaseRecord({ runId: 'h1', timestamp: APPEND_CASE_NOW })],
+    incoming: [],
+    options: { now: APPEND_CASE_NOW },
+    correctRunId: 'nope',
+    patch: { note: '更正' },
+    expectedAccepted: false,
+    expectedViolationPatterns: [/runId=nope 不在 run-log 内/],
+  },
+];
+
+/**
+ * RunLog append 内联用例（D-5①/N-5 追加器纯逻辑，无 fixture、无 IO）。
+ * 断言：accepted 一致 / 拒绝时 violations 匹配 / 诊断与 note 痕迹匹配 /
+ * 放行时（历史 + 新增）时间戳严格递增 / 历史行逐字段与入参相等（追加器不得回溯改写历史）。
+ */
+function runRunLogAppendCases(): CaseResult[] {
+  const results: CaseResult[] = [];
+  for (const c of RUN_LOG_APPEND_CASES) {
+    const details: string[] = [];
+    const plan =
+      c.correctRunId !== undefined
+        ? planCorrection(c.existing, c.correctRunId, c.patch ?? {}, c.options)
+        : planAppend(c.existing, c.incoming, c.options);
+    if (plan.accepted !== c.expectedAccepted) {
+      details.push(
+        `  - 期望 accepted=${c.expectedAccepted}，实际 accepted=${plan.accepted}（violations: ${plan.violations.join('；')}）`,
+      );
+    }
+    if (!c.expectedAccepted) {
+      details.push(...matchReasonPatterns(plan.violations, c.expectedViolationPatterns));
+    }
+    if (c.expectedDiagnosticPatterns !== undefined) {
+      details.push(...matchReasonPatterns(plan.diagnostics, c.expectedDiagnosticPatterns));
+    }
+    if (c.expectedAccepted) {
+      const appended = plan.entries.slice(plan.entries.length - plan.appended);
+      if (c.expectedNotePatterns !== undefined) {
+        const lastNote = appended.length > 0 ? String(appended.at(-1)!.note ?? '') : '';
+        details.push(...matchReasonPatterns([lastNote], c.expectedNotePatterns));
+      }
+      const stamps = plan.entries.map((entry) => Date.parse(String(entry.timestamp)));
+      for (let index = 1; index < stamps.length; index++) {
+        // eslint-disable-next-line security/detect-object-injection -- index 为本地数组循环计数（非外部输入），stamps 为同函数内的数值列表
+        if (!(stamps[index]! > stamps[index - 1]!)) {
+          details.push(`  - 第 ${index + 1} 行时间戳未严格递增（append-only 契约违反）`);
+        }
+      }
+    }
+    for (const [index, history] of c.existing.entries()) {
+      // eslint-disable-next-line security/detect-object-injection -- index 为本地用例数组循环计数（非外部输入），plan.entries 为同函数内的计划结果
+      if (JSON.stringify(plan.entries[index]) !== JSON.stringify(history)) {
+        details.push(`  - 历史行 ${index + 1} 被改写（追加器必须保持历史行逐字段不变）`);
+      }
+    }
+    results.push({
+      name: `run-log-append/${c.description}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 async function runMaturityCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of MATURITY_CASES) {
@@ -5123,6 +5304,7 @@ async function main(): Promise<void> {
     runCodeHealthPhase1GuardCases(samplesDir),
     runCodeHealthPhase1DynamicCases(samplesDir),
   ]);
+  const runLogAppendResults = runRunLogAppendCases();
   const codeHealthResults = await runCodeHealthCases(samplesDir);
   const codeHealthApplyResults = await runCodeHealthApplyCases(samplesDir);
   const codeHealthGapResults = await runCodeHealthGapCases(samplesDir);
@@ -5135,6 +5317,7 @@ async function main(): Promise<void> {
     ...tlaResults,
     ...budgetResults,
     ...runLogResults,
+    ...runLogAppendResults,
     ...maturityResults,
     ...maturityRunLogResults,
     ...checkpointResults,

@@ -75,6 +75,7 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'project-read-validation.test.ts',
   'review-package-cli.test.ts',
   'verifier-logic.test.ts',
+  'wm-append-runlog-cli.test.ts',
   'wm-status.test.ts',
   'wm-write.test.ts',
 ];

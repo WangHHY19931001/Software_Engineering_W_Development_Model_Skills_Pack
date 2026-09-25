@@ -23,10 +23,10 @@
 >     独立根是并发的前提，同时把不变量加强为「本探针在自己根内不留半成品」（共享根只能做弱归因）；
 >     实测 47 探针由串行 71s 降至约 22s，断言一字未减。tsx 不可用等
 >     探针不可用情形按失败处理，不静默跳过。
-> - 口径与中心探针一致（45 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
+> - 口径与中心探针一致（46 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
 >   `metrics-report.ts` 使用特殊探针参数，但仍计入集合）。
 >
-> - **门禁脚本**：基名（`w-model-dev/scripts/cli/<name>.ts` 去掉 `.ts`）。全表 45 行，每门禁恰一行。
+> - **门禁脚本**：基名（`w-model-dev/scripts/cli/<name>.ts` 去掉 `.ts`）。全表 46 行，每门禁恰一行。
 > - **负向机制**：只允许 `fixture`（在盘 `samples/` fixture）/ `invocation`（CLI 参数或测试临时目录调用）/
 >   `mutated-copy`（测试内改写文本副本）三种。
 > - **负向案例 / 证据位置**：`fixture` 行写 `` `samples/...` ``（相对 `w-model-dev/scripts/`），并附
@@ -100,7 +100,7 @@
 | ------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | check-tla-bdd-sync | fixture  | `samples/tla-bdd-sync/bad-transition-mismatch.json`（`self-test.ts#file: 'bad-transition-mismatch.json'`，任务 1 强化后断言转移未找到） | 去掉转移等价断言后 TLA+ 转移在 BDD 中缺对应 When 步骤仍判等价 |
 
-### C 组：负向输入是参数或变异副本（17）
+### C 组：负向输入是参数或变异副本（18）
 
 | 门禁脚本                  | 负向机制     | 负向案例 / 证据位置                                                                                                                                                                                | 所防回归（一句话）                                                                                                                   |
 | ------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -117,6 +117,7 @@
 | platform-deps-install     | invocation   | `w-model-dev/scripts/__tests__/platform-deps-install.test.ts#expect(result.stdout).toMatch(/ERROR_JSON .*"rule":"P0-1"/);`                                                                         | 缺 `--lockfile` / `--package` 不再 exit 2，平台依赖会在未验证 lockfile 时安装                                                        |
 | review-package            | invocation   | `w-model-dev/scripts/__tests__/review-package-cli.test.ts#it('无值选项、空白值和未知位置参数均为 ARG_INVALID', async () => {`（同测试断言目标 out 路径零文件）                                     | 未知 flag 不在任何写盘前被拒时，评审包会以残缺参数先写盘再失败，留下半成品或覆盖既有 diff 文件（exit-2 失败原子性失守）              |
 | security-scan             | invocation   | `w-model-dev/scripts/__tests__/cli-natural-exit.test.ts#const invalid = runScript(SECURITY_SCRIPT, [], { cwd: directory, env });`                                                                  | baseline 缺失不再 exit 2，扫描会以「无新增」通过而实际未做比对                                                                       |
+| wm-append-runlog          | invocation   | `w-model-dev/scripts/__tests__/wm-append-runlog-cli.test.ts#expect(r.stderr).toMatch(/重复的命令行参数 --timestamp/);`（同测试断言目标 run-log 零创建、未知 flag exit 2 且不建文件、时间戳倒退 exit 1 且文件 sha256 前后一致）              | 重复值 flag（--timestamp）不再 exit 2 时，追加器会按 last-wins 静默改写时间戳来源；时间戳倒退不再 exit 1 时，run-log 的严格递增/append-only 契约退化——即本轮手搓追加脚本静默覆盖时间戳的复现      |
 | wm-export-evidence        | invocation   | `w-model-dev/scripts/__tests__/evidence-export-logic.test.ts#for (const args of [[], ['--unknown-option'], ['--verify']]) {`                                                                       | 非法参数不再 exit 2 且可能建出输出目录，导出会留下半成品证据包                                                                       |
 | wm-status                 | invocation   | `w-model-dev/scripts/__tests__/cli-natural-exit.test.ts#const invalid = runScript(STATUS_SCRIPT, [directory]);`                                                                                    | project.json 损坏不再 exit 2，状态快照会以默认值给出假状态                                                                           |
 | wm-verify-evidence-source | invocation   | `w-model-dev/scripts/__tests__/exit2-failure-atomicity.test.ts#const outcome = await runNegativeProbe(gateFile, probeRoot);`（同测试逐门禁循环对 wm-verify-evidence-source 断言 exit 2）           | 非法参数不再 exit 2，provenance 会以 package-only 冒充 source-bound 证据                                                             |
