@@ -301,24 +301,25 @@ export function checkIcebergSweep(
         for (let j = i + 1; j < wide.length; j++) {
           const vi = wide[i]!;
           const vj = wide[j]!;
-          const diff = symmetricDiff(viewSets[vi] ?? [], viewSets[vj] ?? []);
+          const diff = symmetricDiff(viewSets[vi]!, viewSets[vj]!);
           if (diff.length > 0) {
             disagreements.push(`R6[design-wide] ${vi}↔${vj} 差异项：${diff.join(', ')}`);
           }
         }
       }
-      const wideUnion = new Set(wide.flatMap((v) => viewSets[v] ?? []));
+      const wideUnion = new Set(wide.flatMap((v) => viewSets[v]!));
       const wideSdUnion = new Set([...wideUnion].filter(isSdDesignId));
       for (const v of designViews.filter((x) => VIEW_NAMESPACE[x] === 'design-sd')) {
-        const narrow = viewSets[v] ?? [];
+        const narrow = viewSets[v]!;
         const narrowSet = new Set(narrow);
-        const extra = narrow.filter((id) => !wideUnion.has(id));
+        const extra = [...narrowSet].filter((id) => !wideUnion.has(id));
         if (extra.length > 0) {
           disagreements.push(`R6[design-sd] ${v} 超出宽视角设计 ID 集：${extra.join(', ')}`);
         }
         // 漏 SD 方向：窄池须含宽视角的全部 SD 项。跨命名空间（DD/INTF）豁免，SD 缺口不豁免——
-        // phase>=2 由 check-tla-model 强制 `sdCoverage.uncoveredSdNodes` 为空并与 `graphSdNodes`
-        // 交叉校验，故真实跑批的 tla SD 集恰等于宽视角 SD 切片，漏 SD 是真实缺口而非宽度差。
+        // 该不变量在**阶段 1-4** 由 check-tla-model（--graph，`sdCoverage.uncoveredSdNodes` 为空
+        // 并与 `graphSdNodes` 交叉校验）建立；**阶段 5-8 该门不再复检**（SKILL.md:99：
+        // check-tla-model 仅阶段 1-4 列入 G 门禁），故该方向由本判据守护，不可省。
         const missing = [...wideSdUnion].filter((id) => !narrowSet.has(id));
         if (missing.length > 0) {
           disagreements.push(`R6[design-sd] 宽视角 SD 项未进入 ${v}：${missing.join(', ')}`);

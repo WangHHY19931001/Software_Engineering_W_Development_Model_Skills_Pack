@@ -363,14 +363,25 @@ describe('R6 命名空间分池', () => {
     const sets = { graph: ['SD-001'], rtm: ['SD-001'], tla: ['SD-001', 'SD-009'] };
     const v = checkIcebergSweep(validReport(), { viewSets: sets }).reasons;
     expect(v.some((x) => x.includes('R6') && x.includes('SD-009'))).toBe(true);
+    // 池标签须可锁定（宽池侧已由 design-wide 断言覆盖，窄池侧不可缺）
+    expect(v.some((x) => x.includes('R6[design-sd]') && x.includes('SD-009'))).toBe(true);
   });
 
   it('宽视角 SD 项未进入 tla（tla 漏 SD）→ 仍违规（SD 命名空间内差异不得被分池豁免）', () => {
-    // 依据：check-tla-model phase>=2 强制 sdCoverage.uncoveredSdNodes 为空并与 graphSdNodes
-    // 交叉校验，故真实跑批中 tla 的 SD 集==宽视角 SD 切片；漏 SD 是真实缺口而非命名空间噪声。
+    // 依据：该不变量在阶段 1-4 由 check-tla-model（--graph，uncoveredSdNodes 空 + graphSdNodes
+    // 交叉校验）建立；阶段 5-8 该门不再复检，故该方向由 R6 窄池双向判据守护。
     const sets = { graph: ['SD-001', 'SD-002'], rtm: ['SD-001', 'SD-002'], tla: ['SD-001'] };
     const v = checkIcebergSweep(validReport(), { viewSets: sets }).reasons;
     expect(v.some((x) => x.includes('R6') && x.includes('SD-002'))).toBe(true);
+    expect(v.some((x) => x.includes('R6[design-sd]') && x.includes('SD-002'))).toBe(true);
+  });
+
+  it('tla 含重复 ID → 违规文案去重（同一 ID 只列一次）', () => {
+    const sets = { graph: ['SD-001'], rtm: ['SD-001'], tla: ['SD-001', 'SD-009', 'SD-009'] };
+    const r6 = checkIcebergSweep(validReport(), { viewSets: sets })
+      .reasons.filter((x) => x.includes('R6[design-sd]'))
+      .join('');
+    expect(r6.match(/SD-009/g)?.length).toBe(1);
   });
 
   it('scope（文件路径命名空间）不参与 R6 与 R8 收敛集', () => {

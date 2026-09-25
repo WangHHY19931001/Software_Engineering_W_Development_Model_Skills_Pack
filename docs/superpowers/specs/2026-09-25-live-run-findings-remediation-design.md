@@ -75,14 +75,14 @@
 
 **选定 C**，判据（逐池）：
 - **池 A（设计 ID · 宽）**：`graph ↔ rtm` **精确相等**（保留 DD/INTF 漂移检出——两视角同源于 designDoc，漂移即装配缺陷）；
-- **池 B（设计 ID · SD 子集）**：`tla ⊆ (graph ∩ rtm)`（tla 的 SD-only 是**规约语义**；反向「SD 未被 TLA 覆盖」已由 `check-tla-model` 的 `uncoveredSdNodes` 承担，不重复主张，故不构成新盲区）；
+- **池 B（设计 ID · SD 切片）**：`tla` 与宽视角的 **SD 切片双向相等**（`tla == (graph ∩ rtm) ∩ SD`，超出与漏项都报）。tla 的 SD-only 是**规约语义**，故跨命名空间的 DD/INTF 宽度差不构成差异；反向「SD 未被 TLA 覆盖」**不豁免**——该方向的守护分工是：阶段 1-4 由 `check-tla-model` 的 `uncoveredSdNodes`（phase≥2 强制为空 + 与 `graphSdNodes` 交叉校验）承担，**阶段 5-8 该门不再复检该不变量**（`SKILL.md:99`：`check-tla-model` 仅阶段 1-4 列入 G 门禁），故阶段 5-8 由 R6 的窄池双向判据守护——「不重复主张」不成立，双向是必要加固（门禁能力不可为省一次重复而退化）；
 - **scope（文件路径命名空间）**：**退出 R6 比对与 R8 收敛集**，仅保留 R7 的存在性声明。
 - R6 违规文案按池命名（`R6[design-wide] graph↔rtm 差异项：…`）以便排障。
 
 **落点**：`logic/iceberg-sweep-logic.ts`（`:116` 抽取参数化、`:138-189` deriveViewSets 标注视角命名空间、`:261-267` R6 分池、`:300-310` R8 收敛集限定设计 ID 视角）。
 **同步面**：`__tests__/iceberg-logic.test.ts:181-190,239-257,297-307`（宽抽取断言改 SD 期望 + 新增 scope-不参与 R6 用例 + 新增「graph↔rtm 的 DD 漂移仍红」负例）；`samples/iceberg/*` + `self-test.ts:1729-1756` ICEBERG_CASES；`samples/README.md:29`、`NEGATIVE-COVERAGE.md:81`（新增负例登记）；文档 `references/iceberg-sweep-guide.md:197-206`（§8.1 表）、§8.3/8.4、`SSoT:2267-2271`（§10L.3，改正自相矛盾句）、`AGENTS.md:20,170`、`CHANGELOG.md`。
 **风险**：判据变化后历史归档的 iceberg 结论不可重放复现同一退出码（归档不跑门禁，接受；写进 CHANGELOG）。
-**验收**：demo 阶段 2-8 既有证据上复跑 `check-iceberg-sweep` → R6 不再差异（若报告声明字段与新口径冲突则以 samples 正例代替，并在证据中说明）；负向探针 3 条：`graph↔rtm` 删一个 DD → exit 1；`tla` 含 graph 外 SD → exit 1；`scope` 在盘且与 ID 不一致 → **exit 0**（修为目的）。
+**验收**：demo 阶段 2-8 既有证据上复跑 `check-iceberg-sweep` → R6 不再差异（若报告声明字段与新口径冲突则以 samples 正例代替，并在证据中说明）；负向探针 **4 条**：`graph↔rtm` 删一个 DD → exit 1；`tla` 含 graph 外 SD → exit 1；`tla` 漏 SD（graph 有而 tla 无）→ exit 1（反向守护：阶段 5-8 无 `check-tla-model` 复检该不变量）；`scope` 在盘且与 ID 不一致 → **exit 0**（修为目的）。
 
 ### WS-2 · 编码链 R3×9+V×3 契约固化与前置自检（D-2 + N-2）
 

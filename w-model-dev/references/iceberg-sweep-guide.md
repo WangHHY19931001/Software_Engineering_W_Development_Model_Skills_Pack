@@ -203,8 +203,14 @@
 | tla | `tla-manifest.json` 的 `sdCoverage.coveredSdNodes` | `design-sd`（SD-only 是规约语义） | 与宽视角的 **SD 切片**相等（超出报、漏 SD 也报） |
 | scope | 阶段 5-8 用 `change-scope.json` 的 `changedFiles` | `path`（文件路径） | **不参与** R6/R8 的集合比对 |
 
-窄池漏 SD 仍是违规而非宽度差：phase≥2 由 `check-tla-model` 强制 `sdCoverage.uncoveredSdNodes` 为空并与
-`graphSdNodes` 交叉校验，故真实跑批的 tla SD 集恰等于宽视角 SD 切片，漏 SD 指向真实缺口。
+窄池**双向都不豁免**：漏 SD 不是宽度差而是真实缺口。该方向的守护分工是——**阶段 1-4** 由
+`check-tla-model`（`--graph`，phase≥2 强制 `sdCoverage.uncoveredSdNodes` 为空并与 `graphSdNodes`
+交叉校验）建立「tla 的 SD 集 == graph 的 SD 集」；**阶段 5-8 该门不再复检该不变量**（`SKILL.md:99`：
+`check-tla-model` 仅在阶段 1-4 列入 G 门禁），故阶段 5-8 中该方向由 R6 的窄池双向判据守护。
+
+**scope 视角的读盘依赖（阶段 5-8）**：`check-iceberg-sweep.ts` 只解析 `.w-model/change-scope.json`
+（无阶段后缀）。若项目按阶段后缀命名（如 `change-scope.p5.json`），该视角将缺席，此时报告**必须**
+在 `sweepCoverage.absentViews` 显式声明 `scope`，否则 R7 判「视角缺席未显式声明」（禁止静默跳过）。
 
 刻意**不含** REQ/NFR/CON：需求命名空间只有 graph 与 rtm 视角有，混入会制造结构性差异（假阳性）。
 

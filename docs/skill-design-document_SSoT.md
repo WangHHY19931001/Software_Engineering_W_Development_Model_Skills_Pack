@@ -2265,9 +2265,9 @@ interface RunLogEntry {
   `iceberg-sweep-logic.ts` 保持纯函数。
 - **派生口径（分池，D-1/N-1）**：视角命名空间宽度不同，故按 `VIEW_NAMESPACE` 分池而非同池精确比对——
   **宽池 `design-wide`**（graph 取节点 `id`、rtm 取各行 `designDoc` 解析值）抽 `SD-NNN / DD-NNN / INTF-NNN` 全量，两两精确相等；
-  **窄池 `design-sd`**（tla 取 `sdCoverage.coveredSdNodes`）只要求与宽视角的 **SD 切片**相等：跨命名空间的 DD/INTF 宽度差不构成差异，
-  但窄池漏 SD 仍失败（phase≥2 由 `check-tla-model` 强制 `sdCoverage.uncoveredSdNodes` 为空并与 `graphSdNodes` 交叉校验，
-  故真实跑批的 tla SD 集恰等于 SD 切片，漏 SD 指向真实缺口）；
+  **窄池 `design-sd`**（tla 取 `sdCoverage.coveredSdNodes`）与宽视角的 **SD 切片双向相等**（超出与漏项均报）：跨命名空间的 DD/INTF 宽度差不构成差异，
+  但窄池漏 SD 不豁免——该方向的守护分工为「阶段 1-4 由 `check-tla-model` 强制 `sdCoverage.uncoveredSdNodes` 为空并与 `graphSdNodes` 交叉校验，
+  **阶段 5-8 该门不再复检该不变量**（`SKILL.md:99`：`check-tla-model` 仅阶段 1-4 列入 G 门禁），故阶段 5-8 由 R6 窄池双向判据守护」；
   **path 命名空间**（阶段 5-8 的 `scope` 取 `change-scope.json` 的 `changedFiles`）**不参与** R6/R8 的集合比对
   （与设计 ID 同池比对时，change-scope 在盘即结构性必红）。**刻意不含 REQ/NFR/CON**（TLA 侧无此命名空间，混入制造结构性假阳性）。
 - **在场表**：`ICEBERG_VIEW_PRESENCE`（**代码常量，非文档**——写文档会与实现漂移，先例见 `subagent-delegation.md` 计数漂移）。
