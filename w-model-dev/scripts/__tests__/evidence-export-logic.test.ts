@@ -408,6 +408,8 @@ describe('evidence export logic', () => {
     const result = await exportEvidence(project, output);
 
     expect(result).toEqual(expect.objectContaining({ ok: true, exitCode: 0 }));
+    // git 包的导出摘要保持现状：不带 verificationLevel（只有 no-git 包补 package-only）。
+    expect(result).not.toHaveProperty('verificationLevel');
     const manifest = JSON.parse(await fs.readFile(path.join(output, 'evidence-manifest.json'), 'utf8')) as {
       provenance: { measurements: { signatureChain: { count: number } } };
       files: Array<{ path: string; kind: string }>;
@@ -969,6 +971,12 @@ describe('evidence export logic', () => {
 
     const exported = runCli([project, output]);
     expect(exported.code).toBe(0);
+    // 导出摘要与 verify 通道口径一致：no-git 包在成功出口也只自述 package-only。
+    expect(cliSummary(exported.stdout)).toMatchObject({
+      ok: true,
+      mode: 'export',
+      verificationLevel: 'package-only',
+    });
     const manifestPath = path.join(output, 'evidence-manifest.json');
     const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as { provenance: Record<string, unknown> };
     expect(manifest.provenance).toMatchObject({

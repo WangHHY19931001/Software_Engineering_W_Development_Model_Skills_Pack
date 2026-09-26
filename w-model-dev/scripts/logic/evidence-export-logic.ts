@@ -687,6 +687,9 @@ export async function exportEvidence(projectDir: string, outputDir: string): Pro
       ok: true,
       exitCode: 0,
       mode: 'export',
+      // 纯输出增量：no-git 包的导出摘要与 verify 通道口径一致（package-only）；git 包保持
+      // 现状（不带该键），避免改变既有摘要断言。
+      ...(sourceProvenance.provenanceKind === 'no-git' ? { verificationLevel: 'package-only' as const } : {}),
       outputDir: output,
       manifestPath: path.join(output, MANIFEST_NAME),
       exportedFiles: sortedFiles.length,

@@ -199,6 +199,21 @@ describe('source provenance', () => {
     expect(verified.reason).toBe('NOT_SOURCE_BOUND_NO_GIT');
   });
 
+  it('never self-describes a no-git record as source-bound, even on the allowNoGitRecord exception path', async () => {
+    const project = await makeNoGitProject();
+    expect((await produceSourceProvenance(project, { noGitOk: true })).ok).toBe(true);
+
+    const exception = await verifySourceProvenance(project, undefined, { allowNoGitRecord: true });
+
+    expect(exception).toMatchObject({
+      ok: true,
+      exitCode: 0,
+      verificationLevel: 'package-only',
+      verificationStatus: 'passed',
+    });
+    expect(exception.provenance?.provenanceKind).toBe('no-git');
+  });
+
   it('still reports MISSING_GIT_HEAD for a no-git workspace without the explicit noGitOk opt-in', async () => {
     const project = await makeNoGitProject();
 

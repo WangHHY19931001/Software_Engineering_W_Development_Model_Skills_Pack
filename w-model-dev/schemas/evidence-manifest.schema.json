@@ -66,7 +66,7 @@
           "enum": ["git", "no-git"]
         },
         "workspaceDigest": {
-          "description": "no-git 形态下替代 HEAD 的工作区内容摘要（导出源集合的规范化清单 SHA-256，64 位小写十六进制；provenanceKind=no-git 时条件必填）",
+          "description": "no-git 形态下替代 HEAD 的工作区内容摘要（导出源集合的规范化清单 SHA-256，64 位小写十六进制；provenanceKind=no-git 时条件必填）。当前实现与 sourceBundleSha256 由同一规范清单导出，两者取值相同",
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         },

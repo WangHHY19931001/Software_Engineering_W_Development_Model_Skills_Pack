@@ -46,7 +46,7 @@
       "enum": ["git", "no-git"]
     },
     "workspaceDigest": {
-      "description": "no-git 形态下替代 HEAD 的工作区内容摘要：对导出源文件集合（相对路径 + 各自 SHA-256，按路径排序）的规范化清单 SHA-256（64 位小写十六进制；provenanceKind=no-git 时条件必填，git 形态不出现）",
+      "description": "no-git 形态下替代 HEAD 的工作区内容摘要：对导出源文件集合（相对路径 + 各自 SHA-256，按路径排序）的规范化清单 SHA-256（64 位小写十六进制；provenanceKind=no-git 时条件必填，git 形态不出现）。当前实现与 sourceBundleSha256 由同一规范清单导出，两者取值相同——前者是 no-git 的身份替代槽，后者是 bundle 比对槽",
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     },

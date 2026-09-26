@@ -746,6 +746,7 @@ export async function verifySourceProvenance(
     // 永久护栏：no-git 记录（无 HEAD 可绑定）不得被复验为 source-bound。唯一例外是
     // exportEvidence 的本地一致性复验（allowNoGitRecord）——该路径产出的包仍带
     // provenanceKind=no-git，于是 `--source-project` 复验在 verifyEvidence 侧再次被拒。
+    // 该例外**不改变**结果自述的 verificationLevel：no-git 恒为 package-only（见下方返回值）。
     if (actual.provenanceKind === 'no-git' && options.allowNoGitRecord !== true)
       throw new ProvenanceFailure(1, 'NOT_SOURCE_BOUND_NO_GIT');
     if (reviewedHead !== undefined && actual.commitSha !== reviewedHead)
@@ -771,7 +772,9 @@ export async function verifySourceProvenance(
       ok: true,
       exitCode: 0,
       provenance: actual,
-      verificationLevel: 'source-bound',
+      // no-git 恒自述 package-only：全仓不得存在把 no-git 记录读成 source-bound 的出口
+      // （含 allowNoGitRecord 例外路径——它只放宽本地一致性复验，不放宽自述口径）。
+      verificationLevel: actual.provenanceKind === 'no-git' ? 'package-only' : 'source-bound',
       verificationStatus: 'passed',
     };
   } catch (error) {
