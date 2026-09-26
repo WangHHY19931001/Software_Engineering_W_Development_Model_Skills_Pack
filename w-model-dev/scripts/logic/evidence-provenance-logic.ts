@@ -401,6 +401,34 @@ async function collectDirectory(
   await walk(absolute, directory);
   return files;
 }
+/**
+ * Collects one allowlisted root-level evidence file (`.w-model/<file>`) with the
+ * same lexical-walk + real-root containment discipline as directory collection.
+ * Absent file → `[]` (non-emptiness is enforced by the caller's contract).
+ */
+async function collectRootFile(state: string, stateReal: string, file: string, kind: Kind): Promise<SourceFile[]> {
+  const absolute = path.join(state, file);
+  await assertCanonicalPath(absolute, stateReal, true);
+  const stat = await fs.lstat(absolute).catch(() => null);
+  if (!stat) return [];
+  const content = await readStableFile(absolute, stateReal);
+  return [{ path: file, kind, sha256: sha256(content) }];
+}
+/**
+ * Signature-chain location: the repository-wide convention is the root-level
+ * `signature-chain.jsonl`; the plural `signature-chains/` directory remains
+ * supported as the legacy layout. Both present → fail-closed (ambiguous authority).
+ */
+async function collectSignatureChainFiles(state: string, stateReal: string): Promise<SourceFile[]> {
+  const legacyDirectory = 'signature-chains';
+  const rootFile = 'signature-chain.jsonl';
+  const legacyPresent = (await fs.lstat(path.join(state, legacyDirectory)).catch(() => null)) !== null;
+  const rootPresent = (await fs.lstat(path.join(state, rootFile)).catch(() => null)) !== null;
+  if (legacyPresent && rootPresent) throw new ProvenanceFailure(1, 'SIGNATURE_CHAIN_AMBIGUOUS');
+  return legacyPresent
+    ? collectDirectory(state, stateReal, legacyDirectory, 'signature-chain', false)
+    : collectRootFile(state, stateReal, rootFile, 'signature-chain');
+}
 function measurements(files: SourceFile[]): SourceProvenance['measurements'] {
   const of = (kind: Kind): Measurement => {
     const selected = files.filter((file) => file.kind === kind);
@@ -427,7 +455,7 @@ async function buildSourceProvenance(
   const identity = await resolveProvenanceIdentity(project, options.noGitOk === true);
   const gateFiles = await collectDirectory(state, stateReal, 'gate-logs', 'gate-log', true);
   const verifierFiles = await collectDirectory(state, stateReal, 'verifier-outputs', 'verifier-output', false);
-  const signatureFiles = await collectDirectory(state, stateReal, 'signature-chains', 'signature-chain', false);
+  const signatureFiles = await collectSignatureChainFiles(state, stateReal);
   const codegraphFiles = await collectDirectory(state, stateReal, 'codegraph-queries', 'codegraph-query', false);
   const runLogPath = path.join(state, 'run-log.jsonl');
   const runLogContent = await readStableFile(runLogPath, stateReal, 'MISSING_RUN_LOG');

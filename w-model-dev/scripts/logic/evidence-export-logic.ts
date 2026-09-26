@@ -71,6 +71,7 @@ type FailureReason =
   | 'UNMANIFESTED_OUTPUT'
   | 'HASH_MISMATCH'
   | 'NOT_SOURCE_BOUND_NO_GIT'
+  | 'SIGNATURE_CHAIN_AMBIGUOUS'
   | 'EVIDENCE_EXPORT_FAILED';
 
 export interface EvidenceExportResult {
@@ -117,6 +118,17 @@ const DIRECTORY_SOURCES: Array<{ directory: string; kind: EvidenceKind }> = [
   { directory: 'signature-chains', kind: 'signature-chain' },
   { directory: 'codegraph-queries', kind: 'codegraph-query' },
 ];
+/**
+ * Root-level allowlisted evidence files (`.w-model/<file>`). `signature-chain.jsonl`
+ * is the repository-wide convention (`references/signature-chain-guide.md`); the
+ * plural `signature-chains/` directory stays supported as the legacy layout.
+ */
+const ROOT_FILE_SOURCES: Array<{ file: string; kind: EvidenceKind }> = [
+  { file: 'run-log.jsonl', kind: 'run-log' },
+  { file: 'signature-chain.jsonl', kind: 'signature-chain' },
+];
+const SIGNATURE_CHAIN_FILE = 'signature-chain.jsonl';
+const SIGNATURE_CHAIN_DIRECTORY = 'signature-chains';
 const comparePaths = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
 
 class EvidenceFailure extends Error {
@@ -188,7 +200,8 @@ function isSafeManifestPath(relativePath: string): boolean {
   return isSafeRelativePath(relativePath) && !hasUnsafeMetadata(relativePath);
 }
 function expectedEvidenceKind(relativePath: string): EvidenceKind | undefined {
-  if (relativePath === 'run-log.jsonl') return 'run-log';
+  const rootFile = ROOT_FILE_SOURCES.find(({ file }) => relativePath === file);
+  if (rootFile) return rootFile.kind;
   return DIRECTORY_SOURCES.find(({ directory }) => relativePath.startsWith(`${directory}/`))?.kind;
 }
 function isAllowlistedEvidenceFile(file: EvidenceFile): boolean {
@@ -292,15 +305,23 @@ async function collectExportSources(
   sourceReal: string,
 ): Promise<Array<{ sourceRelative: string; kind: EvidenceKind }>> {
   const sources: Array<{ sourceRelative: string; kind: EvidenceKind }> = [];
+  // 链位置歧义：唯一根级文件与 legacy 复数目录并存时无法裁定权威链 → fail-closed。
+  // 该判定与 producer（evidence-provenance-logic）同源同名，导出侧与 verify 侧共用。
+  const legacyChainPresent = (await lstatOrNull(path.join(state, SIGNATURE_CHAIN_DIRECTORY))) !== null;
+  const rootChainPresent = (await lstatOrNull(path.join(state, SIGNATURE_CHAIN_FILE))) !== null;
+  if (legacyChainPresent && rootChainPresent) throw new EvidenceFailure(1, 'SIGNATURE_CHAIN_AMBIGUOUS');
   for (const { directory, kind } of DIRECTORY_SOURCES) {
+    if (kind === 'signature-chain' && rootChainPresent) continue;
     const directoryPath = path.join(state, directory);
     if (!(await lstatOrNull(directoryPath))) continue;
     const files: string[] = [];
     await collectDirectoryFiles(sourceReal, directoryPath, files);
     sources.push(...files.map((sourceRelative) => ({ sourceRelative, kind })));
   }
-  const runLog = path.join(state, 'run-log.jsonl');
-  if (await lstatOrNull(runLog)) sources.push({ sourceRelative: 'run-log.jsonl', kind: 'run-log' });
+  for (const { file, kind } of ROOT_FILE_SOURCES) {
+    if (kind === 'signature-chain' && legacyChainPresent) continue;
+    if (await lstatOrNull(path.join(state, file))) sources.push({ sourceRelative: file, kind });
+  }
   return sources.sort((left, right) => comparePaths(left.sourceRelative, right.sourceRelative));
 }
 
@@ -767,7 +788,10 @@ export async function verifyEvidence(manifestPath: string, sourceProject?: strin
       // 复验一律拒绝，防止把工作区内容摘要表述为 verified source 证据。
       if (typed.provenance.provenanceKind === 'no-git') throw new EvidenceFailure(1, 'NOT_SOURCE_BOUND_NO_GIT');
       const source = await verifySourceProvenance(sourceProject);
-      if (source.reason === 'NOT_SOURCE_BOUND_NO_GIT') throw new EvidenceFailure(1, 'NOT_SOURCE_BOUND_NO_GIT');
+      // 两个稳定护栏 reason 直接透传以便判据可读（no-git 永久 package-only / 链位置歧义）；
+      // 其余源复验失败仍归并为 INVALID_PROVENANCE（既有契约不变）。
+      if (source.reason === 'NOT_SOURCE_BOUND_NO_GIT' || source.reason === 'SIGNATURE_CHAIN_AMBIGUOUS')
+        throw new EvidenceFailure(1, source.reason);
       if (
         !source.ok ||
         !source.provenance ||

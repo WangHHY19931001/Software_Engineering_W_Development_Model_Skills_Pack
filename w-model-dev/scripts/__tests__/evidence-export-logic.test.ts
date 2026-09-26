@@ -66,12 +66,16 @@ function refreshManifestHash(manifest: Record<string, unknown>): void {
   manifest.manifestSha256 = evidenceManifestHash(manifest as Parameters<typeof evidenceManifestHash>[0]);
 }
 
-async function createProject(name = 'project', options: { noGit?: boolean } = {}): Promise<string> {
+async function createProject(
+  name = 'project',
+  options: { noGit?: boolean; chain?: 'legacy' | 'root' } = {},
+): Promise<string> {
   const project = projectPath(name);
   const state = path.join(project, '.w-model');
   await fs.mkdir(path.join(state, 'gate-logs'), { recursive: true });
   await fs.mkdir(path.join(state, 'verifier-outputs'), { recursive: true });
-  await fs.mkdir(path.join(state, 'signature-chains'), { recursive: true });
+  if ((options.chain ?? 'legacy') === 'legacy')
+    await fs.mkdir(path.join(state, 'signature-chains'), { recursive: true });
   await fs.mkdir(path.join(state, 'codegraph-queries'), { recursive: true });
   await fs.writeFile(
     path.join(state, 'gate-logs', 'gate.json'),
@@ -103,7 +107,10 @@ async function createProject(name = 'project', options: { noGit?: boolean } = {}
   );
   await fs.copyFile(
     path.resolve(process.cwd(), 'w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl'),
-    path.join(state, 'signature-chains', 'chain.jsonl'),
+    path.join(
+      state,
+      (options.chain ?? 'legacy') === 'legacy' ? 'signature-chains/chain.jsonl' : 'signature-chain.jsonl',
+    ),
   );
   await fs.writeFile(
     path.join(state, 'codegraph-queries', 'query.json'),
@@ -231,6 +238,7 @@ describe('evidence export logic', () => {
           filePath.startsWith('gate-logs/') ||
           filePath.startsWith('verifier-outputs/') ||
           filePath.startsWith('signature-chains/') ||
+          filePath === 'signature-chain.jsonl' ||
           filePath.startsWith('codegraph-queries/') ||
           filePath === 'run-log.jsonl',
       ),
@@ -392,6 +400,53 @@ describe('evidence export logic', () => {
       reason: 'INVALID_PROVENANCE',
     });
   }, 90_000);
+
+  it('exports and measures a root-level signature-chain.jsonl as an allowlisted signature-chain record', async () => {
+    const project = await createProject('root-chain-project', { chain: 'root' });
+    const output = path.join(tmpDir, 'root-chain-evidence');
+
+    const result = await exportEvidence(project, output);
+
+    expect(result).toEqual(expect.objectContaining({ ok: true, exitCode: 0 }));
+    const manifest = JSON.parse(await fs.readFile(path.join(output, 'evidence-manifest.json'), 'utf8')) as {
+      provenance: { measurements: { signatureChain: { count: number } } };
+      files: Array<{ path: string; kind: string }>;
+    };
+    expect(validateBySchema('evidence-manifest', manifest).valid).toBe(true);
+    expect(manifest.files).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: 'signature-chain.jsonl', kind: 'signature-chain' })]),
+    );
+    expect(manifest.provenance.measurements.signatureChain).toMatchObject({ count: 1 });
+    expect(await fs.readFile(path.join(output, 'signature-chain.jsonl'), 'utf8')).toContain('sigId');
+    await expect(verifyEvidence(path.join(output, 'evidence-manifest.json'), project)).resolves.toMatchObject({
+      ok: true,
+      exitCode: 0,
+      verificationLevel: 'source-bound',
+    });
+  });
+
+  it('fails closed on both sides when the root-level chain and the legacy signature-chains directory coexist', async () => {
+    const project = await createProject('ambiguous-chain-project');
+    const output = path.join(tmpDir, 'ambiguous-chain-evidence');
+    expect(runCli([project, output]).code).toBe(0);
+    const manifestPath = path.join(output, 'evidence-manifest.json');
+    // 并存歧义由源工作区引入：唯一根级文件 + legacy 复数目录 → 无法裁定权威链。
+    await fs.copyFile(
+      path.resolve(process.cwd(), 'w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl'),
+      path.join(project, '.w-model', 'signature-chain.jsonl'),
+    );
+
+    await expect(exportEvidence(project, path.join(tmpDir, 'ambiguous-second-evidence'))).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'SIGNATURE_CHAIN_AMBIGUOUS',
+    });
+    await expect(verifyEvidence(manifestPath, project)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'SIGNATURE_CHAIN_AMBIGUOUS',
+    });
+  });
 
   it('rejects mutated source bundle and run provenance before creating a passed manifest', async () => {
     const project = await createProject();

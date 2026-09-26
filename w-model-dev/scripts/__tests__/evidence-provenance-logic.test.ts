@@ -25,7 +25,7 @@ afterEach(async () => {
   await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
-async function makeProject(): Promise<string> {
+async function makeProject(options: { chain?: 'legacy' | 'root' | 'both' } = {}): Promise<string> {
   const project = path.join(tmpDir, 'project');
   const state = path.join(project, '.w-model');
   await fs.mkdir(path.join(state, 'gate-logs'), { recursive: true });
@@ -46,11 +46,16 @@ async function makeProject(): Promise<string> {
     path.join(state, 'gate-logs', 'gate.json'),
     '{"script":"check-bdd-model.ts","exitCode":0,"passed":true,"reasons":[],"reportSummary":{"phase":1,"checkedAt":"2026-08-20T00:00:00.000Z","summary":"ok","violationsCount":0,"exitCode":0,"passed":true},"stdoutSummary":{"exitCode":0,"passed":true}}',
   );
-  await fs.mkdir(path.join(state, 'signature-chains'), { recursive: true });
-  await fs.copyFile(
-    path.resolve(process.cwd(), 'w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl'),
-    path.join(state, 'signature-chains', 'chain.jsonl'),
-  );
+  // 链位置三形态：legacy 复数目录（默认，向后兼容）/ 根级单数文件（全仓约定）/ 两者并存（歧义）。
+  const chain = options.chain ?? 'legacy';
+  const chainSample = path.resolve(process.cwd(), 'w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl');
+  if (chain === 'root' || chain === 'both') {
+    await fs.copyFile(chainSample, path.join(state, 'signature-chain.jsonl'));
+  }
+  if (chain === 'legacy' || chain === 'both') {
+    await fs.mkdir(path.join(state, 'signature-chains'), { recursive: true });
+    await fs.copyFile(chainSample, path.join(state, 'signature-chains', 'chain.jsonl'));
+  }
   for (const args of [
     ['init'],
     ['add', '.'],
@@ -200,6 +205,34 @@ describe('source provenance', () => {
     const produced = await produceSourceProvenance(project);
 
     expect(produced).toMatchObject({ ok: false, exitCode: 1, reason: 'MISSING_GIT_HEAD' });
+  });
+
+  it('accepts a root-level signature-chain.jsonl as the authoritative chain', async () => {
+    const project = await makeProject({ chain: 'root' });
+
+    const produced = await produceSourceProvenance(project);
+
+    expect(produced).toMatchObject({ ok: true, verificationLevel: 'source-bound' });
+    expect(produced.reason).toBeUndefined();
+    expect(produced.provenance?.sourceFiles).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: 'signature-chain.jsonl', kind: 'signature-chain' })]),
+    );
+    expect(produced.provenance?.measurements.signatureChain).toMatchObject({ count: 1 });
+    await expect(verifySourceProvenance(project)).resolves.toMatchObject({
+      ok: true,
+      verificationLevel: 'source-bound',
+    });
+  });
+
+  it('fails closed when the root-level chain and the legacy signature-chains directory coexist', async () => {
+    const project = await makeProject({ chain: 'both' });
+
+    const produced = await produceSourceProvenance(project);
+
+    expect(produced).toMatchObject({ ok: false, exitCode: 1, reason: 'SIGNATURE_CHAIN_AMBIGUOUS' });
+    await expect(fs.access(path.join(project, '.w-model', 'evidence-provenance.json'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
   });
 
   it('includes codegraph query files in sourceFiles and measurements', async () => {
