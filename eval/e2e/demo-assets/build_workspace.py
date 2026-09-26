@@ -629,11 +629,16 @@ write_json('.w-model/bdd/reports/report.json', {
 })
 
 # ---------- RTM（phase 8 终态；中间态由轨迹驱动脚本演化或按阶段另存） ----------
+# REQ 行的 designDoc = 设计链 ID 列表（真实 RTM 的自然写法：阶段 2 填 SD、阶段 3 补 INTF、阶段 4 补 DD 后累积登记，
+# 与 docs/changes/archive/2026-07-26-round15-end-to-end-test/rtm-snapshot.json 的 "SD-001,DD-001~DD-005" 同形）。
+# 必须覆盖 graph 声明的全部设计 ID（此处 SD-001/INTF-001/DD-001）：iceberg R6 宽池按
+# 「graph ↔ rtm 设计 ID 精确相等」对账，rtm 侧分母即从本字段解析，只写 SD 会让基准态自报 INTF/DD 差异。
+# NFR/CON 行按横切治理口径登记其横切 SD 清单（templates/requirement-spec.md §12.1），不属于 REQ 行的设计链登记。
 rows = [
-  {'requirementId': 'REQ-001', 'description': '环形计数器取值 [0,10]', 'designDoc': 'docs/requirement-spec.md#REQ-001',
+  {'requirementId': 'REQ-001', 'description': '环形计数器取值 [0,10]', 'designDoc': 'SD-001,INTF-001,DD-001',
    'codeModule': 'SD-001:src/counter.ts', 'unitTest': 'TC-UNIT-001', 'integrationTest': 'TC-INT-001',
    'systemTest': 'TC-SYS-001', 'acceptanceTest': 'docs/acceptance-test-design.md#UAT-001', 'coverageStatus': '完整'},
-  {'requirementId': 'REQ-002', 'description': 'Inc 自增与 Reset 复位', 'designDoc': 'docs/requirement-spec.md#REQ-002',
+  {'requirementId': 'REQ-002', 'description': 'Inc 自增与 Reset 复位', 'designDoc': 'SD-001,INTF-001,DD-001',
    'codeModule': 'SD-001:src/counter.ts', 'unitTest': 'TC-UNIT-002', 'integrationTest': 'TC-INT-002',
    'systemTest': 'TC-SYS-002', 'acceptanceTest': 'docs/acceptance-test-design.md#UAT-002', 'coverageStatus': '完整'},
   {'requirementId': 'NFR-001', 'description': '响应时间 P95 ≤ 200ms', 'designDoc': 'SD-001',
@@ -831,18 +836,8 @@ write('docs/uat-path-mapping.md', '''| UAT ID | 设计路径（阶段1） | 实�
 ''')
 
 # ---------- 归档（phase 8 后置） ----------
-arch_files = ['requirements.md', 'risk-assessment.md', 'uat-path-mapping.md', 'coverage.json', 'graph.json',
-              'tla-manifest.json', 'bdd-manifest.json', 'system-design.md', 'system-test-design.md',
-              'outline-design.md', 'integration-test-design.md', 'detailed-design.md', 'unit-test-design.md',
-              'src/counter.ts', 'unit-test-report.json', 'rtm.json', 'run-log.jsonl', 'checkpoint-log.jsonl',
-              'signature-chain.jsonl', 'integration-test-report.json', 'system-test-report.json',
-              'acceptance-test-report.json', 'verifier-output-1.json', 'gate-logs/graph-gate.json']
-for f in arch_files:
-  write(f'archive/2026-09-19-counter-api/{f}', f'# {f}（counter-api 归档占位，内容由终检核对的清单锚定）\n')
-write_json('archive/2026-09-19-counter-api/archive-manifest.json', {
-  'schemaVersion': '1.0', 'projectId': 'counter-api', 'archivedAt': '2026-09-19T06:00:00+08:00',
-  'files': arch_files,
-})
+# 归档清单的落盘在文件末尾：编码计划归档快照与活动位产物**同源**（同一组内容构造函数），
+# 须在阶段 5-8 编码链段之后生成，故本段只保留清单契约说明，实际写出见文件末尾「归档写出」段。
 
 
 # ---------- 阶段 5-8 变更上下文链（change-scope + codegraph 查询 + 编码计划制品/账本/审查） ----------
@@ -907,6 +902,48 @@ def _fake_sha(seed):
   """确定性伪提交号（同输入同字节可重放：不引入时间戳 / 随机源）。"""
   return hashlib.sha1(seed.encode('utf-8')).hexdigest()[:7]
 
+# 编码链制品正文构造函数（单一来源）：活动位（docs/plans + .superpowers/sdd）与归档快照
+# （archive/<归档目录>/）共用同一组函数，杜绝两处文本漂移（快照语义由文件末尾的自测锚定）。
+def _coding_plan_text(_cid, _p):
+  """编码计划正文（R1/R2）：目标节 + 任务节，逐节一条行首「验证：」命令行。"""
+  _plan_lines = [
+    f'# {_cid} 编码计划（counter-api e2e 调测）', '',
+    '来源：superpowers writing-plans（编码计划制品契约，门禁 `check-coding-plan.ts` R1-R6）；',
+    f'执行账本：`.superpowers/sdd/{_cid}.plan/progress.md`；任务三件套与评审包同目录。', '',
+    '## 目标', '',
+    f'阶段 {_p}：让 counter-api 的变更集（{len(PHASE_FILES[_p])} 个文件）在阶段 {_p} 门禁下可验证地推进；',
+    '任务颗粒度 = 单次可验证的改动；每个任务节内给出一条行首「验证：」命令行（散文行不参与解析）。', '',
+  ]
+  for _n, (_title, _verify) in enumerate(PLAN_TASKS[_p], 1):
+    _plan_lines += [f'## 任务 {_n}：{_title}', '', f'验证：{_verify}', '']
+  return '\n'.join(_plan_lines)
+
+def _coding_ledger_text(_cid, _p):
+  """执行账本正文（R3）：首行身份 + 逐任务 `Task N: complete`（附确定性伪提交号）。"""
+  _ledger_lines = [
+    f'# SDD ledger — plan: docs/plans/{_cid}.plan.md', '',
+    '任务账本（superpowers SDD）：逐任务一行 `Task N: complete`（附提交号）；',
+    '三件套 task-<N>-brief.md / task-<N>-report.md 与评审包 review-*.diff 与账本同目录。', '',
+  ]
+  for _n, (_title, _verify) in enumerate(PLAN_TASKS[_p], 1):
+    _ledger_lines.append(f'Task {_n}: complete (commits {_fake_sha(f"{_cid}-task{_n}")})')
+  return '\n'.join(_ledger_lines) + '\n'
+
+def _coding_task_text(_cid, _p, _n, _kind):
+  """任务三件套单份正文（R4）：brief 记输入与验收命令；report 记提交号并**不预置执行结论**。"""
+  _title, _verify = PLAN_TASKS[_p][_n - 1]
+  if _kind == 'brief':
+    return (f'# 任务 {_n} 简报：{_title}' + chr(10) + chr(10) +
+            f'变更：{_cid}（阶段 {_p}）；输入：上游阶段门产物 + 编码计划 docs/plans/{_cid}.plan.md。' + chr(10) +
+            f'验收：{_verify}' + chr(10))
+  # 回执**不预置执行结论**：计划里的验证命令并非都对该 fixture 为绿（如 check-code-tla-consistency 的
+  # D4 断言覆盖在 demo 源码上为红，见 docs/debug/2026-09-21-superpowers-replace-replay/replay.txt §三-1），
+  # 写死「退出码 0」会与门禁结论打架且无门禁能拦住；结论一律由 G 门禁复核（门禁日志落 .w-model/gate-logs/）。
+  return (f'# 任务 {_n} 回执：{_title}' + chr(10) + chr(10) +
+          f'提交：{_fake_sha(f"{_cid}-task{_n}")}；结果：完成（未偏离编码计划）。' + chr(10) +
+          f'验证命令见编码计划 docs/plans/{_cid}.plan.md 的「任务 {_n}」节；' +
+          '执行结论以 G 门禁复核为准（门禁日志落 .w-model/gate-logs/）。' + chr(10))
+
 for _p in (5, 6, 7, 8):
   _cid = f'phase{_p}-demo'
   _tasks = PLAN_TASKS[_p]
@@ -939,41 +976,13 @@ for _p in (5, 6, 7, 8):
     write(f'.w-model/v-reviews/phase{_p}-{_stage_name}.md',
           '# V ' + _stage_name + chr(10) + chr(10) + f'阶段 {_p} 编码链 {_stage_name} 环节 V 审查（e2e 调测）：通过。' + chr(10))
   # R1/R2：编码计划（目标节 + 任务节；任务节内逐条「验证：」命令行）
-  _plan_lines = [
-    f'# {_cid} 编码计划（counter-api e2e 调测）', '',
-    '来源：superpowers writing-plans（编码计划制品契约，门禁 `check-coding-plan.ts` R1-R6）；',
-    f'执行账本：`.superpowers/sdd/{_cid}.plan/progress.md`；任务三件套与评审包同目录。', '',
-    '## 目标', '',
-    f'阶段 {_p}：让 counter-api 的变更集（{len(PHASE_FILES[_p])} 个文件）在阶段 {_p} 门禁下可验证地推进；',
-    '任务颗粒度 = 单次可验证的改动；每个任务节内给出一条行首「验证：」命令行（散文行不参与解析）。', '',
-  ]
-  for _n, (_title, _verify) in enumerate(_tasks, 1):
-    _plan_lines += [f'## 任务 {_n}：{_title}', '', f'验证：{_verify}', '']
-  write(f'docs/plans/{_cid}.plan.md', '\n'.join(_plan_lines))
+  write(f'docs/plans/{_cid}.plan.md', _coding_plan_text(_cid, _p))
   # R3/R4：执行账本 + 任务三件套 + 评审包 diff
   _ledger_dir = f'.superpowers/sdd/{_cid}.plan'
-  _ledger_lines = [
-    f'# SDD ledger — plan: docs/plans/{_cid}.plan.md', '',
-    '任务账本（superpowers SDD）：逐任务一行 `Task N: complete`（附提交号）；',
-    '三件套 task-<N>-brief.md / task-<N>-report.md 与评审包 review-*.diff 与账本同目录。', '',
-  ]
+  write(f'{_ledger_dir}/progress.md', _coding_ledger_text(_cid, _p))
   for _n, (_title, _verify) in enumerate(_tasks, 1):
-    _ledger_lines.append(f'Task {_n}: complete (commits {_fake_sha(f"{_cid}-task{_n}")})')
-  write(f'{_ledger_dir}/progress.md', '\n'.join(_ledger_lines) + '\n')
-  for _n, (_title, _verify) in enumerate(_tasks, 1):
-    _sha = _fake_sha(f'{_cid}-task{_n}')
-    write(f'{_ledger_dir}/task-{_n}-brief.md',
-          f'# 任务 {_n} 简报：{_title}' + chr(10) + chr(10) +
-          f'变更：{_cid}（阶段 {_p}）；输入：上游阶段门产物 + 编码计划 docs/plans/{_cid}.plan.md。' + chr(10) +
-          f'验收：{_verify}' + chr(10))
-    # 回执**不预置执行结论**：计划里的验证命令并非都对该 fixture 为绿（如 check-code-tla-consistency 的
-    # D4 断言覆盖在 demo 源码上为红，见 docs/debug/2026-09-21-superpowers-replace-replay/replay.txt §三-1），
-    # 写死「退出码 0」会与门禁结论打架且无门禁能拦住；结论一律由 G 门禁复核（门禁日志落 .w-model/gate-logs/）。
-    write(f'{_ledger_dir}/task-{_n}-report.md',
-          f'# 任务 {_n} 回执：{_title}' + chr(10) + chr(10) +
-          f'提交：{_sha}；结果：完成（未偏离编码计划）。' + chr(10) +
-          f'验证命令见编码计划 docs/plans/{_cid}.plan.md 的「任务 {_n}」节；' +
-          '执行结论以 G 门禁复核为准（门禁日志落 .w-model/gate-logs/）。' + chr(10))
+    for _kind in ('brief', 'report'):
+      write(f'{_ledger_dir}/task-{_n}-{_kind}.md', _coding_task_text(_cid, _p, _n, _kind))
   write(f'{_ledger_dir}/review-{_cid}-t1.diff',
         'diff --git a/src/counter.ts b/src/counter.ts' + chr(10) +
         '--- a/src/counter.ts' + chr(10) +
@@ -986,6 +995,49 @@ for _p in (5, 6, 7, 8):
     write(f'openspec/changes/{_cid}/{_doc}',
           '# ' + _doc[:-3] + chr(10) + chr(10) + f'{_cid} 变更{_doc[:-3]}（counter-api e2e 调测，旧 opsx 链路制品）：变更文件 ' + ', '.join(PHASE_FILES[_p]) + '。' + chr(10))
   write(f'openspec/changes/{_cid}/specs/.gitkeep', '')
+
+# ---------- 归档写出（phase 8 后置；置于编码链段之后，使归档快照与活动位同源） ----------
+ARCHIVE_DIR = 'archive/2026-09-19-counter-api'
+# 编码计划归档快照（check-archive-integrity.ts 的 `codingPlanSnapshot` 条件项，判据见
+# w-model-dev/scripts/logic/archive-integrity-logic.ts）：归档根须含 <changeId>.plan.md + progress.md
+# + 账本内每个 `Task N: complete` 对应的 task-<N>-{brief,report}.md。快照取**阶段 8 活动位**
+# （归档时点的变更 changeId=phase8-demo，与 docs/plans/ + .superpowers/sdd/ 下的同名产物逐字一致）；
+# 归档根恰一 *.plan.md → 该条件项经「自动派生」分支激活（驱动 run_trajectory.sh 不传 --change-id，
+# 覆盖自动派生形态；显式 --change-id 形态由 samples/archive-integrity 与 CLI 子进程用例覆盖）。
+# 边界（如实登记）：快照只覆盖 archive-integrity 的结构子集（plan / 账本 / 三件套），
+# review-*.diff 等全量契约由 check-coding-plan R4/R6 在活动位承担；本目录不在其归档根
+# （docs/changes/archive/）内，故 R6 不解析本目录（目录名沿用装配器既有 <日期>-<项目> 形态）。
+ARCHIVE_PLAN_CID = 'phase8-demo'
+arch_plan_snapshot = [f'{ARCHIVE_PLAN_CID}.plan.md', 'progress.md'] + [
+    f'task-{_n}-{_kind}.md'
+    for _n in range(1, len(PLAN_TASKS[8]) + 1) for _kind in ('brief', 'report')]
+arch_files = ['requirements.md', 'risk-assessment.md', 'uat-path-mapping.md', 'coverage.json', 'graph.json',
+              'tla-manifest.json', 'bdd-manifest.json', 'system-design.md', 'system-test-design.md',
+              'outline-design.md', 'integration-test-design.md', 'detailed-design.md', 'unit-test-design.md',
+              'src/counter.ts', 'unit-test-report.json', 'rtm.json', 'run-log.jsonl', 'checkpoint-log.jsonl',
+              'signature-chain.jsonl', 'integration-test-report.json', 'system-test-report.json',
+              'acceptance-test-report.json', 'verifier-output-1.json', 'gate-logs/graph-gate.json']
+for f in arch_files:
+  write(f'{ARCHIVE_DIR}/{f}', f'# {f}（counter-api 归档占位，内容由终检核对的清单锚定）\n')
+write(f'{ARCHIVE_DIR}/{ARCHIVE_PLAN_CID}.plan.md', _coding_plan_text(ARCHIVE_PLAN_CID, 8))
+write(f'{ARCHIVE_DIR}/progress.md', _coding_ledger_text(ARCHIVE_PLAN_CID, 8))
+for _n in range(1, len(PLAN_TASKS[8]) + 1):
+  for _kind in ('brief', 'report'):
+    write(f'{ARCHIVE_DIR}/task-{_n}-{_kind}.md', _coding_task_text(ARCHIVE_PLAN_CID, 8, _n, _kind))
+write_json(f'{ARCHIVE_DIR}/archive-manifest.json', {
+  'schemaVersion': '1.0', 'projectId': 'counter-api', 'archivedAt': '2026-09-19T06:00:00+08:00',
+  'files': arch_files + arch_plan_snapshot,
+})
+# 快照语义自测（fail-fast，与文件头 run-log 基准自测同型）：归档快照须与活动位**逐字一致**；
+# 若将来只改活动位（或反之），此处 fail-fast 防「归档快照与活动位漂移」静默通过。
+for _rel in arch_plan_snapshot:
+  _snap_path = os.path.join(ROOT, ARCHIVE_DIR, _rel)
+  _live_path = os.path.join(ROOT, '.superpowers', 'sdd', f'{ARCHIVE_PLAN_CID}.plan', _rel) \
+      if _rel != f'{ARCHIVE_PLAN_CID}.plan.md' else os.path.join(ROOT, 'docs', 'plans', _rel)
+  with open(_snap_path, encoding='utf-8') as _f_snap, open(_live_path, encoding='utf-8') as _f_live:
+    if _f_snap.read() != _f_live.read():
+      sys.exit(f'✗ 装配器自测失败：归档快照 {ARCHIVE_DIR}/{_rel} 与活动位 {_live_path} 内容不一致——'
+               '快照须与活动位同源（正文由 _coding_*_text 单一来源构造）。')
 
 print('workspace built at', ROOT)
 

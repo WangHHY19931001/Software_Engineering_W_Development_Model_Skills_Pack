@@ -35,6 +35,8 @@ bash run_negative_probes.sh              # 期望末行：✓ 9/9 探针被拦�
 
 旧 opsx 链路制品（`openspec/changes/<changeId>/`）在 demo 工作区中仍被生成（装配器未删除），但**对应的门禁已在 2026-09-21 退役**：`check-opsx-artifacts.ts` 与其 fixture（`w-model-dev/scripts/samples/opsx-artifacts/`）已 `git rm`，语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3（stage 词表 `plan/execute/finalize`，旧词表 `explore/propose/coding` 不充数）。该目录现在只是留作历史对照的静态样本，没有任何门禁读取它。
 
+**归档位（阶段 8 后置）**：`archive/2026-09-19-counter-api/` 除各阶段清单占位文件外，还含**编码计划归档快照**——`phase8-demo.plan.md` + `progress.md` + `task-<N>-{brief,report}.md`（正文与阶段 8 活动位产物同源，装配器有「快照 ↔ 活动位逐字一致」的 fail-fast 自测锚），使 `check-archive-integrity.ts` 的 `codingPlanSnapshot` 条件项经「归档根恰一 `*.plan.md`」的**自动派生**分支激活（驱动不传 `--change-id`；显式形态由 `samples/archive-integrity` 与 CLI 子进程用例覆盖）。快照只覆盖该条件项的结构子集（plan / 账本 / 三件套），`review-*.diff` 等全量契约由 `check-coding-plan.ts` R4/R6 在活动位承担。基准态 `rtm.json` 的 REQ 行 `designDoc` 按真实 RTM 形态登记全设计链（`SD-001,INTF-001,DD-001`，与 graph 声明的设计 ID 集精确相等），使 iceberg R6 宽池 `graph↔rtm` 不再自报差异。
+
 ## 销毁前证据保全
 
 `--reset` 与常规运行都会删 `.w-model`（run-log / signature-chain / budget 等运行时状态随之清空）。若当前工作区态可能是某次真实调测/运行的**唯一证据载体**，销毁前必须先完成证据分级裁定并保全，再重建。证据按「类别 × 粒度 × 保全手段」分级：
