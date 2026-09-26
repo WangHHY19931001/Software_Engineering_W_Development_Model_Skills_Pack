@@ -66,7 +66,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 8   | 编排者最小化          | O 只编排；实施动作由子代理执行；每阶段 S/V/G 各 ≥1，R3 三维度（role=R 的 r3-* success 记录）各 ≥1 |
 | 9   | 门禁退出码不可伪      | exitCode 与 process.exit 强一致；G 存档 stdout；run-log 交叉校验                                  |
 | 10  | 系统层级树 + REQ 层级 | 7 层图谱；REQ level 1-4 必填、level≥2 须 reqGroup                                                 |
-| 11  | 闭环机制 + R3 审查    | 5 脚本每阶段门 exitCode=0（check-run-log R11 校验）；S 产出后 R3 三报告强制                       |
+| 11  | 闭环机制 + R3 审查    | 5 脚本每阶段门 exitCode=0（check-run-log R11 校验）；S 产出后 R3 三报告强制；放行三步顺序：确认落盘 → 闭环五门串行 → 放行记录末条（严格晚于五门，同秒不算） |
 | 12  | 返工必经根因定位      | V/G 不通过先 R 报告 → V 复审 → G 门禁 → S-fix                                                     |
 | 13  | 行为门禁按成熟度分级  | 阶段 1-4 TLA+ + BDD 按成熟度强制                                                                  |
 | 14  | 代码改动前后门禁      | 修改前 codegraph 影响分析落盘 + 改动后回归测试                                                    |
@@ -85,7 +85,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | A 分析 | 阶段 1–4 分块分析、合并建图                                 | 只产出 ingestion 中间产物        |
 | R 根因 | 定位根因产出 RootCauseReport；R3 预防性审查                 | 只产出报告，不实施修复           |
 
-每阶段时序：O 路由 → 🔴 CHECKPOINT 进入确认 → S 产出 → R3 预防性审查 → G 运行 `check-preventive-review.ts`（exitCode=0）→ V 评审 → G 常规门禁 → O 展示证据 → 🔴 CHECKPOINT 阶段门放行 → O 更新状态。细则（S 拆分、self-as-verifier 模式、只读脚本例外、dispatch-matrix 总览）见 [references/subagent-delegation.md](references/subagent-delegation.md)。跨阶段/跨角色交接与调用分类的书写规则见同文件「调用分类」与「跨阶段与跨角色交接的书写规则」两节；交接必须写成显式动作句，人类入口不得由子代理代达。
+每阶段时序：O 路由 → 🔴 CHECKPOINT 进入确认 → S 产出 → R3 预防性审查 → G 运行 `check-preventive-review.ts`（exitCode=0）→ V 评审 → G 常规门禁 → **阶段门放行三步（D-4，顺序不可换、不可并行）** → O 展示证据 → 🔴 CHECKPOINT 阶段门放行 → O 更新状态。**阶段门放行三步**：① 用户确认**先落盘**为 `checkpoint-log/phase-N`（阶段 1 由 R0 自举形态消费该确认作初级证据）→ ② **闭环五门串行**执行且 `exitCode=0`（`check-budget.ts` → `check-run-log.ts` → `check-maturity.ts` → `check-checkpoint.ts` → `check-preventive-review.ts`；五门均须提供 run-log——`check-run-log.ts` / `check-checkpoint.ts` 为位置参数 `<run-log.jsonl>`，其余 `--run-log=<path>`，`check-checkpoint.ts` 另加 `--checkpoint-log=<dir>`）→ ③ 由 O 追加**放行记录**（`action=checkpoint`、`outcome=success`）作为**阶段末条**，且**严格晚于**五条 gate 记录（同秒不算早于；`check-run-log.ts` R11 机器核验，反伪造）。细则（S 拆分、self-as-verifier 模式、只读脚本例外、dispatch-matrix 总览）见 [references/subagent-delegation.md](references/subagent-delegation.md)。跨阶段/跨角色交接与调用分类的书写规则见同文件「调用分类」与「跨阶段与跨角色交接的书写规则」两节；交接必须写成显式动作句，人类入口不得由子代理代达。
 
 ## 执行工作流
 
@@ -96,7 +96,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 5. **产出**（O→S）：生成产物 + 同步测试设计 + 更新 RTM；阶段 1–4 额外产出 TLA+ 规格与 BDD features（按成熟度）；ingestion 子流程（plan-chunks → A-chunk/A-cross → check-requirement-graph，收敛循环 MAX_ROUNDS=5）见 ingestion-chunk.md。
 6. **R3 预防性审查**（O→R→G）：S 产出后分派 R 完成 completeness/reliability/security 三份报告，再由 G 运行 check-preventive-review.ts；exitCode=0 后才可进入 V。
 7. **评审**（O→V）：按 targetKind 路由 Persona 产出 VerifierOutput。**编排者不得自评**。
-8. **门禁**（O→G）：跑 check-verifier-output.ts；阶段 1–4 额外 check-tla-model.ts + check-bdd-model.ts；阶段 5 额外 check-code-tla-consistency.ts。
+8. **门禁**（O→G）：跑 check-verifier-output.ts；阶段 1–4 额外 check-tla-model.ts + check-bdd-model.ts；阶段 5 额外 check-code-tla-consistency.ts。**阶段门放行前顺序（D-4，三步不可换序、不可并行）**：① `checkpoint-log/phase-N` 用户确认**先落盘**（阶段 1 由 R0 首阶段自举形态消费该确认作初级证据）→ ② **闭环五门串行**（`check-budget.ts` → `check-run-log.ts` → `check-maturity.ts` → `check-checkpoint.ts` → `check-preventive-review.ts`，五门均须提供 run-log，全部 `exitCode=0`）→ ③ **放行记录**（`action=checkpoint`、`outcome=success`）为**阶段末条**且**严格晚于**五条 gate 记录（同秒不算早于；违反即 `check-run-log.ts` R11 blocking，约束 #11）。
 9. **验证与暂停**（O）：普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；跳过 R 或 R 报告复审/门禁分别命中反模式 #18/#19。S-fix 后与放行前分派冰山扫掠（iceberg-sweep-guide.md）；阶段 1 ingestion 图谱失败仍走 A→G 专用收敛循环。
 10. **持久化**（O）：用户放行后才更新 `project.status`；状态写入统一经 wm-write.ts（锁 + 备份 + 原子写）。
 
