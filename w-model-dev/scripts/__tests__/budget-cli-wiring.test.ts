@@ -11,8 +11,11 @@
  *
  * 覆盖：
  *   - exit 1：--run-log 含有效 tokens 且阶段累计 > perPhase.maxTokens → stdout 出现 `R6：` 文案
- *   - exit 0：未提供 --run-log → R6/R5-b 整体跳过（与新增前行为一字不变）
+ *   - exit 0：未提供 --run-log → R6/R5-b 整体跳过（与新增前行为一字不变）**且输出未接线诊断**
+ *     （D-5②：省略 --run-log 不再等于静默跳过；判据与退出码一字不变，只加非阻断诊断）
  *   - exit 0 + stderr「R6 未生效」：提供了 --run-log 但 Σtokens=0（跳过不等于通过）
+ *   - exit 0：同 (timestamp, tokens, duration_s) 多行 → 「疑似重复归账」上界口径诊断（不改退出码）
+ *   - --json：未接线诊断进入机器可读摘要（diagnostics 键，非阻断，键仅在非空时出现）
  *
  * 本文件启动真实 tsx 子进程 → 已登记 config/vitest.config.ts 的 SUBPROCESS_TEST_FILES
  * （vitest-project-split 双向守护）。
@@ -79,5 +82,42 @@ describe('check-budget CLI R6 用量实效接线（D-4b）', () => {
     const r = runCli([BUDGET_SAMPLE, `--run-log=${runLog}`, '--phase=5']);
     expect(r.code).toBe(0);
     expect(r.stderr).toContain('R6 未生效');
+  });
+});
+
+describe('check-budget CLI 未接线可见化与上界口径诊断（D-5② / N-6）', () => {
+  it('exit 0：未提供 --run-log → 非阻断诊断「R6/R5-b 未生效（未提供 run-log）」', () => {
+    const r = runCli([BUDGET_SAMPLE, '--phase=8']);
+    expect(r.code).toBe(0);
+    expect(r.stdout + r.stderr).toMatch(/R6\/R5-b 未生效（未提供 run-log）/);
+  });
+
+  it('exit 0：同 (timestamp+tokens+duration_s) 多行 → 「疑似重复归账」上界口径诊断，退出码不变', async () => {
+    const dup = (runId: string): string =>
+      `{"runId":"${runId}","timestamp":"2026-09-19T04:01:00Z","phase":1,"action":"r3-completeness","role":"R","duration_s":30,"tokens":1000,"outcome":"success"}`;
+    const runLog = await writeRunLog([dup('r3-a'), dup('r3-b'), dup('r3-c')]);
+    const r = runCli([BUDGET_SAMPLE, `--run-log=${runLog}`, '--phase=1']);
+    // 3 条同键记录 = 1 组（1000×3 仍远低于样本上限 → 只出诊断，不改退出码）
+    expect(r.code).toBe(0);
+    expect(r.stdout + r.stderr).toMatch(/疑似重复归账 1 组/);
+    expect(r.stdout + r.stderr).toMatch(/Σtokens 为上界口径/);
+  });
+
+  it('exit 0：无重复归账（键互异）→ 不出现「疑似重复归账」诊断', async () => {
+    const runLog = await writeRunLog([
+      '{"runId":"a","timestamp":"2026-09-19T04:01:00Z","phase":1,"action":"gate","role":"G","duration_s":30,"tokens":1000,"outcome":"success"}',
+      '{"runId":"b","timestamp":"2026-09-19T04:02:00Z","phase":1,"action":"gate","role":"G","duration_s":31,"tokens":1000,"outcome":"success"}',
+    ]);
+    const r = runCli([BUDGET_SAMPLE, `--run-log=${runLog}`, '--phase=1']);
+    expect(r.code).toBe(0);
+    expect(r.stdout + r.stderr).not.toMatch(/疑似重复归账/);
+  });
+
+  it('--json：未接线诊断进入机器可读摘要（diagnostics 键，exitCode 仍为 0）', () => {
+    const r = runCli([BUDGET_SAMPLE, '--phase=8', '--json']);
+    expect(r.code).toBe(0);
+    const report = JSON.parse(r.stdout.trim()) as { diagnostics?: string[]; exitCode: number };
+    expect(report.exitCode).toBe(0);
+    expect((report.diagnostics ?? []).some((d) => d.includes('R6/R5-b 未生效（未提供 run-log）'))).toBe(true);
   });
 });

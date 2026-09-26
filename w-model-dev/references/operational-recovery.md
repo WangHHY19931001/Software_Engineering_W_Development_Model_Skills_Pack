@@ -448,12 +448,14 @@ G 子代理在每个阶段门按以下顺序调用，任一退出码 ≠ 0 → O
 
 | 顺序 | 脚本 | 校验对象 | 退出码 ≠ 0 守护 |
 |---|---|---|---|
-| 1 | `check-budget.ts` | `.w-model/budget.json` | 反模式 #9（谎报状态） |
+| 1 | `check-budget.ts .w-model/budget.json --project=.w-model/project.json --phase=<N> --run-log=.w-model/run-log.jsonl`（**必带** `--run-log`） | `.w-model/budget.json` | 反模式 #9（谎报状态） |
 | 2 | `check-run-log.ts` | `.w-model/run-log.jsonl` + `gate-logs/` | 反模式 #9 / #10（O 越权） |
 | 3 | `check-maturity.ts` | `.w-model/maturity.json` | 反模式 #9 |
 | 4 | `check-checkpoint.ts` | run-log 中 checkpoint 类记录 | 反模式 #9 / O4 |
 | 5 | 现有三门禁（**非闭环**，常规门禁） | `check-verifier-output.ts` / `check-requirement-graph.ts` / `check-tla-model.ts` | #1/#4/#11-#17 |
 | — | 闭环五门之第五门 `check-preventive-review.ts`（**不在本表**） | `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json`，**V 评审前**执行 | 反模式 #33 / #42 |
+
+> **`check-budget.ts` 的 `--run-log` 为必带参数（D-5② 接线硬线）**：不传 `--run-log` 时 R6（用量实效：Σtokens(阶段/全量) vs `perPhase.maxTokens` / `project.maxTokensTotal`）与 R5-b（burnRate 用量告警）**不生效**——脚本仅输出非阻断诊断 `R6/R5-b 未生效（未提供 run-log）`，退出码仍为 0（判据与退出码语义一字不变；跳过不等于通过）。live run 实测 **9/9 次 `check-budget` 调用均未传该参数**、R6/R5-b 全程静默（`budget-logic.ts` 的「未提供即视为未提供」口径），故本表把该参数定为必带；调用时须给 `--phase=<N>`，否则阶段口径的 Σtokens 判定退化为仅总量口径。另注：Σtokens 为**上界**口径（同一分派的多条归账会重复累计），脚本在同 `(timestamp, tokens, duration_s)` 多行时输出「疑似重复归账 N 组」非阻断诊断（只诊断、**不去重**）；R3 三条目归账约定与上界口径成文见 `data-models.md`「用量实效校验（R6）」。
 
 ### 校验内容摘要
 

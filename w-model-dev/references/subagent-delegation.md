@@ -336,7 +336,7 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 
 | 脚本                    | 用途                                                         | 触发时机              |
 | ----------------------- | ------------------------------------------------------------ | --------------------- |
-| check-budget            | 预算检查                                                     | 每阶段门放行前        |
+| `check-budget.ts .w-model/budget.json --project=.w-model/project.json --phase=<N> --run-log=.w-model/run-log.jsonl`（**必带** `--run-log`；不传时 R6/R5-b 不生效，仅输出非阻断诊断） | 预算检查 | 每阶段门放行前        |
 | check-run-log           | run-log 完整性 + 字段 schema + R3 记录数                     | 每阶段门放行前        |
 | check-maturity          | 成熟度判定                                                   | 每阶段门放行前        |
 | check-checkpoint        | CHECKPOINT acknowledgedDecisions 关键词                      | 每阶段门放行前        |
