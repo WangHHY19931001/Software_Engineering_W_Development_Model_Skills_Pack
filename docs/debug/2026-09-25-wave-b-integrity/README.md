@@ -208,7 +208,40 @@ npm error A complete log of this run can be found in: C:\Users\wangh\AppData\Loc
 PREPUSH_EXIT=0
 ```
 
-**caveat（如实登记）**：第 14 项 `npm audit` 本轮为**网络不可达跳过**（`connect ETIMEDOUT 127.8.0.1:443`，非阻断设计路径）——即**本次未实际复核依赖漏洞面**；如需该维度结论须在网络可达时补跑 `npm audit --audit-level=high`。第 12 项（vitest 全量 + coverage 阈值）与第 15 项（docs-consistency，复用同次 vitest JSON 与受控 provenance）均 exit 0，覆盖 Wave B 新增的哈希链 / 放行锚 / 追加器 / 归档前缀性 / 预算诊断全部用例。
+**caveat（如实登记）**：第 14 项 `npm audit` 在本轮为**网络不可达跳过**（`connect ETIMEDOUT 127.8.0.1:443`，属非阻断设计路径）→ 本轮未实际复核依赖漏洞面；该面已由下方**提交后确认运行**真实覆盖（`✓ npm audit 未发现 high 以上漏洞`）。第 12 项（vitest 全量 + coverage 阈值）与第 15 项（docs-consistency，复用同次 vitest JSON 与受控 provenance）均 exit 0，覆盖 Wave B 新增的哈希链 / 放行锚 / 追加器 / 归档前缀性 / 预算诊断全部用例。
+
+### 7.1 确认运行（提交后复跑，HEAD `cfb4bfe3`）
+
+按「交付前必须跑全量」纪律，文档提交后在 `cfb4bfe3` 上复跑同一命令（日志 `C:\Users\wangh\AppData\Local\Temp\wm-task12\prepush-postcommit.log`，19:19 → 19:45 运行 ≈ 26 分钟）：
+
+```text
+[pre-push] 平台依赖检查（ensure-platform-deps --check）...
+[ensure-deps] [32m✓[0m 平台依赖齐备（win32-x64）
+[pre-push] [32m✓[0m self-test 全部样本匹配期望（exit 0）
+[pre-push] [32m✓[0m check:verifier 无参数退出 2（exit 2）
+[pre-push] [32m✓[0m check:gate 不存在目录退出 2（exit 2）
+[pre-push] [32m✓[0m check:verifier 有效样本退出 0（exit 0）
+[pre-push] [32m✓[0m check:verifier 无效样本退出 1（exit 1）
+[pre-push] [32m✓[0m security-scan 无新增风险（exit 0）
+[pre-push] [32m✓[0m check-bdd-model 有效 BDD 样本退出 0（exit 0）
+[pre-push] [32m✓[0m check-bdd-model schema 不合规 BDD 样本退出 2（exit 2）
+[pre-push] [32m✓[0m check:coverage 有效覆盖样本退出 0（exit 0）
+[pre-push] [32m✓[0m check:exemption 有效豁免样本退出 0（exit 0）
+[pre-push] [32m✓[0m check-signature-chain 有效签名链样本退出 0（exit 0）
+[pre-push] [32m✓[0m vitest 单元测试 + coverage 阈值通过（exit 0）
+[pre-push] [32m✓[0m 规则层覆盖口径 (logic+lib) 达阈值（exit 0）
+[pre-push] npm audit 依赖漏洞扫描（high 以上阻断）...
+[pre-push] [32m✓[0m npm audit 未发现 high 以上漏洞
+[pre-push] [32m✓[0m docs-consistency 活体文档一致（exit 0）
+[pre-push] [32m✓[0m samples 覆盖矩阵一致（无未登记 fixture）（exit 0）
+[pre-push] [32m✓[0m prettier 格式一致性（--check）（exit 0）
+[pre-push] [32m✓[0m tsc 类型检查 0 错误（exit 0）
+[pre-push] [32m✓[0m eval 语料断言与覆盖矩阵全绿（exit 0）
+[pre-push] 全部门禁通过，允许推送 ✓
+PREPUSH_POSTCOMMIT_EXIT=0
+```
+
+即：**19/19 全绿**（含第 14 项 npm audit 本次**真实执行通过**）——上一次运行的 audit 跳过缺口由此闭环；两次运行共同构成「实现态（8a9c5561）与交付态（cfb4bfe3）均已全量验证」。
 
 ## 8. 未达成项 / 疑虑（如实登记）
 
