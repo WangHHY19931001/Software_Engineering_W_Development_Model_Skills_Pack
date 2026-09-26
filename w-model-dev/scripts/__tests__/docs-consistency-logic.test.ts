@@ -1903,7 +1903,9 @@ describe('runDocConsistencyChecks', () => {
         await fs.rm(outside, { recursive: true, force: true });
       }
     });
-  }, 120_000);
+  }, 600_000); // 本用例连跑 5 次 fixture CLI（每次内部含 48 条 exit-2 探针的串行 spawn）；本机实测单次 CLI
+  // ~40.4s，负载下更慢 → 原 120s 预算结构性不足（2026-09-26 全量套件实测超时，与用例逻辑无关）。
+  // 600s 覆盖「5 次 spawn × 90s 上限」最坏路径，只放宽墙钟预算；断言、探针数与判据语义一律不变。
 
   it('CLI --json 对不可信 coverage 仍 exit1 并输出完整失败测量字段', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
@@ -2923,7 +2925,10 @@ function runDocsConsistencyCli(
   const result = spawnSync(process.execPath, [tsxCli, DOCS_CONSISTENCY_CLI, fixtureRoot, ...args], {
     cwd: fixtureRoot,
     encoding: 'utf-8',
-    timeout: options.timeoutMs ?? 90_000,
+    // 单次 fixture CLI 预算：内部含 48 条 exit-2 探针的串行 spawn，本机实测 ~40.4s（负载下更慢）→
+    // 原 90s 上限在负载下会先杀掉子进程（status=null → 断言读到假失败）。240s 给足负载余量；
+    // 外层每个用例自身的 testTimeout 仍是总预算上限（只放宽墙钟，判据/断言/探针数不变）。
+    timeout: options.timeoutMs ?? 240_000,
     env: {
       ...process.env,
       WM_VITEST_COUNT_FILE: countFile,

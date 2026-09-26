@@ -542,13 +542,17 @@ function readVitestCountFile(root: string): VitestMeasurements | null {
 }
 
 /**
- * Vitest standalone 自采集的 spawn 墙钟上限（毫秒）。随套件规模调整；快路径（WM_VITEST_COUNT_FILE）不受影响。
- * 当前 1800s：`fileParallelism: false`（config/vitest.config.ts，消除子进程测试并行抖动）后，
- * 全量套件实测墙钟约 975~1060s（1904 用例），取约 1.7 倍余量，避免健康仓库在
- * standalone 自采集时因超时被误判 fail-closed（600s 时代实测：spawn 被杀 → JSON 未落盘 → 双 -1）。
- * pre-push/probe 仍走 WM_VITEST_COUNT_FILE 快路径，不受此常量影响。
+ * Vitest standalone 自采集的 spawn 墙钟上限（毫秒）。**随套件规模与机器负载调整**；快路径
+ * （WM_VITEST_COUNT_FILE）不受影响——它直接读 pre-push 第 12 项的同次 JSON，不 spawn。
+ *
+ * 当前 3600s：`fileParallelism: false`（config/vitest.config.ts，消除子进程测试并行抖动）后，
+ * 套件持续增长（1904 → 2579 用例 / 106 文件）。旧值 1800s 已小于本机实测墙钟 **1962s**
+ * （2026-09-26 全量套件 `--reporter=json` 实测）→ spawn 被杀 → JSON 未落盘 → 自采集路径
+ * 双 -1 fail-closed（单跑 `check-docs-consistency.ts` 因此结构性 exit 1，与判据无关）。
+ * 取约 1.8 倍余量（3600s / 1962s）覆盖负载波动；这是**基建常量**（放宽等待，不放宽判据）——
+ * 采集失败仍走 fail-closed，真实失败的套件不会因此被放行（JSON 里 numFailedTests 会被读出）。
  */
-const VITEST_SPAWN_TIMEOUT_MS = 1_800_000;
+const VITEST_SPAWN_TIMEOUT_MS = 3_600_000;
 
 /**
  * 采集 Vitest 完整运行事实包（堵住只查文件数或用例总数的盲区）。
