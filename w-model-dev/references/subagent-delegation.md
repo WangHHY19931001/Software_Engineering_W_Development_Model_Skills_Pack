@@ -748,6 +748,12 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
   2. 必须满足 verifier-spec.md §6 Schema（subCriteria / compositeScore / qualityLevel / passed / reworkHints）
   3. Severity 标签作为 reworkHints 前缀（[Critical] / [Required] / [Optional] / [Nit] / [FYI]）
   4. 返回编排者：{VerifierOutput JSON 路径, summary 摘要}
+
+V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返工重评）：
+  1. rawScores 须为真实离散值：禁全同（复制填入）；禁 0.01 完美等差（构造数据）；text-parse 模式下 max - min ∈ [0.01, 0.10]
+  2. evidence 每条须为 `path:§sec=陈述` 或 `path:Lnn=陈述`（单 L 形态）；禁双 L 区间 `path:L51-L53=`
+  3. reviewedAt 须为评审完成的真实时刻，且不早于被评审产物的产出时刻
+
 禁止：
   - 跑门禁脚本
   - 改产物文件
@@ -1195,6 +1201,11 @@ superpowers 编码链（S-plan → S-coding → S-finalize）每段须额外产�
   2. targetKind=rootcause，persona=code-reviewer（或新增 rootcause-reviewer persona，待定）
   3. reworkHints 含 [Critical]/[Required] 时表示根因报告不准确，须重派 R
   4. 返回编排者：{role:"V", targetKind:"rootcause", qualityLevel, passed, reworkHints}
+
+V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返工重评）：
+  1. rawScores 须为真实离散值：禁全同（复制填入）；禁 0.01 完美等差（构造数据）；text-parse 模式下 max - min ∈ [0.01, 0.10]
+  2. evidence 每条须为 `path:§sec=陈述` 或 `path:Lnn=陈述`（单 L 形态）；禁双 L 区间 `path:L51-L53=`
+  3. reviewedAt 须为评审完成的真实时刻，且不早于被评审产物的产出时刻
 
 禁止：
   - 改 R 报告文件

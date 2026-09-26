@@ -105,12 +105,12 @@ const RULES: readonly RuleCase[] = [
       }),
   },
   {
-    id: 'O3 evidence 格式（EVIDENCE_PATTERN）',
-    forbidden: 'O3 命中',
+    id: 'evidence 格式不符（EVIDENCE_PATTERN 不匹配，D-10① 两路文案之格式路）',
+    forbidden: 'evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt，单 L 形态）',
     anchor: 'if (!EVIDENCE_PATTERN.test(item)) {',
     red: () =>
       mutate((o) => {
-        subAt(o, 0).evidence = '评审意见整体良好'; // 非「path:§=」格式且非空泛前缀 → 仅格式规则命中
+        subAt(o, 0).evidence = '评审意见整体良好'; // 非「path:§=」格式且非空泛前缀 → 仅格式路命中
       }),
   },
   {

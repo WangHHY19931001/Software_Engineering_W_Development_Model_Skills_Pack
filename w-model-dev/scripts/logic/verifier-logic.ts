@@ -312,7 +312,8 @@ export function determineQualityLevel(score: number): QualityLevel {
 /**
  * evidence 格式正则（conventions.md「格式约定」§2.1）：
  *   合法格式：path:§section=statement 或 path:L42=statement 或 path:L42-58=statement
- *   非法格式：path.field=value（点号，已废弃）/ 纯文件名无定位 / 空泛声明
+ *   非法格式：path.field=value（点号，已废弃）/ 纯文件名无定位 / 双 L 区间 `path:L51-L53=statement`
+ *     （行号区间须写 `path:L51-53=statement`，单 L 形态）/ 空泛声明
  */
 const EVIDENCE_PATTERN = /^(?:[\w/.-]+:§[\w.-]+|[\w/.-]+:L\d+(?:-\d+)?)=.+$/;
 const VAGUE_EVIDENCE_PATTERNS = [
@@ -320,10 +321,24 @@ const VAGUE_EVIDENCE_PATTERNS = [
   /^(质量良好|评审通过|校验通过|全部通过)/,
   /^(全\s*通过|已\s*通过|满\s*足)/,
 ];
-export function validateEvidenceFormat(evidence: string[]): { valid: boolean; vagueItems: string[] } {
+export function validateEvidenceFormat(evidence: string[]): {
+  valid: boolean;
+  vagueItems: string[];
+  formatMismatchItems: string[];
+} {
   const vagueItems: string[] = [];
+  // D-10①：失败分两路可归因——正则不匹配（格式不符：缺 `path:Lnn=` / `path:§sec=` 定位，
+  // 或双 L 区间 `path:L51-L53=` 这类非规范形态）与匹配后命中空泛前缀（空泛声明）。
+  // vagueItems 保持「全部不合规条目」的历史语义（既有调用方与断言依赖），
+  // formatMismatchItems 为其中属格式不符的子集，供主流程产出可执行的诊断文案。
+  //
+  // 可达性事实（实测，非估计）：VAGUE_EVIDENCE_PATTERNS 全部 `^` 锚定在裸声明前缀，
+  // 而 EVIDENCE_PATTERN 要求行首即 `path:` 前缀——两者互斥，故「匹配后命中空泛前缀」
+  // 当前恒不可达，O3 文案桶保留为语义定义（判据将来放宽时的兜底），实际归因全部走格式不符路。
+  const formatMismatchItems: string[] = [];
   for (const item of evidence) {
     if (!EVIDENCE_PATTERN.test(item)) {
+      formatMismatchItems.push(item);
       vagueItems.push(item);
       continue;
     }
@@ -334,7 +349,7 @@ export function validateEvidenceFormat(evidence: string[]): { valid: boolean; va
       }
     }
   }
-  return { valid: vagueItems.length === 0, vagueItems };
+  return { valid: vagueItems.length === 0, vagueItems, formatMismatchItems };
 }
 
 // ==================== 主校验函数 ====================
@@ -353,7 +368,8 @@ export function validateEvidenceFormat(evidence: string[]): { valid: boolean; va
  *   5. 防漂移：根据 rawScores 重算方差，与 variance 字段误差 ≤ VARIANCE_EPSILON，
  *      防止 Agent 谎报低方差掩盖「单次评估复制 N 次」的作弊
  *   6. 综合分数 = Σ(score * weight)，与输出 compositeScore 误差 ≤ EPSILON
- *   7. 证据格式校验（O3 空泛声明→compositeScore -0.1，再判定 qualityLevel/passed）
+ *   7. 证据格式校验（两路文案：正则不匹配 → 格式不符；匹配但空泛声明 → O3 命中；
+ *      两条路径都 → compositeScore -0.1，再判定 qualityLevel/passed）
  *   8. qualityLevel 与降级后综合分数映射一致（§6.1），evidence 扣分后重新判定
  *   9. passed = (qualityLevel === A || B) 且所有子标准得分 ≥ 0.70（R13 单轴下限）
  *  10. passed=false 时 reworkHints 必须非空数组
@@ -548,7 +564,8 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
         }
         if (isArithmetic && Math.abs(diff - 0.01) < 1e-9) {
           reasons.push(
-            `维度 ${dimName} 的 rawScores 为完美等差数列 [${numericScores.join(',')}]（公差 0.01），疑似构造数据`,
+            `维度 ${dimName} 的 rawScores 为完美等差数列 [${numericScores.join(',')}]（公差 0.01），疑似构造数据；` +
+              '请改用真实离散值（相邻打分差值不得恒等、不得为 0.01 完美等差）',
           );
         }
       }
@@ -619,7 +636,20 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
         compositeScore = Math.max(0, compositeScore - 0.1);
       }
       evidenceDeduction = true;
-      reasons.push(`evidence 格式校验失败（空泛声明，O3 命中）：${evidenceResult.vagueItems.join('; ')}`);
+      // D-10①：两路文案区分——正则不匹配 → 格式不符（给出可执行形态）；
+      // 匹配后命中 VAGUE_EVIDENCE_PATTERNS → 保留空泛声明（O3）文案。两者扣分与
+      // qualityLevel/passed 重判定路径完全一致，只有诊断归因不同。
+      if (evidenceResult.formatMismatchItems.length > 0) {
+        reasons.push(
+          `evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt，单 L 形态）：${evidenceResult.formatMismatchItems.join('; ')}`,
+        );
+      }
+      const vagueItemsOnly = evidenceResult.vagueItems.filter(
+        (item) => !evidenceResult.formatMismatchItems.includes(item),
+      );
+      if (vagueItemsOnly.length > 0) {
+        reasons.push(`evidence 格式校验失败（空泛声明，O3 命中）：${vagueItemsOnly.join('; ')}`);
+      }
     }
   }
 

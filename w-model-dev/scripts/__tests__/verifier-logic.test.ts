@@ -3,7 +3,9 @@
  *
  * 覆盖 verifier-logic.ts 中 validateEvidenceFormat 函数：
  *   - 合法 evidence（冒号格式）通过
- *   - 空泛声明（C1-C10 全通过 / 质量良好 / 评审通过）命中 O3
+ *   - 不合规 evidence 判 valid=false，且 vagueItems 记录全部不合规条目（历史语义）
+ *   - 失败分两路可归因（D-10①）：EVIDENCE_PATTERN 不匹配 → 格式不符（formatMismatchItems）；
+ *     匹配后命中 VAGUE_EVIDENCE_PATTERNS → 空泛声明（O3）
  *
  * 覆盖 checkR13SingleAxisFloor 函数（单轴下限，反模式 #41）：
  *   - 全部子标准 ≥ 0.70 → 无违规
@@ -51,6 +53,12 @@ function runVerifierCli(
     timeout: 15_000,
   });
   return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+}
+
+/** 跑 samples/verifier 下样本的真实 CLI（人类可读模式，reasons 打在 stdout） */
+function runVerifier(sampleRelPath: string): { exitCode: number | null; stdout: string; stderr: string } {
+  const result = runVerifierCli(resolve(ROOT, sampleRelPath), { json: false });
+  return { exitCode: result.code, stdout: result.stdout, stderr: result.stderr };
 }
 
 describe('Persona Verifier fixtures', () => {
@@ -250,6 +258,36 @@ describe('evidence 格式校验', () => {
   });
 });
 
+describe('V 产物形态负样本（D-10：等差改进指引 / 双 L 文案区分 / 分辨力下限）', () => {
+  it('正则不匹配（含双 L 区间）→ 全部记入 formatMismatchItems（格式不符路）', () => {
+    const evidence = ['质量良好', 'docs/x.md:L51-L53=双 L 区间'];
+    const result = validateEvidenceFormat(evidence);
+    expect(result.valid).toBe(false);
+    expect(result.formatMismatchItems).toEqual(evidence);
+    // 向后兼容：vagueItems 仍是「全部不合规条目」的并集
+    expect(result.vagueItems).toEqual(evidence);
+  });
+
+  it('完美等差数列 rawScores → 失败且文案含改进指引', () => {
+    const r = runVerifier('w-model-dev/scripts/samples/verifier/bad-arithmetic-sequence.json');
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/真实离散/);
+  });
+
+  it('双 L evidence 形态 → 文案点明格式不符（非空泛声明）', () => {
+    const r = runVerifier('w-model-dev/scripts/samples/verifier/bad-evidence-double-l.json');
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/格式不符|须 path:Lnn=stmt/);
+    expect(r.stdout + r.stderr).not.toMatch(/空泛声明/);
+  });
+
+  it('非全等但分布坍缩 → 失败且文案点明分辨力下限', () => {
+    const r = runVerifier('w-model-dev/scripts/samples/verifier/bad-resolution-floor.json');
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/分布坍缩/);
+  });
+});
+
 describe('R13 单轴下限（反模式 #41）', () => {
   it('全部子标准 ≥ 0.70 应无违规', () => {
     const subCriteria = [
@@ -361,7 +399,7 @@ describe('evidence 扣分后 passed 重算', () => {
     expect(result.compositeScore).toBeLessThan(0.72);
     expect(result.qualityLevel).toBe('C');
     expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => r.includes('evidence 格式校验失败'))).toBe(true);
+    expect(result.reasons.some((r) => r.includes('evidence 格式不符'))).toBe(true);
   });
 
   it('evidence 合法时不扣分，passed 基于原始 compositeScore 判定', () => {

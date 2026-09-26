@@ -295,6 +295,28 @@ const VERIFIER_CASES: VerifierCase[] = [
     description:
       'R13 单轴下限：completeness=0.65<0.70 加权平均达 A 级（0.86）但单轴失败，应 passed=false（反模式 #41）',
   },
+  // -------------------- D-10：V 产物形态负样本 --------------------
+  {
+    file: 'bad-arithmetic-sequence.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/完美等差.*公差 0\.01/, /真实离散/],
+    description:
+      'D-10① text-parse 下 completeness rawScores [0.97,0.96,0.98] 为 0.01 完美等差，文案须含真实离散改进指引',
+  },
+  {
+    file: 'bad-resolution-floor.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R18.*completeness.*分布坍缩/],
+    description:
+      'D-10③ completeness rawScores [0.9001,0.9002,0.9] 非全等但方差 6.67e-9 < 1e-6，应被 R18 分辨力下限拦截',
+  },
+  {
+    file: 'bad-evidence-double-l.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/evidence 格式不符.*单 L 形态/, /L51-L53=/],
+    description:
+      'D-10② evidence 逐条为双 L 区间形态（path:L51-L53=…），须报「格式不符（须 path:Lnn=stmt 或 path:§sec=stmt，单 L 形态）」而非「空泛声明，O3 命中」',
+  },
   // -------------------- rootcause targetKind（§7.5） --------------------
   {
     file: 'valid-rootcause.json',
