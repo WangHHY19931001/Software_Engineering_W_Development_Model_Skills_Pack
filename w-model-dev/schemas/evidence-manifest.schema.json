@@ -56,9 +56,19 @@
           "minLength": 1
         },
         "commitSha": {
-          "description": "验证运行对应的 Git 提交 SHA-1（40 位小写十六进制）。",
+          "description": "验证运行对应的 Git 提交 SHA-1（40 位小写十六进制）；provenanceKind=no-git 时为空字符串（该包永久只能 package-only）",
           "type": "string",
-          "pattern": "^[0-9a-f]{40}$"
+          "pattern": "^([0-9a-f]{40})?$"
+        },
+        "provenanceKind": {
+          "description": "绑定 provenance 的身份来源形态（可选，缺省等同 git 的旧包形态）：no-git 表示源工作区无 .git、以 workspaceDigest 为身份，该包永久只能 package-only——`--source-project` 复验一律拒绝（NOT_SOURCE_BOUND_NO_GIT）",
+          "type": "string",
+          "enum": ["git", "no-git"]
+        },
+        "workspaceDigest": {
+          "description": "no-git 形态下替代 HEAD 的工作区内容摘要（导出源集合的规范化清单 SHA-256，64 位小写十六进制；provenanceKind=no-git 时条件必填）",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         },
         "artifactId": {
           "description": "验证工件的非空标识。",
@@ -107,7 +117,24 @@
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         }
-      }
+      },
+      "allOf": [
+        {
+          "$comment": "no-git 形态：commitSha 为空字符串 + workspaceDigest 条件必填（永久 package-only 护栏）；其余情形（provenanceKind=git 或缺省该字段的旧包）commitSha 必须是 40 位小写十六进制。",
+          "if": { "properties": { "provenanceKind": { "const": "no-git" } }, "required": ["provenanceKind"] },
+          "then": {
+            "required": ["workspaceDigest"],
+            "properties": {
+              "commitSha": { "type": "string", "maxLength": 0 },
+              "workspaceDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          },
+          "else": {
+            "required": ["commitSha"],
+            "properties": { "commitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" } }
+          }
+        }
+      ]
     },
     "files": {
       "description": "导出文件清单（不包含 manifest 本身）。",

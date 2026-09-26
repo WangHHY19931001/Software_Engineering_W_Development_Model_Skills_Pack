@@ -66,7 +66,7 @@ function refreshManifestHash(manifest: Record<string, unknown>): void {
   manifest.manifestSha256 = evidenceManifestHash(manifest as Parameters<typeof evidenceManifestHash>[0]);
 }
 
-async function createProject(name = 'project'): Promise<string> {
+async function createProject(name = 'project', options: { noGit?: boolean } = {}): Promise<string> {
   const project = projectPath(name);
   const state = path.join(project, '.w-model');
   await fs.mkdir(path.join(state, 'gate-logs'), { recursive: true });
@@ -137,6 +137,12 @@ async function createProject(name = 'project'): Promise<string> {
   // eslint-disable-next-line security/detect-object-injection -- taggedGateIndex 由同一数组 findIndex 得出且上方已断言 >= 0（受控下标，非外部键）
   runLogLines[taggedGateIndex] = runLogLines[taggedGateIndex]!.replace(/\}$/, ',"gateLogPath":"gate.json"}');
   await fs.writeFile(path.join(state, 'run-log.jsonl'), runLogLines.join('\n'));
+  if (options.noGit) {
+    // 无 git 工作区（遗留⑥a）：provenance 以 no-git 形态产出，导出包永久只能 package-only。
+    const noGitProvenance = await produceSourceProvenance(project, { noGitOk: true });
+    if (!noGitProvenance.ok) throw new Error(`no-git provenance fixture setup failed: ${noGitProvenance.reason}`);
+    return project;
+  }
   for (const args of [
     ['init'],
     ['add', '.'],
@@ -899,6 +905,36 @@ describe('evidence export logic', () => {
       exitCode: 0,
       verificationLevel: 'source-bound',
       verificationStatus: 'passed',
+    });
+  });
+
+  it('keeps a no-git package package-only and permanently refuses --source-project re-verification', async () => {
+    const project = await createProject('no-git-project', { noGit: true });
+    const output = path.join(tmpDir, 'no-git-evidence');
+
+    const exported = runCli([project, output]);
+    expect(exported.code).toBe(0);
+    const manifestPath = path.join(output, 'evidence-manifest.json');
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as { provenance: Record<string, unknown> };
+    expect(manifest.provenance).toMatchObject({
+      provenanceKind: 'no-git',
+      commitSha: '',
+      workspaceDigest: expect.stringMatching(/^[0-9a-f]{64}$/),
+    });
+    expect(validateBySchema('evidence-manifest', manifest).valid).toBe(true);
+
+    const packageOnly = runCli(['--verify', manifestPath]);
+    expect(packageOnly.code).toBe(0);
+    expect(cliSummary(packageOnly.stdout)).toMatchObject({ ok: true, verificationLevel: 'package-only' });
+
+    const sourceBound = runCli(['--verify', manifestPath, '--source-project', project]);
+    expect(sourceBound.code).toBe(1);
+    expect(cliSummary(sourceBound.stdout)).toMatchObject({ ok: false, reason: 'NOT_SOURCE_BOUND_NO_GIT' });
+
+    await expect(verifyEvidence(manifestPath, project)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'NOT_SOURCE_BOUND_NO_GIT',
     });
   });
 

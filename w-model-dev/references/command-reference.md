@@ -57,6 +57,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 ### 证据 provenance 与导出验证
 
 - **producer+verify**：`npm run wm:verify-evidence-source -- <project-dir>` 不是只读查询；它重建并校验当前 HEAD、run-log、passed gate-log、signature-chain 与 source bundle，成功后原子写入 `.w-model/evidence-provenance.json`。缺少或失败的真实运行证据时拒绝写入 `verificationStatus=passed`。
+- **no-git 形态**：`--no-git-ok` 是唯一显式降级开关；无 `.git` 工作区未传该 flag 时仍是 `MISSING_GIT_HEAD` exit 1，传了才产出 `provenanceKind=no-git`（`commitSha` 空 + `workspaceDigest`），该形态永久只能 package-only（`--source-project` 复验 → exit 1 `NOT_SOURCE_BOUND_NO_GIT`）。详见下方「Source-bound provenance 边界」节。
 - **package-only**：`npm run wm:export-evidence -- --verify <manifest>` 只验证包内 schema、文件清单、hash、路径和脱敏内容，返回 `verificationLevel=package-only`，不证明源项目仍匹配。
 - **source-bound**：追加 `--source-project <project-dir>` 后，verify 会重建 source provenance，并比较当前 HEAD、run/artifact 身份、五类 measurements（含 codegraph-queries）、source bundle hash 与 producer 版本，返回 `verificationLevel=source-bound`。
 
@@ -79,6 +80,8 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 ### Source-bound provenance 边界
 
 `evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。`wm-export-evidence --verify` 在没有 `--source-project` 时只能是 package-only；只有传入 `--source-project <project-dir>` 才能执行 source-bound verify。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性；它不是密码学签名，也不是第三方不可抵赖证明。package-only 不能表述为 verified source 证据。
+
+**no-git 形态（无 `.git` 工作区，遗留⑥a）**：`wm-verify-evidence-source.ts <project-dir>` 默认行为不变——无 `.git` 工作区仍以 `MISSING_GIT_HEAD` exit 1 拒绝；只有显式传 `--no-git-ok` 才改走 no-git 分支，产出 `provenanceKind=no-git` 记录（`commitSha` 为空字符串、`workspaceDigest` 为导出源集合的规范化清单 SHA-256、保留 `runId`/`artifactId` 身份），CLI 摘要 `verificationLevel=package-only`。**硬护栏**：no-git 记录与由它导出的证据包**永久只能 package-only**——`wm-export-evidence --verify <manifest> --source-project <project-dir>` 一律 exit 1 `NOT_SOURCE_BOUND_NO_GIT`（先于任何源项目读取判定），`verifySourceProvenance` 对 no-git 记录同样拒绝（唯一例外是导出时的本地一致性复验，不改变包的 no-git 形态）。该形态不得表述为 verified source 证据。
 
 ## `/wm analyze <需求>`
 
