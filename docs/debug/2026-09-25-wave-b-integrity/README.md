@@ -22,7 +22,7 @@
 
 1. **仓库内快照是纯 legacy 日志**：443 行、`grep -c recordHash` = 0、8 条放行记录均无 `runLogAnchor`。按 D-3a 设计，哈希链只保护「首个带哈希记录起」的段，**全 legacy 段内的改写不可检出**——这是已登记的固有限制（`schemas/run-log.schema.json` 的 `recordHash` / `runLogAnchor` description 明写）。
 2. 因此**主探针集建在带哈希的日志上**：把快照 `cp` 到仓外 → 经 `wm-append-runlog.ts` 追加 2 条记录（起一条哈希链）→ 在**该基线**上做四类突变。
-3. **边界探针（诚实登记）**：对**未附加链**的纯 legacy 副本改一条 `note` → 实测 **exit 0 + LEGACY 诊断**，用于证明「限制被如实登记、非静默假通过」（§3 边界行）。
+3. **边界探针（诚实登记）**：对**未附加链**的纯 legacy 副本改一条 `note` → 实测 **exit 0 + LEGACY 诊断**，用于证明「限制可见、非静默隐瞒」（§3 边界行）。
 4. 追加目标须为**已注册状态路径**（`<projectRoot>/.w-model/run-log.jsonl`）：本轮首次尝试以 `<tmp>/hash-base.jsonl` 为目标是 exit 1 `INVALID_JSON`（`lib/state-schema-registry.ts:16` 只注册 `.w-model/run-log.jsonl`），改用 `<tmp>/ws/.w-model/run-log.jsonl` 后 `appended:2`。**这不是缺陷**，是 wm-write 的状态路径注册语义。
 5. **仓库内快照不可变核验**：验收开始（§3.2 之前）与全部哈希/归档探针结束后各测一次 `md5sum docs/debug/2026-09-23-wm-8phase-live-run/snapshots/run-log.jsonl` → 两次均为 `4ee418e349a10777dd2cbf3aa0fc4fa0`；`git status` 该路径始终为未跟踪（本仓不跟踪该快照目录），无内容变更。
 
@@ -37,7 +37,67 @@ npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts "$TMPW/ws/.w-model/run-log.j
 # → RUNLOG_APPEND_JSON {"lines":445,"appended":2,"digest":"sha256:592497bd…","ok":true,…,"legacyInvalidLines":[]}   APPEND_EXIT=0
 ```
 
-追加的 2 条（时间戳显式注入，晚于末条 `2026-09-25T14:35:00.000Z`，未用 `--allow-clock-adjust`）：`p8-S-produce-waveb-01`（`2026-09-26T11:00:00.000Z`，哈希段首条，`prevRecordHash=""`）、`p8-O-checkpoint-waveb-02`（`2026-09-26T11:01:00.000Z`，`action=checkpoint/outcome=success` → 追加器**自动填锚** `{"lines":444,"sha256":"f6652b57…"}`，锚自身入链）。
+追加的 2 条（时间戳显式注入，晚于末条 `2026-09-25T14:35:00.000Z`，未用 `--allow-clock-adjust`）：`p8-S-produce-waveb-01`（`2026-09-26T11:00:00.000Z`，哈希段首条，`prevRecordHash=""`）、`p8-O-checkpoint-waveb-02`（`2026-09-26T11:01:00.000Z`，`action=checkpoint/outcome=success` → 追加器**自动填锚**，锚自身入链）。
+
+### 3.0 起链载荷原文（可再推导，非 transcript 独占）
+
+`$TMPW/payload-2.json` 原文（`--from` 载荷 = JSON 数组；等价 `--stdin` 形态即两条 JSONL；**行内空白不影响哈希**——链哈希的载荷是 `canonicalJson` 重序列化结果，不是原文文本）：
+
+```json
+[
+  {
+    "runId": "p8-S-produce-waveb-01",
+    "timestamp": "2026-09-26T11:00:00.000Z",
+    "phase": 8,
+    "phaseName": "验收测试",
+    "action": "produce",
+    "role": "S",
+    "duration_s": 1,
+    "tokens": 1000,
+    "estimated": true,
+    "subagentSpawns": 0,
+    "gateExitCode": null,
+    "outcome": "success",
+    "artifacts": ["docs/debug/2026-09-25-wave-b-integrity/README.md"],
+    "note": "Wave B 验收探针：哈希段起点记录 1（Task 12）"
+  },
+  {
+    "runId": "p8-O-checkpoint-waveb-02",
+    "timestamp": "2026-09-26T11:01:00.000Z",
+    "phase": 8,
+    "phaseName": "验收测试",
+    "action": "checkpoint",
+    "role": "O",
+    "duration_s": 0,
+    "tokens": 28000,
+    "estimated": true,
+    "subagentSpawns": 0,
+    "gateExitCode": null,
+    "outcome": "success",
+    "artifacts": [".w-model/checkpoint-log/phase-8.txt"],
+    "acknowledgedDecisions": ["Wave B 验收：Task 12 反伪造探针放行（临时工作区，不入库）"],
+    "note": "Wave B 验收探针：哈希段起点记录 2（Task 12）"
+  }
+]
+```
+
+落盘后的**完整**链字段（64 位小写 hex，非截断；基线行号 444 / 445）：
+
+| 行 | runId | `prevRecordHash` | `recordHash` | `runLogAnchor` |
+| -- | ----- | ---------------- | ------------ | -------------- |
+| 444 | `p8-S-produce-waveb-01` | `""`（空串，哈希段首条） | `59617208d2229b43ac470257dfc54d32c10b388f6f44ab1d3ef22ef88d86a3b7` | — |
+| 445 | `p8-O-checkpoint-waveb-02` | `59617208d2229b43ac470257dfc54d32c10b388f6f44ab1d3ef22ef88d86a3b7` | `73acd0d89abba9975033a8fc95a901bfda2ca7f876f008c858d816497a867eca` | `{"lines":444,"sha256":"f6652b57adc0bd5ba6f9a638352f0842c23a4b1247a9fc7f1feb3fb7886fe8be"}` |
+
+**独立复算**（`node:crypto`，不依赖仓库实现；输入 = 上表 payload + 仓库内快照副本）：
+
+```bash
+$ node -e "…按 README §3.0 payload 与快照行重算 recordHash[1]/recordHash[2]/anchor…"   # 一次性脚本，逻辑 = sha256(prev + '\n' + canonicalJson(record 去 recordHash)) / sha256(前缀行以 '\n' 连接)
+recomputed recordHash[1] = 59617208d2229b43ac470257dfc54d32c10b388f6f44ab1d3ef22ef88d86a3b7 (MATCH)
+recomputed recordHash[2] = 73acd0d89abba9975033a8fc95a901bfda2ca7f876f008c858d816497a867eca (MATCH)
+recomputed anchor        = f6652b57adc0bd5ba6f9a638352f0842c23a4b1247a9fc7f1feb3fb7886fe8be (MATCH) lines=444
+```
+
+即三个哈希均**可由本 README 内联的载荷 + 快照独立复算**，不需要 transcript。
 
 | #       | 突变形态                                          | 命令（仓外副本）                                                                                                | 退出码 | 关键输出（逐字摘录）                                                                                                                                                                                                                                                                                                     |
 | ------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -46,6 +106,8 @@ npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts "$TMPW/ws/.w-model/run-log.j
 | **(c)** | 删一条带哈希记录（删哈希段首条）                  | `check-run-log.ts "$TMPW/mut-c.jsonl" --json`                                                                   | **1**  | `R7: 哈希链断裂：条目 p8-O-checkpoint-waveb-02 的 prevRecordHash=59617208… 与前一条 recordHash= 不符（链被重排/删除/插入）`；`R7: …runLogAnchor…：lines=444 ≠ 当前前缀记录数 443`；`R7: …sha256=f6652b57… ≠ … fbde538b…`（reasons=3）                                                                                       |
 | **(d)** | 在哈希段内插入一条无哈希记录（`p8-S-produce-legacy-inserted`，`11:00:30Z`，无 `recordHash`） | `check-run-log.ts "$TMPW/mut-d.jsonl" --json`                                                                   | **1**  | `R7: 哈希链断裂：条目 p8-S-produce-legacy-inserted 无 recordHash（哈希段之后不得出现未入链记录；就地删除 recordHash 亦命中）`；`R7: …runLogAnchor…：lines=444 ≠ 当前前缀记录数 445`；`R7: …sha256=f6652b57… ≠ … 2af9a320…`（reasons=3）                                                                                       |
 | **(e)** | **正确用法**：经追加器追加后直接校验（基线 445 行） | `check-run-log.ts "$TMPW/ws/.w-model/run-log.jsonl" --json`                                                     | **0**  | `passed=true reasons=[] violations=[]`；`r11={"checkedGates":9,"missing":0}`；`R7: 历史段 443 条无哈希（LEGACY，未参与链校验）`（诊断在场）+ 8 条放行记录 `早于 cutoff → LEGACY 非阻断`；新放行记录带锚且自洽 → **无 R7 blocking**                        |
+
+> 上表「关键输出」中的哈希为**阅读用截断**（`f6652b57…` / `59617208…` 等）；工具输出原文是完整 64 位小写 hex，完整值与可复算命令见 §3.0。
 
 **探针 (a)-(d) 的突变构造**（node 脚本，仓外；均在副本上原地改，仓库内快照未触碰）：
 
@@ -66,7 +128,7 @@ npx tsx w-model-dev/scripts/cli/check-run-log.ts "$TMPW/legacy-mut-note.jsonl" -
 EXIT=0
 ```
 
-**结论（如实登记，不作强主张）**：纯 legacy 段内的就地改写**不可检出**（exit 0），但门禁**明示**「历史段 N 条无哈希（LEGACY，未参与链校验）」——限制可见、非静默假通过；该段的历史可信度由**归档快照字节前缀**（L4，§4）与导出包 SHA-256 manifest 承担，不由链承担。这是 5 类探针中**唯一的非拦截项**，且属设计内已登记口径。
+**结论（如实登记，不作强主张）**：纯 legacy 段内的就地改写**不可检出**（exit 0），但门禁**明示**「历史段 N 条无哈希（LEGACY，未参与链校验）」——限制可见、非静默隐瞒；该段的历史可信度由**归档快照字节前缀**（L4，§4）与导出包 SHA-256 manifest 承担，不由链承担。这是 5 类探针中**唯一的非拦截项**，且属设计内已登记口径。
 
 ### 3.2 历史零回归（仓库内快照，只读）
 
@@ -92,7 +154,7 @@ EXIT=0
 
 ## 5. 三态时序回归矩阵（转录自 Tasks 9/10 报告，本轮未重跑）
 
-> 出处：`.superpowers/sdd/2026-09-25-live-run-findings-remediation/task-9-10-report.md`「三态回归锚」节 + §「命令证据 ⑤」（仓外 `%TEMP%\wm-t9t10\`）。该账本 gitignored，故按 task-12 简报要求转录此 tracked 面。三态 run-log 时间戳均早于 `RELEASE_ANCHOR_CUTOFF`，缺锚走 LEGACY 非阻断诊断，不影响结论。
+> 出处：`.superpowers/sdd/2026-09-25-live-run-findings-remediation/task-9-10-report.md`「三态回归锚」节 + §「命令证据 ⑤」（**gitignored 账本**；原始进程输出在仓外 `%TEMP%\wm-t9t10\`，**不在 tracked 面**，故本表为**转录**、本轮未重跑）。三态 run-log 时间戳均早于 `RELEASE_ANCHOR_CUTOFF`，缺锚走 LEGACY 非阻断诊断，不影响结论。
 
 | 态                                            | 构造                                                                                                                                    | 命令 → 结果                                                                                                                                                                                                                                                                                                                                                                                       |
 | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -243,10 +305,116 @@ PREPUSH_POSTCOMMIT_EXIT=0
 
 即：**19/19 全绿**（含第 14 项 npm audit 本次**真实执行通过**）——上一次运行的 audit 跳过缺口由此闭环；两次运行共同构成「实现态（8a9c5561）与交付态（cfb4bfe3）均已全量验证」。
 
+### 7.2 交付态最终运行（HEAD `d7cd03db`，本证据文档定稿后）
+
+文档补记提交后，在**最终交付态** `d7cd03db` 上第三次跑同一命令（日志 `C:\Users\wangh\AppData\Local\Temp\wm-task12\prepush-final.log`，19:19 → 19:45 运行 ≈ 26 分钟）→ **exit 0**：
+
+```text
+[pre-push] 检测到校验脚本相关变更，启动推送前门禁...
+[pre-push] 平台依赖检查（ensure-platform-deps --check）...
+[ensure-deps] [32m✓[0m 平台依赖齐备（win32-x64）
+[pre-push] [32m✓[0m self-test 全部样本匹配期望（exit 0）
+[pre-push] [32m✓[0m check:verifier 无参数退出 2（exit 2）
+[pre-push] [32m✓[0m check:gate 不存在目录退出 2（exit 2）
+[pre-push] [32m✓[0m check:verifier 有效样本退出 0（exit 0）
+[pre-push] [32m✓[0m check:verifier 无效样本退出 1（exit 1）
+[pre-push] [32m✓[0m security-scan 无新增风险（exit 0）
+[pre-push] [32m✓[0m check-bdd-model 有效 BDD 样本退出 0（exit 0）
+[pre-push] [32m✓[0m check-bdd-model schema 不合规 BDD 样本退出 2（exit 2）
+[pre-push] [32m✓[0m check:coverage 有效覆盖样本退出 0（exit 0）
+[pre-push] [32m✓[0m check:exemption 有效豁免样本退出 0（exit 0）
+[pre-push] [32m✓[0m check-signature-chain 有效签名链样本退出 0（exit 0）
+[pre-push] [32m✓[0m vitest 单元测试 + coverage 阈值通过（exit 0）
+[pre-push] [32m✓[0m 规则层覆盖口径 (logic+lib) 达阈值（exit 0）
+[pre-push] npm audit 依赖漏洞扫描（high 以上阻断）...
+[pre-push] [33m⚠[0m npm audit 网络不可达或 registry 不支持 audit endpoint，跳过（不阻断）
+npm warn audit request to https://registry.npmjs.org/-/npm/v1/security/advisories/bulk failed, reason: connect ETIMEDOUT 127.8.0.1:443
+undefined
+npm error audit endpoint returned an error
+[pre-push] [32m✓[0m docs-consistency 活体文档一致（exit 0）
+[pre-push] [32m✓[0m samples 覆盖矩阵一致（无未登记 fixture）（exit 0）
+[pre-push] [32m✓[0m prettier 格式一致性（--check）（exit 0）
+[pre-push] [32m✓[0m tsc 类型检查 0 错误（exit 0）
+[pre-push] [32m✓[0m eval 语料断言与覆盖矩阵全绿（exit 0）
+[pre-push] 全部门禁通过，允许推送 ✓
+PREPUSH_FINAL_EXIT=0
+```
+
+（第 14 项 npm audit 本次再因网络不可达按设计跳过——该网络为间歇性；依赖漏洞面由 §7.1 的运行真实覆盖。）
+
+**三次运行口径（不bump，事实合并）**：`8a9c5561`（实现态）exit 0 → `cfb4bfe3`（交付态一）exit 0 → `d7cd03db`（交付态最终）exit 0，**无红项**；`npm audit` 仅在 `cfb4bfe3` 一次真实执行通过。
+
+### 7.3 `npm run test:affected`（快速车道记录）
+
+```bash
+$ npm run test:affected -- --since 8a9c5561     # 覆盖 Wave B 三个提交的改动面
+# 触及 docs/** 与根活体文档（CHANGELOG）→ 按设计涟漪回退**全量 vitest**（非子集）
+# Test Files  2 failed | 104 passed (106)
+# Tests       3 failed | 2597 passed (2600)
+# Duration    3009.48s（50 分钟）
+TEST_AFFECTED_EXIT=1
+```
+
+**3 项失败全为时序预算 / 超时断言（非逻辑断言），判定为负载时序噪声，已隔离复验**：
+
+| 失败用例 | 断言 | 判定 |
+| -------- | ---- | ---- |
+| `pre-commit-hook.test.ts > bounds a hanging Prettier check…` | `expected 15504 to be less than 12000`（**前一行 `status===124` 断言已通过**——hook 确实按 3s 预算截断，仅总墙钟超出余量） | 墙钟余量型，负载敏感 |
+| `pre-commit-hook.test.ts > terminates the batch helper process tree on snapshot timeout…` | `expected 14071 to be less than 10000`（同样 `status===124` 断言已通过——2s 快照超时确实触发） | 墙钟余量型，负载敏感 |
+| `evidence-export-logic.test.ts > rejects hash-valid package-only manifests with sensitive provenance IDs and file paths` | `Test timed out in 30000ms`（该用例本身墙钟 38.3s） | 长用例自重 timeout 型 |
+
+**隔离复跑（同机、仅这两个文件）**：
+
+```bash
+$ npx vitest run --config config/vitest.config.ts \
+    w-model-dev/scripts/__tests__/pre-commit-hook.test.ts \
+    w-model-dev/scripts/__tests__/evidence-export-logic.test.ts
+# Test Files  2 passed (2)
+# Tests       60 passed (60)      Duration 139.94s
+ISOLATED_EXIT=0
+```
+
+**口径（如实登记）**：本项为**非验收门禁**（脚本自身头注即声明「本地迭代用、不是验收门禁」），3 项失败在两文件隔离复跑中全部通过，且**同一代码树（`d7cd03db`，与本次仅差 markdown）在 §7.2 的全量 prepush 中 2600/2600 通过** → 判定为并发/串行 50 分钟累积负载下的时序噪声，非内容回归。本 README 不据此改动任何测试预算（守本轮只读 `w-model-dev/` 纪律）。
+
+### 7.4 证据收口运行（评审响应，HEAD `d7cd03db`）
+
+评审要求「处置结论须落在 tracked 面」，故补齐两项门禁在**当前 HEAD** 上的记录（两次运行均单独执行、无并发负载）：
+
+```bash
+$ npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts
+vitest 用例  : 2600
+静态违规      : 0
+动态违规      : 0
+检查结果      : ✓ 全部一致
+DOCS_CONSISTENCY_JSON {"passed":true,"violationCount":0,"staticViolationCount":0,"dynamicViolationCount":0,
+  "dynamicMeasurements":{"schemaCount":34,"cliScriptCount":47,"exit2ScriptCount":46,"testFileCount":106,
+  "vitestTestCount":2600,"numPassedTests":2600,"numFailedTests":0,"success":true,
+  "vitestRunId":"633e8a562d2ff547","vitestCommitSha":"d7cd03dbf9f27786039265dbd9e39f8ab00e578d",
+  "exit2ProbeResults":[…48 条全 status/errorExitCode=2（0 漂移）…]},"exitCode":0}
+DOCS_CONSISTENCY_EXIT=0
+```
+
+**facts 通道 = 自采集**：本次运行**未**注入 `WM_VITEST_COUNT_FILE` / `WM_VITEST_PROVENANCE_FILE` / `WM_VITEST_PROVENANCE_ROOT`（`env | grep -c WM_VITEST` = 0），CLI 自行 spawn 全量 vitest（2600/2600）并自生成同目录 provenance，另跑 48 条中心 exit-2 探针（全 2，零漂移）；`vitestCommitSha` 绑定当前 HEAD `d7cd03db`。
+
+```bash
+$ npx tsx w-model-dev/scripts/cli/self-test.ts
+✓ …（样本逐条，含 Wave B 相关 fixture）
+总计 373 条用例：373 通过，0 失败
+SELF_TEST_EXIT=0
+```
+
+即：`self-test` 与基线 **373 一致**（无下降）。这两项与 §7.1/§7.2 的 prepush 全量共同构成交付态门禁记录。
+
+### 补充：原始日志与脚本的可再推导性
+
+上列逐项输出与探针产物均来自 `%TEMP%\wm-task12\`（瞬态）；本 README **转录**其关键行并把**起链载荷原文与完整链哈希**内联（§3.0，可独立复算），使其不再依赖 transcript 或临时目录（先例：`docs/debug/2026-09-22-rc-closeout-acceptance/` 曾把 `acceptance.txt` 原文入库）。突变脚本本身为一次性 `node -e`，其构造规则已在 §3 表内逐条写明（等价改写即可复现）。
+
 ## 8. 未达成项 / 疑虑（如实登记）
 
 1. **纯 legacy 段的改写不可检出**（§3.1）——设计内固有限制（哈希链只保护带哈希段；cutoff 前的放行锚按 LEGACY 吸收）。本轮以「边界探针 exit 0 + 非阻断诊断可见」如实登记，**不主张**历史段防伪；该段的完整性主张由归档字节前缀（§4）与 `wm-export-evidence` 的 SHA-256 manifest 承担。
 2. **探针 (b) 只命中内容维度**：时间戳突变若同时破坏单调性，会额外触发既有 R7 时序段——本轮刻意选「仍单调」的变体，以证明**内容哈希**维度独立于时序维度生效（reasons=1）。
 3. **`--allow-clock-adjust` 未在本轮触发**：追加时间戳 `2026-09-26T11:00/11:01Z` 均晚于末条（`2026-09-25T14:35:00.000Z`）且当前时钟更晚，故走显式注入通道（`clock-injected` 留痕），**未使用** `--allow-clock-adjust`。
 4. **归档前缀的字节前缀口径不证明「归档后无改写 + live 侧尾部追加」的绝对归属**（两侧不可同真，文案已改为「须人工裁定证据归属」，测试只断言 `[runLogPrefix]`）——Task 8 报告已登记，本轮不改口径。
-5. **三态时序矩阵为本轮转录、非本轮重跑**（§5）：原始进程输出在 gitignored 账本 `task-9-10-report.md` 中；本轮以同一基线的 R11 `checkedGates=9/missing=0` 作旁证，未另造 A/B/C 三态副本。
+5. **三态时序矩阵为本轮转录、非本轮重跑**（§5）：原始进程输出在 gitignored 账本 `task-9-10-report.md` 与仓外 `%TEMP%\wm-t9t10\`；本轮以同一基线的 R11 `checkedGates=9/missing=0` 作旁证，未另造 A/B/C 三态副本。
+6. **原始日志 / 突变脚本为 `%TEMP%` 瞬态**（`C:\Users\wangh\AppData\Local\Temp\wm-task12\`，不入库）：本 README 为**转录**，并以 §3.0 内联的起链载荷原文 + 完整链哈希 + 独立复算命令补足可再推导性（不再依赖 transcript）；突变脚本为一次性 `node -e`，构造规则已在 §3 表内逐条写明。
+7. **`npm run test:affected` 非验收门禁**（§7.3）：它只跑受影响测试文件、且在触及 `docs/**` / 根活体文档时按设计回退全量 vitest；本轮记录见 §7.3，验收依据仍是 §7/§7.1/§7.2 的 prepush 全量三次 exit 0。
