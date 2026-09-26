@@ -77,7 +77,12 @@ export const L0_BASELINE = {
   // 的相对链接 `../scripts/logic/run-log-logic.ts`（共享实现）与 `../scripts/cli/wm-append-runlog.ts`
   // （写入端），二者同时计入 l1Only；由 npm run audit:l0-links 实测 rebaseline，
   // placeholders 仍 36、violations 仍 0）。
-  relativeLinkCount: 697,
-  l1Only: 99,
+  // 699 = 697 + 2；l1Only 101 = 99 + 2（2026-09-25 live-run-findings-remediation 任务 8（D-3b）：
+  // references/data-models.md 新增「checkpoint 放行锚（runLogAnchor，D-3b）」节时再补 2 条指向 L1 的
+  // 相对链接 `../scripts/logic/run-log-logic.ts`（共享实现）与 `../scripts/cli/wm-append-runlog.ts`
+  // （写入端），二者同时计入 l1Only；command-reference.md 的 L4 速查行未新增相对链接（纯反引号引用）；
+  // 由 npm run audit:l0-links 实测 rebaseline，placeholders 仍 36、violations 仍 0）。
+  relativeLinkCount: 699,
+  l1Only: 101,
   placeholders: 36,
 } as const;

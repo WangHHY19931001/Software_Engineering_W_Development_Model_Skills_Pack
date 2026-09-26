@@ -81,6 +81,12 @@ export interface JsonReport {
    * 显式声明则无条件启用。其它门禁不提供此字段（可选）。
    */
   snapshotSource?: string;
+  /**
+   * 归档 run-log 前缀性（L4，D-3b）的**判定依据**（check-archive-integrity --json）：
+   * 未提供 `--live-run-log`（本项不适用，非阻断）/ 已校验且归档快照是 live 的字节前缀 /
+   * 已校验且非前缀（违规见 missingFiles 的 `[runLogPrefix]`）。其它门禁不提供此字段（可选）。
+   */
+  runLogPrefix?: string;
   /** run-log exit 0 的语义边界说明。 */
   statusNote?: string;
   /**

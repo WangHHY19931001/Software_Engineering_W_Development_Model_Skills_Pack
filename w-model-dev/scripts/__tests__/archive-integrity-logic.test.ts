@@ -240,3 +240,57 @@ describe('deriveArchiveIntegrityManifest（CLI 清单自动派生）', () => {
 // 类型层面守卫：manifest 三字段均可选（编译期断言，防止误改为必填破坏既有 fixture 形态）
 const _manifestTypeProbe: ArchiveIntegrityManifest = {};
 void _manifestTypeProbe;
+
+// ==================== 归档前缀性（L4，D-3b：--live-run-log 注入文本） ====================
+// 归档内 run-log.jsonl 快照必须是 live run-log 的**字节前缀**：live 侧被截断/重排/改写即
+// 不再包含归档快照 → blocking（[runLogPrefix] 前缀并入 missingFiles）。未提供 live 文本时
+// 零行为变化（非阻断，不改变既有退出码语义）。
+
+describe('archive-integrity-logic 归档前缀性（L4）', () => {
+  it('归档快照非 live 前缀 → 违规（[runLogPrefix] 并入 missingFiles，passed=false）', () => {
+    const r = checkArchiveIntegrity(new Set(['run-log.jsonl']), ['1'], undefined, {
+      liveRunLogText: 'A\nB\nC\n',
+      archivedRunLogText: 'A\nX\n',
+    });
+    expect(r.missingFiles.some((m) => m.includes('[runLogPrefix]'))).toBe(true);
+    expect(r.passed).toBe(false);
+  });
+
+  it('归档快照是 live 字节前缀 → 通过（前缀性不产生任何违规）', () => {
+    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
+      liveRunLogText: 'A\nB\nC\n',
+      archivedRunLogText: 'A\nB\n',
+    });
+    expect(r.missingFiles).toEqual([]);
+    expect(r.passed).toBe(true);
+  });
+
+  it('live == 归档（无新增记录）→ 通过', () => {
+    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
+      liveRunLogText: 'A\nB\n',
+      archivedRunLogText: 'A\nB\n',
+    });
+    expect(r.passed).toBe(true);
+  });
+
+  it('未提供 live 文本 → 零行为变化（既有 3 参调用/缺省路径不新增违规）', () => {
+    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {});
+    expect(r.missingFiles).toEqual([]);
+    expect(r.passed).toBe(true);
+    expect(checkArchiveIntegrity(loadFullContents()).passed).toBe(true);
+  });
+
+  it('提供 live 但归档侧文本未提供 → fail-closed（无法证明前缀性不得静默放过）', () => {
+    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, { liveRunLogText: 'A\nB\n' });
+    expect(r.missingFiles.some((m) => m.includes('[runLogPrefix]'))).toBe(true);
+    expect(r.passed).toBe(false);
+  });
+
+  it('空归档文本是任意 live 的前缀 → 通过（空快照不做无依据的阻断）', () => {
+    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
+      liveRunLogText: 'A\nB\n',
+      archivedRunLogText: '',
+    });
+    expect(r.passed).toBe(true);
+  });
+});

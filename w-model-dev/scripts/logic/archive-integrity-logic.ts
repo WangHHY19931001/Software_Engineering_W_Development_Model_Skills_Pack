@@ -62,6 +62,25 @@ export interface ArchiveIntegrityCheckResult {
   checkedPhases: string[];
 }
 
+/**
+ * 归档前缀性注入选项（L4，D-3b；缺省 = 未启用，零行为变化）。
+ *
+ * 归档内 `run-log.jsonl` 快照必须是 **live** run-log 的**字节前缀**（`liveText.startsWith(archiveText)`）：
+ * live 侧在归档后被截断/重排/改写，或归档快照被改写（两者不可同真）即刻不成立 → blocking。
+ * 两侧文本由 CLI 层实读注入（logic 层零 `node:fs`，同 `progressMdContent` 先例）。
+ *
+ * 语义分派（fail-closed 方向）：
+ *   - `liveRunLogText` 未提供 → 本项不适用（未启用，零行为变化）；
+ *   - 提供 live 但 `archivedRunLogText` 未提供 → 归档侧快照不可读，**无法证明前缀性** →
+ *     `[runLogPrefix]` fail-closed（调用方已显式要求校验，不得静默放过）。
+ */
+export interface ArchiveRunLogPrefixOptions {
+  /** live run-log 文本（`--live-run-log=<path>` 实读） */
+  liveRunLogText?: string;
+  /** 归档快照 `run-log.jsonl` 文本（CLI 从归档根实读；缺失/不可读时不设） */
+  archivedRunLogText?: string;
+}
+
 // ==================== 主校验函数 ====================
 
 /** 归档根级 `*.plan.md` 快照（不含子目录）；localeCompare 排序保证违规条目顺序稳定 */
@@ -148,16 +167,43 @@ function checkCodingPlanSnapshot(
 }
 
 /**
+ * 归档 run-log 前缀性校验（L4，D-3b）：归档快照必须是 live run-log 的**字节前缀**。
+ *
+ * 违规以 `[runLogPrefix]` 前缀并入 `missingFiles`（blocking）；未提供 live 文本时不产生任何条目
+ * （非阻断，退出码语义不变——诊断由 CLI 人类可读输出承担）。
+ */
+function checkRunLogPrefix(options: ArchiveRunLogPrefixOptions, missingFiles: string[], presentFiles: string[]): void {
+  const liveText = options.liveRunLogText;
+  if (liveText === undefined) return; // 未启用：零行为变化
+  if (options.archivedRunLogText === undefined) {
+    missingFiles.push(
+      '[runLogPrefix] 归档 run-log.jsonl 快照不可读（提供 --live-run-log 时前缀性校验 fail-closed：无法证明归档快照是 live 的字节前缀）',
+    );
+    return;
+  }
+  if (liveText.startsWith(options.archivedRunLogText)) {
+    presentFiles.push(`[runLogPrefix] 归档 run-log.jsonl 是 live 的字节前缀（live ${liveText.length} 字节）`);
+  } else {
+    missingFiles.push(
+      `[runLogPrefix] 归档 run-log.jsonl 不是 live run-log 的字节前缀（归档 ${options.archivedRunLogText.length} 字节 vs live ${liveText.length} 字节）：` +
+        '两侧在前缀处不一致（live 侧被截断/重排/改写，或归档快照被改写——两者不可同真，须人工裁定证据归属）',
+    );
+  }
+}
+
+/**
  * 校验归档目录是否包含各阶段强制快照文件。
  *
  * @param archiveDirContents 归档目录下所有文件/子目录的相对路径集合
  * @param phasesToCheck 须校验的阶段列表（默认 1-8 + global）
  * @param manifest 归档清单条件项（缺省 undefined = 仅既有阶段清单，零行为变化）
+ * @param runLogPrefix L4 归档前缀性注入选项（缺省 undefined = 未启用，零行为变化）
  */
 export function checkArchiveIntegrity(
   archiveDirContents: Set<string>,
   phasesToCheck: string[] = ['1', '2', '3', '4', '5', '6', '7', '8', 'global'],
   manifest?: ArchiveIntegrityManifest,
+  runLogPrefix?: ArchiveRunLogPrefixOptions,
 ): ArchiveIntegrityCheckResult {
   const missingFiles: string[] = [];
   const presentFiles: string[] = [];
@@ -202,6 +248,11 @@ export function checkArchiveIntegrity(
   // 编码计划归档快照条件项（缺省 false = 零行为变化，既有 fixture 硬判据）
   if (manifest?.codingPlanSnapshot === true) {
     checkCodingPlanSnapshot(archiveDirContents, manifest, missingFiles, presentFiles);
+  }
+
+  // L4 归档前缀性条件项（缺省 undefined = 未启用，零行为变化）
+  if (runLogPrefix !== undefined) {
+    checkRunLogPrefix(runLogPrefix, missingFiles, presentFiles);
   }
 
   return {

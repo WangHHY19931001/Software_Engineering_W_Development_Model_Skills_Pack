@@ -19,6 +19,8 @@ import {
   checkRunLog,
   canonicalJson,
   computeRecordHash,
+  computeRunLogAnchor,
+  anchorDigestOf,
   sha256Hex,
   extractExitCode,
   inspectGateLogContent,
@@ -3078,5 +3080,216 @@ describe('run-log R7 扩展：记录哈希链（D-3a）', () => {
     expect(result.passed).toBe(true);
     expect(chainViolations(result.violations)).toEqual([]);
     expect(result.diagnostics?.includes('R7: 历史段 1 条无哈希（LEGACY，未参与链校验）')).toBe(true);
+  });
+});
+
+// ==================== R7 扩展：checkpoint 放行锚（D-3b，2026-09-25）====================
+// 背景（诚实边界）：哈希链（D-3a）能捕获「改/删/插中段记录」，但**放行前整链重算 + 时间戳重对齐**
+// （把历史行整体重排后重算全部 recordHash）与**尾删**在链上仍自洽——链只保护链自身。
+// 放行锚 = 放行时刻的**历史前缀**外部锚：checkpoint 放行记录声明 `runLogAnchor { lines, sha256 }`，
+// 前缀 = 文件序下 `timestamp ≤ 放行时间戳` 的全部记录（不含锚自身所在记录）：
+//   lines  = 前缀记录条数；
+//   sha256 = 前缀各记录**原始行字节**（行终止符剥离后原样文本）以单个 "\n" 连接
+//            （**末尾不加换行**）后的 SHA-256（64 位小写 hex）。
+// `check-run-log` R7 第三段按同法重算并比对；不符 = blocking（文案含 R7 + 放行锚/runLogAnchor + runId）；
+// 字段缺席 = 非阻断（历史记录 LEGACY）。
+
+/** 放行锚违规（blocking）：文案同时含 R7 与 runLogAnchor/放行锚 */
+function anchorViolations(violations: readonly string[]): string[] {
+  return violations.filter(
+    (violation) => violation.includes('R7') && (violation.includes('runLogAnchor') || violation.includes('放行锚')),
+  );
+}
+
+/** 与 writer 同口径：把 row 接到 prevRows 链尾（prevRows 须已带 recordHash；空数组 = 链首） */
+function chainAfter(prevRows: readonly RunLogEntry[], row: Record<string, unknown>): RunLogEntry {
+  const last = prevRows.at(-1);
+  const prevHash = last === undefined ? '' : String((last as unknown as Record<string, unknown>).recordHash ?? '');
+  const chained = { ...row, prevRecordHash: prevHash };
+  const recordHash = computeRecordHash(chained, prevHash);
+  return { ...chained, recordHash } as unknown as RunLogEntry;
+}
+
+/** 已知行整体重算链（攻击者掌握工具链的形态：中段重排后整链重算，链判定自洽） */
+function rechain(rows: readonly (RunLogEntry | Record<string, unknown>)[]): RunLogEntry[] {
+  return withChain(rows as Array<Record<string, unknown>>);
+}
+
+/** 放行前的完整证据前缀：S(produce) → V(review) → 闭环五脚本 G(gate)，令 R1/R8/R11 全绿 */
+function releasePrefixRows(): Array<Record<string, unknown>> {
+  return [
+    entryRecord({ runId: 'p1', timestamp: chainStamp(0), action: 'produce', role: 'S' }),
+    entryRecord({ runId: 'v1', timestamp: chainStamp(1), action: 'review', role: 'V' }),
+    ...RUN_LOG_CLOSURE_SCRIPTS.map((script, index) =>
+      entryRecord({
+        runId: `g-${script}`,
+        timestamp: chainStamp(index + 2),
+        action: 'gate',
+        role: 'G',
+        script,
+        gateExitCode: 0,
+      }),
+    ),
+  ];
+}
+
+/** 放行记录（checkpoint success）：锚由 writer 语义填入（见 logWithReleaseAnchor） */
+function releaseAnchorRow(overrides: Partial<RunLogEntry> = {}): Record<string, unknown> {
+  return entryRecord({
+    runId: 'cp-1',
+    timestamp: chainStamp(20),
+    action: 'checkpoint',
+    role: 'O',
+    tokens: 500,
+    acknowledgedDecisions: ['采用方案 A（放行锚定稿）'],
+    ...overrides,
+  });
+}
+
+/**
+ * 造「前置带链记录 + 带锚的放行记录」完整文件：锚按**前缀最终字节**计算（与 writer 同口径），
+ * 故原始行 = 落盘字节（entries 与 rawLines 严格同序同长）。
+ */
+function logWithReleaseAnchor(
+  prefixRows: Array<Record<string, unknown>>,
+  anchorRow: Record<string, unknown>,
+): { entries: RunLogEntry[]; rawLines: string[]; anchor: { lines: number; sha256: string } } {
+  const prefix = withChain(prefixRows);
+  const anchor = computeRunLogAnchor(prefix.map((row) => JSON.stringify(row)));
+  const anchorEntry = chainAfter(prefix, { ...anchorRow, runLogAnchor: anchor });
+  const entries = [...prefix, anchorEntry];
+  return { entries, rawLines: entries.map((entry) => JSON.stringify(entry)), anchor };
+}
+
+describe('run-log R7 扩展：checkpoint 放行锚（D-3b）', () => {
+  it('anchorDigestOf / computeRunLogAnchor：与第三方独立复算一致（"\n" 连接、末尾不加换行）', () => {
+    const lines = ['{"a":1}', '{"b":2}'];
+    const expected = createHash('sha256').update(lines.join('\n'), 'utf8').digest('hex');
+    expect(anchorDigestOf(lines)).toBe(expected);
+    expect(computeRunLogAnchor(lines)).toEqual({ lines: 2, sha256: expected });
+    // 空前缀：lines=0 且摘要 = 空串的 SHA-256（不得写成 sha256("\n")）
+    expect(computeRunLogAnchor([])).toEqual({
+      lines: 0,
+      sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    });
+    expect(anchorDigestOf(['a', 'b'])).toBe(anchorDigestOf(['a', 'b']));
+    // 行边界参与摘要：["a","b"] 与 ["a\n","b"] 的拼接不同（前者 "a\nb"，后者 "a\n\nb"）
+    expect(anchorDigestOf(['a', 'b'])).not.toBe(anchorDigestOf(['a\n', 'b']));
+  });
+
+  it('R7：放行锚与该放行时刻之前的记录前缀不符 → 违规（无需注入原始文本即可判 lines）', () => {
+    const rows = [
+      makeEntry({ runId: 'a' }),
+      makeEntry({
+        runId: 'cp',
+        action: 'checkpoint',
+        outcome: 'success',
+        tokens: 500,
+        acknowledgedDecisions: ['放行'],
+        runLogAnchor: { lines: 9, sha256: 'a'.repeat(64) },
+      }),
+    ];
+    const result = checkRunLog(rows);
+    expect(result.violations.some((v) => v.includes('放行锚') || v.includes('runLogAnchor'))).toBe(true);
+    expect(anchorViolations(result.violations).some((v) => v.includes('cp'))).toBe(true);
+  });
+
+  it('R7：锚自洽（lines + sha256，注入原始行）→ 零锚违规且无「未校验」诊断', () => {
+    const { entries, rawLines } = logWithReleaseAnchor(releasePrefixRows(), releaseAnchorRow());
+    const result = checkRunLog(entries, { runLogRawLines: rawLines });
+    expect(anchorViolations(result.violations)).toEqual([]);
+    expect(result.diagnostics?.some((d) => d.includes('未校验'))).toBe(false);
+    // 锚只增不改：该放行日志在锚存在时仍然整体通过（R1/R4/R8/R11 全绿）
+    expect(result.passed).toBe(true);
+  });
+
+  it('R7：未注入原始行 → 只校验 lines，sha256 记非阻断诊断（点名单条 runId）', () => {
+    const { entries } = logWithReleaseAnchor(releasePrefixRows(), releaseAnchorRow());
+    const result = checkRunLog(entries);
+    expect(anchorViolations(result.violations)).toEqual([]);
+    expect(result.diagnostics?.some((d) => d.includes('未校验') && d.includes('cp-1'))).toBe(true);
+  });
+
+  it('R7：放行锚 sha256 与前缀原始字节不符 → blocking（改锚后整链重算，链判定自洽仍被锚拦下）', () => {
+    const { entries } = logWithReleaseAnchor(releasePrefixRows(), releaseAnchorRow());
+    const tampered = structuredClone(entries);
+    const lastIndex = tampered.length - 1;
+    // eslint-disable-next-line security/detect-object-injection -- lastIndex 为本本地数组末位下标（非外部输入），数组为本测试构造的记录列表
+    const anchorRecord = tampered[lastIndex] as unknown as { runLogAnchor: { sha256: string } };
+    anchorRecord.runLogAnchor.sha256 = 'f'.repeat(64);
+    const rehashed = rechain(tampered);
+    const result = checkRunLog(rehashed, { runLogRawLines: rehashed.map((entry) => JSON.stringify(entry)) });
+    expect(chainViolations(result.violations)).toEqual([]);
+    expect(anchorViolations(result.violations).some((v) => v.includes('cp-1') && v.includes('sha256'))).toBe(true);
+  });
+
+  it('R7：放行前重排历史行 + 时间戳重对齐（链全量重算）→ 链不报、锚报（外部锚捕获链盲区）', () => {
+    const { entries, rawLines } = logWithReleaseAnchor(releasePrefixRows(), releaseAnchorRow());
+    // 正例：锚自洽
+    expect(anchorViolations(checkRunLog(entries, { runLogRawLines: rawLines }).violations)).toEqual([]);
+
+    // 突变：历史行整体重排（放行前重排录入）后整链重算——链判定完全自洽
+    const plain = entries as unknown as Array<Record<string, unknown>>;
+    const [p1, v1, ...gates] = plain;
+    // 时间戳同步重对齐（保持严格递增），使 R7 时间单调判据也不报——突变只剩「前缀字节顺序」
+    const rewritten = rechain([{ ...v1!, timestamp: chainStamp(0) }, { ...p1!, timestamp: chainStamp(1) }, ...gates]);
+    const rewrittenRaw = rewritten.map((entry) => JSON.stringify(entry));
+    const result = checkRunLog(rewritten, { runLogRawLines: rewrittenRaw });
+    expect(chainViolations(result.violations)).toEqual([]);
+    expect(result.violations.some((v) => v.includes('非 append-only'))).toBe(false);
+    expect(anchorViolations(result.violations).length).toBeGreaterThan(0);
+  });
+
+  it('R7：尾删（放行后删除前缀之外的尾部记录）不改变前缀 → 锚仍自洽（残余窗口诚实登记）', () => {
+    const { entries, rawLines } = logWithReleaseAnchor(releasePrefixRows(), releaseAnchorRow());
+    // 尾删的检出属归档前缀性（L4）职责；锚只钉前缀，故此处不产生锚违规（不得假阳性）
+    const head = entries.slice(0, entries.length - 1);
+    const result = checkRunLog(head, { runLogRawLines: rawLines.slice(0, entries.length - 1) });
+    expect(anchorViolations(result.violations)).toEqual([]);
+  });
+
+  it('R7：锚缺席 → 非阻断（历史记录 LEGACY，不产生任何锚违规/锚诊断）', () => {
+    const prefix = withChain(releasePrefixRows());
+    const rows = [...prefix, chainAfter(prefix, releaseAnchorRow())];
+    const result = checkRunLog(rows);
+    expect(anchorViolations(result.violations)).toEqual([]);
+    expect(result.diagnostics?.some((d) => d.includes('runLogAnchor') || d.includes('放行锚'))).toBe(false);
+  });
+
+  it('R7：锚记录之外的记录携带锚同样按同法校验（每条锚自洽，不限于 checkpoint）', () => {
+    const { entries } = logWithReleaseAnchor(releasePrefixRows(), releaseAnchorRow());
+    const withForeignAnchor = structuredClone(entries);
+    (withForeignAnchor[0] as unknown as Record<string, unknown>).runLogAnchor = { lines: 0, sha256: 'b'.repeat(64) };
+    const rehashed = rechain(withForeignAnchor);
+    const result = checkRunLog(rehashed, { runLogRawLines: rehashed.map((entry) => JSON.stringify(entry)) });
+    expect(chainViolations(result.violations)).toEqual([]);
+    expect(anchorViolations(result.violations).some((v) => v.includes('p1'))).toBe(true);
+  });
+
+  it('R7：锚形态非法（lines 非整数 / sha256 非 64 位小写 hex）→ blocking fail-closed', () => {
+    for (const bad of [
+      { lines: 1.5, sha256: 'a'.repeat(64) },
+      { lines: -1, sha256: 'a'.repeat(64) },
+      { lines: 1, sha256: 'DEADBEEF' },
+      { lines: 1 },
+      'not-an-object',
+    ]) {
+      const rows = [
+        makeEntry({ runId: 'a' }),
+        makeEntry({
+          runId: 'cp',
+          action: 'checkpoint',
+          outcome: 'success',
+          tokens: 500,
+          acknowledgedDecisions: ['放行'],
+          runLogAnchor: bad as unknown as { lines: number; sha256: string },
+        }),
+      ];
+      const result = checkRunLog(rows);
+      // 形态非法一律 fail-closed：schema 挡下的走 [schema]（instancePath 点名 runLogAnchor），
+      // 越过 schema 的（direct logic 调用）由 R7 锚段挡下——两条通道都必须 blocking 且点名该字段。
+      expect(result.passed).toBe(false);
+      expect(result.violations.some((v) => v.includes('runLogAnchor'))).toBe(true);
+    }
   });
 });

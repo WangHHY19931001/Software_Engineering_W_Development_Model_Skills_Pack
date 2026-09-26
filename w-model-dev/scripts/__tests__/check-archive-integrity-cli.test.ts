@@ -229,3 +229,76 @@ describe('check-archive-integrity CLI：--change-id 参数错误三态（exit 2 
     expect(errorCategory(r.stdout)).toBe('ARG_INVALID');
   });
 });
+
+// ==================== 归档前缀性（L4，D-3b：--live-run-log） ====================
+// 归档内 run-log.jsonl 快照必须是 live run-log 的字节前缀；未提供该参数时只出非阻断诊断，
+// 退出码语义不变（向后兼容硬线）。
+
+describe('check-archive-integrity CLI：归档前缀性（L4，--live-run-log）', () => {
+  const ARCHIVED_TEXT = `${JSON.stringify({ runId: 'a', note: '放行' })}\n`;
+  const LIVE_TEXT = `${ARCHIVED_TEXT}${JSON.stringify({ runId: 'b', note: '放行后新增' })}\n`;
+
+  /** 铺归档根 + 写入归档快照 run-log.jsonl（覆盖 writeFullArchive 的占位内容）与 live run-log */
+  function seedRunLogs(archiveText: string, liveText: string): { archive: string; live: string } {
+    const archive = join(tmpDir, 'archive');
+    writeFullArchive(archive);
+    writeFileSync(join(archive, 'run-log.jsonl'), archiveText);
+    const live = join(tmpDir, 'live-run-log.jsonl');
+    writeFileSync(live, liveText);
+    return { archive, live };
+  }
+
+  it('归档快照是 live 字节前缀 → exit 0，输出明示前缀性校验已执行', () => {
+    const { archive, live } = seedRunLogs(ARCHIVED_TEXT, LIVE_TEXT);
+    const r = runCli([archive, `--live-run-log=${live}`, '--json']);
+    expect(r.code).toBe(0);
+    const report = JSON.parse(r.stdout) as { passed: boolean; reasons: string[]; runLogPrefix: string };
+    expect(report.passed).toBe(true);
+    expect(report.reasons).toEqual([]);
+    expect(report.runLogPrefix).toContain('字节前缀');
+    expect(report.runLogPrefix).toContain('是 live');
+  });
+
+  it('归档快照非 live 前缀（live 侧被截断/重排）→ exit 1 且 [runLogPrefix] 具名', () => {
+    const { archive, live } = seedRunLogs(LIVE_TEXT, ARCHIVED_TEXT);
+    const human = runCli([archive, `--live-run-log=${live}`]);
+    expect(human.code).toBe(1);
+    expect(human.stdout).toContain('[runLogPrefix]');
+    const json = runCli([archive, `--live-run-log=${live}`, '--json']);
+    expect(json.code).toBe(1);
+    const report = JSON.parse(json.stdout) as { passed: boolean; reasons: string[] };
+    expect(report.passed).toBe(false);
+    expect(report.reasons.some((m) => m.includes('[runLogPrefix]'))).toBe(true);
+  });
+
+  it('未传 --live-run-log → exit 0 + 非阻断诊断（既有退出码语义不变）', () => {
+    const { archive } = seedRunLogs(LIVE_TEXT, ARCHIVED_TEXT);
+    const r = runCli([archive, '--json']);
+    expect(r.code).toBe(0);
+    const report = JSON.parse(r.stdout) as { passed: boolean; runLogPrefix: string };
+    expect(report.passed).toBe(true);
+    expect(report.runLogPrefix).toContain('未提供 --live-run-log');
+    expect(report.runLogPrefix).toContain('非阻断');
+  });
+
+  it('live run-log 文件不存在 → exit 2 FILE_NOT_FOUND（显式声明的输入不得静默降级）', () => {
+    const { archive } = seedRunLogs(ARCHIVED_TEXT, LIVE_TEXT);
+    const r = runCli([archive, `--live-run-log=${join(tmpDir, 'nope.jsonl')}`]);
+    expect(r.code).toBe(2);
+    expect(errorCategory(r.stdout)).toBe('FILE_NOT_FOUND');
+  });
+
+  it('--live-run-log 参数错误三态（空值 / 裸形态 / 重复）→ exit 2 ARG_INVALID', () => {
+    const { archive, live } = seedRunLogs(ARCHIVED_TEXT, LIVE_TEXT);
+    for (const args of [
+      [archive, '--live-run-log='],
+      [archive, '--live-run-log', live],
+      [archive, `--live-run-log=${live}`, `--live-run-log=${live}`],
+    ]) {
+      const r = runCli(args);
+      expect(r.code).toBe(2);
+      expect(errorCategory(r.stdout)).toBe('ARG_INVALID');
+      expect(r.stderr).toContain('--live-run-log');
+    }
+  });
+});

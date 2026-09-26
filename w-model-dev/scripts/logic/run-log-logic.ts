@@ -5,7 +5,8 @@
  * 与 w-model-dev/references/operational-recovery.md §5.2。
  * 校验：R1 阶段动作完整性 + R2 tokens 非负 + R3 返工记录一致
  *       + R4 acknowledgedDecisions 非空 + R5 O 越权检测 + R6 exitCode 一致
- *       + R7 append-only 时序 + 记录哈希链（D-3a：链断 blocking / 历史段 LEGACY 非阻断）。
+ *       + R7 append-only 时序 + 记录哈希链（D-3a：链断 blocking / 历史段 LEGACY 非阻断）
+ *         + checkpoint 放行锚（D-3b：锚与放行时刻前缀不符 blocking / 缺字段 LEGACY 非阻断）。
  *       + R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint）
  *       + R9 跨轮次评审一致性 + R10 revertEvidence 回滚证伪
  *       + R11 闭环五脚本机器核验（约束 #11）
@@ -164,6 +165,32 @@ export interface RunLogEntry {
   prevRecordHash?: string;
   /** 本条记录的内容指纹：sha256(prevRecordHash + "\n" + canonicalJson(记录去掉 recordHash 字段)) 小写 hex */
   recordHash?: string;
+  // ---- checkpoint 放行锚（D-3b，可选；定义见 computeRunLogAnchor）----
+  /** 放行时刻的历史前缀外部锚（由追加器在写 checkpoint success 记录时自动填入；缺席 = LEGACY 非阻断） */
+  runLogAnchor?: RunLogAnchor;
+}
+
+/**
+ * checkpoint 放行锚（D-3b）——放行时刻的**历史前缀**外部锚。
+ *
+ * 哈希链（D-3a）只保护链自身：把握「整链重算」能力者对放行前历史行整体重排 + 时间戳重对齐后
+ * 重算全部 `recordHash`，链判定完全自洽（真实调测盲区）；尾删同样不可见。锚把前缀字节钉死：
+ *
+ * - **前缀** = 文件序下 `timestamp ≤ 锚记录 timestamp` 的全部记录（含锚记录之前的历史行；**不含**
+ *   锚自身所在记录）——按时间戳而非物理位置定义，故「把锚记录挪到文件更早位置」不会缩小前缀；
+ * - `lines` = 该前缀的记录条数；
+ * - `sha256` = 该前缀各记录**原始行字节**（行终止符 LF/CRLF 剥离后的原样文本，含空白与转义）以
+ *   **单个 `"\n"` 连接**（**末尾不加换行**）后的 SHA-256（64 位小写 hex）；`lines=0` 即空串摘要
+ *   `e3b0c442…`（不是 `sha256("\n")`）。
+ *
+ * 三方复算口径一致：写入端（`logic/run-log-append-logic.ts`）与校验端（本文件 R7 第三段）共用
+ * `anchorDigestOf` / `computeRunLogAnchor`（禁止各写一份）；第三方可由 JSONL 文件按上述定义独立复算。
+ */
+export interface RunLogAnchor {
+  /** 前缀记录条数（`timestamp ≤ 放行时间戳` 且不含锚自身所在记录） */
+  lines: number;
+  /** 前缀各行原始字节以单个 "\n" 连接（末尾不加换行）后的 SHA-256（64 位小写 hex） */
+  sha256: string;
 }
 
 export interface RunLogCheckOptions {
@@ -178,6 +205,14 @@ export interface RunLogCheckOptions {
    * 用于复用宿主 crypto 或测试替换；公式不变（sha256 + canonicalJson）。
    */
   hashFn?: HashFunction;
+  /**
+   * R7 放行锚：run-log 文件的**原始行**（与 `entries` 同序同长，行终止符已剥离、原文未 trim）。
+   *
+   * 锚的 `sha256` 定义在原始字节上（见 `RunLogAnchor`），而 logic 层零 `node:fs`/`node:crypto`
+   * → 文本由 CLI 层注入（`lib/read-json-or-exit.ts` 的 `rawLines`，与 `entries` 同一过滤规则）。
+   * 未注入时只校验 `lines` 并记非阻断诊断（绝不假装验过 sha256）。
+   */
+  runLogRawLines?: readonly string[];
 }
 
 export type RunLogLifecycleStatus = 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
@@ -775,6 +810,39 @@ function recordHashOf(entry: RunLogEntry): string | undefined {
   return typeof value === 'string' && value !== '' ? value : undefined;
 }
 
+// ==================== checkpoint 放行锚（D-3b，2026-09-25）====================
+//
+// 单点真值（writer 与 checker 共用，禁止各写一份）：
+//   anchorSha256 = sha256(前缀各行原始字节以单个 "\n" 连接，末尾不加换行)
+
+/**
+ * 放行锚摘要：各行原始字节（行终止符已由调用方的行切分剥离、原文不 trim）以单个 `"\n"`
+ * 连接（**末尾不加换行**）后取 SHA-256 小写 hex；空前缀 = 空串摘要。
+ *
+ * `hashFn` 可注入（宿主 crypto / 测试替换），默认纯 TS `sha256Hex`（logic 层零 `node:crypto`）。
+ */
+export function anchorDigestOf(rawLines: readonly string[], hashFn: HashFunction = sha256Hex): string {
+  return hashFn(rawLines.join('\n'));
+}
+
+/** 计算放行锚：`lines` = 前缀行数，`sha256` = `anchorDigestOf(前缀行)`。 */
+export function computeRunLogAnchor(prefixRawLines: readonly string[], hashFn: HashFunction = sha256Hex): RunLogAnchor {
+  return { lines: prefixRawLines.length, sha256: anchorDigestOf(prefixRawLines, hashFn) };
+}
+
+/** 锚形态判定（schema 同口径的防御性副本：direct logic 调用方可绕过 schema 校验） */
+export function isWellFormedRunLogAnchor(value: unknown): value is RunLogAnchor {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const anchor = value as Record<string, unknown>;
+  return (
+    typeof anchor.lines === 'number' &&
+    Number.isInteger(anchor.lines) &&
+    anchor.lines >= 0 &&
+    typeof anchor.sha256 === 'string' &&
+    /^[0-9a-f]{64}$/.test(anchor.sha256)
+  );
+}
+
 // ==================== 校验入口 ====================
 
 export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): RunLogCheckResult {
@@ -804,6 +872,8 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   // 结构校验：narrow 每个元素为 Partial<RunLogEntry>，缺失必需字段则跳过并记录（容错，不 crash）
   // 必需字段为 R1-R8 实际访问的核心字段：runId / timestamp / phase / action / outcome
   const valid: RunLogEntry[] = [];
+  /** valid[i] 在**入参数组**中的原始下标（D-3b 放行锚需按原始文件序定位前缀，故不能只留 valid 下标） */
+  const validOrigins: number[] = [];
   for (let i = 0; i < entries.length; i++) {
     const raw = entries[i];
     // === Schema 前置校验 ===
@@ -830,6 +900,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
               Object.entries(raw as Record<string, unknown>).filter(([field]) => field !== 'reworkHints'),
             );
             valid.push(withoutHints as unknown as RunLogEntry);
+            validOrigins.push(i);
             diagnostics.push(
               `LEGACY_REWORK_HINTS: ${(raw as { action?: string }).action} 条目 ${i + 1} passed=false 缺非空 reworkHints（variant 规则同窗前的旧记录）; deferred`,
             );
@@ -851,6 +922,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
           Object.entries(raw as Record<string, unknown>).filter(([field]) => !missingFields.includes(field)),
         );
         valid.push(withoutIdentity as unknown as RunLogEntry);
+        validOrigins.push(i);
         // variant 规则引入前形态（未声明 variant）的 emergency-fix：缺失的
         // variant/blocker（可能连同 identity 字段）以 LEGACY_VARIANT 明示；
         // identity 缺失部分随后由 LEGACY_UNSCOPED 循环补充说明。
@@ -886,6 +958,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       continue;
     }
     valid.push(e as RunLogEntry);
+    validOrigins.push(i);
   }
 
   // Missing lifecycle identity is observable and deferred, never inferred from
@@ -1373,6 +1446,77 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       if (recomputed !== ownHash) {
         violations.push(
           `R7: 哈希链断裂：条目 ${entry.runId ?? '?'} 记录内容与 recordHash 不符（记录被就地改写或链字段被篡改）`,
+        );
+      }
+    }
+  }
+
+  // R7 扩展（D-3b）：checkpoint 放行锚（外部锚，第三段）。
+  //
+  // 为什么需要第三段：哈希链（D-3a）只保护链自身——把握「整链重算」能力者把放行前的历史行整体
+  // 重排 + 时间戳重对齐后重算全部 recordHash，链判定完全自洽（真实调测盲区）；尾删同样不可见。
+  // 放行锚把「放行时刻的历史前缀」钉死为外部锚（定义见 RunLogAnchor / computeRunLogAnchor）：
+  //   prefix = 文件序下 timestamp ≤ 锚记录 timestamp 的全部记录（不含锚自身所在记录）
+  //   lines  = 前缀记录条数；sha256 = 前缀各行原始字节以单个 "\n" 连接（末尾不加换行）的 SHA-256
+  // 校验：按同法重算并比对——不符即 blocking（文案含 R7 + runLogAnchor/放行锚 + runId）。锚字段
+  // 缺席 = 非阻断（历史记录 LEGACY：本机制引入前写入的放行记录不补锚，禁止回溯补锚）。
+  // sha256 维度需要**原始行文本**（logic 层零 fs → 由调用方注入 options.runLogRawLines，与 entries
+  // 同序同长）；未注入时只校验 lines 并记非阻断诊断（绝不假装验过 sha256）。
+  {
+    const rawLines = options?.runLogRawLines;
+    const rawLinesAligned = Array.isArray(rawLines) && rawLines.length === entries.length;
+    for (let index = 0; index < valid.length; index++) {
+      // eslint-disable-next-line security/detect-object-injection -- index 为本地数组下界循环计数（非外部输入），数组为同函数内的有效记录列表
+      const entry = valid[index]!;
+      const anchorValue = (entry as unknown as Record<string, unknown>).runLogAnchor;
+      if (anchorValue === undefined) continue; // LEGACY：缺席非阻断（不回溯补锚）
+      const anchorRunId = entry.runId ?? '?';
+      if (!isWellFormedRunLogAnchor(anchorValue)) {
+        violations.push(
+          `R7: 放行锚形态非法：条目 ${anchorRunId} 的 runLogAnchor 须为 { lines: 非负整数, sha256: 64 位小写 hex }`,
+        );
+        continue;
+      }
+      const anchorMs = Date.parse(String(entry.timestamp));
+      if (!Number.isFinite(anchorMs)) {
+        violations.push(
+          `R7: 放行锚不可核验：条目 ${anchorRunId} 的 timestamp 不可解析，无法重算放行时刻前缀（fail-closed）`,
+        );
+        continue;
+      }
+      // eslint-disable-next-line security/detect-object-injection -- index 与 validOrigins 同步推进的本地下标（非外部输入），数组为本函数内构造的原始下标列表
+      const anchorOrigin = validOrigins[index]!;
+      const prefixIndexes: number[] = [];
+      for (let i = 0; i < entries.length; i++) {
+        if (i === anchorOrigin) continue;
+        // eslint-disable-next-line security/detect-object-injection -- i 为本地数组下界循环计数（非外部输入），数组为同函数内的 run-log 入参数组
+        const candidate = entries[i];
+        if (typeof candidate !== 'object' || candidate === null || Array.isArray(candidate)) continue;
+        const candidateMs = Date.parse(String((candidate as { timestamp?: unknown }).timestamp ?? ''));
+        if (!Number.isFinite(candidateMs) || candidateMs > anchorMs) continue;
+        prefixIndexes.push(i);
+      }
+      if (anchorValue.lines !== prefixIndexes.length) {
+        violations.push(
+          `R7: 放行记录 ${anchorRunId} 的 runLogAnchor 与当前历史前缀不符（放行后被改写/重排）：` +
+            `lines=${anchorValue.lines} ≠ 当前前缀记录数 ${prefixIndexes.length}`,
+        );
+      }
+      if (rawLinesAligned) {
+        const recomputed = anchorDigestOf(
+          // eslint-disable-next-line security/detect-object-injection -- i 为前缀下标（本地数值数组），rawLines 与 entries 同序同长（已断言对齐）
+          prefixIndexes.map((i) => rawLines![i] ?? ''),
+          options?.hashFn ?? sha256Hex,
+        );
+        if (recomputed !== anchorValue.sha256) {
+          violations.push(
+            `R7: 放行记录 ${anchorRunId} 的 runLogAnchor 与当前历史前缀不符（放行后被改写/重排）：` +
+              `sha256=${anchorValue.sha256} ≠ 当前前缀原始字节摘要 ${recomputed}`,
+          );
+        }
+      } else {
+        diagnostics.push(
+          `R7: 条目 ${anchorRunId} 的 runLogAnchor.sha256 未校验（调用方未注入 runLogRawLines 原始行文本，仅校验 lines）`,
         );
       }
     }

@@ -29,14 +29,14 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 
 以下生产 CLI 均受自然退出契约约束：
 
-| 脚本                       | 适用结果状态 | 退出实现                                                                |
-| -------------------------- | ------------ | ----------------------------------------------------------------------- |
-| `ensure-codegraph.ts`      | 0 / 1 / 2    | 外部依赖检测结束后设置 `process.exitCode`，自然返回                     |
-| `metrics-report.ts`        | 0 / 2        | 报告输出完成后设置 `process.exitCode=0`，自然返回                       |
-| `security-scan.ts`         | 0 / 1 / 2    | 扫描/重生成结果设置 `process.exitCode`，自然返回                        |
-| `self-test.ts`             | 0 / 1        | 汇总或未预期异常设置 `process.exitCode`，自然返回                       |
-| `wm-status.ts`             | 0 / 2        | 状态输出或未初始化提示设置 `process.exitCode=0`，自然返回               |
-| `check-pollution.ts`       | 0 / 1 / 2    | 扫描与单行 `POLLUTION_JSON` 输出完成后设置 `process.exitCode`，自然返回 |
+| 脚本                  | 适用结果状态 | 退出实现                                                                |
+| --------------------- | ------------ | ----------------------------------------------------------------------- |
+| `ensure-codegraph.ts` | 0 / 1 / 2    | 外部依赖检测结束后设置 `process.exitCode`，自然返回                     |
+| `metrics-report.ts`   | 0 / 2        | 报告输出完成后设置 `process.exitCode=0`，自然返回                       |
+| `security-scan.ts`    | 0 / 1 / 2    | 扫描/重生成结果设置 `process.exitCode`，自然返回                        |
+| `self-test.ts`        | 0 / 1        | 汇总或未预期异常设置 `process.exitCode`，自然返回                       |
+| `wm-status.ts`        | 0 / 2        | 状态输出或未初始化提示设置 `process.exitCode=0`，自然返回               |
+| `check-pollution.ts`  | 0 / 1 / 2    | 扫描与单行 `POLLUTION_JSON` 输出完成后设置 `process.exitCode`，自然返回 |
 
 生产 CLI 的 exit `1` 仅适用于具有校验失败/检查点结果的 runner；metrics-report 与 wm-status 没有 exit 1 结果分支，输入错误统一为 exit 2。测试工具、fixtures 与 `exitWithError` 的结构化错误处理不属于生产 CLI 直接退出静态检查范围。新增生产 CLI 或结果分支时，须更新自然退出契约测试。
 
@@ -162,7 +162,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 - **`pass`**（S 子代理）：仅将实际通过用例标为通过，并更新 `executionSummary.<type>Test`。
 - **`fail`**（S 子代理）：记录失败用例、根因和关联模块，更新 RTM，按阶段参考回退。
 - **评审**（V 子代理）：按 `targetKind=test` 路由 `test-engineer` Persona。
-- **门禁**（G 子代理）：阶段 1~7 跑 `check-verifier-output.ts`；阶段 5~8 另跑 `check-artifact-gate.ts --phase=N`（M07 起含测试证据 E1~E4 校验，`GATE_JSON.testEvidence` 为 8 键计数对象——完整形状与「`testEvidence.legacy`（数值）vs 顶层 `legacy`（非阻断诊断数组）」的区别见 `rtm-guide.md`「测试执行证据（M07）」节；给定 `--tickets` 时另含 `GATE_JSON.tickets:{checked,criticalMissing,buildabilityMissing}`，见下「Artifact Gate 项目阶段证据门」节）。
+- **门禁**（G 子代理）：阶段 1~~7 跑 `check-verifier-output.ts`；阶段 5~~8 另跑 `check-artifact-gate.ts --phase=N`（M07 起含测试证据 E1~E4 校验，`GATE_JSON.testEvidence` 为 8 键计数对象——完整形状与「`testEvidence.legacy`（数值）vs 顶层 `legacy`（非阻断诊断数组）」的区别见 `rtm-guide.md`「测试执行证据（M07）」节；给定 `--tickets` 时另含 `GATE_JSON.tickets:{checked,criticalMissing,buildabilityMissing}`，见下「Artifact Gate 项目阶段证据门」节）。
 - **产出**（S 子代理）：使用 `templates/test-report.md` 生成测试报告。
 
 ## `/wm review <target>`
@@ -449,7 +449,8 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **codegraph checker**：校验 `.w-model/codegraph-queries/` 下 phase 前缀 = scope.phase 的查询记录（`codegraph-query.schema.json` 结构前置校验）——`changeId` 精确等于 scope.changeId（同 changeId 异 phase 前缀文件违规）、`targetFiles` 全部属于 scope.changedFiles 且非空、`queryTimestamp` 合法 ISO date-time 且不晚于 `scopeCreatedAt`；scope 中每个须覆盖的 code/test 变更文件至少被一个合法查询覆盖（未覆盖逐文件 violation）。缺 changeId/targetFiles 的既有查询逐文件 violation（不允许 silent skip）。**证据形态声明（D-6）**：按项目根是否存在 `.codegraph/` 索引判定——有索引只接受 `evidenceKind:'cli'`（缺声明或 `'artifact'` 均 violation，禁止降级）；无索引只接受 `'artifact'` + 非空 `degradationReason` + ≥1 条 `alternativeEvidence[{command, evidencePath}]`（逐条两字段非空）；未声明一律 violation（不合规记录不计覆盖）。
 - **coding-plan checker**（R1-R6）：strict 只校验 `scope.changeId` 对应的编码计划制品——**R1** `docs/plans/<changeId>.plan.md` 存在且 changeId 含 `phase<phase>-` 前缀；**R2** plan 含目标节 + ≥1 任务节（标题含 `Task N` / `任务 N`），每任务节 ≥1 条行首「`验证：`/`Verify:`」命令行（命令体非空、禁 `;` `&` `|`）；**R3** 执行账本 `.superpowers/sdd/<plan-基名>/progress.md` 存在、首行身份 `# SDD ledger — plan: <计划文件路径>` 且 `Task N: complete` 具名覆盖 plan 全部任务节；**R4** 已完成任务三件套 `task-<N>-{brief,report}.md` 非空 + 账本目录 ≥1 个 `review-*.diff`；**R5** `.w-model/r3-reviews/phase<N>-{plan,execute,finalize}-<dim>.md` ×9 + `.w-model/v-reviews/phase<N>-{plan,execute,finalize}.md` ×3（stage 词表 plan/execute/finalize，旧词表 explore/propose/coding 不充数；每份须**非空**（0 字节即 exit 1，内容下限）——行级证据锚 `path:Lnn=` / `path:§sec=` 只作 stderr 非阻断诊断，不进 GATE_JSON）；**R6** 活动位缺失时回退归档位 `docs/changes/archive/<changeId>/` 或 `<YYYY-MM-DD>-<changeId>/`——**锚定匹配**（目录名恰为 `<changeId>`，或 `<YYYY-MM-DD>-` 定长前缀 + 恰为 `<changeId>` 且日期前缀通过日历回读校验；`<changeId>-extra` / `foo-bar-<changeId>` 等相似名不匹配，非法日历日如 `2026-13-45-<changeId>` 独立成态 fail-closed），**恰一匹配**才继续，多匹配 exit 1 并具名列出全部匹配目录，零匹配时的 violation 附「近失」诊断（含 changeId 子串但未锚定命中的目录名）；归档态按同契约校验 plan / 账本 / 三件套快照，快照缺失 fail-closed；活动位存在时**永远**优先活动位。strict 模式只校验 scope 选定的变更（`changesNames` 恒为 `scope.changeId`），同阶段其它半成品兄弟目录不在本 gate 扫描范围，每个 change 须各自执行 gate。
 - **归档后置校验（阶段 8）**：原 check-openspec-archive（opsx:archive 后置门）已于 2026-09-21 退役（superpowers 替换批次 1），归档后置校验并入 **check-archive-integrity**（codingPlanSnapshot 清单项；不在 `check-artifact-gate.ts` pre-archive gate 内强制，由 G 在归档完成后单独跑）：
-  - 速查行：`npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/changes/archive/<changeId 或 <日期>-<changeId> 目录> [--change-id=<changeId>] [--json]`（退出码 0=通过 / 1=缺失 / 2=输入错误；`--change-id` 仅等号形态，重复或空值 → exit 2 ARG_INVALID）
+  - 速查行：`npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts docs/changes/archive/<changeId 或 <日期>-<changeId> 目录> [--change-id=<changeId>] [--live-run-log=<path>] [--json]`（退出码 0=通过 / 1=缺失 / 2=输入错误；`--change-id` 与 `--live-run-log` 均仅等号形态，重复或空值 → exit 2 ARG_INVALID，live 文件不存在 → exit 2 FILE_NOT_FOUND）
+  - **归档前缀性（L4，D-3b）**：提供 `--live-run-log=<path>` 时校验归档内 `run-log.jsonl` 快照是 **live** run-log 的**字节前缀**（`liveText.startsWith(archiveText)`）——live 侧被截断/重排/改写或归档快照被改写（两者不可同真）即不成立 → `[runLogPrefix]` 并入 missingFiles（blocking / exit 1，须人工裁定证据归属）；归档快照不可读 → 同前缀 fail-closed。**未提供该参数时只输出非阻断诊断**（人类可读 `归档前缀性` 行 + `--json`/`ARCHIVE_INTEGRITY_JSON` 的 `runLogPrefix` 字段），退出码语义不变。
   - codingPlanSnapshot 条件项**两个入口**：**显式** `--change-id=<id>` 无条件启用并锚定归档根 `<id>.plan.md`（不依赖生产者摆放——plan 快照被摆到子目录也不会静默放过）；**自动派生**（未传 flag）在归档根含恰一 `*.plan.md` 时启用、零匹配则该条件项整体不适用（legacy 归档零行为变化）、多匹配 fail-closed 不猜 changeId。两个入口都在输出注明**判定依据**（人类可读 `快照判定依据` 行 + `--json`/`ARCHIVE_INTEGRITY_JSON` 的 `snapshotSource` 字段），供审计区分「快照项已执行」与「本项不适用」。要求归档根存在 `<changeId>.plan.md` + `progress.md`，且归档账本内每个 `Task N: complete` 行存在对应 `task-<N>-brief.md`/`task-<N>-report.md`（`Task N: complete` 判定与 check-coding-plan 同源（共享纯函数 `extractCompletedTaskNumbers`）；归档快照校验为其**结构子集**（仅查存在），全量契约（review-*.diff 存在性与非空、账本首行身份）由 check-coding-plan R4/R6 承担）
   - 各阶段强制快照清单（1-8 + global）见 `logic/archive-integrity-logic.ts` 的 `ARCHIVE_INTEGRITY_CHECKLIST`（单点事实源）。
 - **GATE_JSON / 摘要**：codegraph 收尾 `CODEGRAPH_QUERIES_JSON`、coding-plan 收尾 `CODING_PLAN_JSON`（均含 passed/violations/exitCode，phase 5-8 strict 模式下额外含 changeId 与覆盖/制品计数）；`OPSX_ARTIFACTS_JSON`（check-opsx-artifacts）与 `OPENSPEC_ARCHIVE_JSON`（check-openspec-archive）两个 producer 均已退役、不再有新产物——run-log-logic 的 `GATE_JSON_PATTERNS` 保留这两个模式仅用于解析历史 gate-logs / run-log（`CODING_PLAN_JSON` 为新链路实读模式）。
