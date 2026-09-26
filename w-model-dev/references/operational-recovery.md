@@ -444,7 +444,7 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 
 ### 调用时机（阶段门执行顺序）
 
-G 子代理在每个阶段门按以下顺序调用，任一退出码 ≠ 0 → O 不得放行（反模式 #3/#6/#9 守护）。该表是阶段门放行三步（D-4：① 用户确认落盘 → ② 闭环五门串行 → ③ 放行记录末条）中的第 ② 步；闭环五门（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）均须提供 run-log（`check-run-log.ts` / `check-checkpoint.ts` 为位置参数 `<run-log.jsonl>`，`check-budget.ts` / `check-maturity.ts` 为 `--run-log=<path>`，`check-preventive-review.ts` 用 `--auto-trigger --run-log=<path>`；`check-checkpoint.ts` 另加 `--checkpoint-log=<dir>`），其 gate 记录须**严格早于**放行记录（同秒不算早于），详见本节「阶段 1 自举豁免」末尾的「调用约定」：
+G 子代理在每个阶段门按以下顺序调用，任一退出码 ≠ 0 → O 不得放行（反模式 #3/#6/#9 守护）。**口径澄清（D-4）**：本表是阶段门放行三步（① 用户确认落盘 → ② 闭环校验串行 → ③ 放行记录末条）中**第 ② 步的调度顺序**，但**本表不等于闭环五门清单**——第 1–4 行是闭环五门中的**四门**，第 5 行「现有三门禁」是**非闭环**的常规门禁；闭环五门的**第五门** `check-preventive-review.ts` **不在本表**（它在 V 评审前执行，见本节开头与下方「调用约定」）。**闭环五门齐备表述**以本句为准（读者可数出五个）：`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts` 五者均须提供 run-log（`check-run-log.ts` / `check-checkpoint.ts` 为位置参数 `<run-log.jsonl>`，`check-budget.ts` / `check-maturity.ts` 为 `--run-log=<path>`，`check-preventive-review.ts` 用 `--auto-trigger --run-log=<path>`；`check-checkpoint.ts` 另加 `--checkpoint-log=<dir>`），其 gate 记录须**严格早于**放行记录（同秒不算早于），详见本节「阶段 1 自举豁免」末尾的「调用约定」：
 
 | 顺序 | 脚本 | 校验对象 | 退出码 ≠ 0 守护 |
 |---|---|---|---|
@@ -452,7 +452,8 @@ G 子代理在每个阶段门按以下顺序调用，任一退出码 ≠ 0 → O
 | 2 | `check-run-log.ts` | `.w-model/run-log.jsonl` + `gate-logs/` | 反模式 #9 / #10（O 越权） |
 | 3 | `check-maturity.ts` | `.w-model/maturity.json` | 反模式 #9 |
 | 4 | `check-checkpoint.ts` | run-log 中 checkpoint 类记录 | 反模式 #9 / O4 |
-| 5 | 现有三门禁 | `check-verifier-output.ts` / `check-requirement-graph.ts` / `check-tla-model.ts` | #1/#4/#11-#17 |
+| 5 | 现有三门禁（**非闭环**，常规门禁） | `check-verifier-output.ts` / `check-requirement-graph.ts` / `check-tla-model.ts` | #1/#4/#11-#17 |
+| — | 闭环五门之第五门 `check-preventive-review.ts`（**不在本表**） | `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json`，**V 评审前**执行 | 反模式 #33 / #42 |
 
 ### 校验内容摘要
 
