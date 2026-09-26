@@ -489,6 +489,10 @@ interface RunLogEntry {
   revertEvidence?: { command: string; description?: string };
   /** effective consumer 的机器状态，不改写 raw JSONL；exit 0 仍可能是 NOT_CLOSED_NOT_PROVEN */
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
+  /** 记录哈希链前驱（D-3a，可选）：前一条带哈希记录的 recordHash；文件内首条带哈希记录为 "" */
+  prevRecordHash?: string;
+  /** 记录内容哈希（D-3a，可选）：sha256 小写 hex，由定稿公式计算（见「记录哈希链」节） */
+  recordHash?: string;
 }
 ```
 
@@ -523,6 +527,22 @@ interface RunLogEntry {
 - 未提供 `--run-log` 时 `check-maturity.ts` 输出「R5 未生效」非阻断诊断（省略该参数不再等于静默跳过 R5），退出码语义不变（仍 exit 0）。
 - **禁止字段混用**：不得用 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`）写 `run-log.jsonl`（注：`decisions` 非任何 schema 的合法字段名，正确字段名为 RunLogEntry 的 `acknowledgedDecisions`）。详见下方「RunLogEntry vs EventIngress Schema 边界对照表」节。
 - `decisionConfidence` 为可选字段：评审/门禁/返工等关键决策时可记录置信度（0.0-1.0）；低置信度高频出现是 Loop 4 劣化分析信号。
+
+### 记录哈希链（recordHash / prevRecordHash，D-3a）
+
+> 目的：R7 的时间戳单调判据只约束「相对顺序」，对既有行被**就地改写**（改 note / 改历史时间戳 / 删行 / 插行）完全不可见；记录级哈希链把「中段篡改必须整链重算」变成可执行契约。共享实现 = [`scripts/logic/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) 的 `canonicalJson` / `computeRecordHash`（追加器与校验器**禁止各写一份**）；写入端 = [`scripts/cli/wm-append-runlog.ts`](../scripts/cli/wm-append-runlog.ts)（经 `scripts/logic/run-log-append-logic.ts`），校验端 = `check-run-log.ts` R7 扩展。
+
+**定稿公式（第三方可独立复算）**：
+
+```text
+recordHash = sha256(prevRecordHash + "\n" + canonicalJson(record 去掉 recordHash 字段))
+canonicalJson = 对象键按 Unicode 码点升序、无空白、UTF-8、数组保序
+```
+
+- `prevRecordHash` 是记录字段，因此**参与**本条 `canonicalJson` 载荷（链关系被前缀与载荷双重绑定）；`recordHash` 字段本身必须从载荷剔除（否则不可复算）。哈希输出为 64 位小写 hex。
+- **写入（裁定 C）**：追加器写新记录时 `prevRecordHash` 取**文件内最后一条带哈希记录**的 `recordHash`（无则 `""`），并写入 `recordHash`；载荷自带的链字段由追加器重算覆盖并在 `diagnostics` 留痕（哈希链只能由写入端计算）。`--correct` 生成的更正记录同样入链；历史行**不改写、不补哈希**（禁止回溯补链）。
+- **校验（裁定 B，并入 R7）**：从最后一条带 `recordHash` 的记录开始向前逐条验证——`prevRecordHash` 必须等于前一条的 `recordHash`，文件内首条带哈希记录的 `prevRecordHash` 必须为 `""`，且逐条按定稿公式复算 `recordHash`。断链 / 内容不符 / 哈希段之后出现无哈希记录 → blocking（文案前缀 `R7:` + 记录 runId）；遇到第一条无 `recordHash` 的记录即停止并记**非阻断**诊断 `R7: 历史段 N 条无哈希（LEGACY，未参与链校验）`（全无哈希的日志同样只出该诊断）。既有时间戳单调判据原样保留（不被链判定削弱）。
+- **边界**：链只保护已入链段；首个带哈希记录之前的历史段不参与校验（改写不可检出）。整链全量重算（含中段改写后重算后续所有链）同样不可检出——该残余窗口由阶段门 checkpoint 锚收口（Task 8）。
 
 ### R1 阶段动作完整性：按阶段分档
 

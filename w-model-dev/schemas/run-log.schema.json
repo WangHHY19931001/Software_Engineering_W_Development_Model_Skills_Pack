@@ -404,6 +404,14 @@
       "type": "number",
       "minimum": 0,
       "maximum": 1
+    },
+    "prevRecordHash": {
+      "description": "记录哈希链前驱（D-3a，可选）：链定稿公式 recordHash = sha256(prevRecordHash + \"\\n\" + canonicalJson(record 去掉 recordHash 字段))；canonicalJson = 对象键按 Unicode 码点升序、无空白、UTF-8、数组保序。取值 = 文件内前一条带 recordHash 记录的 recordHash；文件内首条带哈希记录为 \"\"（空串）。prevRecordHash 自身是记录字段，参与本条 canonicalJson 载荷（链关系因此双重绑定）。由 wm-append-runlog.ts 追加时自动写入（prevRecordHash 取文件内最后一条带哈希记录的 recordHash，无则 \"\"；历史行不补链）；check-run-log.ts R7 从最后一条带 recordHash 的记录向前逐条复算——链断（prevRecordHash ≠ 前一条 recordHash）即 blocking，首个带哈希记录之前的历史段只记非阻断 LEGACY 诊断。第三方可按公式独立复算。",
+      "type": "string"
+    },
+    "recordHash": {
+      "description": "记录内容哈希（D-3a，可选）：链定稿公式 recordHash = sha256(prevRecordHash + \"\\n\" + canonicalJson(record 去掉 recordHash 字段))；canonicalJson = 对象键按 Unicode 码点升序、无空白、UTF-8、数组保序；输出 64 位小写 hex；记录自身的 recordHash 字段不参与载荷（否则不可复算）。由 wm-append-runlog.ts 追加时自动计算写入（载荷自带的 recordHash 由追加器按链重算覆盖并在 diagnostics 留痕）；check-run-log.ts R7 复算不符即 blocking（记录被就地改写，或中段删行/插行导致链重排）。历史记录缺该字段不阻断：首个带哈希记录之前的历史段（或全无哈希的日志）只记非阻断 LEGACY 诊断，禁止回溯补哈希。第三方可按公式独立复算。",
+      "type": "string"
     }
   }
 }

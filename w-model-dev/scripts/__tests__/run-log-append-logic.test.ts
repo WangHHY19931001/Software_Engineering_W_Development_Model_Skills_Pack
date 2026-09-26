@@ -12,6 +12,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { planAppend, planCorrection, type RunLogRecord } from '../logic/run-log-append-logic.js';
+import { checkRunLog, computeRecordHash } from '../logic/run-log-logic.js';
 
 function mkEntry(patch: Partial<RunLogRecord> = {}): RunLogRecord {
   return {
@@ -290,5 +291,84 @@ describe('planCorrection：更正记录（裁定 B）', () => {
     expect(second.accepted).toBe(true);
     expect(second.entries).toHaveLength(3);
     expect(second.entries[2]!.note).toMatch(/correction-of:/);
+  });
+});
+
+// ==================== 记录哈希链接线（D-3a 裁定 C） ====================
+
+describe('planAppend：记录哈希链接线（D-3a 裁定 C）', () => {
+  it('首条追加：prevRecordHash="" 且 recordHash 与定稿公式一致（64 位小写 hex）', () => {
+    const plan = planAppend([], [mkEntry({ runId: 'n1' })], { now: '2026-09-25T10:00:00.000Z' });
+    expect(plan.accepted).toBe(true);
+    const appended = plan.entries.at(-1)!;
+    expect(appended.prevRecordHash).toBe('');
+    expect(appended.recordHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(appended.recordHash).toBe(computeRecordHash(appended, ''));
+  });
+
+  it('两次连续追加 → 链连续（第二条 prevRecordHash === 第一条 recordHash）', () => {
+    const first = planAppend([], [mkEntry({ runId: 'n1' })], { now: '2026-09-25T10:00:00.000Z' });
+    const second = planAppend(first.entries, [mkEntry({ runId: 'n2' })], { now: '2026-09-25T10:01:00.000Z' });
+    const head = first.entries.at(-1)!;
+    const tail = second.entries.at(-1)!;
+    expect(tail.prevRecordHash).toBe(head.recordHash);
+    expect(tail.recordHash).toBe(computeRecordHash(tail, String(head.recordHash)));
+    // writer 产出的链直接送 checker（共用同一实现 → 无链判定违规，passed 不变）
+    const checked = checkRunLog(second.entries);
+    expect(checked.violations.filter((violation) => violation.includes('哈希链'))).toEqual([]);
+    expect(checked.passed).toBe(true);
+  });
+
+  it('历史无哈希段在前 → 新记录 prevRecordHash="" 且历史行零改写（禁止回溯补链）', () => {
+    const existing = [mkEntry({ runId: 'h1', timestamp: '2026-09-25T09:00:00.000Z' })];
+    const snapshot = JSON.parse(JSON.stringify(existing)) as RunLogRecord[];
+    const plan = planAppend(existing, [mkEntry({ runId: 'n1' })], { now: '2026-09-25T10:00:00.000Z' });
+    expect(plan.accepted).toBe(true);
+    expect(plan.entries[0]).toEqual(snapshot[0]);
+    expect(plan.entries[0]!.recordHash).toBeUndefined();
+    expect(plan.entries.at(-1)!.prevRecordHash).toBe('');
+  });
+
+  it('已有带链历史 + 无哈希尾行 → 新记录接在文件内最后一条带哈希记录之后', () => {
+    const seeded = planAppend([], [mkEntry({ runId: 'c1' })], { now: '2026-09-25T09:00:00.000Z' });
+    const withLegacyTail = [...seeded.entries, mkEntry({ runId: 'legacy', timestamp: '2026-09-25T09:30:00.000Z' })];
+    const plan = planAppend(withLegacyTail, [mkEntry({ runId: 'c2' })], { now: '2026-09-25T10:00:00.000Z' });
+    expect(plan.accepted).toBe(true);
+    expect(plan.entries.at(-1)!.prevRecordHash).toBe(seeded.entries[0]!.recordHash);
+  });
+
+  it('--correct 生成的更正记录同样入链（历史行含其哈希零改写）', () => {
+    const seeded = planAppend([], [mkEntry({ runId: 'a', note: '错值 4' })], { now: '2026-09-25T10:00:00.000Z' });
+    const plan = planCorrection(seeded.entries, 'a', { note: '更正为 5' }, { now: '2026-09-25T10:01:00.000Z' });
+    expect(plan.accepted).toBe(true);
+    const head = seeded.entries.at(-1)!;
+    const correction = plan.entries.at(-1)!;
+    expect(correction.prevRecordHash).toBe(head.recordHash);
+    expect(correction.recordHash).toBe(computeRecordHash(correction, String(head.recordHash)));
+    expect(plan.entries[0]!.recordHash).toBe(head.recordHash);
+  });
+
+  it('载荷自带链字段被重算覆盖（非静默：diagnostics 留痕）', () => {
+    const plan = planAppend(
+      [],
+      [mkEntry({ runId: 'n1', recordHash: 'f'.repeat(64), prevRecordHash: 'e'.repeat(64) })],
+      { now: '2026-09-25T10:00:00.000Z' },
+    );
+    expect(plan.accepted).toBe(true);
+    const appended = plan.entries.at(-1)!;
+    expect(appended.recordHash).not.toBe('f'.repeat(64));
+    expect(appended.prevRecordHash).toBe('');
+    expect(plan.diagnostics.some((line) => line.includes('链字段') && line.includes('重算覆盖'))).toBe(true);
+  });
+
+  it('批内多条追加 → 批内链连续', () => {
+    const plan = planAppend([], [mkEntry({ runId: 'n1' }), mkEntry({ runId: 'n2' }), mkEntry({ runId: 'n3' })], {
+      now: '2026-09-25T10:00:00.000Z',
+    });
+    expect(plan.accepted).toBe(true);
+    const [first, second, third] = plan.entries;
+    expect(second!.prevRecordHash).toBe(first!.recordHash);
+    expect(third!.prevRecordHash).toBe(second!.recordHash);
+    expect(third!.recordHash).toBe(computeRecordHash(third!, String(second!.recordHash)));
   });
 });

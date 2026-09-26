@@ -29,10 +29,18 @@
  *   - 历史末条扫描用宽容口径 `Number.isFinite(Date.parse(v))`（schema 的 `format: date-time` 对大小写 /
  *     分隔符宽容，严格正则只用于新注入 / 新记录），避免历史行时间戳被跳过导致单调性下界失真；
  *   - `--correct=<runId>` 只**新增**一条更正记录（`note` 含 `correction-of:<runId>`），
- *     历史行不删不改；runId 不存在即拒绝（UNKNOWN_RUN_ID，调用方按输入错误 exit 2 处理）。
+ *     历史行不删不改；runId 不存在即拒绝（UNKNOWN_RUN_ID，调用方按输入错误 exit 2 处理）；
+ *   - **记录哈希链（D-3a / 裁定 C）**：每条新记录的 `prevRecordHash` 取**文件内最后一条带哈希记录**
+ *     的 `recordHash`（无则 `""`），`recordHash` 按定稿公式
+ *     `sha256(prevRecordHash + "\n" + canonicalJson(record 去掉 recordHash 字段))` 计算
+ *     （共享实现 `logic/run-log-logic.ts` 的 `computeRecordHash`，禁止各写一份）；载荷自带的链字段
+ *     由追加器重算覆盖并在 `diagnostics` 留痕（哈希链只能由写入端计算）。历史行**不补哈希**（禁止
+ *     回溯补链），`--correct` 生成的更正记录同样入链。
  *
  * @module
  */
+
+import { computeRecordHash } from './run-log-logic.js';
 
 /** run-log.jsonl 单条记录（形状由 `schemas/run-log.schema.json` 强制，本模块只关心追加相关字段） */
 export interface RunLogRecord {
@@ -42,6 +50,10 @@ export interface RunLogRecord {
   timestamp?: string;
   /** 备注：时间戳痕迹（clock-injected / clock-adjust / correction-of）追加于此，不覆盖既有内容 */
   note?: string;
+  /** 记录哈希链（D-3a）：本条记录的 prevRecordHash（前一条带哈希记录的 recordHash；无则 ""） */
+  prevRecordHash?: string;
+  /** 记录哈希链（D-3a）：本条记录的内容指纹（sha256 小写 hex，由追加器按定稿公式计算） */
+  recordHash?: string;
   /** 其余 RunLogEntry 字段原样透传（必填性由 CLI 侧逐行 schema 校验强制） */
   [key: string]: unknown;
 }
@@ -123,6 +135,19 @@ function lastTimestamp(entries: readonly RunLogRecord[]): { ms: number; text: st
     if (ms !== null) return { ms, text: String(entry.timestamp) };
   }
   return null;
+}
+
+/**
+ * 文件内最后一条带哈希记录的 `recordHash`（无则 `""`）——D-3a 裁定 C：新记录 `prevRecordHash` 的
+ * 唯一取值来源。历史无哈希段被完整跳过（不补链），故「历史段 + 新带链记录」形态的链首为 `""`。
+ */
+function lastRecordHash(entries: readonly RunLogRecord[]): string {
+  for (let index = entries.length - 1; index >= 0; index--) {
+    // eslint-disable-next-line security/detect-object-injection -- index 为本地数组下界循环计数（非外部输入），数组为同函数内的记录列表
+    const candidate = entries[index]?.recordHash;
+    if (isNonEmptyString(candidate)) return candidate;
+  }
+  return '';
 }
 
 class PlanCollector {
@@ -279,6 +304,8 @@ function planIncoming(
   const seenRunIds = new Set(existing.map((entry) => entry.runId).filter(isNonEmptyString));
   const historyLast = lastTimestamp(existing);
   let floor = historyLast;
+  // D-3a 裁定 C：链尾从**文件内**最后一条带哈希记录派生（历史行不补链，故无哈希历史段不参与）
+  let chainPrev = lastRecordHash(existing);
 
   for (const [index, record] of incoming.entries()) {
     const label = `第 ${index + 1} 条追加记录`;
@@ -317,7 +344,21 @@ function planIncoming(
     );
     if (stamped === null) continue;
 
-    planned.push(stamped);
+    // D-3a 裁定 C：新记录入链。prevRecordHash 取链尾（文件内最后一条带哈希记录）并**先写入记录**，
+    // 再按定稿公式计算 recordHash——prevRecordHash 是记录字段，参与 canonicalJson 载荷（与
+    // check-run-log R7 的复算口径逐字一致：`computeRecordHash(记录, 记录.prevRecordHash)`）。
+    // 载荷自带链字段一律重算覆盖（哈希链只能由写入端计算），且以 diagnostic 明示，绝不静默沿用。
+    if (record.recordHash !== undefined || record.prevRecordHash !== undefined) {
+      collector.diagnostics.push(
+        `${label}载荷自带链字段（recordHash/prevRecordHash）已由追加器按定稿公式重算覆盖（哈希链只能由写入端计算，载荷值不可信）`,
+      );
+    }
+    const chained: RunLogRecord = { ...stamped, prevRecordHash: chainPrev };
+    const recordHash = computeRecordHash(chained, chainPrev);
+    chained.recordHash = recordHash;
+    chainPrev = recordHash;
+
+    planned.push(chained);
     floor = { ms: resolved.ms, text: resolved.text };
   }
 

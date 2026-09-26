@@ -17,6 +17,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   checkRunLog,
+  canonicalJson,
+  computeRecordHash,
+  sha256Hex,
   extractExitCode,
   inspectGateLogContent,
   buildGateLogKeys,
@@ -2886,5 +2889,194 @@ describe('run-log D-2: R3/R7 配对接受 V 重发记录（V 自有产物重发 
     const r = checkRunLog(reworkChain(vResend({ outcome: 'fail' })));
     expect(r.violations.some((v) => v.startsWith('R3: rootcause 报告 RC-p3-1'))).toBe(true);
     expect(r.violations.some((v) => v.startsWith('R7: rootcause 记录') && v.includes('successful fix'))).toBe(true);
+  });
+});
+
+// ==================== R7 扩展：记录哈希链（D-3a，2026-09-25）====================
+// 背景：R7 的时间戳单调判据只约束「相对顺序」，对既有行被**就地改写**（改 note / 改历史时间戳 /
+// 删行 / 插行）完全不可见（四类突变全部 exit 0）。记录哈希链把「中段篡改必须整链重算」变成
+// 可执行契约：`recordHash = sha256(prevRecordHash + "\n" + canonicalJson(record 去掉 recordHash 字段))`。
+//
+// withChain：与 writer（logic/run-log-append-logic.ts → cli/wm-append-runlog.ts）共用
+// run-log-logic.ts 的 computeRecordHash 单一实现（禁两处各写一份）。载荷 = 记录去掉 recordHash
+// 字段后的 canonicalJson（prevRecordHash 作为记录字段参与载荷），前缀 = prevRecordHash + "\n"。
+
+/** 带链记录的时间戳：严格递增且互不相同（避免与 R7 时间单调判据的违规文案混在一起） */
+function chainStamp(index: number): string {
+  return `2026-09-25T10:00:${String(index).padStart(2, '0')}Z`;
+}
+
+function withChain(rows: Array<Record<string, unknown>>): RunLogEntry[] {
+  let prev = '';
+  return rows.map((row) => {
+    const chained = { ...row, prevRecordHash: prev };
+    const recordHash = computeRecordHash(chained, prev);
+    prev = recordHash;
+    return { ...chained, recordHash } as unknown as RunLogEntry;
+  });
+}
+
+/** RunLogEntry → withChain 入参（Record 形态；schema 校验拒绝 unknown 字段，故仅作链构造用） */
+function entryRecord(overrides: Partial<RunLogEntry>): Record<string, unknown> {
+  return { ...makeEntry(overrides) } as unknown as Record<string, unknown>;
+}
+
+/** 构造 count 条带链记录（action=produce 且无阶段门 → 除链判定外零违规，passed 可作正例断言） */
+function chainedEntries(count: number): RunLogEntry[] {
+  return withChain(
+    Array.from({ length: count }, (_, index) =>
+      entryRecord({ runId: `rc-${index + 1}`, timestamp: chainStamp(index) }),
+    ),
+  );
+}
+
+/** 链判定违规（blocking）：文案同时含 R7 与「哈希链」 */
+function chainViolations(violations: readonly string[]): string[] {
+  return violations.filter((violation) => violation.includes('R7') && violation.includes('哈希链'));
+}
+
+describe('run-log R7 扩展：记录哈希链（D-3a）', () => {
+  it('canonicalJson：对象键按 Unicode 码点升序、无空白、数组保序', () => {
+    expect(canonicalJson({ b: 1, a: [2, 1], z: null })).toBe('{"a":[2,1],"b":1,"z":null}');
+    expect(canonicalJson({ z: { y: 1, x: [{ b: 1, a: 2 }] } })).toBe('{"z":{"x":[{"a":2,"b":1}],"y":1}}');
+    // 键序是「码点序」而非「UTF-16 码元序」：U+FFFD(65533) < U+1F600(128512)，码元序会得到相反结果
+    expect(canonicalJson({ '\u{1F600}': 1, '\uFFFD': 2 })).toBe('{"\uFFFD":2,"😀":1}');
+    // 值为 undefined 的键按 JSON.stringify 口径剔除（不产生非法 JSON）
+    expect(canonicalJson({ dropped: undefined, kept: 1 })).toBe('{"kept":1}');
+    // 字符串值按 JSON 转义（含控制字符 / 引号 / 反斜杠）
+    expect(canonicalJson({ s: 'line\nbreak "q" \\ tail' })).toBe(`{"s":${JSON.stringify('line\nbreak "q" \\ tail')}}`);
+    // 顶层数组保序（不排序元素）
+    expect(canonicalJson([{ b: 1, a: 2 }, 'x'])).toBe('[{"a":2,"b":1},"x"]');
+    // 同一对象多次调用字节稳定（键序与插入顺序无关）
+    expect(canonicalJson({ b: 1, a: 2 })).toBe(canonicalJson({ a: 2, b: 1 }));
+  });
+
+  it('sha256Hex：与 node:crypto sha256 逐字节一致（含多块 / astral / 孤立代理对 / 已知向量）', () => {
+    const cases = ['', 'abc', '中文字符', '😀'.repeat(3), 'a'.repeat(200), '\uD800', 'x\uDFFFy', 'a'.repeat(55)];
+    for (const text of cases) {
+      expect(sha256Hex(text)).toBe(createHash('sha256').update(text, 'utf8').digest('hex'));
+    }
+    expect(sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    expect(sha256Hex('')).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+  });
+
+  it('computeRecordHash：与文档公式的第三方独立复算一致（键序 / 前缀 / 去掉 recordHash）', () => {
+    const prev = 'a'.repeat(64);
+    const payload = { ...makeEntry({ runId: 'rc-x' }), prevRecordHash: prev, note: '第三方复算' };
+    const withoutHash = { ...payload };
+    delete (withoutHash as Record<string, unknown>).recordHash;
+    const expected = createHash('sha256')
+      .update(`${prev}\n${canonicalJson(withoutHash)}`, 'utf8')
+      .digest('hex');
+    expect(computeRecordHash(payload, prev)).toBe(expected);
+    // 记录内的 recordHash 字段不参与载荷（否则哈希不可复算）
+    expect(computeRecordHash({ ...payload, recordHash: '旧值' }, prev)).toBe(expected);
+    // 内容不同 → 哈希不同（雪崩）
+    expect(computeRecordHash({ ...payload, note: '改过' }, prev)).not.toBe(expected);
+  });
+
+  it('R7：改写中段记录内容（note）→ 哈希链断裂（blocking，文案含 R7 + runId）', () => {
+    const rows = chainedEntries(3);
+    rows[1]!.note = '被就地改写';
+    const result = checkRunLog(rows);
+    expect(result.passed).toBe(false);
+    expect(chainViolations(result.violations).length).toBeGreaterThan(0);
+    expect(chainViolations(result.violations).some((violation) => violation.includes('rc-2'))).toBe(true);
+  });
+
+  it('R7：改写中段记录的历史时间戳 → 哈希链断裂（时间单调判据看不见的突变）', () => {
+    const rows = chainedEntries(3);
+    // 仍是严格递增（R7 时间单调判据无异常），但是对已哈希内容的就地改写
+    rows[1]!.timestamp = '2026-09-25T10:00:00.500Z';
+    const result = checkRunLog(rows);
+    expect(result.violations.some((violation) => violation.includes('非 append-only'))).toBe(false);
+    expect(chainViolations(result.violations).length).toBeGreaterThan(0);
+  });
+
+  it('R7：删除中段一条记录 → 哈希链断裂', () => {
+    const rows = chainedEntries(4);
+    const result = checkRunLog([rows[0]!, rows[1]!, rows[3]!]);
+    expect(result.passed).toBe(false);
+    expect(chainViolations(result.violations).length).toBeGreaterThan(0);
+  });
+
+  it('R7：插入一条无哈希记录（哈希段之后）→ 哈希链断裂', () => {
+    const rows = chainedEntries(3);
+    const inserted = makeEntry({ runId: 'rc-ins', timestamp: '2026-09-25T10:00:00.500Z' });
+    const result = checkRunLog([rows[0]!, inserted, rows[1]!, rows[2]!]);
+    expect(result.passed).toBe(false);
+    expect(chainViolations(result.violations).some((violation) => violation.includes('rc-ins'))).toBe(true);
+  });
+
+  it('R7：插入一条伪造哈希的记录（复制既有链字段）→ 哈希链断裂', () => {
+    const rows = chainedEntries(3);
+    const forged = { ...rows[1]!, runId: 'rc-forged', timestamp: '2026-09-25T10:00:00.500Z' } as RunLogEntry;
+    const result = checkRunLog([rows[0]!, forged, rows[1]!, rows[2]!]);
+    expect(result.passed).toBe(false);
+    expect(chainViolations(result.violations).some((violation) => violation.includes('rc-forged'))).toBe(true);
+  });
+
+  it('R7：就地删除中段记录的 recordHash 字段 → 哈希链断裂', () => {
+    const rows = chainedEntries(3);
+    delete (rows[1] as unknown as Record<string, unknown>).recordHash;
+    const result = checkRunLog(rows);
+    expect(result.passed).toBe(false);
+    expect(chainViolations(result.violations).some((violation) => violation.includes('rc-2'))).toBe(true);
+  });
+
+  it('R7：链首（首条带哈希记录）prevRecordHash 必须为 ""', () => {
+    const rows = chainedEntries(3);
+    rows[0]!.prevRecordHash = 'f'.repeat(64);
+    const result = checkRunLog(rows);
+    expect(result.passed).toBe(false);
+    expect(chainViolations(result.violations).length).toBeGreaterThan(0);
+  });
+
+  it('R7：历史全无哈希 → 非阻断 LEGACY 诊断（passed 不变）+ 时间单调判据原样保留', () => {
+    const rows = [
+      makeEntry({ runId: 'old1', timestamp: '2026-09-25T10:00:00Z' }),
+      makeEntry({ runId: 'old2', timestamp: '2026-09-25T10:00:01Z' }),
+    ];
+    const result = checkRunLog(rows);
+    expect(result.passed).toBe(true);
+    expect(chainViolations(result.violations)).toEqual([]);
+    expect(result.diagnostics?.includes('R7: 历史段 2 条无哈希（LEGACY，未参与链校验）')).toBe(true);
+
+    // 既有时间戳单调判据不得被链判定削弱：历史（无哈希）倒序仍报 R7 非 append-only
+    const reversed = [
+      makeEntry({ runId: 'old1', timestamp: '2026-09-25T10:00:05Z' }),
+      makeEntry({ runId: 'old2', timestamp: '2026-09-25T10:00:01Z' }),
+    ];
+    const bad = checkRunLog(reversed);
+    expect(bad.passed).toBe(false);
+    expect(bad.violations.some((violation) => violation.includes('R7') && violation.includes('非 append-only'))).toBe(
+      true,
+    );
+  });
+
+  it('R7：混合（历史无哈希段 + 新带链记录）→ 通过 + 历史段计数诊断', () => {
+    const chained = withChain([
+      entryRecord({ runId: 'n1', timestamp: chainStamp(2) }),
+      entryRecord({ runId: 'n2', timestamp: chainStamp(3) }),
+    ]);
+    const mixed = [
+      makeEntry({ runId: 'old1', timestamp: chainStamp(0) }),
+      makeEntry({ runId: 'old2', timestamp: chainStamp(1) }),
+      ...chained,
+    ];
+    const result = checkRunLog(mixed);
+    expect(result.passed).toBe(true);
+    expect(chainViolations(result.violations)).toEqual([]);
+    expect(result.diagnostics?.includes('R7: 历史段 2 条无哈希（LEGACY，未参与链校验）')).toBe(true);
+  });
+
+  it('R7：混合段中新记录链自洽但历史段被改写 → 只按链判定拦截（历史未入链不假阳性）', () => {
+    const chained = withChain([entryRecord({ runId: 'n1', timestamp: chainStamp(2) })]);
+    const mixed = [makeEntry({ runId: 'old1', timestamp: chainStamp(0) }), ...chained];
+    mixed[0]!.note = '历史行被改写（未参与链校验，链判定无法察觉）';
+    const result = checkRunLog(mixed);
+    expect(result.passed).toBe(true);
+    expect(chainViolations(result.violations)).toEqual([]);
+    expect(result.diagnostics?.includes('R7: 历史段 1 条无哈希（LEGACY，未参与链校验）')).toBe(true);
   });
 });

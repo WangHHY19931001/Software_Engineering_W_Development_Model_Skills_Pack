@@ -5,7 +5,7 @@
  * 与 w-model-dev/references/operational-recovery.md §5.2。
  * 校验：R1 阶段动作完整性 + R2 tokens 非负 + R3 返工记录一致
  *       + R4 acknowledgedDecisions 非空 + R5 O 越权检测 + R6 exitCode 一致
- *       + R7 append-only 时序。
+ *       + R7 append-only 时序 + 记录哈希链（D-3a：链断 blocking / 历史段 LEGACY 非阻断）。
  *       + R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint）
  *       + R9 跨轮次评审一致性 + R10 revertEvidence 回滚证伪
  *       + R11 闭环五脚本机器核验（约束 #11）
@@ -159,6 +159,11 @@ export interface RunLogEntry {
   round?: number;
   /** gate: 门禁脚本名 */
   script?: string;
+  // ---- 记录哈希链（D-3a，可选；公式见 canonicalJson / computeRecordHash）----
+  /** 前一条带哈希记录的 recordHash（文件内首条带哈希记录为 ""）；作为记录字段参与本条哈希载荷 */
+  prevRecordHash?: string;
+  /** 本条记录的内容指纹：sha256(prevRecordHash + "\n" + canonicalJson(记录去掉 recordHash 字段)) 小写 hex */
+  recordHash?: string;
 }
 
 export interface RunLogCheckOptions {
@@ -168,6 +173,11 @@ export interface RunLogCheckOptions {
   phase?: number;
   /** R5/R6: gate-logs 数据，key = gateLogPath，value = { exitCode?, content } */
   gateLogs?: Map<string, { exitCode?: number; content: string }>;
+  /**
+   * R7 哈希链：注入的哈希实现（默认纯 TS `sha256Hex`）。
+   * 用于复用宿主 crypto 或测试替换；公式不变（sha256 + canonicalJson）。
+   */
+  hashFn?: HashFunction;
 }
 
 export type RunLogLifecycleStatus = 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
@@ -557,6 +567,213 @@ const ACTION_ROLE_PAIRING: Record<string, 'S' | 'V' | 'G' | 'R'> = {
   'r3-reliability': 'R',
   'r3-security': 'R',
 };
+
+// ==================== 记录哈希链（D-3a，2026-09-25）====================
+//
+// 目的：R7 的时间戳单调判据只约束「相对顺序」，对既有行被**就地改写**（改 note / 改历史时间戳 /
+// 删行 / 插行）完全不可见——四类突变此前全部 exit 0（真实调测中正是靠该盲区完成放行前重排）。
+// 记录级哈希链把「中段篡改必须整链重算」变成可执行契约。
+//
+// 定稿公式（写入 `references/data-models.md` 与 `schemas/run-log.schema.json` 的字段 description，
+// 第三方可独立复算）：
+//
+//   recordHash = sha256(prevRecordHash + "\n" + canonicalJson(record 去掉 recordHash 字段))
+//   canonicalJson = 对象键按 Unicode 码点升序、无空白、UTF-8、数组保序
+//
+// 说明：`prevRecordHash` 是记录字段，因此**参与** canonicalJson 载荷（前缀里再出现一次，链关系因此
+// 被双重绑定）；`recordHash` 字段本身必须从载荷剔除，否则哈希不可复算。
+
+/** 哈希函数签名：输入 UTF-8 文本，输出小写 hex 摘要（默认 `sha256Hex`，可注入宿主 crypto 实现） */
+export type HashFunction = (input: string) => string;
+
+/** SHA-256 轮常量（FIPS 180-4，前 64 个素数立方根小数部分前 32 位） */
+const SHA256_ROUND_CONSTANTS = new Uint32Array([
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98,
+  0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786,
+  0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8,
+  0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+  0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819,
+  0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a,
+  0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7,
+  0xc67178f2,
+]);
+
+/** 32 位循环右移 */
+function rotateRight(value: number, bits: number): number {
+  return ((value >>> bits) | (value << (32 - bits))) >>> 0;
+}
+
+/**
+ * UTF-8 字节编码（WHATWG 口径：孤立代理对 → U+FFFD，与 `TextEncoder` 一致）。
+ *
+ * 不自带 `TextEncoder` 依赖（logic 层保持零运行时依赖、零全局依赖），手写规则 §3.9 逐条等价。
+ */
+function utf8Bytes(text: string): number[] {
+  const bytes: number[] = [];
+  for (const character of text) {
+    const codeUnit = character.charCodeAt(0);
+    // 孤立代理对（长度为 1 的代理码元）→ U+FFFD（TextEncoder 同款替换语义）
+    const isLoneSurrogate = character.length === 1 && codeUnit >= 0xd800 && codeUnit <= 0xdfff;
+    const codePoint = isLoneSurrogate ? 0xfffd : (character.codePointAt(0) ?? 0);
+    if (codePoint < 0x80) {
+      bytes.push(codePoint);
+    } else if (codePoint < 0x800) {
+      bytes.push(0xc0 | (codePoint >> 6), 0x80 | (codePoint & 0x3f));
+    } else if (codePoint < 0x10000) {
+      bytes.push(0xe0 | (codePoint >> 12), 0x80 | ((codePoint >> 6) & 0x3f), 0x80 | (codePoint & 0x3f));
+    } else {
+      bytes.push(
+        0xf0 | (codePoint >> 18),
+        0x80 | ((codePoint >> 12) & 0x3f),
+        0x80 | ((codePoint >> 6) & 0x3f),
+        0x80 | (codePoint & 0x3f),
+      );
+    }
+  }
+  return bytes;
+}
+
+/**
+ * 纯 TypeScript SHA-256（UTF-8 输入 → 小写 hex 摘要）。
+ *
+ * 为什么手写而不用 `node:crypto`：本文件属 logic 层，D-3a 控制者裁定 A 明确要求哈希计算的
+ * `node:crypto` 不得进 logic（以参数注入或由 lib/cli 层传入为准）。此处提供**自包含纯实现**作为
+ * `computeRecordHash` 的默认哈希函数，使 checker（`checkRunLog`）与 writer（`planAppend`）无需任何
+ * 外部注入即可复核同一公式；`HashFunction` 注入点保留给需要复用宿主 crypto 的调用方。
+ * 正确性由 `__tests__/run-log-logic.test.ts` 对 `node:crypto` 的逐一比对锁定（空串 / 多块 / astral /
+ * 孤立代理对 / 已知向量）。
+ */
+/* eslint-disable security/detect-object-injection -- SHA-256 依定义按轮次索引定长 typed array（Uint32Array / Uint8Array）与本地字节数组，下标全部来自本地循环整数与固定偏移（非外部输入），不存在对象注入面 */
+export function sha256Hex(input: string): string {
+  const bytes = utf8Bytes(input);
+  const bitLength = bytes.length * 8;
+  const paddedLength = Math.ceil((bytes.length + 9) / 64) * 64;
+  const padded = new Uint8Array(paddedLength);
+  padded.set(bytes);
+  padded[bytes.length] = 0x80;
+  const highBits = Math.floor(bitLength / 0x100000000);
+  const lowBits = bitLength >>> 0;
+  for (let index = 0; index < 4; index++) {
+    padded[paddedLength - 8 + index] = (highBits >>> (24 - index * 8)) & 0xff;
+    padded[paddedLength - 4 + index] = (lowBits >>> (24 - index * 8)) & 0xff;
+  }
+
+  const hash = new Uint32Array([
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+  ]);
+  const schedule = new Uint32Array(64);
+  for (let offset = 0; offset < paddedLength; offset += 64) {
+    for (let index = 0; index < 16; index++) {
+      const at = offset + index * 4;
+      const word = (padded[at] ?? 0) << 24;
+      const second = (padded[at + 1] ?? 0) << 16;
+      const third = (padded[at + 2] ?? 0) << 8;
+      const fourth = padded[at + 3] ?? 0;
+      schedule[index] = (word | second | third | fourth) >>> 0;
+    }
+    for (let index = 16; index < 64; index++) {
+      const first = schedule[index - 15] ?? 0;
+      const second = schedule[index - 2] ?? 0;
+      const sigma0 = rotateRight(first, 7) ^ rotateRight(first, 18) ^ (first >>> 3);
+      const sigma1 = rotateRight(second, 17) ^ rotateRight(second, 19) ^ (second >>> 10);
+      schedule[index] = ((schedule[index - 16] ?? 0) + sigma0 + (schedule[index - 7] ?? 0) + sigma1) >>> 0;
+    }
+
+    let a = hash[0] ?? 0;
+    let b = hash[1] ?? 0;
+    let c = hash[2] ?? 0;
+    let d = hash[3] ?? 0;
+    let e = hash[4] ?? 0;
+    let f = hash[5] ?? 0;
+    let g = hash[6] ?? 0;
+    let h = hash[7] ?? 0;
+    for (let index = 0; index < 64; index++) {
+      const bigSigma1 = rotateRight(e, 6) ^ rotateRight(e, 11) ^ rotateRight(e, 25);
+      const choose = (e & f) ^ (~e & g);
+      const temp1 = (h + bigSigma1 + choose + (SHA256_ROUND_CONSTANTS[index] ?? 0) + (schedule[index] ?? 0)) >>> 0;
+      const bigSigma0 = rotateRight(a, 2) ^ rotateRight(a, 13) ^ rotateRight(a, 22);
+      const majority = (a & b) ^ (a & c) ^ (b & c);
+      const temp2 = (bigSigma0 + majority) >>> 0;
+      h = g;
+      g = f;
+      f = e;
+      e = (d + temp1) >>> 0;
+      d = c;
+      c = b;
+      b = a;
+      a = (temp1 + temp2) >>> 0;
+    }
+    hash[0] = ((hash[0] ?? 0) + a) >>> 0;
+    hash[1] = ((hash[1] ?? 0) + b) >>> 0;
+    hash[2] = ((hash[2] ?? 0) + c) >>> 0;
+    hash[3] = ((hash[3] ?? 0) + d) >>> 0;
+    hash[4] = ((hash[4] ?? 0) + e) >>> 0;
+    hash[5] = ((hash[5] ?? 0) + f) >>> 0;
+    hash[6] = ((hash[6] ?? 0) + g) >>> 0;
+    hash[7] = ((hash[7] ?? 0) + h) >>> 0;
+  }
+  return [...hash].map((word) => word.toString(16).padStart(8, '0')).join('');
+}
+/* eslint-enable security/detect-object-injection */
+
+/** 按 Unicode 码点升序比较字符串（≠ 默认 UTF-16 码元序：astral 字符与 U+E000..U+FFFF 的相对次序不同） */
+function compareByCodePoint(left: string, right: string): number {
+  const leftPoints = [...left];
+  const rightPoints = [...right];
+  const shared = Math.min(leftPoints.length, rightPoints.length);
+  for (let index = 0; index < shared; index++) {
+    // eslint-disable-next-line security/detect-object-injection -- 同上：本地码点数组 + 循环整数下标
+    const leftPoint = leftPoints[index]?.codePointAt(0) ?? 0;
+    // eslint-disable-next-line security/detect-object-injection -- 同上：本地码点数组 + 循环整数下标
+    const rightPoint = rightPoints[index]?.codePointAt(0) ?? 0;
+    if (leftPoint !== rightPoint) return leftPoint - rightPoint;
+  }
+  return leftPoints.length - rightPoints.length;
+}
+
+/**
+ * 规范化 JSON（`canonicalJson`，D-3a 定稿：对象键按 Unicode 码点升序、无空白、UTF-8、数组保序）。
+ *
+ * 值与 `JSON.stringify` 同口径：字符串按 JSON 规则转义、数组保序、值为 `undefined` 的对象键剔除
+ * （数组内 `undefined` 按 JSON 语义记为 `null`）、非有限数字记为 `null`。
+ */
+export function canonicalJson(value: unknown): string {
+  if (value === null) return 'null';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (typeof value === 'number') return Number.isFinite(value) ? JSON.stringify(value) : 'null';
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => canonicalJson(item === undefined ? null : item)).join(',')}]`;
+  }
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined)
+      .sort(([left], [right]) => compareByCodePoint(left, right));
+    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(',')}}`;
+  }
+  return 'null';
+}
+
+/**
+ * 记录哈希（D-3a 定稿公式）：`sha256(prevRecordHash + "\n" + canonicalJson(record 去掉 recordHash 字段))`。
+ *
+ * writer（`logic/run-log-append-logic.ts`）与 checker（`checkRunLog` R7）共用本实现，禁止各写一份；
+ * `hashFn` 为可注入哈希实现（默认纯 TS `sha256Hex`）。
+ */
+export function computeRecordHash(
+  record: Record<string, unknown>,
+  prevRecordHash: string,
+  hashFn: HashFunction = sha256Hex,
+): string {
+  const withoutHash = Object.fromEntries(Object.entries(record).filter(([field]) => field !== 'recordHash'));
+  return hashFn(`${prevRecordHash}\n${canonicalJson(withoutHash)}`);
+}
+
+/** 记录携带的链字段（空串/N 非字符串视为未带哈希） */
+function recordHashOf(entry: RunLogEntry): string | undefined {
+  const value = (entry as unknown as Record<string, unknown>).recordHash;
+  return typeof value === 'string' && value !== '' ? value : undefined;
+}
 
 // ==================== 校验入口 ====================
 
@@ -1108,6 +1325,57 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       }
     }
     prevTimestamp = e.timestamp;
+  }
+
+  // R7 扩展（D-3a）：记录哈希链。
+  // 时间戳单调只约束「相对顺序」，对既有行被就地改写（改 note / 改历史时间戳 / 删行 / 插行）不可见；
+  // 链判定补上「记录内容 + 记录间链接」两个维度：
+  //   1. link：第 i 条（i > 首个带哈希记录）的 prevRecordHash 必须等于第 i-1 条的 recordHash；
+  //      首个带哈希记录的 prevRecordHash 必须为 ""（文件内无更早的带哈希记录）；
+  //   2. content：逐条按定稿公式复算 recordHash（载荷含 prevRecordHash，故链字段自身篡改同样暴露）；
+  //   3. 哈希段（首个带哈希记录起）之后不得出现无哈希记录（插入/就地删除 recordHash 的突变形态）；
+  //   4. 首个带哈希记录之前的历史段（以及全无哈希的日志）只记非阻断 LEGACY 诊断——历史行不补链，
+  //      禁止回溯补哈希；该段的改写超出现有证据能力（Task 8 的 checkpoint 锚负责收口）。
+  // 断链/内容不符/哈希段缺哈希一律 blocking（文案含 R7 + runId）。
+  const chainHashFn = options?.hashFn ?? sha256Hex;
+  const firstHashedIndex = valid.findIndex((e) => recordHashOf(e) !== undefined);
+  if (firstHashedIndex < 0) {
+    diagnostics.push(`R7: 历史段 ${valid.length} 条无哈希（LEGACY，未参与链校验）`);
+  } else {
+    if (firstHashedIndex > 0) {
+      diagnostics.push(`R7: 历史段 ${firstHashedIndex} 条无哈希（LEGACY，未参与链校验）`);
+    }
+    for (let index = firstHashedIndex; index < valid.length; index++) {
+      // eslint-disable-next-line security/detect-object-injection -- index 为本地数组下界循环计数（非外部输入），数组为同函数内的 valid 记录列表
+      const entry = valid[index]!;
+      const ownHash = recordHashOf(entry);
+      if (ownHash === undefined) {
+        violations.push(
+          `R7: 哈希链断裂：条目 ${entry.runId ?? '?'} 无 recordHash（哈希段之后不得出现未入链记录；就地删除 recordHash 亦命中）`,
+        );
+        continue;
+      }
+      const predecessor = index > firstHashedIndex ? valid[index - 1] : undefined;
+      const expectedPrev = predecessor === undefined ? '' : recordHashOf(predecessor);
+      if (entry.prevRecordHash !== undefined && typeof entry.prevRecordHash !== 'string') {
+        violations.push(`R7: 哈希链断裂：条目 ${entry.runId ?? '?'} 的 prevRecordHash 不是字符串（链字段形态非法）`);
+      } else if (expectedPrev !== undefined && entry.prevRecordHash !== expectedPrev) {
+        violations.push(
+          `R7: 哈希链断裂：条目 ${entry.runId ?? '?'} 的 prevRecordHash=${String(entry.prevRecordHash)} ` +
+            `与前一条 recordHash=${expectedPrev} 不符（链被重排/删除/插入）`,
+        );
+      }
+      const recomputed = computeRecordHash(
+        entry as unknown as Record<string, unknown>,
+        typeof entry.prevRecordHash === 'string' ? entry.prevRecordHash : '',
+        chainHashFn,
+      );
+      if (recomputed !== ownHash) {
+        violations.push(
+          `R7: 哈希链断裂：条目 ${entry.runId ?? '?'} 记录内容与 recordHash 不符（记录被就地改写或链字段被篡改）`,
+        );
+      }
+    }
   }
 
   // R7 扩展：返工路径按同身份 segment 检查，禁止跨 report/targetKind 借动作。
