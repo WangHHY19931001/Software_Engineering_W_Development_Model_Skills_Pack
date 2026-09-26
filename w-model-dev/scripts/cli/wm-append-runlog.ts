@@ -5,13 +5,18 @@
  * 背景：技能包此前只有 `wm-write.ts`（整文件原子写，无追加语义），真实调测中每个项目各自手搓
  * 追加脚本，出现「静默改写时间戳」一类回溯改写。本脚本把「禁止回溯改写」变成可执行契约：
  *
- *   - 时间戳**严格递增**：显式时间戳（记录自带 `timestamp` 或 `--timestamp=<iso>`）≤ 末条时间
- *     → exit 1 写入拒绝（文案含「时间戳不递增」+ 末条时间 + 建议），目标文件不被修改；
- *   - 无条件来源（无显式时间戳）用当前时间派生；≤ 末条时间时步进到末条 +1ms，并在 `diagnostics`
- *     明示「时钟调整 +Nms」、在记录 `note` 追加 `clock-adjust:auto+<N>ms`（绝不静默调整）；
+ *   - **时间戳三态（②与③不得合并叙述）**：① **显式**时间戳（记录自带 `timestamp` 或
+ *     `--timestamp=<iso>`）**≤ 末条** → **exit 1 写入拒绝**（`TIMESTAMP_NOT_INCREASING`，文案含
+ *     「时间戳不递增」+ 末条时间 + 建议），目标文件不被修改；② **无显式时间戳**且 `now` **早于**
+ *     末条（时钟真倒退：曾注入未来时间戳 / NTP 回拨 / 跨机拷贝）→ **exit 1 拒绝**，**仅**显式
+ *     `--allow-clock-adjust=<reason>` 才放行（步进末条 +1ms，`note` 留
+ *     `clock-adjust:auto+<N>ms:<reason>`）；③ **无显式时间戳**且 `now` **等于**末条毫秒、或仅
+ *     **批内冲突** → **良性 +1ms 步进**并留 `clock-adjust:auto+<N>ms`（`diagnostics` 明示
+ *     「时钟调整 +Nms」，绝不静默调整）；
  *   - `--timestamp=<iso>` 注入成功 → 记录 `note` 追加 `clock-injected:<iso>`；
- *   - `--allow-clock-adjust=<reason>` 显式声明小步进 → 步进到末条 +1ms 且记录 `note` 追加
- *     `clock-adjust:<reason>`（非空理由，禁止静默）；
+ *   - `--allow-clock-adjust=<reason>` 是 ①/② 的显式逃生口（非空理由，禁止静默）：把「exit 1 拒绝」
+ *     改为步进末条 +1ms 放行——①（显式不递增）留痕 `clock-adjust:<reason>`、②（now 倒退）留痕
+ *     `clock-adjust:auto+<N>ms:<reason>`；
  *   - `--correct=<runId>` 只**新增**一条更正记录（`note` 含 `correction-of:<runId>`），历史行不删不改；
  *     runId 不存在 → exit 2 输入错误。
  *
