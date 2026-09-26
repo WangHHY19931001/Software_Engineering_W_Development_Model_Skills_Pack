@@ -208,12 +208,25 @@ write('SPEC.md', '''# counter-api 冻结规格（2026-09-19，e2e 调测用）
 ''')
 
 # ---------- 真实源码与四级测试（node:test，零依赖） ----------
-write('src/counter.ts', '''export type CounterState = 'zeroed' | 'counting';
+# src/counter.ts 含不变式断言（与 TLA+ L2_counter_service 的 BusinessInvariant/TypeInvariant 同锚）：
+# check-code-tla-consistency 维度4（断言覆盖不变式）以全 src 的 assert/invariant/require 抽取数为判据，
+# 无断言即红（历史 fixture 缺口，见 docs/debug/2026-09-21-superpowers-replace-replay/replay.txt §三-1）。
+write('src/counter.ts', '''import assert from 'node:assert/strict';
+
+export type CounterState = 'zeroed' | 'counting';
 
 export class Counter {
   private value = 0;
-  inc(): number { this.value = (this.value + 1) % 11; return this.value; }
-  reset(): number { this.value = 0; return this.value; }
+  inc(): number {
+    this.value = (this.value + 1) % 11;
+    assert.ok(this.value >= 0 && this.value <= 10, 'invariant: 0 <= value <= 10');
+    return this.value;
+  }
+  reset(): number {
+    this.value = 0;
+    assert.ok(this.value >= 0 && this.value <= 10, 'invariant: 0 <= value <= 10');
+    return this.value;
+  }
   get(): number { return this.value; }
   state(): CounterState { return this.value === 0 ? 'zeroed' : 'counting'; }
 }
@@ -936,9 +949,9 @@ def _coding_task_text(_cid, _p, _n, _kind):
     return (f'# 任务 {_n} 简报：{_title}' + chr(10) + chr(10) +
             f'变更：{_cid}（阶段 {_p}）；输入：上游阶段门产物 + 编码计划 docs/plans/{_cid}.plan.md。' + chr(10) +
             f'验收：{_verify}' + chr(10))
-  # 回执**不预置执行结论**：计划里的验证命令并非都对该 fixture 为绿（如 check-code-tla-consistency 的
-  # D4 断言覆盖在 demo 源码上为红，见 docs/debug/2026-09-21-superpowers-replace-replay/replay.txt §三-1），
-  # 写死「退出码 0」会与门禁结论打架且无门禁能拦住；结论一律由 G 门禁复核（门禁日志落 .w-model/gate-logs/）。
+  # 回执**不预置执行结论**：写死「退出码 0」会与门禁实际结论打架且无门禁能拦住；结论一律由 G 门禁复核
+  # （门禁日志落 .w-model/gate-logs/）。该纪律与命令当次是否绿无关——历史例：check-code-tla-consistency 的
+  # D4 断言缺口曾使本 demo 源码为红，2026-09-25 已由 src/counter.ts 补不变式断言闭合（门禁未放宽）。
   return (f'# 任务 {_n} 回执：{_title}' + chr(10) + chr(10) +
           f'提交：{_fake_sha(f"{_cid}-task{_n}")}；结果：完成（未偏离编码计划）。' + chr(10) +
           f'验证命令见编码计划 docs/plans/{_cid}.plan.md 的「任务 {_n}」节；' +
