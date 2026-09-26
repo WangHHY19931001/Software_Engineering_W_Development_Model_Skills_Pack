@@ -1,0 +1,25 @@
+$ cd eval/e2e/demo-assets && bash run_trajectory.sh
+--- 尾部输出 ---
+[final-O-wm-status] EXIT_CODE=0
+
+### 轨迹执行完毕 2026-09-27T02:52:21+08:00 ###
+TOTAL_GATE_RUNS=119
+NONZERO_EXIT_COUNT=0
+EXIT_CODE=0
+
+--- 门禁执行统计 ---
+TOTAL_GATE_RUNS=119
+NONZERO_EXIT_COUNT=0
+
+--- 各阶段末门（每阶段最后 6 条 EXIT_CODE） ---
+[final-O-wm-status] $ npx tsx D:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/cli/wm-status.ts .
+[final-O-wm-status] EXIT_CODE=0
+[p8-G-budget] EXIT_CODE=0
+[p8-G-run-log] EXIT_CODE=0
+[p8-G-maturity] EXIT_CODE=0
+[p8-G-checkpoint] EXIT_CODE=0
+[p8-G-preventive] EXIT_CODE=0
+[p8-G-role-dispatch] EXIT_CODE=0
+[p8-G-signature-chain] EXIT_CODE=0
+[p8-O-wm-write-final] EXIT_CODE=0
+[final-O-wm-status] EXIT_CODE=0
