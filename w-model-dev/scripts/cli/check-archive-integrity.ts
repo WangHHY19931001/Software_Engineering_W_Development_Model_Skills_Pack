@@ -229,8 +229,8 @@ async function main(): Promise<void> {
     liveRunLogAbs === undefined
       ? '未提供 --live-run-log（跳过归档 run-log 前缀性校验，非阻断）'
       : result.missingFiles.some((missing) => missing.includes('[runLogPrefix]'))
-        ? `已校验（--live-run-log=${liveRunLogAbs}）：✗ 归档快照不是 live 的字节前缀`
-        : `已校验（--live-run-log=${liveRunLogAbs}）：归档 run-log.jsonl 是 live 的字节前缀`;
+        ? `已校验（--live-run-log=${liveRunLogAbs}）：✗ 归档前缀性未通过（非前缀 / 非记录边界（中途截断）/ 空快照，详见 missingFiles 的 [runLogPrefix] 条目）`
+        : `已校验（--live-run-log=${liveRunLogAbs}）：归档 run-log.jsonl 是 live 的记录边界前缀`;
   const exitCode = result.passed ? 0 : 1;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置

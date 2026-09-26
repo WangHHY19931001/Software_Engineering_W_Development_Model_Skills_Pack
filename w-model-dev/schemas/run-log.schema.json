@@ -414,7 +414,7 @@
       "type": "string"
     },
     "runLogAnchor": {
-      "description": "checkpoint 放行锚（D-3b，可选）：放行时刻的**历史前缀**外部锚，收口哈希链看不见的「整链重算 + 时间戳重对齐」与尾删。前缀 = 文件序下 `timestamp ≤ 锚所在记录 timestamp` 的全部记录（含其之前的全部历史行；**不含**锚自身所在记录，按时间戳而非物理位置定义）。lines = 前缀记录条数；sha256 = 前缀各记录**原始行字节**（行终止符 LF/CRLF 剥离后的原样文本，含空白与转义）以**单个 \"\\n\" 连接**（**末尾不加换行**）后的 SHA-256（64 位小写 hex）；lines=0 即空串摘要 e3b0c442…。写入：wm-append-runlog.ts 在写 action=checkpoint 且 outcome=success 的记录时按写入前前缀**自动填入**；调用方显式提供锚时须与自算值一致，不一致 exit 2 不写盘。校验：check-run-log.ts R7 第三段按同法重算并比对，不符即 blocking（文案含 R7 + runLogAnchor + runId）；字段缺席 = 非阻断（历史记录 LEGACY，禁止回溯补锚）。第三方可按定义独立复算。",
+      "description": "checkpoint 放行锚（D-3b，可选）：放行时刻的**历史前缀**外部锚，收口哈希链看不见的「整链重算 + 时间戳重对齐」与尾删。前缀 = 文件序下 `timestamp ≤ 锚所在记录 timestamp` 的全部记录（含其之前的全部历史行；**不含**锚自身所在记录，按时间戳而非物理位置定义）。lines = 前缀记录条数；sha256 = 前缀各记录**原始行字节**（行终止符 LF/CRLF 剥离后的原样文本，含空白与转义）以**单个 \"\\n\" 连接**（**末尾不加换行**）后的 SHA-256（64 位小写 hex）；lines=0 即空串摘要 e3b0c442…。写入：wm-append-runlog.ts 在写 action=checkpoint 且 outcome=success 的记录时按写入前前缀**自动填入**；调用方显式提供锚时须与自算值一致，不一致 exit 2 不写盘。校验：check-run-log.ts R7 第三段按同法重算并比对，不符即 blocking（文案含 R7 + runLogAnchor + runId）。历史兼容（RELEASE_ANCHOR_CUTOFF='2026-09-26T00:00:00Z'）：timestamp 早于 cutoff 的放行记录缺该字段 = 非阻断（LEGACY，禁止回溯补锚）；timestamp 不早于 cutoff 的 action=checkpoint 且 outcome=success 记录缺该字段 = blocking（堵 fail-open 窗口）；timestamp 缺失/非法不按 LEGACY 吸收（保守 blocking）。第三方可按定义独立复算。",
       "type": "object",
       "additionalProperties": false,
       "required": ["lines", "sha256"],

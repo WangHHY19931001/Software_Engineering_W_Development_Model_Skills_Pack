@@ -3248,12 +3248,14 @@ describe('run-log R7 扩展：checkpoint 放行锚（D-3b）', () => {
     expect(anchorViolations(result.violations)).toEqual([]);
   });
 
-  it('R7：锚缺席 → 非阻断（历史记录 LEGACY，不产生任何锚违规/锚诊断）', () => {
+  it('R7：cutoff 前的锚缺席 → 非阻断 LEGACY 诊断（历史放行记录，不产生锚违规）', () => {
     const prefix = withChain(releasePrefixRows());
     const rows = [...prefix, chainAfter(prefix, releaseAnchorRow())];
     const result = checkRunLog(rows);
     expect(anchorViolations(result.violations)).toEqual([]);
-    expect(result.diagnostics?.some((d) => d.includes('runLogAnchor') || d.includes('放行锚'))).toBe(false);
+    expect(result.diagnostics?.some((d) => d.includes('cp-1') && d.includes('放行锚') && d.includes('LEGACY'))).toBe(
+      true,
+    );
   });
 
   it('R7：锚记录之外的记录携带锚同样按同法校验（每条锚自洽，不限于 checkpoint）', () => {
@@ -3264,6 +3266,123 @@ describe('run-log R7 扩展：checkpoint 放行锚（D-3b）', () => {
     const result = checkRunLog(rehashed, { runLogRawLines: rehashed.map((entry) => JSON.stringify(entry)) });
     expect(chainViolations(result.violations)).toEqual([]);
     expect(anchorViolations(result.violations).some((v) => v.includes('p1'))).toBe(true);
+  });
+
+  it('R7：cutoff 后的放行记录缺锚 → blocking（裁定 G；文案含 R7 + 放行锚 + runId）', () => {
+    const rows = [
+      makeEntry({ runId: 'a', timestamp: '2026-09-26T09:00:00Z' }),
+      makeEntry({
+        runId: 'cp-post-cutoff',
+        timestamp: '2026-09-26T10:00:00Z',
+        action: 'checkpoint',
+        outcome: 'success',
+        tokens: 500,
+        acknowledgedDecisions: ['放行'],
+      }),
+    ];
+    const result = checkRunLog(rows);
+    expect(result.passed).toBe(false);
+    expect(anchorViolations(result.violations).some((v) => v.includes('cp-post-cutoff'))).toBe(true);
+    expect(anchorViolations(result.violations).some((v) => v.includes('缺 runLogAnchor'))).toBe(true);
+  });
+
+  it('R7：cutoff 当刻（timestamp === cutoff）即适用 → 缺锚 blocking（边界含上界）', () => {
+    const rows = [
+      makeEntry({ runId: 'cp-at-cutoff', timestamp: '2026-09-26T00:00:00Z', action: 'checkpoint', tokens: 500 }),
+    ];
+    rows[0]!.acknowledgedDecisions = ['放行'];
+    rows[0]!.outcome = 'success';
+    const result = checkRunLog(rows);
+    expect(anchorViolations(result.violations).some((v) => v.includes('cp-at-cutoff'))).toBe(true);
+  });
+
+  it('R7：cutoff 前的历史放行记录无锚 → 非阻断 LEGACY（豁免范围与 data-models.md 一致）', () => {
+    const rows = [
+      makeEntry({ runId: 'a', timestamp: '2026-09-25T09:00:00Z' }),
+      makeEntry({
+        runId: 'cp-legacy',
+        timestamp: '2026-09-25T10:00:00Z',
+        action: 'checkpoint',
+        outcome: 'success',
+        tokens: 500,
+        acknowledgedDecisions: ['放行'],
+      }),
+    ];
+    const result = checkRunLog(rows);
+    expect(anchorViolations(result.violations)).toEqual([]);
+  });
+
+  it('R7：cutoff 后无锚的 blocking 只针对放行动作（非 checkpoint/success 记录缺锚不报）', () => {
+    const rows = [
+      makeEntry({ runId: 'p-post', timestamp: '2026-09-27T09:00:00Z', action: 'produce' }),
+      makeEntry({ runId: 'cp-blocked', timestamp: '2026-09-27T10:00:00Z', action: 'checkpoint', outcome: 'blocked' }),
+    ];
+    const result = checkRunLog(rows);
+    expect(anchorViolations(result.violations)).toEqual([]);
+  });
+
+  it('R7：多条锚共存（含锚位于文件中间）→ 每条各自按自己的前缀校验（互不串扰）', () => {
+    // 链：A → cp1（锚1 = 前缀 [A]）→ B → cp2（锚2 = 前缀 [A, cp1, B]）——cp1 位于文件中间
+    const chainedA = withChain(releasePrefixRows());
+    const anchor1 = computeRunLogAnchor(chainedA.map((row) => JSON.stringify(row)));
+    const cp1 = chainAfter(chainedA, { ...releaseAnchorRow(), runLogAnchor: anchor1 });
+    const chainedB = chainAfter([...chainedA, cp1], entryRecord({ runId: 'p2', timestamp: chainStamp(30) }));
+    const prefix2 = [...chainedA, cp1, chainedB];
+    const anchor2 = computeRunLogAnchor(prefix2.map((row) => JSON.stringify(row)));
+    const cp2 = chainAfter(prefix2, {
+      ...releaseAnchorRow({ runId: 'cp-2', timestamp: chainStamp(40) }),
+      runLogAnchor: anchor2,
+    });
+    const entries = [...prefix2, cp2];
+    const rawLines = entries.map((row) => JSON.stringify(row));
+
+    // 正例：两条锚都自洽（中间位置的锚按「timestamp ≤ 自身」的短前缀校验，不被后续行污染）
+    const ok = checkRunLog(entries, { runLogRawLines: rawLines });
+    expect(anchorViolations(ok.violations)).toEqual([]);
+
+    // 负例 1：只改**中间**那条锚 → 它自己报（其前缀字节不符）；后续锚因前缀字节变化同样报（预期级联，
+    // 锚绑定原始字节的定义使然）——关键是「中间位置的锚确实被校验」，不被后续行掩盖。
+    const tamperedMiddle = structuredClone(entries);
+    const cp1Index = tamperedMiddle.findIndex((row) => (row as unknown as { runId?: string }).runId === 'cp-1');
+    expect(cp1Index).toBeGreaterThan(0);
+    // eslint-disable-next-line security/detect-object-injection -- cp1Index 由本测试的 findIndex 在本地构造数组上求得（非外部输入）
+    (tamperedMiddle[cp1Index] as unknown as { runLogAnchor: { sha256: string } }).runLogAnchor.sha256 = 'c'.repeat(64);
+    const rehashedMiddle = rechain(tamperedMiddle);
+    const middle = anchorViolations(
+      checkRunLog(rehashedMiddle, { runLogRawLines: rehashedMiddle.map((row) => JSON.stringify(row)) }).violations,
+    );
+    expect(middle.some((v) => v.includes('cp-1'))).toBe(true);
+
+    // 负例 2：只改**最后**那条锚 → 只有它报；中间锚仍自洽（证明两条锚各自独立校验、无串扰）
+    const tamperedLast = structuredClone(entries);
+    const cp2Index = tamperedLast.findIndex((row) => (row as unknown as { runId?: string }).runId === 'cp-2');
+    expect(cp2Index).toBe(entries.length - 1);
+    // eslint-disable-next-line security/detect-object-injection -- cp2Index 由本测试的 findIndex 在本地构造数组上求得（非外部输入）
+    (tamperedLast[cp2Index] as unknown as { runLogAnchor: { sha256: string } }).runLogAnchor.sha256 = 'c'.repeat(64);
+    const rehashedLast = rechain(tamperedLast);
+    const last = anchorViolations(
+      checkRunLog(rehashedLast, { runLogRawLines: rehashedLast.map((row) => JSON.stringify(row)) }).violations,
+    );
+    expect(last.some((v) => v.includes('cp-2'))).toBe(true);
+    expect(last.some((v) => v.includes('cp-1'))).toBe(false);
+  });
+
+  it('R7：数字（非字符串）时间戳行不计入前缀（A2 谓词与写入端共用，不产生「自动锚立刻不符」）', () => {
+    // 攻击/畸形形态：历史行 timestamp 为数字 2026（`Date.parse(String(2026))` 可解析 → 旧校验端会把它
+    // 计入前缀，而写入端按非字符串排除 → 追加器刚填好的锚立刻被判「不符」的误导性 blocking）。
+    const prefix = withChain(releasePrefixRows());
+    const numericStampRow = {
+      ...makeEntry({ runId: 'num-ts' }),
+      timestamp: 2026 as unknown as string,
+    } as unknown as RunLogEntry;
+    // 与写入端同口径：数字时间戳行**不入前缀**（锚只覆盖 prefix 的 N 行）
+    const anchor = computeRunLogAnchor(prefix.map((row) => JSON.stringify(row)));
+    const chainedNumeric = chainAfter(prefix, numericStampRow as unknown as Record<string, unknown>);
+    const cp = chainAfter([...prefix, chainedNumeric], { ...releaseAnchorRow(), runLogAnchor: anchor });
+    const entries = [...prefix, chainedNumeric, cp];
+    const result = checkRunLog(entries, { runLogRawLines: entries.map((row) => JSON.stringify(row)) });
+    expect(anchor.lines).toBe(prefix.length);
+    expect(anchorViolations(result.violations)).toEqual([]);
   });
 
   it('R7：锚形态非法（lines 非整数 / sha256 非 64 位小写 hex）→ blocking fail-closed', () => {

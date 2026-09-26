@@ -248,15 +248,38 @@ describe('check-archive-integrity CLI：归档前缀性（L4，--live-run-log）
     return { archive, live };
   }
 
-  it('归档快照是 live 字节前缀 → exit 0，输出明示前缀性校验已执行', () => {
+  it('归档快照是 live 的记录边界前缀（以 \\n 结尾）→ exit 0，输出明示前缀性校验已执行', () => {
     const { archive, live } = seedRunLogs(ARCHIVED_TEXT, LIVE_TEXT);
     const r = runCli([archive, `--live-run-log=${live}`, '--json']);
     expect(r.code).toBe(0);
     const report = JSON.parse(r.stdout) as { passed: boolean; reasons: string[]; runLogPrefix: string };
     expect(report.passed).toBe(true);
     expect(report.reasons).toEqual([]);
-    expect(report.runLogPrefix).toContain('字节前缀');
+    expect(report.runLogPrefix).toContain('记录边界前缀');
     expect(report.runLogPrefix).toContain('是 live');
+  });
+
+  it('第 N 行中途截断（是前缀但不在记录边界）→ exit 1 且文案区分「非记录边界」', () => {
+    // 归档快照 = live 去掉最后一个换行后的**半行**快照（A1 收紧前会假通过）
+    const { archive, live } = seedRunLogs(LIVE_TEXT.replace(/\n$/, ''), LIVE_TEXT);
+    const r = runCli([archive, `--live-run-log=${live}`, '--json']);
+    expect(r.code).toBe(1);
+    const report = JSON.parse(r.stdout) as { passed: boolean; reasons: string[] };
+    expect(report.passed).toBe(false);
+    expect(report.reasons.some((m) => m.includes('[runLogPrefix]') && m.includes('记录中途'))).toBe(true);
+    expect(report.reasons.some((m) => m.includes('不是 live run-log 的字节前缀'))).toBe(false);
+  });
+
+  it('空归档快照（0 字节）→ exit 1 且文案区分「空快照」（A1 收紧：不再假通过）', () => {
+    const { archive, live } = seedRunLogs('', LIVE_TEXT);
+    const human = runCli([archive, `--live-run-log=${live}`]);
+    expect(human.code).toBe(1);
+    expect(human.stdout).toContain('[runLogPrefix]');
+    expect(human.stdout).toContain('快照为空');
+    const json = runCli([archive, `--live-run-log=${live}`, '--json']);
+    expect(json.code).toBe(1);
+    const report = JSON.parse(json.stdout) as { reasons: string[] };
+    expect(report.reasons.some((m) => m.includes('快照为空'))).toBe(true);
   });
 
   it('归档快照非 live 前缀（live 侧被截断/重排）→ exit 1 且 [runLogPrefix] 具名', () => {

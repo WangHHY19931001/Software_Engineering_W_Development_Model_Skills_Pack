@@ -12,7 +12,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { planAppend, planCorrection, type RunLogRecord } from '../logic/run-log-append-logic.js';
-import { checkRunLog, computeRecordHash } from '../logic/run-log-logic.js';
+import { checkRunLog, computeRecordHash, sha256Hex } from '../logic/run-log-logic.js';
 
 function mkEntry(patch: Partial<RunLogRecord> = {}): RunLogRecord {
   return {
@@ -370,5 +370,83 @@ describe('planAppend：记录哈希链接线（D-3a 裁定 C）', () => {
     expect(second!.prevRecordHash).toBe(first!.recordHash);
     expect(third!.prevRecordHash).toBe(second!.recordHash);
     expect(third!.recordHash).toBe(computeRecordHash(third!, String(second!.recordHash)));
+  });
+});
+
+// ==================== D-3b 放行锚（A4：自动填锚 / 不可核验拒绝 / 显式锚比对） ====================
+
+describe('planAppend：checkpoint 放行锚（D-3b）', () => {
+  const HISTORY = [mkEntry({ runId: 'a', timestamp: '2026-09-25T10:00:00.000Z' })];
+  const HISTORY_LINE = JSON.stringify(HISTORY[0]);
+  const NOW = '2026-09-26T10:00:00.000Z';
+  const release = (patch: Partial<RunLogRecord> = {}): RunLogRecord =>
+    mkEntry({
+      runId: 'cp-1',
+      action: 'checkpoint',
+      outcome: 'success',
+      tokens: 500,
+      acknowledgedDecisions: ['放行'],
+      ...patch,
+    });
+
+  it('有历史行原文 → 自动填入锚（lines + sha256 = 前缀原文摘要，且锚自身入链）', () => {
+    const plan = planAppend(HISTORY, [release()], { now: NOW, historyRawLines: [HISTORY_LINE] });
+    expect(plan.accepted).toBe(true);
+    const appended = plan.entries.at(-1)!;
+    expect(appended.runLogAnchor).toEqual({ lines: 1, sha256: sha256Hex(HISTORY_LINE) });
+    // 先写锚再算 recordHash：recordHash 覆盖 runLogAnchor（后续 check-run-log 复算可验证「改锚即断链」）
+    expect(appended.recordHash).toBe(computeRecordHash(appended, String(appended.prevRecordHash)));
+  });
+
+  it('历史行原文不可得 → 跳过自动填锚 + 非阻断诊断（绝不猜测原文、绝不写错锚）', () => {
+    const plan = planAppend(HISTORY, [release()], { now: NOW });
+    expect(plan.accepted).toBe(true);
+    expect(plan.entries.at(-1)!.runLogAnchor).toBeUndefined();
+    expect(plan.diagnostics.some((line) => line.includes('未能自动填入放行锚'))).toBe(true);
+  });
+
+  it('显式提供锚但原文不可得 → ANCHOR_UNVERIFIABLE 拒绝（不可验证的输入 fail-closed）', () => {
+    const plan = planAppend(HISTORY, [release({ runLogAnchor: { lines: 1, sha256: 'a'.repeat(64) } })], { now: NOW });
+    expect(plan.accepted).toBe(false);
+    expect(codesOf(plan)).toContain('ANCHOR_UNVERIFIABLE');
+  });
+
+  it('显式锚与自算值一致 → 通过；不一致 → ANCHOR_MISMATCH（锚只能由写入端按前缀计算）', () => {
+    const good = planAppend(HISTORY, [release({ runLogAnchor: { lines: 1, sha256: sha256Hex(HISTORY_LINE) } })], {
+      now: NOW,
+      historyRawLines: [HISTORY_LINE],
+    });
+    expect(good.accepted).toBe(true);
+    expect(good.entries.at(-1)!.runLogAnchor).toEqual({ lines: 1, sha256: sha256Hex(HISTORY_LINE) });
+
+    const bad = planAppend(HISTORY, [release({ runLogAnchor: { lines: 1, sha256: 'd'.repeat(64) } })], {
+      now: NOW,
+      historyRawLines: [HISTORY_LINE],
+    });
+    expect(bad.accepted).toBe(false);
+    expect(codesOf(bad)).toContain('ANCHOR_MISMATCH');
+  });
+
+  it('非放行记录不自动填锚（锚是放行动作的专属外部锚）', () => {
+    const plan = planAppend(HISTORY, [mkEntry({ runId: 'p2', timestamp: '2026-09-26T11:00:00.000Z' })], {
+      now: NOW,
+      historyRawLines: [HISTORY_LINE],
+    });
+    expect(plan.accepted).toBe(true);
+    expect(plan.entries.at(-1)!.runLogAnchor).toBeUndefined();
+  });
+
+  it('批内多条放行：后一条锚覆盖「历史 + 批内前序行」（批内前缀自洽）', () => {
+    const plan = planAppend(HISTORY, [release({ runId: 'cp-1' }), release({ runId: 'cp-2' })], {
+      now: NOW,
+      historyRawLines: [HISTORY_LINE],
+    });
+    expect(plan.accepted).toBe(true);
+    const [first, second] = plan.entries.slice(-2);
+    expect(first!.runLogAnchor).toEqual({ lines: 1, sha256: sha256Hex(HISTORY_LINE) });
+    expect(second!.runLogAnchor).toEqual({
+      lines: 2,
+      sha256: sha256Hex(`${HISTORY_LINE}\n${JSON.stringify(first!)}`),
+    });
   });
 });

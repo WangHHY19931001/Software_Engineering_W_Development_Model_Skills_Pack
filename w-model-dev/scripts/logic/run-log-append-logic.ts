@@ -47,7 +47,7 @@
  * @module
  */
 
-import { computeRecordHash, computeRunLogAnchor, type RunLogAnchor } from './run-log-logic.js';
+import { computeRecordHash, computeRunLogAnchor, recordTimestampMs, type RunLogAnchor } from './run-log-logic.js';
 
 /** run-log.jsonl 单条记录（形状由 `schemas/run-log.schema.json` 强制，本模块只关心追加相关字段） */
 export interface RunLogRecord {
@@ -138,12 +138,13 @@ function isNonEmptyString(value: unknown): value is string {
  * `2026-01-02 10:00:00Z` 均合法），历史行因此可能带非严格形态的时间戳。若历史扫描用严格正则，
  * 这类行会被当作「无时间戳」跳过 → 单调性下界失真。严格正则（`isIsoTimestamp`）只保留给
  * **新注入 / 新记录**（工具自己产出的时间戳必须规范）。
+ *
+ * A2：谓词实现与校验端**共用** `logic/run-log-logic.ts` 的 `recordTimestampMs`（单一真值）。
+ * 两端各写一份时，数字时间戳行会被一端计入放行锚前缀、另一端不计入 → 追加器刚自动填好的锚
+ * 立刻被判「与当前历史前缀不符」（误导性 blocking）。
  */
 function timestampMsOf(record: RunLogRecord): number | null {
-  const value = record.timestamp;
-  if (!isNonEmptyString(value)) return null;
-  const ms = Date.parse(value);
-  return Number.isFinite(ms) ? ms : null;
+  return recordTimestampMs(record.timestamp);
 }
 
 /** 末条有效时间戳（从尾部扫描；无有效时间戳返回 null） */

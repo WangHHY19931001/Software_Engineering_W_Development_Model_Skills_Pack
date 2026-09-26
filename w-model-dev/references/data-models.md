@@ -558,12 +558,15 @@ lines  = 该前缀的记录条数
 sha256 = sha256( 前缀各记录行的**原始字节**以单个 "\n" 连接，末尾不加换行 )
 ```
 
-- **原始字节**口径：各行去掉行终止符（LF / CRLF）后的原样文本（含前导/尾随空白与转义），以**单个 `"\n"` 连接**，**末尾不加换行**——`lines=0` 即空串摘要 `e3b0c442…`（**不是** `sha256("\n")`）。前缀按**时间戳**而非物理位置定义：把锚记录挪到文件更早位置不会缩小前缀。
+- **原始字节**口径：各行去掉行终止符（LF / CRLF）后的原样文本（含前导/尾随空白与转义），以**单个 `"\n"` 连接**，**末尾不加换行**——`lines=0` 即空串摘要 `e3b0c442…`（**不是** `sha256("\n")`）。前缀按**时间戳**而非物理位置定义：把锚记录挪到文件更早位置不会缩小前缀。前缀行的时间戳谓词为 `recordTimestampMs`（**非空字符串**且可解析；数字等非字符串形态两端一致排除——写入端与校验端**共用同一实现**，避免一端计入另一端不计入而让刚填好的锚立刻被判「不符」）。
 - **写入（裁定 B，自动化）**：追加器（`wm-append-runlog.ts`）在写入 `action=checkpoint` 且 `outcome=success` 的记录时**自动填入** `runLogAnchor`（基于**写入前**前缀 = 历史行原文 + 本批已规划行的落盘序列化中 `timestamp ≤` 本条时间戳者）。调用方**显式提供**锚时须与自算值一致，不一致 → **exit 2**（输入错误，不写盘）；历史行原文由 CLI 经 `AppendOptions.historyRawLines` 注入（logic 层零 `node:fs`），不可得时自动填锚跳过并留非阻断诊断、显式提供的锚按不可核验拒绝。锚字段**自身入链**（先写锚再算 `recordHash`）→ 改锚即断链。
 - **校验（裁定 A，并入 R7 第三段）**：`check-run-log.ts` 对**每条**携带 `runLogAnchor` 的记录按同法重算并比对，不符 → **blocking**（文案含 `R7` + `runLogAnchor`/放行锚 + 记录 runId，如 `R7: 放行记录 <runId> 的 runLogAnchor 与当前历史前缀不符（放行后被改写/重排）`）；`sha256` 维度需要原始行文本（CLI 注入 `rawLines`），未注入时只校验 `lines` 并记非阻断诊断（绝不假装验过）。
-- **历史兼容**：字段缺席 = 非阻断（本机制引入前写入的放行记录为 LEGACY，**禁止回溯补锚**）。
+- **历史兼容与 cutoff（裁定 G）**：`RELEASE_ANCHOR_CUTOFF = '2026-09-26T00:00:00Z'`（D-3b 落地日，`scripts/logic/run-log-logic.ts`）。
+  - `timestamp < cutoff` 的 `action=checkpoint` + `outcome=success` 记录**无锚** → LEGACY（非阻断；**禁止回溯补锚**）；
+  - `timestamp ≥ cutoff` 的放行记录**无锚** → **blocking**（文案含 `R7` + 放行锚 + runId）——堵住「未来调用方漏注入历史行原文 / 绕过追加器直写放行记录」使 D-3b 保证静默消失（fail-open）的窗口；
+  - `timestamp` 缺失/非法**不**按 LEGACY 吸收（保守：宁可 blocking——不可信的时间戳不构成「旧记录」证据）；非 checkpoint/success 记录不参与该判定（锚是放行动作的专属外部锚）。
 - **边界（诚实登记）**：前缀不可变保证覆盖到**最后一个锚**为止——锚之后的尾部在下一次锚定前不可证伪；且掌握工具链者可整链重算 + 重算全部下游锚。最强外部锚是本仓库既有的**归档快照**（以下 L4 前缀性）与导出包 SHA-256 manifest，本机制不主张「密码学不可抵赖」。
-- **归档前缀性（L4）**：`check-archive-integrity.ts` 的可选 `--live-run-log=<path>` 校验归档内 `run-log.jsonl` 快照是 **live** run-log 的**字节前缀**（`liveText.startsWith(archiveText)`）；非前缀 → `[runLogPrefix]` 并入 `missingFiles`（blocking / exit 1），归档快照不可读 → 同前缀 fail-closed；**未提供该参数时只输出非阻断诊断**（退出码语义不变）。
+- **归档前缀性（L4）**：`check-archive-integrity.ts` 的可选 `--live-run-log=<path>` 校验归档内 `run-log.jsonl` 快照是 **live** run-log 的**记录边界前缀**：通过 ⇔ `archiveText === liveText`，或（`liveText.startsWith(archiveText)` 且 `archiveText` 非空且以 `"\n"` 结尾）。违规以 `[runLogPrefix]` 并入 `missingFiles`（blocking / exit 1）并**分类具名**：非前缀 / **非记录边界（第 N 行中途截断，末尾无换行）** / **空快照（0 字节）**；归档快照不可读 → 同前缀 fail-closed；**未提供该参数时只输出非阻断诊断**（退出码语义不变）。
 
 ### R1 阶段动作完整性：按阶段分档
 

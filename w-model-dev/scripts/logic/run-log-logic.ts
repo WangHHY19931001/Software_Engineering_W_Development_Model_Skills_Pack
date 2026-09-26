@@ -26,6 +26,22 @@ import { parseJsonSafe } from '../lib/safe-json.js';
 export const LEGACY_VARIANT_CUTOFF = '2026-09-01T00:00:00Z';
 
 /**
+ * D-3b 放行锚 cutoff（裁定 G，取值 = D-3b 落地日 2026-09-26）。
+ *
+ * 分界语义（与 LEGACY_VARIANT_CUTOFF 同型的两段式）：
+ *   - `timestamp < cutoff` 的 `action=checkpoint` + `outcome=success` 记录**无锚** → LEGACY（非阻断；
+ *     本机制引入前写入的历史放行记录不补锚，禁止回溯补锚）；
+ *   - `timestamp ≥ cutoff` 的放行记录**无锚** → **blocking**（文案含 `R7` + 放行锚 + runId）。
+ *
+ * 为什么需要 cutoff：无锚只是「本机制引入前的历史形态」时留 LEGACY 是对的；但若**未来**某个调用方
+ * 漏注入历史行原文（`historyRawLines`）或绕过追加器直写放行记录，D-3b 的保证会静默消失（fail-open）。
+ * 以落地日为界把「历史豁免」与「新记录必须带锚」分开，堵住该窗口。
+ * `timestamp` 缺失/非法时不按 legacy 吸收（保守：宁可 blocking——不可信的时间戳不构成「旧记录」证据，
+ * 与 reworkHints 族的取界方向一致）。
+ */
+export const RELEASE_ANCHOR_CUTOFF = '2026-09-26T00:00:00Z';
+
+/**
  * R9 跨轮次评审不一致的档差阈值（A-3d 标准偏移）。
  *
  * 2 档意味着评审标准发生实质漂移（1 档可能只是产物确实改进了）。
@@ -843,6 +859,117 @@ export function isWellFormedRunLogAnchor(value: unknown): value is RunLogAnchor 
   );
 }
 
+/**
+ * 放行锚前缀行的时间戳谓词（A2，单一真值：writer `logic/run-log-append-logic.ts` 与 checker 共用）。
+ *
+ * 只接受**非空字符串**且可解析为有限毫秒的 `timestamp`；数字（ms 纪元值）等非字符串形态一律返回 `null`。
+ * 为什么必须共用：两端各写一份时，数字时间戳行会被一端计入前缀、另一端不计入 →
+ * 追加器刚自动填好的锚立刻被判「与当前历史前缀不符」（误导性 blocking，且用户无从修复）。
+ */
+export function recordTimestampMs(value: unknown): number | null {
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * R7 第三段（D-3b 放行锚）判据实现：A5 自 `checkRunLog` 内联块抽出（行为逐字不变），便于单测与阅读。
+ *
+ * 判定顺序（每条**携带锚**的记录；锚缺席时另按 cutoff 判「新放行是否该有锚」）：
+ *   1. 锚形态非法 → blocking；
+ *   2. 锚记录自身 timestamp 不可解析 → blocking（fail-closed）；
+ *   3. 前缀 = 文件序下 `timestamp ≤ 锚时间戳` 且**不含锚自身**的记录（`recordTimestampMs` 谓词，A2）；
+ *      `lines` 与 `sha256` 各按同法重算比对，不符 → blocking（文案含 R7 + runLogAnchor + runId）；
+ *   4. `sha256` 需要原始行文本（`options.runLogRawLines`，与 entries 同序同长）；未注入时只校验
+ *      `lines` 并记非阻断诊断「未校验」（绝不假装验过）。
+ */
+function collectReleaseAnchorViolations(
+  entries: readonly unknown[],
+  valid: readonly RunLogEntry[],
+  validOrigins: readonly number[],
+  options: RunLogCheckOptions | undefined,
+): { violations: string[]; diagnostics: string[] } {
+  const violations: string[] = [];
+  const diagnostics: string[] = [];
+  const rawLines = options?.runLogRawLines;
+  const rawLinesAligned = Array.isArray(rawLines) && rawLines.length === entries.length;
+  const cutoffMs = Date.parse(RELEASE_ANCHOR_CUTOFF);
+  for (let index = 0; index < valid.length; index++) {
+    // eslint-disable-next-line security/detect-object-injection -- index 为本地数组下界循环计数（非外部输入），数组为本函数入参的有效记录列表
+    const entry = valid[index]!;
+    const anchorRunId = entry.runId ?? '?';
+    const anchorValue = (entry as unknown as Record<string, unknown>).runLogAnchor;
+    const anchorMs = recordTimestampMs(entry.timestamp);
+    if (anchorValue === undefined) {
+      // A3（裁定 G）：cutoff 后的 checkpoint 放行**必须**带锚；cutoff 前为 LEGACY（非阻断，但明示，
+      // 不静默——豁免范围在 `diagnostics` 可见，便于审计区分「历史豁免」与「漏注入」）。
+      // 非 checkpoint/success 记录不参与该判定（锚是放行动作的专属外部锚）。
+      const isRelease = entry.action === 'checkpoint' && entry.outcome === 'success';
+      const isLegacy = anchorMs !== null && anchorMs < cutoffMs;
+      if (isRelease && !isLegacy) {
+        violations.push(
+          `R7: 放行记录 ${anchorRunId} 缺 runLogAnchor（放行锚）：时间戳 ${String(entry.timestamp)} 不早于 cutoff ${RELEASE_ANCHOR_CUTOFF}，` +
+            '此处放行记录必须携带放行锚（请改用 wm-append-runlog.ts 追加放行记录，或补齐 historyRawLines 后重写）——否则前缀不可证伪（fail-open）',
+        );
+      } else if (isRelease) {
+        diagnostics.push(
+          `R7: 放行记录 ${anchorRunId} 缺 runLogAnchor（放行锚）：时间戳 ${String(entry.timestamp)} 早于 cutoff ${RELEASE_ANCHOR_CUTOFF}` +
+            ' → LEGACY 非阻断（本机制引入前的历史放行记录，禁止回溯补锚）; deferred',
+        );
+      }
+      continue;
+    }
+    if (!isWellFormedRunLogAnchor(anchorValue)) {
+      violations.push(
+        `R7: 放行锚形态非法：条目 ${anchorRunId} 的 runLogAnchor 须为 { lines: 非负整数, sha256: 64 位小写 hex }`,
+      );
+      continue;
+    }
+    if (anchorMs === null) {
+      violations.push(
+        `R7: 放行锚不可核验：条目 ${anchorRunId} 的 timestamp 不可解析，无法重算放行时刻前缀（fail-closed）`,
+      );
+      continue;
+    }
+    // eslint-disable-next-line security/detect-object-injection -- index 与 validOrigins 同步推进的本地下标（非外部输入），数组为本函数入参的原始下标列表
+    const anchorOrigin = validOrigins[index]!;
+    const prefixIndexes: number[] = [];
+    for (let i = 0; i < entries.length; i++) {
+      if (i === anchorOrigin) continue;
+      // eslint-disable-next-line security/detect-object-injection -- i 为本地数组下界循环计数（非外部输入），数组为同函数内的 run-log 入参数组
+      const candidate = entries[i];
+      if (typeof candidate !== 'object' || candidate === null || Array.isArray(candidate)) continue;
+      const candidateMs = recordTimestampMs((candidate as { timestamp?: unknown }).timestamp);
+      if (candidateMs === null || candidateMs > anchorMs) continue;
+      prefixIndexes.push(i);
+    }
+    if (anchorValue.lines !== prefixIndexes.length) {
+      violations.push(
+        `R7: 放行记录 ${anchorRunId} 的 runLogAnchor 与当前历史前缀不符（放行后被改写/重排）：` +
+          `lines=${anchorValue.lines} ≠ 当前前缀记录数 ${prefixIndexes.length}`,
+      );
+    }
+    if (rawLinesAligned) {
+      const recomputed = anchorDigestOf(
+        // eslint-disable-next-line security/detect-object-injection -- i 为前缀下标（本地数值数组），rawLines 与 entries 同序同长（已断言对齐）
+        prefixIndexes.map((i) => rawLines![i] ?? ''),
+        options?.hashFn ?? sha256Hex,
+      );
+      if (recomputed !== anchorValue.sha256) {
+        violations.push(
+          `R7: 放行记录 ${anchorRunId} 的 runLogAnchor 与当前历史前缀不符（放行后被改写/重排）：` +
+            `sha256=${anchorValue.sha256} ≠ 当前前缀原始字节摘要 ${recomputed}`,
+        );
+      }
+    } else {
+      diagnostics.push(
+        `R7: 条目 ${anchorRunId} 的 runLogAnchor.sha256 未校验（调用方未注入 runLogRawLines 原始行文本，仅校验 lines）`,
+      );
+    }
+  }
+  return { violations, diagnostics };
+}
+
 // ==================== 校验入口 ====================
 
 export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): RunLogCheckResult {
@@ -1451,75 +1578,12 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
-  // R7 扩展（D-3b）：checkpoint 放行锚（外部锚，第三段）。
-  //
-  // 为什么需要第三段：哈希链（D-3a）只保护链自身——把握「整链重算」能力者把放行前的历史行整体
-  // 重排 + 时间戳重对齐后重算全部 recordHash，链判定完全自洽（真实调测盲区）；尾删同样不可见。
-  // 放行锚把「放行时刻的历史前缀」钉死为外部锚（定义见 RunLogAnchor / computeRunLogAnchor）：
-  //   prefix = 文件序下 timestamp ≤ 锚记录 timestamp 的全部记录（不含锚自身所在记录）
-  //   lines  = 前缀记录条数；sha256 = 前缀各行原始字节以单个 "\n" 连接（末尾不加换行）的 SHA-256
-  // 校验：按同法重算并比对——不符即 blocking（文案含 R7 + runLogAnchor/放行锚 + runId）。锚字段
-  // 缺席 = 非阻断（历史记录 LEGACY：本机制引入前写入的放行记录不补锚，禁止回溯补锚）。
-  // sha256 维度需要**原始行文本**（logic 层零 fs → 由调用方注入 options.runLogRawLines，与 entries
-  // 同序同长）；未注入时只校验 lines 并记非阻断诊断（绝不假装验过 sha256）。
+  // R7 扩展（D-3b）：checkpoint 放行锚（外部锚，第三段）——判据实现见 collectReleaseAnchorViolations
+  // （A5：自内联块抽出为同文件私有函数，便于单测与阅读；行为逐字不变）。
   {
-    const rawLines = options?.runLogRawLines;
-    const rawLinesAligned = Array.isArray(rawLines) && rawLines.length === entries.length;
-    for (let index = 0; index < valid.length; index++) {
-      // eslint-disable-next-line security/detect-object-injection -- index 为本地数组下界循环计数（非外部输入），数组为同函数内的有效记录列表
-      const entry = valid[index]!;
-      const anchorValue = (entry as unknown as Record<string, unknown>).runLogAnchor;
-      if (anchorValue === undefined) continue; // LEGACY：缺席非阻断（不回溯补锚）
-      const anchorRunId = entry.runId ?? '?';
-      if (!isWellFormedRunLogAnchor(anchorValue)) {
-        violations.push(
-          `R7: 放行锚形态非法：条目 ${anchorRunId} 的 runLogAnchor 须为 { lines: 非负整数, sha256: 64 位小写 hex }`,
-        );
-        continue;
-      }
-      const anchorMs = Date.parse(String(entry.timestamp));
-      if (!Number.isFinite(anchorMs)) {
-        violations.push(
-          `R7: 放行锚不可核验：条目 ${anchorRunId} 的 timestamp 不可解析，无法重算放行时刻前缀（fail-closed）`,
-        );
-        continue;
-      }
-      // eslint-disable-next-line security/detect-object-injection -- index 与 validOrigins 同步推进的本地下标（非外部输入），数组为本函数内构造的原始下标列表
-      const anchorOrigin = validOrigins[index]!;
-      const prefixIndexes: number[] = [];
-      for (let i = 0; i < entries.length; i++) {
-        if (i === anchorOrigin) continue;
-        // eslint-disable-next-line security/detect-object-injection -- i 为本地数组下界循环计数（非外部输入），数组为同函数内的 run-log 入参数组
-        const candidate = entries[i];
-        if (typeof candidate !== 'object' || candidate === null || Array.isArray(candidate)) continue;
-        const candidateMs = Date.parse(String((candidate as { timestamp?: unknown }).timestamp ?? ''));
-        if (!Number.isFinite(candidateMs) || candidateMs > anchorMs) continue;
-        prefixIndexes.push(i);
-      }
-      if (anchorValue.lines !== prefixIndexes.length) {
-        violations.push(
-          `R7: 放行记录 ${anchorRunId} 的 runLogAnchor 与当前历史前缀不符（放行后被改写/重排）：` +
-            `lines=${anchorValue.lines} ≠ 当前前缀记录数 ${prefixIndexes.length}`,
-        );
-      }
-      if (rawLinesAligned) {
-        const recomputed = anchorDigestOf(
-          // eslint-disable-next-line security/detect-object-injection -- i 为前缀下标（本地数值数组），rawLines 与 entries 同序同长（已断言对齐）
-          prefixIndexes.map((i) => rawLines![i] ?? ''),
-          options?.hashFn ?? sha256Hex,
-        );
-        if (recomputed !== anchorValue.sha256) {
-          violations.push(
-            `R7: 放行记录 ${anchorRunId} 的 runLogAnchor 与当前历史前缀不符（放行后被改写/重排）：` +
-              `sha256=${anchorValue.sha256} ≠ 当前前缀原始字节摘要 ${recomputed}`,
-          );
-        }
-      } else {
-        diagnostics.push(
-          `R7: 条目 ${anchorRunId} 的 runLogAnchor.sha256 未校验（调用方未注入 runLogRawLines 原始行文本，仅校验 lines）`,
-        );
-      }
-    }
+    const anchorCheck = collectReleaseAnchorViolations(entries, valid, validOrigins, options);
+    for (const violation of anchorCheck.violations) violations.push(violation);
+    for (const diagnostic of anchorCheck.diagnostics) diagnostics.push(diagnostic);
   }
 
   // R7 扩展：返工路径按同身份 segment 检查，禁止跨 report/targetKind 借动作。

@@ -167,28 +167,57 @@ function checkCodingPlanSnapshot(
 }
 
 /**
- * 归档 run-log 前缀性校验（L4，D-3b）：归档快照必须是 live run-log 的**字节前缀**。
+ * 归档 run-log 前缀性校验（L4，D-3b）：归档快照必须是 live run-log 的**记录边界前缀**。
  *
- * 违规以 `[runLogPrefix]` 前缀并入 `missingFiles`（blocking）；未提供 live 文本时不产生任何条目
- * （非阻断，退出码语义不变——诊断由 CLI 人类可读输出承担）。
+ * 通过判据（A1 收紧，审查裁定）：
+ *   `archivedText === liveText`（无新增记录），
+ *   或（`liveText.startsWith(archivedText)` 且 `archivedText.length > 0` 且 `archivedText.endsWith('\n')`）。
+ *
+ * 为什么必须收紧：只做逐字 `startsWith` 时「快照在第 N 行**中途被截断**」（末尾无换行）与「0 字节空快照」
+ * 都会判通过——前者让「归档被截断」这一真实突变静默通过，后者让 L4 在归档快照缺失内容时形同虚设
+ * （`ARCHIVE_INTEGRITY_CHECKLIST` 只查存在性，没有其它判据会拦）。
+ *
+ * 违规以 `[runLogPrefix]` 前缀并入 `missingFiles`（blocking），且**分类具名**三种形态：
+ * 非前缀 / 非记录边界（中途截断）/ 空快照；未提供 live 文本时不产生任何条目（非阻断，退出码语义不变）。
  */
 function checkRunLogPrefix(options: ArchiveRunLogPrefixOptions, missingFiles: string[], presentFiles: string[]): void {
   const liveText = options.liveRunLogText;
   if (liveText === undefined) return; // 未启用：零行为变化
-  if (options.archivedRunLogText === undefined) {
+  const archivedText = options.archivedRunLogText;
+  if (archivedText === undefined) {
     missingFiles.push(
       '[runLogPrefix] 归档 run-log.jsonl 快照不可读（提供 --live-run-log 时前缀性校验 fail-closed：无法证明归档快照是 live 的字节前缀）',
     );
     return;
   }
-  if (liveText.startsWith(options.archivedRunLogText)) {
-    presentFiles.push(`[runLogPrefix] 归档 run-log.jsonl 是 live 的字节前缀（live ${liveText.length} 字节）`);
-  } else {
+  const isPrefix = liveText.startsWith(archivedText);
+  const isIdentical = archivedText === liveText;
+  const endsAtRecordBoundary = archivedText.length > 0 && archivedText.endsWith('\n');
+  if (isPrefix && (isIdentical || endsAtRecordBoundary)) {
+    presentFiles.push(
+      `[runLogPrefix] 归档 run-log.jsonl 是 live 的记录边界前缀（归档 ${archivedText.length} 字节 / live ${liveText.length} 字节${
+        isIdentical ? '，两者一致（归档后无新增记录）' : ''
+      }）`,
+    );
+    return;
+  }
+  if (!isPrefix) {
     missingFiles.push(
-      `[runLogPrefix] 归档 run-log.jsonl 不是 live run-log 的字节前缀（归档 ${options.archivedRunLogText.length} 字节 vs live ${liveText.length} 字节）：` +
+      `[runLogPrefix] 归档 run-log.jsonl 不是 live run-log 的字节前缀（归档 ${archivedText.length} 字节 vs live ${liveText.length} 字节）：` +
         '两侧在前缀处不一致（live 侧被截断/重排/改写，或归档快照被改写——两者不可同真，须人工裁定证据归属）',
     );
+    return;
   }
+  if (archivedText.length === 0) {
+    missingFiles.push(
+      `[runLogPrefix] 归档 run-log.jsonl 快照为空（0 字节）而 live 有 ${liveText.length} 字节：空快照无法证明前缀性，不得据此放行（缺内容请补归档快照后重跑）`,
+    );
+    return;
+  }
+  missingFiles.push(
+    `[runLogPrefix] 归档 run-log.jsonl 落在记录中途（非记录边界）：快照 ${archivedText.length} 字节未以换行结尾，而 live 为 ${liveText.length} 字节——` +
+      '疑似归档写入途中崩溃或被截断（半行快照），不得据此放行；请补全归档快照后重跑',
+  );
 }
 
 /**
