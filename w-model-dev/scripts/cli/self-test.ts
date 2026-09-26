@@ -313,9 +313,9 @@ const VERIFIER_CASES: VerifierCase[] = [
   {
     file: 'bad-evidence-double-l.json',
     expectedPassed: false,
-    expectedReasonPatterns: [/evidence 格式不符.*单 L 形态/, /L51-L53=/],
+    expectedReasonPatterns: [/evidence 格式不符.*双 L 非法/, /L51-L53=/],
     description:
-      'D-10② evidence 逐条为双 L 区间形态（path:L51-L53=…），须报「格式不符（须 path:Lnn=stmt 或 path:§sec=stmt，单 L 形态）」而非「空泛声明，O3 命中」',
+      'D-10② evidence 逐条为双 L 区间形态（path:L51-L53=…），须报「格式不符（须 path:Lnn=stmt 或 path:§sec=stmt；行号区间合法写法 path:L51-53=stmt，双 L 非法）」而非「空泛声明，O3 命中」',
   },
   // -------------------- rootcause targetKind（§7.5） --------------------
   {

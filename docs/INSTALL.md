@@ -12,7 +12,7 @@
 
 ### Source-bound provenance 边界
 
-`evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。`npm run wm:export-evidence -- <project-dir> <output-dir>` 只从 `.w-model` 下的 `gate-logs/`、`verifier-outputs/`、`signature-chains/`、`codegraph-queries/` 和 `run-log.jsonl` 白名单导出；项目源码、`.zcode/`、`coverage/`、未白名单运行时文件和 `docs/changes/archive/` 不属于当前运行证据。JSON/JSONL/Markdown 会清理敏感字段与绝对路径，manifest 记录稳定相对路径、kind、SHA-256 和 package manifest hash；CLI 成功输出只显示脱敏占位路径。`wm-export-evidence --verify` 在没有 `--source-project` 时只能是 package-only；只有传入 `--source-project <project-dir>` 才能执行 source-bound verify。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性；它不是密码学签名，也不是第三方不可抵赖证明。package-only 不能表述为 verified source 证据；导出和 producer+verify 都不会自动 Git 提交或发布。**交付 / 外发前必须经 `wm-export-evidence` 生成脱敏包；禁止直接外发归档目录**（`docs/changes/archive/` 保留执行证据原貌——gate-log 头部的 `cwd` / 输入路径属本机真实执行证据，不得就地脱敏；对外交付一律走上述脱敏导出链）。
+`evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。`npm run wm:export-evidence -- <project-dir> <output-dir>` 只从 `.w-model` 下的 `gate-logs/`、`verifier-outputs/`、`signature-chains/`、`codegraph-queries/` 和 `run-log.jsonl` 白名单导出；项目源码、`.zcode/`、`coverage/`、未白名单运行时文件和 `docs/changes/archive/` 不属于当前运行证据。JSON/JSONL/Markdown 会清理敏感字段与绝对路径，manifest 记录稳定相对路径、kind、SHA-256 和 package manifest hash；CLI 成功输出只显示脱敏占位路径。`wm-export-evidence --verify` 在没有 `--source-project` 时只能是 package-only；只有传入 `--source-project <project-dir>` 才能执行 source-bound verify。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性；它不是密码学签名，也不是第三方不可抵赖证明。package-only 不能表述为 verified source 证据；导出和 producer+verify 都不会自动 Git 提交或发布。**交付 / 外发前必须经 `wm-export-evidence` 生成脱敏包；禁止直接外发归档目录**（`docs/changes/archive/` 保留执行证据原貌——gate-log 头部的 `cwd` / 输入路径属本机真实执行证据，不得就地脱敏；对外交付一律走上述脱敏导出链）；**归档目录仅作受控留档、不构成交付物**，如需交付其中文档，走脱敏导出链生成**独立副本**（导出白名单不含 `docs/changes/archive/`）。
 
 ## 验证仓库
 
@@ -34,7 +34,7 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\\w-model-dev"
 
 > **本地生成物与审计证据**：`coverage/`、`.zcode/` 与 `.w-model/` 是 **Git 忽略** 的本地生成物，不应强制提交；`.w-model/` 可含运行期状态与审计证据，默认不随 Git 交付。需要交付时先运行 `npm run wm:verify-evidence-source -- <project-dir>` 由 producer 重建并写入 source-bound provenance，再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
 >
-> **交付 / 外发前必须经 `wm-export-evidence` 生成脱敏包；禁止直接外发归档目录**（`docs/changes/archive/` 与本地 `.w-model/` 都含本机绝对路径与运行期证据原貌——归档允许保留执行证据原貌，但对外交付只走上述脱敏导出链）。
+> **交付 / 外发前必须经 `wm-export-evidence` 生成脱敏包；禁止直接外发归档目录**（`docs/changes/archive/` 与本地 `.w-model/` 都含本机绝对路径与运行期证据原貌——归档允许保留执行证据原貌，但对外交付只走上述脱敏导出链）。**归档目录仅作受控留档、不构成交付物**；如需交付其中文档，走脱敏导出链生成**独立副本**（导出白名单不含 `docs/changes/archive/`）。
 
 ---
 

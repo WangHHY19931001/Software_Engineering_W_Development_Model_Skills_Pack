@@ -1014,10 +1014,11 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 - **五轴评审与严重等级标签**（吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `code-review-and-quality` 技能）：代码评审（`targetKind=code`）的子标准按五轴（Correctness / Readability / Security / Architecture / Performance）组织发现项；每条发现项标注 Severity（Critical / Required / Nit / Optional / FYI），使作者区分必修与可选。详细子标准映射与 Structural Remedies 见 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §7.4A。
 - **防漂移校验**：外部 Agent 输出 JSON 后必须调用 `w-model-dev/scripts/cli/check-verifier-output.ts` 校验（退出码 `0=通过 / 1=校验失败 / 2=输入错误`）。校验纯逻辑单点事实源为 `w-model-dev/scripts/logic/verifier-logic.ts`。
 - **与外部演化工具的关系**：本规范只覆盖「阶段产物校验流程」，是技能内部的产物质量保障；技能演化（Rollout / Reflect / Edit / Skill Lift）由外部 SkillOpt / darwin-skill 完成，可消费本规范产出的 `VerifierOutput` JSON 作为训练信号。
-- **evidence 格式规范**：evidence 字段每条须含 `<文件路径>.<字段路径>=<值>` 格式
-  - 合法示例：`coverage.json.matrices.stakeholder.coverage=100%` / `tla-manifest.json.specs[0].tlcChecked=true`
-  - 非法示例：`C1-C10 全通过` / `质量良好` / `评审通过`（空泛声明）
-  - 空泛声明视为 O3（Verifier Theater）命中，V 评审降级重做
+- **evidence 格式规范**：evidence 字段每条须含 `<文件路径>:<定位>=<值>` 格式（定位为 `§section` 或 `L行号`；行号区间写 `L51-53`，**单 L 形态**）
+  - 合法示例：`docs/phase1-requirements/requirement-spec.md:§1.1=32 需求齐全` / `src/auth.ts:L42-58=JWT 签发逻辑`
+  - 非法示例：`coverage.json.matrices.stakeholder.coverage=100%`（点号格式，已废弃）/ `docs/x.md:L51-L53=…`（双 L 区间，合法写法为 `L51-53`）/ `C1-C10 全通过` / `质量良好` / `评审通过`（裸声明）
+  - **裸声明的现行归因是「格式不符」**：缺 `path:定位=` 形态 → 门禁报 `evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt；行号区间合法写法 path:L51-53=stmt，双 L 非法）`，V 据此补定位形态而非改分数
+  - `空泛声明 / O3 命中` 文案桶须先匹配 `<路径>:<定位>=` 再命中空泛前缀，属语义兜底、**当前不可达**（D-10①）；两条归因都只做 `compositeScore -0.1` 并重判 `qualityLevel` / `passed`
   - evidence 字段为空 → 评审失败
 
 `/wm review <target>` 命令（见 §6）仅返回结构化评审指引——根据目标 ID 识别 `targetKind`，提示对应的子标准集合，并指引外部 Agent 加载 `verifier-spec.md` §8 提示词模板执行评审、再调用校验脚本。命令本身不调用 LLM。

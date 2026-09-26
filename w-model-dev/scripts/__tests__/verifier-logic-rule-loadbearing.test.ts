@@ -106,7 +106,7 @@ const RULES: readonly RuleCase[] = [
   },
   {
     id: 'evidence 格式不符（EVIDENCE_PATTERN 不匹配，D-10① 两路文案之格式路）',
-    forbidden: 'evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt，单 L 形态）',
+    forbidden: 'evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt；行号区间合法写法 path:L51-53=stmt，双 L 非法）',
     anchor: 'if (!EVIDENCE_PATTERN.test(item)) {',
     red: () =>
       mutate((o) => {

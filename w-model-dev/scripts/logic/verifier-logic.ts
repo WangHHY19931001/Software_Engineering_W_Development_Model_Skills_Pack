@@ -329,7 +329,8 @@ export function validateEvidenceFormat(evidence: string[]): {
   const vagueItems: string[] = [];
   // D-10①：失败分两路可归因——正则不匹配（格式不符：缺 `path:Lnn=` / `path:§sec=` 定位，
   // 或双 L 区间 `path:L51-L53=` 这类非规范形态）与匹配后命中空泛前缀（空泛声明）。
-  // vagueItems 保持「全部不合规条目」的历史语义（既有调用方与断言依赖），
+  // vagueItems 保持「全部不合规条目」的历史语义（字段名为历史命名，实际语义是并集而非仅空泛项；
+  // 既有调用方与断言依赖该并集语义），
   // formatMismatchItems 为其中属格式不符的子集，供主流程产出可执行的诊断文案。
   //
   // 可达性事实（实测，非估计）：VAGUE_EVIDENCE_PATTERNS 全部 `^` 锚定在裸声明前缀，
@@ -641,7 +642,7 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
       // qualityLevel/passed 重判定路径完全一致，只有诊断归因不同。
       if (evidenceResult.formatMismatchItems.length > 0) {
         reasons.push(
-          `evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt，单 L 形态）：${evidenceResult.formatMismatchItems.join('; ')}`,
+          `evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt；行号区间合法写法 path:L51-53=stmt，双 L 非法）：${evidenceResult.formatMismatchItems.join('; ')}`,
         );
       }
       const vagueItemsOnly = evidenceResult.vagueItems.filter(

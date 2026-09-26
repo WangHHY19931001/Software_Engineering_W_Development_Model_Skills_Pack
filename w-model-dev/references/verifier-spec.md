@@ -523,11 +523,11 @@ V 子代理须在 `summary` 中包含：
 
 **禁止措辞**：「评审通过」「质量良好」「符合要求」等空泛表述。summary 长度须 ≥ 50 字符（R11 校验）。
 
-**evidence 格式规范**（冒号分隔）：evidence 字段每条须含 `<文件路径>:<定位>=<值>` 格式，定位为 `§section` 或 `L行号`（**单 L 形态**）。
-- 合法示例：`docs/phase1-requirements/requirement-spec.md:§1.1=32 需求齐全` / `src/auth.ts:L42-58=JWT 签发逻辑`
+**evidence 格式规范**（冒号分隔）：evidence 字段每条须含 `<文件路径>:<定位>=<值>` 格式，定位为 `§section` 或 `L行号`（**单 L 形态**：`L42`，或合法区间 `L42-58`）。
+- 合法示例：`docs/phase1-requirements/requirement-spec.md:§1.1=32 需求齐全` / `src/auth.ts:L42-58=JWT 签发逻辑`（区间形态合法，**不要**改成单行）
 - 非法示例：`coverage.json.matrices.stakeholder.coverage=100%`（点号格式，已废弃）/ `docs/phase1-requirements/requirement-spec.md:L51-L53=REQ-001 需求覆盖`（**双 L 区间**：区间写法为 `L51-53`，多写一个 `L` 即格式不符，D-10②）/ `C1-C10 全通过` / `质量良好` / `评审通过`
-- **两路归因**（D-10①）：不匹配 `<路径>:<定位>=` 正则（含上例双 L 形态）→ **格式不符**（须 `path:Lnn=stmt` 或 `path:§sec=stmt`，可直接换写法修复）；匹配后命中空泛前缀 → **空泛声明，O3 命中**（属评审造假，须重评）。两路都使 `compositeScore -0.1` 并重新判定 `qualityLevel` / `passed`，但修复动作不同，V 不得混淆。
-- 空泛声明视为 O3（Verifier Theater）命中，V 评审降级重做
+- **两路归因**（D-10①）：不匹配 `<路径>:<定位>=` 正则（含上例双 L 形态）→ **格式不符**（须 `path:Lnn=stmt` 或 `path:§sec=stmt`；行号区间合法写法为 `path:L51-53=stmt`——**单 L 区间合法、双 L 才非法**，可直接换写法修复）；匹配后命中空泛前缀 → **空泛声明，O3 命中**（属评审造假，须重评）。两路都使 `compositeScore -0.1` 并重新判定 `qualityLevel` / `passed`，但修复动作不同，V 不得混淆。
+- **裸声明的现行归因是「格式不符」，不是「空泛声明」**：`质量良好` / `评审通过` / `C1-C10 全通过` 这类裸声明缺 `path:定位=` 形态 → 门禁报 `evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt；行号区间合法写法 path:L51-53=stmt，双 L 非法）`；V 应据此**补定位形态**（或换合法区间写法），而非改分数。`空泛声明 / O3 命中` 文案桶须先匹配 `<路径>:<定位>=` 再命中空泛前缀，属语义兜底，**当前不可达**（`^` 锚定的裸前缀与 `path:` 前缀互斥）。
 - 格式约定见 [conventions.md](conventions.md#格式约定) §2.1；对应负样本 `w-model-dev/scripts/samples/verifier/bad-evidence-double-l.json`
 
 ### 6.2.1 evidence 字段可追溯约束

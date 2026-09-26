@@ -24,7 +24,7 @@
 
 > **本地生成物与审计证据**：`coverage/`、`.zcode/` 与 `.w-model/` 是 **Git 忽略** 的本地生成物，不应强制提交；`.w-model/` 可含运行期状态与审计证据，默认不随 Git 交付。需要交付时先运行 `npm run wm:verify-evidence-source -- <project-dir>` 由 producer 重建并写入 source-bound provenance，再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；导出只允许 `.w-model/gate-logs/`、`verifier-outputs/`、`signature-chains/`、`codegraph-queries/` 与 `run-log.jsonl`，不包含项目源码、`.zcode/`、`coverage/`、未白名单运行时文件或 `docs/changes/archive/`；JSON/JSONL/Markdown 的敏感字段与绝对路径会脱敏，CLI 成功输出使用占位路径。`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；导出后仍须按项目安全策略审阅，导出和 producer+verify 都不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。
 >
-> **交付 / 外发前必须经 `wm-export-evidence` 生成脱敏包；禁止直接外发归档目录**（`docs/changes/archive/` 与本地 `.w-model/` 都含本机绝对路径与运行期证据原貌——归档允许保留执行证据原貌，但对外交付只走上述脱敏导出链）。
+> **交付 / 外发前必须经 `wm-export-evidence` 生成脱敏包；禁止直接外发归档目录**（`docs/changes/archive/` 与本地 `.w-model/` 都含本机绝对路径与运行期证据原貌——归档允许保留执行证据原貌，但对外交付只走上述脱敏导出链）。**归档目录仅作受控留档、不构成交付物**；如需交付其中文档，走脱敏导出链生成**独立副本**（导出白名单不含 `docs/changes/archive/`）。
 >
 > **销毁前证据保全**：凡对 gitignored 工作区执行破坏性重建/清理（含 `build_workspace.py --reset` 与常规运行——两者都会删 `.w-model`），若该态可能是唯一证据载体（存在真实调测/运行的 `.w-model` 态），必须先完成证据分级裁定并保全（快照入库 `docs/debug/` 或走导出链；注意导出链 source-bound 对无 `.git` 工作区不可用），再销毁。
 
@@ -32,7 +32,7 @@
 
 ### Source-bound provenance 边界
 
-`evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。`wm-export-evidence --verify` 在没有 `--source-project` 时只能是 package-only；只有传入 `--source-project <project-dir>` 才能执行 source-bound verify。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性；它不是密码学签名，也不是第三方不可抵赖证明。package-only 不能表述为 verified source 证据。**交付 / 外发前必须经 `wm-export-evidence` 生成脱敏包；禁止直接外发归档目录**（`docs/changes/archive/` 保留执行证据原貌——gate-log 头部的 `cwd` / 输入路径属本机真实执行证据，不得就地脱敏；对外交付一律走脱敏导出链）。
+`evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。`wm-export-evidence --verify` 在没有 `--source-project` 时只能是 package-only；只有传入 `--source-project <project-dir>` 才能执行 source-bound verify。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性；它不是密码学签名，也不是第三方不可抵赖证明。package-only 不能表述为 verified source 证据。**交付 / 外发前必须经 `wm-export-evidence` 生成脱敏包；禁止直接外发归档目录**（`docs/changes/archive/` 保留执行证据原貌——gate-log 头部的 `cwd` / 输入路径属本机真实执行证据，不得就地脱敏；对外交付一律走脱敏导出链）；**归档目录仅作受控留档、不构成交付物**，如需交付其中文档，走脱敏导出链生成**独立副本**（导出白名单不含 `docs/changes/archive/`）。
 
 ## 2. 关键目录速查
 

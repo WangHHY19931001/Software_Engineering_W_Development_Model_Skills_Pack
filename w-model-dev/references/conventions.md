@@ -159,7 +159,7 @@ path:§3.2,L42       （章节+行号混合）
 
 > 本格式同时是 `graph.json` 节点可选字段 `evidenceAnchor`（产出期证据锚点）的格式权威（见术语表 evidenceAnchor 条目）。
 
-格式：`path:§section=statement` 或 `path:L42=statement`
+格式：`path:§section=statement` 或 `path:L42=statement` 或 `path:L42-58=statement`（行号区间，**单 L 形态**）
 
 ```
 合法示例：
@@ -169,7 +169,8 @@ path:§3.2,L42       （章节+行号混合）
 
 非法示例：
   coverage.json.matrices.stakeholder.coverage=100%  （点号格式，已废弃）
-  C1-C10 全通过                                       （空泛声明）
+  docs/x.md:L51-L53=…                                （双 L 区间；合法写法为 L51-53）
+  C1-C10 全通过                                       （裸声明 → 现行归因「格式不符」；空泛声明/O3 桶为语义兜底、当前不可达）
   system-design.md                                    （无定位）
 ```
 
