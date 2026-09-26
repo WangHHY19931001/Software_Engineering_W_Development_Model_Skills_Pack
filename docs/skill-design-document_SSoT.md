@@ -1164,6 +1164,13 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 - **G 角色校验职责**：G 跑门禁脚本前先跑 `check-signature-chain.ts`（R1-R10）；O checkpoint 前须跑签名链校验 + 用户确认签名。
 - **归档**：`signature-chain.jsonl` 须纳入归档完整性强制快照清单（由 `check-archive-integrity.ts` 校验）。
 
+### 7.10 证据导出与 source provenance 边界（2026-09-27，live-run 修复 ⑥/N-7 销项）
+
+> 操作口径的权威复述在 [`AGENTS.md`](../AGENTS.md)「本地生成物与审计证据」节与 [`docs/INSTALL.md`](./INSTALL.md)；schema 结构权威在 [`data-models.md`](../w-model-dev/references/data-models.md)（`evidence-manifest` / `evidence-provenance` 行）。本节登记两条设计决策，防实现漂移。
+
+- **链位置唯一权威（N-7）**：source provenance 生产者（`wm-verify-evidence-source`）与导出白名单（`wm-export-evidence`）**统一接受根级 `.w-model/signature-chain.jsonl` 为权威形态**；`signature-chains/` 复数目录保留为 legacy 兼容读取。根级文件与 legacy 目录**并存即 fail-closed**（`SIGNATURE_CHAIN_AMBIGUOUS`，exit 1）——链位置歧义不作猜测、不取并集；两侧（导出与 verify）共用同一白名单函数保持双向对称。设计依据：全仓约定（`signature-chain-guide.md` / 归档完整性快照清单）一直是根级单文件，producer 侧旧要求复数目录使真实项目导出链整体不可用。
+- **no-git 形态（⑥a）与永久护栏**：无 `.git` 工作区从「`MISSING_GIT_HEAD` exit 1 结构性不可用」改为**显式 `--no-git-ok` 才产出 `provenanceKind='no-git'` 形态**——`commitSha` 置空、以 `workspaceDigest`（导出源文件集合的规范化清单 SHA-256，与 `sourceBundleSha256` 同一清单导出、取值相同）替代 HEAD 身份，`runId`/`user`/`host` 身份字段保留。**该形态永久只能 package-only**：`--source-project` 复验一律拒绝（`NOT_SOURCE_BOUND_NO_GIT`，exit 1）；`verifySourceProvenance` 的返回值自述（含 `allowNoGitRecord` 本地一致性例外路径）与 `wm-export-evidence` 成功摘要（no-git 包带 `verificationLevel:'package-only'` 键）都不得把它表述为 source-bound / verified source——**全仓不存在把 no-git 记录读成 source-bound 的出口**。设计依据：无 HEAD 可绑定的证据不能主张流程完整性到源码级，宁可降低自述等级也不虚高。
+
 ---
 
 ## 8. 技术实现方案

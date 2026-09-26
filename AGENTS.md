@@ -144,10 +144,7 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 > [CHANGELOG-archive.md](./CHANGELOG-archive.md)（41.0.0 之前）承载；轮次详细决策记录见
 > [docs/changes/decision-log/](./docs/changes/decision-log/README.md)。
 
-> **进行中的收口程序（2026-09-18）**：B（规则层覆盖门）/J1（run-log R11）/N（code-health 端到端）/O（logic 负载性）四项遗留收口正在执行，规格与计划见
-> [docs/superpowers/specs/2026-09-18-leftovers-closeout-design.md](./docs/superpowers/specs/2026-09-18-leftovers-closeout-design.md) 与
-> [docs/superpowers/plans/2026-09-18-leftovers-closeout.md](./docs/superpowers/plans/2026-09-18-leftovers-closeout.md)；**接续工作前先读交接文档**
-> [docs/superpowers/handoffs/2026-09-18-leftovers-closeout-handoff.md](./docs/superpowers/handoffs/2026-09-18-leftovers-closeout-handoff.md)（含任务状态、账本路径、恢复步骤与验收约束：最终必须跑全量 19 项 prepush 后推送）。
+> **遗留收口程序（2026-09-18）已完成**：B（规则层覆盖门 `check-coverage-scope.ts`）/J1（run-log R11 闭环五脚本）/N（code-health 端到端 Phase 1-4 + campaign 归档）/O（logic 负载性）四项已全部收口并推送（终值与逐项来源见 [CHANGELOG.md](./CHANGELOG.md)「全部遗留事项收口」节与计划文末「收尾记录」：[docs/superpowers/plans/2026-09-18-leftovers-closeout.md](./docs/superpowers/plans/2026-09-18-leftovers-closeout.md)）；历史交接快照存 [docs/superpowers/handoffs/2026-09-18-leftovers-closeout-handoff.md](./docs/superpowers/handoffs/2026-09-18-leftovers-closeout-handoff.md)（该文件头注「执行中」为快照时点状态，不再反映现状）。
 
 ## 8. 脚本导航表
 
