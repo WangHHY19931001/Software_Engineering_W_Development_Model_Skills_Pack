@@ -523,6 +523,11 @@ interface RunLogEntry {
 **使用约定**：
 
 - `run-log.jsonl` 是 append-only：不得修改历史记录；运行时读取可跳过损坏行并记录 note，但 `check-run-log.ts` 门禁对空/坏行 **fail-closed**（空/空白/malformed-only/valid+malformed 一律 exit 1，parseErrors 并入 blocking，消息保留 `PARSE_INCOMPLETE` 前缀），不得把坏行当作可放行的证据缺失。
+- **时间戳真值 + 禁止回溯改写（D-5①，反伪造）**：记录的时间戳必须为**写入时刻真值**；**禁止回溯改写历史行或重排时间戳**（改时间戳 / 改 note / 删行 / 插行后重排时间轴同样禁止——R7 的记录哈希链与放行锚正为检出这类改写而设）；记录修正**只允许**经 O 侧统一追加器 `wm-append-runlog` **追加更正记录**（历史行逐字节不变），不得手改历史行；禁令与替代动作成对，手搓改行不是合法路径。
+- **追加与更正唯一入口（D-5①/N-5）**：O 追加 run-log 一律经 [`scripts/cli/wm-append-runlog.ts`](../scripts/cli/wm-append-runlog.ts)（写盘复用 `state-write-logic` 的锁 + 备份 + tmp/rename + 回读），不得手搓追加脚本或直接 `Write`/`Edit` run-log。用法示例（命令形态照该工具既有登记 `<run-log.jsonl> [--from=<json|jsonl>|--stdin] [--correct=<runId>] [--timestamp=<iso>] [--allow-clock-adjust=<reason>] [--lock-timeout=] [--json]`）：
+  - 追加新记录：`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin`
+  - 更正既有记录（只新增一条更正记录，`note` 含 `correction-of:<runId>`）：`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin --correct=<runId>`
+  - 时间戳**严格递增**：`now < 末条` 默认 exit 1 拒绝（文案点名末条时间与建议）；`--timestamp=<iso>` / `--allow-clock-adjust=<reason>` 为显式逃生口，分别在记录 `note` 留 `clock-injected:<iso>` / `clock-adjust:<reason>` 痕迹（绝不静默改写时间戳来源）。
 - 编排者 O 在以下时机 append：子代理分派返回后 / 门禁脚本执行后 / 🔴 CHECKPOINT 放行后 / 返工回退后。
 - `acknowledgedDecisions` 在阶段门放行时由用户填写（≥1 关键决策摘要，非"确认"/"同意"）；为空视为 O4（Comprehension Debt）命中，拒绝放行。
 - O 系列失败模式的机器可读标注为 `operationalFailureModes`（可选，`O1`~~`O6` 枚举数组，`uniqueItems`）；`check-maturity.ts` R5 只统计该字段（存在即累加长度）。`note` 中的 O1~~O6 字样视为**引用**（含评审规则编号同名情形，如 O3 既是运维失败模式也是 V 门禁 evidence 扣分规则名），不计入 R5；词法命中仅作非阻断诊断，并指引「确为运维失败时改用 `operationalFailureModes` 标注」。
