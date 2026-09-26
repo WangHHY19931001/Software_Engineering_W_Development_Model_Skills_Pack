@@ -17,6 +17,10 @@
  *   C10 CLI：阶段 5-8 无 --scope → exit 1（不是 0）；有合法 scope → exit 0；
  *       覆盖缺失 → exit 1
  *   C11 文件名 phase 前缀精确单数字（phase05-* 不计入 phase 5；phase5-* 正常计入）
+ *   C14 索引探测 + 显式降级声明（D-6，2026-09-25 live-run 修复）：项目存在 `.codegraph/`
+ *       → 记录须声明 `evidenceKind: 'cli'`（禁止降级）；无索引 → 须显式降级
+ *       （`evidenceKind: 'artifact'` + 非空 `degradationReason` + ≥1 条 `alternativeEvidence`）；
+ *       未声明 `evidenceKind` 一律违规——把「制品口径」从隐形判据变成显式声明
  */
 
 import { execSync } from 'node:child_process';
@@ -66,6 +70,15 @@ function makeScope(overrides: Partial<ChangeScope> = {}): ChangeScope {
   };
 }
 
+/** 合规降级声明（临时项目树无 .codegraph/ 索引 → 无索引分支下的唯一合法形态，D-6） */
+const DEGRADED_EVIDENCE = {
+  evidenceKind: 'artifact',
+  degradationReason: '临时项目树无 .codegraph/ 索引（codegraph CLI 未初始化），以制品级查询记录替代',
+  alternativeEvidence: [
+    { command: 'codegraph query TargetSymbol', evidencePath: '.w-model/codegraph-queries/probe.log' },
+  ],
+};
+
 /** 完整合法查询（覆盖 main.ts 或 util.ts） */
 function queryFile(changeId: string, targetFiles: string[], extra: Record<string, unknown> = {}): string {
   return JSON.stringify({
@@ -76,6 +89,7 @@ function queryFile(changeId: string, targetFiles: string[], extra: Record<string
     queryTimestamp: '2026-09-03T00:00:00Z',
     changeId,
     targetFiles,
+    ...DEGRADED_EVIDENCE,
     ...extra,
   });
 }
@@ -185,6 +199,7 @@ describe('checkCodegraphQueriesStrict（覆盖绑定校验）', () => {
         callees: ['B'],
         blastRadius: 2,
         queryTimestamp: '2026-09-03T00:00:00Z',
+        ...DEGRADED_EVIDENCE,
       }),
     });
     const r = readResult(root, makeScope());
@@ -309,6 +324,7 @@ describe('checkCodegraphQueries（legacy 两参兼容层）', () => {
         callees: ['B'],
         blastRadius: 2,
         queryTimestamp: '2026-09-03T00:00:00Z',
+        ...DEGRADED_EVIDENCE,
       }),
     });
     const r = checkCodegraphQueries(root, 5);
@@ -425,6 +441,7 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
         queryTimestamp: QUERY_TS,
         changeId: 'phase5-cgq-cli',
         targetFiles: ['src/main.ts', 'src/forgotten.ts'],
+        ...DEGRADED_EVIDENCE,
       }),
     );
     writeFileSync(
@@ -455,6 +472,7 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
         queryTimestamp: QUERY_TS,
         changeId: 'phase5-cgq-cli',
         targetFiles: ['src/main.ts'],
+        ...DEGRADED_EVIDENCE,
       }),
     );
     writeFileSync(
@@ -518,5 +536,86 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
     expect(r.status).toBe(2);
     expect(r.stdout).toMatch(/ERROR_JSON/);
     expect(r.stdout + r.stderr).toMatch(/重复的命令行参数 --scope/);
+  });
+
+  // ==================== C14：索引探测 + 显式降级声明（D-6，2026-09-25 live-run 修复） ====================
+  /** D-6 用例共用：落盘 ChangeScope + 单条 phase5 查询记录（changeId=phase5-cgq-cli，覆盖两个变更文件） */
+  function writeScopeAndQuery(root: string, baseSha: string, headSha: string, record: Record<string, unknown>): void {
+    mkdirSync(join(root, '.w-model', 'codegraph-queries'), { recursive: true });
+    writeFileSync(join(root, '.w-model', 'codegraph-queries', 'phase5-audit-cgq-a.json'), JSON.stringify(record));
+    writeFileSync(
+      join(root, '.w-model', 'scope.json'),
+      JSON.stringify({
+        changeId: 'phase5-cgq-cli',
+        phase: 5,
+        baseRef: baseSha,
+        headRef: headSha,
+        scopeCreatedAt: SCOPE_TS,
+        changedFiles: ['src/main.ts', 'src/forgotten.ts'],
+      }),
+    );
+  }
+
+  /** 结构完整合法的查询记录；extra 注入 D-6 证据声明字段 */
+  function d6Record(extra: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      querySymbol: 'main.ts symbol',
+      callers: ['x'],
+      callees: ['y'],
+      blastRadius: 2,
+      queryTimestamp: QUERY_TS,
+      changeId: 'phase5-cgq-cli',
+      targetFiles: ['src/main.ts', 'src/forgotten.ts'],
+      ...extra,
+    };
+  }
+
+  /** D-6 三态用例的 CLI 调用（复用既有真实子进程口径，同时暴露 exitCode 供三态断言） */
+  function runChecker(args: string[]): { exitCode: number; stdout: string; stderr: string } {
+    const r = runCli(args);
+    return { exitCode: r.status, stdout: r.stdout, stderr: r.stderr };
+  }
+
+  /** 期望非零退出：exit 0 时抛错，避免三态断言静默退化为「只看输出文本」 */
+  function runCheckerExpectFail(args: string[]): { exitCode: number; stdout: string; stderr: string } {
+    const r = runChecker(args);
+    if (r.exitCode === 0) {
+      throw new Error(`期望非零退出码，实际 exit 0（stdout 尾部：${r.stdout.slice(-500)}）`);
+    }
+    return r;
+  }
+
+  it('C14a: 无 .codegraph/ 索引且未声明降级 → exit 1（伪造制品口径不得通过）', () => {
+    const { root, baseSha, headSha } = makeScopedProject({});
+    writeScopeAndQuery(root, baseSha, headSha, d6Record());
+    const r = runCheckerExpectFail([`"${root}"`, '--phase', '5', '--scope=.w-model/scope.json']);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/降级|degraded|evidenceKind/);
+  });
+
+  it('C14b: 无索引 + artifact 声明 + 替代证据 → exit 0（显式降级是合法路径）', () => {
+    const { root, baseSha, headSha } = makeScopedProject({});
+    writeScopeAndQuery(root, baseSha, headSha, d6Record(DEGRADED_EVIDENCE));
+    const r = runChecker([`"${root}"`, '--phase', '5', '--scope=.w-model/scope.json']);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toMatch(/"passed":true/);
+  });
+
+  it('C14c: 存在 .codegraph/ 索引却声明 artifact（降级）→ exit 1（索引在盘禁止降级）', () => {
+    const { root, baseSha, headSha } = makeScopedProject({});
+    mkdirSync(join(root, '.codegraph'), { recursive: true });
+    writeScopeAndQuery(root, baseSha, headSha, d6Record(DEGRADED_EVIDENCE));
+    const r = runCheckerExpectFail([`"${root}"`, '--phase', '5', '--scope=.w-model/scope.json']);
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/\.codegraph|索引/);
+  });
+
+  it('C14d: 存在索引 + evidenceKind:cli → exit 0（对照：禁止降级不等于禁止查询记录）', () => {
+    const { root, baseSha, headSha } = makeScopedProject({});
+    mkdirSync(join(root, '.codegraph'), { recursive: true });
+    writeScopeAndQuery(root, baseSha, headSha, d6Record({ evidenceKind: 'cli' }));
+    const r = runChecker([`"${root}"`, '--phase', '5', '--scope=.w-model/scope.json']);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toMatch(/"passed":true/);
   });
 });

@@ -1,0 +1,20 @@
+{
+ "id": "counter-api",
+ "name": "counter-api",
+ "description": "W-Model 8 阶段真实调测项目（环形计数器，2026-09-22 全流程真实运行）",
+ "status": "项目完成",
+ "techStack": {
+  "frontend": [],
+  "backend": [
+   "TypeScript",
+   "node:test"
+  ],
+  "database": [],
+  "others": [
+   "TLA+",
+   "BDD"
+  ]
+ },
+ "createdAt": "2026-09-22T10:27:03.431Z",
+ "updatedAt": "2026-09-25T14:40:00.000Z"
+}

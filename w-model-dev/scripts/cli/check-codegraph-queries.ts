@@ -14,6 +14,15 @@
  * 至少被一个查询覆盖。无 scope → exit 1（不是 0）。原两参
  * `checkCodegraphQueries(projectRoot, phase)` 保留为 legacy 兼容层（self-test 用）。
  *
+ * 索引探测 + 显式降级声明（2026-09-25 live-run 修复，D-6）：只验结构/覆盖/时序会让
+ * 手工编造的查询记录（无任何 CLI 出处、项目根本没有 `.codegraph/` 索引）通过，与
+ * hard-constraints.md「不得伪造查询记录」相悖。故每条记录须显式声明证据形态：
+ *   - 项目根存在 `.codegraph/` 索引 → 只允许 `evidenceKind: 'cli'`（禁止降级）；
+ *   - 无索引 → 必须显式降级：`evidenceKind: 'artifact'` + 非空 `degradationReason`
+ *     + ≥1 条 `alternativeEvidence[{command, evidencePath}]`；
+ *   - 未声明 `evidenceKind` 一律违规（把「制品口径」从隐形默认变成显式声明）。
+ * 判据在 legacy 与 strict 两层共用（self-test 经 legacy 层覆盖样本）。
+ *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-codegraph-queries.ts <project-root> --phase <5|6|7|8> \
  *       --scope=<change-scope.json> [--json]
@@ -63,12 +72,26 @@ import {
 } from '../lib/change-scope.js';
 
 /** legacy 兼容层查询形状（strict 模式在其上叠加 changeId/targetFiles） */
-interface CodegraphQuery {
+interface CodegraphQuery extends EvidenceDeclarationShape {
   querySymbol: string;
   callers?: unknown[];
   callees?: unknown[];
   blastRadius?: unknown;
   queryTimestamp: string;
+}
+
+/** strict 判定读取的记录字段（changeId/targetFiles/queryTimestamp + 证据声明族） */
+interface StrictQueryShape extends EvidenceDeclarationShape {
+  changeId?: unknown;
+  targetFiles?: unknown;
+  queryTimestamp?: unknown;
+}
+
+/** 证据声明族形状（schema 可选字段；语义判据由本模块按索引实际状态强制） */
+interface EvidenceDeclarationShape {
+  evidenceKind?: unknown;
+  degradationReason?: unknown;
+  alternativeEvidence?: unknown;
 }
 
 interface CheckResult {
@@ -105,6 +128,80 @@ function phaseQueryFiles(queriesDir: string, phase: number): { own: string[]; fo
     else foreign.push(f);
   }
   return { own, foreign };
+}
+
+/**
+ * 项目根是否存在 `.codegraph/` 索引——决定记录允许的证据形态（cli / 显式降级 artifact）。
+ * 索引在盘 = codegraph CLI 可用，任何「降级」都是逃避真实查询；索引缺失 = 允许显式降级，
+ * 但必须留下 degradationReason 与替代证据（禁止隐形默认）。
+ */
+export function codegraphIndexPresent(projectRoot: string): boolean {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控项目根下的固定子目录存在性探测
+  return existsSync(path.join(projectRoot, '.codegraph'));
+}
+
+/**
+ * 索引探测 + 显式降级声明判据（D-6，2026-09-25 live-run 修复）。
+ *
+ * 堵住「只验声明-覆盖绑定」的逃逸：手工编造的查询记录（callers/callees/blastRadius 无 CLI 出处、
+ * 项目根本没有 `.codegraph/` 索引）在原判据下 exit 0，与 hard-constraints.md「不得伪造查询记录」
+ * 相悖。本判据把隐形的「制品口径」变成显式声明：
+ *   - 索引在盘 → 只允许 `evidenceKind: 'cli'`（缺声明 / 'artifact' 一律违规，禁止降级）；
+ *   - 无索引 → 必须 `evidenceKind: 'artifact'` + 非空 `degradationReason`
+ *     + ≥1 条 `alternativeEvidence[{command, evidencePath}]`（逐条校验两字段非空）；
+ *   - 未声明 `evidenceKind` 由上述两支自然覆盖（一律违规）。
+ *
+ * @param projectRoot 项目根（索引探测基准）
+ * @param fileName    违规消息前缀用的查询文件名
+ * @param record      解析后的查询记录（只读 evidenceKind/degradationReason/alternativeEvidence）
+ * @returns 违规文案数组（空数组 = 合规）
+ */
+export function evidenceDeclarationViolations(
+  projectRoot: string,
+  fileName: string,
+  record: EvidenceDeclarationShape,
+): string[] {
+  const violations: string[] = [];
+  const kindLabel = record.evidenceKind === undefined ? '未声明' : String(record.evidenceKind);
+  if (codegraphIndexPresent(projectRoot)) {
+    if (record.evidenceKind !== 'cli') {
+      violations.push(
+        `${fileName}：项目存在 .codegraph/ 索引，查询记录须声明 evidenceKind:'cli'（CLI 真实执行；禁止降级，当前=${kindLabel}）`,
+      );
+    }
+    return violations;
+  }
+  if (record.evidenceKind !== 'artifact') {
+    violations.push(
+      `${fileName}：无 .codegraph/ 索引时须显式降级声明——evidenceKind:'artifact' + 非空 degradationReason` +
+        ` + ≥1 条 alternativeEvidence[{command,evidencePath}]（当前 evidenceKind=${kindLabel}；未声明不得通过）`,
+    );
+    return violations;
+  }
+  if (typeof record.degradationReason !== 'string' || record.degradationReason.trim() === '') {
+    violations.push(
+      `${fileName}：降级声明缺非空 degradationReason（须说明为何无法用 codegraph CLI 真实执行查询，如项目无 .codegraph/ 索引）`,
+    );
+  }
+  const alternative = record.alternativeEvidence;
+  if (!Array.isArray(alternative) || alternative.length === 0) {
+    violations.push(`${fileName}：降级声明缺 alternativeEvidence（须 ≥1 条 {command, evidencePath} 给出替代证据来源）`);
+  } else {
+    alternative.forEach((entry, index) => {
+      const item = entry as { command?: unknown; evidencePath?: unknown } | null;
+      const command = item === null || typeof item !== 'object' ? undefined : item.command;
+      const evidencePath = item === null || typeof item !== 'object' ? undefined : item.evidencePath;
+      if (
+        typeof command !== 'string' ||
+        command.trim() === '' ||
+        typeof evidencePath !== 'string' ||
+        evidencePath.trim() === ''
+      ) {
+        violations.push(`${fileName}：alternativeEvidence[${index}] 须含非空 command 与 evidencePath`);
+      }
+    });
+  }
+  return violations;
 }
 
 /** schema 失败时优先给出精确路径/时间违规消息（值级定位），否则退回通用结构消息 */
@@ -185,6 +282,12 @@ export function checkCodegraphQueries(projectRoot: string, phase: number): Check
       }
       if (q.blastRadius === undefined || q.blastRadius === null || typeof q.blastRadius !== 'number') {
         violations.push(`${f}：缺 blastRadius 字段（查询结果影响半径，须为 number）`);
+        continue;
+      }
+      // D-6：证据声明族的语义判据（索引探测 + 显式降级）在 legacy 与 strict 两层共用
+      const evidenceViolations = evidenceDeclarationViolations(projectRoot, f, q);
+      if (evidenceViolations.length > 0) {
+        violations.push(...evidenceViolations);
         continue;
       }
       validCount++;
@@ -294,7 +397,14 @@ export function checkCodegraphQueriesStrict(projectRoot: string, scope: ChangeSc
       violations.push(schemaFailViolation(f, schemaResult.errorMessages, q));
       continue;
     }
-    const query = q as { changeId?: unknown; targetFiles?: unknown; queryTimestamp?: unknown };
+    const query = q as StrictQueryShape;
+    // D-6：证据声明先于覆盖绑定判定——未显式声明（或与索引状态矛盾）的记录不提供覆盖
+    // （伪造/隐形口径的记录不得把 targetFiles 计入 covered）
+    const evidenceViolations = evidenceDeclarationViolations(projectRoot, f, query);
+    if (evidenceViolations.length > 0) {
+      violations.push(...evidenceViolations);
+      fileValid = false;
+    }
     if (query.changeId === undefined || query.changeId === null || typeof query.changeId !== 'string') {
       violations.push(
         `${f}：缺 changeId 字段（strict 模式必填，须等于 scope.changeId=${scope.changeId}；不允许 silent skip）`,

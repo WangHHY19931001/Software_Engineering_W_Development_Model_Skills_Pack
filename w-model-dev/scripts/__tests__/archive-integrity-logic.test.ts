@@ -240,3 +240,89 @@ describe('deriveArchiveIntegrityManifest（CLI 清单自动派生）', () => {
 // 类型层面守卫：manifest 三字段均可选（编译期断言，防止误改为必填破坏既有 fixture 形态）
 const _manifestTypeProbe: ArchiveIntegrityManifest = {};
 void _manifestTypeProbe;
+
+// ==================== 归档前缀性（L4，D-3b：--live-run-log 注入文本） ====================
+// 归档内 run-log.jsonl 快照必须是 live run-log 的**记录边界前缀**（A1 收紧）：
+//   通过 ⇔ `archivedText === liveText`，或（liveText.startsWith(archivedText) 且 archivedText 非空且以 "\n" 结尾）。
+// 只做逐字 startsWith 时「第 N 行中途被截断」与「0 字节空快照」都会假通过 → 现按三种形态具名拒绝：
+// 非前缀 / 非记录边界（中途截断）/ 空快照。未提供 live 文本时零行为变化（非阻断）。
+
+describe('archive-integrity-logic 归档前缀性（L4）', () => {
+  it('归档快照非 live 前缀 → 违规（[runLogPrefix] 并入 missingFiles，passed=false）', () => {
+    const r = checkArchiveIntegrity(new Set(['run-log.jsonl']), ['1'], undefined, {
+      liveRunLogText: 'A\nB\nC\n',
+      archivedRunLogText: 'A\nX\n',
+    });
+    expect(r.missingFiles.some((m) => m.includes('[runLogPrefix]') && m.includes('不是 live run-log 的字节前缀'))).toBe(
+      true,
+    );
+    expect(r.passed).toBe(false);
+  });
+
+  it('归档快照是 live 的记录边界前缀（以 \\n 结尾）→ 通过', () => {
+    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
+      liveRunLogText: 'A\nB\nC\n',
+      archivedRunLogText: 'A\nB\n',
+    });
+    expect(r.missingFiles).toEqual([]);
+    expect(r.passed).toBe(true);
+  });
+
+  it('live == 归档（无新增记录）→ 通过', () => {
+    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
+      liveRunLogText: 'A\nB\n',
+      archivedRunLogText: 'A\nB\n',
+    });
+    expect(r.passed).toBe(true);
+  });
+
+  it('第 N 行中途截断（是前缀但不在记录边界）→ 违规且文案区分「非记录边界」', () => {
+    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
+      liveRunLogText: 'A\nB\nC\n',
+      archivedRunLogText: 'A\nB',
+    });
+    expect(r.passed).toBe(false);
+    expect(r.missingFiles.some((m) => m.includes('[runLogPrefix]') && m.includes('记录中途'))).toBe(true);
+    // 不得与「非前缀」形态混淆（两者根因与处置不同）
+    expect(r.missingFiles.some((m) => m.includes('不是 live run-log 的字节前缀'))).toBe(false);
+  });
+
+  it('中间行中途截断（以多行形态截在行内）→ 违规且文案区分「非记录边界」', () => {
+    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
+      liveRunLogText: '{"runId":"a"}\n{"runId":"b"}\n{"runId":"c"}\n',
+      archivedRunLogText: '{"runId":"a"}\n{"runI',
+    });
+    expect(r.passed).toBe(false);
+    expect(r.missingFiles.some((m) => m.includes('[runLogPrefix]') && m.includes('记录中途'))).toBe(true);
+  });
+
+  it('空归档文本（0 字节）而 live 有内容 → 违规且文案区分「空快照」（A1 收紧：不再通过）', () => {
+    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
+      liveRunLogText: 'A\nB\n',
+      archivedRunLogText: '',
+    });
+    expect(r.passed).toBe(false);
+    expect(r.missingFiles.some((m) => m.includes('[runLogPrefix]') && m.includes('快照为空'))).toBe(true);
+  });
+
+  it('空 live + 空归档（两侧皆空）→ 通过（无记录可保护，不构成本项违规）', () => {
+    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
+      liveRunLogText: '',
+      archivedRunLogText: '',
+    });
+    expect(r.passed).toBe(true);
+  });
+
+  it('未提供 live 文本 → 零行为变化（既有 3 参调用/缺省路径不新增违规）', () => {
+    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {});
+    expect(r.missingFiles).toEqual([]);
+    expect(r.passed).toBe(true);
+    expect(checkArchiveIntegrity(loadFullContents()).passed).toBe(true);
+  });
+
+  it('提供 live 但归档侧文本未提供 → fail-closed（无法证明前缀性不得静默放过）', () => {
+    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, { liveRunLogText: 'A\nB\n' });
+    expect(r.missingFiles.some((m) => m.includes('[runLogPrefix]'))).toBe(true);
+    expect(r.passed).toBe(false);
+  });
+});

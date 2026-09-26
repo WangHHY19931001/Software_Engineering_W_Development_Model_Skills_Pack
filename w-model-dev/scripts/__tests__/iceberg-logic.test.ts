@@ -338,3 +338,62 @@ describe('deriveViewSets（CLI 侧上游产物 → 各视角应扫集合）', ()
     expect(Object.keys(sets)).toHaveLength(0);
   });
 });
+
+describe('R6 命名空间分池', () => {
+  // 视角命名空间不同宽：graph/rtm 抽 SD/DD/INTF 全量（design-wide），tla 只有 SD（design-sd，
+  // sdCoverage.coveredSdNodes），scope 是文件路径（path）。同池两两精确比对会把命名空间结构性
+  // 噪声报成缺口（D-1/N-1），故分池：宽池精确相等、窄池对 SD 切片相等、path 不参与集合比对。
+  it('graph 与 rtm 在设计 ID 全宽上精确相等（含 DD/INTF）→ 通过', () => {
+    const sets = { graph: ['SD-001', 'INTF-002', 'DD-003'], rtm: ['SD-001', 'INTF-002', 'DD-003'], tla: ['SD-001'] };
+    expect(checkIcebergSweep(validReport(), { viewSets: sets }).reasons.filter((v) => v.includes('R6'))).toEqual([]);
+  });
+
+  it('graph 与 rtm 的 DD 漂移仍被检出 → 违规', () => {
+    const sets = { graph: ['SD-001', 'DD-003'], rtm: ['SD-001'], tla: ['SD-001'] };
+    const v = checkIcebergSweep(validReport(), { viewSets: sets }).reasons;
+    expect(v.some((x) => x.includes('R6') && x.includes('graph↔rtm') && x.includes('DD-003'))).toBe(true);
+  });
+
+  it('tla 落在 SD 子集内 → 通过（宽视角含 INTF/DD 不构成差异）', () => {
+    const sets = { graph: ['SD-001', 'INTF-002'], rtm: ['SD-001', 'INTF-002'], tla: ['SD-001'] };
+    expect(checkIcebergSweep(validReport(), { viewSets: sets }).reasons.filter((v) => v.includes('R6'))).toEqual([]);
+  });
+
+  it('tla 含 graph 之外的 SD → 违规（子集方向仍有牙）', () => {
+    const sets = { graph: ['SD-001'], rtm: ['SD-001'], tla: ['SD-001', 'SD-009'] };
+    const v = checkIcebergSweep(validReport(), { viewSets: sets }).reasons;
+    expect(v.some((x) => x.includes('R6') && x.includes('SD-009'))).toBe(true);
+    // 池标签须可锁定（宽池侧已由 design-wide 断言覆盖，窄池侧不可缺）
+    expect(v.some((x) => x.includes('R6[design-sd]') && x.includes('SD-009'))).toBe(true);
+  });
+
+  it('宽视角 SD 项未进入 tla（tla 漏 SD）→ 仍违规（SD 命名空间内差异不得被分池豁免）', () => {
+    // 依据：该不变量在阶段 1-4 由 check-tla-model（--graph，uncoveredSdNodes 空 + graphSdNodes
+    // 交叉校验）建立；阶段 5-8 该门不再复检，故该方向由 R6 窄池双向判据守护。
+    const sets = { graph: ['SD-001', 'SD-002'], rtm: ['SD-001', 'SD-002'], tla: ['SD-001'] };
+    const v = checkIcebergSweep(validReport(), { viewSets: sets }).reasons;
+    expect(v.some((x) => x.includes('R6') && x.includes('SD-002'))).toBe(true);
+    expect(v.some((x) => x.includes('R6[design-sd]') && x.includes('SD-002'))).toBe(true);
+  });
+
+  it('tla 含重复 ID → 违规文案去重（同一 ID 只列一次）', () => {
+    const sets = { graph: ['SD-001'], rtm: ['SD-001'], tla: ['SD-001', 'SD-009', 'SD-009'] };
+    const r6 = checkIcebergSweep(validReport(), { viewSets: sets })
+      .reasons.filter((x) => x.includes('R6[design-sd]'))
+      .join('');
+    expect(r6.match(/SD-009/g)?.length).toBe(1);
+  });
+
+  it('scope（文件路径命名空间）不参与 R6 与 R8 收敛集', () => {
+    const sets = { graph: ['SD-001'], rtm: ['SD-001'], tla: ['SD-001'], scope: ['src/counter.ts'] };
+    const r = checkIcebergSweep(
+      validReport({
+        reportId: 'IS-phase5-1-01',
+        phase: 'phase5-coding',
+        sweepCoverage: { sweptArtifacts: ['SD-001'], sweptDimensions: ['completeness', 'reliability', 'security'] },
+      }),
+      { viewSets: sets },
+    );
+    expect(r.reasons.filter((v) => v.includes('R6') || v.includes('R8'))).toEqual([]);
+  });
+});

@@ -38,6 +38,17 @@ export interface StateWriteOptions {
   allowUntyped?: boolean;
   /** Injectable only for state-write tests; validator infrastructure failures must propagate. */
   schemaValidator?: (name: string, data: unknown) => SchemaValidationResult;
+  /**
+   * jsonl 注册目标的 schema 校验口径（append 语义专用，默认 `all`）：
+   *   - `all`：逐行全量校验（wm-write 等整文件写入语义，任一不符即 SCHEMA_INVALID）；
+   *   - `appended`：只强制校验**新增**行（行号 ≥ `appendFromLine`）；其前的历史行与盘上内容逐字节相同
+   *     （append 写入方保证），不符当前 schema 只登记为非阻断诊断 `legacyInvalidLines`，不改退出码——
+   *     读侧（check-run-log）对同类 legacy 行本就是吸收语义，写侧重校会封死「在既有 legacy 日志上追加」
+   *     这一唯一使用场景。
+   */
+  validateLines?: 'all' | 'appended';
+  /** `validateLines: 'appended'` 时的首条新增行行号（1-based；缺省或非法值 = 1，即全部视为新增，最保守） */
+  appendFromLine?: number;
 }
 
 export interface StateWriteResult {
@@ -54,6 +65,8 @@ export interface StateWriteResult {
     | 'UNREGISTERED_TARGET'
     | 'SCHEMA_INVALID';
   schemaInvalidLine?: number;
+  /** `validateLines: 'appended'` 下与当前 schema 不符的**历史**行行号（非阻断诊断，写入仍成功） */
+  legacyInvalidLines?: number[];
   untyped?: boolean;
   rolledBack?: boolean;
 }
@@ -334,7 +347,8 @@ function validateRegisteredStatePayload(
   projectRoot: string,
   allowUntyped: boolean,
   schemaValidator: (name: string, data: unknown) => SchemaValidationResult,
-): Pick<StateWriteResult, 'reason' | 'schemaInvalidLine' | 'untyped'> | undefined {
+  opts: StateWriteOptions = {},
+): Pick<StateWriteResult, 'reason' | 'schemaInvalidLine' | 'untyped' | 'legacyInvalidLines'> | undefined {
   const registered = resolveStateSchema(absPath, projectRoot);
   if (!registered) {
     if (isProjectStateTarget(absPath, projectRoot) && !allowUntyped) return { reason: 'UNREGISTERED_TARGET' };
@@ -348,16 +362,33 @@ function validateRegisteredStatePayload(
   }
 
   const lines = jsonText.split(/\r?\n/);
+  // append 口径：行号 < appendFromLine 的历史行只登记非阻断诊断（其字节由追加方原样保留，从不重写）
+  const appendedOnly = opts.validateLines === 'appended';
+  const firstAppendedLine =
+    Number.isSafeInteger(opts.appendFromLine) && (opts.appendFromLine ?? 0) >= 1 ? (opts.appendFromLine as number) : 1;
+  const legacyInvalidLines: number[] = [];
   for (const [index, rawLine] of lines.entries()) {
     const line = rawLine.trim();
     if (line === '') continue;
-    const payload = parseStatePayload(line, index + 1);
-    if (payload.invalid) return payload.invalid;
+    const lineNumber = index + 1;
+    const isLegacyLine = appendedOnly && lineNumber < firstAppendedLine;
+    const payload = parseStatePayload(line, lineNumber);
+    if (payload.invalid) {
+      if (isLegacyLine) {
+        legacyInvalidLines.push(lineNumber);
+        continue;
+      }
+      return payload.invalid;
+    }
     if (!schemaValidator(registered.schemaName, payload.parsed).valid) {
-      return { reason: 'SCHEMA_INVALID', schemaInvalidLine: index + 1 };
+      if (isLegacyLine) {
+        legacyInvalidLines.push(lineNumber);
+        continue;
+      }
+      return { reason: 'SCHEMA_INVALID', schemaInvalidLine: lineNumber };
     }
   }
-  return undefined;
+  return legacyInvalidLines.length > 0 ? { legacyInvalidLines } : undefined;
 }
 
 async function restoreIfStillOwned(
@@ -474,6 +505,7 @@ export async function writeStateJson(
       projectRoot,
       opts.allowUntyped === true,
       opts.schemaValidator ?? validateBySchema,
+      opts,
     );
     if (validation?.reason) return { ok: false, writtenPath: absPath, ...validation };
     if (opts.expectMtimeMs != null) {
@@ -531,7 +563,13 @@ export async function writeStateJson(
       }
       return { ok: false, writtenPath: absPath, reason: 'WRITE_VERIFY_FAILED', rolledBack };
     }
-    return { ok: true, writtenPath: absPath, backupPath, ...(validation?.untyped ? { untyped: true } : {}) };
+    return {
+      ok: true,
+      writtenPath: absPath,
+      backupPath,
+      ...(validation?.untyped ? { untyped: true } : {}),
+      ...(validation?.legacyInvalidLines ? { legacyInvalidLines: validation.legacyInvalidLines } : {}),
+    };
   } finally {
     if (tmpPath) await fs.rm(tmpPath, { force: true });
     await releaseLock(acquired.lockDir, acquired.ownerDir, acquired.metadata.token, opts);

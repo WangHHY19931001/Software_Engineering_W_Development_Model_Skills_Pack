@@ -251,6 +251,53 @@ describe('writeStateJson', () => {
     await expect(fs.access(p)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  it('validateLines=appended 只强制校验新增行：历史行不符 schema → 写入成功 + legacyInvalidLines 诊断', async () => {
+    const p = stateTarget('run-log.jsonl');
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    await fs.rm(p, { force: true });
+    const legacyLine = JSON.stringify({ ...validRunLogEntry, extraLegacyField: true });
+
+    const result = await writeStateJson(p, `${legacyLine}\n${JSON.stringify(validRunLogEntry)}\n`, {
+      projectRoot: tmpDir,
+      validateLines: 'appended',
+      appendFromLine: 2,
+    });
+
+    expect(result).toMatchObject({ ok: true, legacyInvalidLines: [1] });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe(`${legacyLine}\n${JSON.stringify(validRunLogEntry)}\n`);
+  });
+
+  it('validateLines=appended 对新增行仍严格：新增行不符 schema → SCHEMA_INVALID + 行号', async () => {
+    const p = stateTarget('run-log.jsonl');
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    await fs.rm(p, { force: true });
+    const legacyLine = JSON.stringify({ ...validRunLogEntry, extraLegacyField: true });
+    const badAppendedLine = JSON.stringify({ ...validRunLogEntry, extraAppendedField: true });
+
+    const result = await writeStateJson(p, `${legacyLine}\n${badAppendedLine}\n`, {
+      projectRoot: tmpDir,
+      validateLines: 'appended',
+      appendFromLine: 2,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'SCHEMA_INVALID', schemaInvalidLine: 2 });
+    await expect(fs.access(p)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('validateLines 缺省（all）保持全量严格：历史行不符 schema → SCHEMA_INVALID', async () => {
+    const p = stateTarget('run-log.jsonl');
+    await fs.mkdir(path.dirname(p), { recursive: true });
+    await fs.rm(p, { force: true });
+    const legacyLine = JSON.stringify({ ...validRunLogEntry, extraLegacyField: true });
+
+    const result = await writeStateJson(p, `${legacyLine}\n${JSON.stringify(validRunLogEntry)}\n`, {
+      projectRoot: tmpDir,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'SCHEMA_INVALID', schemaInvalidLine: 1 });
+    await expect(fs.access(p)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
   it('keeps an outside target untyped even when the project root is supplied', async () => {
     const outsideRoot = path.join(tmpDir, 'outside');
     const projectRoot = path.join(tmpDir, 'project');

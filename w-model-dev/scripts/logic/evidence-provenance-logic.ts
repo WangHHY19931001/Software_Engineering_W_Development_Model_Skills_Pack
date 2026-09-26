@@ -8,18 +8,29 @@ import { buildGateLogKeys, checkRunLog, type RunLogEntry } from './run-log-logic
 import { checkSignatureChain, type SignatureChainEntry } from './signature-chain-logic.js';
 
 const PROVENANCE_NAME = 'evidence-provenance.json';
-const PRODUCER_VERSION = 'D7B-1';
+const PRODUCER_VERSION = 'D7B-2';
 const TEXT_EXTENSIONS = new Set(['.json', '.jsonl', '.log', '.txt', '.md']);
 type Kind = 'gate-log' | 'verifier-output' | 'signature-chain' | 'codegraph-query' | 'run-log';
 type Measurement = { count: number; contentHash: string };
 export type SourceFile = { path: string; kind: Kind; sha256: string };
 type MeasurementKey = 'gateLogs' | 'verifierOutputs' | 'runLog' | 'signatureChain' | 'codegraphQueries';
+/**
+ * Identity source of a provenance record. `git` binds the record to the current
+ * HEAD commit; `no-git` is the explicit opt-in form for workspaces without a
+ * `.git` directory, where `workspaceDigest` replaces HEAD. A `no-git` record can
+ * never be re-certified source-bound (see `NOT_SOURCE_BOUND_NO_GIT`).
+ */
+export type ProvenanceKind = 'git' | 'no-git';
 export type SourceProvenance = {
   format: 'w-model-evidence-source-provenance';
   version: 1;
   runId: string;
   artifactId: string;
+  /** `provenanceKind: 'no-git'` records carry an empty commitSha. */
   commitSha: string;
+  provenanceKind: ProvenanceKind;
+  /** Present only for `no-git`: canonical digest of the export source set (replaces HEAD). */
+  workspaceDigest?: string;
   verifiedAt: string;
   verificationStatus: 'passed';
   measurements: Record<MeasurementKey, Measurement>;
@@ -28,12 +39,22 @@ export type SourceProvenance = {
   producerVersion: string;
   provenanceSha256: string;
 };
+/** Producer option: only an explicit `noGitOk` degrades `MISSING_GIT_HEAD` into the no-git form. */
+export type ProduceSourceProvenanceOptions = { noGitOk?: boolean };
+/**
+ * Verify option: `allowNoGitRecord` exists for exactly one internal caller,
+ * `exportEvidence` — packaging still needs the local "does the recorded
+ * provenance still match this workspace?" re-check, while the resulting package
+ * keeps `provenanceKind: 'no-git'` and stays permanently package-only. Every
+ * other caller keeps the default hard refusal (`NOT_SOURCE_BOUND_NO_GIT`).
+ */
+export type VerifySourceProvenanceOptions = { allowNoGitRecord?: boolean };
 export type ProvenanceResult = {
   ok: boolean;
   exitCode: 0 | 1 | 2;
   reason?: string;
   provenance?: SourceProvenance;
-  verificationLevel?: 'source-bound';
+  verificationLevel?: 'source-bound' | 'package-only';
   verificationStatus?: 'passed';
 };
 
@@ -223,6 +244,26 @@ async function gitHead(project: string): Promise<string> {
     throw new ProvenanceFailure(1, 'MISSING_GIT_HEAD');
   }
 }
+/**
+ * Resolves the provenance identity: the current HEAD, or — only when the caller
+ * explicitly opted in via `noGitOk` — the `no-git` form.
+ *
+ * Only `MISSING_GIT_HEAD` degrades: safety failures such as
+ * `UNSAFE_SOURCE_EVIDENCE` must never be absorbed by the no-git branch, or a
+ * symlink/redirected git entry could buy a package-only record.
+ */
+async function resolveProvenanceIdentity(
+  project: string,
+  noGitOk: boolean,
+): Promise<{ commitSha: string; provenanceKind: ProvenanceKind }> {
+  try {
+    return { commitSha: await gitHead(project), provenanceKind: 'git' };
+  } catch (error) {
+    if (noGitOk && error instanceof ProvenanceFailure && error.reason === 'MISSING_GIT_HEAD')
+      return { commitSha: '', provenanceKind: 'no-git' };
+    throw error;
+  }
+}
 type FileSnapshot = {
   realPath: string;
   dev: number;
@@ -360,6 +401,34 @@ async function collectDirectory(
   await walk(absolute, directory);
   return files;
 }
+/**
+ * Collects one allowlisted root-level evidence file (`.w-model/<file>`) with the
+ * same lexical-walk + real-root containment discipline as directory collection.
+ * Absent file → `[]` (non-emptiness is enforced by the caller's contract).
+ */
+async function collectRootFile(state: string, stateReal: string, file: string, kind: Kind): Promise<SourceFile[]> {
+  const absolute = path.join(state, file);
+  await assertCanonicalPath(absolute, stateReal, true);
+  const stat = await fs.lstat(absolute).catch(() => null);
+  if (!stat) return [];
+  const content = await readStableFile(absolute, stateReal);
+  return [{ path: file, kind, sha256: sha256(content) }];
+}
+/**
+ * Signature-chain location: the repository-wide convention is the root-level
+ * `signature-chain.jsonl`; the plural `signature-chains/` directory remains
+ * supported as the legacy layout. Both present → fail-closed (ambiguous authority).
+ */
+async function collectSignatureChainFiles(state: string, stateReal: string): Promise<SourceFile[]> {
+  const legacyDirectory = 'signature-chains';
+  const rootFile = 'signature-chain.jsonl';
+  const legacyPresent = (await fs.lstat(path.join(state, legacyDirectory)).catch(() => null)) !== null;
+  const rootPresent = (await fs.lstat(path.join(state, rootFile)).catch(() => null)) !== null;
+  if (legacyPresent && rootPresent) throw new ProvenanceFailure(1, 'SIGNATURE_CHAIN_AMBIGUOUS');
+  return legacyPresent
+    ? collectDirectory(state, stateReal, legacyDirectory, 'signature-chain', false)
+    : collectRootFile(state, stateReal, rootFile, 'signature-chain');
+}
 function measurements(files: SourceFile[]): SourceProvenance['measurements'] {
   const of = (kind: Kind): Measurement => {
     const selected = files.filter((file) => file.kind === kind);
@@ -373,16 +442,20 @@ function measurements(files: SourceFile[]): SourceProvenance['measurements'] {
     codegraphQueries: of('codegraph-query'),
   };
 }
-async function buildSourceProvenance(projectDir: string, verifiedAt?: string): Promise<SourceProvenance> {
+async function buildSourceProvenance(
+  projectDir: string,
+  verifiedAt?: string,
+  options: ProduceSourceProvenanceOptions = {},
+): Promise<SourceProvenance> {
   const project = path.resolve(projectDir);
   const projectReal = await assertProjectRoot(project);
   const state = path.join(project, '.w-model');
   const stateReal = await assertCanonicalPath(state, projectReal);
   if (!isPathInside(stateReal, projectReal)) throw new ProvenanceFailure(1, 'UNSAFE_SOURCE_EVIDENCE');
-  const commitSha = await gitHead(project);
+  const identity = await resolveProvenanceIdentity(project, options.noGitOk === true);
   const gateFiles = await collectDirectory(state, stateReal, 'gate-logs', 'gate-log', true);
   const verifierFiles = await collectDirectory(state, stateReal, 'verifier-outputs', 'verifier-output', false);
-  const signatureFiles = await collectDirectory(state, stateReal, 'signature-chains', 'signature-chain', false);
+  const signatureFiles = await collectSignatureChainFiles(state, stateReal);
   const codegraphFiles = await collectDirectory(state, stateReal, 'codegraph-queries', 'codegraph-query', false);
   const runLogPath = path.join(state, 'run-log.jsonl');
   const runLogContent = await readStableFile(runLogPath, stateReal, 'MISSING_RUN_LOG');
@@ -448,7 +521,12 @@ async function buildSourceProvenance(projectDir: string, verifiedAt?: string): P
     version: 1,
     runId,
     artifactId: `evidence-${runId}`,
-    commitSha,
+    commitSha: identity.commitSha,
+    provenanceKind: identity.provenanceKind,
+    // no-git 形态以工作区内容摘要替代 HEAD：对导出源集合（相对路径 + 各自 SHA-256，按路径排序）
+    // 的规范化清单摘要。它与 sourceBundleSha256 由同一规范清单导出（同一值、两个语义槽：
+    // 前者是身份替代物，后者是 bundle 比对依据），故显式单独登记而非复用字段名。
+    ...(identity.provenanceKind === 'no-git' ? { workspaceDigest: hashList(files) } : {}),
     verifiedAt: verifiedAt ?? new Date().toISOString(),
     verificationStatus: 'passed',
     measurements: measurements(files),
@@ -609,13 +687,16 @@ async function atomicWrite(
     if (guardCreated) await fs.rm(guard, { force: true }).catch(() => undefined);
   }
 }
-export async function produceSourceProvenance(projectDir: string): Promise<ProvenanceResult> {
+export async function produceSourceProvenance(
+  projectDir: string,
+  options: ProduceSourceProvenanceOptions = {},
+): Promise<ProvenanceResult> {
   try {
     const project = path.resolve(projectDir);
     const projectReal = await assertProjectRoot(project);
     const state = path.join(project, '.w-model');
     const stateReal = await assertCanonicalPath(state, projectReal);
-    const provenance = await buildSourceProvenance(project);
+    const provenance = await buildSourceProvenance(project, undefined, options);
     if (!validateBySchema('evidence-provenance', provenance).valid)
       throw new ProvenanceFailure(1, 'INVALID_SOURCE_PROVENANCE');
     const target = path.join(state, PROVENANCE_NAME);
@@ -638,14 +719,20 @@ export async function produceSourceProvenance(projectDir: string): Promise<Prove
       ok: true,
       exitCode: 0,
       provenance,
-      verificationLevel: 'source-bound',
+      // no-git 记录只有工作区内容摘要替代 HEAD，因此 producer 自身就只声明 package-only，
+      // 不谎报 source-bound（护栏的机器挂点在 verifySourceProvenance 的 NOT_SOURCE_BOUND_NO_GIT）。
+      verificationLevel: provenance.provenanceKind === 'no-git' ? 'package-only' : 'source-bound',
       verificationStatus: 'passed',
     };
   } catch (error) {
     return fail(error);
   }
 }
-export async function verifySourceProvenance(projectDir: string, reviewedHead?: string): Promise<ProvenanceResult> {
+export async function verifySourceProvenance(
+  projectDir: string,
+  reviewedHead?: string,
+  options: VerifySourceProvenanceOptions = {},
+): Promise<ProvenanceResult> {
   try {
     const project = path.resolve(projectDir);
     const projectReal = await assertProjectRoot(project);
@@ -656,11 +743,21 @@ export async function verifySourceProvenance(projectDir: string, reviewedHead?: 
     if (!validateBySchema('evidence-provenance', existing).valid)
       throw new ProvenanceFailure(1, 'INVALID_SOURCE_PROVENANCE');
     const actual = existing as SourceProvenance;
+    // 永久护栏：no-git 记录（无 HEAD 可绑定）不得被复验为 source-bound。唯一例外是
+    // exportEvidence 的本地一致性复验（allowNoGitRecord）——该路径产出的包仍带
+    // provenanceKind=no-git，于是 `--source-project` 复验在 verifyEvidence 侧再次被拒。
+    // 该例外**不改变**结果自述的 verificationLevel：no-git 恒为 package-only（见下方返回值）。
+    if (actual.provenanceKind === 'no-git' && options.allowNoGitRecord !== true)
+      throw new ProvenanceFailure(1, 'NOT_SOURCE_BOUND_NO_GIT');
     if (reviewedHead !== undefined && actual.commitSha !== reviewedHead)
       throw new ProvenanceFailure(1, 'FINAL_HEAD_MISMATCH');
-    const expected = await buildSourceProvenance(project, actual.verifiedAt);
+    const expected = await buildSourceProvenance(project, actual.verifiedAt, {
+      noGitOk: actual.provenanceKind === 'no-git',
+    });
     if (
       actual.commitSha !== expected.commitSha ||
+      actual.provenanceKind !== expected.provenanceKind ||
+      actual.workspaceDigest !== expected.workspaceDigest ||
       actual.runId !== expected.runId ||
       actual.artifactId !== expected.artifactId ||
       actual.verifiedAt !== expected.verifiedAt ||
@@ -675,7 +772,9 @@ export async function verifySourceProvenance(projectDir: string, reviewedHead?: 
       ok: true,
       exitCode: 0,
       provenance: actual,
-      verificationLevel: 'source-bound',
+      // no-git 恒自述 package-only：全仓不得存在把 no-git 记录读成 source-bound 的出口
+      // （含 allowNoGitRecord 例外路径——它只放宽本地一致性复验，不放宽自述口径）。
+      verificationLevel: actual.provenanceKind === 'no-git' ? 'package-only' : 'source-bound',
       verificationStatus: 'passed',
     };
   } catch (error) {

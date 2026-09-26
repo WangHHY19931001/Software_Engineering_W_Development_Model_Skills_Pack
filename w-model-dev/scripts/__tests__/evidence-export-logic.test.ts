@@ -66,12 +66,16 @@ function refreshManifestHash(manifest: Record<string, unknown>): void {
   manifest.manifestSha256 = evidenceManifestHash(manifest as Parameters<typeof evidenceManifestHash>[0]);
 }
 
-async function createProject(name = 'project'): Promise<string> {
+async function createProject(
+  name = 'project',
+  options: { noGit?: boolean; chain?: 'legacy' | 'root' } = {},
+): Promise<string> {
   const project = projectPath(name);
   const state = path.join(project, '.w-model');
   await fs.mkdir(path.join(state, 'gate-logs'), { recursive: true });
   await fs.mkdir(path.join(state, 'verifier-outputs'), { recursive: true });
-  await fs.mkdir(path.join(state, 'signature-chains'), { recursive: true });
+  if ((options.chain ?? 'legacy') === 'legacy')
+    await fs.mkdir(path.join(state, 'signature-chains'), { recursive: true });
   await fs.mkdir(path.join(state, 'codegraph-queries'), { recursive: true });
   await fs.writeFile(
     path.join(state, 'gate-logs', 'gate.json'),
@@ -103,7 +107,10 @@ async function createProject(name = 'project'): Promise<string> {
   );
   await fs.copyFile(
     path.resolve(process.cwd(), 'w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl'),
-    path.join(state, 'signature-chains', 'chain.jsonl'),
+    path.join(
+      state,
+      (options.chain ?? 'legacy') === 'legacy' ? 'signature-chains/chain.jsonl' : 'signature-chain.jsonl',
+    ),
   );
   await fs.writeFile(
     path.join(state, 'codegraph-queries', 'query.json'),
@@ -137,6 +144,12 @@ async function createProject(name = 'project'): Promise<string> {
   // eslint-disable-next-line security/detect-object-injection -- taggedGateIndex 由同一数组 findIndex 得出且上方已断言 >= 0（受控下标，非外部键）
   runLogLines[taggedGateIndex] = runLogLines[taggedGateIndex]!.replace(/\}$/, ',"gateLogPath":"gate.json"}');
   await fs.writeFile(path.join(state, 'run-log.jsonl'), runLogLines.join('\n'));
+  if (options.noGit) {
+    // 无 git 工作区（遗留⑥a）：provenance 以 no-git 形态产出，导出包永久只能 package-only。
+    const noGitProvenance = await produceSourceProvenance(project, { noGitOk: true });
+    if (!noGitProvenance.ok) throw new Error(`no-git provenance fixture setup failed: ${noGitProvenance.reason}`);
+    return project;
+  }
   for (const args of [
     ['init'],
     ['add', '.'],
@@ -225,6 +238,7 @@ describe('evidence export logic', () => {
           filePath.startsWith('gate-logs/') ||
           filePath.startsWith('verifier-outputs/') ||
           filePath.startsWith('signature-chains/') ||
+          filePath === 'signature-chain.jsonl' ||
           filePath.startsWith('codegraph-queries/') ||
           filePath === 'run-log.jsonl',
       ),
@@ -386,6 +400,55 @@ describe('evidence export logic', () => {
       reason: 'INVALID_PROVENANCE',
     });
   }, 90_000);
+
+  it('exports and measures a root-level signature-chain.jsonl as an allowlisted signature-chain record', async () => {
+    const project = await createProject('root-chain-project', { chain: 'root' });
+    const output = path.join(tmpDir, 'root-chain-evidence');
+
+    const result = await exportEvidence(project, output);
+
+    expect(result).toEqual(expect.objectContaining({ ok: true, exitCode: 0 }));
+    // git 包的导出摘要保持现状：不带 verificationLevel（只有 no-git 包补 package-only）。
+    expect(result).not.toHaveProperty('verificationLevel');
+    const manifest = JSON.parse(await fs.readFile(path.join(output, 'evidence-manifest.json'), 'utf8')) as {
+      provenance: { measurements: { signatureChain: { count: number } } };
+      files: Array<{ path: string; kind: string }>;
+    };
+    expect(validateBySchema('evidence-manifest', manifest).valid).toBe(true);
+    expect(manifest.files).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: 'signature-chain.jsonl', kind: 'signature-chain' })]),
+    );
+    expect(manifest.provenance.measurements.signatureChain).toMatchObject({ count: 1 });
+    expect(await fs.readFile(path.join(output, 'signature-chain.jsonl'), 'utf8')).toContain('sigId');
+    await expect(verifyEvidence(path.join(output, 'evidence-manifest.json'), project)).resolves.toMatchObject({
+      ok: true,
+      exitCode: 0,
+      verificationLevel: 'source-bound',
+    });
+  });
+
+  it('fails closed on both sides when the root-level chain and the legacy signature-chains directory coexist', async () => {
+    const project = await createProject('ambiguous-chain-project');
+    const output = path.join(tmpDir, 'ambiguous-chain-evidence');
+    expect(runCli([project, output]).code).toBe(0);
+    const manifestPath = path.join(output, 'evidence-manifest.json');
+    // 并存歧义由源工作区引入：唯一根级文件 + legacy 复数目录 → 无法裁定权威链。
+    await fs.copyFile(
+      path.resolve(process.cwd(), 'w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl'),
+      path.join(project, '.w-model', 'signature-chain.jsonl'),
+    );
+
+    await expect(exportEvidence(project, path.join(tmpDir, 'ambiguous-second-evidence'))).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'SIGNATURE_CHAIN_AMBIGUOUS',
+    });
+    await expect(verifyEvidence(manifestPath, project)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'SIGNATURE_CHAIN_AMBIGUOUS',
+    });
+  });
 
   it('rejects mutated source bundle and run provenance before creating a passed manifest', async () => {
     const project = await createProject();
@@ -899,6 +962,42 @@ describe('evidence export logic', () => {
       exitCode: 0,
       verificationLevel: 'source-bound',
       verificationStatus: 'passed',
+    });
+  });
+
+  it('keeps a no-git package package-only and permanently refuses --source-project re-verification', async () => {
+    const project = await createProject('no-git-project', { noGit: true });
+    const output = path.join(tmpDir, 'no-git-evidence');
+
+    const exported = runCli([project, output]);
+    expect(exported.code).toBe(0);
+    // 导出摘要与 verify 通道口径一致：no-git 包在成功出口也只自述 package-only。
+    expect(cliSummary(exported.stdout)).toMatchObject({
+      ok: true,
+      mode: 'export',
+      verificationLevel: 'package-only',
+    });
+    const manifestPath = path.join(output, 'evidence-manifest.json');
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as { provenance: Record<string, unknown> };
+    expect(manifest.provenance).toMatchObject({
+      provenanceKind: 'no-git',
+      commitSha: '',
+      workspaceDigest: expect.stringMatching(/^[0-9a-f]{64}$/),
+    });
+    expect(validateBySchema('evidence-manifest', manifest).valid).toBe(true);
+
+    const packageOnly = runCli(['--verify', manifestPath]);
+    expect(packageOnly.code).toBe(0);
+    expect(cliSummary(packageOnly.stdout)).toMatchObject({ ok: true, verificationLevel: 'package-only' });
+
+    const sourceBound = runCli(['--verify', manifestPath, '--source-project', project]);
+    expect(sourceBound.code).toBe(1);
+    expect(cliSummary(sourceBound.stdout)).toMatchObject({ ok: false, reason: 'NOT_SOURCE_BOUND_NO_GIT' });
+
+    await expect(verifyEvidence(manifestPath, project)).resolves.toMatchObject({
+      ok: false,
+      exitCode: 1,
+      reason: 'NOT_SOURCE_BOUND_NO_GIT',
     });
   });
 

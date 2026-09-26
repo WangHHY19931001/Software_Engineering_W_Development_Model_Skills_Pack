@@ -4,6 +4,9 @@
  * 对应 w-model-dev/references/data-models.md MaturityConfig schema（§自主成熟度模型）
  * 与 w-model-dev/references/hard-constraints.md（反模式节）§运维失败模式清单 O1~O6。
  * 校验：level 合法（R2）+ 成功阶段更新一致（R3）+ history 时序一致（R4）+ 降级触发检测（R5）。
+ * R5 为**真值通道**（D-7）：命中次数只统计 run-log 的 `operationalFailureModes` 字段，note 中的
+ * O1~O6 字样（含评审规则编号同名情形）视为引用、仅作非阻断诊断；未提供 run-log 时由调用方
+ * 经 `options.diagnostics` 显式登记「R5 未生效」，不再静默跳过。
  * schema 完整（R1，level/unlockConditions/history/downgradeTriggers required）由
  * maturity.schema.json 前置拦截，逻辑层不再重复校验（audit-fixes task 5，F-G2-05 死分支清理）。
  *
@@ -60,8 +63,13 @@ export interface MaturityCheckOptions {
   completedPhases?: number;
   /** R4: project 创建时间（用于 history.at 比较） */
   projectCreatedAt?: string;
-  /** R5: run-log 中 O 系列失败模式命中次数（O1-O6，从 note 字段统计） */
+  /** R5: run-log 中 O 系列失败模式命中次数（O1-O6，只统计 operationalFailureModes 字段，D-7 真值通道） */
   operationalFailureCount?: number;
+  /**
+   * 非阻断诊断（D-7）：由 CLI 层组装的事实性提示（R5 未接线 / note 词法疑似引用），
+   * 逐字回传进报告（与 warnings 并存），**不参与 passed 判定**。
+   */
+  diagnostics?: string[];
 }
 
 export interface MaturityCheckResult {
@@ -69,6 +77,8 @@ export interface MaturityCheckResult {
   violations: string[];
   /** 非阻断警告：可选 context 缺失导致某规则未校验时的可见性提示（F-G2-04） */
   warnings: string[];
+  /** 非阻断诊断（D-7）：R5 真值通道/词法降级/未接线可见化，与 warnings 并存且不影响 passed */
+  diagnostics: string[];
 }
 
 // ==================== 校验入口 ====================
@@ -81,6 +91,7 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
       passed: false,
       violations: schemaResult.errorMessages.map((m) => `[schema] ${m}`),
       warnings: [],
+      diagnostics: [],
     };
   }
 
@@ -88,6 +99,8 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
   // 非阻断警告（F-G2-04）：R3 周期一致依赖可选 --project context（completedPhases），
   // 未提供时显式降级为警告，不再静默跳过（exit 0 须可解释）
   const warnings: string[] = [];
+  // 非阻断诊断（D-7）：调用方（CLI / self-test）注入的事实性提示，逐字回传，不影响 passed
+  const diagnostics: string[] = [...(options?.diagnostics ?? [])];
   if (options?.completedPhases === undefined) {
     warnings.push('R3 未校验：未提供 --project');
   }
@@ -95,7 +108,7 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
   // 输入校验（先做）：非法输入返回 violations 而非抛 TypeError
   // 注意：typeof [] === 'object' 且 ![] 为 false，数组须显式排除，否则误报"maturity 必须为对象"有误导
   if (!maturity || typeof maturity !== 'object' || Array.isArray(maturity)) {
-    return { passed: false, violations: ['maturity 必须为对象'], warnings };
+    return { passed: false, violations: ['maturity 必须为对象'], warnings, diagnostics };
   }
   // narrow 为 Partial<MaturityConfig> 用于后续字段访问
   const m = maturity as Partial<MaturityConfig>;
@@ -139,6 +152,7 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
   }
 
   // R5 降级触发：O 系列失败模式命中次数已达 streak 阈值，应触发降级评估
+  // 真值通道（D-7）：operationalFailureCount 由调用方只统计 run-log 的 operationalFailureModes 字段得出
   if (
     options?.operationalFailureCount !== undefined &&
     dt &&
@@ -150,5 +164,5 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
     );
   }
 
-  return { passed: violations.length === 0, violations, warnings };
+  return { passed: violations.length === 0, violations, warnings, diagnostics };
 }

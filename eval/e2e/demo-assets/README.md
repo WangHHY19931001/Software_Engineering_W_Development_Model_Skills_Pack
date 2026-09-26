@@ -20,7 +20,7 @@ bash run_trajectory.sh                   # 期望末行：✓ 119/119 exit 0
 bash run_negative_probes.sh              # 期望末行：✓ 9/9 探针被拦截 + 恢复复绿
 ```
 
-`change-scope` 的 `baseRef/headRef` 取运行时 `HEAD~1..HEAD`（可用 `REPLAY_BASE` / `REPLAY_HEAD` 覆盖），`changedFiles` 取该区间真实差异；`codegraph-queries`、编码计划制品（`docs/plans/` + `.superpowers/sdd/`）与 `openspec/changes/` 按同一文件列表生成，故 scope 校验恒成立。
+`change-scope` 的 `baseRef/headRef` 取运行时 `HEAD~1..HEAD`（可用 `REPLAY_BASE` / `REPLAY_HEAD` 覆盖），`changedFiles` 取该区间真实差异；`codegraph-queries`、编码计划制品（`docs/plans/` + `.superpowers/sdd/`）与 `openspec/changes/` 按同一文件列表生成，故 scope 校验恒成立。查询记录按 D-6（2026-09-25）显式声明证据形态：demo 工作区无 `.codegraph/` 索引 → 一律写 `evidenceKind:'artifact'` + `degradationReason` + ≥1 条 `alternativeEvidence`（判据见 `check-codegraph-queries.ts` 的索引探测；索引在盘时须改为 `'cli'`）。
 
 **注意 `--scope` 的干净工作树前提**：`verifyScopeGitBinding` 把「commit 区间 + 暂存 + 未暂存 + 未跟踪（限 cwd）」与实际变更精确比对，且 `headRef` 必须等于当前 HEAD。因此任何未提交改动都会让 p5–p8 的 `--scope` 校验失败——先提交改动，再重建 + 重放；工作区重建后 HEAD 一旦前移（如证据入库的新提交），也须重建后方可再跑（这是设计，不是缺陷）。
 
@@ -34,6 +34,8 @@ bash run_negative_probes.sh              # 期望末行：✓ 9/9 探针被拦�
 | stage 审查 | `.w-model/r3-reviews/phase<N>-{plan,execute,finalize}-{completeness,reliability,security}.md` ×9 + `.w-model/v-reviews/phase<N>-{plan,execute,finalize}.md` ×3 | R5    |
 
 旧 opsx 链路制品（`openspec/changes/<changeId>/`）在 demo 工作区中仍被生成（装配器未删除），但**对应的门禁已在 2026-09-21 退役**：`check-opsx-artifacts.ts` 与其 fixture（`w-model-dev/scripts/samples/opsx-artifacts/`）已 `git rm`，语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3（stage 词表 `plan/execute/finalize`，旧词表 `explore/propose/coding` 不充数）。该目录现在只是留作历史对照的静态样本，没有任何门禁读取它。
+
+**归档位（阶段 8 后置）**：`archive/2026-09-19-counter-api/` 除各阶段清单占位文件外，还含**编码计划归档快照**——`phase8-demo.plan.md` + `progress.md` + `task-<N>-{brief,report}.md`（正文与阶段 8 活动位产物同源，装配器有「快照 ↔ 活动位逐字一致」的 fail-fast 自测锚），使 `check-archive-integrity.ts` 的 `codingPlanSnapshot` 条件项经「归档根恰一 `*.plan.md`」的**自动派生**分支激活（驱动不传 `--change-id`；显式形态由 `samples/archive-integrity` 与 CLI 子进程用例覆盖）。快照只覆盖该条件项的结构子集（plan / 账本 / 三件套），`review-*.diff` 等全量契约由 `check-coding-plan.ts` R4/R6 在活动位承担。基准态 `rtm.json` 的 REQ 行 `designDoc` 按真实 RTM 形态登记全设计链（`SD-001,INTF-001,DD-001`，与 graph 声明的设计 ID 集精确相等），使 iceberg R6 宽池 `graph↔rtm` 不再自报差异。
 
 ## 销毁前证据保全
 

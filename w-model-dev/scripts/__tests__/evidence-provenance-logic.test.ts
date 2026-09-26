@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { produceSourceProvenance, verifySourceProvenance } from '../logic/evidence-provenance-logic.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
@@ -24,7 +25,7 @@ afterEach(async () => {
   await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
-async function makeProject(): Promise<string> {
+async function makeProject(options: { chain?: 'legacy' | 'root' | 'both' } = {}): Promise<string> {
   const project = path.join(tmpDir, 'project');
   const state = path.join(project, '.w-model');
   await fs.mkdir(path.join(state, 'gate-logs'), { recursive: true });
@@ -45,11 +46,16 @@ async function makeProject(): Promise<string> {
     path.join(state, 'gate-logs', 'gate.json'),
     '{"script":"check-bdd-model.ts","exitCode":0,"passed":true,"reasons":[],"reportSummary":{"phase":1,"checkedAt":"2026-08-20T00:00:00.000Z","summary":"ok","violationsCount":0,"exitCode":0,"passed":true},"stdoutSummary":{"exitCode":0,"passed":true}}',
   );
-  await fs.mkdir(path.join(state, 'signature-chains'), { recursive: true });
-  await fs.copyFile(
-    path.resolve(process.cwd(), 'w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl'),
-    path.join(state, 'signature-chains', 'chain.jsonl'),
-  );
+  // 链位置三形态：legacy 复数目录（默认，向后兼容）/ 根级单数文件（全仓约定）/ 两者并存（歧义）。
+  const chain = options.chain ?? 'legacy';
+  const chainSample = path.resolve(process.cwd(), 'w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl');
+  if (chain === 'root' || chain === 'both') {
+    await fs.copyFile(chainSample, path.join(state, 'signature-chain.jsonl'));
+  }
+  if (chain === 'legacy' || chain === 'both') {
+    await fs.mkdir(path.join(state, 'signature-chains'), { recursive: true });
+    await fs.copyFile(chainSample, path.join(state, 'signature-chains', 'chain.jsonl'));
+  }
   for (const args of [
     ['init'],
     ['add', '.'],
@@ -72,6 +78,13 @@ async function makeProject(): Promise<string> {
       throw new Error('git fixture setup failed');
     }
   }
+  return project;
+}
+
+/** 无 git 工作区：保留全部运行时证据，仅移除 git 身份来源（遗留⑥a 的 no-git 形态）。 */
+async function makeNoGitProject(): Promise<string> {
+  const project = await makeProject();
+  await fs.rm(path.join(project, '.git'), { recursive: true, force: true });
   return project;
 }
 
@@ -143,6 +156,97 @@ describe('source provenance', () => {
       ok: true,
       verificationLevel: 'source-bound',
       verificationStatus: 'passed',
+    });
+  });
+
+  it('keeps provenanceKind=git with a 40-hex HEAD and no workspaceDigest for git workspaces', async () => {
+    const project = await makeProject();
+
+    const produced = await produceSourceProvenance(project);
+
+    expect(produced).toMatchObject({ ok: true, verificationLevel: 'source-bound' });
+    expect(produced.provenance?.provenanceKind).toBe('git');
+    expect(produced.provenance?.commitSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(produced.provenance?.workspaceDigest).toBeUndefined();
+    expect(validateBySchema('evidence-provenance', produced.provenance).valid).toBe(true);
+  });
+
+  it('produces provenanceKind=no-git with a workspaceDigest only when the caller passes noGitOk', async () => {
+    const project = await makeNoGitProject();
+
+    const produced = await produceSourceProvenance(project, { noGitOk: true });
+
+    expect(produced).toMatchObject({ ok: true, verificationLevel: 'package-only', verificationStatus: 'passed' });
+    expect(produced.provenance?.provenanceKind).toBe('no-git');
+    expect(produced.provenance?.commitSha).toBe('');
+    expect(produced.provenance?.workspaceDigest).toMatch(/^[0-9a-f]{64}$/);
+    expect(produced.provenance?.runId).toBeTruthy();
+    expect(validateBySchema('evidence-provenance', produced.provenance).valid).toBe(true);
+    expect(
+      JSON.parse(await fs.readFile(path.join(project, '.w-model', 'evidence-provenance.json'), 'utf8')),
+    ).toMatchObject({ provenanceKind: 'no-git', commitSha: '' });
+  });
+
+  it('permanently refuses source-bound verification for a no-git provenance', async () => {
+    const project = await makeNoGitProject();
+    const produced = await produceSourceProvenance(project, { noGitOk: true });
+    expect(produced.ok).toBe(true);
+
+    const verified = await verifySourceProvenance(project);
+
+    expect(verified.ok).toBe(false);
+    expect(verified.exitCode).toBe(1);
+    expect(verified.reason).toBe('NOT_SOURCE_BOUND_NO_GIT');
+  });
+
+  it('never self-describes a no-git record as source-bound, even on the allowNoGitRecord exception path', async () => {
+    const project = await makeNoGitProject();
+    expect((await produceSourceProvenance(project, { noGitOk: true })).ok).toBe(true);
+
+    const exception = await verifySourceProvenance(project, undefined, { allowNoGitRecord: true });
+
+    expect(exception).toMatchObject({
+      ok: true,
+      exitCode: 0,
+      verificationLevel: 'package-only',
+      verificationStatus: 'passed',
+    });
+    expect(exception.provenance?.provenanceKind).toBe('no-git');
+  });
+
+  it('still reports MISSING_GIT_HEAD for a no-git workspace without the explicit noGitOk opt-in', async () => {
+    const project = await makeNoGitProject();
+
+    const produced = await produceSourceProvenance(project);
+
+    expect(produced).toMatchObject({ ok: false, exitCode: 1, reason: 'MISSING_GIT_HEAD' });
+  });
+
+  it('accepts a root-level signature-chain.jsonl as the authoritative chain', async () => {
+    const project = await makeProject({ chain: 'root' });
+
+    const produced = await produceSourceProvenance(project);
+
+    expect(produced).toMatchObject({ ok: true, verificationLevel: 'source-bound' });
+    expect(produced.reason).toBeUndefined();
+    expect(produced.provenance?.sourceFiles).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: 'signature-chain.jsonl', kind: 'signature-chain' })]),
+    );
+    expect(produced.provenance?.measurements.signatureChain).toMatchObject({ count: 1 });
+    await expect(verifySourceProvenance(project)).resolves.toMatchObject({
+      ok: true,
+      verificationLevel: 'source-bound',
+    });
+  });
+
+  it('fails closed when the root-level chain and the legacy signature-chains directory coexist', async () => {
+    const project = await makeProject({ chain: 'both' });
+
+    const produced = await produceSourceProvenance(project);
+
+    expect(produced).toMatchObject({ ok: false, exitCode: 1, reason: 'SIGNATURE_CHAIN_AMBIGUOUS' });
+    await expect(fs.access(path.join(project, '.w-model', 'evidence-provenance.json'))).rejects.toMatchObject({
+      code: 'ENOENT',
     });
   });
 
@@ -448,6 +552,27 @@ describe('source provenance', () => {
     ).toMatchObject({
       verificationStatus: 'passed',
       producerVersion: expect.any(String),
+    });
+  });
+
+  it('real CLI reports package-only no-git provenance only with the explicit --no-git-ok switch', async () => {
+    const project = await makeNoGitProject();
+
+    const withoutFlag = await runSourceCli([project]);
+    expect(withoutFlag.code).toBe(1);
+    expect(withoutFlag.stdout).toContain('MISSING_GIT_HEAD');
+    await expect(fs.access(path.join(project, '.w-model', 'evidence-provenance.json'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+
+    const withFlag = await runSourceCli([project, '--no-git-ok']);
+    expect(withFlag.code).toBe(0);
+    const line = withFlag.stdout.split(/\r?\n/).find((entry) => entry.startsWith('EVIDENCE_SOURCE_JSON '));
+    expect(line).toBeDefined();
+    expect(JSON.parse(line!.slice('EVIDENCE_SOURCE_JSON '.length))).toMatchObject({
+      ok: true,
+      verificationLevel: 'package-only',
+      provenance: { provenanceKind: 'no-git', commitSha: '' },
     });
   });
 });

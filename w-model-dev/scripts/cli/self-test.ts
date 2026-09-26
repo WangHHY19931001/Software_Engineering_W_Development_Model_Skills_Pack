@@ -49,6 +49,7 @@ import {
 import { checkTlaModel } from '../logic/tla-logic.js';
 import { checkBudget } from '../logic/budget-logic.js';
 import { checkRunLog } from '../logic/run-log-logic.js';
+import { planAppend, planCorrection, type AppendOptions, type RunLogRecord } from '../logic/run-log-append-logic.js';
 import { checkMaturity } from '../logic/maturity-logic.js';
 import { checkCheckpoint } from '../logic/checkpoint-logic.js';
 import { checkRequirementCoverage, type CoverageCheckOptions } from '../logic/coverage-logic.js';
@@ -116,6 +117,9 @@ import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
+// R5 真值通道样本（D-7）：复用 check-maturity.ts 导出的计数/词法收集/诊断组装三函数，
+// 使 self-test 的样本口径与 CLI 接线单点一致（该文件尾部有 isDirectInvocation 入口守卫，import 不触发 main）
+import { buildR5Diagnostics, collectLexicalMentions, countOperationalFailures } from './check-maturity.js';
 import { checkUatPathMappingContent } from './check-artifact-gate.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
@@ -290,6 +294,28 @@ const VERIFIER_CASES: VerifierCase[] = [
     expectedReasonPatterns: [/completeness.*0\.65.*0\.7(?!\d).*单轴下限/],
     description:
       'R13 单轴下限：completeness=0.65<0.70 加权平均达 A 级（0.86）但单轴失败，应 passed=false（反模式 #41）',
+  },
+  // -------------------- D-10：V 产物形态负样本 --------------------
+  {
+    file: 'bad-arithmetic-sequence.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/完美等差.*公差 0\.01/, /真实离散/],
+    description:
+      'D-10① text-parse 下 completeness rawScores [0.97,0.96,0.98] 为 0.01 完美等差，文案须含真实离散改进指引',
+  },
+  {
+    file: 'bad-resolution-floor.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R18.*completeness.*分布坍缩/],
+    description:
+      'D-10③ completeness rawScores [0.9001,0.9002,0.9] 非全等但方差 6.67e-9 < 1e-6，应被 R18 分辨力下限拦截',
+  },
+  {
+    file: 'bad-evidence-double-l.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/evidence 格式不符.*双 L 非法/, /L51-L53=/],
+    description:
+      'D-10② evidence 逐条为双 L 区间形态（path:L51-L53=…），须报「格式不符（须 path:Lnn=stmt 或 path:§sec=stmt；行号区间合法写法 path:L51-53=stmt，双 L 非法）」而非「空泛声明，O3 命中」',
   },
   // -------------------- rootcause targetKind（§7.5） --------------------
   {
@@ -1467,6 +1493,51 @@ const MATURITY_CASES: MaturityCase[] = [
   },
 ];
 
+// -------------------- Maturity run-log（R5 真值通道，D-7） --------------------
+
+interface MaturityRunLogCase {
+  /** 样本文件名（相对 samples/run-log/，JSONL 格式） */
+  file: string;
+  /** 期望 check-maturity R5 判定是否通过 */
+  expectedPassed: boolean;
+  /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedViolationPatterns?: RegExp[];
+  /** 期望非阻断诊断中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedDiagnosticPatterns?: RegExp[];
+  /** 用例说明 */
+  description: string;
+}
+
+/**
+ * R5 真值通道样本（D-7）：喂给 check-maturity 的 `--run-log` 输入（基准成熟度模型取
+ * `samples/maturity/valid.json`，其 downgradeTriggers.operationalFailureStreak=3）。
+ * 计数与诊断经 check-maturity.ts 导出的三函数（与 CLI 接线单点一致）；CLI 三态的真实子进程
+ * 端到端另有 `__tests__/maturity-logic.test.ts` 覆盖。
+ * 注意：本数组只登记 R5 判定口径，不参与 RUN_LOG_CASES（check-run-log 的 R1/R7/R8 等）校验。
+ */
+const MATURITY_RUN_LOG_CASES: MaturityRunLogCase[] = [
+  {
+    file: 'valid-o3-mention-only.jsonl',
+    expectedPassed: true,
+    expectedDiagnosticPatterns: [
+      /疑似引用 3 处（含规则编号引用，非运维失败）/,
+      /operationalFailureModes 标注：p1-G-verifier-16, p3-G-verifier-03/,
+    ],
+    description: 'note 中 O3/O4 字样共 3 处全为规则编号引用 → R5 不违规（exit 0）+ 非阻断引用诊断',
+  },
+  {
+    file: 'bad-operational-modes-3x.jsonl',
+    expectedPassed: false,
+    expectedViolationPatterns: [/R5: O 系列失败模式命中 3 次/],
+    expectedDiagnosticPatterns: [
+      /疑似引用 1 处（含规则编号引用，非运维失败）/,
+      /operationalFailureModes 标注：p5-G-maturity-01/,
+    ],
+    description:
+      'operationalFailureModes 字段标注 3 次（真值通道）≥ streak=3 → R5 违规；note 词法仅 1 处引用，证明判据取自字段而非词法（诊断并存且不阻断）',
+  },
+];
+
 // -------------------- Checkpoint --------------------
 
 interface CheckpointCase {
@@ -1736,7 +1807,7 @@ const ICEBERG_CASES: IcebergCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/R6/, /视角间存在未对账差异/, /视角间存在未对账差异[\s\S]*SD-002/],
     injectViewSets: { graph: ['SD-001', 'SD-002'], tla: ['SD-001'], rtm: ['SD-001', 'SD-002'] },
-    description: 'graph/rtm 视角含 SD-002 而 tla 不含，两两对账差异即刻失败（R6，三视角平权）',
+    description: 'graph/rtm 含 SD-002 而 tla 不含，窄池漏 SD 即刻失败（R6[design-sd]，SD 命名空间内差异不豁免）',
   },
   {
     file: 'bad-view-absent-silent.json',
@@ -1751,6 +1822,21 @@ const ICEBERG_CASES: IcebergCase[] = [
     expectedReasonPatterns: [/R8/, /零发现但 sweptArtifacts 未覆盖收敛集合/],
     injectViewSets: { graph: ['SD-007'], tla: ['SD-007'], rtm: ['SD-007'] },
     description: '三视角收敛于 SD-007 但 sweptArtifacts 未覆盖，newFindings=[] 无法证明扫掠发生（R8）',
+  },
+  {
+    file: 'bad-r6-wide-dd-drift.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R6/, /design-wide/, /graph↔rtm[\s\S]*DD-003/],
+    injectViewSets: { graph: ['SD-001', 'DD-003'], tla: ['SD-001'], rtm: ['SD-001'] },
+    description:
+      '宽池 graph↔rtm 的 DD 漂移（DD-003 仅 graph 有）仍被检出（R6[design-wide]：分池只豁免跨命名空间宽度差）',
+  },
+  {
+    file: 'valid-phase5-scope-present.json',
+    expectedPassed: true,
+    injectViewSets: { graph: ['SD-001'], tla: ['SD-001'], rtm: ['SD-001'], scope: ['src/counter.ts'] },
+    description:
+      '阶段 5 scope 视角在盘且为文件路径命名空间：不参与 R6 集合比对与 R8 收敛集，零发现报告可放行（D-1/N-1 分池）',
   },
 ];
 
@@ -1853,7 +1939,7 @@ const CODEGRAPH_QUERY_CASES: CodegraphQueryCase[] = [
     phase: 5,
     expectedPassed: true,
     description:
-      '有效的 codegraph 查询落盘（含 querySymbol/callers/callees/blastRadius/timestamp），应通过（legacy 无 scope 兼容层样本；strict 覆盖绑定见 check-codegraph-queries.test.ts）',
+      '有效的 codegraph 查询落盘（含 querySymbol/callers/callees/blastRadius/timestamp + 显式降级声明），应通过（legacy 无 scope 兼容层样本；strict 覆盖绑定见 check-codegraph-queries.test.ts）',
   },
   {
     sampleDir: 'codegraph-queries/bad-empty',
@@ -1875,6 +1961,22 @@ const CODEGRAPH_QUERY_CASES: CodegraphQueryCase[] = [
     expectedPassed: false,
     expectedViolationPatterns: [/缺 blastRadius 字段/],
     description: '查询文件有 callers/callees 但缺 blastRadius 字段，应未通过（legacy 无 scope 兼容层样本）',
+  },
+  {
+    sampleDir: 'codegraph-queries/bad-degraded-without-evidence',
+    phase: 5,
+    expectedPassed: false,
+    expectedViolationPatterns: [/degradationReason/, /alternativeEvidence/],
+    description:
+      '无 .codegraph/ 索引却只声明 evidenceKind:artifact（缺 degradationReason/alternativeEvidence），应未通过（D-6：降级须显式且带替代证据）',
+  },
+  {
+    sampleDir: 'codegraph-queries/bad-cli-kind-without-index',
+    phase: 5,
+    expectedPassed: false,
+    expectedViolationPatterns: [/无 \.codegraph\/ 索引时须显式降级/],
+    description:
+      '无 .codegraph/ 索引却声明 evidenceKind:cli（claim CLI 真实执行），应未通过（D-6：索引不在盘不得声称 CLI 出处）',
   },
 ];
 
@@ -1918,6 +2020,15 @@ const CODING_PLAN_CASES: CodingPlanCase[] = [
     expectedPassed: false,
     expectedViolationPatterns: [/缺验证命令行/],
     description: 'Task 2 任务节无「验证：」/「Verify:」验证命令行（R2：每任务节须 ≥1 条），应未通过',
+  },
+  {
+    sampleDir: 'coding-plan/bad-review-empty',
+    phase: 5,
+    changeId: 'phase5-demo',
+    expectedPassed: false,
+    expectedViolationPatterns: [/phase5-plan-completeness\.md 为空文件/],
+    description:
+      'stage 审查产物为 0 字节（R5 内容下限：文件存在但无实质内容；行级证据锚降为非阻断诊断后不在此列），应未通过（2026-09-25 任务 2 / D-2）',
   },
 ];
 
@@ -3663,6 +3774,186 @@ async function runRunLogCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+// -------------------- RunLog append（D-5①/N-5 追加器纯逻辑，内联用例不落 fixture） --------------------
+
+interface RunLogAppendCase {
+  /** 用例说明 */
+  description: string;
+  /** 既有记录（历史行；追加器必须保持其逐字段不变——禁止回溯改写） */
+  existing: RunLogRecord[];
+  /** 待追加记录 */
+  incoming: RunLogRecord[];
+  /** planAppend / planCorrection 选项（now 固定注入，不依赖墙钟） */
+  options: AppendOptions;
+  /** 期望 accepted */
+  expectedAccepted: boolean;
+  /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
+  expectedViolationPatterns?: RegExp[];
+  /** 期望 diagnostics 中至少一条匹配以下每个正则 */
+  expectedDiagnosticPatterns?: RegExp[];
+  /** 期望末条新记录 note 匹配以下每个正则 */
+  expectedNotePatterns?: RegExp[];
+  /** 更正用例：--correct 的 runId（存在时走 planCorrection） */
+  correctRunId?: string;
+  /** 更正用例的 patch */
+  patch?: RunLogRecord;
+}
+
+/** 追加器内联用例的基准记录：缺 timestamp 时由追加器按严格递增契约填充 */
+function appendCaseRecord(patch: Partial<RunLogRecord> = {}): RunLogRecord {
+  return {
+    runId: 'a',
+    phase: 1,
+    phaseName: '需求分析',
+    action: 'produce',
+    role: 'S',
+    duration_s: 1,
+    tokens: 10,
+    estimated: false,
+    subagentSpawns: 0,
+    gateExitCode: null,
+    outcome: 'success',
+    ...patch,
+  };
+}
+
+const APPEND_CASE_NOW = '2026-01-05T00:00:00.000Z';
+
+const RUN_LOG_APPEND_CASES: RunLogAppendCase[] = [
+  {
+    description: 'now 派生：与末条同毫秒时步进 +1ms 且 diagnostics 明示「时钟调整 +Nms」（绝不静默）',
+    existing: [appendCaseRecord({ runId: 'h1', timestamp: APPEND_CASE_NOW })],
+    incoming: [appendCaseRecord({ runId: 'n1' })],
+    options: { now: APPEND_CASE_NOW },
+    expectedAccepted: true,
+    expectedDiagnosticPatterns: [/时钟调整 \+\d+ms/],
+    expectedNotePatterns: [/clock-adjust:auto\+\d+ms/],
+  },
+  {
+    description: '显式时间戳倒退（≤ 末条时间）即拒绝，violation 含「时间戳不递增」',
+    existing: [appendCaseRecord({ runId: 'h1', timestamp: APPEND_CASE_NOW })],
+    incoming: [appendCaseRecord({ runId: 'n1', timestamp: '2026-01-04T23:59:59.000Z' })],
+    options: { now: APPEND_CASE_NOW },
+    expectedAccepted: false,
+    expectedViolationPatterns: [/时间戳不递增/],
+  },
+  {
+    description: '--timestamp 注入成功：生效时间戳取注入值且 note 留 clock-injected 痕迹',
+    existing: [appendCaseRecord({ runId: 'h1', timestamp: '2026-01-04T00:00:00.000Z' })],
+    incoming: [appendCaseRecord({ runId: 'n1' })],
+    options: { now: APPEND_CASE_NOW, timestamp: '2026-01-04T12:00:00.000Z' },
+    expectedAccepted: true,
+    expectedNotePatterns: [/clock-injected:2026-01-04T12:00:00\.000Z/],
+  },
+  {
+    description: '--allow-clock-adjust 显式声明小步进：步进到末条 +1ms 且 note 留 clock-adjust 理由',
+    existing: [appendCaseRecord({ runId: 'h1', timestamp: APPEND_CASE_NOW })],
+    incoming: [appendCaseRecord({ runId: 'n1', timestamp: '2026-01-04T00:00:00.000Z' })],
+    options: { now: APPEND_CASE_NOW, allowClockAdjust: 'live-run-replay' },
+    expectedAccepted: true,
+    expectedDiagnosticPatterns: [/时钟调整 \+\d+ms/],
+    expectedNotePatterns: [/clock-adjust:live-run-replay/],
+  },
+  {
+    description: '批内三条 now 派生逐条 +1ms 严格递增（同毫秒不再产生并列时间戳）',
+    existing: [],
+    incoming: [appendCaseRecord({ runId: 'n1' }), appendCaseRecord({ runId: 'n2' }), appendCaseRecord({ runId: 'n3' })],
+    options: { now: APPEND_CASE_NOW },
+    expectedAccepted: true,
+    expectedDiagnosticPatterns: [/时钟调整 \+1ms/],
+  },
+  {
+    description: '重复 runId 拒绝（禁止以追加方式覆盖既有记录身份）',
+    existing: [appendCaseRecord({ runId: 'h1', timestamp: APPEND_CASE_NOW })],
+    incoming: [appendCaseRecord({ runId: 'h1' })],
+    options: { now: APPEND_CASE_NOW },
+    expectedAccepted: false,
+    expectedViolationPatterns: [/runId=h1 与既有记录重复/],
+  },
+  {
+    description: '空载荷拒绝（追加器不接受「无记录」的空追加）',
+    existing: [],
+    incoming: [],
+    options: { now: APPEND_CASE_NOW },
+    expectedAccepted: false,
+    expectedViolationPatterns: [/待追加记录为空/],
+  },
+  {
+    description: '--correct 只新增更正记录（note 含 correction-of:<runId>），历史行逐字段不变',
+    existing: [appendCaseRecord({ runId: 'h1', timestamp: APPEND_CASE_NOW, note: '错值 4' })],
+    incoming: [],
+    options: { now: '2026-01-05T00:01:00.000Z' },
+    correctRunId: 'h1',
+    patch: { note: '更正为 5' },
+    expectedAccepted: true,
+    expectedNotePatterns: [/更正为 5 correction-of:h1/],
+  },
+  {
+    description: '--correct 引用不存在的 runId 拒绝（调用方按输入错误 exit 2 处理）',
+    existing: [appendCaseRecord({ runId: 'h1', timestamp: APPEND_CASE_NOW })],
+    incoming: [],
+    options: { now: APPEND_CASE_NOW },
+    correctRunId: 'nope',
+    patch: { note: '更正' },
+    expectedAccepted: false,
+    expectedViolationPatterns: [/runId=nope 不在 run-log 内/],
+  },
+];
+
+/**
+ * RunLog append 内联用例（D-5①/N-5 追加器纯逻辑，无 fixture、无 IO）。
+ * 断言：accepted 一致 / 拒绝时 violations 匹配 / 诊断与 note 痕迹匹配 /
+ * 放行时（历史 + 新增）时间戳严格递增 / 历史行逐字段与入参相等（追加器不得回溯改写历史）。
+ */
+function runRunLogAppendCases(): CaseResult[] {
+  const results: CaseResult[] = [];
+  for (const c of RUN_LOG_APPEND_CASES) {
+    const details: string[] = [];
+    const plan =
+      c.correctRunId !== undefined
+        ? planCorrection(c.existing, c.correctRunId, c.patch ?? {}, c.options)
+        : planAppend(c.existing, c.incoming, c.options);
+    if (plan.accepted !== c.expectedAccepted) {
+      details.push(
+        `  - 期望 accepted=${c.expectedAccepted}，实际 accepted=${plan.accepted}（violations: ${plan.violations.join('；')}）`,
+      );
+    }
+    if (!c.expectedAccepted) {
+      details.push(...matchReasonPatterns(plan.violations, c.expectedViolationPatterns));
+    }
+    if (c.expectedDiagnosticPatterns !== undefined) {
+      details.push(...matchReasonPatterns(plan.diagnostics, c.expectedDiagnosticPatterns));
+    }
+    if (c.expectedAccepted) {
+      const appended = plan.entries.slice(plan.entries.length - plan.appended);
+      if (c.expectedNotePatterns !== undefined) {
+        const lastNote = appended.length > 0 ? String(appended.at(-1)!.note ?? '') : '';
+        details.push(...matchReasonPatterns([lastNote], c.expectedNotePatterns));
+      }
+      const stamps = plan.entries.map((entry) => Date.parse(String(entry.timestamp)));
+      for (let index = 1; index < stamps.length; index++) {
+        // eslint-disable-next-line security/detect-object-injection -- index 为本地数组循环计数（非外部输入），stamps 为同函数内的数值列表
+        if (!(stamps[index]! > stamps[index - 1]!)) {
+          details.push(`  - 第 ${index + 1} 行时间戳未严格递增（append-only 契约违反）`);
+        }
+      }
+    }
+    for (const [index, history] of c.existing.entries()) {
+      // eslint-disable-next-line security/detect-object-injection -- index 为本地用例数组循环计数（非外部输入），plan.entries 为同函数内的计划结果
+      if (JSON.stringify(plan.entries[index]) !== JSON.stringify(history)) {
+        details.push(`  - 历史行 ${index + 1} 被改写（追加器必须保持历史行逐字段不变）`);
+      }
+    }
+    results.push({
+      name: `run-log-append/${c.description}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 async function runMaturityCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of MATURITY_CASES) {
@@ -3685,6 +3976,55 @@ async function runMaturityCases(samplesDir: string): Promise<CaseResult[]> {
       description: c.description,
       details: details.length > 0 ? details : undefined,
     });
+  }
+  return results;
+}
+
+/**
+ * R5 真值通道样本（D-7）：run-log fixture × check-maturity 逻辑层 + CLI 导出的计数/诊断函数。
+ * 判定口径与 `cli/check-maturity.ts` 主流程一致：operationalFailureCount 只来自
+ * countOperationalFailures（operationalFailureModes 字段），词法命中只进 diagnostics。
+ */
+async function runMaturityRunLogCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  // 基准成熟度模型：samples/maturity/valid.json（L1，streak=3）；schema 前置校验要求全 required 字段
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- samples/maturity/valid.json 为仓库内受控 fixture（基准成熟度模型），只读
+  const baseMaturity = parseJsonSafe(await fs.readFile(path.join(samplesDir, 'maturity', 'valid.json'), 'utf-8'));
+  for (const c of MATURITY_RUN_LOG_CASES) {
+    const abs = path.join(samplesDir, 'run-log', c.file);
+    const name = `maturity-run-log/${c.file}`;
+    const details: string[] = [];
+    try {
+      const raw = await fs.readFile(abs, 'utf-8');
+      const entries: unknown[] = raw
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0)
+        .map((l) => parseJsonSafe(l) as unknown);
+      const diagnostics = buildR5Diagnostics(true, collectLexicalMentions(entries));
+      const r = checkMaturity(baseMaturity, {
+        operationalFailureCount: countOperationalFailures(entries),
+        diagnostics,
+      });
+      if (r.passed !== c.expectedPassed) {
+        details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+      }
+      details.push(...matchReasonPatterns(r.violations, c.expectedViolationPatterns));
+      details.push(...matchReasonPatterns(r.diagnostics, c.expectedDiagnosticPatterns));
+      results.push({
+        name,
+        passed: details.length === 0,
+        description: c.description,
+        details: details.length > 0 ? details : undefined,
+      });
+    } catch (err) {
+      results.push({
+        name,
+        passed: false,
+        description: c.description,
+        details: [`  - 异常: ${err instanceof Error ? err.message : String(err)}`],
+      });
+    }
   }
   return results;
 }
@@ -4872,6 +5212,7 @@ async function main(): Promise<void> {
   console.log(`Budget 用例   : ${BUDGET_CASES.length}`);
   console.log(`RunLog 用例   : ${RUN_LOG_CASES.length}`);
   console.log(`Maturity 用例 : ${MATURITY_CASES.length}`);
+  console.log(`MaturityRunLog 用例 : ${MATURITY_RUN_LOG_CASES.length}`);
   console.log(`Checkpoint 用例: ${CHECKPOINT_CASES.length}`);
   console.log(`Code-TLA 用例 : ${CODE_TLA_CASES.length}`);
   console.log(`RootCause 用例 : ${ROOTCAUSE_CASES.length}`);
@@ -4910,6 +5251,7 @@ async function main(): Promise<void> {
     budgetResults,
     runLogResults,
     maturityResults,
+    maturityRunLogResults,
     checkpointResults,
     codeTlaResults,
     rootcauseResults,
@@ -4959,6 +5301,7 @@ async function main(): Promise<void> {
     runBudgetCases(samplesDir),
     runRunLogCases(samplesDir),
     runMaturityCases(samplesDir),
+    runMaturityRunLogCases(samplesDir),
     runCheckpointCases(samplesDir),
     runCodeTlaCases(samplesDir),
     runRootCauseCases(samplesDir),
@@ -4983,6 +5326,7 @@ async function main(): Promise<void> {
     runCodeHealthPhase1GuardCases(samplesDir),
     runCodeHealthPhase1DynamicCases(samplesDir),
   ]);
+  const runLogAppendResults = runRunLogAppendCases();
   const codeHealthResults = await runCodeHealthCases(samplesDir);
   const codeHealthApplyResults = await runCodeHealthApplyCases(samplesDir);
   const codeHealthGapResults = await runCodeHealthGapCases(samplesDir);
@@ -4995,7 +5339,9 @@ async function main(): Promise<void> {
     ...tlaResults,
     ...budgetResults,
     ...runLogResults,
+    ...runLogAppendResults,
     ...maturityResults,
+    ...maturityRunLogResults,
     ...checkpointResults,
     ...codeTlaResults,
     ...rootcauseResults,

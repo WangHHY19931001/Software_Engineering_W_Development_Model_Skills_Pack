@@ -313,7 +313,7 @@ V 子代理在输出 VerifierOutput JSON 前必须自检：
 
 1. **必填字段齐全**：`meta` / `subCriteria`（评估维度，含每项的 `name` / `weight` / `score` / `rawScores` / `variance` / `evidence`）/ `compositeScore` / `qualityLevel` / `passed` / `summary` 均不得缺失。
 2. **禁止手工编造 rawScores**：必须实际执行 `repeatTimes ≥ 3` 次扰动评分（不同随机种子 / 温度 / 上下文扰动），将每次真实评分填入 `rawScores`；禁止复制同一个分数填满数组（详见 §3.2.1 规则 1）。
-3. **rawScores 须有实际差异**：`rawScores` 各元素不得全同；text-parse 模式下 `max - min` 须 ∈ `[0.01, 0.10]`（详见 §3.2.1 规则 3）。
+3. **rawScores 须有真实离散差异**：`rawScores` 各元素不得全同（复制填入），也不得构成 0.01 完美等差（构造数据，如 `[0.97,0.96,0.98]`）；text-parse 模式下 `max - min` 须 ∈ `[0.01, 0.10]`（详见 §3.2.1 规则 1/3；完美等差检测仅对 text-parse 生效——logits 天然可能等差）。
 4. **variance 须由 rawScores 自动计算**：禁止手工填写 `variance` 字段；必须用总体方差公式 `Var = Σ(xᵢ - μ)² / N` 从 `rawScores` 计算（与 `check-verifier-output.ts` 重算公式一致，避免因 `N` vs `N-1` 差异导致 `1e-6` 误差判失败；详见 §3.2.1 规则 2）。
 8. **不变式业务语义对齐**（P2.6）
    - 校验：TLA+ 每个不变式是否真实反映设计文档的业务约束
@@ -325,6 +325,8 @@ V 子代理在输出 VerifierOutput JSON 前必须自检：
 9. **断言强度与「是否真的在测东西」自检**（S21，判据见 `quality-standards.md`「测试质量判据（S21/S19/S20/M03）」§①/§②）：`targetKind=test` 时逐条核对——测试是否只断言「有意的决定」而成为 change detector；是否只断言「源文本包含某行」而落入 string-presence trap；测试名 / 意图能否**点名它抓的破坏**（"Name the break" 前置门，点不出即判测试无效并要求重命名或删除）；期望值是否由被测代码或其 helper 推导 / 复制（mirror assertion）。并按 **Mutation Check 5 类变异**核对「每个现实变异至少让一个测试转红」。本项**不新增子标准名**，作为 `correctness` / `clarity` / `independence` 既有子标准的证据要求。
 10. **mock 规则自检**（S20，判据见同节 §③）：替换真实方法前是否已学清其**全部副作用**；替身是否镜像被替对象的**全部已文档化字段**（而非只镜像测试读到的字段）；生产类是否混入 **test-only 方法**。**作用域限定**：本项只评审**被测生产代码**；门禁 fixture（`samples/**`）与本仓脚本按「是否忠实模拟被替对象」判定，**不适用** mock 三条硬规则。
 11. **S-tickets 产出评审自检**（S18，判据见 `command-reference.md`「S18 票据内容门禁」条——六条黑名单 + Buildability 三条负面判据 + 已知边界）：评审 S-tickets 产出时，按该判据核对票据内容（符号级契约是否点名、占位短语 / 无具体动作祈使 / 未定义符号引用 / Buildability 负面形态是否为零；已知边界由 V 复核兜底）。本项**不新增子标准名**，作为既有子标准的证据要求；判据全文以 `command-reference.md` 与 `gate-logic.ts` 实现为权威，此处只指向、不复制。
+12. **evidence 单 L 形态自检**（D-10②）：每条 `subCriteria[*].evidence` 须为 `path:§sec=陈述` 或 `path:Lnn=陈述`；行号区间写 `path:L51-53=陈述`，**禁双 L 形态** `path:L51-L53=陈述`（门禁报「evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt，单 L 形态）」，与「空泛声明」是两条不同归因）。
+13. **reviewedAt 时序自检**（D-10③）：`meta.reviewedAt` 须为本次评审完成的真实时刻，且**不早于**被评审产物的产出时刻（评审不可能先于产物存在）。该项**不做成门禁判据**（会引入时钟依赖、破坏 logic 层确定性），由 R 子代理四路时钟对账与 V 自检承担。
 
 ## 独立评审会话模板
 
@@ -521,11 +523,12 @@ V 子代理须在 `summary` 中包含：
 
 **禁止措辞**：「评审通过」「质量良好」「符合要求」等空泛表述。summary 长度须 ≥ 50 字符（R11 校验）。
 
-**evidence 格式规范**（冒号分隔）：evidence 字段每条须含 `<文件路径>:<定位>=<值>` 格式，定位为 `§section` 或 `L行号`。
-- 合法示例：`docs/phase1-requirements/requirement-spec.md:§1.1=32 需求齐全` / `src/auth.ts:L42-58=JWT 签发逻辑`
-- 非法示例：`coverage.json.matrices.stakeholder.coverage=100%`（点号格式，已废弃）/ `C1-C10 全通过` / `质量良好` / `评审通过`
-- 空泛声明视为 O3（Verifier Theater）命中，V 评审降级重做
-- 格式约定见 [conventions.md](conventions.md#格式约定) §2.1
+**evidence 格式规范**（冒号分隔）：evidence 字段每条须含 `<文件路径>:<定位>=<值>` 格式，定位为 `§section` 或 `L行号`（**单 L 形态**：`L42`，或合法区间 `L42-58`）。
+- 合法示例：`docs/phase1-requirements/requirement-spec.md:§1.1=32 需求齐全` / `src/auth.ts:L42-58=JWT 签发逻辑`（区间形态合法，**不要**改成单行）
+- 非法示例：`coverage.json.matrices.stakeholder.coverage=100%`（点号格式，已废弃）/ `docs/phase1-requirements/requirement-spec.md:L51-L53=REQ-001 需求覆盖`（**双 L 区间**：区间写法为 `L51-53`，多写一个 `L` 即格式不符，D-10②）/ `C1-C10 全通过` / `质量良好` / `评审通过`
+- **两路归因**（D-10①）：不匹配 `<路径>:<定位>=` 正则（含上例双 L 形态）→ **格式不符**（须 `path:Lnn=stmt` 或 `path:§sec=stmt`；行号区间合法写法为 `path:L51-53=stmt`——**单 L 区间合法、双 L 才非法**，可直接换写法修复）；匹配后命中空泛前缀 → **空泛声明，O3 命中**（属评审造假，须重评）。两路都使 `compositeScore -0.1` 并重新判定 `qualityLevel` / `passed`，但修复动作不同，V 不得混淆。
+- **裸声明的现行归因是「格式不符」，不是「空泛声明」**：`质量良好` / `评审通过` / `C1-C10 全通过` 这类裸声明缺 `path:定位=` 形态 → 门禁报 `evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt；行号区间合法写法 path:L51-53=stmt，双 L 非法）`；V 应据此**补定位形态**（或换合法区间写法），而非改分数。`空泛声明 / O3 命中` 文案桶须先匹配 `<路径>:<定位>=` 再命中空泛前缀，属语义兜底，**当前不可达**（`^` 锚定的裸前缀与 `path:` 前缀互斥）。
+- 格式约定见 [conventions.md](conventions.md#格式约定) §2.1；对应负样本 `w-model-dev/scripts/samples/verifier/bad-evidence-double-l.json`
 
 ### 6.2.1 evidence 字段可追溯约束
 

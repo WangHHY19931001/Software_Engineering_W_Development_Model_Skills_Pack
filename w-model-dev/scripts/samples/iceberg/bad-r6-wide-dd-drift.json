@@ -1,0 +1,20 @@
+{
+  "reportId": "IS-phase3-1-06",
+  "phase": "phase3-outline",
+  "triggerType": "ICEBERG-B",
+  "icebergRound": 1,
+  "sweptAt": "2026-09-25T10:00:00Z",
+  "sweptBy": "R-iceberg",
+  "线索来源": {
+    "reworkHintsHistory": ["V 评审发现详细设计清单缺 DD-003 的数据约束"],
+    "fixedPoints": ["docs/phase3-outline/blog-system-detail-design.md:L120"],
+    "previousFindings": []
+  },
+  "newFindings": [],
+  "sweepCoverage": {
+    "sweptArtifacts": ["docs/phase3-outline/blog-system-detail-design.md"],
+    "sweptDimensions": ["completeness", "reliability", "security"]
+  },
+  "summary": "本次扫掠覆盖 completeness/reliability/security 三维度共 1 份产物，宽池对账发现 graph 含 DD-003 而 rtm 不含，设计 ID 分池后宽池差异仍须失败，不得放行。",
+  "passed": true
+}

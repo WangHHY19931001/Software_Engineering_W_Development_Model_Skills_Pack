@@ -72,7 +72,17 @@ export const L0_BASELINE = {
   // 角色划分表 S 行允许动作补第 ⑤ 项（logic 层零 node:fs 的 IO 形态约定交叉引用）时新增
   // 1 条同目录链接 `[asset-authoring.md](asset-authoring.md)`；由 npm run audit:l0-links
   // 实测 rebaseline，l1Only 仍 97、placeholders 仍 36、violations 仍 0）。
-  relativeLinkCount: 695,
-  l1Only: 97,
+  // 697 = 695 + 2；l1Only 99 = 97 + 2（2026-09-25 live-run-findings-remediation 任务 7（D-3a）：
+  // references/data-models.md 新增「记录哈希链（recordHash / prevRecordHash，D-3a）」节时补 2 条指向 L1
+  // 的相对链接 `../scripts/logic/run-log-logic.ts`（共享实现）与 `../scripts/cli/wm-append-runlog.ts`
+  // （写入端），二者同时计入 l1Only；由 npm run audit:l0-links 实测 rebaseline，
+  // placeholders 仍 36、violations 仍 0）。
+  // 699 = 697 + 2；l1Only 101 = 99 + 2（2026-09-25 live-run-findings-remediation 任务 8（D-3b）：
+  // references/data-models.md 新增「checkpoint 放行锚（runLogAnchor，D-3b）」节时再补 2 条指向 L1 的
+  // 相对链接 `../scripts/logic/run-log-logic.ts`（共享实现）与 `../scripts/cli/wm-append-runlog.ts`
+  // （写入端），二者同时计入 l1Only；command-reference.md 的 L4 速查行未新增相对链接（纯反引号引用）；
+  // 由 npm run audit:l0-links 实测 rebaseline，placeholders 仍 36、violations 仍 0）。
+  relativeLinkCount: 699,
+  l1Only: 101,
   placeholders: 36,
 } as const;

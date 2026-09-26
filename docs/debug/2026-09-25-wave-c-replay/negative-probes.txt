@@ -1,0 +1,16 @@
+$ cd eval/e2e/demo-assets && bash run_negative_probes.sh
+--- 输出 ---
+[NP:checkpoint-vague] EXPECT_MATCH=yes
+[NP:cucumber-failed] $ npx tsx D:/w_skill_opt/Software_Engineering_W_Development_Model_Skills_Pack/w-model-dev/scripts/cli/check-bdd-model.ts .w-model/bdd-manifest.json --phase=5 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=.w-model/bdd/reports/report.json
+--- D8 SD Coverage: 0 violations
+
+=== JSON Summary ===
+BDD_JSON {"type":"bdd","passed":false,"exitCode":1,"summary":"BDD model check failed with 1 violations (phase 5)"}
+[NP:cucumber-failed] EXIT_CODE=1（期望 1；期望词「--- D5 Step Binding: [1-9]」）
+[NP:cucumber-failed] EXPECT_MATCH=yes
+
+### 探针恢复后回归复验 ###
+restore-check check-signature-chain.ts EXIT=0
+restore-check check-run-log.ts EXIT=0
+probe-orig residue count=0
+EXIT_CODE=0

@@ -17,8 +17,11 @@
  *                         返工口径（D-4a）：action ∈ {rework, fix, emergency-fix} 或 outcome ∈ {fail, rework}
  *                         的条数；tlaReworkCount 再从中筛 note/target 含 TLA 的条数（详见 countReworks）
  *                         用量口径（D-4b）：Σtokens 只累计有限非负数的 tokens 字段（详见 sumTokens）；
- *                         未提供 --run-log 时 R5/R6 一并跳过；提供了但 Σtokens=0 时输出「R6 未生效」警告
- *                         （跳过不等于通过）
+ *                         未提供 --run-log 时 R5/R6 一并跳过，但输出非阻断诊断「R6/R5-b 未生效（未提供 run-log）」
+ *                         （D-5② 未接线可见化：省略 --run-log 不再等于静默跳过，退出码语义不变）；
+ *                         提供了但 Σtokens=0 时输出「R6 未生效」警告（跳过不等于通过）
+ *                         提供了且同 (timestamp, tokens, duration_s) 多行时输出「疑似重复归账 N 组」诊断
+ *                         （N-6 上界口径：同一分派的多条归账会重复累计，只诊断不去重）
  *   --phase=N             当前阶段 1-8（可选，用于过滤 run-log 中本阶段的返工/用量记录；支持 --phase=N 与 --phase N 两形态，重复传参即错）
  *   --json                机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse，含 warnings 非阻断警告字段）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
@@ -35,6 +38,9 @@
  * 输出：
  *   stdout 打印结构化校验报告（人类可读 + 收尾 BUDGET_JSON 摘要，便于 Agent 正则截取）
  *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出进 ERROR_JSON）
+ *   非阻断诊断（D-5②/N-6：未接线可见化 + 上界口径）走两条通道——人类可读路径的
+ *   「非阻断诊断：」段（stdout，通过与否都打印）与 `--json` / `BUDGET_JSON` 的 `diagnostics` 键
+ *   （**仅在非空时出现**，同 check-maturity / check-checkpoint 口径）；不影响退出码
  *
  * 错误字段（ERROR_JSON）：
  *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
@@ -166,6 +172,39 @@ export function sumTokens(entries: unknown[], phase: number | undefined): TokenU
   return { phase: phaseTokens, total: totalTokens };
 }
 
+// ==================== 疑似重复归账统计（N-6 上界口径诊断） ====================
+
+/**
+ * 统计 run-log 中「同 `(timestamp, tokens, duration_s)` 出现 >1 次」的**组数**（N-6）。
+ *
+ * 用途：Σtokens 是**上界**口径——同一分派动作若按 R3 三条目（completeness/reliability/security）
+ * 各归一次账，同一 token 消耗会被重复计入，使 Σtokens 高于真实唯一消耗（live run 实测
+ * 522M 记录值中约 72.8M 来自重复归账）。本函数只**统计并可见化**该现象，**不做去重**：
+ * 去重键在 legacy 记录上不可靠（阶段 1-4 的 `reportId` 为空、`timestamp` 等值会误并真实并发分派），
+ * 预算判定继续按上界执行（口径成文见 data-models.md「用量实效校验（R6）」）。
+ *
+ * 计入判据：`typeof timestamp === 'string' && timestamp !== ''`（run-log schema 的必填字段；
+ * 缺时间戳的记录不参与分组，避免把手工 fixture 误判为重复）且 tokens 为有限非负数
+ * （与 sumTokens 同口径）。分组键包含 `duration_s` 原值（schema 亦为必填非负数）。
+ *
+ * @returns 出现次数 >1 的键数（组数），无重复返回 0
+ */
+export function countSuspectedDuplicateGroups(entries: unknown[]): number {
+  const groups = new Map<string, number>();
+  for (const entry of entries) {
+    const e = entry as { timestamp?: unknown; tokens?: unknown; duration_s?: unknown };
+    if (typeof e.timestamp !== 'string' || e.timestamp === '') continue;
+    if (typeof e.tokens !== 'number' || !Number.isFinite(e.tokens) || e.tokens < 0) continue;
+    const key = `${e.timestamp}|${e.tokens}|${String(e.duration_s)}`;
+    groups.set(key, (groups.get(key) ?? 0) + 1);
+  }
+  let duplicateGroupCount = 0;
+  for (const count of groups.values()) {
+    if (count > 1) duplicateGroupCount++;
+  }
+  return duplicateGroupCount;
+}
+
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
@@ -228,6 +267,8 @@ async function main(): Promise<void> {
   // 只有文件确实存在（fs.access 成功即置位，空文件同样算存在）才把「Σtokens=0」解释为「无用量字段」；读取失败时
   // 已由下方 warning 说明跳过原因，不再追加 R6 未生效警告（避免把「没读到」说成「没用量」）
   let runLogReadable = false;
+  // 疑似重复归账组数（N-6）：只在 run-log 确实读到内容时统计；未提供/读取失败时保持 0
+  let duplicateGroupCount = 0;
   if (runLogFile) {
     const runLogAbs = path.resolve(runLogFile);
     try {
@@ -244,6 +285,7 @@ async function main(): Promise<void> {
       reworkCount = stats.reworkCount;
       tlaReworkCount = stats.tlaReworkCount;
       tokensUsed = sumTokens(entries, phase);
+      duplicateGroupCount = countSuspectedDuplicateGroups(entries);
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
       console.error(`⚠ --run-log 文件读取失败，跳过 R5/R6/R5-b 触发检测: ${runLogAbs}（${e.code ?? e.message}）`);
@@ -267,6 +309,24 @@ async function main(): Promise<void> {
     result.warnings.push('R6 未生效：--run-log 无有效 tokens 用量（Σtokens=0），用量实效校验无实际约束力');
   }
 
+  // 非阻断诊断（D-5② 未接线可见化 + N-6 上界口径）：不影响 exit code，但须可见。
+  // ① 未提供 --run-log：R6/R5-b 整体跳过（判据与退出码语义一字不变），省略该参数不再等于静默跳过
+  //    ——live run 实测 9/9 次调用均未传该参数，R6/R5-b 全程无声，正是本条要堵的隐性规避通道；
+  // ② 提供了且存在同 (timestamp, tokens, duration_s) 多行：提示 Σtokens 的**上界**口径（只诊断不去重，
+  //    去重键在 legacy 记录上不可靠——阶段 1-4 reportId 为空、timestamp 等值会误并真实并发分派）。
+  // 读取失败分支不追加诊断：上一条 warning 已说明跳过原因（避免把「没读到」说成「没接线」）。
+  const diagnostics: string[] = [];
+  if (!runLogFile) {
+    diagnostics.push(
+      'R6/R5-b 未生效（未提供 run-log）：用量实效（Σtokens vs 上限）与 burnRate 告警整体跳过，跳过不等于通过',
+    );
+  }
+  if (duplicateGroupCount > 0) {
+    diagnostics.push(
+      `Σtokens 为上界口径；疑似重复归账 ${duplicateGroupCount} 组（同 timestamp/tokens/duration）——同一分派的多条归账会重复累计，预算判定按上界执行（不去重，口径见 data-models.md「用量实效校验（R6）」）`,
+    );
+  }
+
   const exitCode = result.passed ? 0 : 1;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置；warnings 透传（F-G2-04 可见性）
@@ -278,6 +338,8 @@ async function main(): Promise<void> {
         reasons: result.violations,
         violations: buildViolationDistribution(result.violations.length),
         warnings: result.warnings,
+        // diagnostics 仅在非空时出现（同 check-maturity / check-checkpoint 口径；D-5② 契约变化已登记）
+        ...(diagnostics.length > 0 ? { diagnostics } : {}),
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -316,6 +378,15 @@ async function main(): Promise<void> {
     console.log('  w-model-dev/references/operational-recovery.md §成本预算与运行日志');
   }
 
+  // 非阻断诊断（D-5② 未接线可见化 / N-6 上界口径）：不影响 exit code，但须可见
+  // （通过与否都打印——exit 0 时正是「为何未触发 R6/R5-b」需要被解释的场景）
+  if (diagnostics.length > 0) {
+    console.log('非阻断诊断：');
+    for (const d of diagnostics) {
+      console.log(`  - ${d}`);
+    }
+  }
+
   // 非阻断警告（如 R1 未校验：未提供 --project）：不影响 exit code，但须可见
   for (const w of result.warnings) {
     console.error(`⚠ ${w}`);
@@ -323,6 +394,7 @@ async function main(): Promise<void> {
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exitCode 一致（门禁防伪造三层机制之一）
+  // diagnostics 仅在非空时出现（同 check-maturity / check-checkpoint 口径）
   printGateReport(
     'BUDGET',
     {
@@ -330,6 +402,7 @@ async function main(): Promise<void> {
       passed: result.passed,
       violations: result.violations,
       warnings: result.warnings,
+      ...(diagnostics.length > 0 ? { diagnostics } : {}),
     },
     exitCode,
   );

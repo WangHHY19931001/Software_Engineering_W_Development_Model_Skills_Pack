@@ -36,9 +36,19 @@
       "minLength": 1
     },
     "commitSha": {
-      "description": "验证时的 Git 提交 SHA-1（40 位小写十六进制；wm-verify-evidence-source 校验须等于当前 HEAD）",
+      "description": "git 形态下的 Git 提交 SHA-1（40 位小写十六进制）或 no-git 形态下的空字符串（条件必填：provenanceKind=git——含缺省——须为 40 位小写十六进制；provenanceKind=no-git 须为空字符串，由 allOf 条件强制）",
       "type": "string",
-      "pattern": "^[0-9a-f]{40}$"
+      "pattern": "^([0-9a-f]{40})?$"
+    },
+    "provenanceKind": {
+      "description": "provenance 身份来源形态（可选，缺省等同 git 的旧记录形态）：git=以当前 HEAD 提交 SHA-1 为身份；no-git=无 .git 工作区，以 workspaceDigest 为身份且该包永久只能 package-only——`wm-export-evidence --verify --source-project` 复验一律拒绝（NOT_SOURCE_BOUND_NO_GIT），不得表述为 verified source 证据",
+      "type": "string",
+      "enum": ["git", "no-git"]
+    },
+    "workspaceDigest": {
+      "description": "no-git 形态下替代 HEAD 的工作区内容摘要：对导出源文件集合（相对路径 + 各自 SHA-256，按路径排序）的规范化清单 SHA-256（64 位小写十六进制；provenanceKind=no-git 时条件必填，git 形态不出现）。当前实现与 sourceBundleSha256 由同一规范清单导出，两者取值相同——前者是 no-git 的身份替代槽，后者是 bundle 比对槽",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     },
     "verifiedAt": {
       "description": "producer+verify 执行时间（ISO-8601 日期时间）",
@@ -93,6 +103,23 @@
       "pattern": "^[0-9a-f]{64}$"
     }
   },
+  "allOf": [
+    {
+      "$comment": "no-git 形态：commitSha 必须为空字符串、workspaceDigest 条件必填（永久只能 package-only 的机器挂点）；其余情形（provenanceKind=git 或缺省该字段的历史记录）commitSha 必须是 40 位小写十六进制。",
+      "if": { "properties": { "provenanceKind": { "const": "no-git" } }, "required": ["provenanceKind"] },
+      "then": {
+        "required": ["workspaceDigest"],
+        "properties": {
+          "commitSha": { "type": "string", "maxLength": 0 },
+          "workspaceDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      },
+      "else": {
+        "required": ["commitSha"],
+        "properties": { "commitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" } }
+      }
+    }
+  ],
   "definitions": {
     "measurement": {
       "description": "一类证据的测量单元：文件计数 + 按路径排序的规范内容哈希",

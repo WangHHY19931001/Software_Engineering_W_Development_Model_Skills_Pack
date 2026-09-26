@@ -249,7 +249,13 @@ async function main(): Promise<void> {
   }
 
   // 构建 options 并调用纯逻辑校验
-  const result = checkRunLog(entries, { tlaCheckRounds, gateLogs });
+  // D-3b：注入 run-log 原始行文本（与 entries 同序同长）——R7 放行锚的 sha256 定义在前缀各行原文
+  // 字节上，而 logic 层零 fs；未注入时锚只校验 lines 并记非阻断诊断（本 CLI 恒注入，sha256 恒校验）。
+  const result = checkRunLog(entries, {
+    tlaCheckRounds,
+    gateLogs,
+    runLogRawLines: parsedRunLog.rawLines,
+  });
   // 审计修复（task 3）：parseErrors 从纯 diagnostics 并入 blocking violations——
   // 坏行使输入不完整（可能丢失证据），空/空白/malformed-only/valid+malformed 一律 exit 1。
   // 消息保留 PARSE_INCOMPLETE 前缀以便与 lifecycle diagnostics 区分。

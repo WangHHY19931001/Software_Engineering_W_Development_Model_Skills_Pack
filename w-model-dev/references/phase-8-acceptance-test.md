@@ -281,7 +281,10 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 - 由 S 子代理执行（编排者不越权，反模式 #10 不变）
 - archive 后 `.w-model/` 原始产物保留（不删除，作为可追溯证据）
 - archive 产物只读，后续项目引用时只读取不修改
-- archive 产物禁止具体文件路径（归档 durability 共识）
+- **归档披露面规则（D-9，可执行口径）**：**归档允许保留执行证据原貌**——gate-log 头部记录的 `cwd`、输入文件路径等属「本机真实执行」证据，是归档可追溯性的价值所在，**不得**就地脱敏或改写（就地脱敏会同时破坏归档 README 声明的逐字节 sha256 等价与 `copiedIntoArchive` 契约）；**禁止的是设计文档与归档 README 中的具体文件路径**（`design.md` / `proposal.md` / `specs.md` / `tasks.md` / `tla-summary.md` / `verifier-summary.md` 与归档 `README.md` 一律走符号 / 契约级表述，归档 durability 共识不变）
+- **交付 / 外发前必须经 `wm-export-evidence` 生成脱敏包；禁止直接外发归档目录**（归档目录含本机绝对路径与运行期证据原貌，只作受控留档；对外交付走 `npm run wm:verify-evidence-source -- <project-dir>` → `npm run wm:export-evidence -- <project-dir> <output-dir>` 的脱敏 + SHA-256 manifest 链，边界见 `AGENTS.md`「本地生成物与审计证据」节）
+- **归档目录仅作受控留档、不构成交付物**：`wm-export-evidence` 的导出白名单**不含 `docs/changes/archive/`**（归档属「历史留档」而非「当前运行证据」，见 `AGENTS.md` 同一节）；如需交付归档里的文档，先复制为工作区内的**独立副本**（脱离归档目录），再走上述脱敏导出链生成脱敏包——不得把归档目录本身当交付物外发
+- **归档 README 披露惯例**：归档 `README.md` 须写明本披露口径与交付义务（「归档保留执行证据原貌（含本机路径）；交付 / 外发前必须经 `wm-export-evidence` 生成脱敏包，禁止直接外发归档目录」），使读者无需读源码即可知道归档不可直接外发——即 D-9 订正所指「归档 README 未披露」的补位（不新建模板文件，沿用既有归档 README 惯例）
 - **tickets.md 源路径无关性**：阶段 5 票据产出位置（`.w-model/tickets.md` 或 `docs/tickets.md`）不影响 archive——archive 时 S 子代理从源路径读取内容，写入 archive 的 `tasks.md`，源文件保留不动
 - **worktree 收尾归属（S23）**：归档/收尾时按 `phase-5-coding.md`「worktree 纪律（S23）」的**拥有权判定**处置 worktree：
   - 仅清理**本次自建**且位于 `.worktrees/` / `worktrees/` 下的 worktree；**非自建的一律不清理**，交还用户处置；

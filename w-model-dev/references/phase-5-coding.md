@@ -71,7 +71,7 @@
 **修改前流程**（ChangeScope 绑定，2026-09-04 audit-gate-closure）：
 1. **变更上下文**：阶段 5-8 门禁要求 codegraph 查询与实际变更绑定——S-coding 须维护 ChangeScope manifest（`schemas/change-scope.schema.json`，落盘如 `.w-model/change-scope.json`：`changeId` 含 `phaseN-` 前缀 / `phase` / `baseRef` / `headRef` / `scopeCreatedAt` / `changedFiles`），保证 `headRef=当前 HEAD`、`changedFiles` 与实际 Git 变更集合精确一致（门禁重算比对，不符 fail-closed）
 2. `codegraph query <目标符号>`（codegraph CLI，宿主 MCP 工具为可选加速）→ 查询 callers / callees / blast radius
-3. 落盘结果到 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`：除 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp 外，strict 模式（阶段 5-8 CLI）**必须含 `changeId`（精确等于 scope.changeId）与 `targetFiles`（本次查询服务的变更文件，全部属于 scope.changedFiles；每条查询至少声明一个目标文件）**；`queryTimestamp` 不得晚于 scopeCreatedAt。记录结构见 `schemas/codegraph-query.schema.json`
+3. 落盘结果到 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`：除 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp 外，strict 模式（阶段 5-8 CLI）**必须含 `changeId`（精确等于 scope.changeId）与 `targetFiles`（本次查询服务的变更文件，全部属于 scope.changedFiles；每条查询至少声明一个目标文件）**；`queryTimestamp` 不得晚于 scopeCreatedAt；**另须声明证据形态 `evidenceKind`（索引在盘→`'cli'`；无索引→`'artifact'` + 降级字段，见下「显式降级声明与索引陈旧同步」节）**。记录结构见 `schemas/codegraph-query.schema.json`
 4. 评估：修改是否波及 callers？是否需同步改 callees？
 5. 安全确认后 `Edit`/`Write` 代码
 6. （可选）修改后再查一次确认影响未意外扩大
@@ -79,6 +79,13 @@
 **覆盖义务**：scope 中每个须覆盖的 code/test 变更文件（`docs/`、`schemas/`、`config/`、`eval/`、`.w-model/`、`openspec/` 等顶层段、dotfile 与 `*.md` 之外，按工程源码/测试扩展名判定，分类函数 `lib/change-scope.ts` `isCodeOrTestFile`）至少被一个合法查询的 `targetFiles` 覆盖——门禁校验的是**实际覆盖**而非目录存在；未查询/未绑定的变更文件逐文件 violation。`.githooks/` 下无扩展名脚本（如 pre-push）按 code 文件计，改动须被查询覆盖。
 
 **门禁调用**：G 侧 `check-codegraph-queries.ts <project-root> --phase 5|6|7|8 --scope=<change-scope.json>`（或薄封装 `--change=<id> --base=<ref> --head=<ref>`；缺 scope → exit 1 fail-closed；文件/JSON/schema 非法 → exit 2）；阶段 5-8 artifact gate（`check-artifact-gate.ts --phase=N --scope=<file>`）把本 checker 与 coding-plan strict 校验聚合进 reasons/exitCode——`GATE_JSON.external` 含 `codegraph` 与 `codingPlan` 两键，coding-plan violations 以 `[coding-plan]` 前缀并入 reasons。
+
+**显式降级声明与索引陈旧同步**（2026-09-25 live-run 修复，D-6）：
+
+- **三态判据（声明须与索引实际状态一致）**：每条查询记录须带 `evidenceKind`——项目根存在 `.codegraph/` 索引时只允许 `'cli'`（CLI 真实执行；**缺声明或 `'artifact'` 一律 violation，禁止降级**）；无索引时只允许 `'artifact'` + 非空 `degradationReason` + ≥1 条 `alternativeEvidence[{command, evidencePath}]`（逐条须含非空两字段）。**未声明 `evidenceKind` 一律 violation**——把「制品口径」从隐形默认变成显式声明，杜绝手工编造的记录（callers/callees/blastRadius 无 CLI 出处）静默通过。
+- **有索引却降级 = 伪造查询记录**：索引在盘说明 CLI 可用，此时降级（或未声明）即 `hard-constraints.md` 明令禁止的「伪造查询记录」；判据由 checker 探测项目实际索引状态（`check-codegraph-queries.ts` 的 `codegraphIndexPresent`）决定，不采信记录自述。
+- **无索引时的先后次序**：先按 `ensure-codegraph.ts` 三层检测处置——CLI 缺失会自动安装，`.codegraph/` 缺失可 `codegraph init` 建索引（这是把路径拉回 `'cli'` 的唯一动作）；确认无法建索引（瞬态工作区 / 受限环境）后才走显式降级，并在 `degradationReason` 写明真实原因；`alternativeEvidence` 须给出可定位的替代证据来源（探测失败输出 + 只读推导依据），不得写「已授权」之类无出处文本。
+- **索引陈旧同步**：索引在盘但落后于工作树时，`codegraph status` 查看索引统计与陈旧情况，`codegraph sync` 只同步上次索引以来的变更（`codegraph index` 为整树重建）；查询须在同步后的索引上做，否则 callers/callees/blastRadius 反映的是旧代码。
 
 **与 code-TLA+ 一致性校验的关系**：codegraph = 修改前预防，code-TLA+ = 修改后回归，互补不冲突。
 
@@ -102,7 +109,7 @@ G          → check-coding-plan.ts <project-root> --phase=<5|6|7|8> --scope=<ch
 - **任务三件套**（R4）：账本目录内每个已完成任务 N 的 `task-<N>-brief.md` 与 `task-<N>-report.md` 存在且非空，且至少一个 `review-*.diff`（任务评审包证据）。
 - **归档快照**（R6）：`docs/changes/archive/<changeId>/` 或 `<YYYY-MM-DD>-<changeId>/`（**锚定匹配**：`<changeId>-extra` / 非日期前缀名不匹配、非法日历日独立成态 fail-closed；**恰一匹配**才可用，多匹配 fail-closed）内的 `<changeId>.plan.md` + `progress.md` + 三件套按同契约校验；活动位存在时优先活动位。归档后置校验单独跑 `check-archive-integrity.ts <archive-dir> --change-id=<changeId>`（显式开关无条件启用 `codingPlanSnapshot`，不依赖生产者摆放）。
 
-**每段 R3×3 + V 审查**：每段产物须跑 R3 三维度（completeness/reliability/security）+ V 评审，产出 `.w-model/r3-reviews/phase<N>-{plan,execute,finalize}-{completeness,reliability,security}.md` ×9 与 `.w-model/v-reviews/phase<N>-{plan,execute,finalize}.md` ×3（R5；旧 stage 词表 explore/propose/coding 不充数）；不合格打回重做（反模式 #39）。
+**每段 R3×3 + V 审查（双轨契约，互不替代）**：每段产物须跑 R3 三维度（completeness/reliability/security）+ V 评审，产出 stage 级 12 份 MD——`.w-model/r3-reviews/phase<N>-{plan,execute,finalize}-{completeness,reliability,security}.md` ×9 与 `.w-model/v-reviews/phase<N>-{plan,execute,finalize}.md` ×3（R5；旧 stage 词表 explore/propose/coding 不充数）；**非空（`size > 0`）为阻断下限**（0 字节即 exit 1），行级证据锚 `path:Lnn=` / `path:§sec=` 仅为 CLI stderr 非阻断诊断（不改退出码、不进 GATE_JSON）。phase 级三份 `.w-model/preventive-reviews/<N>-{completeness,reliability,security}.json`（`check-preventive-review.ts` + schema）另行强制：stage 级 MD 证「每段审查跑过」，phase 级 JSON 证「结论与 findings（`passed=false ⇒ findings ≥1`）」，二者路径、判据、门禁各不相同，不可互替。不合格打回重做（反模式 #39）。**产出前对齐**：`check-coding-plan.ts <project-root> --phase=<5|6|7|8> --scope=<change-scope.json> --preflight` 只读列出固定 14 项清单（9 R3 + 3 V + plan + 账本）与 missing/invalid（变长三件套/review diff 单列 `artifacts` 不计数），供 O 在电池前一次性分派补齐。
 
 ## Tracer-bullet 票据拆解
 

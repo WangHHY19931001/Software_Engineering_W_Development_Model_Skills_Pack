@@ -24,6 +24,8 @@ type SourceVerificationProvenance = {
   version: 1;
   runId: string;
   commitSha: string;
+  provenanceKind?: 'git' | 'no-git';
+  workspaceDigest?: string;
   artifactId: string;
   verificationStatus: 'passed';
   measurements: EvidenceMeasurements;
@@ -37,6 +39,8 @@ type EvidenceProvenance = {
   version: 1;
   runId: string;
   commitSha: string;
+  provenanceKind?: 'git' | 'no-git';
+  workspaceDigest?: string;
   artifactId: string;
   verificationStatus: 'passed';
   measurements: EvidenceMeasurements;
@@ -66,6 +70,8 @@ type FailureReason =
   | 'UNSANITIZED_EVIDENCE'
   | 'UNMANIFESTED_OUTPUT'
   | 'HASH_MISMATCH'
+  | 'NOT_SOURCE_BOUND_NO_GIT'
+  | 'SIGNATURE_CHAIN_AMBIGUOUS'
   | 'EVIDENCE_EXPORT_FAILED';
 
 export interface EvidenceExportResult {
@@ -112,6 +118,17 @@ const DIRECTORY_SOURCES: Array<{ directory: string; kind: EvidenceKind }> = [
   { directory: 'signature-chains', kind: 'signature-chain' },
   { directory: 'codegraph-queries', kind: 'codegraph-query' },
 ];
+/**
+ * Root-level allowlisted evidence files (`.w-model/<file>`). `signature-chain.jsonl`
+ * is the repository-wide convention (`references/signature-chain-guide.md`); the
+ * plural `signature-chains/` directory stays supported as the legacy layout.
+ */
+const ROOT_FILE_SOURCES: Array<{ file: string; kind: EvidenceKind }> = [
+  { file: 'run-log.jsonl', kind: 'run-log' },
+  { file: 'signature-chain.jsonl', kind: 'signature-chain' },
+];
+const SIGNATURE_CHAIN_FILE = 'signature-chain.jsonl';
+const SIGNATURE_CHAIN_DIRECTORY = 'signature-chains';
 const comparePaths = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
 
 class EvidenceFailure extends Error {
@@ -183,7 +200,8 @@ function isSafeManifestPath(relativePath: string): boolean {
   return isSafeRelativePath(relativePath) && !hasUnsafeMetadata(relativePath);
 }
 function expectedEvidenceKind(relativePath: string): EvidenceKind | undefined {
-  if (relativePath === 'run-log.jsonl') return 'run-log';
+  const rootFile = ROOT_FILE_SOURCES.find(({ file }) => relativePath === file);
+  if (rootFile) return rootFile.kind;
   return DIRECTORY_SOURCES.find(({ directory }) => relativePath.startsWith(`${directory}/`))?.kind;
 }
 function isAllowlistedEvidenceFile(file: EvidenceFile): boolean {
@@ -287,15 +305,23 @@ async function collectExportSources(
   sourceReal: string,
 ): Promise<Array<{ sourceRelative: string; kind: EvidenceKind }>> {
   const sources: Array<{ sourceRelative: string; kind: EvidenceKind }> = [];
+  // 链位置歧义：唯一根级文件与 legacy 复数目录并存时无法裁定权威链 → fail-closed。
+  // 该判定与 producer（evidence-provenance-logic）同源同名，导出侧与 verify 侧共用。
+  const legacyChainPresent = (await lstatOrNull(path.join(state, SIGNATURE_CHAIN_DIRECTORY))) !== null;
+  const rootChainPresent = (await lstatOrNull(path.join(state, SIGNATURE_CHAIN_FILE))) !== null;
+  if (legacyChainPresent && rootChainPresent) throw new EvidenceFailure(1, 'SIGNATURE_CHAIN_AMBIGUOUS');
   for (const { directory, kind } of DIRECTORY_SOURCES) {
+    if (kind === 'signature-chain' && rootChainPresent) continue;
     const directoryPath = path.join(state, directory);
     if (!(await lstatOrNull(directoryPath))) continue;
     const files: string[] = [];
     await collectDirectoryFiles(sourceReal, directoryPath, files);
     sources.push(...files.map((sourceRelative) => ({ sourceRelative, kind })));
   }
-  const runLog = path.join(state, 'run-log.jsonl');
-  if (await lstatOrNull(runLog)) sources.push({ sourceRelative: 'run-log.jsonl', kind: 'run-log' });
+  for (const { file, kind } of ROOT_FILE_SOURCES) {
+    if (kind === 'signature-chain' && legacyChainPresent) continue;
+    if (await lstatOrNull(path.join(state, file))) sources.push({ sourceRelative: file, kind });
+  }
   return sources.sort((left, right) => comparePaths(left.sourceRelative, right.sourceRelative));
 }
 
@@ -484,6 +510,20 @@ function sanitizeContent(sourcePath: string, content: Buffer): Buffer {
   }
   return Buffer.from(extension === '.md' ? sanitizeMarkdown(text) : sanitizeString(text), 'utf8');
 }
+/**
+ * Identity consistency of a governed provenance block: git (or the legacy shape
+ * without `provenanceKind`) binds a 40-hex HEAD; no-git binds an empty commitSha
+ * plus a 64-hex `workspaceDigest`.
+ */
+function isConsistentProvenanceIdentity(provenance: {
+  commitSha: string;
+  provenanceKind?: 'git' | 'no-git';
+  workspaceDigest?: string;
+}): boolean {
+  const kind = provenance.provenanceKind ?? 'git';
+  if (kind === 'no-git') return provenance.commitSha === '' && /^[0-9a-f]{64}$/.test(provenance.workspaceDigest ?? '');
+  return kind === 'git' && /^[0-9a-f]{40}$/.test(provenance.commitSha);
+}
 function isEvidenceMeasurement(value: unknown): value is EvidenceMeasurement {
   if (value === null || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
@@ -510,13 +550,22 @@ function isEvidenceMeasurements(value: unknown): value is EvidenceMeasurements {
 function parseSourceProvenance(value: unknown): SourceVerificationProvenance {
   if (value === null || typeof value !== 'object') throw new EvidenceFailure(1, 'INVALID_PROVENANCE');
   const source = value as Record<string, unknown>;
+  // 缺省 provenanceKind 等同 git：历史（无该字段的）provenance 记录按原口径校验 40 位 HEAD。
+  const provenanceKind = source.provenanceKind ?? 'git';
+  const commitShaValid =
+    typeof source.commitSha === 'string' &&
+    (provenanceKind === 'no-git' ? source.commitSha === '' : /^[0-9a-f]{40}$/.test(source.commitSha));
+  const workspaceDigestValid =
+    provenanceKind !== 'no-git' ||
+    (typeof source.workspaceDigest === 'string' && /^[0-9a-f]{64}$/.test(source.workspaceDigest));
   if (
+    (provenanceKind !== 'git' && provenanceKind !== 'no-git') ||
     source.format !== 'w-model-evidence-source-provenance' ||
     source.version !== 1 ||
     typeof source.runId !== 'string' ||
     source.runId.length === 0 ||
-    typeof source.commitSha !== 'string' ||
-    !/^[0-9a-f]{40}$/.test(source.commitSha) ||
+    !commitShaValid ||
+    !workspaceDigestValid ||
     typeof source.artifactId !== 'string' ||
     !isSafeManifestMetadata(source.runId) ||
     !isSafeManifestMetadata(source.artifactId) ||
@@ -541,6 +590,8 @@ function toExportProvenance(source: SourceVerificationProvenance, files: Evidenc
     version: 1,
     runId: source.runId,
     commitSha: source.commitSha,
+    ...(source.provenanceKind === undefined ? {} : { provenanceKind: source.provenanceKind }),
+    ...(source.workspaceDigest === undefined ? {} : { workspaceDigest: source.workspaceDigest }),
     artifactId: source.artifactId,
     verificationStatus: 'passed',
     measurements: source.measurements,
@@ -605,7 +656,9 @@ export async function exportEvidence(projectDir: string, outputDir: string): Pro
       if (filesForKind.length !== expected.count || hashFileList(filesForKind) !== expected.contentHash)
         throw new EvidenceFailure(1, 'INVALID_PROVENANCE');
     }
-    const sourceVerification = await verifySourceProvenance(project);
+    // allowNoGitRecord：打包仍需「记录是否仍匹配当前工作区」的本地一致性复验，但 no-git
+    // 记录产出的包保持 provenanceKind=no-git，`--source-project` 复验在 verifyEvidence 侧被拒。
+    const sourceVerification = await verifySourceProvenance(project, undefined, { allowNoGitRecord: true });
     if (!sourceVerification.ok || !sourceVerification.provenance) throw new EvidenceFailure(1, 'INVALID_PROVENANCE');
     staging = `${output}.tmp-${randomUUID()}`;
     await assertSafeOutputPath(staging, sourceReal);
@@ -634,6 +687,9 @@ export async function exportEvidence(projectDir: string, outputDir: string): Pro
       ok: true,
       exitCode: 0,
       mode: 'export',
+      // 纯输出增量：no-git 包的导出摘要与 verify 通道口径一致（package-only）；git 包保持
+      // 现状（不带该键），避免改变既有摘要断言。
+      ...(sourceProvenance.provenanceKind === 'no-git' ? { verificationLevel: 'package-only' as const } : {}),
       outputDir: output,
       manifestPath: path.join(output, MANIFEST_NAME),
       exportedFiles: sortedFiles.length,
@@ -690,7 +746,7 @@ export async function verifyEvidence(manifestPath: string, sourceProject?: strin
     if (
       !isSafeManifestProvenance(typed.provenance) ||
       typed.provenance.verificationStatus !== 'passed' ||
-      !/^[0-9a-f]{40}$/.test(typed.provenance.commitSha) ||
+      !isConsistentProvenanceIdentity(typed.provenance) ||
       !/^[0-9a-f]{64}$/.test(typed.provenance.sourceBundleSha256 ?? '') ||
       !typed.provenance.producerVersion ||
       typeof typed.provenance.verifiedAt !== 'string' ||
@@ -731,7 +787,14 @@ export async function verifyEvidence(manifestPath: string, sourceProject?: strin
     if (actual.some((entry) => !allowed.has(entry)) || actual.length !== allowed.size)
       throw new EvidenceFailure(1, 'UNMANIFESTED_OUTPUT');
     if (sourceProject) {
+      // 永久护栏（先于任何源项目读取）：no-git 包没有可绑定的 HEAD，`--source-project`
+      // 复验一律拒绝，防止把工作区内容摘要表述为 verified source 证据。
+      if (typed.provenance.provenanceKind === 'no-git') throw new EvidenceFailure(1, 'NOT_SOURCE_BOUND_NO_GIT');
       const source = await verifySourceProvenance(sourceProject);
+      // 两个稳定护栏 reason 直接透传以便判据可读（no-git 永久 package-only / 链位置歧义）；
+      // 其余源复验失败仍归并为 INVALID_PROVENANCE（既有契约不变）。
+      if (source.reason === 'NOT_SOURCE_BOUND_NO_GIT' || source.reason === 'SIGNATURE_CHAIN_AMBIGUOUS')
+        throw new EvidenceFailure(1, source.reason);
       if (
         !source.ok ||
         !source.provenance ||

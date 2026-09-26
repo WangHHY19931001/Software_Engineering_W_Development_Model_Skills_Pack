@@ -260,8 +260,18 @@
       "items": { "type": "string" }
     },
     "note": {
-      "description": "备注：rework 原因 / escalation 上下文 / 阻塞说明 / O 系列失败模式标注（如 \"O1 Token Burn\"）",
+      "description": "备注：rework 原因 / escalation 上下文 / 阻塞说明。其中出现的 O1..O6 字样按引用处理（含评审规则编号同名情形，如 O3 既是运维失败模式也是 V 门禁 evidence 扣分规则），不计入 check-maturity.ts R5——运维失败模式须用 operationalFailureModes 机器可读标注",
       "type": "string"
+    },
+    "operationalFailureModes": {
+      "description": "O 系列运维失败模式的机器可读标注（check-maturity.ts R5 的唯一真值通道）：O1=Token Burn / O2=State Rot / O3=Verifier Theater / O4=Comprehension Debt Spiral / O5=Cognitive Surrender / O6=Escalation Failure（定义见 SSoT §4A.2a）；每条记录内同一取值至多出现一次。R5 只统计本字段（存在即累加数组长度），note 中的 O1..O6 字样视为引用、不计入。可选字段：缺失表示本条无 O 系列命中（向后兼容历史记录）",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "description": "运维失败模式编号：O1 / O2 / O3 / O4 / O5 / O6（枚举合法性由本 schema 强制；R5 按数组长度计数，不另行校验取值）",
+        "type": "string",
+        "enum": ["O1", "O2", "O3", "O4", "O5", "O6"]
+      }
     },
     "artifacts": {
       "description": "本条记录涉及的产物路径数组（fix 动作须为非空）",
@@ -394,6 +404,32 @@
       "type": "number",
       "minimum": 0,
       "maximum": 1
+    },
+    "prevRecordHash": {
+      "description": "记录哈希链前驱（D-3a，可选）：链定稿公式 recordHash = sha256(prevRecordHash + \"\\n\" + canonicalJson(record 去掉 recordHash 字段))；canonicalJson = 对象键按 Unicode 码点升序、无空白、UTF-8、数组保序。取值 = 文件内前一条带 recordHash 记录的 recordHash；文件内首条带哈希记录为 \"\"（空串）。prevRecordHash 自身是记录字段，参与本条 canonicalJson 载荷（链关系因此双重绑定）。由 wm-append-runlog.ts 追加时自动写入（prevRecordHash 取文件内最后一条带哈希记录的 recordHash，无则 \"\"；历史行不补链）；check-run-log.ts R7 从**首条**带 recordHash 的记录起向文件末逐条复算 + 比对前驱——链断（prevRecordHash ≠ 前一条 recordHash）或内容与 recordHash 不符即 blocking，首个带哈希记录之前的历史段只记非阻断 LEGACY 诊断。第三方可按公式独立复算。",
+      "type": "string"
+    },
+    "recordHash": {
+      "description": "记录内容哈希（D-3a，可选）：链定稿公式 recordHash = sha256(prevRecordHash + \"\\n\" + canonicalJson(record 去掉 recordHash 字段))；canonicalJson = 对象键按 Unicode 码点升序、无空白、UTF-8、数组保序；输出 64 位小写 hex；记录自身的 recordHash 字段不参与载荷（否则不可复算）。由 wm-append-runlog.ts 追加时自动计算写入（载荷自带的 recordHash 由追加器按链重算覆盖并在 diagnostics 留痕）；check-run-log.ts R7 复算不符即 blocking（记录被就地改写，或中段删行/插行导致链重排）。历史记录缺该字段不阻断：首个带哈希记录之前的历史段（或全无哈希的日志）只记非阻断 LEGACY 诊断，禁止回溯补哈希。第三方可按公式独立复算。",
+      "type": "string"
+    },
+    "runLogAnchor": {
+      "description": "checkpoint 放行锚（D-3b，可选）：放行时刻的**历史前缀**外部锚，收口哈希链看不见的「整链重算 + 时间戳重对齐」与尾删。前缀 = 文件序下 `timestamp ≤ 锚所在记录 timestamp` 的全部记录（含其之前的全部历史行；**不含**锚自身所在记录，按时间戳而非物理位置定义）。lines = 前缀记录条数；sha256 = 前缀各记录**原始行字节**（行终止符 LF/CRLF 剥离后的原样文本，含空白与转义）以**单个 \"\\n\" 连接**（**末尾不加换行**）后的 SHA-256（64 位小写 hex）；lines=0 即空串摘要 e3b0c442…。写入：wm-append-runlog.ts 在写 action=checkpoint 且 outcome=success 的记录时按写入前前缀**自动填入**；调用方显式提供锚时须与自算值一致，不一致 exit 2 不写盘。校验：check-run-log.ts R7 第三段按同法重算并比对，不符即 blocking（文案含 R7 + runLogAnchor + runId）。历史兼容（RELEASE_ANCHOR_CUTOFF='2026-09-26T00:00:00Z'）：timestamp 早于 cutoff 的放行记录缺该字段 = 非阻断（LEGACY，禁止回溯补锚）；timestamp 不早于 cutoff 的 action=checkpoint 且 outcome=success 记录缺该字段 = blocking（堵 fail-open 窗口）；timestamp 缺失/非法不按 LEGACY 吸收（保守 blocking）。第三方可按定义独立复算。",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lines", "sha256"],
+      "properties": {
+        "lines": {
+          "description": "放行时刻历史前缀的记录条数（非负整数；前缀 = timestamp ≤ 放行时间戳且不含锚自身所在记录）",
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "description": "前缀各行原始字节以单个 \"\\n\" 连接（末尾不加换行）后的 SHA-256，64 位小写 hex",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
     }
   }
 }

@@ -1,0 +1,416 @@
+npm warn Unknown user config "home". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> w-model-dev-skill@42.2.1 self-test
+> tsx w-model-dev/scripts/cli/self-test.ts
+
+════════════════════════════════════════════════════════════
+校验逻辑自检（Self-Test）
+════════════════════════════════════════════════════════════
+样本目录      : D:\w_skill_opt\Software_Engineering_W_Development_Model_Skills_Pack\w-model-dev\scripts\samples
+Verifier 用例 : 25
+Gate 用例     : 28
+Graph 用例    : 34
+SpecEnhance 用例 : 4
+SpecStructure 用例 : 4
+SpecStructureOutOfScope 用例（内联，§8 M08）: 8
+DesignEnhance 用例 : 4
+Phase2SpecStructure 用例 : 4
+OutlineEnhance 用例 : 4
+Phase3SpecStructure 用例 : 4
+DetailedEnhance 用例 : 4
+Phase4SpecStructure 用例 : 4
+TLA 用例      : 15
+Budget 用例   : 5
+RunLog 用例   : 19
+Maturity 用例 : 3
+Checkpoint 用例: 2
+Code-TLA 用例 : 5
+RootCause 用例 : 16
+Schema 用例    : 17
+CodeHealth 用例: 17
+CodeHealth Phase1 静态用例: 3
+CodeHealth Phase1 Guard 用例: 2
+CodeHealth Phase1 动态用例: 2
+CodeHealth Apply 用例: 4
+CodeHealth Gap 用例: 12
+CodeHealth Phase3 Test 用例: 8
+CodeHealth Phase4 Duplicate 用例: 12
+BDD 用例       : 11
+Coverage 用例  : 10
+CoverageScope 用例 : 2
+Exemption 用例 : 8
+SignatureChain 用例 : 14
+ArchiveIntegrity 用例: 4
+Metadata 用例  : 1
+PreventiveReview 用例: 3
+IcebergSweep 用例: 8
+TlaBddSync 用例: 2
+RoleDispatch 用例 : 3
+StateMachine 用例 : 3
+DesignContract 用例 : 5 条
+CodegraphQuery 用例 : 4
+OpsxArtifact 用例 : 3
+OpenspecArchive 用例 : 3
+UatPathMapping 用例 : 5
+────────────────────────────────────────────────────────────
+✓ verifier/valid.json                      完整、合规的 VerifierOutput，应通过所有校验
+✓ verifier/persona-code-reviewer.json      code-reviewer Persona 的当前 Schema 可执行样例，应通过全部校验
+✓ verifier/persona-test-engineer.json      test-engineer Persona 的当前 Schema 可执行样例，应通过全部校验
+✓ verifier/persona-security-auditor.json   security-auditor Persona 的当前 Schema 可执行样例，应通过全部校验
+✓ verifier/persona-performance-auditor.json performance-auditor Persona 的当前 Schema 可执行样例，应通过全部校验
+✓ verifier/bad-ranking-k.json              ranking.k=2.5 非整数，应被 schema type:integer 前置校验拦截
+✓ verifier/bad-composite-score.json        compositeScore 与 Σ(score*weight) 不一致，应被防漂移校验拦截
+✓ verifier/bad-quality-level.json          qualityLevel=C 与综合分数 0.8735（应映射为 A）不一致
+✓ verifier/bad-variance-threshold.json     meta.varianceThreshold 缺失，应被 schema required 前置校验拦截
+✓ verifier/bad-variance-drift.json         variance=0 与 rawScores 重算方差不一致，应被防谎报校验拦截
+✓ verifier/bad-passed-mismatch.json        passed=false 与 qualityLevel=B 不一致（B 级应 passed=true）
+✓ verifier/bad-reviewed-at.json            reviewedAt 不是有效时间，应被 schema format:date-time 前置校验拦截
+✓ verifier/bad-variance-threshold-range.json 方差阈值被放宽到 0.50，应被拒绝
+✓ verifier/bad-ranking-ordered.json        排序结果包含重复候选项，应被拒绝
+✓ verifier/bad-rawscores-all-same.json     completeness 维度 rawScores 全同 [0.95,0.95,0.95]，应被防漂移规则 1 拦截
+✓ verifier/bad-variance-mismatch.json      completeness variance=0.001 与重算方差 0.000267 不一致，应被防谎报校验拦截
+✓ verifier/bad-perturbation-out-of-range.json text-parse 扰动范围 0.45 > 0.10，应被防漂移规则 3 拦截
+✓ verifier/bad-targetkind.json             P2.5 targetKind=testcase 已废弃，应被 schema enum 前置校验拦截
+✓ verifier/bad-subcriteria-name.json       P2.4 subCriteria 名称 fake-criterion 不在 test 标准集合内，应被命名校验拦截
+✓ verifier/bad-rawscores-constant.json     P3.10 coverage 维度 rawScores 全同 [0.90,0.90,0.90]，应被防漂移规则 1 拦截
+✓ verifier/bad-summary-too-short.json      summary 长度 < 50 字符，应被 schema minLength:50 前置校验拦截
+✓ verifier/bad-evidence-empty.json         evidence 缺具体引用，应被 R12 校验拦截（sig-002）
+✓ verifier/bad-single-axis-low.json        R13 单轴下限：completeness=0.65<0.70 加权平均达 A 级（0.86）但单轴失败，应 passed=false（反模式 #41）
+✓ verifier/valid-rootcause.json            targetKind=rootcause 合法 VerifierOutput（§7.5 子标准集合 + 权重），应通过全部校验
+✓ verifier/bad-rootcause-subcriteria.json  targetKind=rootcause 但误用 test 集合子标准，应被 §7.5 子标准集合校验拦截
+✓ gate/valid-rtm.json                      RTM 覆盖率 100% 且四级测试全部通过
+✓ gate/bad-coverage.json                   RTM 存在不完整追溯行，应被覆盖率门禁拦截
+✓ gate/bad-count-invariant.json            测试汇总计数不守恒，应阻止假通过
+✓ gate/bad-unit-coverage.json              单元测试代码覆盖率低于 80%，应阻止放行
+✓ gate/bad-duplicate-id.json               RTM 存在重复需求 ID，应被结构校验拦截
+✓ gate/bad-test-failed.json                单元测试 failed>0，应被四级测试门禁拦截
+✓ gate/bad-structure.json                  RTM 缺 executionSummary，应被 schema required 前置校验拦截（[schema] 前缀）
+✓ gate/valid-phase6.json[p6]               P1.1 phase=6 合法：unit+integration 通过，system/acceptance pending 合理跳过
+✓ gate/bad-phase6-pending-system.json[p6]  P1.1 phase=6 REQ 缺 integrationTest 字段应失败
+✓ gate/bad-phase5-missing-codemodule.json[p5] P1.1 phase=5 REQ 缺 codeModule 应失败
+✓ gate/bad-phase5-missing-codemodule.json[p8] P1.1 phase=5 bad 样本在 phase=8 终检也应失败
+✓ gate/valid-phase6.json[p8]               P1.1 phase=6 合法场景在 phase=8 终检应失败（system/acceptance pending）
+✓ gate/valid-phase6.json                   P1.1 未传 phaseOption 默认 phase=8（向后兼容，valid-phase6 应因 pending 失败）
+✓ gate/valid-phase1.json[p1]               §10J phase=1 REQ 行 acceptanceTest 非空 + NFR 行豁免，应通过
+✓ gate/bad-phase1-missing-acceptance-test.json[p1] §10J phase=1 REQ 行 acceptanceTest 为空，应被增量校验拦截
+✓ gate/bad-rtm-coverage-below-100.json     RTM coveragePercent=66% < 100%，应被覆盖率门禁拦截（约束 #3）
+✓ gate/bad-rtm-status-mismatch.json        RTM coverageStatus="100%" 但 coveragePercent=66%，应被 coverageStatus 一致性校验拦截
+✓ gate/bad-nfr-missing-dual-fields.json    NFR-001 行缺 targetValue + testThreshold 双字段，应被 NFR 双值校验拦截
+✓ gate/valid-sd-numeric-levels.json[p5]    SD 数字层级 id（SD-5.2.1）经 checkSdToCodeModuleMapping 识别为数字层级，命中 codeModule 前缀映射应通过
+✓ gate/bad-phase5-codemodule-format.json[p5] phase5 终检：REQ 行 codeModule 缺 SD 前缀（"src/auth/login.ts"），应被 SD→codeModule 格式校验拦截
+✓ gate/valid-test-evidence.json[p6]        M07 E2 端到端：四级全绿 + 各层 evidence，unitTest 携 rawOutput 对（真实 sha256）→ 通过
+✓ gate/bad-test-evidence-hash-mismatch.json[p6] M07 E2：声明 rawOutputSha256 与产物实际 SHA-256 不符，应被哈希核验拦截
+✓ gate/bad-test-evidence-exitcode-mismatch.json[p6] M07 E3 RED 绑定：failed=1 却记 exitCode=0（有失败必来自非零退出），应被结果一致性拦截
+✓ gate/bad-test-evidence-unpaired-output.json[p6] M07 E1 配对：只有 rawOutputPath 缺 rawOutputSha256，应被配对校验拦截
+✓ gate/bad-test-evidence-missing.json[p6]  M07 E4：lastUpdated 缺失（保守按 cutoff 后）且单元测试层 total>0 无 evidence，应被存在性校验拦截
+✓ gate/valid-test-evidence-legacy.json[p6] M07 E4 legacy 吸收：lastUpdated 早于 cutoff 且阶段内层无 evidence → 非阻断通过（legacy 标注）
+✓ gate/valid-rtm.json+tickets-valid.md     S18 正例：票据含符号级契约（接口签名 / 状态转移）与验收标准、零占位符 → --tickets 不引入任何阻断（tickets 计数全 0）
+✓ gate/valid-rtm.json+tickets-bad-content.md S18 反例：占位短语 TODO / 无具体动作祈使 / 要求写测试无符号 / 类似任务 N / 引用未定义符号 / 只给路径不给符号 → 逐条被黑名单与 Buildability 拦截
+✓ graph/bad-isolated.json                  存在孤立节点 REQ-002，应被连通性校验拦截
+✓ graph/bad-round-exceeded.json            analysisRounds 含 round=6 > MAX_GRAPH_ROUNDS(5)，应被轮次上限校验拦截（防无限返工循环）
+✓ graph/bad-multi-root.json                两个 REQ 根节点（depends-on 不构成 parent），应被单根校验拦截
+✓ graph/bad-orphan.json                    SD-002 无 parent 边且为非 REQ 根候选，应被单根/orphan 校验拦截
+✓ graph/bad-multi-parent.json              REQ-C 有两条 parent 入边，应被父唯一性校验拦截
+✓ graph/bad-sd-no-implements.json          phase=2 时 SD 缺 implements，应被追溯校验拦截
+✓ graph/bad-intf-no-defines.json           phase=3 时 INTF 缺 defines，应被追溯校验拦截
+✓ graph/bad-dd-no-realizes.json            phase=4 时 DD 缺 realizes，应被追溯校验拦截
+✓ graph/bad-blackhole.json                 REQ-001 只进不出，应被信息流黑洞校验拦截
+✓ graph/bad-miracle.json                   REQ-001 只出不进，应被信息流奇迹校验拦截
+✓ graph/bad-dead-module.json               REQ-001 无信息流经，应被死模块校验拦截
+✓ graph/bad-subsystem-orphan.json          SD-5.2.2 无 parent 依附，应被 orphan BFS 校验拦截
+✓ graph/bad-parent-cycle.json              parent 边构成 REQ-A→REQ-B→REQ-C→REQ-A 环，应被环检测拦截
+✓ graph/bad-governance-out-of-scope.json   governs 边源 SD-5.2.1 非治理类子系统（governance 标记缺失），应被横切边校验拦截
+✓ graph/bad-collaboration-asymmetric.json  collaborates-with 目标 SD-5.2.9 不存在，应被横切边校验拦截
+✓ graph/valid-req-hierarchy.json           四维·维度1：phase=1 纯 REQ 层级树（4 层 parent + level + reqGroup），应通过 R1-R4
+✓ graph/valid-multi-group.json             四维·维度1：phase=1 纯 REQ 多 group（2 个 level=1 根 + collaborates-with），应通过多 group 模式
+✓ graph/valid-cross-cuts-nfr.json          四维·维度3：phase=1 纯 REQ 图含 NFR/CON 横切节点（cross-cuts 边），NFR/CON 不参与 R1-R4
+✓ graph/valid-cross-logic.json             四维·维度3：phase=1 纯 REQ 图含 depends-on/precedes/conflicts-with（对称）+ cross-cuts，应通过 R5/R6
+✓ graph/valid-small-project-exemption.json 四维·维度1：phase=1 小项目纯 REQ 图（REQ 总数<5），R4 不强制 level=1 group
+✓ graph/bad-req-hierarchy-orphan.json      四维·维度1：REQ-003 level=3 缺 parent 入边，应被 R2 orphan 校验拦截
+✓ graph/bad-req-hierarchy-multi-parent.json 四维·维度1：REQ-003 有两条 parent 入边，应被 R2 父唯一性校验拦截
+✓ graph/bad-level-not-monotonic.json       四维·维度1：REQ-001(1)→REQ-002(3) 跳级，应被 R3 level 单调校验拦截
+✓ graph/bad-missing-level.json             四维·维度1：REQ 节点缺 level 字段，应被 R1-R4 强制必填校验拦截
+✓ graph/bad-no-req-group.json              四维·维度1：REQ 总数≥5 但无 level=1 REQ，应被 R4 REQ-group 非空校验拦截
+✓ graph/bad-depends-on-cycle.json          四维·维度3：depends-on 子图有环（REQ-002→REQ-003→REQ-002），应被 R5 依赖无环校验拦截
+✓ graph/bad-precedes-cycle.json            四维·维度3：precedes 子图有环（REQ-002→REQ-003→REQ-002），应被 R5 时序无环校验拦截
+✓ graph/bad-cross-logic.json               四维·维度3：cross-cuts 目标 SD-001 非 REQ + conflicts-with 单向，应被 R6 横切边校验拦截
+✓ graph/valid-warnings.json                4 REQ 节点 3 parent 边（边数 < 节点×3），应通过但触发边数下限警告
+✓ graph/valid-evidence-anchor.json         REQ 节点带合法 evidenceAnchor（path:§section=statement），应通过 R15
+✓ graph/bad-evidence-anchor.json           REQ 节点 evidenceAnchor 无定位（"登录需要密码"），应被 R15 拦截
+✓ graph/bad-evidence-anchor-missing.json   R15a：节点缺 evidenceAnchor（必填），应被锚点必填校验拦截（不再"未声明不阻断"）
+✓ graph/bad-evidence-status-invalid.json   R15b：evidenceStatus="maybe" 非 confirmed|pending，应被状态枚举校验拦截
+✓ graph/bad-evidence-path-missing.json     R15c：evidenceAnchor 指向不存在的路径 nonexistent/does-not-exist.md，应被存在性校验拦截
+✓ graph/valid-spec-enhance.json            R7/R8 通过：追踪矩阵字段合法 + mermaid 配平
+✓ graph/bad-spec-r7.json                   R7 失败：候选落点§ 非法 + 验收关联缺 UAT/§
+✓ graph/bad-spec-r8.json                   R8 失败：mermaid 块未配平
+✓ graph/bad-spec-missing-section4.json     R7 失败：主规格缺 §4 层级树节
+✓ gate/valid-requirement-spec-structure.json 结构校验通过：6 引用块 + SSOT 头 + DoD 9 项
+✓ gate/bad-refs-missing.json               结构校验失败：引用文件缺失
+✓ gate/bad-ssot-header.json                结构校验失败：SSOT 头缺声明
+✓ gate/bad-dod-incomplete.json             结构校验失败：DoD 清单 < 8
+✓ spec-structure/oos-valid-register        §8 合规表格：五列齐全 + rejected/reconsidered 两态 + 显式 `-` 回链 → 无违规
+✓ spec-structure/oos-sentinel-only         §8 仅含 `conceptKey = -` 哨兵行（模板的「无」形态）→ 豁免状态枚举与 Prior requests 校验，无违规
+✓ spec-structure/oos-section-missing       判定 (a)：§8 节缺失（「无」也须显式声明）
+✓ spec-structure/oos-legacy-prose          判定 (b)：§8 为旧模板散文形态（含 `- {{`）且无表格 → 迁移指引
+✓ spec-structure/oos-header-missing-column 判定 (c)：表头缺列（缺「状态」）；缺失列不叠加派生违规 → 恰好 1 条
+✓ spec-structure/oos-duplicate-concept-key 判定 (c)：conceptKey 重复（须一概念一行）
+✓ spec-structure/oos-status-invalid        判定 (c)：状态 ∉ {rejected, reconsidered}
+✓ spec-structure/oos-prior-requests-blank  判定 (c)：Prior requests 留白（须为回链列表或显式 `-`）
+✓ graph/valid-design-enhance.json          R9/R10 通过：SD 字段合法 + mermaid 配平
+✓ graph/bad-design-r9.json                 R9 失败：SD 编号非法 + 落点§ 非模块 ID
+✓ graph/bad-design-r10.json                R10 失败：mermaid 块未配平
+✓ graph/bad-design-missing-section3.json   R9 失败：主文档缺 §3 模块划分节
+✓ gate/valid-phase2-spec-structure.json    Phase 2 结构校验通过：6 引用块 + SSOT 头 + DoD 9 项
+✓ gate/bad-phase2-refs-missing.json        Phase 2 结构校验失败：引用文件缺失
+✓ gate/bad-phase2-ssot-header.json         Phase 2 结构校验失败：SSOT 头缺声明
+✓ gate/bad-phase2-dod-incomplete.json      Phase 2 结构校验失败：DoD 清单 < 8
+✓ graph/valid-outline-enhance.json         R11/R12 通过：INTF 字段合法 + mermaid 配平
+✓ graph/bad-outline-r11.json               R11 失败：INTF 编号非法 + 落点§ 非法
+✓ graph/bad-outline-r12.json               R12 失败：mermaid 块未配平
+✓ graph/bad-outline-missing-section2.json  R11 失败：主文档缺 §2 接口定义节
+✓ gate/valid-phase3-spec-structure.json    Phase 3 结构校验通过：6 引用块 + SSOT 头 + DoD 8 项
+✓ gate/bad-phase3-refs-missing.json        Phase 3 结构校验失败：引用文件缺失
+✓ gate/bad-phase3-ssot-header.json         Phase 3 结构校验失败：SSOT 头缺声明
+✓ gate/bad-phase3-dod-incomplete.json      Phase 3 结构校验失败：DoD 清单 < 8
+✓ graph/valid-detailed-enhance.json        R13/R14 通过：DD 字段合法 + class/data mermaid 配平
+✓ graph/bad-detailed-r13.json              R13 失败：DD 编号非法 + 落点§ 非法
+✓ graph/bad-detailed-r14.json              R14 失败：mermaid 块未配平
+✓ graph/bad-detailed-missing-section1.json R13 失败：主文档缺 §1 类设计节
+✓ code-health/code-health-campaign/valid-campaign.json 合法 campaign manifest
+✓ code-health/code-health-ledger-event/valid-ledger-event.json 合法 append-only ledger event
+✓ code-health/code-health-candidate/valid-candidate.json discovered candidate remains undecided
+✓ code-health/code-health-evidence/valid-evidence.json 合法 source-bound evidence package
+✓ code-health/code-health-approval/valid-approval.json 合法 human approval scope
+✓ code-health/code-health-archive/valid-archive.json 合法 redacted archive record
+✓ code-health/code-health-gap/valid-gap.json 合法 test-gap row
+✓ code-health/code-health-test-inventory/valid-test-inventory.json 合法 protected test inventory
+✓ code-health/code-health-duplicate-cluster/valid-duplicate-cluster.json 合法 duplicate cluster review
+✓ code-health/code-health-candidate/bad-missing-candidate-id.json candidate identity is required
+✓ code-health/code-health-candidate/bad-candidate-conclusion.json discovery cannot carry a conclusion
+✓ code-health/code-health-evidence/bad-no-command-hash.json command evidence requires a raw output hash
+✓ code-health/code-health-candidate/bad-stale-revision.json stale or malformed revision identity is rejected
+✓ code-health/code-health-approval/bad-approval-scope-mismatch.json approval scope hash must be structurally valid
+✓ code-health/code-health-test-inventory/bad-protected-omission.json protected facts cannot be omitted
+✓ code-health/code-health-archive/bad-missing-archive-redaction.json archived evidence must be redaction-clean
+✓ code-health/code-health-campaign/bad-unavailable-environment-pass.json unavailable required environments cannot pass
+✓ gate/valid-phase4-spec-structure.json    Phase 4 结构校验通过：6 引用块 + SSOT 头 + DoD 8 项
+✓ gate/bad-phase4-refs-missing.json        Phase 4 结构校验失败：引用文件缺失
+✓ gate/bad-phase4-ssot-header.json         Phase 4 结构校验失败：SSOT 头缺声明
+✓ gate/bad-phase4-dod-incomplete.json      Phase 4 结构校验失败：DoD 清单 < 8
+✓ tla/valid.json                           L1+L2 完整 manifest：单 L1 根 + 双向一致 + 拆解合规 + 声明标志全 true
+✓ tla/bad-no-l1-root.json                  无 L1 根规格（仅 L2 且 parent=null），应被层次校验拦截
+✓ tla/bad-multi-l1-root.json               两个 L1 根规格（L1-system-a/L1-system-b），应被单根校验拦截
+✓ tla/bad-parent-child-mismatch.json       L2-auth 声明 parent=L1-system，但 L1-system.children 为空，应被 parent→child 双向校验拦截
+✓ tla/bad-sibling-asymmetric.json          L2-auth 声明 sibling=L2-article，但 L2-article.siblings 为空，应被 sibling 双向校验拦截
+✓ tla/bad-level-not-monotonic.json         L3-auth parent=L1-system 但层级跨级（L1→L3），应被层级单调校验拦截
+✓ tla/bad-must-split-violation.json        variableCombination=50000 > 1w 但 decision=consider-split，应被拆解决策校验拦截
+✓ tla/bad-declared-flags.json              声明标志全反（syntax/deadlock/invariant/explosion），应同时触发四类违反
+✓ tla/bad-coverage-missing-sd.json         manifest.graphSdNodes 含 11 个 SD，但仅 2 个被 spec 覆盖，应被覆盖率校验拦截
+✓ tla/bad-cfg-missing-invariant.json       .cfg 仅含 NoExitTerminal，缺 ArtifactGateConsistency，应被 cfg-tla 一致性校验拦截
+✓ tla/bad-cfg-module-declaration.json      .cfg 含 ---- MODULE L3_xxx ----，应被 cfg 结构校验拦截
+✓ tla/bad-invariant-count-mismatch.json    .cfg 含 INV1 INV2 INV3，比 .tla BusinessInvariant 多 INV3，应被 cfg-tla 一致性校验拦截
+✓ tla/valid-cfg-consistency.json           .cfg 与 .tla 不变式集合完全一致，应通过 cfg-tla 一致性 + cfg 结构校验
+✓ tla/bad-checkrounds-phase-summary.json   checkRounds 元素含 phaseSummary 字段（phase 级摘要），应被 schema additionalProperties:false 前置拦截（F-G4-13 收紧；此前由 R13 拦截）
+✓ tla/bad-coverage-uncovered-sd.json       部分 SD 节点（SD-002/SD-003）未被任何 TLA+ spec 覆盖，应被覆盖完整性校验拦截
+✓ budget/valid.json                        完整、合规的 BudgetConfig，应通过所有校验
+✓ budget/bad-stale.json                    updatedAt==createdAt 且项目已推进，应被 R1 时效性校验拦截
+✓ budget/bad-killswitch-triggered.json     killSwitch.budgetBurnRate=1.5 超出 [0,1]，应被 schema maximum:1 前置校验拦截
+✓ budget/rootcause-valid.json              含 rootcauseParallelBudget 且所有轮次均在限额内，应通过 R4-A 校验
+✓ budget/rootcause-over-budget.json        R4-A：persona tokens 超 maxTokensPerPersona + 总 tokens 超 maxTotalTokensPerRound
+✓ run-log/valid.jsonl                      3 阶段各含 chunk/cross/gate/checkpoint + 每阶段闭环五脚本，append-only 且 checkpoint tokens>0
+✓ run-log/bad-incomplete.jsonl             阶段 1 缺 chunk 动作，应被 R1 阶段动作完整性校验拦截
+✓ run-log/bad-o-overreach.jsonl            checkpoint success 但 tokens=0，应被 R2 tokens 非负校验拦截
+✓ run-log/bad-exitcode-mismatch.jsonl      r1 时间戳 02:00 早于 r2 时间戳 01:00（时间戳倒序），应被 R7 append-only 校验拦截
+✓ run-log/bad-ordering.jsonl               V(review) 先于 S(produce) 出现（评审在产出前），应被 R8-4 轨迹顺序链校验拦截
+✓ run-log/rootcause-valid.jsonl            完整 rootcause→review→fix→review→gate 返工闭环，应通过 R1/R3/R6/R7 扩展校验
+✓ run-log/rootcause-missing-fix.jsonl      有 R 但缺 S-fix 记录，应被 R3 一一对应 + R7 时序校验拦截
+✓ run-log/rootcause-missing-review.jsonl   有 R 但缺 V 复审 rootcause 记录，应被 R3 复审数 + R7 时序校验拦截
+✓ run-log/phase5-valid.jsonl               阶段 5 含 produce/review/gate/checkpoint，R1 分档通过（不要求 chunk/cross）
+✓ run-log/phase5-missing-produce.jsonl     阶段 5 缺 produce 动作，应被 R1 阶段分档校验拦截
+✓ run-log/bad-gateExitCode-null.jsonl      gate 条目 gateLogPath 已设但 gateExitCode 为 null，应被 R6 拦截
+✓ run-log/bad-review-level-drift.jsonl     同一产物两次 review qualityLevel 为 A→C（跨 2 档）→ R9 标准偏移，走高成熟度 CHECKPOINT 交人裁定（不走 R）
+✓ run-log/rootcause-intermediate-review.jsonl rootcause→普通review→review(targetKind=rootcause)→fix，R7 按 targetKind 定位不误报
+✓ run-log/rootcause-multi-fix.jsonl        1 fix（basedOnReport="RC-1; RC-2"）覆盖 2 份 R 报告，去重映射应通过
+✓ run-log/rootcause-multi-uncovered.jsonl  2 份 R 报告但仅 1 份有 fix，RC-phase5-1-02 未覆盖应被 R3 拦截
+✓ run-log/review-false-no-hints-post-cutoff.jsonl cutoff 后 review passed=false 无 reworkHints，应被 [rework-hints] 规则拦截（LEGACY_VARIANT_CUTOFF 起强制，cutoff 前旧行按 LEGACY_REWORK_HINTS 诊断吸收）
+✓ run-log/bad-fix-missing-revert-evidence.jsonl fix 缺 revertEvidence，应被 R10 拦截（严格模式：无时间戳豁免，与 timestamp 早晚无关）
+✓ run-log/bad-r11-missing-closure.jsonl    R11：阶段 1 缺 check-maturity.ts 闭环记录应被拦截（约束 #11 机器核验）
+✓ run-log/bad-r11-late-closure.jsonl       R11：闭环脚本记录晚于 checkpoint 放行应被拦截（无时间戳豁免）
+✓ maturity/valid.json                      完整、合规的 MaturityConfig（L1），应通过所有校验
+✓ maturity/bad-stale.json                  level=L5 超出 L0/L1/L2/L3，应被 schema enum 前置校验拦截
+✓ maturity/bad-r3-cycle-mismatch.json      P2.1 R3 单位修正：completedPhases=8（1 完整周期）但 completedCycles=0，应触发 R3 违规
+✓ checkpoint/valid.jsonl                   2 阶段 checkpoint 决策含具体名词（REQ-1.1 / SD-5.2.1）+ 长度合规
+✓ checkpoint/bad-empty-decisions.jsonl     cp1 acknowledgedDecisions=[] 空决策放行，应被 R1 校验拦截
+✓ code-tla/valid.json                      四维度全通过：SD→codeModule 映射 + 代码赋值 + Next 分支对应 + 断言覆盖
+✓ code-tla/bad-sd-no-code-module.json      SD-REVIEW 无对应 codeModule，应被维度1映射校验拦截
+✓ code-tla/bad-no-assignment.json          代码无赋值语句（仅 const + return），应被维度2状态转移校验拦截
+✓ code-tla/bad-next-no-match.json          TLA+ Next 含 Register/Login 但代码无对应函数，应被维度3分支对应校验拦截
+✓ code-tla/bad-no-assertion.json           TLA+ 有 BusinessInvariant 但代码无 assert/invariant/require，应被维度4断言覆盖校验拦截
+✓ rootcause/valid.json                     完整、合规的 RootCauseReport，应通过所有校验
+✓ rootcause/valid-no-root-cause.json       调查与缓解证据完整的 noRootCause 合法出口，应通过校验
+✓ rootcause/bad-no-root-cause-missing-investigation.json noRootCause 缺 investigation 调查记录，应被拒绝
+✓ rootcause/bad-r1-missing-fields.json     R1 缺 rootCause 字段
+✓ rootcause/bad-r2-chain-length.json       R2 chain 仅 1 步（schema minItems:2 前置拦截）
+✓ rootcause/bad-r3-falsifiability.json     R3 无若...则句式
+✓ rootcause/bad-r4-fix-recommendation.json R4 缺 rationale
+✓ rootcause/bad-r5-prevention.json         R5 缺 owner
+✓ rootcause/bad-r6-upstream-defect.json    R6 present=true 缺 upstreamPhase
+✓ rootcause/bad-r7-quality-level.json      R7 qualityLevel=C 但 passed=true
+✓ rootcause/bad-r8-report-id.json          R8 reportId 含下划线
+✓ rootcause/bad-r9-partial-missing.json    R9 多角度缺 partialReports
+✓ rootcause/bad-r10-reality-confidence.json R10 reality-checker confidence=0.3
+✓ rootcause/bad-r10-no-reality-checker.json R10 combined 方法 partialReports 缺失 canonical testing-reality-checker（legacy reality-checker fallback）personaSlice（E16）
+✓ rootcause/bad-r11-unknown-persona.json   R11 多角度 partialReports 含 28 人格库中不存在的 persona（engineering-testability），应被矩阵内校验拦截
+✓ rootcause/bad-r11-category-mismatch.json R11 自述 category=coding-error 但多角度视角取自 design-flaw 行，与第一键行无交集，应被拦截
+✓ schema/verifier-output/bad-additional-props.json 未知字段 unknownExtraField 应被 additionalProperties:false 拦截
+✓ schema/verifier-output/bad-missing-required.json 缺失 passed / meta 必填字段应被 required 拦截
+✓ schema/verifier-output/bad-wrong-type.json compositeScore 为字符串应被 type:number 拦截
+✓ schema/budget/bad-budget-additional-props.json budget 顶层未知字段 unknownBudgetField 应被 additionalProperties:false 拦截
+✓ schema/checkpoint-log/bad-checkpoint-log-missing-required.json checkpoint-log 缺 runId 必填字段应被 required 拦截
+✓ schema/code-tla-manifest/bad-code-tla-manifest-wrong-type.json code-tla-manifest manifest.specs 为字符串应被 type:array 拦截
+✓ schema/event-ingress/bad-event-ingress-missing-required.json event-ingress 缺 eventId 必填字段应被 required 拦截
+✓ schema/graph/bad-graph-additional-props.json graph node 未知字段 unknownNodeField 应被 additionalProperties:false 拦截
+✓ schema/hill-climbing-report/bad-hill-climbing-report-missing-required.json hill-climbing-report 缺 reportId 必填字段应被 required 拦截
+✓ schema/maturity/bad-maturity-wrong-type.json maturity level=L5-INVALID-ENUM 应被 enum 拦截
+✓ schema/project/bad-project-missing-required.json project 缺 id 必填字段应被 required 拦截
+✓ schema/rootcause-report/bad-rootcause-report-additional-props.json rootcause-report 顶层未知字段 unknownReportField 应被 additionalProperties:false 拦截
+✓ schema/rtm/bad-rtm-wrong-type.json       rtm currentPhase 为字符串应被 type:integer 拦截
+✓ schema/rtm/bad-rtm-evidence-wrong-type.json rtm testSummary.evidence.exitCode 为字符串应被 type:integer 拦截
+✓ schema/run-log/bad-run-log-missing-required.json run-log 缺 timestamp 必填字段应被 required 拦截
+✓ schema/tla-manifest/bad-tla-manifest-additional-props.json tla-manifest 顶层未知字段 unknownManifestField 应被 additionalProperties:false 拦截
+✓ schema/coverage/bad-coverage-missing-required.json coverage 缺 metrics 必填字段应被 required 拦截
+✓ bdd/valid-manifest.json                  完整合法的 L1 features + manifest：头标注完整 + 状态机七要素齐全 + scenario 路径合法
+✓ bdd/valid-l2-manifest.json               完整合法的 L2 features + manifest：parent 指向 L1 + 状态机七要素齐全
+✓ bdd/bad-schema.manifest.json             manifest 缺 basePath 字段，应被 schema required 前置校验拦截（exitCode=2）
+✓ bdd/valid-manifest.json                  feature 头标注缺 @tla-spec，应被 parseFeatureHeader 头标注完整性校验拦截
+✓ bdd/valid-manifest.json                  Background 缺 @rejecting-states，应被 D3 状态机七要素完整性校验拦截
+✓ bdd/valid-manifest.json                  转移表 From=Unknown 不在 @states 中，应被 D3 转移表校验拦截
+✓ bdd/valid-manifest.json                  scenario When=logout 但转移表无此 From+Event，应被 D6 路径合法性校验拦截
+✓ bdd/bad-tla-mismatch.manifest.json       L2 子系统级 BDD 状态集与 TLA+ 快照不一致（L2 不豁免 D4 自动等价），应被 D4 等价性校验拦截
+✓ bdd/valid-manifest.json                  feature id 未登记在 RTM test 字段中（由 rtmRows 参数注入），应被 D7 RTM 映射校验拦截
+✓ bdd/valid-manifest.json                  feature 含未绑定 step（注入 cucumberReport.undefinedCount=1），应被 D5 step 绑定校验拦截
+✓ bdd/bad-d8-uncovered-sd.json             部分 SD 节点（SD-002/SD-003）未被任何 BDD feature 覆盖，应被 D8 覆盖校验拦截
+✓ coverage/valid-full-coverage.json        四维·维度4：完整覆盖（4 维度均 100% + REQ/NFR/CON 三类 + happy/error/boundary 三类）
+✓ coverage/valid-minimal-coverage.json     四维·维度4：最小合规覆盖（每维度仅 1 项 covered，metrics 重算一致）
+✓ coverage/valid-metrics-recalc.json       四维·维度4：metrics 100% 与重算一致（C10 通过）
+✓ coverage/valid-cross-cuts-consistent.json 四维·维度4：crossCuts 与 graph.json cross-cuts 边集一致（C7 通过）
+✓ coverage/valid-out-of-scope-declared.json 四维·维度4：NFR/CON 不适用但 status=covered + gapDescription 声明
+✓ coverage/bad-empty-stakeholder.json      四维·维度4：stakeholders 数组为空，应被 C1 校验拦截
+✓ coverage/bad-missing-scenario-type.json  四维·维度4：scenarios 缺 boundary 类型，应被 C4 场景类型校验拦截
+✓ coverage/bad-coverage-below-threshold.json 四维·维度4：stakeholder 覆盖率 50% < 100%，应被 C8 阈值校验拦截
+✓ coverage/bad-partial-not-resolved.json   四维·维度4：存在 partial 项未补齐，应被 C8 100% 阈值校验拦截
+✓ coverage/bad-cross-cuts-mismatch.json    四维·维度4：coverage 有 NFR-001→REQ-002 但 graph.json 无，应被 C7 双向校验拦截
+✓ coverage-scope/valid.json                valid 样本 thresholds 全 0：passed=true、fileCount=2、合计 pct=75/50/100/75（小写盘符+正斜杠与大写盘符+反斜杠各一）
+✓ coverage-scope/valid.json                valid 样本 thresholds 全 100：passed=false 且 failures 逐指标列出（functions=100 不低于阈值不计入）
+✓ exemption/valid-full-approval.json       四维·豁免：完整 S→R→V→人类 四阶段 approve（E1-E9 全通过）
+✓ exemption/valid-coverage-exemption.json  四维·豁免：coverage-missing-declared 类型豁免（NFR 不适用声明）
+✓ exemption/valid-evidence-anchor-pending.json 四维·豁免：第 6 类 evidence-anchor-pending（pending 锚点的阶段门合法出口），复用 E1-E9 四阶段审批链
+✓ exemption/bad-s-self-approve.json        四维·豁免：S 自行批准（缺 R/V/人类三阶段），应被 E4/E7/E8 拦截
+✓ exemption/bad-r-template-review.json     四维·豁免：R rootCauseAnalysis 模板化（<30 字符），schema minLength:30 前置拦截（E6 与 schema 冗余）
+✓ exemption/bad-v-not-verified.json        四维·豁免：V 校验未通过（verified=false），应被 E7 拦截
+✓ exemption/bad-no-human.json              四维·豁免：缺人类确认阶段，应被 E8 拦截
+✓ exemption/bad-r-reject.json              四维·豁免：R 审查拒绝（reviewDecision=reject），应被 E5 拦截
+✓ signature-chain/valid-all-roles.jsonl    签名链：阶段 1 完整 9 角色 + 用户确认 checkpoint（R1-R10 全通过）
+✓ signature-chain/bad-missing-V.jsonl      签名链：缺 V 角色，R1 失败
+✓ signature-chain/bad-broken-chain.jsonl   签名链：prevSigHash 不匹配，R2 失败
+✓ signature-chain/bad-backdated.jsonl      签名链：时间戳非单调，R3 失败
+✓ signature-chain/bad-O-produce.jsonl      签名链：非法角色 X 被 schema role enum 前置拦截（[schema] 违规 + R1 失败）
+✓ signature-chain/bad-O-self-sign.jsonl    签名链：O 代签 checkpoint，R5 失败
+✓ signature-chain/bad-tampered-hash.jsonl  签名链：sigHash 篡改，R6 失败
+✓ signature-chain/bad-dangling-source.jsonl 签名链：悬空来源，R7 失败
+✓ signature-chain/bad-missing-artifact.jsonl 签名链：缺失产物，R8 失败
+✓ signature-chain/bad-S-consumes-G.jsonl   签名链：S 越权消费 G，R9 失败
+✓ signature-chain/bad-R-consumes-S.jsonl   签名链：R 越权消费 S，R9 失败
+✓ signature-chain/bad-O-bypass-G.jsonl     签名链：O checkpoint 绕过 G，R10 失败
+✓ signature-chain/valid-continuous-chain.jsonl 签名链：2 阶段连续链存档模式（R2 跨阶段连续链语义；含 --phase=2 档位由跨阶段断链负例覆盖）
+✓ signature-chain/bad-broken-cross-phase.jsonl 签名链：跨阶段断链（prevSigId 不存在于全链），R2 失败
+✓ archive-integrity/valid-full.json        归档完整性：全阶段强制文件齐全
+✓ archive-integrity/bad-missing-phase1-docs.json 归档完整性：缺 phase-1 文档
+✓ archive-integrity/bad-missing-signature-chain.json 归档完整性：缺 signature-chain.jsonl
+✓ archive-integrity/bad-missing-gate-logs.json 归档完整性：缺 gate-logs/ 目录
+✓ metadata/version-consistency             SKILL.md frontmatter version 与 skill-metadata.json 一致
+✓ design-contract/valid-consistent.json    路径/参数/状态码/字段全部一致，应通过
+✓ design-contract/bad-path-mismatch.json   UAT 路径映射实际路径在路由定义中不存在，应被 D1 拦截
+✓ design-contract/bad-param-mismatch.json  验收测试使用 limit 但路由定义使用 pageSize，应被 D2 拦截
+✓ design-contract/bad-status-mismatch.json 验收测试预期 204 但路由实际返回 200，应被 D3 拦截
+✓ design-contract/bad-route-not-found.json 验收断言指向的路由在路由定义中不存在，应报 violation（不再静默跳过）
+✓ preventive-review/valid-completeness.json R3 完整性报告合规（但其他维度缺失，整体 passed=false）
+✓ preventive-review/bad-missing-evidence.json R3 报告缺失 evidence 字段（schema 校验失败 + 其他维度缺失）
+✓ preventive-review/bad-passed-false.json  R3 报告 passed=false 须产生 violation（checker 须读取 passed）
+✓ tla-bdd-sync/valid.json                  TLA+/BDD 一致
+✓ tla-bdd-sync/bad-transition-mismatch.json TLA+/BDD 转移不一致
+✓ run-log/bad-missing-V-role.jsonl         阶段 1 缺 role=V 评审记录，应被角色分派校验拦截（约束 #8）
+✓ run-log/bad-missing-G-role.jsonl         阶段 1 缺 role=G 门禁记录，应被角色分派校验拦截（约束 #8）；checkpoint 记 blocked（未放行）——未放行阶段无 R11 闭环义务，该样本只触发角色分派规则
+✓ run-log/bad-missing-R-role.jsonl         阶段 1 仅有 1 条 R3 记录（缺 reliability/security），R3 无条件强制应被拦截
+✓ state-machine/bad-missing-transition.json 设计文档有 draft→published 但代码缺，应被一致性校验拦截
+✓ state-machine/bad-extra-transition.json  代码有 archived→deleted 但设计文档缺，应被一致性校验拦截
+✓ state-machine/valid-consistent.json      设计文档与代码状态机完全一致，应通过
+✓ codegraph-queries/valid-phase5           有效的 codegraph 查询落盘（含 querySymbol/callers/callees/blastRadius/timestamp），应通过（legacy 无 scope 兼容层样本；strict 覆盖绑定见 check-codegraph-queries.test.ts）
+✓ codegraph-queries/bad-empty              codegraph-queries 目录存在但无 phase5-*.json 文件，应未通过（legacy 无 scope 兼容层样本）
+✓ codegraph-queries/bad-missing-field      查询文件缺 callers/callees 字段，应未通过（legacy 无 scope 兼容层样本）
+✓ codegraph-queries/bad-missing-blastradius 查询文件有 callers/callees 但缺 blastRadius 字段，应未通过（legacy 无 scope 兼容层样本）
+✓ opsx-artifacts/valid-phase5              opsx 制品齐全（proposal/design/tasks/tickets/specs）+ R3×9 + V×3，应通过（legacy 全扫描兼容层样本；strict changeId 见 check-opsx-artifacts.test.ts）
+✓ opsx-artifacts/bad-missing-tickets       opsx 变更目录缺 tickets.md（反模式 #40），应未通过（legacy 全扫描兼容层样本）
+✓ opsx-artifacts/bad-multi-dir-missing     多变更目录（phase5-demo + phase5-extra）中 phase5-extra 缺 tickets.md，列出全部缺失（legacy 全扫描兼容层样本）
+✓ openspec-archive/valid                   openspec 归档目录含完整制品（proposal/design/tasks/tickets/specs），应通过（legacy 未锚定 entries[0] 兼容层样本；strict 锚定见 check-openspec-archive.test.ts）
+✓ openspec-archive/bad-no-archive          openspec/changes/archive/ 不存在（opsx:archive 未执行），应未通过（legacy 兼容层样本）
+✓ openspec-archive/bad-missing-tickets     归档目录含 proposal/design/tasks 但缺 tickets.md，应未通过（legacy 兼容层样本）
+✓ uat-path-mapping/valid-phase5            阶段5回填完整（实际路径非占位符 + mappingType 合法），应通过
+✓ uat-path-mapping/bad-empty-table         空表（仅表头无数据行）应报"无有效映射行"，不静默通过
+✓ uat-path-mapping/bad-malformed-row       畸形行（单元格数 < 4）应记录 violation，不静默跳行
+✓ uat-path-mapping/bad-empty-cell          畸形行（空单元格）应记录 violation，不静默跳行
+✓ uat-path-mapping/bad-unbackfilled        终检语义（checkUatPathMappingContent 供阶段5/终检共用）下含未回填行应失败
+✓ iceberg/valid-full.json                  合法冰山扫掠报告（无新发现，passed=true）
+✓ iceberg/bad-round-out-of-range.json      icebergRound=6 越界（R2，maxIcebergRounds=5）
+✓ iceberg/bad-missing-evidence.json        finding 缺 evidence（R4 可证伪校验失败）
+✓ iceberg/bad-duplicate-finding.json       findingId 与 previousFindings 重复（R3 去重失败）
+✓ iceberg/bad-empty-swept-artifacts.json   sweptArtifacts 为空数组（schema minItems=1：空声明使零发现不可对账）
+✓ iceberg/bad-view-disagreement.json       graph/rtm 视角含 SD-002 而 tla 不含，两两对账差异即刻失败（R6，三视角平权）
+✓ iceberg/bad-view-absent-silent.json      阶段 3 在场表含 rtm 但未提供且 absentViews 未声明（R7：禁止静默跳过）
+✓ iceberg/bad-empty-findings-uncovered.json 三视角收敛于 SD-007 但 sweptArtifacts 未覆盖，newFindings=[] 无法证明扫掠发生（R8）
+✓ code-health/phase1/static/valid.json     静态 inventory 覆盖动态 import/reflection/shell/schema-template-RTM/test helper
+✓ code-health/phase1/static/signals.json   静态 inventory 逐信号覆盖：decorator/DI metadata、filesystem discovery、config handler、path/EOL、shell literal、schema/template/migration/graph ID、custom matcher、test double import
+✓ code-health/phase1/static/blocked.json   源文件不可读 → lead blocked，绝不产出 dead 结论
+✓ code-health/phase1/guards/valid.json     无 false-positive 机制且 trace 全部 observed/reached → guard 为空，lead 保持 candidate（非 dead）
+✓ code-health/phase1/guards/blocked.json   false-positive guard 命中（dynamic import/reflection/platform）→ classification=unknown
+✓ code-health/phase1/dynamic/valid.json    scenario matrix 结构合法且含声明 supported=false 的环境（保证 unexercisedScenarios 非空）
+✓ code-health/phase1/dynamic/blocked.json  全部 scenario 声明 supported=false → 无可用环境，候选只能 blocked/unknown，绝不产出 dead 结论
+✓ code-health/apply/approval-required.json 无人类 approval artifact → HUMAN_APPROVAL_REQUIRED，绝不删除
+✓ code-health/apply/scope-mismatch.json    approval 扩大 files scope → SCOPE_MISMATCH，未知文件 fail-closed
+✓ code-health/apply/valid-patch.json       exact human scope/revision → 受控 .patch proposal + executable rollback plan，不写工作树
+✓ code-health/apply/rollback-failure.json  candidate rollback plan executable=false → executeRollback 返回 false，绝不声称成功
+✓ code-health/phase2/valid-gap.json        七维度 discovery 生成完整 matrix 并通过 validateGapMatrix（coverage 仅信号）
+✓ code-health/phase2/missing-security.json 缺 security 维度 → findGaps fail-closed，coverage 不能替代该维度
+✓ code-health/phase2/missing-platform.json 缺 platform 维度 → findGaps fail-closed
+✓ code-health/phase2/coverage-only.json    coverageSignal.lines=1 且缺维度 → 100% coverage 不授权跳过任何维度
+✓ code-health/phase2/red-not-fail.json     implemented gap 的 redEvidence exitCode=0 → validateGapMatrix 拒绝非失败 RED
+✓ code-health/phase2/red-unclassified.json RED 非零但缺 codeHealthTddFailureClass 分类 → 手工证据不能冒充真实 RED
+✓ code-health/phase2/redgreen-binding-mismatch.json 矩阵行 red/green 证据未绑定到该行 gapId → 拒绝跨 gap 拼装
+✓ code-health/phase2/forged-scope-declaration.json 矩阵行伪造 implementationArtifact/声明 → 与 ledger candidate scope/tests 不一致被拒
+✓ code-health/phase2/forged-scope-redgreen.json red-green 伪造声明（断言当实现、真实实现当测试）→ 与 ledger 记录不一致被 CLI 拒绝
+✓ code-health/phase2/green-weakening.json  GREEN 的 assertionHash 与 RED 不同（削弱/改写断言）→ validateRedGreenEvidence 拒绝
+✓ code-health/phase2/infrastructure-red.json RED 因无关基础设施原因失败（模块缺失/语法错误）→ 不计为 RED
+✓ code-health/phase2/unknown-command.json  RED 命令不存在（observation=unavailable, exitCode=null）→ 不计为 RED
+✓ code-health/phase3/valid-inventory.json  受保护唯一负向测试被完整登记 → protected facts 与记录分类一致，且作者/年龄仅为 provenance
+✓ code-health/phase3/valid-redundant-removal.json 等价 survivor + ledger 锚定 scope + 已解释 facts → 允许一次性删除；作者/年龄不参与判定
+✓ code-health/phase3/bad-author-age-deletion.json 作者/年龄诱导删除唯一 protected 测试且无 survivor → 拒删
+✓ code-health/phase3/bad-weaker-oracle.json survivor oracle 更弱 → 等价性证明失败
+✓ code-health/phase3/bad-governance-drift.json 19 项 pre-push 顺序/计数或 self-test facts 漂移未解释 → 阻塞
+✓ code-health/phase3/bad-prepost-regression.json pre/post 真实回归未观测到减一 → 阻塞
+✓ code-health/phase3/bad-missing-ledger.json 移除声明缺 ledger 记录锚定 → 无授权，fail-closed
+✓ code-health/phase3/bad-neutral-unprotected.json 中性文本测试仅靠 delete-code ledger 声明 → 未正向建立非保护状态，默认按 protected 拒绝
+✓ code-health/phase4/valid-cluster.json    两个独立稳定生产调用点 + 完整逐项等价证明 + 可量化维护收益 → guard 放行（仅提案级）
+✓ code-health/phase4/deferred-one-site.json 仅 1 个稳定生产调用点 → deferred（非批准），绝不授权抽象
+✓ code-health/phase4/bad-test-only.json    test-only helper 充当实现 → rejected，test-only 绝不授权
+✓ code-health/phase4/bad-platform-difference.json platform-specific 行为差异 → 不授权
+✓ code-health/phase4/bad-error-mismatch.json error/retry 逐项差异 → 不授权
+✓ code-health/phase4/bad-security-mismatch.json security validation-order 差异 → 不授权
+✓ code-health/phase4/bad-lifecycle-mismatch.json lifecycle/resource 差异 → 不授权
+✓ code-health/phase4/bad-maintenance-only.json 维护收益仅“少几行/更短 diff” → 不构成收益，不授权
+✓ code-health/phase4/bad-generated.json    tracked record 标记 generated copy → 排除，绝不计为稳定生产调用点
+✓ code-health/phase4/bad-oneoff.json       tracked record 标记 one-off experiment → 排除，绝不授权
+✓ code-health/phase4/bad-deadcopy.json     tracked record 标记 dead copy → 排除，绝不授权
+✓ code-health/phase4/bad-prose-views.json  三个结构视图均为自由文本 → typed 结构证据不足，deferred
+────────────────────────────────────────────────────────────
+总计 358 条用例：358 通过，0 失败
+SELFTEST_RUN1_EXIT=0

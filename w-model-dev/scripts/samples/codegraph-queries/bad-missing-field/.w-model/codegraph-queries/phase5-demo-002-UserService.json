@@ -1,4 +1,12 @@
 {
   "querySymbol": "UserService.login",
-  "queryTimestamp": "2026-07-30T11:00:00Z"
+  "queryTimestamp": "2026-07-30T11:00:00Z",
+  "evidenceKind": "artifact",
+  "degradationReason": "样本目录无 .codegraph/ 索引（codegraph CLI 未初始化），以制品级查询记录替代",
+  "alternativeEvidence": [
+    {
+      "command": "codegraph query UserService.login",
+      "evidencePath": ".w-model/codegraph-queries/phase5-demo-002-UserService.json"
+    }
+  ]
 }

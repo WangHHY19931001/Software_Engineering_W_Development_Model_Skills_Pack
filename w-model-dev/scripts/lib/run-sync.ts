@@ -262,6 +262,22 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     timeout: { required: true, status: 'present' },
   },
   {
+    api: 'spawnSync',
+    file: '__tests__/wm-append-runlog-cli.test.ts',
+    anchor: 'const result = spawnSync(process.execPath, [tsxCli, SCRIPT, ...args], {',
+    symbol: 'run',
+    reason: 'run-log 追加器 CLI 子进程用例真实 spawn tsx，显式 20 秒超时（D-5①/N-5 三态取证）。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
+    api: 'spawnSync',
+    file: '__tests__/wm-append-runlog-cli.test.ts',
+    anchor: 'const result = spawnSync(process.execPath, [tsxCli, script, ...args], {',
+    symbol: 'runScript',
+    reason: 'D-3b 放行锚端到端取证：同一用例内真实 spawn check-run-log.ts 复核追加器写入的锚，显式 30 秒超时。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
     api: 'execSync',
     file: '__tests__/eval-runner.test.ts',
     anchor: "const stdout = execSync(`npx tsx \"${join(repoRoot, 'eval', 'runner.ts')}\" --self-check`, {",

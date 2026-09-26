@@ -280,7 +280,7 @@ graph LR
 
 技能包不内置调用上述工具，通过 CHECKPOINT 指令 + 子代理分派模板触发。依赖检测由 `ensure-codegraph.ts` 承载：codegraph 收敛为 **CLI 依赖**（L1 CLI + L3 `.codegraph/`；L2 MCP 降级为可选加速，未注册不出 CHECKPOINT），并新增 superpowers 方法论三层检测（L1 宿主技能目录 / L2 技能包 `references/superpowers-adoption.md` / L3 项目 `docs/superpowers/`），**只检测不安装**，缺失 → 🔴 CHECKPOINT。
 
-**ChangeScope 绑定（2026-09-04 audit-gate-closure）**：阶段 5-8 的 codegraph / coding-plan / archive 门禁与实际变更绑定——S-coding 阶段产出 ChangeScope manifest（`schemas/change-scope.schema.json`，如落盘 `.w-model/change-scope.json`）声明 `changeId`（须含 `phaseN-` 前缀）/ `phase` / `baseRef` / `headRef` / `scopeCreatedAt` / `changedFiles`，CLI 以 `--scope=<file>` 传入（或 `--change=<id> --base=<ref> --head=<ref>` 薄封装）。scope 必须与实际 Git 变更集合精确一致：`headRef` 解析 sha 须等于当前 HEAD、`changedFiles` 须与实际变更集合（`baseRef..headRef` tracked + worktree staged/unstaged/untracked）集合相等；Git 不可用 / refs 不可解析 / 集合不一致一律 **fail-closed**（exit 1），不是警告跳过。codegraph 查询落盘记录（`codegraph-query.schema.json`）在 strict 模式下须含 `changeId`（精确等于 scope.changeId）与 `targetFiles`（全部属于 scope.changedFiles），且 scope 中每个须覆盖的 code/test 变更文件（`docs/`、`schemas/`、`config/`、`eval/`、`.w-model/`、`openspec/` 等顶层段、dotfile 与 `*.md` 之外，按工程源码/测试扩展名判定——`openspec/` 是 legacy 顶层段，仍按 `lib/change-scope.ts` 的 `EXCLUDED_ROOT_SEGMENTS` 排除，不因 opsx 退役而变更）至少被一个合法查询的 `targetFiles` 覆盖；`queryTimestamp` 不得晚于 `scopeCreatedAt`。无 scope → 阶段 5-8 门禁 exit 1。分类纯函数与 Git 绑定校验见 `lib/change-scope.ts`（`isCodeOrTestFile` / `verifyScopeGitBinding`）。
+**ChangeScope 绑定（2026-09-04 audit-gate-closure）**：阶段 5-8 的 codegraph / coding-plan / archive 门禁与实际变更绑定——S-coding 阶段产出 ChangeScope manifest（`schemas/change-scope.schema.json`，如落盘 `.w-model/change-scope.json`）声明 `changeId`（须含 `phaseN-` 前缀）/ `phase` / `baseRef` / `headRef` / `scopeCreatedAt` / `changedFiles`，CLI 以 `--scope=<file>` 传入（或 `--change=<id> --base=<ref> --head=<ref>` 薄封装）。scope 必须与实际 Git 变更集合精确一致：`headRef` 解析 sha 须等于当前 HEAD、`changedFiles` 须与实际变更集合（`baseRef..headRef` tracked + worktree staged/unstaged/untracked）集合相等；Git 不可用 / refs 不可解析 / 集合不一致一律 **fail-closed**（exit 1），不是警告跳过。codegraph 查询落盘记录（`codegraph-query.schema.json`）在 strict 模式下须含 `changeId`（精确等于 scope.changeId）与 `targetFiles`（全部属于 scope.changedFiles），且 scope 中每个须覆盖的 code/test 变更文件（`docs/`、`schemas/`、`config/`、`eval/`、`.w-model/`、`openspec/` 等顶层段、dotfile 与 `*.md` 之外，按工程源码/测试扩展名判定——`openspec/` 是 legacy 顶层段，仍按 `lib/change-scope.ts` 的 `EXCLUDED_ROOT_SEGMENTS` 排除，不因 opsx 退役而变更）至少被一个合法查询的 `targetFiles` 覆盖；`queryTimestamp` 不得晚于 `scopeCreatedAt`。无 scope → 阶段 5-8 门禁 exit 1。分类纯函数与 Git 绑定校验见 `lib/change-scope.ts`（`isCodeOrTestFile` / `verifyScopeGitBinding`）。**证据形态显式声明（2026-09-25 live-run 修复，D-6）**：查询记录须带 `evidenceKind` 且与项目实际索引状态一致——项目根存在 `.codegraph/` 索引时只允许 `'cli'`（缺声明或 `'artifact'` 一律 violation，禁止降级）；无索引时只允许 `'artifact'` + 非空 `degradationReason` + ≥1 条 `alternativeEvidence[{command, evidencePath}]`；未声明一律 violation。判据由 `check-codegraph-queries.ts` 探测项目实际索引状态（`codegraphIndexPresent`），不采信记录自述；索引缺失时先走 `ensure-codegraph.ts` 检测（CLI 自动安装 / `codegraph init` 建索引），索引陈旧用 `codegraph sync` 增量同步（`codegraph status` 查看状态），确认无法建索引才显式降级——`codegraph` 门禁不再接受「隐形制品口径」：手工编造、无 CLI 出处且未声明降级的记录一律 exit 1。
 
 ---
 
@@ -660,7 +660,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 
 > 吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/failure-modes.md`，适配 W 模型语境。
 > 与 48 条流程反模式（#1~#48）+ 10 条行为退化（F1~~F10）互补：反模式是流程破坏，失败模式是行为退化，运维失败模式是运行健康问题。
-> O 系列命中**不触发脚本回退**（与 F1~~F10 同级），但应在 run-log 的 note 字段标注，并在阶段产物「备注」节或评审报告 reworkHints 中记录。
+> O 系列命中**不触发脚本回退**（与 F1~~F10 同级），但应在 run-log 的 `operationalFailureModes` 字段做**机器可读标注**（取值 `O1`~`O6`，`check-maturity.ts` R5 的唯一真值通道；`note` 中的 `O1`~`O6` 字样视为引用、不计入），并在阶段产物「备注」节或评审报告 reworkHints 中记录。未提供 `--run-log` 时 R5 输出「未生效」非阻断诊断（不静默跳过）。
 
 | #   | 失败模式                                             | 症状                                                              | 与现有反模式/失败模式的关系                                         | 缓解措施                                                                                                                       |
 | --- | ---------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -671,7 +671,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 | O5  | Cognitive Surrender（"循环处理了"无设计意见）        | 用户放弃对设计/架构的意见；全权委托 Agent                         | 与 §4A.1 第 3 条（Push Back）对立面                                 | 阶段 2/4 设计 CHECKPOINT 强制用户提出 ≥1 修改意见或替代方案；无意见视为 O5 命中                                                |
 | O6  | Escalation Failure（attempt cap 触发但无人被通知）   | 返工达 maxReworkRounds 但用户未被告知；循环卡死                   | 与 #8（越过 CHECKPOINT）互补：#8 是显式越过，O6 是隐式卡死          | attempt cap 触发 → run-log append escalate 记录 + 强制 🔴 CHECKPOINT 展示返工历史                                              |
 
-> O 系列命中不回退，但应在 run-log 的 note 字段标注（如 note="O1 Token Burn"），并在阶段产物「备注」节或评审报告 reworkHints 中记录。O4/O5 直接关联 CHECKPOINT 有效性，命中时拒绝放行。
+> O 系列命中不回退，但应在 run-log 的 `operationalFailureModes` 字段标注（如 `"operationalFailureModes": ["O1"]`；`note` 中的 O1~O6 字样按引用处理——如 O3 同时是评审规则编号，不计入 R5），并在阶段产物「备注」节或评审报告 reworkHints 中记录。O4/O5 直接关联 CHECKPOINT 有效性，命中时拒绝放行。
 
 ### 4A.2b 返工循环反模式扩展（#18/#19）
 
@@ -1014,10 +1014,11 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 - **五轴评审与严重等级标签**（吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `code-review-and-quality` 技能）：代码评审（`targetKind=code`）的子标准按五轴（Correctness / Readability / Security / Architecture / Performance）组织发现项；每条发现项标注 Severity（Critical / Required / Nit / Optional / FYI），使作者区分必修与可选。详细子标准映射与 Structural Remedies 见 [`w-model-dev/references/verifier-spec.md`](../w-model-dev/references/verifier-spec.md) §7.4A。
 - **防漂移校验**：外部 Agent 输出 JSON 后必须调用 `w-model-dev/scripts/cli/check-verifier-output.ts` 校验（退出码 `0=通过 / 1=校验失败 / 2=输入错误`）。校验纯逻辑单点事实源为 `w-model-dev/scripts/logic/verifier-logic.ts`。
 - **与外部演化工具的关系**：本规范只覆盖「阶段产物校验流程」，是技能内部的产物质量保障；技能演化（Rollout / Reflect / Edit / Skill Lift）由外部 SkillOpt / darwin-skill 完成，可消费本规范产出的 `VerifierOutput` JSON 作为训练信号。
-- **evidence 格式规范**：evidence 字段每条须含 `<文件路径>.<字段路径>=<值>` 格式
-  - 合法示例：`coverage.json.matrices.stakeholder.coverage=100%` / `tla-manifest.json.specs[0].tlcChecked=true`
-  - 非法示例：`C1-C10 全通过` / `质量良好` / `评审通过`（空泛声明）
-  - 空泛声明视为 O3（Verifier Theater）命中，V 评审降级重做
+- **evidence 格式规范**：evidence 字段每条须含 `<文件路径>:<定位>=<值>` 格式（定位为 `§section` 或 `L行号`；行号区间写 `L51-53`，**单 L 形态**）
+  - 合法示例：`docs/phase1-requirements/requirement-spec.md:§1.1=32 需求齐全` / `src/auth.ts:L42-58=JWT 签发逻辑`
+  - 非法示例：`coverage.json.matrices.stakeholder.coverage=100%`（点号格式，已废弃）/ `docs/x.md:L51-L53=…`（双 L 区间，合法写法为 `L51-53`）/ `C1-C10 全通过` / `质量良好` / `评审通过`（裸声明）
+  - **裸声明的现行归因是「格式不符」**：缺 `path:定位=` 形态 → 门禁报 `evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt；行号区间合法写法 path:L51-53=stmt，双 L 非法）`，V 据此补定位形态而非改分数
+  - `空泛声明 / O3 命中` 文案桶须先匹配 `<路径>:<定位>=` 再命中空泛前缀，属语义兜底、**当前不可达**（D-10①）；两条归因都只做 `compositeScore -0.1` 并重判 `qualityLevel` / `passed`
   - evidence 字段为空 → 评审失败
 
 `/wm review <target>` 命令（见 §6）仅返回结构化评审指引——根据目标 ID 识别 `targetKind`，提示对应的子标准集合，并指引外部 Agent 加载 `verifier-spec.md` §8 提示词模板执行评审、再调用校验脚本。命令本身不调用 LLM。
@@ -1162,6 +1163,13 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 
 - **G 角色校验职责**：G 跑门禁脚本前先跑 `check-signature-chain.ts`（R1-R10）；O checkpoint 前须跑签名链校验 + 用户确认签名。
 - **归档**：`signature-chain.jsonl` 须纳入归档完整性强制快照清单（由 `check-archive-integrity.ts` 校验）。
+
+### 7.10 证据导出与 source provenance 边界（2026-09-27，live-run 修复 ⑥/N-7 销项）
+
+> 操作口径的权威复述在 [`AGENTS.md`](../AGENTS.md)「本地生成物与审计证据」节与 [`docs/INSTALL.md`](./INSTALL.md)；schema 结构权威在 [`data-models.md`](../w-model-dev/references/data-models.md)（`evidence-manifest` / `evidence-provenance` 行）。本节登记两条设计决策，防实现漂移。
+
+- **链位置唯一权威（N-7）**：source provenance 生产者（`wm-verify-evidence-source`）与导出白名单（`wm-export-evidence`）**统一接受根级 `.w-model/signature-chain.jsonl` 为权威形态**；`signature-chains/` 复数目录保留为 legacy 兼容读取。根级文件与 legacy 目录**并存即 fail-closed**（`SIGNATURE_CHAIN_AMBIGUOUS`，exit 1）——链位置歧义不作猜测、不取并集；两侧（导出与 verify）共用同一白名单函数保持双向对称。设计依据：全仓约定（`signature-chain-guide.md` / 归档完整性快照清单）一直是根级单文件，producer 侧旧要求复数目录使真实项目导出链整体不可用。
+- **no-git 形态（⑥a）与永久护栏**：无 `.git` 工作区从「`MISSING_GIT_HEAD` exit 1 结构性不可用」改为**显式 `--no-git-ok` 才产出 `provenanceKind='no-git'` 形态**——`commitSha` 置空、以 `workspaceDigest`（导出源文件集合的规范化清单 SHA-256，与 `sourceBundleSha256` 同一清单导出、取值相同）替代 HEAD 身份，`runId`/`user`/`host` 身份字段保留。**该形态永久只能 package-only**：`--source-project` 复验一律拒绝（`NOT_SOURCE_BOUND_NO_GIT`，exit 1）；`verifySourceProvenance` 的返回值自述（含 `allowNoGitRecord` 本地一致性例外路径）与 `wm-export-evidence` 成功摘要（no-git 包带 `verificationLevel:'package-only'` 键）都不得把它表述为 source-bound / verified source——**全仓不存在把 no-git 记录读成 source-bound 的出口**。设计依据：无 HEAD 可绑定的证据不能主张流程完整性到源码级，宁可降低自述等级也不虚高。
 
 ---
 
@@ -1385,7 +1393,7 @@ npx tsx w-model-dev/scripts/cli/check-artifact-gate.ts [project-dir] --phase=<N>
 阶段 5-8 的 codegraph / coding-plan / archive 门禁与 ChangeScope 绑定（§3.3.1），门禁顺序为：**codegraph 与 coding-plan strict 校验 → artifact gate（聚合）→ 归档（`docs/changes/archive/<日期>-<changeId>/`）→ archive checker（`check-archive-integrity.ts` 的 `codingPlanSnapshot` 条件项）→ 最终 CHECKPOINT**。归档校验是 phase 8 的**后置门**：`check-archive-integrity.ts <archive-dir>` 在归档后单独运行，不在 pre-archive 的 artifact gate 内强制；原后置门 `check-openspec-archive.ts`（opsx:archive 形态）已于 2026-09-21 退役，归档快照改由 archive checker 承担。
 
 - **聚合**：`check-artifact-gate.ts --phase=5..8 --scope=<change-scope.json>` 在常规 RTM / TLA+ / BDD / Cucumber 校验之外先装载 ChangeScope，把 `checkCodegraphQueriesStrict` 与 `checkCodingPlan` 的 violations 并入 `reasons` 与 exitCode——codegraph/coding-plan 失败**不得被 RTM 通过掩盖**。scope 缺失 → 两个 checker 各自 fail-closed（exit 1）；scope 已提供但 Git 绑定失败（`headRef` 过期、变更集合不符等）→ 以 `[scope]` 前缀并入 reasons，且**抑制「未提供 --scope」误导文案**（真实原因指向更新过期 scope，见 `aggregateExternalChecks` 的 `scopeProvidedButFailed`）；scope 文件/JSON/schema 非法 → exit 2。`GATE_JSON` 的 `external` summary 为 `{ codegraph, codingPlan }`：codegraph 的 `passed`/`violationCount`/`provided`/`changeId`/`requiredFileCount`/`coveredFileCount` 与 `codingPlan` 的 `passed`/`violationCount`/`provided`/`changeId`/`changesNames`（相对路径计数，strict 绑定语义下恒为 `[scope.changeId]`）；违规行前缀分别为 `[codegraph]` / `[coding-plan]`。`gate-logic.ts` 的 `ArtifactGateResult` 不再含 `codegraphQueriesValid`/`opsxArtifactsValid`/`openspecArchived` 透传字段（dead externalChecks passthrough 已删除）。
-- **checker 各自可独立跑**（G 子代理定位用）：`check-codegraph-queries.ts <project-root> --phase 5|6|7|8 --scope=<file>`（缺 scope exit 1；查询文件须过 `codegraph-query.schema.json`，同 changeId 异 phase 前缀文件属违规，`queryTimestamp` 晚于 `scopeCreatedAt` 违规，未覆盖的 code/test 变更文件逐文件 violation）；`check-coding-plan.ts <project-root> --phase 5|6|7|8 --scope=<file>`（R1-R6：plan 存在/前缀 → 任务节与验证命令行 → 账本身份与 `Task N: complete` 覆盖 → 任务三件套非空 + review diff → R3×9 + V×3（stage ∈ plan/execute/finalize）→ 归档态快照回退；strict 只校验 scope 绑定的一个 changeId，活动位 `docs/plans/<changeId>.plan.md` 优先，缺失时回退归档位 `docs/changes/archive/<changeId>` 或 `<YYYY-MM-DD>-<changeId>`（**锚定匹配** + 日期前缀日历回读校验，`<changeId>-extra` / 非法日历日不采信；恰一匹配才继续，多匹配 fail-closed），输出 `CODING_PLAN_JSON`）；归档态另由 `check-archive-integrity.ts <archive-dir> [--change-id=<id>]` 覆盖（**显式 `--change-id` 无条件启用** `codingPlanSnapshot` 清单项，不依赖生产者摆放；未传时按归档根恰一 `*.plan.md` 自动派生，零匹配则该条件项整体不适用、多匹配 fail-closed 不猜 changeId；两种入口的输出都含 `snapshotSource` 判定依据），校验 `<changeId>.plan.md` + `progress.md` + `Task N: complete` 三件套，违规以 `[codingPlanSnapshot]` 前缀并入 `missingFiles`；legacy 归档零行为变化）。旧链路 `check-opsx-artifacts.ts` 与其 legacy 纯逻辑 `checkOpsxArtifacts` **已于 2026-09-21 一并退役**（`git rm`：脚本 + self-test 用例 + `samples/opsx-artifacts/` fixture + vitest SUBPROCESS 登记），语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3。
+- **checker 各自可独立跑**（G 子代理定位用）：`check-codegraph-queries.ts <project-root> --phase 5|6|7|8 --scope=<file>`（缺 scope exit 1；查询文件须过 `codegraph-query.schema.json`，同 changeId 异 phase 前缀文件属违规，`queryTimestamp` 晚于 `scopeCreatedAt` 违规，未覆盖的 code/test 变更文件逐文件 violation；2026-09-25 D-6 另按项目实际索引状态校验证据形态声明——索引在盘须 `evidenceKind:'cli'`，无索引须 `'artifact'` + 非空 `degradationReason` + ≥1 条 `alternativeEvidence`，未声明一律 violation）；`check-coding-plan.ts <project-root> --phase 5|6|7|8 --scope=<file>`（R1-R6：plan 存在/前缀 → 任务节与验证命令行 → 账本身份与 `Task N: complete` 覆盖 → 任务三件套非空 + review diff → R3×9 + V×3（stage ∈ plan/execute/finalize）→ 归档态快照回退；strict 只校验 scope 绑定的一个 changeId，活动位 `docs/plans/<changeId>.plan.md` 优先，缺失时回退归档位 `docs/changes/archive/<changeId>` 或 `<YYYY-MM-DD>-<changeId>`（**锚定匹配** + 日期前缀日历回读校验，`<changeId>-extra` / 非法日历日不采信；恰一匹配才继续，多匹配 fail-closed），输出 `CODING_PLAN_JSON`）；归档态另由 `check-archive-integrity.ts <archive-dir> [--change-id=<id>]` 覆盖（**显式 `--change-id` 无条件启用** `codingPlanSnapshot` 清单项，不依赖生产者摆放；未传时按归档根恰一 `*.plan.md` 自动派生，零匹配则该条件项整体不适用、多匹配 fail-closed 不猜 changeId；两种入口的输出都含 `snapshotSource` 判定依据），校验 `<changeId>.plan.md` + `progress.md` + `Task N: complete` 三件套，违规以 `[codingPlanSnapshot]` 前缀并入 `missingFiles`；legacy 归档零行为变化）。旧链路 `check-opsx-artifacts.ts` 与其 legacy 纯逻辑 `checkOpsxArtifacts` **已于 2026-09-21 一并退役**（`git rm`：脚本 + self-test 用例 + `samples/opsx-artifacts/` fixture + vitest SUBPROCESS 登记），语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3。
 
 **`--validate-templates` 模式（模板漂移校验）**：`check-artifact-gate.ts` 支持 `--validate-templates` 独立模式，按 `gate-logic.ts` 的 `PHASE_SPEC_LAYOUT` 校验技能包自身 `templates/` 资产是否含必需结构标记（SSOT 头 / 引用块 / DoD 节），用于检出模板漂移。该模式校验对象是技能包自身 `templates/` 目录（相对脚本定位，与 project-dir 无关），独立分支：不读 RTM、不受 `--phase` 影响，violations 非空 → 退出码 1。支持 `--json` 输出机器可读报告（`type: 'templates'`）。
 
@@ -1920,6 +1928,7 @@ interface RunLogEntry {
 - **预算检查不替代门禁脚本**（反模式 #3/#6）：预算超限触发的是暂停/告警，不是放行/否决；放行仍由 G 子代理退出码决定。
 - **kill switch 是暂停不是终止**：触发 kill switch 后须 🔴 CHECKPOINT 展示消耗明细，由用户决定增预算/降范围/取消。
 - **run-log 是 append-only**：不得修改历史记录；运行时读取可跳过损坏行并记录 note，但门禁对空/坏行 **fail-closed**（见 §10D.8），不得把坏行静默当作证据缺失放行。
+- **run-log 时间戳真值 + 禁止回溯改写（D-5①，反伪造）**：run-log 记录的时间戳必须为**写入时刻真值**；**禁止回溯改写历史行或重排时间戳**（改时间戳 / 改 note / 删行 / 插行后重排时间轴同样禁止——R7 的记录哈希链与放行锚正是为检出这类改写而设）；记录修正**只允许**经 O 侧统一追加器 `wm-append-runlog` **追加更正记录**——`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin --correct=<runId>`（更正记录 `note` 含 `correction-of:<runId>`，历史行逐字节不变），不得手改历史行；禁令与替代动作成对，手搓改行不是合法路径。追加器另强制时间戳严格递增（`now < 末条` 默认退出码 1 拒绝；`--timestamp=<iso>` / `--allow-clock-adjust=<reason>` 为显式逃生口且分别在 note 留 `clock-injected:` / `clock-adjust:` 痕迹，绝不静默）。
 
 ### 10D.7 预算与运行日志强制校验项（check-budget.ts / check-run-log.ts）
 
@@ -1929,12 +1938,12 @@ interface RunLogEntry {
 - **预算更新时戳**：每个阶段门放行前，`budget.json.updatedAt` 须更新为当前时间戳（证明预算检查已执行，非沿用历史值）；未更新 → `check-budget.ts` 退出码 1。
 - **killSwitch 告警**：killSwitch 任一触发条件满足（`consecutiveReworks` / `budgetBurnRate` / `tlaReworks`）时须产出告警（run-log 记录 + 🔴 CHECKPOINT 展示消耗明细），不得静默；`check-budget.ts` 校验 killSwitch 触发但 run-log 无对应告警记录 → 退出码 1。
 - **killSwitch 返工计数口径（D-4a，对齐真实事件）**：`check-budget.ts` 的 `reworkCount` 按**真实事件**累计——`action ∈ {rework, fix, emergency-fix}` **或** `outcome ∈ {fail, rework}` 的记录各计 1 条（`countReworks` 已导出以供测试）；它是「返工事件 + 未过门事件」的**累计**条数而非「连续 N 轮返工」的滑动窗口，`consecutiveReworks` 实际约束的是本阶段累计阈值（字段名沿用 schema，语义以本口径为准）；若提供 `--phase=N` 则只统计 `phase===N` 的记录。`tlaReworkCount` 为其中 note/target 含 TLA 的子集（未扩大 tla 判据：非返工记录即使提及 TLA 也不计入）。背景：真实 8 阶段调测的 run-log 中 `action=rework` 一条都没有（返工以 fix/fail 记录），旧口径只数 `action=rework` 会让护栏静默失灵。
-- **用量实效校验 R6 + burnRate 告警 R5-b（D-4b）**：预算配置合法 ≠ 用量在预算内。`check-budget.ts --run-log=<path>` 从 run-log 累计 tokens（只计有限非负数的 `tokens` 字段，NaN/Infinity/负数/字符串/缺字段一律剔除，否则 Σ 变 NaN 而判定静默永不触发），Σtokens(阶段) 严格大于 `perPhase.maxTokens` 或 Σtokens(全量) 严格大于 `project.maxTokensTotal` → **blocking（退出码 1）**（消息以 `R6：` 开头并附超限占比；恰等于上限不算超限）；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` → killSwitch 用量告警（消息以 `R5-b：` 开头，与 R5 既有返工/TLA 文案区分——R5 既有文案逐字不变）。未提供 `--run-log` 时 R5 触发检测与 R6/R5-b 一并跳过（行为与新增前一字不变）；提供了但 Σtokens=0（无 `tokens` 记录）时输出「R6 未生效」非阻断警告（跳过不等于通过）。
+- **用量实效校验 R6 + burnRate 告警 R5-b（D-4b）**：预算配置合法 ≠ 用量在预算内。`check-budget.ts --run-log=<path>` 从 run-log 累计 tokens（只计有限非负数的 `tokens` 字段，NaN/Infinity/负数/字符串/缺字段一律剔除，否则 Σ 变 NaN 而判定静默永不触发），Σtokens(阶段) 严格大于 `perPhase.maxTokens` 或 Σtokens(全量) 严格大于 `project.maxTokensTotal` → **blocking（退出码 1）**（消息以 `R6：` 开头并附超限占比；恰等于上限不算超限）；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` → killSwitch 用量告警（消息以 `R5-b：` 开头，与 R5 既有返工/TLA 文案区分——R5 既有文案逐字不变）。**未接线诊断（D-5②/N-6）**：未提供 `--run-log` 时 R5 触发检测与 R6/R5-b 一并跳过（退出码行为与新增前一字不变），但**不再静默**——CLI 输出「`R6/R5-b 未生效（未提供 run-log）`」非阻断诊断（跳过不等于通过）；提供了但 Σtokens=0（无 `tokens` 记录）时输出「R6 未生效」非阻断警告。**权威调用表必带（D-5②）**：阶段门调用 `check-budget.ts` 须带 `--run-log=.w-model/run-log.jsonl --phase=N`（权威表见 `operational-recovery.md`「调用时机表」/ `subagent-delegation.md` / `toolbox.md`），不带接线属未接线运行。**Σtokens 上界口径 + R3 归账（D-5②/N-6）**：Σtokens 是**上界**而非精确消耗——同一分派的多条归账会重复累计（典型：R3 三维度按 preventive-reviews 三条目各归账一次，三条 = 三倍）；「同 `(timestamp, tokens, duration_s)` 出现多于一条」的组以「疑似重复归账」非阻断诊断提示（不改退出码），判超限（R6/R5-b）一律按上界口径执行。
 - **运行日志 4 类动作完备**：每个阶段 run-log.jsonl 须含 `chunk` / `cross` / `gate` / `checkpoint` 4 类动作记录（阶段 1–4 ingestion 含 `chunk`/`cross`；所有阶段含 `gate`/`checkpoint`）；缺类 → `check-run-log.ts` 退出码 1。
 - **返工须有 rework 记录**：任一返工发生后，run-log 须追加 `action=rework` 记录（`note` 填原因）；返工发生但无 `rework` 记录 → `check-run-log.ts` 退出码 1。
 - **R8 相对顺序约束（同生命周期段内动作链序）**：`check-run-log.ts` 对 phase 8 按 identity segment 校验 **S-fix → R3×3 → implementation V → implementation G → checkpoint**，rootcause R/V/G 不混入实现链；legacy 缺身份记录输出 `LEGACY_UNSCOPED`/deferred，不用 phase-wide 首索引、最近记录或集合数量补齐。其他阶段保留兼容的阶段级轨迹校验。真实顺序缺失仍返回退出码 1。
 - **编排质量指标（orchestrationQuality，只读统计，不加门禁）**：`metrics-report.ts` 在 7 区度量基础上新增 `orchestration` 子区，统计编排质量信号——`r3`（R3 预防性审查套数 / 维度分布 / findings 严重度分布，数据源 `.w-model/preventive-reviews/`）、`iceberg`（冰山扫掠轮次分布 / 新发现计数 / 严重度分布，数据源 `.w-model/iceberg/`）、`reworkHints`（V 审查返工提示密度，数据源 run-log 本身）。`r3`/`iceberg` 数据源缺失时对应子区为 `null`（不告警、不阻断）；该指标仅供汇报与诊断，不参与任何门禁放行判定。
-- **强制校验脚本**：`check-budget.ts`（预算更新时戳 + killSwitch 告警）与 `check-run-log.ts`（4 类动作 + rework 记录 + §10E 交叉校验）须在每个阶段门由 G 子代理执行；任一退出码 ≠ 0 → O 不得放行（反模式 #3/#6/#9 守护）。闭环五脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）是否真的在每个阶段门跑过，由 `check-run-log` R11 机器核验（2026-09-18）：凡有 `action=checkpoint` 且 `outcome=success` 放行的阶段，放行前须已有五条 `role=G` / `outcome=success` / `gateExitCode=0` 的闭环脚本 gate 记录且**严格早于**放行（同秒不算，无时间戳豁免；无放行的 run 不触发）。
+- **强制校验脚本**：`check-budget.ts`（预算更新时戳 + killSwitch 告警）与 `check-run-log.ts`（4 类动作 + rework 记录 + §10E 交叉校验）须在每个阶段门由 G 子代理执行；任一退出码 ≠ 0 → O 不得放行（反模式 #3/#6/#9 守护）。闭环五脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）是否真的在每个阶段门跑过，由 `check-run-log` R11 机器核验（2026-09-18）：凡有 `action=checkpoint` 且 `outcome=success` 放行的阶段，放行前须已有五条 `role=G` / `outcome=success` / `gateExitCode=0` 的闭环脚本 gate 记录且**严格早于**放行（同秒不算，无时间戳豁免；无放行的 run 不触发）。**历史日志兼容例外（D-6）**：`phase===1` × `check-checkpoint.ts` 的后置窗口（晚于本放行、早于下一放行；无下一放行则窗口无上界；同秒不算合格）是该严格判据的**唯一例外**，且仅为**历史日志兼容**保留——它只兼容以旧时序（先写放行记录、后补 `check-checkpoint.ts` gate 记录）写入的历史 run-log，删除会使这些历史日志变红；E-2 方案 B 落地后的新建项目走自然时序「确认落盘 → 闭环五门 → 放行记录末条」**不应产生该形态**（后置形态仍被 R8 轨迹模板拦截）；`phase>=2` 无此例外。
 
 ### 10D.8 R3 证明路径矩阵与角色分派精确语义（2026-09-04 audit-gate-closure）
 
@@ -1944,7 +1953,13 @@ interface RunLogEntry {
 | ---------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | standard（阶段级）                             | 常规 S 产出（produce / 各阶段产物）                    | 该阶段 run-log 含 role=R + outcome=success 的 `r3-completeness`/`r3-reliability`/`r3-security` 各 ≥1 条（每条维度唯一，重复维度不充数）+ 三份 preventive-review JSON 齐备 | `check-role-dispatch.ts`（三维度缺口即 fail）+ `check-preventive-review.ts`            |
 | fix / emergency-fix（run-log identity window） | S-fix 返工 / 紧急修复通道                              | run-log 同身份窗口内（`S-fix → R3×3 → implementation V/G`，§10D.3 D8）role=R 三维度各 ≥1 条 success + 对应 variant（fix / emergency-fix）的 preventive-review JSON        | `check-run-log.ts` R8 段内校验 + `check-preventive-review.ts --variant=fix\|emergency` |
-| 编码链 stage（9+3 文件）                       | superpowers 编码链三段式（plan/execute/finalize）项目级 stage 审查 | `.w-model/r3-reviews/phase<N>-<stage>-{completeness,reliability,security}.md` 9 份 + `.w-model/v-reviews/phase<N>-<stage>.md` 3 份                                        | `check-coding-plan.ts` R5（strict 绑定 changeId 时一并校验）                           |
+| 编码链 stage（9+3 文件）                       | superpowers 编码链三段式（plan/execute/finalize）项目级 stage 审查 | `.w-model/r3-reviews/phase<N>-<stage>-{completeness,reliability,security}.md` 9 份 + `.w-model/v-reviews/phase<N>-<stage>.md` 3 份（**非空为阻断下限**，0 字节即违规；行级证据锚 `path:Lnn=` / `path:§sec=` 为**非阻断诊断**，不阻断历史产物） | `check-coding-plan.ts` R5（strict 绑定 changeId 时一并校验；`--preflight` 只读列出固定 14 项清单，不改判据） |
+
+**编码链双轨契约（2026-09-25 任务 2 / D-2 + N-2，清单化约定——两门互不替代）**：
+
+- **stage 级 12 份 MD**（`check-coding-plan.ts` R5，`--phase=5|6|7|8` strict 绑定 changeId）：9 份 `.w-model/r3-reviews/phase<N>-<stage>-<dim>.md`（stage ∈ plan/execute/finalize，dim ∈ completeness/reliability/security）+ 3 份 `.w-model/v-reviews/phase<N>-<stage>.md`；每份**非空**（`size > 0`）为阻断下限，行级证据锚仅为 CLI stderr 诊断；缺失/0 字节即 exit 1，无降级形态。
+- **phase 级三份 JSON**（按 `preventive-review.schema.json`，由 `check-preventive-review.ts` 校验）：`.w-model/preventive-reviews/<N>-<dim>.json`（standard；S-fix / emergency / ingest 走 `-fix-` / `-emergency-` / `-ingest-` 变体路径）；`passed=false ⇒ findings ≥1` 由 schema 强制。
+- **不可互替**：stage 级 MD 证「每段审查跑过」（内容下限 + 命名锚定），phase 级 JSON 证「三维度结论与 findings」（schema 校验）；前者不校验 findings 结构，后者不承载 stage 粒度（合并双轨会丢 `passed=false ⇒ findings ≥1` 与反模式 #33 的机器挂点，已被 §3 WS-2 方案 B 否决）。生产者在 S 产出前可用 `check-coding-plan.ts --preflight` 一次性对齐固定 14 项清单（9 R3 + 3 V + plan + 账本；变长任务三件套/review diff 单列 `artifacts` 不计数）。
 
 **role-dispatch 精确语义**（`check-role-dispatch.ts` / `role-dispatch-logic.ts`）：
 
@@ -2203,7 +2218,7 @@ interface RunLogEntry {
 
 - **脱敏**：`lib/code-health-redaction.ts` 对 campaign artifact 输出 `status`（`not_reviewed` / `clean` / `blocked`）、`rules` 与 `blockedReasons`；`blocked` 的产物不得导出。
 - **19 项 pre-push 不变**：code-health CLI 不纳入 `.githooks/pre-push`，现有 19 项检查、顺序与 exit 语义原样保留。
-- **codegraph 前置（约束 #14）**：进入阶段 5–8 的代码修改前须先做 codegraph 影响分析并落盘 `.w-model/codegraph-queries/`；本仓库 checkout 无 `.codegraph/` 索引，code-health Phase 1–4 不消费 codegraph，也不得伪造查询记录。
+- **codegraph 前置（约束 #14）**：进入阶段 5–8 的代码修改前须先做 codegraph 影响分析并落盘 `.w-model/codegraph-queries/`；本仓库 checkout 无 `.codegraph/` 索引，code-health Phase 1–4 不消费 codegraph，也不得伪造查询记录。**合法降级与伪造的界线（2026-09-25 D-6）**：无索引时记录须显式降级（`evidenceKind:'artifact'` + 非空 `degradationReason` + ≥1 条 `alternativeEvidence[{command, evidencePath}]`）；索引在盘时只允许 `evidenceKind:'cli'`，此时降级声明或未声明即「伪造查询记录」（门禁探测项目实际索引状态判定，不看记录自述）。
 
 ### 10K.6 campaign 归档（已实现）
 
@@ -2256,22 +2271,28 @@ interface RunLogEntry {
 - **R15e 契约**：须存在**同一**签名链条目同时满足 —— `role=V` 且 `action=review`；其 `artifacts` 含该节点 id；
   其 `inputProvenance.sourceArtifacts[].path` 等于锚点 `path` 部分。"审过该节点"与"核验过该锚点"是两件事，二者须同时成立。
 
-### 10L.3 冰山扫掠分母对账（三视角平权）
+### 10L.3 冰山扫掠分母对账（设计 ID 分池）
 
 - **分母来源**：`newFindings: []` 此前即可通过，且 `sweptArtifacts` 允许空数组，导致「最省事的报告」与
   「最彻底的报告」不可区分。分母（该扫多少）改由 checker 从**上游已放行产物实测**，不由 R 声明——
   声明式分母只是把自证从"自报发现了什么"换成"自报该发现多少"。
 - **注入约定**：`check-iceberg-sweep.ts` 读盘后经 `externalEvidence.viewSets` 注入（与 §10L.2 的 R15c/R15e 同构）；
   `iceberg-sweep-logic.ts` 保持纯函数。
-- **派生口径**：三份产物的**最窄公共命名空间** `SD-NNN / DD-NNN / INTF-NNN`——
-  graph 取节点 `id`、tla 取 `sdCoverage.coveredSdNodes`、rtm 取各行 `designDoc` 解析值；
-  阶段 5-8 的 `scope` 视角取 `change-scope.json` 的 `changedFiles`。**刻意不含 REQ/NFR/CON**（TLA 侧无此命名空间，混入制造结构性假阳性）。
+- **派生口径（分池，D-1/N-1）**：视角命名空间宽度不同，故按 `VIEW_NAMESPACE` 分池而非同池精确比对——
+  **宽池 `design-wide`**（graph 取节点 `id`、rtm 取各行 `designDoc` 解析值）抽 `SD-NNN / DD-NNN / INTF-NNN` 全量，两两精确相等；
+  **窄池 `design-sd`**（tla 取 `sdCoverage.coveredSdNodes`）与宽视角的 **SD 切片双向相等**（超出与漏项均报）：跨命名空间的 DD/INTF 宽度差不构成差异，
+  但窄池漏 SD 不豁免——该方向的守护分工为「阶段 1-4 由 `check-tla-model` 强制 `sdCoverage.uncoveredSdNodes` 为空并与 `graphSdNodes` 交叉校验，
+  **阶段 5-8 该门不再复检该不变量**（`SKILL.md:99`：`check-tla-model` 仅阶段 1-4 列入 G 门禁），故阶段 5-8 由 R6 窄池双向判据守护」；
+  **path 命名空间**（阶段 5-8 的 `scope` 取 `change-scope.json` 的 `changedFiles`）**不参与** R6/R8 的集合比对
+  （与设计 ID 同池比对时，change-scope 在盘即结构性必红）。**刻意不含 REQ/NFR/CON**（TLA 侧无此命名空间，混入制造结构性假阳性）。
 - **在场表**：`ICEBERG_VIEW_PRESENCE`（**代码常量，非文档**——写文档会与实现漂移，先例见 `subagent-delegation.md` 计数漂移）。
   取值待端到端调测按各阶段实际产出物核定。
-- **三视角平权**：graph / TLA / RTM 等权，两两比对，任一差异即刻失败；**无主视角、不仲裁、不取并集后放行**
-  （取并集会把真实缺口洗成"已覆盖"）。
-- **三类失败信号**：R6 视角间差异（→ 普通 V/G 失败链由 R 定位）/ R7 视角缺席未在 `sweepCoverage.absentViews` 显式声明
-  （**禁止静默跳过**；产物缺失时**不合成空集合**，空集合会被当作"真的一致"放行）/ R8 零发现但收敛集合为空或 `sweptArtifacts` 未覆盖。
+- **分池对账**：宽池等权（graph / RTM），池内任一差异即刻失败；**无主视角、不仲裁、不取并集后放行**
+  （取并集会把真实缺口洗成"已覆盖"）；窄池（TLA）按 SD 切片相等，两个方向（超出宽集 / 漏 SD）均报。
+- **三类失败信号**：R6 视角间差异（分池后池内差异，标注 `R6[design-wide]` / `R6[design-sd]` → 普通 V/G 失败链由 R 定位）/
+  R7 视角缺席未在 `sweepCoverage.absentViews` 显式声明
+  （**禁止静默跳过**；产物缺失时**不合成空集合**，空集合会被当作"真的一致"放行）/
+  R8 零发现但收敛集合为空或 `sweptArtifacts` 未覆盖（**收敛集只取设计 ID 视角的并集**，`scope` 的文件路径不进入）。
 - **schema 强化**：`sweepCoverage.sweptArtifacts` 加 `minItems: 1`；新增可选 `sweepCoverage.absentViews`。
 
 ### 10L.4 三类评审偏移检测（权威定义）

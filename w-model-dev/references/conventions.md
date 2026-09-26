@@ -72,6 +72,11 @@
 - **规范定义**：CHECKPOINT 用户确认的决策数组，须含 ID 模式（REQ-NNN / INTF-NNN）或技术关键词（接口/状态机/不变式等），「同意」「确认」视为空（check-checkpoint R2）。
 - **_Avoid_**：decisions/确认项/决策列表（字段名必须为「acknowledgedDecisions」）。
 
+### operationalFailureModes（RunLogEntry）
+
+- **规范定义**：RunLogEntry 的可选字段，O 系列运维失败模式（`O1`~`O6`）的**机器可读标注**数组（枚举取值、`uniqueItems`）；`check-maturity.ts` R5 的唯一真值通道。`note` 中的 O1~O6 字样视为引用（含评审规则编号同名情形，如 O3 既是运维失败模式也是 V 门禁 evidence 扣分规则名），不计入 R5，仅触发非阻断引用诊断。
+- **_Avoid_**：note 标注/O 命中/失败模式列表（字段名必须为「operationalFailureModes」；不得用 note 词法命中作为 R5 判据）。
+
 ### 3. 工程资产相关
 
 ### codeModule
@@ -116,7 +121,7 @@
 
 ### exit-2 脚本口径
 
-- **规范定义**：`scripts/cli/` 下全部脚本除 `self-test.ts`（回归基线，exit 0/1）外均为 exit 2 结构化错误脚本：= 45（27 个 check-* + 18 个工具 CLI（含 7 个 code-health 门禁 CLI），不含 self-test；含 review-package.ts / wm-export-evidence.ts / wm-verify-evidence-source.ts / check-pollution.ts / check-coverage-scope.ts）；计数由 docs-consistency 的真实输入错误契约探针得出（AGENTS.md「45 个脚本」与本句由 checkConventionsExit2Count 双向兜底），不维护固定补数。
+- **规范定义**：`scripts/cli/` 下全部脚本除 `self-test.ts`（回归基线，exit 0/1）外均为 exit 2 结构化错误脚本：= 46（27 个 check-* + 19 个工具 CLI（含 7 个 code-health 门禁 CLI），不含 self-test；含 review-package.ts / wm-export-evidence.ts / wm-verify-evidence-source.ts / wm-append-runlog.ts / check-pollution.ts / check-coverage-scope.ts）；计数由 docs-consistency 的真实输入错误契约探针得出（AGENTS.md「46 个脚本」与本句由 checkConventionsExit2Count 双向兜底），不维护固定补数。
 - **_Avoid_**：称 self-test 为 exit-2 脚本 / “31 个脚本”之类过期计数（见 [docs-consistency-logic.ts](../scripts/logic/docs-consistency-logic.ts) 的 EXPECTED）。
 
 ### 普通 V/G 失败链
@@ -154,7 +159,7 @@ path:§3.2,L42       （章节+行号混合）
 
 > 本格式同时是 `graph.json` 节点可选字段 `evidenceAnchor`（产出期证据锚点）的格式权威（见术语表 evidenceAnchor 条目）。
 
-格式：`path:§section=statement` 或 `path:L42=statement`
+格式：`path:§section=statement` 或 `path:L42=statement` 或 `path:L42-58=statement`（行号区间，**单 L 形态**）
 
 ```
 合法示例：
@@ -164,7 +169,8 @@ path:§3.2,L42       （章节+行号混合）
 
 非法示例：
   coverage.json.matrices.stakeholder.coverage=100%  （点号格式，已废弃）
-  C1-C10 全通过                                       （空泛声明）
+  docs/x.md:L51-L53=…                                （双 L 区间；合法写法为 L51-53）
+  C1-C10 全通过                                       （裸声明 → 现行归因「格式不符」；空泛声明/O3 桶为语义兜底、当前不可达）
   system-design.md                                    （无定位）
 ```
 

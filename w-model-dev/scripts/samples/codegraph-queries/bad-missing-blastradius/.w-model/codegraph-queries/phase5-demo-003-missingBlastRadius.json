@@ -2,5 +2,13 @@
   "querySymbol": "CacheService.invalidate",
   "callers": ["ArticleController.handleUpdate"],
   "callees": [],
-  "queryTimestamp": "2026-07-30T10:00:00Z"
+  "queryTimestamp": "2026-07-30T10:00:00Z",
+  "evidenceKind": "artifact",
+  "degradationReason": "样本目录无 .codegraph/ 索引（codegraph CLI 未初始化），以制品级查询记录替代",
+  "alternativeEvidence": [
+    {
+      "command": "codegraph query CacheService.invalidate",
+      "evidencePath": ".w-model/codegraph-queries/phase5-demo-003-missingBlastRadius.json"
+    }
+  ]
 }

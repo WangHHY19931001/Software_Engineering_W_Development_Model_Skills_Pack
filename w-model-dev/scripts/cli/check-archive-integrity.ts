@@ -18,17 +18,20 @@
  * 锚定 `<changeId>.plan.md`（缺失即 exit 1）。未传时维持既有自动派生行为，并在输出注明判定依据。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir> [--change-id=<id>]
+ *   npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir> [--change-id=<id>] [--live-run-log=<path>]
  *
  * 参数：
  *   archive-dir   归档目录路径
  *   --change-id=<id>  显式声明本归档目录所属 changeId（仅等号形态）；与自动派生互斥，显式优先
+ *   --live-run-log=<path>  live run-log.jsonl 路径（仅等号形态，D-3b/L4）：提供时校验归档快照
+ *                      `run-log.jsonl` 是 live 的**字节前缀**，否则 `[runLogPrefix]` 并入 missingFiles
+ *                      （blocking / exit 1）；**未提供时只输出非阻断诊断**（退出码语义不变）
  *   --json        机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
  *   0  校验通过
- *   1  完整性缺失（missingFiles 列出缺失文件）
- *   2  输入错误（目录不存在）
+ *   1  完整性缺失（missingFiles 列出缺失文件；含 [runLogPrefix] 归档前缀性违规）
+ *   2  输入错误（目录不存在 / --live-run-log 路径不存在或参数非法）
  *
  * 输出：
  *   stdout 打印结构化校验报告（人类可读 + 收尾 ARCHIVE_INTEGRITY_JSON 摘要，便于 Agent 正则截取）
@@ -92,7 +95,7 @@ async function main(): Promise<void> {
       rule: 'P0-1',
       message: '参数缺失 <archive-dir>',
       detail:
-        '用法: npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir> [--change-id=<id>] [--json]',
+        '用法: npx tsx w-model-dev/scripts/cli/check-archive-integrity.ts <archive-dir> [--change-id=<id>] [--live-run-log=<path>] [--json]',
       exitCode: 2,
     });
     return;
@@ -110,6 +113,18 @@ async function main(): Promise<void> {
     return;
   }
 
+  // L4（D-3b）同款形态约束：裸 --live-run-log 的值会被位置参数扫描吞掉（被当作 <archive-dir>）
+  if (argv.includes('--live-run-log')) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: '--live-run-log 仅支持等号形态（--live-run-log=<path>）',
+      detail: '空格形态会把值当作 <archive-dir> 位置参数，故拒绝；用法: --live-run-log=<path>',
+      exitCode: 2,
+    });
+    return;
+  }
+
   // 显式 changeId（I-4）：不依赖生产者摆放，无条件启用 codingPlanSnapshot 并锚定 <changeId>.plan.md。
   // 值 flag 只允许等号形态；重复出现由 parseFlagValue 抛 DuplicateFlagError（runMain → ARG_INVALID / exit 2）。
   const explicitChangeId = parseFlagValue(argv, 'change-id');
@@ -119,6 +134,19 @@ async function main(): Promise<void> {
       rule: 'P0-1',
       message: '--change-id 取值不得为空',
       detail: '用法: --change-id=<changeId>（如 --change-id=phase5-demo）',
+      exitCode: 2,
+    });
+    return;
+  }
+
+  // L4（D-3b）：live run-log 路径（仅等号形态；重复出现由 parseFlagValue 抛 DuplicateFlagError → exit 2）
+  const explicitLiveRunLog = parseFlagValue(argv, 'live-run-log');
+  if (explicitLiveRunLog !== undefined && explicitLiveRunLog.trim() === '') {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: '--live-run-log 取值不得为空',
+      detail: '用法: --live-run-log=<path>（如 --live-run-log=.w-model/run-log.jsonl）',
       exitCode: 2,
     });
     return;
@@ -163,7 +191,46 @@ async function main(): Promise<void> {
       // progress.md 缺失或不可读 → 不设 progressMdContent，清单校验按缺失/未提供内容报违规
     }
   }
-  const result = checkArchiveIntegrity(contents, undefined, manifest);
+  // L4（D-3b）归档前缀性：显式声明 --live-run-log 时实读**两侧**文本（logic 层零 fs → 文本注入）。
+  // live 侧路径由调用方显式给出：不存在/不可读是**输入错误**（exit 2），不得静默降级为「未提供」；
+  // 归档侧 run-log.jsonl 缺失/不可读则不设文本，由前缀性校验 fail-closed 报 [runLogPrefix]。
+  let liveRunLogAbs: string | undefined;
+  let runLogPrefix: { liveRunLogText: string; archivedRunLogText?: string } | undefined;
+  if (explicitLiveRunLog !== undefined) {
+    liveRunLogAbs = path.resolve(explicitLiveRunLog);
+    let liveText: string;
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- live 路径来自 CLI 显式参数并 path.resolve 归一（读取调用方显式声明的输入是本工具契约）
+      liveText = await fs.readFile(liveRunLogAbs, 'utf-8');
+    } catch {
+      exitWithError({
+        category: 'FILE_NOT_FOUND',
+        rule: 'P0-2',
+        message: 'live run-log 文件不存在或不可读',
+        file: liveRunLogAbs,
+        exitCode: 2,
+      });
+      return;
+    }
+    let archivedText: string | undefined;
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path 由受控 archiveAbs（main 入参 resolve 后）拼接的固定子路径
+      archivedText = await fs.readFile(path.join(archiveAbs, 'run-log.jsonl'), 'utf-8');
+    } catch {
+      // 归档快照缺失/不可读 → 不设文本（fail-closed 由 [runLogPrefix] 承担）
+    }
+    runLogPrefix = {
+      liveRunLogText: liveText,
+      ...(archivedText !== undefined ? { archivedRunLogText: archivedText } : {}),
+    };
+  }
+  const result = checkArchiveIntegrity(contents, undefined, manifest, runLogPrefix);
+  const prefixSource =
+    liveRunLogAbs === undefined
+      ? '未提供 --live-run-log（跳过归档 run-log 前缀性校验，非阻断）'
+      : result.missingFiles.some((missing) => missing.includes('[runLogPrefix]'))
+        ? `已校验（--live-run-log=${liveRunLogAbs}）：✗ 归档前缀性未通过（非前缀 / 非记录边界（中途截断）/ 空快照，详见 missingFiles 的 [runLogPrefix] 条目）`
+        : `已校验（--live-run-log=${liveRunLogAbs}）：归档 run-log.jsonl 是 live 的记录边界前缀`;
   const exitCode = result.passed ? 0 : 1;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
@@ -175,6 +242,7 @@ async function main(): Promise<void> {
         reasons: result.missingFiles,
         violations: buildViolationDistribution(result.missingFiles.length),
         snapshotSource,
+        runLogPrefix: prefixSource,
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -190,6 +258,7 @@ async function main(): Promise<void> {
   console.log(`文件数            : ${contents.size}`);
   console.log(`校验阶段          : ${result.checkedPhases.join(', ')}`);
   console.log(`快照判定依据      : ${snapshotSource}`);
+  console.log(`归档前缀性        : ${prefixSource}`);
   console.log(`校验结果          : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
