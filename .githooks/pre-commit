@@ -671,7 +671,7 @@ fi
 prettier_targets=()
 for staged_path in "${staged_array[@]}"; do
   case "$staged_path" in
-    *.md|docs/index.html|docs/changes/*|eval/*|w-model-dev/scripts/samples/*|w-model-dev/templates/*) continue ;;
+    *.md|docs/index.html|docs/changes/*|docs/debug/*|eval/*|w-model-dev/scripts/samples/*|w-model-dev/templates/*) continue ;;
   esac
   prettier_targets+=("$snapshot_dir/$staged_path")
 done

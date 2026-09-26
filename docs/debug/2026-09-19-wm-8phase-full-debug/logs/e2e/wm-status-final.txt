@@ -1,0 +1,22 @@
+npm warn Unknown user config "home". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+════════════════════════════════════════════════════════════
+/wm status（项目状态快照）
+════════════════════════════════════════════════════════════
+项目状态      : 项目完成
+当前阶段      : 8 / 8
+完成进度      : 8/8（100%）
+updatedAt     : 2026-09-19T03:00:00+08:00
+RTM 覆盖率    : 0/4（0%）
+四级测试      :
+  单元 3/3（failed=0, pending=0）
+  集成 2/2（failed=0, pending=0）
+  系统 2/2（failed=0, pending=0）
+  验收 2/2（failed=0, pending=0）
+最近动作      :
+  [8] gate · G · success · exit=0 · 2026-09-19T05:42:00Z
+  [8] gate · G · success · exit=0 · 2026-09-19T05:43:00Z
+  [8] checkpoint · O · success · 2026-09-19T05:44:00Z
+下一步建议    :
+  - 8 阶段全部完成：可运行 check-artifact-gate --phase=8 终检确认，或进入归档流程
+────────────────────────────────────────────────────────────
+STATUS_JSON {"phase":8,"completedPhases":8,"progress":"8/8（100%）","status":"项目完成","updatedAt":"2026-09-19T03:00:00+08:00","rtmCoverage":{"covered":0,"total":4,"percent":0},"testSummary":{"unit":{"total":3,"passed":3,"failed":0,"pending":0},"integration":{"total":2,"passed":2,"failed":0,"pending":0},"system":{"total":2,"passed":2,"failed":0,"pending":0},"acceptance":{"total":2,"passed":2,"failed":0,"pending":0}},"recentActions":[{"runId":"p8-c-c","timestamp":"2026-09-19T05:42:00Z","phase":8,"action":"gate","role":"G","outcome":"success","gateExitCode":0},{"runId":"p8-c-pr","timestamp":"2026-09-19T05:43:00Z","phase":8,"action":"gate","role":"G","outcome":"success","gateExitCode":0},{"runId":"p8-cp","timestamp":"2026-09-19T05:44:00Z","phase":8,"action":"checkpoint","role":"O","outcome":"success","gateExitCode":null}],"nextSteps":["8 阶段全部完成：可运行 check-artifact-gate --phase=8 终检确认，或进入归档流程"]}
