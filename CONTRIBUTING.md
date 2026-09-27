@@ -4,7 +4,7 @@
 
 ### Source-bound provenance 边界
 
-`evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。`npm run wm:export-evidence -- <project-dir> <output-dir>` 只从 `.w-model` 下的 `gate-logs/`、`verifier-outputs/`、`signature-chains/`（legacy 形态）、根级 `signature-chain.jsonl`（权威形态）、`codegraph-queries/` 和 `run-log.jsonl` 白名单导出（两者并存时链位置歧义 → fail-closed `SIGNATURE_CHAIN_AMBIGUOUS`）；项目源码、`.zcode/`、`coverage/`、未白名单运行时文件和 `docs/changes/archive/` 不属于当前运行证据。JSON/JSONL/Markdown 会清理敏感字段与绝对路径，manifest 记录稳定相对路径、kind、SHA-256 和 package manifest hash；CLI 成功输出只显示脱敏占位路径。`wm-export-evidence --verify` 在没有 `--source-project` 时只能是 package-only；只有传入 `--source-project <project-dir>` 才能执行 source-bound verify。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性；它不是密码学签名，也不是第三方不可抵赖证明。package-only 不能表述为 verified source 证据；导出和 producer+verify 都不会自动 Git 提交或发布。
+`evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性；它不是密码学签名，也不是第三方不可抵赖证明。package-only 不能表述为 verified source 证据；导出和 producer+verify 都不会自动 Git 提交或发布。**导出白名单 / 排除项 / manifest 脱敏形态与 provenance 三形态的判据枚举**见 [command-reference.md](./w-model-dev/references/command-reference.md)「证据 provenance 与导出验证」节及其「Source-bound provenance 边界」节。
 
 ## 行为准则
 

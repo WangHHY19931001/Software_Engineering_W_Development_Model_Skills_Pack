@@ -71,7 +71,7 @@
 **修改前流程**（ChangeScope 绑定，2026-09-04 audit-gate-closure）：
 1. **变更上下文**：阶段 5-8 门禁要求 codegraph 查询与实际变更绑定——S-coding 须维护 ChangeScope manifest（`schemas/change-scope.schema.json`，落盘如 `.w-model/change-scope.json`：`changeId` 含 `phaseN-` 前缀 / `phase` / `baseRef` / `headRef` / `scopeCreatedAt` / `changedFiles`），保证 `headRef=当前 HEAD`、`changedFiles` 与实际 Git 变更集合精确一致（门禁重算比对，不符 fail-closed）
 2. `codegraph query <目标符号>`（codegraph CLI，宿主 MCP 工具为可选加速）→ 查询 callers / callees / blast radius
-3. 落盘结果到 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`：除 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp 外，strict 模式（阶段 5-8 CLI）**必须含 `changeId`（精确等于 scope.changeId）与 `targetFiles`（本次查询服务的变更文件，全部属于 scope.changedFiles；每条查询至少声明一个目标文件）**；`queryTimestamp` 不得晚于 scopeCreatedAt；**另须声明证据形态 `evidenceKind`（索引在盘→`'cli'`；无索引→`'artifact'` + 降级字段，见下「显式降级声明与索引陈旧同步」节）**。记录结构见 `schemas/codegraph-query.schema.json`
+3. 落盘结果到 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`：除 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp 外，strict 模式（阶段 5-8 CLI）**必须含 `changeId`（精确等于 scope.changeId）与 `targetFiles`（本次查询服务的变更文件，全部属于 scope.changedFiles；每条查询至少声明一个目标文件）**；`queryTimestamp` 不得晚于 scopeCreatedAt；**另须声明证据形态 `evidenceKind` 且与索引实际状态一致**（三形态判据与字段枚举见 [`command-reference.md`](command-reference.md)「阶段 5-8 codegraph/coding-plan 门禁 CLI」节的 codegraph checker 条目）。记录结构见 `schemas/codegraph-query.schema.json`
 4. 评估：修改是否波及 callers？是否需同步改 callees？
 5. 安全确认后 `Edit`/`Write` 代码
 6. （可选）修改后再查一次确认影响未意外扩大
@@ -82,10 +82,8 @@
 
 **显式降级声明与索引陈旧同步**（2026-09-25 live-run 修复，D-6）：
 
-- **三态判据（声明须与索引实际状态一致）**：每条查询记录须带 `evidenceKind`——项目根存在 `.codegraph/` 索引时只允许 `'cli'`（CLI 真实执行；**缺声明或 `'artifact'` 一律 violation，禁止降级**）；无索引时只允许 `'artifact'` + 非空 `degradationReason` + ≥1 条 `alternativeEvidence[{command, evidencePath}]`（逐条须含非空两字段）。**未声明 `evidenceKind` 一律 violation**——把「制品口径」从隐形默认变成显式声明，杜绝手工编造的记录（callers/callees/blastRadius 无 CLI 出处）静默通过。
-- **有索引却降级 = 伪造查询记录**：索引在盘说明 CLI 可用，此时降级（或未声明）即 `hard-constraints.md` 明令禁止的「伪造查询记录」；判据由 checker 探测项目实际索引状态（`check-codegraph-queries.ts` 的 `codegraphIndexPresent`）决定，不采信记录自述。
-- **无索引时的先后次序**：先按 `ensure-codegraph.ts` 三层检测处置——CLI 缺失会自动安装，`.codegraph/` 缺失可 `codegraph init` 建索引（这是把路径拉回 `'cli'` 的唯一动作）；确认无法建索引（瞬态工作区 / 受限环境）后才走显式降级，并在 `degradationReason` 写明真实原因；`alternativeEvidence` 须给出可定位的替代证据来源（探测失败输出 + 只读推导依据；`evidencePath` 写真实替代制品形态，如 `docs/plans/phase5-demo.plan.md#任务3`——禁自指查询记录自身，自指不是替代证据），不得写「已授权」之类无出处文本。
-- **索引陈旧同步**：索引在盘但落后于工作树时，`codegraph status` 查看索引统计与陈旧情况，`codegraph sync` 只同步上次索引以来的变更（`codegraph index` 为整树重建）；查询须在同步后的索引上做，否则 callers/callees/blastRadius 反映的是旧代码。
+- **义务摘要**：每条查询记录须带 `evidenceKind` 且**与项目实际索引状态一致**——有索引时只允许 `'cli'`（此时降级或未声明即 `hard-constraints.md` 明令禁止的「伪造查询记录」）；无索引时只允许**显式降级**（声明 + 降级理由 + 可定位的替代证据），**未声明一律 violation**（把「制品口径」从隐形默认变成显式声明，杜绝手工编造的记录静默通过）。**三形态字段名、替代证据的自指禁令与判据枚举**（checker 探测索引状态、不采信记录自述）见 [`command-reference.md`](command-reference.md)「阶段 5-8 codegraph/coding-plan 门禁 CLI」节的 codegraph checker 条目。
+- **先后次序**：索引缺失时先按 `ensure-codegraph.ts` 三层检测把路径拉回 `'cli'`（CLI 缺失自动安装、`.codegraph/` 缺失可 `codegraph init` 建索引）；确认无法建索引（瞬态工作区 / 受限环境）才走显式降级，理由写明真实原因、替代证据须真实可定位，不得写「已授权」之类无出处文本。索引在盘但落后于工作树时先 `codegraph sync` 增量同步（`codegraph status` 查看陈旧情况，`codegraph index` 为整树重建），查询须在同步后的索引上做，否则 callers/callees/blastRadius 反映的是旧代码。
 
 **与 code-TLA+ 一致性校验的关系**：codegraph = 修改前预防，code-TLA+ = 修改后回归，互补不冲突。
 

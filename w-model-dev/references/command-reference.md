@@ -59,6 +59,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 - **producer+verify**：`npm run wm:verify-evidence-source -- <project-dir>` 不是只读查询；它重建并校验当前 HEAD、run-log、passed gate-log、signature-chain 与 source bundle，成功后原子写入 `.w-model/evidence-provenance.json`。缺少或失败的真实运行证据时拒绝写入 `verificationStatus=passed`。
 - **no-git 形态**：`--no-git-ok` 是唯一显式降级开关；无 `.git` 工作区未传该 flag 时仍是 `MISSING_GIT_HEAD` exit 1，传了才产出 `provenanceKind=no-git`（`commitSha` 空 + `workspaceDigest`），该形态永久只能 package-only（`--source-project` 复验 → exit 1 `NOT_SOURCE_BOUND_NO_GIT`）。详见下方「Source-bound provenance 边界」节。
 - **导出白名单**：`.w-model/gate-logs/`、`.w-model/verifier-outputs/`、`.w-model/codegraph-queries/`、`.w-model/run-log.jsonl` 与签名链。**签名链位置**：根级 `.w-model/signature-chain.jsonl` 是权威形态（全仓约定，见 `signature-chain-guide.md`），`.w-model/signature-chains/` 复数目录保留为 legacy 兼容；producer（`wm-verify-evidence-source`）与导出/verify 两侧共用同一白名单判定，**两者并存时链位置歧义 → fail-closed**（producer 与导出均 exit 1 `SIGNATURE_CHAIN_AMBIGUOUS`）。
+- **排除项与导出内容处理**：白名单外一律不导出——项目源码、`.zcode/`、`coverage/`、未白名单运行时文件与 `docs/changes/archive/` 均不属于当前运行证据；JSON/JSONL/Markdown 清理敏感字段与绝对路径，manifest 记录稳定相对路径、kind、SHA-256 与 package manifest hash，CLI 成功输出只显示脱敏占位路径。
 - **package-only**：`npm run wm:export-evidence -- --verify <manifest>` 只验证包内 schema、文件清单、hash、路径和脱敏内容，返回 `verificationLevel=package-only`，不证明源项目仍匹配。
 - **source-bound**：追加 `--source-project <project-dir>` 后，verify 会重建 source provenance，并比较当前 HEAD、run/artifact 身份、五类 measurements（含 codegraph-queries）、source bundle hash 与 producer 版本，返回 `verificationLevel=source-bound`。
 
