@@ -281,23 +281,28 @@ export function codegraphIndexPresent(projectRoot: string): boolean {
 
 - [ ] **步骤 3：窄池空宽池守卫（G3-3，翻任务 4 的红）**
 
+> **实现期订正（任务 4 审查发现，2026-09-27）**：守卫条件不是 `wide.length === 0`——`{graph:[],rtm:[],tla:[...],scope:[]}` 形态下四视角全部「在场」（`ICEBERG_VIEW_PRESENCE[5]` × `Array.isArray` 派生），`wide.length === 2` 字面守卫命中不到；真正的命中条件是**宽视角基线集为空** `wideUnion.size === 0`。另：`IcebergSweepCheckResult` 现为 `{passed, reasons, reportSummary}`，**无** diagnostics/warnings 通道——按 `CheckpointCheckResult.diagnostics` 先例给返回类型加可选 `diagnostics?: string[]`（非破坏），CLI 侧有则打印一行；不进 `reasons`（那是阻断面）。
+
 窄池循环前加：
 
 ```ts
-if (wide.length === 0) {
-  // 宽视角全缺：无基准集合，窄池既谈不上「超出」也谈不上「漏」——跳过比对，
-  // 记非阻断诊断（宽池无基准，窄池对账跳过）；R7 视角缺席仍按既有判据报。
+const wideUnion = new Set(wide.flatMap((v) => viewSets[v]!)); // 既有变量，位置前移
+if (wideUnion.size === 0) {
+  // 宽视角基线集为空（视角可在场但集合为空）：无基准集合，窄池既谈不上「超出」也谈不上「漏」——
+  // 跳过比对并记非阻断诊断（宽池无基准，窄池对账跳过）；R7 视角缺席仍按既有判据报。
   diagnostics.push('R6[design-sd] 宽视角设计 ID 集为空，窄池对账跳过（无基准）');
 } else {
   // …既有窄池双向判据原样…
 }
 ```
 
-（`diagnostics` 通道名以 iceberg-logic 现有返回结构为准——若只有 `violations`/`warnings`，用 `warnings`。任务 4 步骤 4 的退化用例翻绿。）
+（任务 4 步骤 4 的退化用例翻绿，且其断言只锁 `reasons` 中 R6 文案为空——与诊断通道解耦。）
 
-- [ ] **步骤 4：锚诊断时点 + preflight 守卫（G3-4/5，翻任务 4 依赖）**
+- [ ] **步骤 4：锚诊断时点 + preflight 守卫（G3-4/5）**
 
-check-coding-plan.ts：锚缺失诊断的打印移到 scope 解析成功之后（`resolveCliScope` 成功分支内）；`--preflight` 路径的 `statSync`/`readdirSync` 包 try/catch + `isFile()`/`isDirectory()` 守卫，异常按 `FILE_NOT_FOUND` 结构化报错而非裸栈。任务 4 步骤 4 的 artifacts 断言翻绿（G3-12 完成后）。
+check-coding-plan.ts：锚缺失诊断的打印移到 scope 解析成功之后（`resolveCliScope` 成功分支内）；`--preflight` 路径的 `statSync`/`readdirSync` 包 try/catch + `isFile()`/`isDirectory()` 守卫，异常按 `FILE_NOT_FOUND` 结构化报错而非裸栈。
+
+> **实现期订正（任务 4 审查发现，2026-09-27）**：原「任务 4 步骤 4 的 artifacts 断言翻绿（G3-12 完成后）」**作废**——artifacts 断言（C12 门禁计数形态）实测**已经 exit 1 且绿**；原始发现的「仍 exit 0」属 `--preflight` 只列不计数语义（已由 C12b 覆盖）。G3-12 照常执行（单源化），但**不以任何测试翻绿为完成判据**。
 
 - [ ] **步骤 5：验证与 Commit**
 
@@ -342,7 +347,7 @@ git add w-model-dev/scripts .eslintsecurity-baseline.json docs/troubleshooting.m
 git commit -m "refactor(closeout): 白名单/正则/账本路径单源化 + 字节前缀文案四处 + 超时注释统一 + baseline orphan清理（G3-6/8/9/10/12/16）"
 ```
 
-## 任务 8：行为增量（G3-7/14/15）——本批唯一触碰运行语义的任务
+## 任务 8：行为增量（G3-7/14/15/18）——本批唯一触碰运行语义的任务
 
 **文件：**
 - `w-model-dev/schemas/run-log.schema.json`（可选 `parentDispatchId`）
@@ -378,21 +383,35 @@ const keyOf = (e: any) =>
 
 （实现时以既有函数形态为准，保持导出签名不变；任务 4 的直测翻转：`tokens: 0` 不计组断言转绿。）
 
-- [ ] **步骤 3：绝对路径诊断（G3-14）**
+- [ ] **步骤 3：R5 读路径守卫（G3-18，任务 4 审查增补）**
+
+> 来源：上批延后项「R5 计数不校验 enum/uniqueItems（schema 声明与读取路径不同门）」在本批首版规格中漏排（任务 4 审查者点名，Important）。归入本任务（行为增量集中地）。**语义边界（不得越界）**：schema 的 `uniqueItems` 与「存在即累加数组长度」口径**不变**（不得改为去重计数——那会推翻 schema description 与任务 4 已绿用例）；本守卫只处理**读取路径的非 enum 值**：`countOperationalFailures` 累加前过滤 `O1..O6` 之外的值（如 `'O9'`、拼写错误），并在过滤命中时经诊断通道输出一条「N 项非 O1~O6 取值已忽略（schema 应拒绝；读取路径防御）」；无命中零输出。
+
+`cli/check-maturity.ts` 的 `countOperationalFailures`：
+
+```ts
+const O_PATTERN_VALUES = new Set(['O1', 'O2', 'O3', 'O4', 'O5', 'O6']);
+// …累加改为：entries.flatMap(e => e.operationalFailureModes ?? []).filter(v => O_PATTERN_VALUES.has(v)).length
+//   同时收集 ignored = 非 enum 值计数（>0 时并入 diagnostics 通道，非阻断）
+```
+
+测试（maturity-logic.test.ts 追加，与任务 4 的既有三例同风格）：`['O9']` → 计数 0 + 诊断行含「非 O1~O6」；`['O3','O3']` → 计数 2（不变，锁定 schema 语义不被本守卫改变）。
+
+- [ ] **步骤 4：绝对路径诊断（G3-14）**
 
 archive-integrity-logic.ts 判据段追加（纯诊断，不进 violations）：归档清单文件条目（gate-log 等 `files[]`）中 `path` 含 `\\` 或匹配 `/^([A-Za-z]:|\/)/` 的计数 >0 时，输出诊断「归档清单含 N 条疑似本机绝对路径条目——交付前须经 wm-export-evidence 脱敏导出（归档仅受控留档）」。CLI `--json` 输出透传该诊断键；未提供清单或 0 命中不打。logic 层经注入参数收清单文本（zero-fs 约定，仿 `liveRunLogText` 先例）。
 
-- [ ] **步骤 4：样本与登记**
+- [ ] **步骤 5：样本与登记**
 
 新增 `samples/run-log/valid-parent-dispatch.jsonl`（主条目 + 2 条带同 `parentDispatchId` 的 R3 归账 → check-budget 疑似组数 0）与 `samples/run-log/bad-duplicate-groups.jsonl`（同键 3 条无 parent → 组数 ≥1 诊断）；登记 samples/README 矩阵与 self-test 用例；`eval/mappings.json` 若锚受影响一并核。
 
-- [ ] **步骤 5：验证与 Commit**
+- [ ] **步骤 6：验证与 Commit**
 
-budget 直测全绿（含翻转）、archive-integrity 新诊断用例正反两态、schema 校验通过；`npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/budget* w-model-dev/scripts/__tests__/archive-integrity*`。Commit：
+budget 直测全绿（含翻转）、archive-integrity 新诊断用例正反两态、maturity 新守卫两例（`['O9']`→0+诊断 / `['O3','O3']`→2 不变）、schema 校验通过；`npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/budget* w-model-dev/scripts/__tests__/archive-integrity* w-model-dev/scripts/__tests__/maturity*`。Commit：
 
 ```bash
 git add w-model-dev/schemas/run-log.schema.json w-model-dev/scripts w-model-dev/scripts/samples
-git commit -m "feat(closeout): parentDispatchId可选字段+重复归账精确化+键守卫 / 归档绝对路径非阻断诊断（G3-7/14/15，本批唯一行为增量）"
+git commit -m "feat(closeout): parentDispatchId可选字段+重复归账精确化+键守卫 / 归档绝对路径非阻断诊断 / R5读路径enum守卫（G3-7/14/15/18，本批唯一行为增量）"
 ```
 
 ---
