@@ -231,7 +231,7 @@ describe('check-archive-integrity CLI：--change-id 参数错误三态（exit 2 
 });
 
 // ==================== 归档前缀性（L4，D-3b：--live-run-log） ====================
-// 归档内 run-log.jsonl 快照必须是 live run-log 的字节前缀；未提供该参数时只出非阻断诊断，
+// 归档内 run-log.jsonl 快照必须是 live run-log 的记录边界前缀；未提供该参数时只出非阻断诊断，
 // 退出码语义不变（向后兼容硬线）。
 
 describe('check-archive-integrity CLI：归档前缀性（L4，--live-run-log）', () => {
@@ -267,7 +267,7 @@ describe('check-archive-integrity CLI：归档前缀性（L4，--live-run-log）
     const report = JSON.parse(r.stdout) as { passed: boolean; reasons: string[] };
     expect(report.passed).toBe(false);
     expect(report.reasons.some((m) => m.includes('[runLogPrefix]') && m.includes('记录中途'))).toBe(true);
-    expect(report.reasons.some((m) => m.includes('不是 live run-log 的字节前缀'))).toBe(false);
+    expect(report.reasons.some((m) => m.includes('不是 live run-log 的记录边界前缀'))).toBe(false);
   });
 
   it('空归档快照（0 字节）→ exit 1 且文案区分「空快照」（A1 收紧：不再假通过）', () => {

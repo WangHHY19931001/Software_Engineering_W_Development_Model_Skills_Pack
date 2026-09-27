@@ -253,9 +253,9 @@ describe('archive-integrity-logic 归档前缀性（L4）', () => {
       liveRunLogText: 'A\nB\nC\n',
       archivedRunLogText: 'A\nX\n',
     });
-    expect(r.missingFiles.some((m) => m.includes('[runLogPrefix]') && m.includes('不是 live run-log 的字节前缀'))).toBe(
-      true,
-    );
+    expect(
+      r.missingFiles.some((m) => m.includes('[runLogPrefix]') && m.includes('不是 live run-log 的记录边界前缀')),
+    ).toBe(true);
     expect(r.passed).toBe(false);
   });
 
@@ -284,7 +284,7 @@ describe('archive-integrity-logic 归档前缀性（L4）', () => {
     expect(r.passed).toBe(false);
     expect(r.missingFiles.some((m) => m.includes('[runLogPrefix]') && m.includes('记录中途'))).toBe(true);
     // 不得与「非前缀」形态混淆（两者根因与处置不同）
-    expect(r.missingFiles.some((m) => m.includes('不是 live run-log 的字节前缀'))).toBe(false);
+    expect(r.missingFiles.some((m) => m.includes('不是 live run-log 的记录边界前缀'))).toBe(false);
   });
 
   it('中间行中途截断（以多行形态截在行内）→ 违规且文案区分「非记录边界」', () => {

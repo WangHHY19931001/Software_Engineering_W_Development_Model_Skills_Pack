@@ -24,7 +24,7 @@
  *   archive-dir   归档目录路径
  *   --change-id=<id>  显式声明本归档目录所属 changeId（仅等号形态）；与自动派生互斥，显式优先
  *   --live-run-log=<path>  live run-log.jsonl 路径（仅等号形态，D-3b/L4）：提供时校验归档快照
- *                      `run-log.jsonl` 是 live 的**字节前缀**，否则 `[runLogPrefix]` 并入 missingFiles
+ *                      `run-log.jsonl` 是 live 的**记录边界前缀**（非空且以换行结尾），否则 `[runLogPrefix]` 并入 missingFiles
  *                      （blocking / exit 1）；**未提供时只输出非阻断诊断**（退出码语义不变）
  *   --json        机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *

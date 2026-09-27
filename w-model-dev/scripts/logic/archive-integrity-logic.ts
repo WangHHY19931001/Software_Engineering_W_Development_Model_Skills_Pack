@@ -65,7 +65,7 @@ export interface ArchiveIntegrityCheckResult {
 /**
  * 归档前缀性注入选项（L4，D-3b；缺省 = 未启用，零行为变化）。
  *
- * 归档内 `run-log.jsonl` 快照必须是 **live** run-log 的**字节前缀**（`liveText.startsWith(archiveText)`）：
+ * 归档内 `run-log.jsonl` 快照必须是 **live** run-log 的**记录边界前缀**（非空、以换行结尾；判据见下方 `checkRunLogPrefix`）：
  * live 侧在归档后被截断/重排/改写，或归档快照被改写（两者不可同真）即刻不成立 → blocking。
  * 两侧文本由 CLI 层实读注入（logic 层零 `node:fs`，同 `progressMdContent` 先例）。
  *
@@ -186,7 +186,7 @@ function checkRunLogPrefix(options: ArchiveRunLogPrefixOptions, missingFiles: st
   const archivedText = options.archivedRunLogText;
   if (archivedText === undefined) {
     missingFiles.push(
-      '[runLogPrefix] 归档 run-log.jsonl 快照不可读（提供 --live-run-log 时前缀性校验 fail-closed：无法证明归档快照是 live 的字节前缀）',
+      '[runLogPrefix] 归档 run-log.jsonl 快照不可读（提供 --live-run-log 时前缀性校验 fail-closed：无法证明归档快照是 live 的记录边界前缀）',
     );
     return;
   }
@@ -203,7 +203,7 @@ function checkRunLogPrefix(options: ArchiveRunLogPrefixOptions, missingFiles: st
   }
   if (!isPrefix) {
     missingFiles.push(
-      `[runLogPrefix] 归档 run-log.jsonl 不是 live run-log 的字节前缀（归档 ${archivedText.length} 字节 vs live ${liveText.length} 字节）：` +
+      `[runLogPrefix] 归档 run-log.jsonl 不是 live run-log 的记录边界前缀（归档 ${archivedText.length} 字节 vs live ${liveText.length} 字节）：` +
         '两侧在前缀处不一致（live 侧被截断/重排/改写，或归档快照被改写——两者不可同真，须人工裁定证据归属）',
     );
     return;

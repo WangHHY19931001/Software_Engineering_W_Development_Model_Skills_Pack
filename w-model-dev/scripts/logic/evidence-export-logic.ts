@@ -6,7 +6,11 @@ import * as path from 'node:path';
 import { evidenceFs as fs } from '../infrastructure/evidence-fs.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 
-import { verifySourceProvenance } from './evidence-provenance-logic.js';
+import {
+  SIGNATURE_CHAIN_DIRECTORY,
+  SIGNATURE_CHAIN_FILE,
+  verifySourceProvenance,
+} from './evidence-provenance-logic.js';
 
 export type EvidenceKind = 'gate-log' | 'verifier-output' | 'signature-chain' | 'codegraph-query' | 'run-log';
 
@@ -112,23 +116,24 @@ const ABSOLUTE_PATH_PATTERN =
   /(?:(?<![A-Za-z])[A-Za-z]:[\\/][^\r\n"'`<>]*|\\\\[^\r\n"'`<>]+|(?<![\w./:-])\/+[^\r\n"'`<>]*)/g;
 const ABSOLUTE_PATH_DETECTION_PATTERN =
   /(?:(?<![A-Za-z])[A-Za-z]:[\\/][^\r\n"'`<>]*|\\\\[^\r\n"'`<>]+|(?<![\w./:-])\/+[^\r\n"'`<>]*)/;
+/** Signature-chain location comes from the producer module (single source, G3-16). */
 const DIRECTORY_SOURCES: Array<{ directory: string; kind: EvidenceKind }> = [
   { directory: 'gate-logs', kind: 'gate-log' },
   { directory: 'verifier-outputs', kind: 'verifier-output' },
-  { directory: 'signature-chains', kind: 'signature-chain' },
+  { directory: SIGNATURE_CHAIN_DIRECTORY, kind: 'signature-chain' },
   { directory: 'codegraph-queries', kind: 'codegraph-query' },
 ];
 /**
- * Root-level allowlisted evidence files (`.w-model/<file>`). `signature-chain.jsonl`
- * is the repository-wide convention (`references/signature-chain-guide.md`); the
- * plural `signature-chains/` directory stays supported as the legacy layout.
+ * Root-level allowlisted evidence files (`.w-model/<file>`). `SIGNATURE_CHAIN_FILE`
+ * is the repository-wide convention (`references/signature-chain-guide.md`) and is
+ * imported from the producer so the allowlist and `collectSignatureChainFiles`
+ * cannot drift apart; the plural `signature-chains/` directory stays supported as
+ * the legacy layout.
  */
 const ROOT_FILE_SOURCES: Array<{ file: string; kind: EvidenceKind }> = [
   { file: 'run-log.jsonl', kind: 'run-log' },
-  { file: 'signature-chain.jsonl', kind: 'signature-chain' },
+  { file: SIGNATURE_CHAIN_FILE, kind: 'signature-chain' },
 ];
-const SIGNATURE_CHAIN_FILE = 'signature-chain.jsonl';
-const SIGNATURE_CHAIN_DIRECTORY = 'signature-chains';
 const comparePaths = (left: string, right: string): number => (left < right ? -1 : left > right ? 1 : 0);
 
 class EvidenceFailure extends Error {
@@ -306,7 +311,8 @@ async function collectExportSources(
 ): Promise<Array<{ sourceRelative: string; kind: EvidenceKind }>> {
   const sources: Array<{ sourceRelative: string; kind: EvidenceKind }> = [];
   // 链位置歧义：唯一根级文件与 legacy 复数目录并存时无法裁定权威链 → fail-closed。
-  // 该判定与 producer（evidence-provenance-logic）同源同名，导出侧与 verify 侧共用。
+  // 该判定与 producer（evidence-provenance-logic）同源同名：两个位置常量直接 import 自该模块，
+  // 导出侧与 verify 侧共用，字面量不再各存一份。
   const legacyChainPresent = (await lstatOrNull(path.join(state, SIGNATURE_CHAIN_DIRECTORY))) !== null;
   const rootChainPresent = (await lstatOrNull(path.join(state, SIGNATURE_CHAIN_FILE))) !== null;
   if (legacyChainPresent && rootChainPresent) throw new EvidenceFailure(1, 'SIGNATURE_CHAIN_AMBIGUOUS');
