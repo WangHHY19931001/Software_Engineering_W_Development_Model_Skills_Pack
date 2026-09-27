@@ -171,6 +171,13 @@ export interface DocConsistencyInput {
   testFileCount: number;
   /** Vitest facts 实际运行输出的用例总数；-1 = 无法采集，动态检查 fail-closed。 */
   vitestTestCount: number;
+  /**
+   * T3（门禁瘦身）：调用方（独立运行，无受控 vitest 工件且未显式 `--spawn-vitest`）跳过整条
+   * Vitest 动态 facts 校验通道——不产生 vitest-* 违规，由调用方输出非阻断诊断并把
+   * dynamicMeasurements 置 null；退出码仅由静态违规决定。
+   * 缺省（prepush 受控工件快路径 / 显式自采集）语义一字不变：动态 facts 缺失或不可信仍 fail-closed。
+   */
+  vitestFactsSkipped?: boolean;
   /** 同一份 Vitest JSON 测量的运行结果完整性；false 时不可用动态计数支撑通过结论。 */
   vitestMeasurementsValid?: boolean;
   /** Vitest JSON 缺字段、失败或状态不一致时的确定性原因。 */
@@ -1033,17 +1040,21 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
   }
   // Vitest 文件数与用例总数只作为受控事实包的动态测量输出，不再要求复制到活体文档。
   // 仍校验 facts/provenance 的完整性、身份、hash 与成功状态，缺失或不可信时 fail-closed。
-  violations.push(
-    ...checkVitestMeasurements(
-      input.vitestTestCount,
-      input.vitestMeasurementsValid,
-      input.vitestMeasurementsReason,
-      input.vitestRunId,
-      input.vitestArtifactId,
-      input.vitestArtifactSha256,
-      input.vitestCommitSha,
-    ),
-  );
+  // T3：vitestFactsSkipped（独立运行且无工件/无逃生口）时整条动态 facts 通道跳过——调用方已输出
+  // 非阻断诊断并置 dynamicMeasurements=null，故此处不产出 vitest-* 违规（prepush 路径恒不跳过）。
+  if (input.vitestFactsSkipped !== true) {
+    violations.push(
+      ...checkVitestMeasurements(
+        input.vitestTestCount,
+        input.vitestMeasurementsValid,
+        input.vitestMeasurementsReason,
+        input.vitestRunId,
+        input.vitestArtifactId,
+        input.vitestArtifactSha256,
+        input.vitestCommitSha,
+      ),
+    );
+  }
   violations.push(...checkPrTemplatePrePushCount(input.prTemplate));
   violations.push(...checkGateCountLiveDocs(input.gateCountDocs));
   if (input.a4Docs !== undefined) {

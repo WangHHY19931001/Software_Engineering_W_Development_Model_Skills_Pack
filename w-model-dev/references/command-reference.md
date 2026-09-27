@@ -450,6 +450,17 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **COVERAGE_SCOPE_JSON 字段**：`{fileCount, totals:{statements,branches,functions,lines}, files:[{file, statements|branches|functions|lines:{covered,total,pct}}], failures:[], passed, thresholds}`；`file` 为 `w-model-dev/scripts/` 之后的显示后缀（正斜杠），`files` 按 localeCompare 升序保证逐字节可复现；`totals` 为各文件 covered/total 求和后的加权 pct（两位小数，非百分比平均）。
 - **退出码**：0=达标（stdout 单行 `COVERAGE_SCOPE_JSON`）/ 1=阈值不达（`passed=false` 且 `failures` 逐指标列出 `实际 < 阈值`）/ 2=输入错误（报告不存在或不可读 `FILE_NOT_FOUND`、非法 JSON `FILE_PARSE`、报告畸形 `STRUCTURE_INVALID`、**白名单零命中**（`fileCount===0`，include 前缀失配或报告为空）`STRUCTURE_INVALID` → ERROR_JSON）。
 
+## 活体文档一致性门禁 CLI（check-docs-consistency）
+
+- **速查行**：`npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts [repo-root] [--json] [--spawn-vitest]`（`repo-root` 缺省 cwd；`--json` 输出单行机器可读报告；`--spawn-vitest` 为显式自采集逃生口，见下）
+- **Vitest 动态 facts 三态（门禁瘦身 T3）**：
+  1. **受控工件快路径**：`WM_VITEST_COUNT_FILE` + `WM_VITEST_PROVENANCE_FILE` 在场（pre-push 第 15 项注入）→ 直接读取同次成功运行，不 spawn；**fail-closed 一字不变**（provenance 缺失、hash / commitSha / 成功状态任一不可信 → exit 1）；
+  2. **显式自采集**：工件不在场且显式 `--spawn-vitest` → spawn 全量 vitest 并自生成同目录 provenance（墙钟上限 `VITEST_SPAWN_TIMEOUT_MS`；全量套件约 30 分钟），供无 prepush 场景；
+  3. **跳过（独立运行缺省）**：工件不在场且无 flag → **不 spawn**；`diagnostics` 输出非阻断诊断 `○ 动态 facts 未校验：未提供受控 vitest 工件（WM_VITEST_COUNT_FILE / WM_VITEST_PROVENANCE_FILE）；终局验收经 npm run prepush 覆盖（fail-closed）。如需自采集请显式加 --spawn-vitest（约 30 分钟）。`，`dynamicMeasurements` 置 `null`（JSON 键保持在场、形状稳定；`null` = 本次跳过，不是「测量为 0」）；静态检查全跑，退出码仅由静态违规决定。
+- **弱校验前提**：态 3 只用于任务级 / 文档级快速迭代；**终局验收一律 `npm run prepush`**（AGENTS §6「迭代可走快速车道，验收必须全量」）——prepush 内该门禁走态 1，动态 facts 仍 fail-closed。
+- **退出码**：0=全部一致（含态 3 跳过）/ 1=存在违规（静态计数与结构违规；或态 1 受控工件不可信、态 2 自采集失败）/ 2=输入错误（未知或非 `--json` 形态 flag、`repo-root` 缺必需文件 → `ERROR_JSON`）。
+- **动态侧排障**：受控工件缺失 / provenance 不可信 / 自采集失败的现象、原因与处置见仓库 `docs/troubleshooting.md` §1.7（技能包内不放置逃逸技能包根的外链）。
+
 ## 阶段 5-8 codegraph/coding-plan 门禁 CLI（ChangeScope 绑定）
 
 两个 checker 均接受同一套变更上下文参数（对应约束 #14 / 反模式 #38/#39；归档后置校验已并入 check-archive-integrity，见本节「归档后置校验（阶段 8）」）：

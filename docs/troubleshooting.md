@@ -83,11 +83,13 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 
 ### 1.7 docs-consistency 报动态测量缺失 / provenance 不可信
 
-**现象**：`npm run check:docs-consistency` 退出码 1，提示动态测量缺失或不可信（如「无法读取受控 vitest facts/provenance」「provenance 与当前 HEAD 不一致」），或静态清单计数与实际不符（schema / references / persona / exit-2 脚本数等）。
+> **T3 语义变更（2026-09-27 门禁瘦身）**：独立运行（无 `WM_VITEST_COUNT_FILE`）默认**不再自采集全量 vitest**——动态 facts 通道跳过并输出非阻断诊断，独立运行因此**不会**因动态测量缺失而退出 1（静态检查全跑，退出码仅由静态违规决定）。下文的动态侧失败场景适用于 **prepush 第 15 项（受控工件态）** 与显式 `--spawn-vitest` 自采集态；速查行与三态口径见 `w-model-dev/references/command-reference.md`「活体文档一致性门禁 CLI」节。
+
+**现象**：`npm run check:docs-consistency`（prepush 内或显式 `--spawn-vitest`）退出码 1，提示动态测量缺失或不可信（如「无法读取受控 vitest facts/provenance」「provenance 与当前 HEAD 不一致」），或静态清单计数与实际不符（schema / references / persona / exit-2 脚本数等）。独立运行时这些动态提示改为非阻断诊断（`○ 动态 facts 未校验：…`），不改变退出码。
 
 **原因**：docs-consistency 的 vitest **文件数与用例数是受控动态 facts**——由同次受控运行产出 `generated-results.json` + provenance（commitSha / runId / artifactSha256）绑定实际提交，**不再要求复制到 README / AGENTS / pre-push 等活体文档**（README / AGENTS 对 vitest 的表述为「以当前命令输出为准」）；静态计数类（schema 清单 25 份等）仍从代码事实核验文档声明。动态侧失败通常是 provenance 缺失、hash/commitSha 不匹配或自采集运行不完整（负载敏感瞬时失败），不是文档复制遗漏。
 
-**处置**：动态侧先按 CLI 提示重跑（`npm run prepush` 会先跑 vitest 再以同次 JSON + provenance 调 docs-consistency；手动验证用 `npx vitest run --reporter=json --outputFile=...` + 环境变量 `WM_VITEST_COUNT_FILE` / `WM_VITEST_PROVENANCE_FILE` / `WM_VITEST_PROVENANCE_ROOT` 传入同次受控运行），确认全部用例通过（用例数以当前命令输出为准）且 provenance 指向当前 HEAD 后重跑；若为负载敏感瞬时失败（读取数 < 全量）须隔离重跑，不得把失败 provenance 写成通过。静态侧按 violations 文本同步文档声明（新增 schema 文件须同步 `data-models.md`「Schema 清单」与 README/AGENTS/CONTRIBUTING/INSTALL 的 schema 计数表述）。
+**处置**：动态侧先按 CLI 提示重跑（`npm run prepush` 会先跑 vitest 再以同次 JSON + provenance 调 docs-consistency；手动验证用 `npx vitest run --reporter=json --outputFile=...` + 环境变量 `WM_VITEST_COUNT_FILE` / `WM_VITEST_PROVENANCE_FILE` / `WM_VITEST_PROVENANCE_ROOT` 传入同次受控运行），确认全部用例通过（用例数以当前命令输出为准）且 provenance 指向当前 HEAD 后重跑；若为负载敏感瞬时失败（读取数 < 全量）须隔离重跑，不得把失败 provenance 写成通过。独立运行只需任务级/文档级快速校验时，可接受态 3 的「动态 facts 未校验」诊断（终局验收仍以 prepush 为准）；确需独立复现动态校验时显式加 `--spawn-vitest`。静态侧按 violations 文本同步文档声明（新增 schema 文件须同步 `data-models.md`「Schema 清单」与 README/AGENTS/CONTRIBUTING/INSTALL 的 schema 计数表述）。
 
 ### 1.7a pre-push 第 12 项 vitest 抖动（**已按子进程类拆 project 串行消除**）
 
@@ -102,7 +104,7 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 1. **现状**：cli-serial 串行 + unit-parallel 并行已生效，无需人工干预。若仍见失败，先隔离重跑可疑文件（`npx vitest run --config config/vitest.config.ts <file>`，应全绿）再全量重跑。
 2. **不得让子进程类文件回到并行**（全局放开或并入 unit-parallel 等价于恢复抖动）。新增会真实启动子进程的测试文件必须登记进配置里的 `SUBPROCESS_TEST_FILES`——`vitest-project-split.test.ts` 双向守护该清单（真实 spawn 未登记、无证据残留、文件不存在均红灯）。注意判定口径：`vi.mock('node:child_process')` 整体替换子进程的文件（artifact-gate-assets）、正则里的 `.exec(`（examples-contract）、仅在字符串常量里出现的模块名（dependency-boundaries）都**不是**真实 spawn，不登记；`doctor-logic.test.ts` 自 2026-09-18 起新增真实 CLI 子进程用例（D1 真实路径回归），**已登记**进清单。**已知守护盲点（HEAD 既存，非本轮引入）**：`run-sync.test.ts` 顶部虽有同类 `vi.mock`，但其 `472-486` 行用例经 `vi.doUnmock('node:child_process')` + `vi.resetModules()` 重新加载模块后**真实** spawn 子进程（`runSync(process.execPath, ['-e', 'setTimeout(() => {}, 5_000)'], { timeout: 250 })`，断言真实 `ETIMEDOUT`）——该文件**含真实 spawn 却未被登记**，因守护的 `mocked` 判定是文件级一刀切才不报红灯；修正需把 `mocked` 改为逐调用点判定并登记该文件，留待收口后单独立项。
 3. **不得**放宽断言、加重试掩盖或改写 coverage 阈值——抖动是环境暴露的真实现象，掩盖会同时掩盖真失败。
-4. 配套校准（均已随处置一并实施）：`check-docs-consistency.ts` 的 `VITEST_SPAWN_TIMEOUT_MS` 600s→1800s→**3600s**（standalone 自采集 spawn 的墙钟上限；600s 与 1800s 均已低于 2026-09-26 全量套件 `--reporter=json` 实测墙钟 **1962s**，会把健康仓库误杀成 fail-closed），及 `lib/run-sync.ts` manifest 中两条 runSync 行号锚与超时口径（随注释扩充 +2 行顺延；常量再调时同步）。若后续再改 `check-docs-consistency.ts` 前部行数或该常量取值，run-sync.test.ts 会以行级断言报错提示同步 manifest。
+4. 配套校准（均已随处置一并实施）：`check-docs-consistency.ts` 的 `VITEST_SPAWN_TIMEOUT_MS` 600s→1800s→**3600s**（**显式 `--spawn-vitest` 自采集** spawn 的墙钟上限；T3 后独立运行缺省不再自采集，该常量只约束逃生口；600s 与 1800s 均已低于 2026-09-26 全量套件 `--reporter=json` 实测墙钟 **1962s**，会把健康仓库误杀成 fail-closed），及 `lib/run-sync.ts` manifest 中两条 runSync 行号锚与超时口径（随注释扩充 +2 行顺延；常量再调时同步）。若后续再改 `check-docs-consistency.ts` 前部行数或该常量取值，run-sync.test.ts 会以行级断言报错提示同步 manifest。
 5. **提速的诚实边界**：串行化后带 coverage 全量约 1055s（并行 457s 但 exit 1）；按子进程类拆分后全量约 974s——子进程文件的执行时间本身占大头，拆分的收益主要在**结构确定性**（并行集合与串行集合显式化、由守护测试锁定），而非大幅缩短全量墙钟。真正的提速方向是把子进程测试本身的耗时降下来（减少真实 spawn 次数、合并场景），而非调整并发结构。
 
 详见 `docs/changes/vitest-parallel-flakiness-finding.md`（含七组对照实测记录）。
@@ -161,7 +163,7 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 | `npm run prepush` 报 `'bash' 不是内部或外部命令` | 无 bash 解释器                                    | 安装 Git for Windows 用 Git Bash 运行                                                                                               |
 | `npm run lint:security` 退出 1 / 2               | baseline 指纹失效                                 | 人工确认风险后 `--regenerate`（见 [1.4](#14-eslint-security-baseline-指纹失效--需重生成)）                                          |
 | 门禁脚本退出 2（`ERROR_JSON`）                   | 参数 / 文件路径 / JSON 格式问题                   | 按 6 类错误类别排查，见 [user-guide.md §3.3](./user-guide.md)                                                                       |
-| `check-docs-consistency` 退出 1                  | 动态 provenance 缺失/不可信或静态计数漂移         | 按 violations 文本同步文档；动态侧重跑 vitest + 同次 provenance（见 [1.7](#17-docs-consistency-报动态测量缺失--provenance-不可信)） |
+| `check-docs-consistency` 退出 1                  | 静态计数漂移；或 prepush 态动态 provenance 失败   | 按 violations 文本同步文档；动态侧重跑 vitest + 同次 provenance（见 [1.7](#17-docs-consistency-报动态测量缺失--provenance-不可信)）；独立运行缺省跳过动态 facts（仅诊断，不改退出码） |
 | 依赖升级后门禁失败                               | 依赖行为变化影响校验逻辑                          | 回到当批起点修正，跑全量回归；勿用 `--no-verify` 绕过（见 [1.2](#12-git-push---no-verify契约声明)）                                 |
 | `code-health-*` CLI 退出 1/2                     | 参数错误 / 候选 `blocked` / 缺 tracked suite 清单 | 按 [1.9](#19-wm-code-health-cli-失败) 处置；不得绕过 `code-health-apply.ts`                                                         |
 

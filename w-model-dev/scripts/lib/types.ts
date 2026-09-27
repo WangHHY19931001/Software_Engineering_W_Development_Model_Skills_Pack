@@ -32,8 +32,12 @@ export interface JsonReport {
   /** 可选的规则原始分组，供 docs-consistency 等报告保留兼容摘要同时暴露分类明细。 */
   staticViolations?: unknown[];
   dynamicViolations?: unknown[];
-  /** 当前运行时采集的数值事实，不是硬编码规范。 */
-  dynamicMeasurements?: Record<string, unknown>;
+  /**
+   * 当前运行时采集的数值事实，不是硬编码规范。
+   * `null`（docs-consistency 独立运行无受控 vitest 工件且未传 `--spawn-vitest`，T3）表示本次
+   * 动态 facts 通道整体跳过——键保持在场以稳定形状，供审计区分「已校验」与「本次跳过」。
+   */
+  dynamicMeasurements?: Record<string, unknown> | null;
   /** 非阻断生命周期诊断（例如 LEGACY_UNSCOPED/pending-pre-approval）。 */
   diagnostics?: string[];
   /** 非阻断警告（如 check-requirement-coverage 未提供 --graph 时 C7 降级）。 */

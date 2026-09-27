@@ -3,13 +3,19 @@
  * 文档一致性门禁（Doc Consistency Checker）
  *
  * 校验活体文档中的静态计数 / 枚举 / 清单与代码事实一致，并校验动态 facts 的完整性，防文档漂移。
+ * Vitest 动态 facts 为三态（T3 门禁瘦身，详见 collectVitestMeasurements 头注）：独立运行默认**不 spawn**
+ * 全量 vitest，动态 facts 通道输出非阻断诊断并跳过（退出码仅由静态违规决定）；受控工件快路径
+ * （WM_VITEST_COUNT_FILE / WM_VITEST_PROVENANCE_FILE，pre-push 第 15 项）fail-closed 语义一字不变，
+ * 自采集由显式 --spawn-vitest 触发。终局验收一律经 npm run prepush 覆盖（AGENTS §6）。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts [repo-root] [--json]
+ *   npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts [repo-root] [--json] [--spawn-vitest]
  *   （repo-root 默认 cwd；本仓库根目录）
  *
  * 参数：
- *   --json   机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
+ *   --json         机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
+ *   --spawn-vitest 显式自采集 Vitest 完整事实包（spawn 全量 vitest，墙钟上限 VITEST_SPAWN_TIMEOUT_MS）；
+ *                  仅在未提供受控工件时需要——缺省不 spawn（动态 facts 跳过 + 非阻断诊断）
  *
  * 退出码：
  *   0  全部一致
@@ -542,24 +548,28 @@ function readVitestCountFile(root: string): VitestMeasurements | null {
 }
 
 /**
- * Vitest standalone 自采集的 spawn 墙钟上限（毫秒）。**随套件规模与机器负载调整**；快路径
+ * Vitest standalone 自采集的 spawn 墙钟上限（毫秒）。**仅态 2（显式 --spawn-vitest）使用**；快路径
  * （WM_VITEST_COUNT_FILE）不受影响——它直接读 pre-push 第 12 项的同次 JSON，不 spawn。
  *
  * 当前 3600s：`fileParallelism: false`（config/vitest.config.ts，消除子进程测试并行抖动）后，
  * 套件持续增长（1904 → 2579 用例 / 106 文件）。旧值 1800s 已小于本机实测墙钟 **1962s**
  * （2026-09-26 全量套件 `--reporter=json` 实测）→ spawn 被杀 → JSON 未落盘 → 自采集路径
- * 双 -1 fail-closed（单跑 `check-docs-consistency.ts` 因此结构性 exit 1，与判据无关）。
- * 取约 1.8 倍余量（3600s / 1962s）覆盖负载波动；这是**基建常量**（放宽等待，不放宽判据）——
- * 采集失败仍走 fail-closed，真实失败的套件不会因此被放行（JSON 里 numFailedTests 会被读出）。
+ * 双 -1 fail-closed。取约 1.8 倍余量（3600s / 1962s）覆盖负载波动；这是**基建常量**（放宽等待，
+ * 不放宽判据）——采集失败仍走 fail-closed，真实失败的套件不会因此被放行（JSON 里 numFailedTests
+ * 会被读出）。
  */
 const VITEST_SPAWN_TIMEOUT_MS = 3_600_000;
 
 /**
- * 采集 Vitest 完整运行事实包（堵住只查文件数或用例总数的盲区）。
- * 优先级（快路径优先，避免重复全量 vitest）：
- *   1. 环境变量 WM_VITEST_COUNT_FILE 指向的 vitest JSON outputFile（pre-push 第 12 项复用）→ 直接读取，不 spawn；
- *   2. 未提供可用 JSON 时，一律显式 spawn Vitest 采集（不以 scriptsChanged 跳过）。
- * 主路径用 process.execPath 直接执行 node_modules/vitest 入口（Windows 下 .cmd 无法被
+ * 采集 Vitest 完整运行事实包（堵住只查文件数或用例总数的盲区）。**三态**（T3 门禁瘦身）：
+ *   1. **受控工件快路径**：WM_VITEST_COUNT_FILE（+ WM_VITEST_PROVENANCE_FILE）在场 → 直接读取
+ *      pre-push 第 12 项同次 JSON 与 provenance，不 spawn；**fail-closed 一字不变**（provenance 缺失 /
+ *      hash / commit / 成功状态任一不可信即 -1 → 动态违规 exit 1）；
+ *   2. **显式自采集**：工件不在场且显式 `--spawn-vitest` → spawn 全量 vitest（既有路径一字不变）；
+ *   3. **跳过**：工件不在场且无 flag → **不 spawn**，返回 null；调用方输出非阻断诊断并置
+ *      `dynamicMeasurements=null`，静态检查全跑、退出码仅由静态违规决定。终局验收一律经
+ *      `npm run prepush` 覆盖（AGENTS §6「迭代可走快速车道，验收必须全量」）。
+ * 态 2 主路径用 process.execPath 直接执行 node_modules/vitest 入口（Windows 下 .cmd 无法被
  * runSync 直接执行且 npx.cmd 需 shell，绕开该坑）；vitest 未安装时回退 `npx ...`（shell）；
  * 落盘/解析失败（含 spawn 超时/错误）一律先尝试读取 JSON outputFile（vitest 若已完整跑完必落盘）；
  * 仍读不到则返回 -1，由逻辑层生成动态 facts 违规并 fail-closed（不虚构计数）。
@@ -572,9 +582,11 @@ const VITEST_SPAWN_TIMEOUT_MS = 3_600_000;
  * 默认 include 会扫全树，嵌套 git worktree（.worktrees/**）下的测试文件将被重复计数
  * （实测根仓库 + worktree 双份时会导致动态 facts 门禁误报）。
  */
-function collectVitestMeasurements(root: string): VitestMeasurements {
+function collectVitestMeasurements(root: string, spawnVitest: boolean): VitestMeasurements | null {
   const fromFile = readVitestCountFile(root);
   if (fromFile !== null) return fromFile;
+  // 态 3：无受控工件且未显式要求自采集 → 不 spawn（调用方输出非阻断诊断 + dynamicMeasurements=null）
+  if (!spawnVitest) return null;
   const outFile = join(tmpdir(), `w-model-vitest-count-${process.pid}.json`);
   const vitestArgs = ['run', '--config', 'config/vitest.config.ts', '--reporter=json', `--outputFile=${outFile}`];
   const vitestBin = findVitestBin(root);
@@ -630,21 +642,23 @@ async function main(): Promise<void> {
   // S22：未知 `--*` flag 不再静默丢弃（避免被当作位置参数 repo-root 误读）——已知集合校验，
   // 未知即 ARG_INVALID / exit 2（与 l0-link-audit「未知 → ARG_INVALID」口径一致）
   const rawArgs = process.argv.slice(2);
-  const knownFlags = new Set(['--json']);
+  const knownFlags = new Set(['--json', '--spawn-vitest']);
   const unknownFlags = rawArgs.filter((a) => a.startsWith('--') && !knownFlags.has(a.split('=')[0]!));
   if (unknownFlags.length > 0) {
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
       message: `未知参数：${unknownFlags.join(' ')}`,
-      detail: '用法: check-docs-consistency.ts [repo-root] [--json]',
+      detail: '用法: check-docs-consistency.ts [repo-root] [--json] [--spawn-vitest]',
       exitCode: 2,
     });
     return;
   }
-  // --json：机器可读报告模式（不打印人类可读分隔线与统计）；--json 不入位置参数
-  const args = rawArgs.filter((a) => a !== '--json');
-  const jsonMode = args.length !== rawArgs.length;
+  // --json：机器可读报告模式（不打印人类可读分隔线与统计）；--spawn-vitest：显式自采集（态 2）。
+  // 二者均为布尔开关，不入位置参数；缺省独立运行不 spawn（态 3，见 collectVitestMeasurements 头注）。
+  const jsonMode = rawArgs.includes('--json');
+  const spawnVitest = rawArgs.includes('--spawn-vitest');
+  const args = rawArgs.filter((a) => a !== '--json' && a !== '--spawn-vitest');
   const startTime = Date.now();
   const root = pathResolve(args[0] ?? '.');
   const missing = REQUIRED_PATHS.filter((p) => !existsSync(join(root, p)));
@@ -705,9 +719,14 @@ async function main(): Promise<void> {
   const testDirectoryInventoryCount = readdirSync(join(root, 'w-model-dev/scripts/__tests__')).filter((f) =>
     f.endsWith('.test.ts'),
   ).length;
-  const vitestMeasurements = collectVitestMeasurements(root);
-  const testFileCount = vitestMeasurements.testFileCount;
-  const vitestTestCount = vitestMeasurements.vitestTestCount;
+  const vitestMeasurements = collectVitestMeasurements(root, spawnVitest);
+  // T3 态 3：无受控工件且未显式 --spawn-vitest → 动态 facts 通道整体跳过（诊断 + dynamicMeasurements=null）。
+  // -1 哨兵仅用于保持 input 形状；逻辑层经 vitestFactsSkipped 跳过该检查，故不产生 vitest-* 违规，
+  // 且该哨兵不会出现在输出（dynamicMeasurements 在输出前已置 null）。
+  const vitestFactsSkipped = vitestMeasurements === null;
+  const vitestFacts = vitestMeasurements ?? invalidVitestMeasurements('跳过动态 facts：未提供受控 vitest 工件');
+  const testFileCount = vitestFacts.testFileCount;
+  const vitestTestCount = vitestFacts.vitestTestCount;
   const scriptsChanged = detectScriptsChanges(root);
 
   // C3 内链存在性数据源：SKILL.md + references/*.md + README.md + AGENTS.md + SSoT（核心导航文档集）
@@ -799,15 +818,16 @@ async function main(): Promise<void> {
     designDocs,
     testFileCount,
     vitestTestCount,
-    vitestMeasurementsValid: vitestMeasurements.valid,
-    vitestMeasurementsReason: vitestMeasurements.reason,
-    vitestPassedCount: vitestMeasurements.numPassedTests,
-    vitestFailedCount: vitestMeasurements.numFailedTests,
-    vitestSuccess: vitestMeasurements.success,
-    vitestRunId: vitestMeasurements.runId,
-    vitestArtifactId: vitestMeasurements.artifactId,
-    vitestArtifactSha256: vitestMeasurements.artifactSha256,
-    vitestCommitSha: vitestMeasurements.commitSha,
+    vitestMeasurementsValid: vitestFacts.valid,
+    vitestMeasurementsReason: vitestFacts.reason,
+    vitestPassedCount: vitestFacts.numPassedTests,
+    vitestFailedCount: vitestFacts.numFailedTests,
+    vitestSuccess: vitestFacts.success,
+    vitestRunId: vitestFacts.runId,
+    vitestArtifactId: vitestFacts.artifactId,
+    vitestArtifactSha256: vitestFacts.artifactSha256,
+    vitestCommitSha: vitestFacts.commitSha,
+    vitestFactsSkipped,
     testDirectoryInventoryCount,
     exit2ProbeResults,
     a4Docs: {
@@ -854,6 +874,18 @@ async function main(): Promise<void> {
   }
   const exitCode = violations.length === 0 ? 0 : 1;
 
+  // T3 态 3：动态 facts 未校验 → 非阻断诊断（人类可读段 + --json/GATE_JSON 的 diagnostics 键，仅在非空时出现）
+  // + dynamicMeasurements 置 null（JSON 键保持在场、形状稳定：消费者可区分「已校验」与「本次跳过」）。
+  // 静态违规与仍在执行的检查（含 48 条 exit-2 探针）决定退出码；prepush 受控工件路径 diagnostics 恒空。
+  const diagnostics: string[] = [];
+  let dynamicMeasurements: Record<string, unknown> | null = report.dynamicMeasurements;
+  if (vitestFactsSkipped) {
+    diagnostics.push(
+      '○ 动态 facts 未校验：未提供受控 vitest 工件（WM_VITEST_COUNT_FILE / WM_VITEST_PROVENANCE_FILE）；终局验收经 npm run prepush 覆盖（fail-closed）。如需自采集请显式加 --spawn-vitest（约 30 分钟）。',
+    );
+    dynamicMeasurements = null;
+  }
+
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
     // violations 分布按检查项聚合（与人类可读 `[${v.check}] ${v.message}` 对齐）
@@ -867,7 +899,8 @@ async function main(): Promise<void> {
         violations: [...byCheck.entries()].map(([rule, count]) => ({ rule, count })),
         staticViolations: report.staticViolations,
         dynamicViolations: report.dynamicViolations,
-        dynamicMeasurements: report.dynamicMeasurements,
+        dynamicMeasurements,
+        ...(diagnostics.length > 0 ? { diagnostics } : {}),
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -876,6 +909,14 @@ async function main(): Promise<void> {
     return;
   }
 
+  const skippedLabel = '跳过（未提供受控 vitest 工件）';
+  const testFileLabel = vitestFactsSkipped ? skippedLabel : String(testFileCount);
+  const vitestTestLabel = vitestFactsSkipped
+    ? skippedLabel
+    : vitestTestCount < 0
+      ? '无法采集（不一致）'
+      : String(vitestTestCount);
+
   console.log('═'.repeat(60));
   console.log('文档一致性检查（Doc Consistency Checker）');
   console.log('═'.repeat(60));
@@ -883,8 +924,8 @@ async function main(): Promise<void> {
   console.log(`schema 文件   : ${schemaFiles.length}`);
   console.log(`exit-2 脚本   : ${exit2ScriptCount}`);
   console.log(`persona 文件   : ${personaCount}`);
-  console.log(`test 文件    : ${testFileCount}`);
-  console.log(`vitest 用例  : ${vitestTestCount < 0 ? '无法采集（不一致）' : vitestTestCount}`);
+  console.log(`test 文件    : ${testFileLabel}`);
+  console.log(`vitest 用例  : ${vitestTestLabel}`);
   console.log(`静态违规      : ${report.staticViolations.length}`);
   console.log(`动态违规      : ${report.dynamicViolations.length}`);
   console.log(`检查结果      : ${violations.length === 0 ? '✓ 全部一致' : `✗ ${violations.length} 项不一致`}`);
@@ -896,6 +937,14 @@ async function main(): Promise<void> {
     }
   }
 
+  // 非阻断诊断（T3 跳过态）：不影响 exit code，但须可见（exit 0 时正是「本次未校验什么」需要被解释的场景）
+  if (diagnostics.length > 0) {
+    console.log('非阻断诊断：');
+    for (const d of diagnostics) {
+      console.log(`  - ${d}`);
+    }
+  }
+
   printGateReport(
     'DOCS_CONSISTENCY',
     {
@@ -903,7 +952,8 @@ async function main(): Promise<void> {
       violationCount: violations.length,
       staticViolationCount: report.staticViolations.length,
       dynamicViolationCount: report.dynamicViolations.length,
-      dynamicMeasurements: report.dynamicMeasurements,
+      dynamicMeasurements,
+      ...(diagnostics.length > 0 ? { diagnostics } : {}),
     },
     exitCode,
   );
