@@ -242,7 +242,7 @@ describe('deriveArchiveIntegrityManifest（CLI 清单自动派生）', () => {
 const _manifestTypeProbe: ArchiveIntegrityManifest = {};
 void _manifestTypeProbe;
 
-// ==================== 归档前缀性（L4，D-3b：--live-run-log 注入文本） ====================
+// ==================== 归档前缀性（L4：--live-run-log 注入文本） ====================
 // 归档内 run-log.jsonl 快照必须是 live run-log 的**记录边界前缀**（A1 收紧）：
 //   通过 ⇔ `archivedText === liveText`，或（liveText.startsWith(archivedText) 且 archivedText 非空且以 "\n" 结尾）。
 // 只做逐字 startsWith 时「第 N 行中途被截断」与「0 字节空快照」都会假通过 → 现按三种形态具名拒绝：

@@ -67,14 +67,6 @@ export interface JsonlParseError {
 export interface JsonlReadResult {
   entries: unknown[];
   parseErrors: JsonlParseError[];
-  /**
-   * 与 `entries` **同序同长**的原始行文本（行终止符已剥离、原文不 trim）。
-   *
-   * 供需要「原始字节」语义的消费者使用（D-3b 放行锚：`runLogAnchor.sha256` 定义在前缀各行原文
-   * 的字节上）。空白行与被跳过的非 JSON 行**不进入**本数组——与 `entries` 的过滤规则严格一致，
-   * 故 `rawLines[i]` 恒为 `entries[i]` 的原文。
-   */
-  rawLines: string[];
 }
 
 export async function readJsonlOrExit(file: string, label = '行'): Promise<unknown[]> {
@@ -103,21 +95,18 @@ function parseJsonlLinesDetailed(raw: string, label: string, abs: string): Jsonl
   const lines = raw.split(/\r?\n/);
   const entries: unknown[] = [];
   const parseErrors: JsonlParseError[] = [];
-  const rawLines: string[] = [];
   for (const [i, line] of lines.entries()) {
     const trimmed = line.trim();
     if (trimmed === '') continue;
     try {
       entries.push(parseJsonSafe(trimmed));
-      // 与 entries 同步推进：原文（未 trim）即该条目的字节原文（行终止符已被 split 剥离）
-      rawLines.push(line);
     } catch {
       const message = `${label} 第 ${i + 1} 行非合法 JSON`;
       parseErrors.push({ line: i + 1, message });
       console.error(`⚠ [FILE_PARSE] ${message}，已跳过: ${abs}`);
     }
   }
-  return { entries, parseErrors, rawLines };
+  return { entries, parseErrors };
 }
 
 function parseJsonlLines(raw: string, label: string, abs: string): unknown[] {

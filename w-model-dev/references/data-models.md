@@ -490,12 +490,6 @@ interface RunLogEntry {
   revertEvidence?: { command: string; description?: string };
   /** effective consumer 的机器状态，不改写 raw JSONL；exit 0 仍可能是 NOT_CLOSED_NOT_PROVEN */
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
-  /** 记录哈希链前驱（D-3a，可选）：前一条带哈希记录的 recordHash；文件内首条带哈希记录为 "" */
-  prevRecordHash?: string;
-  /** 记录内容哈希（D-3a，可选）：sha256 小写 hex，由定稿公式计算（见「记录哈希链」节） */
-  recordHash?: string;
-  /** checkpoint 放行锚（D-3b，可选）：放行时刻历史前缀的外部锚 { lines, sha256 }（见「checkpoint 放行锚」节） */
-  runLogAnchor?: { lines: number; sha256: string };
   /** 多归账分派的主记录 ID（G3-15，可选）：R3 三维度等同一分派多条归账时，附属条目以该字段指向主条目 runId；仅用于 check-budget 疑似重复归账判定的精确化（判定细则见本文件「用量实效校验」段（R6）），Σtokens 上界口径不变，legacy 缺字段维持现判定 */
   parentDispatchId?: string;
 }
@@ -526,7 +520,7 @@ interface RunLogEntry {
 **使用约定**：
 
 - `run-log.jsonl` 是 append-only：不得修改历史记录；运行时读取可跳过损坏行并记录 note，但 `check-run-log.ts` 门禁对空/坏行 **fail-closed**（空/空白/malformed-only/valid+malformed 一律 exit 1，parseErrors 并入 blocking，消息保留 `PARSE_INCOMPLETE` 前缀），不得把坏行当作可放行的证据缺失。
-- **时间戳真值 + 禁止回溯改写（D-5①，反伪造）**：记录的时间戳必须为**写入时刻真值**；**禁止回溯改写历史行或重排时间戳**（改时间戳 / 改 note / 删行 / 插行后重排时间轴同样禁止——R7 的记录哈希链与放行锚正为检出这类改写而设）；记录修正**只允许**经 O 侧统一追加器 `wm-append-runlog` **追加更正记录**（历史行逐字节不变），不得手改历史行；禁令与替代动作成对，手搓改行不是合法路径。
+- **时间戳真值 + 禁止回溯改写（D-5①，反伪造）**：记录的时间戳必须为**写入时刻真值**；**禁止回溯改写历史行或重排时间戳**（改时间戳 / 改 note / 删行 / 插行后重排时间轴同样禁止；可检测性由 R7 追加序 + R8 轨迹 + R9-R11 语义判据承担）；记录修正**只允许**经 O 侧统一追加器 `wm-append-runlog` **追加更正记录**（历史行逐字节不变），不得手改历史行；禁令与替代动作成对，手搓改行不是合法路径。
 - **追加与更正唯一入口（D-5①/N-5）**：O 追加 run-log 一律经 `scripts/cli/wm-append-runlog.ts`（写盘复用 `state-write-logic` 的锁 + 备份 + tmp/rename + 回读），不得手搓追加脚本或直接 `Write`/`Edit` run-log。用法示例（命令形态照该工具既有登记 `<run-log.jsonl> [--from=<json|jsonl>|--stdin] [--correct=<runId>] [--timestamp=<iso>] [--allow-clock-adjust=<reason>] [--lock-timeout=] [--json]`）：
   - 追加新记录：`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin`
   - 更正既有记录（只新增一条更正记录，`note` 含 `correction-of:<runId>`）：`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin --correct=<runId>`
@@ -538,43 +532,9 @@ interface RunLogEntry {
 - **禁止字段混用**：不得用 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`）写 `run-log.jsonl`（注：`decisions` 非任何 schema 的合法字段名，正确字段名为 RunLogEntry 的 `acknowledgedDecisions`）。详见下方「RunLogEntry vs EventIngress Schema 边界对照表」节。
 - `decisionConfidence` 为可选字段：评审/门禁/返工等关键决策时可记录置信度（0.0-1.0）；低置信度高频出现是 Loop 4 劣化分析信号。
 
-### 记录哈希链（recordHash / prevRecordHash，D-3a）
+### 归档 run-log 前缀性（L4）
 
-> 目的：R7 的时间戳单调判据只约束「相对顺序」，对既有行被**就地改写**（改 note / 改历史时间戳 / 删行 / 插行）完全不可见；记录级哈希链把「中段篡改必须整链重算」变成可执行契约。共享实现 = [`scripts/logic/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) 的 `canonicalJson` / `computeRecordHash`（追加器与校验器**禁止各写一份**）；写入端 = [`scripts/cli/wm-append-runlog.ts`](../scripts/cli/wm-append-runlog.ts)（经 `scripts/logic/run-log-append-logic.ts`），校验端 = `check-run-log.ts` R7 扩展。
-
-**定稿公式（第三方可独立复算）**：
-
-```text
-recordHash = sha256(prevRecordHash + "\n" + canonicalJson(record 去掉 recordHash 字段))
-canonicalJson = 对象键按 Unicode 码点升序、无空白、UTF-8、数组保序（与 JSON.stringify 键序无关：显式按 Unicode 码点升序序列化）
-```
-
-- `prevRecordHash` 是记录字段，因此**参与**本条 `canonicalJson` 载荷（链关系被前缀与载荷双重绑定）；`recordHash` 字段本身必须从载荷剔除（否则不可复算）。哈希输出为 64 位小写 hex。
-- **写入（裁定 C）**：追加器写新记录时 `prevRecordHash` 取**文件内最后一条带哈希记录**的 `recordHash`（无则 `""`），并写入 `recordHash`；载荷自带的链字段由追加器重算覆盖并在 `diagnostics` 留痕（哈希链只能由写入端计算）。`--correct` 生成的更正记录同样入链；历史行**不改写、不补哈希**（禁止回溯补链）。
-- **校验（裁定 B，并入 R7）**：从**首条**带 `recordHash` 的记录起向文件末逐条复算 + 比对前驱——第 i 条的 `prevRecordHash` 必须等于第 i−1 条的 `recordHash`，文件内首条带哈希记录的 `prevRecordHash` 必须为 `""`，且逐条按定稿公式复算 `recordHash`。（方向是**自首条向文件末**，不是自末条向前：哈希段之后插入记录这类突变只有正向扫描才会暴露——反向扫描会在首个无哈希记录处提前停住而漏检。）断链 / 内容不符 / 哈希段之后出现无哈希记录 → blocking（文案前缀 `R7:` + 记录 runId）；首个带哈希记录之前的历史段只记**非阻断**诊断 `R7: 历史段 N 条无哈希（LEGACY，未参与链校验）`（全无哈希的日志同样只出该诊断）。既有时间戳单调判据原样保留（不被链判定削弱）。
-- **边界**：链只保护已入链段；首个带哈希记录之前的历史段不参与校验（改写不可检出）。整链全量重算（含中段改写后重算后续所有链）在链判定上自洽同样不可检出——该残余窗口由阶段门 checkpoint 锚（D-3b，见下节）收口。
-
-### checkpoint 放行锚（runLogAnchor，D-3b）
-
-> 目的：哈希链（D-3a）只保护链自身。把握「整链重算」能力者在放行前对历史行**整体重排 + 时间戳重对齐**后重算全部 `recordHash`，链判定完全自洽（真实调测盲区：放行前重排录入）；**尾删**（放行后删除前缀之外/之内的尾部行）在链上同样不可见。放行锚把「放行时刻的历史前缀」钉死为**外部锚**，`check-run-log` R7 第三段按同法重算并比对。共享实现 = [`scripts/logic/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) 的 `anchorDigestOf` / `computeRunLogAnchor`（追加器与校验器**禁止各写一份**）；写入端 = [`scripts/cli/wm-append-runlog.ts`](../scripts/cli/wm-append-runlog.ts)（经 `scripts/logic/run-log-append-logic.ts`），校验端 = `check-run-log.ts` R7 扩展。
-
-**定稿定义（第三方可独立复算）**：
-
-```text
-前缀   = 文件序下 timestamp ≤ 锚所在记录 timestamp 的全部记录（含该记录之前的全部历史行；不含锚自身所在记录）
-lines  = 该前缀的记录条数
-sha256 = sha256( 前缀各记录行的**原始字节**以单个 "\n" 连接，末尾不加换行 )
-```
-
-- **原始字节**口径：各行去掉行终止符（LF / CRLF）后的原样文本（含前导/尾随空白与转义），以**单个 `"\n"` 连接**，**末尾不加换行**——`lines=0` 即空串摘要 `e3b0c442…`（**不是** `sha256("\n")`）。前缀按**时间戳**而非物理位置定义：把锚记录挪到文件更早位置不会缩小前缀。前缀行的时间戳谓词为 `recordTimestampMs`（**非空字符串**且可解析；数字等非字符串形态两端一致排除——写入端与校验端**共用同一实现**，避免一端计入另一端不计入而让刚填好的锚立刻被判「不符」）。
-- **写入（裁定 B，自动化）**：追加器（`wm-append-runlog.ts`）在写入 `action=checkpoint` 且 `outcome=success` 的记录时**自动填入** `runLogAnchor`（基于**写入前**前缀 = 历史行原文 + 本批已规划行的落盘序列化中 `timestamp ≤` 本条时间戳者）。调用方**显式提供**锚时须与自算值一致，不一致 → **exit 2**（输入错误，不写盘）；历史行原文由 CLI 经 `AppendOptions.historyRawLines` 注入（logic 层零 `node:fs`），不可得时自动填锚跳过并留非阻断诊断、显式提供的锚按不可核验拒绝。锚字段**自身入链**（先写锚再算 `recordHash`）→ 改锚即断链。
-- **校验（裁定 A，并入 R7 第三段）**：`check-run-log.ts` 对**每条**携带 `runLogAnchor` 的记录按同法重算并比对，不符 → **blocking**（文案含 `R7` + `runLogAnchor`/放行锚 + 记录 runId，如 `R7: 放行记录 <runId> 的 runLogAnchor 与当前历史前缀不符（放行后被改写/重排）`）；`sha256` 维度需要原始行文本（CLI 注入 `rawLines`），未注入时只校验 `lines` 并记非阻断诊断（绝不假装验过）。
-- **历史兼容与 cutoff（裁定 G）**：`RELEASE_ANCHOR_CUTOFF = '2026-09-26T00:00:00Z'`（D-3b 落地日，`scripts/logic/run-log-logic.ts`）。
-  - `timestamp < cutoff` 的 `action=checkpoint` + `outcome=success` 记录**无锚** → LEGACY（非阻断；**禁止回溯补锚**）——LEGACY 分支命中时输出一条非阻断诊断（文案含 runId 与 cutoff，缀 `; deferred`），非静默跳过；
-  - `timestamp ≥ cutoff` 的放行记录**无锚** → **blocking**（文案含 `R7` + 放行锚 + runId）——堵住「未来调用方漏注入历史行原文 / 绕过追加器直写放行记录」使 D-3b 保证静默消失（fail-open）的窗口；
-  - `timestamp` 缺失/非法**不**按 LEGACY 吸收（保守：宁可 blocking——不可信的时间戳不构成「旧记录」证据）；非 checkpoint/success 记录不参与该判定（锚是放行动作的专属外部锚）。
-- **边界（诚实登记）**：前缀不可变保证覆盖到**最后一个锚**为止——锚之后的尾部在下一次锚定前不可证伪；且掌握工具链者可整链重算 + 重算全部下游锚。最强外部锚是本仓库既有的**归档快照**（以下 L4 前缀性）与导出包 SHA-256 manifest，本机制不主张「密码学不可抵赖」。
-- **归档前缀性（L4）**：`check-archive-integrity.ts` 的可选 `--live-run-log=<path>` 校验归档内 `run-log.jsonl` 快照是 **live** run-log 的**记录边界前缀**；违规以 `[runLogPrefix]` 并入 `missingFiles`（blocking / exit 1），**未提供该参数时只输出非阻断诊断**（退出码语义不变）——完整判据与违规分类见 [`command-reference.md`](command-reference.md) 的「归档后置校验（阶段 8）」节「归档前缀性」条。
+`check-archive-integrity.ts` 的可选 `--live-run-log=<path>` 校验归档内 `run-log.jsonl` 快照是 **live** run-log 的**记录边界前缀**；违规以 `[runLogPrefix]` 并入 `missingFiles`（blocking / exit 1），**未提供该参数时只输出非阻断诊断**（退出码语义不变）——完整判据与违规分类见 [`command-reference.md`](command-reference.md) 的「归档后置校验（阶段 8）」节「归档前缀性」条。
 
 ### R1 阶段动作完整性：按阶段分档
 

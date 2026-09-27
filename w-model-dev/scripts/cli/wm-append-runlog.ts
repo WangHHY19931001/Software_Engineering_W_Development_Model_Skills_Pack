@@ -105,8 +105,6 @@ function inputErrorCategory(code: AppendViolationCode): 'ARG_INVALID' | 'STRUCTU
     case 'TIMESTAMP_INVALID':
     case 'NOTE_INVALID':
     case 'RECORD_INVALID':
-    case 'ANCHOR_MISMATCH':
-    case 'ANCHOR_UNVERIFIABLE':
       return 'STRUCTURE_INVALID';
     default:
       return undefined;
@@ -402,9 +400,6 @@ async function main(): Promise<void> {
     now,
     ...(parsed.timestamp !== undefined ? { timestamp: parsed.timestamp } : {}),
     ...(parsed.allowClockAdjust !== undefined ? { allowClockAdjust: parsed.allowClockAdjust } : {}),
-    // D-3b：历史行**原始字节**（锚 sha256 的唯一来源）。历史行从盘上逐字节保留（本工具从不重写），
-    // rawLines 即其原文（行终止符已剥离）→ 与读侧 check-run-log 注入的原文同口径。
-    historyRawLines: content.rawLines,
   };
   const plan =
     parsed.correctRunId !== undefined

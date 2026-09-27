@@ -86,7 +86,7 @@ export interface JsonReport {
    */
   snapshotSource?: string;
   /**
-   * 归档 run-log 前缀性（L4，D-3b）的**判定依据**（check-archive-integrity --json）：
+   * 归档 run-log 前缀性（L4）的**判定依据**（check-archive-integrity --json）：
    * 未提供 `--live-run-log`（本项不适用，非阻断）/ 已校验且归档快照是 live 的记录边界前缀 /
    * 已校验且非前缀（违规见 missingFiles 的 `[runLogPrefix]`）。其它门禁不提供此字段（可选）。
    * 前缀判据与违规分类见 `references/command-reference.md`「归档后置校验（阶段 8）」节「归档前缀性」条。

@@ -23,7 +23,7 @@
  * 参数：
  *   archive-dir   归档目录路径
  *   --change-id=<id>  显式声明本归档目录所属 changeId（仅等号形态）；与自动派生互斥，显式优先
- *   --live-run-log=<path>  live run-log.jsonl 路径（仅等号形态，D-3b/L4）：提供时校验归档快照
+ *   --live-run-log=<path>  live run-log.jsonl 路径（仅等号形态，L4）：提供时校验归档快照
  *                      `run-log.jsonl` 是 live 的**记录边界前缀**，否则 `[runLogPrefix]` 并入 missingFiles
  *                      （blocking / exit 1）；**未提供时只输出非阻断诊断**（退出码语义不变）。
  *                      完整判据与违规分类见 `references/command-reference.md`「归档后置校验（阶段 8）」节「归档前缀性」条
@@ -121,7 +121,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  // L4（D-3b）同款形态约束：裸 --live-run-log 的值会被位置参数扫描吞掉（被当作 <archive-dir>）
+  // L4 同款形态约束：裸 --live-run-log 的值会被位置参数扫描吞掉（被当作 <archive-dir>）
   if (argv.includes('--live-run-log')) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -147,7 +147,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  // L4（D-3b）：live run-log 路径（仅等号形态；重复出现由 parseFlagValue 抛 DuplicateFlagError → exit 2）
+  // L4：live run-log 路径（仅等号形态；重复出现由 parseFlagValue 抛 DuplicateFlagError → exit 2）
   const explicitLiveRunLog = parseFlagValue(argv, 'live-run-log');
   if (explicitLiveRunLog !== undefined && explicitLiveRunLog.trim() === '') {
     exitWithError({
@@ -210,7 +210,7 @@ async function main(): Promise<void> {
       // progress.md 缺失或不可读 → 不设 progressMdContent，清单校验按缺失/未提供内容报违规
     }
   }
-  // L4（D-3b）归档前缀性：显式声明 --live-run-log 时实读**两侧**文本（logic 层零 fs → 文本注入）。
+  // L4 归档前缀性：显式声明 --live-run-log 时实读**两侧**文本（logic 层零 fs → 文本注入）。
   // live 侧路径由调用方显式给出：不存在/不可读是**输入错误**（exit 2），不得静默降级为「未提供」；
   // 归档侧 run-log.jsonl 缺失/不可读则不设文本，由前缀性校验 fail-closed 报 [runLogPrefix]。
   let liveRunLogAbs: string | undefined;

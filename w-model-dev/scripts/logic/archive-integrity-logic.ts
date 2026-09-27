@@ -72,7 +72,7 @@ export interface ArchiveIntegrityCheckResult {
 }
 
 /**
- * 归档前缀性注入选项（L4，D-3b；缺省 = 未启用，零行为变化）。
+ * 归档前缀性注入选项（L4；缺省 = 未启用，零行为变化）。
  *
  * 归档内 `run-log.jsonl` 快照必须是 **live** run-log 的**记录边界前缀**（判据实现见下方
  * `checkRunLogPrefix`；对外判据与违规分类见 `references/command-reference.md`「归档后置校验（阶段 8）」
@@ -232,7 +232,7 @@ function checkCodingPlanSnapshot(
 }
 
 /**
- * 归档 run-log 前缀性校验（L4，D-3b）：归档快照必须是 live run-log 的**记录边界前缀**。
+ * 归档 run-log 前缀性校验（L4）：归档快照必须是 live run-log 的**记录边界前缀**。
  *
  * 判据实现（A1 收紧，审查裁定）：全等，或 live 以归档为前缀**且**归档非空**且**以 `"\n"` 结尾
  * （判据细节与逐形态违规文案见本函数；对外判据与违规分类见 `references/command-reference.md`
