@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { countReworks, sumTokens } from '../cli/check-budget.js';
+import { countReworks, countSuspectedDuplicateGroups, sumTokens } from '../cli/check-budget.js';
 import { checkBudget, checkRootcauseBudget, type BudgetConfig } from '../logic/budget-logic.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -341,5 +341,106 @@ describe('sumTokens token 累计口径（D-4b）', () => {
       { runId: 'b', phase: 2, tokens: 2 },
     ];
     expect(sumTokens(entries, undefined)).toEqual({ phase: 3, total: 3 });
+  });
+});
+
+/**
+ * countSuspectedDuplicateGroups（N-6 上界口径诊断，G2-2 直测）
+ *
+ * 现状语义（`cli/check-budget.ts:193-207`）：分组键 = `timestamp|tokens|String(duration_s)`，
+ * 计入判据仅「非空字符串 timestamp + 有限非负 tokens」；`tokens: 0` 与 `duration_s` 缺字段
+ * **当前同样入组**（噪声键，非零 tokens 的正常重复归账之外还会把这些误并为疑似组）。
+ * 键守卫（tokens 须有限正数 + duration_s 须为 number）与 `parentDispatchId` 精确化归任务 8/G3-7——
+ * 故下方两条「噪声键入组」断言按**现状口径**锁定，任务 8 实施守卫后**须同步翻转为 0**
+ * （已在测试名与注释中标注翻转点，避免静默漂移）。
+ */
+describe('countSuspectedDuplicateGroups 疑似重复归账分组口径（N-6，G2-2）', () => {
+  const dup = (patch: Record<string, unknown> = {}): Record<string, unknown> => ({
+    runId: 'r',
+    timestamp: '2026-09-20T00:00:00.000Z',
+    tokens: 100,
+    duration_s: 5,
+    ...patch,
+  });
+
+  it('同 (timestamp, tokens, duration_s) 两条 → 1 组', () => {
+    expect(countSuspectedDuplicateGroups([dup({ runId: 'a' }), dup({ runId: 'b' })])).toBe(1);
+  });
+
+  it('同键三条 → 仍计 1 组（组数 ≠ 条数）', () => {
+    expect(countSuspectedDuplicateGroups([dup({ runId: 'a' }), dup({ runId: 'b' }), dup({ runId: 'c' })])).toBe(1);
+  });
+
+  it('键的任一分量不同即不同组（timestamp / tokens / duration_s 三向）→ 0 组', () => {
+    expect(
+      countSuspectedDuplicateGroups([
+        dup({ runId: 'a' }),
+        dup({ runId: 'b', timestamp: '2026-09-20T00:00:00.001Z' }),
+        dup({ runId: 'c', tokens: 101 }),
+        dup({ runId: 'd', duration_s: 6 }),
+      ]),
+    ).toBe(0);
+  });
+
+  it('两个不同键各重复两条 → 2 组（组数逐键累计）', () => {
+    expect(
+      countSuspectedDuplicateGroups([
+        dup({ runId: 'a' }),
+        dup({ runId: 'b' }),
+        dup({ runId: 'c', tokens: 200 }),
+        dup({ runId: 'd', tokens: 200 }),
+      ]),
+    ).toBe(2);
+  });
+
+  it('【现状锁定 / 任务 8（G3-7）翻转点】tokens: 0 当前计入组（键守卫实施后 → 0）', () => {
+    // 现状：tokens=0 通过「有限非负数」判据并入组（check-budget.ts:198）；G3-7 要求 tokens 须为
+    // **有限正数**才入组 → 任务 8 实施后本断言改为 toBe(0)。
+    expect(countSuspectedDuplicateGroups([dup({ runId: 'a', tokens: 0 }), dup({ runId: 'b', tokens: 0 })])).toBe(1);
+  });
+
+  it('【现状锁定 / 任务 8（G3-7）翻转点】duration_s 缺字段当前计入组（键守卫实施后 → 0）', () => {
+    // 现状：键取 String(undefined)='undefined'，两条同形记录仍并为一组；G3-7 要求 duration_s
+    // 须为 number 才入组 → 任务 8 实施后本断言改为 toBe(0)。
+    expect(
+      countSuspectedDuplicateGroups([
+        dup({ runId: 'a', duration_s: undefined }),
+        dup({ runId: 'b', duration_s: undefined }),
+      ]),
+    ).toBe(1);
+  });
+
+  it('缺 timestamp / 非字符串 timestamp 不计组（既有判据，任务 8 不变）', () => {
+    expect(
+      countSuspectedDuplicateGroups([
+        dup({ runId: 'a', timestamp: undefined }),
+        dup({ runId: 'b', timestamp: undefined }),
+        dup({ runId: 'c', timestamp: '' }),
+        dup({ runId: 'd', timestamp: '' }),
+        dup({ runId: 'e', timestamp: 123 }),
+        dup({ runId: 'f', timestamp: 123 }),
+      ]),
+    ).toBe(0);
+  });
+
+  it('坏 tokens（负数 / NaN / Infinity / 字符串 / 缺字段）不计组（sumTokens 同口径）', () => {
+    expect(
+      countSuspectedDuplicateGroups([
+        dup({ runId: 'a', tokens: -1 }),
+        dup({ runId: 'b', tokens: -1 }),
+        dup({ runId: 'c', tokens: Number.NaN }),
+        dup({ runId: 'd', tokens: Number.NaN }),
+        dup({ runId: 'e', tokens: Number.POSITIVE_INFINITY }),
+        dup({ runId: 'f', tokens: Number.POSITIVE_INFINITY }),
+        dup({ runId: 'g', tokens: '100' }),
+        dup({ runId: 'h', tokens: '100' }),
+        dup({ runId: 'i', tokens: undefined }),
+        dup({ runId: 'j', tokens: undefined }),
+      ]),
+    ).toBe(0);
+  });
+
+  it('空输入 → 0 组', () => {
+    expect(countSuspectedDuplicateGroups([])).toBe(0);
   });
 });

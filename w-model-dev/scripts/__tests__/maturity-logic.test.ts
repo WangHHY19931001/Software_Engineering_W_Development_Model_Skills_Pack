@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildR5Diagnostics, collectLexicalMentions, countOperationalFailures } from '../cli/check-maturity.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { runSync } from '../lib/run-sync.js';
 import { checkMaturity, type MaturityConfig } from '../logic/maturity-logic.js';
 
@@ -305,5 +306,52 @@ describe('check-maturity CLI：--run-log 三态（D-7 端到端，真实子进�
     expect(maturitySummary(r.stdout ?? '')['diagnostics']).toEqual([
       'R5 未生效：未提供 --run-log（O 系列失败模式未校验）',
     ]);
+  });
+});
+
+// ==================== R5 三态补强（G2-1） ====================
+
+/**
+ * 补三条廉价断言（live-run-findings Task 4 延后项，G2-1）：
+ *   1. diagnostics 通道透传——含 `--json` 机器通道（此前只断言人类可读段与 MATURITY_JSON 摘要）；
+ *   2. `operationalFailureModes: []`（空标注）→ 不计次；
+ *   3. 重复值形态的计数口径。实现为「存在即累加数组长度」（`cli/check-maturity.ts:99-106`），
+ *      「每条记录内同一取值至多出现一次」由 `run-log.schema.json` 的 `uniqueItems` 前置强制
+ *      （重复值记录 schema 不合法，不进入合规 run-log）——故计数层不去重，断言按实现口径写。
+ */
+describe('R5 三态补强（G2-1）', () => {
+  it('R5 诊断经 --json 输出透传（diagnostics 通道）', async () => {
+    // 逻辑层：diagnostics 由 options 注入后逐字回传（通道名以 maturity-logic.ts 现状为准）
+    const logic = checkMaturity(mkMaturity(3), {
+      operationalFailureCount: 0,
+      diagnostics: ['R5 未生效：未提供 --run-log'],
+    });
+    expect(logic.diagnostics).toContain('R5 未生效：未提供 --run-log');
+    // CLI 层：--json 单行报告透传 diagnostics（非阻断，passed 仍为 true）
+    const maturity = await write('maturity.json', VALID_MATURITY);
+    const r = runSync(process.execPath, [tsxCli, path.join(cliDir, 'check-maturity.ts'), maturity, '--json']);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse((r.stdout ?? '').trim()) as { passed: boolean; diagnostics?: string[] };
+    expect(parsed.passed).toBe(true);
+    expect(parsed.diagnostics).toContain('R5 未生效：未提供 --run-log（O 系列失败模式未校验）');
+  });
+
+  it('R5 operationalFailureModes 空数组 → 不计次', () => {
+    const rows = [mkEntry({ operationalFailureModes: [] })];
+    expect(countOperationalFailures(rows)).toBe(0);
+  });
+
+  it('R5 operationalFailureModes 重复值：schema uniqueItems 拒收，计数按数组长度（每项至多一次由 schema 强制）', () => {
+    const duplicate = JSON.parse(runLogEntry('r5-dup-mode', { operationalFailureModes: ['O3', 'O3'] })) as Record<
+      string,
+      unknown
+    >;
+    const single = JSON.parse(runLogEntry('r5-single-mode', { operationalFailureModes: ['O3'] })) as Record<
+      string,
+      unknown
+    >;
+    expect(validateBySchema('run-log', duplicate).valid).toBe(false); // 重复值被 uniqueItems 拒收
+    expect(validateBySchema('run-log', single).valid).toBe(true); // 对照：单值形态合法
+    expect(countOperationalFailures([duplicate])).toBe(2); // 计数口径 = 数组长度（合法输入不含重复值，不去重）
   });
 });

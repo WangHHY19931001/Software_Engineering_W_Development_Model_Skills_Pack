@@ -21,6 +21,8 @@
  *       → 记录须声明 `evidenceKind: 'cli'`（禁止降级）；无索引 → 须显式降级
  *       （`evidenceKind: 'artifact'` + 非空 `degradationReason` + ≥1 条 `alternativeEvidence`）；
  *       未声明 `evidenceKind` 一律违规——把「制品口径」从隐形判据变成显式声明
+ *   C15 降级声明**内容下限**两子分支（G2-3）：`degradationReason` 全空白、`alternativeEvidence[i]`
+ *       的 command/evidencePath 空字段 → 各具名 violation（判据 `trim()` 分支，直测导出函数）
  */
 
 import { execSync } from 'node:child_process';
@@ -34,6 +36,7 @@ import { validateBySchema } from '../infrastructure/schema-loader.js';
 import {
   checkCodegraphQueries,
   checkCodegraphQueriesStrict,
+  evidenceDeclarationViolations,
   type CodegraphStrictResult,
 } from '../cli/check-codegraph-queries.js';
 import type { ChangeScope } from '../lib/change-scope.js';
@@ -333,6 +336,43 @@ describe('checkCodegraphQueries（legacy 两参兼容层）', () => {
       '.w-model/codegraph-queries/phase5-a.json': JSON.stringify({ querySymbol: 'X' }),
     });
     expect(checkCodegraphQueries(root2, 5).passed).toBe(false);
+  });
+});
+
+// ==================== C15：降级声明内容下限两子分支（G2-3） ====================
+
+/**
+ * C15（G2-3）：`evidenceDeclarationViolations` 的「降级声明内容下限」两子分支。
+ *
+ * 既有 C14a-d 只覆盖 evidenceKind 三态（未声明 / artifact / cli），未覆盖声明为 artifact 后
+ * **原因与替代证据的内容下限**。判据（`cli/check-codegraph-queries.ts:181-203`）：
+ * `degradationReason.trim() === ''` 与逐条 `command`/`evidencePath` 非空校验。
+ * schema 层（`codegraph-query.schema.json` 的 `minLength: 1` + `pattern: "\\S"`）同样拒收这两形态，
+ * 故 strict CLI 路径会先以「结构校验失败」violation 短路——本用例直测两层共用的判据函数本身
+ * （`:288` legacy / `:403` strict 两个调用点），确保内容下限分支有牙，而非只靠 schema 兜底。
+ */
+describe('C15：降级声明内容下限两子分支（G2-3）', () => {
+  it('degradationReason 全空白（trim 后为空）→ violation 具名 degradationReason', () => {
+    const root = writeProject({}); // 无 .codegraph/ 索引 → 走显式降级分支
+    const violations = evidenceDeclarationViolations(root, 'phase5-a.json', {
+      ...DEGRADED_EVIDENCE,
+      degradationReason: '   ',
+    });
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain('phase5-a.json');
+    expect(violations[0]).toContain('degradationReason');
+  });
+
+  it('alternativeEvidence 条目 command/evidencePath 均空 → violation 具名索引 0', () => {
+    const root = writeProject({});
+    const violations = evidenceDeclarationViolations(root, 'phase5-a.json', {
+      ...DEGRADED_EVIDENCE,
+      alternativeEvidence: [{ command: '', evidencePath: '' }],
+    });
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain('alternativeEvidence[0]');
+    expect(violations[0]).toContain('command');
+    expect(violations[0]).toContain('evidencePath');
   });
 });
 
