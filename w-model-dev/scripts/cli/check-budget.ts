@@ -25,7 +25,7 @@
  * 校验规则（详见 w-model-dev/references/data-models.md §成本预算模型）：
  *   R1 时效性 · R3 onExceed 合法 · R4-A 多角度 R token 预算 · R5 killSwitch 触发检测（返工/TLA+）
  *   · R5-b 用量 burnRate 告警（D-4b）· R6 用量实效（D-4b）
- *   （R5-b / R6 的判据细节与上界口径见同文件「用量实效校验」段）
+ *   （R5-b / R6 的判据细节与上界口径见 w-model-dev/references/data-models.md「用量实效校验」段（R6））
  *
  * 退出码：
  *   0  校验通过
