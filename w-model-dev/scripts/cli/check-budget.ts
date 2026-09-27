@@ -15,9 +15,9 @@
  *   --project=<path>      project.json 路径（可选，用于读取 projectUpdatedAt 做 R1 时效性校验；读取侧经 project.schema.json 校验，缺失/非法/不符 schema → exit 2）
  *   --run-log=<path>      run-log.jsonl 路径（可选，用于统计返工次数做 R5 触发检测 + 累计 tokens 做 R6 用量实效校验）；
  *                         阶段门调用必带 --run-log 与 --phase=N（R6/R5-b 用量校验的接线判据）
- *                         返工口径（D-4a）见 logic 层 countReworks；用量口径（D-4b：Σtokens 累计、
+ *                         返工口径（D-4a）见同文件 countReworks；用量口径（D-4b：Σtokens 累计、
  *                         未接线可见化诊断、上界口径、疑似重复归账分组键与键守卫、parentDispatchId
- *                         归账精确化）见 logic 层 sumTokens / countSuspectedDuplicateGroups 与
+ *                         归账精确化）见同文件 sumTokens / countSuspectedDuplicateGroups 与
  *                         w-model-dev/references/data-models.md「用量实效校验」段（R6）——对外口径以该段为准
  *   --phase=N             当前阶段 1-8（可选，用于过滤 run-log 中本阶段的返工/用量记录；支持 --phase=N 与 --phase N 两形态，重复传参即错）
  *   --json                机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse，含 warnings 非阻断警告字段）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
