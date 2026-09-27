@@ -15,25 +15,17 @@
  *   --project=<path>      project.json 路径（可选，用于读取 projectUpdatedAt 做 R1 时效性校验；读取侧经 project.schema.json 校验，缺失/非法/不符 schema → exit 2）
  *   --run-log=<path>      run-log.jsonl 路径（可选，用于统计返工次数做 R5 触发检测 + 累计 tokens 做 R6 用量实效校验）；
  *                         阶段门调用必带 --run-log 与 --phase=N（R6/R5-b 用量校验的接线判据）
- *                         返工口径（D-4a）：action ∈ {rework, fix, emergency-fix} 或 outcome ∈ {fail, rework}
- *                         的条数；tlaReworkCount 再从中筛 note/target 含 TLA 的条数（详见 countReworks）
- *                         用量口径（D-4b）：Σtokens 只累计有限非负数的 tokens 字段（详见 sumTokens）；
- *                         未提供 --run-log 时 R5/R6 一并跳过，但输出非阻断诊断「R6/R5-b 未生效（未提供 run-log）」
- *                         （D-5② 未接线可见化：省略 --run-log 不再等于静默跳过，退出码语义不变）；
- *                         提供了但 Σtokens=0 时输出「R6 未生效」警告（跳过不等于通过）
- *                         提供了且同 (parentDispatchId, timestamp, tokens, duration_s) 多行时输出「疑似重复归账 N 组」诊断
- *                         （N-6 上界口径：同一分派的多条归账会重复累计，只诊断不去重）
- *                         键守卫（G3-7）：tokens 须为有限正数、duration_s 须为 number，否则为噪声键不入组
- *                         （tokens=0 的无用量记录与缺时长的手工 fixture 不再并成疑似组）
- *                         归账精确化（G3-15）：parentDispatchId 在场且非空时以该字段入键——R3 三维度等
- *                         同一分派的多条归账不再互计为疑似重复；legacy 缺字段判定不变（Σtokens 上界口径不变）
+ *                         返工口径（D-4a）见 logic 层 countReworks；用量口径（D-4b：Σtokens 累计、
+ *                         未接线可见化诊断、上界口径、疑似重复归账分组键与键守卫、parentDispatchId
+ *                         归账精确化）见 logic 层 sumTokens / countSuspectedDuplicateGroups 与
+ *                         w-model-dev/references/data-models.md「用量实效校验」段（R6）——对外口径以该段为准
  *   --phase=N             当前阶段 1-8（可选，用于过滤 run-log 中本阶段的返工/用量记录；支持 --phase=N 与 --phase N 两形态，重复传参即错）
  *   --json                机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse，含 warnings 非阻断警告字段）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 校验规则（详见 w-model-dev/references/data-models.md §成本预算模型）：
  *   R1 时效性 · R3 onExceed 合法 · R4-A 多角度 R token 预算 · R5 killSwitch 触发检测（返工/TLA+）
- *   · R5-b 用量 burnRate 告警（D-4b：Σtokens(阶段) ≥ budgetBurnRate × perPhase.maxTokens，文案以 `R5-b：` 开头）
- *   · R6 用量实效（D-4b：Σtokens(阶段) > perPhase.maxTokens 或 Σtokens(总) > project.maxTokensTotal → exit 1）
+ *   · R5-b 用量 burnRate 告警（D-4b）· R6 用量实效（D-4b）
+ *   （R5-b / R6 的判据细节与上界口径见同文件「用量实效校验」段）
  *
  * 退出码：
  *   0  校验通过
@@ -182,23 +174,16 @@ export function sumTokens(entries: unknown[], phase: number | undefined): TokenU
 /**
  * 统计 run-log 中「同 `(parentDispatchId, timestamp, tokens, duration_s)` 出现 >1 次」的**组数**（N-6）。
  *
- * 用途：Σtokens 是**上界**口径——同一分派动作若按 R3 三条目（completeness/reliability/security）
- * 各归一次账，同一 token 消耗会被重复计入，使 Σtokens 高于真实唯一消耗（live run 实测
- * 522M 记录值中约 72.8M 来自重复归账）。本函数只**统计并可见化**该现象，**不做去重**：
- * 去重键在 legacy 记录上不可靠（阶段 1-4 的 `reportId` 为空、`timestamp` 等值会误并真实并发分派），
- * 预算判定继续按上界执行（口径成文见 data-models.md「用量实效校验（R6）」）。
+ * 用途：Σtokens 是**上界**口径（同一分派动作的多条归账会被重复累计），本函数只**统计并可见化**
+ * 该现象、**不做去重**——预算判定继续按上界执行，去重键在 legacy 记录上不可靠；完整口径（含
+ * R3 三条目归账约定与键句）成文见 data-models.md「用量实效校验」段（R6）。
  *
- * 计入判据：`typeof timestamp === 'string' && timestamp !== ''`（run-log schema 的必填字段；
+ * 计入判据（实现）：`typeof timestamp === 'string' && timestamp !== ''`（run-log schema 必填字段；
  * 缺时间戳的记录不参与分组，避免把手工 fixture 误判为重复）且 tokens 为**有限正数**、
  * `duration_s` 为 number（键守卫，G3-7：tokens=0 的无用量记录与缺时长的手工 fixture 只会
  * 产生噪声键，一律不入组——与 sumTokens 的「有限非负」口径在此**故意不同**，后者为求和、
- * 前者为分组）。分组键另含可选 `parentDispatchId` 原值（G3-15，在场且非空时生效）。
- *
- * 归账精确化（G3-15）：`parentDispatchId` 在场且非空的条目以该字段入键——R3 三维度等同一分派
- * 的多条归账（主条目与附属条目键前缀不同）不再互计为疑似重复；legacy 缺字段的记录键前缀为空串，
- * 判定与字段引入前逐字相同。同 parentDispatchId 的多条本身是约定内归账，**除非键也全同才计组**
- * （键全同 = 同一 parent 下又一次完全相同的归账，仍属可疑）。Σtokens 上界口径不变（本函数不参与
- * 任何去重扣减，字段仅影响本诊断的**精度**）。
+ * 前者为分组）。分组键另含可选 `parentDispatchId` 原值（G3-15 归账精确化：在场且非空时入键；
+ * legacy 缺字段 = 空前缀，判定与字段引入前逐字相同）。
  *
  * @returns 出现次数 >1 的键数（组数），无重复返回 0
  */
@@ -333,12 +318,10 @@ async function main(): Promise<void> {
   }
 
   // 非阻断诊断（D-5② 未接线可见化 + N-6 上界口径）：不影响 exit code，但须可见。
-  // ① 未提供 --run-log：R6/R5-b 整体跳过（判据与退出码语义一字不变），省略该参数不再等于静默跳过
-  //    ——live run 实测 9/9 次调用均未传该参数，R6/R5-b 全程无声，正是本条要堵的隐性规避通道；
+  // ① 未提供 --run-log：R6/R5-b 整体跳过（判据与退出码语义一字不变），省略该参数不再等于静默跳过；
   // ② 提供了且存在同 (parentDispatchId, timestamp, tokens, duration_s) 多行：提示 Σtokens 的**上界**口径
-  //    （只诊断不去重，去重键在 legacy 记录上不可靠——阶段 1-4 reportId 为空、timestamp 等值会误并真实
-  //    并发分派）。计数精度由键守卫（G3-7：tokens 有限正数 + duration_s 为 number）与 parentDispatchId
-  //    归账精确化（G3-15）保证；两者都只影响本诊断的判定，不改变 Σtokens 上界口径与退出码。
+  //    （只诊断不去重，计数精度由键守卫 G3-7 与 parentDispatchId 归账精确化 G3-15 保证；
+  //    完整口径见 data-models.md「用量实效校验」段（R6））。
   // 读取失败分支不追加诊断：上一条 warning 已说明跳过原因（避免把「没读到」说成「没接线」）。
   const diagnostics: string[] = [];
   if (!runLogFile) {

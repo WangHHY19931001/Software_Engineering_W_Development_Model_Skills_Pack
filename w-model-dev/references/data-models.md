@@ -496,7 +496,7 @@ interface RunLogEntry {
   recordHash?: string;
   /** checkpoint 放行锚（D-3b，可选）：放行时刻历史前缀的外部锚 { lines, sha256 }（见「checkpoint 放行锚」节） */
   runLogAnchor?: { lines: number; sha256: string };
-  /** 多归账分派的主记录 ID（G3-15，可选）：R3 三维度等同一分派多条归账时，附属条目以该字段指向主条目 runId；仅用于 check-budget 疑似重复归账判定的精确化（同 parent 且键全同仍计组），Σtokens 上界口径不变，legacy 缺字段维持现判定 */
+  /** 多归账分派的主记录 ID（G3-15，可选）：R3 三维度等同一分派多条归账时，附属条目以该字段指向主条目 runId；仅用于 check-budget 疑似重复归账判定的精确化（判定细则见本文件「用量实效校验」段（R6）），Σtokens 上界口径不变，legacy 缺字段维持现判定 */
   parentDispatchId?: string;
 }
 ```
@@ -530,7 +530,7 @@ interface RunLogEntry {
 - **追加与更正唯一入口（D-5①/N-5）**：O 追加 run-log 一律经 `scripts/cli/wm-append-runlog.ts`（写盘复用 `state-write-logic` 的锁 + 备份 + tmp/rename + 回读），不得手搓追加脚本或直接 `Write`/`Edit` run-log。用法示例（命令形态照该工具既有登记 `<run-log.jsonl> [--from=<json|jsonl>|--stdin] [--correct=<runId>] [--timestamp=<iso>] [--allow-clock-adjust=<reason>] [--lock-timeout=] [--json]`）：
   - 追加新记录：`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin`
   - 更正既有记录（只新增一条更正记录，`note` 含 `correction-of:<runId>`）：`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin --correct=<runId>`
-  - 时间戳**严格递增三态**（与 `wm-append-runlog` 头注同序，②与③不得合并叙述）：① **显式**时间戳（记录自带 `timestamp` 或 `--timestamp=<iso>`）**≤ 末条** → exit 1 写入拒绝（文案含「时间戳不递增」+ 末条时间 + 建议，目标文件不被修改）；② **无显式时间戳**且 `now` **早于**末条（时钟真倒退）→ exit 1 拒绝，仅显式 `--allow-clock-adjust=<reason>` 才放行（步进末条 +1ms，`note` 留 `clock-adjust:auto+<N>ms:<reason>`）；③ **无显式时间戳**且 `now` **等于**末条毫秒、或仅**批内冲突** → 良性 +1ms 步进（同毫秒良性步进形态 `clock-adjust:auto+<N>ms`，`diagnostics` 明示「时钟调整 +Nms」，绝不静默）；`--timestamp=<iso>` 注入成功另在记录 `note` 留 `clock-injected:<iso>` 痕迹。
+  - 时间戳**严格递增三态**（②与③不得合并叙述；完整口径与逃生口语义见 [`command-reference.md`](command-reference.md) 的 `wm-append-runlog.ts` 条目「时间戳三态」）——① 显式 ≤ 末条拒绝；② 无显式且时钟真倒退拒绝；③ 无显式且同毫秒/批内冲突良性步进。
 - 编排者 O 在以下时机 append：子代理分派返回后 / 门禁脚本执行后 / 🔴 CHECKPOINT 放行后 / 返工回退后。
 - `acknowledgedDecisions` 在阶段门放行时由用户填写（≥1 关键决策摘要，非"确认"/"同意"）；为空视为 O4（Comprehension Debt）命中，拒绝放行。
 - O 系列失败模式的机器可读标注为 `operationalFailureModes`（可选，`O1`~~`O6` 枚举数组，`uniqueItems`）；`check-maturity.ts` R5 只统计该字段（存在即累加长度）。`note` 中的 O1~~O6 字样视为**引用**（含评审规则编号同名情形，如 O3 既是运维失败模式也是 V 门禁 evidence 扣分规则名），不计入 R5；词法命中仅作非阻断诊断，并指引「确为运维失败时改用 `operationalFailureModes` 标注」。
@@ -574,7 +574,7 @@ sha256 = sha256( 前缀各记录行的**原始字节**以单个 "\n" 连接，�
   - `timestamp ≥ cutoff` 的放行记录**无锚** → **blocking**（文案含 `R7` + 放行锚 + runId）——堵住「未来调用方漏注入历史行原文 / 绕过追加器直写放行记录」使 D-3b 保证静默消失（fail-open）的窗口；
   - `timestamp` 缺失/非法**不**按 LEGACY 吸收（保守：宁可 blocking——不可信的时间戳不构成「旧记录」证据）；非 checkpoint/success 记录不参与该判定（锚是放行动作的专属外部锚）。
 - **边界（诚实登记）**：前缀不可变保证覆盖到**最后一个锚**为止——锚之后的尾部在下一次锚定前不可证伪；且掌握工具链者可整链重算 + 重算全部下游锚。最强外部锚是本仓库既有的**归档快照**（以下 L4 前缀性）与导出包 SHA-256 manifest，本机制不主张「密码学不可抵赖」。
-- **归档前缀性（L4）**：`check-archive-integrity.ts` 的可选 `--live-run-log=<path>` 校验归档内 `run-log.jsonl` 快照是 **live** run-log 的**记录边界前缀**：通过 ⇔ `archiveText === liveText`，或（`liveText.startsWith(archiveText)` 且 `archiveText` 非空且以 `"\n"` 结尾）。违规以 `[runLogPrefix]` 并入 `missingFiles`（blocking / exit 1）并**分类具名**：非前缀 / **非记录边界（第 N 行中途截断，末尾无换行）** / **空快照（0 字节）**；归档快照不可读 → 同前缀 fail-closed；**未提供该参数时只输出非阻断诊断**（退出码语义不变）。
+- **归档前缀性（L4）**：`check-archive-integrity.ts` 的可选 `--live-run-log=<path>` 校验归档内 `run-log.jsonl` 快照是 **live** run-log 的**记录边界前缀**；违规以 `[runLogPrefix]` 并入 `missingFiles`（blocking / exit 1），**未提供该参数时只输出非阻断诊断**（退出码语义不变）——完整判据与违规分类见 [`command-reference.md`](command-reference.md) 的「归档后置校验（阶段 8）」节「归档前缀性」条。
 
 ### R1 阶段动作完整性：按阶段分档
 

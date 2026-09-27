@@ -13,21 +13,13 @@
  *   2. 单点事实：追加判定（时间戳单调性 / runId 身份 / 更正痕迹）只在本文件；
  *   3. 历史不可变：`entries` 中的历史行始终来自入参 `existing`，本模块不就地修改任何入参对象。
  *
- * 契约（裁定 A / 裁定 B，取值逐字固定）：
- *   - ① 显式时间戳（记录自带 `timestamp` 或 `--timestamp=<iso>`）≤ 末条时间 → 拒绝
- *     （violation 文案含「时间戳不递增」+ 末条时间 + 建议），除非显式给出
- *     `allowClockAdjust`（对应 `--allow-clock-adjust=<reason>`），此时步进到末条 +1ms
- *     并在记录 `note` 追加 `clock-adjust:<reason>`；
- *   - `--timestamp` 注入成功时在记录 `note` 追加 `clock-injected:<iso>`；
- *   - 无条件来源（无显式时间戳）用 `now` 派生，取权威三态编号的 ②③ 两态（与
- *     `cli/wm-append-runlog.ts` 头注「时间戳三态」同序，② 与 ③ 不得合并叙述；
- *     裁定 A + 控制者裁定 F）：
- *     ② `now` **早于**末条历史时间（时钟真倒退：曾注入未来时间戳 / NTP 回拨 / 跨机拷贝）→ 默认拒绝
- *        （TIMESTAMP_NOT_INCREASING，文案含末条时间 + 建议）；仅显式 `allowClockAdjust` 时步进到
- *        末条 +1ms 并留痕 `clock-adjust:auto+<N>ms:<reason>`；
- *     ③ `now` 与末条**同毫秒**（同毫秒良性步进形态 `clock-adjust:auto+<N>ms`）或仅与**本次批内**
- *        已规划记录冲突 → 有界 +1ms 步进（不涉历史改写），`note` 追加 `clock-adjust:auto+<N>ms`；
- *     ②③ 均在 `diagnostics` 明示「时钟调整 +Nms」（与显式路径同口径：调整必留痕迹，绝不静默）；
+ * 契约（裁定 A / 裁定 B / 控制者裁定 F，取值逐字固定；对外口径见
+ * `w-model-dev/references/command-reference.md` 的 `wm-append-runlog.ts` 条目「时间戳三态」）：
+ *   - 新增记录的时间戳**严格递增三态**在本模块单点实现：显式时间戳 ≤ 末条 → 拒绝；无显式且
+ *     `now` 早于末条（时钟真倒退）→ 默认拒绝、仅显式 `allowClockAdjust` 放行；无显式且与末条
+ *     同毫秒或仅与本次批内已规划记录冲突 → 有界 +1ms 步进（不涉历史改写）。② 与 ③ 不得合并叙述；
+ *   - 任何注入 / 步进都在记录 `note` 与返回的 `diagnostics` 留可复核痕迹（`clock-injected:` /
+ *     `clock-adjust:`），绝不静默调整；
  *   - 历史末条扫描用宽容口径 `Number.isFinite(Date.parse(v))`（schema 的 `format: date-time` 对大小写 /
  *     分隔符宽容，严格正则只用于新注入 / 新记录），避免历史行时间戳被跳过导致单调性下界失真；
  *   - `--correct=<runId>` 只**新增**一条更正记录（`note` 含 `correction-of:<runId>`），
@@ -328,7 +320,11 @@ function resolveTimestamp(
     collector.diagnostics.push(
       `时钟调整 +${stepped - nowMs}ms（now=${opts.now} ≤ 末条时间 ${floor.text}，按末条/批内 +1ms 步进）`,
     );
-    return { ms: stepped, text: new Date(stepped).toISOString(), traces: [`clock-adjust:auto+${stepped - nowMs}ms`] };
+    return {
+      ms: stepped,
+      text: new Date(stepped).toISOString(),
+      traces: [`clock-adjust:auto+${stepped - nowMs}ms`],
+    };
   }
   return { ms: nowMs, text: new Date(nowMs).toISOString(), traces: [] };
 }
@@ -439,7 +435,10 @@ function planIncoming(
     if (isRelease || hasAnchor(record)) {
       const prefix =
         historyRawLines === undefined && existing.length > 0
-          ? ({ ok: false, reason: '未提供（或长度不匹配）historyRawLines，历史行原始字节不可得' } as const)
+          ? ({
+              ok: false,
+              reason: '未提供（或长度不匹配）historyRawLines，历史行原始字节不可得',
+            } as const)
           : anchorPrefixRawLines(existing, historyRawLines ?? [], planned, resolved.ms);
       if (!prefix.ok) {
         if (hasAnchor(record)) {
@@ -453,7 +452,10 @@ function planIncoming(
       } else {
         const anchor = computeRunLogAnchor(prefix.lines);
         if (hasAnchor(record) && !sameAnchor(record.runLogAnchor, anchor)) {
-          const provided = record.runLogAnchor as { lines?: unknown; sha256?: unknown };
+          const provided = record.runLogAnchor as {
+            lines?: unknown;
+            sha256?: unknown;
+          };
           collector.violate(
             'ANCHOR_MISMATCH',
             `${label}自带放行锚与写入前前缀自算值不一致（provided lines=${String(provided.lines)}/sha256=${String(

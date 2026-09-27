@@ -74,8 +74,9 @@ export interface ArchiveIntegrityCheckResult {
 /**
  * 归档前缀性注入选项（L4，D-3b；缺省 = 未启用，零行为变化）。
  *
- * 归档内 `run-log.jsonl` 快照必须是 **live** run-log 的**记录边界前缀**（非空、以换行结尾；判据见下方 `checkRunLogPrefix`）：
- * live 侧在归档后被截断/重排/改写，或归档快照被改写（两者不可同真）即刻不成立 → blocking。
+ * 归档内 `run-log.jsonl` 快照必须是 **live** run-log 的**记录边界前缀**（判据实现见下方
+ * `checkRunLogPrefix`；对外判据与违规分类见 `references/command-reference.md`「归档后置校验（阶段 8）」
+ * 节「归档前缀性」条）：live 侧在归档后被截断/重排/改写，或归档快照被改写（两者不可同真）即刻不成立 → blocking。
  * 两侧文本由 CLI 层实读注入（logic 层零 `node:fs`，同 `progressMdContent` 先例）。
  *
  * 语义分派（fail-closed 方向）：
@@ -163,7 +164,10 @@ export function deriveArchiveIntegrityManifest(archiveDirContents: Set<string>):
   const planSnapshots = rootPlanSnapshots(archiveDirContents);
   if (planSnapshots.length === 1) {
     const planFile = planSnapshots[0]!;
-    return { codingPlanSnapshot: true, changeId: planFile.slice(0, -'.plan.md'.length) };
+    return {
+      codingPlanSnapshot: true,
+      changeId: planFile.slice(0, -'.plan.md'.length),
+    };
   }
   if (planSnapshots.length > 1) return { codingPlanSnapshot: true };
   return { codingPlanSnapshot: false };
@@ -230,16 +234,15 @@ function checkCodingPlanSnapshot(
 /**
  * 归档 run-log 前缀性校验（L4，D-3b）：归档快照必须是 live run-log 的**记录边界前缀**。
  *
- * 通过判据（A1 收紧，审查裁定）：
- *   `archivedText === liveText`（无新增记录），
- *   或（`liveText.startsWith(archivedText)` 且 `archivedText.length > 0` 且 `archivedText.endsWith('\n')`）。
+ * 判据实现（A1 收紧，审查裁定）：全等，或 live 以归档为前缀**且**归档非空**且**以 `"\n"` 结尾
+ * （判据细节与逐形态违规文案见本函数；对外判据与违规分类见 `references/command-reference.md`
+ * 「归档后置校验（阶段 8）」节「归档前缀性」条）。
  *
- * 为什么必须收紧：只做逐字 `startsWith` 时「快照在第 N 行**中途被截断**」（末尾无换行）与「0 字节空快照」
- * 都会判通过——前者让「归档被截断」这一真实突变静默通过，后者让 L4 在归档快照缺失内容时形同虚设
+ * 为什么必须收紧：只做逐字 `startsWith` 会让「归档被截断」与「归档快照无内容」两类真实突变静默通过
  * （`ARCHIVE_INTEGRITY_CHECKLIST` 只查存在性，没有其它判据会拦）。
  *
- * 违规以 `[runLogPrefix]` 前缀并入 `missingFiles`（blocking），且**分类具名**三种形态：
- * 非前缀 / 非记录边界（中途截断）/ 空快照；未提供 live 文本时不产生任何条目（非阻断，退出码语义不变）。
+ * 违规以 `[runLogPrefix]` 前缀并入 `missingFiles`（blocking）；未提供 live 文本时不产生任何条目
+ * （非阻断，退出码语义不变）。
  */
 function checkRunLogPrefix(options: ArchiveRunLogPrefixOptions, missingFiles: string[], presentFiles: string[]): void {
   const liveText = options.liveRunLogText;
