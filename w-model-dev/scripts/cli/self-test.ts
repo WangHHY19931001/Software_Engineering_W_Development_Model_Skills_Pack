@@ -14,7 +14,7 @@
  *   0  所有样本的校验结果与期望一致
  *   1  至少一个样本不匹配
  *
- * 样本目录约定（samples/<area>/，27 个样本子目录（35+1 个用例数组），详见 samples/README.md 覆盖矩阵）：
+ * 样本目录约定（samples/<area>/，27 个样本子目录（45 个 `*_CASES` 用例数组），详见 samples/README.md 覆盖矩阵）：
  *   verifier / gate / graph / tla / code-tla / bdd / coverage / exemption / budget /
  *   run-log / maturity / checkpoint / rootcause / preventive-review / iceberg /
  *   tla-bdd-sync / state-machine / design-contract / signature-chain /

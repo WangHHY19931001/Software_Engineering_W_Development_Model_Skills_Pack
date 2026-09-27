@@ -8,12 +8,13 @@
  * onExceed/killSwitch 合法性与触发状态。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--phase=N]
+ *   npx tsx w-model-dev/scripts/cli/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl> --phase=<N>]（阶段门调用必带：R6/R5-b 用量校验的接线判据）
  *
  * 参数：
  *   budget.json           budget.json 文件路径
  *   --project=<path>      project.json 路径（可选，用于读取 projectUpdatedAt 做 R1 时效性校验；读取侧经 project.schema.json 校验，缺失/非法/不符 schema → exit 2）
- *   --run-log=<path>      run-log.jsonl 路径（可选，用于统计返工次数做 R5 触发检测 + 累计 tokens 做 R6 用量实效校验）
+ *   --run-log=<path>      run-log.jsonl 路径（可选，用于统计返工次数做 R5 触发检测 + 累计 tokens 做 R6 用量实效校验）；
+ *                         阶段门调用必带 --run-log 与 --phase=N（R6/R5-b 用量校验的接线判据）
  *                         返工口径（D-4a）：action ∈ {rework, fix, emergency-fix} 或 outcome ∈ {fail, rework}
  *                         的条数；tlaReworkCount 再从中筛 note/target 含 TLA 的条数（详见 countReworks）
  *                         用量口径（D-4b）：Σtokens 只累计有限非负数的 tokens 字段（详见 sumTokens）；
@@ -233,7 +234,7 @@ async function main(): Promise<void> {
       rule: 'P0-1',
       message: '参数缺失 <budget.json>',
       detail:
-        '用法: npx tsx w-model-dev/scripts/cli/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--phase=N]',
+        '用法: npx tsx w-model-dev/scripts/cli/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl> --phase=<N>]（阶段门调用必带：R6/R5-b 用量校验的接线判据）',
       exitCode: 2,
     });
     return;

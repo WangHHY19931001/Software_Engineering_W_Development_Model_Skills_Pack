@@ -14,7 +14,7 @@
 | tla-manifest.json | TLA+ 行为门禁（SANY + TLC） | `npx tsx w-model-dev/scripts/cli/check-tla-model.ts <manifest.json> [--phase=N]` |
 | bdd-manifest.json | BDD 模型门禁（D1-D8 八维度：头标注/状态机/TLA+ 等价/step 绑定/scenario 路径/RTM 映射/SD 覆盖） | `npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json> --phase=N`，项目阶段门参数见 [bdd.md §5.3](bdd.md#53-调用方式)：1-4 TLA evidence，2-4 graph，5-8 graph + required Cucumber report |
 | tla-manifest + graph + rtm + src/ | 阶段 5 代码-TLA+ 一致性回归 | `npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts --manifest=... --graph=... --rtm=... --src=...` |
-| budget.json | 预算超限检查（**必带** `--run-log`；不传时 R6/R5-b 不生效，仅输出非阻断诊断） | `npx tsx w-model-dev/scripts/cli/check-budget.ts .w-model/budget.json --project=.w-model/project.json --phase=<N> --run-log=.w-model/run-log.jsonl` |
+| budget.json | 预算超限检查（**必带** `--run-log`；不传时 R6/R5-b 不生效，仅输出非阻断诊断） | `npx tsx w-model-dev/scripts/cli/check-budget.ts .w-model/budget.json --project=.w-model/project.json --run-log=.w-model/run-log.jsonl --phase=N` |
 | run-log.jsonl | 运行日志完整性检查 | `npx tsx w-model-dev/scripts/cli/check-run-log.ts <run-log.jsonl> [--gate-logs=] [--tla-manifest=]` |
 | maturity.json | 成熟度等级检查 | `npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=] [--run-log=]` |
 | run-log.jsonl（含 CHECKPOINT） | 决策内容具体性检查 | `npx tsx w-model-dev/scripts/cli/check-checkpoint.ts <run-log.jsonl> [--checkpoint-log=]` |
