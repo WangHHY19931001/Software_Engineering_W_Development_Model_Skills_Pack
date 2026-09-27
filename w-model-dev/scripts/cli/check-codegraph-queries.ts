@@ -53,7 +53,7 @@
  * @module
  */
 
-import { existsSync, lstatSync, readdirSync, readFileSync, statSync, type Stats } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import * as path from 'node:path';
 
 import { exitWithError } from '../lib/cli-error.js';
@@ -137,11 +137,12 @@ function phaseQueryFiles(queriesDir: string, phase: number): { own: string[]; fo
  * 但必须留下 degradationReason 与替代证据（禁止隐形默认）。
  *
  * G3-1：以 `statSync` 类型判别替代 `existsSync`——**目录**（标准索引形态）与**单文件**索引
- * 均算「在盘」；悬挂符号链接（ENOENT）/ FIFO / socket 等非目录非文件条目不算（后者旧判据
- * `existsSync` 会误判为「在盘」并强制 cli 声明，与索引实际不可用相悖）。探测基准保持
- * **projectRoot**（「改 git 顶层」半项已销：无 git 工作区形态本无 git 顶层，projectRoot
- * 基准与 e2e/降级形态自洽）。非目录/文件形态由调用方经 `codegraphIndexAnomaly` 输出一行
- * 非阻断诊断（探测按「无索引」处理，允许显式降级）。
+ * 均算「在盘」（stat 跟随符号链接，故**有效符号链接 / junction 指向真实索引**同在盘）；
+ * 悬挂符号链接（ENOENT）/ FIFO / socket 等非目录非文件条目不算（后者旧判据 `existsSync`
+ * 会误判为「在盘」并强制 cli 声明，与索引实际不可用相悖）。探测基准保持 **projectRoot**
+ * （「改 git 顶层」半项已销：无 git 工作区形态本无 git 顶层，projectRoot 基准与 e2e/降级形态自洽）。
+ * 探测判为不可用的形态由调用方经 `codegraphIndexAnomaly` 输出一行非阻断诊断（该诊断与本节
+ * 同用 stat 语义：可达的链接目标是索引时零诊断，仅「stat 不可达且 lstat 占位」或非目录非文件才提示）。
  */
 export function codegraphIndexPresent(projectRoot: string): boolean {
   try {
@@ -154,21 +155,36 @@ export function codegraphIndexPresent(projectRoot: string): boolean {
 }
 
 /**
- * 非阻断诊断（G3-1）：`.codegraph` 条目在盘、但既非目录也非普通文件（悬挂符号链接 / FIFO /
- * socket 等退化形态）。探测按「无索引」处理（允许显式降级），此诊断只把该形态显式化——
- * 不进 violations、不改退出码。返回 `undefined` 即形态正常（条目缺席 / 目录 / 普通文件）。
+ * 非阻断诊断（G3-1）：把「探测判为不可用、但条目确实占位」的退化为一行提示——
+ * 不进 violations、不改退出码。返回 `undefined` 即形态正常。
+ *
+ * **触发条件必须与 `codegraphIndexPresent` 的 stat 语义对齐（修复轮 1 / 审查 Important-1）**：
+ * 先 `statSync`（**跟随**符号链接）——
+ *   - stat 可达且为目录/普通文件 → 正常形态（含**有效符号链接 / junction 指向真实索引**），零诊断；
+ *   - stat 可达但既非目录也非普通文件（FIFO / socket 等）→ 探测判「无索引」，出诊断；
+ *   - stat 不可达 → 再 `lstatSync` 区分「条目缺席」（正常，零诊断）与「悬挂符号链接」（退化，出诊断）。
+ * 判据是「**探测视为不可用**（present=false）**且** stat 确实不可达 / 类型不可用」而非「lstat 是不是
+ * 符号链接」——否则 win32 上把共享索引 junction 进项目根的常见形态会被误报，且文案会与
+ * 「索引在盘 → 禁止降级」的判定自相矛盾（诱导 Agent 声明被门禁拒绝的降级）。
  */
 export function codegraphIndexAnomaly(projectRoot: string): string | undefined {
   const target = path.join(projectRoot, '.codegraph');
-  let st: Stats;
   try {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同一受控条目的 lstat 形态判别（lstat 不跟随符号链接）
-    st = lstatSync(target);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控条目与 codegraphIndexPresent 同源的 stat 探测
+    const st = statSync(target);
+    return st.isDirectory() || st.isFile()
+      ? undefined
+      : `${target} 存在但既非目录也非普通文件（FIFO / socket 等），索引探测按「无索引」处理（允许显式降级声明）`;
+  } catch {
+    // stat 不可达：可能是正常缺席，也可能是悬挂符号链接——交由下方 lstat 区分
+  }
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上；lstat 不跟随符号链接，用于区分「缺席」与「悬挂链接占位」
+    lstatSync(target);
   } catch {
     return undefined; // 条目缺席：正常形态（无索引）
   }
-  if (st.isDirectory() || st.isFile()) return undefined;
-  return `${target} 存在但既非目录也非普通文件（悬挂符号链接 / FIFO / socket 等），索引探测按「无索引」处理（允许显式降级声明）`;
+  return `${target} 存在但不可达（悬挂符号链接等），索引探测按「无索引」处理（允许显式降级声明）`;
 }
 
 /**
@@ -567,9 +583,10 @@ async function main(): Promise<void> {
 
   const abs = path.resolve(file);
 
-  // G3-1 非阻断诊断：`.codegraph` 条目在盘但既非目录也非普通文件（退化形态：悬挂符号链接 /
-  // FIFO / socket 等）时提示一行——探测按「无索引」处理并允许显式降级，此诊断只把形态显式化，
-  // 不进 violations / 不改退出码；正常形态（缺席 / 目录 / 普通文件）零输出。
+  // G3-1 非阻断诊断：`.codegraph` 探测判为不可用时提示一行（stat 不可达但 lstat 占位 = 悬挂符号
+  // 链接；或 stat 可达但既非目录也非普通文件 = FIFO / socket 等）——探测按「无索引」处理并允许
+  // 显式降级，此诊断只把形态显式化，不进 violations / 不改退出码；正常形态（缺席 / 目录 / 普通
+  // 文件 / 指向真实索引的有效符号链接或 junction）零输出，与探测的 stat 语义一致。
   const indexAnomaly = codegraphIndexAnomaly(abs);
   if (indexAnomaly !== undefined) {
     process.stderr.write(`○ 诊断：${indexAnomaly}\n`);
