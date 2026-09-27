@@ -520,7 +520,7 @@ interface RunLogEntry {
 **使用约定**：
 
 - `run-log.jsonl` 是 append-only：不得修改历史记录；运行时读取可跳过损坏行并记录 note，但 `check-run-log.ts` 门禁对空/坏行 **fail-closed**（空/空白/malformed-only/valid+malformed 一律 exit 1，parseErrors 并入 blocking，消息保留 `PARSE_INCOMPLETE` 前缀），不得把坏行当作可放行的证据缺失。
-- **时间戳真值 + 禁止回溯改写（D-5①，反伪造）**：记录的时间戳必须为**写入时刻真值**；**禁止回溯改写历史行或重排时间戳**（改时间戳 / 改 note / 删行 / 插行后重排时间轴同样禁止；可检测性由 R7 追加序 + R8 轨迹 + R9-R11 语义判据承担）；记录修正**只允许**经 O 侧统一追加器 `wm-append-runlog` **追加更正记录**（历史行逐字节不变），不得手改历史行；禁令与替代动作成对，手搓改行不是合法路径。
+- **时间戳真值 + 禁止回溯改写（D-5①，反伪造）**：记录的时间戳必须为**写入时刻真值**；**禁止回溯改写历史行或重排时间戳**（改时间戳 / 改 note / 删行 / 插行后重排时间轴同样禁止）。可检测性由两类承载共同承担——**源派生判据**（读侧现算）与交付时的**文件级证据链**（导出清单 SHA-256 / provenance、角色签名链）；**逐条判据与「哪些改写形态不再可检出」的边界见 SSoT §10D.6（`docs/skill-design-document_SSoT.md`）「run-log 时间戳真值 + 禁止回溯改写」条**（本文件不复述枚举，避免两处口径漂移）。记录修正**只允许**经 O 侧统一追加器 `wm-append-runlog` **追加更正记录**（历史行逐字节不变），不得手改历史行；禁令与替代动作成对，手搓改行不是合法路径。
 - **追加与更正唯一入口（D-5①/N-5）**：O 追加 run-log 一律经 `scripts/cli/wm-append-runlog.ts`（写盘复用 `state-write-logic` 的锁 + 备份 + tmp/rename + 回读），不得手搓追加脚本或直接 `Write`/`Edit` run-log。用法示例（命令形态照该工具既有登记 `<run-log.jsonl> [--from=<json|jsonl>|--stdin] [--correct=<runId>] [--timestamp=<iso>] [--allow-clock-adjust=<reason>] [--lock-timeout=] [--json]`）：
   - 追加新记录：`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin`
   - 更正既有记录（只新增一条更正记录，`note` 含 `correction-of:<runId>`）：`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin --correct=<runId>`
