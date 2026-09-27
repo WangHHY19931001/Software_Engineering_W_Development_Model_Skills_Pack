@@ -242,6 +242,11 @@
       "type": "integer",
       "minimum": 0
     },
+    "parentDispatchId": {
+      "description": "可选。多归账分派的主记录 ID：R3 三维度等同一分派多条归账时，附属条目以该字段指向主条目 runId。仅用于 check-budget 疑似重复归账判定的精确化（在场时同 parentDispatchId 的条目不互计重复组）；legacy 记录缺字段维持现判定。Σtokens 上界口径不变——字段不参与任何去重扣减。",
+      "type": "string",
+      "minLength": 1
+    },
     "gateExitCode": {
       "description": "门禁脚本退出码（0=通过/1=校验失败/2=输入错误）；仅 gate/tla-gate/graph-gate/checkpoint 类动作填写，其他为 null；须与 gate-logs/ 存档一致（约束 #9 防伪造）",
       "type": ["integer", "null"]

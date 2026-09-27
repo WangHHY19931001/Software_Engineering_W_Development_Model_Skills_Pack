@@ -11,6 +11,8 @@
  *   - R5 真值通道（D-7）：只统计 run-log 的 `operationalFailureModes` 字段，note 中的 O1..O6
  *     字样（含评审规则编号同名情形，如 O3 既是运维失败模式也是 Verifier 扣分规则）按引用处理，
  *     仅作非阻断诊断；未提供 --run-log 时诊断「R5 未生效」而非静默跳过
+ *   - R5 读路径枚举守卫（G3-18）：过滤非 O1~O6 取值（`'O9'`/拼写错误/非字符串）并出非阻断诊断；
+ *     `uniqueItems` 与「存在即累加数组长度」口径不变（`['O3','O3']` 仍计 2）
  *   - CLI 三态（真实 tsx 子进程 + 真实临时 run-log）：仅引用 → exit 0 + 诊断 /
  *     字段标注 3 次 → exit 1 + R5 违规 / 未提供 --run-log → exit 0 + 诊断
  */
@@ -23,7 +25,12 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { buildR5Diagnostics, collectLexicalMentions, countOperationalFailures } from '../cli/check-maturity.js';
+import {
+  buildR5Diagnostics,
+  collectLexicalMentions,
+  countOperationalFailures,
+  summarizeOperationalFailures,
+} from '../cli/check-maturity.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { runSync } from '../lib/run-sync.js';
 import { checkMaturity, type MaturityConfig } from '../logic/maturity-logic.js';
@@ -353,5 +360,66 @@ describe('R5 三态补强（G2-1）', () => {
     expect(validateBySchema('run-log', duplicate).valid).toBe(false); // 重复值被 uniqueItems 拒收
     expect(validateBySchema('run-log', single).valid).toBe(true); // 对照：单值形态合法
     expect(countOperationalFailures([duplicate])).toBe(2); // 计数口径 = 数组长度（合法输入不含重复值，不去重）
+  });
+});
+
+// ==================== R5 读路径枚举守卫（G3-18，任务 4 审查增补） ====================
+
+/**
+ * 上批延后项「R5 计数不校验 enum/uniqueItems（schema 声明与读取路径不同门）」：schema 只管写入侧，
+ * CLI 直读 run-log.jsonl 无 schema 前置校验，故读取路径再过滤一次非 O1~O6 取值并出非阻断诊断。
+ * **语义边界（不得越界）**：`uniqueItems` 与「存在即累加数组长度」口径不变——`['O3','O3']` 仍计 2
+ * （由上方 G2-1 用例锁定），本守卫只处理非 enum 取值（如 `'O9'`、拼写错误、非字符串）。
+ */
+describe('R5 读路径枚举守卫（G3-18）', () => {
+  it("非 enum 取值 ['O9'] → 计数 0（不计入 R5 判定）+ 诊断行含「非 O1~O6」", () => {
+    const rows = [mkEntry({ operationalFailureModes: ['O9'] })];
+    const summary = summarizeOperationalFailures(rows);
+    expect(summary).toEqual({ count: 0, ignoredCount: 1 });
+    expect(countOperationalFailures(rows)).toBe(0); // 越界取值不进 R5 判定
+    // 诊断经 buildR5Diagnostics 第三参并入（CLI 与 self-test 共用同一文案源），非阻断
+    const diagnostics = buildR5Diagnostics(true, [], summary.ignoredCount);
+    expect(diagnostics.some((d) => d.includes('非 O1~O6'))).toBe(true);
+    expect(diagnostics).toContain('1 项非 O1~O6 取值已忽略（schema 应拒绝；读取路径防御）');
+    // R5 判定不受影响：命中数 0 < streak 3 → passed（非阻断）
+    const r = checkMaturity(mkMaturity(3), {
+      operationalFailureCount: summary.count,
+      diagnostics,
+    });
+    expect(r.passed).toBe(true);
+    expect(r.diagnostics).toContain('1 项非 O1~O6 取值已忽略（schema 应拒绝；读取路径防御）');
+  });
+
+  it("拼写错误 / 非字符串取值同样被过滤（'O7' / 'o3' / 7 / null），合法值照常累加", () => {
+    const rows = [
+      mkEntry({ operationalFailureModes: ['O1', 'O7'] }),
+      mkEntry({ operationalFailureModes: ['o3'] }),
+      mkEntry({ operationalFailureModes: [7] }),
+      mkEntry({ operationalFailureModes: [null, 'O6'] }),
+    ];
+    expect(summarizeOperationalFailures(rows)).toEqual({ count: 2, ignoredCount: 4 });
+  });
+
+  it("锁定 schema 语义未被本守卫改变：['O3','O3'] → 计数 2（长度口径，不去重）+ 零诊断", () => {
+    const rows = [mkEntry({ operationalFailureModes: ['O3', 'O3'] })];
+    expect(countOperationalFailures(rows)).toBe(2); // 与 G2-1 已绿用例同口径（不得改为去重计数）
+    expect(summarizeOperationalFailures(rows)).toEqual({ count: 2, ignoredCount: 0 });
+    expect(buildR5Diagnostics(true, [], 0)).toEqual([]); // 无越界取值 → 零输出
+  });
+
+  it('CLI 端到端：run-log 含非 enum 取值 → exit 0 + 诊断（schema 非法输入在读取路径被防御）', async () => {
+    const maturity = await write('maturity.json', VALID_MATURITY);
+    // 该行 schema 不合法（O9 不在 enum 内），但 CLI 直读 JSONL 无 schema 前置校验 → 走读取路径守卫
+    const rows = [runLogEntry('p1-G-non-enum', { operationalFailureModes: ['O9'] })].join('\n');
+    const runLog = await write('run-log.jsonl', rows);
+    const r = runSync(process.execPath, [
+      tsxCli,
+      path.join(cliDir, 'check-maturity.ts'),
+      maturity,
+      `--run-log=${runLog}`,
+    ]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('1 项非 O1~O6 取值已忽略（schema 应拒绝；读取路径防御）');
+    expect(maturitySummary(r.stdout ?? '')['passed']).toBe(true);
   });
 });

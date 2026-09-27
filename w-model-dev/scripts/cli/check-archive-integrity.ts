@@ -26,7 +26,9 @@
  *   --live-run-log=<path>  live run-log.jsonl 路径（仅等号形态，D-3b/L4）：提供时校验归档快照
  *                      `run-log.jsonl` 是 live 的**记录边界前缀**（非空且以换行结尾），否则 `[runLogPrefix]` 并入 missingFiles
  *                      （blocking / exit 1）；**未提供时只输出非阻断诊断**（退出码语义不变）
- *   --json        机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
+ *   （隐式读取）归档根 `archive-manifest.json`：存在时其实读文本注入 logic 做 G3-14 绝对路径诊断；
+ *                      缺失/不可读 = 未提供清单（本诊断零输出，不是门禁失败）
+ *   --json        机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse，含 diagnostics 非阻断诊断键）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
  *   0  校验通过
@@ -34,7 +36,12 @@
  *   2  输入错误（目录不存在 / --live-run-log 路径不存在或参数非法）
  *
  * 输出：
- *   stdout 打印结构化校验报告（人类可读 + 收尾 ARCHIVE_INTEGRITY_JSON 摘要，便于 Agent 正则截取）
+ *   stdout 打印结构化校验报告（人类可读 + 非阻断诊断 + 收尾 ARCHIVE_INTEGRITY_JSON 摘要，便于 Agent 正则截取）
+ *   非阻断诊断（G3-14）：归档根 `archive-manifest.json` 的 `files[]` 条目中含疑似本机绝对路径
+ *   （含 `\`，或以盘符 / `/` 开头）的计数 >0 时，输出「归档清单含 N 条疑似本机绝对路径条目——交付前须经
+ *   wm-export-evidence 脱敏导出（归档仅受控留档）」；`--json` 的 `diagnostics` 键透传（**仅在非空时出现**，
+ *   同 check-maturity / check-budget 口径）。未提供清单（文件缺失/不可读）或 0 命中时不打印；
+ *   纯诊断，不进 missingFiles、不改退出码。
  *   exit 2 场景 stdout 输出 `ERROR_JSON {...}`（category/message/exitCode=2；file/rule/field/detail 仅在有值时输出进 ERROR_JSON）
  *
  * 错误字段（ERROR_JSON）：
@@ -167,6 +174,17 @@ async function main(): Promise<void> {
   }
 
   const contents = await walkDir(archiveAbs, archiveAbs);
+
+  // G3-14：归档清单（`archive-manifest.json`）实读——存在才注入 logic（zero-fs：文本注入，仿 liveRunLogText 先例）。
+  // 缺失/不可读 = 未提供清单 → 本诊断零输出（非阻断；归档清单本身不是本门禁的强制快照项）。
+  let archiveManifestText: string | undefined;
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- path 由受控 archiveAbs（main 入参 resolve 后）拼接的固定子路径
+    archiveManifestText = await fs.readFile(path.join(archiveAbs, 'archive-manifest.json'), 'utf-8');
+  } catch {
+    // 未提供清单：不注入（零输出）
+  }
+
   // 编码计划归档快照条件项：显式 --change-id 优先（无条件启用）；未传时按归档根恰一 *.plan.md 自动派生
   const manifest =
     explicitChangeId === undefined
@@ -224,7 +242,13 @@ async function main(): Promise<void> {
       ...(archivedText !== undefined ? { archivedRunLogText: archivedText } : {}),
     };
   }
-  const result = checkArchiveIntegrity(contents, undefined, manifest, runLogPrefix);
+  const result = checkArchiveIntegrity(
+    contents,
+    undefined,
+    manifest,
+    runLogPrefix,
+    archiveManifestText === undefined ? undefined : { archiveManifestText },
+  );
   const prefixSource =
     liveRunLogAbs === undefined
       ? '未提供 --live-run-log（跳过归档 run-log 前缀性校验，非阻断）'
@@ -234,6 +258,7 @@ async function main(): Promise<void> {
   const exitCode = result.passed ? 0 : 1;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
+  // diagnostics（G3-14 归档清单绝对路径披露计数）仅在非空时出现（同 check-maturity / check-budget 口径）
   if (jsonMode) {
     printJsonReport(
       {
@@ -243,6 +268,7 @@ async function main(): Promise<void> {
         violations: buildViolationDistribution(result.missingFiles.length),
         snapshotSource,
         runLogPrefix: prefixSource,
+        ...(result.diagnostics.length > 0 ? { diagnostics: result.diagnostics } : {}),
         durationMs: Date.now() - startTime,
       },
       exitCode,
@@ -274,6 +300,15 @@ async function main(): Promise<void> {
     console.log('  w-model-dev/references/hard-constraints.md（反模式节）#31');
   }
 
+  // 非阻断诊断（G3-14 归档清单绝对路径披露计数）：不影响退出码，但须可见
+  // （通过与否都打印——归档允许保留执行证据原貌，交付前须走脱敏导出链）
+  if (result.diagnostics.length > 0) {
+    console.log('非阻断诊断：');
+    for (const d of result.diagnostics) {
+      console.log(`  - ${d}`);
+    }
+  }
+
   printGateReport(
     'ARCHIVE_INTEGRITY',
     {
@@ -282,6 +317,7 @@ async function main(): Promise<void> {
       missingFiles: result.missingFiles,
       checkedPhases: result.checkedPhases,
       snapshotSource,
+      ...(result.diagnostics.length > 0 ? { diagnostics: result.diagnostics } : {}),
     },
     exitCode,
   );

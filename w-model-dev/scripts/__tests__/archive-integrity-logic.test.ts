@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import {
   checkArchiveIntegrity,
   deriveArchiveIntegrityManifest,
+  countArchiveManifestAbsolutePaths,
   ARCHIVE_INTEGRITY_CHECKLIST,
   type ArchiveIntegrityManifest,
 } from '../logic/archive-integrity-logic.js';
@@ -324,5 +325,78 @@ describe('archive-integrity-logic 归档前缀性（L4）', () => {
     const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, { liveRunLogText: 'A\nB\n' });
     expect(r.missingFiles.some((m) => m.includes('[runLogPrefix]'))).toBe(true);
     expect(r.passed).toBe(false);
+  });
+});
+
+// ==================== 归档清单绝对路径诊断（G3-14） ====================
+
+/**
+ * G3-14：归档清单（`archive-manifest.json`）`files[]` 条目中疑似本机绝对路径的**纯诊断**计数。
+ * 语义边界：不进 missingFiles、不改 passed / 退出码；未提供清单文本或 0 命中时 `diagnostics` 为空。
+ */
+describe('archive-integrity-logic 归档清单绝对路径诊断（G3-14）', () => {
+  it('countArchiveManifestAbsolutePaths：对象条目取 path（盘符 / POSIX 根 / 反斜杠三形态）各自命中', () => {
+    const manifest = JSON.stringify({
+      files: [
+        { path: 'C:\\ws\\proj\\.w-model\\gate-logs\\phase-8.json', kind: 'gate-log' },
+        { path: '/home/user/proj/.w-model/run-log.jsonl', kind: 'run-log' },
+        { path: 'gate-logs\\graph-gate.json', kind: 'gate-log' },
+        { path: 'gate-logs/graph-gate.json', kind: 'gate-log' }, // 相对 POSIX → 不命中
+        { path: './run-log.jsonl', kind: 'run-log' }, // 相对（./ 前缀）→ 不命中
+        { sha256: 'x' }, // 无 path → 不命中
+      ],
+    });
+    expect(countArchiveManifestAbsolutePaths(manifest)).toBe(3);
+  });
+
+  it('countArchiveManifestAbsolutePaths：字符串条目取自身（装配器 archive-manifest.json 形态）', () => {
+    const manifest = JSON.stringify({
+      files: ['requirements.md', 'gate-logs/graph-gate.json', 'D:\\archive\\x.json', '\\server\\share'],
+    });
+    expect(countArchiveManifestAbsolutePaths(manifest)).toBe(2); // 盘符 + UNC 反斜杠
+  });
+
+  it('countArchiveManifestAbsolutePaths：非法 JSON / 无 files[] / 非数组条目 → 0（本诊断不做输入校验）', () => {
+    expect(countArchiveManifestAbsolutePaths('not json')).toBe(0);
+    expect(countArchiveManifestAbsolutePaths('{}')).toBe(0);
+    expect(countArchiveManifestAbsolutePaths('{"files": "C:\\\\x"}')).toBe(0);
+    expect(countArchiveManifestAbsolutePaths('{"files": [42, null, true]}')).toBe(0);
+  });
+
+  it('checkArchiveIntegrity 正例：清单含绝对路径条目 → 一条非阻断诊断，passed / missingFiles 不变', () => {
+    const manifestText = JSON.stringify({
+      files: [
+        { path: 'C:\\ws\\.w-model\\gate-logs\\p8.json', kind: 'gate-log' },
+        { path: 'gate-logs/p8.json', kind: 'gate-log' },
+      ],
+    });
+    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, undefined, {
+      archiveManifestText: manifestText,
+    });
+    expect(r.diagnostics).toEqual([
+      '归档清单含 1 条疑似本机绝对路径条目——交付前须经 wm-export-evidence 脱敏导出（归档仅受控留档）',
+    ]);
+    expect(r.missingFiles).toEqual([]);
+    expect(r.passed).toBe(true); // 纯诊断：不阻断
+  });
+
+  it('checkArchiveIntegrity 反例：清单全为相对路径 → 零诊断（0 命中不打）', () => {
+    const manifestText = JSON.stringify({ files: ['run-log.jsonl', { path: 'gate-logs/p8.json' }] });
+    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, undefined, {
+      archiveManifestText: manifestText,
+    });
+    expect(r.diagnostics).toEqual([]);
+    expect(r.passed).toBe(true);
+  });
+
+  it('checkArchiveIntegrity：未提供清单文本 / 五参缺省 → diagnostics 为空（既有调用零回归）', () => {
+    expect(checkArchiveIntegrity(loadFullContents()).diagnostics).toEqual([]);
+    expect(checkArchiveIntegrity(loadFullContents(), undefined, undefined, undefined, {}).diagnostics).toEqual([]);
+    // 清单文本在场但归档清单缺失违规并存时，诊断与违规互不影响（诊断不进 missingFiles）
+    const r = checkArchiveIntegrity(new Set<string>(), undefined, undefined, undefined, {
+      archiveManifestText: JSON.stringify({ files: ['C:\\x'] }),
+    });
+    expect(r.passed).toBe(false); // 清单缺失照常 blocking
+    expect(r.diagnostics).toHaveLength(1); // 诊断照常输出
   });
 });
