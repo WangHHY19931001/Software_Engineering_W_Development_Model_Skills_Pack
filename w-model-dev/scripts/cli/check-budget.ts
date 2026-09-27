@@ -348,7 +348,7 @@ async function main(): Promise<void> {
   }
   if (duplicateGroupCount > 0) {
     diagnostics.push(
-      `Σtokens 为上界口径；疑似重复归账 ${duplicateGroupCount} 组（同 timestamp/tokens/duration）——同一分派的多条归账会重复累计，预算判定按上界执行（不去重，口径见 data-models.md「用量实效校验（R6）」）`,
+      `Σtokens 为上界口径；疑似重复归账 ${duplicateGroupCount} 组（同 parentDispatchId/timestamp/tokens/duration_s 键）——同一分派的多条归账会重复累计，预算判定按上界执行（不去重，口径见 data-models.md「用量实效校验（R6）」）`,
     );
   }
 

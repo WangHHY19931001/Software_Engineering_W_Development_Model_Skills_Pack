@@ -397,7 +397,7 @@ interface BudgetConfig {
 - 预算检查不替代门禁脚本（反模式 #3/#6）：预算超限触发暂停/告警，放行仍由 G 子代理退出码决定。
 - `rootcauseParallelBudget` 为多角度 R 的 token 预算配置（字段名保留向后兼容，实际含义为「每轮多角度 R 的 token 预算」，不论并行/串行均累计）。由 [`check-budget.ts`](../scripts/cli/check-budget.ts) R4-A 规则校验：每轮 persona 数 ≤ `maxPersonasPerRound`、每个 persona tokens ≤ `maxTokensPerPersona`、每轮总 tokens ≤ `maxTotalTokensPerRound`（串行分派时累计校验，超限触发 killSwitch）。未配置该字段时不校验（向后兼容）。
 - **用量实效校验（R6，D-4b）**：预算配置合法 ≠ 用量在预算内。`check-budget.ts --run-log=` 从 `run-log.jsonl` 累计 `tokens`（Σtokens(阶段) 与 Σtokens(全量)；只累计有限非负数的 `tokens` 字段，坏值不计入），再与上限比对：Σtokens(阶段) > `perPhase.maxTokens` **或** Σtokens(全量) > `project.maxTokensTotal` → **blocking（退出码 1）**，违规消息以 `R6：` 开头并附超限占比；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` 时另报 killSwitch 用量告警（**R5-b**，消息以 `R5-b：` 开头，与 R5 的返工/TLA 触发文案区分——R5 既有文案「killSwitch 应触发（返工 N >= M）但未告警」逐字不变）。未提供 `--run-log`（即无用量输入）时 R6/R5-b 整体跳过（**判据与退出码不变**），但输出非阻断诊断「R6/R5-b 未生效（未提供 run-log）」——省略该参数不再等于静默跳过（D-5② 未接线可见化；live run 实测 9/9 次调用均未传该参数，R6/R5-b 全程静默，故权威调用表把 `--run-log` 定为必带，见 `operational-recovery.md`「调用时机」表）；`--run-log` 文件存在且 Σtokens=0（无 `tokens` 记录）时输出「R6 未生效」非阻断警告（跳过不等于通过；读取失败时该警告不追加，避免把「没读到」说成「没用量」）；提供了 `--run-log` 但**读取失败**时同样**不出**「未接线」诊断（此时走该门自身的失败路径：stderr 读取失败警告已说明跳过原因，R5/R6/R5-b 同样跳过）。背景：真实 8 阶段调测实耗 580M tokens 而门禁全程未红，`perPhase.maxTokens`/`project.maxTokensTotal` 形同虚设。
-- **Σtokens 为上界口径（N-6）**：Σtokens 是「按 run-log 记录值累计」的口径，**同一分派动作的多条归账会重复累计**（实测 live run 记录值 522M 中约 72.8M 来自重复归账），故它是**真实唯一消耗的上界**；R6/R5-b 的预算判定**按上界执行**（宁严不松），**不做去重**——去重键在 legacy 记录上不可靠（阶段 1-4 的 `reportId` 为空、`timestamp` 等值会误并真实并发分派）。脚本在同 `(timestamp, tokens, duration_s)` 出现 >1 次时输出「疑似重复归账 N 组」非阻断诊断（只统计并可见化、不改变 Σtokens 与退出码）。**R3 三条目归账约定**：同一分派若按 `r3-completeness` / `r3-reliability` / `r3-security` 分别记账，**能拆分到维度的则各自填实际 `tokens`，不能拆分时只填一条、其余两条填 `0`**——避免把同一消耗写三遍而人为放大上界。
+- **Σtokens 为上界口径（N-6）**：Σtokens 是「按 run-log 记录值累计」的口径，**同一分派动作的多条归账会重复累计**（实测 live run 记录值 522M 中约 72.8M 来自重复归账），故它是**真实唯一消耗的上界**；R6/R5-b 的预算判定**按上界执行**（宁严不松），**不做去重**——去重键在 legacy 记录上不可靠（阶段 1-4 的 `reportId` 为空、`timestamp` 等值会误并真实并发分派）。脚本在同 `(parentDispatchId, timestamp, tokens, duration_s)` **键**出现 >1 次时输出「疑似重复归账 N 组」非阻断诊断（键守卫：`tokens` 非有限正数或 `duration_s` 非数字的条目不入组；同 `parentDispatchId` 且键全同仍计组；只统计并可见化、不改变 Σtokens 与退出码）。**R3 三条目归账约定**：同一分派若按 `r3-completeness` / `r3-reliability` / `r3-security` 分别记账，**能拆分到维度的则各自填实际 `tokens`，不能拆分时只填一条、其余两条填 `0`**——避免把同一消耗写三遍而人为放大上界。
 - **`killSwitch.consecutiveReworks` 的计数口径（D-4a）**：`check-budget.ts` 的 `reworkCount` 是「返工事件 ∪ 未过门事件」的**累计**条数（`action ∈ {rework, fix, emergency-fix}` 或 `outcome ∈ {fail, rework}`），不是「连续 N 轮返工」的滑动窗口——该阈值实际约束的是本阶段返工/未过门事件累计条数（字段名沿用 schema，语义以此口径为准）。
 
 ## 运行日志模型（run-log.jsonl）
@@ -496,6 +496,8 @@ interface RunLogEntry {
   recordHash?: string;
   /** checkpoint 放行锚（D-3b，可选）：放行时刻历史前缀的外部锚 { lines, sha256 }（见「checkpoint 放行锚」节） */
   runLogAnchor?: { lines: number; sha256: string };
+  /** 多归账分派的主记录 ID（G3-15，可选）：R3 三维度等同一分派多条归账时，附属条目以该字段指向主条目 runId；仅用于 check-budget 疑似重复归账判定的精确化（同 parent 且键全同仍计组），Σtokens 上界口径不变，legacy 缺字段维持现判定 */
+  parentDispatchId?: string;
 }
 ```
 
