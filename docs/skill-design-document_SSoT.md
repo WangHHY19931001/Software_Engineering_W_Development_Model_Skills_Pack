@@ -1928,7 +1928,7 @@ interface RunLogEntry {
 - **预算检查不替代门禁脚本**（反模式 #3/#6）：预算超限触发的是暂停/告警，不是放行/否决；放行仍由 G 子代理退出码决定。
 - **kill switch 是暂停不是终止**：触发 kill switch 后须 🔴 CHECKPOINT 展示消耗明细，由用户决定增预算/降范围/取消。
 - **run-log 是 append-only**：不得修改历史记录；运行时读取可跳过损坏行并记录 note，但门禁对空/坏行 **fail-closed**（见 §10D.8），不得把坏行静默当作证据缺失放行。
-- **run-log 时间戳真值 + 禁止回溯改写（D-5①，反伪造）**：run-log 记录的时间戳必须为**写入时刻真值**；**禁止回溯改写历史行或重排时间戳**（改时间戳 / 改 note / 删行 / 插行后重排时间轴同样禁止——R7 的记录哈希链与放行锚正是为检出这类改写而设）；记录修正**只允许**经 O 侧统一追加器 `wm-append-runlog` **追加更正记录**——`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin --correct=<runId>`（更正记录 `note` 含 `correction-of:<runId>`，历史行逐字节不变），不得手改历史行；禁令与替代动作成对，手搓改行不是合法路径。追加器另强制时间戳严格递增（`now < 末条` 默认退出码 1 拒绝；`--timestamp=<iso>` / `--allow-clock-adjust=<reason>` 为显式逃生口且分别在 note 留 `clock-injected:` / `clock-adjust:` 痕迹，绝不静默）。
+- **run-log 时间戳真值 + 禁止回溯改写（D-5①，反伪造）**：run-log 记录的时间戳必须为**写入时刻真值**；**禁止回溯改写历史行或重排时间戳**（改时间戳 / 改 note / 删行 / 插行后重排时间轴同样禁止——R7 的记录哈希链与放行锚正是为检出这类改写而设）；记录修正**只允许**经 O 侧统一追加器 `wm-append-runlog` **追加更正记录**——`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin --correct=<runId>`（更正记录 `note` 含 `correction-of:<runId>`，历史行逐字节不变），不得手改历史行；禁令与替代动作成对，手搓改行不是合法路径。追加器另强制时间戳严格递增（**时间戳三态**，与 `wm-append-runlog` 头注同序：① **显式**时间戳（记录自带 `timestamp` 或 `--timestamp=<iso>`）**≤ 末条** → 退出码 1 写入拒绝；② **无显式时间戳**且时钟真倒退（`now < 末条`）→ 退出码 1 拒绝，仅 `--allow-clock-adjust=<reason>` 放行（`note` 留 `clock-adjust:auto+<N>ms:<reason>`）；③ **无显式时间戳**且同毫秒/仅批内冲突 → 良性 +1ms 步进（同毫秒良性步进形态 `clock-adjust:auto+<N>ms`），绝不静默；`--timestamp=<iso>` 注入成功另留 `clock-injected:` 痕迹）。
 
 ### 10D.7 预算与运行日志强制校验项（check-budget.ts / check-run-log.ts）
 
