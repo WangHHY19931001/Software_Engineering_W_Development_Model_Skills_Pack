@@ -69,7 +69,7 @@
 4. **三数 provenance 链的追踪面变化**：`helpers/l0-baseline.ts` 已删，`CHANGELOG.md` 既有条目（`[42.2.1]` / `[42.3.0]` 节）与 `docs/changes/2026-09-01-42.2.1-audit-remediation-acceptance.md:476` 中指向该 helper 的锚现为历史锚（§3.5 历史不改写，本批未动）——三数（700 / 101 / 36）来历现仅存于 git 历史与 CHANGELOG 历史条目，后续读者勿按该锚追踪。
 5. **T1 登记册「所防回归」子句的承载变化**（审查 deferred minor，如实登记）：换件 / 删行后，6 组同门禁次要样本退出登记册（check-verifier-output 的 D-10 三样本、check-budget 的 run-log 诊断样本、check-maturity 的 R5 真值通道样本、check-codegraph-queries 的两个 sampleDir、check-coding-plan 的 `bad-missing-ledger`）——其**断言与用例描述仍在 `self-test.ts` 逐条执行**，仅少「登记册文案」这一层承载（登记册「迁移说明」已逐条列名）。
 6. **历史 / 内部规划面不改写**：`docs/superpowers/**`（含 `2026-09-22-e2-spec-amendment.md` 的旧锚形态）、`docs/changes/**`、`docs/debug/**` 与 `CHANGELOG.md` 历史条目（含 `:81` 一带的旧锚形态）按规格 §3.5 一字未改。
-7. **`wm-append-runlog` 的 `digestOf` 保留定性（规格 §9 审计表末行）**：`RUNLOG_APPEND_JSON.digest` 为**无外部消费者的写入批遥测**（整文件文本 SHA-256，**文件级**、非记录级 / 行级）——按「无消费者则一并移除，有则保留并登记」裁定为**保留并登记**（定性更正见 `task-9-report.md` §11-C；原报告曾误记为「活消费者」）。
+7. **`wm-append-runlog` 的 `digest` 保留定性（规格 §9 审计表末行）**：`digest` = 写入后**整文件**文本的 SHA-256（**文件级**，规格 §9 判定原则 1 允许面）；其唯一读取方是本工具自身的 stdout 机器键 `RUNLOG_APPEND_JSON.digest`（受 §3 全局约束 3「不改机器可读契约」保护），**无外部下游消费者**——故按**文件级遥测保留**，**不适用**「无消费者则移除」（该口径针对**行 / 记录级**哈希）（定性更正见 `task-9-report.md` §11-C；原报告曾误记为「活消费者」）。
 
 ### WS-T7 · 去 hash 化（2026-09-28 追加：移除记录级哈希链与 checkpoint 放行锚）
 
@@ -91,8 +91,9 @@
 - **self-test**：**381 → 381**（未改 `self-test.ts` 用例数组；T5 / T6 / WS-T7 只改注释与文案）。
 - **samples 覆盖**：`fixtureCount 379` / `negativeCoverageRows 46` / `negativeCoverageProbes 48` / `probeFailures 0` 全部与基线逐字相同。
 - **门禁强制计数契约**：`schema 34` / `exit-2 脚本 46` / `prepush 19` / `CLI 47` / `persona 33` / `references 44` 均不变（T5 清扫只动**无门禁强制**的计数）。
-- **docs-consistency 独立运行**：**11.04 s**（T3 实测；收口复测 **13.96 s**，含 `npx tsx` 启动与 48 条 exit-2 探针约 8.5 s 的真实 spawn）——此前同命令 35-45 分钟；输出含非阻断诊断「动态 facts 未校验」，`dynamicMeasurements: null`，`exitCode 0`（态 3 语义，独立运行不再 self-spawn 全量 vitest）。
-- **终局验收（收口实测，2026-09-28）**：`npm run prepush` **19 项全绿 / `PREPUSH_EXIT=0`**（含全量 vitest + coverage 阈值、规则层覆盖口径、npm audit、48 探针、tsc、prettier、eval；逐项输出见账本 `task-8-prepush.txt`）；独立运行 `check-docs-consistency` **exit 0 / 13.96 s**（`task-8-docs-consistency.txt`）；`check-samples-coverage` **exit 0**（`task-8-samples-coverage.txt`：`fixtureCount 379` / `negativeCoverageRows 46` / `negativeCoverageProbes 48` / `probeFailures 0` / `derivedAnchors` 在场）。
+- **L0 链接审计三计数（T2 后仅可观测、无断言）**：本批文档改动后实测 **725 / 97 / 36**（`relativeLinkCount` / `l1OnlyCount` / `templatePlaceholderCount`；`violations: []` / exit 0）；基线对照 **700 / 101 / 36**（2026-09-27 deferred-closeout 终值）。
+- **docs-consistency 独立运行**：**11.04 s**（T3 实测；收口复测 **13.3 s**，冻结节实测——13.96 s 为被覆盖的中间态运行；含 `npx tsx` 启动与 48 条 exit-2 探针约 8.5 s 的真实 spawn）——此前同命令 35-45 分钟；输出含非阻断诊断「动态 facts 未校验」，`dynamicMeasurements: null`，`exitCode 0`（态 3 语义，独立运行不再 self-spawn 全量 vitest）。
+- **终局验收（收口实测，2026-09-28）**：`npm run prepush` **19 项全绿 / `PREPUSH_EXIT=0`**（含全量 vitest + coverage 阈值、规则层覆盖口径、npm audit、48 探针、tsc、prettier、eval；逐项输出见账本 `task-8-prepush.txt`）；独立运行 `check-docs-consistency` **13.3 s / exit 0**（`task-8-report.md` 冻结节实测；13.96 s 为被覆盖的中间态运行；证据文件 `task-8-docs-consistency.txt` 含 `DOCS_EXIT=0` 与该次 stdout，**不含计时行**）；`check-samples-coverage` **exit 0**（`task-8-samples-coverage.txt`：`fixtureCount 379` / `negativeCoverageRows 46` / `negativeCoverageProbes 48` / `probeFailures 0` / `derivedAnchors` 在场）。
 
 ## [42.3.0] - 2026-09-27
 
