@@ -2286,7 +2286,11 @@ interface RunLogEntry {
   **path 命名空间**（阶段 5-8 的 `scope` 取 `change-scope.json` 的 `changedFiles`）**不参与** R6/R8 的集合比对
   （与设计 ID 同池比对时，change-scope 在盘即结构性必红）。**刻意不含 REQ/NFR/CON**（TLA 侧无此命名空间，混入制造结构性假阳性）。
 - **在场表**：`ICEBERG_VIEW_PRESENCE`（**代码常量，非文档**——写文档会与实现漂移，先例见 `subagent-delegation.md` 计数漂移）。
-  取值待端到端调测按各阶段实际产出物核定。
+  取值**已按代码事实定值**（2026-09-27 任务 9 / G4-3，删去原「待端到端调测核定」，与 live-run 各阶段 `viewSets` 实测一致）：
+  阶段 1 = `graph` + `rtm`；阶段 2-4 = `graph` + `tla` + `rtm`；阶段 5-8 = `graph` + `tla` + `rtm` + `scope`。
+  该表是**必要条件而非充分条件**：`deriveViewSets` 还要求对应产物可解析（graph 取 `nodes[]`、tla 取 `sdCoverage.coveredSdNodes`、
+  rtm 取 `rows[]`、scope 取 `changedFiles[]`）——不在表的视角即使产物在盘也不派生（阶段 1 的 tla、阶段 1-4 的 scope），
+  在表而产物缺失的视角同样不派生（阶段 5-8 的 tla 即「有 TLA 资产时」在场），二者都须由 R 记入 `sweepCoverage.absentViews`（R7 校验）。
 - **分池对账**：宽池等权（graph / RTM），池内任一差异即刻失败；**无主视角、不仲裁、不取并集后放行**
   （取并集会把真实缺口洗成"已覆盖"）；窄池（TLA）按 SD 切片相等，两个方向（超出宽集 / 漏 SD）均报。
 - **三类失败信号**：R6 视角间差异（分池后池内差异，标注 `R6[design-wide]` / `R6[design-sd]` → 普通 V/G 失败链由 R 定位）/

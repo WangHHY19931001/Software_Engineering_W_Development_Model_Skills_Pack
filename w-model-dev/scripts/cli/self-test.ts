@@ -786,6 +786,31 @@ const GRAPH_CASES: GraphCase[] = [
     injectAnchorPaths: true,
     description: 'R15c：evidenceAnchor 指向不存在的路径 nonexistent/does-not-exist.md，应被存在性校验拦截',
   },
+  // -------------------- 阶段 2-4 图谱正例（F-5 / G4-4）--------------------
+  // 补齐阶段 2/3/4 的**正例**形态：既有样本只有阶段 1 正例 + 阶段 2/3/4 各一条负例，
+  // 阶段 2-4 的合法图在反向（门禁过严误红）方向没有回归基线。三份样本按各阶段结构
+  // 与规模下限构造（边数 ≥ 节点数 × 3、语义来源占比 100%），实测零 violations 零 warnings。
+  {
+    file: 'valid-phase2.json',
+    phase: 2,
+    expectedPassed: true,
+    description:
+      '[p2] 阶段 2 正例：唯一 REQ 根 + SD 全覆盖 implements 追溯 + EXT-IN/EXT-OUT 边界 + 信息流闭合（死模块清零），8 节点 / 25 边，应通过连通/单根/父唯一/层级单调/追溯/信息流全部判据',
+  },
+  {
+    file: 'valid-phase3.json',
+    phase: 3,
+    expectedPassed: true,
+    description:
+      '[p3] 阶段 3 正例：接口层 INTF 全覆盖 defines 入边（SD→INTF）+ parent 层级 REQ→SD→INTF 相邻层单调 + 边界与信息流闭合，10 节点 / 33 边，应通过阶段 3 全部判据',
+  },
+  {
+    file: 'valid-phase4.json',
+    phase: 4,
+    expectedPassed: true,
+    description:
+      '[p4] 阶段 4 正例：详细设计层 DD 全覆盖 realizes 出边（DD→INTF）+ 四层 parent 追溯（REQ→SD→INTF→DD）+ 边界与信息流闭合，11 节点 / 36 边，应通过阶段 4 零违反（放行进编码的前置）',
+  },
 ];
 
 // ==================== R7/R8 需求规格产物校验 ====================
