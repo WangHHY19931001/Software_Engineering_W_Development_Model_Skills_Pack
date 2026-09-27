@@ -6,7 +6,7 @@
 > 回归纪律（约束 #14）：任何 `.ts` 文件 `Edit`/`Write` 前先经 codegraph CLI 查询目标符号影响半径并落 `.w-model/codegraph-queries/`；每组结束跑定向 vitest，任务 10 跑全量 `npm run prepush`。
 > 行号说明：文中 `:N` 为编写计划时的实测锚，实现时以符号名搜索为准，漂移不构成偏差。
 
-**目标：** 把 live-run-findings-remediation 批次的全部延后 minor（账本行合并口径 61 项）处置完毕——修 50 / 销 8（CHANGELOG 登记理由）/ 显式不修 3——终局全量 prepush 19 项全绿。
+**目标：** 把 live-run-findings-remediation 批次的全部延后 minor（账本行合并口径 62 项）处置完毕——修 51 / 销 8（CHANGELOG 登记理由）/ 显式不修 3——终局全量 prepush 19 项全绿。
 
 **架构：** 四组任务推进：G1 文档措辞（3 任务）→ G2 测试补强（2 任务）→ G3 代码小额（3 任务，含 2 处行为增量）→ G4 登记与夹具（1 任务）→ 收口（1 任务）。文档组先行（零风险面），行为增量集中在任务 8 单独评审。所有新字段可选、不改判据编号、历史 fixture 零改动即绿。
 
@@ -456,7 +456,7 @@ git commit -m "test(samples): NEGATIVE登记补齐两处 + 阶段2-4图谱正例
 
 - [ ] **步骤 1：CHANGELOG 清收小节**
 
-`[42.3.0]` 节内新增「未解/延后清收（2026-09-27）」：处置统计（修 50 / 销 8 / 不修 3）、§5 销账 8 项理由全文、显式不修 3 项（F-6/R5 观察期/Phase 5-8）、证据=本计划账本与各任务提交号。
+`[42.3.0]` 节内新增「未解/延后清收（2026-09-27）」：处置统计（62 = 修 51 + 销 8 + 不修 3）、§5 销账 8 项理由全文、显式不修 3 项（F-6/R5 观察期/Phase 5-8）、证据=本计划账本与各任务提交号。
 
 - [ ] **步骤 2：终局全量验收**
 
@@ -476,7 +476,7 @@ npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts   # exit 0
 
 ```bash
 git add CHANGELOG.md
-git commit -m "docs(changelog): 未解/延后清收登记 + 销账8项理由 + 显式不修3项（61 项全处置）"
+git commit -m "docs(changelog): 未解/延后清收登记 + 销账8项理由 + 显式不修3项（62 项全处置）"
 ```
 
 ---
