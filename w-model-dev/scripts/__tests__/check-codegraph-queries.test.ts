@@ -23,10 +23,12 @@
  *       未声明 `evidenceKind` 一律违规——把「制品口径」从隐形判据变成显式声明
  *   C15 降级声明**内容下限**两子分支（G2-3）：`degradationReason` 全空白、`alternativeEvidence[i]`
  *       的 command/evidencePath 空字段 → 各具名 violation（判据 `trim()` 分支，直测导出函数）
+ *   C16 索引探测 stat 判别（G3-1）：`.codegraph` 目录 / 普通文件均算在盘；缺席与悬挂链接不算
+ *       （后者经 `codegraphIndexAnomaly` 输出一行非阻断诊断，不进 violations）
  */
 
 import { execSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -36,6 +38,8 @@ import { validateBySchema } from '../infrastructure/schema-loader.js';
 import {
   checkCodegraphQueries,
   checkCodegraphQueriesStrict,
+  codegraphIndexAnomaly,
+  codegraphIndexPresent,
   evidenceDeclarationViolations,
   type CodegraphStrictResult,
 } from '../cli/check-codegraph-queries.js';
@@ -373,6 +377,53 @@ describe('C15：降级声明内容下限两子分支（G2-3）', () => {
     expect(violations[0]).toContain('alternativeEvidence[0]');
     expect(violations[0]).toContain('command');
     expect(violations[0]).toContain('evidencePath');
+  });
+});
+
+// ==================== C16：索引探测 stat 判别（G3-1） ====================
+
+/**
+ * C16（G3-1）：`codegraphIndexPresent` 由 `existsSync` 改为 `statSync` 类型判别——
+ * **目录**（标准索引形态）与**普通文件**索引均算「在盘」；悬挂链接 / FIFO / socket 等
+ * 非目录非文件形态不算（探测按「无索引」处理、允许显式降级），并由 `codegraphIndexAnomaly`
+ * 输出一行非阻断诊断（不进 violations / 不改退出码）。探测基准保持 projectRoot。
+ */
+describe('C16：索引探测 stat 判别与非阻断诊断（G3-1）', () => {
+  it('`.codegraph` 为目录（标准索引形态）→ 在盘，无诊断', () => {
+    const root = writeProject({ '.codegraph/index.json': '{}' });
+    expect(codegraphIndexPresent(root)).toBe(true);
+    expect(codegraphIndexAnomaly(root)).toBeUndefined();
+  });
+
+  it('`.codegraph` 为普通文件（单文件索引形态）→ 在盘，无诊断', () => {
+    const root = writeProject({ '.codegraph': '{}' });
+    expect(codegraphIndexPresent(root)).toBe(true);
+    expect(codegraphIndexAnomaly(root)).toBeUndefined();
+  });
+
+  it('`.codegraph` 缺席 → 不在盘且无诊断（正常降级形态，不产生噪音）', () => {
+    const root = writeProject({});
+    expect(codegraphIndexPresent(root)).toBe(false);
+    expect(codegraphIndexAnomaly(root)).toBeUndefined();
+  });
+
+  it('`.codegraph` 为悬挂链接（既非目录也非文件）→ 不算在盘 + 具名非阻断诊断', () => {
+    const root = writeProject({});
+    try {
+      symlinkSync(
+        join(root, 'missing-target'),
+        join(root, '.codegraph'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+    } catch (error) {
+      if (process.platform === 'win32') return; // 无链接创建权限的环境跳过（同 evidence-provenance 既有模式）
+      throw error;
+    }
+    // statSync 跟随链接 → ENOENT → 不在盘；lstatSync 可见该条目 → 诊断显式化退化形态
+    expect(codegraphIndexPresent(root)).toBe(false);
+    const anomaly = codegraphIndexAnomaly(root);
+    expect(anomaly).toContain('.codegraph');
+    expect(anomaly).toContain('既非目录也非普通文件');
   });
 });
 

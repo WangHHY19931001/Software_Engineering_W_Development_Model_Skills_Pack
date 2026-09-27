@@ -22,8 +22,8 @@ export const nodeCodingPlanFs: CodingPlanFs = {
   existsSync: (p: string): boolean => fs.existsSync(p),
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上；UTF-8 文本读入由适配器固定
   readFileSync: (p: string): string => fs.readFileSync(p, 'utf-8'),
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上；logic 层仅消费 isFile/size 两个只读字段
-  statSync: (p: string): { isFile(): boolean; size: number } => fs.statSync(p),
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上；logic 层仅消费 isFile/isDirectory/size 三个只读字段
+  statSync: (p: string): { isFile(): boolean; isDirectory(): boolean; size: number } => fs.statSync(p),
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上；仅枚举目录条目名、不做任何写入
   readdirSync: (p: string, opts: { withFileTypes: true }): Array<{ name: string; isDirectory(): boolean }> =>
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上（prettier 换行使调用独占一行，disable 随行）

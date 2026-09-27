@@ -68,9 +68,10 @@ function mkFs({ files = {}, dirs = [] }: { files?: Record<string, string>; dirs?
       if (content !== undefined)
         return {
           isFile: () => true,
+          isDirectory: () => false,
           size: Buffer.byteLength(content, 'utf-8'),
         };
-      if (dirSet.has(p)) return { isFile: () => false, size: 0 };
+      if (dirSet.has(p)) return { isFile: () => false, isDirectory: () => true, size: 0 };
       throw new Error(`stub: statSync 未登记路径 ${p}`);
     },
     readdirSync(p) {
@@ -631,6 +632,18 @@ describe('preflightCodingPlan（电池前清单自检，2026-09-25 任务 2）',
     const r = preflightCodingPlan(ROOT, 5, CHANGE_ID, mkFs());
     expect(r.required).toHaveLength(14);
     expect(r.missing).toHaveLength(14);
+    expect(r.invalid).toEqual([]);
+    expect(r.artifacts).toEqual([]);
+  });
+
+  it('账本路径是非目录（普通文件占位）→ 不裸抛、artifacts 空列表且 progress.md 记 missing（G3-5）', () => {
+    // 修复前：existsSync 通过后直接 readdirSync(文件) → 裸抛 ENOTDIR（生产路径经 runMain 升级为
+    // UNEXPECTED / exit 2 + 原始栈）；修复后：isDirectory 守卫分流为「无可枚举项」，
+    // 缺失仍由固定项 progress.md 具名报出（退出码语义不变：missing → exit 1）。
+    const files = withFile(withoutKeys(validTreeFiles(), LEDGER_DIR), LEDGER_DIR, 'not a directory\n');
+    const r = preflightCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
+    expect(r.required).toHaveLength(14);
+    expect(r.missing).toEqual([`${LEDGER_REL}/progress.md`]);
     expect(r.invalid).toEqual([]);
     expect(r.artifacts).toEqual([]);
   });

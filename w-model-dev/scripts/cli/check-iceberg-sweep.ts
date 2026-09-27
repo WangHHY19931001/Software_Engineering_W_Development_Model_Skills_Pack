@@ -219,6 +219,11 @@ async function main(): Promise<void> {
     report,
     buildIcebergExternalEvidence(path.resolve(reportPathArg), parseIcebergPhase(report.phase)),
   );
+  // 非阻断诊断（G3-3）：如「宽视角基线集为空 → 窄池对账跳过」；走 stderr 一行，
+  // 不进 reasons / 不改退出码、不污染 stdout 单行 ICEBERG_JSON 摘要。
+  for (const diagnostic of result.diagnostics ?? []) {
+    process.stderr.write(`○ 诊断：${diagnostic}\n`);
+  }
   const reasons = [...result.reasons];
 
   // 交叉核对：--auto-trigger 模式下校验 report.phase 与 run-log 最近 checkpoint phase 一致（独立于 logic 层 R1-R5 编号体系）

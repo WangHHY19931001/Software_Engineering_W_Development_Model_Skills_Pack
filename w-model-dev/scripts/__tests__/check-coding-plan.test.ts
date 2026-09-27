@@ -15,6 +15,9 @@
  *       无 --scope → exit 2；C10 非 preflight 路径的 R5 无锚诊断走 stderr 且不改退出码/stdout 判据
  *   C12 变长 artifacts 双口径（G2-4）：门禁路径 R4 计数（删 task-2-report.md → exit 1 且 violation 具名）；
  *       --preflight 路径只列不计数（同一删除 → exit 0，artifacts 列表项消失）
+ *   C13/C14 守卫（G3-4/G3-5）：锚诊断挂 scope 解析成功之后（无 --scope → 不打印 `○ R5 诊断`）；
+ *       --preflight 账本路径为同名普通文件 → 结构化为固定项缺失（exit 1 + PREFLIGHT_JSON），
+ *       而非 readdirSync 裸抛 ENOTDIR 经 runMain 升级为 UNEXPECTED / exit 2
  */
 
 import { execSync } from 'node:child_process';
@@ -318,6 +321,35 @@ describe('check-coding-plan.ts CLI', () => {
       `.superpowers/sdd/${CHANGE_ID}.plan/task-1-report.md`,
       `.superpowers/sdd/${CHANGE_ID}.plan/task-2-brief.md`,
     ]);
+  });
+
+  /**
+   * C13/C14 组（G3-4/G3-5）：
+   *   C13 锚诊断时点：scope 缺失（exit 1 输入原因）→ 不再附 `○ R5 诊断`（诊断挂 scope 解析成功之后，
+   *       避免在输入错误路径上产生审计噪音）；正向对照见 C10（scope ok + 无锚产物 → 诊断在 stderr）。
+   *   C14 preflight 守卫：账本路径被替换为同名**普通文件** → 不再裸崩（修复前 readdirSync 抛 ENOTDIR，
+   *       经 runMain 升级为 UNEXPECTED / exit 2 + 原始栈），按固定项缺失分类（exit 1 + PREFLIGHT_JSON 正常）。
+   */
+  it('C13: 无 --scope（exit 1 输入原因）→ 不再附 R5 锚诊断（G3-4 时点）', () => {
+    const { root } = makeCodingPlanRepo((r) => writeValidTree(r)); // 12 份无锚产物在盘（有诊断可打）
+    const r = runCli([`"${root}"`, '--phase', '5']);
+    expect(r.status).toBe(1);
+    expect(r.stdout).toContain('仅支持等号形态 --scope=<file>');
+    expect(r.stderr).not.toContain('○ R5 诊断');
+  });
+
+  it('C14: --preflight 账本路径为同名普通文件 → exit 1（非 UNEXPECTED/exit 2），artifacts 空且 progress.md 记 missing（G3-5）', () => {
+    const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
+    const ledgerDir = join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`);
+    rmSync(ledgerDir, { recursive: true, force: true });
+    writeFileSync(ledgerDir, 'not a directory\n');
+    writeScope(root, head);
+    const r = runPreflight([`"${root}"`, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
+    expect(r.status).toBe(1);
+    expect(r.stderr).not.toContain('UNEXPECTED');
+    expect(r.payload.artifacts).toEqual([]);
+    expect(r.payload.missing).toEqual([`.superpowers/sdd/${CHANGE_ID}.plan/progress.md`]);
+    expect(r.payload.invalid).toEqual([]);
   });
 
   /**

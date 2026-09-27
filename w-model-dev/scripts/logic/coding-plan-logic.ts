@@ -54,7 +54,8 @@ import * as path from 'node:path';
  * `l0-link-audit-logic` 为直连形态先例）。
  *
  * 只声明本模块实际消费的四个只读方法（结构化类型，不引 Node 类型）：
- * - `existsSync` / `statSync`：存在性与类型/大小判定（plan / 账本 / 三件套非空）；
+ * - `existsSync` / `statSync`：存在性与类型/大小判定（plan / 账本 / 三件套非空；
+ *   `isDirectory` 供 preflight 枚举前守卫，G3-5）；
  * - `readFileSync`：文本读入（UTF-8 解码由适配器固定；CRLF → LF 归一化仍在本层内容边界做）；
  * - `readdirSync({ withFileTypes: true })`：目录枚举（归档位锚定匹配 + review-*.diff 探测）。
  *
@@ -63,7 +64,7 @@ import * as path from 'node:path';
 export interface CodingPlanFs {
   existsSync(p: string): boolean;
   readFileSync(p: string): string;
-  statSync(p: string): { isFile(): boolean; size: number };
+  statSync(p: string): { isFile(): boolean; isDirectory(): boolean; size: number };
   readdirSync(p: string, opts: { withFileTypes: true }): Array<{ name: string; isDirectory(): boolean }>;
 }
 
@@ -489,7 +490,11 @@ export function preflightCodingPlan(
   }
 
   let artifacts: string[] = [];
-  if (fs.existsSync(ledgerDir)) {
+  // G3-5：枚举前先判 isDirectory——账本路径是普通文件（或其它非目录形态）时 readdirSync 会裸抛
+  // ENOTDIR（旧行为：经 runMain 升级为 UNEXPECTED / exit 2 + 原始栈）；非目录按「无可枚举项」处理
+  // （artifacts 空列表，缺失仍由 required 的 progress.md 具名报出）。真正的探测竞态
+  // （existsSync 与 statSync 之间条目被删）由 CLI 侧 try/catch 折算为结构化 FILE_NOT_FOUND。
+  if (fs.existsSync(ledgerDir) && fs.statSync(ledgerDir).isDirectory()) {
     artifacts = fs
       .readdirSync(ledgerDir, { withFileTypes: true })
       .map((e) => e.name)

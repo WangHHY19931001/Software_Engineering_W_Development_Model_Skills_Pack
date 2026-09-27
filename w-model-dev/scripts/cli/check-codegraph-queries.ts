@@ -17,7 +17,8 @@
  * 索引探测 + 显式降级声明（2026-09-25 live-run 修复，D-6）：只验结构/覆盖/时序会让
  * 手工编造的查询记录（无任何 CLI 出处、项目根本没有 `.codegraph/` 索引）通过，与
  * hard-constraints.md「不得伪造查询记录」相悖。故每条记录须显式声明证据形态：
- *   - 项目根存在 `.codegraph/` 索引 → 只允许 `evidenceKind: 'cli'`（禁止降级）；
+ *   - 项目根存在 `.codegraph` 索引（G3-1：stat 判别，目录/普通文件均算在盘；非二者不算，
+ *     并输出一行非阻断诊断）→ 只允许 `evidenceKind: 'cli'`（禁止降级）；
  *   - 无索引 → 必须显式降级：`evidenceKind: 'artifact'` + 非空 `degradationReason`
  *     + ≥1 条 `alternativeEvidence[{command, evidencePath}]`；
  *   - 未声明 `evidenceKind` 一律违规（把「制品口径」从隐形默认变成显式声明）。
@@ -52,7 +53,7 @@
  * @module
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync, type Stats } from 'node:fs';
 import * as path from 'node:path';
 
 import { exitWithError } from '../lib/cli-error.js';
@@ -131,13 +132,43 @@ function phaseQueryFiles(queriesDir: string, phase: number): { own: string[]; fo
 }
 
 /**
- * 项目根是否存在 `.codegraph/` 索引——决定记录允许的证据形态（cli / 显式降级 artifact）。
+ * 项目根是否存在 `.codegraph` 索引——决定记录允许的证据形态（cli / 显式降级 artifact）。
  * 索引在盘 = codegraph CLI 可用，任何「降级」都是逃避真实查询；索引缺失 = 允许显式降级，
  * 但必须留下 degradationReason 与替代证据（禁止隐形默认）。
+ *
+ * G3-1：以 `statSync` 类型判别替代 `existsSync`——**目录**（标准索引形态）与**单文件**索引
+ * 均算「在盘」；悬挂符号链接（ENOENT）/ FIFO / socket 等非目录非文件条目不算（后者旧判据
+ * `existsSync` 会误判为「在盘」并强制 cli 声明，与索引实际不可用相悖）。探测基准保持
+ * **projectRoot**（「改 git 顶层」半项已销：无 git 工作区形态本无 git 顶层，projectRoot
+ * 基准与 e2e/降级形态自洽）。非目录/文件形态由调用方经 `codegraphIndexAnomaly` 输出一行
+ * 非阻断诊断（探测按「无索引」处理，允许显式降级）。
  */
 export function codegraphIndexPresent(projectRoot: string): boolean {
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控项目根下的固定子目录存在性探测
-  return existsSync(path.join(projectRoot, '.codegraph'));
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控项目根下的固定条目类型探测
+    const st = statSync(path.join(projectRoot, '.codegraph'));
+    return st.isDirectory() || st.isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 非阻断诊断（G3-1）：`.codegraph` 条目在盘、但既非目录也非普通文件（悬挂符号链接 / FIFO /
+ * socket 等退化形态）。探测按「无索引」处理（允许显式降级），此诊断只把该形态显式化——
+ * 不进 violations、不改退出码。返回 `undefined` 即形态正常（条目缺席 / 目录 / 普通文件）。
+ */
+export function codegraphIndexAnomaly(projectRoot: string): string | undefined {
+  const target = path.join(projectRoot, '.codegraph');
+  let st: Stats;
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同一受控条目的 lstat 形态判别（lstat 不跟随符号链接）
+    st = lstatSync(target);
+  } catch {
+    return undefined; // 条目缺席：正常形态（无索引）
+  }
+  if (st.isDirectory() || st.isFile()) return undefined;
+  return `${target} 存在但既非目录也非普通文件（悬挂符号链接 / FIFO / socket 等），索引探测按「无索引」处理（允许显式降级声明）`;
 }
 
 /**
@@ -535,6 +566,14 @@ async function main(): Promise<void> {
   const phase = phaseParsed.phase;
 
   const abs = path.resolve(file);
+
+  // G3-1 非阻断诊断：`.codegraph` 条目在盘但既非目录也非普通文件（退化形态：悬挂符号链接 /
+  // FIFO / socket 等）时提示一行——探测按「无索引」处理并允许显式降级，此诊断只把形态显式化，
+  // 不进 violations / 不改退出码；正常形态（缺席 / 目录 / 普通文件）零输出。
+  const indexAnomaly = codegraphIndexAnomaly(abs);
+  if (indexAnomaly !== undefined) {
+    process.stderr.write(`○ 诊断：${indexAnomaly}\n`);
+  }
 
   // ==================== ChangeScope 装载（strict 绑定；阶段 5-8 必选） ====================
   const loaded = loadCliScope(process.argv, abs, phase);

@@ -405,12 +405,18 @@ async function collectDirectory(
  * Collects one allowlisted root-level evidence file (`.w-model/<file>`) with the
  * same lexical-walk + real-root containment discipline as directory collection.
  * Absent file → `[]` (non-emptiness is enforced by the caller's contract).
+ *
+ * G3-2: a non-regular file (directory, FIFO, ...) is likewise treated as absent
+ * (`[]`) instead of being handed to `readStableFile`, which would fail with
+ * `UNSAFE_SOURCE_EVIDENCE` (symlink/non-file) or a raw `EISDIR` before the
+ * caller's named contract (e.g. `MISSING_SIGNATURE_CHAIN`) can report it.
  */
 async function collectRootFile(state: string, stateReal: string, file: string, kind: Kind): Promise<SourceFile[]> {
   const absolute = path.join(state, file);
   await assertCanonicalPath(absolute, stateReal, true);
   const stat = await fs.lstat(absolute).catch(() => null);
-  if (!stat) return [];
+  // 符号链接已由上方 assertCanonicalPath 拒绝；此处 lstat 判 isFile 覆盖目录 / FIFO 等非普通文件
+  if (!stat || !stat.isFile()) return [];
   const content = await readStableFile(absolute, stateReal);
   return [{ path: file, kind, sha256: sha256(content) }];
 }

@@ -45,6 +45,11 @@
  *
  * R5 非阻断诊断（裁定 A，非 preflight 路径）：审查产物「在盘且非空但无行级证据锚」时向 **stderr**
  *   打一行 `○ R5 诊断：…`；不改退出码、不进 CODING_PLAN_JSON / GATE_JSON / artifact-gate 聚合。
+ *   仅在 **scope 解析成功后** 打印（G3-4：scope 缺失/被拒的 exit 1 路径不再附诊断噪音）。
+ *
+ * G3-5 竞态守卫（--preflight）：只读探测期间的 TOCTOU 竞态异常折算为结构化
+ *   `FILE_NOT_FOUND` / exit 2（不再经 runMain 升级为 UNEXPECTED + 原始栈）；账本路径为非目录的
+ *   确定性形态由 `preflightCodingPlan` 的 isDirectory/isFile 守卫分流。
  *
  * @module
  */
@@ -64,6 +69,7 @@ import {
   collectMissingAnchorReviews,
   preflightCodingPlan,
   type CodingPlanCheckResult,
+  type PreflightResult,
 } from '../logic/coding-plan-logic.js';
 
 const EMPTY_RESULT: CodingPlanCheckResult = {
@@ -151,21 +157,27 @@ async function main(): Promise<void> {
         `○ --preflight 诊断：scope 未通过校验，按 scope.changeId=${preflightChangeId} 出清单（清单只判产物在盘与否，与 scope 有效性无关；${loaded.violations.join('；')}）\n`,
       );
     }
-    const preflight = preflightCodingPlan(abs, phase, preflightChangeId, nodeCodingPlanFs);
+    // G3-5：preflight 的只读探测存在 TOCTOU 竞态（existsSync 通过后条目被删除/替换，statSync /
+    // readdirSync 随即抛 ENOENT/EACCES/ENOTDIR）——裸异常会经 runMain 升级为 UNEXPECTED + 原始栈；
+    // 此处统一折算为结构化 FILE_NOT_FOUND（exit 2）。确定性非目录形态（账本路径是普通文件等）
+    // 已由 preflightCodingPlan 的 isDirectory/isFile 守卫分流，不落到本分支。
+    let preflight: PreflightResult;
+    try {
+      preflight = preflightCodingPlan(abs, phase, preflightChangeId, nodeCodingPlanFs);
+    } catch (error) {
+      exitWithError({
+        category: 'FILE_NOT_FOUND',
+        rule: 'P0-2',
+        message: '--preflight 只读探测失败（编码计划产物树在探测期间被删除或替换）',
+        file: abs,
+        detail: error instanceof Error ? error.message : String(error),
+        exitCode: 2,
+      });
+      return;
+    }
     console.log(`CODING_PLAN_PREFLIGHT_JSON ${JSON.stringify(preflight)}`);
     process.exitCode = preflight.missing.length + preflight.invalid.length === 0 ? 0 : 1;
     return;
-  }
-
-  // R5 非阻断诊断（裁定 A）：在盘非空但无行级证据锚的审查产物 → stderr 一行提示，
-  // 不改退出码、不进 CODING_PLAN_JSON / GATE_JSON / artifact-gate 聚合。
-  // 本调用绝不抛：collectMissingAnchorReviews 内逐条 try/catch（读盘失败按「无锚」计），
-  // 否则诊断异常会经 runMain 升级为 UNEXPECTED / exit 2，把「诊断不改退出码」打成假象（修复轮 1 / 发现 1）
-  const anchorGaps = collectMissingAnchorReviews(abs, phase, nodeCodingPlanFs);
-  if (anchorGaps.length > 0) {
-    process.stderr.write(
-      `○ R5 诊断：${anchorGaps.length} 份审查产物未含行级证据锚（建议 path:Lnn=… 或 path:§sec=…）：${anchorGaps.join(', ')}\n`,
-    );
   }
 
   let result: CodingPlanCheckResult;
@@ -178,6 +190,18 @@ async function main(): Promise<void> {
   } else {
     scopeLabel = loaded.scopeLabel;
     changeId = loaded.scope.changeId;
+    // R5 非阻断诊断（裁定 A）：在盘非空但无行级证据锚的审查产物 → stderr 一行提示，
+    // 不改退出码、不进 CODING_PLAN_JSON / GATE_JSON / artifact-gate 聚合。
+    // G3-4：诊断挂 **scope 解析成功之后**——scope 缺失/被拒时本行是审计噪音（那些路径已由
+    // missing/violations 具名报出），且诊断的对象是 changeId 绑定的审查产物集。
+    // 本调用绝不抛：collectMissingAnchorReviews 内逐条 try/catch（读盘失败按「无锚」计），
+    // 否则诊断异常会经 runMain 升级为 UNEXPECTED / exit 2，把「诊断不改退出码」打成假象（修复轮 1 / 发现 1）
+    const anchorGaps = collectMissingAnchorReviews(abs, phase, nodeCodingPlanFs);
+    if (anchorGaps.length > 0) {
+      process.stderr.write(
+        `○ R5 诊断：${anchorGaps.length} 份审查产物未含行级证据锚（建议 path:Lnn=… 或 path:§sec=…）：${anchorGaps.join(', ')}\n`,
+      );
+    }
     result = checkCodingPlan(abs, phase, loaded.scope.changeId, nodeCodingPlanFs);
   }
   const exitCode = result.passed ? 0 : 1;
