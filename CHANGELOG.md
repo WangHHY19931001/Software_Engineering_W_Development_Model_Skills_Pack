@@ -38,6 +38,24 @@
 
 iceberg `tla` 视角不加宽到 DD/INTF（规约冲突，WS-1 方案 B 否决）；R3 双轨不合并（会弃掉 `passed=false ⇒ findings ≥1` 与反模式 #33 机器挂点）；归档不就地脱敏（破坏执行证据原真性与 sha256 等价契约）；`check-archive-integrity` 绝对路径诊断（中等成本无阻断力，后续可选）；`reviewedAt` 时序门禁（时钟依赖破坏 logic 纯函数）；budget Σtokens 去重字段（去重键在 legacy 记录上不可靠，后续可选）；不新增反模式编号（伪造时序禁令走约束 #11 补充句）；不删除 R11 的 phase-1 后置窗口（会打红历史 run-log）；R5 行级证据锚不阻断化（实测 demo 15 份既有 review 锚命中 0，阻断化立即打红全部历史证据——先以非阻断诊断观察，后续版本按适配情况评估升级）。
 
+### 未解/延后清收（2026-09-27）
+
+> 来源：`docs/superpowers/plans/2026-09-25-live-run-findings-remediation.md` 批次账本（`.superpowers/sdd/2026-09-25-live-run-findings-remediation/progress.md`，gitignored）全部 minor(deferred) 项 + `[42.3.0]` 显式不修项中的「后续可选」2 项 + `docs/debug/2026-09-19` 报告 F-5。规格 `docs/superpowers/specs/2026-09-27-deferred-closeout-design.md`、计划 `docs/superpowers/plans/2026-09-27-deferred-closeout.md`，账本 `.superpowers/sdd/2026-09-27-deferred-closeout/`（gitignored）。版本保持 42.3.0，**不 bump**（纯收口批；先例：Wave A/B 行为增量同样登记于既有版本节内）。
+
+**处置统计（账本行合并口径）：62 = 修 51 + 销账 8 + 显式不修 3。** 四组任务：G1 文档措辞（任务 1-3）/ G2 测试补强（任务 4-5）/ G3 代码小额（任务 6-8，含两处守卫修复轮）/ G4 登记与夹具（任务 9，含 F-5 阶段 2-4 图谱正例 3 份）。
+
+- **G1 文档措辞（`b80eb400` / `28183c65` / `f99180ec`+`06ca4fe0`）**：时间戳三态编号统一（权威序 ①显式≤末条拒绝 / ②无显式且时钟真倒退拒绝 / ③无显式且同毫秒良性步进 `clock-adjust:auto+<N>ms`）与四处补 ③ 形态；command-reference 拒绝原因枚举补全（`TARGET_MISSING_FOR_MTIME`/`INVALID_JSON`/`TIMESTAMP_CONFLICT`）+ `--json` 键（`ok`/`legacyInvalidLines`）；SKILL.md 五门表达与调用表口径对齐；预算接线「读取失败不出未接线诊断」句与「Σtokens 上界口径 + R3 归账」句；「非空(size>0)」族统一为「非空且为普通文件（`isFile()` 且 `size > 0`）」（7+2 处）；WS-1 判据句改宽并集表述；「禁双 L」登记；SSoT §10C/§10D.8 交叉引用；wave-b 证据 README 四处订正（时间窗经日志原件 CreationTime 校正 19:51→20:15 ≈ 24 分钟）。
+- **G2 测试补强（`efb6b74` / `98a156fe`）**：maturity 三态断言 + `countSuspectedDuplicateGroups` 直测 + codegraph 两子分支 + artifacts CLI 断言（C12/C12b，**审查实证「预期红」不成立**——门禁路径早已 exit 1，原发现属 `--preflight` 只列不计数语义）+ 窄池退化用例（设计红，任务 6 翻绿）+ 追加器边界三态（CRLF/BOM/无换行）+ 锁时值非法形态；**NEGATIVE-COVERAGE 多锚语法**（`主锚 (；纯引用段)*`，向后兼容——46 行 old/new 逐字节同输出实证；第二锚破坏→exit 1 经控制者与审查者双独立验证）。
+- **G3 代码小额（`3320e0e5`+`ea2773e2` / `778fe4b6` / `0c823ef5`）**：索引探测 stat 判别（有效 symlink/junction → present，异常诊断仅 stat 不可达时输出）+ `collectRootFile` isFile + 窄池空基准守卫（`wideUnion.size === 0`，结果类型增可选 `diagnostics`）+ 锚诊断时点（scope 解析成功后）+ preflight 竞态守卫（`FILE_NOT_FOUND` 结构化）；白名单常量单源（**方向裁定：常量归 producer 模块所有、exporter import**——反向会构成运行图环被 `dependency-boundaries` 拒绝）+ 编码链正则/账本路径单源 + 「记录边界前缀」文案 5 处 + 超时注释统一 + security baseline orphan 5 条清理（289→284，新增 0）；**行为增量三项**：`parentDispatchId` 可选字段 + 疑似重复归账键守卫与精确化（`tokens` 有限正数 / `duration_s` 数字才入组；同 parent 且键全同仍计组）/ 归档清单绝对路径非阻断诊断（注入面，zero-fs）/ R5 读路径非 O1~O6 过滤 + 诊断（**语义边界：uniqueItems 与「存在即累加数组长度」口径不变**）。
+- **G4 登记与夹具（`205d908f`）**：NEGATIVE-COVERAGE 补回 `bad-missing-ledger`/`bad-empty` 登记 + 新增 `bad-cli-kind-without-index`（check-budget 非失败次锚以第四列「次锚非失败证据」澄清，不改锚）；**F-5 阶段 2-4 图谱正例 3 份**（8/25、10/33、11/36 节点边数，`check-requirement-graph --phase=N` 实测 exit 0，无投机豁免字段）；SSoT §10L.3 `ICEBERG_VIEW_PRESENCE` 在场表按代码常量定值（阶段 1=graph+rtm / 2-4=+tla / 5-8=+scope，与 live-run p1-p8 日志信号一致）。
+- **收口前置（`e6952595`，carry-forward 文档对齐）**：AGENTS §6 run-log 条改三态表述（与 §8 对齐）；CHANGELOG Wave B ③ 条补「无显式时间戳且」限定语；预算诊断文案与 data-models/operational-recovery 键句补 `parentDispatchId`；`RunLogEntry` 接口补 `parentDispatchId?`。另注：本批 G3-14 使 Wave B 条目「该 CLI 从不读 `archive-manifest.json`」**字面不再成立**（仅供新增诊断读取归档根清单；其关于快照判定来源的实质结论仍真）。
+
+**销账 8 项（理由全文，销 = 有登记无代码改动）**：① O3「空泛声明」桶恒不可达——`^` 锚定与 `path:` 前缀互斥是既有判据形态，令其可达会改变全部 evidence 判定语义、误伤正常产物，保留为语义兜底并升级为显式不修；② `collectExportSources` 冗余防御——防御性分支在输入异常时给出稳定失败，删除属「为修而修」且降稳健性；③ 归档快照命名不闭合——「目录名须以 changeId 结尾」口径无任何门禁消费，强改破坏「与阶段 8 活动位产物同源」语义；④ `--preflight=true`/拼错旗标静默忽略——全仓布尔 flag 既有语义（`--json` 同），全 CLI 严格化属独立主题；⑤ state-write appended 口径吸收非法 JSON 历史行——与裁定 E「历史行非阻断」一致，收紧会打红合法 legacy 追加场景，产品路径无洞；⑥ 逃生口 `--timestamp` 互斥表述——CLI 头注已在 2026-09-26 修复轮收口（可证纯注释），剩余文档复述已由本批 G1-16 完成；⑦ `test:affected` 无记录——快速车道「不得作验收依据」已成文，为无效通道补记录无信息增量；⑧ writer 比 checker 宽容无告警——追加器写盘时链字段由追加器自身构造（`--correct` 已剔除继承），该形态产品路径不可达且 checker 有牙。
+
+**账本全量审计补充（44 行 deferred 逐一核对，2026-09-27）**：清收批对 2026-09-25 账本全部 44 行 `minor (deferred)` 逐行核对处置落点，结论——40 行已由本批 G1-G4 处置（修/销），另有 4 类情形补充如下：① **审计新增两处一行修复**（`5cd73b19`）：陈旧锁 `STALE_LOCK` 逃生口文案补「手工删除 `<target>.lock/` 目录」与 `wm-write.ts --recover-stale-lock` 双路径；SSoT §10D.4 编排者维护职责表补「放行三步顺序」交叉引用（机器核验指向 `check-run-log` R11）。② **复核确认已处置（前批）**：「`--run-log` 提供但读失败时 R5 静默跳过」——前批修复轮已实装 `⚠ --run-log 文件读取失败，跳过 R5…` 警告（`check-maturity.ts:244/:254`，告别静默），本批复核确认；装配器 `rtm.designDoc` 全设计链引用与 demo `iceberg-reports/` 快照口径改向，均由前批 Tasks 15/16 与验收方式重定处置。③ **登记为不修（无缺陷属性，风格偏好）**：`validOrigins` 并行数组结构体化、`runLogPrefix` 三态枚举化、证据表格 padding 重排、「valid 集 vs 原始行」测试前提注释——四项经复核均无行为/判据风险，属重构风格偏好，按「不为改而改」口径不实施。④ 计入上述后，**2026-09-25 账本延后清单清零**（回写见该账本文末「清收回写」节）。
+
+**显式不修 3 项（随本批登记）**：F-6 真实 `/wm` 会话正向导出演练（需真实会话逐 gate 测量文件，另约）；R5 行级证据锚阻断化（维持观察期，先积累诊断命中数据再评估升级）；code-health Phase 5-8 迁移（独立子系统，SSoT §10K「未实现（不得凭步执行）」，单独立项）。
+
 ## [42.2.1] - 2026-09-01
 
 ### Wave A：门禁语义与牙齿（2026-09-25）
