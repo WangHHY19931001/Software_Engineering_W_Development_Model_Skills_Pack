@@ -7,6 +7,93 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [42.4.0] - 2026-09-27
+
+> 来源：「门禁/测试瘦身」批（用户裁定「不能为了校验而校验，为了测试而测试」）——对**校验机制本身**做外科手术：**留牙齿、砍记账**。规格 `docs/superpowers/specs/2026-09-27-gate-thinning-design.md`（WS-T1..T6 + §5 牙齿替代对照 + §7 风险登记 + **§9 去 hash 化，2026-09-28 追加**）、计划 `docs/superpowers/plans/2026-09-27-gate-thinning.md`，账本 `.superpowers/sdd/2026-09-27-gate-thinning/`（gitignored 账本，路径为引用非交付物；逐任务三件套 `task-N-{brief,report}.md` + `review-*.diff`）。**版本 bump 42.3.0 → 42.4.0**（判据：批次含行为可见的门禁变更——登记册语法与判据收紧、独立运行回退语义变更 + 新 flag、run-log schema 删字段）；节标题日期沿用计划口径 `2026-09-27`，**WS-T7 为其后一日（2026-09-28）追加指令**，见下方该小节。**计数影响**：`schema 34` / `exit-2 脚本 46` / `prepush 19` / `CLI 47` / `persona 33` / `references 44` 均不变（**有门禁强制的计数契约一处未动**）；vitest 用例数**自度量下降** 2674 → **2615**（−59 = T1 −14 / T3 +4 / WS-T7 −49；无任何外部常量断言该总数，见「计数与验收」节）。
+
+### 门禁/测试瘦身（WS-T1..T6）
+
+- **T1 · NEGATIVE-COVERAGE 自动探针化（`0c9c9481` + 修复轮 `e6351acb` / `f8a5f6c5`）**：登记册由 5 列（含手写「证据位置 / 锚」抄本）改为 **4 列** `门禁 | fixture | 机制 | 所防回归`。门禁侧删除 10 个锚机制符号 + 3 个仅服务它们的类型 / 常量 + 4 个违规码（`negative-coverage-evidence-anchor` / `-invalid` / `-relevance` / `-shared-anchor`）；新增**派生锚**（`self-test.ts#<覆盖条目标识>`，由 `collectCaseEntries` / `entryCoversFixture` 现算，进人类可读输出与 `SAMPLES_COVERAGE_JSON.derivedAnchors`（additive 键，控制者裁定②））与两条新违规码 `negative-coverage-not-failing` / `negative-coverage-ambiguous-coverage`。规则 4 收紧为「**fixture 机制行**：fixture 在盘 + 被 self-test 覆盖**恰一处** + 覆盖条目须为**期望失败**」（控制者裁定②：18 条 `invocation` / `mutated-copy` 行的 fixture 列是测试文件路径、无 case 声明覆盖，沿用「落点文件在盘」判据）。**48 条 exit-2 探针的代码与断言一字未动**（每探针独立隔离根 / 有界并发 4 路 / 零漂移断言 / `ERROR_JSON` + 人类错误行；模块头注随「有界并发 4 路」口径订正，属文档面、非牙齿改动）。换件一处：`check-artifact-gate` 行 `samples/gate/valid-phase6.json`（被 3 个 GATE_CASES 条目覆盖、含 1 条通过）→ `samples/gate/bad-rtm-coverage-below-100.json`（1 覆盖 + 期望失败）——原 phase=8 pending **断言仍在 self-test 执行**，登记册文案损失已在登记册「迁移说明」留痕。删行一处：`check-budget` 的次 fixture `samples/run-log/bad-duplicate-groups.jsonl`（G3-15 诊断样本、实测 exit 0 非阻断）按「非失败样本不得占行」删行（该样本仍由 `BUDGET_RUN_LOG_CASES` 执行）。
+- **T2 · L0 计数去常量（`c184bd76`）**：`__tests__/helpers/l0-baseline.ts`（95 行：700 / 101 / 36 三常量 + 全部 rebaseline provenance 注释协议）整文件删除；两个测试文件移除 6 条「等于基线常量」断言（`relativeLinkCount` / `l1Only` / `placeholders`，logic 3 + cli 3）、2 条 import、3 行注释——**0 个测试用例（`it`）被删**（logic 38 / cli 11 不变）；`audit:l0-links` 三计数输出保留（可观测、非断言），`violations` 断言与全部负例（悬空 / L1 隔离 / 占位符形态 / exit 2）逐条保留。**fixture 级计数断言保留**（控制者裁定③：`relativeLinkCount: 0` 两处是分类行为的确定性结构性质，零维护成本）。连带清理：`asset-budget.test.ts` 两处注释去掉对已删 helper 的悬空引用（断言与上限值未动）；全仓活体资产「rebaseline / 重基线」指令**零命中**（该义务只存在于历史计划与 CHANGELOG 历史条目）。
+- **T3 · docs-consistency 独立运行提速（`90bf568a`）**：动态 facts 组装三态化——**态 1**（`WM_VITEST_COUNT_FILE` / `WM_VITEST_PROVENANCE_FILE` 在场，即 prepush 第 15 项）**fail-closed 语义与实现一字不变**；**态 2** 新增 `--spawn-vitest` 显式逃生口（自采集 + 自生成同目录 provenance + 严格校验，行为等同原自采集路径）；**态 3**（缺省、独立运行）**不再 self-spawn**——跳过动态 facts、输出非阻断诊断（逐字文案入 `diagnostics`），`dynamicMeasurements` 置 `null`（键仍在场、形状稳定，消费者无需改），退出码由静态检查与 exit-2 探针决定。实测：独立运行 **35-45 分钟 → 11.04 s**（其中约 8.5 s 仍为 48 条 exit-2 探针真实 spawn；被移除的只有全量 vitest 自采集）。测试：`docs-consistency-logic.test.ts` 206 → 210（1 例语义替换 + 新增 4 例，含受控 stub vitest 走通态 2「spawn → 自 provenance → 严格校验」成功路径）；`lib/types.ts` 的 `JsonReport.dynamicMeasurements` 放宽为 `Record<string, unknown> | null`。文档同步：`command-reference.md` 新增「活体文档一致性门禁 CLI」节（三态 / 退出码 / 排障），`docs/troubleshooting.md` §1.7 / §1.7a-4 / §3 同步。**语义降级登记（规格 §7）**：独立运行属弱校验（静态 + 探针）+ 显式诊断；前提「终局验收一律 `npm run prepush`」已成文（AGENTS §6「迭代可走快速车道，验收必须全量」）。
+- **T4 · pointer 化 8 簇（`ee8133fb` + `862843f1` + `8b718a83` / `fb782417` + `110b20dd` / `35c9c6c6` + `d505b414`）**：同一规则的**枚举只允许出现在权威一处**，其余落点改「≤1 句义务摘要 + 指针（权威文件名 + 可 grep 命中的小节号 / 唯一短语）」；8 簇权威与落点见表。设计决策句可另存 SSoT 但**不得复制枚举**；每簇改完以「指纹短语在权威外命中 == 0（摘要句除外）」grep 校验（逐簇真实证据见各任务报告 §3）。零新增门禁。三处修复轮裁定：① 为过 grep 指纹而改写权威措辞不可接受——`operational-recovery.md:480`（D-6 判据表，表头自称「判据（保留不变）」）**逐字回退**；② 「三形态」指针在权威无同名表述 → 在权威加标签「**证据形态声明（D-6，三形态判据）**」使指针可按字面定位；③ `data-models.md:1066` 删除「未解⑥a」陈旧状态标签。T4-A 另有 6 处纯 prettier 换行（行为中性，控制者裁定⑥：保留、仅如实登记）与两处自引入的错误指针（`check-budget.ts:18-20` 误标「logic 层」/ `:28` 误指「同文件「用量实效校验」段」）经审查发现后修复。
+- **T5 · 易漂计数清扫（`3d1fa193` + 修复轮 `8b2d018a`）**：清扫**无门禁强制**的易漂计数 **28 处 / 10 文件**（其中 **8 处实测已漂移**：13→19 / 10→11 / 7→8 / 2→3 / 12→14 / 12→13 / 43→44 / 25→26 schema），处置为自描述（「数量以运行输出 / 目录实测为准」）或去数字；**保留**门禁强制的计数契约、测试断言中的机器事实、阈值 / 默认值 / 超时等契约常量、带日期的历史实测依据。修复轮一并处置审查发现：`command-reference.md:463` 退出码条补限定词（与同节 `:462` 的 `--spawn-vitest=1` 语义不再自相矛盾）、`INSTALL.md:111` 指针拆分为「.ts 总数见 `SKILL.md`「资源计数」段 / exit-2 口径见 `conventions.md`「exit-2 脚本口径」节」、`asset-budget.test.ts` 一处「当前实测」改历史口径（上限值与断言未动）。
+- **T6 · 流程约定（`3d1fa193` + `8b2d018a`）**：`references/subagent-delegation.md` 新增「任务合并与审查面」短节（10 行：三条约定 + 边界句）——① **纯文档任务**（零 `.ts` / `.json` / schema / `.py`，且**同一阶段内**）合并为一个任务、单一审查面；② 审查出的 **minor 措辞类发现批量入账本**、随下一批同域任务顺带修复，**不触发逐轮 V→R→S-fix 返工**（明文化现状，与 §3.4.4「Minor 不进 loop」对齐）；③ 计划头部注明可合并分派条件。边界句：合并只减分派 / 审查面，**不减免任何门禁判据**。
+
+#### T4 · 枚举权威表（8 簇，枚举只允许出现在权威一处）
+
+| 簇 | 枚举权威（判定） | 其余落点（≤1 句摘要 + 指针） |
+| --- | --- | --- |
+| ① 时间戳三态（①②③ + 两个逃生口） | `command-reference.md`（`wm-append-runlog.ts` 条目「时间戳三态」） | AGENTS §6 / §8、SSoT §10D.6、`data-models.md`、`operational-recovery.md`、`subagent-delegation.md`、`wm-append-runlog.ts` 与 `run-log-append-logic.ts` 头注（实现短式） |
+| ② 非空本质判定族（`isFile()` 且 `size > 0`） | `command-reference.md`（「阶段 5-8 codegraph/coding-plan 门禁 CLI」节 coding-plan checker（R5）条） | `hard-constraints.md`、`subagent-delegation.md`、`phase-5-coding.md`、SSoT §10D.8、`templates/coding-plan.md`、`scripts/samples/README.md` |
+| ③ `parentDispatchId` 键句与上界口径 | `data-models.md`（「用量实效校验（R6）」段） | SSoT §10D.7、`operational-recovery.md`、`toolbox.md`、`subagent-delegation.md`、`check-budget.ts` 注释（短式）、`run-log.schema.json` 字段 description（字段语义短式保留） |
+| ④ 记录边界前缀三态 | `command-reference.md`（「归档前缀性（L4，D-3b）」条） | `archive-integrity-logic.ts` / `check-archive-integrity.ts`（实现短式 + 运行文案）、`data-models.md`、`lib/types.ts` 字段语义注 |
+| ⑤ 预算接线口径（未接线诊断 / 必带 / 上界） | `data-models.md`（「用量实效校验（R6）」段） | SSoT §10D.7、`operational-recovery.md`（调用时机表 + 硬线段）、`toolbox.md`、`subagent-delegation.md` |
+| ⑥ 五门闭环与放行三步顺序 | `SKILL.md`「阶段门放行三步」（复用既有权威：五门清单与调用顺序 = `operational-recovery.md`「调用时机」节；D-6 后置窗口 = 同文件「阶段 1 自举豁免（R11 后置窗口，D-6）」节） | `operational-recovery.md`、SSoT §10.6 / §10D.4 / §10D.7、`data-models.md`（R11 条）、`hard-constraints.md`（约束 #11）、`command-reference.md`（check-run-log R11 条） |
+| ⑦ 导出白名单与 provenance 形态 | 枚举 → `command-reference.md`「证据 provenance 与导出验证」节（+「Source-bound provenance 边界」节）；设计决策 → SSoT §7.10（只写决策与指针） | AGENTS §1 两节 / §8、`docs/INSTALL.md`、`README.md`、`CONTRIBUTING.md`、`data-models.md`（`evidence-provenance` 结构行保留字段语义短式） |
+| ⑧ codegraph 降级契约 | 设计决策 → SSoT :283 段；操作枚举 → `command-reference.md`「阶段 5-8 …」节 codegraph checker 条（「证据形态声明（D-6，三形态判据）」） | `phase-5-coding.md`、`hard-constraints.md`（约束 #14）、`data-models.md`（`codegraph-query` 结构行）、AGENTS §1、SSoT §10K.5、`scripts/samples/README.md` |
+
+**规格外同域命中（grep 发现后一并改，逐条登记）**：`AGENTS.md:159` / `scripts/samples/README.md:21`（T4-A）、SSoT §10.6 :1466（T4-B）、`CONTRIBUTING.md:7` / SSoT §10K.5 :2223 / `scripts/samples/README.md:42`（T4-C）——均为本簇枚举的额外复述，属同域收敛，非扩面。
+
+**例外（保留全文复述，不受 pointer 化约束）**：① AGENTS.md 的**一级红线单句**（导航可读性——如「CHECKPOINT 不可绕过」、run-log 时间戳真值纪律、交付 / 外发红线）；② **代码注释的实现视角描述**（实现自身谓词与短描述保留，**不得复制枚举**）；③ **版本六镜像**（交付契约）；④ **schema / enum / exit-code 等机器契约**（`w-model-dev/schemas/**` 字段 description、`GATE_JSON` / `DOCS_CONSISTENCY_JSON` 键、违规码与退出码字面、负向登记册与 samples 矩阵等门禁直接读取的机器面）。
+
+#### 牙齿替代对照（规格 §5 逐行）
+
+| 删除 | 原牙齿 | 替代承载 |
+| --- | --- | --- |
+| 手写锚证据与多锚语法（T1） | 「证据位置」指向 self-test 引用 | 门禁**派生**锚（同信息、机器现算、永不回填）+ 既有 rule 1 覆盖强制 + 「fixture 被 self-test 覆盖**恰一处**」新断言 |
+| 非失败样本占行（T1 收紧） | 无（本就无牙） | **fixture 机制行**的覆盖条目须为**期望失败**（`negative-coverage-not-failing` / `-ambiguous-coverage`，静态可校验的 `FAILURE_EXPECTATION_PATTERNS` 闭集）；门禁级「真实失败」由 **48 条探针**承担（行粒度 = 门禁粒度） |
+| L0 精确计数断言（T2） | 检测链接增删 | `violations`（悬空 / L1 隔离 / 占位符形态）——检测「错」不是「变」；三计数仍由 CLI 输出可观测；rebaseline 协议与 `helpers/l0-baseline.ts` 整体退役 |
+| 独立运行动态 facts（T3） | 无工件时自采集成强校验 | prepush 第 15 项 **fail-closed 不变**（受控 vitest 工件路径一字未改）+ 独立运行**显式非阻断诊断** + `--spawn-vitest` 逃生口（**语义降级登记**，前提「终局一律 prepush」已成文 AGENTS §6） |
+| 跨文件枚举复述（T4） | 靠门禁 / 审查在 N 处同步 | 单一权威 + 指针；「枚举短语在权威外命中 == 0（摘要句除外）」可 grep 校验（逐簇证据见任务报告 §3） |
+| 易漂注释计数（T5） | 无牙（纯漂移债） | 自描述表述（「以运行输出 / 目录实测为准」，**无数字可漂**） |
+
+**WS-T7 的牙齿对照（规格 §9，2026-09-28 追加）**：行级哈希 / 放行锚移除后的替代承载 = R7 追加序 + R8 轨迹模板 + R9-R11 语义判据（源派生）+ 交付时文件级证据链（导出清单 SHA-256 / provenance / 角色签名链）；**逐条与诚实边界见下方 WS-T7 小节**。
+
+#### 批间关系声明（T1 ↔ 清收批 G2-8）
+
+清收批（`[42.3.0]` 节内登记）的 **G2-8 多锚语法**（`主锚 (；纯引用段)*` + 相关度判据 + 共享锚判据）是上一批为「**手写锚如何写完整**」而加的机制；本批 T1 从根上去掉手写锚（锚改由门禁从 `self-test.ts` 用例条目**派生**），该机制失去承载对象，故与其 **6 例测试**一并移除——**非反复**（判据对象已不存在，不是「先加后删」的摇摆；规格 §7 已登记）。
+
+#### 删除测试处置摘要（不静默消失）
+
+- **T1（`check-samples-coverage.test.ts` 35 → 21；删 21 / 增 7）**：其中 **5 条判定「仍被覆盖」**——#1 换判据（invocation 落点非路径 → `dangling`）、#6（fixture 不在盘 → `dangling`）、#21（缺列 → `malformed` 三态扩容）、#13 / #14（同名 fixture 区分；**如实登记为部分成立**：新测试覆盖「被两个条目覆盖 → `ambiguous-coverage`」等条目粒度判据，但「同名 fixture 分属两数组」场景未由新测试单独覆盖——攻击面随手写锚整体消失，按「有意退休」方向登记）；**16 条「有意退休」**：手写锚 / 多锚语法 / 旧行号语法 / 锚零命中 / 锚不唯一 / 空锚 / 相关度 / 共用锚等攻击面**随机制移除而结构性不可达**（逐条理由与替代指向见 `task-1-report.md` §3.2）。
+- **T2：删除 6 条基线计数断言、0 个测试用例**（逐条「仍被覆盖 / 有意退休」及指向见 `task-2-report.md` §3）。
+- **任务 7 修复轮：删除 1 个死变异半段**（`docs-consistency-logic.test.ts` 中 `install.replace('27 个 check-*.ts', …)`——该字面量随 T5 去数字而恒为 no-op）：**有意退休**（判据载体已不存在；INSTALL 该位置无门禁消费，`exit2ScriptCount === 46` 由同文件另一用例继续覆盖；AGENTS 半段与两条断言逐字保留），登记见 `task-7-report.md` §8.2。
+- **WS-T7 / 任务 9：删除 49 条 run-log 用例（`43ce56c4`；三文件逐条对应）**：`run-log-logic.test.ts` **−29**（D-3a 链段 13 + D-3b 锚段 16）、`run-log-append-logic.test.ts` **−13**（D-3a 7 + D-3b 6）、`wm-append-runlog-cli.test.ts` **−7**——**全部「有意退休」**（机制按用户裁定整体移除，行级哈希 / 锚的可检出能力**不再主张**，完整性改由 WS-T7 小节的三类承载承担）；其中 3 例的**等价面仍被覆盖**：`--correct` 更正语义（同文件保留用例：只追加新记录、历史行逐字节不变、`note` 含 `correction-of:<runId>`）、宽容时间戳谓词（`run-log-append-logic.test.ts`「小写 t/z 时间戳仍作为单调下界」）、`check-run-log` CLI 端到端（`checkpoint-r0-bootstrap-cli.test.ts` 真实 spawn 断言 exit 0/1）。逐条处置与 helper 删除清单见 `task-9-report.md` §4。
+
+#### 口径与边界登记（本批裁定与残余）
+
+1. **T4 审计动作含「锚串须 grep 命中目标小节名」的反向校验**（本批实测教训：D-6 锚串与节标题实际含后缀不符，字面 grep 只命中指针行自身 → 7 处 / 5 文件锚串改为可命中的「阶段 1 自举豁免」节名）。零新增门禁，仅成文为审查动作。
+2. **`eval/e2e/demo-assets/**` 的 D-6 枚举显式豁免**（控制者裁定⑪）：eval 属**批次外资产**（AGENTS §1「非技能包运行时代码、门禁不读取」），且为 e2e 回放资产、改动牵动 replay 语义——「权威外枚举命中 == 0」口径对该目录不适用（避免同批出现两种口径）。
+3. **T2 后 `audit-l0-links` 的 `l1OnlyCount` / `templatePlaceholderCount` 两键仅剩可观测、无任何断言**（显式登记，避免未登记的能力退休；producer 与 `command-reference.md` 声明仍在）。
+4. **三数 provenance 链的追踪面变化**：`helpers/l0-baseline.ts` 已删，`CHANGELOG.md` 既有条目（`[42.2.1]` / `[42.3.0]` 节）与 `docs/changes/2026-09-01-42.2.1-audit-remediation-acceptance.md:476` 中指向该 helper 的锚现为历史锚（§3.5 历史不改写，本批未动）——三数（700 / 101 / 36）来历现仅存于 git 历史与 CHANGELOG 历史条目，后续读者勿按该锚追踪。
+5. **T1 登记册「所防回归」子句的承载变化**（审查 deferred minor，如实登记）：换件 / 删行后，6 组同门禁次要样本退出登记册（check-verifier-output 的 D-10 三样本、check-budget 的 run-log 诊断样本、check-maturity 的 R5 真值通道样本、check-codegraph-queries 的两个 sampleDir、check-coding-plan 的 `bad-missing-ledger`）——其**断言与用例描述仍在 `self-test.ts` 逐条执行**，仅少「登记册文案」这一层承载（登记册「迁移说明」已逐条列名）。
+6. **历史 / 内部规划面不改写**：`docs/superpowers/**`（含 `2026-09-22-e2-spec-amendment.md` 的旧锚形态）、`docs/changes/**`、`docs/debug/**` 与 `CHANGELOG.md` 历史条目（含 `:81` 一带的旧锚形态）按规格 §3.5 一字未改。
+7. **`wm-append-runlog` 的 `digestOf` 保留定性（规格 §9 审计表末行）**：`RUNLOG_APPEND_JSON.digest` 为**无外部消费者的写入批遥测**（整文件文本 SHA-256，**文件级**、非记录级 / 行级）——按「无消费者则一并移除，有则保留并登记」裁定为**保留并登记**（定性更正见 `task-9-report.md` §11-C；原报告曾误记为「活消费者」）。
+
+### WS-T7 · 去 hash 化（2026-09-28 追加：移除记录级哈希链与 checkpoint 放行锚）
+
+> **用户裁定（逐字）**：「禁止为了hash而hash行为，比如为了证明某个文件更新过程可以有独立签名链和git提交记录，但一行文本不应该有这种东西，概念一致性应该是源派生方式而不是hash一致化，有的以上情况都需要整改。」
+
+**判定原则（规格 §9，全仓 hash 机制审计；覆盖 §3.1「证据防伪链（哈希链）」的冻结）**：① 证明**文件 / 制品**级更新过程 → 允许（独立签名链 / git 提交记录 / 逐文件 SHA-256 / 文件级 provenance / 受控工件绑定 / 供应链校验）；② **行 / 记录**级文本**不得**携带哈希（链）或前缀哈希来证明其更新过程（即「为了 hash 而 hash」）；③ 一致性（计数 / 锚 / 口径）一律走**源派生**（现算 / 实测 / 单一权威 + 指针），不走 hash 一致化。
+
+**移除（`43ce56c4`；全链条，非仅停写）**：**记录级哈希链（D-3a）**——`run-log.schema.json` 的 `prevRecordHash` / `recordHash` 两字段（含分支与 description）、追加器链计算 / 前驱扫描 / 载荷重算覆盖、`check-run-log` **R7 链复算段**与首个带哈希记录之前的 LEGACY 吸收分支、`read-json-or-exit` 仅服务锚的原始行数组；**checkpoint 放行锚（D-3b）**——`runLogAnchor {lines, sha256}` 字段、前缀摘要计算与相关导出函数、写入侧自动填锚与 `ANCHOR_MISMATCH` / `ANCHOR_UNVERIFIABLE` 两个违规码、读侧 `RELEASE_ANCHOR_CUTOFF` 与锚校验段（其存在理由「哈希链只保护链自身、可被整链重算」随链一并消失）；文档两节（`data-models.md`「记录哈希链」「checkpoint 放行锚」）与 `command-reference.md` / `AGENTS.md` / `SKILL.md` / `references/{operational-recovery,hard-constraints,signature-chain-guide}.md` / SSoT 的 D-3a / D-3b 表述；三测试文件 **−49 例**及全部链 / 锚 helper（逐条处置见「删除测试处置摘要」）。活体面指纹（`recordHash|prevRecordHash|runLogAnchor|哈希链|放行锚|D-3a|D-3b`）grep **零命中**（历史面按「历史不改写」原样保留）。**未新增 legacy 吸收分支**——否则会在活体代码中重新引入已删字段字面量。
+
+**保留（文件 / 制品级；规格 §9 审计表逐行）**：角色签名链 `sigHash` / `prevSigHash`；evidence-manifest / evidence-provenance 逐文件 SHA-256、`sourceBundleSha256`、`workspaceDigest`、`commitSha`；code-health 全部哈希（逐文件 sha256 + approval / archive / ledger / candidate / test-inventory 摘要 + file-verifier / deletion-authority 删前校验）；gate-log 内容摘要；docs-consistency 受控 vitest 工件绑定（`artifactSha256` + `commitSha`）与 `runId = sha256(raw)`（派生态）；platform-deps 归档 sha512（供应链）；security-scan baseline 命中指纹。**`wm-append-runlog` stdout `digest`**：经审计定性为**无外部消费者的写入批遥测**（整文件文本 SHA-256，**文件级**、非记录级；产出方与消费方同属本工具，测试的逐字节断言不构成外部消费者）→ **保留并登记**（更正见 `task-9-report.md` §11-C）。
+
+**迁移口径（旧版追加器写入的本地 run-log；实测定性）**：`[42.3.0]` 批（2026-09-25 ~ 2026-09-28）由旧追加器写入的 `.w-model/run-log.jsonl` 含上述三字段，在新 schema（`additionalProperties: false`）下 **invalid → fail-closed**：`check-run-log` 输出 `条目 N [schema] /: must NOT have additional properties [additionalProperties]`（**通用文案、不点名字段**；本批实测三字段逐一命中）并 exit 1；`wm-append-runlog --correct=<旧放行记录>` 因 `planCorrection` 的 `{...base}` **继承被更正记录的字段**而 exit 2（`STRUCTURE_INVALID`；A/B 实测：同一 patch 对无该三字段的历史进入写入流程、对该形态即 exit 2）。**处置 = 重跑追加或重建工作区，不得就地改写历史行**（历史不改写纪律；该判断属项目侧裁定，非本批单方决定）。**仓内实测零命中**：`samples/run-log/**`（26 fixture）、`__tests__/fixtures/**`、`docs/debug/**` 快照（443 行）与全仓 `*.json` / `*.jsonl` grep 均零命中，故本仓门禁与测试不受影响。
+
+**替代承载 + 诚实边界（规格 §9「牙齿对照」）**：run-log 完整性 / 可检测性由 ① R7 追加序（相邻时间戳单调）+ R8 轨迹模板 + R9-R11 语义判据（**全部源派生**）；② 交付时的**文件级**证据链（`wm-export-evidence` 导出清单 SHA-256 / provenance）；③ 角色签名链（文件级 `sigHash`）承担。**诚实边界（已写入 SSoT §10D.6，并由 `data-models.md` 指针指回）**：行级哈希保证**不再主张**——R7 追加序只约束相邻时间戳单调，故 **改 note / 删中段行 / 保持单调的时间戳改写均不再可检出**（这三类改写的可证伪性只在交付时的文件级证据链，不在读侧判据）。R7 追加序的覆盖指向 `w-model-dev/scripts/cli/self-test.ts:1387` + fixture `samples/run-log/bad-exitcode-mismatch.jsonl`（**非** `run-log-logic.test.ts`——该文件 `grep -c "非 append-only"` = 0）。
+
+### 计数与验收（本批实测，含 WS-T7）
+
+- **vitest 全量**：**2674（基线）→ 2660（T1 −14）→ 2664（T3 +4）→ 2615（WS-T7 −49）**，`testFileCount 106` 不变（`helpers/l0-baseline.ts` 是 helper 非 `*.test.ts`）。分项（逐文件，实测）：T1 `check-samples-coverage.test.ts` 35→21；T3 `docs-consistency-logic.test.ts` 206→210；WS-T7 `run-log-logic.test.ts` 161→132（−29）/ `run-log-append-logic.test.ts` 39→26（−13）/ `wm-append-runlog-cli.test.ts` 33→26（−7）；T2（删断言不删用例）/ T4 / T5 / T6 / 任务 7（删 `it` 体内写盘行，用例数结构性不变）用例数均不变。**该总数无任何外部常量断言**（T2 已退役 rebaseline 常量，见「牙齿替代对照」）。
+- **self-test**：**381 → 381**（未改 `self-test.ts` 用例数组；T5 / T6 / WS-T7 只改注释与文案）。
+- **samples 覆盖**：`fixtureCount 379` / `negativeCoverageRows 46` / `negativeCoverageProbes 48` / `probeFailures 0` 全部与基线逐字相同。
+- **门禁强制计数契约**：`schema 34` / `exit-2 脚本 46` / `prepush 19` / `CLI 47` / `persona 33` / `references 44` 均不变（T5 清扫只动**无门禁强制**的计数）。
+- **docs-consistency 独立运行**：**11.04 s**（T3 实测；收口复测 **13.96 s**，含 `npx tsx` 启动与 48 条 exit-2 探针约 8.5 s 的真实 spawn）——此前同命令 35-45 分钟；输出含非阻断诊断「动态 facts 未校验」，`dynamicMeasurements: null`，`exitCode 0`（态 3 语义，独立运行不再 self-spawn 全量 vitest）。
+- **终局验收（收口实测，2026-09-28）**：`npm run prepush` **19 项全绿 / `PREPUSH_EXIT=0`**（含全量 vitest + coverage 阈值、规则层覆盖口径、npm audit、48 探针、tsc、prettier、eval；逐项输出见账本 `task-8-prepush.txt`）；独立运行 `check-docs-consistency` **exit 0 / 13.96 s**（`task-8-docs-consistency.txt`）；`check-samples-coverage` **exit 0**（`task-8-samples-coverage.txt`：`fixtureCount 379` / `negativeCoverageRows 46` / `negativeCoverageProbes 48` / `probeFailures 0` / `derivedAnchors` 在场）。
+
 ## [42.3.0] - 2026-09-27
 
 > 来源：8 阶段 live run 调测发现全量修复计划的 Wave C 与收口（发现项 D-9、D-10、遗留 ③④⑥、N-4/N-7；规格 `docs/superpowers/specs/2026-09-25-live-run-findings-remediation-design.md` §5-§6、计划 `docs/superpowers/plans/2026-09-25-live-run-findings-remediation.md` 任务 13-20）。Wave A/B 已在 `[42.2.1]` 节登记（不 bump 惯例）；本节为 Wave C + 全计划收口，**版本 bump 42.2.1 → 42.3.0**（规格 §8 O-3 取值：批次含行为增量——新 flag、新判据、新 schema 字段族）。**计数影响**：Wave C 未新增 CLI / schema / references 文件，exit-2 族保持 **46**、schema 保持 **34**、反模式保持 **48**。
