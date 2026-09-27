@@ -6,7 +6,7 @@
   "alternativeEvidence": [
     {
       "command": "codegraph query UserService.login",
-      "evidencePath": ".w-model/codegraph-queries/phase5-demo-002-UserService.json"
+      "evidencePath": "docs/plans/phase5-demo.plan.md#任务3"
     }
   ]
 }

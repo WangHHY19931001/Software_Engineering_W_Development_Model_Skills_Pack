@@ -9,7 +9,7 @@
   "alternativeEvidence": [
     {
       "command": "codegraph query ArticleService.create",
-      "evidencePath": ".w-model/codegraph-queries/phase5-demo-001-ArticleService.json"
+      "evidencePath": "docs/plans/phase5-demo.plan.md#任务3"
     }
   ]
 }

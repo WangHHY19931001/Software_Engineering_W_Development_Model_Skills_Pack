@@ -307,7 +307,7 @@ PREPUSH_POSTCOMMIT_EXIT=0
 
 ### 7.2 交付态最终运行（HEAD `d7cd03db`，本证据文档定稿后）
 
-文档补记提交后，在**最终交付态** `d7cd03db` 上第三次跑同一命令（日志 `C:\Users\wangh\AppData\Local\Temp\wm-task12\prepush-final.log`，19:49 → 20:15 运行 ≈ 26 分钟）→ **exit 0**：
+文档补记提交后，在**最终交付态** `d7cd03db` 上第三次跑同一命令（日志 `C:\Users\wangh\AppData\Local\Temp\wm-task12\prepush-final.log`，19:51 → 20:15 运行 ≈ 24 分钟）→ **exit 0**：
 
 **28 行逐字摘录（含 ANSI 转义；窗自门禁启动行至验收标记 `PREPUSH_FINAL_EXIT=0`，窗内略去 3 行 npm 噪声——`npm warn Unknown env/user config "home"` ×2 与 `npm error A complete log of this run…`，已对照日志原件核实）**：
 
