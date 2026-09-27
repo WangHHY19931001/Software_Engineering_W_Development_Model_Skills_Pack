@@ -7,3 +7,4 @@
 证据（行级锚）：
 
 docs/plans/phase5-demo.plan.md:L5=目标节；L9=Task 1 节；L16=Task 2 节。
+<!-- 占位内容：本 fixture 唯一失败点 = plan-completeness 为空文件 -->

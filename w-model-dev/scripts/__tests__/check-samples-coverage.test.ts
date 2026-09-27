@@ -444,6 +444,51 @@ describe('check-samples-coverage 负向覆盖不变量（M06 / S28）', () => {
     expect(r.stdout).toContain('锚为空');
   });
 
+  // ====== 多锚（全角分号分隔，G2-8 / 2026-09-27 任务 5）：逐锚机器校验 + 既有行零行为变化 ======
+  it('多锚正例：`文件#锚1；文件#锚2` 两个锚各自命中恰一次 → exit 0', async () => {
+    await putEvidenceFile(EVIDENCE_FILE);
+    await setupSingleGateRepo([
+      {
+        name: 'check-foo',
+        mechanism: 'invocation',
+        evidence: `\`${EVIDENCE_FILE}#// line 2；${EVIDENCE_FILE}#// line 1\``,
+      },
+    ]);
+    const r = run();
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('"negativeCoverageProbeFailures":0');
+  });
+
+  it('多锚 RED：第二锚零命中 → exit 1 negative-coverage-evidence-anchor（第二锚失配必须真实阻断，不静默）', async () => {
+    await putEvidenceFile(EVIDENCE_FILE);
+    await setupSingleGateRepo([
+      {
+        name: 'check-foo',
+        mechanism: 'invocation',
+        evidence: `\`${EVIDENCE_FILE}#// line 2；${EVIDENCE_FILE}#// line ghost\``,
+      },
+    ]);
+    const r = run();
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('negative-coverage-evidence-anchor');
+    expect(r.stdout).toContain('// line ghost');
+    expect(r.stdout).toContain('零命中');
+  });
+
+  it('向后兼容：`；` 后接描述文字的段不构成多锚（段内引用即使写坏也零行为变化）→ exit 0', async () => {
+    await putEvidenceFile(EVIDENCE_FILE);
+    await setupSingleGateRepo([
+      {
+        name: 'check-foo',
+        mechanism: 'invocation',
+        evidence: `\`${EVIDENCE_FILE}#// line 2\`（主锚；另见描述性提及 \`${EVIDENCE_FILE}#// line ghost\`）`,
+      },
+    ]);
+    const r = run();
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('"negativeCoverageProbeFailures":0');
+  });
+
   // ============ fixture 行锚相关度：锚须落在**登记该 fixture 的用例条目**内（2026-09-18 修复轮） ============
   /**
    * 「两个同名 fixture 分属两个用例数组」的自建 self-test：`samples/alpha/dupe.json` 与
@@ -566,6 +611,62 @@ describe('check-samples-coverage 负向覆盖不变量（M06 / S28）', () => {
     expect(r.stdout).toContain('negative-coverage-evidence-shared-anchor');
     expect(r.stdout).toContain('alpha/extra.txt');
     expect(r.stdout).not.toContain('negative-coverage-evidence-relevance');
+  });
+
+  // ====== 多锚 fixture 行（G2-8 + G4-1/2 登记形态）：每个锚各锚到自己那个 fixture 的用例条目 ======
+  it('多锚正例：一行以 `；` 登记两个 fixture，各锚到自己的用例条目 → exit 0', async () => {
+    await putEvidenceFile(EVIDENCE_FILE);
+    await setupSameNameRepo([
+      {
+        name: 'check-alpha',
+        mechanism: 'fixture',
+        evidence:
+          "`samples/alpha/dupe.json`（`self-test.ts#note: 'alpha-entry-note'`）；" +
+          "`samples/beta/dupe.json`（`self-test.ts#marker: 'beta-entry-marker'`）",
+      },
+      { name: 'check-beta', mechanism: 'invocation', evidence: `\`${EVIDENCE_FILE}#// line 2\`` },
+    ]);
+    const r = run();
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('"negativeCoverageRows":2');
+    expect(r.stdout).toContain('"negativeCoverageProbeFailures":0');
+  });
+
+  it('多锚 RED：第二锚指向另一个 fixture 的用例条目 → exit 1 evidence-relevance（按锚各自的 fixture 判定）', async () => {
+    await putEvidenceFile(EVIDENCE_FILE);
+    await setupSameNameRepo([
+      {
+        name: 'check-alpha',
+        mechanism: 'fixture',
+        evidence:
+          "`samples/alpha/dupe.json`（`self-test.ts#note: 'alpha-entry-note'`）；" +
+          "`samples/beta/dupe.json`（`self-test.ts#marker: 'alpha-entry-marker'`）",
+      },
+      { name: 'check-beta', mechanism: 'invocation', evidence: `\`${EVIDENCE_FILE}#// line 2\`` },
+    ]);
+    const r = run();
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('negative-coverage-evidence-relevance');
+    expect(r.stdout).toContain('锚落在用例条目 ALPHA_CASES 内');
+    expect(r.stdout).toContain('beta/dupe.json');
+  });
+
+  it('多锚 RED：第二锚段点名的 fixture 不在盘 → exit 1 negative-coverage-dangling（点名的第二 fixture 逐锚核在盘）', async () => {
+    await putEvidenceFile(EVIDENCE_FILE);
+    await setupSameNameRepo([
+      {
+        name: 'check-alpha',
+        mechanism: 'fixture',
+        evidence:
+          "`samples/alpha/dupe.json`（`self-test.ts#note: 'alpha-entry-note'`）；" +
+          "`samples/alpha/ghost.json`（`self-test.ts#note: 'alpha-entry-note'`）",
+      },
+      { name: 'check-beta', mechanism: 'invocation', evidence: `\`${EVIDENCE_FILE}#// line 2\`` },
+    ]);
+    const r = run();
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('negative-coverage-dangling');
+    expect(r.stdout).toContain('alpha/ghost.json');
   });
 
   it('RED（相关度 fail-closed）：fixture 行的锚指向用例登记来源之外的文件 → exit 1 evidence-relevance', async () => {
