@@ -325,7 +325,7 @@ V 子代理在输出 VerifierOutput JSON 前必须自检：
 9. **断言强度与「是否真的在测东西」自检**（S21，判据见 `quality-standards.md`「测试质量判据（S21/S19/S20/M03）」§①/§②）：`targetKind=test` 时逐条核对——测试是否只断言「有意的决定」而成为 change detector；是否只断言「源文本包含某行」而落入 string-presence trap；测试名 / 意图能否**点名它抓的破坏**（"Name the break" 前置门，点不出即判测试无效并要求重命名或删除）；期望值是否由被测代码或其 helper 推导 / 复制（mirror assertion）。并按 **Mutation Check 5 类变异**核对「每个现实变异至少让一个测试转红」。本项**不新增子标准名**，作为 `correctness` / `clarity` / `independence` 既有子标准的证据要求。
 10. **mock 规则自检**（S20，判据见同节 §③）：替换真实方法前是否已学清其**全部副作用**；替身是否镜像被替对象的**全部已文档化字段**（而非只镜像测试读到的字段）；生产类是否混入 **test-only 方法**。**作用域限定**：本项只评审**被测生产代码**；门禁 fixture（`samples/**`）与本仓脚本按「是否忠实模拟被替对象」判定，**不适用** mock 三条硬规则。
 11. **S-tickets 产出评审自检**（S18，判据见 `command-reference.md`「S18 票据内容门禁」条——六条黑名单 + Buildability 三条负面判据 + 已知边界）：评审 S-tickets 产出时，按该判据核对票据内容（符号级契约是否点名、占位短语 / 无具体动作祈使 / 未定义符号引用 / Buildability 负面形态是否为零；已知边界由 V 复核兜底）。本项**不新增子标准名**，作为既有子标准的证据要求；判据全文以 `command-reference.md` 与 `gate-logic.ts` 实现为权威，此处只指向、不复制。
-12. **evidence 单 L 形态自检**（D-10②）：每条 `subCriteria[*].evidence` 须为 `path:§sec=陈述` 或 `path:Lnn=陈述`；行号区间写 `path:L51-53=陈述`，**禁双 L 形态** `path:L51-L53=陈述`（门禁报「evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt，单 L 形态）」，与「空泛声明」是两条不同归因）。
+12. **evidence 单 L 形态自检**（D-10②）：每条 `subCriteria[*].evidence` 须为 `path:§sec=陈述` 或 `path:Lnn=陈述`；行号区间写 `path:L51-53=陈述`，**禁双 L 形态** `path:L51-L53=陈述`（门禁报「evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt；行号区间合法写法 path:L51-53=stmt，双 L 非法）」，与「空泛声明」是两条不同归因）。
 13. **reviewedAt 时序自检**（D-10③）：`meta.reviewedAt` 须为本次评审完成的真实时刻，且**不早于**被评审产物的产出时刻（评审不可能先于产物存在）。该项**不做成门禁判据**（会引入时钟依赖、破坏 logic 层确定性），由 R 子代理四路时钟对账与 V 自检承担。
 
 ## 独立评审会话模板

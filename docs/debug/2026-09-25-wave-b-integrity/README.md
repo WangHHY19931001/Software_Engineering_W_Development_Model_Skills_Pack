@@ -37,7 +37,26 @@ npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts "$TMPW/ws/.w-model/run-log.j
 # → RUNLOG_APPEND_JSON {"lines":445,"appended":2,"digest":"sha256:592497bd…","ok":true,…,"legacyInvalidLines":[]}   APPEND_EXIT=0
 ```
 
-追加的 2 条（时间戳显式注入，晚于末条 `2026-09-25T14:35:00.000Z`，未用 `--allow-clock-adjust`）：`p8-S-produce-waveb-01`（`2026-09-26T11:00:00.000Z`，哈希段首条，`prevRecordHash=""`）、`p8-O-checkpoint-waveb-02`（`2026-09-26T11:01:00.000Z`，`action=checkpoint/outcome=success` → 追加器**自动填锚**，锚自身入链）。
+追加的 2 条（时间戳为载荷自带的显式值，晚于末条 `2026-09-25T14:35:00.000Z`，未用 `--allow-clock-adjust`）：`p8-S-produce-waveb-01`（`2026-09-26T11:00:00.000Z`，哈希段首条，`prevRecordHash=""`）、`p8-O-checkpoint-waveb-02`（`2026-09-26T11:01:00.000Z`，`action=checkpoint/outcome=success` → 追加器**自动填锚**，锚自身入链）。
+
+| #       | 突变形态                                          | 命令（仓外副本）                                                                                                | 退出码 | 关键输出（逐字摘录）                                                                                                                                                                                                                                                                                                     |
+| ------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **(a)** | 改带哈希记录内容（`p8-S-produce-waveb-01` 的 `note`） | `check-run-log.ts "$TMPW/mut-a.jsonl" --json`                                                                   | **1**  | `R7: 哈希链断裂：条目 p8-S-produce-waveb-01 记录内容与 recordHash 不符（记录被就地改写或链字段被篡改）`；`R7: 放行记录 p8-O-checkpoint-waveb-02 的 runLogAnchor 与当前历史前缀不符（放行后被改写/重排）：sha256=f6652b57… ≠ 当前前缀原始字节摘要 2fca5b7b…`（reasons=2）                                                                      |
+| **(b)** | 改带哈希记录时间戳（`p8-O-checkpoint-waveb-02` → `11:02:00Z`，仍单调） | `check-run-log.ts "$TMPW/mut-b.jsonl" --json`                                                                   | **1**  | `R7: 哈希链断裂：条目 p8-O-checkpoint-waveb-02 记录内容与 recordHash 不符（记录被就地改写或链字段被篡改）`（reasons=**1**，干净单命中：仅内容维度；时间戳仍单调 → 不触发 R7 时序段）                                                                                                                                          |
+| **(c)** | 删一条带哈希记录（删哈希段首条）                  | `check-run-log.ts "$TMPW/mut-c.jsonl" --json`                                                                   | **1**  | `R7: 哈希链断裂：条目 p8-O-checkpoint-waveb-02 的 prevRecordHash=59617208… 与前一条 recordHash= 不符（链被重排/删除/插入）`；`R7: …runLogAnchor…：lines=444 ≠ 当前前缀记录数 443`；`R7: …sha256=f6652b57… ≠ … fbde538b…`（reasons=3）                                                                                       |
+| **(d)** | 在哈希段内插入一条无哈希记录（`p8-S-produce-legacy-inserted`，`11:00:30Z`，无 `recordHash`） | `check-run-log.ts "$TMPW/mut-d.jsonl" --json`                                                                   | **1**  | `R7: 哈希链断裂：条目 p8-S-produce-legacy-inserted 无 recordHash（哈希段之后不得出现未入链记录；就地删除 recordHash 亦命中）`；`R7: …runLogAnchor…：lines=444 ≠ 当前前缀记录数 445`；`R7: …sha256=f6652b57… ≠ … 2af9a320…`（reasons=3）                                                                                       |
+| **(e)** | **正确用法**：经追加器追加后直接校验（基线 445 行） | `check-run-log.ts "$TMPW/ws/.w-model/run-log.jsonl" --json`                                                     | **0**  | `passed=true reasons=[] violations=[]`；`r11={"checkedGates":9,"missing":0}`；`R7: 历史段 443 条无哈希（LEGACY，未参与链校验）`（诊断在场）+ 8 条放行记录 `早于 cutoff → LEGACY 非阻断`；新放行记录带锚且自洽 → **无 R7 blocking**                        |
+
+> 上表「关键输出」中的哈希为**阅读用截断**（`f6652b57…` / `59617208…` 等）；工具输出原文是完整 64 位小写 hex，完整值与可复算命令见 §3.0。
+
+**探针 (a)-(d) 的突变构造**（node 脚本，仓外；均在副本上原地改，仓库内快照未触碰）：
+
+| 突变 | 构造 |
+| ---- | ---- |
+| (a)  | 第 444 行解析后 `note += ' [TAMPERED-BY-PROBE-a]'`，重新序列化 |
+| (b)  | 第 445 行 `timestamp = '2026-09-26T11:02:00.000Z'`（晚于前条 11:00:00、保持单调） |
+| (c)  | `splice(443,1)` 删除哈希段首条 |
+| (d)  | 在第 444/445 行之间 `splice(444,0,<无 recordHash 的 legacy 形态记录>)` |
 
 ### 3.0 起链载荷原文（可再推导，非 transcript 独占）
 
@@ -98,25 +117,6 @@ recomputed anchor        = f6652b57adc0bd5ba6f9a638352f0842c23a4b1247a9fc7f1feb3
 ```
 
 即三个哈希均**可由本 README 内联的载荷 + 快照独立复算**，不需要 transcript。
-
-| #       | 突变形态                                          | 命令（仓外副本）                                                                                                | 退出码 | 关键输出（逐字摘录）                                                                                                                                                                                                                                                                                                     |
-| ------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **(a)** | 改带哈希记录内容（`p8-S-produce-waveb-01` 的 `note`） | `check-run-log.ts "$TMPW/mut-a.jsonl" --json`                                                                   | **1**  | `R7: 哈希链断裂：条目 p8-S-produce-waveb-01 记录内容与 recordHash 不符（记录被就地改写或链字段被篡改）`；`R7: 放行记录 p8-O-checkpoint-waveb-02 的 runLogAnchor 与当前历史前缀不符（放行后被改写/重排）：sha256=f6652b57… ≠ 当前前缀原始字节摘要 2fca5b7b…`（reasons=2）                                                                      |
-| **(b)** | 改带哈希记录时间戳（`p8-O-checkpoint-waveb-02` → `11:02:00Z`，仍单调） | `check-run-log.ts "$TMPW/mut-b.jsonl" --json`                                                                   | **1**  | `R7: 哈希链断裂：条目 p8-O-checkpoint-waveb-02 记录内容与 recordHash 不符（记录被就地改写或链字段被篡改）`（reasons=**1**，干净单命中：仅内容维度；时间戳仍单调 → 不触发 R7 时序段）                                                                                                                                          |
-| **(c)** | 删一条带哈希记录（删哈希段首条）                  | `check-run-log.ts "$TMPW/mut-c.jsonl" --json`                                                                   | **1**  | `R7: 哈希链断裂：条目 p8-O-checkpoint-waveb-02 的 prevRecordHash=59617208… 与前一条 recordHash= 不符（链被重排/删除/插入）`；`R7: …runLogAnchor…：lines=444 ≠ 当前前缀记录数 443`；`R7: …sha256=f6652b57… ≠ … fbde538b…`（reasons=3）                                                                                       |
-| **(d)** | 在哈希段内插入一条无哈希记录（`p8-S-produce-legacy-inserted`，`11:00:30Z`，无 `recordHash`） | `check-run-log.ts "$TMPW/mut-d.jsonl" --json`                                                                   | **1**  | `R7: 哈希链断裂：条目 p8-S-produce-legacy-inserted 无 recordHash（哈希段之后不得出现未入链记录；就地删除 recordHash 亦命中）`；`R7: …runLogAnchor…：lines=444 ≠ 当前前缀记录数 445`；`R7: …sha256=f6652b57… ≠ … 2af9a320…`（reasons=3）                                                                                       |
-| **(e)** | **正确用法**：经追加器追加后直接校验（基线 445 行） | `check-run-log.ts "$TMPW/ws/.w-model/run-log.jsonl" --json`                                                     | **0**  | `passed=true reasons=[] violations=[]`；`r11={"checkedGates":9,"missing":0}`；`R7: 历史段 443 条无哈希（LEGACY，未参与链校验）`（诊断在场）+ 8 条放行记录 `早于 cutoff → LEGACY 非阻断`；新放行记录带锚且自洽 → **无 R7 blocking**                        |
-
-> 上表「关键输出」中的哈希为**阅读用截断**（`f6652b57…` / `59617208…` 等）；工具输出原文是完整 64 位小写 hex，完整值与可复算命令见 §3.0。
-
-**探针 (a)-(d) 的突变构造**（node 脚本，仓外；均在副本上原地改，仓库内快照未触碰）：
-
-| 突变 | 构造 |
-| ---- | ---- |
-| (a)  | 第 444 行解析后 `note += ' [TAMPERED-BY-PROBE-a]'`，重新序列化 |
-| (b)  | 第 445 行 `timestamp = '2026-09-26T11:02:00.000Z'`（晚于前条 11:00:00、保持单调） |
-| (c)  | `splice(443,1)` 删除哈希段首条 |
-| (d)  | 在第 444/445 行之间 `splice(444,0,<无 recordHash 的 legacy 形态记录>)` |
 
 ### 3.1 边界探针（未附加链的纯 legacy 副本，诚实登记）
 
@@ -234,7 +234,7 @@ PREPUSH_EXIT=0
 | 18  | tsc 类型检查                           | `✓ tsc 类型检查 0 错误（exit 0）`                                      |
 | 19  | eval 语料断言与覆盖矩阵                | `✓ eval 语料断言与覆盖矩阵全绿（exit 0）`                              |
 
-**末 30 行（原文逐字，含 ANSI 转义与 npm warn）**：
+**末 30 行（原文逐字，含 ANSI 转义与 npm warn；块内另含验收标记行 `PREPUSH_EXIT=0`，故共 31 行）**：
 
 ```text
 [pre-push] 检测到校验脚本相关变更，启动推送前门禁...
@@ -307,7 +307,9 @@ PREPUSH_POSTCOMMIT_EXIT=0
 
 ### 7.2 交付态最终运行（HEAD `d7cd03db`，本证据文档定稿后）
 
-文档补记提交后，在**最终交付态** `d7cd03db` 上第三次跑同一命令（日志 `C:\Users\wangh\AppData\Local\Temp\wm-task12\prepush-final.log`，19:19 → 19:45 运行 ≈ 26 分钟）→ **exit 0**：
+文档补记提交后，在**最终交付态** `d7cd03db` 上第三次跑同一命令（日志 `C:\Users\wangh\AppData\Local\Temp\wm-task12\prepush-final.log`，19:49 → 20:15 运行 ≈ 26 分钟）→ **exit 0**：
+
+**28 行逐字摘录（含 ANSI 转义；窗自门禁启动行至验收标记 `PREPUSH_FINAL_EXIT=0`，窗内略去 3 行 npm 噪声——`npm warn Unknown env/user config "home"` ×2 与 `npm error A complete log of this run…`，已对照日志原件核实）**：
 
 ```text
 [pre-push] 检测到校验脚本相关变更，启动推送前门禁...
@@ -413,7 +415,7 @@ SELF_TEST_EXIT=0
 
 1. **纯 legacy 段的改写不可检出**（§3.1）——设计内固有限制（哈希链只保护带哈希段；cutoff 前的放行锚按 LEGACY 吸收）。本轮以「边界探针 exit 0 + 非阻断诊断可见」如实登记，**不主张**历史段防伪；该段的完整性主张由归档字节前缀（§4）与 `wm-export-evidence` 的 SHA-256 manifest 承担。
 2. **探针 (b) 只命中内容维度**：时间戳突变若同时破坏单调性，会额外触发既有 R7 时序段——本轮刻意选「仍单调」的变体，以证明**内容哈希**维度独立于时序维度生效（reasons=1）。
-3. **`--allow-clock-adjust` 未在本轮触发**：追加时间戳 `2026-09-26T11:00/11:01Z` 均晚于末条（`2026-09-25T14:35:00.000Z`）且当前时钟更晚，故走显式注入通道（`clock-injected` 留痕），**未使用** `--allow-clock-adjust`。
+3. **`--allow-clock-adjust` 未在本轮触发**：追加记录的时间戳为**载荷自带**的显式时间戳（`2026-09-26T11:00/11:01Z`，均晚于末条 `2026-09-25T14:35:00.000Z`）→ 正常追加，无拒绝亦无时钟步进；`clock-injected:` 痕迹仅在 `--timestamp=<iso>` flag 注入时写入记录 `note`（本轮未用该 flag，§3.0 载荷原文的 `note` 无时钟痕迹），**未使用** `--allow-clock-adjust`。
 4. **归档前缀的字节前缀口径不证明「归档后无改写 + live 侧尾部追加」的绝对归属**（两侧不可同真，文案已改为「须人工裁定证据归属」，测试只断言 `[runLogPrefix]`）——Task 8 报告已登记，本轮不改口径。
 5. **三态时序矩阵为本轮转录、非本轮重跑**（§5）：原始进程输出在 gitignored 账本 `task-9-10-report.md` 与仓外 `%TEMP%\wm-t9t10\`；本轮以同一基线的 R11 `checkedGates=9/missing=0` 作旁证，未另造 A/B/C 三态副本。
 6. **原始日志 / 突变脚本为 `%TEMP%` 瞬态**（`C:\Users\wangh\AppData\Local\Temp\wm-task12\`，不入库）：本 README 为**转录**，并以 §3.0 内联的起链载荷原文 + 完整链哈希 + 独立复算命令补足可再推导性（不再依赖 transcript）；突变脚本为一次性 `node -e`，构造规则已在 §3 表内逐条写明。

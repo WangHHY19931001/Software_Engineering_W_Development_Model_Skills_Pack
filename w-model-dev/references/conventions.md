@@ -159,7 +159,7 @@ path:§3.2,L42       （章节+行号混合）
 
 > 本格式同时是 `graph.json` 节点可选字段 `evidenceAnchor`（产出期证据锚点）的格式权威（见术语表 evidenceAnchor 条目）。
 
-格式：`path:§section=statement` 或 `path:L42=statement` 或 `path:L42-58=statement`（行号区间，**单 L 形态**）
+格式：`path:§section=statement` 或 `path:L42=statement` 或 `path:L42-58=statement`（行号区间，**单 L 形态**）。**evidence 禁双 L 形态**（`path:Lnn-Lmm=`），单 L 或 §sec 形态合法。
 
 ```
 合法示例：

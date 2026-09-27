@@ -544,7 +544,7 @@ interface RunLogEntry {
 
 ```text
 recordHash = sha256(prevRecordHash + "\n" + canonicalJson(record 去掉 recordHash 字段))
-canonicalJson = 对象键按 Unicode 码点升序、无空白、UTF-8、数组保序
+canonicalJson = 对象键按 Unicode 码点升序、无空白、UTF-8、数组保序（与 JSON.stringify 键序无关：显式按 Unicode 码点升序序列化）
 ```
 
 - `prevRecordHash` 是记录字段，因此**参与**本条 `canonicalJson` 载荷（链关系被前缀与载荷双重绑定）；`recordHash` 字段本身必须从载荷剔除（否则不可复算）。哈希输出为 64 位小写 hex。

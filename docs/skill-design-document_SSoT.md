@@ -1756,14 +1756,14 @@ interface MaturityConfig {
 3. 查 L0~L3 放行矩阵：✅ 等用户 → 执行 CHECKPOINT 暂停；⚡ 自动放行 → 跳过暂停，run-log append 记录
 4. 检查高风险路径（仅 L3）：命中高风险路径表 → 即使 L3 也强制决策型 CHECKPOINT
 5. 升级判定（每次阶段 8 完成后）：汇总 unlockConditions，若全部达标 → 询问用户是否升级（决策型 CHECKPOINT，不可自动升级）
-6. 降级判定（每次 O 系列失败模式命中后）：若 operationalFailures ≥ downgradeTriggers.operationalFailureStreak → 自动降级到 L0
+6. 降级判定（每次 O 系列失败模式命中后）：若 operationalFailures ≥ downgradeTriggers.operationalFailureStreak → 自动降级到 L0（R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）
 
 **关键约束**：
 
 - **L1+ 自动放行是操作型 CHECKPOINT 的选择性激活，非绕过**（约束 2）：自动放行仍在 run-log 记录 action=checkpoint outcome=success，保留可追溯性。
 - **决策型 CHECKPOINT 在所有级别均等用户**：设计方向不可自动决定。
 - **升级不可自动**：升级是决策型 CHECKPOINT，须用户显式确认。
-- **降级可自动**：O 系列失败模式连续命中触发自动降级回 L0。
+- **降级可自动**：O 系列失败模式连续命中触发自动降级回 L0（R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）。
 
 ### 10C.7 阶段完成计数与强制校验（check-maturity.ts）
 
