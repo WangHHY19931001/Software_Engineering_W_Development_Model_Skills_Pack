@@ -33,9 +33,9 @@
 >     门禁的专用 fixture）并有界并发（4 路），断言 exit code=2、stdout 含可解析 `ERROR_JSON`
 >     （`exitCode=2` 且 category 属 exit-2 类别）、stderr 含同类别人类错误行、且**该探针自己的**隔离根
 >     调用前后逐项不变（不得留下半成品）。独立根是并发的前提，同时把不变量加强为「本探针在自己根内不留
->     半成品」（共享根只能做弱归因）；实测对照为引入时的 47 探针（现 48）——由串行 71s 降至约 22s，
->     断言一字未减。tsx 不可用等探针不可用情形按失败处理，不静默跳过
->     （→ `negative-coverage-probe-failed`）。
+>     半成品」（共享根只能做弱归因）；探针数量以 `lib/exit2-probe-registry.ts` 注册表为准，墙钟随机器与
+>     并发度变化（串行 → 有界并发显著缩短，均不写死数字），断言一字未减。tsx 不可用等探针不可用情形按
+>     失败处理，不静默跳过（→ `negative-coverage-probe-failed`）。
 > - 口径与中心探针一致（46 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
 >   `metrics-report.ts` 使用特殊探针参数，但仍计入集合）。
 > - **所防回归**：若该负向案例被删掉 / 放宽，会漏掉的那一个具体回归；禁止「防止出错」这类空话。

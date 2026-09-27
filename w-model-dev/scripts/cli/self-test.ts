@@ -14,12 +14,12 @@
  *   0  所有样本的校验结果与期望一致
  *   1  至少一个样本不匹配
  *
- * 样本目录约定（samples/<area>/，27 个样本子目录（45 个 `*_CASES` 用例数组），详见 samples/README.md 覆盖矩阵）：
+ * 样本目录约定（samples/<area>/；子目录与 `*_CASES` 用例数组的数量以 samples/README.md 覆盖矩阵与运行输出为准）：
  *   verifier / gate / graph / tla / code-tla / bdd / coverage / exemption / budget /
  *   run-log / maturity / checkpoint / rootcause / preventive-review / iceberg /
  *   tla-bdd-sync / state-machine / design-contract / signature-chain /
  *   archive-integrity / schema / code-health / codegraph-queries /
- *   uat-path-mapping（tla-e2e 为需 Java 的手动 fixture，豁免）
+ *   uat-path-mapping 等（tla-e2e 为需 Java 的手动 fixture，豁免）
  *
  * 注意：self-test 是纯逻辑回归基线，**不依赖 Java/jar**。TLA+ 的 SANY/TLC 端到端测试
  *   在 samples/tla-e2e/ 下提供 fixture，需 Java 才能跑（见该目录 README）。
@@ -657,7 +657,7 @@ const GRAPH_CASES: GraphCase[] = [
     expectedReasonPatterns: [/collaborates-with.*目标节点不存在/],
     description: 'collaborates-with 目标 SD-5.2.9 不存在，应被横切边校验拦截',
   },
-  // -------------------- 四维识别·维度1/3：13 个 phase=1 纯 REQ 图样本 --------------------
+  // -------------------- 四维识别·维度1/3：phase=1 纯 REQ 图样本 --------------------
   {
     file: 'valid-req-hierarchy.json',
     phase: 1,
@@ -2124,7 +2124,7 @@ const UAT_PATH_MAPPING_CASES: UatPathMappingCase[] = [
   },
 ];
 
-// -------------------- BDD（10 样本，2 valid + 8 bad） --------------------
+// -------------------- BDD（valid + bad 样本） --------------------
 
 interface BddCase {
   /** manifest 文件名（相对 samples/bdd/） */
@@ -2156,7 +2156,7 @@ interface BddCase {
 }
 
 const BDD_CASES: BddCase[] = [
-  // -------------------- 2 valid 样本（L1 + L2） --------------------
+  // -------------------- valid 样本（L1 + L2） --------------------
   {
     manifestFile: 'valid-manifest.json',
     featureFiles: ['valid-l1.feature'],
@@ -2173,7 +2173,7 @@ const BDD_CASES: BddCase[] = [
     phase: 2,
     description: '完整合法的 L2 features + manifest：parent 指向 L1 + 状态机七要素齐全',
   },
-  // -------------------- 8 bad 样本（覆盖 D1/D3/D4/D5/D6/D7 + schema） --------------------
+  // -------------------- bad 样本（覆盖 D1/D3/D4/D5/D6/D7 + schema） --------------------
   {
     manifestFile: 'bad-schema.manifest.json',
     featureFiles: ['valid-l1.feature'],
@@ -2271,7 +2271,7 @@ const BDD_CASES: BddCase[] = [
   },
 ];
 
-// -------------------- Coverage（四维·维度4：10 样本，5 valid + 5 bad） --------------------
+// -------------------- Coverage（四维·维度4：valid + bad 样本） --------------------
 
 interface CoverageCase {
   /** 样本文件名（相对 samples/coverage/） */
@@ -2287,7 +2287,7 @@ interface CoverageCase {
 }
 
 const COVERAGE_CASES: CoverageCase[] = [
-  // -------------------- 5 valid 样本 --------------------
+  // -------------------- valid 样本 --------------------
   {
     file: 'valid-full-coverage.json',
     expectedPassed: true,
@@ -2314,7 +2314,7 @@ const COVERAGE_CASES: CoverageCase[] = [
     expectedPassed: true,
     description: '四维·维度4：NFR/CON 不适用但 status=covered + gapDescription 声明',
   },
-  // -------------------- 5 bad 样本 --------------------
+  // -------------------- bad 样本 --------------------
   {
     file: 'bad-empty-stakeholder.json',
     expectedPassed: false,
@@ -2348,7 +2348,7 @@ const COVERAGE_CASES: CoverageCase[] = [
   },
 ];
 
-// -------------------- Exemption（四维·豁免审批：7 样本，2 valid + 5 bad） --------------------
+// -------------------- Exemption（四维·豁免审批：valid + bad 样本） --------------------
 
 interface ExemptionCase {
   /** 样本文件名（相对 samples/exemption/） */
@@ -2362,7 +2362,7 @@ interface ExemptionCase {
 }
 
 const EXEMPTION_CASES: ExemptionCase[] = [
-  // -------------------- 2 valid 样本（S→R→V→人类 全 approve） --------------------
+  // -------------------- valid 样本（S→R→V→人类 全 approve） --------------------
   {
     file: 'valid-full-approval.json',
     expectedPassed: true,
@@ -2378,7 +2378,7 @@ const EXEMPTION_CASES: ExemptionCase[] = [
     expectedPassed: true,
     description: '四维·豁免：第 6 类 evidence-anchor-pending（pending 锚点的阶段门合法出口），复用 E1-E9 四阶段审批链',
   },
-  // -------------------- 5 bad 样本（覆盖 E4-E8 各阶段失败） --------------------
+  // -------------------- bad 样本（覆盖 E4-E8 各阶段失败） --------------------
   {
     file: 'bad-s-self-approve.json',
     expectedPassed: false,
@@ -2456,7 +2456,7 @@ const DESIGN_CONTRACT_CASES: DesignContractCase[] = [
   },
 ];
 
-// -------------------- SignatureChain（签名链：12 样本，1 valid + 11 bad） --------------------
+// -------------------- SignatureChain（签名链：valid + bad 样本） --------------------
 
 interface SignatureChainCase {
   /** 样本文件名（相对 samples/signature-chain/） */
@@ -2573,7 +2573,7 @@ const SIGNATURE_CHAIN_CASES: SignatureChainCase[] = [
   },
 ];
 
-// -------------------- ArchiveIntegrity（归档完整性：6 样本，2 valid + 4 bad，含 codingPlanSnapshot 条件项 1+1） --------------------
+// -------------------- ArchiveIntegrity（归档完整性：valid + bad 样本，含 codingPlanSnapshot 条件项） --------------------
 
 interface ArchiveIntegrityCase {
   /** 样本文件名（相对 samples/archive-integrity/） */
@@ -2644,7 +2644,7 @@ interface SchemaCase {
 }
 
 const SCHEMA_CASES: SchemaCase[] = [
-  // -------------------- verifier-output schema（基线 3 条） --------------------
+  // -------------------- verifier-output schema（基线用例） --------------------
   {
     file: 'bad-additional-props.json',
     schema: 'verifier-output',
@@ -2666,7 +2666,7 @@ const SCHEMA_CASES: SchemaCase[] = [
     expectedErrorPatterns: [/type/],
     description: 'compositeScore 为字符串应被 type:number 拦截',
   },
-  // -------------------- Schema 用例：12 份 schema 各加一条前置校验用例 --------------------
+  // -------------------- Schema 用例：每份 schema 各加一条前置校验用例 --------------------
   {
     file: 'bad-budget-additional-props.json',
     schema: 'budget',

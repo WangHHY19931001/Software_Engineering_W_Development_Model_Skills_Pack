@@ -83,7 +83,7 @@ D2 的可执行范围分三层：`logic/`、`lib/` 与生产 CLI 入口均不直
 
 `evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。`wm-export-evidence --verify` 在没有 `--source-project` 时只能是 package-only；只有传入 `--source-project <project-dir>` 才能执行 source-bound verify。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性；它不是密码学签名，也不是第三方不可抵赖证明。package-only 不能表述为 verified source 证据。
 
-**no-git 形态（无 `.git` 工作区，遗留⑥a）**：`wm-verify-evidence-source.ts <project-dir>` 默认行为不变——无 `.git` 工作区仍以 `MISSING_GIT_HEAD` exit 1 拒绝；只有显式传 `--no-git-ok` 才改走 no-git 分支，产出 `provenanceKind=no-git` 记录（`commitSha` 为空字符串、`workspaceDigest` 为导出源集合的规范化清单 SHA-256、保留 `runId`/`artifactId` 身份），CLI 摘要 `verificationLevel=package-only`。**硬护栏**：no-git 记录与由它导出的证据包**永久只能 package-only**——`wm-export-evidence --verify <manifest> --source-project <project-dir>` 一律 exit 1 `NOT_SOURCE_BOUND_NO_GIT`（先于任何源项目读取判定），`verifySourceProvenance` 对 no-git 记录同样拒绝（唯一例外是导出时的本地一致性复验，不改变包的 no-git 形态）。该形态不得表述为 verified source 证据。
+**no-git 形态（无 `.git` 工作区）**：`wm-verify-evidence-source.ts <project-dir>` 默认行为不变——无 `.git` 工作区仍以 `MISSING_GIT_HEAD` exit 1 拒绝；只有显式传 `--no-git-ok` 才改走 no-git 分支，产出 `provenanceKind=no-git` 记录（`commitSha` 为空字符串、`workspaceDigest` 为导出源集合的规范化清单 SHA-256、保留 `runId`/`artifactId` 身份），CLI 摘要 `verificationLevel=package-only`。**硬护栏**：no-git 记录与由它导出的证据包**永久只能 package-only**——`wm-export-evidence --verify <manifest> --source-project <project-dir>` 一律 exit 1 `NOT_SOURCE_BOUND_NO_GIT`（先于任何源项目读取判定），`verifySourceProvenance` 对 no-git 记录同样拒绝（唯一例外是导出时的本地一致性复验，不改变包的 no-git 形态）。该形态不得表述为 verified source 证据。
 
 ## `/wm analyze <需求>`
 
@@ -459,7 +459,8 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
   2. **显式自采集**：工件不在场且显式 `--spawn-vitest` → spawn 全量 vitest 并自生成同目录 provenance（墙钟上限 `VITEST_SPAWN_TIMEOUT_MS`；全量套件约 30 分钟），供无 prepush 场景；
   3. **跳过（独立运行缺省）**：工件不在场且无 flag → **不 spawn**；`diagnostics` 输出非阻断诊断 `○ 动态 facts 未校验：未提供受控 vitest 工件（WM_VITEST_COUNT_FILE / WM_VITEST_PROVENANCE_FILE）；终局验收经 npm run prepush 覆盖（fail-closed）。如需自采集请显式加 --spawn-vitest（约 30 分钟）。`，`dynamicMeasurements` 置 `null`（JSON 键保持在场、形状稳定；`null` = 本次跳过，不是「测量为 0」）；静态检查全跑，退出码仅由静态违规决定。
 - **弱校验前提**：态 3 只用于任务级 / 文档级快速迭代；**终局验收一律 `npm run prepush`**（AGENTS §6「迭代可走快速车道，验收必须全量」）——prepush 内该门禁走态 1，动态 facts 仍 fail-closed。
-- **退出码**：0=全部一致（含态 3 跳过）/ 1=存在违规（静态计数与结构违规；或态 1 受控工件不可信、态 2 自采集失败）/ 2=输入错误（未知或非 `--json` 形态 flag、`repo-root` 缺必需文件 → `ERROR_JSON`）。
+- **flag 形态（裸 flag，唯一形态）**：`--json` / `--spawn-vitest` 是**布尔开关**，只认裸 flag 精确形态、不入位置参数；**带赋值形态不生效**（`--spawn-vitest=1` 因 `=` 前基名在已知集合内而不报「未知参数」，但也**不会**触发自采集）——它作为第 1 个位置参数时被当作 `repo-root` 解析 → 报「`repo-root` 缺少必需文件」exit 2；位于 `repo-root` **之后**时被静默忽略并按态 3 处理（诊断会提示「如需自采集请显式加 --spawn-vitest」）。`--phase` 一类的「等号 / 空格」两形态支持**不适用于本门禁**：位置参数只有 `repo-root` 一个。
+- **退出码**：0=全部一致（含态 3 跳过）/ 1=存在违规（静态计数与结构违规；或态 1 受控工件不可信、态 2 自采集失败）/ 2=输入错误（未知 flag；`--json` / `--spawn-vitest` 带赋值形态（见上条「flag 形态」）；`repo-root` 缺必需文件 → `ERROR_JSON`）。
 - **动态侧排障**：受控工件缺失 / provenance 不可信 / 自采集失败的现象、原因与处置见仓库 `docs/troubleshooting.md` §1.7（技能包内不放置逃逸技能包根的外链）。
 
 ## 阶段 5-8 codegraph/coding-plan 门禁 CLI（ChangeScope 绑定）

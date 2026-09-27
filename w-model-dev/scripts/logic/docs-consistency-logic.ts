@@ -1771,7 +1771,7 @@ export function checkConventionsExit2Count(conventions: string, actualCount: num
 /**
  * schema 属性级 description 全覆盖检查（F-G4-08，audit-fixes task 6）：
  * 任何含 properties 的 schema 节点（根 / 嵌套对象 / definitions|$defs / 数组 items）
- * 必须自带 description，使 AGENTS.md「25 份全字段 description 自描述」声明受门禁强制。
+ * 必须自带 description，使 AGENTS.md「全字段 description 自描述」（份数以 AGENTS 原文为准）声明受门禁强制。
  * 遍历覆盖 properties 子节点、definitions（含 draft-2019-09+ 的 $defs 兼容）与 items
  * （数组形态逐项、单例形态整体）；标量属性节点由其所在 properties 持有者的子节点遍历到达。
  */
@@ -1820,7 +1820,7 @@ function checkAssetCounts(personaCount: number, readme: string): DocCheckViolati
 /**
  * references/ 目录 .md 文件数一致性：
  * 期望值从 SKILL.md「Bundled Resources」表「（N 个 .md）」计数表述解析
- * （如 `` `references/`（57 个 .md） ``，资源名反引号格式可异），与实测比对——
+ * （如 `` `references/`（N 个 .md） ``，资源名反引号格式可异，N 为实测份数），与实测比对——
  * 新增 references/*.md 时只需同步 SKILL.md，门禁自动校验一致性，防再次漂移。
  */
 function checkReferencesCount(referencesCount: number, skill: string): DocCheckViolation[] {
@@ -2190,7 +2190,7 @@ export function checkSkillOutboundLinks(
 
 /**
  * S31 orphan-reference 豁免清单（条目 = references/ 下文件名，如 'draft-appendix.md'）。
- * 当前为空数组：实测 43 个 references/*.md 全部有 ≥1 条来自 SKILL.md 或其它 references/*.md
+ * 当前为空数组：实测全部 references/*.md 均有 ≥1 条来自 SKILL.md 或其它 references/*.md
  * 的相对入链，门禁先天严格。未来出现合法孤儿载体（如纯附录页）时登记到此处并注明理由；
  * 清单外文件一律强制入链——豁免是显式登记，不是缺省放行。
  */

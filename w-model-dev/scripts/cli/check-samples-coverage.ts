@@ -745,7 +745,8 @@ function listProbeTree(root: string): string[] {
 /**
  * 单探针并发度。每个探针各有**独立隔离根**（见 runExit2Probes），彼此不共享任何可观测状态，
  * 因此并发不引入互相干扰；取 4 是在 Windows 进程启动开销（每次 spawn ≈1.5–2s）与 CPU 争用之间的折中。
- * 实测：47 个探针串行 71s → 4 路并发约 25s（每个探针的 exit-2/ERROR_JSON/人类错误/零漂移断言不变）。
+ * 实测：探针数量以 `lib/exit2-probe-registry.ts` 注册表为准，墙钟随机器与并发度变化（串行 → 有界并发
+ * 显著缩短，均不写死数字）；每个探针的 exit-2/ERROR_JSON/人类错误/零漂移断言不变。
  */
 const PROBE_CONCURRENCY = 4;
 

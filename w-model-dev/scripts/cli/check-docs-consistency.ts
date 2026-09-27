@@ -876,7 +876,7 @@ async function main(): Promise<void> {
 
   // T3 态 3：动态 facts 未校验 → 非阻断诊断（人类可读段 + --json/GATE_JSON 的 diagnostics 键，仅在非空时出现）
   // + dynamicMeasurements 置 null（JSON 键保持在场、形状稳定：消费者可区分「已校验」与「本次跳过」）。
-  // 静态违规与仍在执行的检查（含 48 条 exit-2 探针）决定退出码；prepush 受控工件路径 diagnostics 恒空。
+  // 静态违规与仍在执行的检查（含全部 exit-2 探针，条数以 lib/exit2-probe-registry.ts 为准）决定退出码；prepush 受控工件路径 diagnostics 恒空。
   const diagnostics: string[] = [];
   let dynamicMeasurements: Record<string, unknown> | null = report.dynamicMeasurements;
   if (vitestFactsSkipped) {
