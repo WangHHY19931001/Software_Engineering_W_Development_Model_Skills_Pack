@@ -1911,6 +1911,8 @@ interface RunLogEntry {
 | 每次返工/回退后                  | append 一条 RunLogEntry（action=rework/rollback，note 填原因）                                  |
 | 预算检查点（每阶段门后）         | 读 budget.json + 累计本阶段 run-log tokens，若超 maxTokens 或触发 killSwitch → 按 onExceed 处置 |
 
+> **顺序纪律交叉引用（D-4/D-8，2026-09-27 清收批补）**：本表「每个 🔴 CHECKPOINT 放行后」动作须遵循放行三步顺序——`checkpoint-log/phase-N` 确认先落盘 → 闭环五门串行（均带 `--run-log`）→ 放行记录（`action=checkpoint`）为阶段末条且**严格晚于**五条 gate 记录（同秒不算）；机器核验见 `check-run-log` R11（§10D.7），例外登记见 §10.6。
+
 ### 10D.5 预算检查逻辑（确定性，无 LLM）
 
 编排者 O 在阶段门放行前执行：

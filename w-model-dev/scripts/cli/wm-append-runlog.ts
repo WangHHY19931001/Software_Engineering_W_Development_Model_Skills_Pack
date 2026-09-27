@@ -92,7 +92,10 @@ const REASON_MESSAGES: ReadonlyMap<string, string> = new Map([
   ['MTIME_CONFLICT', '目标 mtime 在读取后发生变化（可能有并发追加），写入已拒绝；重读目标后重试（宁可拒绝不可丢记录）'],
   ['TARGET_MISSING_FOR_MTIME', '目标文件在读取后被删除，写入已拒绝；重读后重试'],
   ['LOCK_TIMEOUT', '等待 run-log 跨进程锁超时，写入已拒绝'],
-  ['STALE_LOCK', '检测到陈旧 run-log 锁，写入已拒绝；可用 wm-write.ts 对同一目标的 --recover-stale-lock 显式恢复'],
+  [
+    'STALE_LOCK',
+    '检测到陈旧 run-log 锁，写入已拒绝；恢复方式：手工删除 <target>.lock/ 目录后重试，或对同一目标跑 wm-write.ts --recover-stale-lock 显式恢复',
+  ],
   ['WRITE_VERIFY_FAILED', '写后回读校验失败（内容不一致），请检查磁盘/杀软拦截后重试'],
   ['SCHEMA_INVALID', '写入后文件不符 run-log schema（含历史行逐行重校；历史 legacy 行需先治理），写入已拒绝'],
   ['UNREGISTERED_TARGET', '目标 .w-model 状态路径未注册 Schema，写入已拒绝（run-log 应为 .w-model/run-log.jsonl）'],
