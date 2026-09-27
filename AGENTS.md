@@ -32,7 +32,7 @@
 
 ### Source-bound provenance 边界
 
-`evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性；**它不是密码学签名，也不是第三方不可抵赖证明；package-only 不能表述为 verified source 证据**。`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；no-git 形态（显式 `--no-git-ok`）**永久只能 package-only**（`--source-project` 复验一律拒绝，exit 1），不得表述为 verified source 证据——**三形态判据与 exit code 枚举**见 `w-model-dev/references/command-reference.md`「Source-bound provenance 边界」节。交付 / 外发边界见上文本地生成物节。
+`evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性；**它不是密码学签名，也不是第三方不可抵赖证明；package-only 不能表述为 verified source 证据**。`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；no-git 形态（显式 `--no-git-ok`）**永久只能 package-only**（`--source-project` 复验一律拒绝，exit 1），不得表述为 verified source 证据——**形态判据与 exit code 枚举**见 `w-model-dev/references/command-reference.md`「Source-bound provenance 边界」节。交付 / 外发边界见上文本地生成物节。
 
 ## 2. 关键目录速查
 
