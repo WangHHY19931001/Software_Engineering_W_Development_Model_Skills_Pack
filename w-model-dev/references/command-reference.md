@@ -460,7 +460,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
   3. **跳过（独立运行缺省）**：工件不在场且无 flag → **不 spawn**；`diagnostics` 输出非阻断诊断 `○ 动态 facts 未校验：未提供受控 vitest 工件（WM_VITEST_COUNT_FILE / WM_VITEST_PROVENANCE_FILE）；终局验收经 npm run prepush 覆盖（fail-closed）。如需自采集请显式加 --spawn-vitest（约 30 分钟）。`，`dynamicMeasurements` 置 `null`（JSON 键保持在场、形状稳定；`null` = 本次跳过，不是「测量为 0」）；静态检查全跑，退出码仅由静态违规决定。
 - **弱校验前提**：态 3 只用于任务级 / 文档级快速迭代；**终局验收一律 `npm run prepush`**（AGENTS §6「迭代可走快速车道，验收必须全量」）——prepush 内该门禁走态 1，动态 facts 仍 fail-closed。
 - **flag 形态（裸 flag，唯一形态）**：`--json` / `--spawn-vitest` 是**布尔开关**，只认裸 flag 精确形态、不入位置参数；**带赋值形态不生效**（`--spawn-vitest=1` 因 `=` 前基名在已知集合内而不报「未知参数」，但也**不会**触发自采集）——它作为第 1 个位置参数时被当作 `repo-root` 解析 → 报「`repo-root` 缺少必需文件」exit 2；位于 `repo-root` **之后**时被静默忽略并按态 3 处理（诊断会提示「如需自采集请显式加 --spawn-vitest」）。`--phase` 一类的「等号 / 空格」两形态支持**不适用于本门禁**：位置参数只有 `repo-root` 一个。
-- **退出码**：0=全部一致（含态 3 跳过）/ 1=存在违规（静态计数与结构违规；或态 1 受控工件不可信、态 2 自采集失败）/ 2=输入错误（未知 flag；`--json` / `--spawn-vitest` 带赋值形态（见上条「flag 形态」）；`repo-root` 缺必需文件 → `ERROR_JSON`）。
+- **退出码**：0=全部一致（含态 3 跳过）/ 1=存在违规（静态计数与结构违规；或态 1 受控工件不可信、态 2 自采集失败）/ 2=输入错误（未知 flag；`--json` / `--spawn-vitest` 带赋值形态**作为首个位置参数时**（见上条「flag 形态」；位于 `repo-root` 之后则被静默忽略并按态 3 处理，可 exit 0）；`repo-root` 缺必需文件 → `ERROR_JSON`）。
 - **动态侧排障**：受控工件缺失 / provenance 不可信 / 自采集失败的现象、原因与处置见仓库 `docs/troubleshooting.md` §1.7（技能包内不放置逃逸技能包根的外链）。
 
 ## 阶段 5-8 codegraph/coding-plan 门禁 CLI（ChangeScope 绑定）

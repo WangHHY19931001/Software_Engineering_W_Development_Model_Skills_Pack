@@ -1764,19 +1764,16 @@ describe('runDocConsistencyChecks', () => {
     });
   }, 120_000);
 
-  it('AGENTS=34 与 INSTALL=24 的旧资产声明在同一真实 fixture 中失败', async () => {
+  it('AGENTS=34 的旧资产声明在同一真实 fixture 中失败', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       await writeVitestCount(fixtureRoot, 1002);
       const agentsPath = path.join(fixtureRoot, 'AGENTS.md');
-      const installPath = path.join(fixtureRoot, 'docs', 'INSTALL.md');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
       const agents = await fs.readFile(agentsPath, 'utf8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
-      const install = await fs.readFile(installPath, 'utf8');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
       await fs.writeFile(agentsPath, agents.replace('全仓 46 个脚本 exit 2', '全仓 34 个脚本 exit 2'), 'utf8');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
-      await fs.writeFile(installPath, install.replace('27 个 check-*.ts', '24 个 check-*.ts'), 'utf8');
+      // INSTALL 侧的同类半段（原 `install.replace('27 个 check-*.ts', …)`）已随 2026-09-27 门禁瘦身
+      // T5 去数字退休：该字面量不再存在，变异恒为 no-op，且无门禁消费该位置声明。
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(result.code).toBe(1);
       expect(result.stdout).toContain('exit2-scripts');

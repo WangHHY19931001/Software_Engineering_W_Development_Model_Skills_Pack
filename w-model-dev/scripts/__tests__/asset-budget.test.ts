@@ -118,7 +118,8 @@ const ASSET_BUDGET = {
   // 当前实测最大 tla-plus.md：base 3e3b521f 实测 2295 行（无目录节）；head 实测 2317 行
   // （含本次补入的目录节 +22；2026-09-15 P2-B Task 3 实测）。
   referenceFileMaxLines: 2500,
-  // references 文件数上限。当前实测 43 个 .md；预算 48 留 5 个新增余量（2026-09-15 实测）。
+  // references 文件数上限。2026-09-15 实测 43 个 .md，预算 48 留 5 个新增余量（历史依据，不再声明「当前」；
+  // 上限值与前瞻余量不动，实际份数以目录实测为准）。
   referenceMaxFileCount: 48,
   // references 总行数上限。当前实测 16482 行（含 Task 1 对 hard-constraints.md 的 S27 链接
   // 增行 +4 与 Task 3 补入的两个目录节 +40；base 3e3b521f 实测 16442 行；
