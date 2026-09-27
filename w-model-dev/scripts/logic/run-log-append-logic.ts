@@ -14,18 +14,20 @@
  *   3. 历史不可变：`entries` 中的历史行始终来自入参 `existing`，本模块不就地修改任何入参对象。
  *
  * 契约（裁定 A / 裁定 B，取值逐字固定）：
- *   - 显式时间戳（记录自带 `timestamp` 或 `--timestamp=<iso>`）≤ 末条时间 → 拒绝
+ *   - ① 显式时间戳（记录自带 `timestamp` 或 `--timestamp=<iso>`）≤ 末条时间 → 拒绝
  *     （violation 文案含「时间戳不递增」+ 末条时间 + 建议），除非显式给出
  *     `allowClockAdjust`（对应 `--allow-clock-adjust=<reason>`），此时步进到末条 +1ms
  *     并在记录 `note` 追加 `clock-adjust:<reason>`；
  *   - `--timestamp` 注入成功时在记录 `note` 追加 `clock-injected:<iso>`；
- *   - 无条件来源（无显式时间戳）用 `now` 派生，判据分三层（裁定 A + 控制者裁定 F）：
- *     ① `now` **早于**末条历史时间（时钟真倒退：曾注入未来时间戳 / NTP 回拨 / 跨机拷贝）→ 默认拒绝
+ *   - 无条件来源（无显式时间戳）用 `now` 派生，取权威三态编号的 ②③ 两态（与
+ *     `cli/wm-append-runlog.ts` 头注「时间戳三态」同序，② 与 ③ 不得合并叙述；
+ *     裁定 A + 控制者裁定 F）：
+ *     ② `now` **早于**末条历史时间（时钟真倒退：曾注入未来时间戳 / NTP 回拨 / 跨机拷贝）→ 默认拒绝
  *        （TIMESTAMP_NOT_INCREASING，文案含末条时间 + 建议）；仅显式 `allowClockAdjust` 时步进到
  *        末条 +1ms 并留痕 `clock-adjust:auto+<N>ms:<reason>`；
- *     ② `now` 与末条**同毫秒**（良性）→ 步进末条 +1ms，`note` 追加 `clock-adjust:auto+<N>ms`；
- *     ③ 仅与**本次批内**已规划记录冲突 → 同样 +1ms 步进（不涉历史改写）；
- *     ②③ 均在 `diagnostics` 明示「时钟调整 +Nms」（与显式路径同口径：调整必留痕迹）；
+ *     ③ `now` 与末条**同毫秒**（同毫秒良性步进形态 `clock-adjust:auto+<N>ms`）或仅与**本次批内**
+ *        已规划记录冲突 → 有界 +1ms 步进（不涉历史改写），`note` 追加 `clock-adjust:auto+<N>ms`；
+ *     ②③ 均在 `diagnostics` 明示「时钟调整 +Nms」（与显式路径同口径：调整必留痕迹，绝不静默）；
  *   - 历史末条扫描用宽容口径 `Number.isFinite(Date.parse(v))`（schema 的 `format: date-time` 对大小写 /
  *     分隔符宽容，严格正则只用于新注入 / 新记录），避免历史行时间戳被跳过导致单调性下界失真；
  *   - `--correct=<runId>` 只**新增**一条更正记录（`note` 含 `correction-of:<runId>`），

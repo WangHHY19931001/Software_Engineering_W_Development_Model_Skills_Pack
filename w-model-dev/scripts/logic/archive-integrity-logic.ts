@@ -10,6 +10,10 @@
  * 为其结构子集（仅查 plan / progress.md / 三件套存在），全量契约（review-*.diff 存在性与非空、
  * 账本首行身份）由 check-coding-plan R4/R6 承担。
  *
+ * G3-14：本层另按注入的归档清单文本统计「疑似本机绝对路径条目」并输出**非阻断诊断**
+ * （`diagnostics`；不进 missingFiles、不改 passed）——归档允许保留执行证据原貌，但交付/外发前
+ * 必须经 wm-export-evidence 脱敏导出，见 AGENTS.md「本地生成物与审计证据」。
+ *
  * 单点事实源，不依赖任何 LLM。
  */
 
@@ -60,12 +64,17 @@ export interface ArchiveIntegrityCheckResult {
   missingFiles: string[];
   presentFiles: string[];
   checkedPhases: string[];
+  /**
+   * 非阻断诊断（G3-14：归档清单绝对路径披露计数）。**不改退出码、不改动清单判定**；
+   * 无命中 / 未提供清单时为**空数组**（调用方按「仅在非空时输出」口径透传）。
+   */
+  diagnostics: string[];
 }
 
 /**
  * 归档前缀性注入选项（L4，D-3b；缺省 = 未启用，零行为变化）。
  *
- * 归档内 `run-log.jsonl` 快照必须是 **live** run-log 的**字节前缀**（`liveText.startsWith(archiveText)`）：
+ * 归档内 `run-log.jsonl` 快照必须是 **live** run-log 的**记录边界前缀**（非空、以换行结尾；判据见下方 `checkRunLogPrefix`）：
  * live 侧在归档后被截断/重排/改写，或归档快照被改写（两者不可同真）即刻不成立 → blocking。
  * 两侧文本由 CLI 层实读注入（logic 层零 `node:fs`，同 `progressMdContent` 先例）。
  *
@@ -79,6 +88,58 @@ export interface ArchiveRunLogPrefixOptions {
   liveRunLogText?: string;
   /** 归档快照 `run-log.jsonl` 文本（CLI 从归档根实读；缺失/不可读时不设） */
   archivedRunLogText?: string;
+}
+
+/**
+ * 归档清单绝对路径诊断注入选项（G3-14；缺省 = 未提供清单，零输出）。
+ *
+ * 归档清单（`archive-manifest.json`）的 `files[]` 条目登记归档内文件路径；本诊断统计其中
+ * **疑似本机绝对路径**（含反斜杠，或以盘符 / `/` 开头）的条目数，命中时输出一条非阻断提示
+ * （交付/外发前必须经 wm-export-evidence 脱敏导出；归档仅受控留档）。
+ * 文本由 CLI 层实读注入（logic 层零 `node:fs`，同 `liveRunLogText` / `progressMdContent` 先例）。
+ * **纯诊断**：不进 missingFiles、不改 passed、不改退出码。
+ */
+export interface ArchiveManifestPathsOptions {
+  /** 归档清单文本（CLI 从归档根 `archive-manifest.json` 实读；缺失/不可读时不设） */
+  archiveManifestText?: string;
+}
+
+/** 疑似本机绝对路径判据（G3-14）：含反斜杠，或以盘符（`C:`）/ POSIX 根（`/`）开头 */
+const ABSOLUTE_PATH_PATTERN = /^([A-Za-z]:|\/)/;
+
+/**
+ * 统计归档清单 `files[]` 中疑似本机绝对路径的条目数（G3-14，纯函数，zero-fs）。
+ *
+ * 条目两形态（兼容既有生产者）：
+ *   - 对象条目取 `path` 字段（evidence-manifest 形态：`{path, sha256, kind}`）；
+ *   - 字符串条目取自身（装配器 `archive-manifest.json` 形态：`files: ['gate-logs/graph-gate.json', …]`）。
+ *
+ * 非法 JSON / 无 `files[]` 数组 → 0（本诊断不做输入校验，非阻断；「0 命中不打」口径见 CLI）。
+ */
+export function countArchiveManifestAbsolutePaths(manifestText: string): number {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(manifestText);
+  } catch {
+    return 0;
+  }
+  const files = (parsed as { files?: unknown } | null)?.files;
+  if (!Array.isArray(files)) return 0;
+  let absolutePathCount = 0;
+  for (const entry of files) {
+    let candidate: unknown;
+    if (typeof entry === 'string') {
+      candidate = entry;
+    } else if (entry !== null && typeof entry === 'object') {
+      candidate = (entry as { path?: unknown }).path;
+    } else {
+      continue;
+    }
+    if (typeof candidate === 'string' && (candidate.includes('\\') || ABSOLUTE_PATH_PATTERN.test(candidate))) {
+      absolutePathCount++;
+    }
+  }
+  return absolutePathCount;
 }
 
 // ==================== 主校验函数 ====================
@@ -186,7 +247,7 @@ function checkRunLogPrefix(options: ArchiveRunLogPrefixOptions, missingFiles: st
   const archivedText = options.archivedRunLogText;
   if (archivedText === undefined) {
     missingFiles.push(
-      '[runLogPrefix] 归档 run-log.jsonl 快照不可读（提供 --live-run-log 时前缀性校验 fail-closed：无法证明归档快照是 live 的字节前缀）',
+      '[runLogPrefix] 归档 run-log.jsonl 快照不可读（提供 --live-run-log 时前缀性校验 fail-closed：无法证明归档快照是 live 的记录边界前缀）',
     );
     return;
   }
@@ -203,7 +264,7 @@ function checkRunLogPrefix(options: ArchiveRunLogPrefixOptions, missingFiles: st
   }
   if (!isPrefix) {
     missingFiles.push(
-      `[runLogPrefix] 归档 run-log.jsonl 不是 live run-log 的字节前缀（归档 ${archivedText.length} 字节 vs live ${liveText.length} 字节）：` +
+      `[runLogPrefix] 归档 run-log.jsonl 不是 live run-log 的记录边界前缀（归档 ${archivedText.length} 字节 vs live ${liveText.length} 字节）：` +
         '两侧在前缀处不一致（live 侧被截断/重排/改写，或归档快照被改写——两者不可同真，须人工裁定证据归属）',
     );
     return;
@@ -227,16 +288,19 @@ function checkRunLogPrefix(options: ArchiveRunLogPrefixOptions, missingFiles: st
  * @param phasesToCheck 须校验的阶段列表（默认 1-8 + global）
  * @param manifest 归档清单条件项（缺省 undefined = 仅既有阶段清单，零行为变化）
  * @param runLogPrefix L4 归档前缀性注入选项（缺省 undefined = 未启用，零行为变化）
+ * @param archiveManifestPaths G3-14 归档清单绝对路径诊断注入选项（缺省 undefined = 未提供清单，零输出）
  */
 export function checkArchiveIntegrity(
   archiveDirContents: Set<string>,
   phasesToCheck: string[] = ['1', '2', '3', '4', '5', '6', '7', '8', 'global'],
   manifest?: ArchiveIntegrityManifest,
   runLogPrefix?: ArchiveRunLogPrefixOptions,
+  archiveManifestPaths?: ArchiveManifestPathsOptions,
 ): ArchiveIntegrityCheckResult {
   const missingFiles: string[] = [];
   const presentFiles: string[] = [];
   const checkedPhases: string[] = [];
+  const diagnostics: string[] = [];
 
   for (const phase of phasesToCheck) {
     checkedPhases.push(phase);
@@ -284,10 +348,21 @@ export function checkArchiveIntegrity(
     checkRunLogPrefix(runLogPrefix, missingFiles, presentFiles);
   }
 
+  // G3-14 归档清单绝对路径披露计数（纯诊断：不进 missingFiles、不改 passed；未提供清单或 0 命中零输出）
+  if (archiveManifestPaths?.archiveManifestText !== undefined) {
+    const absolutePathCount = countArchiveManifestAbsolutePaths(archiveManifestPaths.archiveManifestText);
+    if (absolutePathCount > 0) {
+      diagnostics.push(
+        `归档清单含 ${absolutePathCount} 条疑似本机绝对路径条目——交付前须经 wm-export-evidence 脱敏导出（归档仅受控留档）`,
+      );
+    }
+  }
+
   return {
     passed: missingFiles.length === 0,
     missingFiles,
     presentFiles,
     checkedPhases,
+    diagnostics,
   };
 }

@@ -396,4 +396,47 @@ describe('R6 命名空间分池', () => {
     );
     expect(r.reasons.filter((v) => v.includes('R6') || v.includes('R8'))).toEqual([]);
   });
+
+  it('宽视角全缺 + tla 在盘 → 窄池跳过比对 + 诊断（无基准无从比对，G2-6）', () => {
+    // 阶段 5 在场四视角（graph/tla/rtm/scope）全部在盘（空数组亦计「在盘」→ 无 R7），
+    // 但宽视角（graph/rtm）的**基线集为空**：窄池（tla）既谈不上「超出」也谈不上「漏」。
+    // 现状（logic/iceberg-sweep-logic.ts:317-333）把 tla 的全部 ID 报为 R6[design-sd] 超出 → 本用例红；
+    // G3-3 守卫实施后跳过窄池比对并记非阻断诊断 → 本断言翻绿。
+    // 翻转条件提示：本 sets 的 graph/rtm 在场但为空数组（wide.length=2）——守卫须判「宽视角基线集为空」，
+    // 仅判「宽视角键缺席（wide.length===0）」不会命中本退化形态。
+    const sets = { graph: [], rtm: [], tla: ['SD-001'], scope: [] };
+    const r = checkIcebergSweep(
+      validReport({
+        reportId: 'IS-phase5-1-01',
+        phase: 'phase5-coding',
+        sweepCoverage: { sweptArtifacts: ['SD-001'], sweptDimensions: ['completeness', 'reliability', 'security'] },
+      }),
+      { viewSets: sets },
+    );
+    expect(r.reasons.filter((v) => v.includes('R6'))).toEqual([]);
+  });
+
+  it('窄池跳过的非阻断诊断进 diagnostics（不进 reasons、不改 passed；G3-3 通道）', () => {
+    // 同一退化形态（宽视角基线集为空）另锁诊断通道：诊断须可见、且与阻断面（reasons）解耦；
+    // R8 分支在此形态下良性——收敛集含 tla 的 SD-001，sweptArtifacts 已覆盖，零发现可对账。
+    const sets = { graph: [], rtm: [], tla: ['SD-001'], scope: [] };
+    const r = checkIcebergSweep(
+      validReport({
+        reportId: 'IS-phase5-1-01',
+        phase: 'phase5-coding',
+        sweepCoverage: { sweptArtifacts: ['SD-001'], sweptDimensions: ['completeness', 'reliability', 'security'] },
+      }),
+      { viewSets: sets },
+    );
+    expect(r.passed).toBe(true);
+    expect(r.reasons).toEqual([]);
+    expect(r.diagnostics).toEqual(['R6[design-sd] 宽视角设计 ID 集为空，窄池对账跳过（无基准）']);
+  });
+
+  it('无退化形态时 diagnostics 键缺席（非空才出现，非阻断通道不污染既有结构）', () => {
+    const converged = ['SD-001'];
+    const r = checkIcebergSweep(validReport(), { viewSets: { graph: converged, rtm: converged, tla: converged } });
+    expect(r.diagnostics).toBeUndefined();
+    expect(Object.keys(r).includes('diagnostics')).toBe(false);
+  });
 });

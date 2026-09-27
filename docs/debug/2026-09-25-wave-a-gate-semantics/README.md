@@ -214,7 +214,7 @@ AFFECTED_EXIT=0
 PREPUSH_EXIT=0
 ```
 
-末 30 行原文（去色后）：
+末 31 行（原文逐字，去色后；含验收标记行 `PREPUSH_EXIT=0` 与收尾行 `=== END 2026-09-25T20:58:26Z ===`）：
 
 ```
 （node:286992) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true …

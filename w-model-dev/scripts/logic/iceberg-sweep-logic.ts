@@ -125,6 +125,11 @@ export interface IcebergSweepCheckResult {
     newFindingsCount: number;
     passed: boolean;
   };
+  /**
+   * 非阻断诊断（`CheckpointCheckResult.diagnostics` 先例）：只在非空时出现，**不进** `reasons`
+   * （`reasons` 是阻断面）、不改 `passed` / 退出码。当前来源：宽视角基线集为空时窄池对账跳过。
+   */
+  diagnostics?: string[];
 }
 
 const MAX_ICEBERG_ROUNDS = 5;
@@ -222,6 +227,8 @@ export function checkIcebergSweep(
   externalEvidence?: IcebergCheckExternalEvidence,
 ): IcebergSweepCheckResult {
   const reasons: string[] = [];
+  // 非阻断诊断通道（G3-3）：只记「无法对账但也不构成差异」的形态，绝不并入 reasons
+  const diagnostics: string[] = [];
   // R1: schema 前置校验（反模式 #28）
   const schemaResult = validateBySchema('iceberg-sweep', report);
   if (!schemaResult.valid) {
@@ -313,22 +320,29 @@ export function checkIcebergSweep(
       }
       // eslint-disable-next-line security/detect-object-injection -- 键 v 同取自 wide（ICEBERG_VIEW_PRESENCE 常量表枚举，IcebergView 四值闭集），非外部可控输入
       const wideUnion = new Set(wide.flatMap((v) => viewSets[v]!));
-      const wideSdUnion = new Set([...wideUnion].filter(isSdDesignId));
-      for (const v of designViews.filter((x) => VIEW_NAMESPACE.get(x) === 'design-sd')) {
-        // eslint-disable-next-line security/detect-object-injection -- 键 v 取自 designViews（常量表枚举，IcebergView 四值闭集），非外部可控输入
-        const narrow = viewSets[v]!;
-        const narrowSet = new Set(narrow);
-        const extra = [...narrowSet].filter((id) => !wideUnion.has(id));
-        if (extra.length > 0) {
-          disagreements.push(`R6[design-sd] ${v} 超出宽视角设计 ID 集：${extra.join(', ')}`);
-        }
-        // 漏 SD 方向：窄池须含宽视角的全部 SD 项。跨命名空间（DD/INTF）豁免，SD 缺口不豁免——
-        // 该不变量在**阶段 1-4** 由 check-tla-model（--graph，`sdCoverage.uncoveredSdNodes` 为空
-        // 并与 `graphSdNodes` 交叉校验）建立；**阶段 5-8 该门不再复检**（SKILL.md:99：
-        // check-tla-model 仅阶段 1-4 列入 G 门禁），故该方向由本判据守护，不可省。
-        const missing = [...wideSdUnion].filter((id) => !narrowSet.has(id));
-        if (missing.length > 0) {
-          disagreements.push(`R6[design-sd] 宽视角 SD 项未进入 ${v}：${missing.join(', ')}`);
+      if (wideUnion.size === 0) {
+        // G3-3 守卫：**宽视角基线集为空**（视角可在场但集合为空，如 graph/rtm 均为空数组）——
+        // 无基准集合，窄池既谈不上「超出」也谈不上「漏」（把窄池全部 ID 报成超出是退化解误报）。
+        // 跳过比对并记非阻断诊断；R7 视角缺席仍按既有判据报，R8 收敛集仍照常计算（不因此豁免）。
+        diagnostics.push('R6[design-sd] 宽视角设计 ID 集为空，窄池对账跳过（无基准）');
+      } else {
+        const wideSdUnion = new Set([...wideUnion].filter(isSdDesignId));
+        for (const v of designViews.filter((x) => VIEW_NAMESPACE.get(x) === 'design-sd')) {
+          // eslint-disable-next-line security/detect-object-injection -- 键 v 取自 designViews（常量表枚举，IcebergView 四值闭集），非外部可控输入
+          const narrow = viewSets[v]!;
+          const narrowSet = new Set(narrow);
+          const extra = [...narrowSet].filter((id) => !wideUnion.has(id));
+          if (extra.length > 0) {
+            disagreements.push(`R6[design-sd] ${v} 超出宽视角设计 ID 集：${extra.join(', ')}`);
+          }
+          // 漏 SD 方向：窄池须含宽视角的全部 SD 项。跨命名空间（DD/INTF）豁免，SD 缺口不豁免——
+          // 该不变量在**阶段 1-4** 由 check-tla-model（--graph，`sdCoverage.uncoveredSdNodes` 为空
+          // 并与 `graphSdNodes` 交叉校验）建立；**阶段 5-8 该门不再复检**（SKILL.md:99：
+          // check-tla-model 仅阶段 1-4 列入 G 门禁），故该方向由本判据守护，不可省。
+          const missing = [...wideSdUnion].filter((id) => !narrowSet.has(id));
+          if (missing.length > 0) {
+            disagreements.push(`R6[design-sd] 宽视角 SD 项未进入 ${v}：${missing.join(', ')}`);
+          }
         }
       }
       if (disagreements.length > 0) {
@@ -377,5 +391,7 @@ export function checkIcebergSweep(
       // 以最终校验结果为准（R5 违规时原始 report.passed 可能为 true，避免误导 gate-logs 消费方）
       passed,
     },
+    // 非阻断诊断仅在非空时出现（check-checkpoint / check-budget 同口径）
+    ...(diagnostics.length > 0 ? { diagnostics } : {}),
   };
 }

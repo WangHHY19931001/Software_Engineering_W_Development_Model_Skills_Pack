@@ -8,7 +8,7 @@
   "alternativeEvidence": [
     {
       "command": "codegraph query CacheService.invalidate",
-      "evidencePath": ".w-model/codegraph-queries/phase5-demo-003-missingBlastRadius.json"
+      "evidencePath": "docs/plans/phase5-demo.plan.md#任务3"
     }
   ]
 }

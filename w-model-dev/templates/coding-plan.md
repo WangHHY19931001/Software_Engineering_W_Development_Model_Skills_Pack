@@ -51,12 +51,12 @@ Task 2: complete
 
 ## 审查产物（R5）
 
-编码链三 stage 审查产物须齐备（**非空为阻断下限**，与 phase 级 preventive 双轨互不替代）：
+编码链三 stage 审查产物须齐备（**非空且为普通文件（`isFile()` 且 `size > 0`；非普通文件同违规）为阻断下限**，与 phase 级 preventive 双轨互不替代）：
 
 - **stage 级 12 份 MD**（`check-coding-plan.ts` R5，strict 绑定 changeId）：
   - `.w-model/r3-reviews/phase<phase>-<stage>-<dim>.md` ×9（stage ∈ plan / execute / finalize；dim ∈ completeness / reliability / security）；
   - `.w-model/v-reviews/phase<phase>-<stage>.md` ×3。
-  - 每份须**非空**（0 字节即使文件存在也判违规 exit 1）；**建议**含行级证据锚 `path:Lnn=` / `path:Lnn-mm=` / `path:§sec=`（行首起）——锚只是 CLI stderr 的非阻断诊断，不构成判据。
+  - 每份须**非空且为普通文件**（`isFile()` 且 `size > 0`；非普通文件同违规；0 字节即使文件存在也判违规 exit 1）；**建议**含行级证据锚 `path:Lnn=` / `path:Lnn-mm=` / `path:§sec=`（行首起）——锚只是 CLI stderr 的非阻断诊断，不构成判据。
 - **phase 级三份 JSON**（`check-preventive-review.ts`，schema `preventive-review.schema.json`）：`.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json`（S-fix / emergency / ingest 变体走 `-fix-` / `-emergency-` / `-ingest-` 路径）。stage 级 MD 证「每段审查跑过」，phase 级 JSON 证「三维度结论与 findings（`passed=false ⇒ findings ≥1`）」——二者互不替代。
 - **产出前对齐**：`check-coding-plan.ts <project-root> --phase=<5|6|7|8> --scope=<change-scope.json> --preflight` 只读列出固定 14 项清单（9 R3 + 3 V + plan + 账本）与 missing/invalid；变长任务三件套 / `review-*.diff` 单列 `artifacts` 不计数（缺失即 exit 1，不改 R5 判据）。
 

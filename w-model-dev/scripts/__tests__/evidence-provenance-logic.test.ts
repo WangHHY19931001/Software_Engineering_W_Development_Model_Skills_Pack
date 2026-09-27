@@ -239,6 +239,20 @@ describe('source provenance', () => {
     });
   });
 
+  it('treats a directory-typed root-level signature-chain.jsonl as absent instead of reading it (G3-2)', async () => {
+    const project = await makeProject({ chain: 'root' });
+    const chainPath = path.join(project, '.w-model', 'signature-chain.jsonl');
+    await fs.rm(chainPath, { force: true });
+    await fs.mkdir(chainPath); // 目录占位：既非普通文件、也非符号链接
+    await fs.writeFile(path.join(chainPath, 'keep.txt'), 'not a chain\n', 'utf8');
+
+    const produced = await produceSourceProvenance(project);
+
+    // collectRootFile 按「缺席」返回 []（不产出 SourceFile、不进 readStableFile），
+    // 由调用方的非空契约具名报缺——而非在 snapshotFile 处以 UNSAFE_SOURCE_EVIDENCE 中断
+    expect(produced).toMatchObject({ ok: false, exitCode: 1, reason: 'MISSING_SIGNATURE_CHAIN' });
+  });
+
   it('fails closed when the root-level chain and the legacy signature-chains directory coexist', async () => {
     const project = await makeProject({ chain: 'both' });
 

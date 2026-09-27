@@ -54,7 +54,8 @@ import * as path from 'node:path';
  * `l0-link-audit-logic` 为直连形态先例）。
  *
  * 只声明本模块实际消费的四个只读方法（结构化类型，不引 Node 类型）：
- * - `existsSync` / `statSync`：存在性与类型/大小判定（plan / 账本 / 三件套非空）；
+ * - `existsSync` / `statSync`：存在性与类型/大小判定（plan / 账本 / 三件套非空；
+ *   `isDirectory` 供 preflight 枚举前守卫，G3-5）；
  * - `readFileSync`：文本读入（UTF-8 解码由适配器固定；CRLF → LF 归一化仍在本层内容边界做）；
  * - `readdirSync({ withFileTypes: true })`：目录枚举（归档位锚定匹配 + review-*.diff 探测）。
  *
@@ -63,7 +64,7 @@ import * as path from 'node:path';
 export interface CodingPlanFs {
   existsSync(p: string): boolean;
   readFileSync(p: string): string;
-  statSync(p: string): { isFile(): boolean; size: number };
+  statSync(p: string): { isFile(): boolean; isDirectory(): boolean; size: number };
   readdirSync(p: string, opts: { withFileTypes: true }): Array<{ name: string; isDirectory(): boolean }>;
 }
 
@@ -187,6 +188,23 @@ function listArchiveDirNames(archiveRoot: string, fs: CodingPlanFs): string[] {
 function toRel(...segments: string[]): string {
   return segments.join('/');
 }
+
+/** 执行账本文件名（单源）：活动位与归档位快照同名 `progress.md` */
+const LEDGER_FILE_NAME = 'progress.md';
+
+/** 执行账本目录（单源，projectRoot 相对 POSIX）：`.superpowers/sdd/<planId>`；planId = `<changeId>.plan` */
+function sddLedgerDirRel(planId: string): string {
+  return toRel('.superpowers', 'sdd', planId);
+}
+
+/**
+ * 执行账本文件（单源，projectRoot 相对 POSIX）：`.superpowers/sdd/<planId>/progress.md`。
+ *
+ * 活动位账本路径的唯一事实源：preflight 的必需项、`checkCodingPlan` 的账本定位与返回的 `ledgerPath`
+ * 全部经它派生（绝对路径 = `path.join(projectRoot, PROGRESS_REL(planId))`，`path.join` 归一化 `/`，
+ * 跨平台与 `path.join` 分段拼接同值）；归档位账本在归档目录内，按同名的 `LEDGER_FILE_NAME` 拼装。
+ */
+export const PROGRESS_REL = (planId: string): string => toRel(sddLedgerDirRel(planId), LEDGER_FILE_NAME);
 
 /**
  * CRLF → LF 行尾归一化（内容解析边界单点）。
@@ -442,10 +460,13 @@ export interface PreflightResult {
   artifacts: string[];
 }
 
-/** R4 口径的任务三件套文件名（与 `validateLedgerAndArtifacts` 同规：`task-<N>-brief|report.md`） */
-const TASK_ARTIFACT_RE = /^task-\d+-(?:brief|report)\.md$/;
-/** R4 口径的评审包 diff 名（`review-*.diff`） */
-const REVIEW_DIFF_RE = /^review-.+\.diff$/;
+/** R4 口径的任务三件套文件名（单源）：`task-<N>-<kind>.md`（R4 存在性探测构造名，与下方判据同规） */
+export const taskArtifactName = (taskNumber: number, kind: 'brief' | 'report'): string =>
+  `task-${taskNumber}-${kind}.md`;
+/** R4 口径的任务三件套名判据（单源；preflight 枚举用，接受语言 = `taskArtifactName` 的输出集） */
+export const TASK_ARTIFACT_RE = /^task-\d+-(?:brief|report)\.md$/;
+/** R4 口径的评审包 diff 名判据（单源；preflight 枚举与 R4 存在性探测共用，不再各处内联） */
+export const REVIEW_DIFF_RE = /^review-.+\.diff$/;
 
 /**
  * 电池前清单自检（只读）：列出本阶段**固定 14 项**必需产物与 missing/invalid，单列变长 `artifacts`。
@@ -463,8 +484,9 @@ export function preflightCodingPlan(
   fs: CodingPlanFs,
 ): PreflightResult {
   const entries = stageReviewEntries(projectRoot, phase);
-  const ledgerDir = path.join(projectRoot, '.superpowers', 'sdd', `${changeId}.plan`);
-  const ledgerRelDir = toRel('.superpowers', 'sdd', `${changeId}.plan`);
+  const planId = `${changeId}.plan`;
+  const ledgerRelDir = sddLedgerDirRel(planId);
+  const ledgerDir = path.join(projectRoot, ledgerRelDir);
   const requiredEntries = [
     // 9 份 R3 + 3 份 V（分组顺序与契约表述一致：R3×9 在前、V×3 在后）
     ...entries.filter((e) => e.kind === 'r3'),
@@ -473,7 +495,7 @@ export function preflightCodingPlan(
       rel: toRel('docs', 'plans', `${changeId}.plan.md`),
       abs: path.join(projectRoot, 'docs', 'plans', `${changeId}.plan.md`),
     },
-    { rel: toRel(ledgerRelDir, 'progress.md'), abs: path.join(ledgerDir, 'progress.md') },
+    { rel: PROGRESS_REL(planId), abs: path.join(projectRoot, PROGRESS_REL(planId)) },
   ];
   const required = requiredEntries.map((e) => e.rel);
 
@@ -489,7 +511,11 @@ export function preflightCodingPlan(
   }
 
   let artifacts: string[] = [];
-  if (fs.existsSync(ledgerDir)) {
+  // G3-5：枚举前先判 isDirectory——账本路径是普通文件（或其它非目录形态）时 readdirSync 会裸抛
+  // ENOTDIR（旧行为：经 runMain 升级为 UNEXPECTED / exit 2 + 原始栈）；非目录按「无可枚举项」处理
+  // （artifacts 空列表，缺失仍由 required 的 progress.md 具名报出）。真正的探测竞态
+  // （existsSync 与 statSync 之间条目被删）由 CLI 侧 try/catch 折算为结构化 FILE_NOT_FOUND。
+  if (fs.existsSync(ledgerDir) && fs.statSync(ledgerDir).isDirectory()) {
     artifacts = fs
       .readdirSync(ledgerDir, { withFileTypes: true })
       .map((e) => e.name)
@@ -511,8 +537,8 @@ function validateLedgerAndArtifacts(
   violations: string[],
   artifactsFound: string[],
 ): number {
-  const ledgerPath = path.join(ledgerDir, 'progress.md');
-  const ledgerRel = toRel(ledgerRelDir, 'progress.md');
+  const ledgerPath = path.join(ledgerDir, LEDGER_FILE_NAME);
+  const ledgerRel = toRel(ledgerRelDir, LEDGER_FILE_NAME);
   if (!fs.existsSync(ledgerPath) || !fs.statSync(ledgerPath).isFile()) {
     violations.push(`${ledgerRel} 缺失（R3：执行账本须随编码计划落盘）`);
     return 0;
@@ -540,8 +566,8 @@ function validateLedgerAndArtifacts(
   const checkedTaskNumbers = new Set<number>([...taskNumbers, ...completed]);
   for (const n of checkedTaskNumbers) {
     for (const kind of ['brief', 'report'] as const) {
-      const artifactRel = toRel(ledgerRelDir, `task-${n}-${kind}.md`);
-      const artifactPath = path.join(ledgerDir, `task-${n}-${kind}.md`);
+      const artifactRel = toRel(ledgerRelDir, taskArtifactName(n, kind));
+      const artifactPath = path.join(ledgerDir, taskArtifactName(n, kind));
       if (!fs.existsSync(artifactPath) || fs.statSync(artifactPath).size === 0) {
         violations.push(`${artifactRel} 缺失或为空（R4：已完成任务三件套须齐备非空）`);
       } else {
@@ -556,7 +582,7 @@ function validateLedgerAndArtifacts(
     reviewDiffs = fs
       .readdirSync(ledgerDir, { withFileTypes: true })
       .map((e) => e.name)
-      .filter((f) => /^review-.+\.diff$/.test(f))
+      .filter((f) => REVIEW_DIFF_RE.test(f))
       .sort((a, b) => a.localeCompare(b));
   }
   if (reviewDiffs.length === 0) {
@@ -654,8 +680,8 @@ export function checkCodingPlan(
   if (resolution.kind === 'active') {
     planAbs = path.join(projectRoot, 'docs', 'plans', planFileName);
     planRel = activePlanRel;
-    ledgerDir = path.join(projectRoot, '.superpowers', 'sdd', ledgerBaseName);
-    ledgerRelDir = toRel('.superpowers', 'sdd', ledgerBaseName);
+    ledgerRelDir = sddLedgerDirRel(ledgerBaseName);
+    ledgerDir = path.join(projectRoot, ledgerRelDir);
   } else {
     planAbs = path.join(projectRoot, 'docs', 'changes', 'archive', resolution.dirName, planFileName);
     planRel = toRel('docs', 'changes', 'archive', resolution.dirName, planFileName);
@@ -717,7 +743,7 @@ export function checkCodingPlan(
     passed: violations.length === 0,
     violations,
     planPath: planRel,
-    ledgerPath: toRel(ledgerRelDir, 'progress.md'),
+    ledgerPath: toRel(ledgerRelDir, LEDGER_FILE_NAME),
     tasksTotal,
     tasksCompleted,
     artifactsFound,

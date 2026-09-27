@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { countReworks, sumTokens } from '../cli/check-budget.js';
+import { countReworks, countSuspectedDuplicateGroups, sumTokens } from '../cli/check-budget.js';
 import { checkBudget, checkRootcauseBudget, type BudgetConfig } from '../logic/budget-logic.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -341,5 +341,157 @@ describe('sumTokens token 累计口径（D-4b）', () => {
       { runId: 'b', phase: 2, tokens: 2 },
     ];
     expect(sumTokens(entries, undefined)).toEqual({ phase: 3, total: 3 });
+  });
+});
+
+/**
+ * countSuspectedDuplicateGroups（N-6 上界口径诊断，G2-2 直测 + 任务 8/G3-7 键守卫翻转 + G3-15 归账精确化）
+ *
+ * 语义（`cli/check-budget.ts` 现实现）：分组键 = `parentDispatchId|timestamp|tokens|duration_s`，
+ * 计入判据 = 「非空字符串 timestamp + **有限正数** tokens + `duration_s` 为 number」。
+ * 任务 8 已实施 G3-7 键守卫（tokens=0 与缺 duration_s 的噪声键不再入组，两条现状锁定断言翻转为 0）
+ * 与 G3-15 归账精确化（`parentDispatchId` 在场且非空时以该字段入键——同 parent 的 R3 多条归账
+ * 不再互计为疑似重复；键全同 = 同一 parent 下又一次完全相同的归账，仍计组）。
+ */
+describe('countSuspectedDuplicateGroups 疑似重复归账分组口径（N-6，G2-2）', () => {
+  const dup = (patch: Record<string, unknown> = {}): Record<string, unknown> => ({
+    runId: 'r',
+    timestamp: '2026-09-20T00:00:00.000Z',
+    tokens: 100,
+    duration_s: 5,
+    ...patch,
+  });
+
+  it('同 (timestamp, tokens, duration_s) 两条 → 1 组', () => {
+    expect(countSuspectedDuplicateGroups([dup({ runId: 'a' }), dup({ runId: 'b' })])).toBe(1);
+  });
+
+  it('同键三条 → 仍计 1 组（组数 ≠ 条数）', () => {
+    expect(countSuspectedDuplicateGroups([dup({ runId: 'a' }), dup({ runId: 'b' }), dup({ runId: 'c' })])).toBe(1);
+  });
+
+  it('键的任一分量不同即不同组（timestamp / tokens / duration_s 三向）→ 0 组', () => {
+    expect(
+      countSuspectedDuplicateGroups([
+        dup({ runId: 'a' }),
+        dup({ runId: 'b', timestamp: '2026-09-20T00:00:00.001Z' }),
+        dup({ runId: 'c', tokens: 101 }),
+        dup({ runId: 'd', duration_s: 6 }),
+      ]),
+    ).toBe(0);
+  });
+
+  it('两个不同键各重复两条 → 2 组（组数逐键累计）', () => {
+    expect(
+      countSuspectedDuplicateGroups([
+        dup({ runId: 'a' }),
+        dup({ runId: 'b' }),
+        dup({ runId: 'c', tokens: 200 }),
+        dup({ runId: 'd', tokens: 200 }),
+      ]),
+    ).toBe(2);
+  });
+
+  it('【任务 8（G3-7）翻转】tokens: 0 不计组（键守卫：须有限正数）', () => {
+    // 守卫前：tokens=0 通过「有限非负数」判据并入组；G3-7 要求 tokens 须为有限正数 → 噪声键不入组。
+    expect(countSuspectedDuplicateGroups([dup({ runId: 'a', tokens: 0 }), dup({ runId: 'b', tokens: 0 })])).toBe(0);
+  });
+
+  it('【任务 8（G3-7）翻转】duration_s 缺字段不计组（键守卫：须为 number）', () => {
+    // 守卫前：键取 String(undefined)='undefined'，两条同形记录并为一组；G3-7 要求 duration_s 须为 number。
+    expect(
+      countSuspectedDuplicateGroups([
+        dup({ runId: 'a', duration_s: undefined }),
+        dup({ runId: 'b', duration_s: undefined }),
+      ]),
+    ).toBe(0);
+  });
+
+  it('duration_s 非 number（字符串 / null）亦不计组（键守卫生效面与缺字段同口径）', () => {
+    expect(
+      countSuspectedDuplicateGroups([
+        dup({ runId: 'a', duration_s: '5' }),
+        dup({ runId: 'b', duration_s: '5' }),
+        dup({ runId: 'c', duration_s: null }),
+        dup({ runId: 'd', duration_s: null }),
+      ]),
+    ).toBe(0);
+  });
+
+  it('【任务 8（G3-15）】主条目 + 2 条同 parentDispatchId 的 R3 归账（各自实际消耗）→ 0 组（不互计）', () => {
+    // 归账形态对齐 data-models.md「R3 三条目归账约定」：主条目记整次分派消耗，两条附属条目按维度各记
+    // 自己的实际消耗并以 parentDispatchId 指向主条目 runId → 三个键互异 → 0 组（G3-15 要修的
+    // 「同一分派的约定内多归账被误报为疑似重复」）。
+    expect(
+      countSuspectedDuplicateGroups([
+        dup({ runId: 'p5-R-r3-01', tokens: 1200, duration_s: 30 }),
+        dup({ runId: 'p5-R-r3-02', tokens: 300, duration_s: 12, parentDispatchId: 'p5-R-r3-01' }),
+        dup({ runId: 'p5-R-r3-03', tokens: 150, duration_s: 8, parentDispatchId: 'p5-R-r3-01' }),
+      ]),
+    ).toBe(0);
+  });
+
+  it('【任务 8（G3-15）】不同 parentDispatchId 的同键条目分组互不合并 → 0 组', () => {
+    expect(
+      countSuspectedDuplicateGroups([
+        dup({ runId: 'a', parentDispatchId: 'pA' }),
+        dup({ runId: 'b', parentDispatchId: 'pB' }),
+        dup({ runId: 'c' }),
+      ]),
+    ).toBe(0);
+  });
+
+  it('【任务 8（G3-15）】同 parentDispatchId 且键全同仍计组（parent 不豁免完全相同的归账）', () => {
+    // 约定内归账只解释「主条目 + 附属条目」的键差异；同一 parent 下又一次完全相同的归账仍属可疑。
+    expect(
+      countSuspectedDuplicateGroups([
+        dup({ runId: 'a', parentDispatchId: 'pA' }),
+        dup({ runId: 'b', parentDispatchId: 'pA' }),
+      ]),
+    ).toBe(1);
+  });
+
+  it('【任务 8（G3-15）】parentDispatchId 空串/非字符串按缺字段处理（legacy 判定不变）', () => {
+    expect(
+      countSuspectedDuplicateGroups([
+        dup({ runId: 'a', parentDispatchId: '' }),
+        dup({ runId: 'b', parentDispatchId: 123 }),
+        dup({ runId: 'c', parentDispatchId: undefined }),
+      ]),
+    ).toBe(1); // 三条键前缀均为空串 → 同一键 3 条 → 1 组（字段引入前同判定）
+  });
+
+  it('缺 timestamp / 非字符串 timestamp 不计组（既有判据，任务 8 不变）', () => {
+    expect(
+      countSuspectedDuplicateGroups([
+        dup({ runId: 'a', timestamp: undefined }),
+        dup({ runId: 'b', timestamp: undefined }),
+        dup({ runId: 'c', timestamp: '' }),
+        dup({ runId: 'd', timestamp: '' }),
+        dup({ runId: 'e', timestamp: 123 }),
+        dup({ runId: 'f', timestamp: 123 }),
+      ]),
+    ).toBe(0);
+  });
+
+  it('坏 tokens（负数 / NaN / Infinity / 字符串 / 缺字段）不计组（与 sumTokens 的「有限非负」口径在此故意不同）', () => {
+    expect(
+      countSuspectedDuplicateGroups([
+        dup({ runId: 'a', tokens: -1 }),
+        dup({ runId: 'b', tokens: -1 }),
+        dup({ runId: 'c', tokens: Number.NaN }),
+        dup({ runId: 'd', tokens: Number.NaN }),
+        dup({ runId: 'e', tokens: Number.POSITIVE_INFINITY }),
+        dup({ runId: 'f', tokens: Number.POSITIVE_INFINITY }),
+        dup({ runId: 'g', tokens: '100' }),
+        dup({ runId: 'h', tokens: '100' }),
+        dup({ runId: 'i', tokens: undefined }),
+        dup({ runId: 'j', tokens: undefined }),
+      ]),
+    ).toBe(0);
+  });
+
+  it('空输入 → 0 组', () => {
+    expect(countSuspectedDuplicateGroups([])).toBe(0);
   });
 });

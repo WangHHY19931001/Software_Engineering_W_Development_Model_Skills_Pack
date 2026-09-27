@@ -7,8 +7,10 @@
  *      历史行逐字节不变（sha256 前缀对照），digest = 写入后文件字节的 SHA-256；
  *   2. 时间戳倒退 → exit 1（写入拒绝）+ stderr 点名「时间戳不递增 + 末条时间 + 建议」，
  *      文件 sha256 前后一致（未被修改）；
- *   3. 非法输入（未知/重复值 flag、runId 不存在、记录不符 schema）→ exit 2 + ERROR_JSON，文件未被修改；
- *   4. --correct 只追加新记录（note 含 correction-of:<runId>），历史行逐字节不变。
+ *   3. 非法输入（未知/重复值 flag、runId 不存在、记录不符 schema、--lock-timeout 非法值）→ exit 2 + ERROR_JSON，文件未被修改；
+ *   4. --correct 只追加新记录（note 含 correction-of:<runId>），历史行逐字节不变；
+ *   5. 历史文件边界形态（G2-5）：CRLF 行尾 / BOM 头 / 无换行结尾 各 1 例——解析吸收、exit 0、
+ *      目标文件历史字节前缀不变（CRLF 经 split(/\r?\n/) 吸收，BOM 经 parseJsonSafe 剥离，末尾只补分隔 LF）。
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -179,6 +181,60 @@ describe('wm-append-runlog：正确追加（exit 0）', () => {
   });
 });
 
+// ==================== 历史文件边界形态（G2-5） ====================
+
+/**
+ * G2-5 边界三态：历史文件三种非标准形态下的追加行为。断言口径 = 「解析吸收或明确拒绝，与实现一致」，
+ * 且**目标文件历史行逐字节不变**（追加器从不重写历史行）：
+ *   - CRLF 行尾：`readRunLogFile` 以 `split(/\r?\n/)` 吸收行尾 → 解析成功、exit 0；
+ *   - BOM 头：`parseJsonSafe` 剥离首部 BOM（`lib/safe-json.ts`）→ 首行可解析、exit 0；
+ *   - 无换行结尾：`composeAppendedText` 只补一个分隔 LF（不改动任何既有字节）→ exit 0。
+ */
+describe('wm-append-runlog：历史文件边界形态（G2-5）', () => {
+  it('CRLF 行尾的历史文件：解析吸收、exit 0，历史字节前缀不变', async () => {
+    const existingText = `${line(record())}\r\n`;
+    await seed(existingText);
+    const r = run([runLogPath, '--stdin'], line(record({ runId: 'b', timestamp: undefined })));
+    expect(r.stderr).not.toContain('✗');
+    expect(r.code).toBe(0);
+    expect(appendPayload(r.stdout).appended).toBe(1);
+    const raw = await fs.readFile(runLogPath, 'utf-8');
+    expect(raw.startsWith(existingText)).toBe(true); // 历史（含 CRLF 行尾）逐字节保留
+    const entries = raw
+      .split(/\r?\n/)
+      .filter((l) => l.trim() !== '')
+      .map((l) => JSON.parse(l) as { runId: string });
+    expect(entries.map((e) => e.runId)).toEqual(['a', 'b']);
+  });
+
+  it('BOM 头的历史文件：解析吸收（剥离 BOM）、exit 0，历史字节（含 BOM 三字节）不变', async () => {
+    const existingText = `\uFEFF${line(record())}\n`;
+    await seed(existingText);
+    const r = run([runLogPath, '--stdin'], line(record({ runId: 'b', timestamp: undefined })));
+    expect(r.stderr).not.toContain('✗');
+    expect(r.code).toBe(0);
+    const raw = await fs.readFile(runLogPath, 'utf-8');
+    expect(raw.startsWith(existingText)).toBe(true);
+    // 字节层：BOM 仍在文件首（历史行逐字节保留，未被就地剥离/重写）
+    const buf = await fs.readFile(runLogPath);
+    expect([...buf.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  });
+
+  it('无换行结尾的历史文件：只补分隔 LF，exit 0，历史字节前缀不变', async () => {
+    const existingText = line(record()); // 末尾无 \n
+    await seed(existingText);
+    const r = run([runLogPath, '--stdin'], line(record({ runId: 'b', timestamp: undefined })));
+    expect(r.stderr).not.toContain('✗');
+    expect(r.code).toBe(0);
+    const raw = await fs.readFile(runLogPath, 'utf-8');
+    expect(raw.startsWith(existingText)).toBe(true);
+    // 新增的唯一字节 = 分隔 LF + 新记录行；既有文本零改写
+    expect(raw.charAt(existingText.length)).toBe('\n');
+    const appended = JSON.parse(raw.slice(existingText.length + 1).trim()) as { runId: string };
+    expect(appended.runId).toBe('b');
+  });
+});
+
 describe('wm-append-runlog：时间戳倒退（exit 1，写入拒绝）', () => {
   it('时间戳不递增 → exit 1，文案点名末条时间与建议，文件未被修改', async () => {
     await seed(`${line(record())}\n`);
@@ -314,6 +370,24 @@ describe('wm-append-runlog：非法输入（exit 2）', () => {
     expect(r.code).toBe(2);
     expect(r.stderr).toMatch(/--stdin|--from/);
   });
+
+  it.each(['abc', '-1', '1e3'])(
+    '--lock-timeout=%s 非法值 → exit 2 ARG_INVALID（点名非法值），文件未被修改',
+    async (raw) => {
+      await seed(`${line(record())}\n`);
+      const before = await sha256(runLogPath);
+      const r = run(
+        [runLogPath, '--stdin', `--lock-timeout=${raw}`],
+        line(record({ runId: 'b', timestamp: undefined })),
+      );
+      expect(r.code).toBe(2);
+      expect(r.stderr).toContain('✗ [ARG_INVALID]');
+      expect(r.stderr).toContain('--lock-timeout 需为非负安全整数（毫秒）');
+      expect(r.stderr).toContain(`收到: ${raw}`);
+      expect(r.stdout).toMatch(/ERROR_JSON .*"category":"ARG_INVALID".*"exitCode":2/);
+      expect(await sha256(runLogPath)).toBe(before);
+    },
+  );
 
   it('--correct 搭配多条载荷（非单条 patch）→ exit 2 ARG_INVALID', async () => {
     await seed(`${line(record())}\n`);

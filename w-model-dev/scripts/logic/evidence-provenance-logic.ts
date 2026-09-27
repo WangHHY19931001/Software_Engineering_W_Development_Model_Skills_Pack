@@ -245,12 +245,24 @@ async function gitHead(project: string): Promise<string> {
   }
 }
 /**
- * Resolves the provenance identity: the current HEAD, or — only when the caller
- * explicitly opted in via `noGitOk` — the `no-git` form.
+ * Resolves the provenance identity from the git metadata (no `git` binary is
+ * invoked): on success `gitHead` yields the current HEAD commit and
+ * `provenanceKind: 'git'`.
  *
- * Only `MISSING_GIT_HEAD` degrades: safety failures such as
- * `UNSAFE_SOURCE_EVIDENCE` must never be absorbed by the no-git branch, or a
- * symlink/redirected git entry could buy a package-only record.
+ * `noGitOk` degrades exactly one failure shape — a `ProvenanceFailure` whose
+ * reason is `MISSING_GIT_HEAD` — into `{ commitSha: '', provenanceKind: 'no-git' }`.
+ * Every other error is rethrown unchanged, so guard-classified failures
+ * (`UNSAFE_SOURCE_EVIDENCE` from a symlinked/escaping path or a TOCTOU-unstable
+ * read) can never buy a package-only record through this branch.
+ *
+ * `MISSING_GIT_HEAD` is what `gitHead` assigns to every metadata anomaly it does
+ * not itself classify as `UNSAFE_SOURCE_EVIDENCE`: absent `.git`, unparsable
+ * `gitdir:` pointer, a `.git` entry (or pointer target) that is neither a real
+ * directory nor a pointer file, a symref whose ref file is missing in both the
+ * worktree git dir and the common git dir, and a HEAD value that is not a 40-hex
+ * object name. The degradation therefore covers malformed layouts too, not only
+ * "no git at all"; the 40-hex value is format-checked only, the commit object
+ * itself is not dereferenced.
  */
 async function resolveProvenanceIdentity(
   project: string,
@@ -405,29 +417,39 @@ async function collectDirectory(
  * Collects one allowlisted root-level evidence file (`.w-model/<file>`) with the
  * same lexical-walk + real-root containment discipline as directory collection.
  * Absent file → `[]` (non-emptiness is enforced by the caller's contract).
+ *
+ * G3-2: a non-regular file (directory, FIFO, ...) is likewise treated as absent
+ * (`[]`) instead of being handed to `readStableFile`, which would fail with
+ * `UNSAFE_SOURCE_EVIDENCE` (symlink/non-file) or a raw `EISDIR` before the
+ * caller's named contract (e.g. `MISSING_SIGNATURE_CHAIN`) can report it.
  */
 async function collectRootFile(state: string, stateReal: string, file: string, kind: Kind): Promise<SourceFile[]> {
   const absolute = path.join(state, file);
   await assertCanonicalPath(absolute, stateReal, true);
   const stat = await fs.lstat(absolute).catch(() => null);
-  if (!stat) return [];
+  // 符号链接已由上方 assertCanonicalPath 拒绝；此处 lstat 判 isFile 覆盖目录 / FIFO 等非普通文件
+  if (!stat || !stat.isFile()) return [];
   const content = await readStableFile(absolute, stateReal);
   return [{ path: file, kind, sha256: sha256(content) }];
 }
 /**
- * Signature-chain location: the repository-wide convention is the root-level
+ * Signature-chain location convention, single source for the producer (here) and
+ * the exporter (`evidence-export-logic`, which imports both constants into its
+ * allowlist): the repository-wide convention is the root-level
  * `signature-chain.jsonl`; the plural `signature-chains/` directory remains
  * supported as the legacy layout. Both present → fail-closed (ambiguous authority).
  */
+export const SIGNATURE_CHAIN_FILE = 'signature-chain.jsonl';
+export const SIGNATURE_CHAIN_DIRECTORY = 'signature-chains';
+
+/** Collects the authoritative chain source: root-level file, or the legacy directory. */
 async function collectSignatureChainFiles(state: string, stateReal: string): Promise<SourceFile[]> {
-  const legacyDirectory = 'signature-chains';
-  const rootFile = 'signature-chain.jsonl';
-  const legacyPresent = (await fs.lstat(path.join(state, legacyDirectory)).catch(() => null)) !== null;
-  const rootPresent = (await fs.lstat(path.join(state, rootFile)).catch(() => null)) !== null;
+  const legacyPresent = (await fs.lstat(path.join(state, SIGNATURE_CHAIN_DIRECTORY)).catch(() => null)) !== null;
+  const rootPresent = (await fs.lstat(path.join(state, SIGNATURE_CHAIN_FILE)).catch(() => null)) !== null;
   if (legacyPresent && rootPresent) throw new ProvenanceFailure(1, 'SIGNATURE_CHAIN_AMBIGUOUS');
   return legacyPresent
-    ? collectDirectory(state, stateReal, legacyDirectory, 'signature-chain', false)
-    : collectRootFile(state, stateReal, rootFile, 'signature-chain');
+    ? collectDirectory(state, stateReal, SIGNATURE_CHAIN_DIRECTORY, 'signature-chain', false)
+    : collectRootFile(state, stateReal, SIGNATURE_CHAIN_FILE, 'signature-chain');
 }
 function measurements(files: SourceFile[]): SourceProvenance['measurements'] {
   const of = (kind: Kind): Measurement => {

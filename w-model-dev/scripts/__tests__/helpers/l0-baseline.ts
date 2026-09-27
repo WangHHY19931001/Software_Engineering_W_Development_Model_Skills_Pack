@@ -82,7 +82,14 @@ export const L0_BASELINE = {
   // 相对链接 `../scripts/logic/run-log-logic.ts`（共享实现）与 `../scripts/cli/wm-append-runlog.ts`
   // （写入端），二者同时计入 l1Only；command-reference.md 的 L4 速查行未新增相对链接（纯反引号引用）；
   // 由 npm run audit:l0-links 实测 rebaseline，placeholders 仍 36、violations 仍 0）。
-  relativeLinkCount: 699,
+  // 700 = 699 + 1（2026-09-27 deferred-closeout 任务 2（G1-11）：SKILL.md「阶段门放行三步」段的
+  // 闭环五门表述对齐时新增 1 条同目录相对链接
+  // `[references/operational-recovery.md](references/operational-recovery.md)`（SKILL.md:88），
+  // 作为「闭环五门齐备表述以『调用时机』节为准」的落点；由 npm run audit:l0-links 实测 rebaseline，
+  // l1Only 仍 101、placeholders 仍 36、violations 仍 0）。归因经 git archive 历史树回放核实：
+  // 前序提交 b80eb400 实测 699（= 上条基线），28183c65（任务 2）实测 700，其 w-model-dev 差异中
+  // 相对链接净 +1 即上述 SKILL.md 一处；后继提交 f99180ec（任务 3）实测仍 700。
+  relativeLinkCount: 700,
   l1Only: 101,
   placeholders: 36,
 } as const;

@@ -111,7 +111,7 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\w-model-dev"
 │   ├── cli/            # CLI 入口层（27 个 check-*.ts 门禁入口（含编码计划门 check-coding-plan 与元门禁 check-docs-consistency / check-samples-coverage / check-coverage-scope / check-pollution）+ 7 个 code-health 门禁 CLI：code-health-phase1 / code-health-gap / code-health-tests / code-health-duplicates / code-health-ledger / code-health-apply / code-health-archive + 12 个工具 CLI：security-scan / wm-status / metrics-report / ensure-codegraph / wm-write / wm-append-runlog / doctor / plan-chunks / wm-export-evidence / wm-verify-evidence-source / platform-deps-install / review-package；共 47 个 .ts，exit-2 脚本口径 = 46，self-test.ts 单列（回归基线，非 exit-2）；IO 抽离，传纯数据给 logic 层）
 │   ├── logic/          # 纯函数校验逻辑（40 个 .ts：39 个 *-logic.ts + code-health-contract.ts）
 │   ├── infrastructure/ # 基础设施适配（schema-loader.ts / schema-fs.ts；Ajv 单例 + schemas/*.schema.json 自动加载）
-│   ├── lib/            # 共享工具（33 个：cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate / artifact-gate-assets / uat-path-mapping / tla-clean-trace 与 code-health-* 注入边界等）
+│   ├── lib/            # 共享工具（36 个：cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate / artifact-gate-assets / uat-path-mapping / tla-clean-trace 与 code-health-* 注入边界等）
 │   └── __tests__/      # vitest 单元测试（文件数与用例数以当前命令输出为准 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例

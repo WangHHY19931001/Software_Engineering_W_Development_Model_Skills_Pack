@@ -396,8 +396,8 @@ interface BudgetConfig {
 - `budget.updatedAt` 须在每个阶段门放行前更新（编排者 O 在 CHECKPOINT 放行时同步刷新为当前时间戳）。与 `check-budget.ts` R1 时效性校验对齐：当 `project.updatedAt > budget.createdAt` 时须满足 `budget.updatedAt > budget.createdAt`，否则报「阶段推进但 budget 未更新」。
 - 预算检查不替代门禁脚本（反模式 #3/#6）：预算超限触发暂停/告警，放行仍由 G 子代理退出码决定。
 - `rootcauseParallelBudget` 为多角度 R 的 token 预算配置（字段名保留向后兼容，实际含义为「每轮多角度 R 的 token 预算」，不论并行/串行均累计）。由 [`check-budget.ts`](../scripts/cli/check-budget.ts) R4-A 规则校验：每轮 persona 数 ≤ `maxPersonasPerRound`、每个 persona tokens ≤ `maxTokensPerPersona`、每轮总 tokens ≤ `maxTotalTokensPerRound`（串行分派时累计校验，超限触发 killSwitch）。未配置该字段时不校验（向后兼容）。
-- **用量实效校验（R6，D-4b）**：预算配置合法 ≠ 用量在预算内。`check-budget.ts --run-log=` 从 `run-log.jsonl` 累计 `tokens`（Σtokens(阶段) 与 Σtokens(全量)；只累计有限非负数的 `tokens` 字段，坏值不计入），再与上限比对：Σtokens(阶段) > `perPhase.maxTokens` **或** Σtokens(全量) > `project.maxTokensTotal` → **blocking（退出码 1）**，违规消息以 `R6：` 开头并附超限占比；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` 时另报 killSwitch 用量告警（**R5-b**，消息以 `R5-b：` 开头，与 R5 的返工/TLA 触发文案区分——R5 既有文案「killSwitch 应触发（返工 N >= M）但未告警」逐字不变）。未提供 `--run-log`（即无用量输入）时 R6/R5-b 整体跳过（**判据与退出码不变**），但输出非阻断诊断「R6/R5-b 未生效（未提供 run-log）」——省略该参数不再等于静默跳过（D-5② 未接线可见化；live run 实测 9/9 次调用均未传该参数，R6/R5-b 全程静默，故权威调用表把 `--run-log` 定为必带，见 `operational-recovery.md`「调用时机」表）；`--run-log` 文件存在且 Σtokens=0（无 `tokens` 记录）时输出「R6 未生效」非阻断警告（跳过不等于通过；读取失败时该警告不追加，避免把「没读到」说成「没用量」）。背景：真实 8 阶段调测实耗 580M tokens 而门禁全程未红，`perPhase.maxTokens`/`project.maxTokensTotal` 形同虚设。
-- **Σtokens 为上界口径（N-6）**：Σtokens 是「按 run-log 记录值累计」的口径，**同一分派动作的多条归账会重复累计**（实测 live run 记录值 522M 中约 72.8M 来自重复归账），故它是**真实唯一消耗的上界**；R6/R5-b 的预算判定**按上界执行**（宁严不松），**不做去重**——去重键在 legacy 记录上不可靠（阶段 1-4 的 `reportId` 为空、`timestamp` 等值会误并真实并发分派）。脚本在同 `(timestamp, tokens, duration_s)` 出现 >1 次时输出「疑似重复归账 N 组」非阻断诊断（只统计并可见化、不改变 Σtokens 与退出码）。**R3 三条目归账约定**：同一分派若按 `r3-completeness` / `r3-reliability` / `r3-security` 分别记账，**能拆分到维度的则各自填实际 `tokens`，不能拆分时只填一条、其余两条填 `0`**——避免把同一消耗写三遍而人为放大上界。
+- **用量实效校验（R6，D-4b）**：预算配置合法 ≠ 用量在预算内。`check-budget.ts --run-log=` 从 `run-log.jsonl` 累计 `tokens`（Σtokens(阶段) 与 Σtokens(全量)；只累计有限非负数的 `tokens` 字段，坏值不计入），再与上限比对：Σtokens(阶段) > `perPhase.maxTokens` **或** Σtokens(全量) > `project.maxTokensTotal` → **blocking（退出码 1）**，违规消息以 `R6：` 开头并附超限占比；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` 时另报 killSwitch 用量告警（**R5-b**，消息以 `R5-b：` 开头，与 R5 的返工/TLA 触发文案区分——R5 既有文案「killSwitch 应触发（返工 N >= M）但未告警」逐字不变）。未提供 `--run-log`（即无用量输入）时 R6/R5-b 整体跳过（**判据与退出码不变**），但输出非阻断诊断「R6/R5-b 未生效（未提供 run-log）」——省略该参数不再等于静默跳过（D-5② 未接线可见化；live run 实测 9/9 次调用均未传该参数，R6/R5-b 全程静默，故权威调用表把 `--run-log` 定为必带，见 `operational-recovery.md`「调用时机」表）；`--run-log` 文件存在且 Σtokens=0（无 `tokens` 记录）时输出「R6 未生效」非阻断警告（跳过不等于通过；读取失败时该警告不追加，避免把「没读到」说成「没用量」）；提供了 `--run-log` 但**读取失败**时同样**不出**「未接线」诊断（此时走该门自身的失败路径：stderr 读取失败警告已说明跳过原因，R5/R6/R5-b 同样跳过）。背景：真实 8 阶段调测实耗 580M tokens 而门禁全程未红，`perPhase.maxTokens`/`project.maxTokensTotal` 形同虚设。
+- **Σtokens 为上界口径（N-6）**：Σtokens 是「按 run-log 记录值累计」的口径，**同一分派动作的多条归账会重复累计**（实测 live run 记录值 522M 中约 72.8M 来自重复归账），故它是**真实唯一消耗的上界**；R6/R5-b 的预算判定**按上界执行**（宁严不松），**不做去重**——去重键在 legacy 记录上不可靠（阶段 1-4 的 `reportId` 为空、`timestamp` 等值会误并真实并发分派）。脚本在同 `(parentDispatchId, timestamp, tokens, duration_s)` **键**出现 >1 次时输出「疑似重复归账 N 组」非阻断诊断（键守卫：`tokens` 非有限正数或 `duration_s` 非数字的条目不入组；同 `parentDispatchId` 且键全同仍计组；只统计并可见化、不改变 Σtokens 与退出码）。**R3 三条目归账约定**：同一分派若按 `r3-completeness` / `r3-reliability` / `r3-security` 分别记账，**能拆分到维度的则各自填实际 `tokens`，不能拆分时只填一条、其余两条填 `0`**——避免把同一消耗写三遍而人为放大上界。
 - **`killSwitch.consecutiveReworks` 的计数口径（D-4a）**：`check-budget.ts` 的 `reworkCount` 是「返工事件 ∪ 未过门事件」的**累计**条数（`action ∈ {rework, fix, emergency-fix}` 或 `outcome ∈ {fail, rework}`），不是「连续 N 轮返工」的滑动窗口——该阈值实际约束的是本阶段返工/未过门事件累计条数（字段名沿用 schema，语义以此口径为准）。
 
 ## 运行日志模型（run-log.jsonl）
@@ -496,6 +496,8 @@ interface RunLogEntry {
   recordHash?: string;
   /** checkpoint 放行锚（D-3b，可选）：放行时刻历史前缀的外部锚 { lines, sha256 }（见「checkpoint 放行锚」节） */
   runLogAnchor?: { lines: number; sha256: string };
+  /** 多归账分派的主记录 ID（G3-15，可选）：R3 三维度等同一分派多条归账时，附属条目以该字段指向主条目 runId；仅用于 check-budget 疑似重复归账判定的精确化（同 parent 且键全同仍计组），Σtokens 上界口径不变，legacy 缺字段维持现判定 */
+  parentDispatchId?: string;
 }
 ```
 
@@ -528,7 +530,7 @@ interface RunLogEntry {
 - **追加与更正唯一入口（D-5①/N-5）**：O 追加 run-log 一律经 `scripts/cli/wm-append-runlog.ts`（写盘复用 `state-write-logic` 的锁 + 备份 + tmp/rename + 回读），不得手搓追加脚本或直接 `Write`/`Edit` run-log。用法示例（命令形态照该工具既有登记 `<run-log.jsonl> [--from=<json|jsonl>|--stdin] [--correct=<runId>] [--timestamp=<iso>] [--allow-clock-adjust=<reason>] [--lock-timeout=] [--json]`）：
   - 追加新记录：`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin`
   - 更正既有记录（只新增一条更正记录，`note` 含 `correction-of:<runId>`）：`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin --correct=<runId>`
-  - 时间戳**严格递增**：`now < 末条` 默认 exit 1 拒绝（文案点名末条时间与建议）；`--timestamp=<iso>` / `--allow-clock-adjust=<reason>` 为显式逃生口，分别在记录 `note` 留 `clock-injected:<iso>` / `clock-adjust:<reason>` 痕迹（绝不静默改写时间戳来源）。
+  - 时间戳**严格递增三态**（与 `wm-append-runlog` 头注同序，②与③不得合并叙述）：① **显式**时间戳（记录自带 `timestamp` 或 `--timestamp=<iso>`）**≤ 末条** → exit 1 写入拒绝（文案含「时间戳不递增」+ 末条时间 + 建议，目标文件不被修改）；② **无显式时间戳**且 `now` **早于**末条（时钟真倒退）→ exit 1 拒绝，仅显式 `--allow-clock-adjust=<reason>` 才放行（步进末条 +1ms，`note` 留 `clock-adjust:auto+<N>ms:<reason>`）；③ **无显式时间戳**且 `now` **等于**末条毫秒、或仅**批内冲突** → 良性 +1ms 步进（同毫秒良性步进形态 `clock-adjust:auto+<N>ms`，`diagnostics` 明示「时钟调整 +Nms」，绝不静默）；`--timestamp=<iso>` 注入成功另在记录 `note` 留 `clock-injected:<iso>` 痕迹。
 - 编排者 O 在以下时机 append：子代理分派返回后 / 门禁脚本执行后 / 🔴 CHECKPOINT 放行后 / 返工回退后。
 - `acknowledgedDecisions` 在阶段门放行时由用户填写（≥1 关键决策摘要，非"确认"/"同意"）；为空视为 O4（Comprehension Debt）命中，拒绝放行。
 - O 系列失败模式的机器可读标注为 `operationalFailureModes`（可选，`O1`~~`O6` 枚举数组，`uniqueItems`）；`check-maturity.ts` R5 只统计该字段（存在即累加长度）。`note` 中的 O1~~O6 字样视为**引用**（含评审规则编号同名情形，如 O3 既是运维失败模式也是 V 门禁 evidence 扣分规则名），不计入 R5；词法命中仅作非阻断诊断，并指引「确为运维失败时改用 `operationalFailureModes` 标注」。
@@ -544,7 +546,7 @@ interface RunLogEntry {
 
 ```text
 recordHash = sha256(prevRecordHash + "\n" + canonicalJson(record 去掉 recordHash 字段))
-canonicalJson = 对象键按 Unicode 码点升序、无空白、UTF-8、数组保序
+canonicalJson = 对象键按 Unicode 码点升序、无空白、UTF-8、数组保序（与 JSON.stringify 键序无关：显式按 Unicode 码点升序序列化）
 ```
 
 - `prevRecordHash` 是记录字段，因此**参与**本条 `canonicalJson` 载荷（链关系被前缀与载荷双重绑定）；`recordHash` 字段本身必须从载荷剔除（否则不可复算）。哈希输出为 64 位小写 hex。
@@ -568,7 +570,7 @@ sha256 = sha256( 前缀各记录行的**原始字节**以单个 "\n" 连接，�
 - **写入（裁定 B，自动化）**：追加器（`wm-append-runlog.ts`）在写入 `action=checkpoint` 且 `outcome=success` 的记录时**自动填入** `runLogAnchor`（基于**写入前**前缀 = 历史行原文 + 本批已规划行的落盘序列化中 `timestamp ≤` 本条时间戳者）。调用方**显式提供**锚时须与自算值一致，不一致 → **exit 2**（输入错误，不写盘）；历史行原文由 CLI 经 `AppendOptions.historyRawLines` 注入（logic 层零 `node:fs`），不可得时自动填锚跳过并留非阻断诊断、显式提供的锚按不可核验拒绝。锚字段**自身入链**（先写锚再算 `recordHash`）→ 改锚即断链。
 - **校验（裁定 A，并入 R7 第三段）**：`check-run-log.ts` 对**每条**携带 `runLogAnchor` 的记录按同法重算并比对，不符 → **blocking**（文案含 `R7` + `runLogAnchor`/放行锚 + 记录 runId，如 `R7: 放行记录 <runId> 的 runLogAnchor 与当前历史前缀不符（放行后被改写/重排）`）；`sha256` 维度需要原始行文本（CLI 注入 `rawLines`），未注入时只校验 `lines` 并记非阻断诊断（绝不假装验过）。
 - **历史兼容与 cutoff（裁定 G）**：`RELEASE_ANCHOR_CUTOFF = '2026-09-26T00:00:00Z'`（D-3b 落地日，`scripts/logic/run-log-logic.ts`）。
-  - `timestamp < cutoff` 的 `action=checkpoint` + `outcome=success` 记录**无锚** → LEGACY（非阻断；**禁止回溯补锚**）；
+  - `timestamp < cutoff` 的 `action=checkpoint` + `outcome=success` 记录**无锚** → LEGACY（非阻断；**禁止回溯补锚**）——LEGACY 分支命中时输出一条非阻断诊断（文案含 runId 与 cutoff，缀 `; deferred`），非静默跳过；
   - `timestamp ≥ cutoff` 的放行记录**无锚** → **blocking**（文案含 `R7` + 放行锚 + runId）——堵住「未来调用方漏注入历史行原文 / 绕过追加器直写放行记录」使 D-3b 保证静默消失（fail-open）的窗口；
   - `timestamp` 缺失/非法**不**按 LEGACY 吸收（保守：宁可 blocking——不可信的时间戳不构成「旧记录」证据）；非 checkpoint/success 记录不参与该判定（锚是放行动作的专属外部锚）。
 - **边界（诚实登记）**：前缀不可变保证覆盖到**最后一个锚**为止——锚之后的尾部在下一次锚定前不可证伪；且掌握工具链者可整链重算 + 重算全部下游锚。最强外部锚是本仓库既有的**归档快照**（以下 L4 前缀性）与导出包 SHA-256 manifest，本机制不主张「密码学不可抵赖」。

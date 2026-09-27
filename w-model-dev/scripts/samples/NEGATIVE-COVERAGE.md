@@ -21,7 +21,7 @@
 >     断言 exit code=2、stdout 含可解析 `ERROR_JSON`（`exitCode=2` 且 category 属 exit-2 类别）、
 >     stderr 含同类别人类错误行、且**该探针自己的**隔离根调用前后逐项不变（不得留下半成品）。
 >     独立根是并发的前提，同时把不变量加强为「本探针在自己根内不留半成品」（共享根只能做弱归因）；
->     实测 47 探针由串行 71s 降至约 22s，断言一字未减。tsx 不可用等
+>     实测对照为引入时的 47 探针（现 48）——由串行 71s 降至约 22s，断言一字未减。tsx 不可用等
 >     探针不可用情形按失败处理，不静默跳过。
 > - 口径与中心探针一致（46 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
 >   `metrics-report.ts` 使用特殊探针参数，但仍计入集合）。
@@ -42,9 +42,20 @@
 >   `file` / `manifestFile` / `ticketsFile` / `featureFiles` / `auxFiles` / `sampleDir` 须覆盖该 fixture；
 >   锚指到别的 fixture 的条目 → exit 1），且同一 `引用文件#锚` 不得被两条指向不同 fixture 的 fixture
 >   行共用。锚内不得含全角逗号 / 全角括号 / 全角分号 / `#` /
->   反引号（这些字符标志锚结束），锚之后的文字是描述性备注。整条引用裹为 Markdown 行内代码（反引号）：
+>   反引号（这些字符标志锚结束），锚之后的文字是描述性备注（全角分号例外：它同时是**多锚分隔符**，见下条）。
+>   整条引用裹为 Markdown 行内代码（反引号）：
 >   `w-model-dev/scripts/__tests__/...` 一类路径含 `__`，不裹代码会被 Markdown 当作强调而改写
 >   （prettier 重排实测会渲染成 `**tests**`）。
+> - **多锚（2026-09-27 任务 5 / G2-8，向后兼容）**：一行的锚列可登记**多个**锚，用**全角分号 `；`**
+>   分隔——`` `文件#锚1；文件#锚2` ``；多 fixture 行可在 `；` 后的段里点名该锚所属的 fixture：
+>   `` `samples/主 fixture`（`self-test.ts#锚1`）；`samples/次 fixture`（`self-test.ts#锚2`） ``。
+>   门禁**逐锚**机器校验：每个附加锚各自核「引用文件在盘 + 锚在该文件内恰命中一次」；fixture 行的
+>   附加锚另按**它自己那个 fixture** 核相关度（锚须落在登记该 fixture 的用例条目内），点名了 fixture 的
+>   附加锚还须该路径在盘（否则 `negative-coverage-dangling`）。**第二锚失配与主锚同等阻断**（exit 1），
+>   不静默跳过。**边界（向后兼容的实现基础）**：`；` 后的段只有是「**纯引用段**」（抹去锚式引用 /
+>   行内代码 / `samples/...` 路径后只剩空白与标点，**无描述文字**）才构成附加锚；`；` 后接描述文字的段
+>   仍是描述性备注，其内引用不参与校验——既有行（如 `check-verifier-output` 的「D-10 形态负样本 …」、
+>   `check-maturity` 的「R5 真值通道第二条负样本 …」）因此**行为零变化**。
 > - **为什么不再用行号**：行号是位置、不是内容——被引文件上方插入任意行即整表漂移（2026-09-17 实测
 >   29 条 fixture 行号全部漂移；2026-09-18 同一会话内三次人工回填），而门禁真正依赖的是内容。锚是
 >   内容寻址：插行不漂移，被指内容改写或搬走则立即「零命中」失败。旧行号语法（文件后跟冒号加数字）
@@ -71,7 +82,7 @@
 | check-requirement-graph           | fixture  | `samples/graph/bad-isolated.json`（`self-test.ts#file: 'bad-isolated.json'`）                                                       | 放宽图谱结构门将漏掉孤立节点（无入边/出边）被当作合法需求图放行                                      |
 | check-tla-model                   | fixture  | `samples/tla/bad-no-l1-root.json`（`self-test.ts#file: 'bad-no-l1-root.json'`）                                                     | 放宽 manifest 校验将漏掉缺 L1 根节点的规格仍被当作可建模通过                                         |
 | check-bdd-model                   | fixture  | `samples/bdd/bad-schema.manifest.json`（`self-test.ts#manifestFile: 'bad-schema.manifest.json'`）                                   | 放宽 BDD 校验将漏掉 manifest 缺必填字段仍通过 D1/D2                                                  |
-| check-budget                      | fixture  | `samples/budget/bad-stale.json`（`self-test.ts#expectedReasonPatterns: [/updatedAt == createdAt/]`）                                | 放宽 R1 时效性将漏掉过期 budget 不再被拦截，预算约束形同虚设                                         |
+| check-budget                      | fixture  | `samples/budget/bad-stale.json`（`self-test.ts#expectedReasonPatterns: [/updatedAt == createdAt/]`）；`samples/run-log/bad-duplicate-groups.jsonl`（`self-test.ts#file: 'bad-duplicate-groups.jsonl'`）                                | 放宽 R1 时效性将漏掉过期 budget 不再被拦截，预算约束形同虚设；**次锚非失败证据**——`run-log/bad-duplicate-groups.jsonl` 是 G3-15 疑似重复归账诊断样本（实测 exit 0，仅非阻断诊断），此处只登记其归属；本行失败证据为 `bad-stale.json`（G4 carry-forward 澄清）                                         |
 | check-run-log                     | fixture  | `samples/run-log/bad-incomplete.jsonl`（`self-test.ts#file: 'bad-incomplete.jsonl'`）                                               | 放宽 R1 完整性将漏掉缺字段的 run-log 记录被静默接受                                                  |
 | check-maturity                    | fixture  | `samples/maturity/bad-stale.json`（`self-test.ts#expectedReasonPatterns: [/\[schema\].*level/]`）；R5 真值通道第二条负样本 `samples/run-log/bad-operational-modes-3x.jsonl`（`self-test.ts#file: 'bad-operational-modes-3x.jsonl'`） | 放宽周期校验将漏掉 maturity 过期未降级导致的成熟度虚高；R5 放宽为词法计数会把规则编号引用误判为运维失败，R5 静默跳过则漏掉 operationalFailureModes 字段的真实命中 |
 | check-checkpoint                  | fixture  | `samples/checkpoint/bad-empty-decisions.jsonl`（`self-test.ts#file: 'bad-empty-decisions.jsonl'`）                                  | 放宽 R1 决策非空将漏掉空决策的 CHECKPOINT 被判通过（人类确认被绕过）                                 |
@@ -81,8 +92,8 @@
 | check-iceberg-sweep               | fixture  | `samples/iceberg/bad-r6-wide-dd-drift.json`（`self-test.ts#file: 'bad-r6-wide-dd-drift.json'`）                                     | 放宽 R6 宽池 graph↔rtm 精确相等将漏掉 DD 漂移仍判三视角一致（本 fixture 只压宽池方向；窄池漏 SD 方向由 bad-view-disagreement.json 用例覆盖） |
 | check-role-dispatch               | fixture  | `samples/run-log/bad-missing-V-role.jsonl`（`self-test.ts#file: 'bad-missing-V-role.jsonl'`）                                       | 放宽角色分派完整性（约束 #8）将漏掉阶段缺 V 分派记录仍通过                                           |
 | check-state-machine-consistency   | fixture  | `samples/state-machine/bad-missing-transition.json`（`self-test.ts#file: 'bad-missing-transition.json'`）                           | 放宽状态集/转移集一致将漏掉设计文档缺转移而代码存在该分支                                            |
-| check-codegraph-queries           | fixture  | `samples/codegraph-queries/bad-degraded-without-evidence`（`self-test.ts#sampleDir: 'codegraph-queries/bad-degraded-without-evidence'`） | 放宽查询落盘判据将漏掉未做 codegraph 查询直接改代码（反模式 #38 逃逸）与无 `.codegraph/` 索引却未显式降级（缺 degradationReason/alternativeEvidence）的伪造记录（D-6） |
-| check-coding-plan                 | fixture  | `samples/coding-plan/bad-review-empty`（`self-test.ts#sampleDir: 'coding-plan/bad-review-empty'`）                            | 放宽 R5 内容下限（stage 审查产物 0 字节）与制品齐全性将漏掉空审查/无账本/缺验证命令的编码变更被放行（编码链形态的反模式 #39 谱系） |
+| check-codegraph-queries           | fixture  | `samples/codegraph-queries/bad-degraded-without-evidence`（`self-test.ts#sampleDir: 'codegraph-queries/bad-degraded-without-evidence'`）；`samples/codegraph-queries/bad-empty`（`self-test.ts#sampleDir: 'codegraph-queries/bad-empty'`）；`samples/codegraph-queries/bad-cli-kind-without-index`（`self-test.ts#sampleDir: 'codegraph-queries/bad-cli-kind-without-index'`） | 放宽查询落盘判据将漏掉四类伪造记录：未做 codegraph 查询直接改代码（反模式 #38 逃逸）、空查询目录被当作已查询（G4-2 补回）、无 `.codegraph/` 索引却声称 CLI 真实执行（G4-2 补齐）、无索引却缺 degradationReason/alternativeEvidence 的降级声明（D-6） |
+| check-coding-plan                 | fixture  | `samples/coding-plan/bad-review-empty`（`self-test.ts#sampleDir: 'coding-plan/bad-review-empty'`）；`samples/coding-plan/bad-missing-ledger`（`self-test.ts#sampleDir: 'coding-plan/bad-missing-ledger'`）                            | 放宽 R5 内容下限（stage 审查产物 0 字节）与制品齐全性将漏掉空审查/无账本（G4-1 补回）/缺验证命令的编码变更被放行（编码链形态的反模式 #39 谱系） |
 | check-requirement-coverage        | fixture  | `samples/coverage/bad-empty-stakeholder.json`（`self-test.ts#file: 'bad-empty-stakeholder.json'`）                                  | 放宽 C1-C10 将漏掉 stakeholder 覆盖率缺口与 metrics 重算不一致                                       |
 | check-exemption                   | fixture  | `samples/exemption/bad-s-self-approve.json`（`self-test.ts#file: 'bad-s-self-approve.json'`）                                       | 放宽 E1-E9 将漏掉 S 自批（缺人类四阶段审批）的豁免被放行                                             |
 | check-design-contract-consistency | fixture  | `samples/design-contract/bad-path-mismatch.json`（`self-test.ts#file: 'bad-path-mismatch.json'`）                                   | 放宽 D1-D4 将漏掉设计路径/参数/状态码/响应字段与实现不一致                                           |

@@ -71,7 +71,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     anchor: 'runSync(process.execPath, [vitestBin, ...vitestArgs], {',
     symbol: 'collectVitestMeasurements',
     reason:
-      'B3 migrated direct Node Vitest execution through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (1800 s) timeout.（行号 2026-09-06 audit-fixes task 9 随 VITEST_SPAWN_TIMEOUT_MS 常量提取下移 7 行；2026-09-14 fileParallelism 抖动处置随该常量注释扩充再下移 2 行，600s→1800s 同步改值）',
+      'B3 migrated direct Node Vitest execution through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (3600 s) timeout.（行号 2026-09-06 audit-fixes task 9 随 VITEST_SPAWN_TIMEOUT_MS 常量提取下移 7 行；2026-09-14 fileParallelism 抖动处置随该常量注释扩充再下移 2 行，600s→1800s 同步改值；2026-09-26 全量套件 --reporter=json 实测墙钟 1962s 超过 1800s，常量再调至 3600s）',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
@@ -81,7 +81,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     anchor: 'runSync(`npx vitest ${vitestArgs.map((a) => (/[ "&=]/.test(a) ? `"${a}"` : a)).join(\' \')}`, [], {',
     symbol: 'collectVitestMeasurements',
     reason:
-      'B3 migrated the shell Vitest fallback through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (1800 s) timeout.（行号 2026-09-06 audit-fixes task 9 同上顺延；2026-09-14 同上再下移 2 行）',
+      'B3 migrated the shell Vitest fallback through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (3600 s) timeout.（行号 2026-09-06 audit-fixes task 9 同上顺延；2026-09-14 同上再下移 2 行；2026-09-26 随实测墙钟 1962s 与宿主同源常量一并调至 3600s）',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },

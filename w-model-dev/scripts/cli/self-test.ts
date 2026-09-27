@@ -14,7 +14,7 @@
  *   0  所有样本的校验结果与期望一致
  *   1  至少一个样本不匹配
  *
- * 样本目录约定（samples/<area>/，27 个样本子目录（35+1 个用例数组），详见 samples/README.md 覆盖矩阵）：
+ * 样本目录约定（samples/<area>/，27 个样本子目录（45 个 `*_CASES` 用例数组），详见 samples/README.md 覆盖矩阵）：
  *   verifier / gate / graph / tla / code-tla / bdd / coverage / exemption / budget /
  *   run-log / maturity / checkpoint / rootcause / preventive-review / iceberg /
  *   tla-bdd-sync / state-machine / design-contract / signature-chain /
@@ -117,6 +117,9 @@ import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
+// 预算疑似重复归账样本（N-6/G3-7/G3-15）：复用 check-budget.ts 导出的分组计数函数，
+// 使样本口径与 CLI 诊断单点一致（该文件尾部有 isDirectInvocation 入口守卫，import 不触发 main）
+import { countSuspectedDuplicateGroups } from './check-budget.js';
 // R5 真值通道样本（D-7）：复用 check-maturity.ts 导出的计数/词法收集/诊断组装三函数，
 // 使 self-test 的样本口径与 CLI 接线单点一致（该文件尾部有 isDirectInvocation 入口守卫，import 不触发 main）
 import { buildR5Diagnostics, collectLexicalMentions, countOperationalFailures } from './check-maturity.js';
@@ -782,6 +785,31 @@ const GRAPH_CASES: GraphCase[] = [
     expectedReasonPatterns: [/R15c 证据路径不存在/],
     injectAnchorPaths: true,
     description: 'R15c：evidenceAnchor 指向不存在的路径 nonexistent/does-not-exist.md，应被存在性校验拦截',
+  },
+  // -------------------- 阶段 2-4 图谱正例（F-5 / G4-4）--------------------
+  // 补齐阶段 2/3/4 的**正例**形态：既有样本只有阶段 1 正例 + 阶段 2/3/4 各一条负例，
+  // 阶段 2-4 的合法图在反向（门禁过严误红）方向没有回归基线。三份样本按各阶段结构
+  // 与规模下限构造（边数 ≥ 节点数 × 3、语义来源占比 100%），实测零 violations 零 warnings。
+  {
+    file: 'valid-phase2.json',
+    phase: 2,
+    expectedPassed: true,
+    description:
+      '[p2] 阶段 2 正例：唯一 REQ 根 + SD 全覆盖 implements 追溯 + EXT-IN/EXT-OUT 边界 + 信息流闭合（死模块清零），8 节点 / 25 边，应通过连通/单根/父唯一/层级单调/追溯/信息流全部判据',
+  },
+  {
+    file: 'valid-phase3.json',
+    phase: 3,
+    expectedPassed: true,
+    description:
+      '[p3] 阶段 3 正例：接口层 INTF 全覆盖 defines 入边（SD→INTF）+ parent 层级 REQ→SD→INTF 相邻层单调 + 边界与信息流闭合，10 节点 / 33 边，应通过阶段 3 全部判据',
+  },
+  {
+    file: 'valid-phase4.json',
+    phase: 4,
+    expectedPassed: true,
+    description:
+      '[p4] 阶段 4 正例：详细设计层 DD 全覆盖 realizes 出边（DD→INTF）+ 四层 parent 追溯（REQ→SD→INTF→DD）+ 边界与信息流闭合，11 节点 / 36 边，应通过阶段 4 零违反（放行进编码的前置）',
   },
 ];
 
@@ -1454,6 +1482,38 @@ const RUN_LOG_CASES: RunLogCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/R11.*check-budget\.ts/],
     description: 'R11：闭环脚本记录晚于 checkpoint 放行应被拦截（无时间戳豁免）',
+  },
+];
+
+// -------------------- Budget 疑似重复归账（N-6/G3-7/G3-15：run-log 样本 → countSuspectedDuplicateGroups） --------------------
+
+interface BudgetRunLogCase {
+  /** 样本文件名（相对 samples/run-log/，JSONL 格式） */
+  file: string;
+  /** 期望 check-budget 的疑似重复归账组数（同 (parentDispatchId, timestamp, tokens, duration_s) 出现 >1 次的键数） */
+  expectedGroups: number;
+  /** 用例说明 */
+  description: string;
+}
+
+/**
+ * 预算疑似重复归账样本（G3-7 键守卫 + G3-15 parentDispatchId 归账精确化）：
+ * 只登记「check-budget `countSuspectedDuplicateGroups` 的分组计数」口径，不参与 RUN_LOG_CASES（check-run-log 的
+ * R1/R7/R8 等）校验——两条样本是归账形态 fixture，不是完整阶段 run-log。样本须为合法 run-log 单行记录
+ * （逐条经 run-log.schema.json 校验，见 runBudgetRunLogCases）。
+ */
+const BUDGET_RUN_LOG_CASES: BudgetRunLogCase[] = [
+  {
+    file: 'valid-parent-dispatch.jsonl',
+    expectedGroups: 0,
+    description:
+      '主条目 + 2 条带同 parentDispatchId 的 R3 归账（按维度拆分实际 tokens）→ 疑似重复归账 0 组（G3-15：同 parent 的两条键互异，不互计）',
+  },
+  {
+    file: 'bad-duplicate-groups.jsonl',
+    expectedGroups: 1,
+    description:
+      '同 timestamp/tokens/duration_s 三条且无 parentDispatchId → 疑似重复归账 1 组（组数 ≠ 条数；诊断非阻断，Σtokens 上界口径不变）',
   },
 ];
 
@@ -3774,6 +3834,40 @@ async function runRunLogCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+/**
+ * Budget 疑似重复归账样本（G3-7/G3-15）：逐行解析 → 逐条 run-log schema 校验（样本须是合法记录形态）→
+ * 断言 `countSuspectedDuplicateGroups` 的组数（check-budget 导出的同一函数，与 CLI 诊断单点同源）。
+ */
+async function runBudgetRunLogCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of BUDGET_RUN_LOG_CASES) {
+    const abs = path.join(samplesDir, 'run-log', c.file);
+    const raw = await fs.readFile(abs, 'utf-8');
+    const lines = raw.split('\n').filter((l) => l.trim() !== '');
+    const entries = lines.map((l) => parseJsonSafe(l));
+
+    const details: string[] = [];
+    lines.forEach((line, index) => {
+      const schemaResult = validateBySchema('run-log', parseJsonSafe(line));
+      if (!schemaResult.valid) {
+        details.push(`  - 第 ${index + 1} 行不是合法 run-log 记录：${schemaResult.errorMessages.join('; ')}`);
+      }
+    });
+    const groups = countSuspectedDuplicateGroups(entries);
+    if (groups !== c.expectedGroups) {
+      details.push(`  - 期望疑似重复归账 ${c.expectedGroups} 组，实际 ${groups} 组`);
+    }
+
+    results.push({
+      name: `run-log/${c.file}（budget 疑似组）`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 // -------------------- RunLog append（D-5①/N-5 追加器纯逻辑，内联用例不落 fixture） --------------------
 
 interface RunLogAppendCase {
@@ -5211,6 +5305,7 @@ async function main(): Promise<void> {
   console.log(`TLA 用例      : ${TLA_CASES.length}`);
   console.log(`Budget 用例   : ${BUDGET_CASES.length}`);
   console.log(`RunLog 用例   : ${RUN_LOG_CASES.length}`);
+  console.log(`BudgetRunLog 用例 : ${BUDGET_RUN_LOG_CASES.length}`);
   console.log(`Maturity 用例 : ${MATURITY_CASES.length}`);
   console.log(`MaturityRunLog 用例 : ${MATURITY_RUN_LOG_CASES.length}`);
   console.log(`Checkpoint 用例: ${CHECKPOINT_CASES.length}`);
@@ -5250,6 +5345,7 @@ async function main(): Promise<void> {
     tlaResults,
     budgetResults,
     runLogResults,
+    budgetRunLogResults,
     maturityResults,
     maturityRunLogResults,
     checkpointResults,
@@ -5300,6 +5396,7 @@ async function main(): Promise<void> {
     runTlaCases(samplesDir),
     runBudgetCases(samplesDir),
     runRunLogCases(samplesDir),
+    runBudgetRunLogCases(samplesDir),
     runMaturityCases(samplesDir),
     runMaturityRunLogCases(samplesDir),
     runCheckpointCases(samplesDir),
@@ -5339,6 +5436,7 @@ async function main(): Promise<void> {
     ...tlaResults,
     ...budgetResults,
     ...runLogResults,
+    ...budgetRunLogResults,
     ...runLogAppendResults,
     ...maturityResults,
     ...maturityRunLogResults,

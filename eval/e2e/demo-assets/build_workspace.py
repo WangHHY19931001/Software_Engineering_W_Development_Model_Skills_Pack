@@ -969,6 +969,8 @@ for _p in (5, 6, 7, 8):
     # （codegraph CLI 探测 CodeGraph not initialized）→ 唯一合法形态是显式降级
     # （evidenceKind='artifact' + degradationReason + ≥1 条 alternativeEvidence）；
     # 判据见 w-model-dev/scripts/cli/check-codegraph-queries.ts 的索引探测。
+    # evidencePath 须指向查询记录**之外**的真实替代制品（禁自指记录自身，自指不是替代证据，
+    # 同 command-reference「证据形态声明（D-6）」范例）→ 指向同 changeId 的编码计划任务节。
     write_json(f'.w-model/codegraph-queries/{_cid}-{_sym.replace(".", "-")}.json', {
       'querySymbol': _sym, 'changeId': _cid, 'targetFiles': PHASE_FILES[_p],
       'callers': _callers, 'callees': _callees, 'blastRadius': _radius,
@@ -978,7 +980,7 @@ for _p in (5, 6, 7, 8):
                            '按授权以制品级查询记录替代',
       'alternativeEvidence': [
         {'command': f'codegraph query {_sym}',
-         'evidencePath': f'.w-model/codegraph-queries/{_cid}-{_sym.replace(".", "-")}.json'},
+         'evidencePath': f'docs/plans/{_cid}.plan.md#任务3'},
       ],
     })
   # R5：编码链 stage 审查（plan / execute / finalize × completeness / reliability / security + V×3）

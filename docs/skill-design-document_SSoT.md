@@ -1756,14 +1756,14 @@ interface MaturityConfig {
 3. 查 L0~L3 放行矩阵：✅ 等用户 → 执行 CHECKPOINT 暂停；⚡ 自动放行 → 跳过暂停，run-log append 记录
 4. 检查高风险路径（仅 L3）：命中高风险路径表 → 即使 L3 也强制决策型 CHECKPOINT
 5. 升级判定（每次阶段 8 完成后）：汇总 unlockConditions，若全部达标 → 询问用户是否升级（决策型 CHECKPOINT，不可自动升级）
-6. 降级判定（每次 O 系列失败模式命中后）：若 operationalFailures ≥ downgradeTriggers.operationalFailureStreak → 自动降级到 L0
+6. 降级判定（每次 O 系列失败模式命中后）：若 operationalFailures ≥ downgradeTriggers.operationalFailureStreak → 自动降级到 L0（R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）
 
 **关键约束**：
 
 - **L1+ 自动放行是操作型 CHECKPOINT 的选择性激活，非绕过**（约束 2）：自动放行仍在 run-log 记录 action=checkpoint outcome=success，保留可追溯性。
 - **决策型 CHECKPOINT 在所有级别均等用户**：设计方向不可自动决定。
 - **升级不可自动**：升级是决策型 CHECKPOINT，须用户显式确认。
-- **降级可自动**：O 系列失败模式连续命中触发自动降级回 L0。
+- **降级可自动**：O 系列失败模式连续命中触发自动降级回 L0（R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）。
 
 ### 10C.7 阶段完成计数与强制校验（check-maturity.ts）
 
@@ -1911,6 +1911,8 @@ interface RunLogEntry {
 | 每次返工/回退后                  | append 一条 RunLogEntry（action=rework/rollback，note 填原因）                                  |
 | 预算检查点（每阶段门后）         | 读 budget.json + 累计本阶段 run-log tokens，若超 maxTokens 或触发 killSwitch → 按 onExceed 处置 |
 
+> **顺序纪律交叉引用（D-4/D-8，2026-09-27 清收批补）**：本表「每个 🔴 CHECKPOINT 放行后」动作须遵循放行三步顺序——`checkpoint-log/phase-N` 确认先落盘 → 闭环五门串行（均带 `--run-log`）→ 放行记录（`action=checkpoint`）为阶段末条且**严格晚于**五条 gate 记录（同秒不算）；机器核验见 `check-run-log` R11（§10D.7），例外登记见 §10.6。
+
 ### 10D.5 预算检查逻辑（确定性，无 LLM）
 
 编排者 O 在阶段门放行前执行：
@@ -1928,7 +1930,7 @@ interface RunLogEntry {
 - **预算检查不替代门禁脚本**（反模式 #3/#6）：预算超限触发的是暂停/告警，不是放行/否决；放行仍由 G 子代理退出码决定。
 - **kill switch 是暂停不是终止**：触发 kill switch 后须 🔴 CHECKPOINT 展示消耗明细，由用户决定增预算/降范围/取消。
 - **run-log 是 append-only**：不得修改历史记录；运行时读取可跳过损坏行并记录 note，但门禁对空/坏行 **fail-closed**（见 §10D.8），不得把坏行静默当作证据缺失放行。
-- **run-log 时间戳真值 + 禁止回溯改写（D-5①，反伪造）**：run-log 记录的时间戳必须为**写入时刻真值**；**禁止回溯改写历史行或重排时间戳**（改时间戳 / 改 note / 删行 / 插行后重排时间轴同样禁止——R7 的记录哈希链与放行锚正是为检出这类改写而设）；记录修正**只允许**经 O 侧统一追加器 `wm-append-runlog` **追加更正记录**——`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin --correct=<runId>`（更正记录 `note` 含 `correction-of:<runId>`，历史行逐字节不变），不得手改历史行；禁令与替代动作成对，手搓改行不是合法路径。追加器另强制时间戳严格递增（`now < 末条` 默认退出码 1 拒绝；`--timestamp=<iso>` / `--allow-clock-adjust=<reason>` 为显式逃生口且分别在 note 留 `clock-injected:` / `clock-adjust:` 痕迹，绝不静默）。
+- **run-log 时间戳真值 + 禁止回溯改写（D-5①，反伪造）**：run-log 记录的时间戳必须为**写入时刻真值**；**禁止回溯改写历史行或重排时间戳**（改时间戳 / 改 note / 删行 / 插行后重排时间轴同样禁止——R7 的记录哈希链与放行锚正是为检出这类改写而设）；记录修正**只允许**经 O 侧统一追加器 `wm-append-runlog` **追加更正记录**——`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin --correct=<runId>`（更正记录 `note` 含 `correction-of:<runId>`，历史行逐字节不变），不得手改历史行；禁令与替代动作成对，手搓改行不是合法路径。追加器另强制时间戳严格递增（**时间戳三态**，与 `wm-append-runlog` 头注同序：① **显式**时间戳（记录自带 `timestamp` 或 `--timestamp=<iso>`）**≤ 末条** → 退出码 1 写入拒绝；② **无显式时间戳**且时钟真倒退（`now < 末条`）→ 退出码 1 拒绝，仅 `--allow-clock-adjust=<reason>` 放行（`note` 留 `clock-adjust:auto+<N>ms:<reason>`）；③ **无显式时间戳**且同毫秒/仅批内冲突 → 良性 +1ms 步进（同毫秒良性步进形态 `clock-adjust:auto+<N>ms`），绝不静默；`--timestamp=<iso>` 注入成功另留 `clock-injected:` 痕迹）。
 
 ### 10D.7 预算与运行日志强制校验项（check-budget.ts / check-run-log.ts）
 
@@ -1938,7 +1940,7 @@ interface RunLogEntry {
 - **预算更新时戳**：每个阶段门放行前，`budget.json.updatedAt` 须更新为当前时间戳（证明预算检查已执行，非沿用历史值）；未更新 → `check-budget.ts` 退出码 1。
 - **killSwitch 告警**：killSwitch 任一触发条件满足（`consecutiveReworks` / `budgetBurnRate` / `tlaReworks`）时须产出告警（run-log 记录 + 🔴 CHECKPOINT 展示消耗明细），不得静默；`check-budget.ts` 校验 killSwitch 触发但 run-log 无对应告警记录 → 退出码 1。
 - **killSwitch 返工计数口径（D-4a，对齐真实事件）**：`check-budget.ts` 的 `reworkCount` 按**真实事件**累计——`action ∈ {rework, fix, emergency-fix}` **或** `outcome ∈ {fail, rework}` 的记录各计 1 条（`countReworks` 已导出以供测试）；它是「返工事件 + 未过门事件」的**累计**条数而非「连续 N 轮返工」的滑动窗口，`consecutiveReworks` 实际约束的是本阶段累计阈值（字段名沿用 schema，语义以本口径为准）；若提供 `--phase=N` 则只统计 `phase===N` 的记录。`tlaReworkCount` 为其中 note/target 含 TLA 的子集（未扩大 tla 判据：非返工记录即使提及 TLA 也不计入）。背景：真实 8 阶段调测的 run-log 中 `action=rework` 一条都没有（返工以 fix/fail 记录），旧口径只数 `action=rework` 会让护栏静默失灵。
-- **用量实效校验 R6 + burnRate 告警 R5-b（D-4b）**：预算配置合法 ≠ 用量在预算内。`check-budget.ts --run-log=<path>` 从 run-log 累计 tokens（只计有限非负数的 `tokens` 字段，NaN/Infinity/负数/字符串/缺字段一律剔除，否则 Σ 变 NaN 而判定静默永不触发），Σtokens(阶段) 严格大于 `perPhase.maxTokens` 或 Σtokens(全量) 严格大于 `project.maxTokensTotal` → **blocking（退出码 1）**（消息以 `R6：` 开头并附超限占比；恰等于上限不算超限）；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` → killSwitch 用量告警（消息以 `R5-b：` 开头，与 R5 既有返工/TLA 文案区分——R5 既有文案逐字不变）。**未接线诊断（D-5②/N-6）**：未提供 `--run-log` 时 R5 触发检测与 R6/R5-b 一并跳过（退出码行为与新增前一字不变），但**不再静默**——CLI 输出「`R6/R5-b 未生效（未提供 run-log）`」非阻断诊断（跳过不等于通过）；提供了但 Σtokens=0（无 `tokens` 记录）时输出「R6 未生效」非阻断警告。**权威调用表必带（D-5②）**：阶段门调用 `check-budget.ts` 须带 `--run-log=.w-model/run-log.jsonl --phase=N`（权威表见 `operational-recovery.md`「调用时机表」/ `subagent-delegation.md` / `toolbox.md`），不带接线属未接线运行。**Σtokens 上界口径 + R3 归账（D-5②/N-6）**：Σtokens 是**上界**而非精确消耗——同一分派的多条归账会重复累计（典型：R3 三维度按 preventive-reviews 三条目各归账一次，三条 = 三倍）；「同 `(timestamp, tokens, duration_s)` 出现多于一条」的组以「疑似重复归账」非阻断诊断提示（不改退出码），判超限（R6/R5-b）一律按上界口径执行。
+- **用量实效校验 R6 + burnRate 告警 R5-b（D-4b）**：预算配置合法 ≠ 用量在预算内。`check-budget.ts --run-log=<path>` 从 run-log 累计 tokens（只计有限非负数的 `tokens` 字段，NaN/Infinity/负数/字符串/缺字段一律剔除，否则 Σ 变 NaN 而判定静默永不触发），Σtokens(阶段) 严格大于 `perPhase.maxTokens` 或 Σtokens(全量) 严格大于 `project.maxTokensTotal` → **blocking（退出码 1）**（消息以 `R6：` 开头并附超限占比；恰等于上限不算超限）；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` → killSwitch 用量告警（消息以 `R5-b：` 开头，与 R5 既有返工/TLA 文案区分——R5 既有文案逐字不变）。**未接线诊断（D-5②/N-6）**：未提供 `--run-log` 时 R5 触发检测与 R6/R5-b 一并跳过（退出码行为与新增前一字不变），但**不再静默**——CLI 输出「`R6/R5-b 未生效（未提供 run-log）`」非阻断诊断（跳过不等于通过）；提供了但 Σtokens=0（无 `tokens` 记录）时输出「R6 未生效」非阻断警告。**权威调用表必带（D-5②）**：阶段门调用 `check-budget.ts` 须带 `--run-log=.w-model/run-log.jsonl --phase=N`（权威表见 `operational-recovery.md`「调用时机表」/ `subagent-delegation.md` / `toolbox.md`），不带接线属未接线运行。**Σtokens 上界口径 + R3 归账（D-5②/N-6）**：Σtokens 是**上界**而非精确消耗——同一分派的多条归账会重复累计（典型：R3 三维度按 preventive-reviews 三条目各归账一次，三条 = 三倍）；同 `(parentDispatchId, timestamp, tokens, duration_s)` **键**出现多于一条的组以「疑似重复归账 N 组」非阻断诊断提示（键守卫：`tokens` 非有限正数或 `duration_s` 非数字的条目不入组；同 `parentDispatchId` 且键全同仍计组；只统计并可见化，不改退出码），判超限（R6/R5-b）一律按上界口径执行。
 - **运行日志 4 类动作完备**：每个阶段 run-log.jsonl 须含 `chunk` / `cross` / `gate` / `checkpoint` 4 类动作记录（阶段 1–4 ingestion 含 `chunk`/`cross`；所有阶段含 `gate`/`checkpoint`）；缺类 → `check-run-log.ts` 退出码 1。
 - **返工须有 rework 记录**：任一返工发生后，run-log 须追加 `action=rework` 记录（`note` 填原因）；返工发生但无 `rework` 记录 → `check-run-log.ts` 退出码 1。
 - **R8 相对顺序约束（同生命周期段内动作链序）**：`check-run-log.ts` 对 phase 8 按 identity segment 校验 **S-fix → R3×3 → implementation V → implementation G → checkpoint**，rootcause R/V/G 不混入实现链；legacy 缺身份记录输出 `LEGACY_UNSCOPED`/deferred，不用 phase-wide 首索引、最近记录或集合数量补齐。其他阶段保留兼容的阶段级轨迹校验。真实顺序缺失仍返回退出码 1。
@@ -1953,11 +1955,11 @@ interface RunLogEntry {
 | ---------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | standard（阶段级）                             | 常规 S 产出（produce / 各阶段产物）                    | 该阶段 run-log 含 role=R + outcome=success 的 `r3-completeness`/`r3-reliability`/`r3-security` 各 ≥1 条（每条维度唯一，重复维度不充数）+ 三份 preventive-review JSON 齐备 | `check-role-dispatch.ts`（三维度缺口即 fail）+ `check-preventive-review.ts`            |
 | fix / emergency-fix（run-log identity window） | S-fix 返工 / 紧急修复通道                              | run-log 同身份窗口内（`S-fix → R3×3 → implementation V/G`，§10D.3 D8）role=R 三维度各 ≥1 条 success + 对应 variant（fix / emergency-fix）的 preventive-review JSON        | `check-run-log.ts` R8 段内校验 + `check-preventive-review.ts --variant=fix\|emergency` |
-| 编码链 stage（9+3 文件）                       | superpowers 编码链三段式（plan/execute/finalize）项目级 stage 审查 | `.w-model/r3-reviews/phase<N>-<stage>-{completeness,reliability,security}.md` 9 份 + `.w-model/v-reviews/phase<N>-<stage>.md` 3 份（**非空为阻断下限**，0 字节即违规；行级证据锚 `path:Lnn=` / `path:§sec=` 为**非阻断诊断**，不阻断历史产物） | `check-coding-plan.ts` R5（strict 绑定 changeId 时一并校验；`--preflight` 只读列出固定 14 项清单，不改判据） |
+| 编码链 stage（9+3 文件）                       | superpowers 编码链三段式（plan/execute/finalize）项目级 stage 审查 | `.w-model/r3-reviews/phase<N>-<stage>-{completeness,reliability,security}.md` 9 份 + `.w-model/v-reviews/phase<N>-<stage>.md` 3 份（**非空且为普通文件（`isFile()` 且 `size > 0`；非普通文件同违规）为阻断下限**，0 字节即违规；行级证据锚 `path:Lnn=` / `path:§sec=` 为**非阻断诊断**，不阻断历史产物） | `check-coding-plan.ts` R5（strict 绑定 changeId 时一并校验；`--preflight` 只读列出固定 14 项清单，不改判据） |
 
 **编码链双轨契约（2026-09-25 任务 2 / D-2 + N-2，清单化约定——两门互不替代）**：
 
-- **stage 级 12 份 MD**（`check-coding-plan.ts` R5，`--phase=5|6|7|8` strict 绑定 changeId）：9 份 `.w-model/r3-reviews/phase<N>-<stage>-<dim>.md`（stage ∈ plan/execute/finalize，dim ∈ completeness/reliability/security）+ 3 份 `.w-model/v-reviews/phase<N>-<stage>.md`；每份**非空**（`size > 0`）为阻断下限，行级证据锚仅为 CLI stderr 诊断；缺失/0 字节即 exit 1，无降级形态。
+- **stage 级 12 份 MD**（`check-coding-plan.ts` R5，`--phase=5|6|7|8` strict 绑定 changeId）：9 份 `.w-model/r3-reviews/phase<N>-<stage>-<dim>.md`（stage ∈ plan/execute/finalize，dim ∈ completeness/reliability/security）+ 3 份 `.w-model/v-reviews/phase<N>-<stage>.md`；每份**非空且为普通文件**（`isFile()` 且 `size > 0`；非普通文件同违规）为阻断下限，行级证据锚仅为 CLI stderr 诊断；缺失/0 字节即 exit 1，无降级形态。
 - **phase 级三份 JSON**（按 `preventive-review.schema.json`，由 `check-preventive-review.ts` 校验）：`.w-model/preventive-reviews/<N>-<dim>.json`（standard；S-fix / emergency / ingest 走 `-fix-` / `-emergency-` / `-ingest-` 变体路径）；`passed=false ⇒ findings ≥1` 由 schema 强制。
 - **不可互替**：stage 级 MD 证「每段审查跑过」（内容下限 + 命名锚定），phase 级 JSON 证「三维度结论与 findings」（schema 校验）；前者不校验 findings 结构，后者不承载 stage 粒度（合并双轨会丢 `passed=false ⇒ findings ≥1` 与反模式 #33 的机器挂点，已被 §3 WS-2 方案 B 否决）。生产者在 S 产出前可用 `check-coding-plan.ts --preflight` 一次性对齐固定 14 项清单（9 R3 + 3 V + plan + 账本；变长任务三件套/review diff 单列 `artifacts` 不计数）。
 
@@ -2286,7 +2288,11 @@ interface RunLogEntry {
   **path 命名空间**（阶段 5-8 的 `scope` 取 `change-scope.json` 的 `changedFiles`）**不参与** R6/R8 的集合比对
   （与设计 ID 同池比对时，change-scope 在盘即结构性必红）。**刻意不含 REQ/NFR/CON**（TLA 侧无此命名空间，混入制造结构性假阳性）。
 - **在场表**：`ICEBERG_VIEW_PRESENCE`（**代码常量，非文档**——写文档会与实现漂移，先例见 `subagent-delegation.md` 计数漂移）。
-  取值待端到端调测按各阶段实际产出物核定。
+  取值**已按代码事实定值**（2026-09-27 任务 9 / G4-3，删去原「待端到端调测核定」，与 live-run 各阶段 `viewSets` 实测一致）：
+  阶段 1 = `graph` + `rtm`；阶段 2-4 = `graph` + `tla` + `rtm`；阶段 5-8 = `graph` + `tla` + `rtm` + `scope`。
+  该表是**必要条件而非充分条件**：`deriveViewSets` 还要求对应产物可解析（graph 取 `nodes[]`、tla 取 `sdCoverage.coveredSdNodes`、
+  rtm 取 `rows[]`、scope 取 `changedFiles[]`）——不在表的视角即使产物在盘也不派生（阶段 1 的 tla、阶段 1-4 的 scope），
+  在表而产物缺失的视角同样不派生（阶段 5-8 的 tla 即「有 TLA 资产时」在场），二者都须由 R 记入 `sweepCoverage.absentViews`（R7 校验）。
 - **分池对账**：宽池等权（graph / RTM），池内任一差异即刻失败；**无主视角、不仲裁、不取并集后放行**
   （取并集会把真实缺口洗成"已覆盖"）；窄池（TLA）按 SD 切片相等，两个方向（超出宽集 / 漏 SD）均报。
 - **三类失败信号**：R6 视角间差异（分池后池内差异，标注 `R6[design-wide]` / `R6[design-sd]` → 普通 V/G 失败链由 R 定位）/

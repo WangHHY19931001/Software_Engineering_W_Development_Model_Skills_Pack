@@ -13,6 +13,11 @@
  *   C8  --phase=99 非法值 → exit 2（ARG_INVALID）；重复值 flag --scope → exit 2（ARG_INVALID）
  *   C9  --preflight 只读电池前自检（N-2）：required 恒 14 + missing/invalid 退出语义 + artifacts 单列；
  *       无 --scope → exit 2；C10 非 preflight 路径的 R5 无锚诊断走 stderr 且不改退出码/stdout 判据
+ *   C12 变长 artifacts 双口径（G2-4）：门禁路径 R4 计数（删 task-2-report.md → exit 1 且 violation 具名）；
+ *       --preflight 路径只列不计数（同一删除 → exit 0，artifacts 列表项消失）
+ *   C13/C14 守卫（G3-4/G3-5）：锚诊断挂 scope 解析成功之后（无 --scope → 不打印 `○ R5 诊断`）；
+ *       --preflight 账本路径为同名普通文件 → 结构化为固定项缺失（exit 1 + PREFLIGHT_JSON），
+ *       而非 readdirSync 裸抛 ENOTDIR 经 runMain 升级为 UNEXPECTED / exit 2
  */
 
 import { execSync } from 'node:child_process';
@@ -275,6 +280,76 @@ describe('check-coding-plan.ts CLI', () => {
     expect(r.stdout).toMatch(/CODING_PLAN_JSON /);
     expect(r.stderr).toContain('○ R5 诊断');
     expect(r.stderr).toContain('.w-model/r3-reviews/phase5-plan-security.md');
+  });
+
+  /**
+   * C12 组（G2-4）：变长 `artifacts` 项（任务三件套 / review diff）的两条 CLI 级断言——
+   *   1. 非 preflight 路径：R4 **计数**变长项（`logic/coding-plan-logic.ts:540-551` 的
+   *      `checkedTaskNumbers` = plan 任务号 ∪ 账本 complete 号，逐项判存在且非空）→ 删
+   *      `task-2-report.md` 必须 exit 1 且 violation 具名；
+   *   2. `--preflight` 路径：`artifacts` 是**变长只列不计数**项（`:491-499` 单列；CLI `:156`
+   *      退出码只看 required 的 missing + invalid）→ 同一删除后退出码仍 0、列表项消失。
+   * 两条合并锁定「门禁内计数 / 预检只列」的双口径，防「删了三件套仍 exit 0」这类证据链缺口。
+   */
+  it('C12: 合规树删除 task-2-report.md → exit 1 且 R4 具名报缺（变长项被门禁计数）', () => {
+    const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
+    rmSync(join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`, 'task-2-report.md'), { force: true });
+    writeScope(root, head);
+    const r = runCli([`"${root}"`, '--phase=5', '--scope=.w-model/scope.json']);
+    expect(r.status).toBe(1);
+    expect(r.stdout).toContain(
+      `.superpowers/sdd/${CHANGE_ID}.plan/task-2-report.md 缺失或为空（R4：已完成任务三件套须齐备非空）`,
+    );
+    const jsonLine = r.stdout.split(/\r?\n/).find((l) => l.startsWith('CODING_PLAN_JSON '));
+    const summary = JSON.parse((jsonLine ?? '').slice('CODING_PLAN_JSON '.length)) as Record<string, unknown>;
+    expect(summary.passed).toBe(false);
+    const artifactsFound = summary.artifactsFound as string[];
+    expect(artifactsFound).not.toContain(`.superpowers/sdd/${CHANGE_ID}.plan/task-2-report.md`);
+    expect(artifactsFound).toContain(`.superpowers/sdd/${CHANGE_ID}.plan/task-2-brief.md`);
+  });
+
+  it('C12b: --preflight 的 artifacts 只列不计数——同一删除后 exit 0 且列表项消失（对照 C12）', () => {
+    const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
+    rmSync(join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`, 'task-2-report.md'), { force: true });
+    writeScope(root, head);
+    const r = runPreflight([`"${root}"`, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
+    expect(r.status).toBe(0); // required 固定 14 项未受影响 → 变长项缺失不改预检退出码
+    expect(r.payload.missing).toEqual([]);
+    expect(r.payload.artifacts).toEqual([
+      `.superpowers/sdd/${CHANGE_ID}.plan/review-abc1234.diff`,
+      `.superpowers/sdd/${CHANGE_ID}.plan/task-1-brief.md`,
+      `.superpowers/sdd/${CHANGE_ID}.plan/task-1-report.md`,
+      `.superpowers/sdd/${CHANGE_ID}.plan/task-2-brief.md`,
+    ]);
+  });
+
+  /**
+   * C13/C14 组（G3-4/G3-5）：
+   *   C13 锚诊断时点：scope 缺失（exit 1 输入原因）→ 不再附 `○ R5 诊断`（诊断挂 scope 解析成功之后，
+   *       避免在输入错误路径上产生审计噪音）；正向对照见 C10（scope ok + 无锚产物 → 诊断在 stderr）。
+   *   C14 preflight 守卫：账本路径被替换为同名**普通文件** → 不再裸崩（修复前 readdirSync 抛 ENOTDIR，
+   *       经 runMain 升级为 UNEXPECTED / exit 2 + 原始栈），按固定项缺失分类（exit 1 + PREFLIGHT_JSON 正常）。
+   */
+  it('C13: 无 --scope（exit 1 输入原因）→ 不再附 R5 锚诊断（G3-4 时点）', () => {
+    const { root } = makeCodingPlanRepo((r) => writeValidTree(r)); // 12 份无锚产物在盘（有诊断可打）
+    const r = runCli([`"${root}"`, '--phase', '5']);
+    expect(r.status).toBe(1);
+    expect(r.stdout).toContain('仅支持等号形态 --scope=<file>');
+    expect(r.stderr).not.toContain('○ R5 诊断');
+  });
+
+  it('C14: --preflight 账本路径为同名普通文件 → exit 1（非 UNEXPECTED/exit 2），artifacts 空且 progress.md 记 missing（G3-5）', () => {
+    const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
+    const ledgerDir = join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`);
+    rmSync(ledgerDir, { recursive: true, force: true });
+    writeFileSync(ledgerDir, 'not a directory\n');
+    writeScope(root, head);
+    const r = runPreflight([`"${root}"`, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
+    expect(r.status).toBe(1);
+    expect(r.stderr).not.toContain('UNEXPECTED');
+    expect(r.payload.artifacts).toEqual([]);
+    expect(r.payload.missing).toEqual([`.superpowers/sdd/${CHANGE_ID}.plan/progress.md`]);
+    expect(r.payload.invalid).toEqual([]);
   });
 
   /**

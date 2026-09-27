@@ -14,6 +14,7 @@
  *   maturity.json        maturity.json 文件路径
  *   --project=<path>     project.json 路径（可选，R3/R4 交叉校验；读取侧经 project.schema.json 校验，缺失/非法/不符 schema → exit 2）
  *   --run-log=<path>     run-log.jsonl 路径（可选，R5 真值通道：只统计每条记录的 operationalFailureModes 字段；
+ *                        读取路径过滤非 O1~O6 取值（计数为 0 并出非阻断诊断——schema 应拒绝，此处为读取路径防御）；
  *                        note 中的 O1..O6 字样视为引用，仅作非阻断诊断。未提供时输出「R5 未生效」非阻断诊断）
  *   --json               机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse，含 warnings 非阻断警告字段与 diagnostics 非阻断诊断字段）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
@@ -89,20 +90,50 @@ const O_PATTERN = /\bO[1-6]\b/g;
 const MISSING_RUN_ID = '<无 runId>';
 
 /**
+ * O 系列失败模式的合法取值（O1~O6，与 run-log.schema.json 的 operationalFailureModes.items.enum 同源）。
+ *
+ * 读取路径守卫（G3-18）：schema 只管**写入侧**，读取侧（本 CLI 直读 run-log.jsonl，无 schema 前置校验）
+ * 遇到越界取值（`'O9'`、拼写错误、非字符串）时若照单累加，会把不存在于 SSoT §4A.2a 的编号计入 R5 判定。
+ * 注意语义边界：**uniqueItems 与「存在即累加数组长度」口径不变**（不去重计数，`['O3','O3']` 仍计 2），
+ * 本守卫只过滤非 O1~O6 取值并出非阻断诊断。
+ */
+const OPERATIONAL_FAILURE_VALUES = new Set(['O1', 'O2', 'O3', 'O4', 'O5', 'O6']);
+
+/** operationalFailureModes 读取路径统计（G3-18）：合法取值计数 + 被过滤的非枚举值计数 */
+export interface OperationalFailureSummary {
+  /** 合法 O1~O6 取值数（R5 判定的输入；同 sumTokens 的「越界值剔除」思路，不让噪声进判定） */
+  count: number;
+  /** 非 O1~O6 / 非字符串取值数（>0 时经诊断通道可见化；schema 本应拒绝，此处为读取路径防御） */
+  ignoredCount: number;
+}
+
+/**
  * R5 真值通道（D-7）：统计 run-log 中 `operationalFailureModes` 字段的标注条目数。
  *
- * 口径：只读该字段，存在即累加数组长度（枚举合法性由 run-log.schema.json 强制；
- * 非数组形态按未标注处理，不按字符数误计）。note 中的 O1..O6 字样一律不计入。
- *
- * 容错：文件读取与逐行解析由 readJsonlOrExit 负责（坏行 warn+skip），此处仅统计。
+ * 口径：只读该字段，存在即累加数组长度（枚举合法性由 run-log.schema.json 强制；非数组形态按未标注处理，
+ * 不按字符数误计）。note 中的 O1..O6 字样一律不计入。G3-18：读取路径再过滤一次非 O1~O6 取值
+ * （越界取值不计入 count，改记入 ignoredCount，由调用方转成非阻断诊断）。
  */
-export function countOperationalFailures(entries: unknown[]): number {
+export function summarizeOperationalFailures(entries: unknown[]): OperationalFailureSummary {
   let count = 0;
+  let ignoredCount = 0;
   for (const entry of entries) {
     const e = entry as { operationalFailureModes?: unknown };
-    if (Array.isArray(e.operationalFailureModes)) count += e.operationalFailureModes.length;
+    if (!Array.isArray(e.operationalFailureModes)) continue;
+    for (const value of e.operationalFailureModes) {
+      if (typeof value === 'string' && OPERATIONAL_FAILURE_VALUES.has(value)) count++;
+      else ignoredCount++;
+    }
   }
-  return count;
+  return { count, ignoredCount };
+}
+
+/**
+ * R5 真值通道计数（既有导出签名，向后兼容）：= `summarizeOperationalFailures(...).count`
+ * （合法 O1~O6 取值数；越界取值由 `summarizeOperationalFailures` 另行计为 ignoredCount）。
+ */
+export function countOperationalFailures(entries: unknown[]): number {
+  return summarizeOperationalFailures(entries).count;
 }
 
 /**
@@ -130,8 +161,14 @@ export function collectLexicalMentions(entries: unknown[]): string[] {
  *      （省略 --run-log 不再等于静默跳过），退出码语义不变（仍 exit 0）。
  *   2. 词法命中非空 → 「疑似引用 N 处（含规则编号引用，非运维失败）…」——指引确为运维失败时改用
  *      `operationalFailureModes` 机器可读标注。
+ *   3. 读取路径过滤命中（G3-18，第三参缺省 0 = 零行为变化）→ 「N 项非 O1~O6 取值已忽略（schema 应拒绝；
+ *      读取路径防御）」——越界取值既不进 R5 计数也不静默消失。
  */
-export function buildR5Diagnostics(runLogProvided: boolean, lexicalMentionRunIds: readonly string[]): string[] {
+export function buildR5Diagnostics(
+  runLogProvided: boolean,
+  lexicalMentionRunIds: readonly string[],
+  ignoredOperationalModeCount = 0,
+): string[] {
   const diagnostics: string[] = [];
   if (!runLogProvided) {
     diagnostics.push('R5 未生效：未提供 --run-log（O 系列失败模式未校验）');
@@ -141,6 +178,9 @@ export function buildR5Diagnostics(runLogProvided: boolean, lexicalMentionRunIds
     diagnostics.push(
       `疑似引用 ${lexicalMentionRunIds.length} 处（含规则编号引用，非运维失败）；若确为运维失败请在记录中以 operationalFailureModes 标注：${runIds}`,
     );
+  }
+  if (ignoredOperationalModeCount > 0) {
+    diagnostics.push(`${ignoredOperationalModeCount} 项非 O1~O6 取值已忽略（schema 应拒绝；读取路径防御）`);
   }
   return diagnostics;
 }
@@ -204,9 +244,11 @@ async function main(): Promise<void> {
         console.error(`⚠ --run-log 文件读取失败，跳过 R5 降级触发检测: ${runLogAbs}（ENOENT）`);
       }
       const entries = await readJsonlOptional(runLogAbs, 'run-log');
-      // R5 真值通道（D-7）：只统计 operationalFailureModes 字段；note 词法命中降级为诊断
-      operationalFailureCount = countOperationalFailures(entries);
-      r5Diagnostics.push(...buildR5Diagnostics(true, collectLexicalMentions(entries)));
+      // R5 真值通道（D-7）：只统计 operationalFailureModes 字段；note 词法命中降级为诊断；
+      // 读取路径再过滤非 O1~O6 取值（G3-18）并经诊断通道可见化（非阻断）
+      const failureSummary = summarizeOperationalFailures(entries);
+      operationalFailureCount = failureSummary.count;
+      r5Diagnostics.push(...buildR5Diagnostics(true, collectLexicalMentions(entries), failureSummary.ignoredCount));
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
       console.error(`⚠ --run-log 文件读取失败，跳过 R5 降级触发检测: ${runLogAbs}（${e.code ?? e.message}）`);
@@ -310,7 +352,7 @@ async function main(): Promise<void> {
 }
 
 // 入口守卫（lib/is-main.ts）：仅直接执行时运行 main，被 __tests__ / self-test 等 import 时不触发
-// （countOperationalFailures / collectLexicalMentions / buildR5Diagnostics 是本模块的导出函数）
+// （countOperationalFailures / summarizeOperationalFailures / collectLexicalMentions / buildR5Diagnostics 是本模块的导出函数）
 if (isDirectInvocation(import.meta.url)) {
   runMain(main);
 }

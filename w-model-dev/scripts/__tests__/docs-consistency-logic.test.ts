@@ -1905,7 +1905,7 @@ describe('runDocConsistencyChecks', () => {
     });
   }, 600_000); // 本用例连跑 5 次 fixture CLI（每次内部含 48 条 exit-2 探针的串行 spawn）；本机实测单次 CLI
   // ~40.4s，负载下更慢 → 原 120s 预算结构性不足（2026-09-26 全量套件实测超时，与用例逻辑无关）。
-  // 600s 覆盖「5 次 spawn × 90s 上限」最坏路径，只放宽墙钟预算；断言、探针数与判据语义一律不变。
+  // 600s 按实测口径给 5 次 spawn 的墙钟预算（单次 ~40.4s；单次 spawn 上限默认 240s 只是负载余量上限，外层 600s 才是总预算；曾误写 90s 旧值）；断言、探针数与判据语义一律不变。
 
   it('CLI --json 对不可信 coverage 仍 exit1 并输出完整失败测量字段', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {

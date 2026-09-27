@@ -11,6 +11,8 @@
  *      = 零匹配 → 本项不适用（输出**明示判定依据**，不静默）；传 flag 时不得静默放过（exit 1）
  *   4. 传错 changeId → exit 1（不得因为根上另有 *.plan.md 而放过）
  *   5. 参数错误三态：裸 `--change-id`（空格形态）/ `--change-id=`（空值）/ 重复 flag → exit 2 ARG_INVALID
+ *   6. G3-14 归档清单绝对路径**非阻断诊断**（archive-manifest.json 的 files[] 含疑似本机绝对路径 →
+ *      人类段「非阻断诊断」+ `--json` diagnostics 透传；0 命中 / 未提供清单不打；退出码语义不变）
  *
  * 全部经 runSync 包装（lib/run-sync.ts），不直接触碰 child_process。
  */
@@ -231,7 +233,7 @@ describe('check-archive-integrity CLI：--change-id 参数错误三态（exit 2 
 });
 
 // ==================== 归档前缀性（L4，D-3b：--live-run-log） ====================
-// 归档内 run-log.jsonl 快照必须是 live run-log 的字节前缀；未提供该参数时只出非阻断诊断，
+// 归档内 run-log.jsonl 快照必须是 live run-log 的记录边界前缀；未提供该参数时只出非阻断诊断，
 // 退出码语义不变（向后兼容硬线）。
 
 describe('check-archive-integrity CLI：归档前缀性（L4，--live-run-log）', () => {
@@ -267,7 +269,7 @@ describe('check-archive-integrity CLI：归档前缀性（L4，--live-run-log）
     const report = JSON.parse(r.stdout) as { passed: boolean; reasons: string[] };
     expect(report.passed).toBe(false);
     expect(report.reasons.some((m) => m.includes('[runLogPrefix]') && m.includes('记录中途'))).toBe(true);
-    expect(report.reasons.some((m) => m.includes('不是 live run-log 的字节前缀'))).toBe(false);
+    expect(report.reasons.some((m) => m.includes('不是 live run-log 的记录边界前缀'))).toBe(false);
   });
 
   it('空归档快照（0 字节）→ exit 1 且文案区分「空快照」（A1 收紧：不再假通过）', () => {
@@ -323,5 +325,74 @@ describe('check-archive-integrity CLI：归档前缀性（L4，--live-run-log）
       expect(errorCategory(r.stdout)).toBe('ARG_INVALID');
       expect(r.stderr).toContain('--live-run-log');
     }
+  });
+});
+
+// ==================== 归档清单绝对路径诊断（G3-14） ====================
+// 归档根 `archive-manifest.json` 的 files[] 条目含疑似本机绝对路径时输出非阻断诊断（不改退出码）。
+// 归档允许保留执行证据原貌，但交付/外发前必须经 wm-export-evidence 脱敏导出。
+
+describe('check-archive-integrity CLI：归档清单绝对路径非阻断诊断（G3-14）', () => {
+  /** 铺归档根（清单齐 + plan 快照齐）并写归档清单 archive-manifest.json */
+  function seedArchiveManifest(files: unknown[]): string {
+    const archive = join(tmpDir, 'archive');
+    writeFullArchive(archive);
+    writeFileSync(join(archive, 'archive-manifest.json'), JSON.stringify({ schemaVersion: '1.0', files }));
+    return archive;
+  }
+
+  it('清单含本机绝对路径条目 → exit 0 + 人类段「非阻断诊断」+ --json diagnostics 透传', () => {
+    const archive = seedArchiveManifest([
+      { path: 'C:\\ws\\proj\\.w-model\\gate-logs\\phase-8.json', kind: 'gate-log' },
+      { path: 'D:\\ws\\proj\\.w-model\\run-log.jsonl', kind: 'run-log' },
+      { path: 'gate-logs/graph-gate.json', kind: 'gate-log' },
+    ]);
+    const human = runCli([archive, `--change-id=${CHANGE_ID}`]);
+    expect(human.code).toBe(0); // 纯诊断：不阻断
+    expect(human.stdout).toContain('非阻断诊断：');
+    expect(human.stdout).toContain(
+      '归档清单含 2 条疑似本机绝对路径条目——交付前须经 wm-export-evidence 脱敏导出（归档仅受控留档）',
+    );
+
+    const json = runCli([archive, `--change-id=${CHANGE_ID}`, '--json']);
+    expect(json.code).toBe(0);
+    const report = JSON.parse(json.stdout) as { passed: boolean; diagnostics?: string[] };
+    expect(report.passed).toBe(true);
+    expect(report.diagnostics).toEqual([
+      '归档清单含 2 条疑似本机绝对路径条目——交付前须经 wm-export-evidence 脱敏导出（归档仅受控留档）',
+    ]);
+  });
+
+  it('清单全为相对路径 → exit 0 且不打诊断（`diagnostics` 键不出现，0 命中不打）', () => {
+    const archive = seedArchiveManifest(['requirements.md', { path: 'gate-logs/graph-gate.json' }]);
+    const human = runCli([archive, `--change-id=${CHANGE_ID}`]);
+    expect(human.code).toBe(0);
+    expect(human.stdout).not.toContain('非阻断诊断：');
+
+    const json = runCli([archive, `--change-id=${CHANGE_ID}`, '--json']);
+    const report = JSON.parse(json.stdout) as { passed: boolean; diagnostics?: string[] };
+    expect(report.passed).toBe(true);
+    expect(report.diagnostics).toBeUndefined();
+  });
+
+  it('归档根无 archive-manifest.json（未提供清单）→ exit 0 且零诊断（退出码语义不变）', () => {
+    const archive = join(tmpDir, 'archive');
+    writeFullArchive(archive);
+    const json = runCli([archive, `--change-id=${CHANGE_ID}`, '--json']);
+    expect(json.code).toBe(0);
+    const report = JSON.parse(json.stdout) as { passed: boolean; diagnostics?: string[] };
+    expect(report.passed).toBe(true);
+    expect(report.diagnostics).toBeUndefined();
+  });
+
+  it('诊断与既有失败路径并存：清单缺失（exit 1）时诊断照出但不改退出码', () => {
+    const archive = seedArchiveManifest(['C:\\ws\\leak.json']);
+    rmSync(join(archive, 'requirements.md'), { force: true }); // 既有 blocking 违规
+    const json = runCli([archive, `--change-id=${CHANGE_ID}`, '--json']);
+    expect(json.code).toBe(1); // 退出码仍由 missingFiles 决定
+    const report = JSON.parse(json.stdout) as { passed: boolean; reasons: string[]; diagnostics?: string[] };
+    expect(report.passed).toBe(false);
+    expect(report.reasons.some((m) => m.includes('requirements.md'))).toBe(true);
+    expect(report.diagnostics).toHaveLength(1);
   });
 });

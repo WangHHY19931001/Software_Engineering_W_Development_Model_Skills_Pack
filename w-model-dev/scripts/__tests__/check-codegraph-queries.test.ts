@@ -21,10 +21,15 @@
  *       → 记录须声明 `evidenceKind: 'cli'`（禁止降级）；无索引 → 须显式降级
  *       （`evidenceKind: 'artifact'` + 非空 `degradationReason` + ≥1 条 `alternativeEvidence`）；
  *       未声明 `evidenceKind` 一律违规——把「制品口径」从隐形判据变成显式声明
+ *   C15 降级声明**内容下限**两子分支（G2-3）：`degradationReason` 全空白、`alternativeEvidence[i]`
+ *       的 command/evidencePath 空字段 → 各具名 violation（判据 `trim()` 分支，直测导出函数）
+ *   C16 索引探测 stat 判别（G3-1）：`.codegraph` 目录 / 普通文件 / **有效链接指向的真实索引**
+ *       均算在盘；缺席与悬挂链接不算（后者经 `codegraphIndexAnomaly` 输出一行非阻断诊断，
+ *       不进 violations）。诊断与探测同用 stat 语义（修复轮 1 / 审查 Important-1）
  */
 
 import { execSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -34,6 +39,9 @@ import { validateBySchema } from '../infrastructure/schema-loader.js';
 import {
   checkCodegraphQueries,
   checkCodegraphQueriesStrict,
+  codegraphIndexAnomaly,
+  codegraphIndexPresent,
+  evidenceDeclarationViolations,
   type CodegraphStrictResult,
 } from '../cli/check-codegraph-queries.js';
 import type { ChangeScope } from '../lib/change-scope.js';
@@ -333,6 +341,108 @@ describe('checkCodegraphQueries（legacy 两参兼容层）', () => {
       '.w-model/codegraph-queries/phase5-a.json': JSON.stringify({ querySymbol: 'X' }),
     });
     expect(checkCodegraphQueries(root2, 5).passed).toBe(false);
+  });
+});
+
+// ==================== C15：降级声明内容下限两子分支（G2-3） ====================
+
+/**
+ * C15（G2-3）：`evidenceDeclarationViolations` 的「降级声明内容下限」两子分支。
+ *
+ * 既有 C14a-d 只覆盖 evidenceKind 三态（未声明 / artifact / cli），未覆盖声明为 artifact 后
+ * **原因与替代证据的内容下限**。判据（`cli/check-codegraph-queries.ts:181-203`）：
+ * `degradationReason.trim() === ''` 与逐条 `command`/`evidencePath` 非空校验。
+ * schema 层（`codegraph-query.schema.json` 的 `minLength: 1` + `pattern: "\\S"`）同样拒收这两形态，
+ * 故 strict CLI 路径会先以「结构校验失败」violation 短路——本用例直测两层共用的判据函数本身
+ * （`:288` legacy / `:403` strict 两个调用点），确保内容下限分支有牙，而非只靠 schema 兜底。
+ */
+describe('C15：降级声明内容下限两子分支（G2-3）', () => {
+  it('degradationReason 全空白（trim 后为空）→ violation 具名 degradationReason', () => {
+    const root = writeProject({}); // 无 .codegraph/ 索引 → 走显式降级分支
+    const violations = evidenceDeclarationViolations(root, 'phase5-a.json', {
+      ...DEGRADED_EVIDENCE,
+      degradationReason: '   ',
+    });
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain('phase5-a.json');
+    expect(violations[0]).toContain('degradationReason');
+  });
+
+  it('alternativeEvidence 条目 command/evidencePath 均空 → violation 具名索引 0', () => {
+    const root = writeProject({});
+    const violations = evidenceDeclarationViolations(root, 'phase5-a.json', {
+      ...DEGRADED_EVIDENCE,
+      alternativeEvidence: [{ command: '', evidencePath: '' }],
+    });
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain('alternativeEvidence[0]');
+    expect(violations[0]).toContain('command');
+    expect(violations[0]).toContain('evidencePath');
+  });
+});
+
+// ==================== C16：索引探测 stat 判别（G3-1） ====================
+
+/**
+ * C16（G3-1）：`codegraphIndexPresent` 由 `existsSync` 改为 `statSync` 类型判别——
+ * **目录**（标准索引形态）与**普通文件**索引均算「在盘」；悬挂链接 / FIFO / socket 等
+ * 非目录非文件形态不算（探测按「无索引」处理、允许显式降级），并由 `codegraphIndexAnomaly`
+ * 输出一行非阻断诊断（不进 violations / 不改退出码）。探测基准保持 projectRoot。
+ *
+ * **修复轮 1 / 审查 Important-1**：诊断触发条件与探测**同用 stat 语义**（先 stat 后 lstat）——
+ * 有效符号链接 / junction 指向真实索引时 `present=true` 且 `anomaly=undefined`（旧实现按 lstat
+ * 判符号链接会误报，且文案与「索引在盘禁止降级」自相矛盾）；仅「stat 不可达且 lstat 占位」
+ * （悬挂链接）或「stat 可达但非目录非文件」（FIFO / socket）才出诊断。
+ */
+describe('C16：索引探测 stat 判别与非阻断诊断（G3-1）', () => {
+  /** 创建目录链接（win32 用 junction，免管理员权限；失败时按仓内既有模式在 win32 跳过） */
+  function linkDir(target: string, linkPath: string): boolean {
+    try {
+      symlinkSync(target, linkPath, process.platform === 'win32' ? 'junction' : 'dir');
+      return true;
+    } catch (error) {
+      if (process.platform === 'win32') return false;
+      throw error;
+    }
+  }
+
+  it('`.codegraph` 为目录（标准索引形态）→ 在盘，无诊断', () => {
+    const root = writeProject({ '.codegraph/index.json': '{}' });
+    expect(codegraphIndexPresent(root)).toBe(true);
+    expect(codegraphIndexAnomaly(root)).toBeUndefined();
+  });
+
+  it('`.codegraph` 为普通文件（单文件索引形态）→ 在盘，无诊断', () => {
+    const root = writeProject({ '.codegraph': '{}' });
+    expect(codegraphIndexPresent(root)).toBe(true);
+    expect(codegraphIndexAnomaly(root)).toBeUndefined();
+  });
+
+  it('`.codegraph` 缺席 → 不在盘且无诊断（正常降级形态，不产生噪音）', () => {
+    const root = writeProject({});
+    expect(codegraphIndexPresent(root)).toBe(false);
+    expect(codegraphIndexAnomaly(root)).toBeUndefined();
+  });
+
+  it('`.codegraph` 为指向真实目录的有效链接（junction/symlink）→ 在盘且无诊断（与 stat 探测同语义，修复轮 1）', () => {
+    const root = writeProject({});
+    const realIndex = join(root, 'codegraph-index-real');
+    mkdirSync(realIndex, { recursive: true });
+    if (!linkDir(realIndex, join(root, '.codegraph'))) return; // win32 无链接创建权限环境跳过
+    // stat 跟随链接 → 目录 → 在盘（门禁强制 evidenceKind:'cli'）→ 诊断必须缺席（旧实现误报）
+    expect(codegraphIndexPresent(root)).toBe(true);
+    expect(codegraphIndexAnomaly(root)).toBeUndefined();
+  });
+
+  it('`.codegraph` 为悬挂链接（stat 不可达但 lstat 占位）→ 不算在盘 + 具名非阻断诊断', () => {
+    const root = writeProject({});
+    if (!linkDir(join(root, 'missing-target'), join(root, '.codegraph'))) return; // win32 无链接创建权限环境跳过
+    // statSync 跟随链接 → ENOENT → 不在盘；lstatSync 可见该条目 → 诊断显式化退化形态
+    expect(codegraphIndexPresent(root)).toBe(false);
+    const anomaly = codegraphIndexAnomaly(root);
+    expect(anomaly).toContain('.codegraph');
+    expect(anomaly).toContain('不可达');
+    expect(anomaly).toContain('允许显式降级声明');
   });
 });
 

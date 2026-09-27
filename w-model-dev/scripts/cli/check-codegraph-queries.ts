@@ -17,7 +17,8 @@
  * 索引探测 + 显式降级声明（2026-09-25 live-run 修复，D-6）：只验结构/覆盖/时序会让
  * 手工编造的查询记录（无任何 CLI 出处、项目根本没有 `.codegraph/` 索引）通过，与
  * hard-constraints.md「不得伪造查询记录」相悖。故每条记录须显式声明证据形态：
- *   - 项目根存在 `.codegraph/` 索引 → 只允许 `evidenceKind: 'cli'`（禁止降级）；
+ *   - 项目根存在 `.codegraph` 索引（G3-1：stat 判别，目录/普通文件均算在盘；非二者不算，
+ *     并输出一行非阻断诊断）→ 只允许 `evidenceKind: 'cli'`（禁止降级）；
  *   - 无索引 → 必须显式降级：`evidenceKind: 'artifact'` + 非空 `degradationReason`
  *     + ≥1 条 `alternativeEvidence[{command, evidencePath}]`；
  *   - 未声明 `evidenceKind` 一律违规（把「制品口径」从隐形默认变成显式声明）。
@@ -52,7 +53,7 @@
  * @module
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import * as path from 'node:path';
 
 import { exitWithError } from '../lib/cli-error.js';
@@ -131,13 +132,59 @@ function phaseQueryFiles(queriesDir: string, phase: number): { own: string[]; fo
 }
 
 /**
- * 项目根是否存在 `.codegraph/` 索引——决定记录允许的证据形态（cli / 显式降级 artifact）。
+ * 项目根是否存在 `.codegraph` 索引——决定记录允许的证据形态（cli / 显式降级 artifact）。
  * 索引在盘 = codegraph CLI 可用，任何「降级」都是逃避真实查询；索引缺失 = 允许显式降级，
  * 但必须留下 degradationReason 与替代证据（禁止隐形默认）。
+ *
+ * G3-1：以 `statSync` 类型判别替代 `existsSync`——**目录**（标准索引形态）与**单文件**索引
+ * 均算「在盘」（stat 跟随符号链接，故**有效符号链接 / junction 指向真实索引**同在盘）；
+ * 悬挂符号链接（ENOENT）/ FIFO / socket 等非目录非文件条目不算（后者旧判据 `existsSync`
+ * 会误判为「在盘」并强制 cli 声明，与索引实际不可用相悖）。探测基准保持 **projectRoot**
+ * （「改 git 顶层」半项已销：无 git 工作区形态本无 git 顶层，projectRoot 基准与 e2e/降级形态自洽）。
+ * 探测判为不可用的形态由调用方经 `codegraphIndexAnomaly` 输出一行非阻断诊断（该诊断与本节
+ * 同用 stat 语义：可达的链接目标是索引时零诊断，仅「stat 不可达且 lstat 占位」或非目录非文件才提示）。
  */
 export function codegraphIndexPresent(projectRoot: string): boolean {
-  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控项目根下的固定子目录存在性探测
-  return existsSync(path.join(projectRoot, '.codegraph'));
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控项目根下的固定条目类型探测
+    const st = statSync(path.join(projectRoot, '.codegraph'));
+    return st.isDirectory() || st.isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 非阻断诊断（G3-1）：把「探测判为不可用、但条目确实占位」的退化为一行提示——
+ * 不进 violations、不改退出码。返回 `undefined` 即形态正常。
+ *
+ * **触发条件必须与 `codegraphIndexPresent` 的 stat 语义对齐（修复轮 1 / 审查 Important-1）**：
+ * 先 `statSync`（**跟随**符号链接）——
+ *   - stat 可达且为目录/普通文件 → 正常形态（含**有效符号链接 / junction 指向真实索引**），零诊断；
+ *   - stat 可达但既非目录也非普通文件（FIFO / socket 等）→ 探测判「无索引」，出诊断；
+ *   - stat 不可达 → 再 `lstatSync` 区分「条目缺席」（正常，零诊断）与「悬挂符号链接」（退化，出诊断）。
+ * 判据是「**探测视为不可用**（present=false）**且** stat 确实不可达 / 类型不可用」而非「lstat 是不是
+ * 符号链接」——否则 win32 上把共享索引 junction 进项目根的常见形态会被误报，且文案会与
+ * 「索引在盘 → 禁止降级」的判定自相矛盾（诱导 Agent 声明被门禁拒绝的降级）。
+ */
+export function codegraphIndexAnomaly(projectRoot: string): string | undefined {
+  const target = path.join(projectRoot, '.codegraph');
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控条目与 codegraphIndexPresent 同源的 stat 探测
+    const st = statSync(target);
+    return st.isDirectory() || st.isFile()
+      ? undefined
+      : `${target} 存在但既非目录也非普通文件（FIFO / socket 等），索引探测按「无索引」处理（允许显式降级声明）`;
+  } catch {
+    // stat 不可达：可能是正常缺席，也可能是悬挂符号链接——交由下方 lstat 区分
+  }
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上；lstat 不跟随符号链接，用于区分「缺席」与「悬挂链接占位」
+    lstatSync(target);
+  } catch {
+    return undefined; // 条目缺席：正常形态（无索引）
+  }
+  return `${target} 存在但不可达（悬挂符号链接等），索引探测按「无索引」处理（允许显式降级声明）`;
 }
 
 /**
@@ -535,6 +582,15 @@ async function main(): Promise<void> {
   const phase = phaseParsed.phase;
 
   const abs = path.resolve(file);
+
+  // G3-1 非阻断诊断：`.codegraph` 探测判为不可用时提示一行（stat 不可达但 lstat 占位 = 悬挂符号
+  // 链接；或 stat 可达但既非目录也非普通文件 = FIFO / socket 等）——探测按「无索引」处理并允许
+  // 显式降级，此诊断只把形态显式化，不进 violations / 不改退出码；正常形态（缺席 / 目录 / 普通
+  // 文件 / 指向真实索引的有效符号链接或 junction）零输出，与探测的 stat 语义一致。
+  const indexAnomaly = codegraphIndexAnomaly(abs);
+  if (indexAnomaly !== undefined) {
+    process.stderr.write(`○ 诊断：${indexAnomaly}\n`);
+  }
 
   // ==================== ChangeScope 装载（strict 绑定；阶段 5-8 必选） ====================
   const loaded = loadCliScope(process.argv, abs, phase);
