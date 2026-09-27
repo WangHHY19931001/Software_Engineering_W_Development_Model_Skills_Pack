@@ -88,14 +88,14 @@
 | G3-6 | Tasks 17-18 | `resolveProvenanceIdentity` 注释不符实际 | 修 | 注释对齐实现 |
 | G3-7 | Task 11 | 重复归账键噪声（tokens=0 / duration 缺字段计入疑似组） | 修 | 键构造守卫（tokens 有限正数才计入），诊断精度提升，退出码不变 |
 | G3-8 | Wave A | `.eslintsecurity-baseline.json` 5 条 orphan 行 | 修 | 清孤儿行 + security-scan 0 新增验证 |
-| G3-9 | Task 8 | 4 处「字节前缀」用户可见文案（含 check-archive-integrity.ts:27 / archive-integrity-logic.ts:189） | 修 | 文案改「记录边界前缀」（措辞，判定一字不动） |
+| G3-9 | Task 8 | 「字节前缀」用户可见文案（**实测 5 处**，非首版记的 4 处；含 check-archive-integrity.ts:27 / archive-integrity-logic.ts:189/206 / lib/types.ts:86） | 修 | 文案改「记录边界前缀」（措辞，判定一字不动） |
 | G3-10 | Task 8 | Part B 注释 90s/240s 不自洽；run-sync.ts:74,84 与 troubleshooting:105 仍写 1800s | 修 | 注释/文档统一新超时口径 |
 | G3-11 | Task 11 | `check-budget.ts:16` usage 仍写「可选」未加接线硬线限定 | 修 | usage 补「阶段门必带 --run-log --phase=N」 |
 | G3-12 | Task 2 | `TASK_ARTIFACT_RE`/`REVIEW_DIFF_RE` 与 R4 内联正则多事实源、账本路径第三处 hardcode | 修 | 抽共享常量单源（logic 内导出，CLI/测试复用） |
 | G3-13 | Tasks 9-10 | `run-log-append-logic.ts:22-28` 自编号与文档编号错位 | 修 | 代码注释编号改为与文档 ①②③ 一致 |
 | G3-14 | 后续可选 | `check-archive-integrity` 绝对路径诊断 | 修 | 对归档清单内含本机绝对路径的条目输出**非阻断诊断**（计数 + 交付前脱敏义务提示；不改退出码、不改动清单判定） |
 | G3-15 | 后续可选 | budget Σtokens 去重字段 `parentDispatchId` | 修 | run-log schema 可选字段 + 疑似重复归账判定在场时按其精确化（legacy 缺字段维持现判定）；description 写明上界口径不变 |
-| G3-16 | Tasks 17-18 | 白名单字面量两侧各一份 | 修 | 抽单源共享（evidence 两 logic 同层互 import 一方导出常量） |
+| G3-16 | Tasks 17-18 | 白名单字面量两侧各一份 | 修 | 抽单源共享——**方向经任务 7 裁定：常量归 producer 模块（evidence-provenance-logic）所有、exporter（evidence-export-logic）import**；简报原「export 侧导出、provenance 侧 import」方向经实测会构成运行图环（dependency-boundaries「生产运行时图无环」2 failed），反向复用既有单向边为 0 新增边最优解 |
 | G3-17 | Tasks 17-18 | `collectExportSources` 冗余防御 | **销 #2** | §5 |
 | G3-18 | Task 4（审查增补） | R5 计数不校验 enum/uniqueItems（读取路径与 schema 不同门）：`countOperationalFailures` 过滤非 O1~O6 取值 + 诊断；**不得改** uniqueItems/长度计数口径 | 修 | cli/check-maturity.ts + maturity-logic.test.ts（任务 8） |
 
