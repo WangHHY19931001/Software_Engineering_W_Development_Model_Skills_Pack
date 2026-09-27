@@ -123,3 +123,42 @@
 - `vitestTestCount` 下降（锚校验/计数断言/多锚用例删除，预估 −20~30 例）；`testFileCount` 不变（l0-baseline 为 helper 非 `*.test.ts`）；
 - `schema 34` / `exit2ScriptCount 46` / `prePushCount 19` / CLI 47 **均不变**；NEGATIVE-COVERAGE 行数可能微调（非失败样本行处置）；
 - docs-consistency 检查项数不变（未增删检查）。
+
+---
+
+## 9. 补充指令：去 hash 化（2026-09-28，用户裁定；**覆盖 §3.1「证据防伪链（哈希链）」的冻结**）
+
+> 用户指令（逐字）：「禁止为了hash而hash行为，比如为了证明某个文件更新过程可以有独立签名链和git提交记录，但一行文本不应该有这种东西，概念一致性应该是源派生方式而不是hash一致化，有的以上情况都需要整改。」
+
+**判定原则**（本批统一口径，写入 CHANGELOG）：
+
+1. 证明**文件/制品**级更新过程 → 允许：独立签名链（`signature-chain`）、git 提交记录、逐文件 SHA-256（evidence-manifest / code-health 逐文件摘要）、文件级 provenance（commitSha / sourceBundleSha256 / workspaceDigest）、受控工件绑定（docs-consistency vitest 工件）、供应链校验（platform-deps 归档 sha512）。
+2. **行 / 记录**级文本**不得**携带哈希（链）或前缀哈希来证明其更新过程——这是「为了 hash 而 hash」。
+3. 一致性（计数 / 锚 / 口径）一律走**源派生**（现算、实测、单一权威 + 指针），不走 hash 一致化。
+
+### WS-T7 去 hash 化：移除 run-log 记录级哈希链与放行锚
+
+**全仓 hash 机制审计（2026-09-28 实测：`createHash` 全部落点 + schema 哈希字段）**：
+
+| 机制 | 粒度 | 判定 |
+| --- | --- | --- |
+| `recordHash` / `prevRecordHash`（run-log 记录哈希链，D-3a） | **记录（行）级** | ❌ **移除**（原则 2） |
+| `runLogAnchor {lines, sha256}`（checkpoint 放行锚，D-3b） | **记录级**（放行记录内嵌历史前缀哈希） | ❌ **移除**（原则 2；其存在理由「哈希链只保护链自身、可被整链重算」随链一并消失） |
+| `sigHash` / `prevSigHash`（角色签名链） | 文件/制品级 | ✅ 保留（原则 1 明示例外） |
+| evidence-manifest / evidence-provenance 逐文件 SHA-256、`sourceBundleSha256`、`workspaceDigest`、`commitSha` | 文件/制品级 | ✅ 保留 |
+| code-health 全部哈希（逐文件 sha256、`sourceBundleSha256`、approval/archive/ledger/candidate/test-inventory 摘要、file-verifier / deletion-authority 删前校验） | 文件级 | ✅ 保留 |
+| gate-log 内容摘要（`gate-logic.ts`） | 文件级 | ✅ 保留 |
+| docs-consistency 受控 vitest 工件绑定（`artifactSha256` + `commitSha`）与 `runId = sha256(raw)` | 文件级 / 源派生 | ✅ 保留（T3 已定 fail-closed 快路径；`runId` 属派生） |
+| platform-deps 归档 sha512 | 制品级 | ✅ 保留（供应链） |
+| security-scan baseline 指纹 `sha256(file\0ruleId\0sourceLine)` | 命中身份键（非 provenance） | ✅ 保留 |
+| `wm-append-runlog` stdout `digest`（`digestOf(写入文本)`） | 写入批内容摘要（遥测） | ⚠️ 审计消费者：无消费者则一并移除；有则保留并登记 |
+
+**移除范围（连带）**：
+1. `schemas/run-log.schema.json`：字段 `prevRecordHash` / `recordHash` / `runLogAnchor`（及分支/描述）整体删除（`schema 34` 不变）；
+2. `logic/run-log-append-logic.ts`：链计算/前驱扫描/锚计算与相关 diagnostics/traces；**时间戳三态（语义）保留**；
+3. `cli/wm-append-runlog.ts` 与 `lib/run-log-append-fs.ts`：写入侧链/锚逻辑与文案；`digestOf` 按上表审计；
+4. `cli/check-run-log.ts` + `logic/run-log-logic.ts`：R7 的**链复算段与放行锚校验段**及其 violation 文案/键；**R7 追加序（相邻时间戳单调）与其余 R1-R11 一律保留**；
+5. 文档：`references/data-models.md`「记录哈希链」「checkpoint 放行锚」两节与字段注、`references/command-reference.md`（wm-append-runlog / check-run-log 条目、「放行锚必填 cutoff」条）、`AGENTS.md`/`SKILL.md`/`references/{operational-recovery,hard-constraints,signature-chain-guide}.md`/`docs/skill-design-document_SSoT.md` 中 D-3a/D-3b/哈希链相关表述（**grep 全覆盖**）；
+6. 测试与 fixture：`run-log-append-logic.test.ts` / `wm-append-runlog-cli.test.ts` / `run-log-logic.test.ts` / `__tests__/README.md` 矩阵行 / `samples/run-log/**` 与 self-test 用例——删除须逐条登记「仍被覆盖（指向）/ 有意退休（理由）」（§5 纪律）。
+
+**替代承载（牙齿对照）**：run-log 完整性 = ① R7 追加序（相邻时间戳单调）+ R8 轨迹模板 + R9-R11 语义判据（**全部源派生**）；② 交付时的**文件级**导出清单 SHA-256 + provenance（`wm-export-evidence`）；③ 角色签名链（文件级，`sigHash`）。**不新增门禁**（§3.2 不变）；「禁止回溯改写历史行或重排时间戳」的纪律文本保留（其可检测性由 ①②③ 承担，不再声称行级哈希保证）。

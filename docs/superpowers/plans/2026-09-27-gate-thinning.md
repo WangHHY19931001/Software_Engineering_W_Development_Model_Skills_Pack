@@ -3,6 +3,7 @@
 > **面向 AI 代理的工作者：** 必需子技能：使用 superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans 逐任务实现此计划。步骤使用复选框（`- [ ]`）语法来跟踪进度。
 > 规格：`docs/superpowers/specs/2026-09-27-gate-thinning-design.md`（本计划是它的逐任务展开；冲突时以规格为准并回来改计划）。
 > 账本（gitignored）：`.superpowers/sdd/2026-09-27-gate-thinning/progress.md`（首行身份 + 逐任务 `Task N: complete`）；逐任务三件套 `task-N-{brief,report}.md` + `review-*.diff`。
+> **2026-09-28 追加（规格 §9，用户裁定「禁止为了 hash 而 hash」）**：新增**任务 9（WS-T7 去 hash 化）**，须在**任务 8 收口之前**完成；任务 8 的 CHANGELOG 须追加 T7 小节后重跑全量 prepush。
 > 回归纪律（约束 #14）：任何 `.ts` 文件 `Edit`/`Write` 前先经 codegraph CLI 查询目标符号影响半径并落 `.w-model/codegraph-queries/`；每组结束跑定向 vitest，任务 8 跑全量 `npm run prepush`。
 > 行号说明：文中 `:N` 为编写计划时的实测锚，实现时以符号/短语搜索为准；漂移不构成偏差。
 
@@ -280,6 +281,52 @@ npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts   # exit 0
 ```bash
 git add CHANGELOG.md package.json package-lock.json w-model-dev/SKILL.md w-model-dev/skill-metadata.json docs/INSTALL.md README.md
 git commit -m "docs(changelog): 门禁/测试瘦身登记（牙齿替代对照 + 42.4.0 版本六镜像）"
+```
+
+---
+
+## 任务 9：WS-T7 · 去 hash 化（run-log 记录级哈希链与放行锚移除）
+
+> 依据：规格 §9（2026-09-28 用户裁定「禁止为了 hash 而 hash」+ §9 全仓 hash 机制审计表）。**本任务在任务 8 收口之前执行**；任务 8 的 CHANGELOG 追加 T7 小节后重跑全量 prepush。
+
+**文件：**
+- 修改：`w-model-dev/schemas/run-log.schema.json`（删 `prevRecordHash` / `recordHash` / `runLogAnchor` 三字段及描述分支；`schema 34` 不变）
+- 修改：`w-model-dev/scripts/logic/run-log-append-logic.ts`（链/锚计算与 scan）、`w-model-dev/scripts/logic/run-log-logic.ts`（R7 链复算段与放行锚校验段）
+- 修改：`w-model-dev/scripts/cli/wm-append-runlog.ts`、`w-model-dev/scripts/cli/check-run-log.ts`、`w-model-dev/scripts/lib/run-log-append-fs.ts`（`digestOf` 按消费者审计：无消费者则移除）
+- 修改（文档）：`w-model-dev/references/{data-models,command-reference,operational-recovery,hard-constraints,signature-chain-guide}.md`、`AGENTS.md`、`w-model-dev/SKILL.md`、`docs/skill-design-document_SSoT.md`
+- 测试/fixture：`w-model-dev/scripts/__tests__/{run-log-append-logic,wm-append-runlog-cli,run-log-logic}.test.ts`、`w-model-dev/scripts/__tests__/README.md`、`w-model-dev/scripts/samples/run-log/**`、`w-model-dev/scripts/cli/self-test.ts` 相关用例
+
+- [ ] **步骤 1：审计表（先出表，写进报告）**
+
+逐落点 before→after：`recordHash`/`prevRecordHash`/`runLogAnchor` 三字段的全部载体（schema / 代码 / 文档 / 测试 / fixture / self-test 用例），每处给「删除」或「保留（理由）」。grep 指纹：`recordHash`、`prevRecordHash`、`runLogAnchor`、`哈希链`、`放行锚`、`D-3a`、`D-3b`、`digestOf`。
+
+- [ ] **步骤 2：代码与 schema 移除**
+
+删除链/锚的**全部**计算、写入、校验与 violation 文案；**保留**：时间戳三态语义与 `--allow-clock-adjust` 逃生口、R7 追加序（相邻时间戳单调）、R8-R11 全部判据、`RUN_LOG_JSON` 其余键、append-only 纪律文本（「禁止回溯改写历史行或重排时间戳」保留，但不得再声称行级哈希保证）。
+
+- [ ] **步骤 3：文档同步**
+
+按 T4 规则（单一权威 + ≤1 句摘要 + 指针）删除两节（data-models「记录哈希链」「checkpoint 放行锚」）与字段注、command-reference 的对应条目/「放行锚必填 cutoff」、其余文档的哈希链表述；`grep -rn "recordHash\|runLogAnchor\|哈希链\|放行锚"` 全仓活体面**零残留**（历史面 `docs/changes`、`docs/debug`、`docs/superpowers`、`CHANGELOG` 不动）。
+
+- [ ] **步骤 4：测试与 fixture 处置**
+
+删除的用例/断言逐条登记「仍被保留测试覆盖（指向）/ 有意退休（理由）」；fixture 若含该三字段则同步清理（并确认 `check-samples-coverage` 仍 exit 0、探针数不变）。
+
+- [ ] **步骤 5：验证**
+
+```bash
+npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts     # exit 0
+npx vitest run --config config/vitest.config.ts w-model-dev/scripts/__tests__/run-log-append-logic.test.ts w-model-dev/scripts/__tests__/wm-append-runlog-cli.test.ts w-model-dev/scripts/__tests__/run-log-logic.test.ts
+npm run self-test 2>&1 | tail -1                              # 全绿（记录用例数变化）
+npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts     # exit 0
+npm run audit:l0-links                                        # exit 0
+```
+
+- [ ] **步骤 6：Commit**
+
+```bash
+git add w-model-dev/schemas/run-log.schema.json w-model-dev/scripts w-model-dev/references AGENTS.md w-model-dev/SKILL.md docs/skill-design-document_SSoT.md
+git commit -m "refactor(run-log): 移除记录级哈希链与放行锚（去 hash 化，WS-T7）"
 ```
 
 ---
