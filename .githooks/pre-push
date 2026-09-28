@@ -74,6 +74,7 @@ log()  { printf '[pre-push] %s\n' "$*" 2>/dev/null || true; }
 ok()   { printf '[pre-push] \033[32m✓\033[0m %s\n' "$*" 2>/dev/null || true; }
 fail() { printf '[pre-push] \033[31m✗\033[0m %s\n' "$*" 2>/dev/null || true; }
 warn() { printf '[pre-push] \033[33m⚠\033[0m %s\n' "$*" 2>/dev/null || true; }
+now_ms() { node -e 'console.log(Date.now())' 2>/dev/null || printf '%s000' "$(date +%s)"; }
 
 # ---------- 路径过滤：无相关变更直接放行 ----------
 #
@@ -294,26 +295,30 @@ fi
 # ---------- 门禁用例 ----------
 # 全部门禁共 19 项检查（第 14 项 npm audit 为阻断项），退出码必须全部符合预期才放行。
 
+PREPUSH_T0="$(now_ms)"
 tmp_log="$(mktemp)"
 tmp_vitest_dir="$(mktemp -d)"
 tmp_vitest_json="$tmp_vitest_dir/results.json"
 tmp_vitest_provenance="$tmp_vitest_dir/provenance.json"
 trap 'rm -f "$tmp_log"; rm -rf "$tmp_vitest_dir"' EXIT
 
-# run_expect <描述> <期望退出码> <命令...>
+# run_expect <描述> <期望退出码> <命令...>（Wave 1 计时：耗时随行输出，判定逻辑逐字节不变）
 run_expect() {
   local desc="$1"; shift
   local expect="$1"; shift
+  local t0 t1
+  t0="$(now_ms)"
   set +e
   "$@" >"$tmp_log" 2>&1
   local code=$?
   set -e
+  t1="$(now_ms)"
   if [ "$code" -ne "$expect" ]; then
-    fail "$desc（期望 exit $expect，实际 $code）"
+    fail "$desc（期望 exit $expect，实际 $code，耗时 $(( (t1 - t0) / 1000 ))s）"
     cat "$tmp_log"
     return 1
   fi
-  ok "$desc（exit $code）"
+  ok "$desc（exit $code，耗时 $(( (t1 - t0) / 1000 ))s）"
   return 0
 }
 
@@ -364,6 +369,11 @@ run_expect "check-signature-chain 有效签名链样本退出 0" 0 \
 #     --reporter=json --outputFile 落盘实测用例总数，供第 15 项 check-docs-consistency 复用（避免 vitest 双跑）
 run_expect "vitest 单元测试 + coverage 阈值通过" 0 \
   npx vitest run --coverage --reporter=json --outputFile="$tmp_vitest_json" --config config/vitest.config.ts || exit 1
+
+# Wave 1 基线采集：指定 PREPUSH_KEEP_VITEST_JSON（正斜杠 Windows 路径）时保留逐文件 JSON
+if [ -n "${PREPUSH_KEEP_VITEST_JSON:-}" ]; then
+  cp "$tmp_vitest_json" "$PREPUSH_KEEP_VITEST_JSON" 2>/dev/null || true
+fi
 
 # 将第 12 项同次 JSON 封装为受控 provenance，绑定当前 HEAD、运行 ID、相对 artifact 与完整 measurements。
 node -e 'const fs=require("fs"),crypto=require("crypto"),cp=require("child_process"),path=require("path"); const artifact=process.argv[1], provenance=process.argv[2], root=process.cwd(); const raw=fs.readFileSync(artifact,"utf8"), d=JSON.parse(raw), sha=crypto.createHash("sha256").update(raw,"utf8").digest("hex"), head=cp.execFileSync("git",["rev-parse","HEAD"],{cwd:root,encoding:"utf8"}).trim(), runId=crypto.randomBytes(8).toString("hex"); fs.writeFileSync(provenance, JSON.stringify({format:"w-model-vitest-provenance",version:1,commitSha:head,runId,artifactRelativePath:path.basename(artifact),artifactSha256:sha,measurements:d},null,2)+"\n");' "$tmp_vitest_json" "$tmp_vitest_provenance"
@@ -447,5 +457,5 @@ run_expect "tsc 类型检查 0 错误" 0 \
 #     断言引擎 --self-check 由 eval/ 自身维护，此处跑全量断言）
 run_expect "eval 语料断言与覆盖矩阵全绿" 0 npx tsx eval/runner.ts || exit 1
 
-log "全部门禁通过，允许推送 ✓"
+log "全部门禁通过，允许推送 ✓（总耗时 $(( ($(now_ms) - PREPUSH_T0) / 1000 ))s）"
 exit 0
