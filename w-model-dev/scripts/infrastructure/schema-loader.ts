@@ -76,6 +76,21 @@ export interface SchemaValidationResult {
 }
 
 /**
+ * 单条 Ajv 错误的稳定格式化（L1）：`<instancePath|/>: <message> [<keyword>]`。
+ *
+ * `additionalProperties` 形态在末尾追加 `(额外字段: <name>)`：Ajv 的 `message`
+ * （`must NOT have additional properties`）不含字段名，同一次校验的多条同类错误因此
+ * 文案完全相同、无法定位字段（T7 迁移实测三条同文案）；字段名来自 `params.additionalProperty`。
+ * 其余 keyword 形态逐字不变，`[<keyword>]` 尾部契约与既有关键字断言（如 /additionalProperties/）不受影响。
+ */
+function formatAjvError(e: ErrorObject): string {
+  const base = `${e.instancePath || '/'}: ${e.message ?? ''} [${e.keyword}]`;
+  if (e.keyword !== 'additionalProperties') return base;
+  const extra = (e.params as Record<string, unknown>).additionalProperty;
+  return typeof extra === 'string' ? `${base} (额外字段: ${extra})` : base;
+}
+
+/**
  * Validates input against a schema registered from `schemas/*.schema.json`.
  *
  * @param name Registered schema basename without the `.schema.json` suffix.
@@ -97,8 +112,6 @@ export function validateBySchema(name: string, data: unknown): SchemaValidationR
   return {
     valid,
     errors,
-    errorMessages: valid
-      ? []
-      : (errors ?? []).map((e) => `${e.instancePath || '/'}: ${e.message ?? ''} [${e.keyword}]`),
+    errorMessages: valid ? [] : (errors ?? []).map(formatAjvError),
   };
 }
