@@ -21,18 +21,14 @@
  */
 
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { runSync } from '../lib/run-sync.js';
+import { invokeCli } from './helpers/cli-invoker.js';
 
-const REPO_ROOT = join(__dirname, '..', '..', '..');
-const CLI = join(__dirname, '..', 'cli', 'check-coding-plan.ts');
-const require = createRequire(import.meta.url);
-const tsxCli = require.resolve('tsx/cli');
 const CHANGE_ID = 'phase5-demo';
 
 const tmpDirs: string[] = [];
@@ -152,55 +148,53 @@ describe('check-coding-plan.ts CLI', () => {
     );
   }
 
-  function runCli(cmdArgs: string[]): { status: number; stdout: string; stderr: string } {
-    const r = runSync(process.execPath, [tsxCli, CLI, ...cmdArgs], {
-      cwd: REPO_ROOT,
-      timeout: 90_000,
-      windowsHide: true,
-    });
-    return { status: r.status ?? 1, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
+  /** 进程内调用被测 CLI（root 以位置参数显式传入，CLI 无 cwd 依赖；模块路径相对 helpers/ 是两个 ../）。
+   *  git spawn 全部来自 fixture 建仓（runSync('git')），保留真实子进程——本文件仍登记 SUBPROCESS_TEST_FILES。 */
+  async function runCli(cmdArgs: string[]): Promise<{ status: number; stdout: string; stderr: string }> {
+    const r = await invokeCli('../../cli/check-coding-plan.js', cmdArgs);
+    return { status: r.exitCode ?? 1, stdout: r.stdout, stderr: r.stderr };
   }
 
-  it('C1: 未知 flag（exit-2 基础探针同参）→ exit 2 + stdout ERROR_JSON + stderr 人类错误行', () => {
+  it('C1: 未知 flag（exit-2 基础探针同参）→ exit 2 + stdout ERROR_JSON + stderr 人类错误行', async () => {
     const { root } = makeCodingPlanRepo(() => undefined);
-    const r = runCli([root, '--d4-invalid-argument']);
+    const r = await runCli([root, '--d4-invalid-argument']);
     expect(r.status).toBe(2);
     expect(r.stdout).toMatch(/^ERROR_JSON \{.*"exitCode":2/);
     expect(r.stderr).toContain('✗ [ARG_INVALID]');
   });
 
-  it('C1b: 无任何参数 → exit 2（缺 <project-root> / --phase）', () => {
-    const r = runCli([]);
+  it('C1b: 无任何参数 → exit 2（缺 <project-root> / --phase）', async () => {
+    const r = await runCli([]);
     expect(r.status).toBe(2);
     expect(r.stdout).toContain('ERROR_JSON');
   });
 
-  it('C8: --phase 99 非法值（空格形态越界）→ exit 2 ARG_INVALID', () => {
+  it('C8: --phase 99 非法值（空格形态越界）→ exit 2 ARG_INVALID', async () => {
     const { root } = makeCodingPlanRepo(() => undefined);
-    const r = runCli([root, '--phase', '99']);
+    const r = await runCli([root, '--phase', '99']);
     expect(r.status).toBe(2);
     expect(r.stderr).toContain('--phase=99');
   });
 
-  it('C8b: 重复值 flag（--scope= 两次）→ exit 2 ARG_INVALID', () => {
+  it('C8b: 重复值 flag（--scope= 两次）→ exit 2 ARG_INVALID', async () => {
     const { root } = makeCodingPlanRepo((r) => writeValidTree(r));
-    const r = runCli([root, '--phase=5', '--scope=a.json', '--scope=b.json']);
+    const r = await runCli([root, '--phase=5', '--scope=a.json', '--scope=b.json']);
     expect(r.status).toBe(2);
     expect(r.stdout).toMatch(/ERROR_JSON \{.*ARG_INVALID/);
   });
 
-  it('C2: 阶段 5-8 无 --scope → exit 1（附等号形态提示）', () => {
+  it('C2: 阶段 5-8 无 --scope → exit 1（附等号形态提示）', async () => {
     const { root } = makeCodingPlanRepo((r) => writeValidTree(r));
-    const r = runCli([root, '--phase', '5']);
+    const r = await runCli([root, '--phase', '5']);
     expect(r.status).toBe(1);
     expect(r.stdout).toMatch(/--scope/);
     expect(r.stdout).toContain('仅支持等号形态 --scope=<file>');
   });
 
-  it('C3: 合法 scope + 完整制品 → exit 0，CODING_PLAN_JSON 字段正确', () => {
+  it('C3: 合法 scope + 完整制品 → exit 0，CODING_PLAN_JSON 字段正确', async () => {
     const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
     writeScope(root, head);
-    const r = runCli([root, '--phase=5', '--scope=.w-model/scope.json']);
+    const r = await runCli([root, '--phase=5', '--scope=.w-model/scope.json']);
     expect(r.status).toBe(0);
     const jsonLine = r.stdout.split(/\r?\n/).find((l) => l.startsWith('CODING_PLAN_JSON '));
     expect(jsonLine).toBeDefined();
@@ -217,11 +211,11 @@ describe('check-coding-plan.ts CLI', () => {
     expect(summary.exitCode).toBe(0);
   });
 
-  it('C4: 合法 scope + 账本缺失（R3）→ exit 1 且 violations 具名', () => {
+  it('C4: 合法 scope + 账本缺失（R3）→ exit 1 且 violations 具名', async () => {
     const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
     rmSync(join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`), { recursive: true, force: true });
     writeScope(root, head);
-    const r = runCli([root, '--phase=5', '--scope=.w-model/scope.json']);
+    const r = await runCli([root, '--phase=5', '--scope=.w-model/scope.json']);
     expect(r.status).toBe(1);
     expect(r.stdout).toContain('progress.md 缺失');
     const jsonLine = r.stdout.split(/\r?\n/).find((l) => l.startsWith('CODING_PLAN_JSON '));
@@ -230,10 +224,10 @@ describe('check-coding-plan.ts CLI', () => {
     expect(summary.tasksCompleted).toBe(0);
   });
 
-  it('C5: --json 模式 → stdout 单行纯 JSON 可整体 parse', () => {
+  it('C5: --json 模式 → stdout 单行纯 JSON 可整体 parse', async () => {
     const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
     writeScope(root, head);
-    const r = runCli([root, '--phase=5', '--scope=.w-model/scope.json', '--json']);
+    const r = await runCli([root, '--phase=5', '--scope=.w-model/scope.json', '--json']);
     expect(r.status).toBe(0);
     const parsed = JSON.parse(r.stdout.trim()) as { type: string; passed: boolean; exitCode: number };
     expect(parsed.type).toBe('coding-plan');
@@ -241,27 +235,27 @@ describe('check-coding-plan.ts CLI', () => {
     expect(parsed.exitCode).toBe(0);
   });
 
-  it('C6: 归档态回退（R6/D-7）→ exit 0 且人类可读段标出归档快照位置', () => {
+  it('C6: 归档态回退（R6/D-7）→ exit 0 且人类可读段标出归档快照位置', async () => {
     const { root, head } = makeCodingPlanRepo((r) => {
       writeValidTree(r);
       archiveTree(r, CHANGE_ID);
     });
     writeScope(root, head);
-    const r = runCli([root, '--phase=5', '--scope=.w-model/scope.json']);
+    const r = await runCli([root, '--phase=5', '--scope=.w-model/scope.json']);
     expect(r.status).toBe(0);
     expect(r.stdout).toContain('docs/changes/archive/2026-01-01-phase5-demo/phase5-demo.plan.md');
   });
 
-  it('C7: scope.changeId 前缀与 phase 不符 → scope 装载即拒（exit 2；gate R1 前缀校验为纵深防御，逻辑层单测覆盖）', () => {
+  it('C7: scope.changeId 前缀与 phase 不符 → scope 装载即拒（exit 2；gate R1 前缀校验为纵深防御，逻辑层单测覆盖）', async () => {
     const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r)); // 树按 phase5-demo 铺
     writeScope(root, head, 6, CHANGE_ID); // scope.phase=6 与 changeId 的 phase5- 前缀不符
-    const r = runCli([root, '--phase=6', '--scope=.w-model/scope.json']);
+    const r = await runCli([root, '--phase=6', '--scope=.w-model/scope.json']);
     expect(r.status).toBe(2);
     expect(r.stdout).toMatch(/STRUCTURE_INVALID/);
     expect(r.stdout).toContain('phase6-');
   });
 
-  it('C11: 审查产物路径上是目录（非普通文件）→ exit 1（R5 违规 + 诊断），不得冒泡为 exit 2 脚本异常', () => {
+  it('C11: 审查产物路径上是目录（非普通文件）→ exit 1（R5 违规 + 诊断），不得冒泡为 exit 2 脚本异常', async () => {
     // 修复轮 1 / 发现 1 的端到端回归：诊断读盘异常若冒泡会经 runMain 变 UNEXPECTED / exit 2。
     // 用「同名目录」制造确定性触发（Windows/Linux 判据一致，不依赖目录 size 的平台差异）。
     const { root, head } = makeCodingPlanRepo((r) => {
@@ -270,7 +264,7 @@ describe('check-coding-plan.ts CLI', () => {
       mkdirSync(join(r, '.w-model', 'r3-reviews', 'phase5-plan-security.md'), { recursive: true });
     });
     writeScope(root, head);
-    const r = runCli([root, '--phase=5', '--scope=.w-model/scope.json']);
+    const r = await runCli([root, '--phase=5', '--scope=.w-model/scope.json']);
     expect(r.status).toBe(1); // 不是 2：诊断与 R5 判据都不得抛
     expect(r.stdout).toContain('非普通文件（R5：stage 审查产物须为文件）');
     expect(r.stdout).toMatch(/CODING_PLAN_JSON /);
@@ -287,11 +281,11 @@ describe('check-coding-plan.ts CLI', () => {
    *      退出码只看 required 的 missing + invalid）→ 同一删除后退出码仍 0、列表项消失。
    * 两条合并锁定「门禁内计数 / 预检只列」的双口径，防「删了三件套仍 exit 0」这类证据链缺口。
    */
-  it('C12: 合规树删除 task-2-report.md → exit 1 且 R4 具名报缺（变长项被门禁计数）', () => {
+  it('C12: 合规树删除 task-2-report.md → exit 1 且 R4 具名报缺（变长项被门禁计数）', async () => {
     const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
     rmSync(join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`, 'task-2-report.md'), { force: true });
     writeScope(root, head);
-    const r = runCli([root, '--phase=5', '--scope=.w-model/scope.json']);
+    const r = await runCli([root, '--phase=5', '--scope=.w-model/scope.json']);
     expect(r.status).toBe(1);
     expect(r.stdout).toContain(
       `.superpowers/sdd/${CHANGE_ID}.plan/task-2-report.md 缺失或为空（R4：已完成任务三件套须齐备非空）`,
@@ -304,11 +298,11 @@ describe('check-coding-plan.ts CLI', () => {
     expect(artifactsFound).toContain(`.superpowers/sdd/${CHANGE_ID}.plan/task-2-brief.md`);
   });
 
-  it('C12b: --preflight 的 artifacts 只列不计数——同一删除后 exit 0 且列表项消失（对照 C12）', () => {
+  it('C12b: --preflight 的 artifacts 只列不计数——同一删除后 exit 0 且列表项消失（对照 C12）', async () => {
     const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
     rmSync(join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`, 'task-2-report.md'), { force: true });
     writeScope(root, head);
-    const r = runPreflight([root, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
+    const r = await runPreflight([root, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
     expect(r.status).toBe(0); // required 固定 14 项未受影响 → 变长项缺失不改预检退出码
     expect(r.payload.missing).toEqual([]);
     expect(r.payload.artifacts).toEqual([
@@ -326,21 +320,21 @@ describe('check-coding-plan.ts CLI', () => {
    *   C14 preflight 守卫：账本路径被替换为同名**普通文件** → 不再裸崩（修复前 readdirSync 抛 ENOTDIR，
    *       经 runMain 升级为 UNEXPECTED / exit 2 + 原始栈），按固定项缺失分类（exit 1 + PREFLIGHT_JSON 正常）。
    */
-  it('C13: 无 --scope（exit 1 输入原因）→ 不再附 R5 锚诊断（G3-4 时点）', () => {
+  it('C13: 无 --scope（exit 1 输入原因）→ 不再附 R5 锚诊断（G3-4 时点）', async () => {
     const { root } = makeCodingPlanRepo((r) => writeValidTree(r)); // 12 份无锚产物在盘（有诊断可打）
-    const r = runCli([root, '--phase', '5']);
+    const r = await runCli([root, '--phase', '5']);
     expect(r.status).toBe(1);
     expect(r.stdout).toContain('仅支持等号形态 --scope=<file>');
     expect(r.stderr).not.toContain('○ R5 诊断');
   });
 
-  it('C14: --preflight 账本路径为同名普通文件 → exit 1（非 UNEXPECTED/exit 2），artifacts 空且 progress.md 记 missing（G3-5）', () => {
+  it('C14: --preflight 账本路径为同名普通文件 → exit 1（非 UNEXPECTED/exit 2），artifacts 空且 progress.md 记 missing（G3-5）', async () => {
     const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
     const ledgerDir = join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`);
     rmSync(ledgerDir, { recursive: true, force: true });
     writeFileSync(ledgerDir, 'not a directory\n');
     writeScope(root, head);
-    const r = runPreflight([root, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
+    const r = await runPreflight([root, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
     expect(r.status).toBe(1);
     expect(r.stderr).not.toContain('UNEXPECTED');
     expect(r.payload.artifacts).toEqual([]);
@@ -353,13 +347,13 @@ describe('check-coding-plan.ts CLI', () => {
    * required 恒为固定 14 项（9 R3 + 3 V + plan + 账本），三件套/review diff 为变长 `artifacts` 只列出；
    * 退出码 = `missing.length + invalid.length === 0 ? 0 : 1`；该分支不执行 R1-R6。
    */
-  function runPreflight(cmdArgs: string[]): {
+  async function runPreflight(cmdArgs: string[]): Promise<{
     status: number;
     stdout: string;
     stderr: string;
     payload: { required: string[]; missing: string[]; invalid: string[]; artifacts: string[] };
-  } {
-    const r = runCli(cmdArgs);
+  }> {
+    const r = await runCli(cmdArgs);
     const line = r.stdout.split(/\r?\n/).find((l) => l.startsWith('CODING_PLAN_PREFLIGHT_JSON '));
     expect(line).toBeDefined();
     const payload = JSON.parse((line ?? '').slice('CODING_PLAN_PREFLIGHT_JSON '.length)) as {
@@ -371,10 +365,10 @@ describe('check-coding-plan.ts CLI', () => {
     return { ...r, payload };
   }
 
-  it('C9: --preflight 全齐 → exit 0，required 恒 14，artifacts 单列三件套 + review diff', () => {
+  it('C9: --preflight 全齐 → exit 0，required 恒 14，artifacts 单列三件套 + review diff', async () => {
     const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
     writeScope(root, head);
-    const r = runPreflight([root, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
+    const r = await runPreflight([root, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
     expect(r.status).toBe(0);
     expect(r.payload.required).toHaveLength(14);
     expect(r.payload.missing).toEqual([]);
@@ -390,44 +384,44 @@ describe('check-coding-plan.ts CLI', () => {
     expect(r.stdout).not.toContain('CODING_PLAN_JSON ');
   });
 
-  it('C9b: --preflight 缺一份 R3 审查 → exit 1 且 missing 具名（固定项不因变长项漂移）', () => {
+  it('C9b: --preflight 缺一份 R3 审查 → exit 1 且 missing 具名（固定项不因变长项漂移）', async () => {
     const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
     rmSync(join(root, '.w-model', 'r3-reviews', 'phase5-finalize-reliability.md'), { force: true });
     writeScope(root, head);
-    const r = runPreflight([root, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
+    const r = await runPreflight([root, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
     expect(r.status).toBe(1);
     expect(r.payload.required).toHaveLength(14);
     expect(r.payload.missing).toEqual(['.w-model/r3-reviews/phase5-finalize-reliability.md']);
     expect(r.payload.invalid).toEqual([]);
   });
 
-  it('C9c: --preflight 产物在盘但 0 字节 → exit 1 且记入 invalid（与 missing 分列）', () => {
+  it('C9c: --preflight 产物在盘但 0 字节 → exit 1 且记入 invalid（与 missing 分列）', async () => {
     const { root, head } = makeCodingPlanRepo((r) => {
       writeValidTree(r);
       writeFileSync(join(r, '.w-model', 'v-reviews', 'phase5-plan.md'), '');
     });
     writeScope(root, head);
-    const r = runPreflight([root, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
+    const r = await runPreflight([root, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
     expect(r.status).toBe(1);
     expect(r.payload.missing).toEqual([]);
     expect(r.payload.invalid).toEqual(['.w-model/v-reviews/phase5-plan.md']);
   });
 
-  it('C9d: --preflight 无 --scope/--change → exit 2 ARG_INVALID（清单无法确定 changeId）', () => {
+  it('C9d: --preflight 无 --scope/--change → exit 2 ARG_INVALID（清单无法确定 changeId）', async () => {
     const { root } = makeCodingPlanRepo((r) => writeValidTree(r));
-    const r = runCli([root, '--phase=5', '--preflight']);
+    const r = await runCli([root, '--phase=5', '--preflight']);
     expect(r.status).toBe(2);
     expect(r.stdout).toMatch(/ERROR_JSON \{.*ARG_INVALID/);
     expect(r.stderr).toContain('--preflight');
   });
 
-  it('C10: 非 preflight 路径的 R5 诊断走 stderr（无锚非空产物具名列出）且不改退出码/stdout 判据', () => {
+  it('C10: 非 preflight 路径的 R5 诊断走 stderr（无锚非空产物具名列出）且不改退出码/stdout 判据', async () => {
     // writeValidTree 的 12 份审查产物为 `# r3\n`（非空、无行级证据锚）→ 诊断应列出全部 12 份
     const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
     // 另造 exit 1（账本缺失）以便捕获 stderr：execSync 成功分支不返回 stderr
     rmSync(join(root, '.superpowers', 'sdd', `${CHANGE_ID}.plan`), { recursive: true, force: true });
     writeScope(root, head);
-    const r = runCli([root, '--phase=5', '--scope=.w-model/scope.json']);
+    const r = await runCli([root, '--phase=5', '--scope=.w-model/scope.json']);
     expect(r.status).toBe(1); // 诊断不阻断、不改退出码（此例的 exit 1 来自 R3 账本缺失）
     expect(r.stderr).toContain('○ R5 诊断：12 份审查产物未含行级证据锚');
     expect(r.stderr).toContain('.w-model/r3-reviews/phase5-plan-completeness.md');

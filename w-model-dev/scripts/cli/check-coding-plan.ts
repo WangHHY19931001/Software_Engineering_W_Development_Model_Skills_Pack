@@ -56,11 +56,11 @@
 
 import * as path from 'node:path';
 
-import { exitWithError } from '../lib/cli-error.js';
+import { exitWithError, HandledCliError } from '../lib/cli-error.js';
 import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
 import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
-import { hasFlag } from '../lib/parse-args.js';
+import { DuplicateFlagError, hasFlag } from '../lib/parse-args.js';
 import { loadCliScope } from '../lib/load-cli-scope.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
@@ -83,17 +83,17 @@ const EMPTY_RESULT: CodingPlanCheckResult = {
   reviewsFound: [],
 };
 
-async function main(): Promise<void> {
+async function runCodingPlanGate(argv: string[]): Promise<void> {
   const startTime = Date.now();
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
-  const jsonMode = hasFlag(process.argv.slice(2), 'json');
+  const jsonMode = hasFlag(argv, 'json');
   // --preflight：只读电池前自检（N-2）；命中即走独立分支，不执行 R1-R6
-  const preflightMode = hasFlag(process.argv.slice(2), 'preflight');
-  const args = process.argv.slice(2);
+  const preflightMode = hasFlag(argv, 'preflight');
+  const args = argv;
   const file = args.find((a) => !a.startsWith('--'));
   // 统一 --phase 校验（lib/parse-phase.ts，5-8；支持 --phase N 与 --phase=N）
-  const hasPhaseFlag = process.argv.includes('--phase') || process.argv.some((a) => a.startsWith('--phase='));
-  const phaseParsed = parsePhaseArg(process.argv, { min: 5, max: 8 });
+  const hasPhaseFlag = argv.includes('--phase') || argv.some((a) => a.startsWith('--phase='));
+  const phaseParsed = parsePhaseArg(argv, { min: 5, max: 8 });
 
   if (!file || !hasPhaseFlag) {
     exitWithError({
@@ -133,7 +133,7 @@ async function main(): Promise<void> {
   const abs = path.resolve(file);
 
   // ==================== ChangeScope 装载（strict changeId 绑定；阶段 5-8 必选） ====================
-  const loaded = loadCliScope(process.argv, abs, phase);
+  const loaded = loadCliScope(argv, abs, phase);
 
   // ==================== --preflight 只读电池前自检（N-2：新增分支，不改非 preflight 任何语义） ====================
   if (preflightMode) {
@@ -262,6 +262,25 @@ async function main(): Promise<void> {
   );
   process.exitCode = exitCode;
   return;
+}
+
+/**
+ * 进程内可调用入口（Wave 2 进程内化）：argv 默认取真实进程参数（已切 node/脚本路径）；
+ * loadCliScope invalid 路径（exitWithError 已输出并设置 exitCode 后抛 HandledCliError）与
+ * DuplicateFlagError（值 flag 重复）在此收敛为正常返回——子进程形态由 runMain 静默处理，
+ * 进程内形态（__tests__/helpers/cli-invoker.ts）同样能读到 exitCode，两形态退出码与输出一致。
+ */
+export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+  try {
+    await runCodingPlanGate(argv);
+  } catch (err) {
+    if (err instanceof HandledCliError) return;
+    if (err instanceof DuplicateFlagError) {
+      exitWithError({ category: 'ARG_INVALID', message: err.message, exitCode: 2 });
+      return;
+    }
+    throw err;
+  }
 }
 
 // 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main

@@ -102,3 +102,25 @@ describe('check-artifact-gate 真实子进程冒烟', () => {
     expect(r.stdout).toContain('tla-manifest.json missing');
   });
 });
+
+describe('check-coding-plan 真实子进程冒烟', () => {
+  // exit 0 需完整 git 仓库 + scope + 制品树（check-coding-plan.test.ts 已覆盖该形态）；
+  // 冒烟取零夹具的 ARG_INVALID 路径：验证真实子进程边界（argv 解析 → ERROR_JSON + exitCode 2 传递）。
+  it('无参 → exit 2 + stdout ERROR_JSON 标记', () => {
+    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/check-coding-plan.ts')]);
+    expect(r.status).toBe(2);
+    expect(r.stdout).toMatch(/^ERROR_JSON \{/);
+    expect(r.stderr).toContain('参数缺失');
+  });
+});
+
+describe('check-codegraph-queries 真实子进程冒烟', () => {
+  // 同 check-coding-plan：exit 0 需 git 仓库 + 合法 scope（check-codegraph-queries.test.ts 已覆盖）；
+  // 冒烟取零夹具的 ARG_INVALID 路径。
+  it('无参 → exit 2 + stdout ERROR_JSON 标记', () => {
+    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/check-codegraph-queries.ts')]);
+    expect(r.status).toBe(2);
+    expect(r.stdout).toMatch(/^ERROR_JSON \{/);
+    expect(r.stderr).toContain('参数缺失');
+  });
+});

@@ -29,7 +29,6 @@
  */
 
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -46,11 +45,7 @@ import {
 } from '../cli/check-codegraph-queries.js';
 import type { ChangeScope } from '../lib/change-scope.js';
 import { runSync } from '../lib/run-sync.js';
-
-const REPO_ROOT = join(__dirname, '..', '..', '..');
-const CLI = join(__dirname, '..', 'cli', 'check-codegraph-queries.ts');
-const require = createRequire(import.meta.url);
-const tsxCli = require.resolve('tsx/cli');
+import { invokeCli } from './helpers/cli-invoker.js';
 
 const tmpDirs: string[] = [];
 function makeTmpDir(prefix = 'wmodel-cgq-'): string {
@@ -482,18 +477,16 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
     return { root, baseSha, headSha };
   }
 
-  function runCli(args: string[]): { status: number; stdout: string; stderr: string } {
-    const r = runSync(process.execPath, [tsxCli, CLI, ...args], {
-      cwd: REPO_ROOT,
-      timeout: 90_000,
-      windowsHide: true,
-    });
-    return { status: r.status ?? 1, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
+  /** 进程内调用被测 CLI（root 以位置参数显式传入，CLI 无 cwd 依赖；模块路径相对 helpers/ 是两个 ../）。
+   *  git spawn 全部来自 fixture 建仓（runSync('git')），保留真实子进程——本文件仍登记 SUBPROCESS_TEST_FILES。 */
+  async function runCli(args: string[]): Promise<{ status: number; stdout: string; stderr: string }> {
+    const r = await invokeCli('../../cli/check-codegraph-queries.js', args);
+    return { status: r.exitCode ?? 1, stdout: r.stdout, stderr: r.stderr };
   }
 
-  it('C10a: 阶段 5-8 无 --scope → exit 1（不是 0），violations 说明须提供变更上下文', () => {
+  it('C10a: 阶段 5-8 无 --scope → exit 1（不是 0），violations 说明须提供变更上下文', async () => {
     const { root } = makeScopedProject({});
-    const r = runCli([root, '--phase', '5']);
+    const r = await runCli([root, '--phase', '5']);
     expect(r.status).toBe(1);
     expect(r.stdout).toMatch(/--scope/);
     expect(r.stdout).toMatch(/变更上下文|ChangeScope/);
@@ -501,7 +494,7 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
     expect(r.stdout).toContain('仅支持等号形态 --scope=<file>');
   });
 
-  it('C10g: scope 违反 schema → exit 2 ERROR_JSON(STRUCTURE_INVALID) 且 detail 含 pattern 定位（F-G6-02）', () => {
+  it('C10g: scope 违反 schema → exit 2 ERROR_JSON(STRUCTURE_INVALID) 且 detail 含 pattern 定位（F-G6-02）', async () => {
     const { root, baseSha, headSha } = makeScopedProject({});
     mkdirSync(join(root, '.w-model'), { recursive: true });
     writeFileSync(
@@ -515,7 +508,7 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
         changedFiles: ['src/./main.ts', 'src/forgotten.ts'],
       }),
     );
-    const r = runCli([root, '--phase', '5', `--scope=${join(root, '.w-model', 'scope-bad.json')}`]);
+    const r = await runCli([root, '--phase', '5', `--scope=${join(root, '.w-model', 'scope-bad.json')}`]);
     expect(r.status).toBe(2);
     const line = r.stdout.split(/\r?\n/).find((l) => l.startsWith('ERROR_JSON '));
     expect(line).toBeDefined();
@@ -533,7 +526,7 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
     expect(parsed.file).toContain('scope-bad.json');
   });
 
-  it('C10b: 合法 scope + 全覆盖查询 → exit 0', () => {
+  it('C10b: 合法 scope + 全覆盖查询 → exit 0', async () => {
     const { root, baseSha, headSha } = makeScopedProject({});
     mkdirSync(join(root, '.w-model', 'codegraph-queries'), { recursive: true });
     writeFileSync(
@@ -560,11 +553,11 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
         changedFiles: ['src/main.ts', 'src/forgotten.ts'],
       }),
     );
-    const r = runCli([root, '--phase', '5', `--scope=.w-model/scope.json`]);
+    const r = await runCli([root, '--phase', '5', `--scope=.w-model/scope.json`]);
     expect(r.status).toBe(0);
   });
 
-  it('C10c: scope 合法但覆盖缺失（forgotten.ts 未查）→ exit 1', () => {
+  it('C10c: scope 合法但覆盖缺失（forgotten.ts 未查）→ exit 1', async () => {
     const { root, baseSha, headSha } = makeScopedProject({});
     mkdirSync(join(root, '.w-model', 'codegraph-queries'), { recursive: true });
     writeFileSync(
@@ -591,14 +584,14 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
         changedFiles: ['src/main.ts', 'src/forgotten.ts'],
       }),
     );
-    const r = runCli([root, '--phase', '5', `--scope=.w-model/scope.json`]);
+    const r = await runCli([root, '--phase', '5', `--scope=.w-model/scope.json`]);
     expect(r.status).toBe(1);
     expect(r.stdout).toMatch(/src\/forgotten\.ts/);
   });
 
-  it('C10d: 薄封装 --change 为空串 → exit 2 + ERROR_JSON(ARG_INVALID)（显式拒绝，非下游 fail-closed 兜底）', () => {
+  it('C10d: 薄封装 --change 为空串 → exit 2 + ERROR_JSON(ARG_INVALID)（显式拒绝，非下游 fail-closed 兜底）', async () => {
     const { root, baseSha, headSha } = makeScopedProject({});
-    const r = runCli([root, '--phase', '5', `--change=`, `--base=${baseSha}`, `--head=${headSha}`]);
+    const r = await runCli([root, '--phase', '5', `--change=`, `--base=${baseSha}`, `--head=${headSha}`]);
     expect(r.status).toBe(2);
     expect(r.stdout).toMatch(/^ERROR_JSON \{/);
     const parsed = JSON.parse(r.stdout.replace(/^ERROR_JSON /, '')) as { category: string; exitCode: number };
@@ -606,9 +599,9 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
     expect(parsed.exitCode).toBe(2);
   });
 
-  it('C10e: 薄封装 changeId 缺 phase5- 前缀 → exit 2 + ERROR_JSON(ARG_INVALID)（覆盖性断言）', () => {
+  it('C10e: 薄封装 changeId 缺 phase5- 前缀 → exit 2 + ERROR_JSON(ARG_INVALID)（覆盖性断言）', async () => {
     const { root, baseSha, headSha } = makeScopedProject({});
-    const r = runCli([root, '--phase', '5', `--change=reviewfix`, `--base=${baseSha}`, `--head=${headSha}`]);
+    const r = await runCli([root, '--phase', '5', `--change=reviewfix`, `--base=${baseSha}`, `--head=${headSha}`]);
     expect(r.status).toBe(2);
     expect(r.stdout).toMatch(/^ERROR_JSON \{/);
     const parsed = JSON.parse(r.stdout.replace(/^ERROR_JSON /, '')) as {
@@ -620,17 +613,24 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
     expect(parsed.exitCode).toBe(2);
   });
 
-  it('C10f: 对照——合法 phase5- 前缀薄封装走正常路径（无查询目录 fail-closed exit 1，非 ARG_INVALID）', () => {
+  it('C10f: 对照——合法 phase5- 前缀薄封装走正常路径（无查询目录 fail-closed exit 1，非 ARG_INVALID）', async () => {
     const { root, baseSha, headSha } = makeScopedProject({});
-    const r = runCli([root, '--phase', '5', `--change=phase5-reviewfix`, `--base=${baseSha}`, `--head=${headSha}`]);
+    const r = await runCli([
+      root,
+      '--phase',
+      '5',
+      `--change=phase5-reviewfix`,
+      `--base=${baseSha}`,
+      `--head=${headSha}`,
+    ]);
     expect(r.status).toBe(1);
     expect(r.stdout).toMatch(/codegraph-queries/);
     expect(r.stdout).not.toMatch(/^ERROR_JSON \{/);
   });
 
-  it('rejects duplicated --scope flags with ARG_INVALID exit 2', () => {
+  it('rejects duplicated --scope flags with ARG_INVALID exit 2', async () => {
     const { root } = makeScopedProject({});
-    const r = runCli([root, '--phase', '5', '--scope=.w-model/scope.json', '--scope=.w-model/other.json']);
+    const r = await runCli([root, '--phase', '5', '--scope=.w-model/scope.json', '--scope=.w-model/other.json']);
     expect(r.status).toBe(2);
     expect(r.stdout).toMatch(/ERROR_JSON/);
     expect(r.stdout + r.stderr).toMatch(/重复的命令行参数 --scope/);
@@ -668,51 +668,51 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
     };
   }
 
-  /** D-6 三态用例的 CLI 调用（复用既有真实子进程口径，同时暴露 exitCode 供三态断言） */
-  function runChecker(args: string[]): { exitCode: number; stdout: string; stderr: string } {
-    const r = runCli(args);
+  /** D-6 三态用例的 CLI 调用（复用既有进程内口径，同时暴露 exitCode 供三态断言） */
+  async function runChecker(args: string[]): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+    const r = await runCli(args);
     return { exitCode: r.status, stdout: r.stdout, stderr: r.stderr };
   }
 
   /** 期望非零退出：exit 0 时抛错，避免三态断言静默退化为「只看输出文本」 */
-  function runCheckerExpectFail(args: string[]): { exitCode: number; stdout: string; stderr: string } {
-    const r = runChecker(args);
+  async function runCheckerExpectFail(args: string[]): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+    const r = await runChecker(args);
     if (r.exitCode === 0) {
       throw new Error(`期望非零退出码，实际 exit 0（stdout 尾部：${r.stdout.slice(-500)}）`);
     }
     return r;
   }
 
-  it('C14a: 无 .codegraph/ 索引且未声明降级 → exit 1（伪造制品口径不得通过）', () => {
+  it('C14a: 无 .codegraph/ 索引且未声明降级 → exit 1（伪造制品口径不得通过）', async () => {
     const { root, baseSha, headSha } = makeScopedProject({});
     writeScopeAndQuery(root, baseSha, headSha, d6Record());
-    const r = runCheckerExpectFail([root, '--phase', '5', '--scope=.w-model/scope.json']);
+    const r = await runCheckerExpectFail([root, '--phase', '5', '--scope=.w-model/scope.json']);
     expect(r.exitCode).toBe(1);
     expect(r.stdout + r.stderr).toMatch(/降级|degraded|evidenceKind/);
   });
 
-  it('C14b: 无索引 + artifact 声明 + 替代证据 → exit 0（显式降级是合法路径）', () => {
+  it('C14b: 无索引 + artifact 声明 + 替代证据 → exit 0（显式降级是合法路径）', async () => {
     const { root, baseSha, headSha } = makeScopedProject({});
     writeScopeAndQuery(root, baseSha, headSha, d6Record(DEGRADED_EVIDENCE));
-    const r = runChecker([root, '--phase', '5', '--scope=.w-model/scope.json']);
+    const r = await runChecker([root, '--phase', '5', '--scope=.w-model/scope.json']);
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toMatch(/"passed":true/);
   });
 
-  it('C14c: 存在 .codegraph/ 索引却声明 artifact（降级）→ exit 1（索引在盘禁止降级）', () => {
+  it('C14c: 存在 .codegraph/ 索引却声明 artifact（降级）→ exit 1（索引在盘禁止降级）', async () => {
     const { root, baseSha, headSha } = makeScopedProject({});
     mkdirSync(join(root, '.codegraph'), { recursive: true });
     writeScopeAndQuery(root, baseSha, headSha, d6Record(DEGRADED_EVIDENCE));
-    const r = runCheckerExpectFail([root, '--phase', '5', '--scope=.w-model/scope.json']);
+    const r = await runCheckerExpectFail([root, '--phase', '5', '--scope=.w-model/scope.json']);
     expect(r.exitCode).toBe(1);
     expect(r.stdout + r.stderr).toMatch(/\.codegraph|索引/);
   });
 
-  it('C14d: 存在索引 + evidenceKind:cli → exit 0（对照：禁止降级不等于禁止查询记录）', () => {
+  it('C14d: 存在索引 + evidenceKind:cli → exit 0（对照：禁止降级不等于禁止查询记录）', async () => {
     const { root, baseSha, headSha } = makeScopedProject({});
     mkdirSync(join(root, '.codegraph'), { recursive: true });
     writeScopeAndQuery(root, baseSha, headSha, d6Record({ evidenceKind: 'cli' }));
-    const r = runChecker([root, '--phase', '5', '--scope=.w-model/scope.json']);
+    const r = await runChecker([root, '--phase', '5', '--scope=.w-model/scope.json']);
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toMatch(/"passed":true/);
   });

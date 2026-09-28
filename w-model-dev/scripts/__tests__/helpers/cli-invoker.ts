@@ -20,10 +20,41 @@ export interface InvokeCliResult {
   stderr: string;
 }
 
+/** 3 个 console 通道（log→stdout；error/warn→stderr）+ 2 个直写流通道的 spy 组合 */
+interface CapturedStreams {
+  out: string[];
+  err: string[];
+  spies: Array<{ mockRestore: () => void }>;
+}
+
+/** 直写流 chunk 统一转字符串（string 直取；Buffer/TypedArray 按 utf8 解码） */
+function chunkToString(chunk: unknown): string {
+  if (typeof chunk === 'string') return chunk;
+  if (chunk instanceof Uint8Array) return Buffer.from(chunk).toString('utf8');
+  return String(chunk);
+}
+
+/** 捕获 process.stdout/stderr.write（Wave 2 推广发现：check-coding-plan 等 CLI 的「○ 诊断」走 process.stderr.write 而非 console.error，试点期仅 mock console 会漏捕获） */
+function captureProcessStreams(sink: CapturedStreams): void {
+  const stdoutWrite = vi.spyOn(process.stdout, 'write');
+  stdoutWrite.mockImplementation(((chunk: unknown) => {
+    sink.out.push(chunkToString(chunk));
+    return true;
+  }) as typeof process.stdout.write);
+  sink.spies.push(stdoutWrite);
+  const stderrWrite = vi.spyOn(process.stderr, 'write');
+  stderrWrite.mockImplementation(((chunk: unknown) => {
+    sink.err.push(chunkToString(chunk));
+    return true;
+  }) as typeof process.stderr.write);
+  sink.spies.push(stderrWrite);
+}
+
 export async function invokeCli(cliModule: string, argv: string[]): Promise<InvokeCliResult> {
   const prevExitCode = process.exitCode;
   const out: string[] = [];
   const err: string[] = [];
+  const spies: Array<{ mockRestore: () => void }> = [];
   const logSpy = vi.spyOn(console, 'log').mockImplementation((...a: unknown[]) => {
     out.push(format(...a) + '\n');
   });
@@ -34,6 +65,8 @@ export async function invokeCli(cliModule: string, argv: string[]): Promise<Invo
   const warnSpy = vi.spyOn(console, 'warn').mockImplementation((...a: unknown[]) => {
     err.push(format(...a) + '\n');
   });
+  spies.push(logSpy, errSpy, warnSpy);
+  captureProcessStreams({ out, err, spies });
   let exitCode: number | undefined;
   try {
     process.exitCode = undefined;
@@ -42,9 +75,7 @@ export async function invokeCli(cliModule: string, argv: string[]): Promise<Invo
     await mod.main(argv);
     exitCode = process.exitCode;
   } finally {
-    logSpy.mockRestore();
-    errSpy.mockRestore();
-    warnSpy.mockRestore();
+    for (const spy of spies) spy.mockRestore();
     // 恢复必须在 finally（审查修复轮 1 发现 1）：import/main 抛错时也恢复，
     // 否则泄漏值残留且后续调用把泄漏值当 prevExitCode 存回（连锁污染）。
     process.exitCode = prevExitCode;
