@@ -138,25 +138,31 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/coverage-logic.test.ts',
-    anchor: 'execSync(`npx tsx ${scriptPath} ${coveragePath} --out-of-scope=${oosPath}`, {',
+    anchor: 'const r = runSync(process.execPath, [tsxCli, scriptPath, coveragePath, `--out-of-scope=${oosPath}`], {',
     symbol: 'C7 invalid out-of-scope fixture',
-    reason: 'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it.',
+    reason:
+      'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it. 2026-09-28 Wave 2.1 npx 清理：execSync 字符串模板迁移 runSync 数组形，超时/cwd 语义保留。',
+    migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'execSync',
     file: '__tests__/coverage-logic.test.ts',
-    anchor: 'execSync(`npx tsx ${scriptPath} ${coveragePath} --out-of-scope=${oosPath}`, {',
+    anchor: 'const r = runSync(process.execPath, [tsxCli, scriptPath, coveragePath, `--out-of-scope=${oosPath}`], {',
     symbol: 'C7 non-array items fixture',
-    reason: 'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it.',
+    reason:
+      'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it. 2026-09-28 Wave 2.1 npx 清理：execSync 字符串模板迁移 runSync 数组形，超时/cwd 语义保留。',
+    migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'execSync',
     file: '__tests__/coverage-logic.test.ts',
-    anchor: 'execSync(`npx tsx ${scriptPath} ${coveragePath} --out-of-scope=${oosPath}`, {',
+    anchor: 'const r = runSync(process.execPath, [tsxCli, scriptPath, coveragePath, `--out-of-scope=${oosPath}`], {',
     symbol: 'C7 valid out-of-scope fixture',
-    reason: 'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it.',
+    reason:
+      'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it. 2026-09-28 Wave 2.1 npx 清理：execSync 字符串模板迁移 runSync 数组形，超时/cwd 语义保留。',
+    migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
   {
@@ -272,26 +278,31 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/eval-runner.test.ts',
-    anchor: "const stdout = execSync(`npx tsx \"${join(repoRoot, 'eval', 'runner.ts')}\" --self-check`, {",
+    anchor: "const r = runSync(process.execPath, [tsxCli, join(repoRoot, 'eval', 'runner.ts'), '--self-check'], {",
     symbol: 'eval runner --self-check 退出码 0 断言',
-    reason: 'eval/runner.ts --self-check 自检命令，显式 15 秒超时保护。',
+    reason:
+      'eval/runner.ts --self-check 自检命令，显式 15 秒超时保护。2026-09-28 Wave 2.1 npx 清理：execSync 字符串模板迁移 runSync 数组形，超时/cwd 语义保留。',
+    migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'execSync',
     file: '__tests__/eval-runner.test.ts',
-    anchor: "const stdout = execSync(`npx tsx \"${join(repoRoot, 'eval', 'runner.ts')}\" --self-check`, {",
+    anchor: "const r = runSync(process.execPath, [tsxCli, join(repoRoot, 'eval', 'runner.ts'), '--self-check'], {",
     symbol: 'eval runner --self-check JSON 可解析断言',
-    reason: 'eval/runner.ts --self-check 自检命令，显式 15 秒超时保护。',
+    reason:
+      'eval/runner.ts --self-check 自检命令，显式 15 秒超时保护。2026-09-28 Wave 2.1 npx 清理：execSync 字符串模板迁移 runSync 数组形，超时/cwd 语义保留。',
+    migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
   {
     api: 'execSync',
     file: '__tests__/check-codegraph-queries.test.ts',
-    anchor: 'const stdout = execSync(`npx tsx "${CLI}" ${args.join(\' \')}`, {',
+    anchor: 'const r = runSync(process.execPath, [tsxCli, CLI, ...args], {',
     symbol: 'runCli',
     reason:
-      '2026-09-04 audit-gate-closure task 1 新增：codegraph checker CLI 边界测试，显式 90 秒超时。（行号 2026-09-06 audit-fixes task 5 随 C12/C13/C10g 新用例下移 42 行）',
+      '2026-09-04 audit-gate-closure task 1 新增：codegraph checker CLI 边界测试，显式 90 秒超时。（行号 2026-09-06 audit-fixes task 5 随 C12/C13/C10g 新用例下移 42 行）2026-09-28 Wave 2.1 npx 清理：execSync 字符串模板迁移 runSync 数组形，超时/cwd 语义保留。',
+    migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
   // 2026-09-21 superpowers 替换批次 1 任务 5：任务 1（check-coding-plan 编码计划制品门）新增了直接
@@ -300,9 +311,11 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   {
     api: 'execSync',
     file: '__tests__/check-coding-plan.test.ts',
-    anchor: 'const stdout = execSync(`npx tsx "${CLI}" ${cmdArgs.join(\' \')}`, {',
+    anchor: 'const r = runSync(process.execPath, [tsxCli, CLI, ...cmdArgs], {',
     symbol: 'runCli',
-    reason: '2026-09-21 任务 1 新增：编码计划 CLI 边界测试，显式 90 秒超时。',
+    reason:
+      '2026-09-21 任务 1 新增：编码计划 CLI 边界测试，显式 90 秒超时。2026-09-28 Wave 2.1 npx 清理：execSync 字符串模板迁移 runSync 数组形，超时/cwd 语义保留。',
+    migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
   // 2026-09-17 review-remediation task 8：task 5 的两个 hook 测试文件新增了直接同步调用但从未登记

@@ -1,29 +1,34 @@
-import { execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
 import { validateEvalDiff } from '../logic/code-health-ledger-logic.js';
+import { runSync } from '../lib/run-sync.js';
 
 const repoRoot = join(import.meta.dirname, '..', '..', '..');
+const require = createRequire(import.meta.url);
+const tsxCli = require.resolve('tsx/cli');
 
 describe('eval runner 引擎自检', () => {
   it('--self-check 退出码 0 且报告 selfCheck=true', () => {
-    const stdout = execSync(`npx tsx "${join(repoRoot, 'eval', 'runner.ts')}" --self-check`, {
-      encoding: 'utf-8',
+    const r = runSync(process.execPath, [tsxCli, join(repoRoot, 'eval', 'runner.ts'), '--self-check'], {
       cwd: repoRoot,
-      timeout: 15000,
+      timeout: 15_000,
+      windowsHide: true,
     });
-    expect(stdout).toContain('"selfCheck":true');
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('"selfCheck":true');
   });
 
   it('--self-check 输出为合法 JSON（可被脚本消费）', () => {
-    const stdout = execSync(`npx tsx "${join(repoRoot, 'eval', 'runner.ts')}" --self-check`, {
-      encoding: 'utf-8',
+    const r = runSync(process.execPath, [tsxCli, join(repoRoot, 'eval', 'runner.ts'), '--self-check'], {
       cwd: repoRoot,
-      timeout: 15000,
+      timeout: 15_000,
+      windowsHide: true,
     });
-    expect(() => JSON.parse(stdout.trim().split('\n').pop()!)).not.toThrow();
+    expect(r.status).toBe(0);
+    expect(() => JSON.parse(r.stdout.trim().split('\n').pop()!)).not.toThrow();
   });
 });
 

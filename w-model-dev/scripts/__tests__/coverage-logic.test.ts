@@ -14,7 +14,7 @@
  *   全通过 4 张矩阵完整 + 100% → passed=true
  */
 
-import { execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -22,6 +22,10 @@ import { tmpdir } from 'node:os';
 import { describe, it, expect, afterEach } from 'vitest';
 
 import { checkRequirementCoverage, type CoverageShape } from '../logic/coverage-logic.js';
+import { runSync } from '../lib/run-sync.js';
+
+const require = createRequire(import.meta.url);
+const tsxCli = require.resolve('tsx/cli');
 
 /** 构造一份全通过的合法 CoverageShape（4 张矩阵完整 + 100% 覆盖率） */
 function makeValidCoverage(): CoverageShape {
@@ -393,15 +397,14 @@ describe('C7: OOS 形状校验 (CLI exit 2)', () => {
     const oosPath = join(dir, 'outOfScope.json');
     writeFileSync(oosPath, JSON.stringify({ something: 'else' }));
 
-    try {
-      execSync(`npx tsx ${scriptPath} ${coveragePath} --out-of-scope=${oosPath}`, {
-        stdio: 'pipe',
-        timeout: 15000,
-      });
+    const r = runSync(process.execPath, [tsxCli, scriptPath, coveragePath, `--out-of-scope=${oosPath}`], {
+      timeout: 15_000,
+      windowsHide: true,
+    });
+    if (r.status !== 0) {
+      expect(r.status).toBe(2);
+    } else {
       expect.fail('should have exited with code 2');
-    } catch (e: unknown) {
-      const err = e as { status?: number; stderr?: Buffer };
-      expect(err.status).toBe(2);
     }
   });
 
@@ -411,15 +414,14 @@ describe('C7: OOS 形状校验 (CLI exit 2)', () => {
     const oosPath = join(dir, 'outOfScope.json');
     writeFileSync(oosPath, JSON.stringify({ items: 'not-an-array' }));
 
-    try {
-      execSync(`npx tsx ${scriptPath} ${coveragePath} --out-of-scope=${oosPath}`, {
-        stdio: 'pipe',
-        timeout: 15000,
-      });
+    const r = runSync(process.execPath, [tsxCli, scriptPath, coveragePath, `--out-of-scope=${oosPath}`], {
+      timeout: 15_000,
+      windowsHide: true,
+    });
+    if (r.status !== 0) {
+      expect(r.status).toBe(2);
+    } else {
       expect.fail('should have exited with code 2');
-    } catch (e: unknown) {
-      const err = e as { status?: number; stderr?: Buffer };
-      expect(err.status).toBe(2);
     }
   });
 
@@ -429,12 +431,11 @@ describe('C7: OOS 形状校验 (CLI exit 2)', () => {
     const oosPath = join(dir, 'outOfScope.json');
     writeFileSync(oosPath, JSON.stringify({ items: ['SH-OTHER'] }));
 
-    expect(() => {
-      execSync(`npx tsx ${scriptPath} ${coveragePath} --out-of-scope=${oosPath}`, {
-        stdio: 'pipe',
-        timeout: 15000,
-      });
-    }).not.toThrow();
+    const r = runSync(process.execPath, [tsxCli, scriptPath, coveragePath, `--out-of-scope=${oosPath}`], {
+      timeout: 15_000,
+      windowsHide: true,
+    });
+    expect(r.status).toBe(0);
   });
 });
 
