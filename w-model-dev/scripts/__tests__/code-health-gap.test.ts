@@ -33,6 +33,7 @@ import { validateGapMatrix, validateRedGreenEvidence } from '../logic/code-healt
 import { createCodeHealthEvidenceStore } from '../lib/code-health-evidence-store.js';
 import { createCodeHealthGitRevisionProvider } from '../lib/code-health-revision-provider.js';
 import { runTddHarness, type TddHarnessOptions } from '../lib/code-health-tdd-harness.js';
+import { childProcessEnv } from '../lib/run-sync.js';
 
 const execFileAsync = promisify(execFile);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -46,6 +47,7 @@ async function runGapCli(args: string[]): Promise<{ code: number; stdout: string
   try {
     const { stdout, stderr } = await execFileAsync(process.execPath, [tsxCli, gapCli, ...args], {
       cwd: repoRoot,
+      env: childProcessEnv(),
       windowsHide: true,
     });
     return { code: 0, stdout, stderr };

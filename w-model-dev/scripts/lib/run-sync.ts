@@ -295,29 +295,12 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
-  {
-    api: 'execSync',
-    file: '__tests__/check-codegraph-queries.test.ts',
-    anchor: 'const r = runSync(process.execPath, [tsxCli, CLI, ...args], {',
-    symbol: 'runCli',
-    reason:
-      '2026-09-04 audit-gate-closure task 1 新增：codegraph checker CLI 边界测试，显式 90 秒超时。（行号 2026-09-06 audit-fixes task 5 随 C12/C13/C10g 新用例下移 42 行）2026-09-28 Wave 2.1 npx 清理：execSync 字符串模板迁移 runSync 数组形，超时/cwd 语义保留。',
-    migratedToRunSync: true,
-    timeout: { required: true, status: 'present' },
-  },
-  // 2026-09-21 superpowers 替换批次 1 任务 5：任务 1（check-coding-plan 编码计划制品门）新增了直接
-  // 同步调用但从未登记（该分支尚未跑通全量 vitest，run-sync 审计一直是红的，与本文件下方 2026-09-17
-  // 同类补登记同理）。以下条目补登记。
-  {
-    api: 'execSync',
-    file: '__tests__/check-coding-plan.test.ts',
-    anchor: 'const r = runSync(process.execPath, [tsxCli, CLI, ...cmdArgs], {',
-    symbol: 'runCli',
-    reason:
-      '2026-09-21 任务 1 新增：编码计划 CLI 边界测试，显式 90 秒超时。2026-09-28 Wave 2.1 npx 清理：execSync 字符串模板迁移 runSync 数组形，超时/cwd 语义保留。',
-    migratedToRunSync: true,
-    timeout: { required: true, status: 'present' },
-  },
+  // 2026-09-28 修复轮 2（Wave 2 收口门回归修复）：`__tests__/check-codegraph-queries.test.ts` 与
+  // `__tests__/check-coding-plan.test.ts` 的两条 migratedToRunSync 台账随 Task 9 批次转换摘除——
+  // 两文件的 CLI spawn 已进程内化（runCli 走 helpers/cli-invoker 直调 main），runSync 仅剩 git
+  // fixture 建仓调用（非 child_process 直调，无须登记）。锚已 0 命中，而守护
+  // （run-sync.test.ts「retains anchor-accurate provenance」）要求 migrated 条目锚命中 ≥1，
+  // 失效条目按锚内容寻址判据移除。
   // 2026-09-17 review-remediation task 8：task 5 的两个 hook 测试文件新增了直接同步调用但从未登记
   // （该分支从未跑通全量 vitest，run-sync 审计一直是红的）。以下条目补登记，并给这些调用补显式 15 秒
   // 超时——台账不允许 `missing-followup`（另一条守护要求全部 present）。

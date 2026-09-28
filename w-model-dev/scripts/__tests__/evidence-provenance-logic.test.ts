@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { produceSourceProvenance, verifySourceProvenance } from '../logic/evidence-provenance-logic.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
+import { childProcessEnv } from '../lib/run-sync.js';
 
 const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
@@ -126,6 +127,8 @@ async function runSourceCli(args: string[]): Promise<{ code: number; stdout: str
   try {
     const result = await execFileAsync(process.execPath, [require.resolve('tsx/cli'), SOURCE_CLI, ...args], {
       encoding: 'utf8',
+      // VITEST 剥离（修复轮 2）：worker 继承的 VITEST 会让 CLI 的 runMain 守卫跳过自执行。
+      env: childProcessEnv(),
       // Load-sensitive: raised from 15 s because the real `tsx` CLI can exceed it when the full suite runs
       // in parallel (execFileAsync then reports a generic failure). Assertions are unchanged.
       timeout: 60_000,

@@ -40,7 +40,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { runSync } from '../lib/run-sync.js';
+import { childProcessEnv, runSync } from '../lib/run-sync.js';
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(TEST_DIR, '..', '..', '..');
@@ -234,7 +234,11 @@ function runNegativeProbe(gateFile: string, probeRoot: string): Promise<ProbeOut
       [TSX_CLI, join(CLI_DIR, gateFile), ...probe.args],
       {
         cwd: probe.cwd ?? REPO_ROOT,
-        ...(probe.env === undefined ? {} : { env: probe.env }),
+        // VITEST 剥离（修复轮 2）：vitest worker 内 spawn 的真实 CLI 若继承 VITEST，
+        // runMain 守卫会跳过自执行 → exit 0 + 空 stdout/stderr，探针期望（exit 2）全部假红。
+        // probe.env 缺省时 childProcessEnv(undefined) 即剥 process.env；
+        // security-scan 探针显式清空 PATH 的语义保留（剥离为幂等 no-op）。
+        env: childProcessEnv(probe.env),
         encoding: 'utf8',
         timeout: 30_000,
         maxBuffer: 64 * 1024 * 1024,
