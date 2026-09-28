@@ -18,7 +18,7 @@
 | L8 | `NEGATIVE-COVERAGE.md` 迁移说明**未逐条登记**被换件/删行丢掉的原「所防回归」子句 | 迁移说明只记了 2 处具名换件 + 6 处次要样本退出 | 在迁移说明补「原列出的次要样本 + 其原所防回归子句」（`check-verifier-output` D-10 文案、`check-codegraph-queries` 4→1、`check-coding-plan` 行） |
 | L9 | T3 的「`vitest 用例 : 无法采集（不一致）`」人类可读标签**无断言** | 该文案仅在 `docs-consistency-logic.test.ts:2072` 注释中出现 | 在态 1/态 2 失败路径的既有用例中补一条人类可读通道断言（不新增用例面） |
 | L10 | `CHANGELOG` `[42.4.0]` 的 T7 小节**未点名全部连带文件** | 只写「全链条」+ 指向账本 | 在 `[42.4.1]` 条目**补记**连带文件清单（`lib/run-sync.ts` / `lib/types.ts` / `logic/archive-integrity-logic.ts` / `cli/check-archive-integrity.ts` / `__tests__/README.md` 矩阵行） |
-| L11 | 长时门禁的执行约定未成文 | 本批两次环境停滞均出在「子代理同步等待 prepush（≈35-45 min）」 | `references/subagent-delegation.md`「任务合并与审查面」节补一条：长时门禁（prepush 级）由控制者后台执行，子代理只做编辑/报告，不同步等待 |
+| L11 | 长时门禁的执行约定未成文 | 2026-09-27/28 两批共两次环境停滞均出在「子代理同步等待 prepush（≈35-45 min）」（本批 0 次；口径与最终审查一致） | `references/subagent-delegation.md`「任务合并与审查面」节补一条：长时门禁（prepush 级）由控制者后台执行，子代理只做编辑/报告，不同步等待 |
 | L12 | 任务 1 报告处置 #13/#14 标注与报告措辞 | 报告为本地留档（`.superpowers/sdd/**`，不随仓交付）；`[42.4.0]` 条目已如实写「部分成立」 | **不改**（已完成，登记为已清） |
 
 **已裁定豁免 / 保留（本批不动，防反复）**：`eval/e2e/demo-assets/**` 的 D-6 枚举（上一批裁定⑪显式豁免）；`CONTRIBUTING.md:7`「provenance 三形态」（裁定⑫）；`logic/budget-logic.ts:7-8` 阈值句（实现视角豁免）；`references/operational-recovery.md:458` 诊断字面；`schemas` 计数契约与其余机器可读契约；已随上一批修复的 `SSoT:1396` 重复与 `command-reference` ⑥a 标签（本批已复核为已清）。
