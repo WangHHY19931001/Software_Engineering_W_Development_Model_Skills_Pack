@@ -34,11 +34,11 @@ import {
   type RunLogEntryLike,
 } from '../logic/metrics-report-logic.js';
 import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
-import { exitWithError } from '../lib/cli-error.js';
+import { exitWithError, HandledCliError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { parsePhaseArg, phaseFlagPresent } from '../lib/parse-phase.js';
-import { parseFlagValue } from '../lib/parse-args.js';
+import { DuplicateFlagError, parseFlagValue } from '../lib/parse-args.js';
 
 interface ParsedArgs {
   projectDir: string;
@@ -50,7 +50,8 @@ interface ParsedArgs {
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
-  const args = argv.slice(2);
+  // main 签名默认参已 slice(2)，此处 argv 即用户参数（不含 node/脚本路径）
+  const args = argv;
   const json = args.includes('--json');
   const positional = args.filter((a) => !a.startsWith('--'));
   // D3/I-3：值 flag 统一 parseFlagValue（等号形态；重复 → DuplicateFlagError），杜绝 last-wins
@@ -179,12 +180,12 @@ function printHuman(r: MetricsReport, runLogFile: string): void {
   console.log('METRICS_JSON ' + JSON.stringify(r));
 }
 
-async function main(): Promise<void> {
-  const { projectDir, from, to, phase, json, out } = parseArgs(process.argv);
+async function runMetricsReport(argv: string[]): Promise<void> {
+  const { projectDir, from, to, phase, json, out } = parseArgs(argv);
 
   // --phase 校验（D3/I-4：形态无关）：显式传了 --phase（空格或等号形态）但非法
   // （非数字 / 非整数 / 越界）→ exit 2 ARG_INVALID
-  if (phaseFlagPresent(process.argv) && phase === undefined) {
+  if (phaseFlagPresent(argv) && phase === undefined) {
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
@@ -238,6 +239,29 @@ async function main(): Promise<void> {
     printHuman(report, runLogFile);
   }
   process.exitCode = 0;
+}
+
+/**
+ * 进程内可调用入口（Wave 2 进程内化）：argv 默认取真实进程参数；
+ * readJsonlOrExit 错误路径（exitWithError 已输出并设置 exitCode 后抛 HandledCliError）与
+ * DuplicateFlagError（值 flag 重复）在此收敛为正常返回——子进程形态由 runMain 静默处理，
+ * 进程内形态（__tests__/helpers/cli-invoker.ts）同样能读到 exitCode，两形态退出码与输出一致。
+ */
+export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+  try {
+    await runMetricsReport(argv);
+  } catch (err) {
+    if (err instanceof HandledCliError) return;
+    if (err instanceof DuplicateFlagError) {
+      exitWithError({
+        category: 'ARG_INVALID',
+        message: err.message,
+        exitCode: 2,
+      });
+      return;
+    }
+    throw err;
+  }
 }
 
 runMain(main);

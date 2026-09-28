@@ -13,10 +13,9 @@
  *
  * CLI 层用例（Persona Verifier CLI regressions / V 负样本）为进程内模式：
  * 经 helpers/cli-invoker.ts 调用导出的 main(argv)（runMain 的 VITEST 守卫阻止 import 自执行）；
- * 真实子进程保真由保真对照用例 + cli-subprocess-smoke.test.ts 承载。
+ * 真实子进程保真由 cli-subprocess-smoke.test.ts 承载。
  */
 
-import { createRequire } from 'node:module';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
@@ -24,7 +23,6 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { runSync } from '../lib/run-sync.js';
 import { invokeCli } from './helpers/cli-invoker.js';
 import {
   validateEvidenceFormat,
@@ -34,11 +32,8 @@ import {
   RESOLUTION_FLOOR,
 } from '../logic/verifier-logic.js';
 
-const require = createRequire(import.meta.url);
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(TEST_DIR, '../../..');
-const VERIFIER_SCRIPT = resolve(TEST_DIR, '../cli/check-verifier-output.ts');
-const TSX_CLI = require.resolve('tsx/cli');
 const PERSONA_FIXTURES = [
   'persona-code-reviewer.json',
   'persona-test-engineer.json',
@@ -62,8 +57,14 @@ async function runVerifierCli(
 async function runVerifier(
   sampleRelPath: string,
 ): Promise<{ exitCode: number | undefined; stdout: string; stderr: string }> {
-  const result = await runVerifierCli(resolve(ROOT, sampleRelPath), { json: false });
-  return { exitCode: result.code, stdout: result.stdout, stderr: result.stderr };
+  const result = await runVerifierCli(resolve(ROOT, sampleRelPath), {
+    json: false,
+  });
+  return {
+    exitCode: result.code,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
 }
 
 describe('Persona Verifier fixtures', () => {
@@ -172,7 +173,12 @@ describe('Persona Verifier CLI regressions', () => {
       const report = JSON.parse(result.stdout) as Record<string, unknown>;
 
       expect(result.code).toBe(1);
-      expect(report).toMatchObject({ type: 'verifier-output', passed: false, qualityLevel: 'A', exitCode: 1 });
+      expect(report).toMatchObject({
+        type: 'verifier-output',
+        passed: false,
+        qualityLevel: 'A',
+        exitCode: 1,
+      });
       expect(report.reasons).toEqual([expect.stringContaining('passed false 与 qualityLevel A 不一致')]);
       expect(report.reasons).not.toEqual(expect.arrayContaining([expect.stringContaining('reworkHints')]));
     } finally {
@@ -232,26 +238,8 @@ describe('Persona Verifier CLI regressions', () => {
     }
   });
 
-  // 试点专属：本文件仍含 1 处真实 spawn（保真对照），试点期保留；
-  // Task 9 推广时对照职责移交 cli-subprocess-smoke.test.ts 后随本用例删除。
-  // 覆盖 exitWithError 路径（readJsonOrExit 抛 HandledCliError、main 内收敛为正常返回）：
-  // 进程内与真实子进程的 exitCode / stdout（ERROR_JSON 行）须逐字节一致。
-  it('保真对照（试点）：exitWithError 路径进程内与真实子进程 exitCode/stdout 逐字节一致', async () => {
-    const tempDir = await mkdtemp(resolve(tmpdir(), 'verifier-cli-'));
-    const missingFixturePath = resolve(tempDir, 'missing.json');
-    try {
-      const inproc = await runVerifierCli(missingFixturePath);
-      const real = runSync(process.execPath, [TSX_CLI, VERIFIER_SCRIPT, '--json', missingFixturePath], {
-        cwd: ROOT,
-        timeout: 15_000,
-      });
-      expect(inproc.code).toBe(real.status);
-      expect(inproc.stdout).toBe(real.stdout);
-    } finally {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary directory
-      await rm(tempDir, { recursive: true, force: true });
-    }
-  });
+  // 试点期的保真对照用例已删除：对照职责由 cli-subprocess-smoke.test.ts 的
+  // 「check-verifier-output 真实子进程冒烟」条目承载（Wave 2 推广，Task 9）。
 });
 
 describe('evidence 格式校验', () => {
@@ -603,7 +591,10 @@ describe('targetKind=rootcause（§7.5 V 复审根因报告）', () => {
   });
 
   it('非法 targetKind 仍被枚举拦截（rootcause 之外的任意值）', () => {
-    const bad = { ...baseRootcause, meta: { ...baseRootcause.meta, targetKind: 'report' } };
+    const bad = {
+      ...baseRootcause,
+      meta: { ...baseRootcause.meta, targetKind: 'report' },
+    };
     const result = checkVerifierOutput(bad);
     expect(result.passed).toBe(false);
     // schema enum 前置拦截（[schema] 前缀）或逻辑层枚举校验均视为拦截成功

@@ -1,27 +1,21 @@
 /**
- * metrics-report.ts CLI 层单元测试（子进程模式）
+ * metrics-report.ts CLI 层单元测试（进程内模式）
  *
  * 覆盖：正常人类可读 9 节 / --json 结构 / run-log 缺失(exit 2) / --phase 非法值系列(exit 2) /
  *       budget 缺失降级(null) / budget 非法(exit 2) / --json --out 组合（stdout 纯净 + 文件写入）/
  *       空 run-log 预警 / run-log 坏行跳过。
  *
- * 子进程说明：CLI 脚本 main() 顶层执行并调用 process.exit，无法直接 import 测试；
- * 采用 runSync(process.execPath, [tsx/cli, 脚本, ...]) 运行真实进程断言退出码与输出。
+ * 进程内说明：经 helpers/cli-invoker.ts 调用导出的 main(argv)（runMain 的 VITEST 守卫
+ * 阻止 import 自执行）；真实子进程保真由 cli-subprocess-smoke.test.ts 承载。
  */
 
 import { promises as fs } from 'node:fs';
-import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { runSync } from '../lib/run-sync.js';
-
-const require = createRequire(import.meta.url);
-const tsxCli = require.resolve('tsx/cli');
-const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/metrics-report.ts');
+import { invokeCli } from './helpers/cli-invoker.js';
 
 const RUN_LOG_JSONL =
   '{"phase":1,"action":"produce","role":"S","outcome":"success","tokens":100,"duration_s":10,"subagentSpawns":1,"gateExitCode":null,"timestamp":"2026-08-05T01:00:00Z"}\n' +
@@ -48,17 +42,17 @@ async function writeWModel(rel: string, content: string): Promise<string> {
   return p;
 }
 
-/** 运行 metrics-report 子进程 */
-function run(...args: string[]): { code: number | null; stdout: string; stderr: string } {
-  const r = runSync(process.execPath, [tsxCli, SCRIPT, tmpDir, ...args]);
-  return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
+/** 进程内调用 metrics-report（argv[0] = 项目根，CLI 不依赖 cwd；模块路径相对 helpers/ 是两个 ../） */
+async function run(...args: string[]): Promise<{ code: number | undefined; stdout: string; stderr: string }> {
+  const r = await invokeCli('../../cli/metrics-report.js', [tmpDir, ...args]);
+  return { code: r.exitCode, stdout: r.stdout, stderr: r.stderr };
 }
 
 describe('metrics-report CLI（正常路径）', () => {
   it('完整夹具人类可读输出：9 节齐全 + METRICS_JSON 标记，exit 0', async () => {
     await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
     await writeWModel('budget.json', BUDGET_JSON);
-    const r = run();
+    const r = await run();
     expect(r.code).toBe(0);
     expect(r.stdout).toContain('总体          :');
     expect(r.stdout).toContain('阶段汇总');
@@ -75,15 +69,23 @@ describe('metrics-report CLI（正常路径）', () => {
   it('--json 输出单行完整 MetricsReport，budget 区非 null', async () => {
     await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
     await writeWModel('budget.json', BUDGET_JSON);
-    const r = run('--json');
+    const r = await run('--json');
     expect(r.code).toBe(0);
     const parsed = JSON.parse(r.stdout) as {
       meta: { recordCount: number };
-      overall: { totalRecords: number; totalTokens: number; reworkRecords: number };
+      overall: {
+        totalRecords: number;
+        totalTokens: number;
+        reworkRecords: number;
+      };
       byPhase: unknown[];
       byAction: Record<string, number>;
       gate: { total: number; passed: number };
-      budget: { totalTokens: number; maxTokensTotal: number; onExceed: string } | null;
+      budget: {
+        totalTokens: number;
+        maxTokensTotal: number;
+        onExceed: string;
+      } | null;
       warnings: unknown[];
     };
     expect(parsed.meta.recordCount).toBe(3);
@@ -93,41 +95,45 @@ describe('metrics-report CLI（正常路径）', () => {
     expect(parsed.byPhase).toHaveLength(2);
     expect(parsed.byAction).toMatchObject({ produce: 1, rework: 1, gate: 1 });
     expect(parsed.gate).toMatchObject({ total: 1, passed: 1 });
-    expect(parsed.budget).toMatchObject({ totalTokens: 180, maxTokensTotal: 10000, onExceed: 'pause' });
+    expect(parsed.budget).toMatchObject({
+      totalTokens: 180,
+      maxTokensTotal: 10000,
+      onExceed: 'pause',
+    });
   });
 });
 
 describe('metrics-report CLI（异常分支）', () => {
   it('run-log.jsonl 缺失 → exit 2，提示文件不存在', async () => {
-    const r = run();
+    const r = await run();
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('文件不存在');
   });
 
   it('--phase=99（越界）→ exit 2', async () => {
     await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const r = run('--phase=99');
+    const r = await run('--phase=99');
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('--phase 参数非法');
   });
 
   it('--phase=1.5（非整数）→ exit 2', async () => {
     await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const r = run('--phase=1.5');
+    const r = await run('--phase=1.5');
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('--phase 参数非法');
   });
 
   it('--phase=abc（非数字）→ exit 2', async () => {
     await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const r = run('--phase=abc');
+    const r = await run('--phase=abc');
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('--phase 参数非法');
   });
 
   it('--phase=（空值，Number("")=0 → 非法）→ exit 2', async () => {
     await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const r = run('--phase=');
+    const r = await run('--phase=');
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('--phase 参数非法');
   });
@@ -135,7 +141,7 @@ describe('metrics-report CLI（异常分支）', () => {
   it('budget.json 非法 JSON → exit 2', async () => {
     await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
     await writeWModel('budget.json', '{bad');
-    const r = run();
+    const r = await run();
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('文件解析失败');
   });
@@ -144,18 +150,21 @@ describe('metrics-report CLI（异常分支）', () => {
 describe('metrics-report CLI（边界与降级）', () => {
   it('budget.json 缺失 → exit 0，人类可读「未提供」，--json 的 budget 为 null', async () => {
     await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const r = run();
+    const r = await run();
     expect(r.code).toBe(0);
     expect(r.stdout).toContain('未提供（.w-model/budget.json 缺失）');
-    const rj = run('--json');
-    const parsed = JSON.parse(rj.stdout) as { budget: unknown; warnings: string[] };
+    const rj = await run('--json');
+    const parsed = JSON.parse(rj.stdout) as {
+      budget: unknown;
+      warnings: string[];
+    };
     expect(parsed.budget).toBeNull();
     expect(parsed.warnings).toContain('budget.json 缺失：预算度量区为 null（仅统计 run-log）');
   });
 
   it('空 run-log（0 条记录）→ exit 0，预警「run-log 为空」', async () => {
     await writeWModel('run-log.jsonl', '');
-    const r = run();
+    const r = await run();
     expect(r.code).toBe(0);
     expect(r.stdout).toContain('run-log 为空');
   });
@@ -165,10 +174,12 @@ describe('metrics-report CLI（边界与降级）', () => {
       'run-log.jsonl',
       '{"phase":1,"action":"produce","role":"S","outcome":"success","tokens":100}\n{broken json line}\n',
     );
-    const r = run('--json');
+    const r = await run('--json');
     expect(r.code).toBe(0);
     expect(r.stderr).toContain('非合法 JSON');
-    const parsed = JSON.parse(r.stdout) as { overall: { totalRecords: number } };
+    const parsed = JSON.parse(r.stdout) as {
+      overall: { totalRecords: number };
+    };
     expect(parsed.overall.totalRecords).toBe(1);
   });
 
@@ -176,22 +187,27 @@ describe('metrics-report CLI（边界与降级）', () => {
     await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
     await writeWModel('budget.json', BUDGET_JSON);
     const outFile = path.join(tmpDir, 'report.json');
-    const r = run('--json', `--out=${outFile}`);
+    const r = await run('--json', `--out=${outFile}`);
     expect(r.code).toBe(0);
     // stdout 必须可整体 JSON.parse（不含「已写入」确认行）
     const parsed = JSON.parse(r.stdout) as { meta: { recordCount: number } };
     expect(parsed.meta.recordCount).toBe(3);
     expect(r.stderr).toContain('度量报告已写入');
     // 文件已写出且内容合法
-    const written = JSON.parse(await fs.readFile(outFile, 'utf-8')) as { meta: { recordCount: number } };
+    const written = JSON.parse(await fs.readFile(outFile, 'utf-8')) as {
+      meta: { recordCount: number };
+    };
     expect(written.meta.recordCount).toBe(3);
   });
 
   it('--phase 过滤生效：--phase=1 仅含阶段 1 记录', async () => {
     await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const r = run('--json', '--phase=1');
+    const r = await run('--json', '--phase=1');
     expect(r.code).toBe(0);
-    const parsed = JSON.parse(r.stdout) as { overall: { totalRecords: number }; byPhase: Array<{ phase: number }> };
+    const parsed = JSON.parse(r.stdout) as {
+      overall: { totalRecords: number };
+      byPhase: Array<{ phase: number }>;
+    };
     expect(parsed.overall.totalRecords).toBe(2);
     expect(parsed.byPhase).toHaveLength(1);
     expect(parsed.byPhase[0]!.phase).toBe(1);
@@ -201,7 +217,7 @@ describe('metrics-report CLI（边界与降级）', () => {
 describe('metrics-report CLI（D3 参数统一：--phase 两形态 + 重复即错）', () => {
   it('--phase=1 --phase=99 重复 → exit 2 ARG_INVALID（D3/I-3）', async () => {
     await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const r = run('--json', '--phase=1', '--phase=99');
+    const r = await run('--json', '--phase=1', '--phase=99');
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('ARG_INVALID');
     expect(r.stdout).toContain('ERROR_JSON ');
@@ -209,9 +225,12 @@ describe('metrics-report CLI（D3 参数统一：--phase 两形态 + 重复即�
 
   it('--phase 1（空格形态）生效：仅含阶段 1 记录（D3/I-4）', async () => {
     await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const r = run('--json', '--phase', '1');
+    const r = await run('--json', '--phase', '1');
     expect(r.code).toBe(0);
-    const parsed = JSON.parse(r.stdout) as { overall: { totalRecords: number }; byPhase: Array<{ phase: number }> };
+    const parsed = JSON.parse(r.stdout) as {
+      overall: { totalRecords: number };
+      byPhase: Array<{ phase: number }>;
+    };
     expect(parsed.overall.totalRecords).toBe(2);
     expect(parsed.byPhase).toHaveLength(1);
     expect(parsed.byPhase[0]!.phase).toBe(1);
@@ -219,7 +238,7 @@ describe('metrics-report CLI（D3 参数统一：--phase 两形态 + 重复即�
 
   it('--phase 99（空格形态非法值）→ exit 2 ARG_INVALID（D3/I-4）', async () => {
     await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const r = run('--json', '--phase', '99');
+    const r = await run('--json', '--phase', '99');
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('ARG_INVALID');
     expect(r.stderr).toContain('--phase');

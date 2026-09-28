@@ -7,8 +7,8 @@
 //
 // 为什么拆两个 project（背景：docs/changes/vitest-parallel-flakiness-finding.md）：
 //   仓库里会真实 execSync/spawnSync/runSync 启动 CLI 子进程的测试文件（成员名单 = 下方
-//   SUBPROCESS_TEST_FILES 常量；2026-09-18 收口实测 40 个，拆分当时为 30 个；2026-09-25
-//   新增 maturity-logic.test.ts 的 check-maturity CLI 三态用例后为 41 个）。这些文件
+//   SUBPROCESS_TEST_FILES 常量；清单长度以常量为准，
+//   由 vitest-project-split.test.ts 双向守护（源码证据 ↔ 登记一一对应））。这些文件
 //   **彼此并行**时子进程互相竞争，出现 `expected null to be N`（子进程未真正运行）、
 //   STACK_TRACE_ERROR、30s 超时，且每次落在不同文件——同一命令同一代码两次运行失败数
 //   可差 10 倍（实测 20 vs 2），量级跳动排除"断言写错"；基线 72081e2 同样复现。
@@ -65,20 +65,16 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'exit2-failure-atomicity.test.ts',
   'gate-report.test.ts',
   'gate-test-evidence.test.ts',
-  'gate-ticket-content.test.ts',
   'graph-logic.test.ts',
   'l0-link-audit-cli.test.ts',
   'maturity-logic.test.ts',
-  'metrics-report.test.ts',
   'platform-deps-hook.test.ts',
   'platform-deps-install.test.ts',
   'pre-commit-hook.test.ts',
   'project-read-validation.test.ts',
   'review-package-cli.test.ts',
   'run-sync.test.ts',
-  'verifier-logic.test.ts',
   'wm-append-runlog-cli.test.ts',
-  'wm-status.test.ts',
   'wm-write.test.ts',
 ];
 

@@ -75,7 +75,7 @@ import {
 } from '../logic/gate-logic.js';
 import { checkCodingPlan } from '../logic/coding-plan-logic.js';
 import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
-import { exitWithError, type CliError } from '../lib/cli-error.js';
+import { exitWithError, HandledCliError, type CliError } from '../lib/cli-error.js';
 import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { ARTIFACT_PATHS } from '../lib/constants.js';
@@ -142,7 +142,8 @@ function parsePhaseArg(argv: string[]): PhaseOption | undefined {
   const res = parsePhaseArgLib(argv, { min: 1, max: 8 });
   if (res !== undefined) return res.phase as PhaseOption;
   // 兼容历史短参数 -p（lib 不识别；值合法即采用，非法报错）
-  for (let i = 2; i < argv.length; i++) {
+  // i 从 0 起：main 签名化后 argv 已切（不含 node/脚本路径），调用方传用户参数全量
+  for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '-p') {
       const next = argv[i + 1] ?? '';
@@ -181,7 +182,8 @@ function parsePhaseArg(argv: string[]): PhaseOption | undefined {
  * 兼容 --phase=N 出现在任意位置的场景。
  */
 function parseProjectDir(argv: string[]): string {
-  for (let i = 2; i < argv.length; i++) {
+  // i 从 0 起：main 签名化后 argv 已切（不含 node/脚本路径），调用方传用户参数全量
+  for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === undefined) continue;
     if (arg.startsWith('--')) {
@@ -326,15 +328,15 @@ async function readMaturityLevel(projectDir: string): Promise<string | undefined
   }
 }
 
-async function main(): Promise<void> {
+async function runArtifactGate(argv: string[]): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
-  const jsonMode = hasFlag(process.argv.slice(2), 'json');
+  const jsonMode = hasFlag(argv, 'json');
   const startTime = Date.now();
 
   // ==================== --validate-templates 模式（C9 模板漂移校验） ====================
   // 校验对象是技能包自身 templates/ 资产（相对脚本定位 ../../templates），与 project-dir 无关；
   // 独立分支：不读 RTM、不受 --phase 影响，violations 非空 → exit 1。
-  if (hasFlag(process.argv.slice(2), 'validate-templates')) {
+  if (hasFlag(argv, 'validate-templates')) {
     const templatesDir = path.resolve(fileURLToPath(import.meta.url), '..', '..', '..', 'templates');
     const violations = checkTemplatesStructure(templatesDir, {
       existsSync: (p) => nodeFs.existsSync(p),
@@ -371,18 +373,18 @@ async function main(): Promise<void> {
     return;
   }
 
-  const phaseOption = parsePhaseArg(process.argv);
+  const phaseOption = parsePhaseArg(argv);
   if (process.exitCode !== undefined) return; // --phase 非法已由 exitWithError 报告（ARG_INVALID），终止主流程
   // --spec-dir=<dir>（phase=1 需求规格独立产物目录，含 requirement-spec.md + 6 独立文件）
   // 全量 argv 扫描（与 parsePhaseArg 一致），避免 --spec-dir 出现在任意位置被静默忽略（false-pass 方向）
-  const specDir = parseFlagValue(process.argv, 'spec-dir');
+  const specDir = parseFlagValue(argv, 'spec-dir');
   // 参数契约（与 --tickets 同口径）：1) 空格形态 / 空值 → ARG_INVALID（本 CLI 值 flag 一律等号形态）；
   // 2) 阶段 1-4 之外给定 → ARG_INVALID。两条都堵的是「传了却什么都没发生」：
   //    - `--spec-dir x`（空格）与 `--spec-dir=` 此前都落成「未提供」，检查跳过、提示还写着
   //      「未提供 --spec-dir」——调用方明明传了，读到的却是「你没传」；
   //    - 缺 --phase 时 phaseOption 为 undefined、下游按默认 8 处理，于是「传了 --spec-dir」与
   //      「阶段 5-8 本就不适用」在 specStructure 标记上都是 null，那个绿是哪一个读不出来。
-  if (hasFlag(process.argv, 'spec-dir') || specDir === '') {
+  if (hasFlag(argv, 'spec-dir') || specDir === '') {
     exitWithError({
       category: 'ARG_INVALID',
       rule: 'P0-1',
@@ -407,7 +409,7 @@ async function main(): Promise<void> {
   // 1) 缺省不触发（既有调用方零影响）；2) 空格形态 / 空值非静默忽略而是 ARG_INVALID
   //    （本 CLI 的值 flag 一律等号形态，与 --scope 同口径）；3) --phase<5 给定 → ARG_INVALID，
   //    不在低阶段静默跳过参数。
-  const ticketsArgResult = parseTicketsArg(process.argv);
+  const ticketsArgResult = parseTicketsArg(argv);
   if (!ticketsArgResult.ok) {
     exitWithError(ticketsArgResult.error);
     return;
@@ -424,8 +426,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  const projectDir = parseProjectDir(process.argv);
-  const cucumberReportArg = parseFlagValue(process.argv, 'cucumber-report');
+  const projectDir = parseProjectDir(argv);
+  const cucumberReportArg = parseFlagValue(argv, 'cucumber-report');
   const cucumberReportFile = path.resolve(
     projectDir,
     cucumberReportArg ?? path.join('.w-model', 'bdd', 'reports', 'report.json'),
@@ -524,10 +526,17 @@ async function main(): Promise<void> {
   const syncRequired = independentSyncContractPhase && !tlaBddWaived;
   if (syncRequired && tlaAsset.valid && bddManifestValid) {
     const pairResult = buildTlaBddSyncPairs({
-      tlaManifest: tlaAsset.manifest as { basePath?: string; specs?: Array<{ id?: string; tlaPath?: string }> },
+      tlaManifest: tlaAsset.manifest as {
+        basePath?: string;
+        specs?: Array<{ id?: string; tlaPath?: string }>;
+      },
       bddManifest: bddManifest as {
         basePath?: string;
-        features?: Array<{ id?: string; tlaSpecId?: string; filePath?: string }>;
+        features?: Array<{
+          id?: string;
+          tlaSpecId?: string;
+          filePath?: string;
+        }>;
       },
       manifestFile,
       projectDir,
@@ -590,9 +599,12 @@ async function main(): Promise<void> {
   const externalPhase: number = phaseOption ?? 8;
   let externalAggregate: ExternalChecksAggregate | undefined;
   if (externalPhase >= 5) {
-    const loaded = loadCliScope(process.argv, projectDir, externalPhase);
+    const loaded = loadCliScope(argv, projectDir, externalPhase);
     if (loaded.kind === 'missing') {
-      externalAggregate = aggregateExternalChecks(projectDir, externalPhase, { scope: null, scopeViolations: [] });
+      externalAggregate = aggregateExternalChecks(projectDir, externalPhase, {
+        scope: null,
+        scopeViolations: [],
+      });
     } else if (loaded.kind === 'violations') {
       // scope 已提供但绑定失败：不输出"未提供 --scope"误导文案，真实原因以 [scope] 前缀进 reasons；
       // summary 标注 provided=true + 尝试绑定的 changeId（D1：区分「未提供」与「已提供但被拒」）
@@ -764,6 +776,21 @@ async function main(): Promise<void> {
   );
   process.exitCode = exitCode;
   return;
+}
+
+/**
+ * 进程内可调用入口（Wave 2 进程内化）：argv 默认取真实进程参数（已切 node/脚本路径）；
+ * readJsonClassified / loadCliScope 错误路径（exitWithError 已输出并设置 exitCode 后抛
+ * HandledCliError）在此收敛为正常返回——子进程形态由 runMain 静默处理，进程内形态
+ * （__tests__/helpers/cli-invoker.ts）同样能读到 exitCode，两形态退出码与输出一致。
+ */
+export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+  try {
+    await runArtifactGate(argv);
+  } catch (err) {
+    if (err instanceof HandledCliError) return;
+    throw err;
+  }
 }
 
 // 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main，被 self-test 等 import 时不触发

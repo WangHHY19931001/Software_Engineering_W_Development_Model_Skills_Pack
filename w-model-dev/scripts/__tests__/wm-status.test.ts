@@ -9,17 +9,12 @@
  */
 
 import { promises as fs } from 'node:fs';
-import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { runSync } from '../lib/run-sync.js';
 import { invokeCli } from './helpers/cli-invoker.js';
-
-const require = createRequire(import.meta.url);
 
 const PROJECT_JSON =
   '{"id":"smoke","name":"Smoke","description":"","status":"编码","techStack":{"frontend":[],"backend":[],"database":[],"others":[]},"createdAt":"2026-08-05T00:00:00Z","updatedAt":"2026-08-05T01:00:00Z"}';
@@ -102,21 +97,8 @@ describe('wm-status CLI（正常路径）', () => {
     expect(parsed.nextSteps.length).toBeGreaterThan(0);
   });
 
-  // 试点专属：本文件仍含 1 处真实 spawn（保真对照），试点期保留；
-  // Task 9 推广时对照职责移交 cli-subprocess-smoke.test.ts 后随本用例删除。
-  it('保真对照（试点）：进程内输出与真实子进程逐字节一致', async () => {
-    await writeWModel('project.json', PROJECT_JSON);
-    await writeWModel('rtm.json', RTM_JSON);
-    await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const inproc = await run();
-    const real = runSync(process.execPath, [
-      require.resolve('tsx/cli'),
-      path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/wm-status.ts'),
-      tmpDir,
-    ]);
-    expect(inproc.code).toBe(real.status);
-    expect(inproc.stdout).toBe(real.stdout);
-  });
+  // 试点期的保真对照用例已删除：对照职责由 cli-subprocess-smoke.test.ts 的
+  // 「wm-status 真实子进程冒烟」条目承载（Wave 2 推广，Task 9）。
 });
 
 describe('wm-status CLI（异常分支）', () => {

@@ -18,8 +18,7 @@
  * （`sources/2026-09-14-superpowers-adopted-excerpts.md:679-703`）标题写「七条」而原文块实测 6 条 bullet，
  * 且含 `（略）` 截断——路径类原文未见（未核实），故本实现不主张任何路径类原文语义。
  */
-import { promises as fs } from 'node:fs';
-import { createRequire } from 'node:module';
+import { promises as fs, readFileSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,12 +27,9 @@ import { describe, expect, it } from 'vitest';
 
 import { parseTicketsArg } from '../cli/check-artifact-gate.js';
 import { checkArtifactGate, checkTicketContent } from '../logic/gate-logic.js';
-import { runSync } from '../lib/run-sync.js';
+import { invokeCli } from './helpers/cli-invoker.js';
 
-const require = createRequire(import.meta.url);
-const tsxCli = require.resolve('tsx/cli');
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
-const CHECK_ARTIFACT_GATE_SCRIPT = path.resolve(TEST_DIR, '../cli/check-artifact-gate.ts');
 const VALID_RTM = path.resolve(TEST_DIR, '../samples/gate/valid-rtm.json');
 
 /** 合规票据：符号级契约 + 验收标准 + 零占位符（六条黑名单与 Buildability 均不触发） */
@@ -76,7 +72,11 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
     const r = checkTicketContent(VALID_TICKETS);
     expect(r.passed).toBe(true);
     expect(r.violations).toEqual([]);
-    expect(r.summary).toEqual({ checked: 2, criticalMissing: 0, buildabilityMissing: 0 });
+    expect(r.summary).toEqual({
+      checked: 2,
+      criticalMissing: 0,
+      buildabilityMissing: 0,
+    });
   });
 
   it('黑名单第 1 条（台账 :696）：禁止占位短语 TODO/implement later → placeholder', () => {
@@ -189,14 +189,24 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
         criteria: '- [ ] `AuthService.authenticate` 可用',
       },
       // 复审 I-1 实测反例 2a：其它契约标记词（`契约`）行 + 调用式
-      { line: '**What to build:** 本票契约：`A.b(x)`', criteria: '- [ ] `A.b` 可用' },
+      {
+        line: '**What to build:** 本票契约：`A.b(x)`',
+        criteria: '- [ ] `A.b` 可用',
+      },
       // 复审 I-1 实测反例 2b：`What to build` 行上的**带参**调用式（形如签名的 `Login(username, password)`）
-      { line: '**What to build:** 实现 `Login(username, password)`', criteria: '- [ ] `Login` 可用' },
+      {
+        line: '**What to build:** 实现 `Login(username, password)`',
+        criteria: '- [ ] `Login` 可用',
+      },
     ];
     for (const c of cases) {
       const r = checkTicketContent(['# 01 — 边界', '', c.line, '**Blocked by:** None', '', c.criteria, ''].join('\n'));
       expect(r.violations, `${c.line} → ${JSON.stringify(r.violations)}`).toEqual([]);
-      expect(r.summary).toEqual({ checked: 1, criticalMissing: 0, buildabilityMissing: 0 });
+      expect(r.summary).toEqual({
+        checked: 1,
+        criticalMissing: 0,
+        buildabilityMissing: 0,
+      });
     }
   });
 
@@ -244,7 +254,11 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
         ['# 01 — 声明式', '', line, '**Blocked by:** None', '', '- [ ] 无异常', ''].join('\n'),
       );
       expect(r.violations, `${line} → ${JSON.stringify(r.violations)}`).toEqual([]);
-      expect(r.summary).toEqual({ checked: 1, criticalMissing: 0, buildabilityMissing: 0 });
+      expect(r.summary).toEqual({
+        checked: 1,
+        criticalMissing: 0,
+        buildabilityMissing: 0,
+      });
     }
   });
 
@@ -261,7 +275,11 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
       ].join('\n'),
     );
     expect(r.violations).toEqual([]);
-    expect(r.summary).toEqual({ checked: 1, criticalMissing: 0, buildabilityMissing: 0 });
+    expect(r.summary).toEqual({
+      checked: 1,
+      criticalMissing: 0,
+      buildabilityMissing: 0,
+    });
   });
 
   it('修复轮 1 ①（⑥ 假阳）：What to build 直接点名带返回契约的符号、无「接口签名」等魔法词 → passed', () => {
@@ -278,7 +296,11 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
     );
     expect(r.violations).toEqual([]);
     expect(r.passed).toBe(true);
-    expect(r.summary).toEqual({ checked: 1, criticalMissing: 0, buildabilityMissing: 0 });
+    expect(r.summary).toEqual({
+      checked: 1,
+      criticalMissing: 0,
+      buildabilityMissing: 0,
+    });
   });
 
   it('修复轮 1 ②（⑥ 旁路）：通用散文词（返回/参数）不得使「只调用未声明」的符号通过', () => {
@@ -363,7 +385,11 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
     );
     expect(r.violations).toEqual([]);
     expect(r.passed).toBe(true);
-    expect(r.summary).toEqual({ checked: 1, criticalMissing: 0, buildabilityMissing: 0 });
+    expect(r.summary).toEqual({
+      checked: 1,
+      criticalMissing: 0,
+      buildabilityMissing: 0,
+    });
   });
 
   it('Buildability ①：缺接口签名且缺验收标准 → buildability-missing-signature-and-criteria', () => {
@@ -425,8 +451,10 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
   });
 
   it('--tickets 缺省（不调用纯函数）时既有行为不变：无 tickets 键、无票据 reasons', () => {
-    const matrix = JSON.parse(require('node:fs').readFileSync(VALID_RTM, 'utf-8')) as never;
-    const r = checkArtifactGate(matrix, { projectRoot: path.dirname(VALID_RTM) });
+    const matrix = JSON.parse(readFileSync(VALID_RTM, 'utf-8')) as never;
+    const r = checkArtifactGate(matrix, {
+      projectRoot: path.dirname(VALID_RTM),
+    });
     expect(r.passed).toBe(true);
     expect(r.reasons).toEqual([]);
     expect(r.tickets).toBeUndefined();
@@ -434,13 +462,20 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
 });
 
 describe('checkArtifactGate 接线：ticketsText → reasons + result.tickets 计数', () => {
-  const matrix = JSON.parse(require('node:fs').readFileSync(VALID_RTM, 'utf-8')) as never;
+  const matrix = JSON.parse(readFileSync(VALID_RTM, 'utf-8')) as never;
 
   it('合规票据：reasons 不含票据违反，tickets 计数全 0', () => {
-    const r = checkArtifactGate(matrix, { projectRoot: path.dirname(VALID_RTM), ticketsText: VALID_TICKETS });
+    const r = checkArtifactGate(matrix, {
+      projectRoot: path.dirname(VALID_RTM),
+      ticketsText: VALID_TICKETS,
+    });
     expect(r.passed).toBe(true);
     expect(r.reasons.filter((x) => x.includes('票据内容校验失败'))).toEqual([]);
-    expect(r.tickets).toEqual({ checked: 2, criticalMissing: 0, buildabilityMissing: 0 });
+    expect(r.tickets).toEqual({
+      checked: 2,
+      criticalMissing: 0,
+      buildabilityMissing: 0,
+    });
   });
 
   it('不合规票据：违反并入 reasons（阻断放行）且计数进 result.tickets', () => {
@@ -450,12 +485,16 @@ describe('checkArtifactGate 接线：ticketsText → reasons + result.tickets �
     });
     expect(r.passed).toBe(false);
     expect(r.reasons.join('\n')).toMatch(/票据内容校验失败：票据 01「样例票据」/);
-    expect(r.tickets).toEqual({ checked: 1, criticalMissing: 1, buildabilityMissing: 0 });
+    expect(r.tickets).toEqual({
+      checked: 1,
+      criticalMissing: 1,
+      buildabilityMissing: 0,
+    });
   });
 });
 
-describe('check-artifact-gate.ts --tickets 参数契约（子进程，S18 §0.1.4）', () => {
-  const rtmSource = require('node:fs').readFileSync(VALID_RTM, 'utf-8') as string;
+describe('check-artifact-gate.ts --tickets 参数契约（进程内，S18 §0.1.4）', () => {
+  const rtmSource = readFileSync(VALID_RTM, 'utf-8') as string;
 
   async function makeProject(): Promise<string> {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-tickets-'));
@@ -464,24 +503,32 @@ describe('check-artifact-gate.ts --tickets 参数契约（子进程，S18 §0.1.
     return dir;
   }
 
-  function runGate(args: string[]): { status: number | null; stdout: string } {
-    const r = runSync(process.execPath, [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, ...args, '--json'], {});
-    return { status: r.status, stdout: r.stdout ?? '' };
+  /** 进程内调用 check-artifact-gate（模块路径相对 helpers/ 是两个 ../） */
+  async function runGate(args: string[]): Promise<{ status: number | undefined; stdout: string }> {
+    const r = await invokeCli('../../cli/check-artifact-gate.js', [...args, '--json']);
+    return { status: r.exitCode, stdout: r.stdout };
   }
 
   it('进程内 argv 校验：--tickets=NUL 映射为 ARG_INVALID/exit 2', () => {
-    const result = parseTicketsArg(['node', CHECK_ARTIFACT_GATE_SCRIPT, '--phase=8', '--tickets=tickets\u0000.md']);
+    const result = parseTicketsArg(['--phase=8', '--tickets=tickets\u0000.md']);
     expect(result).toEqual({
       ok: false,
-      error: expect.objectContaining({ category: 'ARG_INVALID', rule: 'S18', exitCode: 2 }),
+      error: expect.objectContaining({
+        category: 'ARG_INVALID',
+        rule: 'S18',
+        exitCode: 2,
+      }),
     });
   });
 
   it('缺省不触发：无 --tickets 时 GATE_JSON.tickets 为 null 且无票据 reasons（既有调用方零影响）', async () => {
     const dir = await makeProject();
     try {
-      const { stdout } = runGate([dir, '--phase=8']);
-      const report = JSON.parse(stdout) as { tickets?: unknown; reasons: string[] };
+      const { stdout } = await runGate([dir, '--phase=8']);
+      const report = JSON.parse(stdout) as {
+        tickets?: unknown;
+        reasons: string[];
+      };
       expect(report.tickets).toBeNull();
       expect(report.reasons.filter((x) => x.includes('票据内容校验失败'))).toEqual([]);
     } finally {
@@ -492,7 +539,7 @@ describe('check-artifact-gate.ts --tickets 参数契约（子进程，S18 §0.1.
   it('项目内不存在的相对文件 → exit 2 FILE_NOT_FOUND（不静默忽略）', async () => {
     const dir = await makeProject();
     try {
-      const { status, stdout } = runGate([dir, '--phase=8', '--tickets=nope-tickets.md']);
+      const { status, stdout } = await runGate([dir, '--phase=8', '--tickets=nope-tickets.md']);
       expect(status).toBe(2);
       expect(stdout).toContain('ERROR_JSON');
       expect(stdout).toMatch(/"category":"FILE_NOT_FOUND"/);
@@ -506,7 +553,7 @@ describe('check-artifact-gate.ts --tickets 参数契约（子进程，S18 §0.1.
     try {
       const file = path.join(dir, 'tickets.md');
       await fs.writeFile(file, VALID_TICKETS, 'utf-8');
-      const { status, stdout } = runGate([dir, '--phase=4', '--tickets=tickets.md']);
+      const { status, stdout } = await runGate([dir, '--phase=4', '--tickets=tickets.md']);
       expect(status).toBe(2);
       expect(stdout).toMatch(/"category":"ARG_INVALID"/);
     } finally {
@@ -517,10 +564,10 @@ describe('check-artifact-gate.ts --tickets 参数契约（子进程，S18 §0.1.
   it('空格形态 / 空值 --tickets → exit 2 ARG_INVALID（只接受等号形态）', async () => {
     const dir = await makeProject();
     try {
-      const spaceForm = runGate([dir, '--phase=8', '--tickets', path.join(dir, 'tickets.md')]);
+      const spaceForm = await runGate([dir, '--phase=8', '--tickets', path.join(dir, 'tickets.md')]);
       expect(spaceForm.status).toBe(2);
       expect(spaceForm.stdout).toMatch(/"category":"ARG_INVALID"/);
-      const emptyForm = runGate([dir, '--phase=8', '--tickets=']);
+      const emptyForm = await runGate([dir, '--phase=8', '--tickets=']);
       expect(emptyForm.status).toBe(2);
       expect(emptyForm.stdout).toMatch(/"category":"ARG_INVALID"/);
     } finally {
@@ -549,7 +596,7 @@ describe('check-artifact-gate.ts --tickets 参数契约（子进程，S18 §0.1.
         'tickets-dir',
       ];
       for (const candidate of candidates) {
-        const result = runGate([dir, '--phase=8', `--tickets=${candidate}`]);
+        const result = await runGate([dir, '--phase=8', `--tickets=${candidate}`]);
         expect(result.status, candidate).toBe(2);
         expect(result.stdout, candidate).toMatch(/"category":"ARG_INVALID"/);
       }
@@ -564,13 +611,21 @@ describe('check-artifact-gate.ts --tickets 参数契约（子进程，S18 §0.1.
     try {
       const file = path.join(dir, 'tickets.md');
       await fs.writeFile(file, ticket(['- [ ] 加校验']), 'utf-8');
-      const { status, stdout } = runGate([dir, '--phase=8', '--tickets=tickets.md']);
+      const { status, stdout } = await runGate([dir, '--phase=8', '--tickets=tickets.md']);
       expect(status).toBe(1);
       const report = JSON.parse(stdout) as {
-        tickets: { checked: number; criticalMissing: number; buildabilityMissing: number };
+        tickets: {
+          checked: number;
+          criticalMissing: number;
+          buildabilityMissing: number;
+        };
         reasons: string[];
       };
-      expect(report.tickets).toEqual({ checked: 1, criticalMissing: 1, buildabilityMissing: 0 });
+      expect(report.tickets).toEqual({
+        checked: 1,
+        criticalMissing: 1,
+        buildabilityMissing: 0,
+      });
       expect(report.reasons.join('\n')).toMatch(/票据内容校验失败：票据 01「样例票据」/);
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
@@ -582,13 +637,21 @@ describe('check-artifact-gate.ts --tickets 参数契约（子进程，S18 §0.1.
     try {
       const file = path.join(dir, 'tickets.md');
       await fs.writeFile(file, VALID_TICKETS, 'utf-8');
-      const { status, stdout } = runGate([dir, '--phase=8', '--tickets=tickets.md']);
+      const { status, stdout } = await runGate([dir, '--phase=8', '--tickets=tickets.md']);
       expect(status).toBe(1); // phase 8 缺 --scope → 外部校验 fail-closed（与票据无关）
       const report = JSON.parse(stdout) as {
-        tickets: { checked: number; criticalMissing: number; buildabilityMissing: number };
+        tickets: {
+          checked: number;
+          criticalMissing: number;
+          buildabilityMissing: number;
+        };
         reasons: string[];
       };
-      expect(report.tickets).toEqual({ checked: 2, criticalMissing: 0, buildabilityMissing: 0 });
+      expect(report.tickets).toEqual({
+        checked: 2,
+        criticalMissing: 0,
+        buildabilityMissing: 0,
+      });
       expect(report.reasons.filter((x) => x.includes('票据内容校验失败'))).toEqual([]);
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
@@ -596,8 +659,8 @@ describe('check-artifact-gate.ts --tickets 参数契约（子进程，S18 §0.1.
   });
 });
 
-describe('check-artifact-gate.ts --spec-dir 参数契约（子进程，阶段专属 flag 不得静默忽略）', () => {
-  const rtmSource = require('node:fs').readFileSync(VALID_RTM, 'utf-8') as string;
+describe('check-artifact-gate.ts --spec-dir 参数契约（进程内，阶段专属 flag 不得静默忽略）', () => {
+  const rtmSource = readFileSync(VALID_RTM, 'utf-8') as string;
 
   async function makeProject(): Promise<string> {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-specdir-'));
@@ -606,15 +669,16 @@ describe('check-artifact-gate.ts --spec-dir 参数契约（子进程，阶段专
     return dir;
   }
 
-  function runGate(args: string[]): { status: number | null; stdout: string } {
-    const r = runSync(process.execPath, [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, ...args, '--json'], {});
-    return { status: r.status, stdout: r.stdout ?? '' };
+  /** 进程内调用 check-artifact-gate（模块路径相对 helpers/ 是两个 ../） */
+  async function runGate(args: string[]): Promise<{ status: number | undefined; stdout: string }> {
+    const r = await invokeCli('../../cli/check-artifact-gate.js', [...args, '--json']);
+    return { status: r.exitCode, stdout: r.stdout };
   }
 
   it('缺 --phase 时给定 --spec-dir → exit 2 ARG_INVALID（修复前：静默丢弃该参数，specStructure=null 且无任何提示）', async () => {
     const dir = await makeProject();
     try {
-      const { status, stdout } = runGate([dir, `--spec-dir=${dir}`]);
+      const { status, stdout } = await runGate([dir, `--spec-dir=${dir}`]);
       expect(status).toBe(2);
       expect(stdout).toContain('ERROR_JSON');
       expect(stdout).toMatch(/"category":"ARG_INVALID"/);
@@ -627,7 +691,7 @@ describe('check-artifact-gate.ts --spec-dir 参数契约（子进程，阶段专
   it('--phase=8 给定 --spec-dir → exit 2 ARG_INVALID（与 --tickets 同口径：阶段不适用即拒，不静默跳过）', async () => {
     const dir = await makeProject();
     try {
-      const { status, stdout } = runGate([dir, '--phase=8', `--spec-dir=${dir}`]);
+      const { status, stdout } = await runGate([dir, '--phase=8', `--spec-dir=${dir}`]);
       expect(status).toBe(2);
       expect(stdout).toContain('参数非法 --spec-dir');
     } finally {
@@ -638,7 +702,7 @@ describe('check-artifact-gate.ts --spec-dir 参数契约（子进程，阶段专
   it('空值 --spec-dir= → exit 2 ARG_INVALID（空值不是「未提供」，不得静默忽略）', async () => {
     const dir = await makeProject();
     try {
-      const { status, stdout } = runGate([dir, '--phase=1', '--spec-dir=']);
+      const { status, stdout } = await runGate([dir, '--phase=1', '--spec-dir=']);
       expect(status).toBe(2);
       expect(stdout).toContain('参数非法 --spec-dir');
       expect(stdout).toContain('仅接受等号形态且值非空');
@@ -650,7 +714,7 @@ describe('check-artifact-gate.ts --spec-dir 参数契约（子进程，阶段专
   it('空格形态 --spec-dir <dir> → exit 2 ARG_INVALID（修复前被当作「未提供」，提示反说未提供）', async () => {
     const dir = await makeProject();
     try {
-      const { status, stdout } = runGate([dir, '--phase=1', '--spec-dir', dir]);
+      const { status, stdout } = await runGate([dir, '--phase=1', '--spec-dir', dir]);
       expect(status).toBe(2);
       expect(stdout).toContain('参数非法 --spec-dir');
       expect(stdout).toContain('仅接受等号形态且值非空');
@@ -662,7 +726,7 @@ describe('check-artifact-gate.ts --spec-dir 参数契约（子进程，阶段专
   it('--phase=1 给定 --spec-dir → 该参数不被拒（正常进入设计级结构校验，不得误红）', async () => {
     const dir = await makeProject();
     try {
-      const { stdout } = runGate([dir, '--phase=1', `--spec-dir=${dir}`]);
+      const { stdout } = await runGate([dir, '--phase=1', `--spec-dir=${dir}`]);
       expect(stdout).not.toContain('参数非法 --spec-dir');
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
@@ -672,7 +736,7 @@ describe('check-artifact-gate.ts --spec-dir 参数契约（子进程，阶段专
   it('缺省不触发：无 --spec-dir 时阶段 1-4 标记为 skipped（既有调用方零影响）', async () => {
     const dir = await makeProject();
     try {
-      const { stdout } = runGate([dir, '--phase=1']);
+      const { stdout } = await runGate([dir, '--phase=1']);
       const report = JSON.parse(stdout) as { specStructure?: unknown };
       expect(report.specStructure).toBe('skipped');
     } finally {
