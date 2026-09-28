@@ -20,9 +20,9 @@
 //   判定口径：真实 import node:child_process 或调用 runSync/execSync/spawnSync/execFile
 //   （后跟左括号）；vi.mock('node:child_process') 整体替换子进程的文件（artifact-gate-assets）
 //   从不真实启动，**不算** spawn。
-//   已知盲点（HEAD 既存，非本轮引入）：run-sync.test.ts 顶部有同类 vi.mock，但其 472-486 行
-//   用例经 vi.doUnmock + vi.resetModules() 后真实 spawn 子进程并断言真实 ETIMEDOUT——
-//   文件级 mocked 判定使它既未登记也无红灯；修正留待收口后单独立项（逐调用点判定 + 登记）。
+//   已清（2026-09-28 Wave 2/T5）：run-sync.test.ts 顶部 vi.mock 使文件级判定为
+//   非 spawn，但其「terminates a real slow child」用例经 vi.doUnmock 真实 spawn——
+//   已如实登记进 SUBPROCESS_TEST_FILES（登记口径优先于判定口径，宁串行勿漏判）。
 
 const TEST_DIR = 'w-model-dev/scripts/__tests__';
 
@@ -75,6 +75,7 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'pre-commit-hook.test.ts',
   'project-read-validation.test.ts',
   'review-package-cli.test.ts',
+  'run-sync.test.ts',
   'verifier-logic.test.ts',
   'wm-append-runlog-cli.test.ts',
   'wm-status.test.ts',

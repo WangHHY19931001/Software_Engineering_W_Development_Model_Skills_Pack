@@ -15,14 +15,16 @@
  * 判定口径与拆分时的人工核实一致：
  *   spawn 证据 = 真实 import node:child_process（含经 lib/run-sync 间接调用）
  *             或调用 runSync/execSync/spawnSync/execFile（名称后紧跟左括号的真实调用）；
- *             且未被 vi.mock 替换。已知陷阱（口径收紧的由来）：
+ *             且未被 vi.mock 替换（经 vi.doUnmock 还原的除外，2026-09-28 T5：顶部
+ *             mock 后逐用例 doUnmock 回真实模块，仍是真实 spawn，登记口径优先）。
+ *             已知陷阱（口径收紧的由来）：
  *             正则的 .exec(（examples-contract）、仅在字符串常量里出现的模块名
  *             （dependency-boundaries）、以及 vi.mock 整体替换 child_process
  *             （artifact-gate-assets）都不是真实 spawn，不登记。
- *             已知盲点（HEAD 既存，非本轮引入）：run-sync.test.ts 顶部有同类 vi.mock，
- *             但其 472-486 行用例经 vi.doUnmock + vi.resetModules() 后真实 spawn 子进程
- *             并断言真实 ETIMEDOUT——文件级 mocked 判定使它既未登记也无红灯；
- *             修正需把 mocked 改为逐调用点判定 + 登记 run-sync，留待收口后单独立项。
+ *             已清（2026-09-28 Wave 2/T5）：run-sync.test.ts 顶部 vi.mock 使文件级判定
+ *             为非 spawn，但其「terminates a real slow child」用例经 vi.doUnmock 真实
+ *             spawn——已如实登记进 SUBPROCESS_TEST_FILES，判定口径补 doUnmock 例外后
+ *             双向校验对它恢复双向生效（宁串行勿漏判）。
  *             注：doctor-logic 自 2026-09-18 起含真实 CLI 子进程用例（D1 回归），
  *             已登记，不再属「注释里的词」陷阱。
  * 本测试自身不真实启动任何子进程（纯 fs 读取），因此属于 unit-parallel 项目。
@@ -46,8 +48,11 @@ function spawnEvidence(source: string): boolean {
     /\bimport\b[^;'"]*from\s+['"]node:child_process['"]/.test(source) ||
     /require\(\s*['"]node:child_process['"]\s*\)/.test(source);
   const mocked = /vi\.mock\(\s*['"]node:child_process['"]/.test(source);
+  // T5（2026-09-28）：vi.mock 后经 vi.doUnmock 还原的文件仍会真实 spawn（run-sync.test.ts
+  // 的「terminates a real slow child」用例）——mocked 判定对 doUnmock 文件让位（宁串行勿漏判）。
+  const doUnmocked = /vi\.doUnmock\(\s*['"]node:child_process['"]/.test(source);
   const called = /\b(?:runSync|execSync|spawnSync|execFile)\(/.test(source);
-  return (realImport || called) && !mocked;
+  return (realImport || called) && (!mocked || doUnmocked);
 }
 
 function listTests(): string[] {
