@@ -1,4 +1,5 @@
-// Vitest 配置：仅扫描技能包门禁脚本单元测试，按「是否启动真实子进程」拆成两个 project。
+// Vitest 配置：仅扫描技能包门禁脚本单元测试，按「是否启动真实子进程」拆成三个 project
+// （unit-parallel 并行 + cli-serial-a / cli-serial-b 两组串行、组间并行）。
 // 不依赖 vitest/config 的 defineConfig，纯对象导出避免 vitest 包未装时的 ERR_MODULE_NOT_FOUND。
 //
 // testTimeout 说明：部分测试用 execSync 启动 `npx tsx <script>` 子进程（CLI 集成测试）。
@@ -23,14 +24,20 @@
 //   已清（2026-09-28 Wave 2/T5）：run-sync.test.ts 顶部 vi.mock 使文件级判定为
 //   非 spawn，但其「terminates a real slow child」用例经 vi.doUnmock 真实 spawn——
 //   已如实登记进 SUBPROCESS_TEST_FILES（登记口径优先于判定口径，宁串行勿漏判）。
+//   2026-09-29 Wave 2.3 登记：serial 池拆两组（cli-serial-a / cli-serial-b）组间并行。
+//   与 B6 已证伪的「全局共享 workers」不同机制：组内仍 fileParallelism:false 互不重叠，
+//   仅两组并发（分属不同 project，天然并发跑）。启用判据：vitest 墙钟 1191s > 12 min。
+//   前提：3 连跑零 flaky 门槛通过后保留本拆分；任一失败整组回退单一 cli-serial
+//   （回退 = 恢复单 project 配置）。
 
 const TEST_DIR = 'w-model-dev/scripts/__tests__';
 
 /**
  * 会启动真实子进程的测试文件（相对 TEST_DIR）。
  * 判定口径：源码含 `from 'node:child_process'` 或调用 `runSync(/execSync(/spawnSync(/execFile(`。
- * 此清单是 **cli-serial 项目的成员名单 + unit-parallel 项目的排除名单**，两处由本常量派生，
- * 不会漂移；清单本身的正确性由 vitest-project-split.test.ts 双向守护。
+ * 此清单是 **cli-serial-a / cli-serial-b 两组串行项目的成员名单（按索引奇偶派生）+
+ * unit-parallel 项目的排除名单**，三处由本常量派生，不会漂移；
+ * 清单本身的正确性由 vitest-project-split.test.ts 双向守护。
  */
 export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'bdd-cli.test.ts',
@@ -78,7 +85,11 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'wm-write.test.ts',
 ];
 
-const subprocessGlobs = SUBPROCESS_TEST_FILES.map((f) => `${TEST_DIR}/${f}`);
+// 奇偶派生两组 serial 池（单一事实源 SUBPROCESS_TEST_FILES 不裂变；2026-09-29 Wave 2.3，
+// 见文件头「为什么拆两个 project」注释块末段登记）：
+// 偶数索引 → A 组，奇数索引 → B 组；组内串行互不重叠，组间分属不同 project 天然并行。
+const subprocessGlobsA = SUBPROCESS_TEST_FILES.filter((_, i) => i % 2 === 0).map((f) => `${TEST_DIR}/${f}`);
+const subprocessGlobsB = SUBPROCESS_TEST_FILES.filter((_, i) => i % 2 === 1).map((f) => `${TEST_DIR}/${f}`);
 
 export default {
   test: {
@@ -88,7 +99,7 @@ export default {
         test: {
           name: 'unit-parallel',
           include: [`${TEST_DIR}/**/*.test.ts`],
-          exclude: ['node_modules/**', ...subprocessGlobs],
+          exclude: ['node_modules/**', ...subprocessGlobsA, ...subprocessGlobsB],
           testTimeout: 30000,
           hookTimeout: 30000,
           // fileParallelism 缺省即 true：纯逻辑文件无子进程竞争，保持并行。
@@ -96,13 +107,26 @@ export default {
       },
       {
         test: {
-          name: 'cli-serial',
-          include: [...subprocessGlobs],
+          name: 'cli-serial-a',
+          include: [...subprocessGlobsA],
           exclude: ['node_modules/**'],
           testTimeout: 30000,
           hookTimeout: 30000,
-          // 子进程类文件串行：同一时刻至多一个文件在 spawn CLI 子进程，
-          // 消除子进程互抢导致的偶发失败（见文件头说明）。不要为提速改回 true。
+          // 子进程类文件组内串行：同一时刻每组至多一个文件在 spawn CLI 子进程，
+          // 消除子进程互抢导致的偶发失败（见文件头说明）；a/b 两组分属不同 project
+          // 组间并行（Wave 2.3，与 B6 已证伪的「全局共享 workers」不同机制）。
+          // 不要为提速把 fileParallelism 改回 true。
+          fileParallelism: false,
+        },
+      },
+      {
+        test: {
+          name: 'cli-serial-b',
+          include: [...subprocessGlobsB],
+          exclude: ['node_modules/**'],
+          testTimeout: 30000,
+          hookTimeout: 30000,
+          // 同 cli-serial-a：组内串行、组间并行；成员为清单奇数索引派生。
           fileParallelism: false,
         },
       },
