@@ -34,7 +34,7 @@ W 模型 8 阶段**串行**推进。每阶段先经 🔴 CHECKPOINT 进入确认
 | 7 系统测试 | 系统测试执行结果、性能/安全报告、RTM systemTest | `check-artifact-gate.ts --phase=7 --scope=.w-model/change-scope.json`、`check-bdd-model.ts --phase=7 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/system.json` | [stage7-system-test.md](stage7-system-test.md) |
 | 8 验收测试 | 验收测试执行结果、归档产物（含编码计划归档快照）、RTM acceptanceTest | `check-artifact-gate.ts`（终检，默认 `--phase=8`，须 `--scope=.w-model/change-scope.json`）、`check-archive-integrity.ts`（含 codingPlanSnapshot 归档快照条件项）、`check-bdd-model.ts --phase=8 --graph=.w-model/ingestion/graph.json --require-cucumber-report --cucumber-report=reports/cucumber/acceptance.json`、`check-design-contract-consistency.ts`、`check-coding-plan.ts --phase=8 --scope=.w-model/change-scope.json` | [stage8-acceptance-test.md](stage8-acceptance-test.md) |
 
-> 每阶段门放行前，G 还须跑 5 项闭环脚本（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ `check-role-dispatch.ts` + `check-signature-chain.ts`；阶段 5-8 附加 `check-codegraph-queries.ts` / `check-coding-plan.ts`（与 artifact gate 一样以 `--scope` 绑定变更上下文；归档快照由 `check-archive-integrity.ts` 的 `codingPlanSnapshot` 条件项在归档后单独校验；旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役，语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）。完整分派矩阵见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）。
+> 每阶段门放行前，G 还须跑齐闭环五门（约束 #11）+ 角色分派 / 签名链校验，阶段 5-8 另加 codegraph / 编码计划 strict 两门（均与 artifact gate 一样以 `--scope` 绑定变更上下文）——完整清单与调度顺序见 [operational-recovery.md](../references/operational-recovery.md)「调用时机（阶段门执行顺序）」节。完整分派矩阵见 [subagent-delegation.md](../references/subagent-delegation.md)（dispatch-matrix 节）。
 
 ## 串联执行顺序
 
