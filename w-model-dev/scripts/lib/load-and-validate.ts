@@ -16,7 +16,8 @@
  *       其他读取错误      → FILE_READ
  *       JSON 解析失败     → FILE_PARSE
  *       schema 校验失败   → STRUCTURE_INVALID（rule P0-3，field=首个错误的 instancePath，
- *                          detail=首个错误消息）
+ *                          detail=首条**已格式化**错误消息（schema-loader errorMessages[0]，
+ *                          与人类可读 violations 同源；`additionalProperties` 形态含额外字段名）
  *   - 错误路径 exitWithError 后抛哨兵 Error（与 readJsonClassified 同构），
  *     防止调用方继续执行产生「ERROR_JSON + 正常报告」混合输出；调用方 catch 后 return 2。
  *   - ⚠ 调用方必须区分哨兵错误与真实异常：catch 到
@@ -98,7 +99,10 @@ export async function loadAndValidate<T = unknown>(filePath: string, schemaKey: 
       rule: 'P0-3',
       file: abs,
       field: first?.instancePath || '/',
-      detail: first?.message ?? schemaResult.errorMessages[0],
+      // detail 取 schema-loader 的**已格式化**首条消息（errorMessages[0]）：与人类可读 violations
+      // 同源，`additionalProperties` 形态因此带上 `(额外字段: <name>)`（L1 同族，修复轮 1）；
+      // 原始 Ajv `first.message` 仅作 errorMessages 为空时的兜底（不改 category/rule/field/exitCode）。
+      detail: schemaResult.errorMessages[0] ?? first?.message,
     });
     throw new Error(`${LOAD_AND_VALIDATE_SENTINEL_PREFIX}输入错误已通过 exitWithError 处理`);
   }

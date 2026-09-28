@@ -1050,7 +1050,15 @@ async function main(): Promise<void> {
   if (violations.length === 0)
     console.log('✓ 全部 fixture 已被 self-test.ts 引用，矩阵声明齐全，负向登记册与 exit-2 探针一致');
   // 派生锚（2026-09-27 任务 1 / T1）：登记册不再手写锚，覆盖位置由门禁从 self-test.ts 用例条目现算并打印
-  console.log('[派生锚] 每行 → 覆盖位置（由 self-test.ts 用例条目派生，非手写）');
+  // 块头如实描述三形态（L3，2026-09-28 遗留收口）：fixture 行 = 派生锚；invocation / mutated-copy 行 = 本行落点；
+  // fixture 不可派生（不在盘 / 无覆盖条目 / 多义覆盖）→ null（人类可读侧打印占位说明，机器侧 derivedAnchors 的对应元素为 null）。
+  console.log(
+    '[派生锚] 每行 → 覆盖位置：fixture 行 = self-test.ts 用例条目派生的覆盖位置' +
+      "（`self-test.ts#file: 'x.json'` / `self-test.ts#sampleDir: 'dir'`）；" +
+      'invocation / mutated-copy 行 = 本行落点（登记的第 2 列路径）；' +
+      'fixture 不可派生（不在盘 / 无覆盖条目 / 多义覆盖）→ null' +
+      '（人类可读侧打印占位说明，机器可读侧 `SAMPLES_COVERAGE_JSON.derivedAnchors` 的对应元素为 `null`，数组按行序占位）',
+  );
   for (const item of analysis.analyses) {
     console.log(`  ${item.entry.name} → ${item.derivedAnchor ?? '（无 self-test 覆盖，见上方违规）'}`);
   }

@@ -6,8 +6,9 @@
  * 只是把该散文阈值变成确定性上限断言，不是第二权威；改阈值先改 asset-authoring.md §5
  * （单一权威位置），再带实测依据更新此处常量与注释，两处同一次提交完成。
  *
- * 这些断言的价值在「钉住上限防未来膨胀」：每个常量都显著高于当前实测值但紧到有意义，
- * 不是现状描述。注释写明「阈值来源 + 当前实测值 + 实测日期」，改预算常量时连同来历一次写清。
+ * 这些断言的价值在「钉住上限防未来膨胀」：每个常量都显著高于立此上限时的实测值但紧到有意义，
+ * 不是现状描述。注释写明「阈值来源 + 立上限时的实测依据（日期 / 锚）」，改预算常量时连同来历一次写清；
+ * 实测数随文档演进会漂移，注释里的数值只作**历史依据**（实际值以目录实测为准），不追新。
  *
  * 词数类阈值（asset-authoring.md §5 :70-72 的 <150/<200/<500 词）有意不断言：中文字数无
  * 可靠的确定性度量（P2-B 计划 §0.1.3 范围裁定，按 S04「不编码不可测物」精神）。
@@ -103,35 +104,39 @@ function hasTocSection(lines: string[]): boolean {
 }
 
 /**
- * L0 载体定量预算（全部为**上限**；每项注释写明阈值来源 + 当前实测值 + 实测日期）。
+ * L0 载体定量预算（全部为**上限**；每项注释写明阈值来源 + 立上限时的实测依据（日期 / 锚；
+ * 实测数以目录实测为准，注释数值仅作历史依据））。
  */
 const ASSET_BUDGET = {
   // asset-authoring.md §5 :65「SKILL.md body < 500 行」→ 上限 499（正文不含 frontmatter）。
-  // 当前实测 124 行（frontmatter :1-10、正文 :11-134；2026-09-15 P2-B Task 3 实测）。
+  // 立上限时实测 124 行（frontmatter :1-10、正文 :11-134；2026-09-15 P2-B Task 3 实测；
+  // 此后行号与行数以目录实测为准——历史依据，不追新）。
   skillBodyMaxLines: 499,
   // asset-authoring.md §5 :67「代码 / 内容 < 50 行保持内联」→ SKILL.md 单个围栏代码块上限
-  // 50 行（开口栏行到闭栏行端点计入）。当前实测围栏代码块 0 个（2026-09-15 实测；
-  // 本预算为前瞻性上限——首个内联代码块出现时即受约束，防止编排主文件被代码淹没）。
+  // 50 行（开口栏行到闭栏行端点计入）。立上限时实测围栏代码块 0 个（2026-09-15 实测；
+  // 此后围栏数以目录实测为准；本预算为前瞻性上限——首个内联代码块出现时即受约束，
+  // 防止编排主文件被代码淹没）。
   skillFenceMaxLines: 50,
   // asset-authoring.md §5 :66「100+ 行的重参考内容须落到独立文件」+ :69「> 100 行的参考文件
   // 在顶部加目录（TOC）」→ 每文件上限 2500。
-  // 当前实测最大 tla-plus.md：base 3e3b521f 实测 2295 行（无目录节）；head 实测 2317 行
-  // （含本次补入的目录节 +22；2026-09-15 P2-B Task 3 实测）。
+  // 立上限时最大 tla-plus.md：base 3e3b521f 实测 2295 行（无目录节）；head 实测 2317 行
+  // （含本次补入的目录节 +22；2026-09-15 P2-B Task 3 实测；此后各文件行数以目录实测为准）。
   referenceFileMaxLines: 2500,
   // references 文件数上限。2026-09-15 实测 43 个 .md，预算 48 留 5 个新增余量（历史依据，不再声明「当前」；
   // 上限值与前瞻余量不动，实际份数以目录实测为准）。
   referenceMaxFileCount: 48,
-  // references 总行数上限。当前实测 16482 行（含 Task 1 对 hard-constraints.md 的 S27 链接
+  // references 总行数上限。立上限时实测 16482 行（含 Task 1 对 hard-constraints.md 的 S27 链接
   // 增行 +4 与 Task 3 补入的两个目录节 +40；base 3e3b521f 实测 16442 行；
-  // 2026-09-15 P2-B Task 3 实测）。
+  // 2026-09-15 P2-B Task 3 实测；此后总行数以目录实测为准）。
   referenceTotalMaxLines: 20000,
   // asset-authoring.md §5 :68「引用只允许一层深」的结构性表达：references 保持平坦无子目录。
-  // 当前实测 0 个子目录（2026-09-15 实测）。
+  // 立上限时实测 0 个子目录（2026-09-15 实测；此后子目录数以目录实测为准）。
   referenceMaxSubdirectoryCount: 0,
   // asset-authoring.md §5 :69「> 100 行的参考文件在顶部加目录（TOC）」——按 P2-B 计划 §0.1.3
-  // 范围裁定只对 >1000 行的文件断言。当前实测 5 个（head 实测）：tla-plus 2317（base 2295，
+  // 范围裁定只对 >1000 行的文件断言。立上限时实测 5 个（head 实测）：tla-plus 2317（base 2295，
   // 差值即本次目录节 +22）/ bdd 1802（base 1784，含目录节 +18）/ subagent-delegation 1617 /
-  // data-models 1042 / verifier-spec 1026（2026-09-15 P2-B Task 3 实测）。
+  // data-models 1042 / verifier-spec 1026（2026-09-15 P2-B Task 3 实测；此后份数与行数以目录实测为准，
+  // 当前在册文件由用例内 oversized 守卫断言钉住）。
   tocRequiredAboveLines: 1000,
 } as const;
 
@@ -147,7 +152,8 @@ describe('L0 载体定量预算（S30，真实包上限断言）', () => {
     const content = await fs.readFile(SKILL_MD, 'utf8');
     const { blocks, unclosed } = scanFenceBlocks(toLines(content));
 
-    // 当前实测 0 个围栏代码块：本断言的前瞻价值由一次性收紧验证覆盖（见任务报告）。
+    // 立上限时实测 0 个围栏代码块（2026-09-15 P2-B Task 3；此后以目录实测为准）：
+    // 本断言的前瞻价值由一次性收紧验证覆盖（见任务报告）。
     for (const block of blocks) {
       expect(block.lineCount).toBeLessThanOrEqual(ASSET_BUDGET.skillFenceMaxLines);
     }

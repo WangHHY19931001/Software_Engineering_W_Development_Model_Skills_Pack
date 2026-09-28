@@ -2095,10 +2095,20 @@ describe('runDocConsistencyChecks', () => {
         };
         expect(report.reasons.some((reason) => reason.includes('[vitest-'))).toBe(true);
         expect(report.dynamicMeasurements).not.toBeNull();
+
+        // 人类可读通道（L9，2026-09-28 遗留收口）：态 2（自采集失败，-1 哨兵）的统计行须如实为
+        // 「无法采集（不一致）」（cli/check-docs-consistency.ts 的 vitestTestLabel 分支），不得与态 3 的
+        // 「跳过（未提供受控 vitest 工件）」混淆，也不得把 -1 哨兵原样打印。
+        const human = runDocsConsistencyCli(fixtureRoot, NO_VITEST_ENV, ['--spawn-vitest'], {
+          timeoutMs: 60_000,
+        });
+        expect(human.code, JSON.stringify(human)).toBe(1);
+        expect(human.stdout).toContain('vitest 用例  : 无法采集（不一致）');
+        expect(human.stdout).not.toContain('跳过（未提供受控 vitest 工件）');
       },
       { availablePackages: ['tsx', 'typescript', 'esbuild'] },
     );
-  }, 120_000);
+  }, 180_000); // L9 复审（2026-09-28）：本用例含两次真实 CLI spawn（各 timeoutMs 60s）——最坏 2×60s 会顶到原 120s 外层上限，放宽留 fixture 准备与负载余量（实测 ~28s）
 
   it('CLI --spawn-vitest 自采集成功路径：自生成同目录 provenance 后严格校验通过（stub vitest）', async () => {
     await withDocsConsistencyFixture(

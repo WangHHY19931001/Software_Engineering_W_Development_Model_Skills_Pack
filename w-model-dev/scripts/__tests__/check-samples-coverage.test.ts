@@ -439,6 +439,46 @@ describe('check-samples-coverage 负向覆盖不变量（M06 / S28）', () => {
     expect(r.stdout).toContain(`"derivedAnchors":["self-test.ts#file: 'a.json'","${EVIDENCE_FILE}"]`);
   });
 
+  // ==================== 派生锚三形态（L3，2026-09-28 遗留收口）：null 分支 + sampleDir 分支 ====================
+  it('RED：fixture 行不在盘 → 派生锚为 null（机器可读占位不省略，人类可读打印占位说明而非伪锚）', async () => {
+    await setupSingleGateRepo([{ name: 'check-foo', fixture: '`samples/foo/ghost.json`', mechanism: 'fixture' }]);
+    const r = run();
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('negative-coverage-dangling');
+    // 机器可读：不可派生即 null，且数组仍按登记行序占位（长度 = 登记行数，不得静默省略）
+    expect(r.stdout).toContain('"derivedAnchors":[null]');
+    // 人类可读：打印占位说明（不是伪造一个 self-test.ts#… 锚）
+    expect(r.stdout).toContain('check-foo → （无 self-test 覆盖，见上方违规）');
+    // 块头如实描述三形态（L3）：fixture 派生 / 其余行本行落点 / 不可派生为 null
+    expect(r.stdout).toContain('fixture 行 = self-test.ts 用例条目派生的覆盖位置');
+    expect(r.stdout).toContain('invocation / mutated-copy 行 = 本行落点');
+    expect(r.stdout).toContain('fixture 不可派生');
+  });
+
+  it("正例：fixture 由 sampleDir 目录条目覆盖 → 派生锚为 self-test.ts#sampleDir: '<dir>'（目录形态）", async () => {
+    await setupRepo({
+      refs: [],
+      selfTestContent: [
+        "const FOO_CASES: Array<{ sampleDir: string; expectedPassed: boolean }> = [{ sampleDir: 'foo', expectedPassed: false }];",
+        'async function runFooCases(): Promise<void> {',
+        '  for (const c of FOO_CASES) {',
+        '    await run(path.join(samplesDir, c.sampleDir));',
+        '  }',
+        '}',
+      ].join('\n'),
+      onDisk: ['foo/a.json'],
+      readme: fakeReadme(['foo']),
+      cliScripts: ['check-foo.ts'],
+      negative: fakeNegativeCoverage([{ name: 'check-foo', fixture: '`samples/foo/a.json`', mechanism: 'fixture' }]),
+    });
+    const r = run();
+    expect(r.code).toBe(0);
+    // 人类可读：该 fixture 由目录声明覆盖（无精确 file: 声明），锚即目录声明文本本身（可直接 grep self-test.ts）
+    expect(r.stdout).toContain("check-foo → self-test.ts#sampleDir: 'foo'");
+    // 机器可读：同一派生锚进 derivedAnchors（顺序 = 登记行序）
+    expect(r.stdout).toContain(`"derivedAnchors":["self-test.ts#sampleDir: 'foo'"]`);
+  });
+
   it('RED：门禁不实现 exit-2 契约 → exit 1 negative-coverage-probe-failed（探针是真执行，非纸面登记）', async () => {
     await putTargetFile(EVIDENCE_FILE);
     await setupSingleGateRepo([{ name: 'check-foo', fixture: `\`${EVIDENCE_FILE}\``, mechanism: 'invocation' }], {

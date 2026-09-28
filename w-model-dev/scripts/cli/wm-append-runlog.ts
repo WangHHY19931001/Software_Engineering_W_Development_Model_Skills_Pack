@@ -260,7 +260,11 @@ function assertRecordsValid(records: readonly RunLogRecord[], source: string, la
       message: `${label}第 ${index + 1} 条记录不符 run-log schema`,
       file: source,
       field: `records[${index}]${first?.instancePath ?? ''}`,
-      detail: `${first?.message ?? result.errorMessages[0] ?? '未知 schema 错误'} [${first?.keyword ?? 'schema'}]`,
+      // detail 取 schema-loader 的**已格式化**首条消息（result.errorMessages[0]，与人类可读 violations
+      // 同源）——`additionalProperties` 形态因此带上 `(额外字段: <name>)` 且已含 `[keyword]` 尾部；
+      // 原始 Ajv `first.message`（不含字段名、需另行拼 keyword）仅作 errorMessages 为空时的兜底
+      // （L1 同族，修复轮 1；category/rule/field/exitCode 均不变）。
+      detail: result.errorMessages[0] ?? `${first?.message ?? '未知 schema 错误'} [${first?.keyword ?? 'schema'}]`,
       exitCode: 2,
     });
     throw new HandledCliError();

@@ -243,7 +243,7 @@
       "minimum": 0
     },
     "parentDispatchId": {
-      "description": "可选。多归账分派的主记录 ID：R3 三维度等同一分派多条归账时，附属条目以该字段指向主条目 runId。仅用于 check-budget 疑似重复归账判定的精确化（在场时同 parentDispatchId 的条目不互计重复组）；legacy 记录缺字段维持现判定。Σtokens 上界口径不变——字段不参与任何去重扣减。",
+      "description": "可选。多归账分派的主记录 ID：R3 三维度等同一分派多条归账时，附属条目以该字段指向主条目 runId。仅用于 check-budget 疑似重复归账判定的精确化（在场且非空时作为分组键前缀：同 parentDispatchId 且键全同仍计组；不同 parentDispatchId 即使其余键相同也不并组）；legacy 记录缺字段维持现判定（空前缀）。Σtokens 上界口径不变——字段不参与任何去重扣减。",
       "type": "string",
       "minLength": 1
     },
