@@ -448,7 +448,7 @@ describe('check-samples-coverage 负向覆盖不变量（M06 / S28）', () => {
     // 机器可读：不可派生即 null，且数组仍按登记行序占位（长度 = 登记行数，不得静默省略）
     expect(r.stdout).toContain('"derivedAnchors":[null]');
     // 人类可读：打印占位说明（不是伪造一个 self-test.ts#… 锚）
-    expect(r.stdout).toContain('check-foo → （无 self-test 覆盖，见上方违规）');
+    expect(r.stdout).toContain('check-foo → （覆盖位置不可派生：不在盘 / 无覆盖条目 / 多义覆盖，见上方违规）');
     // 块头如实描述三形态（L3）：fixture 派生 / 其余行本行落点 / 不可派生为 null
     expect(r.stdout).toContain('fixture 行 = self-test.ts 用例条目派生的覆盖位置');
     expect(r.stdout).toContain('invocation / mutated-copy 行 = 本行落点');

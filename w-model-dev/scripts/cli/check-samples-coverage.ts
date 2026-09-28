@@ -1060,7 +1060,9 @@ async function main(): Promise<void> {
       '（人类可读侧打印占位说明，机器可读侧 `SAMPLES_COVERAGE_JSON.derivedAnchors` 的对应元素为 `null`，数组按行序占位）',
   );
   for (const item of analysis.analyses) {
-    console.log(`  ${item.entry.name} → ${item.derivedAnchor ?? '（无 self-test 覆盖，见上方违规）'}`);
+    console.log(
+      `  ${item.entry.name} → ${item.derivedAnchor ?? '（覆盖位置不可派生：不在盘 / 无覆盖条目 / 多义覆盖，见上方违规）'}`,
+    );
   }
   printGateReport(
     'SAMPLES_COVERAGE',
