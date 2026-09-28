@@ -49,7 +49,8 @@ interface ReviewPackageArgs {
 
 /** 严格解析仅支持 --name=value；所有位置参数、无值选项和空值均拒绝。 */
 function parseArgs(argv: string[]): ReviewPackageArgs {
-  const raw = argv.slice(2);
+  // main 签名默认参已 slice(2)，此处 argv 即用户参数（不含 node/脚本路径）
+  const raw = argv;
   const args: ReviewPackageArgs = { repo: undefined, base: undefined, head: undefined, out: undefined };
   const seen = new Set<string>();
   for (const token of raw) {
@@ -251,10 +252,10 @@ function gitSection(repo: string, gitArgs: string[], label: string): string {
   return stdout.endsWith('\n') ? stdout.slice(0, -1) : stdout;
 }
 
-async function main(): Promise<void> {
+async function runReviewPackageCli(argv: string[]): Promise<void> {
   let args: ReviewPackageArgs;
   try {
-    args = parseArgs(process.argv);
+    args = parseArgs(argv);
   } catch (error) {
     exitWithError({ category: 'ARG_INVALID', rule: 'P0-1', message: (error as Error).message, exitCode: 2 });
     return;
@@ -379,6 +380,28 @@ async function main(): Promise<void> {
     `REVIEW_PACKAGE_JSON ${JSON.stringify({ path: output.path, base: baseSha, head: headSha, commits, bytes: Buffer.byteLength(content, 'utf8') })}`,
   );
   process.exitCode = 0;
+}
+
+/**
+ * 进程内可调用入口（Wave 2 进程内化）：argv 默认取真实进程参数（已切 node/脚本路径）；
+ * gitSection 失败路径（exitWithError 已输出并设置 exitCode 后抛 HandledCliError）在此收敛
+ * 为正常返回——子进程形态由 runMain 静默处理，进程内形态（__tests__/helpers/cli-invoker.ts）
+ * 同样能读到 exitCode，两形态退出码与输出一致。
+ */
+export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+  try {
+    await runReviewPackageCli(argv);
+  } catch (err) {
+    if (err instanceof HandledCliError) return;
+    // 其余异常按 runMain 同款语义转 UNEXPECTED / exit 2（子进程形态由 runMain 输出，
+    // 进程内形态在此输出——两形态退出码与 stderr 语义一致）
+    exitWithError({
+      category: 'UNEXPECTED',
+      message: '脚本异常',
+      detail: err instanceof Error ? err.message : String(err),
+      exitCode: 2,
+    });
+  }
 }
 
 // 统一入口（lib/run-main.ts）：main().catch 统一为 UNEXPECTED + exit 2；导入模块时不启动 CLI，便于测试写入层。

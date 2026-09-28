@@ -28,6 +28,7 @@ import {
 } from '../logic/code-health-ledger-logic.js';
 import type { ApplyResult } from '../logic/code-health-contract.js';
 import { runSync } from '../lib/run-sync.js';
+import { invokeCli } from './helpers/cli-invoker.js';
 
 import {
   bindRevision,
@@ -42,11 +43,23 @@ import {
   loadApplyFixture,
   REPO_ROOT,
   revisionProvider,
-  runCli,
   tempRoot,
   writeJson,
   type ApplyFixture,
+  type CliResult,
 } from './helpers/code-health-fixtures.js';
+
+/**
+ * 进程内调用被测 CLI（Wave 2 进程内化；--root 显式传参，CLI 无 cwd 依赖）。
+ * 共享 helper 的 runCli（真实子进程）保留原样供 code-health-e2e.test.ts 使用。
+ * 本文件的 git spawn 全部来自 fixture 建仓/回滚验证（runSync('git')），保留真实子进程
+ * ——本文件仍登记 SUBPROCESS_TEST_FILES。
+ */
+async function runCli(script: string, args: string[]): Promise<CliResult> {
+  const module = script.replace(/\.ts$/, '.js');
+  const r = await invokeCli(`../../cli/${module}`, args);
+  return { code: r.exitCode ?? null, stdout: r.stdout, stderr: r.stderr };
+}
 
 afterEach(cleanupTempRoots);
 
@@ -65,8 +78,8 @@ beforeAll(async () => {
 });
 
 describe('code-health-apply CLI guard ordering (R7)', () => {
-  it('unknown mode → exit 2 ERROR_JSON，即使 candidate 文件不存在也先报参数错误', () => {
-    const r = runCli('code-health-apply.ts', [
+  it('unknown mode → exit 2 ERROR_JSON，即使 candidate 文件不存在也先报参数错误', async () => {
+    const r = await runCli('code-health-apply.ts', [
       '--candidate',
       path.join(tmpdir(), 'definitely-missing-code-health-candidate.json'),
       '--mode',
@@ -77,20 +90,20 @@ describe('code-health-apply CLI guard ordering (R7)', () => {
     expect(r.stdout).not.toContain('HUMAN_APPROVAL_REQUIRED');
   });
 
-  it('duplicated value flag → exit 2 ERROR_JSON', () => {
-    const r = runCli('code-health-apply.ts', ['--mode', 'patch', '--mode=commit']);
+  it('duplicated value flag → exit 2 ERROR_JSON', async () => {
+    const r = await runCli('code-health-apply.ts', ['--mode', 'patch', '--mode=commit']);
     expect(r.code).toBe(2);
     expect(r.stdout).toContain('ERROR_JSON');
   });
 
-  it('missing value → exit 2 ERROR_JSON', () => {
-    const r = runCli('code-health-apply.ts', ['--candidate']);
+  it('missing value → exit 2 ERROR_JSON', async () => {
+    const r = await runCli('code-health-apply.ts', ['--candidate']);
     expect(r.code).toBe(2);
     expect(r.stdout).toContain('ERROR_JSON');
   });
 
-  it('unknown flag → exit 2 ERROR_JSON', () => {
-    const r = runCli('code-health-apply.ts', ['--candidate', 'x.json', '--force']);
+  it('unknown flag → exit 2 ERROR_JSON', async () => {
+    const r = await runCli('code-health-apply.ts', ['--candidate', 'x.json', '--force']);
     expect(r.code).toBe(2);
     expect(r.stdout).toContain('ERROR_JSON');
   });
@@ -108,13 +121,20 @@ describe('code-health-apply approval gate (R5/R7)', () => {
     const before = await gitStatus(root);
     const headBefore = await gitHead(root);
 
-    const missing = runCli('code-health-apply.ts', ['--candidate', candidatePath, '--root', root, '--mode', 'apply']);
+    const missing = await runCli('code-health-apply.ts', [
+      '--candidate',
+      candidatePath,
+      '--root',
+      root,
+      '--mode',
+      'apply',
+    ]);
     expect(missing.code).toBe(1);
     expect(missing.stdout).toContain('HUMAN_APPROVAL_REQUIRED');
 
     const scope = await bindRevision(scopeMismatchFixture, revision as RevisionIdentity);
     const approvalPath = await writeJson(workDir, 'approval.json', scope.approval);
-    const mismatched = runCli('code-health-apply.ts', [
+    const mismatched = await runCli('code-health-apply.ts', [
       '--candidate',
       candidatePath,
       '--approval',
@@ -156,7 +176,7 @@ describe('code-health-apply approval gate (R5/R7)', () => {
     const before = await gitStatus(root);
     const headBefore = await gitHead(root);
 
-    const r = runCli('code-health-apply.ts', [
+    const r = await runCli('code-health-apply.ts', [
       '--candidate',
       candidatePath,
       '--approval',
@@ -206,7 +226,7 @@ describe('code-health-apply approval gate (R5/R7)', () => {
     const candidatePath = await writeJson(workDir, 'candidate.json', linkedCandidate);
     const approvalPath = await writeJson(workDir, 'approval.json', linkedApproval);
 
-    const r = runCli('code-health-apply.ts', [
+    const r = await runCli('code-health-apply.ts', [
       '--candidate',
       candidatePath,
       '--approval',
@@ -240,7 +260,7 @@ describe('code-health-apply approval gate (R5/R7)', () => {
     const approvalPath = await writeJson(workDir, 'approval.json', approval);
     const before = await gitStatus(root);
 
-    const r = runCli('code-health-apply.ts', [
+    const r = await runCli('code-health-apply.ts', [
       '--candidate',
       candidatePath,
       '--approval',
@@ -276,7 +296,7 @@ describe('code-health-apply approval gate (R5/R7)', () => {
     const candidatePath = await writeJson(workDir, 'candidate.json', candidate);
     const approvalPath = await writeJson(workDir, 'approval.json', approval);
 
-    const r = runCli('code-health-apply.ts', [
+    const r = await runCli('code-health-apply.ts', [
       '--candidate',
       candidatePath,
       '--approval',
@@ -318,7 +338,7 @@ describe('code-health-apply approval gate (R5/R7)', () => {
     const candidatePath = await writeJson(workDir, 'candidate.json', candidate);
     const approvalPath = await writeJson(workDir, 'approval.json', approval);
     const before = await gitStatus(root);
-    const r = runCli('code-health-apply.ts', [
+    const r = await runCli('code-health-apply.ts', [
       '--candidate',
       candidatePath,
       '--approval',
@@ -334,7 +354,7 @@ describe('code-health-apply approval gate (R5/R7)', () => {
     expect(summary?.patchPath).toMatch(/\.patch$/);
     expect(await gitStatus(root)).toBe(before);
 
-    const unapproved = runCli('code-health-apply.ts', [
+    const unapproved = await runCli('code-health-apply.ts', [
       '--candidate',
       candidatePath,
       '--root',
@@ -364,7 +384,7 @@ describe('code-health-apply refusal proves the rollback (SSoT §10K.4 / governan
     const candidatePath = await writeJson(workDir, 'candidate.json', candidate);
     const approvalPath = await writeJson(workDir, 'approval.json', approval);
 
-    const r = runCli('code-health-apply.ts', [
+    const r = await runCli('code-health-apply.ts', [
       '--candidate',
       candidatePath,
       '--approval',
@@ -430,7 +450,7 @@ describe('code-health-apply refusal proves the rollback (SSoT §10K.4 / governan
     const patchRelative = `.w-model/code-health/apply/${candidate.candidateId}.patch`;
     const patchAbsolute = path.join(root, patchRelative);
 
-    const r = runCli('code-health-apply.ts', [
+    const r = await runCli('code-health-apply.ts', [
       '--candidate',
       candidatePath,
       '--approval',
@@ -479,51 +499,48 @@ describe('code-health-apply refusal proves the rollback (SSoT §10K.4 / governan
     const patchAbsolute = path.join(root, patchRelative);
 
     // Produce the real controlled patch through the CLI itself (never a hand-written patch).
-    expect(
-      runCli('code-health-apply.ts', [
-        '--candidate',
-        candidatePath,
-        '--approval',
-        approvalPath,
-        '--root',
-        root,
-        '--mode',
-        'patch',
-      ]).code,
-    ).toBe(0);
+    const patchRun = await runCli('code-health-apply.ts', [
+      '--candidate',
+      candidatePath,
+      '--approval',
+      approvalPath,
+      '--root',
+      root,
+      '--mode',
+      'patch',
+    ]);
+    expect(patchRun.code).toBe(0);
 
     // (a) The patch was never applied → the reverse application cannot succeed → loud violation.
     const notApplied = codeHealthApplyCli.verifyRollbackRestored(root, patchAbsolute, []);
     expect(notApplied.join(' ')).toMatch(/git apply -R failed/);
 
     // (b) The patch is applied and the reverse application restores the pre-change snapshot.
-    expect(
-      runCli('code-health-apply.ts', [
-        '--candidate',
-        candidatePath,
-        '--approval',
-        approvalPath,
-        '--root',
-        root,
-        '--mode',
-        'commit',
-      ]).code,
-    ).toBe(0);
+    const commitRun = await runCli('code-health-apply.ts', [
+      '--candidate',
+      candidatePath,
+      '--approval',
+      approvalPath,
+      '--root',
+      root,
+      '--mode',
+      'commit',
+    ]);
+    expect(commitRun.code).toBe(0);
     expect(codeHealthApplyCli.verifyRollbackRestored(root, patchAbsolute, [])).toEqual([]);
 
     // (c) A remaining unrelated path means the worktree did not return to the pre-change snapshot.
-    expect(
-      runCli('code-health-apply.ts', [
-        '--candidate',
-        candidatePath,
-        '--approval',
-        approvalPath,
-        '--root',
-        root,
-        '--mode',
-        'commit',
-      ]).code,
-    ).toBe(0);
+    const commitRun2 = await runCli('code-health-apply.ts', [
+      '--candidate',
+      candidatePath,
+      '--approval',
+      approvalPath,
+      '--root',
+      root,
+      '--mode',
+      'commit',
+    ]);
+    expect(commitRun2.code).toBe(0);
     await fs.writeFile(path.join(root, 'residue.txt'), 'unrelated\n', 'utf8');
     const residue = codeHealthApplyCli.verifyRollbackRestored(root, patchAbsolute, []);
     expect(residue.join(' ')).toMatch(/rollback left the worktree modified: residue\.txt/);
@@ -639,7 +656,7 @@ describe('code-health-ledger CLI (init/append/validate)', () => {
     const dir = await tempRoot('code-health-ledger-cli-');
     const ledger = path.join(dir, 'campaign.json');
     const baseline = await writeJson(dir, 'baseline.json', revision);
-    const first = runCli('code-health-ledger.ts', [
+    const first = await runCli('code-health-ledger.ts', [
       'init',
       '--ledger',
       ledger,
@@ -656,7 +673,7 @@ describe('code-health-ledger CLI (init/append/validate)', () => {
     expect(parsed.events).toEqual([]);
     expect(parsed.baseline).toEqual(revision);
 
-    const second = runCli('code-health-ledger.ts', [
+    const second = await runCli('code-health-ledger.ts', [
       'init',
       '--ledger',
       ledger,
@@ -672,22 +689,21 @@ describe('code-health-ledger CLI (init/append/validate)', () => {
     const dir = await tempRoot('code-health-ledger-cli-');
     const ledger = path.join(dir, 'campaign.json');
     const baseline = await writeJson(dir, 'baseline.json', revision);
-    expect(
-      runCli('code-health-ledger.ts', [
-        'init',
-        '--ledger',
-        ledger,
-        '--campaign-id',
-        'CH-2026-09',
-        '--baseline',
-        baseline,
-      ]).code,
-    ).toBe(0);
+    const initRun = await runCli('code-health-ledger.ts', [
+      'init',
+      '--ledger',
+      ledger,
+      '--campaign-id',
+      'CH-2026-09',
+      '--baseline',
+      baseline,
+    ]);
+    expect(initRun.code).toBe(0);
 
     const candidate = discoveredCandidate();
     const candidatePath = await writeJson(dir, 'candidate.json', candidate);
     const eventPath = await writeJson(dir, 'event.json', discoveryEvent(candidate));
-    const accepted = runCli('code-health-ledger.ts', [
+    const accepted = await runCli('code-health-ledger.ts', [
       'append',
       '--ledger',
       ledger,
@@ -700,10 +716,11 @@ describe('code-health-ledger CLI (init/append/validate)', () => {
     const appended = JSON.parse(await fs.readFile(ledger, 'utf8')) as CodeHealthLedger;
     expect(appended.events).toHaveLength(1);
     expect(appended.candidates).toHaveLength(1);
-    expect(runCli('code-health-ledger.ts', ['validate', '--ledger', ledger]).code).toBe(0);
+    const validateRun = await runCli('code-health-ledger.ts', ['validate', '--ledger', ledger]);
+    expect(validateRun.code).toBe(0);
 
     // Duplicate event id must never overwrite an existing ledger line.
-    const duplicate = runCli('code-health-ledger.ts', [
+    const duplicate = await runCli('code-health-ledger.ts', [
       'append',
       '--ledger',
       ledger,
@@ -716,7 +733,7 @@ describe('code-health-ledger CLI (init/append/validate)', () => {
 
     // A malformed event (missing scope hash) is rejected.
     const malformedPath = await writeJson(dir, 'event-bad.json', { ...discoveryEvent(candidate), scopeHash: 'oops' });
-    const malformed = runCli('code-health-ledger.ts', [
+    const malformed = await runCli('code-health-ledger.ts', [
       'append',
       '--ledger',
       ledger,
@@ -735,7 +752,7 @@ describe('code-health-ledger CLI (init/append/validate)', () => {
       to: 'verified',
       at: '2026-09-07T00:11:00.000Z',
     });
-    const illegal = runCli('code-health-ledger.ts', [
+    const illegal = await runCli('code-health-ledger.ts', [
       'append',
       '--ledger',
       ledger,
@@ -766,22 +783,22 @@ describe('code-health-ledger CLI (init/append/validate)', () => {
       redaction: { status: 'not_reviewed', rules: [], blockedReasons: [] },
     };
     await fs.writeFile(ledgerPath, `${JSON.stringify(corrupted, null, 2)}\n`, 'utf8');
-    const r = runCli('code-health-ledger.ts', ['validate', '--ledger', ledgerPath]);
+    const r = await runCli('code-health-ledger.ts', ['validate', '--ledger', ledgerPath]);
     expect(r.code).toBe(1);
   });
 
   it('unknown subcommand / unknown flag → exit 2 ERROR_JSON', async () => {
-    const unknown = runCli('code-health-ledger.ts', ['frobnicate']);
+    const unknown = await runCli('code-health-ledger.ts', ['frobnicate']);
     expect(unknown.code).toBe(2);
     expect(unknown.stdout).toContain('ERROR_JSON');
-    const badFlag = runCli('code-health-ledger.ts', ['validate', '--nope', 'x']);
+    const badFlag = await runCli('code-health-ledger.ts', ['validate', '--nope', 'x']);
     expect(badFlag.code).toBe(2);
     expect(badFlag.stdout).toContain('ERROR_JSON');
   });
 
-  it('--help and help expose a discoverable usage surface without an input error', () => {
+  it('--help and help expose a discoverable usage surface without an input error', async () => {
     for (const args of [['--help'], ['help'], ['init', '--help']]) {
-      const result = runCli('code-health-ledger.ts', args);
+      const result = await runCli('code-health-ledger.ts', args);
       expect(result.code, `code-health-ledger.ts ${args.join(' ')}`).toBe(0);
       expect(result.stdout).toContain('usage: code-health-ledger.ts');
       expect(result.stdout).toContain('init');
@@ -822,30 +839,30 @@ describe('fixture integrity', () => {
 });
 
 describe('code-health-archive CLI (Task 8A)', () => {
-  it('--help 打印用法且不产生任何 package', () => {
-    const result = runCli('code-health-archive.ts', ['--help']);
+  it('--help 打印用法且不产生任何 package', async () => {
+    const result = await runCli('code-health-archive.ts', ['--help']);
     expect(result.code).toBe(0);
     expect(result.stdout).toMatch(/--campaign/);
     expect(result.stdout).toMatch(/--verify/);
     expect(result.stdout).toMatch(/package-only/);
   });
 
-  it('缺参数、未知参数与非法 verification-level 都是 exit 2 + ERROR_JSON', () => {
+  it('缺参数、未知参数与非法 verification-level 都是 exit 2 + ERROR_JSON', async () => {
     for (const args of [
       [],
       ['--campaign', '.'],
       ['--bogus', 'x'],
       ['--campaign', '.', '--output', '.', '--verification-level', 'source-verified'],
     ]) {
-      const result = runCli('code-health-archive.ts', args);
+      const result = await runCli('code-health-archive.ts', args);
       expect(result.code).toBe(2);
       expect(result.stdout).toMatch(/ERROR_JSON/);
       expect(result.stdout).toMatch(/ARG_INVALID/);
     }
   });
 
-  it('不存在的 campaign 目录与 verify/produce 混用都是 exit 2', () => {
-    const missing = runCli('code-health-archive.ts', [
+  it('不存在的 campaign 目录与 verify/produce 混用都是 exit 2', async () => {
+    const missing = await runCli('code-health-archive.ts', [
       '--campaign',
       path.join(REPO_ROOT, '.no-such-campaign'),
       '--output',
@@ -853,14 +870,14 @@ describe('code-health-archive CLI (Task 8A)', () => {
     ]);
     expect(missing.code).toBe(2);
 
-    const mixed = runCli('code-health-archive.ts', ['--verify', REPO_ROOT, '--campaign', REPO_ROOT]);
+    const mixed = await runCli('code-health-archive.ts', ['--verify', REPO_ROOT, '--campaign', REPO_ROOT]);
     expect(mixed.code).toBe(2);
   });
 
   it('缺少 manifest 的 verify 失败且只报告 package-only，绝不升级为 source-bound', async () => {
     const root = await fs.mkdtemp(path.join(tmpdir(), 'code-health-archive-cli-'));
     createdRoots.push(root);
-    const result = runCli('code-health-archive.ts', ['--verify', root, '--source-project', root]);
+    const result = await runCli('code-health-archive.ts', ['--verify', root, '--source-project', root]);
     expect(result.code).toBe(1);
     const payload = jsonLine<{ ok: boolean; verificationLevel: string; archivedAsPassed: boolean }>(
       result.stdout,
@@ -891,7 +908,7 @@ describe('code-health-archive CLI (Task 8A)', () => {
       'utf8',
     );
 
-    const result = runCli('code-health-archive.ts', ['--campaign', root, '--output', output]);
+    const result = await runCli('code-health-archive.ts', ['--campaign', root, '--output', output]);
     expect(result.code).toBe(1);
     const payload = jsonLine<{ ok: boolean; archivedAsPassed: boolean }>(result.stdout, 'ARCHIVE_JSON');
     expect(payload?.ok).toBe(false);

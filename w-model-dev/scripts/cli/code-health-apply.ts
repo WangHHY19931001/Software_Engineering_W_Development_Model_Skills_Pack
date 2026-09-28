@@ -66,6 +66,7 @@ import {
   resolveControlledRoot,
 } from '../lib/code-health-file-verifier.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
+import { HandledCliError } from '../lib/cli-error.js';
 import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { runSync } from '../lib/run-sync.js';
@@ -504,8 +505,7 @@ async function abstractionGuardViolations(
   return violations;
 }
 
-async function main(): Promise<void> {
-  const argv = process.argv.slice(2);
+async function runApplyCli(argv: string[]): Promise<void> {
   let parsed: Partial<Record<ApplyFlag, string>>;
   try {
     parsed = parseApplyArgs(argv);
@@ -544,6 +544,7 @@ async function main(): Promise<void> {
   }
 
   const root = path.resolve(parsed.root ?? process.cwd());
+  // readJsonOrExit 错误路径（exitWithError 已输出并设置 exitCode 后抛 HandledCliError）由 main 统一收敛
   const candidate = await readJsonOrExit<CodeHealthCandidate>(parsed.candidate);
   const approval = parsed.approval === undefined ? undefined : await readJsonOrExit<ApprovalDecision>(parsed.approval);
 
@@ -688,6 +689,28 @@ async function main(): Promise<void> {
   }
 
   emit(0, { mode, applied: true, patchPath, appliedFiles, unrelatedFiles: [], rollback });
+}
+
+/**
+ * 进程内可调用入口（Wave 2 进程内化）：argv 默认取真实进程参数（已切 node/脚本路径）；
+ * readJsonOrExit 错误路径（exitWithError 已输出并设置 exitCode 后抛 HandledCliError）在此
+ * 收敛为正常返回——子进程形态由 runMain 静默处理，进程内形态（__tests__/helpers/cli-invoker.ts）
+ * 同样能读到 exitCode，两形态退出码与输出一致。
+ */
+export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+  try {
+    await runApplyCli(argv);
+  } catch (err) {
+    if (err instanceof HandledCliError) return;
+    // 其余异常按 runMain 同款语义转 UNEXPECTED / exit 2（子进程形态由 runMain 输出，
+    // 进程内形态在此输出——两形态退出码与 stderr 语义一致）
+    exitWithError({
+      category: 'UNEXPECTED',
+      message: '脚本异常',
+      detail: err instanceof Error ? err.message : String(err),
+      exitCode: 2,
+    });
+  }
 }
 
 // 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main

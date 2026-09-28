@@ -29,6 +29,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { runSync } from '../lib/run-sync.js';
 import { validateOutputPath, writeAtomically, type AtomicWriteFileSystem } from '../cli/review-package.js';
+import { invokeCli } from './helpers/cli-invoker.js';
 
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
@@ -78,8 +79,10 @@ function git(args: string[]): string {
 /**
  * 真实 tsx 子进程运行被测 CLI。60s 超时理由同 l0-link-audit-cli.test.ts：
  * 全量并行时 tsx 冷启动可超 runSync 缺省 15s（spawnSync 报 status:null）。
+ * Wave 2 进程内化后仅 2 个用例留守本形态（见调用点注释），本文件因 git fixture spawn
+ * 仍登记 SUBPROCESS_TEST_FILES。
  */
-function runReviewPackage(
+function runReviewPackageSubproc(
   args: string[],
   cwd: string = REPO_ROOT,
   env?: NodeJS.ProcessEnv,
@@ -90,6 +93,12 @@ function runReviewPackage(
     env: env === undefined ? undefined : { ...process.env, ...env },
   });
   return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+}
+
+/** 进程内调用被测 CLI（显式 --repo/--base/--head/--out，无 cwd/env 依赖；模块路径相对 helpers/ 是两个 ../） */
+async function runReviewPackage(args: string[]): Promise<{ code: number | undefined; stdout: string; stderr: string }> {
+  const r = await invokeCli('../../cli/review-package.js', args);
+  return { code: r.exitCode, stdout: r.stdout, stderr: r.stderr };
 }
 
 function errorJson(stdout: string): Record<string, unknown> | null {
@@ -164,7 +173,7 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     const out2 = path.join(tmpDir, 'pkg2.diff');
     const common = [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`];
 
-    const run1 = runReviewPackage([...common, `--out=${out1}`]);
+    const run1 = await runReviewPackage([...common, `--out=${out1}`]);
     expect(run1.code, `stderr=${run1.stderr}`).toBe(0);
     const outLines = run1.stdout.trim().split(/\r?\n/);
     expect(outLines).toHaveLength(1);
@@ -175,7 +184,7 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     const onDiskBytes = (await fs.stat(out1)).size;
     expect(payload.bytes).toBe(onDiskBytes);
 
-    const run2 = runReviewPackage([...common, `--out=${out2}`]);
+    const run2 = await runReviewPackage([...common, `--out=${out2}`]);
     expect(run2.code).toBe(0);
     expect(JSON.parse(run2.stdout.trim().replace('REVIEW_PACKAGE_JSON ', ''))).toMatchObject({
       path: out2,
@@ -206,11 +215,11 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     expect(content1).not.toMatch(/\bDate:\s/);
   });
 
-  it('--out 缺省：写入 cwd 下 review-<base7>..<head7>.diff', async () => {
+  it('--out 缺省：写入 cwd 下 review-<base7>..<head7>.diff（留守真实子进程：本用例被测语义即进程 cwd 缺省，进程内无法注入 cwd）', async () => {
     const cwdDir = path.join(tmpDir, 'cwd');
     await fs.mkdir(cwdDir, { recursive: true });
 
-    const run = runReviewPackage([`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`], cwdDir);
+    const run = runReviewPackageSubproc([`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`], cwdDir);
 
     expect(run.code, `stderr=${run.stderr}`).toBe(0);
     const expectedName = `review-${baseSha.slice(0, 7)}..${headSha.slice(0, 7)}.diff`;
@@ -223,7 +232,7 @@ describe('review-package CLI（S32 确定性评审包）', () => {
   it('未知 flag（--d4-invalid-argument）→ exit 2 + stdout ERROR_JSON 且目标 out 路径零文件（写盘前原子拒绝）', async () => {
     const out = path.join(tmpDir, 'must-not-exist.diff');
 
-    const run = runReviewPackage([
+    const run = await runReviewPackage([
       `--repo=${repoDir}`,
       `--base=${baseSha}`,
       `--head=${headSha}`,
@@ -237,22 +246,27 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     await expect(fs.access(out)).rejects.toThrow();
   });
 
-  it('缺参（无参 / 缺 --base / 缺 --head）→ exit 2', () => {
-    const none = runReviewPackage([]);
+  it('缺参（无参 / 缺 --base / 缺 --head）→ exit 2', async () => {
+    const none = await runReviewPackage([]);
     expect(none.code).toBe(2);
     expect(errorJson(none.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
 
-    const noBase = runReviewPackage([`--repo=${repoDir}`, `--head=${headSha}`]);
+    const noBase = await runReviewPackage([`--repo=${repoDir}`, `--head=${headSha}`]);
     expect(noBase.code).toBe(2);
     expect(errorJson(noBase.stdout)).toMatchObject({ category: 'ARG_INVALID' });
 
-    const noHead = runReviewPackage([`--repo=${repoDir}`, `--base=${baseSha}`]);
+    const noHead = await runReviewPackage([`--repo=${repoDir}`, `--base=${baseSha}`]);
     expect(noHead.code).toBe(2);
     expect(errorJson(noHead.stdout)).toMatchObject({ category: 'ARG_INVALID' });
   });
 
-  it('重复 flag（--base 两次）→ exit 2 ARG_INVALID「重复」', () => {
-    const run = runReviewPackage([`--repo=${repoDir}`, `--base=${baseSha}`, `--base=${headSha}`, `--head=${headSha}`]);
+  it('重复 flag（--base 两次）→ exit 2 ARG_INVALID「重复」', async () => {
+    const run = await runReviewPackage([
+      `--repo=${repoDir}`,
+      `--base=${baseSha}`,
+      `--base=${headSha}`,
+      `--head=${headSha}`,
+    ]);
 
     expect(run.code).toBe(2);
     expect(run.stderr).toContain('ARG_INVALID');
@@ -260,8 +274,8 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     expect(errorJson(run.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
   });
 
-  it('坏 rev（不存在的 sha / 非法标识）→ exit 2', () => {
-    const badSha = runReviewPackage([
+  it('坏 rev（不存在的 sha / 非法标识）→ exit 2', async () => {
+    const badSha = await runReviewPackage([
       `--repo=${repoDir}`,
       '--base=0123456789abcdef0123456789abcdef01234567',
       `--head=${headSha}`,
@@ -269,7 +283,7 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     expect(badSha.code).toBe(2);
     expect(errorJson(badSha.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
 
-    const garbage = runReviewPackage([`--repo=${repoDir}`, `--base=${baseSha}`, '--head=not-a-rev']);
+    const garbage = await runReviewPackage([`--repo=${repoDir}`, `--base=${baseSha}`, '--head=not-a-rev']);
     expect(garbage.code).toBe(2);
     expect(errorJson(garbage.stdout)).toMatchObject({ category: 'ARG_INVALID' });
   });
@@ -277,7 +291,7 @@ describe('review-package CLI（S32 确定性评审包）', () => {
   it('--repo 不存在、不是目录或不是 Git 仓库时统一 ARG_INVALID → exit 2', async () => {
     const filePath = path.join(tmpDir, 'repo-file');
     await fs.writeFile(filePath, 'not a directory\n', 'utf8');
-    const missing = runReviewPackage([
+    const missing = await runReviewPackage([
       `--repo=${path.join(tmpDir, 'no-such-repo')}`,
       `--base=${baseSha}`,
       `--head=${headSha}`,
@@ -285,11 +299,11 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     expect(missing.code).toBe(2);
     expect(errorJson(missing.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
 
-    const file = runReviewPackage([`--repo=${filePath}`, `--base=${baseSha}`, `--head=${headSha}`]);
+    const file = await runReviewPackage([`--repo=${filePath}`, `--base=${baseSha}`, `--head=${headSha}`]);
     expect(file.code).toBe(2);
     expect(errorJson(file.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
 
-    const notARepo = runReviewPackage([`--repo=${tmpDir}`, `--base=${baseSha}`, `--head=${headSha}`]);
+    const notARepo = await runReviewPackage([`--repo=${tmpDir}`, `--base=${baseSha}`, `--head=${headSha}`]);
     expect(notARepo.code).toBe(2);
     expect(errorJson(notARepo.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
   });
@@ -303,7 +317,7 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     writeCommitObject('prefix-collision-b', collisionPeer);
     const out = path.join(tmpDir, 'real-prefix-collision.diff');
 
-    const result = runReviewPackage([
+    const result = await runReviewPackage([
       `--repo=${repoDir}`,
       `--base=${collisionBase.sha}`,
       `--head=${headSha}`,
@@ -327,7 +341,7 @@ describe('review-package CLI（S32 确定性评审包）', () => {
       ['--repo=', `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`],
       [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`, 'unexpected'],
     ]) {
-      const result = runReviewPackage(args);
+      const result = await runReviewPackage(args);
       expect(result.code).toBe(2);
       expect(result.stderr).toContain('ARG_INVALID');
       expect(errorJson(result.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
@@ -341,7 +355,12 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     await fs.writeFile(external, 'unchanged\n', 'utf8');
     await fs.symlink(external, out, 'file');
 
-    const result = runReviewPackage([`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`]);
+    const result = await runReviewPackage([
+      `--repo=${repoDir}`,
+      `--base=${baseSha}`,
+      `--head=${headSha}`,
+      `--out=${out}`,
+    ]);
 
     expect(result.code).toBe(2);
     expect(result.stderr).toContain('ARG_INVALID');
@@ -354,7 +373,12 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     await fs.mkdir(out);
     await fs.writeFile(path.join(out, 'sentinel.txt'), 'unchanged\n', 'utf8');
 
-    const result = runReviewPackage([`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`]);
+    const result = await runReviewPackage([
+      `--repo=${repoDir}`,
+      `--base=${baseSha}`,
+      `--head=${headSha}`,
+      `--out=${out}`,
+    ]);
 
     expect(result.code).toBe(2);
     expect(result.stderr).toContain('ARG_INVALID');
@@ -364,17 +388,22 @@ describe('review-package CLI（S32 确定性评审包）', () => {
 
   it('在 Git 采集前拒绝非法 --out，即使 revision 也无效', async () => {
     const out = path.join(tmpDir, 'missing-parent', 'package.diff');
-    const result = runReviewPackage([`--repo=${repoDir}`, '--base=not-a-rev', `--head=${headSha}`, `--out=${out}`]);
+    const result = await runReviewPackage([
+      `--repo=${repoDir}`,
+      '--base=not-a-rev',
+      `--head=${headSha}`,
+      `--out=${out}`,
+    ]);
 
     expect(result.code).toBe(2);
     expect(result.stderr).toContain('--out 所在目录不存在');
     expect(errorJson(result.stdout)).toMatchObject({ category: 'FILE_NOT_FOUND', exitCode: 2 });
   });
 
-  it('非法 --out 前置校验时真实 Git 调用计数为 0', async () => {
+  it('非法 --out 前置校验时真实 Git 调用计数为 0（留守真实子进程：本用例依赖 PATH 环境注入假 git 探针，进程内 env 是 worker 全局无法隔离）', async () => {
     const out = path.join(tmpDir, 'missing-parent-for-git-probe', 'package.diff');
     const probe = await createGitCallProbe();
-    const result = runReviewPackage(
+    const result = runReviewPackageSubproc(
       [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`],
       REPO_ROOT,
       probe.env,
@@ -391,9 +420,9 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     const common = [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`];
 
     git(['config', 'core.abbrev', '4']);
-    const run4 = runReviewPackage([...common, `--out=${out4}`]);
+    const run4 = await runReviewPackage([...common, `--out=${out4}`]);
     git(['config', 'core.abbrev', '12']);
-    const run12 = runReviewPackage([...common, `--out=${out12}`]);
+    const run12 = await runReviewPackage([...common, `--out=${out12}`]);
 
     expect(run4.code).toBe(0);
     expect(run12.code).toBe(0);
@@ -413,7 +442,7 @@ describe('review-package CLI（S32 确定性评审包）', () => {
       [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=  `],
       [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`, 'unexpected'],
     ]) {
-      const result = runReviewPackage(args);
+      const result = await runReviewPackage(args);
       expect(result.code).toBe(2);
       expect(result.stderr).toContain('ARG_INVALID');
       expect(errorJson(result.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
@@ -433,7 +462,12 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     await fs.chmod(readonlyDir, process.platform === 'win32' ? 0o700 : 0o500);
     await fs.chmod(out, 0o400);
     try {
-      const result = runReviewPackage([`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`]);
+      const result = await runReviewPackage([
+        `--repo=${repoDir}`,
+        `--base=${baseSha}`,
+        `--head=${headSha}`,
+        `--out=${out}`,
+      ]);
       expect(result.code).toBe(2);
       expect(errorJson(result.stdout)).toMatchObject({ exitCode: 2 });
       await expect(fs.readFile(out, 'utf8')).resolves.toBe('sentinel\n');

@@ -73,7 +73,9 @@ export async function invokeCli(cliModule: string, argv: string[]): Promise<Invo
     vi.resetModules();
     const mod = (await import(cliModule)) as { main(argv: string[]): Promise<void> };
     await mod.main(argv);
-    exitCode = process.exitCode;
+    // 未显式设置的退出码按 Node 自然退出语义映射为 0（与真实子进程 status=0 一致；
+    // Wave 2 批次 3 发现：code-health 系 CLI 成功路径不显式设 exitCode，靠自然退出）
+    exitCode = process.exitCode ?? 0;
   } finally {
     for (const spy of spies) spy.mockRestore();
     // 恢复必须在 finally（审查修复轮 1 发现 1）：import/main 抛错时也恢复，

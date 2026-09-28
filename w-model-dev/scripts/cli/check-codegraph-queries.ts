@@ -677,7 +677,14 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
       exitWithError({ category: 'ARG_INVALID', message: err.message, exitCode: 2 });
       return;
     }
-    throw err;
+    // 其余异常按 runMain 同款语义转 UNEXPECTED / exit 2（子进程形态由 runMain 输出，
+    // 进程内形态在此输出——两形态退出码与 stderr 语义一致）
+    exitWithError({
+      category: 'UNEXPECTED',
+      message: '脚本异常',
+      detail: err instanceof Error ? err.message : String(err),
+      exitCode: 2,
+    });
   }
 }
 

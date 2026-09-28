@@ -29,7 +29,7 @@ import type {
 } from '../logic/code-health-contract.js';
 import { canArchiveCandidate, validateCodeHealthCandidate } from '../logic/code-health-ledger-logic.js';
 import { ARCHIVE_MANIFEST_NAME, createTask1ArchiveBoundary } from '../lib/code-health-archive-boundary.js';
-import { exitWithError } from '../lib/cli-error.js';
+import { exitWithError, HandledCliError } from '../lib/cli-error.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
@@ -264,10 +264,10 @@ async function runVerify(values: Partial<Record<ArchiveFlag | 'help', string>>):
   emit(result, 'verify');
 }
 
-async function main(): Promise<void> {
+async function runArchiveCli(argv: string[]): Promise<void> {
   let parsed: Partial<Record<ArchiveFlag | 'help', string>>;
   try {
-    parsed = parseArgs(process.argv.slice(2));
+    parsed = parseArgs(argv);
   } catch (error) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -299,6 +299,28 @@ async function main(): Promise<void> {
     return runVerify(parsed);
   }
   return runProduce(parsed);
+}
+
+/**
+ * 进程内可调用入口（Wave 2 进程内化）：argv 默认取真实进程参数（已切 node/脚本路径）；
+ * readJsonOrExit 错误路径（exitWithError 已输出并设置 exitCode 后抛 HandledCliError）在此
+ * 收敛为正常返回——子进程形态由 runMain 静默处理，进程内形态（__tests__/helpers/cli-invoker.ts）
+ * 同样能读到 exitCode，两形态退出码与输出一致。
+ */
+export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+  try {
+    await runArchiveCli(argv);
+  } catch (err) {
+    if (err instanceof HandledCliError) return;
+    // 其余异常按 runMain 同款语义转 UNEXPECTED / exit 2（子进程形态由 runMain 输出，
+    // 进程内形态在此输出——两形态退出码与 stderr 语义一致）
+    exitWithError({
+      category: 'UNEXPECTED',
+      message: '脚本异常',
+      detail: err instanceof Error ? err.message : String(err),
+      exitCode: 2,
+    });
+  }
 }
 
 // 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main

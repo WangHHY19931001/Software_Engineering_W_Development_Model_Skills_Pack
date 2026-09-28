@@ -44,7 +44,7 @@ import {
   validateDuplicateCluster,
   type DuplicateClusterAuthority,
 } from '../logic/code-health-duplicate-logic.js';
-import { exitWithError } from '../lib/cli-error.js';
+import { exitWithError, HandledCliError } from '../lib/cli-error.js';
 import { readTrackedJson, toTrackedRelativePath } from '../lib/code-health-deletion-authority.js';
 import { resolveControlledRelativePath } from '../lib/code-health-file-verifier.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
@@ -194,10 +194,10 @@ async function missingTrackedPaths(root: string, cluster: DuplicateCluster): Pro
   return missing.sort();
 }
 
-async function main(): Promise<void> {
+async function runDuplicatesCli(argv: string[]): Promise<void> {
   let parsed: ParsedArgs;
   try {
-    parsed = parseArgs(process.argv.slice(2));
+    parsed = parseArgs(argv);
   } catch (error) {
     exitWithError({
       category: 'ARG_INVALID',
@@ -329,6 +329,28 @@ async function main(): Promise<void> {
     authorized,
   });
   process.exitCode = exitCode;
+}
+
+/**
+ * 进程内可调用入口（Wave 2 进程内化）：argv 默认取真实进程参数（已切 node/脚本路径）；
+ * readJsonOrExit 错误路径（exitWithError 已输出并设置 exitCode 后抛 HandledCliError）在此
+ * 收敛为正常返回——子进程形态由 runMain 静默处理，进程内形态（__tests__/helpers/cli-invoker.ts）
+ * 同样能读到 exitCode，两形态退出码与输出一致。
+ */
+export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+  try {
+    await runDuplicatesCli(argv);
+  } catch (err) {
+    if (err instanceof HandledCliError) return;
+    // 其余异常按 runMain 同款语义转 UNEXPECTED / exit 2（子进程形态由 runMain 输出，
+    // 进程内形态在此输出——两形态退出码与 stderr 语义一致）
+    exitWithError({
+      category: 'UNEXPECTED',
+      message: '脚本异常',
+      detail: err instanceof Error ? err.message : String(err),
+      exitCode: 2,
+    });
+  }
 }
 
 // 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main

@@ -124,3 +124,57 @@ describe('check-codegraph-queries 真实子进程冒烟', () => {
     expect(r.stderr).toContain('参数缺失');
   });
 });
+
+describe('code-health-apply 真实子进程冒烟', () => {
+  // exit 0 需完整 git 仓库 + candidate/approval fixture（code-health-cli.test.ts 已覆盖）；
+  // 冒烟取零夹具的 ARG_INVALID 路径。
+  it('无参 → exit 2 + stdout ERROR_JSON 标记', () => {
+    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/code-health-apply.ts')]);
+    expect(r.status).toBe(2);
+    expect(r.stdout).toContain('ERROR_JSON');
+    expect(r.stderr).toContain('--candidate');
+  });
+});
+
+describe('code-health-ledger 真实子进程冒烟', () => {
+  // --help 零读盘纯输出（发现性用法面），exit 0；init/append/validate 正向由 code-health-cli.test.ts 覆盖。
+  it('--help → exit 0 + stdout usage 标记', () => {
+    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/code-health-ledger.ts'), '--help']);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('usage: code-health-ledger.ts');
+  });
+});
+
+describe('code-health-archive 真实子进程冒烟', () => {
+  // --help 零读盘纯输出，exit 0；campaign/verify 正向由 code-health-cli.test.ts 覆盖。
+  it('--help → exit 0 + stdout usage 标记', () => {
+    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/code-health-archive.ts'), '--help']);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/--campaign/);
+  });
+});
+
+describe('code-health-duplicates 真实子进程冒烟', () => {
+  // exit 0 需合法 duplicate matrix 夹具（code-health-duplicates.test.ts 已覆盖）；
+  // 冒烟取零夹具的 ARG_INVALID 路径。
+  it('未知 flag → exit 2 + stdout ERROR_JSON 标记', () => {
+    const r = runSync(process.execPath, [
+      tsxCli,
+      path.resolve(TEST_DIR, '../cli/code-health-duplicates.ts'),
+      '--bogus',
+    ]);
+    expect(r.status).toBe(2);
+    expect(r.stdout).toContain('ERROR_JSON');
+  });
+});
+
+describe('review-package 真实子进程冒烟', () => {
+  // exit 0 需真实 git 仓库 + base/head rev（review-package-cli.test.ts 已覆盖）；
+  // 冒烟取零夹具的 ARG_INVALID 路径。
+  it('无参 → exit 2 + stdout ERROR_JSON 标记', () => {
+    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/review-package.ts')]);
+    expect(r.status).toBe(2);
+    expect(r.stdout).toMatch(/^ERROR_JSON \{/);
+    expect(r.stderr).toContain('--base');
+  });
+});

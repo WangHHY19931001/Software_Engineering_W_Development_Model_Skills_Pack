@@ -8,13 +8,14 @@
  * a hand-crafted `--cluster`.
  */
 
-import { createRequire } from 'node:module';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+
+import { invokeCli } from './helpers/cli-invoker.js';
 
 import {
   clusterDuplicates,
@@ -43,11 +44,8 @@ import type {
 import { createCodeHealthGitRevisionProvider } from '../lib/code-health-revision-provider.js';
 import { runSync } from '../lib/run-sync.js';
 
-const require = createRequire(import.meta.url);
-const tsxCli = require.resolve('tsx/cli');
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, '../../..');
-const CLI_DIR = path.join(REPO_ROOT, 'w-model-dev/scripts/cli');
 const SAMPLE_DIR = path.join(REPO_ROOT, 'w-model-dev/scripts/samples/code-health/phase4');
 
 const revisionProvider = createCodeHealthGitRevisionProvider();
@@ -83,13 +81,13 @@ interface CliResult {
   stderr: string;
 }
 
-function runCli(script: string, args: string[], cwd: string = REPO_ROOT): CliResult {
-  const r = runSync(process.execPath, [tsxCli, path.join(CLI_DIR, script), ...args], {
-    cwd,
-    timeout: 90_000,
-    env: { ...process.env, ...GIT_ENV },
-  });
-  return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
+/** 进程内调用被测 CLI（模块路径相对 helpers/ 是两个 ../）。
+ *  原子进程形态仅以 cwd: REPO_ROOT 稳定启动；对依赖 `--root` 缺省兜底的调用已显式补 --root REPO_ROOT。
+ *  git spawn 全部来自 fixture 建仓/回滚验证（runSync('git')），保留真实子进程——本文件仍登记 SUBPROCESS_TEST_FILES。 */
+async function runCli(script: string, args: string[]): Promise<CliResult> {
+  const module = script.replace(/\.ts$/, '.js');
+  const r = await invokeCli(`../../cli/${module}`, args);
+  return { code: r.exitCode ?? null, stdout: r.stdout, stderr: r.stderr };
 }
 
 function jsonLine<T>(stdout: string, prefix: string): T | null {
@@ -296,7 +294,7 @@ function matrixDocument(overrides: Record<string, unknown> = {}): Record<string,
 }
 
 describe('Phase 4 pure cluster semantics (R3/R4)', () => {
-  it('at least two typed views but fewer than two tracked stable sites → deferred; guard reports two stable production call sites', () => {
+  it('at least two typed views but fewer than two tracked stable sites → deferred; guard reports two stable production call sites', async () => {
     const cluster = clusterDuplicates(
       authoritativeInput(),
       authority({
@@ -314,7 +312,7 @@ describe('Phase 4 pure cluster semantics (R3/R4)', () => {
     ).toBe(true);
   });
 
-  it('test-only helper as implementation → rejected (test-only never authorizes)', () => {
+  it('test-only helper as implementation → rejected (test-only never authorizes)', async () => {
     const cluster = clusterDuplicates(
       {
         ...authoritativeInput(),
@@ -334,7 +332,7 @@ describe('Phase 4 pure cluster semantics (R3/R4)', () => {
     ).toEqual(expect.arrayContaining([expect.stringMatching(/test-only/i)]));
   });
 
-  it('F-3: prose-only views cannot satisfy the structural floor', () => {
+  it('F-3: prose-only views cannot satisfy the structural floor', async () => {
     const prose: DuplicateInput = {
       ...authoritativeInput(),
       ast: ['the two implementations look textually similar'],
@@ -352,7 +350,7 @@ describe('Phase 4 pure cluster semantics (R3/R4)', () => {
     ).toEqual(expect.arrayContaining([expect.stringMatching(/accidental/i)]));
   });
 
-  it('malformed excluded: facts are default-deny rather than silently ignored', () => {
+  it('malformed excluded: facts are default-deny rather than silently ignored', async () => {
     // A malformed exclusion (missing `:<symbol>`) must never be dropped in the permissive direction: the
     // tracked facts are unparseable, so the cluster cannot authorize and must fail closed.
     const malformed = 'excluded:generated:src/service-b.ts';
@@ -363,7 +361,7 @@ describe('Phase 4 pure cluster semantics (R3/R4)', () => {
     ).toThrow(/excluded|malformed|default-deny/i);
   });
 
-  it('structural view key=value values must come from a closed vocabulary', () => {
+  it('structural view key=value values must come from a closed vocabulary', async () => {
     // Meaningless but plausible padding (`node=zzz`) must not satisfy the arity floor; the value side is
     // a closed vocabulary too, so only real structural content counts.
     const padded: DuplicateInput = {
@@ -375,7 +373,7 @@ describe('Phase 4 pure cluster semantics (R3/R4)', () => {
     expect(structuralViewSupport(padded)).toBe(0);
   });
 
-  it('F-2: generated / one-off / dead copies recorded in tracked facts are excluded', () => {
+  it('F-2: generated / one-off / dead copies recorded in tracked facts are excluded', async () => {
     for (const reason of ['generated', 'one-off-experiment', 'dead-copy', 'mock', 'fixture']) {
       const cluster = clusterDuplicates(
         authoritativeInput(),
@@ -392,7 +390,7 @@ describe('Phase 4 pure cluster semantics (R3/R4)', () => {
     expect([...facts.callSites].length).toBe(2);
   });
 
-  it('a declared call site without tracked call-site/contract/regression facts is not stable (default-deny)', () => {
+  it('a declared call site without tracked call-site/contract/regression facts is not stable (default-deny)', async () => {
     expect(clusterDuplicates(authoritativeInput(), authority({ trackedFacts: [] })).stableProductionCallSites).toEqual(
       [],
     );
@@ -404,7 +402,7 @@ describe('Phase 4 pure cluster semantics (R3/R4)', () => {
     ).toEqual([]);
   });
 
-  it('stable sites must be inside the approved scope and covered by an observed regression command', () => {
+  it('stable sites must be inside the approved scope and covered by an observed regression command', async () => {
     const outside = clusterDuplicates(
       authoritativeInput(),
       authority({ approvedScope: ['src/cache-a.ts', 'src/cache-b.ts'] }),
@@ -417,7 +415,7 @@ describe('Phase 4 pure cluster semantics (R3/R4)', () => {
     expect(noRegression.status).toBe('deferred');
   });
 
-  it('restrictAuthority may only narrow the tracked authority', () => {
+  it('restrictAuthority may only narrow the tracked authority', async () => {
     const tracked = authority();
     const narrowed = restrictAuthority(tracked, {
       approvedScope: ['src/cache-a.ts', 'src/cache-b.ts', 'src/service-a.ts'],
@@ -428,7 +426,7 @@ describe('Phase 4 pure cluster semantics (R3/R4)', () => {
     expect(narrowed.trackedFacts).toEqual(tracked.trackedFacts);
   });
 
-  it('clustering is deterministic and the ledger re-export is the same single implementation', () => {
+  it('clustering is deterministic and the ledger re-export is the same single implementation', async () => {
     expect(clusterDuplicates(authoritativeInput(), authority())).toEqual(
       clusterDuplicates(authoritativeInput(), authority()),
     );
@@ -436,7 +434,7 @@ describe('Phase 4 pure cluster semantics (R3/R4)', () => {
     expect(ledgerProveAbstraction).toBe(proveAbstraction);
   });
 
-  it('structurally invalid input / authority fail closed', () => {
+  it('structurally invalid input / authority fail closed', async () => {
     expect(validateDuplicateInput({})).not.toEqual([]);
     expect(validateDuplicateAuthority({})).not.toEqual([]);
     expect(() => clusterDuplicates({} as unknown as DuplicateInput, authority())).toThrow(/requires/i);
@@ -447,11 +445,11 @@ describe('Phase 4 pure cluster semantics (R3/R4)', () => {
 });
 
 describe('Phase 4 abstraction guard: item-wise dimensions (R4/R9)', () => {
-  it('complete equivalence proof + quantified maintenance benefit → no violation (the only authorization)', () => {
+  it('complete equivalence proof + quantified maintenance benefit → no violation (the only authorization)', async () => {
     expect(proveAbstraction(equivalentCluster(), equivalentProposal())).toEqual([]);
   });
 
-  it('security difference (different validation order) → security violation', () => {
+  it('security difference (different validation order) → security violation', async () => {
     const violations = proveAbstraction(
       equivalentCluster(),
       equivalentProposal({ security: 'different validation order' }),
@@ -459,7 +457,7 @@ describe('Phase 4 abstraction guard: item-wise dimensions (R4/R9)', () => {
     expect(violations.some((entry) => entry.includes('security'))).toBe(true);
   });
 
-  it('test-only call site (contract shape: path in views.tests and stableProductionCallSites) → test-only', () => {
+  it('test-only call site (contract shape: path in views.tests and stableProductionCallSites) → test-only', async () => {
     const violations = proveAbstraction(
       equivalentCluster({
         views: { ...equivalentCluster().views, tests: ['tests/helper.ts'] },
@@ -470,7 +468,7 @@ describe('Phase 4 abstraction guard: item-wise dimensions (R4/R9)', () => {
     expect(violations).toEqual(expect.arrayContaining([expect.stringMatching(/test-only/i)]));
   });
 
-  it('textual similarity / short diff / mock similarity cannot authorize', () => {
+  it('textual similarity / short diff / mock similarity cannot authorize', async () => {
     const textual = equivalentCluster({
       equivalenceProof: { ...PROOF, security: 'the two implementations look textually similar' },
     });
@@ -497,7 +495,7 @@ describe('Phase 4 abstraction guard: item-wise dimensions (R4/R9)', () => {
     expect(isQuantifiedMaintenanceBenefit(MAINTENANCE)).toBe(true);
   });
 
-  it('platform / lifecycle differences → not authorized', () => {
+  it('platform / lifecycle differences → not authorized', async () => {
     const lifecycle = equivalentCluster({
       equivalenceProof: { ...PROOF, lifecycleResources: 'cleanup=not equivalent' },
     });
@@ -512,7 +510,7 @@ describe('Phase 4 abstraction guard: item-wise dimensions (R4/R9)', () => {
     ).toEqual(expect.arrayContaining([expect.stringMatching(/platform/i)]));
   });
 
-  it('allDimensionsProven alone is not trusted; missing/negative dimensions are refused', () => {
+  it('allDimensionsProven alone is not trusted; missing/negative dimensions are refused', async () => {
     const proof = { ...PROOF, security: '' };
     expect(proveAbstraction(equivalentCluster({ equivalenceProof: proof }), equivalentProposal())).toEqual(
       expect.arrayContaining([expect.stringMatching(/security/i)]),
@@ -523,7 +521,7 @@ describe('Phase 4 abstraction guard: item-wise dimensions (R4/R9)', () => {
     expect(proveAbstraction(missing, equivalentProposal()).length).toBeGreaterThan(0);
   });
 
-  it('migratedCallSites must equal the minimal stable set; rollback must be executable', () => {
+  it('migratedCallSites must equal the minimal stable set; rollback must be executable', async () => {
     expect(
       proveAbstraction(equivalentCluster(), equivalentProposal({ migratedCallSites: ['src/service-a.ts:load'] })),
     ).toEqual(expect.arrayContaining([expect.stringMatching(/migrated/i)]));
@@ -532,7 +530,7 @@ describe('Phase 4 abstraction guard: item-wise dimensions (R4/R9)', () => {
     ).toEqual(expect.arrayContaining([expect.stringMatching(/rollback/i)]));
   });
 
-  it('structurally invalid cluster/proposal fail closed (STRUCTURE_INVALID)', () => {
+  it('structurally invalid cluster/proposal fail closed (STRUCTURE_INVALID)', async () => {
     expect(() => proveAbstraction({} as unknown as DuplicateCluster, equivalentProposal())).toThrow(/requires/i);
     expect(() => proveAbstraction(equivalentCluster(), {} as unknown as AbstractionProposal)).toThrow(/requires/i);
     expect(validateDuplicateCluster({})).not.toEqual([]);
@@ -555,7 +553,7 @@ describe('F-1: duplicates CLI authority is anchored to a HEAD-tracked ledger', (
         },
       }),
     );
-    const r = runCli('code-health-duplicates.ts', ['--matrix', matrixPath, '--validate']);
+    const r = await runCli('code-health-duplicates.ts', ['--matrix', matrixPath, '--root', REPO_ROOT, '--validate']);
     expect(r.code).toBe(0);
     const summary = jsonLine<{ status: string; authorized: boolean; authoritySource: string }>(
       r.stdout,
@@ -571,11 +569,17 @@ describe('F-1: duplicates CLI authority is anchored to a HEAD-tracked ledger', (
     const workDir = await tempRoot('code-health-duplicates-inputs-');
     const matrixPath = await writeJson(workDir, 'matrix.json', matrixDocument());
 
-    const untracked = runCli('code-health-duplicates.ts', ['--matrix', matrixPath, '--validate']);
+    const untracked = await runCli('code-health-duplicates.ts', [
+      '--matrix',
+      matrixPath,
+      '--root',
+      REPO_ROOT,
+      '--validate',
+    ]);
     expect(untracked.code).toBe(0);
     expect(jsonLine<{ authorized: boolean }>(untracked.stdout, 'DUPLICATES_JSON')?.authorized).toBe(false);
 
-    const tracked = runCli('code-health-duplicates.ts', [
+    const tracked = await runCli('code-health-duplicates.ts', [
       '--matrix',
       matrixPath,
       '--ledger',
@@ -616,7 +620,7 @@ describe('F-1: duplicates CLI authority is anchored to a HEAD-tracked ledger', (
     await fs.rm(path.join(root, 'src', 'ghost.ts'));
     const workDir = await tempRoot('code-health-duplicates-inputs-');
     const matrixPath = await writeJson(workDir, 'matrix.json', matrixDocument());
-    const r = runCli('code-health-duplicates.ts', [
+    const r = await runCli('code-health-duplicates.ts', [
       '--matrix',
       matrixPath,
       '--ledger',
@@ -630,11 +634,12 @@ describe('F-1: duplicates CLI authority is anchored to a HEAD-tracked ledger', (
     expect(jsonLine<{ authorized: boolean }>(r.stdout, 'DUPLICATES_JSON')?.authorized).toBe(false);
   }, 120_000);
 
-  it('unknown flag → exit 2 ERROR_JSON; missing --matrix → exit 2', () => {
-    const unknown = runCli('code-health-duplicates.ts', ['--bogus']);
+  it('unknown flag → exit 2 ERROR_JSON; missing --matrix → exit 2', async () => {
+    const unknown = await runCli('code-health-duplicates.ts', ['--bogus']);
     expect(unknown.code).toBe(2);
     expect(unknown.stdout).toContain('ERROR_JSON');
-    expect(runCli('code-health-duplicates.ts', []).code).toBe(2);
+    const missing = await runCli('code-health-duplicates.ts', []);
+    expect(missing.code).toBe(2);
   });
 
   it('F-6: every fixture resolves to its declared pure status/authorized outcome', async () => {
@@ -751,7 +756,7 @@ describe('F-1: apply gate recomputes the abstraction from a tracked ledger', () 
     const clusterPath = await writeJson(workDir, 'cluster.json', equivalentCluster());
     const proposalPath = await writeJson(workDir, 'proposal.json', equivalentProposal());
 
-    const r = runCli('code-health-apply.ts', [
+    const r = await runCli('code-health-apply.ts', [
       '--candidate',
       candidatePath,
       '--approval',
@@ -780,7 +785,7 @@ describe('F-1: apply gate recomputes the abstraction from a tracked ledger', () 
     const matrixPath = await writeJson(workDir, 'matrix.json', matrixDocument());
     const before = await gitStatus(root);
 
-    const r = runCli('code-health-apply.ts', [
+    const r = await runCli('code-health-apply.ts', [
       '--candidate',
       candidatePath,
       '--approval',
@@ -807,7 +812,7 @@ describe('F-1: apply gate recomputes the abstraction from a tracked ledger', () 
     const matrixPath = await writeJson(workDir, 'matrix.json', matrixDocument());
     const before = await gitStatus(root);
 
-    const r = runCli('code-health-apply.ts', [
+    const r = await runCli('code-health-apply.ts', [
       '--candidate',
       candidatePath,
       '--approval',
@@ -838,7 +843,7 @@ describe('F-1: apply gate recomputes the abstraction from a tracked ledger', () 
     const approvalPath = await writeJson(workDir, 'approval.json', approval);
     const matrixPath = await writeJson(workDir, 'matrix.json', matrixDocument());
 
-    const r = runCli('code-health-apply.ts', [
+    const r = await runCli('code-health-apply.ts', [
       '--candidate',
       candidatePath,
       '--approval',
