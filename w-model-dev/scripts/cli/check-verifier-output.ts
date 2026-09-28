@@ -41,16 +41,16 @@ import * as path from 'node:path';
 
 import { checkVerifierOutput, type VerifierOutputShape } from '../logic/verifier-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
-import { exitWithError } from '../lib/cli-error.js';
+import { exitWithError, HandledCliError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 
-async function main(): Promise<void> {
+export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
-  const jsonMode = hasFlag(process.argv.slice(2), 'json');
+  const jsonMode = hasFlag(argv, 'json');
   const startTime = Date.now();
-  const args = process.argv.slice(2);
+  const args = argv;
   const file = args.find((a) => !a.startsWith('--'));
   const selfAsVerifier = hasFlag(args, 'self-as-verifier');
   const sOutput = parseFlagValue(args, 's-output');
@@ -68,7 +68,17 @@ async function main(): Promise<void> {
   }
 
   const abs = path.resolve(file);
-  const parsed = await readJsonOrExit(file);
+  // readJsonOrExit 错误路径（文件不存在/非法 JSON）exitWithError 已输出（stdout ERROR_JSON +
+  // stderr 人类消息）并设置 exitCode 后抛 HandledCliError；子进程形态由 runMain 静默吞掉，
+  // 此处收敛为正常返回使进程内调用（__tests__/helpers/cli-invoker.ts）同样能读到 exitCode——
+  // 两种形态退出码与输出一致。
+  let parsed: unknown;
+  try {
+    parsed = await readJsonOrExit(file);
+  } catch (err) {
+    if (err instanceof HandledCliError) return;
+    throw err;
+  }
 
   const result = checkVerifierOutput(parsed);
   const meta = (parsed as VerifierOutputShape)?.meta;

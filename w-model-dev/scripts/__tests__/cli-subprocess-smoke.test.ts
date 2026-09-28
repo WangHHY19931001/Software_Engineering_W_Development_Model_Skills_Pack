@@ -38,3 +38,15 @@ describe('wm-status 真实子进程冒烟', () => {
     expect(r.stdout).toContain('STATUS_JSON ');
   });
 });
+
+describe('check-verifier-output 真实子进程冒烟', () => {
+  it('有效样本 exit 0 + 报告头标记', () => {
+    const r = runSync(process.execPath, [
+      tsxCli,
+      path.resolve(TEST_DIR, '../cli/check-verifier-output.ts'),
+      path.resolve(TEST_DIR, '../samples/verifier/valid.json'),
+    ]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('Verifier 输出校验');
+  });
+});

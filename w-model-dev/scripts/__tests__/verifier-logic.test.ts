@@ -10,6 +10,10 @@
  * 覆盖 checkR13SingleAxisFloor 函数（单轴下限，反模式 #41）：
  *   - 全部子标准 ≥ 0.70 → 无违规
  *   - 任一子标准 < 0.70 → 违规列表含该子标准名
+ *
+ * CLI 层用例（Persona Verifier CLI regressions / V 负样本）为进程内模式：
+ * 经 helpers/cli-invoker.ts 调用导出的 main(argv)（runMain 的 VITEST 守卫阻止 import 自执行）；
+ * 真实子进程保真由保真对照用例 + cli-subprocess-smoke.test.ts 承载。
  */
 
 import { createRequire } from 'node:module';
@@ -21,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { runSync } from '../lib/run-sync.js';
+import { invokeCli } from './helpers/cli-invoker.js';
 import {
   validateEvidenceFormat,
   checkR13SingleAxisFloor,
@@ -41,23 +46,23 @@ const PERSONA_FIXTURES = [
   'persona-performance-auditor.json',
 ] as const;
 
-function runVerifierCli(
+/** 进程内调用 check-verifier-output CLI（模块路径相对 helpers/cli-invoker.ts 解析） */
+async function runVerifierCli(
   fixturePath: string,
   options: { json?: boolean } = { json: true },
-): { code: number | null; stdout: string; stderr: string } {
-  const args = [TSX_CLI, VERIFIER_SCRIPT];
-  if (options.json) args.push('--json');
-  args.push(fixturePath);
-  const result = runSync(process.execPath, args, {
-    cwd: ROOT,
-    timeout: 15_000,
-  });
-  return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+): Promise<{ code: number | undefined; stdout: string; stderr: string }> {
+  const argv: string[] = [];
+  if (options.json) argv.push('--json');
+  argv.push(fixturePath);
+  const r = await invokeCli('../../cli/check-verifier-output.js', argv);
+  return { code: r.exitCode, stdout: r.stdout, stderr: r.stderr };
 }
 
-/** 跑 samples/verifier 下样本的真实 CLI（人类可读模式，reasons 打在 stdout） */
-function runVerifier(sampleRelPath: string): { exitCode: number | null; stdout: string; stderr: string } {
-  const result = runVerifierCli(resolve(ROOT, sampleRelPath), { json: false });
+/** 跑 samples/verifier 下样本的 CLI（人类可读模式，reasons 打在 stdout） */
+async function runVerifier(
+  sampleRelPath: string,
+): Promise<{ exitCode: number | undefined; stdout: string; stderr: string }> {
+  const result = await runVerifierCli(resolve(ROOT, sampleRelPath), { json: false });
   return { exitCode: result.code, stdout: result.stdout, stderr: result.stderr };
 }
 
@@ -75,9 +80,9 @@ describe('Persona Verifier fixtures', () => {
 });
 
 describe('Persona Verifier CLI regressions', () => {
-  it.each(PERSONA_FIXTURES)('%s 应通过真实 --json CLI 子进程协议', (file) => {
+  it.each(PERSONA_FIXTURES)('%s 应通过 --json CLI 协议', async (file) => {
     const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier', file);
-    const result = runVerifierCli(fixturePath);
+    const result = await runVerifierCli(fixturePath);
 
     expect(result.code).toBe(0);
     expect(result.stderr).toBe('');
@@ -107,7 +112,7 @@ describe('Persona Verifier CLI regressions', () => {
     try {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary fixture path
       await writeFile(negativeFixturePath, JSON.stringify(fixture), 'utf-8');
-      const result = runVerifierCli(negativeFixturePath);
+      const result = await runVerifierCli(negativeFixturePath);
       const report = JSON.parse(result.stdout) as Record<string, unknown>;
 
       expect(result.code).toBe(1);
@@ -135,7 +140,7 @@ describe('Persona Verifier CLI regressions', () => {
     try {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary fixture path
       await writeFile(positiveFixturePath, JSON.stringify(fixture), 'utf-8');
-      const result = runVerifierCli(positiveFixturePath);
+      const result = await runVerifierCli(positiveFixturePath);
       const report = JSON.parse(result.stdout) as Record<string, unknown>;
 
       expect(result.code).toBe(0);
@@ -163,7 +168,7 @@ describe('Persona Verifier CLI regressions', () => {
     try {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary fixture path
       await writeFile(negativeFixturePath, JSON.stringify(fixture), 'utf-8');
-      const result = runVerifierCli(negativeFixturePath);
+      const result = await runVerifierCli(negativeFixturePath);
       const report = JSON.parse(result.stdout) as Record<string, unknown>;
 
       expect(result.code).toBe(1);
@@ -176,9 +181,9 @@ describe('Persona Verifier CLI regressions', () => {
     }
   });
 
-  it('默认模式保持人类可读报告与 VERIFIER_JSON 摘要协议', () => {
+  it('默认模式保持人类可读报告与 VERIFIER_JSON 摘要协议', async () => {
     const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier/persona-code-reviewer.json');
-    const result = runVerifierCli(fixturePath, { json: false });
+    const result = await runVerifierCli(fixturePath, { json: false });
 
     expect(result.code).toBe(0);
     expect(result.stderr).toBe('');
@@ -191,7 +196,7 @@ describe('Persona Verifier CLI regressions', () => {
     const tempDir = await mkdtemp(resolve(tmpdir(), 'verifier-cli-'));
     const missingFixturePath = resolve(tempDir, 'missing.json');
     try {
-      const result = runVerifierCli(missingFixturePath);
+      const result = await runVerifierCli(missingFixturePath);
 
       expect(result.code).toBe(2);
       expect(result.stdout).toMatch(/^ERROR_JSON /);
@@ -212,7 +217,7 @@ describe('Persona Verifier CLI regressions', () => {
     try {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary fixture path
       await writeFile(malformedFixturePath, '{malformed', 'utf-8');
-      const result = runVerifierCli(malformedFixturePath);
+      const result = await runVerifierCli(malformedFixturePath);
 
       expect(result.code).toBe(2);
       expect(result.stdout).toMatch(/^ERROR_JSON /);
@@ -221,6 +226,27 @@ describe('Persona Verifier CLI regressions', () => {
         exitCode: 2,
       });
       expect(result.stderr).toContain('[FILE_PARSE]');
+    } finally {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary directory
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  // 试点专属：本文件仍含 1 处真实 spawn（保真对照），试点期保留；
+  // Task 9 推广时对照职责移交 cli-subprocess-smoke.test.ts 后随本用例删除。
+  // 覆盖 exitWithError 路径（readJsonOrExit 抛 HandledCliError、main 内收敛为正常返回）：
+  // 进程内与真实子进程的 exitCode / stdout（ERROR_JSON 行）须逐字节一致。
+  it('保真对照（试点）：exitWithError 路径进程内与真实子进程 exitCode/stdout 逐字节一致', async () => {
+    const tempDir = await mkdtemp(resolve(tmpdir(), 'verifier-cli-'));
+    const missingFixturePath = resolve(tempDir, 'missing.json');
+    try {
+      const inproc = await runVerifierCli(missingFixturePath);
+      const real = runSync(process.execPath, [TSX_CLI, VERIFIER_SCRIPT, '--json', missingFixturePath], {
+        cwd: ROOT,
+        timeout: 15_000,
+      });
+      expect(inproc.code).toBe(real.status);
+      expect(inproc.stdout).toBe(real.stdout);
     } finally {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary directory
       await rm(tempDir, { recursive: true, force: true });
@@ -268,21 +294,21 @@ describe('V 产物形态负样本（D-10：等差改进指引 / 双 L 文案区�
     expect(result.vagueItems).toEqual(evidence);
   });
 
-  it('完美等差数列 rawScores → 失败且文案含改进指引', () => {
-    const r = runVerifier('w-model-dev/scripts/samples/verifier/bad-arithmetic-sequence.json');
+  it('完美等差数列 rawScores → 失败且文案含改进指引', async () => {
+    const r = await runVerifier('w-model-dev/scripts/samples/verifier/bad-arithmetic-sequence.json');
     expect(r.exitCode).toBe(1);
     expect(r.stdout + r.stderr).toMatch(/真实离散/);
   });
 
-  it('双 L evidence 形态 → 文案点明格式不符（非空泛声明）', () => {
-    const r = runVerifier('w-model-dev/scripts/samples/verifier/bad-evidence-double-l.json');
+  it('双 L evidence 形态 → 文案点明格式不符（非空泛声明）', async () => {
+    const r = await runVerifier('w-model-dev/scripts/samples/verifier/bad-evidence-double-l.json');
     expect(r.exitCode).toBe(1);
     expect(r.stdout + r.stderr).toMatch(/格式不符|须 path:Lnn=stmt/);
     expect(r.stdout + r.stderr).not.toMatch(/空泛声明/);
   });
 
-  it('非全等但分布坍缩 → 失败且文案点明分辨力下限', () => {
-    const r = runVerifier('w-model-dev/scripts/samples/verifier/bad-resolution-floor.json');
+  it('非全等但分布坍缩 → 失败且文案点明分辨力下限', async () => {
+    const r = await runVerifier('w-model-dev/scripts/samples/verifier/bad-resolution-floor.json');
     expect(r.exitCode).toBe(1);
     expect(r.stdout + r.stderr).toMatch(/分布坍缩/);
   });
