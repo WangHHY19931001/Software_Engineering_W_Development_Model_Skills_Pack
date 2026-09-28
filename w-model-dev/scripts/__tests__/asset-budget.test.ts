@@ -7,8 +7,7 @@
  * （单一权威位置），再带实测依据更新此处常量与注释，两处同一次提交完成。
  *
  * 这些断言的价值在「钉住上限防未来膨胀」：每个常量都显著高于当前实测值但紧到有意义，
- * 不是现状描述。注释写明「阈值来源 + 当前实测值」，rebaseline 注释风格照
- * helpers/l0-baseline.ts（增量来历 + 实测日期 + 影响到的字段）。
+ * 不是现状描述。注释写明「阈值来源 + 当前实测值 + 实测日期」，改预算常量时连同来历一次写清。
  *
  * 词数类阈值（asset-authoring.md §5 :70-72 的 <150/<200/<500 词）有意不断言：中文字数无
  * 可靠的确定性度量（P2-B 计划 §0.1.3 范围裁定，按 S04「不编码不可测物」精神）。
@@ -104,7 +103,7 @@ function hasTocSection(lines: string[]): boolean {
 }
 
 /**
- * L0 载体定量预算（全部为**上限**；rebaseline 注释风格照 helpers/l0-baseline.ts）。
+ * L0 载体定量预算（全部为**上限**；每项注释写明阈值来源 + 当前实测值 + 实测日期）。
  */
 const ASSET_BUDGET = {
   // asset-authoring.md §5 :65「SKILL.md body < 500 行」→ 上限 499（正文不含 frontmatter）。
@@ -119,7 +118,8 @@ const ASSET_BUDGET = {
   // 当前实测最大 tla-plus.md：base 3e3b521f 实测 2295 行（无目录节）；head 实测 2317 行
   // （含本次补入的目录节 +22；2026-09-15 P2-B Task 3 实测）。
   referenceFileMaxLines: 2500,
-  // references 文件数上限。当前实测 43 个 .md；预算 48 留 5 个新增余量（2026-09-15 实测）。
+  // references 文件数上限。2026-09-15 实测 43 个 .md，预算 48 留 5 个新增余量（历史依据，不再声明「当前」；
+  // 上限值与前瞻余量不动，实际份数以目录实测为准）。
   referenceMaxFileCount: 48,
   // references 总行数上限。当前实测 16482 行（含 Task 1 对 hard-constraints.md 的 S27 链接
   // 增行 +4 与 Task 3 补入的两个目录节 +40；base 3e3b521f 实测 16442 行；

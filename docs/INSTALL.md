@@ -12,7 +12,7 @@
 
 ### Source-bound provenance 边界
 
-`evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。`npm run wm:export-evidence -- <project-dir> <output-dir>` 只从 `.w-model` 下的 `gate-logs/`、`verifier-outputs/`、`signature-chains/`（legacy 形态）、根级 `signature-chain.jsonl`（权威形态）、`codegraph-queries/` 和 `run-log.jsonl` 白名单导出（两者并存时链位置歧义 → fail-closed `SIGNATURE_CHAIN_AMBIGUOUS`）；项目源码、`.zcode/`、`coverage/`、未白名单运行时文件和 `docs/changes/archive/` 不属于当前运行证据。JSON/JSONL/Markdown 会清理敏感字段与绝对路径，manifest 记录稳定相对路径、kind、SHA-256 和 package manifest hash；CLI 成功输出只显示脱敏占位路径。`wm-export-evidence --verify` 在没有 `--source-project` 时只能是 package-only；只有传入 `--source-project <project-dir>` 才能执行 source-bound verify。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性；它不是密码学签名，也不是第三方不可抵赖证明。package-only 不能表述为 verified source 证据；导出和 producer+verify 都不会自动 Git 提交或发布。**无 `.git` 工作区默认 `MISSING_GIT_HEAD` exit 1，只有显式传 `--no-git-ok` 才产出 `provenanceKind=no-git` 形态（`commitSha` 为空、以 `workspaceDigest` 工作区内容摘要替代 HEAD）；该形态永久只能 package-only——`--source-project` 复验一律拒绝（`NOT_SOURCE_BOUND_NO_GIT`，exit 1），不得表述为 verified source 证据。** **交付 / 外发前必须经 `wm-export-evidence` 生成脱敏包；禁止直接外发归档目录**（`docs/changes/archive/` 保留执行证据原貌——gate-log 头部的 `cwd` / 输入路径属本机真实执行证据，不得就地脱敏；对外交付一律走上述脱敏导出链）；**归档目录仅作受控留档、不构成交付物**，如需交付其中文档，走脱敏导出链生成**独立副本**（导出白名单不含 `docs/changes/archive/`）。
+`evidence-provenance.schema.json` 登记受控本机的 source provenance；`npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts`）是 producer+verify 命令，会生产并验证 source provenance。受控本机 provenance 通过当前 HEAD、source hash、run 身份和 gate measurements 提供流程完整性——它不是密码学签名，也不是第三方不可抵赖证明；package-only 不能表述为 verified source 证据；导出和 producer+verify 都不会自动 Git 提交或发布。**导出白名单 / 排除项 / manifest 脱敏形态 / no-git 永久护栏的判据枚举**见 [command-reference.md](../w-model-dev/references/command-reference.md)「证据 provenance 与导出验证」节及其「Source-bound provenance 边界」节。
 
 ## 验证仓库
 
@@ -104,14 +104,14 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\w-model-dev"
 ├── SKILL.md            # 入口：YAML frontmatter（name + version + description）+ 编排逻辑 + 架构定位 + 编排者-子代理边界 + Bundled Resources 按需加载契约
 ├── skill-metadata.json # 版本号镜像（与 SKILL.md frontmatter `version` 双写，__tests__/skill-metadata.test.ts 回归校验）
 ├── references/         # 8 阶段细则 + verifier-spec.md + subagent-delegation.md + hard-constraints.md + toolbox.md + 数据模型 + RTM 指南 + 质量标准 + TLA+ 指南 + 编码质量（coding-quality，含设计模式目录）（按需加载，详见 SKILL.md Bundled Resources 表）
-├── subagent/           # 33 个评审 persona 文件（engineering / testing / design / product / project 5 类，按需读取）；每份 frontmatter 含 capabilities / inputs / outputs / boundaries 四字段（换人判据，由 docs-consistency 强制）
+├── subagent/           # 评审 persona 文件（engineering / testing / design / product / project 5 类，按需读取；数量以 `subagent/` 目录实测为准）；每份 frontmatter 含 capabilities / inputs / outputs / boundaries 四字段（换人判据，由 docs-consistency 强制）
 ├── schemas/            # 34 份 JSON Schema (draft-07) 文件（verifier-output / rtm / project / budget / gate-log / run-log / maturity / checkpoint-log / tla-manifest / graph / rootcause-report / hill-climbing-report / event-ingress / code-tla-manifest / bdd-manifest / coverage / exemption / signature-chain / preventive-review / design-contract / iceberg-sweep / evidence-manifest / evidence-provenance / change-scope / codegraph-query / code-health-campaign / code-health-candidate / code-health-evidence / code-health-approval / code-health-archive / code-health-gap / code-health-test-inventory / code-health-duplicate-cluster / code-health-ledger-event），由 infrastructure/schema-loader.ts 在 logic 层前置加载
 ├── tools/              # tla2tools.jar（TLA+ 门禁运行时依赖：check-tla-model.ts 执行 SANY/TLC 时加载）
 ├── scripts/            # 自包含门禁 / 校验脚本，不调用 LLM（依赖 tsx + devDeps，见 §2）
-│   ├── cli/            # CLI 入口层（27 个 check-*.ts 门禁入口（含编码计划门 check-coding-plan 与元门禁 check-docs-consistency / check-samples-coverage / check-coverage-scope / check-pollution）+ 7 个 code-health 门禁 CLI：code-health-phase1 / code-health-gap / code-health-tests / code-health-duplicates / code-health-ledger / code-health-apply / code-health-archive + 12 个工具 CLI：security-scan / wm-status / metrics-report / ensure-codegraph / wm-write / wm-append-runlog / doctor / plan-chunks / wm-export-evidence / wm-verify-evidence-source / platform-deps-install / review-package；共 47 个 .ts，exit-2 脚本口径 = 46，self-test.ts 单列（回归基线，非 exit-2）；IO 抽离，传纯数据给 logic 层）
-│   ├── logic/          # 纯函数校验逻辑（40 个 .ts：39 个 *-logic.ts + code-health-contract.ts）
+│   ├── cli/            # CLI 入口层（check-*.ts 门禁入口（含编码计划门 check-coding-plan 与元门禁 check-docs-consistency / check-samples-coverage / check-coverage-scope / check-pollution）+ code-health 门禁 CLI：code-health-phase1 / code-health-gap / code-health-tests / code-health-duplicates / code-health-ledger / code-health-apply / code-health-archive + 工具 CLI：security-scan / wm-status / metrics-report / ensure-codegraph / wm-write / wm-append-runlog / doctor / plan-chunks / wm-export-evidence / wm-verify-evidence-source / platform-deps-install / review-package；.ts 总数见 SKILL.md「资源计数」段，exit-2 脚本口径见 `references/conventions.md`「exit-2 脚本口径」节与 AGENTS.md §8，self-test.ts 单列（回归基线，非 exit-2）；IO 抽离，传纯数据给 logic 层）
+│   ├── logic/          # 纯函数校验逻辑（*-logic.ts + code-health-contract.ts；数量以目录实测为准）
 │   ├── infrastructure/ # 基础设施适配（schema-loader.ts / schema-fs.ts；Ajv 单例 + schemas/*.schema.json 自动加载）
-│   ├── lib/            # 共享工具（36 个：cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate / artifact-gate-assets / uat-path-mapping / tla-clean-trace 与 code-health-* 注入边界等）
+│   ├── lib/            # 共享工具（cli-error / constants / types / gate-report / safe-json / read-json-or-exit / parse-phase / phase-doc-map / load-and-validate / artifact-gate-assets / uat-path-mapping / tla-clean-trace 与 code-health-* 注入边界等；数量以目录实测为准）
 │   └── __tests__/      # vitest 单元测试（文件数与用例数以当前命令输出为准 + README.md coverage 矩阵）
 ├── templates/          # 需求/设计/测试/RTM 等文档模板
 └── examples/           # 需求分析 / 系统设计 / 编码交互示例
@@ -231,7 +231,7 @@ W-Model 的方法论参考类文件可脱离编排单独拷贝到其他 Agent �
 | `references/root-cause-locator.md`                        | 根因分析方法论（5-Why / 鱼骨图 / 缺陷链追溯）        |
 | `references/asset-authoring.md`                           | 技能资产编写方法论（渐进披露阈值 / no-op test / 授权不写） |
 | `references/iceberg-sweep-guide.md`                       | 隐藏问题深挖扫掠方法                                 |
-| `references/agent-personas.md` + `subagent/`（33 个人格） | 评审角色提示词与多角度分析（含能力声明四字段与 R-persona 两键矩阵） |
+| `references/agent-personas.md` + `subagent/`（评审人格库） | 评审角色提示词与多角度分析（含能力声明四字段与 R-persona 两键矩阵） |
 | `references/conventions.md`                               | 术语表 / 格式 / 目录约定                             |
 | `references/estimation-guide.md`                          | 工作量估算方法                                       |
 | `references/context-management-guide.md`                  | 上下文分层与修剪纪律                                 |
@@ -251,7 +251,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 42.3.0
+version: 42.4.0
 # description 不在此处复制：SKILL.md 的 frontmatter 是其唯一权威来源
 # （本节曾逐字镜像该字段，已发生过一次漂移，故改为指向而非复述）
 ```
@@ -299,7 +299,7 @@ Remove-Item -Recurse -Force "<agent-specific-skills>\w-model-dev"
 | 安全扫描脚本（baseline v2 内容敏感指纹豁免）                                                                      | [../w-model-dev/scripts/cli/security-scan.ts](../w-model-dev/scripts/cli/security-scan.ts)                                                                                                                  |
 | 回归基线脚本（用例数以运行输出为准）                                                                                        | [../w-model-dev/scripts/cli/self-test.ts](../w-model-dev/scripts/cli/self-test.ts)                                                                                                                          |
 | 测试 coverage 矩阵                                                                                                | [../w-model-dev/scripts/**tests**/README.md](../w-model-dev/scripts/__tests__/README.md)                                                                                                                    |
-| 33 个评审 persona 文件                                                                                            | [../w-model-dev/subagent/](../w-model-dev/subagent)                                                                                                                                                         |
+| 评审 persona 文件库（数量以 `subagent/` 目录实测为准）                                                           | [../w-model-dev/subagent/](../w-model-dev/subagent)                                                                                                                                                         |
 | Verifier 输出校验逻辑                                                                                             | [../w-model-dev/scripts/logic/verifier-logic.ts](../w-model-dev/scripts/logic/verifier-logic.ts)                                                                                                            |
 | Verifier 输出校验 CLI                                                                                             | [../w-model-dev/scripts/cli/check-verifier-output.ts](../w-model-dev/scripts/cli/check-verifier-output.ts)                                                                                                  |
 | 工件质量门逻辑                                                                                                    | [../w-model-dev/scripts/logic/gate-logic.ts](../w-model-dev/scripts/logic/gate-logic.ts)                                                                                                                    |

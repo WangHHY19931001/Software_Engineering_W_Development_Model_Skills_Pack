@@ -171,6 +171,13 @@ export interface DocConsistencyInput {
   testFileCount: number;
   /** Vitest facts 实际运行输出的用例总数；-1 = 无法采集，动态检查 fail-closed。 */
   vitestTestCount: number;
+  /**
+   * T3（门禁瘦身）：调用方（独立运行，无受控 vitest 工件且未显式 `--spawn-vitest`）跳过整条
+   * Vitest 动态 facts 校验通道——不产生 vitest-* 违规，由调用方输出非阻断诊断并把
+   * dynamicMeasurements 置 null；退出码仅由静态违规决定。
+   * 缺省（prepush 受控工件快路径 / 显式自采集）语义一字不变：动态 facts 缺失或不可信仍 fail-closed。
+   */
+  vitestFactsSkipped?: boolean;
   /** 同一份 Vitest JSON 测量的运行结果完整性；false 时不可用动态计数支撑通过结论。 */
   vitestMeasurementsValid?: boolean;
   /** Vitest JSON 缺字段、失败或状态不一致时的确定性原因。 */
@@ -1033,17 +1040,21 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
   }
   // Vitest 文件数与用例总数只作为受控事实包的动态测量输出，不再要求复制到活体文档。
   // 仍校验 facts/provenance 的完整性、身份、hash 与成功状态，缺失或不可信时 fail-closed。
-  violations.push(
-    ...checkVitestMeasurements(
-      input.vitestTestCount,
-      input.vitestMeasurementsValid,
-      input.vitestMeasurementsReason,
-      input.vitestRunId,
-      input.vitestArtifactId,
-      input.vitestArtifactSha256,
-      input.vitestCommitSha,
-    ),
-  );
+  // T3：vitestFactsSkipped（独立运行且无工件/无逃生口）时整条动态 facts 通道跳过——调用方已输出
+  // 非阻断诊断并置 dynamicMeasurements=null，故此处不产出 vitest-* 违规（prepush 路径恒不跳过）。
+  if (input.vitestFactsSkipped !== true) {
+    violations.push(
+      ...checkVitestMeasurements(
+        input.vitestTestCount,
+        input.vitestMeasurementsValid,
+        input.vitestMeasurementsReason,
+        input.vitestRunId,
+        input.vitestArtifactId,
+        input.vitestArtifactSha256,
+        input.vitestCommitSha,
+      ),
+    );
+  }
   violations.push(...checkPrTemplatePrePushCount(input.prTemplate));
   violations.push(...checkGateCountLiveDocs(input.gateCountDocs));
   if (input.a4Docs !== undefined) {
@@ -1760,7 +1771,7 @@ export function checkConventionsExit2Count(conventions: string, actualCount: num
 /**
  * schema 属性级 description 全覆盖检查（F-G4-08，audit-fixes task 6）：
  * 任何含 properties 的 schema 节点（根 / 嵌套对象 / definitions|$defs / 数组 items）
- * 必须自带 description，使 AGENTS.md「25 份全字段 description 自描述」声明受门禁强制。
+ * 必须自带 description，使 AGENTS.md「全字段 description 自描述」（份数以 AGENTS 原文为准）声明受门禁强制。
  * 遍历覆盖 properties 子节点、definitions（含 draft-2019-09+ 的 $defs 兼容）与 items
  * （数组形态逐项、单例形态整体）；标量属性节点由其所在 properties 持有者的子节点遍历到达。
  */
@@ -1809,7 +1820,7 @@ function checkAssetCounts(personaCount: number, readme: string): DocCheckViolati
 /**
  * references/ 目录 .md 文件数一致性：
  * 期望值从 SKILL.md「Bundled Resources」表「（N 个 .md）」计数表述解析
- * （如 `` `references/`（57 个 .md） ``，资源名反引号格式可异），与实测比对——
+ * （如 `` `references/`（N 个 .md） ``，资源名反引号格式可异，N 为实测份数），与实测比对——
  * 新增 references/*.md 时只需同步 SKILL.md，门禁自动校验一致性，防再次漂移。
  */
 function checkReferencesCount(referencesCount: number, skill: string): DocCheckViolation[] {
@@ -2179,7 +2190,7 @@ export function checkSkillOutboundLinks(
 
 /**
  * S31 orphan-reference 豁免清单（条目 = references/ 下文件名，如 'draft-appendix.md'）。
- * 当前为空数组：实测 43 个 references/*.md 全部有 ≥1 条来自 SKILL.md 或其它 references/*.md
+ * 当前为空数组：实测全部 references/*.md 均有 ≥1 条来自 SKILL.md 或其它 references/*.md
  * 的相对入链，门禁先天严格。未来出现合法孤儿载体（如纯附录页）时登记到此处并注明理由；
  * 清单外文件一律强制入链——豁免是显式登记，不是缺省放行。
  */

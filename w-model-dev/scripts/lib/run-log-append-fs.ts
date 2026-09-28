@@ -31,8 +31,6 @@ export interface RunLogFileContent {
   text: string;
   /** 既有记录（按文件顺序，已忽略空白行） */
   entries: RunLogRecord[];
-  /** 既有的非空原始行（与 `entries` 同序，逐字节保留原文） */
-  rawLines: string[];
 }
 
 /** 读取结果：解析失败以 `ok:false` 返回（含行号 + exit-2 类别），由 CLI 转 ERROR_JSON，不抛异常 */
@@ -43,7 +41,7 @@ export type RunLogFileReadResult =
 /**
  * 读取 run-log 文件并逐行解析。
  *
- * - 文件不存在 → `{exists:false, text:'', entries:[], rawLines:[]}`（自举语义，不报错）；
+ * - 文件不存在 → `{exists:false, text:'', entries:[]}`（自举语义，不报错）；
  * - 其他读取错误（权限 / 目录等）向上抛，由 CLI `runMain` 统一转 UNEXPECTED；
  * - 某行不是合法 JSON、或不是 JSON 对象 → `ok:false` + 行号（调用方转 FILE_PARSE / STRUCTURE_INVALID）。
  */
@@ -54,13 +52,12 @@ export async function readRunLogFile(absPath: string): Promise<RunLogFileReadRes
     text = await fs.readFile(absPath, 'utf-8');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return { ok: true, content: { exists: false, text: '', entries: [], rawLines: [] } };
+      return { ok: true, content: { exists: false, text: '', entries: [] } };
     }
     throw error;
   }
 
   const entries: RunLogRecord[] = [];
-  const rawLines: string[] = [];
   const lines = text.split(/\r?\n/);
   for (const [index, rawLine] of lines.entries()) {
     if (rawLine.trim() === '') continue;
@@ -79,9 +76,8 @@ export async function readRunLogFile(absPath: string): Promise<RunLogFileReadRes
       };
     }
     entries.push(parsed as RunLogRecord);
-    rawLines.push(rawLine);
   }
-  return { ok: true, content: { exists: true, text, entries, rawLines } };
+  return { ok: true, content: { exists: true, text, entries } };
 }
 
 /**

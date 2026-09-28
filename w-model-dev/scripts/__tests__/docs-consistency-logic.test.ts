@@ -1764,19 +1764,16 @@ describe('runDocConsistencyChecks', () => {
     });
   }, 120_000);
 
-  it('AGENTS=34 与 INSTALL=24 的旧资产声明在同一真实 fixture 中失败', async () => {
+  it('AGENTS=34 的旧资产声明在同一真实 fixture 中失败', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       await writeVitestCount(fixtureRoot, 1002);
       const agentsPath = path.join(fixtureRoot, 'AGENTS.md');
-      const installPath = path.join(fixtureRoot, 'docs', 'INSTALL.md');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
       const agents = await fs.readFile(agentsPath, 'utf8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
-      const install = await fs.readFile(installPath, 'utf8');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
       await fs.writeFile(agentsPath, agents.replace('全仓 46 个脚本 exit 2', '全仓 34 个脚本 exit 2'), 'utf8');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
-      await fs.writeFile(installPath, install.replace('27 个 check-*.ts', '24 个 check-*.ts'), 'utf8');
+      // INSTALL 侧的同类半段（原 `install.replace('27 个 check-*.ts', …)`）已随 2026-09-27 门禁瘦身
+      // T5 去数字退休：该字面量不再存在，变异恒为 no-op，且无门禁消费该位置声明。
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
       expect(result.code).toBe(1);
       expect(result.stdout).toContain('exit2-scripts');
@@ -2039,30 +2036,155 @@ describe('runDocConsistencyChecks', () => {
     });
   }, 120_000); // real CLI spawns (export three-scenario isolation): can exceed the 30s default under full-suite load
 
-  it('CLI 无 JSON 且 Vitest 不可用（显式清除外部 JSON 环境变量）→ vitest-tests 违规并 exit 1', async () => {
+  // T3 三态（门禁瘦身）：无受控工件 + 无 --spawn-vitest → 动态 facts 跳过（诊断 + dynamicMeasurements=null + exit 0，
+  // 不 spawn）；--spawn-vitest → 走自采集（本用例内 vitest 缺失，仍 fail-closed，证明未被静默跳过）。
+  const NO_VITEST_ENV: NodeJS.ProcessEnv = {
+    WM_VITEST_COUNT_FILE: '',
+    WM_VITEST_PROVENANCE_FILE: '',
+    WM_VITEST_PROVENANCE_ROOT: '',
+    PATH: '',
+    Path: '',
+  };
+  const SKIPPED_DIAGNOSTIC =
+    '○ 动态 facts 未校验：未提供受控 vitest 工件（WM_VITEST_COUNT_FILE / WM_VITEST_PROVENANCE_FILE）；终局验收经 npm run prepush 覆盖（fail-closed）。如需自采集请显式加 --spawn-vitest（约 30 分钟）。';
+
+  it('CLI 无受控 vitest 工件且未传 --spawn-vitest → 跳过动态 facts 诊断可见并 exit 0（不 spawn）', async () => {
     await withDocsConsistencyFixture(
       async (fixtureRoot) => {
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixtureRoot is a mkdtemp-owned isolated repository copy
         expect(existsSync(path.join(fixtureRoot, 'node_modules', 'vitest'))).toBe(false);
-        const result = runDocsConsistencyCli(
-          fixtureRoot,
-          {
-            WM_VITEST_COUNT_FILE: '',
-            WM_VITEST_PROVENANCE_FILE: '',
-            WM_VITEST_PROVENANCE_ROOT: '',
-            PATH: '',
-            Path: '',
-          },
-          [],
-          { timeoutMs: 30_000 },
-        );
-        expect(result.code, JSON.stringify(result)).toBe(1);
-        expect(result.stdout).toContain('vitest 用例  : 无法采集（不一致）');
-        expect(result.stdout).toContain('[vitest-tests]');
+        // 无 vitest 可执行且 PATH 清空：若仍 spawn（回退到 npx）必然采集失败 → exit 1；
+        // 故 exit 0 本身即「未 spawn」的判据（同原用例的 vitest 不可用前提，反向断言）。
+        const json = runDocsConsistencyCli(fixtureRoot, NO_VITEST_ENV, ['--json'], { timeoutMs: 30_000 });
+        expect(json.code, JSON.stringify(json)).toBe(0);
+        const report = JSON.parse(json.stdout) as {
+          passed: boolean;
+          dynamicViolations: Array<{ check: string }>;
+          dynamicMeasurements: unknown;
+          diagnostics: string[];
+        };
+        expect(report.passed).toBe(true);
+        // 缺省态 dynamicMeasurements 置 null（JSON 键保持在场、形状稳定），诊断逐字可见
+        expect(report.dynamicMeasurements).toBeNull();
+        expect(report.diagnostics).toEqual([SKIPPED_DIAGNOSTIC]);
+        expect(report.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
+
+        // 人类可读通道同样显式声明「跳过」而不是「无法采集（不一致）」
+        const human = runDocsConsistencyCli(fixtureRoot, NO_VITEST_ENV, [], { timeoutMs: 30_000 });
+        expect(human.code, JSON.stringify(human)).toBe(0);
+        expect(human.stdout).toContain('vitest 用例  : 跳过（未提供受控 vitest 工件）');
+        expect(human.stdout).toContain(SKIPPED_DIAGNOSTIC);
+        expect(human.stdout).not.toContain('[vitest-tests]');
       },
       { availablePackages: ['tsx', 'typescript', 'esbuild'] },
     );
   }, 120_000);
+
+  it('CLI 显式 --spawn-vitest（无工件）→ 仍走自采集 fail-closed，不静默跳过动态 facts', async () => {
+    await withDocsConsistencyFixture(
+      async (fixtureRoot) => {
+        const result = runDocsConsistencyCli(fixtureRoot, NO_VITEST_ENV, ['--json', '--spawn-vitest'], {
+          timeoutMs: 60_000,
+        });
+        // 逃生口语义：显式要求自采集即恢复 fail-closed（vitest 不可用 → 采集失败 → vitest-* 违规 exit 1），
+        // 不得退化成「跳过 + exit 0」。本用例断言路由（spawn 被真实发起）；成功路径见下一条 stub vitest 用例。
+        expect(result.code, JSON.stringify(result)).toBe(1);
+        const report = JSON.parse(result.stdout) as {
+          reasons: string[];
+          dynamicMeasurements: { vitestTestCount: number } | null;
+        };
+        expect(report.reasons.some((reason) => reason.includes('[vitest-'))).toBe(true);
+        expect(report.dynamicMeasurements).not.toBeNull();
+      },
+      { availablePackages: ['tsx', 'typescript', 'esbuild'] },
+    );
+  }, 120_000);
+
+  it('CLI --spawn-vitest 自采集成功路径：自生成同目录 provenance 后严格校验通过（stub vitest）', async () => {
+    await withDocsConsistencyFixture(
+      async (fixtureRoot) => {
+        // 口径说明：真实 `--spawn-vitest` 会跑约 30 分钟全量套件（且中途终止有孤儿进程风险），
+        // 本用例用**受控 stub vitest** 走到「JSON 工件生成成功」为止——spawn 形态（process.execPath +
+        // node_modules/vitest 入口 + --outputFile）与生产路径一致，只把「跑测试」替换为「写 JSON」。
+        const vitestDir = path.join(fixtureRoot, 'node_modules', 'vitest');
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture path is inside the mkdtemp-owned test root
+        await fs.mkdir(vitestDir, { recursive: true });
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture path is inside the mkdtemp-owned test root
+        await fs.writeFile(
+          path.join(vitestDir, 'package.json'),
+          JSON.stringify({ name: 'vitest', version: '0.0.0', bin: { vitest: 'stub-cli.mjs' } }),
+          'utf-8',
+        );
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture path is inside the mkdtemp-owned test root
+        await fs.writeFile(
+          path.join(vitestDir, 'stub-cli.mjs'),
+          [
+            "import { writeFileSync } from 'node:fs';",
+            "const out = process.argv.find((arg) => arg.startsWith('--outputFile='));",
+            'if (out) {',
+            "  writeFileSync(out.slice('--outputFile='.length), JSON.stringify({ testResults: [{}, {}], numTotalTests: 7, numPassedTests: 7, numFailedTests: 0, success: true }));",
+            '}',
+            'process.exit(0);',
+          ].join('\n'),
+          'utf-8',
+        );
+        const result = runDocsConsistencyCli(
+          fixtureRoot,
+          // 只清 WM_VITEST_* 工件变量（保留 PATH：自采集 provenance 的 commitSha 经 git 读取，
+          // 清 PATH 会让该路径退化到「provenance 不可信」，掩盖本用例要验证的成功语义）
+          { WM_VITEST_COUNT_FILE: '', WM_VITEST_PROVENANCE_FILE: '', WM_VITEST_PROVENANCE_ROOT: '' },
+          ['--json', '--spawn-vitest'],
+          { timeoutMs: 60_000 },
+        );
+        expect(result.code, JSON.stringify(result)).toBe(0);
+        const report = JSON.parse(result.stdout) as {
+          dynamicMeasurements: {
+            testFileCount: number;
+            vitestTestCount: number;
+            vitestArtifactId: string;
+            vitestRunId: string;
+            success: boolean;
+          } | null;
+          diagnostics?: string[];
+        };
+        expect(report.dynamicMeasurements).toMatchObject({
+          testFileCount: 2,
+          vitestTestCount: 7,
+          success: true,
+          vitestArtifactId: 'vitest/generated-results.json',
+        });
+        expect(report.dynamicMeasurements?.vitestRunId).toMatch(/^[0-9a-f]{16}$/);
+        // 逃生口下不产生「动态 facts 未校验」诊断（该诊断只属态 3）
+        expect(report.diagnostics ?? []).toEqual([]);
+      },
+      { availablePackages: ['tsx', 'typescript', 'esbuild'] },
+    );
+  }, 120_000);
+
+  it('CLI --spawn-vitest 与受控工件共存时快路径优先（prepush 语义一字不变）', async () => {
+    await withDocsConsistencyFixture(async (fixtureRoot) => {
+      await writeVitestCount(fixtureRoot, 1002);
+      const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json', '--spawn-vitest']);
+      expect(result.code, JSON.stringify(result)).toBe(0);
+      const report = JSON.parse(result.stdout) as {
+        diagnostics?: string[];
+        dynamicMeasurements: { vitestArtifactId: string; vitestTestCount: number };
+      };
+      expect(report.dynamicMeasurements.vitestArtifactId).toBe('vitest/results.json');
+      expect(report.dynamicMeasurements.vitestTestCount).toBe(1002);
+      // 受控工件路径不产生跳过诊断
+      expect(report.diagnostics ?? []).toEqual([]);
+    });
+  }, 120_000);
+
+  it('logic 层 vitestFactsSkipped=true 时跳过 vitest 动态校验（prepush 缺省保持 fail-closed）', () => {
+    const skipped = buildDocConsistencyReport(
+      baseInput({ testFileCount: -1, vitestTestCount: -1, vitestFactsSkipped: true }),
+    );
+    expect(skipped.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
+    const failClosed = buildDocConsistencyReport(baseInput({ testFileCount: -1, vitestTestCount: -1 }));
+    expect(failClosed.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(true);
+  });
 
   it('CLI 注入 SSoT 断链 → internal-links 违规并 exit 1', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {

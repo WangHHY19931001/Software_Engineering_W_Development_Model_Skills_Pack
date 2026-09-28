@@ -18,7 +18,7 @@ AI 助手写代码很容易「差不多就行」：跳段、凭感觉、说不�
 - **全程可追溯**：需求跟踪矩阵（RTM）自动维护，需求 ↔ 设计 ↔ 代码 ↔ 四级测试双向可查；
 - **管流程的人不亲自动手**：编排者（O）只负责调度、记录和等待确认，实际产出与把关全部由子代理（S 产出 / V 评审 / G 门禁 / R 根因定位 / A 分析）承担。
 
-**当前版本**：`42.3.0`（变更历史见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
+**当前版本**：`42.4.0`（变更历史见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
 
 **健康指标**（全部门禁实测通过，怎么验证见下方「CI 策略」与「快速上手」）：
 
@@ -233,7 +233,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 
 几点边界说清楚：
 
-- 导出只从 `.w-model/` 下的白名单（gate-logs / verifier-outputs / 根级 signature-chain.jsonl（权威形态）/ legacy signature-chains / codegraph-queries / run-log.jsonl）取数，两者并存时链位置歧义会 fail-closed（`SIGNATURE_CHAIN_AMBIGUOUS`），**不含项目源码**、`.zcode/`、`coverage/` 或 `docs/changes/archive/` 内容；JSON/JSONL/Markdown 中的敏感字段与绝对路径会被脱敏。
+- 导出只从 `.w-model/` 下的白名单取数，**白名单 / 排除项 / 签名链位置歧义 fail-closed 的枚举**见 [command-reference.md](./w-model-dev/references/command-reference.md)「证据 provenance 与导出验证」节；JSON/JSONL/Markdown 中的敏感字段与绝对路径会被脱敏。
 - `npm run wm:export-evidence --verify` 默认只做 **package-only** 校验；只有传 `--source-project <project-dir>` 才做 **source-bound** 重验。
 - 受控本机 provenance 通过当前 HEAD、source hash、运行身份和门禁测量提供流程完整性——它**不是密码学签名**，也不构成**第三方不可抵赖证明**；package-only 校验不能表述为 verified source 证据。
 - 导出与 producer+verify 都**不会自动提交或发布**，导出后仍须按项目**安全策略审阅**。

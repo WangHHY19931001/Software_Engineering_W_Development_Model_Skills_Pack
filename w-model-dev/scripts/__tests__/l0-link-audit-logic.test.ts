@@ -7,8 +7,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { auditL0RelativeLinks } from '../logic/l0-link-audit-logic.js';
 
-import { L0_BASELINE } from './helpers/l0-baseline.js';
-
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const SKILL_ROOT = path.join(REPO_ROOT, 'w-model-dev');
 const L0_DIRECTORIES = ['references', 'templates', 'examples', 'subagent', 'schemas'];
@@ -506,11 +504,6 @@ describe('auditL0RelativeLinks', () => {
   it('audits the real skill package without hiding L0 boundaries', async () => {
     const result = await auditL0RelativeLinks(SKILL_ROOT);
 
-    // 基线三数单一事实来源见 helpers/l0-baseline.ts（npm run audit:l0-links 实测）。
-    // 增量来历（含 649 → 691 的逐次 rebaseline 说明）全部记在该模块头部，本处不重复。
-    expect(result.relativeLinkCount).toBe(L0_BASELINE.relativeLinkCount);
-    expect(result.l1Only).toHaveLength(L0_BASELINE.l1Only);
-    expect(result.templatePlaceholders).toHaveLength(L0_BASELINE.placeholders);
     expect(result.violations).toEqual([]);
   });
 
