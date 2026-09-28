@@ -27,6 +27,7 @@ import { describe, expect, it } from 'vitest';
 
 import { parseTicketsArg } from '../cli/check-artifact-gate.js';
 import { checkArtifactGate, checkTicketContent } from '../logic/gate-logic.js';
+
 import { invokeCli } from './helpers/cli-invoker.js';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));

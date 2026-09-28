@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest';
+
 import { HandledCliError, exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
 

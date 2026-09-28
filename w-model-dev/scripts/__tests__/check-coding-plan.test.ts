@@ -27,6 +27,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { runSync } from '../lib/run-sync.js';
+
 import { invokeCli } from './helpers/cli-invoker.js';
 
 const CHANGE_ID = 'phase5-demo';

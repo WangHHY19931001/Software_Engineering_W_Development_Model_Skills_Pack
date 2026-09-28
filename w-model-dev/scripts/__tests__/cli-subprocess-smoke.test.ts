@@ -26,7 +26,9 @@ describe('wm-status 真实子进程冒烟', () => {
   let tmpDir: string;
   beforeAll(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-smoke-'));
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- controlled mkdtemp temp root
     await fs.mkdir(path.join(tmpDir, '.w-model'), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- controlled mkdtemp fixture file
     await fs.writeFile(path.join(tmpDir, '.w-model', 'project.json'), PROJECT_JSON, 'utf-8');
   });
   afterAll(async () => {
@@ -55,7 +57,9 @@ describe('metrics-report 真实子进程冒烟', () => {
   let tmpDir: string;
   beforeAll(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'metrics-smoke-'));
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- controlled mkdtemp temp root
     await fs.mkdir(path.join(tmpDir, '.w-model'), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- controlled mkdtemp fixture file
     await fs.writeFile(
       path.join(tmpDir, '.w-model', 'run-log.jsonl'),
       '{"phase":1,"action":"produce","role":"S","outcome":"success","tokens":10,"duration_s":1,"subagentSpawns":1,"gateExitCode":null,"timestamp":"2026-08-05T01:00:00Z"}\n',
@@ -76,6 +80,7 @@ describe('check-artifact-gate 真实子进程冒烟', () => {
   let tmpDir: string;
   beforeAll(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gate-smoke-'));
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- controlled mkdtemp temp root
     await fs.mkdir(path.join(tmpDir, '.w-model'), { recursive: true });
     await fs.copyFile(
       path.resolve(TEST_DIR, '../samples/gate/valid-phase1.json'),

@@ -28,8 +28,8 @@ import {
 } from '../logic/code-health-ledger-logic.js';
 import type { ApplyResult } from '../logic/code-health-contract.js';
 import { runSync } from '../lib/run-sync.js';
-import { invokeCli } from './helpers/cli-invoker.js';
 
+import { invokeCli } from './helpers/cli-invoker.js';
 import {
   bindRevision,
   cleanupTempRoots,

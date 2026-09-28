@@ -23,7 +23,6 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { invokeCli } from './helpers/cli-invoker.js';
 import {
   validateEvidenceFormat,
   checkR13SingleAxisFloor,
@@ -31,6 +30,8 @@ import {
   checkVerifierOutput,
   RESOLUTION_FLOOR,
 } from '../logic/verifier-logic.js';
+
+import { invokeCli } from './helpers/cli-invoker.js';
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(TEST_DIR, '../../..');

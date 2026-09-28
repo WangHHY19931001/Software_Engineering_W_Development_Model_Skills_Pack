@@ -15,8 +15,6 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
-import { invokeCli } from './helpers/cli-invoker.js';
-
 import {
   clusterDuplicates,
   isQuantifiedMaintenanceBenefit,
@@ -43,6 +41,8 @@ import type {
 } from '../logic/code-health-contract.js';
 import { createCodeHealthGitRevisionProvider } from '../lib/code-health-revision-provider.js';
 import { runSync } from '../lib/run-sync.js';
+
+import { invokeCli } from './helpers/cli-invoker.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, '../../..');

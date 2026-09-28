@@ -194,6 +194,7 @@ describe('metrics-report CLI（边界与降级）', () => {
     expect(parsed.meta.recordCount).toBe(3);
     expect(r.stderr).toContain('度量报告已写入');
     // 文件已写出且内容合法
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- controlled mkdtemp fixture file
     const written = JSON.parse(await fs.readFile(outFile, 'utf-8')) as {
       meta: { recordCount: number };
     };
