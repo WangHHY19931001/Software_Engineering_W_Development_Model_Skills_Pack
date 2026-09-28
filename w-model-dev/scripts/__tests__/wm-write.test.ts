@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { childProcessEnv } from '../lib/run-sync.js';
+
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/wm-write.ts');
@@ -38,6 +40,7 @@ function runArgs(
     encoding: 'utf-8',
     input,
     timeout: 15_000,
+    env: childProcessEnv(),
   });
   return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
@@ -61,6 +64,7 @@ function runChild(
     const child = spawn(process.execPath, [tsxCli, SCRIPT, targetPath, ...args], {
       cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
+      env: childProcessEnv(),
     });
     let stdout = '';
     let stderr = '';

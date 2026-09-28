@@ -22,6 +22,8 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { childProcessEnv } from '../lib/run-sync.js';
+
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/wm-append-runlog.ts');
@@ -78,6 +80,7 @@ function run(args: string[], input?: string): { code: number | null; stdout: str
     encoding: 'utf-8',
     input,
     timeout: 20_000,
+    env: childProcessEnv(),
   });
   return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }

@@ -10,6 +10,9 @@ import { exitWithError, HandledCliError } from './cli-error.js';
 import { DuplicateFlagError } from './parse-args.js';
 
 export function runMain(main: () => Promise<void>): void {
+  // Wave 2 进程内调用层：vitest worker 内 import 时不自执行（helpers/cli-invoker.ts
+  // 显式调用 main(argv)）；真实子进程（tsx 直跑）永不设置 VITEST。
+  if (process.env.VITEST) return;
   main().catch((err: unknown) => {
     if (err instanceof HandledCliError) return;
     if (err instanceof DuplicateFlagError) {

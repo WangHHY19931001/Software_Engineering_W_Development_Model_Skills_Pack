@@ -28,6 +28,7 @@ import {
   checkSchemaFieldDescriptions,
   type DocConsistencyInput,
 } from '../logic/docs-consistency-logic.js';
+import { childProcessEnv } from '../lib/run-sync.js';
 
 /** run-log.schema.json action.enum 30 值（与 schema 逐值一致、同序；审计修复 P2 同步源） */
 const ACTION_ENUM_30 = [
@@ -3061,13 +3062,13 @@ function runDocsConsistencyCli(
     // 原 90s 上限在负载下会先杀掉子进程（status=null → 断言读到假失败）。240s 给足负载余量；
     // 外层每个用例自身的 testTimeout 仍是总预算上限（只放宽墙钟，判据/断言/探针数不变）。
     timeout: options.timeoutMs ?? 240_000,
-    env: {
+    env: childProcessEnv({
       ...process.env,
       WM_VITEST_COUNT_FILE: countFile,
       WM_VITEST_PROVENANCE_FILE: provenanceFile,
       WM_VITEST_PROVENANCE_ROOT: fixtureRoot,
       ...envOverrides,
-    },
+    }),
   });
   const spawnError = result.error as (NodeJS.ErrnoException & { message: string }) | undefined;
   return {

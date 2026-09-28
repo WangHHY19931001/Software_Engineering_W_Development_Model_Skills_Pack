@@ -14,6 +14,7 @@ import { evidenceFs } from '../infrastructure/evidence-fs.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { exportEvidence, verifyEvidence } from '../logic/evidence-export-logic.js';
 import { produceSourceProvenance } from '../logic/evidence-provenance-logic.js';
+import { childProcessEnv } from '../lib/run-sync.js';
 
 const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
@@ -188,6 +189,7 @@ function runCli(args: string[]): {
     // (spawnSync then kills it and reports `status: null`). 60 s keeps the bounded-timeout intent while
     // removing the false failure; assertions are unchanged.
     timeout: 60_000,
+    env: childProcessEnv(),
   });
   return {
     code: result.status,

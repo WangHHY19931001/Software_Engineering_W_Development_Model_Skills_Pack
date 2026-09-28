@@ -10,6 +10,7 @@ vi.mock('node:child_process', () => ({ execFile: execFileMock, spawnSync: spawnS
 
 import {
   auditSynchronousChildProcessSource,
+  childProcessEnv,
   DEFAULT_SYNC_MAX_BUFFER,
   DEFAULT_SYNC_TIMEOUT_MS,
   runSync,
@@ -121,6 +122,7 @@ describe('runSync', () => {
 
     expect(result).toMatchObject({ status: 0, stdout: 'ready' });
     expect(spawnSyncMock).toHaveBeenCalledWith('node', ['-e', "process.stdout.write('ready')"], {
+      env: childProcessEnv(), // Wave 2.2：spawn 层中心化剥离 vitest 泄漏的 VITEST（真实子进程语义）
       timeout: DEFAULT_SYNC_TIMEOUT_MS,
       killSignal: 'SIGKILL',
       encoding: 'utf-8',
@@ -164,6 +166,7 @@ describe('runSync', () => {
     runSync('node', ['-e', "process.stdout.write('custom')"], { cwd: '/tmp', timeout: 500 });
 
     expect(spawnSyncMock).toHaveBeenCalledWith('node', ['-e', "process.stdout.write('custom')"], {
+      env: childProcessEnv(), // Wave 2.2：spawn 层中心化剥离 vitest 泄漏的 VITEST（真实子进程语义）
       timeout: 500,
       killSignal: 'SIGKILL',
       encoding: 'utf-8',

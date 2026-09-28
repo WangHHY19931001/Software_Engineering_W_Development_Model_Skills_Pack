@@ -523,6 +523,19 @@ function boundedPositiveNumber(value: number | undefined, fallback: number): num
 }
 
 /**
+ * 子进程环境：剥离 vitest worker 泄漏的 VITEST 变量。
+ * 真实 CLI 调用（tsx 直跑 / 终端）永不设置 VITEST；vitest worker 内 spawn 的
+ * CLI 子进程若继承它，runMain 的 VITEST 守卫会误跳过自执行（Wave 2 进程内
+ * 调用层前提）。options.env 显式给出时以其为基底（多数测试传入的 curated
+ * env 本就无 VITEST，剥离为幂等 no-op）。
+ */
+export function childProcessEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const child = { ...env };
+  delete child.VITEST;
+  return child;
+}
+
+/**
  * Executes a child process synchronously with mandatory process-level bounds.
  * Callers may extend a known long-running timeout but cannot override SIGKILL,
  * UTF-8 output decoding, or the finite positive default fallbacks.
@@ -530,6 +543,7 @@ function boundedPositiveNumber(value: number | undefined, fallback: number): num
 export function runSync(command: string, args: string[], options: RunSyncOptions = {}): SpawnSyncReturns<string> {
   return spawnSync(command, args, {
     ...options,
+    env: childProcessEnv(options.env),
     timeout: boundedPositiveNumber(options.timeout, DEFAULT_SYNC_TIMEOUT_MS),
     killSignal: 'SIGKILL',
     encoding: 'utf-8',
