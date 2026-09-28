@@ -2108,7 +2108,7 @@ describe('runDocConsistencyChecks', () => {
       },
       { availablePackages: ['tsx', 'typescript', 'esbuild'] },
     );
-  }, 120_000);
+  }, 180_000); // L9 复审（2026-09-28）：本用例含两次真实 CLI spawn（各 timeoutMs 60s）——最坏 2×60s 会顶到原 120s 外层上限，放宽留 fixture 准备与负载余量（实测 ~28s）
 
   it('CLI --spawn-vitest 自采集成功路径：自生成同目录 provenance 后严格校验通过（stub vitest）', async () => {
     await withDocsConsistencyFixture(
