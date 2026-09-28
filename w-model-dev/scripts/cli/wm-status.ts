@@ -37,15 +37,15 @@ interface ParsedArgs {
   json: boolean;
 }
 
+/** 解析 CLI 参数（main 的 argv，不含 node/脚本路径——main 签名默认参已 slice 过） */
 function parseArgs(argv: string[]): ParsedArgs {
-  const args = argv.slice(2);
-  const json = args.includes('--json');
-  const positional = args.filter((a) => !a.startsWith('--'));
+  const json = argv.includes('--json');
+  const positional = argv.filter((a) => !a.startsWith('--'));
   return { projectDir: positional[0] ?? process.cwd(), json };
 }
 
-async function main(): Promise<void> {
-  const { projectDir, json } = parseArgs(process.argv);
+export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const { projectDir, json } = parseArgs(argv);
   const wmodelDir = path.join(projectDir, '.w-model');
   const projectFile = path.join(wmodelDir, 'project.json');
   const rtmFile = path.join(wmodelDir, 'rtm.json');

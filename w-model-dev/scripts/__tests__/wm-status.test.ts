@@ -1,11 +1,11 @@
 /**
- * wm-status.ts CLI 层单元测试（子进程模式）
+ * wm-status.ts CLI 层单元测试（进程内模式）
  *
  * 覆盖：正常人类可读 / --json 结构 / 未初始化(exit 0) / project.json 非法·缺必填字段·非对象·数组·枚举越界(exit 2，F-G4-14 读取侧 schema 校验) /
  *       rtm.json 非法(exit 2) / rtm 缺失降级 / run-log 缺失降级 / run-log 坏行跳过 / 仅 project 的降级组合。
  *
- * 子进程说明：CLI 脚本 main() 顶层执行并调用 process.exit，无法直接 import 测试；
- * 采用 runSync(process.execPath, [tsx/cli, 脚本, ...]) 运行真实进程断言退出码与输出。
+ * 进程内说明：经 helpers/cli-invoker.ts 调用导出的 main(argv)（runMain 的 VITEST 守卫
+ * 阻止 import 自执行）；真实子进程保真由 cli-subprocess-smoke.test.ts 承载。
  */
 
 import { promises as fs } from 'node:fs';
@@ -17,10 +17,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { runSync } from '../lib/run-sync.js';
+import { invokeCli } from './helpers/cli-invoker.js';
 
 const require = createRequire(import.meta.url);
-const tsxCli = require.resolve('tsx/cli');
-const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/wm-status.ts');
 
 const PROJECT_JSON =
   '{"id":"smoke","name":"Smoke","description":"","status":"编码","techStack":{"frontend":[],"backend":[],"database":[],"others":[]},"createdAt":"2026-08-05T00:00:00Z","updatedAt":"2026-08-05T01:00:00Z"}';
@@ -48,10 +47,10 @@ async function writeWModel(rel: string, content: string): Promise<string> {
   return p;
 }
 
-/** 运行 wm-status 子进程 */
-function run(...args: string[]): { code: number | null; stdout: string; stderr: string } {
-  const r = runSync(process.execPath, [tsxCli, SCRIPT, tmpDir, ...args]);
-  return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
+/** 进程内调用 wm-status（argv[0] = 项目根，CLI 不依赖 cwd；模块路径相对 helpers/cli-invoker.ts 解析） */
+async function run(...args: string[]): Promise<{ code: number | undefined; stdout: string; stderr: string }> {
+  const r = await invokeCli('../../cli/wm-status.js', [tmpDir, ...args]);
+  return { code: r.exitCode, stdout: r.stdout, stderr: r.stderr };
 }
 
 describe('wm-status CLI（正常路径）', () => {
@@ -59,7 +58,7 @@ describe('wm-status CLI（正常路径）', () => {
     await writeWModel('project.json', PROJECT_JSON);
     await writeWModel('rtm.json', RTM_JSON);
     await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const r = run();
+    const r = await run();
     expect(r.code).toBe(0);
     expect(r.stdout).toContain('项目状态      : 编码');
     expect(r.stdout).toContain('当前阶段      : 5 / 8');
@@ -75,7 +74,7 @@ describe('wm-status CLI（正常路径）', () => {
     await writeWModel('project.json', PROJECT_JSON);
     await writeWModel('rtm.json', RTM_JSON);
     await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const r = run('--json');
+    const r = await run('--json');
     expect(r.code).toBe(0);
     const parsed = JSON.parse(r.stdout) as {
       phase: number;
@@ -96,21 +95,40 @@ describe('wm-status CLI（正常路径）', () => {
     expect(parsed.rtmCoverage).toEqual({ covered: 1, total: 2, percent: 50 });
     expect(parsed.testSummary).not.toBeNull();
     expect(parsed.recentActions).toHaveLength(2);
-    expect(parsed.recentActions[0]).toMatchObject({ action: 'produce', role: 'S' });
+    expect(parsed.recentActions[0]).toMatchObject({
+      action: 'produce',
+      role: 'S',
+    });
     expect(parsed.nextSteps.length).toBeGreaterThan(0);
+  });
+
+  // 试点专属：本文件仍含 1 处真实 spawn（保真对照），试点期保留；
+  // Task 9 推广时对照职责移交 cli-subprocess-smoke.test.ts 后随本用例删除。
+  it('保真对照（试点）：进程内输出与真实子进程逐字节一致', async () => {
+    await writeWModel('project.json', PROJECT_JSON);
+    await writeWModel('rtm.json', RTM_JSON);
+    await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
+    const inproc = await run();
+    const real = runSync(process.execPath, [
+      require.resolve('tsx/cli'),
+      path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/wm-status.ts'),
+      tmpDir,
+    ]);
+    expect(inproc.code).toBe(real.status);
+    expect(inproc.stdout).toBe(real.stdout);
   });
 });
 
 describe('wm-status CLI（异常分支）', () => {
   it('未初始化（无 .w-model/project.json）→ exit 0，提示项目未初始化', async () => {
-    const r = run();
+    const r = await run();
     expect(r.code).toBe(0);
     expect(r.stderr).toContain('项目未初始化');
   });
 
   it('project.json 非法 JSON → exit 2（FILE_PARSE）', async () => {
     await writeWModel('project.json', '{bad json');
-    const r = run();
+    const r = await run();
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('文件解析失败');
     expect(r.stdout).toContain('ERROR_JSON ');
@@ -118,7 +136,7 @@ describe('wm-status CLI（异常分支）', () => {
 
   it('project.json 为 null（合法 JSON 非对象）→ exit 2（schema STRUCTURE_INVALID，F-G4-14）', async () => {
     await writeWModel('project.json', 'null');
-    const r = run();
+    const r = await run();
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('STRUCTURE_INVALID');
     expect(r.stderr).toContain('文件结构不符');
@@ -127,7 +145,7 @@ describe('wm-status CLI（异常分支）', () => {
 
   it('project.json 为数组 → exit 2（schema STRUCTURE_INVALID，F-G4-14）', async () => {
     await writeWModel('project.json', '[1,2,3]');
-    const r = run();
+    const r = await run();
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('STRUCTURE_INVALID');
     expect(r.stdout).toContain('ERROR_JSON ');
@@ -135,7 +153,7 @@ describe('wm-status CLI（异常分支）', () => {
 
   it('project.json 缺必填字段（F-G4-14 RED：schema 不符 → exit 2，不再降级猜测）', async () => {
     await writeWModel('project.json', '{"id":"x"}');
-    const r = run();
+    const r = await run();
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('STRUCTURE_INVALID');
     expect(r.stdout).toContain('ERROR_JSON ');
@@ -144,7 +162,7 @@ describe('wm-status CLI（异常分支）', () => {
   it('rtm.json 非法 JSON → exit 2（可读输入损坏不得猜测状态）', async () => {
     await writeWModel('project.json', PROJECT_JSON);
     await writeWModel('rtm.json', '{bad');
-    const r = run();
+    const r = await run();
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('文件解析失败');
   });
@@ -153,7 +171,7 @@ describe('wm-status CLI（异常分支）', () => {
 describe('wm-status CLI（边界与降级）', () => {
   it('rtm.json 缺失 → exit 0，人类可读降级文案「缺失或格式不符」', async () => {
     await writeWModel('project.json', PROJECT_JSON);
-    const r = run();
+    const r = await run();
     expect(r.code).toBe(0);
     expect(r.stdout).toContain('未生成（.w-model/rtm.json 缺失或格式不符）');
     expect(r.stdout).toContain('无汇总（.w-model/rtm.json 缺失或格式不符）');
@@ -162,7 +180,7 @@ describe('wm-status CLI（边界与降级）', () => {
   it('run-log.jsonl 缺失 → exit 0，最近动作降级为空', async () => {
     await writeWModel('project.json', PROJECT_JSON);
     await writeWModel('rtm.json', RTM_JSON);
-    const r = run();
+    const r = await run();
     expect(r.code).toBe(0);
     expect(r.stdout).toContain('无（.w-model/run-log.jsonl 缺失或为空）');
   });
@@ -173,7 +191,7 @@ describe('wm-status CLI（边界与降级）', () => {
       'run-log.jsonl',
       '{"runId":"a","phase":5,"action":"produce","role":"S","outcome":"success"}\n{broken json line}\n',
     );
-    const r = run();
+    const r = await run();
     expect(r.code).toBe(0);
     expect(r.stderr).toContain('非合法 JSON');
     expect(r.stdout).toContain('最近动作');
@@ -181,7 +199,7 @@ describe('wm-status CLI（边界与降级）', () => {
 
   it('status 为数字（schema 枚举越界）→ exit 2（F-G4-14 翻转：原「归一化为未知状态」场景被 schema required/enum 前置排除）', async () => {
     await writeWModel('project.json', '{"id":"x","status":123,"updatedAt":"t"}');
-    const r = run('--json');
+    const r = await run('--json');
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('STRUCTURE_INVALID');
     expect(r.stdout).toContain('ERROR_JSON ');
@@ -189,7 +207,7 @@ describe('wm-status CLI（边界与降级）', () => {
 
   it('仅 project.json（rtm 与 run-log 全缺）→ exit 0，全降级组合不崩溃', async () => {
     await writeWModel('project.json', PROJECT_JSON);
-    const r = run('--json');
+    const r = await run('--json');
     expect(r.code).toBe(0);
     const parsed = JSON.parse(r.stdout) as {
       rtmCoverage: unknown;

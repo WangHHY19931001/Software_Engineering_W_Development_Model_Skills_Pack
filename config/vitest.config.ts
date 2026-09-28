@@ -46,6 +46,7 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'checkpoint-r0-bootstrap-cli.test.ts',
   'cli-arg-unification.test.ts',
   'cli-natural-exit.test.ts',
+  'cli-subprocess-smoke.test.ts',
   'code-health-cli.test.ts',
   'code-health-duplicates.test.ts',
   'code-health-e2e.test.ts',
