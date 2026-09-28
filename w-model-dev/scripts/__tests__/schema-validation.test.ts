@@ -58,6 +58,9 @@ describe('JSON Schema 前置校验（validateBySchema）', () => {
     const result = validateBySchema('verifier-output', data);
     expect(result.valid).toBe(false);
     expect(result.errorMessages.some((m) => /additionalProperties/.test(m))).toBe(true);
+    // L1（修复轮 1）行为锁定：报错须点名额外字段（Ajv params.additionalProperty），
+    // 防回归退回「多条同文案、无法定位字段」形态（不新增用例，只在既有 it 内加断言）
+    expect(result.errorMessages.join(' ')).toContain('(额外字段: unknownExtraField)');
   });
 
   it('required 拒绝缺失必填字段', async () => {
