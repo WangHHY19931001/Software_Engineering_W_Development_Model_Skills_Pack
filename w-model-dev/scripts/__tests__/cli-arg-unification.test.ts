@@ -4,8 +4,10 @@
  *
  * 覆盖（F-G3-01/02/03/04 的 CLI 面）：
  *   - I-4 静默组：check-budget `--phase 99`（空格形态非法值）→ exit 2 ARG_INVALID（原静默 exit 0）
- *   - I-3 重复值 flag：check-budget / plan-chunks / ensure-codegraph / check-code-tla-consistency
- *     重复 `--phase`（任意形态）→ exit 2 ARG_INVALID「重复」（原 first/last-wins 放行）
+ *   - I-3 重复值 flag：check-budget / plan-chunks / ensure-codegraph / check-code-tla-consistency /
+ *     check-artifact-gate 重复值 flag（任意形态）→ exit 2 ARG_INVALID「重复」（原 first/last-wins 放行；
+ *     check-artifact-gate 条为 Task 9 修复轮 1 守护：进程内化 wrapper 曾把 DuplicateFlagError
+ *     归入 UNEXPECTED，该条锁定 category 不退化）
  *   - I-5 结构门：check-state-machine-consistency 顶层非对象（数组/标量）→ exit 2 STRUCTURE_INVALID
  *     （原「全空合法图」exit 0 放行）；合法对象 → exit 0 不变
  *   - F-G3-04 分类对齐：check-tla-model 顶层非对象 → STRUCTURE_INVALID（原 ARG_INVALID「无法确定 phase」）
@@ -185,5 +187,20 @@ describe('check-code-tla-consistency 重复值 flag（D3/I-3）', () => {
     expect(r.code).toBe(2);
     expect(r.stderr).toContain('ARG_INVALID');
     expect(r.stderr).toContain('重复');
+  });
+});
+
+describe('check-artifact-gate 重复值 flag（D3/I-3，Task 9 修复轮 1 守护）', () => {
+  // 守护进程内化 wrapper 的 DuplicateFlagError 分支：parseTicketsArg 的 parseFlagValue
+  // 对重复 --tickets= 直抛（check-artifact-gate.ts 4 处直抛点之一）。修复前该异常被
+  // main wrapper 归入 UNEXPECTED「脚本异常」（category 退化，违反 D3/I-3 契约）；
+  // 修复后与 runMain.catch 一致转 ARG_INVALID。真实子进程形态同样经 wrapper（runMain
+  // 调 main），本探针同时守护两形态的 ERROR_JSON.category。
+  it('重复 --tickets → exit 2 且 ERROR_JSON.category=ARG_INVALID「重复」（非 UNEXPECTED）', () => {
+    const r = runCli('check-artifact-gate.ts', ['--tickets=a.md', '--tickets=b.md']);
+    expect(r.code).toBe(2);
+    expect(r.stderr).toContain('ARG_INVALID');
+    expect(r.stderr).toContain('重复');
+    expect(errorCategory(r.stdout)).toBe('ARG_INVALID');
   });
 });

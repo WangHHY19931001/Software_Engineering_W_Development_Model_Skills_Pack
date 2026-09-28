@@ -81,7 +81,7 @@ import { runMain } from '../lib/run-main.js';
 import { ARTIFACT_PATHS } from '../lib/constants.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg as parsePhaseArgLib } from '../lib/parse-phase.js';
-import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
+import { DuplicateFlagError, hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { readJsonClassified } from '../lib/read-json-or-exit.js';
 import { SafeProjectPathError, resolveProjectRelativeRegularFile } from '../lib/safe-project-path.js';
 import { type ChangeScope } from '../lib/change-scope.js';
@@ -783,12 +783,18 @@ async function runArtifactGate(argv: string[]): Promise<void> {
  * readJsonClassified / loadCliScope 错误路径（exitWithError 已输出并设置 exitCode 后抛
  * HandledCliError）在此收敛为正常返回——子进程形态由 runMain 静默处理，进程内形态
  * （__tests__/helpers/cli-invoker.ts）同样能读到 exitCode，两形态退出码与输出一致。
+ * DuplicateFlagError（tickets/phase/spec-dir/cucumber-report 等 parseFlagValue 直抛，
+ * D3/I-3）→ ARG_INVALID，与 runMain.catch 契约一致（修复轮 1：原归入 UNEXPECTED 属类别退化）。
  */
 export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
   try {
     await runArtifactGate(argv);
   } catch (err) {
     if (err instanceof HandledCliError) return;
+    if (err instanceof DuplicateFlagError) {
+      exitWithError({ category: 'ARG_INVALID', message: err.message, exitCode: 2 });
+      return;
+    }
     // 其余异常按 runMain 同款语义转 UNEXPECTED / exit 2（子进程形态由 runMain 输出，
     // 进程内形态在此输出——两形态退出码与 stderr 语义一致）
     exitWithError({
