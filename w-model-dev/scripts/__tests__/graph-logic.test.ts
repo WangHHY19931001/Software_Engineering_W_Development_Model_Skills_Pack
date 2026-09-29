@@ -884,6 +884,7 @@ describe('轮次上限校验（MAX_GRAPH_ROUNDS=5）', () => {
       if (kind === 'violation') {
         expect(result.passed, `${name} 应 fail`).toBe(false);
         expect(
+          // eslint-disable-next-line security/detect-non-literal-regexp -- token 为用例内字面量行表条目，聚合用例常量表驱动 RegExp，模式非用户输入
           result.violations.some((v) => new RegExp(token).test(v)),
           `${name} 应报轮次上限违规（${token}）`,
         ).toBe(true);

@@ -138,6 +138,7 @@ describe('C1-C10 覆盖分析校验', () => {
       for (const [name, rule, mutate, metricKey, token] of rows) {
         const coverage = makeValidCoverage();
         mutate(coverage);
+        // eslint-disable-next-line security/detect-object-injection -- metricKey 为用例内字面量行表枚举的 metrics 闭集键（keyof metrics），非用户输入
         coverage.metrics[metricKey] = 100; // 缺失/空集重算仍为 100，匹配重算避免 C10 噪声
         const result = checkRequirementCoverage(coverage);
         expect(result.passed, `${name} 应 fail`).toBe(false);
@@ -246,6 +247,7 @@ describe('C1-C10 覆盖分析校验', () => {
       ];
       for (const [name, metricKey, value, token] of rows) {
         const coverage = makeValidCoverage();
+        // eslint-disable-next-line security/detect-object-injection -- metricKey 为用例内字面量行表枚举的 metrics 闭集键（keyof metrics），非用户输入
         coverage.metrics[metricKey] = value;
         const result = checkRequirementCoverage(coverage);
         expect(result.passed, `${name} 应 fail`).toBe(false);
@@ -439,6 +441,7 @@ describe('C7: OOS 形状校验 (CLI exit 2)', () => {
       const dir = makeTmpDir();
       const coveragePath = writeValidCoverage(dir);
       const oosPath = join(dir, 'outOfScope.json');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- oosPath 拼装自本测试 makeTmpDir() 临时目录，oosContent 为行表字面量 fixture，非用户输入
       writeFileSync(oosPath, JSON.stringify(oosContent));
 
       const r = runSync(process.execPath, [tsxCli, scriptPath, coveragePath, `--out-of-scope=${oosPath}`], {

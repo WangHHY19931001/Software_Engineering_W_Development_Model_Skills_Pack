@@ -576,6 +576,7 @@ describe('check-artifact-gate.ts --tickets 参数契约（进程内，S18 §0.1.
         if (expectErrorJson) {
           expect(stdout, `${场景}: 应含 ERROR_JSON`).toContain('ERROR_JSON');
         }
+        // eslint-disable-next-line security/detect-non-literal-regexp -- 期望Category 为用例内字面量行表条目，聚合用例常量表驱动 RegExp，模式非用户输入
         expect(stdout, `${场景}: 应为 ${期望Category}`).toMatch(new RegExp(`"category":"${期望Category}"`));
       } finally {
         await fs.rm(dir, { recursive: true, force: true });

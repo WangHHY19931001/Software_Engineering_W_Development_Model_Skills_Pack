@@ -193,6 +193,7 @@ describe('signature-chain-logic D-1 返工来源例外', () => {
     ] as const) {
       const r = checkSignatureChain([entry(over)]);
       expect(r.violations, `${场景}: 应报 R9 并含「${期望片段}」`).toEqual(
+        // eslint-disable-next-line security/detect-non-literal-regexp -- 期望片段 为用例内字面量行表条目，聚合用例常量表驱动 RegExp，模式非用户输入
         expect.arrayContaining([expect.stringMatching(new RegExp(`R9: .*${期望片段}`))]),
       );
       expect(r.rulesFailed, `${场景}: R9 应失败`).toContain('R9');

@@ -366,6 +366,7 @@ describe('readCucumberReport', () => {
         // 每迭代自备 fixture：missing 态须清除前序迭代落盘的报告
         await fs.rm(report, { force: true });
       } else {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- report 派生自 mkdtemp 临时目录，value 为用例内字面量 fixture，非用户输入
         await fs.writeFile(report, value, 'utf-8');
       }
       const result = await readCucumberReport(report, true);

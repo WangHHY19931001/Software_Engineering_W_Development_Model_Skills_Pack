@@ -54,6 +54,7 @@ describe('role-dispatch-logic: R≥3 无条件', () => {
       const r = checkRoleDispatch(entries);
       expect(r.passed, `缺 ${missingRole}: 应失败`).toBe(false);
       expect(
+        // eslint-disable-next-line security/detect-non-literal-regexp -- missingRole 为用例内字面量常量（'V'|'S'|'G'），聚合用例常量表驱动 RegExp，模式非用户输入
         r.violations.some((v) => new RegExp(`缺失 role=${missingRole}`).test(v)),
         `缺 ${missingRole}: 应具名缺失角色`,
       ).toBe(true);

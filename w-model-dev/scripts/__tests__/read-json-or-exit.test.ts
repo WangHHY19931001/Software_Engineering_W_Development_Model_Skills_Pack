@@ -134,6 +134,7 @@ describe('readJsonlOrExit', () => {
       ['支持 CRLF 换行', '{"a":1}\r\n{"b":2}\r\n', [{ a: 1 }, { b: 2 }]],
     ] as const) {
       const file = path.join(tmpDir, `parse-${caseName}.jsonl`);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- file 拼装自 mkdtemp 临时目录，content 为用例内字面量 fixture，非用户输入
       await fs.writeFile(file, content);
       const entries = await readJsonlOrExit(file);
       expect(entries, `${caseName}: 解析结果`).toEqual(expected);

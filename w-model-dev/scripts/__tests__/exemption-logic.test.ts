@@ -61,6 +61,7 @@ describe('E1-E9 豁免审批校验', () => {
         [
           'E1: 缺 target 必填字段',
           (e) => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 有意 omit-rest 构造负例：解构丢弃 target 触发 required 缺失，_target 并非真实未用变量
             const { target: _target, ...rest } = e;
             return rest;
           },
@@ -106,6 +107,7 @@ describe('E1-E9 豁免审批校验', () => {
         [
           'E4: review 缺失',
           (e) => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 有意 omit-rest 构造负例：解构丢弃 review 触发 required 缺失，_review 并非真实未用变量
             const { review: _review, ...rest } = e;
             return rest;
           },
@@ -146,6 +148,7 @@ describe('E1-E9 豁免审批校验', () => {
         [
           'E7: verification 缺失',
           (e) => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 有意 omit-rest 构造负例：解构丢弃 verification 触发 required 缺失，_verification 并非真实未用变量
             const { verification: _verification, ...rest } = e;
             return rest;
           },
@@ -156,6 +159,7 @@ describe('E1-E9 豁免审批校验', () => {
         [
           'E8: humanDecision 缺失',
           (e) => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars -- 有意 omit-rest 构造负例：解构丢弃 humanDecision 触发 required 缺失，_humanDecision 并非真实未用变量
             const { humanDecision: _humanDecision, ...rest } = e;
             return rest;
           },

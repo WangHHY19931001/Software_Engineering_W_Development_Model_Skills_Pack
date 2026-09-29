@@ -487,6 +487,7 @@ describe('R6 命名空间分池', () => {
       if (dedup) {
         // 池标签须可锁定（design-sd 窄池侧不可缺）
         const r6 = v.filter((x) => x.includes('R6[design-sd]')).join('');
+        // eslint-disable-next-line security/detect-non-literal-regexp -- id 为用例内字面量行表条目（设计 ID），聚合用例常量表驱动 RegExp，模式非用户输入
         expect(r6.match(new RegExp(id, 'g'))?.length, `${场景}: ${id} 只列一次`).toBe(1);
       } else {
         expect(

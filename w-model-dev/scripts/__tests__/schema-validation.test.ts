@@ -636,6 +636,7 @@ describe('checkVerifierOutput 集成：schema 前置校验', () => {
         `${fixture}: 应含 [schema] 前缀`,
       ).toBe(true);
       expect(
+        // eslint-disable-next-line security/detect-non-literal-regexp -- keyword 为用例内字面量行表条目（schema 错误关键字），聚合用例常量表驱动 RegExp，模式非用户输入
         result.reasons.some((r) => new RegExp(keyword).test(r)),
         `${fixture}: 应含错误关键字 ${keyword}`,
       ).toBe(true);
@@ -726,6 +727,7 @@ describe('phase>=2 coverage 字段（tla-manifest sdCoverage / bdd-manifest desi
     ] as const) {
       const result = validateBySchema(schemaName, manifest);
       expect(result.valid, `${manifestName}: coverage 缺失应校验失败`).toBe(false);
+      // eslint-disable-next-line security/detect-non-literal-regexp -- keyword 为用例内字面量行表条目（coverage 字段名），聚合用例常量表驱动 RegExp，模式非用户输入
       expect(result.errorMessages.join(' '), `${manifestName}: 应点名 ${keyword}`).toMatch(new RegExp(keyword));
     }
   });

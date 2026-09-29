@@ -311,6 +311,7 @@ describe('R11/R12 Verifier 改进（sig-002）', () => {
       const result = checkVerifierOutput(sample);
       // valid.json summary 已扩展至 ≥50 字符、evidence 含 "REQ-001 §3.2" 等具体引用
       expect(
+        // eslint-disable-next-line security/detect-non-literal-regexp -- rule 为用例内字面量常量（'R11'|'R12'），聚合用例常量表驱动 RegExp，模式非用户输入
         result.reasons.some((r) => new RegExp(rule).test(r)),
         `${rule} 不应出现在 valid.json reasons`,
       ).toBe(false);

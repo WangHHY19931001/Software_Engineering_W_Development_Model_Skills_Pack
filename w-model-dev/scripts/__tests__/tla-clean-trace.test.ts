@@ -38,8 +38,10 @@ describe('isTlcStatesDir', () => {
     ] as const) {
       const dir = await makeTmpDir();
       if (isDir) {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir 为本测试 mkdtemp 目录，entryName 为用例内字面量表条目，非用户输入
         await fs.mkdir(path.join(dir, entryName));
       } else {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir 为本测试 mkdtemp 目录，entryName 为用例内字面量表条目，非用户输入
         await fs.writeFile(path.join(dir, entryName), 'x');
       }
       expect(await isTlcStatesDir(dir), `${caseName}: 应判定为 true`).toBe(true);
@@ -53,6 +55,7 @@ describe('isTlcStatesDir', () => {
 
     // 态 2：含无关文件（非 TLC 产物）
     const readmeDir = await makeTmpDir();
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- readmeDir 为本测试 mkdtemp 目录，文件名为字面量 'README.md'，非用户输入
     await fs.writeFile(path.join(readmeDir, 'README.md'), 'not tlc');
     expect(await isTlcStatesDir(readmeDir), '含无关文件: 应判定为 false').toBe(false);
 
@@ -99,14 +102,18 @@ describe('cleanTraceFiles', () => {
       }
       await fs.mkdir(path.join(dir, 'states'));
       for (const name of statesContent) {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir 为本测试 mkdtemp 目录，name 为用例内字面量 statesContent 表条目，非用户输入
         await fs.writeFile(path.join(dir, 'states', name), 'keep');
       }
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir 为本测试 mkdtemp 目录，extraFile 为行表字面量条目，非用户输入
       await fs.writeFile(path.join(dir, extraFile), 'keep');
       const deleted = await cleanTraceFiles(dir);
       const expectedDeleted = hasTla ? [path.join(dir, 'trace.out')] : [];
       expect(deleted, `${caseName}: 删除清单契约`).toEqual(expectedDeleted);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- 只读本测试自建的 mkdtemp states 目录，非用户输入
       expect(await fs.readdir(path.join(dir, 'states')), `${caseName}: states/ 内容不应被删除`).toEqual(statesContent);
       if (!hasTla) {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- 只读本测试自建的 mkdtemp 目录，非用户输入
         expect((await fs.readdir(dir)).sort(), `${caseName}: 目录其余内容保留`).toEqual([extraFile, 'states'].sort());
       }
     }
