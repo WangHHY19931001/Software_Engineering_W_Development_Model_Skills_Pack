@@ -193,8 +193,8 @@ function nameOnlyDirtyPaths(diffOutput: string): Set<string> {
  *
  * 为什么是单调而非相等（请勿"修回"成相等）：全仓 `git status` 对任何**与本任务无关**的并发
  * 工作树变动都敏感。本仓库已有 vitest 抖动记录（docs/changes/vitest-parallel-flakiness-finding.md），
- * P2-A 不应引入新的抖动源：开发者机器、prepush 多 project 并发（Wave 4 后为三
- * project：unit-parallel + cli-serial-a/b）、乃至审查期间控制者提交别的
+ * P2-A 不应引入新的抖动源：开发者机器、prepush 多 project 并发（Wave 4 起拆分 serial 池，
+ * 2026-09-30 起为五 project：unit-parallel + cli-serial-a/b/c/d）、乃至审查期间控制者提交别的
  * 文件，都会让"快照前脏、快照后被外部改干净"从而相等断言假红（真实发生过一次：审查独立复跑时
  * 控制者正在提交 `check-samples-coverage.ts` 的安全扫描修复）。单调口径保留真正要防的风险
  * （门禁不能把干净文件弄脏 / 不能"回退"已有脏项——后者为 after 新增了另一个路径也算新增），
