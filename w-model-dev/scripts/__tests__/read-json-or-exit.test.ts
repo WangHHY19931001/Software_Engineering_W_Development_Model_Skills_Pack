@@ -128,28 +128,31 @@ describe('readJsonlOrExit', () => {
     expect(entries).toEqual([{ i: 1 }, { i: 2 }, { i: 3 }]);
   });
 
-  it('空行跳过', async () => {
-    const file = path.join(tmpDir, 'blank.jsonl');
-    await fs.writeFile(file, '{"a":1}\n\n  \n{"b":2}\n');
-    const entries = await readJsonlOrExit(file);
-    expect(entries).toEqual([{ a: 1 }, { b: 2 }]);
+  it('JSONL 解析行（2 态：空行跳过 / CRLF 换行）', async () => {
+    for (const [caseName, content, expected] of [
+      ['空行跳过', '{"a":1}\n\n  \n{"b":2}\n', [{ a: 1 }, { b: 2 }]],
+      ['支持 CRLF 换行', '{"a":1}\r\n{"b":2}\r\n', [{ a: 1 }, { b: 2 }]],
+    ] as const) {
+      const file = path.join(tmpDir, `parse-${caseName}.jsonl`);
+      await fs.writeFile(file, content);
+      const entries = await readJsonlOrExit(file);
+      expect(entries, `${caseName}: 解析结果`).toEqual(expected);
+    }
   });
 
-  it('单行非法 JSON 跳过并 warn 不 exit', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const file = path.join(tmpDir, 'mixed.jsonl');
-    await fs.writeFile(file, '{"ok":1}\n{bad}\n{"ok":2}\n');
-    const entries = await readJsonlOrExit(file, 'run-log');
-    expect(entries).toEqual([{ ok: 1 }, { ok: 2 }]);
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
-    errSpy.mockRestore();
-  });
-
-  it('支持 CRLF 换行', async () => {
-    const file = path.join(tmpDir, 'crlf.jsonl');
-    await fs.writeFile(file, '{"a":1}\r\n{"b":2}\r\n');
-    const entries = await readJsonlOrExit(file);
-    expect(entries).toEqual([{ a: 1 }, { b: 2 }]);
+  it('JSONL 坏行跳过行（2 态：显式 label / label 缺省为「行」）', async () => {
+    for (const [caseName, label] of [
+      ['单行非法 JSON 跳过并 warn 不 exit（label=run-log）', 'run-log' as const],
+      ['label 缺省为「行」', undefined],
+    ] as const) {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const file = path.join(tmpDir, `skip-${caseName}.jsonl`);
+      await fs.writeFile(file, '{"ok":1}\n{bad}\n{"ok":2}\n');
+      const entries = label === undefined ? await readJsonlOrExit(file) : await readJsonlOrExit(file, label);
+      expect(entries, `${caseName}: 好行保留`).toEqual([{ ok: 1 }, { ok: 2 }]);
+      expect(errSpy, `${caseName}: 应 warn [FILE_PARSE]`).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
+      errSpy.mockRestore();
+    }
   });
 
   it('detailed 读取结果暴露坏行行号，避免 warn+skip 被误当完整输入', async () => {
@@ -181,15 +184,6 @@ describe('readJsonlOrExit', () => {
     errSpy.mockRestore();
     logSpy.mockRestore();
     process.exitCode = undefined;
-  });
-
-  it('label 默认为「行」', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const file = path.join(tmpDir, 'default-label.jsonl');
-    await fs.writeFile(file, '{"ok":1}\n{bad}\n');
-    await readJsonlOrExit(file);
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
-    errSpy.mockRestore();
   });
 });
 
@@ -234,52 +228,48 @@ describe('readJsonClassified', () => {
     expect(result.b).toEqual([2, 3]);
   });
 
-  it('文件不存在（ENOENT）→ exitWithError(FILE_NOT_FOUND) + stdout ERROR_JSON', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const missing = path.join(tmpDir, 'nope-cls.json');
-    await expect(readJsonClassified(missing)).rejects.toThrow();
-    expect(process.exitCode).toBe(2);
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_NOT_FOUND]'));
-    const out = logSpy.mock.calls[0]![0] as string;
-    expect(out.startsWith('ERROR_JSON ')).toBe(true);
-    const parsed = JSON.parse(out.slice('ERROR_JSON '.length)) as { category: string; exitCode: number };
-    expect(parsed).toMatchObject({ category: 'FILE_NOT_FOUND', exitCode: 2 });
-    errSpy.mockRestore();
-    logSpy.mockRestore();
-    process.exitCode = 0;
-  });
-
-  it('非法 JSON → exitWithError(FILE_PARSE) + stdout ERROR_JSON', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const file = path.join(tmpDir, 'bad-cls.json');
-    await fs.writeFile(file, '{not json');
-    await expect(readJsonClassified(file)).rejects.toThrow();
-    expect(process.exitCode).toBe(2);
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_PARSE]'));
-    const out = logSpy.mock.calls[0]![0] as string;
-    const parsed = JSON.parse(out.slice('ERROR_JSON '.length)) as { category: string; exitCode: number };
-    expect(parsed).toMatchObject({ category: 'FILE_PARSE', exitCode: 2 });
-    errSpy.mockRestore();
-    logSpy.mockRestore();
-    process.exitCode = 0;
-  });
-
-  it('读取错误（目录路径）→ exitWithError(FILE_READ)', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const dir = path.join(tmpDir, 'a-dir');
-    await fs.mkdir(dir);
-    await expect(readJsonClassified(dir)).rejects.toThrow();
-    expect(process.exitCode).toBe(2);
-    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('[FILE_READ]'));
-    const out = logSpy.mock.calls[0]![0] as string;
-    const parsed = JSON.parse(out.slice('ERROR_JSON '.length)) as { category: string; exitCode: number };
-    expect(parsed).toMatchObject({ category: 'FILE_READ', exitCode: 2 });
-    errSpy.mockRestore();
-    logSpy.mockRestore();
-    process.exitCode = 0;
+  it('错误三分类（3 态：FILE_NOT_FOUND / FILE_PARSE / FILE_READ）→ exitWithError + stdout ERROR_JSON', async () => {
+    for (const { caseName, prepare, category } of [
+      {
+        caseName: '文件不存在（ENOENT）',
+        prepare: async (): Promise<string> => path.join(tmpDir, 'nope-cls.json'),
+        category: 'FILE_NOT_FOUND',
+      },
+      {
+        caseName: '非法 JSON',
+        prepare: async (): Promise<string> => {
+          const file = path.join(tmpDir, 'bad-cls.json');
+          await fs.writeFile(file, '{not json');
+          return file;
+        },
+        category: 'FILE_PARSE',
+      },
+      {
+        caseName: '读取错误（目录路径）',
+        prepare: async (): Promise<string> => {
+          const dir = path.join(tmpDir, 'a-dir');
+          await fs.mkdir(dir);
+          return dir;
+        },
+        category: 'FILE_READ',
+      },
+    ]) {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const input = await prepare();
+      await expect(readJsonClassified(input), `${caseName}: 应抛错`).rejects.toThrow();
+      expect(process.exitCode, `${caseName}: exitCode 应为 2`).toBe(2);
+      expect(errSpy, `${caseName}: stderr 应含 [${category}]`).toHaveBeenCalledWith(
+        expect.stringContaining(`[${category}]`),
+      );
+      const out = logSpy.mock.calls[0]![0] as string;
+      expect(out.startsWith('ERROR_JSON '), `${caseName}: 应有 ERROR_JSON 前缀`).toBe(true);
+      const parsed = JSON.parse(out.slice('ERROR_JSON '.length)) as { category: string; exitCode: number };
+      expect(parsed, `${caseName}: ERROR_JSON 字段`).toMatchObject({ category, exitCode: 2 });
+      errSpy.mockRestore();
+      logSpy.mockRestore();
+      process.exitCode = 0;
+    }
   });
 });
 

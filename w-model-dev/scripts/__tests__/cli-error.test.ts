@@ -22,49 +22,43 @@ afterEach(() => {
 });
 
 describe('formatCliError', () => {
-  it('带 file → `✗ [CATEGORY] message: file`', () => {
-    expect(formatCliError(NOT_FOUND)).toBe('✗ [FILE_NOT_FOUND] 文件不存在: C:\\proj\\.w-model\\project.json');
+  it('含段行（5 态：file / detail / rule / rule+tail / file+detail）', () => {
+    for (const [caseName, error, expected] of [
+      ['带 file', NOT_FOUND, '✗ [FILE_NOT_FOUND] 文件不存在: C:\\proj\\.w-model\\project.json'],
+      [
+        '带 detail 无 file',
+        { category: 'ARG_INVALID', message: '参数非法 --phase=99', exitCode: 2, detail: '须为 1-8 整数' },
+        '✗ [ARG_INVALID] 参数非法 --phase=99: 须为 1-8 整数',
+      ],
+      [
+        '附加 [rule=...] 段',
+        { category: 'ARG_INVALID', message: 'm', exitCode: 2, rule: 'P0-1' },
+        '✗ [ARG_INVALID] m [rule=P0-1]',
+      ],
+      [
+        'rule 与 tail 组合',
+        { category: 'FILE_NOT_FOUND', message: 'm', exitCode: 2, rule: 'P0-2', file: '/x/rtm.json' },
+        '✗ [FILE_NOT_FOUND] m [rule=P0-2]: /x/rtm.json',
+      ],
+      [
+        'file 与 detail 同有（F-G6-02：detail 附于括号不被 file 吞并）',
+        {
+          category: 'STRUCTURE_INVALID',
+          message: 'ChangeScope 违反 change-scope.schema.json',
+          exitCode: 2,
+          file: '/x/scope.json',
+          detail: '/changedFiles/0: must match pattern [pattern]',
+        },
+        '✗ [STRUCTURE_INVALID] ChangeScope 违反 change-scope.schema.json: /x/scope.json（/changedFiles/0: must match pattern [pattern]）',
+      ],
+    ] as const) {
+      expect(formatCliError(error), `${caseName}: 模板输出`).toBe(expected);
+    }
   });
 
-  it('带 detail 无 file → `✗ [CATEGORY] message: detail`', () => {
-    const e: CliError = {
-      category: 'ARG_INVALID',
-      message: '参数非法 --phase=99',
-      exitCode: 2,
-      detail: '须为 1-8 整数',
-    };
-    expect(formatCliError(e)).toBe('✗ [ARG_INVALID] 参数非法 --phase=99: 须为 1-8 整数');
-  });
-
-  it('无 file/detail → 省略冒号段', () => {
+  it('省略段行（无 file/detail → 省略冒号段）', () => {
     const e: CliError = { category: 'UNEXPECTED', message: '脚本异常', exitCode: 2 };
-    expect(formatCliError(e)).toBe('✗ [UNEXPECTED] 脚本异常');
-  });
-
-  it('formatCliError 附加 [rule=...] 段', () => {
-    expect(formatCliError({ category: 'ARG_INVALID', message: 'm', exitCode: 2, rule: 'P0-1' })).toBe(
-      '✗ [ARG_INVALID] m [rule=P0-1]',
-    );
-  });
-
-  it('formatCliError rule 与 tail 组合输出', () => {
-    expect(
-      formatCliError({ category: 'FILE_NOT_FOUND', message: 'm', exitCode: 2, rule: 'P0-2', file: '/x/rtm.json' }),
-    ).toBe('✗ [FILE_NOT_FOUND] m [rule=P0-2]: /x/rtm.json');
-  });
-
-  it('file 与 detail 同有 → detail 附于括号，不再被 file 吞并（F-G6-02）', () => {
-    expect(
-      formatCliError({
-        category: 'STRUCTURE_INVALID',
-        message: 'ChangeScope 违反 change-scope.schema.json',
-        exitCode: 2,
-        file: '/x/scope.json',
-        detail: '/changedFiles/0: must match pattern [pattern]',
-      }),
-    ).toBe(
-      '✗ [STRUCTURE_INVALID] ChangeScope 违反 change-scope.schema.json: /x/scope.json（/changedFiles/0: must match pattern [pattern]）',
-    );
+    expect(formatCliError(e), '无 file/detail: 省略冒号段').toBe('✗ [UNEXPECTED] 脚本异常');
   });
 });
 
@@ -88,52 +82,62 @@ describe('printError / printErrorJson', () => {
     expect(parsed).toMatchObject({ category: 'FILE_NOT_FOUND', message: '文件不存在', exitCode: 2 });
   });
 
-  it('printErrorJson 无 file → JSON 省略 file 字段', () => {
-    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    printErrorJson({ category: 'UNEXPECTED', message: '脚本异常', exitCode: 2 });
-    const out = spy.mock.calls[0]![0] as string;
-    const parsed = JSON.parse(out.slice('ERROR_JSON '.length)) as Record<string, unknown>;
-    expect(parsed).toMatchObject({ category: 'UNEXPECTED', message: '脚本异常', exitCode: 2 });
-    expect('file' in parsed).toBe(false);
-  });
-
-  it('ERROR_JSON 含 rule/field 字段', () => {
+  /** 捕获 printErrorJson 写到 stdout 的单行 ERROR_JSON（console.log spy，restore 后返回）。 */
+  function captureErrorJsonLine(error: CliError): string {
     const calls: string[] = [];
     const spy = vi.spyOn(console, 'log').mockImplementation((s: string) => {
       calls.push(s);
     });
-    printErrorJson({ category: 'ARG_INVALID', message: 'm', exitCode: 2, rule: 'P0-1', field: 'rtm[0].id' });
-    spy.mockRestore();
-    expect(calls[0]).toContain('"rule":"P0-1"');
-    expect(calls[0]).toContain('"field":"rtm[0].id"');
+    try {
+      printErrorJson(error);
+    } finally {
+      spy.mockRestore();
+    }
+    return calls[0]!;
+  }
+
+  it('ERROR_JSON 含字段行（2 态：rule+field / detail）', () => {
+    for (const { caseName, error, expectContains } of [
+      {
+        caseName: 'rule/field 字段',
+        error: { category: 'ARG_INVALID', message: 'm', exitCode: 2, rule: 'P0-1', field: 'rtm[0].id' },
+        expectContains: ['"rule":"P0-1"', '"field":"rtm[0].id"'],
+      },
+      {
+        caseName: 'detail 字段（F-G6-02：schema 定位信息可机器读取）',
+        error: {
+          category: 'STRUCTURE_INVALID',
+          message: 'ChangeScope 违反 change-scope.schema.json',
+          exitCode: 2,
+          file: '/x/scope.json',
+          detail: '/changedFiles/0: must match pattern [pattern]',
+        },
+        expectContains: ['"detail":"/changedFiles/0: must match pattern [pattern]"'],
+      },
+    ] as const) {
+      const line = captureErrorJsonLine(error);
+      for (const frag of expectContains) {
+        expect(line, `${caseName}: 应含 ${frag}`).toContain(frag);
+      }
+    }
   });
 
-  it('缺失 rule/field 时 ERROR_JSON 省略', () => {
-    const calls: string[] = [];
-    const spy = vi.spyOn(console, 'log').mockImplementation((s: string) => {
-      calls.push(s);
-    });
-    printErrorJson({ category: 'ARG_INVALID', message: 'm', exitCode: 2 });
-    spy.mockRestore();
-    expect(calls[0]).not.toContain('"rule"');
-    expect(calls[0]).not.toContain('"field"');
-    expect(calls[0]).not.toContain('"detail"');
-  });
-
-  it('有 detail 时 ERROR_JSON 含 detail 字段（F-G6-02：schema 定位信息可机器读取）', () => {
-    const calls: string[] = [];
-    const spy = vi.spyOn(console, 'log').mockImplementation((s: string) => {
-      calls.push(s);
-    });
-    printErrorJson({
-      category: 'STRUCTURE_INVALID',
-      message: 'ChangeScope 违反 change-scope.schema.json',
+  it('ERROR_JSON 省略行（2 态：无 file 省略 / 缺省 rule·field·detail 省略）', () => {
+    // 态 1：无 file → JSON 省略 file 字段
+    const line1 = captureErrorJsonLine({ category: 'UNEXPECTED', message: '脚本异常', exitCode: 2 });
+    const parsed1 = JSON.parse(line1.slice('ERROR_JSON '.length)) as Record<string, unknown>;
+    expect(parsed1, '无 file: 基础字段保留').toMatchObject({
+      category: 'UNEXPECTED',
+      message: '脚本异常',
       exitCode: 2,
-      file: '/x/scope.json',
-      detail: '/changedFiles/0: must match pattern [pattern]',
     });
-    spy.mockRestore();
-    expect(calls[0]).toContain('"detail":"/changedFiles/0: must match pattern [pattern]"');
+    expect('file' in parsed1, '无 file: file 字段应省略').toBe(false);
+
+    // 态 2：缺失 rule/field/detail 时省略
+    const line2 = captureErrorJsonLine({ category: 'ARG_INVALID', message: 'm', exitCode: 2 });
+    expect(line2, '缺省: 不应含 "rule"').not.toContain('"rule"');
+    expect(line2, '缺省: 不应含 "field"').not.toContain('"field"');
+    expect(line2, '缺省: 不应含 "detail"').not.toContain('"detail"');
   });
 });
 

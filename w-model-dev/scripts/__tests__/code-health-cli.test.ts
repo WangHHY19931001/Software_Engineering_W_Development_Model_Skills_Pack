@@ -78,34 +78,24 @@ beforeAll(async () => {
 });
 
 describe('code-health-apply CLI guard ordering (R7)', () => {
-  it('unknown mode → exit 2 ERROR_JSON，即使 candidate 文件不存在也先报参数错误', async () => {
-    const r = await runCli('code-health-apply.ts', [
-      '--candidate',
-      path.join(tmpdir(), 'definitely-missing-code-health-candidate.json'),
-      '--mode',
-      'bad',
-    ]);
-    expect(r.code).toBe(2);
-    expect(r.stdout).toContain('ERROR_JSON');
-    expect(r.stdout).not.toContain('HUMAN_APPROVAL_REQUIRED');
-  });
-
-  it('duplicated value flag → exit 2 ERROR_JSON', async () => {
-    const r = await runCli('code-health-apply.ts', ['--mode', 'patch', '--mode=commit']);
-    expect(r.code).toBe(2);
-    expect(r.stdout).toContain('ERROR_JSON');
-  });
-
-  it('missing value → exit 2 ERROR_JSON', async () => {
-    const r = await runCli('code-health-apply.ts', ['--candidate']);
-    expect(r.code).toBe(2);
-    expect(r.stdout).toContain('ERROR_JSON');
-  });
-
-  it('unknown flag → exit 2 ERROR_JSON', async () => {
-    const r = await runCli('code-health-apply.ts', ['--candidate', 'x.json', '--force']);
-    expect(r.code).toBe(2);
-    expect(r.stdout).toContain('ERROR_JSON');
+  it('CLI 参数错误（4 形态：unknown mode / 重复 flag / 缺值 / unknown flag）→ exit 2 ERROR_JSON', async () => {
+    for (const { caseName, args, expectNoApproval } of [
+      {
+        caseName: 'unknown mode（candidate 文件不存在也先报参数错误）',
+        args: ['--candidate', path.join(tmpdir(), 'definitely-missing-code-health-candidate.json'), '--mode', 'bad'],
+        expectNoApproval: true,
+      },
+      { caseName: 'duplicated value flag', args: ['--mode', 'patch', '--mode=commit'], expectNoApproval: false },
+      { caseName: 'missing value', args: ['--candidate'], expectNoApproval: false },
+      { caseName: 'unknown flag', args: ['--candidate', 'x.json', '--force'], expectNoApproval: false },
+    ]) {
+      const r = await runCli('code-health-apply.ts', [...args]);
+      expect(r.code, `${caseName}: 应 exit 2`).toBe(2);
+      expect(r.stdout, `${caseName}: 应含 ERROR_JSON`).toContain('ERROR_JSON');
+      if (expectNoApproval) {
+        expect(r.stdout, `${caseName}: 不应出现 HUMAN_APPROVAL_REQUIRED`).not.toContain('HUMAN_APPROVAL_REQUIRED');
+      }
+    }
   });
 });
 
@@ -839,39 +829,42 @@ describe('fixture integrity', () => {
 });
 
 describe('code-health-archive CLI (Task 8A)', () => {
-  it('--help 打印用法且不产生任何 package', async () => {
+  it('--help help 行：打印用法且不产生任何 package', async () => {
     const result = await runCli('code-health-archive.ts', ['--help']);
-    expect(result.code).toBe(0);
-    expect(result.stdout).toMatch(/--campaign/);
-    expect(result.stdout).toMatch(/--verify/);
-    expect(result.stdout).toMatch(/package-only/);
+    expect(result.code, '--help: 应 exit 0').toBe(0);
+    expect(result.stdout, '--help: 应含 --campaign 用法').toMatch(/--campaign/);
+    expect(result.stdout, '--help: 应含 --verify 用法').toMatch(/--verify/);
+    expect(result.stdout, '--help: 应含 package-only 用法').toMatch(/package-only/);
   });
 
-  it('缺参数、未知参数与非法 verification-level 都是 exit 2 + ERROR_JSON', async () => {
-    for (const args of [
-      [],
-      ['--campaign', '.'],
-      ['--bogus', 'x'],
-      ['--campaign', '.', '--output', '.', '--verification-level', 'source-verified'],
+  it('archive CLI 错误行（缺参 / 未知参数 / 非法 verification-level / 不存在 campaign / verify·produce 混用）→ exit 2', async () => {
+    for (const { caseName, args, expectArgInvalid } of [
+      { caseName: '缺参数', args: [] as string[], expectArgInvalid: true },
+      { caseName: '--campaign 值为文件', args: ['--campaign', '.'], expectArgInvalid: true },
+      { caseName: '未知参数 --bogus', args: ['--bogus', 'x'], expectArgInvalid: true },
+      {
+        caseName: '非法 verification-level',
+        args: ['--campaign', '.', '--output', '.', '--verification-level', 'source-verified'],
+        expectArgInvalid: true,
+      },
+      {
+        caseName: '不存在的 campaign 目录',
+        args: ['--campaign', path.join(REPO_ROOT, '.no-such-campaign'), '--output', path.join(tmpdir(), 'no-such-out')],
+        expectArgInvalid: false,
+      },
+      {
+        caseName: 'verify/produce 混用',
+        args: ['--verify', REPO_ROOT, '--campaign', REPO_ROOT],
+        expectArgInvalid: false,
+      },
     ]) {
-      const result = await runCli('code-health-archive.ts', args);
-      expect(result.code).toBe(2);
-      expect(result.stdout).toMatch(/ERROR_JSON/);
-      expect(result.stdout).toMatch(/ARG_INVALID/);
+      const result = await runCli('code-health-archive.ts', [...args]);
+      expect(result.code, `${caseName}: 应 exit 2`).toBe(2);
+      if (expectArgInvalid) {
+        expect(result.stdout, `${caseName}: 应含 ERROR_JSON`).toMatch(/ERROR_JSON/);
+        expect(result.stdout, `${caseName}: 应含 ARG_INVALID`).toMatch(/ARG_INVALID/);
+      }
     }
-  });
-
-  it('不存在的 campaign 目录与 verify/produce 混用都是 exit 2', async () => {
-    const missing = await runCli('code-health-archive.ts', [
-      '--campaign',
-      path.join(REPO_ROOT, '.no-such-campaign'),
-      '--output',
-      path.join(tmpdir(), 'no-such-out'),
-    ]);
-    expect(missing.code).toBe(2);
-
-    const mixed = await runCli('code-health-archive.ts', ['--verify', REPO_ROOT, '--campaign', REPO_ROOT]);
-    expect(mixed.code).toBe(2);
   });
 
   it('缺少 manifest 的 verify 失败且只报告 package-only，绝不升级为 source-bound', async () => {

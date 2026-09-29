@@ -145,21 +145,61 @@ describe('R5 真值通道：只统计 operationalFailureModes 字段（D-7）', 
     expect(checkMaturity(mkMaturity(3), { operationalFailureCount: countOperationalFailures(rows) }).passed).toBe(true);
   });
 
-  it('operationalFailureModes 标注 3 次 → R5 违规', () => {
-    const rows = [1, 2, 3].map(() => mkEntry({ operationalFailureModes: ['O3'] }));
-    const r = checkMaturity(mkMaturity(3), { operationalFailureCount: countOperationalFailures(rows) });
-    expect(r.passed).toBe(false);
-    expect(r.violations.join()).toMatch(/R5: O 系列失败模式命中 3 次/);
+  it('R5 计数口径·计次行（3 态：标注 3 次违规 / 多枚举数组累加 / 重复值长度口径）', () => {
+    for (const { caseName, rows, expectedCount, expectViolation, schemaChecks } of [
+      {
+        caseName: 'operationalFailureModes 标注 3 次 → R5 违规',
+        rows: [1, 2, 3].map(() => mkEntry({ operationalFailureModes: ['O3'] })),
+        expectedCount: 3,
+        expectViolation: true,
+        schemaChecks: false,
+      },
+      {
+        caseName: '同记录多枚举值按数组长度累加；非数组形态与词法命中均不计入（向后兼容）',
+        rows: [
+          mkEntry({ operationalFailureModes: ['O1', 'O4'] }),
+          mkEntry({ operationalFailureModes: 'O3' }),
+          mkEntry({ note: 'O5 命中字样仅为引用' }),
+          mkEntry({}),
+        ],
+        expectedCount: 2,
+        expectViolation: false,
+        schemaChecks: false,
+      },
+      {
+        caseName: '重复值：schema uniqueItems 拒收，计数按数组长度（每项至多一次由 schema 强制）',
+        rows: [],
+        expectedCount: 2,
+        expectViolation: false,
+        schemaChecks: true,
+      },
+    ]) {
+      let countedRows = rows;
+      if (schemaChecks) {
+        const duplicate = JSON.parse(runLogEntry('r5-dup-mode', { operationalFailureModes: ['O3', 'O3'] })) as Record<
+          string,
+          unknown
+        >;
+        const single = JSON.parse(runLogEntry('r5-single-mode', { operationalFailureModes: ['O3'] })) as Record<
+          string,
+          unknown
+        >;
+        expect(validateBySchema('run-log', duplicate).valid, `${caseName}: 重复值被 uniqueItems 拒收`).toBe(false);
+        expect(validateBySchema('run-log', single).valid, `${caseName}: 对照单值形态合法`).toBe(true);
+        countedRows = [duplicate];
+      }
+      expect(countOperationalFailures(countedRows), `${caseName}: 计数口径`).toBe(expectedCount);
+      if (expectViolation) {
+        const r = checkMaturity(mkMaturity(3), { operationalFailureCount: expectedCount });
+        expect(r.passed, `${caseName}: 应触发 R5 违规`).toBe(false);
+        expect(r.violations.join(), `${caseName}: 违规文案`).toMatch(/R5: O 系列失败模式命中 3 次/);
+      }
+    }
   });
 
-  it('同记录多枚举值按数组长度累加；非数组形态与词法命中均不计入（向后兼容）', () => {
-    const rows = [
-      mkEntry({ operationalFailureModes: ['O1', 'O4'] }),
-      mkEntry({ operationalFailureModes: 'O3' }),
-      mkEntry({ note: 'O5 命中字样仅为引用' }),
-      mkEntry({}),
-    ];
-    expect(countOperationalFailures(rows)).toBe(2);
+  it('R5 计数口径·不计行（空标注不计次）', () => {
+    const rows = [mkEntry({ operationalFailureModes: [] })];
+    expect(countOperationalFailures(rows), '空数组: 计数 0').toBe(0);
   });
 
   it('collectLexicalMentions：按命中次数返回 runId（引用位置可追溯），缺 runId 用占位符', () => {
@@ -270,49 +310,67 @@ function maturitySummary(stdout: string): Record<string, unknown> {
 }
 
 describe('check-maturity CLI：--run-log 三态（D-7 端到端，真实子进程 + 真实临时 run-log）', () => {
-  it('仅引用（note 含 O3 字样，共 17 处）→ exit 0 + 引用诊断（不再误判 R5）', async () => {
-    const maturity = await write('maturity.json', VALID_MATURITY);
-    const mentions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
-      .map((i) => runLogEntry(`p${i}-G-verifier-${i}`, { note: 'O3 既是运维失败模式也是评审规则编号' }))
-      .join('\n');
-    const runLog = await write('run-log.jsonl', mentions);
-    const r = runSync(process.execPath, [
-      tsxCli,
-      path.join(cliDir, 'check-maturity.ts'),
-      maturity,
-      `--run-log=${runLog}`,
-    ]);
-    expect(r.status).toBe(0);
-    expect(r.stdout).toContain('疑似引用 17 处（含规则编号引用，非运维失败）');
-    expect(r.stdout).toContain('operationalFailureModes 标注：');
-    const summary = maturitySummary(r.stdout ?? '');
-    expect(summary['passed']).toBe(true);
-    expect(summary['diagnostics']).toHaveLength(1);
-  });
-
-  it('operationalFailureModes 标注 3 次 → exit 1 + R5 违规', async () => {
-    const maturity = await write('maturity.json', VALID_MATURITY);
-    const rows = [1, 2, 3].map((i) => runLogEntry(`p1-G-${i}`, { operationalFailureModes: ['O3'] })).join('\n');
-    const runLog = await write('run-log.jsonl', rows);
-    const r = runSync(process.execPath, [
-      tsxCli,
-      path.join(cliDir, 'check-maturity.ts'),
-      maturity,
-      `--run-log=${runLog}`,
-    ]);
-    expect(r.status).toBe(1);
-    expect(r.stdout).toContain('R5: O 系列失败模式命中 3 次');
-    expect(maturitySummary(r.stdout ?? '')['passed']).toBe(false);
-  });
-
-  it('未提供 --run-log → exit 0 + 「R5 未生效」诊断（隐性规避通道可见化）', async () => {
-    const maturity = await write('maturity.json', VALID_MATURITY);
-    const r = runSync(process.execPath, [tsxCli, path.join(cliDir, 'check-maturity.ts'), maturity]);
-    expect(r.status).toBe(0);
-    expect(r.stdout).toContain('R5 未生效：未提供 --run-log（O 系列失败模式未校验）');
-    expect(maturitySummary(r.stdout ?? '')['diagnostics']).toEqual([
-      'R5 未生效：未提供 --run-log（O 系列失败模式未校验）',
-    ]);
+  it('CLI 诊断三态（3 态：仅引用 / 标注 3 次违规 / 未提供 --run-log）', async () => {
+    for (const {
+      caseName,
+      runLogContent,
+      expectedExit,
+      stdoutIncludes,
+      expectPassed,
+      expectDiagnosticsLength,
+      expectDiagnosticsEquals,
+    } of [
+      {
+        caseName: '仅引用（note 含 O3 字样，共 17 处）→ 不再误判 R5',
+        runLogContent: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+          .map((i) => runLogEntry(`p${i}-G-verifier-${i}`, { note: 'O3 既是运维失败模式也是评审规则编号' }))
+          .join('\n'),
+        expectedExit: 0,
+        stdoutIncludes: ['疑似引用 17 处（含规则编号引用，非运维失败）', 'operationalFailureModes 标注：'],
+        expectPassed: true,
+        expectDiagnosticsLength: 1,
+        expectDiagnosticsEquals: undefined as string[] | undefined,
+      },
+      {
+        caseName: 'operationalFailureModes 标注 3 次 → exit 1 + R5 违规',
+        runLogContent: [1, 2, 3].map((i) => runLogEntry(`p1-G-${i}`, { operationalFailureModes: ['O3'] })).join('\n'),
+        expectedExit: 1,
+        stdoutIncludes: ['R5: O 系列失败模式命中 3 次'],
+        expectPassed: false,
+        expectDiagnosticsLength: undefined as number | undefined,
+        expectDiagnosticsEquals: undefined,
+      },
+      {
+        caseName: '未提供 --run-log → exit 0 + 「R5 未生效」诊断（隐性规避通道可见化）',
+        runLogContent: null,
+        expectedExit: 0,
+        stdoutIncludes: ['R5 未生效：未提供 --run-log（O 系列失败模式未校验）'],
+        expectPassed: undefined as boolean | undefined,
+        expectDiagnosticsLength: undefined,
+        expectDiagnosticsEquals: ['R5 未生效：未提供 --run-log（O 系列失败模式未校验）'],
+      },
+    ]) {
+      const maturity = await write('maturity.json', VALID_MATURITY);
+      const args = [path.join(cliDir, 'check-maturity.ts'), maturity];
+      if (runLogContent !== null) {
+        args.push(`--run-log=${await write('run-log.jsonl', runLogContent)}`);
+      }
+      const r = runSync(process.execPath, [tsxCli, ...args]);
+      expect(r.status, `${caseName}: 退出码`).toBe(expectedExit);
+      for (const marker of stdoutIncludes) {
+        expect(r.stdout, `${caseName}: stdout 应含「${marker}」`).toContain(marker);
+      }
+      const summary = maturitySummary(r.stdout ?? '');
+      if (expectPassed !== undefined) {
+        expect(summary['passed'], `${caseName}: summary.passed`).toBe(expectPassed);
+      }
+      if (expectDiagnosticsLength !== undefined) {
+        expect(summary['diagnostics'], `${caseName}: diagnostics 条数`).toHaveLength(expectDiagnosticsLength);
+      }
+      if (expectDiagnosticsEquals !== undefined) {
+        expect(summary['diagnostics'], `${caseName}: diagnostics 逐字`).toEqual(expectDiagnosticsEquals);
+      }
+    }
   });
 });
 
@@ -341,25 +399,6 @@ describe('R5 三态补强（G2-1）', () => {
     const parsed = JSON.parse((r.stdout ?? '').trim()) as { passed: boolean; diagnostics?: string[] };
     expect(parsed.passed).toBe(true);
     expect(parsed.diagnostics).toContain('R5 未生效：未提供 --run-log（O 系列失败模式未校验）');
-  });
-
-  it('R5 operationalFailureModes 空数组 → 不计次', () => {
-    const rows = [mkEntry({ operationalFailureModes: [] })];
-    expect(countOperationalFailures(rows)).toBe(0);
-  });
-
-  it('R5 operationalFailureModes 重复值：schema uniqueItems 拒收，计数按数组长度（每项至多一次由 schema 强制）', () => {
-    const duplicate = JSON.parse(runLogEntry('r5-dup-mode', { operationalFailureModes: ['O3', 'O3'] })) as Record<
-      string,
-      unknown
-    >;
-    const single = JSON.parse(runLogEntry('r5-single-mode', { operationalFailureModes: ['O3'] })) as Record<
-      string,
-      unknown
-    >;
-    expect(validateBySchema('run-log', duplicate).valid).toBe(false); // 重复值被 uniqueItems 拒收
-    expect(validateBySchema('run-log', single).valid).toBe(true); // 对照：单值形态合法
-    expect(countOperationalFailures([duplicate])).toBe(2); // 计数口径 = 数组长度（合法输入不含重复值，不去重）
   });
 });
 

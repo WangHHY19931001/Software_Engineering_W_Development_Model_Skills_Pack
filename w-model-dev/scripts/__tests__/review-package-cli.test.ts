@@ -230,83 +230,75 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     await expect(fs.readFile(path.join(cwdDir, expectedName), 'utf8')).resolves.toContain('# review-package');
   });
 
-  it('未知 flag（--d4-invalid-argument）→ exit 2 + stdout ERROR_JSON 且目标 out 路径零文件（写盘前原子拒绝）', async () => {
+  it('exit-2 参数错误·写盘前原子拒绝组（3 形态：未知 flag / 空 --repo / 无值·空白·未知位置参数）', async () => {
     const out = path.join(tmpDir, 'must-not-exist.diff');
-
-    const run = await runReviewPackage([
-      `--repo=${repoDir}`,
-      `--base=${baseSha}`,
-      `--head=${headSha}`,
-      `--out=${out}`,
-      '--d4-invalid-argument',
-    ]);
-
-    expect(run.code).toBe(2);
-    expect(run.stderr).toContain('✗ [ARG_INVALID]');
-    expect(errorJson(run.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
-    await expect(fs.access(out)).rejects.toThrow();
+    for (const [caseName, args] of [
+      [
+        '未知 flag --d4-invalid-argument',
+        [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`, '--d4-invalid-argument'],
+      ],
+      ['空 --repo', ['--repo=', `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`]],
+      ['--repo 无值选项', ['--repo', `--base=${baseSha}`, `--head=${headSha}`]],
+      ['--base 无值选项', [`--repo=${repoDir}`, '--base', `--head=${headSha}`]],
+      ['--head 无值选项', [`--repo=${repoDir}`, `--base=${baseSha}`, '--head', `--out=${out}`]],
+      ['--repo 空白值', [`--repo=  `, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`]],
+      ['--out 空白值', [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, '--out=  ']],
+      ['未知位置参数', [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`, 'unexpected']],
+    ] as const) {
+      const result = await runReviewPackage([...args]);
+      expect(result.code, `${caseName}: 应 exit 2`).toBe(2);
+      expect(result.stderr, `${caseName}: stderr 应含 ARG_INVALID`).toContain('ARG_INVALID');
+      expect(errorJson(result.stdout), `${caseName}: ERROR_JSON`).toMatchObject({
+        category: 'ARG_INVALID',
+        exitCode: 2,
+      });
+      await expect(fs.access(out), `${caseName}: 目标 out 路径应零文件（写盘前拒绝）`).rejects.toThrow();
+    }
   });
 
-  it('缺参（无参 / 缺 --base / 缺 --head）→ exit 2', async () => {
-    const none = await runReviewPackage([]);
-    expect(none.code).toBe(2);
-    expect(errorJson(none.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
-
-    const noBase = await runReviewPackage([`--repo=${repoDir}`, `--head=${headSha}`]);
-    expect(noBase.code).toBe(2);
-    expect(errorJson(noBase.stdout)).toMatchObject({ category: 'ARG_INVALID' });
-
-    const noHead = await runReviewPackage([`--repo=${repoDir}`, `--base=${baseSha}`]);
-    expect(noHead.code).toBe(2);
-    expect(errorJson(noHead.stdout)).toMatchObject({ category: 'ARG_INVALID' });
-  });
-
-  it('重复 flag（--base 两次）→ exit 2 ARG_INVALID「重复」', async () => {
-    const run = await runReviewPackage([
-      `--repo=${repoDir}`,
-      `--base=${baseSha}`,
-      `--base=${headSha}`,
-      `--head=${headSha}`,
-    ]);
-
-    expect(run.code).toBe(2);
-    expect(run.stderr).toContain('ARG_INVALID');
-    expect(run.stderr).toContain('重复');
-    expect(errorJson(run.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
-  });
-
-  it('坏 rev（不存在的 sha / 非法标识）→ exit 2', async () => {
-    const badSha = await runReviewPackage([
-      `--repo=${repoDir}`,
-      '--base=0123456789abcdef0123456789abcdef01234567',
-      `--head=${headSha}`,
-    ]);
-    expect(badSha.code).toBe(2);
-    expect(errorJson(badSha.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
-
-    const garbage = await runReviewPackage([`--repo=${repoDir}`, `--base=${baseSha}`, '--head=not-a-rev']);
-    expect(garbage.code).toBe(2);
-    expect(errorJson(garbage.stdout)).toMatchObject({ category: 'ARG_INVALID' });
-  });
-
-  it('--repo 不存在、不是目录或不是 Git 仓库时统一 ARG_INVALID → exit 2', async () => {
-    const filePath = path.join(tmpDir, 'repo-file');
-    await fs.writeFile(filePath, 'not a directory\n', 'utf8');
-    const missing = await runReviewPackage([
-      `--repo=${path.join(tmpDir, 'no-such-repo')}`,
-      `--base=${baseSha}`,
-      `--head=${headSha}`,
-    ]);
-    expect(missing.code).toBe(2);
-    expect(errorJson(missing.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
-
-    const file = await runReviewPackage([`--repo=${filePath}`, `--base=${baseSha}`, `--head=${headSha}`]);
-    expect(file.code).toBe(2);
-    expect(errorJson(file.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
-
-    const notARepo = await runReviewPackage([`--repo=${tmpDir}`, `--base=${baseSha}`, `--head=${headSha}`]);
-    expect(notARepo.code).toBe(2);
-    expect(errorJson(notARepo.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
+  it('exit-2 参数错误·纯 ARG_INVALID 组（4 态：缺参 / 重复 flag / 坏 rev / --repo 非法）', async () => {
+    await fs.writeFile(path.join(tmpDir, 'repo-file'), 'not a directory\n', 'utf8');
+    for (const [caseName, args, assertExitCodeField, extraStderr] of [
+      ['缺参·无参', [], true, undefined],
+      ['缺参·缺 --base', [`--repo=${repoDir}`, `--head=${headSha}`], false, undefined],
+      ['缺参·缺 --head', [`--repo=${repoDir}`, `--base=${baseSha}`], false, undefined],
+      [
+        '重复 flag·--base 两次',
+        [`--repo=${repoDir}`, `--base=${baseSha}`, `--base=${headSha}`, `--head=${headSha}`],
+        true,
+        '重复',
+      ],
+      [
+        '坏 rev·不存在的 sha',
+        [`--repo=${repoDir}`, '--base=0123456789abcdef0123456789abcdef01234567', `--head=${headSha}`],
+        true,
+        undefined,
+      ],
+      ['坏 rev·非法标识', [`--repo=${repoDir}`, `--base=${baseSha}`, '--head=not-a-rev'], false, undefined],
+      [
+        '--repo 非法·目录不存在',
+        [`--repo=${path.join(tmpDir, 'no-such-repo')}`, `--base=${baseSha}`, `--head=${headSha}`],
+        true,
+        undefined,
+      ],
+      [
+        '--repo 非法·是文件',
+        [`--repo=${path.join(tmpDir, 'repo-file')}`, `--base=${baseSha}`, `--head=${headSha}`],
+        true,
+        undefined,
+      ],
+      ['--repo 非法·非 Git 仓库', [`--repo=${tmpDir}`, `--base=${baseSha}`, `--head=${headSha}`], true, undefined],
+    ] as const) {
+      const result = await runReviewPackage([...args]);
+      expect(result.code, `${caseName}: 应 exit 2`).toBe(2);
+      expect(result.stderr, `${caseName}: stderr 应含 ARG_INVALID`).toContain('ARG_INVALID');
+      const expected: Record<string, unknown> = { category: 'ARG_INVALID' };
+      if (assertExitCodeField) expected.exitCode = 2;
+      expect(errorJson(result.stdout), `${caseName}: ERROR_JSON`).toMatchObject(expected);
+      if (extraStderr) {
+        expect(result.stderr, `${caseName}: stderr 应含「${extraStderr}」`).toContain(extraStderr);
+      }
+    }
   });
 
   it('两个真实 commit object 共享 7 位前缀时，完整 SHA 输入仍生成非空评审包', async () => {
@@ -336,55 +328,37 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     expect(content).toContain('commit B: second');
   });
 
-  it('空 --repo 与位置参数 → ARG_INVALID，且不创建输出目标', async () => {
-    const out = path.join(tmpDir, 'must-not-exist.diff');
-    for (const args of [
-      ['--repo=', `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`],
-      [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`, 'unexpected'],
-    ]) {
-      const result = await runReviewPackage(args);
-      expect(result.code).toBe(2);
-      expect(result.stderr).toContain('ARG_INVALID');
-      expect(errorJson(result.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
-      await expect(fs.access(out)).rejects.toThrow();
-    }
-  });
+  it('输出目标拒绝对（2 态：symlink / 目录）须 ARG_INVALID 拒绝且目标内容不变', async () => {
+    const common = [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`];
 
-  it('输出目标为 symlink 时须拒绝且不改写其项目外目标', async () => {
+    // 态 1：输出目标为 symlink → 拒绝且不改写其项目外目标
     const external = path.join(tmpDir, 'external.diff');
-    const out = path.join(tmpDir, 'out-link.diff');
+    const outLink = path.join(tmpDir, 'out-link.diff');
     await fs.writeFile(external, 'unchanged\n', 'utf8');
-    await fs.symlink(external, out, 'file');
+    await fs.symlink(external, outLink, 'file');
+    const symlinkResult = await runReviewPackage([...common, `--out=${outLink}`]);
+    expect(symlinkResult.code, 'symlink 输出目标: 应 exit 2').toBe(2);
+    expect(symlinkResult.stderr, 'symlink 输出目标: stderr 应含 ARG_INVALID').toContain('ARG_INVALID');
+    expect(errorJson(symlinkResult.stdout), 'symlink 输出目标: ERROR_JSON').toMatchObject({
+      category: 'ARG_INVALID',
+      exitCode: 2,
+    });
+    await expect(fs.readFile(external, 'utf8'), 'symlink 输出目标: 外部目标不应被改写').resolves.toBe('unchanged\n');
 
-    const result = await runReviewPackage([
-      `--repo=${repoDir}`,
-      `--base=${baseSha}`,
-      `--head=${headSha}`,
-      `--out=${out}`,
-    ]);
-
-    expect(result.code).toBe(2);
-    expect(result.stderr).toContain('ARG_INVALID');
-    expect(errorJson(result.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
-    await expect(fs.readFile(external, 'utf8')).resolves.toBe('unchanged\n');
-  });
-
-  it('输出目标是目录时须 ARG_INVALID 拒绝，并且目录内容不变', async () => {
-    const out = path.join(tmpDir, 'out-directory');
-    await fs.mkdir(out);
-    await fs.writeFile(path.join(out, 'sentinel.txt'), 'unchanged\n', 'utf8');
-
-    const result = await runReviewPackage([
-      `--repo=${repoDir}`,
-      `--base=${baseSha}`,
-      `--head=${headSha}`,
-      `--out=${out}`,
-    ]);
-
-    expect(result.code).toBe(2);
-    expect(result.stderr).toContain('ARG_INVALID');
-    expect(errorJson(result.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
-    await expect(fs.readFile(path.join(out, 'sentinel.txt'), 'utf8')).resolves.toBe('unchanged\n');
+    // 态 2：输出目标是目录 → ARG_INVALID 拒绝且目录内容不变
+    const outDir = path.join(tmpDir, 'out-directory');
+    await fs.mkdir(outDir);
+    await fs.writeFile(path.join(outDir, 'sentinel.txt'), 'unchanged\n', 'utf8');
+    const dirResult = await runReviewPackage([...common, `--out=${outDir}`]);
+    expect(dirResult.code, '目录输出目标: 应 exit 2').toBe(2);
+    expect(dirResult.stderr, '目录输出目标: stderr 应含 ARG_INVALID').toContain('ARG_INVALID');
+    expect(errorJson(dirResult.stdout), '目录输出目标: ERROR_JSON').toMatchObject({
+      category: 'ARG_INVALID',
+      exitCode: 2,
+    });
+    await expect(fs.readFile(path.join(outDir, 'sentinel.txt'), 'utf8'), '目录输出目标: 目录内容不变').resolves.toBe(
+      'unchanged\n',
+    );
   });
 
   it('在 Git 采集前拒绝非法 --out，即使 revision 也无效', async () => {
@@ -431,24 +405,6 @@ describe('review-package CLI（S32 确定性评审包）', () => {
     const content12 = await fs.readFile(out12, 'utf8');
     expect(content4).toBe(content12);
     expect(content4).toContain(`${headSha} commit B: second`);
-  });
-
-  it('无值选项、空白值和未知位置参数均为 ARG_INVALID', async () => {
-    const out = path.join(tmpDir, 'must-not-exist-2.diff');
-    for (const args of [
-      ['--repo', `--base=${baseSha}`, `--head=${headSha}`],
-      [`--repo=${repoDir}`, '--base', `--head=${headSha}`],
-      [`--repo=${repoDir}`, `--base=${baseSha}`, '--head', `--out=${out}`],
-      [`--repo=  `, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`],
-      [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=  `],
-      [`--repo=${repoDir}`, `--base=${baseSha}`, `--head=${headSha}`, `--out=${out}`, 'unexpected'],
-    ]) {
-      const result = await runReviewPackage(args);
-      expect(result.code).toBe(2);
-      expect(result.stderr).toContain('ARG_INVALID');
-      expect(errorJson(result.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
-      await expect(fs.access(out)).rejects.toThrow();
-    }
   });
 
   it('写入被拒时保留既有 sentinel 文件（Unix 只读目录 / Windows 只读目标）', async () => {

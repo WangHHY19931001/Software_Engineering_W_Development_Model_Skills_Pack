@@ -53,17 +53,17 @@ function greenProbe(): EnvProbe {
 }
 
 describe('parseJavaMajor', () => {
-  it('解析 openjdk version "11.0.21" → 11', () => {
-    expect(parseJavaMajor('openjdk version "11.0.21" 2023-10-17')).toBe(11);
-  });
-  it('解析 17 / 21 主版本', () => {
-    expect(parseJavaMajor('openjdk version "17.0.8"')).toBe(17);
-    expect(parseJavaMajor('openjdk version "21" 2023-09-19')).toBe(21);
-  });
-  it('无法解析返回 null', () => {
-    expect(parseJavaMajor('java version "1.8.0_392"')).toBe(8); // 旧式 1.x 命名取次版本号
-    expect(parseJavaMajor('not a version string')).toBeNull();
-    expect(parseJavaMajor('')).toBeNull();
+  it('parseJavaMajor 版本解析（3 态：openjdk 11 / 17·21 / 旧式 1.x 与无法解析）', () => {
+    for (const [caseName, output, expected] of [
+      ['openjdk 11.0.21 带日期', 'openjdk version "11.0.21" 2023-10-17', 11],
+      ['openjdk 17.0.8', 'openjdk version "17.0.8"', 17],
+      ['openjdk 21 带日期', 'openjdk version "21" 2023-09-19', 21],
+      ['旧式 1.x 命名取次版本号', 'java version "1.8.0_392"', 8],
+      ['无法解析返回 null', 'not a version string', null],
+      ['空串返回 null', '', null],
+    ] as const) {
+      expect(parseJavaMajor(output), `${caseName}: 解析结果`).toBe(expected);
+    }
   });
 });
 
@@ -79,124 +79,176 @@ describe('checkEnvironment', () => {
     expect(deriveDoctorExitCode(results)).toBe(0);
   });
 
-  it('node 16 < 18 → fail + 升级指引', async () => {
-    const probe = { ...greenProbe(), nodeVersion: 'v16.20.2' };
-    const results = await checkEnvironment(probe, { withTla: false });
-    const node = results.find((r) => r.name === 'node')!;
-    expect(node.status).toBe('fail');
-    expect(node.hint).toContain('18');
-    expect(deriveDoctorExitCode(results)).toBe(1);
+  it('缺依赖 fail 行（3 态：node 16 / tsx 未安装 / java 低于 11）', async () => {
+    for (const { caseName, probe, withTla, itemName, hintIncludes, exitCode } of [
+      {
+        caseName: 'node 16 < 18',
+        probe: { ...greenProbe(), nodeVersion: 'v16.20.2' },
+        withTla: false,
+        itemName: 'node',
+        hintIncludes: '18',
+        exitCode: 1,
+      },
+      {
+        caseName: 'tsx 未安装',
+        probe: { ...greenProbe(), resolveModule: (name: string) => name !== 'tsx' },
+        withTla: false,
+        itemName: 'tsx',
+        hintIncludes: 'npm install',
+        exitCode: undefined as number | undefined,
+      },
+      {
+        caseName: 'java 1.8 低于 11（--with-tla）',
+        probe: {
+          ...greenProbe(),
+          runCommand: (cmd: string) =>
+            cmd === 'java'
+              ? Promise.resolve({ ok: true, output: 'openjdk version "1.8.0_392"' })
+              : Promise.resolve({ ok: true, output: '1.2.3' }),
+        },
+        withTla: true,
+        itemName: 'java',
+        hintIncludes: undefined as string | undefined,
+        exitCode: undefined as number | undefined,
+      },
+    ]) {
+      const results = await checkEnvironment(probe, { withTla });
+      const item = results.find((r) => r.name === itemName)!;
+      expect(item.status, `${caseName}: ${itemName} 应 fail`).toBe('fail');
+      if (hintIncludes !== undefined) {
+        expect(item.hint, `${caseName}: hint 应含「${hintIncludes}」`).toContain(hintIncludes);
+      }
+      if (exitCode !== undefined) {
+        expect(deriveDoctorExitCode(results), `${caseName}: 退出码`).toBe(exitCode);
+      }
+    }
   });
 
-  it('tsx 未安装 → fail + npm install 指引', async () => {
-    const probe = { ...greenProbe(), resolveModule: (name: string) => name !== 'tsx' };
-    const results = await checkEnvironment(probe, { withTla: false });
-    const tsx = results.find((r) => r.name === 'tsx')!;
-    expect(tsx.status).toBe('fail');
-    expect(tsx.hint).toContain('npm install');
-  });
-
-  it('java 缺失：默认提示级（warn），--with-tla 升级为 fail', async () => {
-    const probe: EnvProbe = {
+  it('warn 层级行（默认提示级不阻断：java 缺省 / tla2tools.jar 缺省 / codegraph / superpowers 缺层）', async () => {
+    const javaMissingProbe = (): EnvProbe => ({
       ...greenProbe(),
       runCommand: (cmd: string) =>
         cmd === 'java'
           ? Promise.resolve({ ok: false, output: 'command not found' })
           : Promise.resolve({ ok: true, output: '1.2.3' }),
-    };
-    const defaultResults = await checkEnvironment(probe, { withTla: false });
-    const javaDefault = defaultResults.find((r) => r.name === 'java')!;
-    expect(javaDefault.status).toBe('warn');
-    expect(deriveDoctorExitCode(defaultResults)).toBe(0); // warn 不阻断
-
-    const tlaResults = await checkEnvironment(probe, { withTla: true });
-    const javaTla = tlaResults.find((r) => r.name === 'java')!;
-    expect(javaTla.status).toBe('fail');
-    expect(deriveDoctorExitCode(tlaResults)).toBe(1);
+    });
+    for (const { caseName, probe, withTla, itemName, status, detailIncludes, hintIncludes, noOpenspec, exitCode } of [
+      {
+        caseName: 'java 缺失（默认提示级）',
+        probe: javaMissingProbe(),
+        withTla: false,
+        itemName: 'java',
+        status: 'warn' as const,
+        exitCode: 0 as number | undefined,
+      },
+      {
+        caseName: 'java 缺失（--with-tla 升级 fail）',
+        probe: javaMissingProbe(),
+        withTla: true,
+        itemName: 'java',
+        status: 'fail' as const,
+        exitCode: 1 as number | undefined,
+      },
+      {
+        caseName: 'tla2tools.jar 缺失（默认 warn）',
+        probe: { ...greenProbe(), fileExists: () => false },
+        withTla: false,
+        itemName: 'tla2tools',
+        status: 'warn' as const,
+        exitCode: undefined as number | undefined,
+      },
+      {
+        caseName: 'tla2tools.jar 缺失（--with-tla fail）',
+        probe: { ...greenProbe(), fileExists: () => false },
+        withTla: true,
+        itemName: 'tla2tools',
+        status: 'fail' as const,
+        exitCode: undefined as number | undefined,
+      },
+      {
+        caseName: 'codegraph 缺失（可选依赖）',
+        probe: {
+          ...greenProbe(),
+          runCommand: (): Promise<{ ok: boolean; output: string }> =>
+            Promise.resolve({ ok: false, output: 'not found' }),
+        },
+        withTla: false,
+        itemName: 'codegraph',
+        status: 'warn' as const,
+        noOpenspec: true,
+        exitCode: 0 as number | undefined,
+      },
+      {
+        caseName: 'superpowers 宿主关键技能 <3',
+        probe: {
+          ...greenProbe(),
+          superpowersProbe: () => ({ hostSkillsFound: ['brainstorming'], vendoredAdoption: true, projectDir: true }),
+        },
+        withTla: false,
+        itemName: 'superpowers',
+        status: 'warn' as const,
+        detailIncludes: '宿主',
+        hintIncludes: 'ensure-codegraph',
+        exitCode: 0 as number | undefined,
+      },
+      {
+        caseName: 'superpowers vendor 文件缺失',
+        probe: {
+          ...greenProbe(),
+          superpowersProbe: () => ({
+            hostSkillsFound: ['brainstorming', 'writing-plans', 'executing-plans'],
+            vendoredAdoption: false,
+            projectDir: true,
+          }),
+        },
+        withTla: false,
+        itemName: 'superpowers',
+        status: 'warn' as const,
+        exitCode: undefined as number | undefined,
+      },
+      {
+        caseName: 'superpowers 项目 docs/superpowers/ 缺失',
+        probe: {
+          ...greenProbe(),
+          superpowersProbe: () => ({
+            hostSkillsFound: ['brainstorming', 'writing-plans', 'executing-plans'],
+            vendoredAdoption: true,
+            projectDir: false,
+          }),
+        },
+        withTla: false,
+        itemName: 'superpowers',
+        status: 'warn' as const,
+        detailIncludes: 'docs/superpowers',
+        exitCode: 0 as number | undefined,
+      },
+    ]) {
+      const results = await checkEnvironment(probe, { withTla });
+      const item = results.find((r) => r.name === itemName)!;
+      expect(item.status, `${caseName}: ${itemName} 应为 ${status}`).toBe(status);
+      if (noOpenspec === true) {
+        expect(
+          results.some((r) => r.name === 'openspec'),
+          `${caseName}: openspec 项应已退役`,
+        ).toBe(false);
+      }
+      if (detailIncludes !== undefined) {
+        expect(item.detail, `${caseName}: detail 应含「${detailIncludes}」`).toContain(detailIncludes);
+      }
+      if (hintIncludes !== undefined) {
+        expect(item.hint, `${caseName}: hint 应含「${hintIncludes}」`).toContain(hintIncludes);
+      }
+      if (exitCode !== undefined) {
+        expect(deriveDoctorExitCode(results), `${caseName}: 退出码`).toBe(exitCode);
+      }
+    }
   });
 
-  it('java 版本低于 11 → fail（--with-tla）', async () => {
-    const probe: EnvProbe = {
-      ...greenProbe(),
-      runCommand: (cmd: string) =>
-        cmd === 'java'
-          ? Promise.resolve({ ok: true, output: 'openjdk version "1.8.0_392"' })
-          : Promise.resolve({ ok: true, output: '1.2.3' }),
-    };
-    const results = await checkEnvironment(probe, { withTla: true });
-    const java = results.find((r) => r.name === 'java')!;
-    expect(java.status).toBe('fail');
-  });
-
-  it('tla2tools.jar 缺失：默认 warn，--with-tla fail', async () => {
-    const probe = { ...greenProbe(), fileExists: () => false };
-    const r1 = await checkEnvironment(probe, { withTla: false });
-    expect(r1.find((r) => r.name === 'tla2tools')!.status).toBe('warn');
-    const r2 = await checkEnvironment(probe, { withTla: true });
-    expect(r2.find((r) => r.name === 'tla2tools')!.status).toBe('fail');
-  });
-
-  it('codegraph 缺失 → warn（可选依赖，不阻断）', async () => {
-    const probe: EnvProbe = {
-      ...greenProbe(),
-      runCommand: () => Promise.resolve({ ok: false, output: 'not found' }),
-    };
-    const results = await checkEnvironment(probe, { withTla: false });
-    expect(results.find((r) => r.name === 'codegraph')!.status).toBe('warn');
-    expect(results.some((r) => r.name === 'openspec')).toBe(false); // openspec 项已退役
-    expect(deriveDoctorExitCode(results)).toBe(0);
-  });
-
-  it('superpowers 三层齐备 → ok；任一层缺失 → warn（提示级，不阻断）', async () => {
+  it('ok 行（superpowers 三层齐备 → ok 且不阻断）', async () => {
     const okResults = await checkEnvironment(greenProbe(), { withTla: false });
     const spOk = okResults.find((r) => r.name === 'superpowers')!;
-    expect(spOk.status).toBe('ok');
-    expect(deriveDoctorExitCode(okResults)).toBe(0);
-
-    // 宿主关键技能 <3
-    const sparseHost = await checkEnvironment(
-      {
-        ...greenProbe(),
-        superpowersProbe: () => ({ hostSkillsFound: ['brainstorming'], vendoredAdoption: true, projectDir: true }),
-      },
-      { withTla: false },
-    );
-    const spHost = sparseHost.find((r) => r.name === 'superpowers')!;
-    expect(spHost.status).toBe('warn');
-    expect(spHost.detail).toContain('宿主');
-    expect(spHost.hint).toContain('ensure-codegraph');
-    expect(deriveDoctorExitCode(sparseHost)).toBe(0);
-
-    // vendor 文件缺失
-    const noVendor = await checkEnvironment(
-      {
-        ...greenProbe(),
-        superpowersProbe: () => ({
-          hostSkillsFound: ['brainstorming', 'writing-plans', 'executing-plans'],
-          vendoredAdoption: false,
-          projectDir: true,
-        }),
-      },
-      { withTla: false },
-    );
-    expect(noVendor.find((r) => r.name === 'superpowers')!.status).toBe('warn');
-
-    // 项目 docs/superpowers/ 缺失
-    const noProjectDir = await checkEnvironment(
-      {
-        ...greenProbe(),
-        superpowersProbe: () => ({
-          hostSkillsFound: ['brainstorming', 'writing-plans', 'executing-plans'],
-          vendoredAdoption: true,
-          projectDir: false,
-        }),
-      },
-      { withTla: false },
-    );
-    const spDir = noProjectDir.find((r) => r.name === 'superpowers')!;
-    expect(spDir.status).toBe('warn');
-    expect(spDir.detail).toContain('docs/superpowers');
-    expect(deriveDoctorExitCode(noProjectDir)).toBe(0);
+    expect(spOk.status, 'superpowers 三层齐备: 应 ok').toBe('ok');
+    expect(deriveDoctorExitCode(okResults), 'superpowers 三层齐备: 不阻断').toBe(0);
   });
 });
 

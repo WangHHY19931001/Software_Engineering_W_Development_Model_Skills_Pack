@@ -40,43 +40,24 @@ describe('role-dispatch-logic: R≥3 无条件', () => {
     expect(r.violations).toHaveLength(0);
   });
 
-  it('缺 V 角色应失败', () => {
-    const entries = [
+  it('缺角色族（3 态：缺 V / 缺 S / 缺 G）应失败且具名缺失角色', () => {
+    const base: RoleDispatchEntry[] = [
       { phase: 1, role: 'S', action: 'produce', outcome: 'success' },
-      { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
-      { phase: 1, role: 'R', action: 'r3-reliability', outcome: 'success' },
-      { phase: 1, role: 'R', action: 'r3-security', outcome: 'success' },
-      { phase: 1, role: 'G', action: 'gate', outcome: 'success' },
-    ];
-    const r = checkRoleDispatch(entries);
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => /缺失 role=V/.test(v))).toBe(true);
-  });
-
-  it('缺 S 角色应失败', () => {
-    const entries = [
       { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
       { phase: 1, role: 'R', action: 'r3-reliability', outcome: 'success' },
       { phase: 1, role: 'R', action: 'r3-security', outcome: 'success' },
       { phase: 1, role: 'V', action: 'review', outcome: 'success' },
       { phase: 1, role: 'G', action: 'gate', outcome: 'success' },
     ];
-    const r = checkRoleDispatch(entries);
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => /缺失 role=S/.test(v))).toBe(true);
-  });
-
-  it('缺 G 角色应失败', () => {
-    const entries = [
-      { phase: 1, role: 'S', action: 'produce', outcome: 'success' },
-      { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
-      { phase: 1, role: 'R', action: 'r3-reliability', outcome: 'success' },
-      { phase: 1, role: 'R', action: 'r3-security', outcome: 'success' },
-      { phase: 1, role: 'V', action: 'review', outcome: 'success' },
-    ];
-    const r = checkRoleDispatch(entries);
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => /缺失 role=G/.test(v))).toBe(true);
+    for (const missingRole of ['V', 'S', 'G'] as const) {
+      const entries = base.filter((entry) => entry.role !== missingRole);
+      const r = checkRoleDispatch(entries);
+      expect(r.passed, `缺 ${missingRole}: 应失败`).toBe(false);
+      expect(
+        r.violations.some((v) => new RegExp(`缺失 role=${missingRole}`).test(v)),
+        `缺 ${missingRole}: 应具名缺失角色`,
+      ).toBe(true);
+    }
   });
 
   it('R3 记录多于 3 条应通过', () => {
@@ -183,66 +164,77 @@ describe('role-dispatch-logic: 空输入 fail-closed 与 R3 维度精确语义',
     expect(r.violations.join(' ')).toMatch(/无任何可校验阶段/);
   });
 
-  it('role=R 但 action=rootcause×3 不计入 R3 → 失败且消息指明三维度缺失', () => {
-    const entries = [
-      svg(1, 'S'),
-      svg(1, 'V'),
-      svg(1, 'G'),
-      { phase: 1, role: 'R', action: 'rootcause', outcome: 'success' },
-      { phase: 1, role: 'R', action: 'rootcause', outcome: 'success' },
-      { phase: 1, role: 'R', action: 'rootcause', outcome: 'success' },
-    ];
-    const r = checkRoleDispatch(entries);
-    expect(r.passed).toBe(false);
-    // R 记录存在（rootcause×3）但三维度未齐：消息须为维度不足表述，不再与 phaseSummary R=3 并存误导
-    expect(r.violations.join(' ')).toMatch(/有效 R3 维度记录不足/);
-    expect(r.violations.join(' ')).toMatch(/缺：completeness\/reliability\/security/);
-    expect(r.r3Missing).toEqual([{ phase: 1, missingDimensions: ['completeness', 'reliability', 'security'] }]);
-    // roles 计数保留全部 role=R 记录（含 rootcause）
-    expect(r.phaseSummary[0]!.roles.R).toBe(3);
-  });
-
-  it('重复单维（r3-completeness×3）缺 reliability/security → 失败且指明缺失维度', () => {
-    const entries = [
-      svg(1, 'S'),
-      svg(1, 'V'),
-      svg(1, 'G'),
-      { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
-      { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
-      { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
-    ];
-    const r = checkRoleDispatch(entries);
-    expect(r.passed).toBe(false);
-    expect(r.violations.join(' ')).toMatch(/缺：reliability\/security/);
-    expect(r.r3Missing).toEqual([{ phase: 1, missingDimensions: ['reliability', 'security'] }]);
-  });
-
-  it('R3 outcome=fail/blocked 不计入 → 失败（三维度全缺）', () => {
-    const entries = [
-      svg(1, 'S'),
-      svg(1, 'V'),
-      svg(1, 'G'),
-      { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'fail' },
-      { phase: 1, role: 'R', action: 'r3-reliability', outcome: 'blocked' },
-      { phase: 1, role: 'R', action: 'r3-security', outcome: 'fail' },
-    ];
-    const r = checkRoleDispatch(entries);
-    expect(r.passed).toBe(false);
-    expect(r.violations.join(' ')).toMatch(/缺：completeness\/reliability\/security/);
-  });
-
-  it('非 R3 action（iceberg-sweep 等 role=R success）不计入 R3 → 失败', () => {
-    const entries = [
-      svg(1, 'S'),
-      svg(1, 'V'),
-      svg(1, 'G'),
-      { phase: 1, role: 'R', action: 'iceberg-sweep', outcome: 'success' },
-      { phase: 1, role: 'R', action: 'iceberg-sweep', outcome: 'success' },
-      { phase: 1, role: 'R', action: 'iceberg-sweep', outcome: 'success' },
-    ];
-    const r = checkRoleDispatch(entries);
-    expect(r.passed).toBe(false);
-    expect(r.violations.join(' ')).toMatch(/缺：completeness\/reliability\/security/);
+  it('R3 不计入族（4 态：rootcause×3 / 重复单维 / outcome=fail·blocked / 非 R3 action）→ 失败且指明缺失维度', () => {
+    const svg = (phase: number, role: 'S' | 'V' | 'G'): RoleDispatchEntry => ({
+      phase,
+      role,
+      action: role === 'S' ? 'produce' : role === 'V' ? 'review' : 'gate',
+      outcome: 'success',
+    });
+    for (const { caseName, r3Entries, missingMessage, expectUnderflowMessage, expectR3Missing, expectRolesR } of [
+      {
+        caseName: 'role=R 但 action=rootcause×3 不计入 R3',
+        r3Entries: [
+          { phase: 1, role: 'R', action: 'rootcause', outcome: 'success' },
+          { phase: 1, role: 'R', action: 'rootcause', outcome: 'success' },
+          { phase: 1, role: 'R', action: 'rootcause', outcome: 'success' },
+        ],
+        missingMessage: /缺：completeness\/reliability\/security/,
+        expectUnderflowMessage: true,
+        expectR3Missing: [{ phase: 1, missingDimensions: ['completeness', 'reliability', 'security'] }],
+        expectRolesR: 3,
+      },
+      {
+        caseName: '重复单维 r3-completeness×3 缺 reliability/security',
+        r3Entries: [
+          { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
+          { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
+          { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
+        ],
+        missingMessage: /缺：reliability\/security/,
+        expectUnderflowMessage: false,
+        expectR3Missing: [{ phase: 1, missingDimensions: ['reliability', 'security'] }],
+        expectRolesR: undefined,
+      },
+      {
+        caseName: 'R3 outcome=fail/blocked 不计入（三维度全缺）',
+        r3Entries: [
+          { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'fail' },
+          { phase: 1, role: 'R', action: 'r3-reliability', outcome: 'blocked' },
+          { phase: 1, role: 'R', action: 'r3-security', outcome: 'fail' },
+        ],
+        missingMessage: /缺：completeness\/reliability\/security/,
+        expectUnderflowMessage: false,
+        expectR3Missing: undefined,
+        expectRolesR: undefined,
+      },
+      {
+        caseName: '非 R3 action（iceberg-sweep 等 role=R success）不计入',
+        r3Entries: [
+          { phase: 1, role: 'R', action: 'iceberg-sweep', outcome: 'success' },
+          { phase: 1, role: 'R', action: 'iceberg-sweep', outcome: 'success' },
+          { phase: 1, role: 'R', action: 'iceberg-sweep', outcome: 'success' },
+        ],
+        missingMessage: /缺：completeness\/reliability\/security/,
+        expectUnderflowMessage: false,
+        expectR3Missing: undefined,
+        expectRolesR: undefined,
+      },
+    ]) {
+      const entries: RoleDispatchEntry[] = [svg(1, 'S'), svg(1, 'V'), svg(1, 'G'), ...r3Entries];
+      const r = checkRoleDispatch(entries);
+      expect(r.passed, `${caseName}: 应失败`).toBe(false);
+      expect(r.violations.join(' '), `${caseName}: 应指明缺失维度`).toMatch(missingMessage);
+      if (expectUnderflowMessage) {
+        expect(r.violations.join(' '), `${caseName}: 应为「有效 R3 维度记录不足」措辞`).toMatch(/有效 R3 维度记录不足/);
+      }
+      if (expectR3Missing !== undefined) {
+        expect(r.r3Missing, `${caseName}: r3Missing 应精确`).toEqual(expectR3Missing);
+      }
+      if (expectRolesR !== undefined) {
+        expect(r.phaseSummary[0]!.roles.R, `${caseName}: roles.R 计数保留全部 role=R 记录`).toBe(expectRolesR);
+      }
+    }
   });
 
   it('三维度各 1 条 success（含重复维度重工记录）→ 通过且无 r3Missing', () => {

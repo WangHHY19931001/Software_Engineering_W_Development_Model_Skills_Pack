@@ -62,35 +62,55 @@ describe('superpowers 判据常量', () => {
 });
 
 describe('scanHostSuperpowersSkills（宿主技能目录并集去重）', () => {
-  it('空 home（无 .agents/.claude）→ 未发现任何关键技能', () => {
-    expect(scanHostSuperpowersSkills(makeDir())).toEqual([]);
+  it('发现行（2 态：仅 .agents 3 技能全发现 / 双宿主并集去重）', () => {
+    for (const { caseName, setup, expected } of [
+      {
+        caseName: '仅 ~/.agents/skills 下 3 个含 SKILL.md 的关键技能',
+        setup: (): string => {
+          const home = makeDir();
+          plantSkill(home, '.agents', 'brainstorming');
+          plantSkill(home, '.agents', 'writing-plans');
+          plantSkill(home, '.agents', 'subagent-driven-development');
+          return home;
+        },
+        expected: ['brainstorming', 'subagent-driven-development', 'writing-plans'],
+      },
+      {
+        caseName: '两个宿主目录并集去重（同名技能只计一次，合计可达下限）',
+        setup: (): string => {
+          const home = makeDir();
+          plantSkill(home, '.agents', 'brainstorming');
+          plantSkill(home, '.agents', 'writing-plans');
+          plantSkill(home, '.claude', 'writing-plans'); // 与 .agents 重复 → 去重
+          plantSkill(home, '.claude', 'executing-plans');
+          return home;
+        },
+        expected: ['brainstorming', 'executing-plans', 'writing-plans'],
+      },
+    ] as const) {
+      const home = setup();
+      expect(scanHostSuperpowersSkills(home).sort(), `${caseName}: 应发现去重后的关键技能集`).toEqual(expected);
+    }
   });
 
-  it('仅 ~/.agents/skills 下 3 个含 SKILL.md 的关键技能 → 全部发现', () => {
-    const home = makeDir();
-    plantSkill(home, '.agents', 'brainstorming');
-    plantSkill(home, '.agents', 'writing-plans');
-    plantSkill(home, '.agents', 'subagent-driven-development');
-    expect(scanHostSuperpowersSkills(home).sort()).toEqual([
-      'brainstorming',
-      'subagent-driven-development',
-      'writing-plans',
-    ]);
-  });
-
-  it('子目录存在但缺 SKILL.md → 不计入（子目录内含 SKILL.md 即算的判据）', () => {
-    const home = makeDir();
-    plantSkill(home, '.agents', 'brainstorming', false);
-    expect(scanHostSuperpowersSkills(home)).toEqual([]);
-  });
-
-  it('两个宿主目录并集去重：同名技能只计一次，合计可达下限', () => {
-    const home = makeDir();
-    plantSkill(home, '.agents', 'brainstorming');
-    plantSkill(home, '.agents', 'writing-plans');
-    plantSkill(home, '.claude', 'writing-plans'); // 与 .agents 重复 → 去重
-    plantSkill(home, '.claude', 'executing-plans');
-    expect(scanHostSuperpowersSkills(home).sort()).toEqual(['brainstorming', 'executing-plans', 'writing-plans']);
+  it('不计入行（2 态：空 home / 子目录缺 SKILL.md）→ 未发现任何关键技能', () => {
+    for (const { caseName, setup } of [
+      {
+        caseName: '空 home（无 .agents/.claude）',
+        setup: (): string => makeDir(),
+      },
+      {
+        caseName: '子目录存在但缺 SKILL.md（子目录内含 SKILL.md 即算的判据）',
+        setup: (): string => {
+          const home = makeDir();
+          plantSkill(home, '.agents', 'brainstorming', false);
+          return home;
+        },
+      },
+    ] as const) {
+      const home = setup();
+      expect(scanHostSuperpowersSkills(home), `${caseName}: 应不计入`).toEqual([]);
+    }
   });
 });
 
@@ -104,30 +124,53 @@ describe('resolveVendoredAdoptionPath（技能包内 vendored 副本定位）', 
 });
 
 describe('detectCodegraphMcpRegistration（best-effort，仅说明文案）', () => {
-  it('无任何候选配置 → false', () => {
-    expect(detectCodegraphMcpRegistration(makeDir(), makeDir())).toBe(false);
+  it('true 行（2 态：项目 .mcp.json 含 codegraph 大小写不敏感 / 宿主 .claude.json）', () => {
+    for (const { caseName, setup } of [
+      {
+        caseName: '项目 .mcp.json 含 codegraph（CodeGraph 大小写不敏感）',
+        setup: (): { home: string; projectRoot: string } => {
+          const home = makeDir();
+          const projectRoot = makeDir();
+          writeConfig(
+            join(projectRoot, '.mcp.json'),
+            JSON.stringify({ mcpServers: { CodeGraph: { command: 'codegraph' } } }),
+          );
+          return { home, projectRoot };
+        },
+      },
+      {
+        caseName: '宿主 ~/.claude.json 含 codegraph',
+        setup: (): { home: string; projectRoot: string } => {
+          const home = makeDir();
+          writeConfig(join(home, '.claude.json'), JSON.stringify({ mcpServers: { codegraph: {} } }));
+          return { home, projectRoot: makeDir() };
+        },
+      },
+    ] as const) {
+      const { home, projectRoot } = setup();
+      expect(detectCodegraphMcpRegistration(home, projectRoot), `${caseName}: 应判已注册`).toBe(true);
+    }
   });
 
-  it('项目 .mcp.json 含 codegraph（大小写不敏感）→ true', () => {
-    const projectRoot = makeDir();
-    writeConfig(
-      join(projectRoot, '.mcp.json'),
-      JSON.stringify({ mcpServers: { CodeGraph: { command: 'codegraph' } } }),
-    );
-    expect(detectCodegraphMcpRegistration(makeDir(), projectRoot)).toBe(true);
-  });
-
-  it('宿主 ~/.claude.json 含 codegraph → true', () => {
-    const home = makeDir();
-    writeConfig(join(home, '.claude.json'), JSON.stringify({ mcpServers: { codegraph: {} } }));
-    expect(detectCodegraphMcpRegistration(home, makeDir())).toBe(true);
-  });
-
-  it('配置存在但不含 codegraph → false（不因文件存在即判已注册）', () => {
-    const home = makeDir();
-    const projectRoot = makeDir();
-    writeConfig(join(home, '.claude.json'), JSON.stringify({ mcpServers: { other: {} } }));
-    writeConfig(join(projectRoot, '.mcp.json'), JSON.stringify({ mcpServers: {} }));
-    expect(detectCodegraphMcpRegistration(home, projectRoot)).toBe(false);
+  it('false 行（2 态：无任何候选配置 / 配置存在但不含 codegraph）', () => {
+    for (const { caseName, setup } of [
+      {
+        caseName: '无任何候选配置',
+        setup: (): { home: string; projectRoot: string } => ({ home: makeDir(), projectRoot: makeDir() }),
+      },
+      {
+        caseName: '配置存在但不含 codegraph（不因文件存在即判已注册）',
+        setup: (): { home: string; projectRoot: string } => {
+          const home = makeDir();
+          const projectRoot = makeDir();
+          writeConfig(join(home, '.claude.json'), JSON.stringify({ mcpServers: { other: {} } }));
+          writeConfig(join(projectRoot, '.mcp.json'), JSON.stringify({ mcpServers: {} }));
+          return { home, projectRoot };
+        },
+      },
+    ] as const) {
+      const { home, projectRoot } = setup();
+      expect(detectCodegraphMcpRegistration(home, projectRoot), `${caseName}: 应判未注册`).toBe(false);
+    }
   });
 });

@@ -121,16 +121,24 @@ Background:
     expect(sm.invariants).toContain('TypeOK');
   });
 
-  it.each([
-    ['both files empty', '', ''],
-    ['TLA empty', '', validFeature],
-    ['BDD empty', validTla, ''],
-    ['TLA has no invariant', validTla.replace('TypeInvariant == state \\in {"idle", "active"}', ''), validFeature],
-    ['BDD has no Feature structure', validTla, validFeature.replace('Feature: Test', '')],
-  ])('rejects %s as malformed synchronization input', (_label, tlaContent, featureContent) => {
-    const result = checkTlaBddSync(tlaContent, featureContent);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((violation) => violation.dimension === 'structure')).toBe(true);
-    expect(result.structuredViolations?.some((violation) => violation.rule === 'TLA_BDD_STRUCTURE')).toBe(true);
+  it('rejects 畸形输入为结构违规（5 形态：双空 / TLA 空 / BDD 空 / 无不变式 / 无 Feature 结构）', () => {
+    for (const [label, tlaContent, featureContent] of [
+      ['both files empty', '', ''],
+      ['TLA empty', '', validFeature],
+      ['BDD empty', validTla, ''],
+      ['TLA has no invariant', validTla.replace('TypeInvariant == state \\in {"idle", "active"}', ''), validFeature],
+      ['BDD has no Feature structure', validTla, validFeature.replace('Feature: Test', '')],
+    ] as const) {
+      const result = checkTlaBddSync(tlaContent, featureContent);
+      expect(result.passed, `${label}: 应判同步失败`).toBe(false);
+      expect(
+        result.violations.some((violation) => violation.dimension === 'structure'),
+        `${label}: 应含 structure 维度违规`,
+      ).toBe(true);
+      expect(
+        result.structuredViolations?.some((violation) => violation.rule === 'TLA_BDD_STRUCTURE'),
+        `${label}: 应含 TLA_BDD_STRUCTURE 规则`,
+      ).toBe(true);
+    }
   });
 });

@@ -111,93 +111,80 @@ describe('wm-status CLI（异常分支）', () => {
   it('project.json 非法 JSON → exit 2（FILE_PARSE）', async () => {
     await writeWModel('project.json', '{bad json');
     const r = await run();
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('文件解析失败');
-    expect(r.stdout).toContain('ERROR_JSON ');
+    expect(r.code, '非法 JSON: 应 exit 2').toBe(2);
+    expect(r.stderr, '非法 JSON: 应含「文件解析失败」').toContain('文件解析失败');
+    expect(r.stdout, '非法 JSON: 应含 ERROR_JSON').toContain('ERROR_JSON ');
   });
 
-  it('project.json 为 null（合法 JSON 非对象）→ exit 2（schema STRUCTURE_INVALID，F-G4-14）', async () => {
-    await writeWModel('project.json', 'null');
-    const r = await run();
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('STRUCTURE_INVALID');
-    expect(r.stderr).toContain('文件结构不符');
-    expect(r.stdout).toContain('ERROR_JSON ');
-  });
-
-  it('project.json 为数组 → exit 2（schema STRUCTURE_INVALID，F-G4-14）', async () => {
-    await writeWModel('project.json', '[1,2,3]');
-    const r = await run();
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('STRUCTURE_INVALID');
-    expect(r.stdout).toContain('ERROR_JSON ');
-  });
-
-  it('project.json 缺必填字段（F-G4-14 RED：schema 不符 → exit 2，不再降级猜测）', async () => {
-    await writeWModel('project.json', '{"id":"x"}');
-    const r = await run();
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('STRUCTURE_INVALID');
-    expect(r.stdout).toContain('ERROR_JSON ');
-  });
-
-  it('rtm.json 非法 JSON → exit 2（可读输入损坏不得猜测状态）', async () => {
-    await writeWModel('project.json', PROJECT_JSON);
-    await writeWModel('rtm.json', '{bad');
-    const r = await run();
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('文件解析失败');
+  it('project.json schema STRUCTURE_INVALID（4 态：null / 数组 / 缺必填 / 枚举越界，F-G4-14）', async () => {
+    for (const [caseName, content, args, extraStderr] of [
+      ['null（合法 JSON 非对象）', 'null', [], '文件结构不符'],
+      ['数组输入', '[1,2,3]', [], undefined],
+      ['缺必填字段（schema 不符 → exit 2，不再降级猜测）', '{"id":"x"}', [], undefined],
+      [
+        'status 枚举越界（schema required/enum 前置排除）',
+        '{"id":"x","status":123,"updatedAt":"t"}',
+        ['--json'],
+        undefined,
+      ],
+    ] as const) {
+      await writeWModel('project.json', content);
+      const r = await run(...args);
+      expect(r.code, `${caseName}: 应 exit 2`).toBe(2);
+      expect(r.stderr, `${caseName}: 应含 STRUCTURE_INVALID`).toContain('STRUCTURE_INVALID');
+      expect(r.stdout, `${caseName}: 应含 ERROR_JSON`).toContain('ERROR_JSON ');
+      if (extraStderr) {
+        expect(r.stderr, `${caseName}: 应含「${extraStderr}」`).toContain(extraStderr);
+      }
+    }
   });
 });
 
 describe('wm-status CLI（边界与降级）', () => {
-  it('rtm.json 缺失 → exit 0，人类可读降级文案「缺失或格式不符」', async () => {
+  it('降级路径族（5 态：rtm 非法 / rtm 缺失 / run-log 缺失 / run-log 坏行 / 仅 project 全缺）', async () => {
+    // 态 1：rtm.json 非法 JSON → exit 2（可读输入损坏不得猜测状态）
     await writeWModel('project.json', PROJECT_JSON);
-    const r = await run();
-    expect(r.code).toBe(0);
-    expect(r.stdout).toContain('未生成（.w-model/rtm.json 缺失或格式不符）');
-    expect(r.stdout).toContain('无汇总（.w-model/rtm.json 缺失或格式不符）');
-  });
+    await writeWModel('rtm.json', '{bad');
+    let r = await run();
+    expect(r.code, 'rtm 非法 JSON: 应 exit 2').toBe(2);
+    expect(r.stderr, 'rtm 非法 JSON: 应含「文件解析失败」').toContain('文件解析失败');
 
-  it('run-log.jsonl 缺失 → exit 0，最近动作降级为空', async () => {
-    await writeWModel('project.json', PROJECT_JSON);
+    // 态 2：rtm.json 缺失 → exit 0，人类可读降级文案
+    await fs.rm(path.join(tmpDir, '.w-model', 'rtm.json'), { force: true });
+    r = await run();
+    expect(r.code, 'rtm 缺失: 应 exit 0').toBe(0);
+    expect(r.stdout, 'rtm 缺失: 应含覆盖率降级文案').toContain('未生成（.w-model/rtm.json 缺失或格式不符）');
+    expect(r.stdout, 'rtm 缺失: 应含汇总降级文案').toContain('无汇总（.w-model/rtm.json 缺失或格式不符）');
+
+    // 态 3：run-log.jsonl 缺失 → exit 0，最近动作降级为空
     await writeWModel('rtm.json', RTM_JSON);
-    const r = await run();
-    expect(r.code).toBe(0);
-    expect(r.stdout).toContain('无（.w-model/run-log.jsonl 缺失或为空）');
-  });
+    await fs.rm(path.join(tmpDir, '.w-model', 'run-log.jsonl'), { force: true });
+    r = await run();
+    expect(r.code, 'run-log 缺失: 应 exit 0').toBe(0);
+    expect(r.stdout, 'run-log 缺失: 应含最近动作降级文案').toContain('无（.w-model/run-log.jsonl 缺失或为空）');
 
-  it('run-log.jsonl 含坏行 → exit 0，坏行跳过不崩溃（stderr 警告）', async () => {
-    await writeWModel('project.json', PROJECT_JSON);
+    // 态 4：run-log.jsonl 含坏行 → exit 0，坏行跳过不崩溃（stderr 警告）
     await writeWModel(
       'run-log.jsonl',
       '{"runId":"a","phase":5,"action":"produce","role":"S","outcome":"success"}\n{broken json line}\n',
     );
-    const r = await run();
-    expect(r.code).toBe(0);
-    expect(r.stderr).toContain('非合法 JSON');
-    expect(r.stdout).toContain('最近动作');
-  });
+    r = await run();
+    expect(r.code, 'run-log 坏行: 应 exit 0').toBe(0);
+    expect(r.stderr, 'run-log 坏行: 应含非合法 JSON 警告').toContain('非合法 JSON');
+    expect(r.stdout, 'run-log 坏行: 应仍输出最近动作').toContain('最近动作');
 
-  it('status 为数字（schema 枚举越界）→ exit 2（F-G4-14 翻转：原「归一化为未知状态」场景被 schema required/enum 前置排除）', async () => {
-    await writeWModel('project.json', '{"id":"x","status":123,"updatedAt":"t"}');
-    const r = await run('--json');
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('STRUCTURE_INVALID');
-    expect(r.stdout).toContain('ERROR_JSON ');
-  });
-
-  it('仅 project.json（rtm 与 run-log 全缺）→ exit 0，全降级组合不崩溃', async () => {
-    await writeWModel('project.json', PROJECT_JSON);
-    const r = await run('--json');
-    expect(r.code).toBe(0);
+    // 态 5：仅 project.json（rtm 与 run-log 全缺）→ exit 0，全降级组合不崩溃
+    await fs.rm(path.join(tmpDir, '.w-model', 'rtm.json'), { force: true });
+    await fs.rm(path.join(tmpDir, '.w-model', 'run-log.jsonl'), { force: true });
+    r = await run('--json');
+    expect(r.code, '仅 project: 应 exit 0').toBe(0);
     const parsed = JSON.parse(r.stdout) as {
       rtmCoverage: unknown;
       testSummary: unknown;
       recentActions: unknown[];
     };
-    expect(parsed.rtmCoverage).toBeNull();
-    expect(parsed.testSummary).toBeNull();
-    expect(parsed.recentActions).toEqual([]);
+    expect(parsed.rtmCoverage, '仅 project: rtmCoverage 应为 null').toBeNull();
+    expect(parsed.testSummary, '仅 project: testSummary 应为 null').toBeNull();
+    expect(parsed.recentActions, '仅 project: recentActions 应为空').toEqual([]);
   });
 });

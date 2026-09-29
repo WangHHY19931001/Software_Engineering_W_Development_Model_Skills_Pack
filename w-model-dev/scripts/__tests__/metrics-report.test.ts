@@ -110,32 +110,18 @@ describe('metrics-report CLI（异常分支）', () => {
     expect(r.stderr).toContain('文件不存在');
   });
 
-  it('--phase=99（越界）→ exit 2', async () => {
-    await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const r = await run('--phase=99');
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('--phase 参数非法');
-  });
-
-  it('--phase=1.5（非整数）→ exit 2', async () => {
-    await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const r = await run('--phase=1.5');
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('--phase 参数非法');
-  });
-
-  it('--phase=abc（非数字）→ exit 2', async () => {
-    await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const r = await run('--phase=abc');
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('--phase 参数非法');
-  });
-
-  it('--phase=（空值，Number("")=0 → 非法）→ exit 2', async () => {
-    await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
-    const r = await run('--phase=');
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('--phase 参数非法');
+  it('--phase 非法值 exit-2 四态（=99 越界 / =1.5 小数 / =abc 非数字 / = 空值）→ exit 2', async () => {
+    for (const [value, arg] of [
+      ['99（越界）', '--phase=99'],
+      ['1.5（小数）', '--phase=1.5'],
+      ['abc（非数字）', '--phase=abc'],
+      ['（空值，Number("")=0 → 非法）', '--phase='],
+    ] as const) {
+      await writeWModel('run-log.jsonl', RUN_LOG_JSONL);
+      const r = await run(arg);
+      expect(r.code, `--phase${value}: 应 exit 2`).toBe(2);
+      expect(r.stderr, `--phase${value}: 应提示参数非法`).toContain('--phase 参数非法');
+    }
   });
 
   it('budget.json 非法 JSON → exit 2', async () => {

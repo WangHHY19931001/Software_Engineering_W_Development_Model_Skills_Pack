@@ -141,60 +141,85 @@ describe('check-pollution CLI（S24 污染源定位，按需工具）', () => {
     expect(payload.project).toBe(projectDir);
   });
 
-  it('.w-model/*.lock 陈旧锁目录残留 → exit 1 且列出 kind=stale-lock-dir', async () => {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 是本测试创建的临时项目，仅构造污染 fixture
-    await fs.mkdir(path.join(projectDir, '.w-model', 'project.json.lock'), { recursive: true });
-    await putFile('.w-model/project.json.lock/owner.json', '{}\n'); // 锁目录内可有 owner 对象文件，本体目录已列
-
-    const run = runCheckPollution([`--project=${projectDir}`]);
-
-    expect(run.code).toBe(1);
-    const payload = pollutionJson(run.stdout) as { passed: boolean; findings: PollutionFinding[]; exitCode: number };
-    expect(payload.exitCode).toBe(1);
-    expect(payload.passed).toBe(false);
-    const stale = payload.findings.filter((f) => f.kind === 'stale-lock-dir');
-    expect(stale.length).toBeGreaterThanOrEqual(1);
-    expect(stale.some((f) => f.path === '.w-model/project.json.lock')).toBe(true);
-  });
-
-  it('*.lock 锁文件残留（含深层）→ exit 1 且列出 kind=lock-file', async () => {
-    await putFile('stray.lock', 'owner\n');
-    await putFile('sub/dir/inner.lock', 'x\n');
-
-    const run = runCheckPollution([`--project=${projectDir}`]);
-
-    expect(run.code).toBe(1);
-    const payload = pollutionJson(run.stdout) as { findings: PollutionFinding[] };
-    const locks = payload.findings.filter((f) => f.kind === 'lock-file');
-    expect(locks.map((f) => f.path).sort()).toEqual(['stray.lock', 'sub/dir/inner.lock']);
-  });
-
-  it('coverage/ 残留（含 coverage/.tmp）→ exit 1 且列出 kind=coverage-residue', async () => {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 是本测试创建的临时项目，仅构造污染 fixture
-    await fs.mkdir(path.join(projectDir, 'coverage', '.tmp'), { recursive: true });
-    await putFile('coverage/lcov.info', 'TN:\n');
-
-    const run = runCheckPollution([`--project=${projectDir}`]);
-
-    expect(run.code).toBe(1);
-    const payload = pollutionJson(run.stdout) as { findings: PollutionFinding[] };
-    const cov = payload.findings.filter((f) => f.kind === 'coverage-residue');
-    expect(cov).toHaveLength(1);
-    expect(cov[0]!.path).toBe('coverage/');
-    // 语义：含 .tmp 子目录在内的全部 coverage 内容按一条残留列出（理由行提及 .tmp）
-    expect(cov[0]!.reason).toContain('.tmp');
-  });
-
-  it('vitest 语义 --outputFile JSON 残留 → exit 1 且列出 kind=vitest-output-residue', async () => {
-    await putFile('vitest-results.json', '{"success":false}\n');
-    await putFile('test-results.json', '{"success":true}\n');
-
-    const run = runCheckPollution([`--project=${projectDir}`]);
-
-    expect(run.code).toBe(1);
-    const payload = pollutionJson(run.stdout) as { findings: PollutionFinding[] };
-    const residues = payload.findings.filter((f) => f.kind === 'vitest-output-residue');
-    expect(residues.map((f) => f.path).sort()).toEqual(['test-results.json', 'vitest-results.json']);
+  it('四类污染（4 态：stale-lock-dir / lock-file / coverage-residue / vitest-output-residue）→ exit 1 且按 kind 逐项列出', async () => {
+    for (const { caseName, kind, setup, expectedPaths, exact, expectReasonIncludes } of [
+      {
+        caseName: '.w-model/*.lock 陈旧锁目录残留（锁目录内可有 owner 对象文件，本体目录已列）',
+        kind: 'stale-lock-dir',
+        setup: async (): Promise<void> => {
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 是本测试创建的临时项目，仅构造污染 fixture
+          await fs.mkdir(path.join(projectDir, '.w-model', 'project.json.lock'), { recursive: true });
+          await putFile('.w-model/project.json.lock/owner.json', '{}\n');
+        },
+        expectedPaths: ['.w-model/project.json.lock'],
+        exact: false,
+        expectReasonIncludes: undefined as string | undefined,
+      },
+      {
+        caseName: '*.lock 锁文件残留（含深层）',
+        kind: 'lock-file',
+        setup: async (): Promise<void> => {
+          await putFile('stray.lock', 'owner\n');
+          await putFile('sub/dir/inner.lock', 'x\n');
+        },
+        expectedPaths: ['stray.lock', 'sub/dir/inner.lock'],
+        exact: true,
+        expectReasonIncludes: undefined,
+      },
+      {
+        caseName: 'coverage/ 残留（含 coverage/.tmp）',
+        kind: 'coverage-residue',
+        setup: async (): Promise<void> => {
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 是本测试创建的临时项目，仅构造污染 fixture
+          await fs.mkdir(path.join(projectDir, 'coverage', '.tmp'), { recursive: true });
+          await putFile('coverage/lcov.info', 'TN:\n');
+        },
+        expectedPaths: ['coverage/'],
+        exact: true,
+        expectReasonIncludes: '.tmp',
+      },
+      {
+        caseName: 'vitest 语义 --outputFile JSON 残留',
+        kind: 'vitest-output-residue',
+        setup: async (): Promise<void> => {
+          await putFile('vitest-results.json', '{"success":false}\n');
+          await putFile('test-results.json', '{"success":true}\n');
+        },
+        expectedPaths: ['test-results.json', 'vitest-results.json'],
+        exact: true,
+        expectReasonIncludes: undefined,
+      },
+    ]) {
+      await setup();
+      const run = runCheckPollution([`--project=${projectDir}`]);
+      expect(run.code, `${caseName}: 应 exit 1`).toBe(1);
+      const payload = pollutionJson(run.stdout) as {
+        passed: boolean;
+        exitCode: number;
+        findings: PollutionFinding[];
+      };
+      expect(payload.exitCode, `${caseName}: summary.exitCode`).toBe(1);
+      expect(payload.passed, `${caseName}: summary.passed`).toBe(false);
+      const kindFindings = payload.findings.filter((f) => f.kind === kind);
+      expect(kindFindings.length, `${caseName}: kind=${kind} 至少 1 条`).toBeGreaterThanOrEqual(1);
+      if (exact) {
+        expect(kindFindings.map((f) => f.path).sort(), `${caseName}: kind=${kind} 应恰为具名路径集`).toEqual(
+          [...expectedPaths].sort(),
+        );
+      } else {
+        for (const expectedPath of expectedPaths) {
+          expect(
+            kindFindings.some((f) => f.path === expectedPath),
+            `${caseName}: kind=${kind} 应列出 ${expectedPath}`,
+          ).toBe(true);
+        }
+      }
+      if (expectReasonIncludes !== undefined) {
+        expect(kindFindings[0]!.reason, `${caseName}: reason 应含「${expectReasonIncludes}」`).toContain(
+          expectReasonIncludes,
+        );
+      }
+    }
   });
 
   it('混合污染 → exit 1 且四类逐项全部列出（findingCount 计数正确）', async () => {
@@ -266,24 +291,24 @@ describe('check-pollution CLI（S24 污染源定位，按需工具）', () => {
     expect(paths).toHaveLength(4);
   });
 
-  it('--project 不存在 / 空值 / 裸 --project（空格形态）→ exit 2', async () => {
+  it('exit-2 对（2 态：--project 不存在·空值·裸形态 / 多余位置参数）', async () => {
+    // 态 1：--project 输入非法三形
     const missing = runCheckPollution([`--project=${path.join(tmpDir, 'no-such-project')}`]);
-    expect(missing.code).toBe(2);
-    expect(errorJson(missing.stdout)).toMatchObject({ exitCode: 2 });
+    expect(missing.code, 'project 不存在: 应 exit 2').toBe(2);
+    expect(errorJson(missing.stdout), 'project 不存在: ERROR_JSON').toMatchObject({ exitCode: 2 });
 
     const empty = runCheckPollution(['--project=']);
-    expect(empty.code).toBe(2);
-    expect(errorJson(empty.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
+    expect(empty.code, 'project 空值: 应 exit 2').toBe(2);
+    expect(errorJson(empty.stdout), 'project 空值: ERROR_JSON').toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
 
     const bare = runCheckPollution(['--project', projectDir]);
-    expect(bare.code).toBe(2);
-    expect(bare.stderr).toContain('ARG_INVALID');
-  });
+    expect(bare.code, '裸 --project（空格形态）: 应 exit 2').toBe(2);
+    expect(bare.stderr, '裸 --project（空格形态）: stderr 应含 ARG_INVALID').toContain('ARG_INVALID');
 
-  it('多余位置参数 → exit 2 ARG_INVALID（本 CLI 只接受 flag 形态）', async () => {
+    // 态 2：多余位置参数（本 CLI 只接受 flag 形态）
     const run = runCheckPollution([projectDir]);
-    expect(run.code).toBe(2);
-    expect(errorJson(run.stdout)).toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
+    expect(run.code, '多余位置参数: 应 exit 2').toBe(2);
+    expect(errorJson(run.stdout), '多余位置参数: ERROR_JSON').toMatchObject({ category: 'ARG_INVALID', exitCode: 2 });
   });
 });
 

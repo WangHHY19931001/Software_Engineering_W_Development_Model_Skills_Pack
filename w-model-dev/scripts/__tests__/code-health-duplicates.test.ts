@@ -449,65 +449,83 @@ describe('Phase 4 abstraction guard: item-wise dimensions (R4/R9)', () => {
     expect(proveAbstraction(equivalentCluster(), equivalentProposal())).toEqual([]);
   });
 
-  it('security difference (different validation order) → security violation', async () => {
-    const violations = proveAbstraction(
-      equivalentCluster(),
-      equivalentProposal({ security: 'different validation order' }),
-    );
-    expect(violations.some((entry) => entry.includes('security'))).toBe(true);
+  // 等价性拒绝矩阵·维度差异拒绝行（4 态：security / test-only / lifecycle / platform）
+  // ——各行同流程：proveAbstraction(cluster, proposal) → violations 含具名拒绝原因。
+  it('dimension differences → named violation（4 态：安全差异 / test-only 调用点 / lifecycle / platform）', async () => {
+    for (const { caseName, pattern, cluster, proposal } of [
+      {
+        caseName: 'security difference (different validation order)',
+        pattern: /security/i,
+        cluster: equivalentCluster(),
+        proposal: equivalentProposal({ security: 'different validation order' }),
+      },
+      {
+        caseName: 'test-only call site (contract shape: path in views.tests and stableProductionCallSites)',
+        pattern: /test-only/i,
+        cluster: equivalentCluster({
+          views: { ...equivalentCluster().views, tests: ['tests/helper.ts'] },
+          stableProductionCallSites: ['tests/helper.ts:run', 'src/service-b.ts:load'],
+        }),
+        proposal: equivalentProposal({ migratedCallSites: ['tests/helper.ts:run', 'src/service-b.ts:load'] }),
+      },
+      {
+        caseName: 'lifecycle difference (cleanup not equivalent)',
+        pattern: /lifecycle/i,
+        cluster: equivalentCluster({
+          equivalenceProof: { ...PROOF, lifecycleResources: 'cleanup=not equivalent' },
+        }),
+        proposal: equivalentProposal({ lifecycleResources: 'cleanup=not equivalent' }),
+      },
+      {
+        caseName: 'platform difference (concurrency platforms differ)',
+        pattern: /platform/i,
+        cluster: equivalentCluster({
+          equivalenceProof: { ...PROOF, concurrencyPlatforms: 'locks=equivalent; platform=different' },
+        }),
+        proposal: equivalentProposal({ concurrencyPlatforms: 'locks=equivalent; platform=different' }),
+      },
+    ]) {
+      const violations = proveAbstraction(cluster, proposal);
+      expect(violations, `${caseName}: 应拒绝并具名 ${String(pattern)}`).toEqual(
+        expect.arrayContaining([expect.stringMatching(pattern)]),
+      );
+    }
   });
 
-  it('test-only call site (contract shape: path in views.tests and stableProductionCallSites) → test-only', async () => {
-    const violations = proveAbstraction(
-      equivalentCluster({
-        views: { ...equivalentCluster().views, tests: ['tests/helper.ts'] },
-        stableProductionCallSites: ['tests/helper.ts:run', 'src/service-b.ts:load'],
-      }),
-      equivalentProposal({ migratedCallSites: ['tests/helper.ts:run', 'src/service-b.ts:load'] }),
-    );
-    expect(violations).toEqual(expect.arrayContaining([expect.stringMatching(/test-only/i)]));
-  });
-
-  it('textual similarity / short diff / mock similarity cannot authorize', async () => {
-    const textual = equivalentCluster({
-      equivalenceProof: { ...PROOF, security: 'the two implementations look textually similar' },
-    });
-    expect(proveAbstraction(textual, equivalentProposal())).toEqual(
-      expect.arrayContaining([expect.stringMatching(/security/i)]),
-    );
-
-    const mockSimilar = equivalentCluster({
-      views: { ...equivalentCluster().views, tests: ['tests/mocks/cache-mock.ts'] },
-      stableProductionCallSites: ['tests/mocks/cache-mock.ts:run', 'src/service-b.ts:load'],
-    });
-    expect(proveAbstraction(mockSimilar, equivalentProposal())).toEqual(
-      expect.arrayContaining([expect.stringMatching(/test-only/i)]),
-    );
-
-    const shortDiff = equivalentCluster({ maintenanceBenefit: 'The change is 40 lines shorter and a smaller diff.' });
-    expect(
-      proveAbstraction(
-        shortDiff,
-        equivalentProposal({ maintenanceBenefit: 'The change is 40 lines shorter and a smaller diff.' }),
-      ),
-    ).toEqual(expect.arrayContaining([expect.stringMatching(/maintenance/i)]));
-    expect(isQuantifiedMaintenanceBenefit('40 lines shorter')).toBe(false);
-    expect(isQuantifiedMaintenanceBenefit(MAINTENANCE)).toBe(true);
-  });
-
-  it('platform / lifecycle differences → not authorized', async () => {
-    const lifecycle = equivalentCluster({
-      equivalenceProof: { ...PROOF, lifecycleResources: 'cleanup=not equivalent' },
-    });
-    expect(proveAbstraction(lifecycle, equivalentProposal({ lifecycleResources: 'cleanup=not equivalent' }))).toEqual(
-      expect.arrayContaining([expect.stringMatching(/lifecycle/i)]),
-    );
-    const platform = equivalentCluster({
-      equivalenceProof: { ...PROOF, concurrencyPlatforms: 'locks=equivalent; platform=different' },
-    });
-    expect(
-      proveAbstraction(platform, equivalentProposal({ concurrencyPlatforms: 'locks=equivalent; platform=different' })),
-    ).toEqual(expect.arrayContaining([expect.stringMatching(/platform/i)]));
+  // 等价性拒绝矩阵·文本/模拟/行数不授权行（3 态 + 计量口径守卫）
+  it('textual similarity / mock similarity / short diff cannot authorize（3 态 + isQuantifiedMaintenanceBenefit 口径）', async () => {
+    for (const { caseName, pattern, cluster, proposal } of [
+      {
+        caseName: 'textual similarity（证明文本仅主张「看起来相似」）',
+        pattern: /security/i,
+        cluster: equivalentCluster({
+          equivalenceProof: { ...PROOF, security: 'the two implementations look textually similar' },
+        }),
+        proposal: equivalentProposal(),
+      },
+      {
+        caseName: 'mock similarity（tests/mocks 下复制体）',
+        pattern: /test-only/i,
+        cluster: equivalentCluster({
+          views: { ...equivalentCluster().views, tests: ['tests/mocks/cache-mock.ts'] },
+          stableProductionCallSites: ['tests/mocks/cache-mock.ts:run', 'src/service-b.ts:load'],
+        }),
+        proposal: equivalentProposal(),
+      },
+      {
+        caseName: 'short diff（40 lines shorter 不构成量化收益）',
+        pattern: /maintenance/i,
+        cluster: equivalentCluster({ maintenanceBenefit: 'The change is 40 lines shorter and a smaller diff.' }),
+        proposal: equivalentProposal({ maintenanceBenefit: 'The change is 40 lines shorter and a smaller diff.' }),
+      },
+    ]) {
+      const violations = proveAbstraction(cluster, proposal);
+      expect(violations, `${caseName}: 不得据此授权，应具名 ${String(pattern)}`).toEqual(
+        expect.arrayContaining([expect.stringMatching(pattern)]),
+      );
+    }
+    expect(isQuantifiedMaintenanceBenefit('40 lines shorter'), '「40 lines shorter」不构成量化维护收益').toBe(false);
+    expect(isQuantifiedMaintenanceBenefit(MAINTENANCE), '完整量化主张构成量化维护收益').toBe(true);
   });
 
   it('allDimensionsProven alone is not trusted; missing/negative dimensions are refused', async () => {

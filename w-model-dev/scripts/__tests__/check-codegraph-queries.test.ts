@@ -404,43 +404,60 @@ describe('C16：索引探测 stat 判别与非阻断诊断（G3-1）', () => {
     }
   }
 
-  it('`.codegraph` 为目录（标准索引形态）→ 在盘，无诊断', () => {
-    const root = writeProject({ '.codegraph/index.json': '{}' });
-    expect(codegraphIndexPresent(root)).toBe(true);
-    expect(codegraphIndexAnomaly(root)).toBeUndefined();
+  it('`.codegraph` 在盘认定行（3 态：目录 / 普通文件 / 有效链接）→ 在盘且无诊断', () => {
+    for (const { caseName, setup } of [
+      {
+        caseName: '目录（标准索引形态）',
+        setup: (): string => writeProject({ '.codegraph/index.json': '{}' }),
+      },
+      {
+        caseName: '普通文件（单文件索引形态）',
+        setup: (): string => writeProject({ '.codegraph': '{}' }),
+      },
+      {
+        caseName: '指向真实目录的有效链接（junction/symlink，与 stat 探测同语义·修复轮 1）',
+        setup: (): string | null => {
+          const root = writeProject({});
+          const realIndex = join(root, 'codegraph-index-real');
+          mkdirSync(realIndex, { recursive: true });
+          // stat 跟随链接 → 目录 → 在盘（门禁强制 evidenceKind:'cli'）→ 诊断必须缺席（旧实现误报）
+          return linkDir(realIndex, join(root, '.codegraph')) ? root : null;
+        },
+      },
+    ]) {
+      const root = setup();
+      if (root === null) continue; // win32 无链接创建权限环境跳过该态
+      expect(codegraphIndexPresent(root), `${caseName}: 应认定在盘`).toBe(true);
+      expect(codegraphIndexAnomaly(root), `${caseName}: 应无诊断`).toBeUndefined();
+    }
   });
 
-  it('`.codegraph` 为普通文件（单文件索引形态）→ 在盘，无诊断', () => {
-    const root = writeProject({ '.codegraph': '{}' });
-    expect(codegraphIndexPresent(root)).toBe(true);
-    expect(codegraphIndexAnomaly(root)).toBeUndefined();
-  });
-
-  it('`.codegraph` 缺席 → 不在盘且无诊断（正常降级形态，不产生噪音）', () => {
-    const root = writeProject({});
-    expect(codegraphIndexPresent(root)).toBe(false);
-    expect(codegraphIndexAnomaly(root)).toBeUndefined();
-  });
-
-  it('`.codegraph` 为指向真实目录的有效链接（junction/symlink）→ 在盘且无诊断（与 stat 探测同语义，修复轮 1）', () => {
-    const root = writeProject({});
-    const realIndex = join(root, 'codegraph-index-real');
-    mkdirSync(realIndex, { recursive: true });
-    if (!linkDir(realIndex, join(root, '.codegraph'))) return; // win32 无链接创建权限环境跳过
-    // stat 跟随链接 → 目录 → 在盘（门禁强制 evidenceKind:'cli'）→ 诊断必须缺席（旧实现误报）
-    expect(codegraphIndexPresent(root)).toBe(true);
-    expect(codegraphIndexAnomaly(root)).toBeUndefined();
-  });
-
-  it('`.codegraph` 为悬挂链接（stat 不可达但 lstat 占位）→ 不算在盘 + 具名非阻断诊断', () => {
-    const root = writeProject({});
-    if (!linkDir(join(root, 'missing-target'), join(root, '.codegraph'))) return; // win32 无链接创建权限环境跳过
-    // statSync 跟随链接 → ENOENT → 不在盘；lstatSync 可见该条目 → 诊断显式化退化形态
-    expect(codegraphIndexPresent(root)).toBe(false);
-    const anomaly = codegraphIndexAnomaly(root);
-    expect(anomaly).toContain('.codegraph');
-    expect(anomaly).toContain('不可达');
-    expect(anomaly).toContain('允许显式降级声明');
+  it('`.codegraph` 不在盘认定行（2 态：缺席 / 悬挂链接）→ 诊断语义分流（缺席无噪音·悬挂具名非阻断诊断）', () => {
+    for (const { caseName, anomalyIncludes } of [
+      { caseName: '缺席（正常降级形态，不产生噪音）', anomalyIncludes: undefined as readonly string[] | undefined },
+      {
+        caseName: '悬挂链接（stat 不可达但 lstat 占位）',
+        anomalyIncludes: ['.codegraph', '不可达', '允许显式降级声明'],
+      },
+    ]) {
+      let root: string;
+      if (anomalyIncludes === undefined) {
+        root = writeProject({});
+      } else {
+        root = writeProject({});
+        if (!linkDir(join(root, 'missing-target'), join(root, '.codegraph'))) continue; // win32 无链接创建权限环境跳过
+      }
+      // statSync 跟随链接 → ENOENT → 不在盘；悬挂链接经 lstatSync 可见 → 诊断显式化退化形态
+      expect(codegraphIndexPresent(root), `${caseName}: 应认定不在盘`).toBe(false);
+      const anomaly = codegraphIndexAnomaly(root);
+      if (anomalyIncludes === undefined) {
+        expect(anomaly, `${caseName}: 缺席应无诊断`).toBeUndefined();
+      } else {
+        for (const frag of anomalyIncludes) {
+          expect(anomaly, `${caseName}: 诊断应含「${frag}」`).toContain(frag);
+        }
+      }
+    }
   });
 });
 
@@ -590,28 +607,26 @@ describe('check-codegraph-queries.ts CLI（--scope fail-closed）', () => {
     expect(r.stdout).toMatch(/src\/forgotten\.ts/);
   });
 
-  it('C10d: 薄封装 --change 为空串 → exit 2 + ERROR_JSON(ARG_INVALID)（显式拒绝，非下游 fail-closed 兜底）', async () => {
-    const { root, baseSha, headSha } = makeScopedProject({});
-    const r = await runCli([root, '--phase', '5', `--change=`, `--base=${baseSha}`, `--head=${headSha}`]);
-    expect(r.status).toBe(2);
-    expect(r.stdout).toMatch(/^ERROR_JSON \{/);
-    const parsed = JSON.parse(r.stdout.replace(/^ERROR_JSON /, '')) as { category: string; exitCode: number };
-    expect(parsed.category).toBe('ARG_INVALID');
-    expect(parsed.exitCode).toBe(2);
-  });
-
-  it('C10e: 薄封装 changeId 缺 phase5- 前缀 → exit 2 + ERROR_JSON(ARG_INVALID)（覆盖性断言）', async () => {
-    const { root, baseSha, headSha } = makeScopedProject({});
-    const r = await runCli([root, '--phase', '5', `--change=reviewfix`, `--base=${baseSha}`, `--head=${headSha}`]);
-    expect(r.status).toBe(2);
-    expect(r.stdout).toMatch(/^ERROR_JSON \{/);
-    const parsed = JSON.parse(r.stdout.replace(/^ERROR_JSON /, '')) as {
-      category: string;
-      exitCode: number;
-      message?: string;
-    };
-    expect(parsed.category).toBe('ARG_INVALID');
-    expect(parsed.exitCode).toBe(2);
+  it('C10d/e: 薄封装 --change ARG_INVALID 对（2 态：空串 / 缺 phase5- 前缀）→ exit 2 + ERROR_JSON(ARG_INVALID)', async () => {
+    for (const [caseName, changeValue] of [
+      ['--change 为空串（显式拒绝，非下游 fail-closed 兜底）', ''],
+      ['changeId 缺 phase5- 前缀（覆盖性断言）', 'reviewfix'],
+    ] as const) {
+      const { root, baseSha, headSha } = makeScopedProject({});
+      const r = await runCli([
+        root,
+        '--phase',
+        '5',
+        `--change=${changeValue}`,
+        `--base=${baseSha}`,
+        `--head=${headSha}`,
+      ]);
+      expect(r.status, `${caseName}: 应 exit 2`).toBe(2);
+      expect(r.stdout, `${caseName}: 应有 ERROR_JSON 行`).toMatch(/^ERROR_JSON \{/);
+      const parsed = JSON.parse(r.stdout.replace(/^ERROR_JSON /, '')) as { category: string; exitCode: number };
+      expect(parsed.category, `${caseName}: category 应为 ARG_INVALID`).toBe('ARG_INVALID');
+      expect(parsed.exitCode, `${caseName}: exitCode 应为 2`).toBe(2);
+    }
   });
 
   it('C10f: 对照——合法 phase5- 前缀薄封装走正常路径（无查询目录 fail-closed exit 1，非 ARG_INVALID）', async () => {

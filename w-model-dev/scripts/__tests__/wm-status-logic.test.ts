@@ -24,19 +24,33 @@ describe('STATUS_TO_PHASE', () => {
 });
 
 describe('buildStatusReport', () => {
-  it('项目完成 → phase=8、completedPhases=8、progress=8/8（100%）', () => {
-    const r = buildStatusReport({ status: '项目完成', updatedAt: '2026-08-05T00:00:00Z' });
-    expect(r.phase).toBe(8);
-    expect(r.completedPhases).toBe(8);
-    expect(r.progress).toBe('8/8（100%）');
-    expect(r.updatedAt).toBe('2026-08-05T00:00:00Z');
-  });
-
-  it('中间态 completedPhases = phase-1（系统设计 → 1/8（12.5%））', () => {
-    const r = buildStatusReport({ status: '系统设计' });
-    expect(r.phase).toBe(2);
-    expect(r.completedPhases).toBe(1);
-    expect(r.progress).toBe('1/8（12.5%）');
+  it('progress（2 态：项目完成 8/8（100%）/ 中间态 completedPhases=phase-1）', () => {
+    for (const { caseName, input, expectedPhase, expectedCompleted, expectedProgress, expectedUpdatedAt } of [
+      {
+        caseName: '项目完成',
+        input: { status: '项目完成', updatedAt: '2026-08-05T00:00:00Z' },
+        expectedPhase: 8,
+        expectedCompleted: 8,
+        expectedProgress: '8/8（100%）',
+        expectedUpdatedAt: '2026-08-05T00:00:00Z',
+      },
+      {
+        caseName: '中间态（系统设计）',
+        input: { status: '系统设计' },
+        expectedPhase: 2,
+        expectedCompleted: 1,
+        expectedProgress: '1/8（12.5%）',
+        expectedUpdatedAt: undefined as string | undefined,
+      },
+    ]) {
+      const r = buildStatusReport(input);
+      expect(r.phase, `${caseName}: phase`).toBe(expectedPhase);
+      expect(r.completedPhases, `${caseName}: completedPhases`).toBe(expectedCompleted);
+      expect(r.progress, `${caseName}: progress`).toBe(expectedProgress);
+      if (expectedUpdatedAt !== undefined) {
+        expect(r.updatedAt, `${caseName}: updatedAt 透传`).toBe(expectedUpdatedAt);
+      }
+    }
   });
 
   it('RTM 覆盖按追溯字段重算（coverageStatus 仅展示，不参与计数）', () => {
@@ -61,45 +75,53 @@ describe('buildStatusReport', () => {
     expect(r.rtmCoverage).toEqual({ covered: 2, total: 3, percent: 67 });
   });
 
-  it('RTM total=0 → percent=0', () => {
-    const r = buildStatusReport({ status: '编码' }, { rows: [] });
-    expect(r.rtmCoverage).toEqual({ covered: 0, total: 0, percent: 0 });
-  });
-
-  it('computes RTM coverage from trace fields, not from the display-only coverageStatus', () => {
-    const rows = ['REQ-001', 'REQ-002', 'NFR-001', 'CON-001'].map((requirementId) => ({
-      requirementId,
-      description: 'd',
-      designDoc: 'docs/x.md#1',
-      codeModule: 'SD-001:src/counter.ts',
-      unitTest: 'TC-UNIT-001',
-      integrationTest: 'TC-INT-001',
-      systemTest: 'TC-SYS-001',
-      acceptanceTest: 'docs/y.md#UAT-001',
-      coverageStatus: '完整',
-    }));
-    const report = buildStatusReport({ status: '项目完成' }, { rows }, null);
-    expect(report.rtmCoverage).toEqual({ covered: 4, total: 4, percent: 100 });
-  });
-
-  it('counts rows missing a trace field as uncovered', () => {
-    const base = {
-      description: 'd',
-      designDoc: 'docs/x.md#1',
-      unitTest: 'TC-UNIT-001',
-      integrationTest: 'TC-INT-001',
-      systemTest: 'TC-SYS-001',
-      acceptanceTest: 'docs/y.md#UAT-001',
-      coverageStatus: '完整',
-    } as Record<string, string>;
-    const rows = [
-      { requirementId: 'REQ-001', codeModule: 'SD-001:src/counter.ts', ...base },
-      { requirementId: 'REQ-002', codeModule: '', ...base },
-      { requirementId: 'REQ-003', codeModule: 'SD-002:src/x.ts', ...base },
-      { requirementId: 'REQ-004', codeModule: 'SD-003:src/y.ts', ...base },
-    ];
-    const report = buildStatusReport({ status: '项目完成' }, { rows }, null);
-    expect(report.rtmCoverage).toEqual({ covered: 3, total: 4, percent: 75 });
+  it('RTM 覆盖（3 态：total=0 → percent=0 / 追溯字段重算 / 缺字段行计未覆盖）', () => {
+    for (const { caseName, rows, expected } of [
+      {
+        caseName: 'RTM total=0 → percent=0',
+        rows: [] as Array<Record<string, unknown>>,
+        expected: { covered: 0, total: 0, percent: 0 },
+      },
+      {
+        caseName: 'computes RTM coverage from trace fields, not from the display-only coverageStatus',
+        rows: ['REQ-001', 'REQ-002', 'NFR-001', 'CON-001'].map((requirementId) => ({
+          requirementId,
+          description: 'd',
+          designDoc: 'docs/x.md#1',
+          codeModule: 'SD-001:src/counter.ts',
+          unitTest: 'TC-UNIT-001',
+          integrationTest: 'TC-INT-001',
+          systemTest: 'TC-SYS-001',
+          acceptanceTest: 'docs/y.md#UAT-001',
+          coverageStatus: '完整',
+        })),
+        expected: { covered: 4, total: 4, percent: 100 },
+      },
+      {
+        caseName: 'counts rows missing a trace field as uncovered',
+        rows: (() => {
+          const base = {
+            description: 'd',
+            designDoc: 'docs/x.md#1',
+            unitTest: 'TC-UNIT-001',
+            integrationTest: 'TC-INT-001',
+            systemTest: 'TC-SYS-001',
+            acceptanceTest: 'docs/y.md#UAT-001',
+            coverageStatus: '完整',
+          } as Record<string, string>;
+          return [
+            { requirementId: 'REQ-001', codeModule: 'SD-001:src/counter.ts', ...base },
+            { requirementId: 'REQ-002', codeModule: '', ...base },
+            { requirementId: 'REQ-003', codeModule: 'SD-002:src/x.ts', ...base },
+            { requirementId: 'REQ-004', codeModule: 'SD-003:src/y.ts', ...base },
+          ];
+        })(),
+        expected: { covered: 3, total: 4, percent: 75 },
+      },
+    ]) {
+      const report = buildStatusReport({ status: '项目完成' }, { rows }, null);
+      expect(report.rtmCoverage, `${caseName}`).toEqual(expected);
+    }
   });
 
   it('testSummary 透传 executionSummary 四级', () => {
@@ -118,7 +140,8 @@ describe('buildStatusReport', () => {
     expect(r.testSummary?.acceptance.total).toBe(8);
   });
 
-  it('recentActions 取尾部 3 条并精简字段', () => {
+  it('recentActions（2 态：尾部 3 条精简字段 / 不足 3 条与空列表）', () => {
+    // 态 1：取尾部 3 条并精简字段
     const log = [1, 2, 3, 4, 5].map((n) => ({
       runId: `r${n}`,
       timestamp: `t${n}`,
@@ -129,10 +152,10 @@ describe('buildStatusReport', () => {
       gateExitCode: 0,
     }));
     const r = buildStatusReport({ status: '编码' }, null, log);
-    expect(r.recentActions).toHaveLength(3);
-    expect(r.recentActions[0]!.runId).toBe('r3');
-    expect(r.recentActions[2]!.runId).toBe('r5');
-    expect(Object.keys(r.recentActions[0]!).sort()).toEqual([
+    expect(r.recentActions, '尾部 3 条: 长度').toHaveLength(3);
+    expect(r.recentActions[0]!.runId, '尾部 3 条: 首条为倒数第 3').toBe('r3');
+    expect(r.recentActions[2]!.runId, '尾部 3 条: 末条为最新').toBe('r5');
+    expect(Object.keys(r.recentActions[0]!).sort(), '尾部 3 条: 字段精简白名单').toEqual([
       'action',
       'gateExitCode',
       'outcome',
@@ -141,13 +164,12 @@ describe('buildStatusReport', () => {
       'runId',
       'timestamp',
     ]);
-  });
 
-  it('recentActions 不足 3 条与空列表', () => {
+    // 态 2：不足 3 条与空列表
     const r1 = buildStatusReport({ status: '编码' }, null, [{ runId: 'a' }]);
-    expect(r1.recentActions).toHaveLength(1);
+    expect(r1.recentActions, '不足 3 条: 长度 1').toHaveLength(1);
     const r2 = buildStatusReport({ status: '编码' }, null, []);
-    expect(r2.recentActions).toEqual([]);
+    expect(r2.recentActions, '空列表: recentActions 为空').toEqual([]);
   });
 
   it('rtm/runLog 缺失 → rtmCoverage/testSummary 为 null、recentActions 为空（不崩溃）', () => {

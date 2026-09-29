@@ -198,37 +198,22 @@ describe('check-archive-integrity CLI：codingPlanSnapshot 显式入口（I-4b�
 });
 
 describe('check-archive-integrity CLI：--change-id 参数错误三态（exit 2 / ARG_INVALID）', () => {
-  it('裸 --change-id（空格形态）→ exit 2 ARG_INVALID「仅支持等号形态」', () => {
+  it('--change-id 参数错误四态（裸形态 / 空值 / 重复 / 缺目录）→ exit 2 ARG_INVALID', () => {
     const archive = join(tmpDir, 'archive');
     writeFullArchive(archive);
-    const r = runCli([archive, '--change-id', CHANGE_ID]);
-    expect(r.code).toBe(2);
-    expect(errorCategory(r.stdout)).toBe('ARG_INVALID');
-    expect(r.stderr).toContain('等号形态');
-  });
-
-  it('--change-id=（空值）→ exit 2 ARG_INVALID「取值不得为空」', () => {
-    const archive = join(tmpDir, 'archive');
-    writeFullArchive(archive);
-    const r = runCli([archive, '--change-id=']);
-    expect(r.code).toBe(2);
-    expect(errorCategory(r.stdout)).toBe('ARG_INVALID');
-    expect(r.stderr).toContain('不得为空');
-  });
-
-  it('重复 --change-id → exit 2 ARG_INVALID「重复」', () => {
-    const archive = join(tmpDir, 'archive');
-    writeFullArchive(archive);
-    const r = runCli([archive, '--change-id=a', '--change-id=b']);
-    expect(r.code).toBe(2);
-    expect(errorCategory(r.stdout)).toBe('ARG_INVALID');
-    expect(r.stderr).toContain('重复');
-  });
-
-  it('缺 <archive-dir> → exit 2 ARG_INVALID（既有契约不变）', () => {
-    const r = runCli([`--change-id=${CHANGE_ID}`]);
-    expect(r.code).toBe(2);
-    expect(errorCategory(r.stdout)).toBe('ARG_INVALID');
+    for (const [caseName, args, stderrMarker] of [
+      ['裸 --change-id（空格形态）', [archive, '--change-id', CHANGE_ID], '等号形态'],
+      ['--change-id=（空值）', [archive, '--change-id='], '不得为空'],
+      ['重复 --change-id', [archive, '--change-id=a', '--change-id=b'], '重复'],
+      ['缺 <archive-dir>', [`--change-id=${CHANGE_ID}`], null],
+    ] as const) {
+      const r = runCli([...args]);
+      expect(r.code, `${caseName}: 应 exit 2`).toBe(2);
+      expect(errorCategory(r.stdout), `${caseName}: ERROR_JSON category`).toBe('ARG_INVALID');
+      if (stderrMarker !== null) {
+        expect(r.stderr, `${caseName}: stderr 应含「${stderrMarker}」`).toContain(stderrMarker);
+      }
+    }
   });
 });
 
@@ -250,50 +235,63 @@ describe('check-archive-integrity CLI：归档前缀性（L4，--live-run-log）
     return { archive, live };
   }
 
-  it('归档快照是 live 的记录边界前缀（以 \\n 结尾）→ exit 0，输出明示前缀性校验已执行', () => {
+  it('前缀性通过行（归档快照是 live 的记录边界前缀）→ exit 0，输出明示前缀性校验已执行', () => {
     const { archive, live } = seedRunLogs(ARCHIVED_TEXT, LIVE_TEXT);
     const r = runCli([archive, `--live-run-log=${live}`, '--json']);
-    expect(r.code).toBe(0);
+    expect(r.code, '通过行: 应 exit 0').toBe(0);
     const report = JSON.parse(r.stdout) as { passed: boolean; reasons: string[]; runLogPrefix: string };
-    expect(report.passed).toBe(true);
-    expect(report.reasons).toEqual([]);
-    expect(report.runLogPrefix).toContain('记录边界前缀');
-    expect(report.runLogPrefix).toContain('是 live');
+    expect(report.passed, '通过行: passed 应为 true').toBe(true);
+    expect(report.reasons, '通过行: 应零 reasons').toEqual([]);
+    expect(report.runLogPrefix, '通过行: 应明示「记录边界前缀」').toContain('记录边界前缀');
+    expect(report.runLogPrefix, '通过行: 应明示「是 live」').toContain('是 live');
   });
 
-  it('第 N 行中途截断（是前缀但不在记录边界）→ exit 1 且文案区分「非记录边界」', () => {
-    // 归档快照 = live 去掉最后一个换行后的**半行**快照（A1 收紧前会假通过）
-    const { archive, live } = seedRunLogs(LIVE_TEXT.replace(/\n$/, ''), LIVE_TEXT);
-    const r = runCli([archive, `--live-run-log=${live}`, '--json']);
-    expect(r.code).toBe(1);
-    const report = JSON.parse(r.stdout) as { passed: boolean; reasons: string[] };
-    expect(report.passed).toBe(false);
-    expect(report.reasons.some((m) => m.includes('[runLogPrefix]') && m.includes('记录中途'))).toBe(true);
-    expect(report.reasons.some((m) => m.includes('不是 live run-log 的记录边界前缀'))).toBe(false);
-  });
+  it('前缀性违规行（3 态：中途截断 / 空快照 / 非 live 前缀）→ exit 1 且 [runLogPrefix] 具名', () => {
+    for (const [caseName, archivedText, liveText, expectMidRecord, expectEmpty, expectPassedFalse] of [
+      [
+        '第 N 行中途截断（是前缀但不在记录边界，A1 收紧前会假通过）',
+        LIVE_TEXT.replace(/\n$/, ''),
+        LIVE_TEXT,
+        true,
+        false,
+        true,
+      ],
+      ['空归档快照（0 字节，A1 收紧不再假通过）', '', LIVE_TEXT, false, true, false],
+      ['归档快照非 live 前缀（live 侧被截断/重排）', LIVE_TEXT, ARCHIVED_TEXT, false, false, true],
+    ] as const) {
+      const { archive, live } = seedRunLogs(archivedText, liveText);
+      const human = runCli([archive, `--live-run-log=${live}`]);
+      expect(human.code, `${caseName}: 应 exit 1`).toBe(1);
+      expect(human.stdout, `${caseName}: 应含 [runLogPrefix]`).toContain('[runLogPrefix]');
 
-  it('空归档快照（0 字节）→ exit 1 且文案区分「空快照」（A1 收紧：不再假通过）', () => {
-    const { archive, live } = seedRunLogs('', LIVE_TEXT);
-    const human = runCli([archive, `--live-run-log=${live}`]);
-    expect(human.code).toBe(1);
-    expect(human.stdout).toContain('[runLogPrefix]');
-    expect(human.stdout).toContain('快照为空');
-    const json = runCli([archive, `--live-run-log=${live}`, '--json']);
-    expect(json.code).toBe(1);
-    const report = JSON.parse(json.stdout) as { reasons: string[] };
-    expect(report.reasons.some((m) => m.includes('快照为空'))).toBe(true);
-  });
-
-  it('归档快照非 live 前缀（live 侧被截断/重排）→ exit 1 且 [runLogPrefix] 具名', () => {
-    const { archive, live } = seedRunLogs(LIVE_TEXT, ARCHIVED_TEXT);
-    const human = runCli([archive, `--live-run-log=${live}`]);
-    expect(human.code).toBe(1);
-    expect(human.stdout).toContain('[runLogPrefix]');
-    const json = runCli([archive, `--live-run-log=${live}`, '--json']);
-    expect(json.code).toBe(1);
-    const report = JSON.parse(json.stdout) as { passed: boolean; reasons: string[] };
-    expect(report.passed).toBe(false);
-    expect(report.reasons.some((m) => m.includes('[runLogPrefix]'))).toBe(true);
+      const json = runCli([archive, `--live-run-log=${live}`, '--json']);
+      expect(json.code, `${caseName}: json 模式应 exit 1`).toBe(1);
+      const report = JSON.parse(json.stdout) as { passed: boolean; reasons: string[] };
+      expect(
+        report.reasons.some((m) => m.includes('[runLogPrefix]')),
+        `${caseName}: reasons 应含 [runLogPrefix]`,
+      ).toBe(true);
+      if (expectPassedFalse) {
+        expect(report.passed, `${caseName}: passed 应为 false`).toBe(false);
+      }
+      if (expectMidRecord) {
+        expect(
+          report.reasons.some((m) => m.includes('记录中途')),
+          `${caseName}: 应区分「记录中途」`,
+        ).toBe(true);
+        expect(
+          report.reasons.some((m) => m.includes('不是 live run-log 的记录边界前缀')),
+          `${caseName}: 不应出现笼统非前缀文案`,
+        ).toBe(false);
+      }
+      if (expectEmpty) {
+        expect(human.stdout, `${caseName}: 人类段应含「快照为空」`).toContain('快照为空');
+        expect(
+          report.reasons.some((m) => m.includes('快照为空')),
+          `${caseName}: reasons 应含「快照为空」`,
+        ).toBe(true);
+      }
+    }
   });
 
   it('未传 --live-run-log → exit 0 + 非阻断诊断（既有退出码语义不变）', () => {

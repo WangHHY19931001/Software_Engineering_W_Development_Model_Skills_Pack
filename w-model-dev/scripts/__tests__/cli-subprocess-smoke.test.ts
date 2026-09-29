@@ -108,55 +108,42 @@ describe('check-artifact-gate 真实子进程冒烟', () => {
   });
 });
 
-describe('check-coding-plan 真实子进程冒烟', () => {
-  // exit 0 需完整 git 仓库 + scope + 制品树（check-coding-plan.test.ts 已覆盖该形态）；
+// 以下两组为同构冒烟族的循环内聚合：循环迭代内逐 CLI 各做一次真实子进程 spawn，
+// 「每 CLI ≥1 真实冒烟」语义不变；stdout 标记断言逐 CLI 具名（spawn 标记/形状差异经行字段保真）。
+describe('无参 exit-2 真实子进程冒烟（4 CLI：check-coding-plan / check-codegraph-queries / code-health-apply / review-package）', () => {
+  // exit 0 需完整 git 仓库 + scope/制品树（各自进程内用例文件已覆盖该形态）；
   // 冒烟取零夹具的 ARG_INVALID 路径：验证真实子进程边界（argv 解析 → ERROR_JSON + exitCode 2 传递）。
-  it('无参 → exit 2 + stdout ERROR_JSON 标记', () => {
-    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/check-coding-plan.ts')]);
-    expect(r.status).toBe(2);
-    expect(r.stdout).toMatch(/^ERROR_JSON \{/);
-    expect(r.stderr).toContain('参数缺失');
-  });
+  it('无参 → exit 2 + stdout ERROR_JSON 标记（4 CLI 逐个真实 spawn）', () => {
+    for (const { cli, args, stdoutMode, stderrMarker } of [
+      { cli: 'check-coding-plan.ts', args: [], stdoutMode: 'prefix', stderrMarker: '参数缺失' },
+      { cli: 'check-codegraph-queries.ts', args: [], stdoutMode: 'prefix', stderrMarker: '参数缺失' },
+      { cli: 'code-health-apply.ts', args: [], stdoutMode: 'contains', stderrMarker: '--candidate' },
+      { cli: 'review-package.ts', args: [], stdoutMode: 'prefix', stderrMarker: '--base' },
+    ] as const) {
+      const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli', cli), ...args]);
+      expect(r.status, `${cli}: 应 exit 2`).toBe(2);
+      if (stdoutMode === 'prefix') {
+        expect(r.stdout, `${cli}: stdout 应以 ERROR_JSON { 开头`).toMatch(/^ERROR_JSON \{/);
+      } else {
+        expect(r.stdout, `${cli}: stdout 应含 ERROR_JSON`).toContain('ERROR_JSON');
+      }
+      expect(r.stderr, `${cli}: stderr 应含「${stderrMarker}」`).toContain(stderrMarker);
+    }
+  }, 120_000);
 });
 
-describe('check-codegraph-queries 真实子进程冒烟', () => {
-  // 同 check-coding-plan：exit 0 需 git 仓库 + 合法 scope（check-codegraph-queries.test.ts 已覆盖）；
-  // 冒烟取零夹具的 ARG_INVALID 路径。
-  it('无参 → exit 2 + stdout ERROR_JSON 标记', () => {
-    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/check-codegraph-queries.ts')]);
-    expect(r.status).toBe(2);
-    expect(r.stdout).toMatch(/^ERROR_JSON \{/);
-    expect(r.stderr).toContain('参数缺失');
-  });
-});
-
-describe('code-health-apply 真实子进程冒烟', () => {
-  // exit 0 需完整 git 仓库 + candidate/approval fixture（code-health-cli.test.ts 已覆盖）；
-  // 冒烟取零夹具的 ARG_INVALID 路径。
-  it('无参 → exit 2 + stdout ERROR_JSON 标记', () => {
-    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/code-health-apply.ts')]);
-    expect(r.status).toBe(2);
-    expect(r.stdout).toContain('ERROR_JSON');
-    expect(r.stderr).toContain('--candidate');
-  });
-});
-
-describe('code-health-ledger 真实子进程冒烟', () => {
-  // --help 零读盘纯输出（发现性用法面），exit 0；init/append/validate 正向由 code-health-cli.test.ts 覆盖。
-  it('--help → exit 0 + stdout usage 标记', () => {
-    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/code-health-ledger.ts'), '--help']);
-    expect(r.status).toBe(0);
-    expect(r.stdout).toContain('usage: code-health-ledger.ts');
-  });
-});
-
-describe('code-health-archive 真实子进程冒烟', () => {
-  // --help 零读盘纯输出，exit 0；campaign/verify 正向由 code-health-cli.test.ts 覆盖。
-  it('--help → exit 0 + stdout usage 标记', () => {
-    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/code-health-archive.ts'), '--help']);
-    expect(r.status).toBe(0);
-    expect(r.stdout).toMatch(/--campaign/);
-  });
+describe('--help 真实子进程冒烟（2 CLI：code-health-ledger / code-health-archive）', () => {
+  // --help 零读盘纯输出（发现性用法面），exit 0；init/append/validate 与 campaign/verify 正向由 code-health-cli.test.ts 覆盖。
+  it('--help → exit 0 + stdout usage 标记（2 CLI 逐个真实 spawn）', () => {
+    for (const { cli, marker } of [
+      { cli: 'code-health-ledger.ts', marker: 'usage: code-health-ledger.ts' },
+      { cli: 'code-health-archive.ts', marker: '--campaign' },
+    ] as const) {
+      const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli', cli), '--help']);
+      expect(r.status, `${cli}: --help 应 exit 0`).toBe(0);
+      expect(r.stdout, `${cli}: stdout 应含「${marker}」`).toContain(marker);
+    }
+  }, 120_000);
 });
 
 describe('code-health-duplicates 真实子进程冒烟', () => {
@@ -170,16 +157,5 @@ describe('code-health-duplicates 真实子进程冒烟', () => {
     ]);
     expect(r.status).toBe(2);
     expect(r.stdout).toContain('ERROR_JSON');
-  });
-});
-
-describe('review-package 真实子进程冒烟', () => {
-  // exit 0 需真实 git 仓库 + base/head rev（review-package-cli.test.ts 已覆盖）；
-  // 冒烟取零夹具的 ARG_INVALID 路径。
-  it('无参 → exit 2 + stdout ERROR_JSON 标记', () => {
-    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/review-package.ts')]);
-    expect(r.status).toBe(2);
-    expect(r.stdout).toMatch(/^ERROR_JSON \{/);
-    expect(r.stderr).toContain('--base');
   });
 });

@@ -188,18 +188,20 @@ describe('wm-write CLI lock controls', () => {
     }
   });
 
-  it.each([
-    ['missing value', ['--stdin', '--lock-timeout']],
-    ['negative value', ['--stdin', '--lock-timeout', '-1']],
-    ['decimal value', ['--stdin', '--lock-timeout', '1.5']],
-    ['non-numeric value', ['--stdin', '--lock-timeout', 'abc']],
-    ['unsafe integer', ['--stdin', '--lock-timeout', '9007199254740992']],
-  ])('--lock-timeout %s is ARG_INVALID with exit 2', (_caseName, args) => {
-    const result = run(target(`invalid-${_caseName}.json`), args, '{"value":1}');
+  it('--lock-timeout 非法值族（5 态）is ARG_INVALID with exit 2', () => {
+    for (const [caseName, args] of [
+      ['missing value', ['--stdin', '--lock-timeout']],
+      ['negative value', ['--stdin', '--lock-timeout', '-1']],
+      ['decimal value', ['--stdin', '--lock-timeout', '1.5']],
+      ['non-numeric value', ['--stdin', '--lock-timeout', 'abc']],
+      ['unsafe integer', ['--stdin', '--lock-timeout', '9007199254740992']],
+    ] as const) {
+      const result = run(target(`invalid-${caseName}.json`), [...args], '{"value":1}');
 
-    expect(result.code).toBe(2);
-    expect(result.stderr).toContain('✗ [ARG_INVALID]');
-    expect(result.stdout).toContain('ERROR_JSON ');
+      expect(result.code, `${caseName}: 应 exit 2`).toBe(2);
+      expect(result.stderr, `${caseName}: stderr 应含 ARG_INVALID`).toContain('✗ [ARG_INVALID]');
+      expect(result.stdout, `${caseName}: stdout 应含 ERROR_JSON`).toContain('ERROR_JSON ');
+    }
   });
 
   it('--recover-stale-lock rejects an active external owner without removing it', async () => {
@@ -293,17 +295,28 @@ describe('wm-write CLI lock controls', () => {
     }
   });
 
-  it.each(['', '{broken'])('rejects %j owner metadata without implicit recovery', async (metadata) => {
-    const p = target(`unknown-owner-${metadata === '' ? 'empty' : 'broken'}.json`);
-    const ownerMetadataPath = path.join(`${p}.lock`, 'owner', 'metadata.json');
-    await fs.mkdir(path.dirname(ownerMetadataPath), { recursive: true });
-    await fs.writeFile(ownerMetadataPath, metadata, 'utf-8');
+  it('rejects unknown owner metadata without implicit recovery（2 态）', async () => {
+    for (const [caseName, metadata] of [
+      ['empty metadata', ''],
+      ['broken metadata', '{broken'],
+    ] as const) {
+      const p = target(`unknown-owner-${caseName}.json`);
+      const ownerMetadataPath = path.join(`${p}.lock`, 'owner', 'metadata.json');
+      await fs.mkdir(path.dirname(ownerMetadataPath), { recursive: true });
+      await fs.writeFile(ownerMetadataPath, metadata, 'utf-8');
 
-    const result = run(p, ['--stdin', '--lock-timeout', '5000'], '{"value":"new"}');
+      const result = run(p, ['--stdin', '--lock-timeout', '5000'], '{"value":"new"}');
 
-    expect(result.code).toBe(1);
-    expect(wmwriteSummary(result.stdout)).toMatchObject({ ok: false, reason: 'STALE_LOCK', writtenPath: p });
-    await expect(fs.readFile(ownerMetadataPath, 'utf-8')).resolves.toBe(metadata);
+      expect(result.code, `${caseName}: 应 exit 1`).toBe(1);
+      expect(wmwriteSummary(result.stdout), `${caseName}: 应报 STALE_LOCK`).toMatchObject({
+        ok: false,
+        reason: 'STALE_LOCK',
+        writtenPath: p,
+      });
+      await expect(fs.readFile(ownerMetadataPath, 'utf-8'), `${caseName}: owner metadata 不应被改写`).resolves.toBe(
+        metadata,
+      );
+    }
   });
 
   it('audits and recovers corrupt owner metadata with explicit CLI recovery', async () => {
@@ -497,29 +510,47 @@ describe('wm-write CLI argument boundaries and existing contract', () => {
     expect(result.stdout).toContain('ERROR_JSON ');
   });
 
-  it('--stdin and --from both write successfully', async () => {
-    const stdinTarget = target('stdin.json');
-    const stdinResult = run(stdinTarget, ['--stdin'], '{"source":"stdin"}');
-    expect(stdinResult.code).toBe(0);
-    expect(wmwriteSummary(stdinResult.stdout)).toMatchObject({ ok: true, writtenPath: stdinTarget });
-
-    const fromTarget = target('from.json');
-    const source = target('source.json');
-    await fs.writeFile(source, '{"source":"file"}', 'utf-8');
-    const fromResult = run(fromTarget, ['--from', source]);
-    expect(fromResult.code).toBe(0);
-    expect(wmwriteSummary(fromResult.stdout)).toMatchObject({ ok: true, writtenPath: fromTarget });
-  });
-
-  it('--stdin and --from remain mutually exclusive with exit 2', async () => {
-    const source = target('source.json');
+  it('--stdin 与 --from 组合（2 态：双写成功 / 互斥 exit 2）', async () => {
+    const source = target('stdin-from-source.json');
     await fs.writeFile(source, '{"source":"file"}', 'utf-8');
 
-    const result = run(target('mutual.json'), ['--stdin', '--from', source], '{"source":"stdin"}');
+    for (const { caseName, targetPath, args, input, expected } of [
+      {
+        caseName: '--stdin 写入',
+        targetPath: target('stdin.json'),
+        args: ['--stdin'],
+        input: '{"source":"stdin"}',
+        expected: { code: 0, body: '{"source":"stdin"}' },
+      },
+      {
+        caseName: '--from 写入',
+        targetPath: target('from.json'),
+        args: ['--from', source],
+        input: undefined,
+        expected: { code: 0, body: '{"source":"file"}' },
+      },
+      {
+        caseName: '--stdin 与 --from 互斥',
+        targetPath: target('mutual.json'),
+        args: ['--stdin', '--from', source],
+        input: '{"source":"stdin"}',
+        expected: { code: 2, body: undefined },
+      },
+    ] as const) {
+      const result = run(targetPath, [...args], input);
 
-    expect(result.code).toBe(2);
-    expect(result.stderr).toContain('✗ [ARG_INVALID]');
-    expect(result.stdout).toContain('ERROR_JSON ');
+      expect(result.code, `${caseName}: 退出码`).toBe(expected.code);
+      if (expected.code === 0) {
+        expect(wmwriteSummary(result.stdout), `${caseName}: 成功 summary`).toMatchObject({
+          ok: true,
+          writtenPath: targetPath,
+        });
+        await expect(fs.readFile(targetPath, 'utf-8'), `${caseName}: 目标内容`).resolves.toBe(expected.body);
+      } else {
+        expect(result.stderr, `${caseName}: stderr 应含 ARG_INVALID`).toContain('✗ [ARG_INVALID]');
+        expect(result.stdout, `${caseName}: stdout 应含 ERROR_JSON`).toContain('ERROR_JSON ');
+      }
+    }
   });
 
   it('--expect-mtime accepts a finite fractional value and floors it', async () => {
@@ -549,32 +580,28 @@ describe('wm-write CLI argument boundaries and existing contract', () => {
 });
 
 describe('wm-write duplicate single-value flags（D3/I-3：重复即错）', () => {
-  it('重复 --expect-mtime → exit 2 ARG_INVALID（不再 last-wins）', async () => {
-    const p = target('mtime-duplicate.json');
-    await fs.writeFile(p, '{"value":"old"}', 'utf-8');
-    const mtime = Math.floor((await fs.stat(p)).mtimeMs);
-
-    const result = run(
-      p,
-      ['--stdin', '--expect-mtime', String(mtime), '--expect-mtime', String(mtime)],
-      '{"value":"new"}',
-    );
-
-    expect(result.code).toBe(2);
-    expect(result.stderr).toContain('✗ [ARG_INVALID]');
-    expect(result.stdout).toContain('ERROR_JSON ');
-  });
-
-  it('重复 --from → exit 2 ARG_INVALID', async () => {
+  it('重复单值 flag（2 态：--expect-mtime / --from）→ exit 2 ARG_INVALID（不再 last-wins）', async () => {
+    const mtimeTarget = target('mtime-duplicate.json');
+    await fs.writeFile(mtimeTarget, '{"value":"old"}', 'utf-8');
+    const mtime = Math.floor((await fs.stat(mtimeTarget)).mtimeMs);
     const sourceA = target('source-a.json');
     await fs.writeFile(sourceA, '{"source":"a"}', 'utf-8');
     const sourceB = target('source-b.json');
     await fs.writeFile(sourceB, '{"source":"b"}', 'utf-8');
 
-    const result = run(target('from-duplicate.json'), ['--from', sourceA, '--from', sourceB]);
+    for (const [caseName, targetPath, args] of [
+      [
+        '重复 --expect-mtime',
+        mtimeTarget,
+        ['--stdin', '--expect-mtime', String(mtime), '--expect-mtime', String(mtime)],
+      ],
+      ['重复 --from', target('from-duplicate.json'), ['--from', sourceA, '--from', sourceB]],
+    ] as const) {
+      const result = run(targetPath, [...args], caseName === '重复 --from' ? undefined : '{"value":"new"}');
 
-    expect(result.code).toBe(2);
-    expect(result.stderr).toContain('✗ [ARG_INVALID]');
-    expect(result.stdout).toContain('ERROR_JSON ');
+      expect(result.code, `${caseName}: 应 exit 2`).toBe(2);
+      expect(result.stderr, `${caseName}: stderr 应含 ARG_INVALID`).toContain('✗ [ARG_INVALID]');
+      expect(result.stdout, `${caseName}: stdout 应含 ERROR_JSON`).toContain('ERROR_JSON ');
+    }
   });
 });

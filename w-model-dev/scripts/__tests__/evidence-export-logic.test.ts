@@ -205,18 +205,18 @@ function cliSummary(stdout: string): Record<string, unknown> {
 }
 
 describe('evidence export logic', () => {
-  it.each([[[]], [['--d4-invalid-argument']], [['--verify']]])(
-    'returns structured exit 2 for invalid argument set %j without creating an output directory',
-    (args) => {
-      const result = runCli(args);
-      expect(result.code).toBe(2);
+  it('returns structured exit 2 for invalid argument sets（3 形态：无参 / 未知 flag / 裸 --verify）without creating an output directory', () => {
+    for (const args of [[], ['--d4-invalid-argument'], ['--verify']] as const) {
+      const result = runCli([...args]);
+      expect(result.code, `args=${JSON.stringify(args)}: 应 exit 2`).toBe(2);
       const line = result.stdout.split(/\r?\n/).find((entry) => entry.startsWith('ERROR_JSON '));
-      expect(line).toBeDefined();
-      expect(JSON.parse(line!.slice('ERROR_JSON '.length))).toMatchObject({
-        exitCode: 2,
-      });
-    },
-  );
+      expect(line, `args=${JSON.stringify(args)}: 应有 ERROR_JSON 行`).toBeDefined();
+      expect(
+        JSON.parse(line!.slice('ERROR_JSON '.length)),
+        `args=${JSON.stringify(args)}: 摘要应含 exitCode 2`,
+      ).toMatchObject({ exitCode: 2 });
+    }
+  });
   it('exports only runtime evidence and excludes project source, local tools, coverage, and archive paths', async () => {
     const project = await createProject();
     await fs.mkdir(path.join(project, '.zcode'), { recursive: true });
@@ -786,64 +786,58 @@ describe('evidence export logic', () => {
     await expect(fs.access(path.join(artifactOutput, 'evidence-manifest.json'))).rejects.toThrow();
   });
 
-  it('rejects a package-only manifest with an unallowlisted path', async () => {
-    const project = await createProject();
-    const output = path.join(tmpDir, 'unallowlisted-package');
-    await exportEvidence(project, output);
-    const manifestPath = path.join(output, 'evidence-manifest.json');
-    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
-      files: Array<{ path: string; sha256: string; kind: string }>;
-      provenance: { contentHash: string };
-    };
-    const content = 'source must not be accepted as runtime evidence\\n';
-    await fs.writeFile(path.join(output, 'source.ts'), content, 'utf8');
-    manifest.files.push({ path: 'source.ts', sha256: sha256(content), kind: 'gate-log' });
-    manifest.provenance.contentHash = evidenceContentHash(manifest.files);
-    await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+  it('rejects package-only manifests with structural violations（3 态：越单名单路径 / kind 不符 / 乱序）→ INVALID_MANIFEST', async () => {
+    for (const { caseName, outputName, mutate } of [
+      {
+        caseName: '越单名单路径（source 不得作为 runtime evidence）',
+        outputName: 'unallowlisted-package',
+        mutate: (manifest: {
+          files: Array<{ path: string; sha256: string; kind: string }>;
+          provenance: { contentHash: string };
+        }): void => {
+          const content = 'source must not be accepted as runtime evidence\\n';
+          manifest.files.push({ path: 'source.ts', sha256: sha256(content), kind: 'gate-log' });
+          manifest.provenance.contentHash = evidenceContentHash(manifest.files);
+        },
+      },
+      {
+        caseName: 'evidence kind 与 allowlisted 路径不符',
+        outputName: 'kind-mismatch-package',
+        mutate: async (manifest: {
+          files: Array<{ path: string; sha256: string; kind: string }>;
+          provenance: { contentHash: string };
+        }): Promise<void> => {
+          manifest.files[0]!.kind = manifest.files[0]!.kind === 'gate-log' ? 'run-log' : 'gate-log';
+        },
+      },
+      {
+        caseName: 'files 不在稳定路径序',
+        outputName: 'unsorted-package',
+        mutate: async (manifest: {
+          files: Array<{ path: string; sha256: string; kind: string }>;
+          provenance: { contentHash: string };
+        }): Promise<void> => {
+          manifest.files.reverse();
+        },
+      },
+    ]) {
+      const project = await createProject();
+      const output = path.join(tmpDir, outputName);
+      await exportEvidence(project, output);
+      const manifestPath = path.join(output, 'evidence-manifest.json');
+      const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
+        files: Array<{ path: string; sha256: string; kind: string }>;
+        provenance: { contentHash: string };
+      };
+      await mutate(manifest);
+      await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
 
-    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
-      ok: false,
-      exitCode: 1,
-      reason: 'INVALID_MANIFEST',
-    });
-  });
-
-  it('rejects a package-only manifest whose evidence kind does not match its allowlisted path', async () => {
-    const project = await createProject();
-    const output = path.join(tmpDir, 'kind-mismatch-package');
-    await exportEvidence(project, output);
-    const manifestPath = path.join(output, 'evidence-manifest.json');
-    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
-      files: Array<{ path: string; sha256: string; kind: string }>;
-      provenance: { contentHash: string };
-    };
-    manifest.files[0]!.kind = manifest.files[0]!.kind === 'gate-log' ? 'run-log' : 'gate-log';
-    await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
-
-    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
-      ok: false,
-      exitCode: 1,
-      reason: 'INVALID_MANIFEST',
-    });
-  });
-
-  it('rejects a package-only manifest whose files are not in stable path order', async () => {
-    const project = await createProject();
-    const output = path.join(tmpDir, 'unsorted-package');
-    await exportEvidence(project, output);
-    const manifestPath = path.join(output, 'evidence-manifest.json');
-    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as {
-      files: Array<{ path: string; sha256: string; kind: string }>;
-      provenance: { contentHash: string };
-    };
-    manifest.files.reverse();
-    await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
-
-    await expect(verifyEvidence(manifestPath)).resolves.toMatchObject({
-      ok: false,
-      exitCode: 1,
-      reason: 'INVALID_MANIFEST',
-    });
+      await expect(verifyEvidence(manifestPath), `${caseName}: 应拒并报 INVALID_MANIFEST`).resolves.toMatchObject({
+        ok: false,
+        exitCode: 1,
+        reason: 'INVALID_MANIFEST',
+      });
+    }
   });
 
   it('rejects hash-valid package-only manifests with sensitive provenance IDs and file paths', async () => {
@@ -1338,25 +1332,28 @@ describe('wm-export-evidence CLI', () => {
     expect(output).not.toContain(option);
   });
 
-  it('rejects a source-targeting output-parent symlink through the real CLI without source pollution', async () => {
-    const project = await createProject();
-    const source = path.join(project, '.w-model');
+  it('真实 CLI 拒绝对（2 态：output-parent symlink 指向 source / verify 越界四态）不污染 source', async () => {
+    // 态 1：output parent 是指向 source 的 symlink → UNSAFE_OUTPUT_PATH，且 source 无污染
+    const symlinkProject = await createProject();
+    const source = path.join(symlinkProject, '.w-model');
     const outputParent = path.join(tmpDir, 'cli-output-parent');
     await fs.symlink(source, outputParent, 'junction');
 
-    const result = runCli([project, path.join(outputParent, 'evidence')]);
+    const unsafeResult = runCli([symlinkProject, path.join(outputParent, 'evidence')]);
 
-    expect(result.code).toBe(1);
-    expect(cliSummary(result.stdout)).toMatchObject({
+    expect(unsafeResult.code, 'output-parent symlink: 应 exit 1').toBe(1);
+    expect(cliSummary(unsafeResult.stdout), 'output-parent symlink: 应报 UNSAFE_OUTPUT_PATH').toMatchObject({
       ok: false,
       exitCode: 1,
       reason: 'UNSAFE_OUTPUT_PATH',
     });
-    expect(result.stdout).toContain('ERROR_JSON ');
-    await expect(fs.access(path.join(source, 'evidence'))).rejects.toMatchObject({ code: 'ENOENT' });
-  });
+    expect(unsafeResult.stdout, 'output-parent symlink: 应含 ERROR_JSON').toContain('ERROR_JSON ');
+    await expect(
+      fs.access(path.join(source, 'evidence')),
+      'output-parent symlink: source 不被污染',
+    ).rejects.toMatchObject({ code: 'ENOENT' });
 
-  it('rejects verify traversal, duplicate, symlink, and unmanifested output through the real CLI', async () => {
+    // 态 2：verify 边界四态（traversal / duplicate / unmanifested extra / evidence symlink）
     const project = await createProject();
     const output = path.join(tmpDir, 'cli-verify-boundaries');
     expect(runCli([project, output]).code).toBe(0);
@@ -1365,45 +1362,65 @@ describe('wm-export-evidence CLI', () => {
       files: Array<Record<string, unknown>>;
     } & Record<string, unknown>;
 
-    await fs.writeFile(
-      manifestPath,
-      JSON.stringify({
-        ...manifest,
-        files: [{ ...manifest.files[0], path: '../escape.json' }],
-      }),
-      'utf8',
-    );
-    const traversal = runCli(['--verify', manifestPath]);
-    expect(traversal.code).toBe(1);
-    expect(traversal.stdout).toContain('ERROR_JSON ');
-
-    await fs.writeFile(
-      manifestPath,
-      JSON.stringify({
-        ...manifest,
-        files: [manifest.files[0], manifest.files[0]],
-      }),
-      'utf8',
-    );
-    const duplicate = runCli(['--verify', manifestPath]);
-    expect(duplicate.code).toBe(1);
-    expect(duplicate.stdout).toContain('ERROR_JSON ');
-
-    await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
-    await fs.writeFile(path.join(output, 'extra.txt'), 'extra', 'utf8');
-    const extra = runCli(['--verify', manifestPath]);
-    expect(extra.code).toBe(1);
-    expect(extra.stdout).toContain('ERROR_JSON ');
-    await fs.unlink(path.join(output, 'extra.txt'));
-
-    const evidence = path.join(output, 'gate-logs', 'gate.json');
-    const outside = path.join(tmpDir, 'outside-cli.json');
-    await fs.writeFile(outside, '{"safe":true}', 'utf8');
-    await fs.unlink(evidence);
-    await fs.symlink(outside, evidence);
-    const symlink = runCli(['--verify', manifestPath]);
-    expect(symlink.code).toBe(1);
-    expect(symlink.stdout).toContain('ERROR_JSON ');
+    const mutationCases = [
+      {
+        caseName: 'verify 路径越界 ../escape.json',
+        write: async (): Promise<void> => {
+          await fs.writeFile(
+            manifestPath,
+            JSON.stringify({
+              ...manifest,
+              files: [{ ...manifest.files[0], path: '../escape.json' }],
+            }),
+            'utf8',
+          );
+        },
+        cleanup: async (): Promise<void> => {},
+      },
+      {
+        caseName: 'verify 重复路径',
+        write: async (): Promise<void> => {
+          await fs.writeFile(
+            manifestPath,
+            JSON.stringify({
+              ...manifest,
+              files: [manifest.files[0], manifest.files[0]],
+            }),
+            'utf8',
+          );
+        },
+        cleanup: async (): Promise<void> => {},
+      },
+      {
+        caseName: 'verify 未登记输出文件',
+        write: async (): Promise<void> => {
+          await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+          await fs.writeFile(path.join(output, 'extra.txt'), 'extra', 'utf8');
+        },
+        cleanup: async (): Promise<void> => {
+          await fs.unlink(path.join(output, 'extra.txt'));
+        },
+      },
+      {
+        caseName: 'verify evidence 为 symlink',
+        write: async (): Promise<void> => {
+          await fs.writeFile(manifestPath, JSON.stringify(manifest), 'utf8');
+          const evidence = path.join(output, 'gate-logs', 'gate.json');
+          const outside = path.join(tmpDir, 'outside-cli.json');
+          await fs.writeFile(outside, '{"safe":true}', 'utf8');
+          await fs.unlink(evidence);
+          await fs.symlink(outside, evidence);
+        },
+        cleanup: async (): Promise<void> => {},
+      },
+    ];
+    for (const { caseName, write, cleanup } of mutationCases) {
+      await write();
+      const result = runCli(['--verify', manifestPath]);
+      expect(result.code, `${caseName}: 应 exit 1`).toBe(1);
+      expect(result.stdout, `${caseName}: 应含 ERROR_JSON`).toContain('ERROR_JSON ');
+      await cleanup();
+    }
   });
 
   it('emits safe structured CLI errors for invalid JSON and output safety failures', async () => {

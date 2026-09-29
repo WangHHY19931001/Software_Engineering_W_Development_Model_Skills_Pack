@@ -30,51 +30,41 @@ afterEach(async () => {
 });
 
 describe('isTlcStatesDir', () => {
-  it('含 TLC 时间戳子目录 → true', async () => {
-    const dir = await makeTmpDir();
-    await fs.mkdir(path.join(dir, '2026-08-05-10-30-00'));
-    expect(await isTlcStatesDir(dir)).toBe(true);
+  it('TLC 产物判定·true 行（3 态：时间戳子目录 / 2 位年份时间戳 / .st 指纹文件）', async () => {
+    for (const [caseName, entryName, isDir] of [
+      ['含 TLC 时间戳子目录', '2026-08-05-10-30-00', true],
+      ['含 2 位年份 TLC 时间戳子目录（26-08-05-10-30-00）', '26-08-05-10-30-00', true],
+      ['含 .st 指纹文件', 'L2-AuthService.st', false],
+    ] as const) {
+      const dir = await makeTmpDir();
+      if (isDir) {
+        await fs.mkdir(path.join(dir, entryName));
+      } else {
+        await fs.writeFile(path.join(dir, entryName), 'x');
+      }
+      expect(await isTlcStatesDir(dir), `${caseName}: 应判定为 true`).toBe(true);
+    }
   });
 
-  it('含 2 位年份 TLC 时间戳子目录（26-08-05-10-30-00）→ true', async () => {
-    const dir = await makeTmpDir();
-    await fs.mkdir(path.join(dir, '26-08-05-10-30-00'));
-    expect(await isTlcStatesDir(dir)).toBe(true);
-  });
+  it('TLC 产物判定·false 行（3 态：空目录 / 无关文件 / 目录不存在）', async () => {
+    // 态 1：空目录
+    const emptyDir = await makeTmpDir();
+    expect(await isTlcStatesDir(emptyDir), '空目录: 应判定为 false').toBe(false);
 
-  it('含 .st 指纹文件 → true', async () => {
-    const dir = await makeTmpDir();
-    await fs.writeFile(path.join(dir, 'L2-AuthService.st'), 'x');
-    expect(await isTlcStatesDir(dir)).toBe(true);
-  });
+    // 态 2：含无关文件（非 TLC 产物）
+    const readmeDir = await makeTmpDir();
+    await fs.writeFile(path.join(readmeDir, 'README.md'), 'not tlc');
+    expect(await isTlcStatesDir(readmeDir), '含无关文件: 应判定为 false').toBe(false);
 
-  it('空目录 → false', async () => {
-    const dir = await makeTmpDir();
-    expect(await isTlcStatesDir(dir)).toBe(false);
-  });
-
-  it('含无关文件（非 TLC 产物）→ false', async () => {
-    const dir = await makeTmpDir();
-    await fs.writeFile(path.join(dir, 'README.md'), 'not tlc');
-    expect(await isTlcStatesDir(dir)).toBe(false);
-  });
-
-  it('目录不存在 → false', async () => {
-    expect(await isTlcStatesDir(path.join(os.tmpdir(), 'no-such-tlc-dir-xyz'))).toBe(false);
+    // 态 3：目录不存在
+    expect(await isTlcStatesDir(path.join(os.tmpdir(), 'no-such-tlc-dir-xyz')), '目录不存在: 应判定为 false').toBe(
+      false,
+    );
   });
 });
 
 describe('cleanTraceFiles', () => {
-  it('目录无 .tla 文件 → 不删除任何内容（守卫 1）', async () => {
-    const dir = await makeTmpDir();
-    await fs.mkdir(path.join(dir, 'states'));
-    await fs.writeFile(path.join(dir, 'notes.txt'), 'keep');
-    const deleted = await cleanTraceFiles(dir);
-    expect(deleted).toEqual([]);
-    expect((await fs.readdir(dir)).sort()).toEqual(['notes.txt', 'states']);
-  });
-
-  it('含 .tla + states/ 为 TLC 时间戳产物 → 删除 states 与 *.dump/*.out', async () => {
+  it('删除行（含 .tla + states/ 为 TLC 时间戳产物）→ 删除 states 与 *.dump/*.out', async () => {
     const dir = await makeTmpDir();
     await fs.writeFile(path.join(dir, 'L2-AuthService.tla'), 'MODULE L2-AuthService');
     await fs.mkdir(path.join(dir, 'states', '2026-08-05-10-30-00'), { recursive: true });
@@ -88,14 +78,37 @@ describe('cleanTraceFiles', () => {
     expect((await fs.readdir(dir)).includes('L2-AuthService.tla')).toBe(true);
   });
 
-  it('含 .tla + states/ 无 TLC 特征 → 跳过 states 不删，仅删 *.out（守卫 2）', async () => {
-    const dir = await makeTmpDir();
-    await fs.writeFile(path.join(dir, 'L2-AuthService.tla'), 'MODULE L2-AuthService');
-    await fs.mkdir(path.join(dir, 'states'));
-    await fs.writeFile(path.join(dir, 'states', 'business-data.txt'), 'keep');
-    await fs.writeFile(path.join(dir, 'trace.out'), 'x');
-    const deleted = await cleanTraceFiles(dir);
-    expect(deleted).toEqual([path.join(dir, 'trace.out')]);
-    expect(await fs.readdir(path.join(dir, 'states'))).toEqual(['business-data.txt']);
+  it('跳过行（2 态：无 .tla 全不删·守卫 1 / states 无 TLC 特征仅删 *.out·守卫 2）', async () => {
+    for (const { caseName, hasTla, extraFile, statesContent } of [
+      {
+        caseName: '目录无 .tla 文件 → 不删除任何内容（守卫 1）',
+        hasTla: false,
+        extraFile: 'notes.txt',
+        statesContent: [] as string[],
+      },
+      {
+        caseName: '含 .tla + states/ 无 TLC 特征 → 跳过 states 不删，仅删 *.out（守卫 2）',
+        hasTla: true,
+        extraFile: 'trace.out',
+        statesContent: ['business-data.txt'],
+      },
+    ]) {
+      const dir = await makeTmpDir();
+      if (hasTla) {
+        await fs.writeFile(path.join(dir, 'L2-AuthService.tla'), 'MODULE L2-AuthService');
+      }
+      await fs.mkdir(path.join(dir, 'states'));
+      for (const name of statesContent) {
+        await fs.writeFile(path.join(dir, 'states', name), 'keep');
+      }
+      await fs.writeFile(path.join(dir, extraFile), 'keep');
+      const deleted = await cleanTraceFiles(dir);
+      const expectedDeleted = hasTla ? [path.join(dir, 'trace.out')] : [];
+      expect(deleted, `${caseName}: 删除清单契约`).toEqual(expectedDeleted);
+      expect(await fs.readdir(path.join(dir, 'states')), `${caseName}: states/ 内容不应被删除`).toEqual(statesContent);
+      if (!hasTla) {
+        expect((await fs.readdir(dir)).sort(), `${caseName}: 目录其余内容保留`).toEqual([extraFile, 'states'].sort());
+      }
+    }
   });
 });

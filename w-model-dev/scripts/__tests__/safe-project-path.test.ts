@@ -17,13 +17,18 @@ function makeDir(prefix = 'wmodel-safe-project-path-'): string {
   return dir;
 }
 
-function expectRejected(project: string, candidate: string, reason: SafeProjectPathError['reason']): void {
+function expectRejected(
+  project: string,
+  candidate: string,
+  reason: SafeProjectPathError['reason'],
+  label = candidate,
+): void {
   try {
     resolveProjectRelativeRegularFile(project, candidate);
     throw new Error(`expected ${JSON.stringify(candidate)} to be rejected`);
   } catch (error) {
-    expect(error).toBeInstanceOf(SafeProjectPathError);
-    expect((error as SafeProjectPathError).reason).toBe(reason);
+    expect(error, `${label}: 应抛 SafeProjectPathError`).toBeInstanceOf(SafeProjectPathError);
+    expect((error as SafeProjectPathError).reason, `${label}: 结构化原因应为 ${reason}`).toBe(reason);
   }
 }
 
@@ -46,15 +51,17 @@ afterEach(() => {
 });
 
 describe('resolveProjectRelativeRegularFile', () => {
-  it.each([
-    ['C:\\outside.txt', 'absolute'],
-    ['\\\\server\\share\\x', 'absolute'],
-    ['/tmp/x', 'absolute'],
-    ['../outside', 'invalid-segment'],
-    ['a\\b', 'invalid-segment'],
-    ['nul\u0000path', 'invalid-segment'],
-  ] as const)('拒绝 %j 并保留结构化原因 %s', (candidate, reason) => {
-    expectRejected(makeDir(), candidate, reason);
+  it('拒绝矩阵（6 路径：绝对路径×3 / 非法段×3）并保留结构化原因', () => {
+    for (const [candidate, reason] of [
+      ['C:\\outside.txt', 'absolute'],
+      ['\\\\server\\share\\x', 'absolute'],
+      ['/tmp/x', 'absolute'],
+      ['../outside', 'invalid-segment'],
+      ['a\\b', 'invalid-segment'],
+      ['nul\u0000path', 'invalid-segment'],
+    ] as const) {
+      expectRejected(makeDir(), candidate, reason);
+    }
   });
 
   it('项目内普通文件返回规范绝对路径', () => {

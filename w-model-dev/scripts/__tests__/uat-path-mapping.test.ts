@@ -45,25 +45,6 @@ describe('parseUatPathMappingFromContent', () => {
       { uatId: 'UAT-002', actualPath: 'GET /api/articles/:id', mappingType: '等价' },
     ]);
   });
-
-  it('单元格数 <4 的畸形行 → violation（不静默跳行）', () => {
-    const content = `| UAT ID | a | b | c |\n|---|---|---|---|\n| UAT-003 | x | y |\n`;
-    const r = parseUatPathMappingFromContent(content);
-    expect(r.violations.some((v) => v.includes('畸形') && v.includes('单元格数 3'))).toBe(true);
-    expect(r.rows).toHaveLength(0);
-  });
-
-  it('前 4 列含空单元格 → violation', () => {
-    const content = `| UAT ID | a | b | c | d |\n|---|---|---|---|---|\n| UAT-004 | | y | 直接 | z |\n`;
-    const r = parseUatPathMappingFromContent(content);
-    expect(r.violations.some((v) => v.includes('含空单元格'))).toBe(true);
-    expect(r.rows).toHaveLength(0);
-  });
-
-  it('非空但无有效映射行 → 「无有效映射行」violation', () => {
-    const r = parseUatPathMappingFromContent('# 只有标题，无表格数据');
-    expect(r.violations).toEqual(['uat-path-mapping 无有效映射行']);
-  });
 });
 
 describe('checkUatPathMappingContent', () => {
@@ -71,44 +52,91 @@ describe('checkUatPathMappingContent', () => {
     expect(checkUatPathMappingContent(VALID_TABLE)).toHaveLength(0);
   });
 
-  it('actualPath 为待回填占位符 → 「未回填」violation', () => {
-    const content = '| UAT ID | a | b | c | d |\n|---|---|---|---|---|\n| UAT-005 | x | _待阶段5回填_ | 直接 | z |';
-    const v = checkUatPathMappingContent(content);
-    expect(v.some((m) => m.includes('未回填') && m.includes('UAT-005'))).toBe(true);
-  });
-
-  it('mappingType 非法 → violation 且含合法值提示', () => {
-    const content = '| UAT ID | a | b | c | d |\n|---|---|---|---|---|\n| UAT-006 | x | y | 错误 | z |';
-    const v = checkUatPathMappingContent(content);
-    expect(
-      v.some((m) => m.includes('mappingType 非法') && m.includes('UAT-006') && m.includes('["直接", "等价", "替代"]')),
-    ).toBe(true);
+  it('UAT 映射违规矩阵（5 态：畸形行 / 空单元格 / 无有效映射行 / 未回填占位符 / 非法 mappingType）', () => {
+    for (const { caseName, kind, content, marker, expectRowsEmpty } of [
+      {
+        caseName: '单元格数 <4 的畸形行（不静默跳行）',
+        kind: 'parse' as const,
+        content: '| UAT ID | a | b | c |\n|---|---|---|---|\n| UAT-003 | x | y |\n',
+        marker: (v: readonly string[]): boolean => v.some((x) => x.includes('畸形') && x.includes('单元格数 3')),
+        expectRowsEmpty: true,
+      },
+      {
+        caseName: '前 4 列含空单元格',
+        kind: 'parse' as const,
+        content: '| UAT ID | a | b | c | d |\n|---|---|---|---|---|\n| UAT-004 | | y | 直接 | z |\n',
+        marker: (v: readonly string[]): boolean => v.some((x) => x.includes('含空单元格')),
+        expectRowsEmpty: true,
+      },
+      {
+        caseName: '非空但无有效映射行',
+        kind: 'parse' as const,
+        content: '# 只有标题，无表格数据',
+        marker: (v: readonly string[]): boolean => v.length === 1 && v[0] === 'uat-path-mapping 无有效映射行',
+        expectRowsEmpty: false,
+      },
+      {
+        caseName: 'actualPath 为待回填占位符（未回填）',
+        kind: 'check' as const,
+        content: '| UAT ID | a | b | c | d |\n|---|---|---|---|---|\n| UAT-005 | x | _待阶段5回填_ | 直接 | z |',
+        marker: (v: readonly string[]): boolean => v.some((m) => m.includes('未回填') && m.includes('UAT-005')),
+        expectRowsEmpty: false,
+      },
+      {
+        caseName: 'mappingType 非法（含合法值提示）',
+        kind: 'check' as const,
+        content: '| UAT ID | a | b | c | d |\n|---|---|---|---|---|\n| UAT-006 | x | y | 错误 | z |',
+        marker: (v: readonly string[]): boolean =>
+          v.some(
+            (m) => m.includes('mappingType 非法') && m.includes('UAT-006') && m.includes('["直接", "等价", "替代"]'),
+          ),
+        expectRowsEmpty: false,
+      },
+    ]) {
+      if (kind === 'parse') {
+        const r = parseUatPathMappingFromContent(content);
+        expect(marker(r.violations), `${caseName}: 应具名报违规`).toBe(true);
+        if (expectRowsEmpty) {
+          expect(r.rows, `${caseName}: 不应产生 rows`).toHaveLength(0);
+        }
+      } else {
+        const v = checkUatPathMappingContent(content);
+        expect(marker(v), `${caseName}: 应具名报违规`).toBe(true);
+      }
+    }
   });
 });
 
 describe('collectUatMappingViolations', () => {
-  it('phase=1 且 docs/uat-path-mapping.md 不存在 → P0-1 存在性 violation', async () => {
-    const v = await collectUatMappingViolations(tmpDir, 1);
-    expect(v.some((m) => m.includes('P0-1 校验失败') && m.includes('不存在'))).toBe(true);
+  it('违规行（2 态：phase=1 存在性缺失 / phase=5 文件缺失）', async () => {
+    for (const { caseName, phase, marker } of [
+      {
+        caseName: 'phase=1 且 docs/uat-path-mapping.md 不存在（P0-1 存在性）',
+        phase: 1,
+        marker: (v: readonly string[]): boolean => v.some((m) => m.includes('P0-1 校验失败') && m.includes('不存在')),
+      },
+      {
+        caseName: 'phase=5 文件缺失（不存在或无法读取）',
+        phase: 5,
+        marker: (v: readonly string[]): boolean =>
+          v.some((m) => m.includes('P0-1 校验失败') && m.includes('不存在或无法读取')),
+      },
+    ] as const) {
+      const v = await collectUatMappingViolations(tmpDir, phase);
+      expect(marker(v), `${caseName}: 应具名报违规`).toBe(true);
+    }
   });
 
-  it('phase=1 且文件存在 → 零 violation（存在性校验）', async () => {
-    await fs.mkdir(path.join(tmpDir, 'docs'), { recursive: true });
-    await fs.writeFile(path.join(tmpDir, 'docs', 'uat-path-mapping.md'), VALID_TABLE, 'utf-8');
-    const v = await collectUatMappingViolations(tmpDir, 1);
-    expect(v).toHaveLength(0);
-  });
-
-  it('phase=5 读取并回填校验（合法内容 → 零 violation）', async () => {
-    await fs.mkdir(path.join(tmpDir, 'docs'), { recursive: true });
-    await fs.writeFile(path.join(tmpDir, 'docs', 'uat-path-mapping.md'), VALID_TABLE, 'utf-8');
-    const v = await collectUatMappingViolations(tmpDir, 5);
-    expect(v).toHaveLength(0);
-  });
-
-  it('phase=5 文件缺失 → 「不存在或无法读取」violation', async () => {
-    const v = await collectUatMappingViolations(tmpDir, 5);
-    expect(v.some((m) => m.includes('P0-1 校验失败') && m.includes('不存在或无法读取'))).toBe(true);
+  it('通过行（2 态：phase=1 存在性通过 / phase=5 回填校验通过）', async () => {
+    for (const { caseName, phase } of [
+      { caseName: 'phase=1 且文件存在（存在性校验）', phase: 1 },
+      { caseName: 'phase=5 读取并回填校验（合法内容）', phase: 5 },
+    ] as const) {
+      await fs.mkdir(path.join(tmpDir, 'docs'), { recursive: true });
+      await fs.writeFile(path.join(tmpDir, 'docs', 'uat-path-mapping.md'), VALID_TABLE, 'utf-8');
+      const v = await collectUatMappingViolations(tmpDir, phase);
+      expect(v, `${caseName}: 应零 violation`).toHaveLength(0);
+    }
   });
 
   it('终检（phaseOption=undefined）同样走回填校验', async () => {
