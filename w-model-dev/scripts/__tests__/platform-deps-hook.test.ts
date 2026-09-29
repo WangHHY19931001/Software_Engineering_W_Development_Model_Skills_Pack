@@ -1224,15 +1224,9 @@ describe('pre-push audit skip boundary', () => {
     expect(source).not.toMatch(/ensure-platform-deps\.sh[^\n]*--install/);
   });
 
-  it('skips an explicit transient audit failure（6 形态：network/unsupported/socket-hangup/http-503/errno-network/e5xx-code）', async () => {
-    for (const auditCase of [
-      'network',
-      'unsupported',
-      'socket-hangup',
-      'http-503',
-      'errno-network',
-      'e5xx-code',
-    ] as const) {
+  // 2026-09-28 Wave 5/T2 收敛：http-503 / e5xx-code 的可跳过分支撤销，迁移到下方 blocking 形态组。
+  it('skips an explicit transient audit failure（4 形态：network/unsupported/socket-hangup/errno-network）', async () => {
+    for (const auditCase of ['network', 'unsupported', 'socket-hangup', 'errno-network'] as const) {
       const result = await simulatedPrePushAudit(auditCase);
 
       expect(result.code, `auditCase=${auditCase} 应跳过（不阻断）\n${result.stdout}\n${result.stderr}`).toBe(0);
@@ -1240,7 +1234,7 @@ describe('pre-push audit skip boundary', () => {
     }
   }, 180_000);
 
-  it('blocks an audit non-transient failure（7 形态：network-text/networking/endpoint/mixed-error/vulnerability/json/permission）', async () => {
+  it('blocks an audit non-transient failure（9 形态：network-text/networking/endpoint/mixed-error/vulnerability/json/permission/http-503/e5xx-code）', async () => {
     for (const auditCase of [
       'network-text',
       'networking',
@@ -1249,6 +1243,9 @@ describe('pre-push audit skip boundary', () => {
       'vulnerability',
       'json',
       'permission',
+      // T2 收敛：5xx 形态（状态文本 / errno 码）不再可跳过，fail-closed 阻断
+      'http-503',
+      'e5xx-code',
     ] as const) {
       const result = await simulatedPrePushAudit(auditCase);
 
@@ -1259,7 +1256,9 @@ describe('pre-push audit skip boundary', () => {
   }, 180_000);
 
   // 20 行表驱动边界样例（review2-fixes task 5 建库 18 行 + audit-fixes task 7
-  // F-G5-01 增 2 行）：每行 = 一段假想 npm audit 输出 + 期望
+  // F-G5-01 增 2 行；2026-09-28 Wave 5/T2 收敛：e404-registry-advisories /
+  // request-failed-503 / registry-502-bad-gateway 期望翻转为 blocking——可跳过面
+  // 收敛为枚举短表，未识别一律 fail-closed）：每行 = 一段假想 npm audit 输出 + 期望
   // can_skip。skip 行与 blocking 行 mock 退出码同为 1——只有 audit_can_skip 的正则判定
   // 决定走「跳过（不阻断）」还是阻断，端到端经 pre-push 全 hook 验证（复用既有 mock 通道）。
   interface AuditBoundaryRow {
@@ -1286,11 +1285,11 @@ describe('pre-push audit skip boundary', () => {
       auditCase: 'npm7-warn-audit-network',
       expectSkip: true,
     },
-    // H2：E404 仅在 registry/advisories 上下文跳过
+    // H2 → T2 收敛：registry/advisories 上下文 404 分支撤销，与裸 code E404 同为 fail-closed 阻断
     {
-      label: 'npm error 404 Not Found - GET .../security/advisories → skip (H2)',
+      label: 'npm error 404 Not Found - GET .../security/advisories → blocking (T2)',
       auditCase: 'e404-registry-advisories',
-      expectSkip: true,
+      expectSkip: false,
     },
     // H2 保守面：裸 code E404（无 registry/advisories 上下文）保持阻断
     {
@@ -1298,21 +1297,22 @@ describe('pre-push audit skip boundary', () => {
       auditCase: 'bare-e404',
       expectSkip: false,
     },
-    // H3：状态词无 network/registry/request 同行锚定 → 保持阻断
+    // H3 → T2 收敛：状态词不再可跳过（原「同行 network/registry/request 锚定可跳过」分支撤销），裸状态词保持阻断
     {
-      label: 'Service Unavailable status word, unanchored → blocking (H3)',
+      label: 'Service Unavailable status word, unanchored → blocking (T2)',
       auditCase: 'status-word-unanchored',
       expectSkip: false,
     },
+    // T2 收敛：5xx 状态词（有无 registry 前缀均同）不再可跳过，fail-closed 阻断
     {
-      label: 'npm error request failed: 503 Service Unavailable → skip',
+      label: 'npm error request failed: 503 Service Unavailable → blocking (T2)',
       auditCase: 'request-failed-503',
-      expectSkip: true,
+      expectSkip: false,
     },
     {
-      label: 'npm error registry request failed: 502 Bad Gateway → skip',
+      label: 'npm error registry request failed: 502 Bad Gateway → blocking (T2)',
       auditCase: 'registry-502-bad-gateway',
-      expectSkip: true,
+      expectSkip: false,
     },
     // blocking 优先不变量：漏洞信号在场时永不 skip
     {

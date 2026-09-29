@@ -312,18 +312,17 @@ audit_has_blocking_signal() {
     "$tmp_log"
 }
 
-# 判定锚定在 npm 自身的 error/warn/err! 前缀行；词面 network 只识别前缀紧邻处或
-# `npm warn audit network`（npm7 形态，防 network-text/networking 等无关文本放宽）。
-# 可确证的网络层信号允许出现在该行任意位置：网络错误码（code/errno 形态，含 HTTP
-# 5xx/429 码）、socket hang up、'reason: getaddrinfo/connect <E码>'、5xx/429 响应文本、
-# registry/advisories 上下文中的 404（裸 E404 不跳），以及带 network/registry/request
-# 同行锚定的状态词（裸状态词不跳，防 HTML 错误页正文误放行）。
+# 2026-09-28 Wave 5/T2 收敛：仅识别 npm 自身前缀行上的明确网络层信号（错误码枚举 /
+# network 词面 / socket hang up / audit endpoint 不支持 / registry 连通性说明）。
+# 原复合正则的「状态词须同行锚定」「registry 上下文 404」等分支撤销——收敛只缩小
+# 可跳过面（未识别一律 fail-closed 阻断），不放宽任何放行；撤销分支所防的
+# 「HTML 错误页正文误放行」由「必须 npm error/warn/err! 前缀行首」这一前提独立覆盖。
 audit_can_skip() {
   if audit_has_blocking_signal; then
     return 1
   fi
   grep -qiE \
-    '^npm (error|warn|err!)[[:space:]]+((code|errno)[[:space:]]+(ENOTFOUND|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|ECONNRESET|ENOTSUP|ENOAUDIT|E429|E5[0-9]{2})|404[[:space:]]+Not[[:space:]]+Found[[:space:]]+-[[:space:]]+GET[[:space:]]+[^[:space:]]*(registry|advisories)|(audit[[:space:]]+)?network([[:space:]:]|$)|problem related to network connectivity|NOT_IMPLEMENTED|registry[[:space:]]+[^[:space:]]+[[:space:]]+does not support audit endpoint|does not support audit endpoint|.*(socket hang up|reason: (getaddrinfo|connect)[[:space:]]+E[A-Z0-9]+|(429|5[0-9]{2})([[:space:]]+|-)(Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error|Too Many Requests)|((network|registry|request).*[^[:alnum:]_](Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error)([^[:alnum:]_]|$)|(.*[^[:alnum:]_])?(Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error)([^[:alnum:]_]|$).*(network|registry|request))))' \
+    '^npm (error|warn|err!)[[:space:]]+((code|errno)[[:space:]]+(ENOTFOUND|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|ECONNRESET|ENOTSUP|ENOAUDIT|E429)|(audit[[:space:]]+)?network([[:space:]:]|$)|problem related to network|NOT_IMPLEMENTED|does not support audit endpoint|.*socket hang up)' \
     "$tmp_log"
 }
 
@@ -462,13 +461,14 @@ par_expect 12 "vitest 单元测试 + coverage 采集通过" 0 \
 #     （Wave 4 三车道：本项为 L3 尾车道，实际执行见文末「L3 尾车道」段——依赖第 12 项产物）
 
 # 14. npm audit：依赖漏洞扫描（high 以上阻断；仅明确网络不可达或 registry 不支持 endpoint 时跳过）
-#     skip 只接受 npm 明确前缀的网络错误、明确错误码，或明确 audit endpoint unsupported 信号；
-#     瞬态网络错误信号扩展（registry 服务端瞬态：socket hang up / 5xx / errno 形态网络错误码）
-#     同样可跳过；npm7 形态 `npm warn audit network ...` 亦属网络信号（network 词面前允许
-#     audit 前缀）。E404 仅在 registry/advisories 上下文（`404 Not Found - GET …registry|
-#     advisories`）跳过，裸 `code E404` 保持阻断；状态词（Bad Gateway 等）须同行含
-#     network/registry/request 锚定，裸状态词保持阻断。任意漏洞报告、JSON 解析、权限/配置
-#     错误都 fail-closed，不因文本中出现 network 而放行。
+#     skip 判定为枚举短表（2026-09-28 Wave 5/T2 收敛，详见 audit_can_skip 注释）：仅识别
+#     npm error/warn/err! 前缀行上的网络错误码枚举（ENOTFOUND/ETIMEDOUT/ECONNREFUSED/
+#     EAI_AGAIN/ENETUNREACH/EHOSTUNREACH/ECONNRESET/ENOTSUP/ENOAUDIT/E429）、network 词面
+#     （npm7 形态 `npm warn audit network` 亦识别）、problem related to network、
+#     NOT_IMPLEMENTED、does not support audit endpoint、socket hang up；原「registry 上下文
+#     404」「状态词同行 network/registry/request 锚定」「5xx errno/状态文本」等分支已撤销——
+#     未识别一律 fail-closed 阻断（裸 code E404、裸状态词保持阻断）。任意漏洞报告、JSON
+#     解析、权限/配置错误都 fail-closed，不因文本中出现 network 而放行。
 par_expect 14 "npm audit 依赖漏洞扫描（high 以上阻断）" 0 item14_audit
 
 # 15. check-docs-consistency：活体文档一致性门禁（复用第 12 项 vitest JSON 用例数，不二次全量 vitest）
