@@ -50,8 +50,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     file: 'cli/check-docs-consistency.ts',
     anchor: "const status = runSync('git', ['status', '--porcelain'], { cwd: root, timeout: 15_000 });",
     symbol: 'detectScriptsChanges',
-    reason:
-      'B3 migrated git status probe through runSync; retained as audit provenance with a 15-second timeout.（行号 2026-09-04 archival-fixes 随 diff 调用多行化下移 3 行）',
+    reason: 'B3 migrated git status probe through runSync; retained as audit provenance with a 15-second timeout.',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
@@ -60,8 +59,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     file: 'cli/check-docs-consistency.ts',
     anchor: "const result = runSync('git', ['rev-parse', 'HEAD'], { cwd: root, timeout: 15_000 });",
     symbol: 'currentCommitSha',
-    reason:
-      'B3 migrated the bounded git HEAD probe through runSync; retained as audit provenance.（行号 2026-09-06 audit-fixes task 5 随 ERROR_JSON detail 脱敏 helper 新增下移 17 行）',
+    reason: 'B3 migrated the bounded git HEAD probe through runSync; retained as audit provenance.',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
@@ -71,7 +69,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     anchor: 'runSync(process.execPath, [vitestBin, ...vitestArgs], {',
     symbol: 'collectVitestMeasurements',
     reason:
-      'B3 migrated direct Node Vitest execution through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (3600 s) timeout.（行号 2026-09-06 audit-fixes task 9 随 VITEST_SPAWN_TIMEOUT_MS 常量提取下移 7 行；2026-09-14 fileParallelism 抖动处置随该常量注释扩充再下移 2 行，600s→1800s 同步改值；2026-09-26 全量套件 --reporter=json 实测墙钟 1962s 超过 1800s，常量再调至 3600s）',
+      'B3 migrated direct Node Vitest execution through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (3600 s) timeout. 2026-09-14 fileParallelism 抖动处置 600s→1800s 同步改值；2026-09-26 全量套件 --reporter=json 实测墙钟 1962s 超过 1800s，常量再调至 3600s。',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
@@ -81,7 +79,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     anchor: 'runSync(`npx vitest ${vitestArgs.map((a) => (/[ "&=]/.test(a) ? `"${a}"` : a)).join(\' \')}`, [], {',
     symbol: 'collectVitestMeasurements',
     reason:
-      'B3 migrated the shell Vitest fallback through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (3600 s) timeout.（行号 2026-09-06 audit-fixes task 9 同上顺延；2026-09-14 同上再下移 2 行；2026-09-26 随实测墙钟 1962s 与宿主同源常量一并调至 3600s）',
+      'B3 migrated the shell Vitest fallback through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (3600 s) timeout. 2026-09-26 随实测墙钟 1962s 与宿主同源常量一并调至 3600s。',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
@@ -90,8 +88,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     file: 'cli/check-tla-model.ts',
     anchor: "const res = runSync('java', ['-version'], {",
     symbol: 'checkEnvironment',
-    reason:
-      'B3 migrated the Java environment probe through runSync with EXEC_LIMITS.shortTimeoutMs.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 6 行）',
+    reason: 'B3 migrated the Java environment probe through runSync with EXEC_LIMITS.shortTimeoutMs.',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
@@ -100,8 +97,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     file: 'cli/check-tla-model.ts',
     anchor: "const res = runSync('java', ['-version'], {",
     symbol: 'main',
-    reason:
-      'B3 migrated the preflight Java probe through runSync with EXEC_LIMITS.shortTimeoutMs.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧下移 7 行）',
+    reason: 'B3 migrated the preflight Java probe through runSync with EXEC_LIMITS.shortTimeoutMs.',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
@@ -119,8 +115,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     file: 'cli/check-tla-model.ts',
     anchor: "const stdout = execFileSync('java', ['-cp', jarAbs, 'tla2sany.SANY', tlaAbs], {",
     symbol: 'runTools',
-    reason:
-      'B4 excludes check-tla-model; SANY uses a command-specific bounded timeout and SIGKILL.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 6 行）',
+    reason: 'B4 excludes check-tla-model; SANY uses a command-specific bounded timeout and SIGKILL.',
     timeout: { required: true, status: 'present' },
   },
   {
@@ -128,8 +123,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     file: 'cli/check-tla-model.ts',
     anchor: 'const stdout = execFileSync(',
     symbol: 'runTools',
-    reason:
-      'B4 excludes check-tla-model; TLC uses a command-specific bounded timeout and SIGKILL.（行号 2026-09-06 audit-fixes 随 D3 参数解析收紧上移 6 行）',
+    reason: 'B4 excludes check-tla-model; TLC uses a command-specific bounded timeout and SIGKILL.',
     timeout: { required: true, status: 'present' },
   },
   // 2026-09-21 修复轮 1（评审裁定 2）：`cli/ensure-codegraph.ts` 的两条 execFileSync 台账随受控
@@ -155,7 +149,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     anchor: 'const result = spawnSync(',
     symbol: 'toBashPath wslpath/cygpath probe',
     reason:
-      'Convert a Windows path to the running Bash form via wslpath/cygpath when the fixture runs on win32; explicit 15-second timeout.（行号 2026-09-18 任务3-B 计数用例顺延 +2 行）',
+      'Convert a Windows path to the running Bash form via wslpath/cygpath when the fixture runs on win32; explicit 15-second timeout.',
     timeout: { required: true, status: 'present' },
   },
   {
@@ -163,8 +157,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     file: '__tests__/docs-consistency-logic.test.ts',
     anchor: "const gitInit = spawnSync('git', ['init'], { cwd: fixtureRoot, encoding: 'utf-8', timeout: 15_000 });",
     symbol: 'withDocsConsistencyFixture git init',
-    reason:
-      'D5 creates a real temporary Git repository so provenance binds to an actual HEAD.（行号 2026-09-06 audit-fixes task 5 随 metrics 探针 rawErrorJson.detail 断言扩展下移 7 行；2026-09-12 code-health archive CLI 登记 +1 行；2026-09-15 p2b S31 随完整性审计双维度用例新增下移 159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
+    reason: 'D5 creates a real temporary Git repository so provenance binds to an actual HEAD.',
     timeout: { required: true, status: 'present' },
   },
   {
@@ -172,8 +165,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     file: '__tests__/docs-consistency-logic.test.ts',
     anchor: "spawnSync('git', ['config', '--local', 'user.email', 'fixture@example.invalid'], {",
     symbol: 'withDocsConsistencyFixture git config email',
-    reason:
-      'D5 configures the isolated fixture Git identity before creating its commit.（行号 2026-09-06 audit-fixes task 5 同上顺延；2026-09-15 p2b S31 同上顺延 +159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
+    reason: 'D5 configures the isolated fixture Git identity before creating its commit.',
     timeout: { required: true, status: 'present' },
   },
   {
@@ -182,8 +174,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     anchor:
       "spawnSync('git', ['config', '--local', 'user.name', 'fixture'], { cwd: fixtureRoot, timeout: 15_000 }).status,",
     symbol: 'withDocsConsistencyFixture git config name',
-    reason:
-      'D5 configures the isolated fixture Git identity before creating its commit.（行号 2026-09-15 p2b S31 同上顺延 +159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
+    reason: 'D5 configures the isolated fixture Git identity before creating its commit.',
     timeout: { required: true, status: 'present' },
   },
   {
@@ -192,8 +183,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     anchor:
       "spawnSync('git', ['config', '--local', 'commit.gpgSign', 'false'], { cwd: fixtureRoot, timeout: 15_000 }).status,",
     symbol: 'withDocsConsistencyFixture git config gpgSign',
-    reason:
-      'D5 disables inherited signing for the isolated provenance fixture.（行号 2026-09-15 p2b S31 同上顺延 +159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
+    reason: 'D5 disables inherited signing for the isolated provenance fixture.',
     timeout: { required: true, status: 'present' },
   },
   {
@@ -202,8 +192,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     anchor:
       "expect(spawnSync('git', ['add', '.provenance-fixture'], { cwd: fixtureRoot, timeout: 15_000 }).status).toBe(0);",
     symbol: 'withDocsConsistencyFixture git add',
-    reason:
-      'D5 stages the copied fixture before creating its provenance-bound commit.（行号 2026-09-15 p2b S31 同上顺延 +159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
+    reason: 'D5 stages the copied fixture before creating its provenance-bound commit.',
     timeout: { required: true, status: 'present' },
   },
   {
@@ -211,8 +200,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     file: '__tests__/docs-consistency-logic.test.ts',
     anchor: 'const commit = spawnSync(',
     symbol: 'withDocsConsistencyFixture git commit',
-    reason:
-      'D5 creates the real fixture HEAD with isolated hooks/signing/editor settings and a bounded timeout.（行号 2026-09-15 p2b S31 同上顺延 +159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
+    reason: 'D5 creates the real fixture HEAD with isolated hooks/signing/editor settings and a bounded timeout.',
     timeout: { required: true, status: 'present' },
   },
   {
@@ -221,8 +209,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     anchor:
       "const result = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: fixtureRoot, encoding: 'utf-8', timeout: 15_000 });",
     symbol: 'fixtureCommitSha',
-    reason:
-      'D5 reads the isolated fixture HEAD for same-run provenance assertions.（行号 2026-09-15 p2b S31 同上顺延 +159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
+    reason: 'D5 reads the isolated fixture HEAD for same-run provenance assertions.',
     timeout: { required: true, status: 'present' },
   },
   {
@@ -230,8 +217,7 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     file: '__tests__/docs-consistency-logic.test.ts',
     anchor: 'const result = spawnSync(process.execPath, [tsxCli, DOCS_CONSISTENCY_CLI, fixtureRoot, ...args], {',
     symbol: 'runDocsConsistencyCli',
-    reason:
-      'D5 keeps the real docs-consistency CLI boundary test with an explicit bounded timeout for exit-2 probes.（行号 2026-09-15 p2b S31 同上顺延 +159 行；2026-09-18 任务3-B 计数用例顺延 +2 行）',
+    reason: 'D5 keeps the real docs-consistency CLI boundary test with an explicit bounded timeout for exit-2 probes.',
     timeout: { required: true, status: 'present' },
   },
   {

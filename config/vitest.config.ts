@@ -137,6 +137,8 @@ export default {
   // 历史注记：全分母阈值（stmts 75/branch 65/funcs 85/lines 75，基线 2026-08-12）已撤销——
   // v8 provider「被 import 文件必入报告」使全分母混入 cli/ 层（2026-09-17 实测全分母
   // stmts 76.83 距阈值仅 1.8pp，「新增低覆盖 CLI import 即假红」与产品回归无关）。
+  // T6 销账（2026-09-29）：历史观察「全量运行时 exclude 写法实测均不生效（机制未查明）」
+  // 如实保留为历史注记；T1 单口径化后该行为不再相关（强制口径不依赖全分母 exclude）。
   // instrumentation（provider/include/reporter）保留：coverage-final.json 供第 13 项消费。
   coverage: {
     provider: 'v8',
