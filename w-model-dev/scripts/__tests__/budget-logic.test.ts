@@ -119,25 +119,29 @@ describe('checkBudget 逐规则单测', () => {
     expect(r.violations.some((v) => v.startsWith('[schema]'))).toBe(true);
   });
 
-  it('R5 正例：reworkCount 低于阈值 → passed 且无 killSwitch 违规', async () => {
-    const b = await loadBudgetSample('valid.json');
-    const r = checkBudget(b, { reworkCount: 2, tlaReworkCount: 2 });
-    expect(r.passed).toBe(true);
-    expect(r.violations.some((v) => v.includes('killSwitch 应触发'))).toBe(false);
-  });
-
-  it('R5 反例：reworkCount 达 consecutiveReworks 阈值 → killSwitch 应触发违规', async () => {
-    const b = await loadBudgetSample('valid.json');
-    const r = checkBudget(b, { reworkCount: 3 });
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('killSwitch 应触发'))).toBe(true);
-  });
-
-  it('R5 反例：tlaReworkCount 达 tlaReworks 阈值 → killSwitch 应触发违规', async () => {
-    const b = await loadBudgetSample('valid.json');
-    const r = checkBudget(b, { tlaReworkCount: 3 });
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('TLA+ 返工'))).toBe(true);
+  it('R5 killSwitch 路径（3 态：低于阈值不触发 / consecutiveReworks 触发 / tlaReworks 触发）', async () => {
+    const rows: readonly [string, { reworkCount?: number; tlaReworkCount?: number }, boolean, string | null][] = [
+      ['reworkCount 低于阈值', { reworkCount: 2, tlaReworkCount: 2 }, false, null],
+      ['reworkCount 达 consecutiveReworks 阈值', { reworkCount: 3 }, true, 'killSwitch 应触发'],
+      ['tlaReworkCount 达 tlaReworks 阈值', { tlaReworkCount: 3 }, true, 'TLA+ 返工'],
+    ];
+    for (const [name, reworks, expectTrigger, token] of rows) {
+      const b = await loadBudgetSample('valid.json');
+      const r = checkBudget(b, reworks);
+      if (expectTrigger) {
+        expect(r.passed, `${name} 应 fail`).toBe(false);
+        expect(
+          r.violations.some((v) => v.includes(token!)),
+          `${name} 应报 ${token}`,
+        ).toBe(true);
+      } else {
+        expect(r.passed, `${name} 应通过`).toBe(true);
+        expect(
+          r.violations.some((v) => v.includes('killSwitch 应触发')),
+          `${name} 不应报 killSwitch 应触发`,
+        ).toBe(false);
+      }
+    }
   });
 });
 
@@ -219,89 +223,206 @@ describe('R6 用量实效 + R5-b burnRate 预警（D-4b）', () => {
     };
   }
 
-  it('R6：阶段 tokens 超 perPhase.maxTokens → blocking', () => {
-    const r = checkBudget(tinyBudget(), { tokensUsed: { phase: 150, total: 150 } });
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => /R6.*阶段 tokens 150.*maxTokens 100/.test(v))).toBe(true);
+  it('R6/R5-b 触发矩阵（4 态：阶段超限 / 总超限 / burnRate 告警 / 严格>边界）', () => {
+    const rows: readonly [string, { phase: number; total: number }, RegExp | null, RegExp | null, boolean, boolean][] =
+      [
+        [
+          'R6：阶段 tokens 超 perPhase.maxTokens → blocking',
+          { phase: 150, total: 150 },
+          /R6.*阶段 tokens 150.*maxTokens 100/,
+          null,
+          false,
+          true,
+        ],
+        [
+          'R6：总 tokens 超 project.maxTokensTotal → blocking',
+          { phase: 0, total: 1200 },
+          /R6.*总 tokens 1200.*maxTokensTotal 1000/,
+          null,
+          false,
+          true,
+        ],
+        [
+          'R5-b：阶段消耗 ≥ budgetBurnRate × maxTokens → killSwitch 告警（文案前缀 R5-b：，不与既有 R5 文案混同）',
+          { phase: 95, total: 95 },
+          null,
+          /^R5-b：killSwitch 应触发（阶段消耗占比 0\.95 >= budgetBurnRate 0\.9）$/,
+          false,
+          true,
+        ],
+        [
+          'R6 边界：阶段 tokens 恰等于 maxTokens 不报 R6（严格 >），但仍达 burnRate 阈值 → 告警',
+          { phase: 100, total: 100 },
+          null,
+          /^R5-b：killSwitch 应触发（阶段消耗占比/,
+          true,
+          false,
+        ],
+      ];
+    for (const [name, tokensUsed, r6Pattern, r5bPattern, assertNoR6, expectBlocking] of rows) {
+      const r = checkBudget(tinyBudget(), { tokensUsed });
+      if (r6Pattern) {
+        expect(
+          r.violations.some((v) => r6Pattern.test(v)),
+          `${name} 应报 ${r6Pattern}`,
+        ).toBe(true);
+      } else {
+        expect(
+          r.violations.some((v) => r5bPattern!.test(v)),
+          `${name} 应报 R5-b 文案（${r5bPattern}）`,
+        ).toBe(true);
+      }
+      if (assertNoR6) {
+        expect(
+          r.violations.some((v) => /R6/.test(v)),
+          `${name} 不应报 R6（严格 >）`,
+        ).toBe(false);
+      }
+      if (expectBlocking) {
+        expect(r.passed, `${name} 应 blocking`).toBe(false);
+      }
+    }
   });
 
-  it('R6：总 tokens 超 project.maxTokensTotal → blocking', () => {
-    const r = checkBudget(tinyBudget(), { tokensUsed: { phase: 0, total: 1200 } });
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => /R6.*总 tokens 1200.*maxTokensTotal 1000/.test(v))).toBe(true);
+  it('R5/R5-b 文案并存（2 态：R5 逐字不变 / R5 与 R5-b 并存各自可归属）', () => {
+    const rows: readonly [
+      string,
+      { reworkCount: number; tlaReworkCount?: number; tokensUsed?: { phase: number; total: number } },
+      string[],
+      boolean,
+    ][] = [
+      [
+        'R5 既有文案逐字不变（D-4b 只新增 R5-b/R6，不改 R5 返工/TLA 触发文案）',
+        { reworkCount: 3, tlaReworkCount: 3 },
+        ['killSwitch 应触发（返工 3 >= 3）但未告警', 'killSwitch 应触发（TLA+ 返工 3 >= 3）但未告警'],
+        false,
+      ],
+      [
+        'R5（返工）与 R5-b（用量）并存时各自可归属，新增文案不遮蔽既有文案',
+        { reworkCount: 3, tokensUsed: { phase: 95, total: 95 } },
+        ['killSwitch 应触发（返工 3 >= 3）但未告警'],
+        true,
+      ],
+    ];
+    for (const [name, opts, expectedTexts, assertR5bSingle] of rows) {
+      const r = checkBudget(tinyBudget(), opts);
+      for (const text of expectedTexts) {
+        expect(r.violations, `${name} 应含「${text}」`).toContain(text);
+      }
+      if (assertR5bSingle) {
+        expect(
+          r.violations.filter((v) => v.startsWith('R5-b：')),
+          `${name} R5-b 文案应恰 1 条`,
+        ).toHaveLength(1);
+      }
+    }
   });
 
-  it('R5-b：阶段消耗 ≥ budgetBurnRate × maxTokens → killSwitch 告警（文案前缀 R5-b：，不与既有 R5 文案混同）', () => {
-    const r = checkBudget(tinyBudget(), { tokensUsed: { phase: 95, total: 95 } });
-    expect(r.passed).toBe(false);
-    expect(
-      r.violations.some((v) => /^R5-b：killSwitch 应触发（阶段消耗占比 0\.95 >= budgetBurnRate 0\.9）$/.test(v)),
-    ).toBe(true);
+  it('守卫/边界族·不触发行（5 态：未提供 / maxTokens=0-R5b 退化 / NaN / total 边界 / burnRate 缺失）', () => {
+    const rows: readonly [
+      string,
+      ((b: BudgetConfig) => void) | null,
+      { phase: number; total: number } | undefined,
+      RegExp,
+      ((r: ReturnType<typeof checkBudget>) => void) | null,
+    ][] = [
+      [
+        '未提供 tokensUsed → 不触发 R6/R5-b（向后兼容：行为一字不变）',
+        null,
+        undefined,
+        /^R6|^R5-b/,
+        (r) => {
+          expect(r.passed, '未提供 tokensUsed 应通过').toBe(true);
+          expect(
+            r.violations.filter((v) => /R6|阶段消耗占比/.test(v)),
+            '未提供 tokensUsed 不应报 R6/阶段消耗占比',
+          ).toHaveLength(0);
+        },
+      ],
+      [
+        'R5-b：perPhase.maxTokens=0（阈值退化为恒真）→ R5-b 不触发且输出无 Infinity/NaN（正数守卫，R6 照常触发）',
+        (b) => {
+          b.perPhase.maxTokens = 0;
+        },
+        { phase: 5, total: 5 },
+        /^R5-b/,
+        (r) => {
+          expect(
+            r.violations.some((v) => /Infinity|NaN/.test(v)),
+            'maxTokens=0 不应输出 Infinity/NaN',
+          ).toBe(false);
+        },
+      ],
+      [
+        'R6/R5-b：tokensUsed 为 NaN（phase/total 均 NaN）→ 视同未提供：不触发且不抛错（非法输入防御）',
+        null,
+        { phase: Number.NaN, total: Number.NaN },
+        /^R6|^R5-b/,
+        (r) => {
+          expect(r.passed, 'NaN tokensUsed 应视同未提供（passed=true）').toBe(true);
+          // 与「未提供 tokensUsed」逐字段对齐（跳过路径等价：不产生额外 violation，也不新增 warning）
+          expect(r, 'NaN tokensUsed 应与未提供 tokensUsed 结果逐字段等价').toEqual(checkBudget(tinyBudget()));
+        },
+      ],
+      [
+        'R6 边界：total 恰等于 maxTokensTotal → R6 不触发（严格 >，2026-09-22 打磨钉死）',
+        null,
+        { phase: 0, total: 1000 },
+        /^R6|^R5-b/,
+        (r) => {
+          expect(
+            r.violations.some((v) => /^R5-b/.test(v)),
+            'total 边界不应报 R5-b',
+          ).toBe(false);
+        },
+      ],
+      [
+        'R5-b：killSwitch.budgetBurnRate 缺失 → R5-b 不触发（typeof 守卫，不因字段缺失误报）',
+        (b) => {
+          delete (b.killSwitch as Partial<BudgetConfig['killSwitch']>).budgetBurnRate;
+        },
+        { phase: 95, total: 95 },
+        /^R6|^R5-b/,
+        (r) => {
+          expect(
+            r.violations.some((v) => /R6/.test(v)),
+            'burnRate 缺失不应连带报 R6',
+          ).toBe(false);
+        },
+      ],
+    ];
+    for (const [name, mutate, tokensUsed, absentPattern, extra] of rows) {
+      const b = tinyBudget();
+      if (mutate) mutate(b);
+      if (tokensUsed !== undefined && Number.isNaN(tokensUsed.phase)) {
+        expect(() => checkBudget(b, { tokensUsed }), `${name} 不应抛错`).not.toThrow();
+      }
+      const r = checkBudget(b, tokensUsed !== undefined ? { tokensUsed } : {});
+      expect(
+        r.violations.filter((v) => absentPattern.test(v)),
+        `${name} 不应触发（${absentPattern}）`,
+      ).toHaveLength(0);
+      if (extra) extra(r);
+    }
   });
 
-  it('R6 边界：阶段 tokens 恰等于 maxTokens 不报 R6（严格 >），但仍达 burnRate 阈值 → 告警', () => {
-    const r = checkBudget(tinyBudget(), { tokensUsed: { phase: 100, total: 100 } });
-    expect(r.violations.some((v) => /R6/.test(v))).toBe(false);
-    expect(r.violations.some((v) => /^R5-b：killSwitch 应触发（阶段消耗占比/.test(v))).toBe(true);
-  });
-
-  it('R5 既有文案逐字不变（D-4b 只新增 R5-b/R6，不改 R5 返工/TLA 触发文案）', () => {
-    const r = checkBudget(tinyBudget(), { reworkCount: 3, tlaReworkCount: 3 });
-    expect(r.violations).toContain('killSwitch 应触发（返工 3 >= 3）但未告警');
-    expect(r.violations).toContain('killSwitch 应触发（TLA+ 返工 3 >= 3）但未告警');
-  });
-
-  it('R5（返工）与 R5-b（用量）并存时各自可归属，新增文案不遮蔽既有文案', () => {
-    const r = checkBudget(tinyBudget(), { reworkCount: 3, tokensUsed: { phase: 95, total: 95 } });
-    expect(r.violations).toContain('killSwitch 应触发（返工 3 >= 3）但未告警');
-    expect(r.violations.filter((v) => v.startsWith('R5-b：'))).toHaveLength(1);
-  });
-
-  it('未提供 tokensUsed → 不触发 R6/R5-b（向后兼容：行为一字不变）', () => {
-    const r = checkBudget(tinyBudget());
-    expect(r.passed).toBe(true);
-    expect(r.violations.filter((v) => /R6|阶段消耗占比/.test(v))).toHaveLength(0);
-  });
-
-  it('R6：perPhase.maxTokens=0 → 仍触发但文案省略百分比段（不含 NaN/Infinity，除零守卫，2026-09-22 打磨）', () => {
+  it('守卫/边界族·触发行（1 态：perPhase.maxTokens=0 仍触发 R6 但文案省略百分比段）', () => {
     const b = tinyBudget();
     b.perPhase.maxTokens = 0;
     const r = checkBudget(b, { tokensUsed: { phase: 5, total: 5 } });
     const r6 = r.violations.filter((v) => v.startsWith('R6'));
-    expect(r6.some((v) => v.includes('阶段 tokens 5 > perPhase.maxTokens 0'))).toBe(true);
-    expect(r6.some((v) => /NaN|Infinity/.test(v))).toBe(false);
-    expect(r6.some((v) => v.includes('%'))).toBe(false);
-  });
-
-  it('R5-b：perPhase.maxTokens=0（阈值退化为恒真）→ R5-b 不触发且输出无 Infinity/NaN（正数守卫，控制者裁定补修）', () => {
-    const b = tinyBudget();
-    b.perPhase.maxTokens = 0;
-    const r = checkBudget(b, { tokensUsed: { phase: 5, total: 5 } });
-    expect(r.violations.some((v) => v.startsWith('R5-b'))).toBe(false);
-    expect(r.violations.some((v) => /Infinity|NaN/.test(v))).toBe(false);
-  });
-
-  it('R6/R5-b：tokensUsed 为 NaN（phase/total 均 NaN）→ 视同未提供：不触发且不抛错（非法输入防御，2026-09-22 打磨）', () => {
-    expect(() => checkBudget(tinyBudget(), { tokensUsed: { phase: Number.NaN, total: Number.NaN } })).not.toThrow();
-    const r = checkBudget(tinyBudget(), { tokensUsed: { phase: Number.NaN, total: Number.NaN } });
-    expect(r.passed).toBe(true);
-    expect(r.violations.filter((v) => /^R6|^R5-b/.test(v))).toHaveLength(0);
-    // 与「未提供 tokensUsed」逐字段对齐（跳过路径等价：不产生额外 violation，也不新增 warning）
-    expect(r).toEqual(checkBudget(tinyBudget()));
-  });
-
-  it('R6 边界：total 恰等于 maxTokensTotal → R6 不触发（严格 >，2026-09-22 打磨钉死）', () => {
-    const r = checkBudget(tinyBudget(), { tokensUsed: { phase: 0, total: 1000 } });
-    expect(r.violations.some((v) => /R6/.test(v))).toBe(false);
-    expect(r.violations.some((v) => /^R5-b/.test(v))).toBe(false);
-  });
-
-  it('R5-b：killSwitch.budgetBurnRate 缺失 → R5-b 不触发（typeof 守卫，不因字段缺失误报，2026-09-22 打磨钉死）', () => {
-    const b = tinyBudget();
-    delete (b.killSwitch as Partial<BudgetConfig['killSwitch']>).budgetBurnRate;
-    const r = checkBudget(b, { tokensUsed: { phase: 95, total: 95 } });
-    expect(r.violations.some((v) => v.startsWith('R5-b'))).toBe(false);
-    expect(r.violations.some((v) => /R6/.test(v))).toBe(false);
+    expect(
+      r6.some((v) => v.includes('阶段 tokens 5 > perPhase.maxTokens 0')),
+      'maxTokens=0 应触发 R6 超限文案',
+    ).toBe(true);
+    expect(
+      r6.some((v) => /NaN|Infinity/.test(v)),
+      'R6 文案不应含 NaN/Infinity（除零守卫）',
+    ).toBe(false);
+    expect(
+      r6.some((v) => v.includes('%')),
+      'R6 文案应省略百分比段（除零守卫）',
+    ).toBe(false);
   });
 });
 
@@ -362,133 +483,135 @@ describe('countSuspectedDuplicateGroups 疑似重复归账分组口径（N-6，G
     ...patch,
   });
 
-  it('同 (timestamp, tokens, duration_s) 两条 → 1 组', () => {
-    expect(countSuspectedDuplicateGroups([dup({ runId: 'a' }), dup({ runId: 'b' })])).toBe(1);
+  it('分组基本口径（4 态：两条 / 三条 / 三向分量不同 / 双键累计）', () => {
+    const rows: readonly [string, Record<string, unknown>[], number][] = [
+      ['同 (timestamp, tokens, duration_s) 两条', [{ runId: 'a' }, { runId: 'b' }], 1],
+      ['同键三条 → 仍计 1 组（组数 ≠ 条数）', [{ runId: 'a' }, { runId: 'b' }, { runId: 'c' }], 1],
+      [
+        '键的任一分量不同即不同组（timestamp / tokens / duration_s 三向）',
+        [
+          { runId: 'a' },
+          { runId: 'b', timestamp: '2026-09-20T00:00:00.001Z' },
+          { runId: 'c', tokens: 101 },
+          { runId: 'd', duration_s: 6 },
+        ],
+        0,
+      ],
+      [
+        '两个不同键各重复两条 → 2 组（组数逐键累计）',
+        [{ runId: 'a' }, { runId: 'b' }, { runId: 'c', tokens: 200 }, { runId: 'd', tokens: 200 }],
+        2,
+      ],
+    ];
+    for (const [name, patches, expected] of rows) {
+      expect(countSuspectedDuplicateGroups(patches.map((patch) => dup(patch))), `${name} 应计 ${expected} 组`).toBe(
+        expected,
+      );
+    }
   });
 
-  it('同键三条 → 仍计 1 组（组数 ≠ 条数）', () => {
-    expect(countSuspectedDuplicateGroups([dup({ runId: 'a' }), dup({ runId: 'b' }), dup({ runId: 'c' })])).toBe(1);
+  it('【任务 8（G3-7）键守卫】坏键不计组（5 态：tokens=0 / 缺 duration_s / duration_s 非 number / 坏 timestamp / 坏 tokens）', () => {
+    const rows: readonly [string, Record<string, unknown>[]][] = [
+      // 守卫前：tokens=0 通过「有限非负数」判据并入组；G3-7 要求 tokens 须为有限正数 → 噪声键不入组。
+      [
+        'tokens: 0 不计组（键守卫：须有限正数）',
+        [
+          { runId: 'a', tokens: 0 },
+          { runId: 'b', tokens: 0 },
+        ],
+      ],
+      // 守卫前：键取 String(undefined)='undefined'，两条同形记录并为一组；G3-7 要求 duration_s 须为 number。
+      [
+        'duration_s 缺字段不计组（键守卫：须为 number）',
+        [
+          { runId: 'a', duration_s: undefined },
+          { runId: 'b', duration_s: undefined },
+        ],
+      ],
+      [
+        'duration_s 非 number（字符串 / null）亦不计组（键守卫生效面与缺字段同口径）',
+        [
+          { runId: 'a', duration_s: '5' },
+          { runId: 'b', duration_s: '5' },
+          { runId: 'c', duration_s: null },
+          { runId: 'd', duration_s: null },
+        ],
+      ],
+      [
+        '缺 timestamp / 非字符串 timestamp 不计组（既有判据，任务 8 不变）',
+        [
+          { runId: 'a', timestamp: undefined },
+          { runId: 'b', timestamp: undefined },
+          { runId: 'c', timestamp: '' },
+          { runId: 'd', timestamp: '' },
+          { runId: 'e', timestamp: 123 },
+          { runId: 'f', timestamp: 123 },
+        ],
+      ],
+      [
+        '坏 tokens（负数 / NaN / Infinity / 字符串 / 缺字段）不计组（与 sumTokens 的「有限非负」口径在此故意不同）',
+        [
+          { runId: 'a', tokens: -1 },
+          { runId: 'b', tokens: -1 },
+          { runId: 'c', tokens: Number.NaN },
+          { runId: 'd', tokens: Number.NaN },
+          { runId: 'e', tokens: Number.POSITIVE_INFINITY },
+          { runId: 'f', tokens: Number.POSITIVE_INFINITY },
+          { runId: 'g', tokens: '100' },
+          { runId: 'h', tokens: '100' },
+          { runId: 'i', tokens: undefined },
+          { runId: 'j', tokens: undefined },
+        ],
+      ],
+    ];
+    for (const [name, patches] of rows) {
+      expect(countSuspectedDuplicateGroups(patches.map((patch) => dup(patch))), `${name} 应计 0 组`).toBe(0);
+    }
   });
 
-  it('键的任一分量不同即不同组（timestamp / tokens / duration_s 三向）→ 0 组', () => {
-    expect(
-      countSuspectedDuplicateGroups([
-        dup({ runId: 'a' }),
-        dup({ runId: 'b', timestamp: '2026-09-20T00:00:00.001Z' }),
-        dup({ runId: 'c', tokens: 101 }),
-        dup({ runId: 'd', duration_s: 6 }),
-      ]),
-    ).toBe(0);
-  });
-
-  it('两个不同键各重复两条 → 2 组（组数逐键累计）', () => {
-    expect(
-      countSuspectedDuplicateGroups([
-        dup({ runId: 'a' }),
-        dup({ runId: 'b' }),
-        dup({ runId: 'c', tokens: 200 }),
-        dup({ runId: 'd', tokens: 200 }),
-      ]),
-    ).toBe(2);
-  });
-
-  it('【任务 8（G3-7）翻转】tokens: 0 不计组（键守卫：须有限正数）', () => {
-    // 守卫前：tokens=0 通过「有限非负数」判据并入组；G3-7 要求 tokens 须为有限正数 → 噪声键不入组。
-    expect(countSuspectedDuplicateGroups([dup({ runId: 'a', tokens: 0 }), dup({ runId: 'b', tokens: 0 })])).toBe(0);
-  });
-
-  it('【任务 8（G3-7）翻转】duration_s 缺字段不计组（键守卫：须为 number）', () => {
-    // 守卫前：键取 String(undefined)='undefined'，两条同形记录并为一组；G3-7 要求 duration_s 须为 number。
-    expect(
-      countSuspectedDuplicateGroups([
-        dup({ runId: 'a', duration_s: undefined }),
-        dup({ runId: 'b', duration_s: undefined }),
-      ]),
-    ).toBe(0);
-  });
-
-  it('duration_s 非 number（字符串 / null）亦不计组（键守卫生效面与缺字段同口径）', () => {
-    expect(
-      countSuspectedDuplicateGroups([
-        dup({ runId: 'a', duration_s: '5' }),
-        dup({ runId: 'b', duration_s: '5' }),
-        dup({ runId: 'c', duration_s: null }),
-        dup({ runId: 'd', duration_s: null }),
-      ]),
-    ).toBe(0);
-  });
-
-  it('【任务 8（G3-15）】主条目 + 2 条同 parentDispatchId 的 R3 归账（各自实际消耗）→ 0 组（不互计）', () => {
-    // 归账形态对齐 data-models.md「R3 三条目归账约定」：主条目记整次分派消耗，两条附属条目按维度各记
-    // 自己的实际消耗并以 parentDispatchId 指向主条目 runId → 三个键互异 → 0 组（G3-15 要修的
-    // 「同一分派的约定内多归账被误报为疑似重复」）。
-    expect(
-      countSuspectedDuplicateGroups([
-        dup({ runId: 'p5-R-r3-01', tokens: 1200, duration_s: 30 }),
-        dup({ runId: 'p5-R-r3-02', tokens: 300, duration_s: 12, parentDispatchId: 'p5-R-r3-01' }),
-        dup({ runId: 'p5-R-r3-03', tokens: 150, duration_s: 8, parentDispatchId: 'p5-R-r3-01' }),
-      ]),
-    ).toBe(0);
-  });
-
-  it('【任务 8（G3-15）】不同 parentDispatchId 的同键条目分组互不合并 → 0 组', () => {
-    expect(
-      countSuspectedDuplicateGroups([
-        dup({ runId: 'a', parentDispatchId: 'pA' }),
-        dup({ runId: 'b', parentDispatchId: 'pB' }),
-        dup({ runId: 'c' }),
-      ]),
-    ).toBe(0);
-  });
-
-  it('【任务 8（G3-15）】同 parentDispatchId 且键全同仍计组（parent 不豁免完全相同的归账）', () => {
-    // 约定内归账只解释「主条目 + 附属条目」的键差异；同一 parent 下又一次完全相同的归账仍属可疑。
-    expect(
-      countSuspectedDuplicateGroups([
-        dup({ runId: 'a', parentDispatchId: 'pA' }),
-        dup({ runId: 'b', parentDispatchId: 'pA' }),
-      ]),
-    ).toBe(1);
-  });
-
-  it('【任务 8（G3-15）】parentDispatchId 空串/非字符串按缺字段处理（legacy 判定不变）', () => {
-    expect(
-      countSuspectedDuplicateGroups([
-        dup({ runId: 'a', parentDispatchId: '' }),
-        dup({ runId: 'b', parentDispatchId: 123 }),
-        dup({ runId: 'c', parentDispatchId: undefined }),
-      ]),
-    ).toBe(1); // 三条键前缀均为空串 → 同一键 3 条 → 1 组（字段引入前同判定）
-  });
-
-  it('缺 timestamp / 非字符串 timestamp 不计组（既有判据，任务 8 不变）', () => {
-    expect(
-      countSuspectedDuplicateGroups([
-        dup({ runId: 'a', timestamp: undefined }),
-        dup({ runId: 'b', timestamp: undefined }),
-        dup({ runId: 'c', timestamp: '' }),
-        dup({ runId: 'd', timestamp: '' }),
-        dup({ runId: 'e', timestamp: 123 }),
-        dup({ runId: 'f', timestamp: 123 }),
-      ]),
-    ).toBe(0);
-  });
-
-  it('坏 tokens（负数 / NaN / Infinity / 字符串 / 缺字段）不计组（与 sumTokens 的「有限非负」口径在此故意不同）', () => {
-    expect(
-      countSuspectedDuplicateGroups([
-        dup({ runId: 'a', tokens: -1 }),
-        dup({ runId: 'b', tokens: -1 }),
-        dup({ runId: 'c', tokens: Number.NaN }),
-        dup({ runId: 'd', tokens: Number.NaN }),
-        dup({ runId: 'e', tokens: Number.POSITIVE_INFINITY }),
-        dup({ runId: 'f', tokens: Number.POSITIVE_INFINITY }),
-        dup({ runId: 'g', tokens: '100' }),
-        dup({ runId: 'h', tokens: '100' }),
-        dup({ runId: 'i', tokens: undefined }),
-        dup({ runId: 'j', tokens: undefined }),
-      ]),
-    ).toBe(0);
+  it('【任务 8（G3-15）】parentDispatchId 归账精确化（4 态：同 parent 不互计 / 异 parent 不合并 / 键全同仍计 / 空串按缺字段）', () => {
+    const rows: readonly [string, Record<string, unknown>[], number][] = [
+      [
+        // 归账形态对齐 data-models.md「R3 三条目归账约定」：主条目记整次分派消耗，两条附属条目按维度各记
+        // 自己的实际消耗并以 parentDispatchId 指向主条目 runId → 三个键互异 → 0 组（G3-15 要修的
+        // 「同一分派的约定内多归账被误报为疑似重复」）。
+        '主条目 + 2 条同 parentDispatchId 的 R3 归账（各自实际消耗）→ 0 组（不互计）',
+        [
+          { runId: 'p5-R-r3-01', tokens: 1200, duration_s: 30 },
+          { runId: 'p5-R-r3-02', tokens: 300, duration_s: 12, parentDispatchId: 'p5-R-r3-01' },
+          { runId: 'p5-R-r3-03', tokens: 150, duration_s: 8, parentDispatchId: 'p5-R-r3-01' },
+        ],
+        0,
+      ],
+      [
+        '不同 parentDispatchId 的同键条目分组互不合并 → 0 组',
+        [{ runId: 'a', parentDispatchId: 'pA' }, { runId: 'b', parentDispatchId: 'pB' }, { runId: 'c' }],
+        0,
+      ],
+      [
+        // 约定内归账只解释「主条目 + 附属条目」的键差异；同一 parent 下又一次完全相同的归账仍属可疑。
+        '同 parentDispatchId 且键全同仍计组（parent 不豁免完全相同的归账）',
+        [
+          { runId: 'a', parentDispatchId: 'pA' },
+          { runId: 'b', parentDispatchId: 'pA' },
+        ],
+        1,
+      ],
+      [
+        'parentDispatchId 空串/非字符串按缺字段处理（legacy 判定不变）',
+        [
+          { runId: 'a', parentDispatchId: '' },
+          { runId: 'b', parentDispatchId: 123 },
+          { runId: 'c', parentDispatchId: undefined },
+        ],
+        1, // 三条键前缀均为空串 → 同一键 3 条 → 1 组（字段引入前同判定）
+      ],
+    ];
+    for (const [name, patches, expected] of rows) {
+      expect(countSuspectedDuplicateGroups(patches.map((patch) => dup(patch))), `${name} 应计 ${expected} 组`).toBe(
+        expected,
+      );
+    }
   });
 
   it('空输入 → 0 组', () => {

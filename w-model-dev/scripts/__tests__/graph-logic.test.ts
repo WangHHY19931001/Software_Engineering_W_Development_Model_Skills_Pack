@@ -319,8 +319,9 @@ describe('R1-R6 四维识别校验', () => {
 
   // ==================== R5: 依赖/时序无环 ====================
   describe('R5: depends-on 与 precedes 无环', () => {
-    it('R5: depends-on 子图有环应 fail', () => {
-      const graph: GraphShape = {
+    /** 三节点双层 REQ 树基底（两测试共用，仅环边类型不同） */
+    function cycleGraph(cycleEdgeType: 'depends-on' | 'precedes'): GraphShape {
+      return {
         version: 1,
         currentPhase: 1,
         nodes: [
@@ -360,65 +361,30 @@ describe('R1-R6 四维识别校验', () => {
         edges: [
           { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
           { from: 'REQ-001', to: 'REQ-003', type: 'parent' },
-          { from: 'REQ-002', to: 'REQ-003', type: 'depends-on' },
-          { from: 'REQ-003', to: 'REQ-002', type: 'depends-on' },
+          { from: 'REQ-002', to: 'REQ-003', type: cycleEdgeType },
+          { from: 'REQ-003', to: 'REQ-002', type: cycleEdgeType },
         ],
       };
-      const result = checkRequirementGraph(graph, 1);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('R5') && v.includes('depends-on'))).toBe(true);
-      expect(result.crossLogic?.dependsOnCycles.length).toBeGreaterThan(0);
-    });
+    }
 
-    it('R5: precedes 子图有环应 fail', () => {
-      const graph: GraphShape = {
-        version: 1,
-        currentPhase: 1,
-        nodes: [
-          {
-            id: 'REQ-001',
-            type: 'REQ',
-            phase: 1,
-            title: '域',
-            summary: 'level=1',
-            evidenceAnchor: 'docs/phase1-requirements/requirement-spec.md:§4=sample fact',
-            evidenceStatus: 'confirmed',
-            level: 1,
-          },
-          {
-            id: 'REQ-002',
-            type: 'REQ',
-            phase: 1,
-            title: '模块A',
-            summary: 'level=2',
-            evidenceAnchor: 'docs/phase1-requirements/requirement-spec.md:§4=sample fact',
-            evidenceStatus: 'confirmed',
-            level: 2,
-            reqGroup: 'REQ-001',
-          },
-          {
-            id: 'REQ-003',
-            type: 'REQ',
-            phase: 1,
-            title: '模块B',
-            summary: 'level=2',
-            evidenceAnchor: 'docs/phase1-requirements/requirement-spec.md:§4=sample fact',
-            evidenceStatus: 'confirmed',
-            level: 2,
-            reqGroup: 'REQ-001',
-          },
-        ],
-        edges: [
-          { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
-          { from: 'REQ-001', to: 'REQ-003', type: 'parent' },
-          { from: 'REQ-002', to: 'REQ-003', type: 'precedes' },
-          { from: 'REQ-003', to: 'REQ-002', type: 'precedes' },
-        ],
-      };
-      const result = checkRequirementGraph(graph, 1);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('R5') && v.includes('precedes'))).toBe(true);
-      expect(result.crossLogic?.precedesCycles.length).toBeGreaterThan(0);
+    it('R5 环（2 态：depends-on 子图 / precedes 子图）→ fail 且对应 cycle 字段非空', () => {
+      const rows: readonly [
+        string,
+        'depends-on' | 'precedes',
+        (r: GraphCheckResult) => { length: number } | undefined,
+      ][] = [
+        ['R5: depends-on 子图有环', 'depends-on', (r) => r.crossLogic?.dependsOnCycles],
+        ['R5: precedes 子图有环', 'precedes', (r) => r.crossLogic?.precedesCycles],
+      ];
+      for (const [name, edgeType, cyclesOf] of rows) {
+        const result = checkRequirementGraph(cycleGraph(edgeType), 1);
+        expect(result.passed, `${name} 应 fail`).toBe(false);
+        expect(
+          result.violations.some((v) => v.includes('R5') && v.includes(edgeType)),
+          `${name} 应报 R5 且点名 ${edgeType}`,
+        ).toBe(true);
+        expect(cyclesOf(result)?.length, `${name} 对应 cycle 字段应非空`).toBeGreaterThan(0);
+      }
     });
 
     it('R5: depends-on 与 precedes 无环不触发 R5 违规', () => {
@@ -549,143 +515,100 @@ describe('R1-R6 四维识别校验', () => {
       expect(result.crossLogic?.conflictsAsymmetric).toEqual([]);
     });
 
-    it('R6: cross-cuts 目标非 REQ 应 fail', () => {
-      const graph: GraphShape = {
-        version: 1,
-        currentPhase: 1,
-        nodes: [
-          {
-            id: 'REQ-001',
-            type: 'REQ',
-            phase: 1,
-            title: '域',
-            summary: 'level=1',
-            evidenceAnchor: 'docs/phase1-requirements/requirement-spec.md:§4=sample fact',
-            evidenceStatus: 'confirmed',
-            level: 1,
-          },
-          {
-            id: 'REQ-002',
-            type: 'REQ',
-            phase: 1,
-            title: 'NFR',
-            summary: '横切NFR',
-            evidenceAnchor: 'docs/phase1-requirements/requirement-spec.md:§4=sample fact',
-            evidenceStatus: 'confirmed',
-            level: 1,
-          },
-          {
-            id: 'EXT-OUT-001',
-            type: 'EXT-OUT',
-            phase: 1,
-            title: '边界汇',
-            summary: '外部输出',
-            evidenceAnchor: 'docs/phase1-requirements/requirement-spec.md:§4=sample fact',
-            evidenceStatus: 'confirmed',
-          },
-        ],
-        edges: [{ from: 'REQ-002', to: 'EXT-OUT-001', type: 'cross-cuts' }],
-      };
-      const result = checkRequirementGraph(graph, 1);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('R6') && v.includes('cross-cuts') && v.includes('目标'))).toBe(
-        true,
-      );
-      expect(result.crossLogic?.crossCutsTargetTypeViolations.length).toBeGreaterThan(0);
-    });
-
-    it('R6: precedes 源非 REQ 应 fail', () => {
-      const graph: GraphShape = {
-        version: 1,
-        currentPhase: 1,
-        nodes: [
-          {
-            id: 'REQ-001',
-            type: 'REQ',
-            phase: 1,
-            title: '域',
-            summary: 'level=1',
-            evidenceAnchor: 'docs/phase1-requirements/requirement-spec.md:§4=sample fact',
-            evidenceStatus: 'confirmed',
-            level: 1,
-          },
-          {
-            id: 'REQ-002',
-            type: 'REQ',
-            phase: 1,
-            title: '模块',
-            summary: 'level=2',
-            evidenceAnchor: 'docs/phase1-requirements/requirement-spec.md:§4=sample fact',
-            evidenceStatus: 'confirmed',
-            level: 2,
-            reqGroup: 'REQ-001',
-          },
-          {
-            id: 'EXT-IN-001',
-            type: 'EXT-IN',
-            phase: 1,
-            title: '边界源',
-            summary: '外部输入',
-            evidenceAnchor: 'docs/phase1-requirements/requirement-spec.md:§4=sample fact',
-            evidenceStatus: 'confirmed',
+    it('R6 非 REQ 端点（3 态：cross-cuts 目标 / precedes 源 / precedes 目标）→ fail', () => {
+      const anchor = 'docs/phase1-requirements/requirement-spec.md:§4=sample fact';
+      const req = (
+        id: string,
+        title: string,
+        summary: string,
+        level: number,
+        reqGroup?: string,
+      ): GraphShape['nodes'][number] => ({
+        id,
+        type: 'REQ',
+        phase: 1,
+        title,
+        summary,
+        evidenceAnchor: anchor,
+        evidenceStatus: 'confirmed',
+        level,
+        ...(reqGroup ? { reqGroup } : {}),
+      });
+      const ext = (
+        id: string,
+        type: 'EXT-IN' | 'EXT-OUT',
+        title: string,
+        summary: string,
+      ): GraphShape['nodes'][number] => ({
+        id,
+        type,
+        phase: 1,
+        title,
+        summary,
+        evidenceAnchor: anchor,
+        evidenceStatus: 'confirmed',
+      });
+      const rows: readonly [
+        string,
+        GraphShape['nodes'],
+        GraphShape['edges'],
+        string[],
+        ((r: GraphCheckResult) => void) | null,
+      ][] = [
+        [
+          'R6: cross-cuts 目标非 REQ',
+          [
+            req('REQ-001', '域', 'level=1', 1),
+            req('REQ-002', 'NFR', '横切NFR', 1),
+            ext('EXT-OUT-001', 'EXT-OUT', '边界汇', '外部输出'),
+          ],
+          [{ from: 'REQ-002', to: 'EXT-OUT-001', type: 'cross-cuts' }],
+          ['R6', 'cross-cuts', '目标'],
+          (r) => {
+            expect(
+              r.crossLogic?.crossCutsTargetTypeViolations.length,
+              'cross-cuts 目标违规应记入 crossLogic',
+            ).toBeGreaterThan(0);
           },
         ],
-        edges: [
-          { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
-          { from: 'EXT-IN-001', to: 'REQ-002', type: 'precedes' },
+        [
+          'R6: precedes 源非 REQ',
+          [
+            req('REQ-001', '域', 'level=1', 1),
+            req('REQ-002', '模块', 'level=2', 2, 'REQ-001'),
+            ext('EXT-IN-001', 'EXT-IN', '边界源', '外部输入'),
+          ],
+          [
+            { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
+            { from: 'EXT-IN-001', to: 'REQ-002', type: 'precedes' },
+          ],
+          ['R6', 'precedes', '源'],
+          null,
         ],
-      };
-      const result = checkRequirementGraph(graph, 1);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('R6') && v.includes('precedes') && v.includes('源'))).toBe(true);
-    });
-
-    it('R6: precedes 目标非 REQ 应 fail', () => {
-      const graph: GraphShape = {
-        version: 1,
-        currentPhase: 1,
-        nodes: [
-          {
-            id: 'REQ-001',
-            type: 'REQ',
-            phase: 1,
-            title: '域',
-            summary: 'level=1',
-            evidenceAnchor: 'docs/phase1-requirements/requirement-spec.md:§4=sample fact',
-            evidenceStatus: 'confirmed',
-            level: 1,
-          },
-          {
-            id: 'REQ-002',
-            type: 'REQ',
-            phase: 1,
-            title: '模块',
-            summary: 'level=2',
-            evidenceAnchor: 'docs/phase1-requirements/requirement-spec.md:§4=sample fact',
-            evidenceStatus: 'confirmed',
-            level: 2,
-            reqGroup: 'REQ-001',
-          },
-          {
-            id: 'EXT-OUT-001',
-            type: 'EXT-OUT',
-            phase: 1,
-            title: '边界汇',
-            summary: '外部输出',
-            evidenceAnchor: 'docs/phase1-requirements/requirement-spec.md:§4=sample fact',
-            evidenceStatus: 'confirmed',
-          },
+        [
+          'R6: precedes 目标非 REQ',
+          [
+            req('REQ-001', '域', 'level=1', 1),
+            req('REQ-002', '模块', 'level=2', 2, 'REQ-001'),
+            ext('EXT-OUT-001', 'EXT-OUT', '边界汇', '外部输出'),
+          ],
+          [
+            { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
+            { from: 'REQ-002', to: 'EXT-OUT-001', type: 'precedes' },
+          ],
+          ['R6', 'precedes', '目标'],
+          null,
         ],
-        edges: [
-          { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
-          { from: 'REQ-002', to: 'EXT-OUT-001', type: 'precedes' },
-        ],
-      };
-      const result = checkRequirementGraph(graph, 1);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('R6') && v.includes('precedes') && v.includes('目标'))).toBe(
-        true,
-      );
+      ];
+      for (const [name, nodes, edges, tokens, extra] of rows) {
+        const result = checkRequirementGraph({ version: 1, currentPhase: 1, nodes, edges } as GraphShape, 1);
+        expect(result.passed, `${name} 应 fail`).toBe(false);
+        expect(
+          result.violations.some((v) => tokens.every((t) => v.includes(t))),
+          `${name} 应报 ${tokens.join(' + ')}`,
+        ).toBe(true);
+        if (extra) extra(result);
+      }
     });
   });
 
@@ -924,35 +847,63 @@ describe('轮次上限校验（MAX_GRAPH_ROUNDS=5）', () => {
     };
   }
 
-  it('analysisRounds 含 round=6 > 5 → 轮次上限违规且 passed=false', () => {
-    const graph = baseGraph([{ phase: 1, round: 6, violations: [], converged: false }]);
-    const result = checkRequirementGraph(graph, 1);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => /轮次上限校验失败.*round > 5.*phase1\/round6/.test(v))).toBe(true);
-  });
-
-  it('round=5 恰好等于上限 → 不报轮次违规（passed 由其余校验决定）', () => {
-    const graph = baseGraph([{ phase: 1, round: 5, violations: [], converged: true }]);
-    const result = checkRequirementGraph(graph, 1);
-    expect(result.violations.some((v) => v.includes('轮次上限校验失败'))).toBe(false);
-    expect(result.passed).toBe(true);
-  });
-
-  it('多轮记录仅越界者被点名（round 1-4 合法 + round 7 越界）', () => {
-    const graph = baseGraph([
-      { phase: 1, round: 1, violations: ['x'], converged: false },
-      { phase: 1, round: 4, violations: [], converged: false },
-      { phase: 1, round: 7, violations: [], converged: false },
-    ]);
-    const result = checkRequirementGraph(graph, 1);
-    const v = result.violations.find((x) => x.includes('轮次上限校验失败'))!;
-    expect(v).toContain('phase1/round7');
-    expect(v).not.toContain('phase1/round4');
-  });
-
-  it('无 analysisRounds 字段 → 不报轮次违规（存在才校验）', () => {
-    const result = checkRequirementGraph(baseGraph(), 1);
-    expect(result.violations.some((v) => v.includes('轮次上限校验失败'))).toBe(false);
+  it('analysisRounds 边界（4 态：round=6 越界 / round=5 边界值 / 仅点名越界者 / 缺字段不校验）', () => {
+    const rows: readonly [
+      string,
+      GraphShape['analysisRounds'] | undefined,
+      string,
+      'violation' | 'clean-passed' | 'named-only' | 'clean',
+    ][] = [
+      [
+        'analysisRounds 含 round=6 > 5 → 轮次上限违规且 passed=false',
+        [{ phase: 1, round: 6, violations: [], converged: false }],
+        /轮次上限校验失败.*round > 5.*phase1\/round6/.source,
+        'violation',
+      ],
+      [
+        'round=5 恰好等于上限 → 不报轮次违规（passed 由其余校验决定）',
+        [{ phase: 1, round: 5, violations: [], converged: true }],
+        '轮次上限校验失败',
+        'clean-passed',
+      ],
+      [
+        '多轮记录仅越界者被点名（round 1-4 合法 + round 7 越界）',
+        [
+          { phase: 1, round: 1, violations: ['x'], converged: false },
+          { phase: 1, round: 4, violations: [], converged: false },
+          { phase: 1, round: 7, violations: [], converged: false },
+        ],
+        'phase1/round7',
+        'named-only',
+      ],
+      ['无 analysisRounds 字段 → 不报轮次违规（存在才校验）', undefined, '轮次上限校验失败', 'clean'],
+    ];
+    for (const [name, rounds, token, kind] of rows) {
+      const graph = baseGraph(rounds);
+      const result = checkRequirementGraph(graph, 1);
+      if (kind === 'violation') {
+        expect(result.passed, `${name} 应 fail`).toBe(false);
+        expect(
+          result.violations.some((v) => new RegExp(token).test(v)),
+          `${name} 应报轮次上限违规（${token}）`,
+        ).toBe(true);
+      } else if (kind === 'clean-passed') {
+        expect(
+          result.violations.some((v) => v.includes(token)),
+          `${name} 不应报轮次违规`,
+        ).toBe(false);
+        expect(result.passed, `${name} 应通过`).toBe(true);
+      } else if (kind === 'named-only') {
+        const v = result.violations.find((x) => x.includes('轮次上限校验失败'))!;
+        expect(v, `${name} 应点名 phase1/round7`).toContain(token);
+        expect(v, `${name} 不应点名合法轮次`).not.toContain('phase1/round4');
+      } else {
+        expect(
+          result.violations.some((v) => v.includes(token)),
+          `${name} 不应报轮次违规`,
+        ).toBe(false);
+      }
+    }
   });
 });
 
@@ -1148,16 +1099,48 @@ describe('recalculatePassed', () => {
   });
 });
 
-// ==================== R7/R8 需求规格产物校验 ====================
+// ==================== R7-R14 阶段设计级产物校验（同构族按「循环内多断言」聚合） ====================
 describe('R7 追踪矩阵一致性', () => {
-  it('合法矩阵通过', () => {
-    const v = checkRequirementSpecEnhance(
-      '| 需求号 | 候选落点§ | 验收关联 |\n|---|---|---|\n| REQ-001 | §4.1 | UAT-001 |\n',
-      '## 4. 需求层级树\n',
-      '```mermaid\ngraph TB\n  A --> B\n```\n',
-    );
-    expect(v.r7).toEqual([]);
+  const REQ_MATRIX = '| 需求号 | 候选落点§ | 验收关联 |\n|---|---|---|\n| REQ-001 | §4.1 | UAT-001 |\n';
+  const REQ_MAIN = '## 4. 需求层级树\n';
+  const MERMAID_GRAPH = '```mermaid\ngraph TB\n  A --> B\n```\n';
+
+  it('矩阵合法对照（4 态：R7 / R9 / R11 / R13）→ 零违规', () => {
+    const rows: readonly [string, (matrix: string, main: string, uml: string) => string[], string, string, string][] = [
+      [
+        'R7 需求规格合法矩阵',
+        (m, d, u) => checkRequirementSpecEnhance(m, d, u).r7,
+        REQ_MATRIX,
+        REQ_MAIN,
+        MERMAID_GRAPH,
+      ],
+      [
+        'R9 系统设计合法矩阵',
+        (m, d, u) => checkDesignSpecEnhance(m, d, u).r9,
+        '| SD 编号 | 对应需求号 | 设计落点§ |\n|---|---|---|\n| SD-001 | REQ-001 | M-001 |\n',
+        '## 3. 模块划分\n',
+        MERMAID_GRAPH,
+      ],
+      [
+        'R11 概要设计合法矩阵',
+        (m, d, u) => checkOutlineSpecEnhance(m, d, u).r11,
+        '| INTF 编号 | 对应 SD 编号 | 设计落点§ |\n|---|---|---|\n| INTF-001 | SD-001 | §2.1 |\n',
+        '## 2. 接口定义\n',
+        MERMAID_GRAPH,
+      ],
+      [
+        'R13 详细设计合法矩阵',
+        (m, d, u) => checkDetailedSpecEnhance(m, d, u).r13,
+        '| DD 编号 | 对应 INTF 编号 | 设计落点§ |\n|---|---|---|\n| DD-001 | INTF-001 | §1 |\n',
+        '## 1. 类设计\n',
+        '```mermaid\nclassDiagram\n  class E1 { +attr }\n```\n',
+      ],
+    ];
+    for (const [name, fieldOf, matrix, main, uml] of rows) {
+      expect(fieldOf(matrix, main, uml), `${name} 应零违规`).toEqual([]);
+    }
   });
+
   it('候选落点§ 非法报 R7', () => {
     const v = checkRequirementSpecEnhance(
       '| 需求号 | 候选落点§ | 验收关联 |\n|---|---|---|\n| REQ-001 | xxx | UAT-001 |\n',
@@ -1166,26 +1149,33 @@ describe('R7 追踪矩阵一致性', () => {
     );
     expect(v.r7.some((m) => m.includes('候选落点§'))).toBe(true);
   });
+
   it('RTM 集合交叉校验', () => {
-    const v = checkRequirementSpecEnhance(
-      '| 需求号 | 候选落点§ | 验收关联 |\n|---|---|---|\n| REQ-001 | §4.1 | UAT-001 |\n',
-      '## 4. 需求层级树\n',
-      '',
-      new Set(['REQ-002']),
-    );
+    const v = checkRequirementSpecEnhance(REQ_MATRIX, REQ_MAIN, '', new Set(['REQ-002']));
     expect(v.r7.some((m) => m.includes('RTM 登记缺失'))).toBe(true);
   });
 });
 
-describe('R8 UML mermaid 块配平', () => {
-  it('配平通过', () => {
+describe('R8/R10/R12/R14 UML mermaid 块配平', () => {
+  it('配平通过（R8 基线：两对 mermaid 块）', () => {
     const { balanced, pairs } = countMermaidBlocks('```mermaid\na\n```\n```mermaid\nb\n```\n');
     expect(balanced).toBe(true);
     expect(pairs).toBe(2);
   });
-  it('未配平报 R8', () => {
-    const v = checkRequirementSpecEnhance('', '', '```mermaid\na\n');
-    expect(v.r8.some((m) => m.includes('配平'))).toBe(true);
+
+  it('矩阵未配平（4 态：R8 / R10 / R12 / R14）→ 报「配平」', () => {
+    const rows: readonly [string, (matrix: string, main: string, uml: string) => string[]][] = [
+      ['R8 需求规格未配平', (m, d, u) => checkRequirementSpecEnhance(m, d, u).r8],
+      ['R10 系统设计未配平', (m, d, u) => checkDesignSpecEnhance(m, d, u).r10],
+      ['R12 概要设计未配平', (m, d, u) => checkOutlineSpecEnhance(m, d, u).r12],
+      ['R14 详细设计未配平', (m, d, u) => checkDetailedSpecEnhance(m, d, u).r14],
+    ];
+    for (const [name, fieldOf] of rows) {
+      expect(
+        fieldOf('', '', '```mermaid\na\n').some((m) => m.includes('配平')),
+        `${name} 应报配平违规`,
+      ).toBe(true);
+    }
   });
 });
 
@@ -1207,97 +1197,84 @@ describe('parseMarkdownTable', () => {
   });
 });
 
-describe('R9 系统设计追踪矩阵一致性', () => {
-  it('合法矩阵通过', () => {
-    const v = checkDesignSpecEnhance(
-      '| SD 编号 | 对应需求号 | 设计落点§ |\n|---|---|---|\n| SD-001 | REQ-001 | M-001 |\n',
-      '## 3. 模块划分\n',
-      '```mermaid\ngraph TB\n  A --> B\n```\n',
-    );
-    expect(v.r9).toEqual([]);
-  });
-  it('SD 编号非法报 R9', () => {
-    const v = checkDesignSpecEnhance(
-      '| SD 编号 | 对应需求号 | 设计落点§ |\n|---|---|---|\n| DD-001 | REQ-001 | M-001 |\n',
-      '## 3. 模块划分\n',
-      '',
-    );
-    expect(v.r9.some((m) => m.includes('SD 编号格式'))).toBe(true);
-  });
-});
+describe('R9/R11/R13 编号非法与主文档缺节', () => {
+  const INTF_MATRIX = '| INTF 编号 | 对应 SD 编号 | 设计落点§ |\n|---|---|---|\n| INTF-001 | SD-001 | §2.1 |\n';
+  const DD_MATRIX = '| DD 编号 | 对应 INTF 编号 | 设计落点§ |\n|---|---|---|\n| DD-001 | INTF-001 | §1 |\n';
 
-describe('R10 UML mermaid 块配平', () => {
-  it('未配平报 R10', () => {
-    const v = checkDesignSpecEnhance('', '', '```mermaid\na\n');
-    expect(v.r10.some((m) => m.includes('配平'))).toBe(true);
+  it('矩阵编号非法（3 态：SD-R9 / INTF-R11 / DD-R13）→ 报编号格式', () => {
+    const rows: readonly [
+      string,
+      (matrix: string, main: string, uml: string) => string[],
+      string,
+      string,
+      string,
+      string,
+    ][] = [
+      [
+        'SD 编号非法报 R9（矩阵内混入 DD-001）',
+        (m, d, u) => checkDesignSpecEnhance(m, d, u).r9,
+        '| SD 编号 | 对应需求号 | 设计落点§ |\n|---|---|---|\n| DD-001 | REQ-001 | M-001 |\n',
+        '## 3. 模块划分\n',
+        '',
+        'SD 编号格式',
+      ],
+      [
+        'INTF 编号非法报 R11（矩阵内混入 DD-001）',
+        (m, d, u) => checkOutlineSpecEnhance(m, d, u).r11,
+        '| INTF 编号 | 对应 SD 编号 | 设计落点§ |\n|---|---|---|\n| DD-001 | SD-001 | §2.1 |\n',
+        '## 2. 接口定义\n',
+        '',
+        'INTF 编号格式',
+      ],
+      [
+        'DD 编号非法报 R13（矩阵内混入 SD-001）',
+        (m, d, u) => checkDetailedSpecEnhance(m, d, u).r13,
+        '| DD 编号 | 对应 INTF 编号 | 设计落点§ |\n|---|---|---|\n| SD-001 | INTF-001 | §1 |\n',
+        '## 1. 类设计\n',
+        '',
+        'DD 编号格式',
+      ],
+    ];
+    for (const [name, fieldOf, matrix, main, uml, marker] of rows) {
+      expect(
+        fieldOf(matrix, main, uml).some((m) => m.includes(marker)),
+        `${name} 应报 ${marker}`,
+      ).toBe(true);
+    }
   });
-});
 
-describe('R11 概要设计追踪矩阵一致性', () => {
-  it('合法矩阵通过', () => {
-    const v = checkOutlineSpecEnhance(
-      '| INTF 编号 | 对应 SD 编号 | 设计落点§ |\n|---|---|---|\n| INTF-001 | SD-001 | §2.1 |\n',
-      '## 2. 接口定义\n',
-      '```mermaid\ngraph TB\n  A --> B\n```\n',
-    );
-    expect(v.r11).toEqual([]);
-  });
-  it('INTF 编号非法报 R11', () => {
-    const v = checkOutlineSpecEnhance(
-      '| INTF 编号 | 对应 SD 编号 | 设计落点§ |\n|---|---|---|\n| DD-001 | SD-001 | §2.1 |\n',
-      '## 2. 接口定义\n',
-      '',
-    );
-    expect(v.r11.some((m) => m.includes('INTF 编号格式'))).toBe(true);
-  });
-  it('主文档缺 §2 接口定义节报 R11', () => {
-    const v = checkOutlineSpecEnhance(
-      '| INTF 编号 | 对应 SD 编号 | 设计落点§ |\n|---|---|---|\n| INTF-001 | SD-001 | §2.1 |\n',
-      '## 1. 模块调用关系\n',
-      '',
-    );
-    expect(v.r11.some((m) => m.includes('主文档缺 §2 接口定义节'))).toBe(true);
-  });
-});
-
-describe('R12 UML mermaid 块配平', () => {
-  it('未配平报 R12', () => {
-    const v = checkOutlineSpecEnhance('', '', '```mermaid\na\n');
-    expect(v.r12.some((m) => m.includes('配平'))).toBe(true);
-  });
-});
-
-describe('R13 详细设计追踪矩阵一致性', () => {
-  it('合法矩阵通过', () => {
-    const v = checkDetailedSpecEnhance(
-      '| DD 编号 | 对应 INTF 编号 | 设计落点§ |\n|---|---|---|\n| DD-001 | INTF-001 | §1 |\n',
-      '## 1. 类设计\n',
-      '```mermaid\nclassDiagram\n  class E1 { +attr }\n```\n',
-    );
-    expect(v.r13).toEqual([]);
-  });
-  it('DD 编号非法报 R13', () => {
-    const v = checkDetailedSpecEnhance(
-      '| DD 编号 | 对应 INTF 编号 | 设计落点§ |\n|---|---|---|\n| SD-001 | INTF-001 | §1 |\n',
-      '## 1. 类设计\n',
-      '',
-    );
-    expect(v.r13.some((m) => m.includes('DD 编号格式'))).toBe(true);
-  });
-  it('主文档缺 §1 类设计节报 R13', () => {
-    const v = checkDetailedSpecEnhance(
-      '| DD 编号 | 对应 INTF 编号 | 设计落点§ |\n|---|---|---|\n| DD-001 | INTF-001 | §1 |\n',
-      '## 2. 数据库设计\n',
-      '',
-    );
-    expect(v.r13.some((m) => m.includes('主文档缺 §1 类设计节'))).toBe(true);
-  });
-});
-
-describe('R14 UML mermaid 块配平', () => {
-  it('未配平报 R14', () => {
-    const v = checkDetailedSpecEnhance('', '', '```mermaid\na\n');
-    expect(v.r14.some((m) => m.includes('配平'))).toBe(true);
+  it('主文档缺节（2 态：R11 缺 §2 接口定义节 / R13 缺 §1 类设计节）→ 报缺节', () => {
+    const rows: readonly [
+      string,
+      (matrix: string, main: string, uml: string) => string[],
+      string,
+      string,
+      string,
+      string,
+    ][] = [
+      [
+        'R11 主文档缺 §2 接口定义节',
+        (m, d, u) => checkOutlineSpecEnhance(m, d, u).r11,
+        INTF_MATRIX,
+        '## 1. 模块调用关系\n',
+        '',
+        '主文档缺 §2 接口定义节',
+      ],
+      [
+        'R13 主文档缺 §1 类设计节',
+        (m, d, u) => checkDetailedSpecEnhance(m, d, u).r13,
+        DD_MATRIX,
+        '## 2. 数据库设计\n',
+        '',
+        '主文档缺 §1 类设计节',
+      ],
+    ];
+    for (const [name, fieldOf, matrix, main, uml, marker] of rows) {
+      expect(
+        fieldOf(matrix, main, uml).some((m) => m.includes(marker)),
+        `${name} 应报「${marker}」`,
+      ).toBe(true);
+    }
   });
 });
 
@@ -1340,19 +1317,19 @@ describe('R15 evidenceAnchor 格式校验', () => {
     };
   }
 
-  it('合法锚点通过（path:§section=statement）', () => {
-    const r = checkRequirementGraph(
-      makeReqGraph('docs/phase1-requirements/requirement-spec.md:§4.2=登录需密码策略（用户原话）'),
-      1,
-    );
-    expect(r.passed).toBe(true);
-    expect(r.violations.some((v) => v.includes('R15'))).toBe(false);
-  });
-
-  it('合法锚点通过（path:L42=statement）', () => {
-    const r = checkRequirementGraph(makeReqGraph('src/auth.ts:L42-58=JWT 签发逻辑'), 1);
-    expect(r.passed).toBe(true);
-    expect(r.violations.some((v) => v.includes('R15'))).toBe(false);
+  it('合法锚点形态（2 态：path:§section=statement / path:L42=statement）→ 通过且无 R15', () => {
+    const rows: readonly [string, string][] = [
+      ['§section 形态', 'docs/phase1-requirements/requirement-spec.md:§4.2=登录需密码策略（用户原话）'],
+      ['L42 行号形态', 'src/auth.ts:L42-58=JWT 签发逻辑'],
+    ];
+    for (const [name, anchor] of rows) {
+      const r = checkRequirementGraph(makeReqGraph(anchor), 1);
+      expect(r.passed, `${name} 合法锚点应通过`).toBe(true);
+      expect(
+        r.violations.some((v) => v.includes('R15')),
+        `${name} 不应报 R15`,
+      ).toBe(false);
+    }
   });
 
   it('非法锚点（无定位）R15 拦截', () => {
@@ -1412,86 +1389,108 @@ describe('R15a-f 证据锚点子项', () => {
     return out.violations.find((v) => v.startsWith(`R15${sub} `) || v.startsWith(`R15${sub} `));
   }
 
-  it('R15a 节点缺 evidenceAnchor → violation', () => {
-    const g = makeGraph({
-      nodes: [
-        { id: 'REQ-001', type: 'REQ', phase: 1, title: 't', summary: 's', level: 1, evidenceStatus: 'confirmed' },
+  it('R15a/b 负例（3 态：缺 evidenceAnchor / evidenceStatus 非法 / evidenceStatus 缺失）→ violation', () => {
+    const rows: readonly [string, Array<Record<string, unknown>>, string, string | null, boolean][] = [
+      [
+        'R15a 节点缺 evidenceAnchor',
+        [{ id: 'REQ-001', type: 'REQ', phase: 1, title: 't', summary: 's', level: 1, evidenceStatus: 'confirmed' }],
+        'a',
+        'evidenceAnchor 缺失',
+        true,
       ],
-    });
-    const out = checkRequirementGraph(g, 1);
-    expect(out.passed).toBe(false);
-    expect(r15(out, 'a')).toBeDefined();
-    expect(r15(out, 'a')).toContain('evidenceAnchor 缺失');
+      [
+        'R15b evidenceStatus 非法（maybe）',
+        [
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: 't',
+            summary: 's',
+            level: 1,
+            evidenceAnchor: 'docs/req.md:§4=x',
+            evidenceStatus: 'maybe',
+          },
+        ],
+        'b',
+        'evidenceStatus 非法',
+        true,
+      ],
+      [
+        'R15b evidenceStatus 缺失',
+        [
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: 't',
+            summary: 's',
+            level: 1,
+            evidenceAnchor: 'docs/req.md:§4=x',
+          },
+        ],
+        'b',
+        null,
+        false,
+      ],
+    ];
+    for (const [name, nodes, sub, fragment, expectFailed] of rows) {
+      const out = checkRequirementGraph(makeGraph({ nodes }), 1);
+      const violation = r15(out, sub);
+      expect(violation, `${name} 应报 R15${sub}`).toBeDefined();
+      if (fragment !== null) {
+        expect(violation, `${name} 文案应含「${fragment}」`).toContain(fragment);
+      }
+      if (expectFailed) {
+        expect(out.passed, `${name} 应 fail`).toBe(false);
+      }
+    }
   });
 
-  it('R15b evidenceStatus 非法 → violation', () => {
-    const g = makeGraph({
-      nodes: [
-        {
-          id: 'REQ-001',
-          type: 'REQ',
-          phase: 1,
-          title: 't',
-          summary: 's',
-          level: 1,
-          evidenceAnchor: 'docs/req.md:§4=x',
-          evidenceStatus: 'maybe',
-        },
+  it('R15c（2 态：path 不存在注入后触发 / path 存在不触发）', () => {
+    const missingPathNode: Record<string, unknown> = {
+      id: 'REQ-001',
+      type: 'REQ',
+      phase: 1,
+      title: 't',
+      summary: 's',
+      level: 1,
+      evidenceAnchor: 'nonexistent/path.md:§4=x',
+      evidenceStatus: 'confirmed',
+    };
+    // 与 makeGraph({}) 默认节点同形（合法锚点 docs/req.md）
+    const defaultNode: Record<string, unknown> = {
+      id: 'REQ-001',
+      type: 'REQ',
+      phase: 1,
+      title: 't',
+      summary: 's',
+      level: 1,
+      evidenceAnchor: 'docs/req.md:§4=x',
+      evidenceStatus: 'confirmed',
+    };
+    const rows: readonly [string, Record<string, unknown>, string][] = [
+      [
+        // 未注入 → R15c 不触发（纯函数不做 I/O，存在性由 CLI 注入）；注入不含该 path 的集合 → 触发
+        'R15c 锚点 path 不存在（须注入 existingAnchorPaths）',
+        missingPathNode,
+        'violate',
       ],
-    });
-    const out = checkRequirementGraph(g, 1);
-    expect(out.passed).toBe(false);
-    expect(r15(out, 'b')).toBeDefined();
-    expect(r15(out, 'b')).toContain('evidenceStatus 非法');
-  });
-
-  it('R15b evidenceStatus 缺失 → violation', () => {
-    const g = makeGraph({
-      nodes: [
-        {
-          id: 'REQ-001',
-          type: 'REQ',
-          phase: 1,
-          title: 't',
-          summary: 's',
-          level: 1,
-          evidenceAnchor: 'docs/req.md:§4=x',
-        },
-      ],
-    });
-    const out = checkRequirementGraph(g, 1);
-    expect(r15(out, 'b')).toBeDefined();
-  });
-
-  it('R15c 锚点 path 不存在 → violation（须注入 existingAnchorPaths）', () => {
-    const g = makeGraph({
-      nodes: [
-        {
-          id: 'REQ-001',
-          type: 'REQ',
-          phase: 1,
-          title: 't',
-          summary: 's',
-          level: 1,
-          evidenceAnchor: 'nonexistent/path.md:§4=x',
-          evidenceStatus: 'confirmed',
-        },
-      ],
-    });
-    // 未注入 → R15c 不触发（纯函数不做 I/O，存在性由 CLI 注入）
-    const without = checkRequirementGraph(g, 1);
-    expect(r15(without, 'c')).toBeUndefined();
-    // 注入一个不含该 path 的集合 → R15c 触发
-    const out = checkRequirementGraph(g, 1, { existingAnchorPaths: new Set(['other.md']) });
-    expect(out.passed).toBe(false);
-    expect(r15(out, 'c')).toBeDefined();
-    expect(r15(out, 'c')).toContain('证据路径不存在');
-  });
-
-  it('R15c 锚点 path 存在 → 不触发', () => {
-    const g = makeGraph({});
-    const out = checkRequirementGraph(g, 1, { existingAnchorPaths: new Set(['docs/req.md']) });
-    expect(r15(out, 'c')).toBeUndefined();
+      ['R15c 锚点 path 存在 → 不触发', defaultNode, 'clean'],
+    ];
+    for (const [name, node, kind] of rows) {
+      const g = makeGraph({ nodes: [node] });
+      if (kind === 'violate') {
+        const without = checkRequirementGraph(g, 1);
+        expect(r15(without, 'c'), `${name} 未注入时不应触发`).toBeUndefined();
+        const out = checkRequirementGraph(g, 1, { existingAnchorPaths: new Set(['other.md']) });
+        expect(out.passed, `${name} 注入后应 fail`).toBe(false);
+        expect(r15(out, 'c'), `${name} 注入后应报证据路径不存在`).toContain('证据路径不存在');
+      } else {
+        const out = checkRequirementGraph(g, 1, { existingAnchorPaths: new Set(['docs/req.md']) });
+        expect(r15(out, 'c'), `${name} 不应触发`).toBeUndefined();
+      }
+    }
   });
 
   it('R15e confirmed 但签名链无引用该节点的 V review 环 → violation', () => {
@@ -1515,116 +1514,97 @@ describe('R15a-f 证据锚点子项', () => {
     expect(out.violations.some((v) => v.includes('缺签名链 V review 环'))).toBe(true);
   });
 
-  it('R15e pending 不触发（避免早期阶段误红）', () => {
-    const g = makeGraph({
-      nodes: [
+  it('R15e 不触发行（3 态：pending / 未注入签名链 / 存在引用该节点的 V review 环且 inputProvenance 指向锚点）', () => {
+    const confirmedNode: Record<string, unknown> = {
+      id: 'REQ-001',
+      type: 'REQ',
+      phase: 1,
+      title: 't',
+      summary: 's',
+      level: 1,
+      evidenceAnchor: 'docs/req.md:§4=x',
+      evidenceStatus: 'confirmed',
+    };
+    const rows: readonly [string, Array<Record<string, unknown>>, Record<string, unknown> | undefined][] = [
+      [
+        'R15e pending 不触发（避免早期阶段误红）',
+        [{ ...confirmedNode, evidenceStatus: 'pending' }],
+        { signatureChainEntries: [] },
+      ],
+      ['R15e 未注入签名链（阶段 1 早期文件不存在）→ 不触发', [confirmedNode], undefined],
+      [
+        'R15e 存在引用该节点的 V review 环且 inputProvenance 指向锚点 → 不触发',
+        [confirmedNode],
         {
-          id: 'REQ-001',
-          type: 'REQ',
-          phase: 1,
-          title: 't',
-          summary: 's',
-          level: 1,
-          evidenceAnchor: 'docs/req.md:§4=x',
-          evidenceStatus: 'pending',
+          signatureChainEntries: [
+            {
+              role: 'V',
+              action: 'review',
+              artifacts: ['REQ-001'],
+              inputProvenance: { sourceArtifacts: [{ path: 'docs/req.md' }] },
+            },
+          ],
         },
       ],
-    });
-    const out = checkRequirementGraph(g, 1, { signatureChainEntries: [] });
-    expect(out.violations.some((v) => v.startsWith('R15e '))).toBe(false);
-  });
-
-  it('R15e 未注入签名链（阶段 1 早期文件不存在）→ 不触发', () => {
-    const g = makeGraph({});
-    const out = checkRequirementGraph(g, 1);
-    expect(out.violations.some((v) => v.startsWith('R15e '))).toBe(false);
-  });
-
-  it('R15e 存在引用该节点的 V review 环且 inputProvenance 指向锚点 → 不触发', () => {
-    const g = makeGraph({
-      nodes: [
-        {
-          id: 'REQ-001',
-          type: 'REQ',
-          phase: 1,
-          title: 't',
-          summary: 's',
-          level: 1,
-          evidenceAnchor: 'docs/req.md:§4=x',
-          evidenceStatus: 'confirmed',
-        },
-      ],
-    });
-    const out = checkRequirementGraph(g, 1, {
-      signatureChainEntries: [
-        {
-          role: 'V',
-          action: 'review',
-          artifacts: ['REQ-001'],
-          inputProvenance: { sourceArtifacts: [{ path: 'docs/req.md' }] },
-        },
-      ],
-    });
-    expect(out.violations.some((v) => v.startsWith('R15e '))).toBe(false);
+    ];
+    for (const [name, nodes, opts] of rows) {
+      const out = checkRequirementGraph(makeGraph({ nodes }), 1, opts as Record<string, unknown>);
+      expect(
+        out.violations.some((v) => v.startsWith('R15e ')),
+        `${name} 不应报 R15e`,
+      ).toBe(false);
+    }
   });
 
   /**
    * R15f 行号锚点越界。修复前 `path:L42` 只验 path 存在、不验行号，
    * 故 `x.md:L99999` 能通过门禁——锚点从"可证伪的证据"退化成"看起来像证据的字符串"。
    */
-  it('R15f 行号超出文件行数 → violation（须注入 anchorLineCounts）', () => {
-    const g = makeGraph({
-      nodes: [
-        {
-          id: 'REQ-001',
-          type: 'REQ',
-          phase: 1,
-          title: 't',
-          summary: 's',
-          level: 1,
-          evidenceAnchor: 'docs/req.md:L99999=不存在的行',
-          evidenceStatus: 'confirmed',
+  it('R15f 违规行（2 态：行号超出文件行数 / 区间倒置）→ violation（须注入 anchorLineCounts）', () => {
+    const rows: readonly [string, string, number, string[], ((g: Record<string, unknown>) => void) | null][] = [
+      [
+        'R15f 行号超出文件行数',
+        'docs/req.md:L99999=不存在的行',
+        30,
+        ['行号锚点越界', '超出文件 30 行'],
+        (g) => {
+          // 未注入行数表 → R15f 不触发（纯函数不做 I/O，行数由 CLI 注入）
+          expect(r15(checkRequirementGraph(g, 1), 'f'), '未注入行数表时 R15f 不应触发').toBeUndefined();
         },
       ],
-    });
-    // 未注入行数表 → R15f 不触发（纯函数不做 I/O，行数由 CLI 注入）
-    expect(r15(checkRequirementGraph(g, 1), 'f')).toBeUndefined();
-    // 注入行数表 → 越界触发
-    const out = checkRequirementGraph(g, 1, {
-      existingAnchorPaths: new Set(['docs/req.md']),
-      anchorLineCounts: new Map([['docs/req.md', 30]]),
-    });
-    expect(out.passed).toBe(false);
-    expect(r15(out, 'f')).toContain('行号锚点越界');
-    expect(r15(out, 'f')).toContain('超出文件 30 行');
+      ['R15f 区间倒置（end < start）', 'docs/req.md:L80-3=倒置区间', 200, ['区间非法'], null],
+    ];
+    for (const [name, anchor, lineCount, fragments, extra] of rows) {
+      const g = makeGraph({
+        nodes: [
+          {
+            id: 'REQ-001',
+            type: 'REQ',
+            phase: 1,
+            title: 't',
+            summary: 's',
+            level: 1,
+            evidenceAnchor: anchor,
+            evidenceStatus: 'confirmed',
+          },
+        ],
+      });
+      const out = checkRequirementGraph(g, 1, {
+        existingAnchorPaths: new Set(['docs/req.md']),
+        anchorLineCounts: new Map([['docs/req.md', lineCount]]),
+      });
+      expect(out.passed, `${name} 应 fail`).toBe(false);
+      for (const fragment of fragments) {
+        expect(r15(out, 'f'), `${name} 文案应含「${fragment}」`).toContain(fragment);
+      }
+      if (extra) extra(g);
+    }
   });
 
-  it('R15f 区间倒置（end < start）→ violation', () => {
-    const g = makeGraph({
-      nodes: [
-        {
-          id: 'REQ-001',
-          type: 'REQ',
-          phase: 1,
-          title: 't',
-          summary: 's',
-          level: 1,
-          evidenceAnchor: 'docs/req.md:L80-3=倒置区间',
-          evidenceStatus: 'confirmed',
-        },
-      ],
-    });
-    const out = checkRequirementGraph(g, 1, {
-      existingAnchorPaths: new Set(['docs/req.md']),
-      anchorLineCounts: new Map([['docs/req.md', 200]]),
-    });
-    expect(out.passed).toBe(false);
-    expect(r15(out, 'f')).toContain('区间非法');
-  });
-
-  it('R15f 行号在文件内 → 不触发', () => {
-    const g = makeGraph({
-      nodes: [
+  it('R15f 不触发行（3 态：行号在文件内 / path 不在行数表 / section 锚点无行号）→ 不误红', () => {
+    const rows: readonly [string, Record<string, unknown>, Map<string, number>][] = [
+      [
+        'R15f 行号在文件内',
         {
           id: 'REQ-001',
           type: 'REQ',
@@ -1635,18 +1615,10 @@ describe('R15a-f 证据锚点子项', () => {
           evidenceAnchor: 'docs/req.md:L5-12=合法区间',
           evidenceStatus: 'confirmed',
         },
+        new Map([['docs/req.md', 30]]),
       ],
-    });
-    const out = checkRequirementGraph(g, 1, {
-      existingAnchorPaths: new Set(['docs/req.md']),
-      anchorLineCounts: new Map([['docs/req.md', 30]]),
-    });
-    expect(r15(out, 'f')).toBeUndefined();
-  });
-
-  it('R15f path 不在行数表（不可读/未登记）→ 跳过，不误红', () => {
-    const g = makeGraph({
-      nodes: [
+      [
+        'R15f path 不在行数表（不可读/未登记）→ 跳过，不误红',
         {
           id: 'REQ-001',
           type: 'REQ',
@@ -1657,22 +1629,30 @@ describe('R15a-f 证据锚点子项', () => {
           evidenceAnchor: 'docs/req.md:L99999=越界但行数未知',
           evidenceStatus: 'confirmed',
         },
+        new Map([['other.md', 10]]),
       ],
-    });
-    const out = checkRequirementGraph(g, 1, {
-      existingAnchorPaths: new Set(['docs/req.md']),
-      anchorLineCounts: new Map([['other.md', 10]]),
-    });
-    expect(r15(out, 'f')).toBeUndefined();
-  });
-
-  it('R15f section 锚点无行号 → 不受行号校验', () => {
-    const g = makeGraph({});
-    const out = checkRequirementGraph(g, 1, {
-      existingAnchorPaths: new Set(['docs/req.md']),
-      anchorLineCounts: new Map([['docs/req.md', 1]]),
-    });
-    expect(r15(out, 'f')).toBeUndefined();
+      [
+        'R15f section 锚点无行号 → 不受行号校验',
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: 't',
+          summary: 's',
+          level: 1,
+          evidenceAnchor: 'docs/req.md:§4=x',
+          evidenceStatus: 'confirmed',
+        },
+        new Map([['docs/req.md', 1]]),
+      ],
+    ];
+    for (const [name, node, lineCounts] of rows) {
+      const out = checkRequirementGraph(makeGraph({ nodes: [node] }), 1, {
+        existingAnchorPaths: new Set(['docs/req.md']),
+        anchorLineCounts: lineCounts,
+      });
+      expect(r15(out, 'f'), `${name} 不应触发 R15f`).toBeUndefined();
+    }
   });
 });
 
@@ -1714,21 +1694,28 @@ describe('R16 节点 id 全项目唯一', () => {
     };
   }
 
-  it('id 唯一 → duplicateNodeIds 为空，不触发', () => {
-    const out = checkRequirementGraph(makeGraph(false), 1);
-    expect(out.duplicateNodeIds).toEqual([]);
-    expect(out.violations.some((v) => v.startsWith('R16 '))).toBe(false);
-    expect(out.passed).toBe(true);
-  });
-
-  it('重复 id → violation（修复前 Set 去重使两个节点被合并成一个判定单元）', () => {
-    const out = checkRequirementGraph(makeGraph(true), 1);
-    expect(out.totalNodes).toBe(3);
-    expect(out.duplicateNodeIds).toEqual(['REQ-002']);
-    expect(out.passed).toBe(false);
-    const r16 = out.violations.find((v) => v.startsWith('R16 '));
-    expect(r16).toContain('REQ-002');
-    expect(r16).toContain('全局唯一');
+  it('R16 duplicate id（2 态：id 唯一不触发 / 重复 id violation）', () => {
+    for (const duplicate of [false, true] as const) {
+      const name = duplicate
+        ? '重复 id → violation（修复前 Set 去重使两个节点被合并成一个判定单元）'
+        : 'id 唯一 → duplicateNodeIds 为空，不触发';
+      const out = checkRequirementGraph(makeGraph(duplicate), 1);
+      if (duplicate) {
+        expect(out.totalNodes, `${name} totalNodes 应为 3`).toBe(3);
+        expect(out.duplicateNodeIds, `${name} 应点名 REQ-002`).toEqual(['REQ-002']);
+        expect(out.passed, `${name} 应 fail`).toBe(false);
+        const r16 = out.violations.find((v) => v.startsWith('R16 '));
+        expect(r16, `${name} R16 文案应含 REQ-002`).toContain('REQ-002');
+        expect(r16, `${name} R16 文案应含「全局唯一」`).toContain('全局唯一');
+      } else {
+        expect(out.duplicateNodeIds, `${name} 应为空`).toEqual([]);
+        expect(
+          out.violations.some((v) => v.startsWith('R16 ')),
+          `${name} 不应报 R16`,
+        ).toBe(false);
+        expect(out.passed, `${name} 应通过`).toBe(true);
+      }
+    }
   });
 });
 

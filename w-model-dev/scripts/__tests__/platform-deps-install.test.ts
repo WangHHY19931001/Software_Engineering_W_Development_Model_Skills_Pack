@@ -469,95 +469,106 @@ describe('readArchiveEntries / extractArchive（自包含 tar 读取）', () => 
     await expect(fs.readFile(path.join(dir, 'package', 'lib', 'deep.txt'), 'utf8')).resolves.toBe('deep');
   });
 
-  it.each([
-    {
-      label: 'symlink',
-      entry: { kind: 'symlink' as const, path: 'package/bad.node', linkname: '/etc/passwd' },
-    },
-    {
-      label: 'hardlink',
-      entry: { kind: 'hardlink' as const, path: 'package/bad.node', linkname: 'package/index.js' },
-    },
-    {
-      label: '普通文件 linkname',
-      entry: {
-        kind: 'file' as const,
-        path: 'package/bad.node',
-        content: '',
-        linkname: '../outside',
+  it('extractArchive 在写入前拒绝链接条目（3 态：symlink / hardlink / 普通文件 linkname）', async () => {
+    const rows = [
+      { label: 'symlink', entry: { kind: 'symlink' as const, path: 'package/bad.node', linkname: '/etc/passwd' } },
+      {
+        label: 'hardlink',
+        entry: { kind: 'hardlink' as const, path: 'package/bad.node', linkname: 'package/index.js' },
       },
-    },
-  ])('extractArchive 在写入前拒绝 $label', async ({ entry }) => {
-    const dir = await makeTempDir('platform-deps-extract-link-');
-    const archive = makeTar([{ kind: 'file', path: 'package/first.txt', content: 'must-not-write' }, entry]);
+      {
+        label: '普通文件 linkname',
+        entry: {
+          kind: 'file' as const,
+          path: 'package/bad.node',
+          content: '',
+          linkname: '../outside',
+        },
+      },
+    ];
+    for (const { label, entry } of rows) {
+      // 每迭代自备 fixture（独立临时目录，失败不污染后续迭代定位）
+      const dir = await makeTempDir('platform-deps-extract-link-');
+      const archive = makeTar([{ kind: 'file', path: 'package/first.txt', content: 'must-not-write' }, entry]);
 
-    await expect(extractArchive(archive, dir)).rejects.toThrow(/链接/);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is the isolated caller-owned extraction root
-    await expect(fs.readdir(dir)).resolves.toEqual([]);
-  });
+      await expect(extractArchive(archive, dir), `entry=${label} 应拒绝链接`).rejects.toThrow(/链接/);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is the isolated caller-owned extraction root
+      await expect(fs.readdir(dir), `entry=${label} 应零写入`).resolves.toEqual([]);
+    }
+  }, 60_000);
 
-  it.each([
-    '/absolute.txt',
-    `C:\\absolute-${randomUUID()}.txt`,
-    'package/../../traversal.txt',
-    'package/./dot.txt',
-    'package//empty.txt',
-    `package/nul-${randomUUID()}\0outside`,
-  ])('extractArchive 在写入前拒绝不安全路径 %s', async (archivePath) => {
-    const dir = await makeTempDir('platform-deps-extract-path-');
-    const archive = archivePath.includes('\0')
-      ? makeTar([
-          { kind: 'file', path: 'package/first.txt', content: 'must-not-write' },
-          {
-            kind: 'file',
-            path: 'package/safe-name',
-            paxRecords: [['path', archivePath]],
-            content: 'blocked',
-          },
-        ])
-      : makeTar([
-          { kind: 'file', path: 'package/first.txt', content: 'must-not-write' },
-          { kind: 'file', path: archivePath, content: 'blocked' },
-        ]);
+  it('extractArchive 在写入前拒绝不安全路径（6 路径）', async () => {
+    const unsafePaths = [
+      '/absolute.txt',
+      `C:\\absolute-${randomUUID()}.txt`,
+      'package/../../traversal.txt',
+      'package/./dot.txt',
+      'package//empty.txt',
+      `package/nul-${randomUUID()}\0outside`,
+    ];
+    for (const archivePath of unsafePaths) {
+      // 每迭代自备 fixture（独立临时目录，失败不污染后续迭代定位）
+      const dir = await makeTempDir('platform-deps-extract-path-');
+      const archive = archivePath.includes('\0')
+        ? makeTar([
+            { kind: 'file', path: 'package/first.txt', content: 'must-not-write' },
+            {
+              kind: 'file',
+              path: 'package/safe-name',
+              paxRecords: [['path', archivePath]],
+              content: 'blocked',
+            },
+          ])
+        : makeTar([
+            { kind: 'file', path: 'package/first.txt', content: 'must-not-write' },
+            { kind: 'file', path: archivePath, content: 'blocked' },
+          ]);
 
-    await expect(extractArchive(archive, dir)).rejects.toThrow(/不安全路径/);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is the isolated caller-owned extraction root
-    await expect(fs.readdir(dir)).resolves.toEqual([]);
-  });
+      await expect(extractArchive(archive, dir), `path=${JSON.stringify(archivePath)} 应拒绝`).rejects.toThrow(
+        /不安全路径/,
+      );
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is the isolated caller-owned extraction root
+      await expect(fs.readdir(dir), `path=${JSON.stringify(archivePath)} 应零写入`).resolves.toEqual([]);
+    }
+  }, 60_000);
 
-  it.each([
-    {
-      label: 'duplicate canonical path',
-      entries: [
-        { kind: 'file' as const, path: 'package/duplicate.txt', content: 'first' },
-        { kind: 'file' as const, path: 'package\\duplicate.txt', content: 'second' },
-      ],
-      message: /重复|duplicate/i,
-    },
-    {
-      label: 'directory/file same-path conflict',
-      entries: [
-        { kind: 'directory' as const, path: 'package/conflict/' },
-        { kind: 'file' as const, path: 'package\\conflict', content: 'blocked' },
-      ],
-      message: /重复|冲突|duplicate|conflict/i,
-    },
-    {
-      label: 'non-adjacent file ancestor conflict',
-      entries: [
-        { kind: 'file' as const, path: 'package/prefix', content: 'file' },
-        { kind: 'file' as const, path: 'package/separator', content: 'separator' },
-        { kind: 'file' as const, path: 'package/prefix/descendant.txt', content: 'blocked' },
-      ],
-      message: /文件\/目录路径冲突/,
-    },
-  ])('extractArchive 在 FS write 前拒绝 $label', async ({ entries, message }) => {
-    const dir = await makeTempDir('platform-deps-extract-conflict-');
+  it('extractArchive 在 FS write 前拒绝冲突（3 场景：duplicate canonical path / directory-file same-path / non-adjacent file ancestor）', async () => {
+    const rows = [
+      {
+        label: 'duplicate canonical path',
+        entries: [
+          { kind: 'file' as const, path: 'package/duplicate.txt', content: 'first' },
+          { kind: 'file' as const, path: 'package\\duplicate.txt', content: 'second' },
+        ],
+        message: /重复|duplicate/i,
+      },
+      {
+        label: 'directory/file same-path conflict',
+        entries: [
+          { kind: 'directory' as const, path: 'package/conflict/' },
+          { kind: 'file' as const, path: 'package\\conflict', content: 'blocked' },
+        ],
+        message: /重复|冲突|duplicate|conflict/i,
+      },
+      {
+        label: 'non-adjacent file ancestor conflict',
+        entries: [
+          { kind: 'file' as const, path: 'package/prefix', content: 'file' },
+          { kind: 'file' as const, path: 'package/separator', content: 'separator' },
+          { kind: 'file' as const, path: 'package/prefix/descendant.txt', content: 'blocked' },
+        ],
+        message: /文件\/目录路径冲突/,
+      },
+    ];
+    for (const { label, entries, message } of rows) {
+      // 每迭代自备 fixture（独立临时目录，失败不污染后续迭代定位）
+      const dir = await makeTempDir('platform-deps-extract-conflict-');
 
-    await expect(extractArchive(makeTar(entries), dir)).rejects.toThrow(message);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is the isolated caller-owned extraction root
-    await expect(fs.readdir(dir)).resolves.toEqual([]);
-  });
+      await expect(extractArchive(makeTar(entries), dir), `label=${label} 应拒绝冲突`).rejects.toThrow(message);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir is the isolated caller-owned extraction root
+      await expect(fs.readdir(dir), `label=${label} 应零写入`).resolves.toEqual([]);
+    }
+  }, 60_000);
 
   it('extractArchive 拒绝既有 file ancestor，不覆盖 caller root 条目', async () => {
     const dir = await makeTempDir('platform-deps-extract-existing-');
@@ -672,26 +683,20 @@ describe('parseArgs（CLI 参数契约）', () => {
     ]);
   });
 
-  it.each([
-    { args: [], why: '缺少全部参数' },
-    { args: ['--package=@esbuild/linux-x64'], why: '缺少 --lockfile' },
-    { args: ['--lockfile=C:\\a\\package-lock.json'], why: '缺少 --package' },
-    { args: [...base, '--bogus=1'], why: '未知参数' },
-    {
-      args: ['--lockfile=C:\\a\\package-lock.json', '--package'],
-      why: '--package 缺 = 取值',
-    },
-    {
-      args: ['--lockfile=relative\\lock.json', '--package=x'],
-      why: 'lockfile 非绝对路径',
-    },
-    { args: ['--lockfile=C:\\a\\lock.json', '--package='], why: '空包名' },
-    {
-      args: ['--lockfile=C:\\a\\lock.json', '--package=../../escape'],
-      why: '包名路径穿越',
-    },
-  ])('拒绝非法参数：$why', ({ args }) => {
-    expect(() => parseArgs(asArgv(args))).toThrow();
+  it('拒绝非法参数（8 组合：缺参 / 未知参数 / 非绝对路径 / 空包名 / 路径穿越）', () => {
+    const rows: readonly [string[], string][] = [
+      [[], '缺少全部参数'],
+      [['--package=@esbuild/linux-x64'], '缺少 --lockfile'],
+      [['--lockfile=C:\\a\\package-lock.json'], '缺少 --package'],
+      [[...base, '--bogus=1'], '未知参数'],
+      [['--lockfile=C:\\a\\package-lock.json', '--package'], '--package 缺 = 取值'],
+      [['--lockfile=relative\\lock.json', '--package=x'], 'lockfile 非绝对路径'],
+      [['--lockfile=C:\\a\\lock.json', '--package='], '空包名'],
+      [['--lockfile=C:\\a\\lock.json', '--package=../../escape'], '包名路径穿越'],
+    ];
+    for (const [args, why] of rows) {
+      expect(() => parseArgs(asArgv(args)), `why=${why}`).toThrow();
+    }
   });
 
   it('--help 返回 help 分支', () => {
@@ -1160,20 +1165,21 @@ describe('CLI 子进程 exit 契约（离线，--tarball 注入）', () => {
     await assertNoStagingLeftover(fixture.repoDir);
   });
 
-  it.each([
-    { args: [], why: '无任何参数' },
-    { args: ['--package=@esbuild/linux-x64'], why: '缺 --lockfile' },
-    { args: ['--lockfile=C:\\abs\\lock.json'], why: '缺 --package' },
-    {
-      args: ['--lockfile=rel\\lock.json', '--package=x'],
-      why: 'lockfile 非绝对路径',
-    },
-  ])('退出码 2：$why', async ({ args }) => {
-    const result = runCli(args);
-    expect(result.code).toBe(2);
-    expect(result.stdout).toContain('用法');
-    expect(result.stdout).toMatch(/ERROR_JSON .*"rule":"P0-1"/);
-  });
+  it('退出码 2（4 组合：无参数 / 缺 --lockfile / 缺 --package / lockfile 非绝对路径）', async () => {
+    const rows: readonly [string[], string][] = [
+      [[], '无任何参数'],
+      [['--package=@esbuild/linux-x64'], '缺 --lockfile'],
+      [['--lockfile=C:\\abs\\lock.json'], '缺 --package'],
+      [['--lockfile=rel\\lock.json', '--package=x'], 'lockfile 非绝对路径'],
+    ];
+    for (const [args, why] of rows) {
+      // 每迭代独立 CLI 子进程（无共享 fixture：exit-2 在参数解析期触发，不读盘）
+      const result = runCli(args);
+      expect(result.code, `why=${why} 退出码应为 2`).toBe(2);
+      expect(result.stdout, `why=${why} 应含用法`).toContain('用法');
+      expect(result.stdout, `why=${why} 应报 P0-1`).toMatch(/ERROR_JSON .*"rule":"P0-1"/);
+    }
+  }, 120_000);
 
   it('退出码 2：--tarball 文件不可读（FILE_NOT_FOUND）', async () => {
     const fixture = await makeFixture();

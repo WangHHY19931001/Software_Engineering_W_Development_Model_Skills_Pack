@@ -9,6 +9,8 @@
  *   - 无 --phase → undefined
  *   - 重复 --phase（任意形态合并计数）→ DuplicateFlagError（D3/I-3）
  *   - phaseFlagPresent 形态无关存在性判定（D3/I-4）
+ *
+ * 同质用例已按「循环内多断言 + 逐行具名消息」聚合（wave 3 第 B 批）。
  */
 
 import { describe, expect, it } from 'vitest';
@@ -17,77 +19,74 @@ import { DuplicateFlagError } from '../lib/parse-args.js';
 import { parsePhaseArg, phaseFlagPresent } from '../lib/parse-phase.js';
 
 describe('parsePhaseArg', () => {
-  describe('--phase=N 形态', () => {
-    it('--phase=5 → { phase: 5, raw: "5" }', () => {
-      expect(parsePhaseArg(['node', 'script.ts', '--phase=5'])).toEqual({ phase: 5, raw: '5' });
+  describe('正例识别行', () => {
+    it('等号形态行（4 行：基本 / 边界 1 / 边界 8 / 夹杂其它参数）', () => {
+      const rows: readonly [string, string[], { phase: number; raw: string }][] = [
+        ['--phase=5（带前置参数）', ['node', 'script.ts', '--phase=5'], { phase: 5, raw: '5' }],
+        ['--phase=1（下边界）', ['--phase=1'], { phase: 1, raw: '1' }],
+        ['--phase=8（上边界）', ['--phase=8'], { phase: 8, raw: '8' }],
+        ['--phase=3 夹在其它参数间', ['x.json', '--phase=3', '--spec=a'], { phase: 3, raw: '3' }],
+      ];
+      for (const [name, argv, expected] of rows) {
+        expect(parsePhaseArg([...argv]), `${name} 应识别为 phase`).toEqual(expected);
+      }
     });
 
-    it('--phase=1 与 --phase=8（边界）→ 1 / 8', () => {
-      expect(parsePhaseArg(['--phase=1'])).toEqual({ phase: 1, raw: '1' });
-      expect(parsePhaseArg(['--phase=8'])).toEqual({ phase: 8, raw: '8' });
-    });
-
-    it('出现在其它参数之间也能识别', () => {
-      expect(parsePhaseArg(['x.json', '--phase=3', '--spec=a'])).toEqual({ phase: 3, raw: '3' });
-    });
-  });
-
-  describe('--phase N（空格分离）形态', () => {
-    it('--phase 5 → { phase: 5, raw: "5" }', () => {
-      expect(parsePhaseArg(['node', 'script.ts', '--phase', '5'])).toEqual({ phase: 5, raw: '5' });
-    });
-
-    it('--phase 8 → 8', () => {
-      expect(parsePhaseArg(['--phase', '8'])).toEqual({ phase: 8, raw: '8' });
-    });
-  });
-
-  describe('位置参数（positional）', () => {
-    it('positional: 0 → { phase: 5, raw: "5" }', () => {
-      expect(parsePhaseArg(['5'], { positional: 0 })).toEqual({ phase: 5, raw: '5' });
-    });
-
-    it('未指定 positional 时不读位置参数', () => {
-      expect(parsePhaseArg(['5'])).toBeUndefined();
+    it('空格形态与位置参数行（4 行）', () => {
+      const rows: readonly [string, string[], { phase: number; raw: string }][] = [
+        ['--phase 5（空格分离，带前置参数）', ['node', 'script.ts', '--phase', '5'], { phase: 5, raw: '5' }],
+        ['--phase 8（空格分离）', ['--phase', '8'], { phase: 8, raw: '8' }],
+      ];
+      for (const [name, argv, expected] of rows) {
+        expect(parsePhaseArg([...argv]), `${name} 应识别为 phase`).toEqual(expected);
+      }
+      expect(parsePhaseArg(['5'], { positional: 0 }), 'positional:0 时位置参数 5 应识别为 phase').toEqual({
+        phase: 5,
+        raw: '5',
+      });
+      expect(parsePhaseArg(['5']), '未指定 positional 时位置参数 5 不应被读取').toBeUndefined();
     });
   });
 
   describe('非法值 → undefined', () => {
-    it.each(['abc', '0', '9', '-1', '', ' 5', '5x', '3.7'])('--phase=%s → undefined', (bad) => {
-      expect(parsePhaseArg([`--phase=${bad}`])).toBeUndefined();
+    it('等号形态非法值（8 值）', () => {
+      for (const bad of ['abc', '0', '9', '-1', '', ' 5', '5x', '3.7'] as const) {
+        expect(parsePhaseArg([`--phase=${bad}`]), `bad=${bad}（--phase=${bad}）应拒绝`).toBeUndefined();
+      }
     });
 
-    it('--phase= 空串 → undefined', () => {
-      expect(parsePhaseArg(['--phase='])).toBeUndefined();
-    });
-
-    it('--phase 后无值（argv 末尾）→ undefined', () => {
-      expect(parsePhaseArg(['--phase'])).toBeUndefined();
-    });
-
-    it('空格分离非法值 --phase abc → undefined', () => {
-      expect(parsePhaseArg(['--phase', 'abc'])).toBeUndefined();
-    });
-
-    it('空格分离越界 --phase 9 → undefined', () => {
-      expect(parsePhaseArg(['--phase', '9'])).toBeUndefined();
+    it('空格/缺值负例族（4 态）', () => {
+      expect(parsePhaseArg(['--phase=']), '等号形态空串应拒绝').toBeUndefined();
+      expect(parsePhaseArg(['--phase']), '--phase 后无值（argv 末尾）应拒绝').toBeUndefined();
+      expect(parsePhaseArg(['--phase', 'abc']), '空格分离非法值 abc 应拒绝').toBeUndefined();
+      expect(parsePhaseArg(['--phase', '9']), '空格分离越界 9 应拒绝').toBeUndefined();
     });
   });
 
   describe('min/max 自定义', () => {
-    it('min:5,max:8 时 --phase=5 与 --phase=8 通过', () => {
-      expect(parsePhaseArg(['--phase=5'], { min: 5, max: 8 })).toEqual({ phase: 5, raw: '5' });
-      expect(parsePhaseArg(['--phase=8'], { min: 5, max: 8 })).toEqual({ phase: 8, raw: '8' });
+    it('通过行（3 行：min:5,max:8 两边界 + min:1,max:4 上边界）', () => {
+      const rows: readonly [string, number, { min: number; max: number }][] = [
+        ['--phase=5（min:5,max:8 下边界）', 5, { min: 5, max: 8 }],
+        ['--phase=8（min:5,max:8 上边界）', 8, { min: 5, max: 8 }],
+        ['--phase=4（min:1,max:4 上边界，plan-chunks 语义）', 4, { min: 1, max: 4 }],
+      ];
+      for (const [name, phase, range] of rows) {
+        expect(parsePhaseArg([`--phase=${phase}`], range), `${name} 应通过`).toEqual({
+          phase,
+          raw: String(phase),
+        });
+      }
     });
 
-    it('min:5,max:8 时 --phase=4 与 --phase=9 拒绝', () => {
-      expect(parsePhaseArg(['--phase=4'], { min: 5, max: 8 })).toBeUndefined();
-      expect(parsePhaseArg(['--phase=9'], { min: 5, max: 8 })).toBeUndefined();
-    });
-
-    it('min:1,max:4（plan-chunks 语义）时 --phase=4 通过、--phase=5 拒绝', () => {
-      expect(parsePhaseArg(['--phase=4'], { min: 1, max: 4 })).toEqual({ phase: 4, raw: '4' });
-      expect(parsePhaseArg(['--phase=5'], { min: 1, max: 4 })).toBeUndefined();
+    it('拒绝行（3 行：min:5,max:8 两侧越界 + min:1,max:4 越上界）', () => {
+      const rows: readonly [string, number, { min: number; max: number }][] = [
+        ['--phase=4（min:5,max:8 低于下界）', 4, { min: 5, max: 8 }],
+        ['--phase=9（min:5,max:8 高于上界）', 9, { min: 5, max: 8 }],
+        ['--phase=5（min:1,max:4 高于上界）', 5, { min: 1, max: 4 }],
+      ];
+      for (const [name, phase, range] of rows) {
+        expect(parsePhaseArg([`--phase=${phase}`], range), `${name} 应拒绝`).toBeUndefined();
+      }
     });
   });
 

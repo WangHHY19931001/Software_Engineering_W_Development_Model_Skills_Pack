@@ -217,22 +217,56 @@ describe('checkCodingPlan（R1 plan 存在 + 前缀）', () => {
 });
 
 describe('checkCodingPlan（R2 任务节与验证命令行）', () => {
-  it('R2: 任务节缺验证命令行 → violation（含任务节标题）', () => {
-    const files = withFile(validTreeFiles(), PLAN_KEY, validPlanText().replace('验证：npm test\n', ''));
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('Task 1') && v.includes('验证命令行'))).toBe(true);
+  it('R2 负例族·违规行（3 态：缺验证行 / 禁用字符 / 零任务节）→ violation', () => {
+    const rows: readonly [string, string, string[], ((r: ReturnType<typeof checkCodingPlan>) => void) | null][] = [
+      [
+        'R2: 任务节缺验证命令行（含任务节标题）',
+        validPlanText().replace('验证：npm test\n', ''),
+        ['Task 1', '验证命令行'],
+        null,
+      ],
+      [
+        'R2: 验证命令体含禁用字符（; & |）（RTM evidence command 同规）',
+        validPlanText().replace('验证：npm test', '验证：npm test && npm run lint'),
+        ['命令体'],
+        null,
+      ],
+      [
+        'R2: 零任务节',
+        '# phase5-demo 编码计划\n\n## 目标\n\n只有目标。\n',
+        ['任务节'],
+        (r) => {
+          expect(r.tasksTotal, 'R2: 零任务节 → tasksTotal 应为 0').toBe(0);
+        },
+      ],
+    ];
+    for (const [name, planText, tokens, extra] of rows) {
+      const files = withFile(validTreeFiles(), PLAN_KEY, planText);
+      const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
+      expect(r.passed, `${name} 应 fail`).toBe(false);
+      expect(
+        r.violations.some((v) => tokens.every((t) => v.includes(t))),
+        `${name} 应报含 ${tokens.join(' + ')} 的 violation`,
+      ).toBe(true);
+      if (extra) extra(r);
+    }
   });
 
-  it('R2: 验证命令体含禁用字符（; & |）→ violation（RTM evidence command 同规）', () => {
-    const files = withFile(
-      validTreeFiles(),
-      PLAN_KEY,
-      validPlanText().replace('验证：npm test', '验证：npm test && npm run lint'),
-    );
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('命令体'))).toBe(true);
+  it('R2 负例族·判别力行（2 态：缺目标节 / 「非目标」节不充数）→ 仍报缺目标节', () => {
+    const rows: readonly [string, string, string][] = [
+      ['R2: 缺目标节', validPlanText().replace('## 目标', '## 背景说明'), '目标节'],
+      // 判据排除非目标/不是目标（2026-09-22 打磨）
+      ['R2: 仅有「非目标」节不充数目标节', validPlanText().replace('## 目标', '## 非目标'), '缺目标节'],
+    ];
+    for (const [name, planText, token] of rows) {
+      const files = withFile(validTreeFiles(), PLAN_KEY, planText);
+      const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
+      expect(r.passed, `${name} 应 fail`).toBe(false);
+      expect(
+        r.violations.some((v) => v.includes(token)),
+        `${name} 应报 ${token}`,
+      ).toBe(true);
+    }
   });
 
   it('R2: 全角冒号「Verify：」前缀的验证行被识别（VERIFY_PREFIXES 全角形态，2026-09-22 打磨）', () => {
@@ -240,28 +274,6 @@ describe('checkCodingPlan（R2 任务节与验证命令行）', () => {
     const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
     expect(r.passed).toBe(true);
     expect(r.violations).toEqual([]);
-  });
-
-  it('R2: 缺目标节 → violation', () => {
-    const files = withFile(validTreeFiles(), PLAN_KEY, validPlanText().replace('## 目标', '## 背景说明'));
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('目标节'))).toBe(true);
-  });
-
-  it('R2: 仅有「非目标」节不充数目标节 → 仍报缺目标节（判据排除非目标/不是目标，2026-09-22 打磨）', () => {
-    const files = withFile(validTreeFiles(), PLAN_KEY, validPlanText().replace('## 目标', '## 非目标'));
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('缺目标节'))).toBe(true);
-  });
-
-  it('R2: 零任务节 → violation', () => {
-    const files = withFile(validTreeFiles(), PLAN_KEY, '# phase5-demo 编码计划\n\n## 目标\n\n只有目标。\n');
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('任务节'))).toBe(true);
-    expect(r.tasksTotal).toBe(0);
   });
 });
 
@@ -317,93 +329,134 @@ describe('checkCodingPlan（CRLF 行尾归一化，内容级保持）', () => {
 });
 
 describe('checkCodingPlan（R3 账本）', () => {
-  it('R3: 账本缺失 → violation（bad-missing-ledger 形态）', () => {
-    const files = withoutKeys(validTreeFiles(), LEDGER_DIR);
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('progress.md') && v.includes('缺失'))).toBe(true);
-  });
-
-  it('R3: 账本首行身份不符 → violation', () => {
-    const files = withFile(
-      validTreeFiles(),
-      LEDGER_KEY,
-      `${VALID_LEDGER_LINES.join('\n')}\n`.replace('# SDD ledger — plan: ', '# 随手记: '),
-    );
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('首行'))).toBe(true);
-  });
-
-  it('R3: 首行为空行（身份行退居第二行）→ 仍报首行身份不符（严格取文件第一行，不回退首个非空行，2026-09-22 打磨）', () => {
-    const files = withFile(validTreeFiles(), LEDGER_KEY, `\n${VALID_LEDGER_LINES.join('\n')}\n`);
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('首行身份不符'))).toBe(true);
-  });
-
-  it('R3: 账本缺某任务 complete 行 → violation 具名到任务号', () => {
-    const files = withFile(
-      validTreeFiles(),
-      LEDGER_KEY,
-      `${VALID_LEDGER_LINES.join('\n')}\n`.replace(
-        'Task 2: complete (commits b..c, review clean)',
-        'Task 2: in progress',
-      ),
-    );
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.tasksCompleted).toBe(1);
-    expect(r.violations.some((v) => v.includes('Task 2') && v.includes('complete'))).toBe(true);
-  });
-
-  it('R3: 首行身份指向别的 plan → violation（基名绑定）', () => {
-    const files = withFile(
-      validTreeFiles(),
-      LEDGER_KEY,
-      `${VALID_LEDGER_LINES.join('\n')}\n`.replace('docs/plans/phase5-demo.plan.md', 'docs/plans/phase5-other.plan.md'),
-    );
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('首行'))).toBe(true);
+  it('R3 负例族（5 态：缺账本 / 首行身份不符 / 首行空行 / 缺 complete / 基名绑定）→ violation 具名', () => {
+    const rows: readonly [
+      string,
+      Record<string, string>,
+      string[],
+      ((r: ReturnType<typeof checkCodingPlan>) => void) | null,
+    ][] = [
+      [
+        'R3: 账本缺失（bad-missing-ledger 形态）',
+        withoutKeys(validTreeFiles(), LEDGER_DIR),
+        ['progress.md', '缺失'],
+        null,
+      ],
+      [
+        'R3: 账本首行身份不符',
+        withFile(
+          validTreeFiles(),
+          LEDGER_KEY,
+          `${VALID_LEDGER_LINES.join('\n')}\n`.replace('# SDD ledger — plan: ', '# 随手记: '),
+        ),
+        ['首行'],
+        null,
+      ],
+      [
+        'R3: 首行为空行（身份行退居第二行；严格取文件第一行，不回退首个非空行，2026-09-22 打磨）',
+        withFile(validTreeFiles(), LEDGER_KEY, `\n${VALID_LEDGER_LINES.join('\n')}\n`),
+        ['首行身份不符'],
+        null,
+      ],
+      [
+        'R3: 账本缺某任务 complete 行（具名到任务号）',
+        withFile(
+          validTreeFiles(),
+          LEDGER_KEY,
+          `${VALID_LEDGER_LINES.join('\n')}\n`.replace(
+            'Task 2: complete (commits b..c, review clean)',
+            'Task 2: in progress',
+          ),
+        ),
+        ['Task 2', 'complete'],
+        (r) => {
+          expect(r.tasksCompleted, 'R3: 缺 Task 2 complete → tasksCompleted 应为 1').toBe(1);
+        },
+      ],
+      [
+        'R3: 首行身份指向别的 plan（基名绑定）',
+        withFile(
+          validTreeFiles(),
+          LEDGER_KEY,
+          `${VALID_LEDGER_LINES.join('\n')}\n`.replace(
+            'docs/plans/phase5-demo.plan.md',
+            'docs/plans/phase5-other.plan.md',
+          ),
+        ),
+        ['首行'],
+        null,
+      ],
+    ];
+    for (const [name, files, tokens, extra] of rows) {
+      const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
+      expect(r.passed, `${name} 应 fail`).toBe(false);
+      expect(
+        r.violations.some((v) => tokens.every((t) => v.includes(t))),
+        `${name} 应报含 ${tokens.join(' + ')} 的 violation`,
+      ).toBe(true);
+      if (extra) extra(r);
+    }
   });
 });
 
 describe('checkCodingPlan（R4 任务三件套）', () => {
-  it('R4: 已完成任务的 report 缺失 → violation', () => {
-    const files = withoutKeys(validTreeFiles(), join(LEDGER_DIR, 'task-2-report.md'));
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('task-2-report.md'))).toBe(true);
-  });
-
-  it('R4: 已完成任务的 brief 为 0 字节 → violation（非空判据；stub statSync.size 按内容字节派生）', () => {
-    const files = withFile(validTreeFiles(), join(LEDGER_DIR, 'task-1-brief.md'), '');
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('task-1-brief.md'))).toBe(true);
-  });
-
-  it('R4: 无 review-*.diff → violation', () => {
-    const files = withoutKeys(validTreeFiles(), join(LEDGER_DIR, 'review-abc1234.diff'));
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('review-') && v.includes('.diff'))).toBe(true);
-  });
-
-  it('R4: 账本 complete 超出 plan 任务节（Task 5）而三件套缺 → 并集语义仍须查（修复轮 1 负例）', () => {
-    const files = withFile(
-      validTreeFiles(),
-      LEDGER_KEY,
-      `${ledgerText(CHANGE_ID)}Task 5: complete (commits d..e, review clean)\n`,
-    );
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.tasksCompleted).toBe(3);
-    // plan 无 Task 5 节（R3 不报），但 R4 以「plan 序号 ∪ complete 号」并集查三件套
-    expect(r.violations.some((v) => v.includes('task-5-brief.md'))).toBe(true);
-    expect(r.violations.some((v) => v.includes('task-5-report.md'))).toBe(true);
-    expect(r.violations.some((v) => v.includes('Task 5') && v.includes('complete 行'))).toBe(false);
+  it('R4 负例族（4 态：report 缺失 / brief 0 字节 / 无 review diff / complete 超出任务节）→ violation 含缺失三件套名', () => {
+    const rows: readonly [
+      string,
+      Record<string, string>,
+      [string, string | null][],
+      ((r: ReturnType<typeof checkCodingPlan>) => void) | null,
+    ][] = [
+      [
+        'R4: 已完成任务的 report 缺失',
+        withoutKeys(validTreeFiles(), join(LEDGER_DIR, 'task-2-report.md')),
+        [['task-2-report.md', null]],
+        null,
+      ],
+      [
+        'R4: 已完成任务的 brief 为 0 字节（非空判据；stub statSync.size 按内容字节派生）',
+        withFile(validTreeFiles(), join(LEDGER_DIR, 'task-1-brief.md'), ''),
+        [['task-1-brief.md', null]],
+        null,
+      ],
+      [
+        'R4: 无 review-*.diff',
+        withoutKeys(validTreeFiles(), join(LEDGER_DIR, 'review-abc1234.diff')),
+        [['review-', '.diff']],
+        null,
+      ],
+      [
+        'R4: 账本 complete 超出 plan 任务节（Task 5）而三件套缺 → 并集语义仍须查（修复轮 1 负例）',
+        withFile(
+          validTreeFiles(),
+          LEDGER_KEY,
+          `${ledgerText(CHANGE_ID)}Task 5: complete (commits d..e, review clean)\n`,
+        ),
+        [
+          ['task-5-brief.md', null],
+          ['task-5-report.md', null],
+        ],
+        (r) => {
+          expect(r.tasksCompleted, 'R4: complete 超出任务节 → tasksCompleted 应为 3').toBe(3);
+          // plan 无 Task 5 节（R3 不报），但 R4 以「plan 序号 ∪ complete 号」并集查三件套
+          expect(
+            r.violations.some((v) => v.includes('Task 5') && v.includes('complete 行')),
+            'R4: 并集语义不应报 Task 5 缺 complete 行',
+          ).toBe(false);
+        },
+      ],
+    ];
+    for (const [name, files, tokenPairs, extra] of rows) {
+      const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
+      expect(r.passed, `${name} 应 fail`).toBe(false);
+      for (const [token, token2] of tokenPairs) {
+        expect(
+          r.violations.some((v) => (token2 === null ? v.includes(token) : v.includes(token) && v.includes(token2))),
+          `${name} 应具名 ${token}${token2 ? `（${token2}）` : ''}`,
+        ).toBe(true);
+      }
+      if (extra) extra(r);
+    }
   });
 
   it('R4（伴例）: 账本 complete 超出 plan 任务节但 task-5 三件套齐备 → 不假阳性', () => {
@@ -428,19 +481,50 @@ describe('checkCodingPlan（R4 任务三件套）', () => {
 });
 
 describe('checkCodingPlan（R5 审查产物，stage 词表 plan/execute/finalize）', () => {
-  it('R5: 缺一份 R3 报告 → violation 具名文件', () => {
-    const files = withoutKeys(validTreeFiles(), join(ROOT, '.w-model', 'r3-reviews', 'phase5-execute-security.md'));
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('phase5-execute-security.md'))).toBe(true);
-    expect(r.reviewsFound).toHaveLength(11);
-  });
-
-  it('R5: 缺一份 V 评审 → violation 具名文件', () => {
-    const files = withoutKeys(validTreeFiles(), join(ROOT, '.w-model', 'v-reviews', 'phase5-finalize.md'));
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('phase5-finalize.md'))).toBe(true);
+  it('R5 负例族（4 态：缺 R3 / 缺 V / R3 0 字节 / V 0 字节）→ violation 具名文件', () => {
+    const R3_DIR = join(ROOT, '.w-model', 'r3-reviews');
+    const V_DIR = join(ROOT, '.w-model', 'v-reviews');
+    const rows: readonly [string, Record<string, string>, string, string | null, number | null][] = [
+      [
+        'R5: 缺一份 R3 报告',
+        withoutKeys(validTreeFiles(), join(R3_DIR, 'phase5-execute-security.md')),
+        'phase5-execute-security.md',
+        null,
+        11,
+      ],
+      [
+        'R5: 缺一份 V 评审',
+        withoutKeys(validTreeFiles(), join(V_DIR, 'phase5-finalize.md')),
+        'phase5-finalize.md',
+        null,
+        null,
+      ],
+      [
+        'R5: R3 审查文件为 0 字节（内容下限阻断；0 字节文件不算有效审查产物）',
+        withFile(validTreeFiles(), join(R3_DIR, 'phase5-plan-completeness.md'), ''),
+        'phase5-plan-completeness.md',
+        '空',
+        11,
+      ],
+      [
+        'R5: V 评审为 0 字节（V×3 同受非空下限约束）',
+        withFile(validTreeFiles(), join(V_DIR, 'phase5-finalize.md'), ''),
+        'phase5-finalize.md',
+        '空',
+        null,
+      ],
+    ];
+    for (const [name, files, token, token2, expectedReviews] of rows) {
+      const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
+      expect(r.passed, `${name} 应 fail`).toBe(false);
+      expect(
+        r.violations.some((v) => (token2 === null ? v.includes(token) : v.includes(token) && v.includes(token2))),
+        `${name} 应具名 ${token}${token2 ? `（${token2}）` : ''}`,
+      ).toBe(true);
+      if (expectedReviews !== null) {
+        expect(r.reviewsFound, `${name} reviewsFound 应为 ${expectedReviews}`).toHaveLength(expectedReviews);
+      }
+    }
   });
 
   it('R5: 旧 stage 词表（explore）不充数——R3×9 须为 plan/execute/finalize', () => {
@@ -462,20 +546,7 @@ describe('checkCodingPlan（R5 内容下限，2026-09-25 任务 2）', () => {
   const R3_DIR = join(ROOT, '.w-model', 'r3-reviews');
   const V_DIR = join(ROOT, '.w-model', 'v-reviews');
 
-  it('R5: R3 审查文件为 0 字节 → violation（内容下限阻断，具名文件）', () => {
-    const files = withFile(validTreeFiles(), join(R3_DIR, 'phase5-plan-completeness.md'), '');
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('phase5-plan-completeness.md') && v.includes('空'))).toBe(true);
-    expect(r.reviewsFound).toHaveLength(11); // 0 字节文件不算有效审查产物
-  });
-
-  it('R5: V 评审为 0 字节 → violation（V×3 同受非空下限约束）', () => {
-    const files = withFile(validTreeFiles(), join(V_DIR, 'phase5-finalize.md'), '');
-    const r = checkCodingPlan(ROOT, 5, CHANGE_ID, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('phase5-finalize.md') && v.includes('空'))).toBe(true);
-  });
+  // 0 字节负例两态已并入「R5 负例族（4 态）」循环（见 R5 审查产物 describe）
 
   it('R5: 非空但无行级证据锚 → 不违规（锚是非阻断诊断，不构成判据；回归锁定）', () => {
     const files = withFile(
@@ -730,44 +801,66 @@ describe('checkCodingPlan（R6 归档态回退，D-7）', () => {
     expect(r.ledgerPath).toBe(`docs/changes/archive/${ARCHIVED}/progress.md`);
   });
 
-  it('R6: 归档目录缺 plan 快照 → fail-closed violation', () => {
-    const files = {
-      [join(ROOT, 'docs', 'changes', 'archive', ARCHIVED, 'progress.md')]: '# SDD ledger — plan: x\n',
-    };
-    const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
-  });
-
-  it('R6: 归档目录缺账本快照 progress.md → fail-closed violation', () => {
-    const files = {
-      [join(ROOT, 'docs', 'changes', 'archive', ARCHIVED, `${CHANGE7}.plan.md`)]: validPlanText(),
-    };
-    const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('progress.md'))).toBe(true);
-  });
-
-  it('R6: 归档位多匹配 → fail-closed 且具名列出全部匹配目录', () => {
-    const files: Record<string, string> = {};
-    for (const dir of ['2026-01-01-phase7-x', '2026-01-02-phase7-x']) {
-      const archiveDir = join(ROOT, 'docs', 'changes', 'archive', dir);
-      files[join(archiveDir, `${CHANGE7}.plan.md`)] = validPlanText();
-      files[join(archiveDir, 'progress.md')] = '# SDD ledger — plan: x\n';
+  it('R6 归档负例族（4 态：缺 plan 快照 / 缺 progress.md / 多匹配 / 零匹配文案）→ fail-closed 具名缺失条目', () => {
+    const rows: readonly [
+      string,
+      Record<string, string> | null,
+      'missing-plan' | 'missing-progress' | 'multi' | 'zero',
+    ][] = [
+      [
+        'R6: 归档目录缺 plan 快照',
+        { [join(ROOT, 'docs', 'changes', 'archive', ARCHIVED, 'progress.md')]: '# SDD ledger — plan: x\n' },
+        'missing-plan',
+      ],
+      [
+        'R6: 归档目录缺账本快照 progress.md',
+        { [join(ROOT, 'docs', 'changes', 'archive', ARCHIVED, `${CHANGE7}.plan.md`)]: validPlanText() },
+        'missing-progress',
+      ],
+      [
+        'R6: 归档位多匹配（具名列出全部匹配目录）',
+        (() => {
+          const files: Record<string, string> = {};
+          for (const dir of ['2026-01-01-phase7-x', '2026-01-02-phase7-x']) {
+            const archiveDir = join(ROOT, 'docs', 'changes', 'archive', dir);
+            files[join(archiveDir, `${CHANGE7}.plan.md`)] = validPlanText();
+            files[join(archiveDir, 'progress.md')] = '# SDD ledger — plan: x\n';
+          }
+          return files;
+        })(),
+        'multi',
+      ],
+      ['R6: 活动位缺失且归档零匹配（保持缺失文案，不新增含糊文案）', null, 'zero'],
+    ];
+    for (const [name, files, kind] of rows) {
+      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs(files !== null ? { files } : {}));
+      expect(r.passed, `${name} 应 fail-closed`).toBe(false);
+      if (kind === 'missing-plan') {
+        expect(
+          r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失')),
+          `${name} 应具名 ${CHANGE7}.plan.md 缺失`,
+        ).toBe(true);
+      } else if (kind === 'missing-progress') {
+        expect(
+          r.violations.some((v) => v.includes('progress.md')),
+          `${name} 应具名 progress.md 缺失`,
+        ).toBe(true);
+      } else if (kind === 'multi') {
+        const multi = r.violations.find((v) => v.includes('多匹配'));
+        expect(multi, `${name} 应报多匹配`).toBeDefined();
+        expect(multi, `${name} 多匹配应具名 2026-01-01-phase7-x`).toContain('2026-01-01-phase7-x');
+        expect(multi, `${name} 多匹配应具名 2026-01-02-phase7-x`).toContain('2026-01-02-phase7-x');
+      } else {
+        expect(
+          r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失')),
+          `${name} 应保持缺失文案`,
+        ).toBe(true);
+        expect(
+          r.violations.some((v) => v.includes('多匹配')),
+          `${name} 不应报多匹配`,
+        ).toBe(false);
+      }
     }
-    const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files }));
-    expect(r.passed).toBe(false);
-    const multi = r.violations.find((v) => v.includes('多匹配'));
-    expect(multi).toBeDefined();
-    expect(multi).toContain('2026-01-01-phase7-x');
-    expect(multi).toContain('2026-01-02-phase7-x');
-  });
-
-  it('R6: 活动位缺失且归档零匹配 → 保持缺失文案（不新增含糊文案）', () => {
-    const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs());
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
-    expect(r.violations.some((v) => v.includes('多匹配'))).toBe(false);
   });
 
   it('R6: 活动位存在时优先活动位（归档残缺不改判定；显式空目录 stub）', () => {
@@ -785,15 +878,20 @@ describe('checkCodingPlan（R6 归档态回退，D-7）', () => {
   });
 
   describe('R6 归档位锚定化 + 日历校验，2026-09-21 最终评审 I-2', () => {
-    it('锚定三态 0：直名 `<changeId>` 归档 → 通过（旧实现能过，新实现不得回归）', () => {
-      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles(CHANGE7) }));
-      expect(r).toMatchObject({ passed: true, violations: [] });
-      expect(r.planPath).toBe(`docs/changes/archive/${CHANGE7}/${CHANGE7}.plan.md`);
-    });
-
-    it('锚定三态 0：`<YYYY-MM-DD>-<changeId>` 归档 → 通过', () => {
-      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles('2026-01-01-phase7-x') }));
-      expect(r).toMatchObject({ passed: true, violations: [] });
+    it('锚定正例族（3 态：直名 / 日期名 / 闰年真实日）→ 通过', () => {
+      const rows: readonly [string, string, string | null][] = [
+        // 旧实现能过，新实现不得回归
+        ['锚定三态 0：直名 `<changeId>` 归档', CHANGE7, `docs/changes/archive/${CHANGE7}/${CHANGE7}.plan.md`],
+        ['锚定三态 0：`<YYYY-MM-DD>-<changeId>` 归档', '2026-01-01-phase7-x', null],
+        ['日历校验：闰年真实日 `2024-02-29-<changeId>`（不得过度拒绝）', '2024-02-29-phase7-x', null],
+      ];
+      for (const [name, dirName, expectedPlanPath] of rows) {
+        const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles(dirName) }));
+        expect(r, `${name} 应通过`).toMatchObject({ passed: true, violations: [] });
+        if (expectedPlanPath !== null) {
+          expect(r.planPath, `${name} planPath 应为 ${expectedPlanPath}`).toBe(expectedPlanPath);
+        }
+      }
     });
 
     it('锚定三态 1（多匹配）：直名 + 日期名同时存在 → fail-closed 具名列出两者', () => {
@@ -806,47 +904,78 @@ describe('checkCodingPlan（R6 归档态回退，D-7）', () => {
       expect(multi).toContain('2026-01-01-phase7-x');
     });
 
-    it('锚定：未锚定后缀名不匹配（`<changeId>-extra` 不得被当作归档位）', () => {
-      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles('phase7-x-extra') }));
-      expect(r.passed).toBe(false);
-      // 不得命中归档位：错配目录名只作为「近失」诊断出现，仍报 plan 缺失
-      expect(r.violations.some((v) => v.includes('近失'))).toBe(true);
-      expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
-      // 命中归档位会走 R6 快照文案——这里必须没有
-      expect(r.violations.some((v) => v.includes('R6：归档目录须含 plan 快照'))).toBe(false);
-    });
-
-    it('锚定：非日期前缀名不匹配（`foo-bar-<changeId>` 不得被当作归档位）', () => {
-      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles('foo-bar-phase7-x') }));
-      expect(r.passed).toBe(false);
-      expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
-      // 命中归档位会报「plan 快照缺失」以外的路径——这里必须仍是 R1 缺失文案
-      expect(r.violations.some((v) => v.includes('R6：归档目录须含 plan 快照'))).toBe(false);
-    });
-
-    it('锚定：多个 changeId 通配/前缀不得互相误配（同阶段兄弟 change 的归档不冒充本 change）', () => {
-      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles('2026-01-01-phase7-x-two') }));
-      expect(r.passed).toBe(false);
-      expect(r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失'))).toBe(true);
-    });
-
-    it('日历校验：`2026-13-45-<changeId>`（形状合法但非真实日历日）→ 独立 fail-closed 文案', () => {
-      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles('2026-13-45-phase7-x') }));
-      expect(r.passed).toBe(false);
-      const violation = r.violations.find((v) => v.includes('非真实日历日'));
-      expect(violation).toBeDefined();
-      expect(violation).toContain('2026-13-45-phase7-x');
-    });
-
-    it('日历校验：`2026-02-30-<changeId>`（当月无该日）同样被拒', () => {
-      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles('2026-02-30-phase7-x') }));
-      expect(r.passed).toBe(false);
-      expect(r.violations.some((v) => v.includes('非真实日历日'))).toBe(true);
-    });
-
-    it('日历校验：闰年真实日 `2024-02-29-<changeId>` → 通过（不得过度拒绝）', () => {
-      const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles('2024-02-29-phase7-x') }));
-      expect(r).toMatchObject({ passed: true, violations: [] });
+    it('锚定负例族（5 态：未锚定后缀 / 非日期前缀 / 兄弟 change / 非真实日历日 / 当月无该日）→ fail-closed', () => {
+      const rows: readonly [string, string, ((r: ReturnType<typeof checkCodingPlan>) => void) | null][] = [
+        [
+          '锚定：未锚定后缀名不匹配（`<changeId>-extra` 不得被当作归档位）',
+          'phase7-x-extra',
+          (r) => {
+            // 不得命中归档位：错配目录名只作为「近失」诊断出现，仍报 plan 缺失
+            expect(
+              r.violations.some((v) => v.includes('近失')),
+              '未锚定后缀应报「近失」诊断',
+            ).toBe(true);
+            expect(
+              r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失')),
+              '未锚定后缀仍应报 plan 缺失',
+            ).toBe(true);
+            // 命中归档位会走 R6 快照文案——这里必须没有
+            expect(
+              r.violations.some((v) => v.includes('R6：归档目录须含 plan 快照')),
+              '未锚定后缀不应报 R6 快照文案',
+            ).toBe(false);
+          },
+        ],
+        [
+          '锚定：非日期前缀名不匹配（`foo-bar-<changeId>` 不得被当作归档位）',
+          'foo-bar-phase7-x',
+          (r) => {
+            expect(
+              r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失')),
+              '非日期前缀仍应报 plan 缺失',
+            ).toBe(true);
+            // 命中归档位会报「plan 快照缺失」以外的路径——这里必须仍是 R1 缺失文案
+            expect(
+              r.violations.some((v) => v.includes('R6：归档目录须含 plan 快照')),
+              '非日期前缀不应报 R6 快照文案',
+            ).toBe(false);
+          },
+        ],
+        [
+          '锚定：多个 changeId 通配/前缀不得互相误配（同阶段兄弟 change 的归档不冒充本 change）',
+          '2026-01-01-phase7-x-two',
+          (r) => {
+            expect(
+              r.violations.some((v) => v.includes(`${CHANGE7}.plan.md`) && v.includes('缺失')),
+              '兄弟 change 归档仍应报 plan 缺失',
+            ).toBe(true);
+          },
+        ],
+        [
+          '日历校验：`2026-13-45-<changeId>`（形状合法但非真实日历日）→ 独立 fail-closed 文案',
+          '2026-13-45-phase7-x',
+          (r) => {
+            const violation = r.violations.find((v) => v.includes('非真实日历日'));
+            expect(violation, '2026-13-45 应报非真实日历日').toBeDefined();
+            expect(violation, '非真实日历日文案应具名归档目录名').toContain('2026-13-45-phase7-x');
+          },
+        ],
+        [
+          '日历校验：`2026-02-30-<changeId>`（当月无该日）同样被拒',
+          '2026-02-30-phase7-x',
+          (r) => {
+            expect(
+              r.violations.some((v) => v.includes('非真实日历日')),
+              '2026-02-30 应报非真实日历日',
+            ).toBe(true);
+          },
+        ],
+      ];
+      for (const [name, dirName, extra] of rows) {
+        const r = checkCodingPlan(ROOT, PHASE, CHANGE7, mkFs({ files: archiveOnlyFiles(dirName) }));
+        expect(r.passed, `${name} 应 fail-closed`).toBe(false);
+        if (extra) extra(r);
+      }
     });
 
     it('日历校验：非法日期名与合法直名并存 → 合法匹配优先（直名恰一匹配即用；非法目录为显式空目录）', () => {

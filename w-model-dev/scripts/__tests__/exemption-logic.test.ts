@@ -11,6 +11,8 @@
  *   E7  verification.verified = true
  *   E8  humanDecision.decision = approve / 缺失
  *   完整流程 四阶段全通过 → passed=true, stage=complete
+ *
+ * 同质用例已按「循环内多断言 + 逐行具名消息」聚合（wave 3 第 B 批）。
  */
 
 import { describe, it, expect } from 'vitest';
@@ -47,177 +49,186 @@ function makeValidExemption(): ExemptionShape {
 }
 
 describe('E1-E9 豁免审批校验', () => {
-  // ==================== E1: schema 完整性 ====================
-  describe('E1: schema 完整性', () => {
-    it('E1: 缺 target 必填字段 → schema 失败 → fail', () => {
-      const e = makeValidExemption();
-      const { target, ...rest } = e;
-      const result = checkExemption(rest);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('[schema]'))).toBe(true);
-      expect(result.stage).toBe('request');
+  // ==================== E1-E9 负例矩阵（15 负例，schema 行 / E4-E9 行两组） ====================
+  describe('E1-E9 负例矩阵', () => {
+    it('schema 行负例（5 态：E1×2 / E2 / E3 / E6）→ [schema] 失败', () => {
+      const rows: readonly [
+        string,
+        (e: ExemptionShape) => Parameters<typeof checkExemption>[0],
+        string | null,
+        string | null,
+      ][] = [
+        [
+          'E1: 缺 target 必填字段',
+          (e) => {
+            const { target: _target, ...rest } = e;
+            return rest;
+          },
+          null,
+          'request',
+        ],
+        ['E1: id 不匹配 pattern（BAD-ID）', (e) => ({ ...e, id: 'BAD-ID' }), null, 'request'],
+        ['E2: justification < 20 字符', (e) => ({ ...e, justification: '太短了' }), 'justification', 'request'],
+        ['E3: evidence 为空数组', (e) => ({ ...e, evidence: [] }), 'evidence', 'request'],
+        [
+          'E6: rootCauseAnalysis < 30 字符',
+          (e) => {
+            e.review!.rootCauseAnalysis = '太短了根本原因分析不足';
+            return e;
+          },
+          'rootCauseAnalysis',
+          null,
+        ],
+      ];
+      for (const [name, build, token, expectedStage] of rows) {
+        const result = checkExemption(build(makeValidExemption()));
+        expect(result.passed, `${name} 应 fail`).toBe(false);
+        expect(
+          result.violations.some((v) =>
+            token === null ? v.includes('[schema]') : v.includes('[schema]') && v.includes(token),
+          ),
+          `${name} 应报 [schema]${token ? ` 且点名 ${token}` : ''}`,
+        ).toBe(true);
+        if (expectedStage !== null) {
+          expect(result.stage, `${name} stage 应为 ${expectedStage}`).toBe(expectedStage);
+        }
+      }
     });
 
-    it('E1: id 不匹配 pattern → schema 失败 → fail', () => {
-      const e = makeValidExemption();
-      const result = checkExemption({ ...e, id: 'BAD-ID' });
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('[schema]'))).toBe(true);
-      expect(result.stage).toBe('request');
+    it('E4-E9 行负例（10 态：E4 缺失 / E5 拒绝×2 / E7×2 / E8×2 / E9 乱序×3）→ fail', () => {
+      const rows: readonly [
+        string,
+        (e: ExemptionShape) => Parameters<typeof checkExemption>[0],
+        string,
+        string | null,
+        string | null,
+      ][] = [
+        [
+          'E4: review 缺失',
+          (e) => {
+            const { review: _review, ...rest } = e;
+            return rest;
+          },
+          'E4',
+          null,
+          null,
+        ],
+        [
+          'E5: reviewDecision = reject',
+          (e) => {
+            e.review!.reviewDecision = 'reject';
+            return e;
+          },
+          'E5',
+          'reject',
+          null,
+        ],
+        [
+          'E5: reviewDecision = need-more-info',
+          (e) => {
+            e.review!.reviewDecision = 'need-more-info';
+            return e;
+          },
+          'E5',
+          'need-more-info',
+          null,
+        ],
+        [
+          'E7: verification.verified = false',
+          (e) => {
+            e.verification!.verified = false;
+            return e;
+          },
+          'E7',
+          'false',
+          null,
+        ],
+        [
+          'E7: verification 缺失',
+          (e) => {
+            const { verification: _verification, ...rest } = e;
+            return rest;
+          },
+          'E7',
+          '缺失',
+          null,
+        ],
+        [
+          'E8: humanDecision 缺失',
+          (e) => {
+            const { humanDecision: _humanDecision, ...rest } = e;
+            return rest;
+          },
+          'E8',
+          '缺失',
+          'verification',
+        ],
+        [
+          'E8: humanDecision.decision = reject',
+          (e) => {
+            e.humanDecision!.decision = 'reject';
+            return e;
+          },
+          'E8',
+          'reject',
+          'human',
+        ],
+        [
+          'E9: submittedAt >= reviewedAt（时序乱序）',
+          (e) => {
+            e.submittedAt = '2026-07-28T12:00:00Z'; // 晚于 reviewedAt
+            return e;
+          },
+          'E9',
+          'submittedAt',
+          null,
+        ],
+        [
+          'E9: reviewedAt >= verifiedAt（时序乱序）',
+          (e) => {
+            e.review!.reviewedAt = '2026-07-28T13:00:00Z'; // 晚于 verifiedAt
+            return e;
+          },
+          'E9',
+          'reviewedAt',
+          null,
+        ],
+        [
+          'E9: verifiedAt >= decidedAt（时序乱序）',
+          (e) => {
+            e.verification!.verifiedAt = '2026-07-28T14:00:00Z'; // 晚于 decidedAt
+            return e;
+          },
+          'E9',
+          'verifiedAt',
+          null,
+        ],
+      ];
+      for (const [name, build, rule, token, expectedStage] of rows) {
+        const result = checkExemption(build(makeValidExemption()));
+        expect(result.passed, `${name} 应 fail`).toBe(false);
+        expect(
+          result.violations.some((v) => (token === null ? v.includes(rule) : v.includes(rule) && v.includes(token))),
+          `${name} 应报 ${rule}${token ? ` 且点名 ${token}` : ''}`,
+        ).toBe(true);
+        if (expectedStage !== null) {
+          expect(result.stage, `${name} stage 应为 ${expectedStage}`).toBe(expectedStage);
+        }
+      }
     });
   });
 
-  // ==================== E2: justification 长度 ≥ 20 字符 ====================
-  describe('E2: justification 长度 ≥ 20 字符', () => {
-    it('E2: justification < 20 字符 → schema 失败 → fail', () => {
-      const e = makeValidExemption();
-      const result = checkExemption({ ...e, justification: '太短了' });
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('[schema]') && v.includes('justification'))).toBe(true);
-      expect(result.stage).toBe('request');
-    });
-
-    it('E2: justification ≥ 20 字符 → schema 通过', () => {
-      const e = makeValidExemption();
-      const result = checkExemption(e);
-      expect(result.violations.some((v) => v.includes('E2'))).toBe(false);
-    });
-  });
-
-  // ==================== E3: evidence 数组非空 ====================
-  describe('E3: evidence 数组非空', () => {
-    it('E3: evidence 为空数组 → schema 失败 → fail', () => {
-      const e = makeValidExemption();
-      const result = checkExemption({ ...e, evidence: [] });
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('[schema]') && v.includes('evidence'))).toBe(true);
-      expect(result.stage).toBe('request');
-    });
-
-    it('E3: evidence 非空 → schema 通过', () => {
-      const e = makeValidExemption();
-      const result = checkExemption(e);
-      expect(result.violations.some((v) => v.includes('E3'))).toBe(false);
-    });
-  });
-
-  // ==================== E4: review 阶段完整 ====================
-  describe('E4: review 阶段完整', () => {
-    it('E4: review 缺失 → fail', () => {
-      const e = makeValidExemption();
-      const { review, ...rest } = e;
-      const result = checkExemption(rest);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('E4'))).toBe(true);
-    });
-  });
-
-  // ==================== E5: review.reviewDecision = approve ====================
-  describe('E5: review.reviewDecision = approve', () => {
-    it('E5: reviewDecision = reject → fail', () => {
-      const e = makeValidExemption();
-      e.review!.reviewDecision = 'reject';
-      const result = checkExemption(e);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('E5') && v.includes('reject'))).toBe(true);
-    });
-
-    it('E5: reviewDecision = need-more-info → fail', () => {
-      const e = makeValidExemption();
-      e.review!.reviewDecision = 'need-more-info';
-      const result = checkExemption(e);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('E5') && v.includes('need-more-info'))).toBe(true);
-    });
-  });
-
-  // ==================== E6: review.rootCauseAnalysis 长度 ≥ 30 字符 ====================
-  describe('E6: review.rootCauseAnalysis 长度 ≥ 30 字符', () => {
-    it('E6: rootCauseAnalysis < 30 字符 → schema 失败 → fail', () => {
-      const e = makeValidExemption();
-      e.review!.rootCauseAnalysis = '太短了根本原因分析不足';
-      const result = checkExemption(e);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('[schema]') && v.includes('rootCauseAnalysis'))).toBe(true);
-    });
-
-    it('E6: rootCauseAnalysis ≥ 30 字符 → schema 通过', () => {
-      const e = makeValidExemption();
-      const result = checkExemption(e);
-      expect(result.violations.some((v) => v.includes('E6'))).toBe(false);
-    });
-  });
-
-  // ==================== E7: verification.verified = true ====================
-  describe('E7: verification.verified = true', () => {
-    it('E7: verification.verified = false → fail', () => {
-      const e = makeValidExemption();
-      e.verification!.verified = false;
-      const result = checkExemption(e);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('E7') && v.includes('false'))).toBe(true);
-    });
-
-    it('E7: verification 缺失 → fail', () => {
-      const e = makeValidExemption();
-      const { verification, ...rest } = e;
-      const result = checkExemption(rest);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('E7') && v.includes('缺失'))).toBe(true);
-    });
-  });
-
-  // ==================== E8: humanDecision.decision = approve ====================
-  describe('E8: humanDecision.decision = approve', () => {
-    it('E8: humanDecision 缺失 → fail', () => {
-      const e = makeValidExemption();
-      const { humanDecision, ...rest } = e;
-      const result = checkExemption(rest);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('E8') && v.includes('缺失'))).toBe(true);
-      expect(result.stage).toBe('verification');
-    });
-
-    it('E8: humanDecision.decision = reject → fail', () => {
-      const e = makeValidExemption();
-      e.humanDecision!.decision = 'reject';
-      const result = checkExemption(e);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('E8') && v.includes('reject'))).toBe(true);
-      expect(result.stage).toBe('human');
-    });
-  });
-
-  // ==================== E9: 时间戳时序 ====================
-  describe('E9: 时间戳时序 submittedAt < reviewedAt < verifiedAt < decidedAt', () => {
-    it('E9: submittedAt >= reviewedAt（时序乱序）→ fail', () => {
-      const e = makeValidExemption();
-      e.submittedAt = '2026-07-28T12:00:00Z'; // 晚于 reviewedAt
-      const result = checkExemption(e);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('E9') && v.includes('submittedAt'))).toBe(true);
-    });
-
-    it('E9: reviewedAt >= verifiedAt（时序乱序）→ fail', () => {
-      const e = makeValidExemption();
-      e.review!.reviewedAt = '2026-07-28T13:00:00Z'; // 晚于 verifiedAt
-      const result = checkExemption(e);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('E9') && v.includes('reviewedAt'))).toBe(true);
-    });
-
-    it('E9: verifiedAt >= decidedAt（时序乱序）→ fail', () => {
-      const e = makeValidExemption();
-      e.verification!.verifiedAt = '2026-07-28T14:00:00Z'; // 晚于 decidedAt
-      const result = checkExemption(e);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('E9') && v.includes('verifiedAt'))).toBe(true);
-    });
-
-    it('E9: 时间戳时序合规 → 无 E9 违规', () => {
-      const e = makeValidExemption();
-      const result = checkExemption(e);
-      expect(result.violations.some((v) => v.includes('E9'))).toBe(false);
+  // ==================== E2/E3/E6/E9 正例对照 ====================
+  describe('E2/E3/E6/E9 正例对照', () => {
+    it('完整输入下对应规则零违规（4 行：E2 / E3 / E6 / E9）', () => {
+      for (const rule of ['E2', 'E3', 'E6', 'E9'] as const) {
+        const e = makeValidExemption();
+        const result = checkExemption(e);
+        expect(
+          result.violations.some((v) => v.includes(rule)),
+          `正例对照 ${rule}: 不应报 ${rule}`,
+        ).toBe(false);
+      }
     });
   });
 

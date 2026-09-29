@@ -19,32 +19,29 @@ function loadFileList(filename: string): Set<string> {
 }
 
 describe('archive-integrity-logic', () => {
-  it('valid-full 通过', () => {
+  it('valid-full 通过（通过行基线）', () => {
     const contents = loadFileList('valid-full.json');
     const result = checkArchiveIntegrity(contents);
     expect(result.passed).toBe(true);
     expect(result.missingFiles).toHaveLength(0);
   });
 
-  it('bad-missing-phase1-docs 失败', () => {
-    const contents = loadFileList('bad-missing-phase1-docs.json');
-    const result = checkArchiveIntegrity(contents);
-    expect(result.passed).toBe(false);
-    expect(result.missingFiles.some((f) => f.includes('requirements.md'))).toBe(true);
-  });
-
-  it('bad-missing-signature-chain 失败', () => {
-    const contents = loadFileList('bad-missing-signature-chain.json');
-    const result = checkArchiveIntegrity(contents);
-    expect(result.passed).toBe(false);
-    expect(result.missingFiles.some((f) => f.includes('signature-chain.jsonl'))).toBe(true);
-  });
-
-  it('bad-missing-gate-logs 失败', () => {
-    const contents = loadFileList('bad-missing-gate-logs.json');
-    const result = checkArchiveIntegrity(contents);
-    expect(result.passed).toBe(false);
-    expect(result.missingFiles.some((f) => f.includes('gate-logs/'))).toBe(true);
+  it('bad fixtures 负例行（3 个 bad-*.json 逐夹具具名）失败', () => {
+    // NEGATIVE-COVERAGE 登记面：循环行键 = fixture 文件名，逐夹具可定位
+    const rows: readonly [string, string][] = [
+      ['bad-missing-phase1-docs.json', 'requirements.md'],
+      ['bad-missing-signature-chain.json', 'signature-chain.jsonl'],
+      ['bad-missing-gate-logs.json', 'gate-logs/'],
+    ];
+    for (const [fixture, token] of rows) {
+      const contents = loadFileList(fixture);
+      const result = checkArchiveIntegrity(contents);
+      expect(result.passed, `${fixture} 应 fail`).toBe(false);
+      expect(
+        result.missingFiles.some((f) => f.includes(token)),
+        `${fixture} 应点名缺失 ${token}`,
+      ).toBe(true);
+    }
   });
 
   it('ARCHIVE_INTEGRITY_CHECKLIST 完整性', () => {
@@ -105,41 +102,54 @@ describe('archive-integrity-logic codingPlanSnapshot 清单项', () => {
     expect(result.missingFiles).toHaveLength(0);
   });
 
-  it('缺 <changeId>.plan.md → fail-closed 且缺失条目具名到文件', () => {
-    const contents = loadFullContents();
-    contents.add('progress.md');
-    contents.add('task-1-brief.md');
-    contents.add('task-1-report.md');
-    const result = checkArchiveIntegrity(contents, undefined, {
-      codingPlanSnapshot: true,
-      changeId: 'phase5-demo',
-      progressMdContent: 'Task 1: complete\n',
-    });
-    expect(result.passed).toBe(false);
-    expect(result.missingFiles.some((f) => f.includes('phase5-demo.plan.md') && f.includes('归档计划快照缺失'))).toBe(
-      true,
-    );
-  });
-
-  it('缺 progress.md → fail-closed（归档账本快照缺失）', () => {
-    const contents = loadFullContents();
-    contents.add('phase5-demo.plan.md');
-    contents.add('task-1-brief.md');
-    contents.add('task-1-report.md');
-    const result = checkArchiveIntegrity(contents, undefined, {
-      codingPlanSnapshot: true,
-      changeId: 'phase5-demo',
-    });
-    expect(result.passed).toBe(false);
-    expect(result.missingFiles.some((f) => f.includes('progress.md') && f.includes('归档账本快照缺失'))).toBe(true);
-  });
-
-  it('progress.md 在清单但未提供内容 → fail-closed（调用方契约，不得静默跳过三件套核对）', () => {
-    const contents = loadFullContents();
-    addCodingPlanSnapshot(contents);
-    const result = checkArchiveIntegrity(contents, undefined, { codingPlanSnapshot: true, changeId: 'phase5-demo' });
-    expect(result.passed).toBe(false);
-    expect(result.missingFiles.some((f) => f.includes('progress.md') && f.includes('内容未提供'))).toBe(true);
+  it('快照三件套单缺失 fail-closed（3 态：缺 plan / 缺 progress / 未提供内容）→ 缺失条目具名到文件', () => {
+    const rows: readonly [
+      string,
+      (contents: Set<string>) => void,
+      { codingPlanSnapshot: boolean; changeId?: string; progressMdContent?: string },
+      string,
+      string,
+    ][] = [
+      [
+        '缺 <changeId>.plan.md',
+        (contents) => {
+          contents.add('progress.md');
+          contents.add('task-1-brief.md');
+          contents.add('task-1-report.md');
+        },
+        { codingPlanSnapshot: true, changeId: 'phase5-demo', progressMdContent: 'Task 1: complete\n' },
+        'phase5-demo.plan.md',
+        '归档计划快照缺失',
+      ],
+      [
+        '缺 progress.md',
+        (contents) => {
+          contents.add('phase5-demo.plan.md');
+          contents.add('task-1-brief.md');
+          contents.add('task-1-report.md');
+        },
+        { codingPlanSnapshot: true, changeId: 'phase5-demo' },
+        'progress.md',
+        '归档账本快照缺失',
+      ],
+      [
+        'progress.md 在清单但未提供内容（调用方契约，不得静默跳过三件套核对）',
+        addCodingPlanSnapshot,
+        { codingPlanSnapshot: true, changeId: 'phase5-demo' },
+        'progress.md',
+        '内容未提供',
+      ],
+    ];
+    for (const [name, setup, opts, file, marker] of rows) {
+      const contents = loadFullContents();
+      setup(contents);
+      const result = checkArchiveIntegrity(contents, undefined, opts);
+      expect(result.passed, `${name} 应 fail-closed`).toBe(false);
+      expect(
+        result.missingFiles.some((f) => f.includes(file) && f.includes(marker)),
+        `${name} 应具名 ${file}（${marker}）`,
+      ).toBe(true);
+    }
   });
 
   it('每个 Task N: complete 行缺三件套 → 逐文件具名（brief/report 独立报缺）', () => {
@@ -249,82 +259,92 @@ void _manifestTypeProbe;
 // 非前缀 / 非记录边界（中途截断）/ 空快照。未提供 live 文本时零行为变化（非阻断）。
 
 describe('archive-integrity-logic 归档前缀性（L4）', () => {
-  it('归档快照非 live 前缀 → 违规（[runLogPrefix] 并入 missingFiles，passed=false）', () => {
-    const r = checkArchiveIntegrity(new Set(['run-log.jsonl']), ['1'], undefined, {
-      liveRunLogText: 'A\nB\nC\n',
-      archivedRunLogText: 'A\nX\n',
-    });
+  it('前缀性通过行（3 态：记录边界前缀 / live == 归档 / 双空）→ 通过', () => {
+    const rows: readonly [string, string, string, boolean][] = [
+      ['归档快照是 live 的记录边界前缀（以 \\n 结尾）', 'A\nB\nC\n', 'A\nB\n', true],
+      ['live == 归档（无新增记录）', 'A\nB\n', 'A\nB\n', false],
+      ['空 live + 空归档（两侧皆空，无记录可保护）', '', '', false],
+    ];
+    for (const [name, liveRunLogText, archivedRunLogText, assertMissingEmpty] of rows) {
+      const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
+        liveRunLogText,
+        archivedRunLogText,
+      });
+      if (assertMissingEmpty) {
+        expect(r.missingFiles, `${name} 应无缺失条目`).toEqual([]);
+      }
+      expect(r.passed, `${name} 应通过`).toBe(true);
+    }
+  });
+
+  it('前缀性违规行（4 态：非前缀 / 末行中途截断 / 中间行中途截断 / 空快照）→ 具名拒绝', () => {
+    // :252 原样保留最小盘面（仅 run-log.jsonl + phases ['1']），其余行沿用 valid-full 全集
+    const rows: readonly [string, Set<string>, string[] | undefined, string, string, string, string | null][] = [
+      [
+        '归档快照非 live 前缀',
+        new Set(['run-log.jsonl']),
+        ['1'],
+        'A\nB\nC\n',
+        'A\nX\n',
+        '不是 live run-log 的记录边界前缀',
+        null,
+      ],
+      [
+        '第 N 行中途截断（是前缀但不在记录边界，不得与「非前缀」形态混淆）',
+        loadFullContents(),
+        undefined,
+        'A\nB\nC\n',
+        'A\nB',
+        '记录中途',
+        '不是 live run-log 的记录边界前缀',
+      ],
+      [
+        '中间行中途截断（以多行形态截在行内）',
+        loadFullContents(),
+        undefined,
+        '{"runId":"a"}\n{"runId":"b"}\n{"runId":"c"}\n',
+        '{"runId":"a"}\n{"runI',
+        '记录中途',
+        null,
+      ],
+      [
+        '空归档文本（0 字节）而 live 有内容（A1 收紧：不再通过）',
+        loadFullContents(),
+        undefined,
+        'A\nB\n',
+        '',
+        '快照为空',
+        null,
+      ],
+    ];
+    for (const [name, contents, phases, liveRunLogText, archivedRunLogText, marker, negMarker] of rows) {
+      const r = checkArchiveIntegrity(contents, phases, undefined, { liveRunLogText, archivedRunLogText });
+      expect(r.passed, `${name} 应 fail`).toBe(false);
+      expect(
+        r.missingFiles.some((m) => m.includes('[runLogPrefix]') && m.includes(marker)),
+        `${name} 应报 [runLogPrefix] 且文案含「${marker}」`,
+      ).toBe(true);
+      if (negMarker !== null) {
+        expect(
+          r.missingFiles.some((m) => m.includes(negMarker)),
+          `${name} 不应与「${negMarker}」形态混淆`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('前缀性缺省/未提供行（2 态：未提供 live 零行为变化 / 提供 live 但归档侧未提供 fail-closed）', () => {
+    const clean = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {});
+    expect(clean.missingFiles, '未提供 live 文本：missingFiles 应为空（既有 3 参调用/缺省路径不新增违规）').toEqual([]);
+    expect(clean.passed, '未提供 live 文本：应通过').toBe(true);
+    expect(checkArchiveIntegrity(loadFullContents()).passed, '未提供 live 文本：既有 3 参调用应通过').toBe(true);
+
+    const blocked = checkArchiveIntegrity(loadFullContents(), undefined, undefined, { liveRunLogText: 'A\nB\n' });
     expect(
-      r.missingFiles.some((m) => m.includes('[runLogPrefix]') && m.includes('不是 live run-log 的记录边界前缀')),
+      blocked.missingFiles.some((m) => m.includes('[runLogPrefix]')),
+      '提供 live 但归档侧文本未提供：应报 [runLogPrefix]（无法证明前缀性不得静默放过）',
     ).toBe(true);
-    expect(r.passed).toBe(false);
-  });
-
-  it('归档快照是 live 的记录边界前缀（以 \\n 结尾）→ 通过', () => {
-    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
-      liveRunLogText: 'A\nB\nC\n',
-      archivedRunLogText: 'A\nB\n',
-    });
-    expect(r.missingFiles).toEqual([]);
-    expect(r.passed).toBe(true);
-  });
-
-  it('live == 归档（无新增记录）→ 通过', () => {
-    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
-      liveRunLogText: 'A\nB\n',
-      archivedRunLogText: 'A\nB\n',
-    });
-    expect(r.passed).toBe(true);
-  });
-
-  it('第 N 行中途截断（是前缀但不在记录边界）→ 违规且文案区分「非记录边界」', () => {
-    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
-      liveRunLogText: 'A\nB\nC\n',
-      archivedRunLogText: 'A\nB',
-    });
-    expect(r.passed).toBe(false);
-    expect(r.missingFiles.some((m) => m.includes('[runLogPrefix]') && m.includes('记录中途'))).toBe(true);
-    // 不得与「非前缀」形态混淆（两者根因与处置不同）
-    expect(r.missingFiles.some((m) => m.includes('不是 live run-log 的记录边界前缀'))).toBe(false);
-  });
-
-  it('中间行中途截断（以多行形态截在行内）→ 违规且文案区分「非记录边界」', () => {
-    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
-      liveRunLogText: '{"runId":"a"}\n{"runId":"b"}\n{"runId":"c"}\n',
-      archivedRunLogText: '{"runId":"a"}\n{"runI',
-    });
-    expect(r.passed).toBe(false);
-    expect(r.missingFiles.some((m) => m.includes('[runLogPrefix]') && m.includes('记录中途'))).toBe(true);
-  });
-
-  it('空归档文本（0 字节）而 live 有内容 → 违规且文案区分「空快照」（A1 收紧：不再通过）', () => {
-    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
-      liveRunLogText: 'A\nB\n',
-      archivedRunLogText: '',
-    });
-    expect(r.passed).toBe(false);
-    expect(r.missingFiles.some((m) => m.includes('[runLogPrefix]') && m.includes('快照为空'))).toBe(true);
-  });
-
-  it('空 live + 空归档（两侧皆空）→ 通过（无记录可保护，不构成本项违规）', () => {
-    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {
-      liveRunLogText: '',
-      archivedRunLogText: '',
-    });
-    expect(r.passed).toBe(true);
-  });
-
-  it('未提供 live 文本 → 零行为变化（既有 3 参调用/缺省路径不新增违规）', () => {
-    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, {});
-    expect(r.missingFiles).toEqual([]);
-    expect(r.passed).toBe(true);
-    expect(checkArchiveIntegrity(loadFullContents()).passed).toBe(true);
-  });
-
-  it('提供 live 但归档侧文本未提供 → fail-closed（无法证明前缀性不得静默放过）', () => {
-    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, { liveRunLogText: 'A\nB\n' });
-    expect(r.missingFiles.some((m) => m.includes('[runLogPrefix]'))).toBe(true);
-    expect(r.passed).toBe(false);
+    expect(blocked.passed, '提供 live 但归档侧文本未提供：应 fail-closed').toBe(false);
   });
 });
 
@@ -335,8 +355,8 @@ describe('archive-integrity-logic 归档前缀性（L4）', () => {
  * 语义边界：不进 missingFiles、不改 passed / 退出码；未提供清单文本或 0 命中时 `diagnostics` 为空。
  */
 describe('archive-integrity-logic 归档清单绝对路径诊断（G3-14）', () => {
-  it('countArchiveManifestAbsolutePaths：对象条目取 path（盘符 / POSIX 根 / 反斜杠三形态）各自命中', () => {
-    const manifest = JSON.stringify({
+  it('countArchiveManifestAbsolutePaths（6 态：对象条目 / 字符串条目 / 非法输入四形态）', () => {
+    const objectEntriesManifest = JSON.stringify({
       files: [
         { path: 'C:\\ws\\proj\\.w-model\\gate-logs\\phase-8.json', kind: 'gate-log' },
         { path: '/home/user/proj/.w-model/run-log.jsonl', kind: 'run-log' },
@@ -346,57 +366,56 @@ describe('archive-integrity-logic 归档清单绝对路径诊断（G3-14）', ()
         { sha256: 'x' }, // 无 path → 不命中
       ],
     });
-    expect(countArchiveManifestAbsolutePaths(manifest)).toBe(3);
-  });
-
-  it('countArchiveManifestAbsolutePaths：字符串条目取自身（装配器 archive-manifest.json 形态）', () => {
-    const manifest = JSON.stringify({
+    const stringEntriesManifest = JSON.stringify({
       files: ['requirements.md', 'gate-logs/graph-gate.json', 'D:\\archive\\x.json', '\\server\\share'],
     });
-    expect(countArchiveManifestAbsolutePaths(manifest)).toBe(2); // 盘符 + UNC 反斜杠
+    const rows: readonly [string, string, number][] = [
+      ['对象条目取 path（盘符 / POSIX 根 / 反斜杠三形态）各自命中', objectEntriesManifest, 3],
+      ['字符串条目取自身（装配器 archive-manifest.json 形态）', stringEntriesManifest, 2], // 盘符 + UNC 反斜杠
+      ['非法 JSON → 0（本诊断不做输入校验）', 'not json', 0],
+      ['无 files[] → 0', '{}', 0],
+      ['files 非数组（字符串）→ 0', '{"files": "C:\\\\x"}', 0],
+      ['files 条目非对象（[42, null, true]）→ 0', '{"files": [42, null, true]}', 0],
+    ];
+    for (const [name, manifest, expected] of rows) {
+      expect(countArchiveManifestAbsolutePaths(manifest), `${name}`).toBe(expected);
+    }
   });
 
-  it('countArchiveManifestAbsolutePaths：非法 JSON / 无 files[] / 非数组条目 → 0（本诊断不做输入校验）', () => {
-    expect(countArchiveManifestAbsolutePaths('not json')).toBe(0);
-    expect(countArchiveManifestAbsolutePaths('{}')).toBe(0);
-    expect(countArchiveManifestAbsolutePaths('{"files": "C:\\\\x"}')).toBe(0);
-    expect(countArchiveManifestAbsolutePaths('{"files": [42, null, true]}')).toBe(0);
-  });
-
-  it('checkArchiveIntegrity 正例：清单含绝对路径条目 → 一条非阻断诊断，passed / missingFiles 不变', () => {
-    const manifestText = JSON.stringify({
+  it('checkArchiveIntegrity 诊断对照（3 态：命中 / 零命中 / 未提供清单）', () => {
+    const hitManifest = JSON.stringify({
       files: [
         { path: 'C:\\ws\\.w-model\\gate-logs\\p8.json', kind: 'gate-log' },
         { path: 'gate-logs/p8.json', kind: 'gate-log' },
       ],
     });
-    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, undefined, {
-      archiveManifestText: manifestText,
-    });
-    expect(r.diagnostics).toEqual([
-      '归档清单含 1 条疑似本机绝对路径条目——交付前须经 wm-export-evidence 脱敏导出（归档仅受控留档）',
-    ]);
-    expect(r.missingFiles).toEqual([]);
-    expect(r.passed).toBe(true); // 纯诊断：不阻断
-  });
-
-  it('checkArchiveIntegrity 反例：清单全为相对路径 → 零诊断（0 命中不打）', () => {
-    const manifestText = JSON.stringify({ files: ['run-log.jsonl', { path: 'gate-logs/p8.json' }] });
-    const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, undefined, {
-      archiveManifestText: manifestText,
-    });
-    expect(r.diagnostics).toEqual([]);
-    expect(r.passed).toBe(true);
-  });
-
-  it('checkArchiveIntegrity：未提供清单文本 / 五参缺省 → diagnostics 为空（既有调用零回归）', () => {
-    expect(checkArchiveIntegrity(loadFullContents()).diagnostics).toEqual([]);
-    expect(checkArchiveIntegrity(loadFullContents(), undefined, undefined, undefined, {}).diagnostics).toEqual([]);
+    const cleanManifest = JSON.stringify({ files: ['run-log.jsonl', { path: 'gate-logs/p8.json' }] });
+    const rows: readonly [string, string, string[]][] = [
+      [
+        '清单含绝对路径条目 → 一条非阻断诊断',
+        hitManifest,
+        ['归档清单含 1 条疑似本机绝对路径条目——交付前须经 wm-export-evidence 脱敏导出（归档仅受控留档）'],
+      ],
+      ['清单全为相对路径 → 零诊断（0 命中不打）', cleanManifest, []],
+    ];
+    for (const [name, manifestText, expectedDiagnostics] of rows) {
+      const r = checkArchiveIntegrity(loadFullContents(), undefined, undefined, undefined, {
+        archiveManifestText: manifestText,
+      });
+      expect(r.diagnostics, `${name}`).toEqual(expectedDiagnostics);
+      expect(r.passed, `${name}：纯诊断不阻断`).toBe(true);
+    }
+    // 未提供清单文本 / 五参缺省 → diagnostics 为空（既有调用零回归）
+    expect(checkArchiveIntegrity(loadFullContents()).diagnostics, '未提供清单文本：diagnostics 为空').toEqual([]);
+    expect(
+      checkArchiveIntegrity(loadFullContents(), undefined, undefined, undefined, {}).diagnostics,
+      '五参缺省：diagnostics 为空',
+    ).toEqual([]);
     // 清单文本在场但归档清单缺失违规并存时，诊断与违规互不影响（诊断不进 missingFiles）
     const r = checkArchiveIntegrity(new Set<string>(), undefined, undefined, undefined, {
       archiveManifestText: JSON.stringify({ files: ['C:\\x'] }),
     });
-    expect(r.passed).toBe(false); // 清单缺失照常 blocking
-    expect(r.diagnostics).toHaveLength(1); // 诊断照常输出
+    expect(r.passed, '清单缺失照常 blocking').toBe(false);
+    expect(r.diagnostics, '诊断照常输出').toHaveLength(1);
   });
 });

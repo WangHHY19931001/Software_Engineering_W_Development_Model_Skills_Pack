@@ -13,6 +13,9 @@
  *   - R9 多角度场景 partialReports 非空
  *   - R10 多角度场景 testing-reality-checker canonical / reality-checker legacy confidence ≥ 0.5
  *   - R11 多角度场景 personaSlice 须为矩阵内已知 persona，且与 rootCause.category 行有交集
+ *
+ * 同质用例已按「循环内多断言 + 逐行具名消息」聚合（wave 3 第 B 批）；
+ * R1-R10 负例族为 NEGATIVE-COVERAGE fixture 载体：循环行键 = fixture 文件名，逐 fixture 具名。
  */
 
 import { promises as fs } from 'node:fs';
@@ -31,140 +34,61 @@ async function loadSample(file: string): Promise<RootCauseReportShape> {
   return JSON.parse(raw);
 }
 
-describe('R1 Schema 完整性', () => {
-  it('缺 rootCause 字段时失败', async () => {
-    const report = await loadSample('bad-r1-missing-fields.json');
-    const result = checkRootCauseReport(report);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => /rootCause/.test(r))).toBe(true);
-  });
-});
-
-describe('R2 rootCauseChain 长度', () => {
-  it('chain 仅 1 步时失败', async () => {
-    const report = await loadSample('bad-r2-chain-length.json');
-    const result = checkRootCauseReport(report);
-    expect(result.passed).toBe(false);
+describe('R1-R10 负例矩阵（bad-r*.json fixture 载体，逐 fixture 具名）', () => {
+  // 循环行键 = fixture 文件名（NEGATIVE-COVERAGE 登记面：探针语义不变，逐 fixture 可定位）
+  const BAD_FIXTURES: readonly [string, RegExp][] = [
+    ['bad-r1-missing-fields.json', /rootCause/],
     // schema minItems:2 前置拦截 1 步链（[schema] 前缀），业务规则长度校验不再触达
-    expect(result.reasons.some((r) => /\[schema\].*rootCauseChain/.test(r))).toBe(true);
-  });
-});
+    ['bad-r2-chain-length.json', /\[schema\].*rootCauseChain/],
+    ['bad-r3-falsifiability.json', /falsifiabilityCheck.*若.*则/],
+    ['bad-r4-fix-recommendation.json', /fixRecommendation.*rationale/],
+    ['bad-r5-prevention.json', /prevention.*owner/],
+    ['bad-r6-upstream-defect.json', /upstreamDefect.*upstreamPhase/],
+    ['bad-r7-quality-level.json', /qualityLevel.*passed.*一致/],
+    ['bad-r8-report-id.json', /reportId.*格式/],
+    ['bad-r9-partial-missing.json', /partialReports.*非空/],
+    ['bad-r10-reality-confidence.json', /reality-checker.*confidence/],
+    ['bad-r10-no-reality-checker.json', /R10.*缺失 reality checker.*testing-reality-checker.*reality-checker/],
+  ];
 
-describe('R3 falsifiabilityCheck 句式', () => {
-  it('无「若...则」句式时失败', async () => {
-    const report = await loadSample('bad-r3-falsifiability.json');
-    const result = checkRootCauseReport(report);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => /falsifiabilityCheck.*若.*则/.test(r))).toBe(true);
-  });
-});
-
-describe('R4 fixRecommendation 四字段', () => {
-  it('缺 rationale 时失败', async () => {
-    const report = await loadSample('bad-r4-fix-recommendation.json');
-    const result = checkRootCauseReport(report);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => /fixRecommendation.*rationale/.test(r))).toBe(true);
-  });
-});
-
-describe('R5 prevention 三字段', () => {
-  it('缺 owner 时失败', async () => {
-    const report = await loadSample('bad-r5-prevention.json');
-    const result = checkRootCauseReport(report);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => /prevention.*owner/.test(r))).toBe(true);
-  });
-});
-
-describe('R6 upstreamDefect 后续字段', () => {
-  it('present=true 但缺 upstreamPhase 时失败', async () => {
-    const report = await loadSample('bad-r6-upstream-defect.json');
-    const result = checkRootCauseReport(report);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => /upstreamDefect.*upstreamPhase/.test(r))).toBe(true);
-  });
-});
-
-describe('R7 qualityLevel 与 passed 一致', () => {
-  it('qualityLevel=C 但 passed=true 时失败', async () => {
-    const report = await loadSample('bad-r7-quality-level.json');
-    const result = checkRootCauseReport(report);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => /qualityLevel.*passed.*一致/.test(r))).toBe(true);
-  });
-});
-
-describe('R8 reportId 格式', () => {
-  it('reportId 含下划线时失败', async () => {
-    const report = await loadSample('bad-r8-report-id.json');
-    const result = checkRootCauseReport(report);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => /reportId.*格式/.test(r))).toBe(true);
-  });
-});
-
-describe('R9 多角度场景 partialReports', () => {
-  it('method=combined 但无 partialReports 时失败', async () => {
-    const report = await loadSample('bad-r9-partial-missing.json');
-    const result = checkRootCauseReport(report);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => /partialReports.*非空/.test(r))).toBe(true);
+  it(`R1-R10 负例矩阵（${BAD_FIXTURES.length} 个 bad-r*.json fixture）逐 fixture fail`, async () => {
+    for (const [fixture, pattern] of BAD_FIXTURES) {
+      const report = await loadSample(fixture);
+      const result = checkRootCauseReport(report);
+      expect(result.passed, `${fixture} 应 fail`).toBe(false);
+      expect(
+        result.reasons.some((r) => pattern.test(r)),
+        `${fixture} 应报 ${pattern}`,
+      ).toBe(true);
+    }
   });
 });
 
 describe('R10 reality-checker confidence', () => {
-  it('reality-checker confidence=0.3 时失败', async () => {
-    const report = await loadSample('bad-r10-reality-confidence.json');
-    const result = checkRootCauseReport(report);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => /reality-checker.*confidence/.test(r))).toBe(true);
-  });
+  const realityPath = '.w-model/rootcause/partial/RC-phase5-1-01/testing-reality-checker.json';
 
-  it('combined 方法 partialReports 缺失 reality-checker 时失败', async () => {
-    const report = await loadSample('bad-r10-no-reality-checker.json');
-    const result = checkRootCauseReport(report);
-    expect(result.passed).toBe(false);
-    expect(
-      result.reasons.some((r) => /R10.*缺失 reality checker.*testing-reality-checker.*reality-checker/.test(r)),
-    ).toBe(true);
-  });
-
-  it('canonical testing-reality-checker confidence 足够时通过', async () => {
-    const report = await loadSample('bad-r10-reality-confidence.json');
-    report.partialReports = [
-      {
-        personaSlice: 'testing-reality-checker',
-        path: '.w-model/rootcause/partial/RC-phase5-1-01/testing-reality-checker.json',
-        confidence: 0.8,
-      },
+  it('confidence 对照对（2 态：canonical / legacy confidence 足够时通过）', async () => {
+    const rows: readonly [string, NonNullable<RootCauseReportShape['partialReports']>][] = [
+      [
+        'canonical testing-reality-checker confidence 足够',
+        [{ personaSlice: 'testing-reality-checker', path: realityPath, confidence: 0.8 }],
+      ],
+      [
+        'legacy reality-checker confidence 足够',
+        [{ personaSlice: 'reality-checker', path: realityPath, confidence: 0.8 }],
+      ],
     ];
-
-    const result = checkRootCauseReport(report);
-
-    expect(result.passed).toBe(true);
-    expect(result.reasons).toHaveLength(0);
-  });
-
-  it('legacy reality-checker confidence 足够时仍通过', async () => {
-    const report = await loadSample('bad-r10-reality-confidence.json');
-    report.partialReports = [
-      {
-        personaSlice: 'reality-checker',
-        path: '.w-model/rootcause/partial/RC-phase5-1-01/testing-reality-checker.json',
-        confidence: 0.8,
-      },
-    ];
-
-    const result = checkRootCauseReport(report);
-
-    expect(result.passed).toBe(true);
-    expect(result.reasons).toHaveLength(0);
+    for (const [name, partialReports] of rows) {
+      const report = await loadSample('bad-r10-reality-confidence.json');
+      report.partialReports = partialReports;
+      const result = checkRootCauseReport(report);
+      expect(result.passed, `${name} 应通过`).toBe(true);
+      expect(result.reasons, `${name} 应无 reasons`).toHaveLength(0);
+    }
   });
 
   it('canonical 与指向同一 artifact 的 legacy 条目不虚增 persona 语义并通过', async () => {
     const report = await loadSample('bad-r10-reality-confidence.json');
-    const realityPath = '.w-model/rootcause/partial/RC-phase5-1-01/testing-reality-checker.json';
     report.partialReports = [
       { personaSlice: 'testing-reality-checker', path: realityPath, confidence: 0.8 },
       { personaSlice: 'reality-checker', path: realityPath, confidence: 0.2 },
@@ -199,7 +123,6 @@ describe('R10 reality-checker confidence', () => {
 
   it('canonical confidence 不足时不被高 confidence legacy alias 绕过', async () => {
     const report = await loadSample('bad-r10-reality-confidence.json');
-    const realityPath = '.w-model/rootcause/partial/RC-phase5-1-01/testing-reality-checker.json';
     report.partialReports = [
       { personaSlice: 'testing-reality-checker', path: realityPath, confidence: 0.3 },
       { personaSlice: 'reality-checker', path: realityPath, confidence: 0.9 },
@@ -259,7 +182,6 @@ describe('R10 reality-checker confidence', () => {
 
   it('同 artifact canonical 高 confidence 优先于 legacy 低 confidence', async () => {
     const report = await loadSample('bad-r10-reality-confidence.json');
-    const realityPath = '.w-model/rootcause/partial/RC-phase5-1-01/testing-reality-checker.json';
     report.partialReports = [
       { personaSlice: 'testing-reality-checker', path: realityPath, confidence: 0.8 },
       { personaSlice: 'reality-checker', path: realityPath, confidence: 0.2 },
@@ -273,20 +195,31 @@ describe('R10 reality-checker confidence', () => {
 });
 
 describe('R11 多角度 persona 选择矩阵', () => {
-  it('partialReports 含矩阵外 persona 时失败', async () => {
-    const report = await loadSample('bad-r11-unknown-persona.json');
-    const result = checkRootCauseReport(report);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => /R11.*矩阵外 persona.*engineering-testability/.test(r))).toBe(true);
-  });
-
-  it('视角集合与 rootCause.category 矩阵行无交集时失败', async () => {
-    const report = await loadSample('bad-r11-category-mismatch.json');
-    const result = checkRootCauseReport(report);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => /R11.*与 rootCause\.category=coding-error 的矩阵行无交集/.test(r))).toBe(true);
-    // 视角本身都是已知 persona：不因「矩阵外」而失败，只命中交集规则
-    expect(result.reasons.some((r) => /R11.*矩阵外/.test(r))).toBe(false);
+  it('R11 矩阵负例（2 个 bad-r11-*.json fixture 逐具名）→ fail', async () => {
+    const rows: readonly [string, RegExp, ((result: ReturnType<typeof checkRootCauseReport>) => void) | null][] = [
+      ['bad-r11-unknown-persona.json', /R11.*矩阵外 persona.*engineering-testability/, null],
+      [
+        'bad-r11-category-mismatch.json',
+        /R11.*与 rootCause\.category=coding-error 的矩阵行无交集/,
+        // 视角本身都是已知 persona：不因「矩阵外」而失败，只命中交集规则
+        (result) => {
+          expect(
+            result.reasons.some((r) => /R11.*矩阵外/.test(r)),
+            'bad-r11-category-mismatch.json 不应报「矩阵外」',
+          ).toBe(false);
+        },
+      ],
+    ];
+    for (const [fixture, pattern, extra] of rows) {
+      const report = await loadSample(fixture);
+      const result = checkRootCauseReport(report);
+      expect(result.passed, `${fixture} 应 fail`).toBe(false);
+      expect(
+        result.reasons.some((r) => pattern.test(r)),
+        `${fixture} 应报 ${pattern}`,
+      ).toBe(true);
+      if (extra) extra(result);
+    }
   });
 
   it('R10 样本不误报 R11（仅触发目标规则）', async () => {
@@ -330,27 +263,39 @@ describe('R11 多角度 persona 选择矩阵', () => {
     ],
   ];
 
-  it.each(ROW_PERSONAS)('R11 第一键行 %s：含本行任一 persona 即通过', async (category, personas) => {
-    const report = await loadSample('bad-r10-reality-confidence.json');
-    (report.rootCause as { category: string }).category = category;
-    report.partialReports = [
-      { personaSlice: personas[0]!, path: `.w-model/rootcause/partial/RC-x/${personas[0]!}.json`, confidence: 0.9 },
-      {
-        personaSlice: 'testing-reality-checker',
-        path: '.w-model/rootcause/partial/RC-x/testing-reality-checker.json',
-        confidence: 0.9,
-      },
-    ];
-    const result = checkRootCauseReport(report);
-    expect(result.reasons.filter((r) => /R11/.test(r))).toEqual([]);
+  it(`R11 第一键行负载性：含本行任一 persona 即通过（${ROW_PERSONAS.length} 行循环，category 具名）`, async () => {
+    for (const [category, personas] of ROW_PERSONAS) {
+      const report = await loadSample('bad-r10-reality-confidence.json');
+      (report.rootCause as { category: string }).category = category;
+      report.partialReports = [
+        { personaSlice: personas[0]!, path: `.w-model/rootcause/partial/RC-x/${personas[0]!}.json`, confidence: 0.9 },
+        {
+          personaSlice: 'testing-reality-checker',
+          path: '.w-model/rootcause/partial/RC-x/testing-reality-checker.json',
+          confidence: 0.9,
+        },
+      ];
+      const result = checkRootCauseReport(report);
+      expect(
+        result.reasons.filter((r) => /R11/.test(r)),
+        `category=${category} 含本行 persona 应通过 R11`,
+      ).toEqual([]);
+    }
   });
 
   // 负向臂只取「行内本就含 reality-checker 之外、且不含 reality-checker」的 5 行：
   // design-flaw 与 requirement-gap 的**矩阵行确实含 testing-reality-checker**（见 agent-personas.md §2），
   // 故对这两行「仅 reality-checker」是合法视角，不应拦截（首版测试按错名单断言，已修正）。
-  it.each(['coding-error', 'test-gap', 'process-missing', 'tool-gap', 'upstream-defect'])(
-    'R11 第一键行 %s：仅 reality-checker（不在本行）即拦截',
-    async (category) => {
+  const NEGATIVE_ARM_CATEGORIES = [
+    'coding-error',
+    'test-gap',
+    'process-missing',
+    'tool-gap',
+    'upstream-defect',
+  ] as const;
+
+  it(`R11 第一键行：仅 reality-checker（不在本行）即拦截（${NEGATIVE_ARM_CATEGORIES.length} 行循环，category 具名）`, async () => {
+    for (const category of NEGATIVE_ARM_CATEGORIES) {
       const report = await loadSample('bad-r10-reality-confidence.json');
       (report.rootCause as { category: string }).category = category;
       report.partialReports = [
@@ -361,9 +306,12 @@ describe('R11 多角度 persona 选择矩阵', () => {
         },
       ];
       const result = checkRootCauseReport(report);
-      expect(result.reasons.some((r) => /R11.*与 rootCause\.category=.*的矩阵行无交集/.test(r))).toBe(true);
-    },
-  );
+      expect(
+        result.reasons.some((r) => /R11.*与 rootCause\.category=.*的矩阵行无交集/.test(r)),
+        `category=${category} 仅 reality-checker 应被拦截`,
+      ).toBe(true);
+    }
+  });
 
   it('noRootCause 分支无 category，不进入 R11', async () => {
     const report = await loadSample('valid-no-root-cause.json');
