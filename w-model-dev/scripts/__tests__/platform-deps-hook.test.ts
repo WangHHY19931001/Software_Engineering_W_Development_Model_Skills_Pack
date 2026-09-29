@@ -382,6 +382,10 @@ npm() {
       PATH: prependBashPath(binDir),
       AUDIT_CASE: auditCase,
       OSTYPE: 'linux-gnu',
+      // 显式钉空串防继承（见上方 read-only platform check 用例注释）：本夹具不 mock cp，
+      // 若继承验证 prepush 的 PREPUSH_KEEP_VITEST_JSON，内层 hook 的 KEEP cp 会真实执行，
+      // 用夹具假 results.json 覆写外层 prepush 正在写的证据 JSON（竞态损坏证据）。
+      PREPUSH_KEEP_VITEST_JSON: '',
     },
     workspace,
   );
@@ -794,6 +798,14 @@ mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; return 98; }
         CALLS: callsPath,
         PREPUSH_FORCE: '0',
         OSTYPE: 'linux-gnu',
+        // 三车道执行形态的机制噪声隔离（Task 14 验证轮实测）：验证 prepush 带
+        // PREPUSH_KEEP_VITEST_JSON 跑全量时，该变量经「外层 hook → vitest 进程 → 本测试
+        // → 内层 hook」逐层继承；三车道「跑完全部车道再汇总」使内层 hook 必达 KEEP 块
+        // （重组前首错即停在 item 1，永不触达），`cp "$tmp_vitest_json" …` 命中 export -f
+        // 的 mock cp 写入 calls.log，下方负向正则 \bcp\b 误红（定向跑无此变量故绿）。
+        // 此处显式钉空串（export VAR=''，hook 内 ${VAR:-} 判空）固定「未请求 KEEP 证据」
+        // 的默认行为；KEEP 证据复制非供应链操作，负向正则强度不放宽。
+        PREPUSH_KEEP_VITEST_JSON: '',
       },
       workspace,
     );
@@ -1380,7 +1392,7 @@ npm() {
     'run check:docs-consistency')
       test -s "$WM_VITEST_COUNT_FILE" || return 97
       printf 'docs-consumed %s\\n' "$WM_VITEST_COUNT_FILE" >> "$CALLS"
-      return 0
+      return 1
       ;;
     'run typecheck') return 0 ;;
     *) return 97 ;;
@@ -1399,7 +1411,6 @@ for arg in "$@"; do
 done
 case "$*" in
   *bad-schema.manifest.json*) exit 2 ;;
-  prettier*) exit 1 ;;
   *) exit 0 ;;
 esac
 `,
@@ -1417,17 +1428,25 @@ esac
         PATH: prependBashPath(binDir),
         TMPDIR: tempRoot,
         OSTYPE: 'linux-gnu',
+        // 显式钉空串防继承（见 read-only platform check 用例注释）：内层 hook 三车道下必达
+        // KEEP 块，未 mock 的 cp 会真实执行覆写外层证据 JSON；本用例断言 tempRoot 清理与
+        // 消费行为，KEEP 通道不属于被测语义。
+        PREPUSH_KEEP_VITEST_JSON: '',
       },
       workspace,
     );
 
     expect(result.code).toBe(1);
-    // 失败来源锚定（2026-09-28 跟进 Wave 1 计时后缀）：该行以
-    // `[pre-push] <ANSI 红叉> prettier 格式一致性（--check）（期望 exit 0，实际 1，耗时 Ns）` 呈现；
-    // 唯一失败项是 prettier 格式门禁（fake npx 对其返回 1），断言 exit 1 来自该行而非其他门禁。
+    // 失败来源锚定（Task 14 三车道重组后对齐）：prettier 位于 L1 并行车道——其失败在汇总
+    // 循环即 exit 1，L3 尾车道（含 docs-consistency 的工件消费）不再执行；为保住「工件必须
+    // 仍被消费且清理」的防御语义，唯一失败样例迁移到 L3 末项 docs-consistency（消费
+    // WM_VITEST_COUNT_FILE 写入 docs-consumed 后返回 1）。该行以
+    // `[pre-push] <ANSI 红叉> docs-consistency 活体文档一致（期望 exit 0，实际 1，耗时 Ns）` 呈现；
+    // 并断言无 L1/L2 汇总失败行（并行车道 N 项不符预期），锚定 exit 1 来自该行而非其他门禁。
     // ANSI 控制码用 `[^\n]*`（同行任意字节）表达，安全扫描 no-control-regex 不豁免 \xNN/\u00NN 转义。
-    expect(result.stdout).toMatch(
-      /\[pre-push\] [^\n]*prettier 格式一致性（--check）（期望 exit 0，实际 1，耗时 \d+s）/,
+    expect(result.stdout).toMatch(/\[pre-push\] [^\n]*docs-consistency 活体文档一致（期望 exit 0，实际 1，耗时 \d+s）/);
+    expect(result.stdout, '唯一失败项应为 L3 的 docs-consistency，L1/L2 车道不应有失败汇总行').not.toContain(
+      '并行车道',
     );
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- controlled mkdtemp call log
     expect(await fs.readFile(callsPath, 'utf8')).toContain('docs-consumed ');

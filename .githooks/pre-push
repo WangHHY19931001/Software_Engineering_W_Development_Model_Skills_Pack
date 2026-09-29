@@ -74,7 +74,17 @@ log()  { printf '[pre-push] %s\n' "$*" 2>/dev/null || true; }
 ok()   { printf '[pre-push] \033[32m✓\033[0m %s\n' "$*" 2>/dev/null || true; }
 fail() { printf '[pre-push] \033[31m✗\033[0m %s\n' "$*" 2>/dev/null || true; }
 warn() { printf '[pre-push] \033[33m⚠\033[0m %s\n' "$*" 2>/dev/null || true; }
-now_ms() { node -e 'console.log(Date.now())' 2>/dev/null || printf '%s000' "$(date +%s)"; }
+# 毫秒时间戳。node 输出为空/非纯数字（node 缺失、被替换、输出异常）时回退 date +%s——
+# 空串流入 $(( )) 会构成算术语法错误并中止所在复合命令（Wave 4 实测：汇总循环被中止后
+# fail_count 恒 0，全红门禁 fail-open exit 0），因此 now_ms 必须恒产出纯数字。
+now_ms() {
+  local t
+  t="$(node -e 'console.log(Date.now())' 2>/dev/null || true)"
+  case "$t" in
+    ''|*[!0-9]*) t="$(date +%s)000" ;;
+  esac
+  printf '%s' "$t"
+}
 
 # ---------- 路径过滤：无相关变更直接放行 ----------
 #
@@ -292,17 +302,48 @@ if ! bash "$(dirname "$0")/ensure-platform-deps.sh" --check; then
   exit 1
 fi
 
-# ---------- 门禁用例 ----------
-# 全部门禁共 19 项检查（第 14 项 npm audit 为阻断项），退出码必须全部符合预期才放行。
+# ---------- 第 14 项 npm audit 跳过判定函数（Wave 4 三车道重组：定义原样保留在门禁区之前，供 item14_audit 引用） ----------
+audit_has_blocking_signal() {
+  grep -qiE \
+    '(^|[[:space:]])(npm (error|warn|err!)[[:space:]]+)?(code[[:space:]]+(EACCES|EPERM|EJSONPARSE|ECONFIG)|.*(vulnerab[a-z]*|permission denied|JSON (parse|input|error)|config(uration)? (error|invalid|failed)))' \
+    "$tmp_log"
+}
+
+# 判定锚定在 npm 自身的 error/warn/err! 前缀行；词面 network 只识别前缀紧邻处或
+# `npm warn audit network`（npm7 形态，防 network-text/networking 等无关文本放宽）。
+# 可确证的网络层信号允许出现在该行任意位置：网络错误码（code/errno 形态，含 HTTP
+# 5xx/429 码）、socket hang up、'reason: getaddrinfo/connect <E码>'、5xx/429 响应文本、
+# registry/advisories 上下文中的 404（裸 E404 不跳），以及带 network/registry/request
+# 同行锚定的状态词（裸状态词不跳，防 HTML 错误页正文误放行）。
+audit_can_skip() {
+  if audit_has_blocking_signal; then
+    return 1
+  fi
+  grep -qiE \
+    '^npm (error|warn|err!)[[:space:]]+((code|errno)[[:space:]]+(ENOTFOUND|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|ECONNRESET|ENOTSUP|ENOAUDIT|E429|E5[0-9]{2})|404[[:space:]]+Not[[:space:]]+Found[[:space:]]+-[[:space:]]+GET[[:space:]]+[^[:space:]]*(registry|advisories)|(audit[[:space:]]+)?network([[:space:]:]|$)|problem related to network connectivity|NOT_IMPLEMENTED|registry[[:space:]]+[^[:space:]]+[[:space:]]+does not support audit endpoint|does not support audit endpoint|.*(socket hang up|reason: (getaddrinfo|connect)[[:space:]]+E[A-Z0-9]+|(429|5[0-9]{2})([[:space:]]+|-)(Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error|Too Many Requests)|((network|registry|request).*[^[:alnum:]_](Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error)([^[:alnum:]_]|$)|(.*[^[:alnum:]_])?(Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error)([^[:alnum:]_]|$).*(network|registry|request))))' \
+    "$tmp_log"
+}
+
+# ---------- 门禁用例（Wave 4 三车道重组；19 项语义清单不变）----------
+# L1 并行车道：静态项 + 独立项，与 L2 同时发起；L2 主车道：vitest 全量 + coverage；
+# L3 尾车道：依赖 L2 产物（provenance 封装 → coverage-scope / docs-consistency）。
+# 全部门禁共 19 项检查（第 14 项 npm audit 为阻断项），任一项退出码不符预期 → 整体 exit 1；
+# 全部 19 项通过才 exit 0 的放行契约不变。
+# 执行形态差异（如实登记）：重组前首错即停；重组后跑完全部车道再汇总——
+# 换取完整失败画像与并行墙钟。
+# 输出容错：后台 job 相关输出一律 2>/dev/null || true（沿用 fd 兼容模式）。
+# L1/L2 用 par_expect 后台并发（退出码/起止毫秒落盘，汇总循环按发起顺序 wait）；
+# L3 顺序执行，沿用 Wave 1 的 run_expect（耗时随行输出语义不变）。
 
 PREPUSH_T0="$(now_ms)"
 tmp_log="$(mktemp)"
 tmp_vitest_dir="$(mktemp -d)"
 tmp_vitest_json="$tmp_vitest_dir/results.json"
 tmp_vitest_provenance="$tmp_vitest_dir/provenance.json"
-trap 'rm -f "$tmp_log"; rm -rf "$tmp_vitest_dir"' EXIT
+lane_dir="$(mktemp -d)"
+trap 'rm -f "$tmp_log"; rm -rf "$tmp_vitest_dir" "$lane_dir"' EXIT
 
-# run_expect <描述> <期望退出码> <命令...>（Wave 1 计时：耗时随行输出，判定逻辑逐字节不变）
+# run_expect <描述> <期望退出码> <命令...>（Wave 1 计时：耗时随行输出，判定逻辑逐字节不变；L3 尾车道沿用）
 run_expect() {
   local desc="$1"; shift
   local expect="$1"; shift
@@ -322,68 +363,101 @@ run_expect() {
   return 0
 }
 
+# par_expect <序号> <描述> <期望退出码> <命令...>：后台执行；退出码/起止毫秒落盘，发起顺序记入 order.txt
+par_expect() {
+  local idx="$1"; shift
+  local desc="$1"; shift
+  local expect="$1"; shift
+  printf '%s' "$(now_ms)" >"$lane_dir/$idx.start"
+  (
+    set +e
+    "$@" >"$lane_dir/$idx.log" 2>&1
+    printf '%s' "$?" >"$lane_dir/$idx.code"
+    # 通知通道：命令体的 stdout/stderr 均被上面重定向进 <idx>.log，观察者不可见；
+    # 命令可写 <idx>.notice 把面向用户的提示（如第 14 项 audit 跳过）经子壳转抛 hook stdout。
+    if [ -s "$lane_dir/$idx.notice" ]; then
+      cat "$lane_dir/$idx.notice" 2>/dev/null || true
+    fi
+    printf '%s' "$(now_ms)" >"$lane_dir/$idx.end"
+  ) &
+  printf '%s|%s|%s|%s\n' "$idx" "$!" "$expect" "$desc" >>"$lane_dir/order.txt"
+}
+
+# 第 14 项 npm audit 的自定义期望封装（0 通过；255/1 + 网络信号 = 0 语义跳过；
+# 跳过判定函数 audit_has_blocking_signal / audit_can_skip 见门禁区之前）。
+# 注意：封装在 par_expect 的 set +e 子壳内执行，末尾不恢复 set -e——
+# 函数内 set -e 会在阻断路径（return 1 后）直接终止子壳，吞掉 .code/.end 落盘。
+# skip 消息通道：函数体 stdout/stderr 均被 par_expect 重定向进 14.log，且 skip 不产生失败行
+# （汇总只对失败项 cat 日志）——跳过提示写 14.notice 由子壳转抛 hook stdout，
+# 保留重组前 warn 直上终端的可见性；14.log 仍同步留痕该提示。
+item14_audit() {
+  tmp_log="$lane_dir/14.log"
+  set +e
+  npm audit --audit-level=high >"$tmp_log" 2>&1
+  local audit_code=$?
+  if [ "$audit_code" -eq 0 ]; then return 0; fi
+  if { [ "$audit_code" -eq 255 ] || [ "$audit_code" -eq 1 ]; } && audit_can_skip; then
+    printf '[pre-push] ⚠ npm audit 网络不可达或 registry 不支持 audit endpoint，跳过（不阻断）\n' >>"$tmp_log" 2>&1 || true
+    printf '[pre-push] ⚠ npm audit 网络不可达或 registry 不支持 audit endpoint，跳过（不阻断）\n' >"$lane_dir/14.notice" 2>/dev/null || true
+    return 0
+  fi
+  return 1
+}
+
+# ---- L1 + L2 同时发起（序号 = 原 19 项编号，语义逐项对应；命令行/描述/期望码与重组前一致）----
+
 # 1. self-test：样本回归基线，用例数以运行输出为准（覆盖全部 check-*.ts 的通过 / 失败 / 输入错误三态，分类明细见 self-test.ts 输出），必须 exit 0
-run_expect "self-test 全部样本匹配期望" 0 npm run self-test || exit 1
+par_expect 1 "self-test 全部样本匹配期望" 0 npm run self-test
 
 # 2. check:verifier 无参数应退出 2（输入错误）
-run_expect "check:verifier 无参数退出 2" 2 npm run check:verifier || exit 1
+par_expect 2 "check:verifier 无参数退出 2" 2 npm run check:verifier
 
 # 3. check:gate 不存在的目录应退出 2（输入错误）
-run_expect "check:gate 不存在目录退出 2" 2 npm run check:gate -- /tmp/nonexistent || exit 1
+par_expect 3 "check:gate 不存在目录退出 2" 2 npm run check:gate -- /tmp/nonexistent
 
 # 4. check:verifier 对有效样本应退出 0
-run_expect "check:verifier 有效样本退出 0" 0 \
-  npm run check:verifier -- w-model-dev/scripts/samples/verifier/valid.json || exit 1
+par_expect 4 "check:verifier 有效样本退出 0" 0 \
+  npm run check:verifier -- w-model-dev/scripts/samples/verifier/valid.json
 
 # 5. check:verifier 对无效样本应退出 1（校验失败）
-run_expect "check:verifier 无效样本退出 1" 1 \
-  npm run check:verifier -- w-model-dev/scripts/samples/verifier/bad-ranking-k.json || exit 1
+par_expect 5 "check:verifier 无效样本退出 1" 1 \
+  npm run check:verifier -- w-model-dev/scripts/samples/verifier/bad-ranking-k.json
 
 # 6. security-scan：跑 eslint-plugin-security + baseline 比对，必须 exit 0
-run_expect "security-scan 无新增风险" 0 \
-  npx tsx w-model-dev/scripts/cli/security-scan.ts || exit 1
+par_expect 6 "security-scan 无新增风险" 0 \
+  npx tsx w-model-dev/scripts/cli/security-scan.ts
 
 # 7. check-bdd-model 对有效 BDD 样本应退出 0（技能包 fixture 回归；不直接运行 TLA、TLA↔BDD 同步或项目工件阶段门，不启用 require flags，因此不要求 named/passed Cucumber 证据）
-run_expect "check-bdd-model 有效 BDD 样本退出 0" 0 \
-  npx tsx w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev/scripts/samples/bdd/valid-manifest.json --phase=1 || exit 1
+par_expect 7 "check-bdd-model 有效 BDD 样本退出 0" 0 \
+  npx tsx w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev/scripts/samples/bdd/valid-manifest.json --phase=1
 
 # 8. check-bdd-model 对 schema 不合规 BDD 样本应退出 2（输入错误）
-run_expect "check-bdd-model schema 不合规 BDD 样本退出 2" 2 \
-  npx tsx w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev/scripts/samples/bdd/bad-schema.manifest.json --phase=1 || exit 1
+par_expect 8 "check-bdd-model schema 不合规 BDD 样本退出 2" 2 \
+  npx tsx w-model-dev/scripts/cli/check-bdd-model.ts w-model-dev/scripts/samples/bdd/bad-schema.manifest.json --phase=1
 
 # 9. check:coverage 对有效覆盖样本应退出 0（阶段 1 需求覆盖分析门禁 C1-C10）
-run_expect "check:coverage 有效覆盖样本退出 0" 0 \
-  npm run check:coverage -- w-model-dev/scripts/samples/coverage/valid-minimal-coverage.json || exit 1
+par_expect 9 "check:coverage 有效覆盖样本退出 0" 0 \
+  npm run check:coverage -- w-model-dev/scripts/samples/coverage/valid-minimal-coverage.json
 
 # 10. check:exemption 对有效豁免样本应退出 0（豁免审批门禁 E1-E9，S→R→V→人类四阶段）
-run_expect "check:exemption 有效豁免样本退出 0" 0 \
-  npm run check:exemption -- w-model-dev/scripts/samples/exemption/valid-full-approval.json || exit 1
+par_expect 10 "check:exemption 有效豁免样本退出 0" 0 \
+  npm run check:exemption -- w-model-dev/scripts/samples/exemption/valid-full-approval.json
 
 # 11. check-signature-chain 对有效签名链样本应退出 0
-run_expect "check-signature-chain 有效签名链样本退出 0" 0 \
-  npx tsx w-model-dev/scripts/cli/check-signature-chain.ts w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl --phase=1 || exit 1
+par_expect 11 "check-signature-chain 有效签名链样本退出 0" 0 \
+  npx tsx w-model-dev/scripts/cli/check-signature-chain.ts w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl --phase=1
 
 # 12. vitest 单元测试全量通过（文件数/用例数以同次 JSON facts 与 provenance 为准）+ coverage 阈值门禁（--coverage 启用 v8 插桩；
 #     logic/ + lib/ 阈值 stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest 会 exit 1 阻断推送；
 #     基线见 config/vitest.config.ts coverage.thresholds 注释）
 #     --reporter=json --outputFile 落盘实测用例总数，供第 15 项 check-docs-consistency 复用（避免 vitest 双跑）
-run_expect "vitest 单元测试 + coverage 阈值通过" 0 \
-  npx vitest run --coverage --reporter=json --outputFile="$tmp_vitest_json" --config config/vitest.config.ts || exit 1
-
-# Wave 1 基线采集：指定 PREPUSH_KEEP_VITEST_JSON（正斜杠 Windows 路径）时保留逐文件 JSON
-if [ -n "${PREPUSH_KEEP_VITEST_JSON:-}" ]; then
-  cp "$tmp_vitest_json" "$PREPUSH_KEEP_VITEST_JSON" 2>/dev/null || true
-fi
-
-# 将第 12 项同次 JSON 封装为受控 provenance，绑定当前 HEAD、运行 ID、相对 artifact 与完整 measurements。
-node -e 'const fs=require("fs"),crypto=require("crypto"),cp=require("child_process"),path=require("path"); const artifact=process.argv[1], provenance=process.argv[2], root=process.cwd(); const raw=fs.readFileSync(artifact,"utf8"), d=JSON.parse(raw), sha=crypto.createHash("sha256").update(raw,"utf8").digest("hex"), head=cp.execFileSync("git",["rev-parse","HEAD"],{cwd:root,encoding:"utf8"}).trim(), runId=crypto.randomBytes(8).toString("hex"); fs.writeFileSync(provenance, JSON.stringify({format:"w-model-vitest-provenance",version:1,commitSha:head,runId,artifactRelativePath:path.basename(artifact),artifactSha256:sha,measurements:d},null,2)+"\n");' "$tmp_vitest_json" "$tmp_vitest_provenance"
+par_expect 12 "vitest 单元测试 + coverage 阈值通过" 0 \
+  npx vitest run --coverage --reporter=json --outputFile="$tmp_vitest_json" --config config/vitest.config.ts
 
 # 13. check-coverage-scope：规则层覆盖口径门禁（logic+lib 白名单分母重算，独立于第 12 项全分母阈值）
 #     阈值 = 2026-09-18 实测（logic+lib）：stmts 84.25 / branch 77.87 / funcs 93.68 / lines 87.01，
 #     向下取整到 5 的倍数；出处：config/vitest.config.ts coverage 注释 + 本计划收尾记录
-run_expect "规则层覆盖口径 (logic+lib) 达阈值" 0 \
-  npx tsx w-model-dev/scripts/cli/check-coverage-scope.ts --report=coverage/coverage-final.json \
-  --min-statements=80 --min-branches=75 --min-functions=90 --min-lines=85 || exit 1
+#     （Wave 4 三车道：本项为 L3 尾车道，实际执行见文末「L3 尾车道」段——依赖第 12 项产物）
 
 # 14. npm audit：依赖漏洞扫描（high 以上阻断；仅明确网络不可达或 registry 不支持 endpoint 时跳过）
 #     skip 只接受 npm 明确前缀的网络错误、明确错误码，或明确 audit endpoint unsupported 信号；
@@ -393,69 +467,86 @@ run_expect "规则层覆盖口径 (logic+lib) 达阈值" 0 \
 #     advisories`）跳过，裸 `code E404` 保持阻断；状态词（Bad Gateway 等）须同行含
 #     network/registry/request 锚定，裸状态词保持阻断。任意漏洞报告、JSON 解析、权限/配置
 #     错误都 fail-closed，不因文本中出现 network 而放行。
-audit_has_blocking_signal() {
-  grep -qiE \
-    '(^|[[:space:]])(npm (error|warn|err!)[[:space:]]+)?(code[[:space:]]+(EACCES|EPERM|EJSONPARSE|ECONFIG)|.*(vulnerab[a-z]*|permission denied|JSON (parse|input|error)|config(uration)? (error|invalid|failed)))' \
-    "$tmp_log"
-}
-
-audit_can_skip() {
-  if audit_has_blocking_signal; then
-    return 1
-  fi
-  # 判定锚定在 npm 自身的 error/warn/err! 前缀行；词面 network 只识别前缀紧邻处或
-  # `npm warn audit network`（npm7 形态，防 network-text/networking 等无关文本放宽）。
-  # 可确证的网络层信号允许出现在该行任意位置：网络错误码（code/errno 形态，含 HTTP
-  # 5xx/429 码）、socket hang up、'reason: getaddrinfo/connect <E码>'、5xx/429 响应文本、
-  # registry/advisories 上下文中的 404（裸 E404 不跳），以及带 network/registry/request
-  # 同行锚定的状态词（裸状态词不跳，防 HTML 错误页正文误放行）。
-  grep -qiE \
-    '^npm (error|warn|err!)[[:space:]]+((code|errno)[[:space:]]+(ENOTFOUND|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|ECONNRESET|ENOTSUP|ENOAUDIT|E429|E5[0-9]{2})|404[[:space:]]+Not[[:space:]]+Found[[:space:]]+-[[:space:]]+GET[[:space:]]+[^[:space:]]*(registry|advisories)|(audit[[:space:]]+)?network([[:space:]:]|$)|problem related to network connectivity|NOT_IMPLEMENTED|registry[[:space:]]+[^[:space:]]+[[:space:]]+does not support audit endpoint|does not support audit endpoint|.*(socket hang up|reason: (getaddrinfo|connect)[[:space:]]+E[A-Z0-9]+|(429|5[0-9]{2})([[:space:]]+|-)(Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error|Too Many Requests)|((network|registry|request).*[^[:alnum:]_](Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error)([^[:alnum:]_]|$)|(.*[^[:alnum:]_])?(Bad Gateway|Service Unavailable|Gateway Time-?out|Internal Server Error)([^[:alnum:]_]|$).*(network|registry|request))))' \
-    "$tmp_log"
-}
-log "npm audit 依赖漏洞扫描（high 以上阻断）..."
-set +e
-npm audit --audit-level=high >"$tmp_log" 2>&1
-local_audit_code=$?
-set -e
-if [ "$local_audit_code" -eq 0 ]; then
-  ok "npm audit 未发现 high 以上漏洞"
-elif { [ "$local_audit_code" -eq 255 ] || [ "$local_audit_code" -eq 1 ]; } && audit_can_skip; then
-  warn "npm audit 网络不可达或 registry 不支持 audit endpoint，跳过（不阻断）"
-  cat "$tmp_log" >&2
-else
-  fail "npm audit 发现 high 以上漏洞或执行失败（返回码 $local_audit_code）"
-  cat "$tmp_log" >&2
-  exit 1
-fi
+par_expect 14 "npm audit 依赖漏洞扫描（high 以上阻断）" 0 item14_audit
 
 # 15. check-docs-consistency：活体文档一致性门禁（复用第 12 项 vitest JSON 用例数，不二次全量 vitest）
 #     注意 1：run_expect 以 "$@" 展开命令，`VAR=x npm ...` 前缀语法不被识别为 env 赋值，须先 export；
 #     注意 2：Git Bash 的 mktemp 产出 MSYS 路径（/tmp/…），Node（Windows）无法直接解析——用 cygpath -w
 #     翻译成 Windows 路径；WSL / 无 cygpath 时保留原值（Node 在 POSIX 下能正确 resolve /tmp/…）。
-export WM_VITEST_COUNT_FILE="$(cygpath -w "$tmp_vitest_json" 2>/dev/null || printf '%s' "$tmp_vitest_json")"
-export WM_VITEST_PROVENANCE_FILE="$(cygpath -w "$tmp_vitest_provenance" 2>/dev/null || printf '%s' "$tmp_vitest_provenance")"
-export WM_VITEST_PROVENANCE_ROOT="$(cygpath -w "$tmp_vitest_dir" 2>/dev/null || printf '%s' "$tmp_vitest_dir")"
-run_expect "docs-consistency 活体文档一致" 0 npm run check:docs-consistency || exit 1
+#     （Wave 4 三车道：本项为 L3 尾车道，实际执行见文末「L3 尾车道」段——复用第 12 项同次 JSON）
 
 # 16. check-samples-coverage：samples 覆盖矩阵门禁
 #     核对每个 fixture 被 self-test.ts 用例数组引用 + 每个子目录在 samples/README.md 矩阵声明，
 #     堵住「新增 fixture 遗忘登记」（未登记 fixture 不参与任何检查，self-test 仍全绿）
-run_expect "samples 覆盖矩阵一致（无未登记 fixture）" 0 npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts || exit 1
+par_expect 16 "samples 覆盖矩阵一致（无未登记 fixture）" 0 npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts
 
 # 17. prettier --check：格式一致性门禁（config/prettier.config.cjs，endOfLine=auto 双平台行尾兼容）
 #     堵住「npm run format 非幂等」回归——任何 .ts/.cjs 编辑未跑 format 即被阻断
-run_expect "prettier 格式一致性（--check）" 0 \
-  npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs" || exit 1
+par_expect 17 "prettier 格式一致性（--check）" 0 \
+  npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs"
 
 # 18. tsc 类型检查：TypeScript strict 0 错误，对齐 SSoT §10H.5 V1 验证门；
 #     README 健康指标「tsc 0 错误」由手动验证升级为自动化门禁
-run_expect "tsc 类型检查 0 错误" 0 \
-  npx tsc -p config/tsconfig.json || exit 1
+par_expect 18 "tsc 类型检查 0 错误" 0 \
+  npx tsc -p config/tsconfig.json
 
 # 19. eval 语料断言：60 条触发边界语料 + coverageMatrix 五项校验全绿（触发边界 campaign 快追；
 #     断言引擎 --self-check 由 eval/ 自身维护，此处跑全量断言）
-run_expect "eval 语料断言与覆盖矩阵全绿" 0 npx tsx eval/runner.ts || exit 1
+par_expect 19 "eval 语料断言与覆盖矩阵全绿" 0 npx tsx eval/runner.ts
+
+# ---- 汇总 L1+L2（按发起顺序等待并判定）----
+# wait 会透传被等待 job 的退出码：期望非 0 的项（第 2/3/5/8 项）若不挂 || true 会在
+# set -e 下中断汇总——退出码以 .code 落盘文件为准，wait 本身只做同步。
+fail_count=0
+while IFS='|' read -r idx pid expect desc; do
+  wait "$pid" 2>/dev/null || true
+  code="$(cat "$lane_dir/$idx.code" 2>/dev/null || printf '1')"
+  end_ms="$(cat "$lane_dir/$idx.end" 2>/dev/null || true)"
+  start_ms="$(cat "$lane_dir/$idx.start" 2>/dev/null || true)"
+  # 落盘数据净化（fail-closed）：.code 缺失/非数字一律按失败计；时间戳缺失/非数字按 0 计
+  # （耗时失真可容忍，判定不可丢）。禁止空串/非数字进入 $(( )) 与 [ -ne ]——算术或整数
+  # 比较错误会中止整个汇总环，fail_count 恒 0 → 全红门禁 fail-open exit 0（Wave 4 实测教训）。
+  case "$code" in ''|*[!0-9]*) code=1 ;; esac
+  case "$end_ms" in ''|*[!0-9]*) end_ms=0 ;; esac
+  case "$start_ms" in ''|*[!0-9]*) start_ms=0 ;; esac
+  ms=$((end_ms - start_ms))
+  if [ "$code" -ne "$expect" ]; then
+    fail "$desc（期望 exit $expect，实际 $code，耗时 $((ms / 1000))s）"
+    cat "$lane_dir/$idx.log" 2>/dev/null || true
+    fail_count=$((fail_count + 1))
+  else
+    ok "$desc（exit $code，耗时 $((ms / 1000))s）"
+  fi
+done <"$lane_dir/order.txt"
+
+# Wave 1 基线采集：指定 PREPUSH_KEEP_VITEST_JSON（正斜杠 Windows 路径）时保留逐文件 JSON。
+# 必须置于全部 wait 完成之后（vitest 已写完 JSON 才复制），且先于红路径退出——
+# 失败也先保留证据再中止，不丢 JSON。
+if [ -n "${PREPUSH_KEEP_VITEST_JSON:-}" ]; then
+  cp "$tmp_vitest_json" "$PREPUSH_KEEP_VITEST_JSON" 2>/dev/null || true
+fi
+
+if [ "$fail_count" -ne 0 ]; then
+  fail "并行车道 $fail_count 项不符预期，中止"
+  exit 1
+fi
+
+# ---- L3 尾车道（依赖第 12 项产物，顺序执行；第 13/15 项语义注释已原位保留于上方 # 13. / # 15. 块）----
+
+# 将第 12 项同次 JSON 封装为受控 provenance，绑定当前 HEAD、运行 ID、相对 artifact 与完整 measurements。
+node -e 'const fs=require("fs"),crypto=require("crypto"),cp=require("child_process"),path=require("path"); const artifact=process.argv[1], provenance=process.argv[2], root=process.cwd(); const raw=fs.readFileSync(artifact,"utf8"), d=JSON.parse(raw), sha=crypto.createHash("sha256").update(raw,"utf8").digest("hex"), head=cp.execFileSync("git",["rev-parse","HEAD"],{cwd:root,encoding:"utf8"}).trim(), runId=crypto.randomBytes(8).toString("hex"); fs.writeFileSync(provenance, JSON.stringify({format:"w-model-vitest-provenance",version:1,commitSha:head,runId,artifactRelativePath:path.basename(artifact),artifactSha256:sha,measurements:d},null,2)+"\n");' "$tmp_vitest_json" "$tmp_vitest_provenance"
+
+export WM_VITEST_COUNT_FILE="$(cygpath -w "$tmp_vitest_json" 2>/dev/null || printf '%s' "$tmp_vitest_json")"
+export WM_VITEST_PROVENANCE_FILE="$(cygpath -w "$tmp_vitest_provenance" 2>/dev/null || printf '%s' "$tmp_vitest_provenance")"
+export WM_VITEST_PROVENANCE_ROOT="$(cygpath -w "$tmp_vitest_dir" 2>/dev/null || printf '%s' "$tmp_vitest_dir")"
+
+# 第 13 项（阈值等语义注释见上方 # 13. 块）
+run_expect "规则层覆盖口径 (logic+lib) 达阈值" 0 \
+  npx tsx w-model-dev/scripts/cli/check-coverage-scope.ts --report=coverage/coverage-final.json \
+  --min-statements=80 --min-branches=75 --min-functions=90 --min-lines=85 || exit 1
+
+# 第 15 项（复用第 12 项同次 JSON；export 注意事项见上方 # 15. 块）
+run_expect "docs-consistency 活体文档一致" 0 npm run check:docs-consistency || exit 1
 
 log "全部门禁通过，允许推送 ✓（总耗时 $(( ($(now_ms) - PREPUSH_T0) / 1000 ))s）"
 exit 0
