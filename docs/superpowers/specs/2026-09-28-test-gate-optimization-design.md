@@ -124,3 +124,43 @@ B5 的 7 处 `execSync('npx tsx …')` → 统一 `runSync(process.execPath, [ts
 - 不动 48 条 exit-2 探针与四类负例探针本体（只在裁定表框架下处理其外围）。
 - 不做 vitest.config include/exclude 机制的根因排查（T1 单口径化后不再相关，T6 销账）。
 - eval 语料不因瘦身目标硬删（§5 重审优先，证据不足不动）。
+
+## 11. 实测结果（2026-09-29 收口）
+
+### Wave 1 · 测量先行
+
+- prepush 计时仪表 + `PREPUSH_KEEP_VITEST_JSON` 保留开关落地；基线全量 19/19 绿 **2144s**（vitest 项 2047s，cli-serial 占 97.3%）。
+- 契约依赖地图（`docs/debug/2026-09-28-test-gate-optimization/contract-map.md`）：四类断言落点登记（prepush 结构/用例数/SUBPROCESS/coverage 阈值）。
+
+### Wave 2 · spawn 成本削减
+
+- npx 残留 7 处迁移 runSync；cli-invoker 进程内调用层 + runMain VITEST 守卫 + spawn 层 VITEST 剥离（守卫前提对照实验证伪后补剥离）；9 CLI main 签名化 + wrapper 三态收敛；冒烟集中 `cli-subprocess-smoke.test.ts`；SUBPROCESS 47→43。
+- 收口 prepush 19/19 绿 **1262s**（vitest 项 2047→1191s，**-42%**）。
+- serial 池拆 a/b 两组（奇偶派生），3 连跑零 flaky。
+
+### Wave 3 · 同质用例合并
+
+- 276 族循环内聚合（执行登记 A-E + 补遗，1 部分退回如实登记），vitest **2631→1874 例**（对规格基线 2617：**-743，-28%**，硬线 ≤2100 达成余量 226）。
+- self-test / eval 重审表 22 行全保留（删减面未触发，如实登记）。
+- 收口 prepush 19/19 绿 1303s。墙钟说明：用例 -28% 但 vitest 项墙钟持平（serial 项目跨 it 调度并行度消失 + 重 fixture 族每迭代自备夹具），提速主战场在 Wave 2（进程内化）与 Wave 4（并行）。
+
+### Wave 4 · prepush 分层重组
+
+- 三车道（L1 并行 + L2 vitest + L3 尾车道复用 L2 产物）落地，19 项语义/退出码契约不变，首错即停→全量汇总如实登记；KEEP 红路径保 JSON；audit skip 消息 notice 通道；落盘数据 fail-closed 净化。
+- 三连跑全绿零 flaky：1349/1314/1489 → 中位 1349s；文档同步 5 落点（`wave4-closeout.md`）。
+- **硬指标未达（如实登记）**：中位 1349s > 900s。归因：总时长 ≈ vitest 全量本体（~20min 主导；docs-consistency-logic ~367s 与 platform-deps-hook ~204s 均在规格排除面）；L1 并行收益被启动期抢核部分抵消。后续三选项（动用排除面 / serial 池再拆 / 接受现状）留待用户裁定。
+
+### Wave 5 · 牙齿重审落地
+
+- T1 单口径化（scope 为唯一牙齿，全分母假红面撤销）/ T2 容错收敛枚举短表（只缩小可跳过面）/ T3 守护确认 + reason 17 条行号史清理 / T4 自描述核对 / T5 已随 Wave 2 登记 / T6 销账句补齐；裁定表终稿 `teeth-adjudication.md`（六行，每处「原牙齿→替代承载」）。
+
+### 硬指标对照表（验收口径）
+
+| 指标 | 基线 | 下限 | 终态 | 裁定 |
+| --- | --- | --- | --- | --- |
+| prepush 时长 | 2144s（35.7min） | ≤15min | **中位 1314s（21.9min，-39%）** | **未达**——vitest 全量本体主导，结构性缺口，留待裁定 |
+| vitest 用例数 | 2617 | ≤2100 | **1874（-743，-28%）** | **达成**（余量 226） |
+| 漂移盲点 B9①-④ | 4 项在场 | 全部修复或销账 | 全部有归宿（①④自描述/守护、②登记、③④销账） | 达成 |
+| flaky | 子进程竞争史 | 分组并行连跑 3 次零 flaky | cli-serial 拆组 3 连跑 + 终局 3 连跑零 flaky | 达成 |
+
+终局 3 连跑（含 Wave 5 改动）：1335/1314/1288s，19/19 全绿，vitest 1874 例全过（`final-vitest.json`）。

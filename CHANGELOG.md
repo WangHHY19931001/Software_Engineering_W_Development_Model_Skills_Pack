@@ -7,6 +7,26 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [42.5.0] - 2026-09-29
+
+### 测试/门禁优化（五波；规格 `docs/superpowers/specs/2026-09-28-test-gate-optimization-design.md`，裁定表 `docs/debug/2026-09-28-test-gate-optimization/teeth-adjudication.md`）
+
+- **提速**：
+  - prepush 三车道并行重组（Wave 4）：L1 并行车道（静态/独立项）+ L2 主车道（vitest 全量）同时发起、L3 尾车道（coverage-scope / docs-consistency）复用 L2 同次 JSON 与 provenance——19 项语义清单与退出码契约不变；首错即停→全量汇总（跑完全部车道再判定，任一不符 exit 1）如实登记；KEEP 证据复制置于全部 wait 之后（失败路径不丢 vitest JSON）。
+  - CLI 测试进程内化（Wave 2）：`cli-invoker` 进程内调用层 + `runMain` VITEST 守卫 + spawn 层 VITEST 剥离（守卫前提经对照实验证伪后由控制者裁定补剥离）；9 个 CLI main 签名化（wrapper 三态收敛 HandledCliError / DuplicateFlagError→ARG_INVALID / UNEXPECTED）；真实子进程保真集中 `cli-subprocess-smoke.test.ts`（每 CLI ≥1 条），48 条 exit-2 探针不动；npx tsx 直调残留 7 处迁移 runSync。
+  - 实测：prepush 总时长 **2144s（35.7min）→ 中位 1314s（21.9min，-39%）**；⚠️ **≤15min 硬指标未达**——重组后总时长 ≈ vitest 全量本体（~20min 主导；docs-consistency-logic ~367s 与 platform-deps-hook ~204s 两大慢文件均在规格排除面），达成需动用排除面或 serial 池再拆，超出本计划授权面，留待裁定（`docs/debug/2026-09-28-test-gate-optimization/wave4-closeout.md` 三选项）。
+- **瘦身**：同质用例循环内聚合（Wave 3，276 族逐族登记「仍被覆盖/有意退休/核体后退回」，`merge-candidates.md` 执行登记 A-E + 补遗），vitest **2617→1874 例（-743，-28%）**，硬线 ≤2100 达成（余量 226）。形态纪律：循环内多断言（禁 it.each）、expect 消息逐条目指名、每迭代自备夹具、NEGATIVE-COVERAGE 载体逐夹具具名、排除面零触碰。
+- **serial 池重组**：cli-serial 拆 a/b 两组组间并行（成员按 SUBPROCESS_TEST_FILES 索引奇偶派生，单一事实源不裂变；组内 fileParallelism:false 保留）——3 连跑零 flaky 门槛通过；清单 47→43（4 个零真实 spawn 文件移入并行项目）。
+- **降维护**：SUBPROCESS 注释计数改自描述（清单长度以常量为准，`vitest-project-split.test.ts` 双向守护）；run-sync 台账 coverage-logic 三同锚条目随循环聚合收敛（审计溯源句保留）；台账 reason 行号史清理 17 条（迁移/豁免/超时事实保留）；self-test / eval 重审表 22 行如实登记（删减面未触发，无硬凑）。
+- **牙齿重审（teeth-adjudication.md T1-T6，每处「原牙齿→替代承载」）**：
+  - T1 coverage 双口径→**单口径化**：第 12 项全分母阈值撤销（2026-09-17 实测全分母 stmts 76.83 距阈值仅 1.8pp，「新增低覆盖 CLI import 即假红」），scope 口径（第 13 项 check-coverage-scope 80/75/90/85）为唯一强制牙齿；`npm run coverage` 不再全分母阻断。
+  - T2 npm audit 容错→**收敛为枚举短表**：只识别 npm 前缀行上的明确网络层信号，未识别一律 fail-closed（只缩小可跳过面；5 个边界样例 skip→blocking 为预期收紧）。
+  - T3 run-sync 台账锚点手工维护→结构字段确认已脚本守护（锚 1:1/timeout/migrated 齐全），reason 行号史清理。
+  - T4 SUBPROCESS 清单注释计数漂移（写 41 实 45）→自描述 + 双向守护销账。
+  - T5 run-sync.test.ts mock 盲点→如实登记 SUBPROCESS（宁串行勿漏判）销账。
+  - T6 coverage exclude 全量不生效（机制未查明）→T1 后不再相关，历史注记如实保留销账。
+- **验收口径**：终局 3 连跑 19/19 全绿零 flaky（1335/1314/1288s）；vitest 1874 例全过；漂移盲点 B9①-④ 全部修复或销账；flaky 零。
+
 ## [42.4.1] - 2026-09-28
 
 > 来源：「遗留收口」批（用户裁定：**处理全部遗留**）——上一批「门禁/测试瘦身」（`[42.4.0]`，`73e7e036` 已并入 main）经整分支最终审查判定**可合并 / 无阻断**，同时留下 12 项「可延后」遗留（L1-L12）。规格 `docs/superpowers/specs/2026-09-28-leftovers-closeout-design.md`（§1 逐项处置表 + §4 验收策略 + §5 风险登记）、计划 `docs/superpowers/plans/2026-09-28-leftovers-closeout.md`，账本 `.superpowers/sdd/2026-09-28-leftovers-closeout/`（gitignored 账本，路径为引用非交付物；逐任务三件套 `task-N-{brief,report}.md` + `review-*.diff`）。**版本 bump 42.4.0 → 42.4.1**（判据：patch 级**行为可见变更**——Ajv `additionalProperties` 报错文案点名字段 + run-log schema 字段 description 文字订正；无判据 / 字段集 / 退出码变更）。口径沿用上一批：**修复为主**（不销账）、**零新增门禁**、**历史不改写**（`[42.4.0]` 及以下条目**逐字节不动**，L10 的补记写入本节）。**计数影响**：`vitest 用例数` 2615 → **2617**（+2 = L3 两条新单测；L9 与 L1 均为**既有用例内**补断言，**不增用例数**）；`self-test 381` / `samples 379 / 46 / 48 / 0` / `schema 34` / `exit-2 脚本 46` / `prepush 19` / `CLI 47` / `persona 33` / `references 44` 均不变。
