@@ -59,3 +59,17 @@
 - `AGENTS.md` §2 pre-push 行 / `README.md` CI 策略：执行结构表述同步为三车道并行、全量汇总、任一不符即 exit 1。
 - `w-model-dev/scripts/__tests__/README.md`：核实无「顺序执行/首错即停」断言（矩阵行均为边界事实），零改动。
 - 同类结论：`CONTRIBUTING.md`/`docs/INSTALL.md`/`docs/troubleshooting.md`/其余 references 仅含「19 项」计数与边界事实（重组后仍真），零改动；`subagent-delegation.md:640`「≈35-45 分钟」为时长期望值（重组后实际 ~22-25min，偏高但不误导后台化决策），本波不动。
+
+## 七、三选项后续实测：serial 池再拆 → 实测不可行，已回退（2026-09-30）
+
+用户裁定「serial 池再拆」后实施四组静态负载均衡（6e006e4c：docs-consistency-logic 340s 与 platform-deps-hook 307s 两大重文件各自独占一组，理论 max=340s；43 文件总 runtime 1234s）：
+
+- **npm test 3 连跑零 flaky 通过**（RUN1/2/3 全 EXIT=0，107 文件全绿）——分组本身正确。
+- **prepush 实测两次、两种非确定失败**：①31 例 task1-integration 断言红（`expectRepositoryRootUnpolluted` 抓到并发瞬态 `M docs/superpowers/plans/…` 与 `.w-model/` 子串行）；②9 例混合失败（a 组独占的 docs-consistency-logic 内部 spawn 完整 vitest 报 `ETIMEDOUT SIGTERM`、2 例 STACK_TRACE_ERROR worker 崩溃、6 例 exit 1）。
+- **同配置 npm test 3 连绿 vs prepush 双红** → 根因不是分组，而是 **4 组并发 × 三车道 L1 门禁并发的总资源饱和**：docs-consistency-logic 内部嵌套 spawn 完整 vitest（自采集）使实际并发进程数远超 5 project 名义并发，spawn 排队超时、worker 崩溃；失败形态随调度漂移（非确定性）。
+- 按规格 §4.3 门槛「任一失败整组回退」执行 revert（7979ac89），恢复已验证稳定的 2 组奇偶（守护测试 4/4 绿）。
+
+**≤900s 硬指标剩余路径**（按可行性排序）：
+1. **docs-consistency 自采集减负**——第 12 项内嵌套的完整 vitest 自采集（~340s + 资源放大 2 倍）改受控工件复用或单 project 采集（实现层改动，需另立授权）；
+2. 更强算力机器（当前机器 5 project + L1 并发已饱和）；
+3. 接受现状 21.9min（-39% 于基线）。
