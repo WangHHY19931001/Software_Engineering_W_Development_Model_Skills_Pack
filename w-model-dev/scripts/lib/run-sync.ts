@@ -135,33 +135,17 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   // 2026-09-21 修复轮 1（评审裁定 2）：`cli/ensure-codegraph.ts` 的两条 execFileSync 台账随受控
   // CLI 派发抽到 `lib/cli-probe.ts` 并改走本模块的 runSync 而摘除——直接同步调用归零即台账归零
   // （runSync 是受控原语：SIGKILL / utf-8 / 有限 timeout 与 maxBuffer 由本模块统一强制）。
+  // 2026-09-29 Wave 3 收口门对账回归修复：原三条同锚 migratedToRunSync 台账（C7 invalid /
+  // non-array / valid out-of-scope fixture）随批 B 循环内聚合收敛为单条目——3 处字面相同的
+  // 调用合并为循环体内单物理调用点（coverage-logic 26→11 例，循环迭代覆盖原三态输入），
+  // 「锚命中行数 == 共用条目数」守护要求台账随物理调用点同步收敛。
   {
     api: 'execSync',
     file: '__tests__/coverage-logic.test.ts',
     anchor: 'const r = runSync(process.execPath, [tsxCli, scriptPath, coveragePath, `--out-of-scope=${oosPath}`], {',
-    symbol: 'C7 invalid out-of-scope fixture',
+    symbol: 'C7 OOS 文件形状三态（invalid / non-array / valid out-of-scope fixture）',
     reason:
-      'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it. 2026-09-28 Wave 2.1 npx 清理：execSync 字符串模板迁移 runSync 数组形，超时/cwd 语义保留。',
-    migratedToRunSync: true,
-    timeout: { required: true, status: 'present' },
-  },
-  {
-    api: 'execSync',
-    file: '__tests__/coverage-logic.test.ts',
-    anchor: 'const r = runSync(process.execPath, [tsxCli, scriptPath, coveragePath, `--out-of-scope=${oosPath}`], {',
-    symbol: 'C7 non-array items fixture',
-    reason:
-      'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it. 2026-09-28 Wave 2.1 npx 清理：execSync 字符串模板迁移 runSync 数组形，超时/cwd 语义保留。',
-    migratedToRunSync: true,
-    timeout: { required: true, status: 'present' },
-  },
-  {
-    api: 'execSync',
-    file: '__tests__/coverage-logic.test.ts',
-    anchor: 'const r = runSync(process.execPath, [tsxCli, scriptPath, coveragePath, `--out-of-scope=${oosPath}`], {',
-    symbol: 'C7 valid out-of-scope fixture',
-    reason:
-      'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it. 2026-09-28 Wave 2.1 npx 清理：execSync 字符串模板迁移 runSync 数组形，超时/cwd 语义保留。',
+      'Existing real CLI assertion has an explicit 15-second timeout; brief explicitly preserves it. 2026-09-28 Wave 2.1 npx 清理：execSync 字符串模板迁移 runSync 数组形，超时/cwd 语义保留。2026-09-29 Wave 3 批 B 循环内聚合将 3 处字面相同调用收敛为循环体单调用点（coverage-logic 26→11 例），审计溯源随物理调用点合并为单条目。',
     migratedToRunSync: true,
     timeout: { required: true, status: 'present' },
   },
