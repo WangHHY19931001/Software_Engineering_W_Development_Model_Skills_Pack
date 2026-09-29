@@ -450,16 +450,15 @@ par_expect 10 "check:exemption 有效豁免样本退出 0" 0 \
 par_expect 11 "check-signature-chain 有效签名链样本退出 0" 0 \
   npx tsx w-model-dev/scripts/cli/check-signature-chain.ts w-model-dev/scripts/samples/signature-chain/valid-all-roles.jsonl --phase=1
 
-# 12. vitest 单元测试全量通过（文件数/用例数以同次 JSON facts 与 provenance 为准）+ coverage 阈值门禁（--coverage 启用 v8 插桩；
-#     logic/ + lib/ 阈值 stmts 75 / branch 65 / funcs 85 / lines 75，阈值不达标 vitest 会 exit 1 阻断推送；
-#     基线见 config/vitest.config.ts coverage.thresholds 注释）
+# 12. vitest 全量 + coverage 采集（instrumentation 供第 13 项 scope 口径消费；阈值强制在第 13 项——2026-09-28 T1 单口径化）
+#     文件数/用例数以同次 JSON facts 与 provenance 为准
 #     --reporter=json --outputFile 落盘实测用例总数，供第 15 项 check-docs-consistency 复用（避免 vitest 双跑）
-par_expect 12 "vitest 单元测试 + coverage 阈值通过" 0 \
+par_expect 12 "vitest 单元测试 + coverage 采集通过" 0 \
   npx vitest run --coverage --reporter=json --outputFile="$tmp_vitest_json" --config config/vitest.config.ts
 
-# 13. check-coverage-scope：规则层覆盖口径门禁（logic+lib 白名单分母重算，独立于第 12 项全分母阈值）
+# 13. check-coverage-scope：规则层覆盖口径门禁（logic+lib 白名单分母重算；2026-09-28 T1 单口径化后为唯一强制覆盖口径）
 #     阈值 = 2026-09-18 实测（logic+lib）：stmts 84.25 / branch 77.87 / funcs 93.68 / lines 87.01，
-#     向下取整到 5 的倍数；出处：config/vitest.config.ts coverage 注释 + 本计划收尾记录
+#     向下取整到 5 的倍数；出处：本计划收尾记录
 #     （Wave 4 三车道：本项为 L3 尾车道，实际执行见文末「L3 尾车道」段——依赖第 12 项产物）
 
 # 14. npm audit：依赖漏洞扫描（high 以上阻断；仅明确网络不可达或 registry 不支持 endpoint 时跳过）
