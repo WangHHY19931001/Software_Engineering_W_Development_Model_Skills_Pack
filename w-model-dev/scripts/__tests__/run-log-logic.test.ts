@@ -38,32 +38,49 @@ async function loadJsonl(file: string): Promise<RunLogEntry[]> {
 }
 
 describe('run-log R1 扩展：rootcause/fix 动作字段', () => {
-  it('rootcause 动作缺 reportId 时失败', async () => {
+  it('R1 扩展字段负例（3 态：缺 reportId/rootCauseCategory/basedOnReport）', async () => {
     const lines = await loadJsonl('rootcause-valid.jsonl');
-    const bad = lines.map((l) => (l.action === 'rootcause' ? { ...l, reportId: undefined } : l)) as RunLogEntry[];
-    const result = checkRunLog(bad);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((r) => /R1.*rootcause.*reportId/.test(r))).toBe(true);
-  });
-
-  it('rootcause 动作缺 rootCauseCategory 时失败', async () => {
-    const lines = await loadJsonl('rootcause-valid.jsonl');
-    const bad = lines.map((l) =>
-      l.action === 'rootcause' ? { ...l, rootCauseCategory: undefined } : l,
-    ) as RunLogEntry[];
-    const result = checkRunLog(bad);
-    expect(result.passed).toBe(false);
-    expect(
-      result.violations.some((r) => /R1.*rootcause.*rootCauseCategory|\[schema\].*rootCauseCategory/.test(r)),
-    ).toBe(true);
-  });
-
-  it('fix 动作缺 basedOnReport 时失败', async () => {
-    const lines = await loadJsonl('rootcause-valid.jsonl');
-    const bad = lines.map((l) => (l.action === 'fix' ? { ...l, basedOnReport: undefined } : l)) as RunLogEntry[];
-    const result = checkRunLog(bad);
-    expect(result.passed).toBe(false);
-    expect(result.diagnostics?.some((r) => /LEGACY_UNSCOPED.*basedOnReport/.test(r))).toBe(true);
+    const cases: {
+      label: string;
+      mutate: (l: RunLogEntry) => RunLogEntry;
+      checkPassed: boolean;
+      scope: 'violations' | 'diagnostics';
+      marker: RegExp;
+    }[] = [
+      {
+        label: 'rootcause 动作缺 reportId',
+        mutate: (l) => (l.action === 'rootcause' ? { ...l, reportId: undefined } : l),
+        checkPassed: true,
+        scope: 'violations',
+        marker: /R1.*rootcause.*reportId/,
+      },
+      {
+        label: 'rootcause 动作缺 rootCauseCategory',
+        mutate: (l) => (l.action === 'rootcause' ? { ...l, rootCauseCategory: undefined } : l),
+        checkPassed: true,
+        scope: 'violations',
+        marker: /R1.*rootcause.*rootCauseCategory|\[schema\].*rootCauseCategory/,
+      },
+      {
+        label: 'fix 动作缺 basedOnReport',
+        mutate: (l) => (l.action === 'fix' ? { ...l, basedOnReport: undefined } : l),
+        checkPassed: false,
+        scope: 'diagnostics',
+        marker: /LEGACY_UNSCOPED.*basedOnReport/,
+      },
+    ];
+    for (const c of cases) {
+      const bad = lines.map(c.mutate) as RunLogEntry[];
+      const result = checkRunLog(bad);
+      if (c.checkPassed) {
+        expect(result.passed, `${c.label} 应 fail`).toBe(false);
+      }
+      const hits = c.scope === 'violations' ? result.violations : (result.diagnostics ?? []);
+      expect(
+        hits.some((r) => c.marker.test(r)),
+        `${c.label} 应命中 ${c.marker}`,
+      ).toBe(true);
+    }
   });
 
   it('完整 rootcause-valid 样本通过所有扩展校验', async () => {
@@ -74,32 +91,49 @@ describe('run-log R1 扩展：rootcause/fix 动作字段', () => {
 });
 
 describe('run-log R3 扩展：R + S-fix 一一对应 + V 复审', () => {
-  it('有 R 但缺 S-fix 时失败', async () => {
-    const lines = await loadJsonl('rootcause-missing-fix.jsonl');
-    const result = checkRunLog(lines);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((r) => /R3.*rootcause.*fix.*一一对应|basedOnReport.*缺失/.test(r))).toBe(true);
-  });
-
-  it('有 R 但缺 V 复审 rootcause 时失败', async () => {
-    const lines = await loadJsonl('rootcause-missing-review.jsonl');
-    const result = checkRunLog(lines);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((r) => /R3.*V 复审 rootcause.*≠.*R 记录数/.test(r))).toBe(true);
+  it('R3 缺失对照（2 态：缺 S-fix / 缺 V 复审 rootcause）', async () => {
+    const cases = [
+      {
+        label: '有 R 但缺 S-fix',
+        fixture: 'rootcause-missing-fix.jsonl',
+        marker: /R3.*rootcause.*fix.*一一对应|basedOnReport.*缺失/,
+      },
+      {
+        label: '有 R 但缺 V 复审 rootcause',
+        fixture: 'rootcause-missing-review.jsonl',
+        marker: /R3.*V 复审 rootcause.*≠.*R 记录数/,
+      },
+    ] as const;
+    for (const c of cases) {
+      const lines = await loadJsonl(c.fixture);
+      const result = checkRunLog(lines);
+      expect(result.passed, `${c.label} 应 fail`).toBe(false);
+      expect(
+        result.violations.some((r) => c.marker.test(r)),
+        `${c.label} 应命中 ${c.marker}`,
+      ).toBe(true);
+    }
   });
 });
 
 describe('run-log R7 扩展：返工路径时序', () => {
-  it('有 R 但缺 S-fix 时 R7 时序校验也失败', async () => {
-    const lines = await loadJsonl('rootcause-missing-fix.jsonl');
-    const result = checkRunLog(lines);
-    expect(result.violations.some((r) => /R7.*rootcause.*fix/.test(r))).toBe(true);
-  });
-
-  it('有 R 但缺 V 复审 rootcause 时 R7 时序校验也失败', async () => {
-    const lines = await loadJsonl('rootcause-missing-review.jsonl');
-    const result = checkRunLog(lines);
-    expect(result.violations.some((r) => /R7.*rootcause.*review.*targetKind=rootcause/.test(r))).toBe(true);
+  it('R7 时序负例（2 态：缺 fix / 缺 V 复审）', async () => {
+    const cases = [
+      { label: '有 R 但缺 S-fix', fixture: 'rootcause-missing-fix.jsonl', marker: /R7.*rootcause.*fix/ },
+      {
+        label: '有 R 但缺 V 复审 rootcause',
+        fixture: 'rootcause-missing-review.jsonl',
+        marker: /R7.*rootcause.*review.*targetKind=rootcause/,
+      },
+    ] as const;
+    for (const c of cases) {
+      const lines = await loadJsonl(c.fixture);
+      const result = checkRunLog(lines);
+      expect(
+        result.violations.some((r) => c.marker.test(r)),
+        `${c.label} R7 应命中 ${c.marker}`,
+      ).toBe(true);
+    }
   });
 });
 
@@ -401,8 +435,10 @@ describe('B1 gate-log 根 JSON 协议', () => {
       stdoutSummary: { exitCode, passed },
     });
 
-  it.each([0, 1, 2])('extractExitCode 从根 JSON 提取 exitCode=%s', (exitCode) => {
-    expect(extractExitCode(rootPayload(exitCode))).toBe(exitCode);
+  it('extractExitCode 从根 JSON 提取 exitCode（3 态：0/1/2）', () => {
+    for (const exitCode of [0, 1, 2] as const) {
+      expect(extractExitCode(rootPayload(exitCode)), `exitCode=${exitCode}`).toBe(exitCode);
+    }
   });
 
   it('根 JSON 优先于旧摘要标记', () => {
@@ -442,78 +478,101 @@ describe('B1 gate-log 根 JSON 协议', () => {
 });
 
 describe('R6 契约迁移：extractExitCode / buildGateLogKeys', () => {
-  it('extractExitCode 从 GATE_JSON 摘要行提取 exitCode', () => {
-    const content = 'some log\nGATE_JSON {"passed":true,"exitCode":0}\nend';
-    expect(extractExitCode(content)).toBe(0);
+  it('extractExitCode 从四类摘要标记提取 exitCode（GATE/VERIFIER/ERROR/STATE_MACHINE）', () => {
+    const cases = [
+      ['GATE_JSON', 'some log\nGATE_JSON {"passed":true,"exitCode":0}\nend', 0],
+      ['VERIFIER_JSON', 'VERIFIER_JSON {"passed":false,"exitCode":1}', 1],
+      [
+        'ERROR_JSON',
+        '✗ [FILE_NOT_FOUND] 文件不存在\nERROR_JSON {"category":"FILE_NOT_FOUND","message":"文件不存在","exitCode":2,"file":"C:\\\\proj\\\\.w-model\\\\project.json"}',
+        2,
+      ],
+      ['STATE_MACHINE_JSON', 'STATE_MACHINE_JSON {"passed":true,"exitCode":0}', 0],
+    ] as const;
+    for (const [marker, content, expected] of cases) {
+      expect(extractExitCode(content), `${marker} 摘要行`).toBe(expected);
+    }
   });
 
-  it('extractExitCode 从 VERIFIER_JSON 摘要行提取 exitCode（多标记扫描）', () => {
-    const content = 'VERIFIER_JSON {"passed":false,"exitCode":1}';
-    expect(extractExitCode(content)).toBe(1);
+  it('extractExitCode 边界负例（4 态：无匹配/畸形跳过/非数值/无 exitCode fallthrough）', () => {
+    const cases = [
+      ['无匹配', 'no json here', undefined],
+      ['畸形 JSON 摘要行跳过继续扫描后续标记', 'GATE_JSON {broken json\nVERIFIER_JSON {"exitCode":1}', 1],
+      ['exitCode 非 number', 'GATE_JSON {"passed":true,"exitCode":"0"}', undefined],
+      [
+        '首个标记无 exitCode 继续扫后续标记（fallthrough）',
+        'GRAPH_JSON {"passed":true}\nMATURITY_JSON {"exitCode":1}',
+        1,
+      ],
+    ] as const;
+    for (const [label, content, expected] of cases) {
+      expect(extractExitCode(content), `${label} → ${expected === undefined ? 'undefined' : String(expected)}`).toBe(
+        expected,
+      );
+    }
   });
 
-  it('extractExitCode 从 ERROR_JSON 摘要行提取 exitCode（exit 2 存档）', () => {
-    const content =
-      '✗ [FILE_NOT_FOUND] 文件不存在\nERROR_JSON {"category":"FILE_NOT_FOUND","message":"文件不存在","exitCode":2,"file":"C:\\\\proj\\\\.w-model\\\\project.json"}';
-    expect(extractExitCode(content)).toBe(2);
-  });
-
-  it('extractExitCode 从 STATE_MACHINE_JSON 摘要行提取 exitCode', () => {
-    const content = 'STATE_MACHINE_JSON {"passed":true,"exitCode":0}';
-    expect(extractExitCode(content)).toBe(0);
-  });
-
-  it('extractExitCode 无匹配 → undefined', () => {
-    expect(extractExitCode('no json here')).toBeUndefined();
-  });
-
-  it('buildGateLogKeys 返回 basename / 绝对路径 / 相对 cwd / 正斜杠归一化 4 类 key', () => {
-    const fileAbs = 'C:/proj/.w-model/gate-logs/phase5-check-a.log';
-    const keys = buildGateLogKeys(fileAbs, 'C:/proj');
-    expect(keys).toContain('phase5-check-a.log');
-    expect(keys).toContain(fileAbs);
-    expect(keys).toContain('.w-model/gate-logs/phase5-check-a.log');
-    expect(keys).toContain('C:\\proj\\.w-model\\gate-logs\\phase5-check-a.log');
-  });
-
-  it('buildGateLogKeys 含反斜杠路径输入（Windows 兼容归一化）', () => {
-    const fileAbs = 'C:\\proj\\.w-model\\gate-logs\\phase1-check-tla.log';
-    const keys = buildGateLogKeys(fileAbs, 'C:\\proj');
-    expect(keys).toContain('phase1-check-tla.log');
-    expect(keys).toContain('C:/proj/.w-model/gate-logs/phase1-check-tla.log');
-    expect(keys).toContain('.w-model/gate-logs/phase1-check-tla.log');
-  });
-
-  it('buildGateLogKeys cwd 为空 → 退化为 basename + 绝对路径（无相对 key）', () => {
-    const keys = buildGateLogKeys('C:/proj/a.log', '');
-    expect(keys).toContain('a.log');
-    expect(keys).toContain('C:/proj/a.log');
-    expect(keys).not.toContain('proj/a.log');
-  });
-
-  it('extractExitCode 畸形 JSON 摘要行 → 跳过继续扫描后续标记', () => {
-    const content = 'GATE_JSON {broken json\nVERIFIER_JSON {"exitCode":1}';
-    expect(extractExitCode(content)).toBe(1);
-  });
-
-  it('extractExitCode exitCode 非 number → undefined', () => {
-    const content = 'GATE_JSON {"passed":true,"exitCode":"0"}';
-    expect(extractExitCode(content)).toBeUndefined();
-  });
-
-  it('extractExitCode 首个标记无 exitCode 时继续扫后续标记（fallthrough）', () => {
-    const content = 'GRAPH_JSON {"passed":true}\nMATURITY_JSON {"exitCode":1}';
-    expect(extractExitCode(content)).toBe(1);
-  });
-
-  it('buildGateLogKeys cwd 外文件 → 无相对 key，仅 basename + 绝对路径 + 归一化', () => {
-    const fileAbs = 'D:/other/x.log';
-    const keys = buildGateLogKeys(fileAbs, 'C:/proj');
-    expect(keys).toContain('x.log');
-    expect(keys).toContain('D:/other/x.log');
-    expect(keys).not.toContain('other/x.log');
-    // 双向归一化 + 去重后应为 3 个 key（basename / 绝对正斜杠 / 绝对反斜杠）
-    expect(keys.length).toBe(3);
+  it('buildGateLogKeys 归一化（4 态：正斜杠/反斜杠/空 cwd/cwd 外）', () => {
+    const cases: {
+      label: string;
+      fileAbs: string;
+      cwd: string;
+      mustContain: string[];
+      mustNotContain: string[];
+      exactLength?: number;
+    }[] = [
+      {
+        label: '正斜杠绝对路径 + cwd → basename/绝对/相对/反斜杠归一化 4 类 key',
+        fileAbs: 'C:/proj/.w-model/gate-logs/phase5-check-a.log',
+        cwd: 'C:/proj',
+        mustContain: [
+          'phase5-check-a.log',
+          'C:/proj/.w-model/gate-logs/phase5-check-a.log',
+          '.w-model/gate-logs/phase5-check-a.log',
+          'C:\\proj\\.w-model\\gate-logs\\phase5-check-a.log',
+        ],
+        mustNotContain: [],
+      },
+      {
+        label: '反斜杠路径输入（Windows 兼容归一化）',
+        fileAbs: 'C:\\proj\\.w-model\\gate-logs\\phase1-check-tla.log',
+        cwd: 'C:\\proj',
+        mustContain: [
+          'phase1-check-tla.log',
+          'C:/proj/.w-model/gate-logs/phase1-check-tla.log',
+          '.w-model/gate-logs/phase1-check-tla.log',
+        ],
+        mustNotContain: [],
+      },
+      {
+        label: 'cwd 为空 → 退化为 basename + 绝对路径（无相对 key）',
+        fileAbs: 'C:/proj/a.log',
+        cwd: '',
+        mustContain: ['a.log', 'C:/proj/a.log'],
+        mustNotContain: ['proj/a.log'],
+      },
+      {
+        label: 'cwd 外文件 → 无相对 key，去重后 3 key',
+        fileAbs: 'D:/other/x.log',
+        cwd: 'C:/proj',
+        mustContain: ['x.log', 'D:/other/x.log'],
+        mustNotContain: ['other/x.log'],
+        exactLength: 3,
+      },
+    ];
+    for (const c of cases) {
+      const keys = buildGateLogKeys(c.fileAbs, c.cwd);
+      for (const key of c.mustContain) {
+        expect(keys, `${c.label} 应含 ${key}`).toContain(key);
+      }
+      for (const key of c.mustNotContain) {
+        expect(keys, `${c.label} 不应含 ${key}`).not.toContain(key);
+      }
+      if (c.exactLength !== undefined) {
+        // 双向归一化 + 去重后应为 3 个 key（basename / 绝对正斜杠 / 绝对反斜杠）
+        expect(keys.length, `${c.label} 去重后 key 数`).toBe(c.exactLength);
+      }
+    }
   });
 });
 
@@ -1643,24 +1702,27 @@ describe('D8 lifecycle identity reducer', () => {
     expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
   });
 
-  it.each(['fail', 'blocked', 'cancelled'] as const)('does not open R3/R8 credit for a %s fix', (outcome) => {
-    const entries = [
-      rootCause('r-failed', 'RC-FAILED'),
-      rootCauseReview('v-failed-root', 'RC-FAILED'),
-      rootCauseGate('g-failed-root', 'RC-FAILED'),
-      fix('f-failed', 'RC-FAILED', 1, 'implementation-FAILED', 'RC-FAILED', outcome),
-      r3('r3-failed-c', 'completeness', 'RC-FAILED'),
-      r3('r3-failed-r', 'reliability', 'RC-FAILED'),
-      r3('r3-failed-s', 'security', 'RC-FAILED'),
-      implementationReview('v-failed-implementation', 'RC-FAILED'),
-      implementationGate('g-failed-implementation', 'RC-FAILED'),
-    ];
-    const result = checkRunLog(entries);
-    expect(
-      result.diagnostics?.some((diagnostic) =>
-        diagnostic.includes(`NON_CREDIT_FIX: fix f-failed outcome=${outcome}; credit deferred`),
-      ),
-    ).toBe(true);
+  it('does not open R3/R8 credit for a non-success fix（3 态：fail/blocked/cancelled）', () => {
+    for (const outcome of ['fail', 'blocked', 'cancelled'] as const) {
+      const entries = [
+        rootCause('r-failed', 'RC-FAILED'),
+        rootCauseReview('v-failed-root', 'RC-FAILED'),
+        rootCauseGate('g-failed-root', 'RC-FAILED'),
+        fix('f-failed', 'RC-FAILED', 1, 'implementation-FAILED', 'RC-FAILED', outcome),
+        r3('r3-failed-c', 'completeness', 'RC-FAILED'),
+        r3('r3-failed-r', 'reliability', 'RC-FAILED'),
+        r3('r3-failed-s', 'security', 'RC-FAILED'),
+        implementationReview('v-failed-implementation', 'RC-FAILED'),
+        implementationGate('g-failed-implementation', 'RC-FAILED'),
+      ];
+      const result = checkRunLog(entries);
+      expect(
+        result.diagnostics?.some((diagnostic) =>
+          diagnostic.includes(`NON_CREDIT_FIX: fix f-failed outcome=${outcome}; credit deferred`),
+        ),
+        `outcome=${outcome}`,
+      ).toBe(true);
+    }
   });
 
   it('requires R7 fix target and artifacts to match the exact implementation target', () => {
@@ -1976,41 +2038,37 @@ describe('run-log action-role 配对（blocking，logic 层强制）', () => {
       (v) => v.startsWith('action-role 配对') && v.includes(`action=${action}`) && v.includes(`runId=`),
     );
 
-  it('r3-* action 由非 R 角色执行 → blocking violation（含 runId/action/role）', () => {
-    const result = checkRunLog([baseEntry('r3-completeness', 'V')]);
-    expect(result.passed).toBe(false);
-    const v = pairingViolation(result, 'r3-completeness');
-    expect(v).toBeDefined();
-    expect(v).toMatch(/role=R/);
-    expect(v).toMatch(/role=V/);
-  });
-
-  it('produce/fix 由非 S 角色执行 → blocking violation', () => {
-    const produce = checkRunLog([baseEntry('produce', 'A', 'run-produce')]);
-    expect(produce.passed).toBe(false);
-    expect(pairingViolation(produce, 'produce')).toBeDefined();
-    const fix = checkRunLog([baseEntry('fix', 'R', 'run-fix')]);
-    expect(fix.passed).toBe(false);
-    expect(pairingViolation(fix, 'fix')).toBeDefined();
-  });
-
-  it('emergency-fix 由非 S 角色执行 → blocking violation', () => {
-    const result = checkRunLog([baseEntry('emergency-fix', 'O', 'run-emergency')]);
-    expect(result.passed).toBe(false);
-    expect(pairingViolation(result, 'emergency-fix')).toBeDefined();
-  });
-
-  it('review 由非 V 角色执行 → blocking violation', () => {
-    const result = checkRunLog([baseEntry('review', 'G', 'run-review')]);
-    expect(result.passed).toBe(false);
-    expect(pairingViolation(result, 'review')).toBeDefined();
-  });
-
-  it('gate/tla-gate/graph-gate 由非 G 角色执行 → blocking violation', () => {
-    for (const action of ['gate', 'tla-gate', 'graph-gate'] as const) {
-      const result = checkRunLog([baseEntry(action, 'S', `run-${action}`)]);
-      expect(result.passed).toBe(false);
-      expect(pairingViolation(result, action)).toBeDefined();
+  it('非法 action-role 配对 → blocking violation（5 态：r3/produce/fix/emergency-fix/review/gate 族）', () => {
+    const cases: {
+      label: string;
+      action: RunLogEntry['action'];
+      role: RunLogEntry['role'];
+      runId: string;
+      messageMarkers?: RegExp[];
+    }[] = [
+      {
+        label: 'r3-completeness 由 V 执行',
+        action: 'r3-completeness',
+        role: 'V',
+        runId: 'pair-run',
+        messageMarkers: [/role=R/, /role=V/],
+      },
+      { label: 'produce 由 A 执行', action: 'produce', role: 'A', runId: 'run-produce' },
+      { label: 'fix 由 R 执行', action: 'fix', role: 'R', runId: 'run-fix' },
+      { label: 'emergency-fix 由 O 执行', action: 'emergency-fix', role: 'O', runId: 'run-emergency' },
+      { label: 'review 由 G 执行', action: 'review', role: 'G', runId: 'run-review' },
+      { label: 'gate 由 S 执行', action: 'gate', role: 'S', runId: 'run-gate' },
+      { label: 'tla-gate 由 S 执行', action: 'tla-gate', role: 'S', runId: 'run-tla-gate' },
+      { label: 'graph-gate 由 S 执行', action: 'graph-gate', role: 'S', runId: 'run-graph-gate' },
+    ];
+    for (const c of cases) {
+      const result = checkRunLog([baseEntry(c.action, c.role, c.runId)]);
+      expect(result.passed, `${c.label} 应 blocking`).toBe(false);
+      const v = pairingViolation(result, c.action);
+      expect(v, `${c.label} 应有 action-role 配对 violation`).toBeDefined();
+      for (const marker of c.messageMarkers ?? []) {
+        expect(v, `${c.label} 消息应含 ${marker}`).toMatch(marker);
+      }
     }
   });
 
@@ -2080,20 +2138,39 @@ describe('run-log emergency-fix variant 语义', () => {
     expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
   });
 
-  it('带 variant=emergency-fix 但缺 blocker → blocking（声明了紧急通道却无阻塞原因）', () => {
-    const entry: RunLogEntry = makeEntry({
-      runId: 'em-no-blocker',
-      phase: 5,
-      action: 'emergency-fix',
-      role: 'S',
-      outcome: 'success',
-      basedOnReport: 'RC-TEST',
-      artifacts: ['test-artifact'],
-      variant: 'emergency-fix',
-    });
-    const result = checkRunLog([entry]);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => /\[schema\].*blocker/.test(v))).toBe(true);
+  it('已声明 variant 却缺 blocker → blocking（2 态：phase5 / phase8 带完整 identity）', () => {
+    const cases: [string, Partial<RunLogEntry>][] = [
+      ['phase5 缺 blocker（声明了紧急通道却无阻塞原因）', { runId: 'em-no-blocker', phase: 5 }],
+      [
+        'phase8 带 identity 缺 blocker（fail-closed 方向不变）',
+        {
+          runId: 'em-declared-no-blocker2',
+          phase: 8,
+          round: 1,
+          reportId: 'RC-TEST',
+          targetKind: 'code',
+          implementationTarget: 'test-artifact',
+          target: 'test-artifact',
+        },
+      ],
+    ];
+    for (const [label, overrides] of cases) {
+      const entry: RunLogEntry = makeEntry({
+        action: 'emergency-fix',
+        role: 'S',
+        outcome: 'success',
+        basedOnReport: 'RC-TEST',
+        artifacts: ['test-artifact'],
+        variant: 'emergency-fix',
+        ...overrides,
+      });
+      const result = checkRunLog([entry]);
+      expect(result.passed, `${label} 应 blocking`).toBe(false);
+      expect(
+        result.violations.some((v) => /\[schema\].*blocker/.test(v)),
+        `${label} 应报 [schema] blocker`,
+      ).toBe(true);
+    }
   });
 
   it('双 legacy（phase-8 缺 identity + 缺 variant/blocker）→ LEGACY 吸收：非 blocking + NOT_CLOSED + LEGACY_VARIANT/LEGACY_UNSCOPED', () => {
@@ -2144,27 +2221,6 @@ describe('run-log emergency-fix variant 语义', () => {
     expect(result.diagnostics?.some((d) => /LEGACY_UNSCOPED/.test(d) && d.includes('identity missing'))).toBe(true);
     expect(result.diagnostics?.some((d) => /LEGACY_VARIANT/.test(d))).toBe(false);
   });
-
-  it('已声明 variant 却缺 blocker 仍 blocking（fail-closed 方向不变）', () => {
-    const entry: RunLogEntry = makeEntry({
-      runId: 'em-declared-no-blocker2',
-      phase: 8,
-      action: 'emergency-fix',
-      role: 'S',
-      outcome: 'success',
-      basedOnReport: 'RC-TEST',
-      artifacts: ['test-artifact'],
-      variant: 'emergency-fix',
-      round: 1,
-      reportId: 'RC-TEST',
-      targetKind: 'code',
-      implementationTarget: 'test-artifact',
-      target: 'test-artifact',
-    });
-    const result = checkRunLog([entry]);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => /\[schema\].*blocker/.test(v))).toBe(true);
-  });
 });
 
 /**
@@ -2183,28 +2239,42 @@ describe('run-log LEGACY_VARIANT cutoff 分界', () => {
     // 缺 variant/blocker（两条用例同形，仅 timestamp 跨 cutoff）
   };
 
-  it('blocks post-cutoff emergency-fix missing variant instead of absorbing as LEGACY_VARIANT', () => {
-    const entry: RunLogEntry = makeEntry({
-      ...baseEmergencyFix,
-      runId: 'em-post-cutoff',
-      timestamp: '2026-09-02T00:00:00.000Z',
-    });
-    const result = checkRunLog([entry]);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(true);
-    expect(result.diagnostics?.some((d) => /LEGACY_VARIANT/.test(d)) ?? false).toBe(false);
-  });
-
-  it('still absorbs pre-cutoff undeclared-variant emergency-fix as LEGACY_VARIANT', () => {
-    const entry: RunLogEntry = makeEntry({
-      ...baseEmergencyFix,
-      runId: 'em-pre-cutoff',
-      timestamp: '2026-08-31T00:00:00.000Z',
-    });
-    const result = checkRunLog([entry]);
-    expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(false);
-    expect(result.diagnostics?.some((d) => /LEGACY_VARIANT/.test(d))).toBe(true);
-    expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+  it('LEGACY_VARIANT cutoff 分界（2 态：cutoff 后 blocking / cutoff 前 LEGACY 吸收）', () => {
+    const cases = [
+      {
+        label: 'cutoff 后（2026-09-02）缺 variant',
+        runId: 'em-post-cutoff',
+        timestamp: '2026-09-02T00:00:00.000Z',
+        blocking: true,
+      },
+      {
+        label: 'cutoff 前（2026-08-31）缺 variant',
+        runId: 'em-pre-cutoff',
+        timestamp: '2026-08-31T00:00:00.000Z',
+        blocking: false,
+      },
+    ];
+    for (const c of cases) {
+      const entry: RunLogEntry = makeEntry({
+        ...baseEmergencyFix,
+        runId: c.runId,
+        timestamp: c.timestamp,
+      });
+      const result = checkRunLog([entry]);
+      expect(
+        result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]')),
+        `${c.label} [schema] violation 判定`,
+      ).toBe(c.blocking);
+      expect(
+        result.diagnostics?.some((d) => /LEGACY_VARIANT/.test(d)) ?? false,
+        `${c.label} LEGACY_VARIANT 吸收判定`,
+      ).toBe(!c.blocking);
+      if (c.blocking) {
+        expect(result.passed, `${c.label} 应 blocking`).toBe(false);
+      } else {
+        expect(result.lifecycleStatus, `${c.label} lifecycle`).toBe('NOT_CLOSED_NOT_PROVEN');
+      }
+    }
   });
 });
 
@@ -2225,19 +2295,36 @@ describe('run-log reworkHints 强制（LEGACY_REWORK_HINTS cutoff 分界）', ()
       ...overrides,
     });
 
-  it('cutoff 后 review passed=false 无 reworkHints → blocking', () => {
-    const result = checkRunLog([failedReview({ timestamp: '2026-09-02T00:00:00.000Z', passed: false })]);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => /\[rework-hints\].*passed=false.*reworkHints/.test(v))).toBe(true);
-    expect(result.diagnostics?.some((d) => /LEGACY_REWORK_HINTS/.test(d)) ?? false).toBe(false);
-  });
-
-  it('cutoff 前 review passed=false 无 reworkHints → LEGACY_REWORK_HINTS 诊断放行', () => {
-    const result = checkRunLog([failedReview({ timestamp: '2026-08-01T00:00:00.000Z', passed: false })]);
-    expect(result.passed).toBe(true);
-    expect(result.violations.some((v) => v.includes('[schema]') || v.includes('[rework-hints]'))).toBe(false);
-    expect(result.diagnostics?.some((d) => /LEGACY_REWORK_HINTS/.test(d))).toBe(true);
-    expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+  it('reworkHints cutoff 分界（2 态：cutoff 后 blocking / cutoff 前 LEGACY 吸收）', () => {
+    const cases = [
+      { label: 'cutoff 后 review passed=false 无 reworkHints', timestamp: '2026-09-02T00:00:00.000Z', blocking: true },
+      { label: 'cutoff 前 review passed=false 无 reworkHints', timestamp: '2026-08-01T00:00:00.000Z', blocking: false },
+    ];
+    for (const c of cases) {
+      const result = checkRunLog([failedReview({ timestamp: c.timestamp, passed: false })]);
+      if (c.blocking) {
+        expect(result.passed, `${c.label} 应 blocking`).toBe(false);
+        expect(
+          result.violations.some((v) => /\[rework-hints\].*passed=false.*reworkHints/.test(v)),
+          `${c.label} 应报 [rework-hints]`,
+        ).toBe(true);
+        expect(
+          result.diagnostics?.some((d) => /LEGACY_REWORK_HINTS/.test(d)) ?? false,
+          `${c.label} 不应 legacy 吸收`,
+        ).toBe(false);
+      } else {
+        expect(result.passed, `${c.label} 应 LEGACY_REWORK_HINTS 诊断放行`).toBe(true);
+        expect(
+          result.violations.some((v) => v.includes('[schema]') || v.includes('[rework-hints]')),
+          `${c.label} 不应有 blocking violation`,
+        ).toBe(false);
+        expect(
+          result.diagnostics?.some((d) => /LEGACY_REWORK_HINTS/.test(d)),
+          `${c.label} 应有 LEGACY_REWORK_HINTS 诊断`,
+        ).toBe(true);
+        expect(result.lifecycleStatus, `${c.label} lifecycle`).toBe('NOT_CLOSED_NOT_PROVEN');
+      }
+    }
   });
 
   it('passed=false 且 reworkHints 非空 → 正常（无该规则违规）', () => {
@@ -2295,45 +2382,34 @@ describe('A-3d 跨轮次评审一致性（R9 标准偏移）', () => {
     expect(hit).toContain('a.md');
   });
 
-  it('同一产物两次 review 只差 1 档 → 不触发（产物确实可能改进了）', () => {
-    const out = checkRunLog([
-      entry({
-        runId: 'r1',
-        artifacts: ['a.md'],
-        qualityLevel: 'A',
-        timestamp: '2026-09-12T00:00:00Z',
-      }),
-      entry({
-        runId: 'r2',
-        artifacts: ['a.md'],
-        qualityLevel: 'B',
-        timestamp: '2026-09-12T00:01:00Z',
-      }),
-    ]);
-    expect(out.violations.some((v) => v.includes('跨轮次评审不一致'))).toBe(false);
-  });
-
-  it('同一产物仅一次 review → 不触发（首次评审豁免，无不一致可言）', () => {
-    const out = checkRunLog([entry({ runId: 'r1', artifacts: ['a.md'], qualityLevel: 'A' })]);
-    expect(out.violations.some((v) => v.includes('跨轮次评审不一致'))).toBe(false);
-  });
-
-  it('不同产物各自的等级不同 → 不触发（只在同一产物内比对）', () => {
-    const out = checkRunLog([
-      entry({
-        runId: 'r1',
-        artifacts: ['a.md'],
-        qualityLevel: 'A',
-        timestamp: '2026-09-12T00:00:00Z',
-      }),
-      entry({
-        runId: 'r2',
-        artifacts: ['b.md'],
-        qualityLevel: 'C',
-        timestamp: '2026-09-12T00:01:00Z',
-      }),
-    ]);
-    expect(out.violations.some((v) => v.includes('跨轮次评审不一致'))).toBe(false);
+  it('qualityLevel 不触发跨轮次评审不一致（3 态：差 1 档/单次/不同产物）', () => {
+    const cases: [string, RunLogEntry[]][] = [
+      [
+        '同一产物两次 review 只差 1 档（产物确实可能改进了）',
+        [
+          entry({ runId: 'r1', artifacts: ['a.md'], qualityLevel: 'A', timestamp: '2026-09-12T00:00:00Z' }),
+          entry({ runId: 'r2', artifacts: ['a.md'], qualityLevel: 'B', timestamp: '2026-09-12T00:01:00Z' }),
+        ],
+      ],
+      [
+        '同一产物仅一次 review（首次评审豁免，无不一致可言）',
+        [entry({ runId: 'r1', artifacts: ['a.md'], qualityLevel: 'A' })],
+      ],
+      [
+        '不同产物各自的等级不同（只在同一产物内比对）',
+        [
+          entry({ runId: 'r1', artifacts: ['a.md'], qualityLevel: 'A', timestamp: '2026-09-12T00:00:00Z' }),
+          entry({ runId: 'r2', artifacts: ['b.md'], qualityLevel: 'C', timestamp: '2026-09-12T00:01:00Z' }),
+        ],
+      ],
+    ];
+    for (const [label, entries] of cases) {
+      const out = checkRunLog(entries);
+      expect(
+        out.violations.some((v) => v.includes('跨轮次评审不一致')),
+        `${label} 不应触发`,
+      ).toBe(false);
+    }
   });
 
   it('四条记录 A→C 跨多轮 → 只报一次（按产物聚合，不重复报）', () => {
@@ -2400,37 +2476,94 @@ describe('run-log R10: revertEvidence 回滚证伪（严格证据模式）', () 
     });
   }
 
-  it('fix 缺 revertEvidence → R10 blocking（无 LEGACY 吸收）', async () => {
-    const result = checkRunLog(stripRevertEvidence(await loadShiftedPastCutoff()));
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => v.startsWith('R10:') && v.includes('revertEvidence'))).toBe(true);
-    expect(result.diagnostics?.some((d) => d.startsWith('LEGACY_REVERT_EVIDENCE')) ?? false).toBe(false);
-    expect(result.revertEvidence).toEqual({
-      checked: 1,
-      missing: 1,
-      legacy: 0,
-    });
-  });
-
-  it('fix command 仅空白 → schema 阻断，不能以字符串存在替代有效命令', async () => {
-    const entries = (await loadShiftedPastCutoff()).map((l) =>
-      l.action === 'fix' ? { ...l, revertEvidence: { command: '   ' } } : l,
-    );
-    const result = checkRunLog(entries);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => v.includes('[schema]') && v.includes('command'))).toBe(true);
-  });
-
-  it('R10: cutoff 前 fix 缺 revertEvidence 仍阻断，timestamp 不得作为 legacy 放行', async () => {
-    const result = checkRunLog(stripRevertEvidence(await loadJsonl('rootcause-valid.jsonl')));
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => v.startsWith('R10:'))).toBe(true);
-    expect(result.diagnostics?.some((d) => d.startsWith('LEGACY_REVERT_EVIDENCE')) ?? false).toBe(false);
-    expect(result.revertEvidence).toEqual({
-      checked: 1,
-      missing: 1,
-      legacy: 0,
-    });
+  it('R10 revertEvidence 负例（4 态：缺失/空白命令/cutoff 前缺失/旧日期 emergency-fix）', async () => {
+    const cases: {
+      label: string;
+      build: () => Promise<RunLogEntry[]> | RunLogEntry[];
+      verify: (result: ReturnType<typeof checkRunLog>, label: string) => void;
+    }[] = [
+      {
+        label: 'fix 缺 revertEvidence（无 LEGACY 吸收）',
+        build: async () => stripRevertEvidence(await loadShiftedPastCutoff()),
+        verify: (result, label) => {
+          expect(result.passed, `${label} 应 blocking`).toBe(false);
+          expect(
+            result.violations.some((v) => v.startsWith('R10:') && v.includes('revertEvidence')),
+            `${label} 应报 R10:revertEvidence`,
+          ).toBe(true);
+          expect(
+            result.diagnostics?.some((d) => d.startsWith('LEGACY_REVERT_EVIDENCE')) ?? false,
+            `${label} 不应 LEGACY 吸收`,
+          ).toBe(false);
+          expect(result.revertEvidence, `${label} r10 计数`).toEqual({
+            checked: 1,
+            missing: 1,
+            legacy: 0,
+          });
+        },
+      },
+      {
+        label: 'fix command 仅空白（不能以字符串存在替代有效命令）',
+        build: async () =>
+          (await loadShiftedPastCutoff()).map((l) =>
+            l.action === 'fix' ? { ...l, revertEvidence: { command: '   ' } } : l,
+          ),
+        verify: (result, label) => {
+          expect(result.passed, `${label} 应 schema 阻断`).toBe(false);
+          expect(
+            result.violations.some((v) => v.includes('[schema]') && v.includes('command')),
+            `${label} 应报 [schema] command`,
+          ).toBe(true);
+        },
+      },
+      {
+        label: 'cutoff 前 fix 缺 revertEvidence（timestamp 不得作为 legacy 放行）',
+        build: async () => stripRevertEvidence(await loadJsonl('rootcause-valid.jsonl')),
+        verify: (result, label) => {
+          expect(result.passed, `${label} 应 blocking`).toBe(false);
+          expect(
+            result.violations.some((v) => v.startsWith('R10:')),
+            `${label} 应报 R10:`,
+          ).toBe(true);
+          expect(
+            result.diagnostics?.some((d) => d.startsWith('LEGACY_REVERT_EVIDENCE')) ?? false,
+            `${label} 不应 legacy 放行`,
+          ).toBe(false);
+          expect(result.revertEvidence, `${label} r10 计数`).toEqual({
+            checked: 1,
+            missing: 1,
+            legacy: 0,
+          });
+        },
+      },
+      {
+        label: '旧日期 emergency-fix 缺 revertEvidence（legacy=0）',
+        build: () => [
+          makeEntry({
+            runId: 'em-r10-old-date',
+            action: 'emergency-fix',
+            role: 'S',
+            variant: 'emergency-fix',
+            blocker: '线上阻断须立即修复',
+            timestamp: '2026-07-24T00:00:00.000Z',
+          }),
+        ],
+        verify: (result, label) => {
+          expect(
+            result.violations.some((v) => v.startsWith('R10:') && v.includes('emergency-fix')),
+            `${label} 应报 R10:emergency-fix`,
+          ).toBe(true);
+          expect(result.revertEvidence, `${label} r10 计数`).toEqual({
+            checked: 1,
+            missing: 1,
+            legacy: 0,
+          });
+        },
+      },
+    ];
+    for (const c of cases) {
+      c.verify(checkRunLog(await c.build()), c.label);
+    }
   });
 
   it('合法携带 revertEvidence → 通过且 r10 计数 checked=1/missing=0/legacy=0', async () => {
@@ -2444,25 +2577,6 @@ describe('run-log R10: revertEvidence 回滚证伪（严格证据模式）', () 
     expect(result.revertEvidence).toEqual({
       checked: 1,
       missing: 0,
-      legacy: 0,
-    });
-  });
-
-  it('旧日期 emergency-fix 缺 revertEvidence → R10 blocking 且 legacy=0', () => {
-    const result = checkRunLog([
-      makeEntry({
-        runId: 'em-r10-old-date',
-        action: 'emergency-fix',
-        role: 'S',
-        variant: 'emergency-fix',
-        blocker: '线上阻断须立即修复',
-        timestamp: '2026-07-24T00:00:00.000Z',
-      }),
-    ]);
-    expect(result.violations.some((v) => v.startsWith('R10:') && v.includes('emergency-fix'))).toBe(true);
-    expect(result.revertEvidence).toEqual({
-      checked: 1,
-      missing: 1,
       legacy: 0,
     });
   });
@@ -2538,38 +2652,134 @@ describe('run-log R11: 闭环五脚本机器核验（约束 #11）', () => {
     expect(result.closure).toEqual({ checkedGates: 1, missing: 0 });
   });
 
-  it('缺 check-maturity.ts 一条 → R11 blocking，消息含缺失脚本名', () => {
-    const partial = closureFive().filter((entry) => entry.script !== 'check-maturity.ts');
-    const result = checkRunLog([...phaseLead(), ...partial, checkpoint()]);
-    const hits = r11(result);
-    expect(hits.some((v) => v.includes('check-maturity.ts'))).toBe(true);
-    expect(hits.some((v) => v.includes('check-budget.ts'))).toBe(false);
-    expect(result.passed).toBe(false);
-    expect(result.closure).toEqual({ checkedGates: 1, missing: 1 });
+  it('R11 不充数（3 态：缺脚本/非 G 角色/非成功记录）', () => {
+    const cases: {
+      label: string;
+      build: () => RunLogEntry[];
+      verify: (result: ReturnType<typeof checkRunLog>, label: string) => void;
+    }[] = [
+      {
+        label: '缺 check-maturity.ts 一条',
+        build: () => [
+          ...phaseLead(),
+          ...closureFive().filter((entry) => entry.script !== 'check-maturity.ts'),
+          checkpoint(),
+        ],
+        verify: (result, label) => {
+          const hits = r11(result);
+          expect(
+            hits.some((v) => v.includes('check-maturity.ts')),
+            `${label} 消息应含缺失脚本名`,
+          ).toBe(true);
+          expect(
+            hits.some((v) => v.includes('check-budget.ts')),
+            `${label} 不应误报其他脚本`,
+          ).toBe(false);
+          expect(result.passed, `${label} 应 blocking`).toBe(false);
+          expect(result.closure, `${label} closure 计数`).toEqual({ checkedGates: 1, missing: 1 });
+        },
+      },
+      {
+        label: '非 G 角色的同名脚本记录（check-budget.ts role=S）不充数',
+        build: () => {
+          const fake = { ...closureEntry('check-budget.ts', '2026-09-18T03:00:00Z', 'g0'), role: 'S' as const };
+          const rest = closureFive().filter((entry) => entry.script !== 'check-budget.ts');
+          return [...phaseLead(), fake, ...rest, checkpoint()];
+        },
+        verify: (result, label) => {
+          expect(
+            r11(result).some((v) => v.includes('check-budget.ts')),
+            `${label} 应 blocking`,
+          ).toBe(true);
+        },
+      },
+      {
+        label: 'gateExitCode≠0 / outcome≠success 的同名脚本记录不充数',
+        build: () => {
+          const failedExit = { ...closureEntry('check-budget.ts', '2026-09-18T03:00:00Z', 'g0'), gateExitCode: 1 };
+          const failedOutcome = {
+            ...closureEntry('check-run-log.ts', '2026-09-18T03:00:01Z', 'g1'),
+            outcome: 'fail' as const,
+          };
+          const rest = closureFive().filter(
+            (entry) => entry.script !== 'check-budget.ts' && entry.script !== 'check-run-log.ts',
+          );
+          return [...phaseLead(), failedExit, failedOutcome, ...rest, checkpoint()];
+        },
+        verify: (result, label) => {
+          const hits = r11(result);
+          expect(
+            hits.some((v) => v.includes('check-budget.ts')),
+            `${label} exitCode≠0 不充数`,
+          ).toBe(true);
+          expect(
+            hits.some((v) => v.includes('check-run-log.ts')),
+            `${label} outcome≠success 不充数`,
+          ).toBe(true);
+          expect(
+            hits.some((v) => v.includes('check-maturity.ts')),
+            `${label} 不应误报其他脚本`,
+          ).toBe(false);
+          expect(result.closure, `${label} closure 计数`).toEqual({ checkedGates: 1, missing: 2 });
+        },
+      },
+    ];
+    for (const c of cases) {
+      c.verify(checkRunLog(c.build()), c.label);
+    }
   });
 
-  it('闭环记录晚于 checkpoint 放行 → R11 blocking', () => {
-    const late = closureFive().map((entry) =>
-      entry.script === 'check-budget.ts' ? { ...entry, timestamp: '2026-09-18T06:00:00Z' } : entry,
-    );
-    const result = checkRunLog([...phaseLead(), ...late, checkpoint()]);
-    expect(r11(result).some((v) => v.includes('check-budget.ts'))).toBe(true);
-    expect(result.closure).toEqual({ checkedGates: 1, missing: 1 });
-  });
-
-  it('闭环 gate 与 checkpoint 放行同一时间戳（同秒）→ 不算「早于放行」，R11 blocking', () => {
-    // 边界钉死：schema 的 timestamp 是 RFC3339 date-time（允许小数秒），同一秒内的
-    // 先后不可判定，故「早于放行」取严格小于。把最后一条闭环记录移到与放行同一时刻
-    // （数组内时间戳仍非递减，不引入 R7 连带），断言该记录不充数。
-    const releaseAt = checkpoint().timestamp;
-    const sameSecond = closureFive().map((entry) =>
-      entry.script === 'check-preventive-review.ts' ? { ...entry, timestamp: releaseAt } : entry,
-    );
-    const result = checkRunLog([...phaseLead(), ...sameSecond, checkpoint()]);
-    const hits = r11(result);
-    expect(hits.some((v) => v.includes('check-preventive-review.ts'))).toBe(true);
-    expect(hits.some((v) => v.includes('check-budget.ts'))).toBe(false);
-    expect(result.closure).toEqual({ checkedGates: 1, missing: 1 });
+  it('R11 时序边界（2 态：闭环记录晚于放行 / 同秒不算早于）', () => {
+    const cases: {
+      label: string;
+      build: () => RunLogEntry[];
+      verify: (result: ReturnType<typeof checkRunLog>, label: string) => void;
+    }[] = [
+      {
+        label: '闭环记录晚于 checkpoint 放行（check-budget.ts → 06:00）',
+        build: () => {
+          const late = closureFive().map((entry) =>
+            entry.script === 'check-budget.ts' ? { ...entry, timestamp: '2026-09-18T06:00:00Z' } : entry,
+          );
+          return [...phaseLead(), ...late, checkpoint()];
+        },
+        verify: (result, label) => {
+          expect(
+            r11(result).some((v) => v.includes('check-budget.ts')),
+            `${label} 应 blocking`,
+          ).toBe(true);
+          expect(result.closure, `${label} closure 计数`).toEqual({ checkedGates: 1, missing: 1 });
+        },
+      },
+      {
+        label: '闭环 gate 与 checkpoint 放行同一时间戳（同秒，check-preventive-review.ts 不充数）',
+        build: () => {
+          // 边界钉死：schema 的 timestamp 是 RFC3339 date-time（允许小数秒），同一秒内的
+          // 先后不可判定，故「早于放行」取严格小于。把最后一条闭环记录移到与放行同一时刻
+          // （数组内时间戳仍非递减，不引入 R7 连带），断言该记录不充数。
+          const releaseAt = checkpoint().timestamp;
+          const sameSecond = closureFive().map((entry) =>
+            entry.script === 'check-preventive-review.ts' ? { ...entry, timestamp: releaseAt } : entry,
+          );
+          return [...phaseLead(), ...sameSecond, checkpoint()];
+        },
+        verify: (result, label) => {
+          const hits = r11(result);
+          expect(
+            hits.some((v) => v.includes('check-preventive-review.ts')),
+            `${label} 应 blocking`,
+          ).toBe(true);
+          expect(
+            hits.some((v) => v.includes('check-budget.ts')),
+            `${label} 不应误报其他脚本`,
+          ).toBe(false);
+          expect(result.closure, `${label} closure 计数`).toEqual({ checkedGates: 1, missing: 1 });
+        },
+      },
+    ];
+    for (const c of cases) {
+      c.verify(checkRunLog(c.build()), c.label);
+    }
   });
 
   it('无 checkpoint 放行的 run-log（如 fix 变体）不触发 R11，也不产出 closure 计数', () => {
@@ -2585,30 +2795,6 @@ describe('run-log R11: 闭环五脚本机器核验（约束 #11）', () => {
     const result = checkRunLog([...phaseLead(), blocked]);
     expect(r11(result)).toEqual([]);
     expect(result.closure).toBeUndefined();
-  });
-
-  it('非 G 角色的同名脚本记录不充数', () => {
-    const fake = { ...closureEntry('check-budget.ts', '2026-09-18T03:00:00Z', 'g0'), role: 'S' as const };
-    const rest = closureFive().filter((entry) => entry.script !== 'check-budget.ts');
-    const result = checkRunLog([...phaseLead(), fake, ...rest, checkpoint()]);
-    expect(r11(result).some((v) => v.includes('check-budget.ts'))).toBe(true);
-  });
-
-  it('gateExitCode≠0 或 outcome≠success 的同名脚本记录不充数', () => {
-    const failedExit = { ...closureEntry('check-budget.ts', '2026-09-18T03:00:00Z', 'g0'), gateExitCode: 1 };
-    const failedOutcome = {
-      ...closureEntry('check-run-log.ts', '2026-09-18T03:00:01Z', 'g1'),
-      outcome: 'fail' as const,
-    };
-    const rest = closureFive().filter(
-      (entry) => entry.script !== 'check-budget.ts' && entry.script !== 'check-run-log.ts',
-    );
-    const result = checkRunLog([...phaseLead(), failedExit, failedOutcome, ...rest, checkpoint()]);
-    const hits = r11(result);
-    expect(hits.some((v) => v.includes('check-budget.ts'))).toBe(true);
-    expect(hits.some((v) => v.includes('check-run-log.ts'))).toBe(true);
-    expect(hits.some((v) => v.includes('check-maturity.ts'))).toBe(false);
-    expect(result.closure).toEqual({ checkedGates: 1, missing: 2 });
   });
 
   it('多阶段各自放行时逐阶段核验（缺一条的阶段单独报）', () => {

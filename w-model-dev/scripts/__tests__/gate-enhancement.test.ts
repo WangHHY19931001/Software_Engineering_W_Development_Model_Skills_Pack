@@ -116,161 +116,205 @@ function makeBaseSpec(id: string, requirementIds: string[]): TlaSpec {
 }
 
 describe('Part A 门禁增强回归测试', () => {
-  describe('P1.1 basePath 强制校验', () => {
-    it('manifest 缺 basePath → checkTlaModel 失败且 violations 含 "basePath 缺失"', () => {
-      const manifest = makeValidManifestWithoutBasePath();
-      const result = checkTlaModel(manifest, 2);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('basePath 缺失'))).toBe(true);
-    });
-
-    it('manifest 含 basePath → 不报 basePath 缺失（复用 samples/tla/valid.json）', () => {
-      const manifest = loadJson<TlaManifest>('tla/valid.json');
-      const result = checkTlaModel(manifest, 2);
-      expect(result.violations.some((v) => v.includes('basePath 缺失'))).toBe(false);
-    });
+  it('样本正反对·违规行（3 态：缺 basePath / 无 SD 标识 / B 级 passed 不一致）', () => {
+    const cases: [string, () => void][] = [
+      [
+        'P1.1 manifest 缺 basePath',
+        () => {
+          const manifest = makeValidManifestWithoutBasePath();
+          const result = checkTlaModel(manifest, 2);
+          expect(result.passed, 'P1.1 缺 basePath 应 fail').toBe(false);
+          expect(
+            result.violations.some((v) => v.includes('basePath 缺失')),
+            'P1.1 应报 basePath 缺失',
+          ).toBe(true);
+        },
+      ],
+      [
+        'P1.2 spec requirementIds 无 SD-xxx',
+        () => {
+          const specs = [makeBaseSpec('L1_test', ['REQ-001'])];
+          const result = checkCoverage(specs, ['SD-001']);
+          expect(result.passed, 'P1.2 无 SD 标识应 fail').toBe(false);
+          expect(
+            result.violations.some((v) => v.includes('无 SD 标识')),
+            'P1.2 应报 无 SD 标识',
+          ).toBe(true);
+        },
+      ],
+      [
+        'P1.3 B 级 passed=false（verifier/bad-passed-mismatch.json）',
+        () => {
+          const verifier = loadJson<VerifierOutputShape>('verifier/bad-passed-mismatch.json');
+          const result = checkVerifierOutput(verifier);
+          expect(result.passed, 'P1.3 B 级 passed=false 应 fail').toBe(false);
+          expect(
+            result.reasons.some((r) => r.includes('passed') && r.includes('qualityLevel') && r.includes('不一致')),
+            'P1.3 应报 passed↔qualityLevel 不一致',
+          ).toBe(true);
+        },
+      ],
+    ];
+    for (const [, check] of cases) check();
   });
 
-  describe('P1.2 SD 覆盖率 spec 方向', () => {
-    it('spec requirementIds 无 SD-xxx → checkCoverage 失败且 violations 含 "无 SD 标识"', () => {
-      const specs = [makeBaseSpec('L1_test', ['REQ-001'])];
-      const result = checkCoverage(specs, ['SD-001']);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('无 SD 标识'))).toBe(true);
-    });
-
-    it('spec requirementIds 含 SD-xxx → spec 方向通过（不报缺 requirementIds / 无 SD 标识）', () => {
-      const specs = [makeBaseSpec('L1_test', ['SD-001', 'REQ-001'])];
-      const result = checkCoverage(specs, ['SD-001']);
-      expect(result.violations.some((v) => v.includes('缺 requirementIds'))).toBe(false);
-      expect(result.violations.some((v) => v.includes('无 SD 标识'))).toBe(false);
-    });
-  });
-
-  describe('P1.3 passed↔qualityLevel 一致性', () => {
-    it('B 级 passed=false → checkVerifierOutput 失败（复用 samples/verifier/bad-passed-mismatch.json）', () => {
-      const verifier = loadJson<VerifierOutputShape>('verifier/bad-passed-mismatch.json');
-      const result = checkVerifierOutput(verifier);
-      expect(result.passed).toBe(false);
-      expect(
-        result.reasons.some((r) => r.includes('passed') && r.includes('qualityLevel') && r.includes('不一致')),
-      ).toBe(true);
-    });
-
-    it('A 级 passed=true → checkVerifierOutput 通过（复用 samples/verifier/valid.json）', () => {
-      const verifier = loadJson<VerifierOutputShape>('verifier/valid.json');
-      const result = checkVerifierOutput(verifier);
-      expect(result.passed).toBe(true);
-    });
+  it('样本正反对·通过行（3 态：含 basePath / 含 SD-xxx / A 级 passed=true）', () => {
+    const cases: [string, () => void][] = [
+      [
+        'P1.1 manifest 含 basePath（tla/valid.json）',
+        () => {
+          const manifest = loadJson<TlaManifest>('tla/valid.json');
+          const result = checkTlaModel(manifest, 2);
+          expect(
+            result.violations.some((v) => v.includes('basePath 缺失')),
+            'P1.1 含 basePath 不应报缺失',
+          ).toBe(false);
+        },
+      ],
+      [
+        'P1.2 spec requirementIds 含 SD-xxx',
+        () => {
+          const specs = [makeBaseSpec('L1_test', ['SD-001', 'REQ-001'])];
+          const result = checkCoverage(specs, ['SD-001']);
+          expect(
+            result.violations.some((v) => v.includes('缺 requirementIds')),
+            'P1.2 不应报缺 requirementIds',
+          ).toBe(false);
+          expect(
+            result.violations.some((v) => v.includes('无 SD 标识')),
+            'P1.2 不应报无 SD 标识',
+          ).toBe(false);
+        },
+      ],
+      [
+        'P1.3 A 级 passed=true（verifier/valid.json）',
+        () => {
+          const verifier = loadJson<VerifierOutputShape>('verifier/valid.json');
+          const result = checkVerifierOutput(verifier);
+          expect(result.passed, 'P1.3 A 级 passed=true 应通过').toBe(true);
+        },
+      ],
+    ];
+    for (const [, check] of cases) check();
   });
 
   // ==================== P1.1 阶段级校验 ====================
   describe('P1.1 阶段级校验（phaseOption）', () => {
-    it('phase=6 合法场景：unit+integration 通过，system+acceptance pending 应通过', () => {
-      const matrix = loadGateSample('valid-phase6.json');
-      const result = checkArtifactGate(matrix, {
-        phaseOption: 6 as PhaseOption,
-      });
-      expect(result.passed).toBe(true);
-      expect(result.reasons).toEqual([]);
+    it('REQ 阶段字段矩阵·通过行（合法 phase6 场景）', () => {
+      const cases: [string, () => void][] = [
+        [
+          'phase=6 合法场景：unit+integration 通过，system+acceptance pending',
+          () => {
+            const matrix = loadGateSample('valid-phase6.json');
+            const result = checkArtifactGate(matrix, { phaseOption: 6 as PhaseOption });
+            expect(result.passed, '合法 phase6 应通过').toBe(true);
+            expect(result.reasons, '合法 phase6 reasons 应为空').toEqual([]);
+          },
+        ],
+      ];
+      for (const [, check] of cases) check();
     });
 
-    it('phase=6 REQ 缺 integrationTest 字段应失败', () => {
-      const matrix = loadGateSample('bad-phase6-pending-system.json');
-      const result = checkArtifactGate(matrix, {
-        phaseOption: 6 as PhaseOption,
-      });
-      expect(result.passed).toBe(false);
-      expect(result.reasons.some((r) => r.includes('REQ-001') && r.includes('integrationTest'))).toBe(true);
-    });
-
-    it('phase=5 REQ 缺 codeModule 应失败', () => {
-      const matrix = loadGateSample('bad-phase5-missing-codemodule.json');
-      const result = checkArtifactGate(matrix, {
-        phaseOption: 5 as PhaseOption,
-      });
-      expect(result.passed).toBe(false);
-      expect(result.reasons.some((r) => r.includes('REQ-001') && r.includes('codeModule'))).toBe(true);
-    });
-
-    it('phase=5 bad 样本在 phase=8 终检也应失败', () => {
-      const matrix = loadGateSample('bad-phase5-missing-codemodule.json');
-      const result = checkArtifactGate(matrix, {
-        phaseOption: 8 as PhaseOption,
-      });
-      expect(result.passed).toBe(false);
-    });
-
-    it('phase=6 合法场景在 phase=8 终检应失败（system/acceptance pending）', () => {
-      const matrix = loadGateSample('valid-phase6.json');
-      const result = checkArtifactGate(matrix, {
-        phaseOption: 8 as PhaseOption,
-      });
-      expect(result.passed).toBe(false);
-      expect(result.reasons.some((r) => r.includes('待执行'))).toBe(true);
-    });
-
-    it('未传 phaseOption 默认 phase=8（向后兼容，valid-phase6 应因 pending 失败）', () => {
-      const matrix = loadGateSample('valid-phase6.json');
-      const result = checkArtifactGate(matrix);
-      expect(result.passed).toBe(false);
+    it('REQ 阶段字段矩阵·拒绝行（5 态：缺 integrationTest/缺 codeModule/phase8 终检×2/默认 phase8）', () => {
+      const cases: [string, () => void][] = [
+        [
+          'phase=6 REQ 缺 integrationTest',
+          () => {
+            const matrix = loadGateSample('bad-phase6-pending-system.json');
+            const result = checkArtifactGate(matrix, { phaseOption: 6 as PhaseOption });
+            expect(result.passed, '缺 integrationTest 应 fail').toBe(false);
+            expect(
+              result.reasons.some((r) => r.includes('REQ-001') && r.includes('integrationTest')),
+              '应点名 REQ-001 integrationTest',
+            ).toBe(true);
+          },
+        ],
+        [
+          'phase=5 REQ 缺 codeModule',
+          () => {
+            const matrix = loadGateSample('bad-phase5-missing-codemodule.json');
+            const result = checkArtifactGate(matrix, { phaseOption: 5 as PhaseOption });
+            expect(result.passed, '缺 codeModule 应 fail').toBe(false);
+            expect(
+              result.reasons.some((r) => r.includes('REQ-001') && r.includes('codeModule')),
+              '应点名 REQ-001 codeModule',
+            ).toBe(true);
+          },
+        ],
+        [
+          'phase=5 bad 样本在 phase=8 终检',
+          () => {
+            const matrix = loadGateSample('bad-phase5-missing-codemodule.json');
+            const result = checkArtifactGate(matrix, { phaseOption: 8 as PhaseOption });
+            expect(result.passed, 'phase8 终检应 fail').toBe(false);
+          },
+        ],
+        [
+          'phase=6 合法场景在 phase=8 终检（system/acceptance pending）',
+          () => {
+            const matrix = loadGateSample('valid-phase6.json');
+            const result = checkArtifactGate(matrix, { phaseOption: 8 as PhaseOption });
+            expect(result.passed, 'pending 场景 phase8 终检应 fail').toBe(false);
+            expect(
+              result.reasons.some((r) => r.includes('待执行')),
+              '应报 待执行',
+            ).toBe(true);
+          },
+        ],
+        [
+          '未传 phaseOption 默认 phase=8（向后兼容，valid-phase6 应因 pending 失败）',
+          () => {
+            const matrix = loadGateSample('valid-phase6.json');
+            const result = checkArtifactGate(matrix);
+            expect(result.passed, '默认 phase8 应因 pending 失败').toBe(false);
+          },
+        ],
+      ];
+      for (const [, check] of cases) check();
     });
   });
 
   // ==================== P2.4/P2.5/P3.10 verifier 标准化校验 ====================
-  describe('P2.4/P2.5/P3.10 verifier 标准化校验', () => {
-    it('P2.5 targetKind=testcase 应失败（已废弃，须用 test）', () => {
-      const v = loadVerifierSample('bad-targetkind.json');
-      const result = checkVerifierOutput(v);
-      expect(result.passed).toBe(false);
-      // schema enum 前置校验拦截，错误消息含 [schema] 和 targetKind 路径
-      expect(result.reasons.some((r) => r.includes('[schema]') && r.includes('targetKind'))).toBe(true);
-    });
-
-    it('P2.4 subCriteria 名称非标准应失败', () => {
-      const v = loadVerifierSample('bad-subcriteria-name.json');
-      const result = checkVerifierOutput(v);
-      expect(result.passed).toBe(false);
-      expect(result.reasons.some((r) => r.includes('应为') && r.includes('fake-criterion'))).toBe(true);
-    });
-
-    it('P3.10 rawScores 全相同应失败', () => {
-      const v = loadVerifierSample('bad-rawscores-constant.json');
-      const result = checkVerifierOutput(v);
-      expect(result.passed).toBe(false);
-      expect(result.reasons.some((r) => r.includes('全同'))).toBe(true);
-    });
+  it('P2/P3/R11/R12 verifier 标准化负例（5 态：targetKind/subCriteria/rawScores/summary/evidence）', () => {
+    const cases: [string, string, (r: string) => boolean][] = [
+      [
+        'P2.5 targetKind=testcase（已废弃，须用 test）',
+        'bad-targetkind.json',
+        (r) => r.includes('[schema]') && r.includes('targetKind'),
+      ],
+      [
+        'P2.4 subCriteria 名称非标准',
+        'bad-subcriteria-name.json',
+        (r) => r.includes('应为') && r.includes('fake-criterion'),
+      ],
+      ['P3.10 rawScores 全相同', 'bad-rawscores-constant.json', (r) => r.includes('全同')],
+      [
+        'R11 summary 长度 < 50 字符',
+        'bad-summary-too-short.json',
+        (r) => r.includes('[schema]') && r.includes('summary'),
+      ],
+      ['R12 evidence 缺具体引用', 'bad-evidence-empty.json', (r) => /evidence.*缺具体引用.*R12/.test(r)],
+    ];
+    for (const [label, fixture, marker] of cases) {
+      const sample = loadVerifierSample(fixture);
+      const result = checkVerifierOutput(sample);
+      expect(result.passed, `${label} 应 fail`).toBe(false);
+      expect(result.reasons.some(marker), `${label} 应命中标记（fixture=${fixture}）`).toBe(true);
+    }
   });
 });
 
 describe('R11/R12 Verifier 改进（sig-002）', () => {
-  it('R11: summary 长度 < 50 字符应失败', () => {
-    const sample = loadVerifierSample('bad-summary-too-short.json');
-    const result = checkVerifierOutput(sample);
-    expect(result.passed).toBe(false);
-    // schema minLength:50 前置校验拦截，错误消息含 [schema] 和 summary 路径
-    expect(result.reasons.some((r) => r.includes('[schema]') && r.includes('summary'))).toBe(true);
-  });
-
-  it('R11: summary 长度 ≥ 50 字符应通过（valid.json）', () => {
-    const sample = loadVerifierSample('valid.json');
-    const result = checkVerifierOutput(sample);
-    // valid.json summary 已扩展至 ≥50 字符，R11 应通过
-    expect(result.reasons.some((r) => /R11/.test(r))).toBe(false);
-  });
-
-  it('R12: evidence 缺具体引用应失败', () => {
-    const sample = loadVerifierSample('bad-evidence-empty.json');
-    const result = checkVerifierOutput(sample);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => /evidence.*缺具体引用.*R12/.test(r))).toBe(true);
-  });
-
-  it('R12: evidence 含具体引用应通过（valid.json）', () => {
-    const sample = loadVerifierSample('valid.json');
-    const result = checkVerifierOutput(sample);
-    // valid.json evidence 含 "REQ-001 §3.2" 等具体引用，R12 应通过
-    expect(result.reasons.some((r) => /R12/.test(r))).toBe(false);
+  it('R11/R12 正例对照（valid.json，2 态：不报 R11 / 不报 R12）', () => {
+    for (const rule of ['R11', 'R12'] as const) {
+      const sample = loadVerifierSample('valid.json');
+      const result = checkVerifierOutput(sample);
+      // valid.json summary 已扩展至 ≥50 字符、evidence 含 "REQ-001 §3.2" 等具体引用
+      expect(
+        result.reasons.some((r) => new RegExp(rule).test(r)),
+        `${rule} 不应出现在 valid.json reasons`,
+      ).toBe(false);
+    }
   });
 });
 
@@ -1010,9 +1054,9 @@ describe('Phase 1 需求规格结构校验', () => {
     },
   });
 
-  it('引用块齐全 + SSOT 头 + DoD≥8 + §8 合规表格 通过', () => {
+  it('phase1 引用块三件（3 态：通过 / 缺 refs / DoD<8）', () => {
     const dir = 'docs/phase1-requirements';
-    const refs = [
+    const allRefs = [
       'system-context.md',
       'glossary.md',
       'traceability-matrix.md',
@@ -1020,45 +1064,51 @@ describe('Phase 1 需求规格结构校验', () => {
       'discipline-dod.md',
       'uml-modeling.md',
     ];
-    let spec = refs.map((r) => `> 详见 [x](./${r})`).join('\n');
-    spec += '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
-    spec += `\n## 8. Out of Scope\n\n${OOS_TABLE_HEADER}\n| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | rejected | 阶段1 |\n`;
-    const files: Record<string, string> = {};
-    files[path.join(dir, 'requirement-spec.md')] = spec;
-    for (const r of refs) files[path.join(dir, r)] = '';
-    files[path.join(dir, 'discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
-    const v = checkPhaseSpecStructure(1, dir, mkFs(files));
-    expect([...v.refs, ...v.ssot, ...v.dod, ...v.outOfScope]).toEqual([]);
-  });
-
-  it('引用文件缺失报 refs', () => {
-    const dir = 'docs/phase1-requirements';
-    const files: Record<string, string> = {};
-    files[path.join(dir, 'requirement-spec.md')] =
-      '> 详见 [x](./system-context.md)\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
-    files[path.join(dir, 'discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
-    const v = checkPhaseSpecStructure(1, dir, mkFs(files));
-    expect(v.refs.length).toBeGreaterThan(0);
-  });
-
-  it('DoD < 8 报 dod', () => {
-    const dir = 'docs/phase1-requirements';
-    const refs = [
-      'system-context.md',
-      'glossary.md',
-      'traceability-matrix.md',
-      'behavior-spec.md',
-      'discipline-dod.md',
-      'uml-modeling.md',
+    const mkSpec = (refs: string[], extra = '') =>
+      refs.map((r) => `> 详见 [x](./${r})`).join('\n') +
+      '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n' +
+      extra;
+    const cases: [string, () => void][] = [
+      [
+        '引用块齐全 + SSOT 头 + DoD≥8 + §8 合规表格 通过',
+        () => {
+          const files: Record<string, string> = {};
+          files[path.join(dir, 'requirement-spec.md')] = mkSpec(
+            allRefs,
+            `\n## 8. Out of Scope\n\n${OOS_TABLE_HEADER}\n| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | rejected | 阶段1 |\n`,
+          );
+          for (const r of allRefs) files[path.join(dir, r)] = '';
+          files[path.join(dir, 'discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+          const v = checkPhaseSpecStructure(1, dir, mkFs(files));
+          expect([...v.refs, ...v.ssot, ...v.dod, ...v.outOfScope], '通过行四桶应全空').toEqual([]);
+        },
+      ],
+      [
+        '引用文件缺失报 refs',
+        () => {
+          const files: Record<string, string> = {};
+          files[path.join(dir, 'requirement-spec.md')] = mkSpec(['system-context.md']);
+          files[path.join(dir, 'discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+          const v = checkPhaseSpecStructure(1, dir, mkFs(files));
+          expect(v.refs.length, '缺引用文件应报 refs').toBeGreaterThan(0);
+        },
+      ],
+      [
+        'DoD < 8 报 dod',
+        () => {
+          const files: Record<string, string> = {};
+          files[path.join(dir, 'requirement-spec.md')] = mkSpec(allRefs);
+          for (const r of allRefs) files[path.join(dir, r)] = '';
+          files[path.join(dir, 'discipline-dod.md')] = Array(5).fill('- [ ] x').join('\n');
+          const v = checkPhaseSpecStructure(1, dir, mkFs(files));
+          expect(
+            v.dod.some((m) => m.includes('DoD 清单仅 5 项')),
+            'DoD<8 应报 清单仅 5 项',
+          ).toBe(true);
+        },
+      ],
     ];
-    let spec = refs.map((r) => `> 详见 [x](./${r})`).join('\n');
-    spec += '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
-    const files: Record<string, string> = {};
-    files[path.join(dir, 'requirement-spec.md')] = spec;
-    for (const r of refs) files[path.join(dir, r)] = '';
-    files[path.join(dir, 'discipline-dod.md')] = Array(5).fill('- [ ] x').join('\n');
-    const v = checkPhaseSpecStructure(1, dir, mkFs(files));
-    expect(v.dod.some((m) => m.includes('DoD 清单仅 5 项'))).toBe(true);
+    for (const [, check] of cases) check();
   });
 });
 
@@ -1155,51 +1205,43 @@ describe('Phase 1 §8 拒绝登记结构校验（M08）', () => {
     expect(v.outOfScope[0]).toMatch(/§8 表格第 1 行状态非法/);
   });
 
-  it('判定 (a)：§8 节缺失 → 恰好 1 条', () => {
-    const { counts, v } = run(undefined);
-    expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 1 });
-    expect(v.outOfScope[0]).toMatch(/§8 Out of Scope 节缺失/);
-  });
-
-  it('判定 (b)：旧散文形态（无表格 + `- {{`）→ 恰好 1 条并含迁移指引', () => {
-    const { counts, v } = run('- {{out-of-scope 项}}\n- {{Brownfield 不动的历史模块}}\n');
-    expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 1 });
-    expect(v.outOfScope[0]).toMatch(/§8 无固定列表格/);
-  });
-
-  it('判定 (c)：表头缺列（缺「状态」）→ 恰好 1 条（缺失列不叠加派生违规）', () => {
-    const { counts, v } = run(
-      '| conceptKey | 拒绝理由 | Prior requests | 来源 |\n| --- | --- | --- | --- |\n' +
-        '| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | 阶段1 |\n',
-    );
-    expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 1 });
-    expect(v.outOfScope[0]).toMatch(/§8 表格表头缺列：状态/);
-  });
-
-  it('判定 (c)：conceptKey 重复 → 恰好 1 条', () => {
-    const { counts, v } = run(
-      `${OOS_TABLE_HEADER}\n` +
-        '| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | rejected | 阶段1 |\n' +
-        '| dark-mode | 换个说法的同一概念 | REQ-205 | rejected | 阶段2 |\n',
-    );
-    expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 1 });
-    expect(v.outOfScope[0]).toMatch(/§8 表格 conceptKey 重复：dark-mode/);
-  });
-
-  it('判定 (c)：状态非法枚举 → 恰好 1 条', () => {
-    const { counts, v } = run(
-      `${OOS_TABLE_HEADER}\n| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | 已完成 | 阶段1 |\n`,
-    );
-    expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 1 });
-    expect(v.outOfScope[0]).toMatch(/§8 表格第 1 行状态非法："已完成"/);
-  });
-
-  it('判定 (c)：Prior requests 留白 → 恰好 1 条', () => {
-    const { counts, v } = run(
-      `${OOS_TABLE_HEADER}\n| dark-mode | 主题切换与既有品牌规范冲突 |  | rejected | 阶段1 |\n`,
-    );
-    expect(counts).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 1 });
-    expect(v.outOfScope[0]).toMatch(/§8 表格第 1 行 Prior requests 为空/);
+  it('§8 判定 (a)(b)(c) 负例矩阵（6 态：缺节/旧散文/缺列/重复 key/非法枚举/留白，均恰好 1 条）', () => {
+    const cases: [string, string | undefined, RegExp][] = [
+      ['判定 (a)：§8 节缺失', undefined, /§8 Out of Scope 节缺失/],
+      [
+        '判定 (b)：旧散文形态（无表格 + `- {{`）',
+        '- {{out-of-scope 项}}\n- {{Brownfield 不动的历史模块}}\n',
+        /§8 无固定列表格/,
+      ],
+      [
+        '判定 (c)：表头缺列（缺「状态」，缺失列不叠加派生违规）',
+        '| conceptKey | 拒绝理由 | Prior requests | 来源 |\n| --- | --- | --- | --- |\n' +
+          '| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | 阶段1 |\n',
+        /§8 表格表头缺列：状态/,
+      ],
+      [
+        '判定 (c)：conceptKey 重复',
+        `${OOS_TABLE_HEADER}\n` +
+          '| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | rejected | 阶段1 |\n' +
+          '| dark-mode | 换个说法的同一概念 | REQ-205 | rejected | 阶段2 |\n',
+        /§8 表格 conceptKey 重复：dark-mode/,
+      ],
+      [
+        '判定 (c)：状态非法枚举',
+        `${OOS_TABLE_HEADER}\n| dark-mode | 主题切换与既有品牌规范冲突 | REQ-101 | 已完成 | 阶段1 |\n`,
+        /§8 表格第 1 行状态非法："已完成"/,
+      ],
+      [
+        '判定 (c)：Prior requests 留白',
+        `${OOS_TABLE_HEADER}\n| dark-mode | 主题切换与既有品牌规范冲突 |  | rejected | 阶段1 |\n`,
+        /§8 表格第 1 行 Prior requests 为空/,
+      ],
+    ];
+    for (const [label, section, marker] of cases) {
+      const { counts, v } = run(section);
+      expect(counts, `${label} 四桶计数应恰 1 条 oos`).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 1 });
+      expect(v.outOfScope[0], `${label} 应命中 ${marker}`).toMatch(marker);
+    }
   });
 });
 
@@ -1220,9 +1262,9 @@ describe('Phase 2 系统设计结构校验', () => {
     },
   });
 
-  it('引用块齐全 + SSOT 头 + DoD≥8 通过', () => {
+  it('phase2 引用块四件（4 态：通过 / 缺 refs / 主文档 glob 零个 / 主文档 glob 多个）', () => {
     const dir = path.join('docs', 'phase2-design');
-    const refs = [
+    const allRefs = [
       'blog-system-system-architecture.md',
       'blog-system-glossary.md',
       'blog-system-traceability-matrix.md',
@@ -1230,42 +1272,61 @@ describe('Phase 2 系统设计结构校验', () => {
       'blog-system-discipline-dod.md',
       'blog-system-uml-modeling.md',
     ];
-    let spec = refs.map((r) => `> 详见 [x](./${r})`).join('\n');
-    spec += '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
-    const files: Record<string, string> = {};
-    for (const r of refs) files[path.join(dir, r)] = '';
-    files[path.join(dir, 'blog-system-system-design.md')] = spec;
-    files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
-    const v = checkPhaseSpecStructure(2, dir, mkFs(files));
-    expect([...v.refs, ...v.ssot, ...v.dod]).toEqual([]);
-  });
-
-  it('引用文件缺失报 refs', () => {
-    const dir = path.join('docs', 'phase2-design');
-    const files: Record<string, string> = {};
-    files[path.join(dir, 'blog-system-system-design.md')] =
-      '> 详见 [x](./blog-system-uml-modeling.md)\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
-    files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
-    const v = checkPhaseSpecStructure(2, dir, mkFs(files));
-    expect(v.refs.length).toBeGreaterThan(0);
-  });
-
-  it('主文档 glob 零个报 refs', () => {
-    const dir = path.join('docs', 'phase2-design');
-    const files: Record<string, string> = {};
-    files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
-    const v = checkPhaseSpecStructure(2, dir, mkFs(files));
-    expect(v.refs.some((m) => m.includes('主文档 glob'))).toBe(true);
-  });
-
-  it('主文档 glob 多个报 refs', () => {
-    const dir = path.join('docs', 'phase2-design');
-    const files: Record<string, string> = {};
-    files[path.join(dir, 'a-system-design.md')] = '> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
-    files[path.join(dir, 'b-system-design.md')] = '> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
-    files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
-    const v = checkPhaseSpecStructure(2, dir, mkFs(files));
-    expect(v.refs.some((m) => m.includes('主文档 glob'))).toBe(true);
+    const mkSpec = (refs: string[]) =>
+      refs.map((r) => `> 详见 [x](./${r})`).join('\n') +
+      '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    const cases: [string, () => void][] = [
+      [
+        '引用块齐全 + SSOT 头 + DoD≥8 通过',
+        () => {
+          const files: Record<string, string> = {};
+          for (const r of allRefs) files[path.join(dir, r)] = '';
+          files[path.join(dir, 'blog-system-system-design.md')] = mkSpec(allRefs);
+          files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+          const v = checkPhaseSpecStructure(2, dir, mkFs(files));
+          expect([...v.refs, ...v.ssot, ...v.dod], '通过行三桶应全空').toEqual([]);
+        },
+      ],
+      [
+        '引用文件缺失报 refs',
+        () => {
+          const files: Record<string, string> = {};
+          files[path.join(dir, 'blog-system-system-design.md')] = mkSpec(['blog-system-uml-modeling.md']);
+          files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+          const v = checkPhaseSpecStructure(2, dir, mkFs(files));
+          expect(v.refs.length, '缺引用文件应报 refs').toBeGreaterThan(0);
+        },
+      ],
+      [
+        '主文档 glob 零个报 refs',
+        () => {
+          const files: Record<string, string> = {};
+          files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+          const v = checkPhaseSpecStructure(2, dir, mkFs(files));
+          expect(
+            v.refs.some((m) => m.includes('主文档 glob')),
+            'glob 零个应报 主文档 glob',
+          ).toBe(true);
+        },
+      ],
+      [
+        '主文档 glob 多个报 refs',
+        () => {
+          const files: Record<string, string> = {};
+          files[path.join(dir, 'a-system-design.md')] =
+            '> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+          files[path.join(dir, 'b-system-design.md')] =
+            '> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+          files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+          const v = checkPhaseSpecStructure(2, dir, mkFs(files));
+          expect(
+            v.refs.some((m) => m.includes('主文档 glob')),
+            'glob 多个应报 主文档 glob',
+          ).toBe(true);
+        },
+      ],
+    ];
+    for (const [, check] of cases) check();
   });
 });
 
@@ -1286,9 +1347,9 @@ describe('Phase 3 概要设计结构校验', () => {
     },
   });
 
-  it('引用块齐全 + SSOT 头 + DoD≥8 通过', () => {
+  it('phase3 引用块三件（3 态：通过 / 缺 refs / 主文档 glob 零个）', () => {
     const dir = path.join('docs', 'phase3-outline');
-    const refs = [
+    const allRefs = [
       'blog-system-interface-contract.md',
       'blog-system-glossary.md',
       'blog-system-traceability-matrix.md',
@@ -1296,32 +1357,45 @@ describe('Phase 3 概要设计结构校验', () => {
       'blog-system-discipline-dod.md',
       'blog-system-uml-modeling.md',
     ];
-    let spec = refs.map((r) => `> 详见 [x](./${r})`).join('\n');
-    spec += '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
-    const files: Record<string, string> = {};
-    for (const r of refs) files[path.join(dir, r)] = '';
-    files[path.join(dir, 'blog-system-interface-design.md')] = spec;
-    files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
-    const v = checkPhaseSpecStructure(3, dir, mkFs(files));
-    expect([...v.refs, ...v.ssot, ...v.dod]).toEqual([]);
-  });
-
-  it('引用文件缺失报 refs', () => {
-    const dir = path.join('docs', 'phase3-outline');
-    const files: Record<string, string> = {};
-    files[path.join(dir, 'blog-system-interface-design.md')] =
-      '> 详见 [x](./blog-system-uml-modeling.md)\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
-    files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
-    const v = checkPhaseSpecStructure(3, dir, mkFs(files));
-    expect(v.refs.length).toBeGreaterThan(0);
-  });
-
-  it('主文档 glob 零个报 refs', () => {
-    const dir = path.join('docs', 'phase3-outline');
-    const files: Record<string, string> = {};
-    files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
-    const v = checkPhaseSpecStructure(3, dir, mkFs(files));
-    expect(v.refs.some((m) => m.includes('主文档 glob'))).toBe(true);
+    const mkSpec = (refs: string[]) =>
+      refs.map((r) => `> 详见 [x](./${r})`).join('\n') +
+      '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    const cases: [string, () => void][] = [
+      [
+        '引用块齐全 + SSOT 头 + DoD≥8 通过',
+        () => {
+          const files: Record<string, string> = {};
+          for (const r of allRefs) files[path.join(dir, r)] = '';
+          files[path.join(dir, 'blog-system-interface-design.md')] = mkSpec(allRefs);
+          files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+          const v = checkPhaseSpecStructure(3, dir, mkFs(files));
+          expect([...v.refs, ...v.ssot, ...v.dod], '通过行三桶应全空').toEqual([]);
+        },
+      ],
+      [
+        '引用文件缺失报 refs',
+        () => {
+          const files: Record<string, string> = {};
+          files[path.join(dir, 'blog-system-interface-design.md')] = mkSpec(['blog-system-uml-modeling.md']);
+          files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+          const v = checkPhaseSpecStructure(3, dir, mkFs(files));
+          expect(v.refs.length, '缺引用文件应报 refs').toBeGreaterThan(0);
+        },
+      ],
+      [
+        '主文档 glob 零个报 refs',
+        () => {
+          const files: Record<string, string> = {};
+          files[path.join(dir, 'blog-system-discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
+          const v = checkPhaseSpecStructure(3, dir, mkFs(files));
+          expect(
+            v.refs.some((m) => m.includes('主文档 glob')),
+            'glob 零个应报 主文档 glob',
+          ).toBe(true);
+        },
+      ],
+    ];
+    for (const [, check] of cases) check();
   });
 });
 
@@ -1419,9 +1493,8 @@ describe('Phase 4 详细设计结构校验', () => {
     },
   });
 
-  it('引用块齐全 + SSOT 头 + DoD≥8 通过', () => {
-    const files: Record<string, string> = {};
-    const refs = [
+  it('phase4 引用块三件（3 态：通过 / 缺 refs / 主文档 glob 零个）', () => {
+    const allRefs = [
       'blog-system-class-design.md',
       'blog-system-data-model.md',
       'blog-system-glossary.md',
@@ -1429,29 +1502,45 @@ describe('Phase 4 详细设计结构校验', () => {
       'blog-system-behavior-spec.md',
       'blog-system-discipline-dod.md',
     ];
-    let spec = refs.map((r) => `> 详见 [x](./${r})`).join('\n');
-    spec += '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
-    for (const r of refs) files[`docs/phase4-detailed/${r}`] = '';
-    files['docs/phase4-detailed/blog-system-detailed-design.md'] = spec;
-    files['docs/phase4-detailed/blog-system-discipline-dod.md'] = Array(9).fill('- [ ] x').join('\n');
-    const v = checkPhaseSpecStructure(4, 'docs/phase4-detailed', mkFs(files));
-    expect([...v.refs, ...v.ssot, ...v.dod]).toEqual([]);
-  });
-
-  it('引用文件缺失报 refs', () => {
-    const files: Record<string, string> = {};
-    files['docs/phase4-detailed/blog-system-detailed-design.md'] =
-      '> 详见 [x](./blog-system-discipline-dod.md)\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
-    files['docs/phase4-detailed/blog-system-discipline-dod.md'] = Array(9).fill('- [ ] x').join('\n');
-    const v = checkPhaseSpecStructure(4, 'docs/phase4-detailed', mkFs(files));
-    expect(v.refs.length).toBeGreaterThan(0);
-  });
-
-  it('主文档 glob 零个报 refs', () => {
-    const files: Record<string, string> = {};
-    files['docs/phase4-detailed/blog-system-discipline-dod.md'] = Array(9).fill('- [ ] x').join('\n');
-    const v = checkPhaseSpecStructure(4, 'docs/phase4-detailed', mkFs(files));
-    expect(v.refs.some((m) => m.includes('主文档 glob'))).toBe(true);
+    const mkSpec = (refs: string[]) =>
+      refs.map((r) => `> 详见 [x](./${r})`).join('\n') +
+      '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
+    const cases: [string, () => void][] = [
+      [
+        '引用块齐全 + SSOT 头 + DoD≥8 通过',
+        () => {
+          const files: Record<string, string> = {};
+          for (const r of allRefs) files[`docs/phase4-detailed/${r}`] = '';
+          files['docs/phase4-detailed/blog-system-detailed-design.md'] = mkSpec(allRefs);
+          files['docs/phase4-detailed/blog-system-discipline-dod.md'] = Array(9).fill('- [ ] x').join('\n');
+          const v = checkPhaseSpecStructure(4, 'docs/phase4-detailed', mkFs(files));
+          expect([...v.refs, ...v.ssot, ...v.dod], '通过行三桶应全空').toEqual([]);
+        },
+      ],
+      [
+        '引用文件缺失报 refs',
+        () => {
+          const files: Record<string, string> = {};
+          files['docs/phase4-detailed/blog-system-detailed-design.md'] = mkSpec(['blog-system-discipline-dod.md']);
+          files['docs/phase4-detailed/blog-system-discipline-dod.md'] = Array(9).fill('- [ ] x').join('\n');
+          const v = checkPhaseSpecStructure(4, 'docs/phase4-detailed', mkFs(files));
+          expect(v.refs.length, '缺引用文件应报 refs').toBeGreaterThan(0);
+        },
+      ],
+      [
+        '主文档 glob 零个报 refs',
+        () => {
+          const files: Record<string, string> = {};
+          files['docs/phase4-detailed/blog-system-discipline-dod.md'] = Array(9).fill('- [ ] x').join('\n');
+          const v = checkPhaseSpecStructure(4, 'docs/phase4-detailed', mkFs(files));
+          expect(
+            v.refs.some((m) => m.includes('主文档 glob')),
+            'glob 零个应报 主文档 glob',
+          ).toBe(true);
+        },
+      ],
+    ];
+    for (const [, check] of cases) check();
   });
 });
 
@@ -1541,59 +1630,86 @@ describe('模板漂移校验（--validate-templates，C9）', () => {
     return files;
   }
 
-  it('四阶段模板齐全合规 → violations 为空', () => {
+  it('四阶段模板齐全合规 → violations 为空（通过行基线）', () => {
     expect(checkTemplatesStructure('templates', mkFs(mkValidTemplates()))).toEqual([]);
   });
 
-  it('主模板缺失 → 报「主模板缺失」且跳过该阶段其余检查', () => {
-    const files = mkValidTemplates();
-    delete files['templates/system-design.md'];
-    const v = checkTemplatesStructure('templates', mkFs(files));
-    expect(v.some((m) => m.includes('阶段 2 主模板缺失 system-design.md'))).toBe(true);
-    // continue 短路：阶段 2 子模板缺失不重复报
-    expect(v.some((m) => m.includes('阶段 2 子模板缺失'))).toBe(false);
-    expect(v.some((m) => m.includes('阶段 2 主模板 §0'))).toBe(false);
-  });
-
-  it('phase≥2 引用块漏 {{module}} 占位符 → 报缺引用块', () => {
-    const files = mkValidTemplates();
-    // 漂移：把 phase 3 引用块写成项目产物形式（{{module}} 前缀丢失）
-    files['templates/interface-design.md'] = files['templates/interface-design.md']!.replace(
-      '(./{{module}}-interface-contract.md)',
-      '(./interface-contract.md)',
-    );
-    const v = checkTemplatesStructure('templates', mkFs(files));
-    expect(
-      v.some((m) => m.includes('阶段 3 主模板 interface-design.md 缺引用块 → ](./{{module}}-interface-contract.md)')),
-    ).toBe(true);
-  });
-
-  it('子模板缺失 → 报「子模板缺失」', () => {
-    const files = mkValidTemplates();
-    delete files['templates/requirement-spec/uml-modeling.md'];
-    const v = checkTemplatesStructure('templates', mkFs(files));
-    expect(v.some((m) => m.includes('阶段 1 子模板缺失 requirement-spec/uml-modeling.md'))).toBe(true);
-  });
-
-  it('§0 SSOT 头缺项 → 报缺对应声明', () => {
-    const files = mkValidTemplates();
-    files['templates/detailed-design.md'] = files['templates/detailed-design.md']!.replace('禁止占位词', '禁止占位');
-    const v = checkTemplatesStructure('templates', mkFs(files));
-    expect(v.some((m) => m.includes('阶段 4 主模板 §0 SSOT 头缺「禁止占位词」'))).toBe(true);
-  });
-
-  it('DoD 子模板清单 < 8 项 → 报项数不足', () => {
-    const files = mkValidTemplates();
-    files['templates/system-design/discipline-dod.md'] = Array(7).fill('- [ ] x').join('\n');
-    const v = checkTemplatesStructure('templates', mkFs(files));
-    expect(v.some((m) => m.includes('阶段 2 DoD 清单仅 7 项（须 ≥ 8）'))).toBe(true);
-  });
-
-  it('DoD 子模板缺失 → 报 DoD 子模板缺失', () => {
-    const files = mkValidTemplates();
-    delete files['templates/interface-design/discipline-dod.md'];
-    const v = checkTemplatesStructure('templates', mkFs(files));
-    expect(v.some((m) => m.includes('阶段 3 DoD 子模板缺失 interface-design/discipline-dod.md'))).toBe(true);
+  it('模板结构缺失矩阵（6 态违规：主模板/引用块占位符/子模板/SSOT 头缺项/DoD<8/DoD 子模板缺失）', () => {
+    const cases: {
+      label: string;
+      mutate: (files: Record<string, string>) => void;
+      markers: string[];
+      absent?: string[];
+    }[] = [
+      {
+        label: '主模板缺失',
+        mutate: (files) => {
+          delete files['templates/system-design.md'];
+        },
+        markers: ['阶段 2 主模板缺失 system-design.md'],
+        // continue 短路：阶段 2 子模板缺失不重复报
+        absent: ['阶段 2 子模板缺失', '阶段 2 主模板 §0'],
+      },
+      {
+        label: 'phase≥2 引用块漏 {{module}} 占位符',
+        // 漂移：把 phase 3 引用块写成项目产物形式（{{module}} 前缀丢失）
+        mutate: (files) => {
+          files['templates/interface-design.md'] = files['templates/interface-design.md']!.replace(
+            '(./{{module}}-interface-contract.md)',
+            '(./interface-contract.md)',
+          );
+        },
+        markers: ['阶段 3 主模板 interface-design.md 缺引用块 → ](./{{module}}-interface-contract.md)'],
+      },
+      {
+        label: '子模板缺失',
+        mutate: (files) => {
+          delete files['templates/requirement-spec/uml-modeling.md'];
+        },
+        markers: ['阶段 1 子模板缺失 requirement-spec/uml-modeling.md'],
+      },
+      {
+        label: '§0 SSOT 头缺项',
+        mutate: (files) => {
+          files['templates/detailed-design.md'] = files['templates/detailed-design.md']!.replace(
+            '禁止占位词',
+            '禁止占位',
+          );
+        },
+        markers: ['阶段 4 主模板 §0 SSOT 头缺「禁止占位词」'],
+      },
+      {
+        label: 'DoD 子模板清单 < 8 项',
+        mutate: (files) => {
+          files['templates/system-design/discipline-dod.md'] = Array(7).fill('- [ ] x').join('\n');
+        },
+        markers: ['阶段 2 DoD 清单仅 7 项（须 ≥ 8）'],
+      },
+      {
+        label: 'DoD 子模板缺失',
+        mutate: (files) => {
+          delete files['templates/interface-design/discipline-dod.md'];
+        },
+        markers: ['阶段 3 DoD 子模板缺失 interface-design/discipline-dod.md'],
+      },
+    ];
+    for (const c of cases) {
+      const files = mkValidTemplates();
+      c.mutate(files);
+      const v = checkTemplatesStructure('templates', mkFs(files));
+      for (const marker of c.markers) {
+        expect(
+          v.some((m) => m.includes(marker)),
+          `${c.label} 应报「${marker}」`,
+        ).toBe(true);
+      }
+      for (const absent of c.absent ?? []) {
+        expect(
+          v.some((m) => m.includes(absent)),
+          `${c.label} 不应报「${absent}」`,
+        ).toBe(false);
+      }
+    }
   });
 
   it('真实技能包 templates/ 资产 → violations 为空（资产回归保护）', () => {
@@ -1648,46 +1764,57 @@ describe('§4.2 验收标准可量化校验（phase 1）与 §5 ADR 三列校验
   const REQ_TABLE_HEADER =
     '| 需求 ID | level | priority | reqGroup | parent | 类型 | 描述 | 验收标准 | evidenceAnchor |\n|---|---|---|---|---|---|---|---|---|';
 
-  it('level=4 行验收标准为空（—）→ acceptance violation', () => {
-    const files = phase1Files(
-      `${REQ_TABLE_HEADER}\n| REQ-004 | 4 | P1 | REQ-001 | REQ-003 | acceptance | 提交订单 | — | x |`,
-    );
-    const v = checkPhaseSpecStructure(1, path.join('docs', 'phase1-requirements'), mkFs(files));
-    expect(v.acceptance).toHaveLength(1);
-    expect(v.acceptance[0]).toMatch(/REQ-004.*level=4 验收节点/);
+  it('acceptance violation 族（3 态：level=4 空 / 主观词「快速」/ NFR 指标「高可用」）', () => {
+    const cases: { label: string; tableBody: string; assert: (v: { acceptance: string[] }) => void }[] = [
+      {
+        label: 'level=4 行验收标准为空（—）',
+        tableBody: `| REQ-004 | 4 | P1 | REQ-001 | REQ-003 | acceptance | 提交订单 | — | x |`,
+        assert: (v) => {
+          expect(v.acceptance, `level=4 空验收 应恰 1 条`).toHaveLength(1);
+          expect(v.acceptance[0], `level=4 空验收 应点名 REQ-004`).toMatch(/REQ-004.*level=4 验收节点/);
+        },
+      },
+      {
+        label: '验收标准含主观词「快速」',
+        tableBody: `| REQ-004 | 4 | P1 | REQ-001 | REQ-003 | acceptance | 提交订单 | 页面响应快速 | x |`,
+        assert: (v) => {
+          expect(v.acceptance, `主观词「快速」应恰 1 条`).toHaveLength(1);
+          expect(v.acceptance[0], `主观词违规应点名该词`).toContain('「快速」');
+        },
+      },
+      {
+        label: 'NFR 行的指标列含「高可用」',
+        tableBody: `| NFR-001 | 1 | P0 | NFR-001 | — | NFR | 系统可用性 | 高可用 | x |`,
+        assert: (v) => {
+          expect(
+            v.acceptance.some((m) => m.includes('「高可用」')),
+            `NFR 行应命中同一黑名单（「高可用」）`,
+          ).toBe(true);
+        },
+      },
+    ];
+    for (const c of cases) {
+      const files = phase1Files(`${REQ_TABLE_HEADER}\n${c.tableBody}`);
+      const v = checkPhaseSpecStructure(1, path.join('docs', 'phase1-requirements'), mkFs(files));
+      c.assert(v);
+    }
   });
 
-  it('验收标准含主观词「快速」→ violation 且点名该词', () => {
-    const files = phase1Files(
-      `${REQ_TABLE_HEADER}\n| REQ-004 | 4 | P1 | REQ-001 | REQ-003 | acceptance | 提交订单 | 页面响应快速 | x |`,
-    );
-    const v = checkPhaseSpecStructure(1, path.join('docs', 'phase1-requirements'), mkFs(files));
-    expect(v.acceptance).toHaveLength(1);
-    expect(v.acceptance[0]).toContain('「快速」');
-  });
-
-  it('NFR 行的指标列含「高可用」→ violation（同一黑名单覆盖 NFR/CON 行）', () => {
-    const files = phase1Files(
-      `${REQ_TABLE_HEADER}\n| NFR-001 | 1 | P0 | NFR-001 | — | NFR | 系统可用性 | 高可用 | x |`,
-    );
-    const v = checkPhaseSpecStructure(1, path.join('docs', 'phase1-requirements'), mkFs(files));
-    expect(v.acceptance.some((m) => m.includes('「高可用」'))).toBe(true);
-  });
-
-  it('可量化标准 + 非验收行用 — 占位 → 不误红', () => {
-    const files = phase1Files(
-      `${REQ_TABLE_HEADER}\n` +
-        `| REQ-001 | 1 | P0 | REQ-001 | — | domain | 领域 | — | x |\n` +
-        `| REQ-004 | 4 | P1 | REQ-001 | REQ-003 | acceptance | 提交订单 | 响应 < 2s 且操作 ≤ 3 步 | x |`,
-    );
-    const v = checkPhaseSpecStructure(1, path.join('docs', 'phase1-requirements'), mkFs(files));
-    expect(v.acceptance).toEqual([]);
-  });
-
-  it('无 §4.2 表 → 跳过（不报，表完整性不由本判据承担）', () => {
-    const files = phase1Files('（本规格未含层级节点表）');
-    const v = checkPhaseSpecStructure(1, path.join('docs', 'phase1-requirements'), mkFs(files));
-    expect(v.acceptance).toEqual([]);
+  it('acceptance 不误红族（2 态：可量化标准 + 非验收行 — 占位 / 无 §4.2 表跳过）', () => {
+    const cases: { label: string; tableBody: string }[] = [
+      {
+        label: '可量化标准 + 非验收行用 — 占位',
+        tableBody:
+          `| REQ-001 | 1 | P0 | REQ-001 | — | domain | 领域 | — | x |\n` +
+          `| REQ-004 | 4 | P1 | REQ-001 | REQ-003 | acceptance | 提交订单 | 响应 < 2s 且操作 ≤ 3 步 | x |`,
+      },
+      { label: '无 §4.2 表（表完整性不由本判据承担）', tableBody: '（本规格未含层级节点表）' },
+    ];
+    for (const c of cases) {
+      const files = phase1Files(`${REQ_TABLE_HEADER}\n${c.tableBody}`);
+      const v = checkPhaseSpecStructure(1, path.join('docs', 'phase1-requirements'), mkFs(files));
+      expect(v.acceptance, `${c.label} 不应误红`).toEqual([]);
+    }
   });
 
   /** 阶段 2 spec-dir：主文档 + 6 引用（含 system-architecture.md 内容） */
@@ -1712,33 +1839,46 @@ describe('§4.2 验收标准可量化校验（phase 1）与 §5 ADR 三列校验
 
   const ADR_TABLE_HEADER = '| ADR 编号 | 决策 | 上下文 | 后果 |\n|---|---|---|---|';
 
-  it('ADR 行缺「后果」→ adr violation（FM-SD-02 此前零实现）', () => {
-    const files = phase2Files(`${ADR_TABLE_HEADER}\n| ADR-001 | 采用分布式锁 | 并发竞价冲突 | — |`);
-    const v = checkPhaseSpecStructure(2, path.join('docs', 'phase2-design'), mkFs(files));
-    expect(v.adr).toHaveLength(1);
-    expect(v.adr[0]).toContain('ADR-001');
-    expect(v.adr[0]).toContain('FM-SD-02');
+  it('ADR violation 族（2 态：缺「后果」/ 占位符未填）', () => {
+    const cases: { label: string; archBody: string; assert: (v: { adr: string[] }) => void }[] = [
+      {
+        label: 'ADR 行缺「后果」（FM-SD-02 此前零实现）',
+        archBody: `${ADR_TABLE_HEADER}\n| ADR-001 | 采用分布式锁 | 并发竞价冲突 | — |`,
+        assert: (v) => {
+          expect(v.adr, `ADR 缺后果 应恰 1 条`).toHaveLength(1);
+          expect(v.adr[0], `ADR 违规应点名 ADR-001`).toContain('ADR-001');
+          expect(v.adr[0], `ADR 违规应含 FM-SD-02`).toContain('FM-SD-02');
+        },
+      },
+      {
+        label: 'ADR 占位符 {{决策}} 视为未填（占位不得算通过）',
+        archBody: `${ADR_TABLE_HEADER}\n| ADR-{{xx}} | {{决策}} | {{上下文}} | {{后果}} |`,
+        assert: (v) => {
+          expect(v.adr, `ADR 占位符 应恰 1 条`).toHaveLength(1);
+          expect(v.adr[0], `ADR 占位符违规应点名三列`).toContain('决策/上下文/后果');
+        },
+      },
+    ];
+    for (const c of cases) {
+      const files = phase2Files(c.archBody);
+      const v = checkPhaseSpecStructure(2, path.join('docs', 'phase2-design'), mkFs(files));
+      c.assert(v);
+    }
   });
 
-  it('ADR 行三列齐全 → 不报', () => {
-    const files = phase2Files(
-      `${ADR_TABLE_HEADER}\n| ADR-001 | 采用分布式锁 | 并发竞价冲突 | 正面：判定收敛；负面：运维成本上升 |`,
-    );
-    const v = checkPhaseSpecStructure(2, path.join('docs', 'phase2-design'), mkFs(files));
-    expect(v.adr).toEqual([]);
-  });
-
-  it('ADR 占位符 {{决策}} 视为未填 → violation（占位不得算通过）', () => {
-    const files = phase2Files(`${ADR_TABLE_HEADER}\n| ADR-{{xx}} | {{决策}} | {{上下文}} | {{后果}} |`);
-    const v = checkPhaseSpecStructure(2, path.join('docs', 'phase2-design'), mkFs(files));
-    expect(v.adr).toHaveLength(1);
-    expect(v.adr[0]).toContain('决策/上下文/后果');
-  });
-
-  it('ADR 表为空或缺节 → 不报（是否该有 ADR 属三问判断型准入，不强制条数 ≥1）', () => {
-    const files = phase2Files('## 4. 架构原则\n\n- 分层单向依赖\n');
-    const v = checkPhaseSpecStructure(2, path.join('docs', 'phase2-design'), mkFs(files));
-    expect(v.adr).toEqual([]);
+  it('ADR 不误红族（2 态：三列齐全 / 表为空或缺节）', () => {
+    const cases: { label: string; archBody: string }[] = [
+      {
+        label: 'ADR 行三列齐全',
+        archBody: `${ADR_TABLE_HEADER}\n| ADR-001 | 采用分布式锁 | 并发竞价冲突 | 正面：判定收敛；负面：运维成本上升 |`,
+      },
+      { label: 'ADR 表为空或缺节（不强制条数 ≥1）', archBody: '## 4. 架构原则\n\n- 分层单向依赖\n' },
+    ];
+    for (const c of cases) {
+      const files = phase2Files(c.archBody);
+      const v = checkPhaseSpecStructure(2, path.join('docs', 'phase2-design'), mkFs(files));
+      expect(v.adr, `${c.label} 不应误红`).toEqual([]);
+    }
   });
 
   it('阶段 1 不施加 ADR 判据、阶段 2 不施加验收判据（互不越界）', () => {

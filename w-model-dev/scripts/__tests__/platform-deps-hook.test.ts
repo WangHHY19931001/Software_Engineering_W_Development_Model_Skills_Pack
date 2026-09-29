@@ -459,16 +459,20 @@ esac`,
     expect(result.calls).toBe('');
   });
 
-  it.each([{ args: ['--unsupported'] }, { args: ['--check', 'unexpected'] }, { args: ['--install', 'unexpected'] }])(
-    'rejects unsupported arguments $args with usage error code 2',
-    async ({ args }) => {
-      const result = await simulatedEnsure(args, 'printf "linux\\n"');
+  it('rejects unsupported arguments with usage error code 2（3 形态：--unsupported / --check 多余位置参数 / --install 多余位置参数）', async () => {
+    const cases: { label: string; args: string[] }[] = [
+      { label: '--unsupported', args: ['--unsupported'] },
+      { label: '--check unexpected', args: ['--check', 'unexpected'] },
+      { label: '--install unexpected', args: ['--install', 'unexpected'] },
+    ];
+    for (const c of cases) {
+      const result = await simulatedEnsure(c.args, 'printf "linux\\n"');
 
-      expect(result.code).toBe(2);
-      expect(result.stdout).toContain('用法');
-      expect(result.calls).toBe('');
-    },
-  );
+      expect(result.code, `args=${JSON.stringify(c.args)} 应拒绝（usage error 2）`).toBe(2);
+      expect(result.stdout, `args=${JSON.stringify(c.args)} 应含用法提示`).toContain('用法');
+      expect(result.calls, `args=${JSON.stringify(c.args)} 不应调用安装器`).toBe('');
+    }
+  });
 
   it('passes the absolute lockfile and every missing package to the local installer, then rechecks', async () => {
     const result = await simulatedEnsure(
@@ -592,9 +596,9 @@ mkdir() { printf 'mkdir %s\\n' "$*" >> "$CALLS"; exit 99; }
 });
 
 describe('pre-push dependency boundary and trigger paths', () => {
-  it.each(['config/probe.ts', 'scripts/probe.cjs', 'package-lock.json'])(
-    'runs the gate for %s',
-    async (changedPath) => {
+  it('runs the gate for trigger paths（3 路径：config/*.ts / scripts/*.cjs / package-lock.json）', async () => {
+    for (const changedPath of ['config/probe.ts', 'scripts/probe.cjs', 'package-lock.json'] as const) {
+      // hook 语义：每迭代自备 fixture（独立临时目录，失败不污染后续迭代）
       const binDir = await makeTempDir('pre-push-bin-');
       const workspace = await makeTempDir('pre-push-workspace-');
       const callsPath = path.join(binDir, 'calls.log');
@@ -626,12 +630,12 @@ npm() { printf 'npm %s\\n' "$*" >> "$CALLS"; return 98; }
         workspace,
       );
 
-      expect(result.code).toBe(1);
-      expect(result.stdout).toContain('node_modules 缺失');
-      expect(result.stdout).toContain('npm install');
-      expect(await fs.readFile(callsPath, 'utf8').catch(() => '')).toBe('');
-    },
-  );
+      expect(result.code, `path=${changedPath} 应触发门禁\n${result.stdout}\n${result.stderr}`).toBe(1);
+      expect(result.stdout, `path=${changedPath} 应提示 node_modules 缺失`).toContain('node_modules 缺失');
+      expect(result.stdout, `path=${changedPath} 应提示 npm install`).toContain('npm install');
+      expect(await fs.readFile(callsPath, 'utf8').catch(() => ''), `path=${changedPath} 不应调用 npm`).toBe('');
+    }
+  }, 180_000);
 
   it('skips the gate when changed paths are unrelated', async () => {
     const binDir = await makeTempDir('pre-push-skip-bin-');
@@ -671,25 +675,28 @@ git() {
   // 历史触发语义见 files_need_gate 注释，不做收窄）；根级清单文件、.githooks/**、
   // 深层 w-model-dev/** 命中；eval/** 触发（评估资产是活体门禁第 19 项的触发面）；
   // docs 非 .md 不触发。
-  it.each([
-    { changedPath: 'docs/changes/2026-09-06.md', expectGate: true },
-    { changedPath: 'docs/superpowers/deep/sub.md', expectGate: true },
-    { changedPath: '.githooks/pre-push', expectGate: true },
-    { changedPath: 'w-model-dev/scripts/a/b/c.ts', expectGate: true },
-    { changedPath: 'README.md', expectGate: true },
-    { changedPath: 'package.json', expectGate: true },
-    { changedPath: 'eval/x.json', expectGate: true },
-    { changedPath: 'docs/notes.txt', expectGate: false },
-  ])('path filter: $changedPath → $expectGate', async ({ changedPath, expectGate }) => {
-    const binDir = await makeTempDir('pre-push-pathfilter-bin-');
-    const workspace = await makeTempDir('pre-push-pathfilter-workspace-');
-    const callsPath = path.join(binDir, 'calls.log');
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- workspace is a test-owned mkdtemp fixture
-    await fs.writeFile(path.join(workspace, '.git'), 'gitdir: irrelevant\n', 'utf8');
-    const bashEnv = path.join(binDir, 'bash-env.sh');
-    await fs.writeFile(
-      bashEnv,
-      `
+  it('path filter: 8 行触发/不触发矩阵（docs/*.md 深层命中 / 根级清单 / .githooks / 深层 w-model-dev / eval；docs 非 .md 不触发）', async () => {
+    const rows = [
+      { changedPath: 'docs/changes/2026-09-06.md', expectGate: true },
+      { changedPath: 'docs/superpowers/deep/sub.md', expectGate: true },
+      { changedPath: '.githooks/pre-push', expectGate: true },
+      { changedPath: 'w-model-dev/scripts/a/b/c.ts', expectGate: true },
+      { changedPath: 'README.md', expectGate: true },
+      { changedPath: 'package.json', expectGate: true },
+      { changedPath: 'eval/x.json', expectGate: true },
+      { changedPath: 'docs/notes.txt', expectGate: false },
+    ] as const;
+    for (const { changedPath, expectGate } of rows) {
+      // hook 语义：每迭代自备 fixture（独立临时目录）
+      const binDir = await makeTempDir('pre-push-pathfilter-bin-');
+      const workspace = await makeTempDir('pre-push-pathfilter-workspace-');
+      const callsPath = path.join(binDir, 'calls.log');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- workspace is a test-owned mkdtemp fixture
+      await fs.writeFile(path.join(workspace, '.git'), 'gitdir: irrelevant\n', 'utf8');
+      const bashEnv = path.join(binDir, 'bash-env.sh');
+      await fs.writeFile(
+        bashEnv,
+        `
 git() {
   case "$*" in
     *'diff --name-only'*) printf '${changedPath}\\n' ;;
@@ -698,30 +705,31 @@ git() {
 }
 npm() { printf 'npm %s\\n' "$*" >> "$CALLS"; return 98; }
 `,
-      'utf8',
-    );
-    const result = await run(
-      prePushScript,
-      [],
-      {
-        PATH: prependBashPath(binDir),
-        CALLS: callsPath,
-        BASH_ENV: bashEnv,
-        PREPUSH_FORCE: '0',
-        OSTYPE: 'linux-gnu',
-      },
-      workspace,
-    );
+        'utf8',
+      );
+      const result = await run(
+        prePushScript,
+        [],
+        {
+          PATH: prependBashPath(binDir),
+          CALLS: callsPath,
+          BASH_ENV: bashEnv,
+          PREPUSH_FORCE: '0',
+          OSTYPE: 'linux-gnu',
+        },
+        workspace,
+      );
 
-    if (expectGate) {
-      expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
-      expect(result.stdout).toContain('node_modules 缺失');
-      expect(result.stdout, `${changedPath}: 应触发门禁，不得跳过`).not.toContain('跳过门禁');
-    } else {
-      expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
-      expect(result.stdout, `${changedPath}: 不在触发面，应跳过门禁`).toContain('跳过门禁');
+      if (expectGate) {
+        expect(result.code, `${changedPath} → 触发: ${result.stdout}\n${result.stderr}`).toBe(1);
+        expect(result.stdout, `${changedPath} 应提示 node_modules 缺失`).toContain('node_modules 缺失');
+        expect(result.stdout, `${changedPath}: 应触发门禁，不得跳过`).not.toContain('跳过门禁');
+      } else {
+        expect(result.code, `${changedPath} → 不触发: ${result.stdout}\n${result.stderr}`).toBe(0);
+        expect(result.stdout, `${changedPath}: 不在触发面，应跳过门禁`).toContain('跳过门禁');
+      }
     }
-  });
+  }, 180_000);
 
   // F-G5-05（audit-fixes task 7）：quotePath flag 源级断言。git mock 按参数子串分派，
   // flag 丢失不会被任何行为断言发现，故直接对 hook 源码断言（源级模式参照 audit skip
@@ -1204,26 +1212,39 @@ describe('pre-push audit skip boundary', () => {
     expect(source).not.toMatch(/ensure-platform-deps\.sh[^\n]*--install/);
   });
 
-  it.each(['network', 'unsupported', 'socket-hangup', 'http-503', 'errno-network', 'e5xx-code'] as const)(
-    'skips an explicit %s audit failure',
-    async (auditCase) => {
+  it('skips an explicit transient audit failure（6 形态：network/unsupported/socket-hangup/http-503/errno-network/e5xx-code）', async () => {
+    for (const auditCase of [
+      'network',
+      'unsupported',
+      'socket-hangup',
+      'http-503',
+      'errno-network',
+      'e5xx-code',
+    ] as const) {
       const result = await simulatedPrePushAudit(auditCase);
 
-      expect(result.code, `${result.stdout}\\n${result.stderr}`).toBe(0);
-      expect(result.stdout).toContain('跳过（不阻断）');
-    },
-  );
+      expect(result.code, `auditCase=${auditCase} 应跳过（不阻断）\n${result.stdout}\n${result.stderr}`).toBe(0);
+      expect(result.stdout, `auditCase=${auditCase} 应含「跳过（不阻断）」`).toContain('跳过（不阻断）');
+    }
+  }, 180_000);
 
-  it.each(['network-text', 'networking', 'endpoint', 'mixed-error', 'vulnerability', 'json', 'permission'] as const)(
-    'blocks an audit %s failure',
-    async (auditCase) => {
+  it('blocks an audit non-transient failure（7 形态：network-text/networking/endpoint/mixed-error/vulnerability/json/permission）', async () => {
+    for (const auditCase of [
+      'network-text',
+      'networking',
+      'endpoint',
+      'mixed-error',
+      'vulnerability',
+      'json',
+      'permission',
+    ] as const) {
       const result = await simulatedPrePushAudit(auditCase);
 
-      expect(result.code).toBe(1);
-      expect(result.stdout).not.toContain('跳过（不阻断）');
-      expect(result.stdout).toContain('npm audit');
-    },
-  );
+      expect(result.code, `auditCase=${auditCase} 应阻断\n${result.stdout}\n${result.stderr}`).toBe(1);
+      expect(result.stdout, `auditCase=${auditCase} 不应跳过`).not.toContain('跳过（不阻断）');
+      expect(result.stdout, `auditCase=${auditCase} 应含 npm audit`).toContain('npm audit');
+    }
+  }, 180_000);
 
   // 20 行表驱动边界样例（review2-fixes task 5 建库 18 行 + audit-fixes task 7
   // F-G5-01 增 2 行）：每行 = 一段假想 npm audit 输出 + 期望
@@ -1306,18 +1327,20 @@ describe('pre-push audit skip boundary', () => {
     },
   ];
 
-  it.each(auditBoundaryRows)('audit skip boundary: $label', async ({ auditCase, expectSkip }) => {
-    const result = await simulatedPrePushAudit(auditCase);
+  it('audit skip boundary: 20 行表驱动边界样例（skip 行与 blocking 行 mock 退出码同为 1，仅 audit_can_skip 判定分派）', async () => {
+    for (const { label, auditCase, expectSkip } of auditBoundaryRows) {
+      const result = await simulatedPrePushAudit(auditCase);
 
-    if (expectSkip) {
-      expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(0);
-      expect(result.stdout).toContain('跳过（不阻断）');
-    } else {
-      expect(result.code, `${result.stdout}\n${result.stderr}`).toBe(1);
-      expect(result.stdout).not.toContain('跳过（不阻断）');
-      expect(result.stdout).toContain('npm audit');
+      if (expectSkip) {
+        expect(result.code, `${label}: ${result.stdout}\n${result.stderr}`).toBe(0);
+        expect(result.stdout, `${label} 应含「跳过（不阻断）」`).toContain('跳过（不阻断）');
+      } else {
+        expect(result.code, `${label}: ${result.stdout}\n${result.stderr}`).toBe(1);
+        expect(result.stdout, `${label} 不应跳过`).not.toContain('跳过（不阻断）');
+        expect(result.stdout, `${label} 应含 npm audit`).toContain('npm audit');
+      }
     }
-  });
+  }, 300_000);
 });
 
 describe('pre-push evidence lifecycle', () => {

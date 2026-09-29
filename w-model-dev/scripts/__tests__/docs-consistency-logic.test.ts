@@ -312,7 +312,7 @@ describe('R10 七来源 source×clause 维护契约', () => {
     }
   });
 
-  it.each(sourceNames)('%s 的每条 R10 clause mutation 均产生明确 violation', (sourceName) => {
+  it('每条 R10 clause mutation 均产生明确 violation（7 source 全源变异）', () => {
     const clauseMutations: Array<[string, RegExp]> = [
       ['canonical-name', /^<r10-contract id="canonical-name"[^\n]*\n?/m],
       ['threshold', /^<r10-contract id="threshold"[^\n]*\n?/m],
@@ -322,53 +322,59 @@ describe('R10 七来源 source×clause 维护契约', () => {
       ['canonical-duplicate', /^<r10-contract id="canonical-duplicate"[^\n]*\n?/m],
       ['legacy-duplicate', /^<r10-contract id="legacy-duplicate"[^\n]*\n?/m],
     ];
-    for (const [clauseName, mutation] of clauseMutations) {
-      const mutated = R10_CONTRACT_FIXTURE.replace(mutation, '');
+    for (const sourceName of sourceNames) {
+      for (const [clauseName, mutation] of clauseMutations) {
+        const mutated = R10_CONTRACT_FIXTURE.replace(mutation, '');
+        const sources = Object.fromEntries(sourceNames.map((name) => [name, R10_CONTRACT_FIXTURE])) as Record<
+          (typeof sourceNames)[number],
+          string
+        >;
+        const mutatedSources = replaceSource(sources, sourceName, mutated);
+        const violations = checkRootCauseR10Contract(mutatedSources);
+        expect(
+          violations.some(
+            (violation) =>
+              violation.check === 'rootcause-r10-contract' &&
+              violation.message.includes(sourceLabel(sourceName)) &&
+              violation.message.includes(clauseName),
+          ),
+          `${sourceName} / ${clauseName} must fail closed`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('R10 clause 反向/否定语义 fail-closed（7 clause）', () => {
+    const cases = [
+      ['canonical-name', 'canonical is not testing-reality-checker'],
+      ['threshold', 'testing-reality-checker confidence is not required to be >= 0.5'],
+      ['legacy-fallback', 'legacy reality-checker is fallback, but canonical is not absent'],
+      ['same-artifact-dedupe', 'same artifact legacy-first and counted twice'],
+      ['cross-artifact-conflict', 'different artifact conflict is allowed'],
+      ['canonical-duplicate', 'canonical > 1 duplicate is allowed'],
+      ['legacy-duplicate', 'legacy > 1 duplicate is allowed'],
+    ] as const;
+    for (const [clauseName, mutation] of cases) {
       const sources = Object.fromEntries(sourceNames.map((name) => [name, R10_CONTRACT_FIXTURE])) as Record<
         (typeof sourceNames)[number],
         string
       >;
-      const mutatedSources = replaceSource(sources, sourceName, mutated);
+      const mutatedFixture = R10_CONTRACT_FIXTURE.split('\n')
+        .map((line) =>
+          line.includes(`<r10-contract id="${clauseName}"`)
+            ? line.slice(0, line.indexOf('>') + 1) + mutation + '</r10-contract>'
+            : line,
+        )
+        .join('\n');
+      const mutatedSources = replaceSource(sources, 'authoritySpec', mutatedFixture);
       const violations = checkRootCauseR10Contract(mutatedSources);
       expect(
         violations.some(
-          (violation) =>
-            violation.check === 'rootcause-r10-contract' &&
-            violation.message.includes(sourceLabel(sourceName)) &&
-            violation.message.includes(clauseName),
+          (violation) => violation.message.includes('authority-spec') && violation.message.includes(clauseName),
         ),
-        `${sourceName} / ${clauseName} must fail closed`,
+        `${clauseName} 反向语义应 fail-closed`,
       ).toBe(true);
     }
-  });
-
-  it.each([
-    ['canonical-name', 'canonical is not testing-reality-checker'],
-    ['threshold', 'testing-reality-checker confidence is not required to be >= 0.5'],
-    ['legacy-fallback', 'legacy reality-checker is fallback, but canonical is not absent'],
-    ['same-artifact-dedupe', 'same artifact legacy-first and counted twice'],
-    ['cross-artifact-conflict', 'different artifact conflict is allowed'],
-    ['canonical-duplicate', 'canonical > 1 duplicate is allowed'],
-    ['legacy-duplicate', 'legacy > 1 duplicate is allowed'],
-  ])('%s 的反向/否定语义 fail-closed', (clauseName, mutation) => {
-    const sources = Object.fromEntries(sourceNames.map((name) => [name, R10_CONTRACT_FIXTURE])) as Record<
-      (typeof sourceNames)[number],
-      string
-    >;
-    const mutatedFixture = R10_CONTRACT_FIXTURE.split('\n')
-      .map((line) =>
-        line.includes(`<r10-contract id="${clauseName}"`)
-          ? line.slice(0, line.indexOf('>') + 1) + mutation + '</r10-contract>'
-          : line,
-      )
-      .join('\n');
-    const mutatedSources = replaceSource(sources, 'authoritySpec', mutatedFixture);
-    const violations = checkRootCauseR10Contract(mutatedSources);
-    expect(
-      violations.some(
-        (violation) => violation.message.includes('authority-spec') && violation.message.includes(clauseName),
-      ),
-    ).toBe(true);
   });
 
   it('结构化宿主之外的 quoted/comment/fenced/example/context bypass 一律 fail-closed', () => {
@@ -728,9 +734,8 @@ describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
 
   // 明确句式契约：每项仅注入一个错误断言；不试图理解清单外的自然语言语义。
   // 保持与逻辑中的具名清单一一对应，防止新增禁止句式时遗漏隔离回归测试。
-  it.each(A4_FORBIDDEN_AUTOMATIC_INSTALL_PATTERNS)(
-    '拒绝隔离的自动安装禁止句式：$description',
-    ({ description: forbiddenStatement }) => {
+  it('拒绝隔离的自动安装禁止句式（具名清单全量，a4-platform-repair）', () => {
+    for (const { description: forbiddenStatement } of A4_FORBIDDEN_AUTOMATIC_INSTALL_PATTERNS) {
       const violations = runDocConsistencyChecks(
         baseInput({
           a4Docs: {
@@ -744,15 +749,15 @@ describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
         }),
       );
 
-      expect(violations.some((x) => x.check === 'a4-platform-repair' && x.message.includes('troubleshooting.md'))).toBe(
-        true,
-      );
-    },
-  );
+      expect(
+        violations.some((x) => x.check === 'a4-platform-repair' && x.message.includes('troubleshooting.md')),
+        `${forbiddenStatement} 应报 a4-platform-repair`,
+      ).toBe(true);
+    }
+  });
 
-  it.each(A4_FORBIDDEN_MTIME_SAFETY_CLAIM_PATTERNS)(
-    '拒绝隔离的 mtime 错误安全主张：$description',
-    ({ description: forbiddenStatement }) => {
+  it('拒绝隔离的 mtime 错误安全主张（具名清单全量，a4-state-lock）', () => {
+    for (const { description: forbiddenStatement } of A4_FORBIDDEN_MTIME_SAFETY_CLAIM_PATTERNS) {
       const violations = runDocConsistencyChecks(
         baseInput({
           a4Docs: {
@@ -766,11 +771,12 @@ describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
         }),
       );
 
-      expect(violations.some((x) => x.check === 'a4-state-lock' && x.message.includes('command-reference.md'))).toBe(
-        true,
-      );
-    },
-  );
+      expect(
+        violations.some((x) => x.check === 'a4-state-lock' && x.message.includes('command-reference.md')),
+        `${forbiddenStatement} 应报 a4-state-lock`,
+      ).toBe(true);
+    }
+  });
 
   it('允许人工 npm install 与 mtime 锁内版本检测的正确契约', () => {
     const violations = runDocConsistencyChecks(
@@ -794,186 +800,224 @@ describe('A4 状态锁、平台修复与 batch B 边界契约', () => {
 });
 
 describe('runDocConsistencyChecks', () => {
-  it('SSoT 三边界架构契约缺失 → 违规', () => {
-    const input = baseInput({
-      ssot: baseInput().ssot.replace('subgraph Tools[可选外部工具]\n', ''),
-    });
-    const violations = runDocConsistencyChecks(input);
-    expect(violations.some((x) => x.check === 'architecture-boundaries' && x.message.includes('三边界'))).toBe(true);
+  it('文档漂移检测矩阵·单断言族（21 态：变异一份文档 → 具名 check 命中）', () => {
+    const cases: { label: string; overrides: Partial<DocConsistencyInput>; check: string; markers: string[] }[] = [
+      {
+        label: 'SSoT 三边界架构契约缺失',
+        overrides: { ssot: baseInput().ssot.replace('subgraph Tools[可选外部工具]\n', '') },
+        check: 'architecture-boundaries',
+        markers: ['三边界'],
+      },
+      {
+        label: 'schema 清单缺行',
+        overrides: { dataModels: '### Schema 清单（21 份）\n| `verifier-output` | ... |' },
+        check: 'schema-list',
+        markers: ['iceberg-sweep.schema.json'],
+      },
+      {
+        label: 'schema 清单标题份数不符',
+        overrides: {
+          dataModels:
+            '### Schema 清单（19 份）\n| `verifier-output` | ... |\n| `run-log` | ... |\n| `iceberg-sweep` | ... |',
+        },
+        check: 'schema-list',
+        markers: ['5 份'],
+      },
+      {
+        label: 'run-log action 枚举长度非 30',
+        overrides: { runLogSchema: JSON.stringify({ properties: { action: { enum: ['a', 'b'] } } }) },
+        check: 'run-log-action',
+        markers: ['30'],
+      },
+      {
+        label: 'data-models run-log 行非 30 类',
+        overrides: { dataModels: '### Schema 清单（21 份）\n| `run-log` | ... | action enum（15 类） |' },
+        check: 'run-log-action',
+        markers: ['30 类'],
+      },
+      {
+        label: 'targetKind 废弃标记残留',
+        overrides: { commandReference: 'targetKind=file 路由 code-reviewer' },
+        check: 'targetkind',
+        markers: ['targetKind=file'],
+      },
+      {
+        label: 'README 残留 5 维度 DoD',
+        overrides: { readme: '5 维度（功能 / 质量 / 测试 / 文档 / 部署）' },
+        check: 'dod',
+        markers: ['5 维度'],
+      },
+      {
+        label: 'quick-self-check 缺七维度标题',
+        overrides: { definitionOfDone: '## 五维度标准' },
+        check: 'dod',
+        markers: ['七维度标准'],
+      },
+      {
+        label: 'README 缺 8 条操作行为',
+        overrides: { readme: '6 条核心操作行为' },
+        check: 'operating-behaviors',
+        markers: [],
+      },
+      {
+        label: 'SKILL.md 操作行为表缺第 8 行内容',
+        overrides: { operationBehaviors: '## 八条操作行为' },
+        check: 'operating-behaviors',
+        markers: ['Structure Over Persuasion'],
+      },
+      {
+        label: 'SKILL.md 内联八条操作行为完整表（已移入 references）',
+        overrides: {
+          skill:
+            '---\nname: w-model-dev\nversion: 41.11.0\n---\n### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
+        },
+        check: 'operating-behaviors',
+        markers: ['不应再内联'],
+      },
+      {
+        label: 'SKILL.md 缺操作行为指针',
+        overrides: { skill: '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 核心操作行为\n（无指针）' },
+        check: 'operating-behaviors',
+        markers: ['operation-behaviors.md'],
+      },
+      {
+        label: '硬约束编号缺失',
+        overrides: {
+          hardConstraints: Array.from({ length: 13 }, (_, i) => `## #${i + 1} 约束${i + 1}标题`).join('\n'),
+        },
+        check: 'hard-constraints',
+        markers: ['## #14'],
+      },
+      {
+        label: '硬约束编号超出',
+        overrides: {
+          hardConstraints: Array.from({ length: 15 }, (_, i) => `## #${i + 1} 约束${i + 1}标题`).join('\n'),
+        },
+        check: 'hard-constraints',
+        markers: ['#15'],
+      },
+      {
+        label: 'SKILL.md 缺硬约束指针',
+        overrides: { skill: '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 不可违反的约束\n（无指针）' },
+        check: 'hard-constraints',
+        markers: ['hard-constraints.md'],
+      },
+      {
+        label: 'SSoT §4A.1 缺权威标题',
+        overrides: {
+          ssot: [
+            '8 条核心操作行为',
+            '每次变更的日常标准（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）',
+            '| **签名链完整性** | ... |',
+          ].join('\n'),
+        },
+        check: 'operating-behaviors',
+        markers: ['权威标题'],
+      },
+      {
+        label: 'SSoT §4A.1 标题仍为七条（过时守卫）',
+        overrides: { ssot: '### 4A.1 七条核心操作行为' },
+        check: 'operating-behaviors',
+        markers: ['七条核心操作行为'],
+      },
+      {
+        label: '| 48 | 被错放主清单表外（检测信号表，归属盲区修复）',
+        overrides: {
+          antiPatterns:
+            '反模式清单（#1~#48；\n## 反模式清单\n| # | 反模式（不要做） | 危害 | 正确做法 |\n| 47 | 大规模重构式改动 | ... |\n### 命中高发阶段\n| 阶段 | 高发反模式编号 |\n### 检测信号与回退命令\n| # | 检测信号 | 命中后回退命令 |\n| 48 | 子代理越界实施 | 回退当前阶段起点 |',
+        },
+        check: 'anti-patterns',
+        markers: ['48', '主清单表区间之外'],
+      },
+      {
+        label: '| 48 | 缺主清单表头（仅在其他表出现）',
+        overrides: {
+          antiPatterns:
+            '反模式清单（#1~#48；\n### 检测信号与回退命令\n| # | 检测信号 | 命中后回退命令 |\n| 48 | 子代理越界实施 | 回退当前阶段起点 |',
+        },
+        check: 'anti-patterns',
+        markers: ['主清单表最大编号应为 48'],
+      },
+      {
+        label: 'pre-push 编号最大值非 19',
+        overrides: { prePush: '# 13. npm audit\n# 与原 CI 一致：13 项检查' },
+        check: 'pre-push',
+        markers: ['19'],
+      },
+      {
+        label: 'glossary 缺逐值列表行（F-G7-05）',
+        overrides: {
+          glossary:
+            '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 30 值，以 `run-log.schema.json` 为准）\n其余文本',
+        },
+        check: 'glossary-action',
+        markers: ['逐值列表行'],
+      },
+    ];
+    for (const c of cases) {
+      const violations = runDocConsistencyChecks(baseInput(c.overrides));
+      expect(
+        violations.some((x) => x.check === c.check && c.markers.every((m) => x.message.includes(m))),
+        `${c.label} 应报 ${c.check}${c.markers.length > 0 ? `（含 ${c.markers.join(' + ')}）` : ''}`,
+      ).toBe(true);
+    }
   });
 
-  it('schema 清单缺行 → 违规', () => {
-    const input = baseInput({
-      dataModels: '### Schema 清单（21 份）\n| `verifier-output` | ... |',
-    });
-    const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'schema-list' && x.message.includes('iceberg-sweep.schema.json'))).toBe(true);
-  });
-
-  it('schema 清单标题份数不符 → 违规', () => {
-    const input = baseInput({
-      dataModels:
-        '### Schema 清单（19 份）\n| `verifier-output` | ... |\n| `run-log` | ... |\n| `iceberg-sweep` | ... |',
-    });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'schema-list' && x.message.includes('5 份'))).toBe(
-      true,
-    );
-  });
-
-  it('run-log action 枚举长度非 30 → 违规', () => {
-    const input = baseInput({
-      runLogSchema: JSON.stringify({
-        properties: { action: { enum: ['a', 'b'] } },
-      }),
-    });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'run-log-action' && x.message.includes('30'))).toBe(
-      true,
-    );
-  });
-
-  it('data-models run-log 行非 30 类 → 违规', () => {
-    const input = baseInput({
-      dataModels: '### Schema 清单（21 份）\n| `run-log` | ... | action enum（15 类） |',
-    });
-    expect(
-      runDocConsistencyChecks(input).some((x) => x.check === 'run-log-action' && x.message.includes('30 类')),
-    ).toBe(true);
-  });
-
-  it('targetKind 废弃标记残留 → 违规', () => {
-    const input = baseInput({
-      commandReference: 'targetKind=file 路由 code-reviewer',
-    });
-    expect(
-      runDocConsistencyChecks(input).some((x) => x.check === 'targetkind' && x.message.includes('targetKind=file')),
-    ).toBe(true);
-  });
-
-  it('README 残留 5 维度 DoD → 违规', () => {
-    const input = baseInput({
-      readme: '5 维度（功能 / 质量 / 测试 / 文档 / 部署）',
-    });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'dod' && x.message.includes('5 维度'))).toBe(true);
-  });
-
-  it('quick-self-check 缺七维度标题 → 违规', () => {
-    const input = baseInput({ definitionOfDone: '## 五维度标准' });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'dod' && x.message.includes('七维度标准'))).toBe(
-      true,
-    );
-  });
-
-  it('README 缺 8 条操作行为 → 违规', () => {
-    const input = baseInput({ readme: '6 条核心操作行为' });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'operating-behaviors')).toBe(true);
-  });
-
-  it('SKILL.md 操作行为表缺第 8 行内容 → 违规', () => {
-    const input = baseInput({ operationBehaviors: '## 八条操作行为' });
-    expect(
-      runDocConsistencyChecks(input).some(
-        (x) => x.check === 'operating-behaviors' && x.message.includes('Structure Over Persuasion'),
-      ),
-    ).toBe(true);
-  });
-
-  it('SKILL.md 内联八条操作行为完整表 → 违规（已移入 references）', () => {
-    const input = baseInput({
-      skill:
-        '---\nname: w-model-dev\nversion: 41.11.0\n---\n### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
-    });
-    expect(
-      runDocConsistencyChecks(input).some((x) => x.check === 'operating-behaviors' && x.message.includes('不应再内联')),
-    ).toBe(true);
-  });
-
-  it('SKILL.md 缺操作行为指针 → 违规', () => {
-    const input = baseInput({
-      skill: '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 核心操作行为\n（无指针）',
-    });
-    expect(
-      runDocConsistencyChecks(input).some(
-        (x) => x.check === 'operating-behaviors' && x.message.includes('operation-behaviors.md'),
-      ),
-    ).toBe(true);
-  });
-
-  it('硬约束编号缺失 → 违规', () => {
-    const input = baseInput({
-      hardConstraints: Array.from({ length: 13 }, (_, i) => `## #${i + 1} 约束${i + 1}标题`).join('\n'),
-    });
-    const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'hard-constraints' && x.message.includes('## #14'))).toBe(true);
-  });
-
-  it('硬约束编号超出 → 违规', () => {
-    const input = baseInput({
-      hardConstraints: Array.from({ length: 15 }, (_, i) => `## #${i + 1} 约束${i + 1}标题`).join('\n'),
-    });
-    const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'hard-constraints' && x.message.includes('#15'))).toBe(true);
-  });
-
-  it('SKILL.md 缺硬约束指针 → 违规', () => {
-    const input = baseInput({
-      skill: '---\nname: w-model-dev\nversion: 41.11.0\n---\n## 不可违反的约束\n（无指针）',
-    });
-    expect(
-      runDocConsistencyChecks(input).some(
-        (x) => x.check === 'hard-constraints' && x.message.includes('hard-constraints.md'),
-      ),
-    ).toBe(true);
-  });
-
-  it('SSoT §4A.1 缺权威标题 → 违规', () => {
-    const input = baseInput({
-      ssot: [
-        '8 条核心操作行为',
-        '每次变更的日常标准（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）',
-        '| **签名链完整性** | ... |',
-      ].join('\n'),
-    });
-    expect(
-      runDocConsistencyChecks(input).some((x) => x.check === 'operating-behaviors' && x.message.includes('权威标题')),
-    ).toBe(true);
-  });
-
-  it('SSoT §4A.1 标题仍为七条 → 违规（过时守卫）', () => {
-    const input = baseInput({ ssot: '### 4A.1 七条核心操作行为' });
-    expect(
-      runDocConsistencyChecks(input).some(
-        (x) => x.check === 'operating-behaviors' && x.message.includes('七条核心操作行为'),
-      ),
-    ).toBe(true);
-  });
-
-  it('反模式最大编号非 46 / 旧区间残留 → 违规', () => {
-    const input = baseInput({
-      antiPatterns: '反模式清单（#1~#29；\n| 43 | ... |',
-    });
-    const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('48'))).toBe(true);
-    expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('#1~#29'))).toBe(true);
-  });
-
-  it('| 48 | 被错放主清单表外（检测信号表）→ 违规（归属盲区修复）', () => {
-    const input = baseInput({
-      antiPatterns:
-        '反模式清单（#1~#48；\n## 反模式清单\n| # | 反模式（不要做） | 危害 | 正确做法 |\n| 47 | 大规模重构式改动 | ... |\n### 命中高发阶段\n| 阶段 | 高发反模式编号 |\n### 检测信号与回退命令\n| # | 检测信号 | 命中后回退命令 |\n| 48 | 子代理越界实施 | 回退当前阶段起点 |',
-    });
-    const v = runDocConsistencyChecks(input);
-    expect(
-      v.some((x) => x.check === 'anti-patterns' && x.message.includes('48') && x.message.includes('主清单表区间之外')),
-    ).toBe(true);
-  });
-
-  it('| 48 | 缺主清单表头（仅在其他表出现）→ 违规', () => {
-    const input = baseInput({
-      antiPatterns:
-        '反模式清单（#1~#48；\n### 检测信号与回退命令\n| # | 检测信号 | 命中后回退命令 |\n| 48 | 子代理越界实施 | 回退当前阶段起点 |',
-    });
-    const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'anti-patterns' && x.message.includes('主清单表最大编号应为 48'))).toBe(true);
+  it('文档漂移检测矩阵·多断言族（3 态：反模式区间 / pre-push 伪造连续块 / pre-push 编号断档）', () => {
+    const cases: {
+      label: string;
+      overrides: Partial<DocConsistencyInput>;
+      verify: (v: ReturnType<typeof runDocConsistencyChecks>) => void;
+    }[] = [
+      {
+        label: '反模式最大编号非 46 / 旧区间残留',
+        overrides: { antiPatterns: '反模式清单（#1~#29；\n| 43 | ... |' },
+        verify: (v) => {
+          expect(
+            v.some((x) => x.check === 'anti-patterns' && x.message.includes('48')),
+            '反模式最大编号应报 48',
+          ).toBe(true);
+          expect(
+            v.some((x) => x.check === 'anti-patterns' && x.message.includes('#1~#29')),
+            '旧区间残留应报 #1~#29',
+          ).toBe(true);
+        },
+      },
+      {
+        label: 'pre-push 伪造 3 块检查（F-G7-08：连续块断言，非仅最大编号）',
+        overrides: {
+          prePush: ['# 1. self-test', '# 2. check:verifier', '# 19. typecheck', '# 全部门禁共 19 项检查'].join('\n'),
+        },
+        verify: (v) => {
+          const hit = v.filter((x) => x.check === 'pre-push');
+          expect(hit.length, 'pre-push 伪造应命中').toBeGreaterThan(0);
+          expect(
+            hit.some((x) => x.message.includes('连续 #1..#19') && x.message.includes('实测 3 块')),
+            '伪造连续块应报「连续 #1..#19 + 实测 3 块」',
+          ).toBe(true);
+        },
+      },
+      {
+        label: 'pre-push 中间删除一块（编号断档）',
+        overrides: {
+          prePush: [
+            ...Array.from({ length: EXPECTED.prePushCount }, (_, i) => i + 1)
+              .filter((n) => n !== 9)
+              .map((n) => `# ${n}. 第 ${n} 项`),
+            `# 全部门禁共 ${EXPECTED.prePushCount} 项检查`,
+          ].join('\n'),
+        },
+        verify: (v) => {
+          expect(
+            v.some((x) => x.check === 'pre-push' && x.message.includes(`实测 ${EXPECTED.prePushCount - 1} 块`)),
+            '编号断档应报实测块数不足',
+          ).toBe(true);
+        },
+      },
+    ];
+    for (const c of cases) {
+      c.verify(runDocConsistencyChecks(baseInput(c.overrides)));
+    }
   });
 
   it('exit-2 脚本数声明 31 实测 29 → 违规；AGENTS 残留 29 → 过时违规', () => {
@@ -986,31 +1030,6 @@ describe('runDocConsistencyChecks', () => {
     expect(vStale.some((x) => x.check === 'exit2-scripts' && x.message.includes('仍含过时「29 个脚本」'))).toBe(true);
   });
 
-  it('pre-push 编号最大值非 19 → 违规', () => {
-    const input = baseInput({
-      prePush: '# 13. npm audit\n# 与原 CI 一致：13 项检查',
-    });
-    const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'pre-push' && x.message.includes('19'))).toBe(true);
-  });
-
-  it('pre-push 伪造 3 块检查（# 1./# 2./# 19.）→ 违规（F-G7-08：连续块断言，非仅最大编号）', () => {
-    const forged = ['# 1. self-test', '# 2. check:verifier', '# 19. typecheck', '# 全部门禁共 19 项检查'].join('\n');
-    const v = runDocConsistencyChecks(baseInput({ prePush: forged }));
-    const hit = v.filter((x) => x.check === 'pre-push');
-    expect(hit.length).toBeGreaterThan(0);
-    expect(hit.some((x) => x.message.includes('连续 #1..#19') && x.message.includes('实测 3 块'))).toBe(true);
-  });
-
-  it('pre-push 中间删除一块（编号断档）→ 违规', () => {
-    const ids = Array.from({ length: EXPECTED.prePushCount }, (_, i) => i + 1).filter((n) => n !== 9);
-    const text = [...ids.map((n) => `# ${n}. 第 ${n} 项`), `# 全部门禁共 ${EXPECTED.prePushCount} 项检查`].join('\n');
-    const v = runDocConsistencyChecks(baseInput({ prePush: text }));
-    expect(v.some((x) => x.check === 'pre-push' && x.message.includes(`实测 ${EXPECTED.prePushCount - 1} 块`))).toBe(
-      true,
-    );
-  });
-
   it('glossary action 列表与 schema enum 漂移（缺值/多值）→ 违规（F-G7-05 逐值断言）', () => {
     const drift = CONVENTIONS_GLOSSARY.replace('`gate` / `tla-gate`', '`gate`').replace(
       '`plan_review`。',
@@ -1021,13 +1040,6 @@ describe('runDocConsistencyChecks', () => {
     expect(hit).toBeDefined();
     expect(hit?.message).toContain('tla-gate');
     expect(hit?.message).toContain('ghost-action');
-  });
-
-  it('glossary 缺逐值列表行 → 违规（F-G7-05）', () => {
-    const noList =
-      '### action（RunLogEntry）\n- **规范定义**：run-log 动作类型枚举（共 30 值，以 `run-log.schema.json` 为准）\n其余文本';
-    const v = runDocConsistencyChecks(baseInput({ glossary: noList }));
-    expect(v.some((x) => x.check === 'glossary-action' && x.message.includes('逐值列表行'))).toBe(true);
   });
 
   it('conventions exit-2 计数句：算术不符 / 与实测不符 / 缺计数句 → 违规（F-G7-04）', () => {
@@ -1799,29 +1811,35 @@ describe('runDocConsistencyChecks', () => {
     });
   }, 120_000);
 
-  it.each([
-    ['missing run identity', { vitestRunId: '' }],
-    ['invalid run identity', { vitestRunId: 'run identity with spaces' }],
-    ['absolute artifact identity', { vitestArtifactId: 'D:/temp/results.json' }],
-    ['traversing artifact identity', { vitestArtifactId: 'vitest/../results.json' }],
-    ['invalid commit SHA', { vitestCommitSha: 'a'.repeat(39) }],
-    ['invalid content hash', { vitestArtifactSha256: 'b'.repeat(63) }],
-  ])('成功测量的 %s 必须 fail-closed', (_caseName, invalidField) => {
-    const report = buildDocConsistencyReport(
-      baseInput({
-        vitestMeasurementsValid: true,
-        vitestMeasurementsReason: undefined,
-        vitestPassedCount: 915,
-        vitestFailedCount: 0,
-        vitestSuccess: true,
-        vitestRunId: 'a'.repeat(16),
-        vitestArtifactId: 'vitest/results.json',
-        vitestArtifactSha256: 'b'.repeat(64),
-        vitestCommitSha: 'c'.repeat(40),
-        ...invalidField,
-      }),
-    );
-    expect(report.violations.some((violation) => violation.check === 'vitest-results')).toBe(true);
+  it('成功测量的非法形态必须 fail-closed（6 态：run identity/artifact identity/commit SHA/content hash）', () => {
+    const cases = [
+      ['missing run identity', { vitestRunId: '' }],
+      ['invalid run identity', { vitestRunId: 'run identity with spaces' }],
+      ['absolute artifact identity', { vitestArtifactId: 'D:/temp/results.json' }],
+      ['traversing artifact identity', { vitestArtifactId: 'vitest/../results.json' }],
+      ['invalid commit SHA', { vitestCommitSha: 'a'.repeat(39) }],
+      ['invalid content hash', { vitestArtifactSha256: 'b'.repeat(63) }],
+    ] as const;
+    for (const [caseName, invalidField] of cases) {
+      const report = buildDocConsistencyReport(
+        baseInput({
+          vitestMeasurementsValid: true,
+          vitestMeasurementsReason: undefined,
+          vitestPassedCount: 915,
+          vitestFailedCount: 0,
+          vitestSuccess: true,
+          vitestRunId: 'a'.repeat(16),
+          vitestArtifactId: 'vitest/results.json',
+          vitestArtifactSha256: 'b'.repeat(64),
+          vitestCommitSha: 'c'.repeat(40),
+          ...invalidField,
+        }),
+      );
+      expect(
+        report.violations.some((violation) => violation.check === 'vitest-results'),
+        `${caseName} 测量非法应 fail-closed（vitest-results）`,
+      ).toBe(true);
+    }
   });
 
   it('成功 JSON 报告绑定同一相对 artifact identity/hash，且不暴露本机路径', async () => {
@@ -2231,19 +2249,32 @@ describe('runDocConsistencyChecks', () => {
     expect(runDocConsistencyChecks(input).filter((x) => x.check === 'vitest-tests')).toEqual([]);
   });
 
-  it('PR 模板含过期门禁项数（14 项）→ pre-push 违规', () => {
-    const input = baseInput({
-      prTemplate: '- [ ] `npm run prepush` 14 项通过',
-    });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'pre-push');
-    expect(v.some((x) => x.message.includes('PULL_REQUEST_TEMPLATE') && x.message.includes('14 项'))).toBe(true);
-  });
-
-  it('PR 模板项数与 EXPECTED 一致 → 零 pre-push 违规', () => {
-    const input = baseInput({
-      prTemplate: `- [ ] \`npm run prepush\` ${EXPECTED.prePushCount} 项通过`,
-    });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'pre-push')).toBe(false);
+  it('PR 模板门禁项数（2 态：过期 14 项 / 与 EXPECTED 一致）', () => {
+    const cases = [
+      {
+        label: 'PR 模板含过期门禁项数（14 项）',
+        prTemplate: '- [ ] `npm run prepush` 14 项通过',
+        kind: 'hit' as const,
+        markers: ['PULL_REQUEST_TEMPLATE', '14 项'],
+      },
+      {
+        label: 'PR 模板项数与 EXPECTED 一致',
+        prTemplate: `- [ ] \`npm run prepush\` ${EXPECTED.prePushCount} 项通过`,
+        kind: 'clean' as const,
+        markers: [],
+      },
+    ];
+    for (const c of cases) {
+      const v = runDocConsistencyChecks(baseInput({ prTemplate: c.prTemplate })).filter((x) => x.check === 'pre-push');
+      if (c.kind === 'hit') {
+        expect(
+          v.some((x) => c.markers.every((m) => x.message.includes(m))),
+          `${c.label} 应报 pre-push 违规（含 ${c.markers.join(' + ')}）`,
+        ).toBe(true);
+      } else {
+        expect(v, `${c.label} 应零 pre-push 违规`).toEqual([]);
+      }
+    }
   });
 
   it('vitestExtraDocs / prTemplate 缺省注入 → 跳过检查不产生违规', () => {
@@ -2254,40 +2285,57 @@ describe('runDocConsistencyChecks', () => {
     ).toBe(false);
   });
 
-  it('技能包文档含逃逸链接 → skill-outbound-links 违规', () => {
-    const docs = [
-      {
-        name: 'w-model-dev/references/verifier-spec.md',
-        content: '见 [SKILL.md](../SKILL.md) 与 [SSoT](../../docs/skill-design-document_SSoT.md)。',
-        baseDir: 'references',
-      },
-      {
-        name: 'w-model-dev/SKILL.md',
-        content: '安装路径见 [INSTALL](../docs/INSTALL.md)。',
-        baseDir: '.',
-      },
-    ];
-    const v = checkSkillOutboundLinks(docs);
-    expect(v.length).toBe(2);
-    expect(v.every((x) => x.check === 'skill-outbound-links')).toBe(true);
-    expect(v[0]!.message).toContain('../../docs/skill-design-document_SSoT.md');
-    expect(v[1]!.message).toContain('../docs/INSTALL.md');
-  });
-
-  it('技能包文档仅包内链接 / 外部 URL → 零 skill-outbound-links 违规', () => {
-    const docs = [
-      {
-        name: 'w-model-dev/references/verifier-spec.md',
-        content: '见 [SKILL.md](../SKILL.md) 与 [反模式](hard-constraints.md)；外部 [spec](https://example.com/x.md)。',
-        baseDir: 'references',
-      },
-      {
-        name: 'w-model-dev/scripts/samples/tla-e2e/README.md',
-        content: '运行 [check-tla-model.ts](../../cli/check-tla-model.ts)。',
-        baseDir: 'scripts/samples/tla-e2e',
-      },
-    ];
-    expect(checkSkillOutboundLinks(docs)).toEqual([]);
+  it('skill-outbound-links（2 态对照：逃逸链接违规 / 仅包内链接与外部 URL 零违规）', () => {
+    type PkgDoc = { name: string; content: string; baseDir: string };
+    const cases: { label: string; docs: PkgDoc[]; verify: (v: ReturnType<typeof checkSkillOutboundLinks>) => void }[] =
+      [
+        {
+          label: '技能包文档含逃逸链接',
+          docs: [
+            {
+              name: 'w-model-dev/references/verifier-spec.md',
+              content: '见 [SKILL.md](../SKILL.md) 与 [SSoT](../../docs/skill-design-document_SSoT.md)。',
+              baseDir: 'references',
+            },
+            {
+              name: 'w-model-dev/SKILL.md',
+              content: '安装路径见 [INSTALL](../docs/INSTALL.md)。',
+              baseDir: '.',
+            },
+          ],
+          verify: (v) => {
+            expect(v, '两个逃逸链接各报 1 条').toHaveLength(2);
+            expect(
+              v.every((x) => x.check === 'skill-outbound-links'),
+              '全部为 skill-outbound-links',
+            ).toBe(true);
+            expect(v[0]!.message, '第 1 条应指名 SSoT 逃逸路径').toContain('../../docs/skill-design-document_SSoT.md');
+            expect(v[1]!.message, '第 2 条应指名 INSTALL 逃逸路径').toContain('../docs/INSTALL.md');
+          },
+        },
+        {
+          label: '技能包文档仅包内链接 / 外部 URL',
+          docs: [
+            {
+              name: 'w-model-dev/references/verifier-spec.md',
+              content:
+                '见 [SKILL.md](../SKILL.md) 与 [反模式](hard-constraints.md)；外部 [spec](https://example.com/x.md)。',
+              baseDir: 'references',
+            },
+            {
+              name: 'w-model-dev/scripts/samples/tla-e2e/README.md',
+              content: '运行 [check-tla-model.ts](../../cli/check-tla-model.ts)。',
+              baseDir: 'scripts/samples/tla-e2e',
+            },
+          ],
+          verify: (v) => {
+            expect(v, '包内链接与外部 URL 不应违规').toEqual([]);
+          },
+        },
+      ];
+    for (const c of cases) {
+      c.verify(checkSkillOutboundLinks(c.docs));
+    }
   });
 
   it('skillPkgDocs 注入时经 runDocConsistencyChecks 触发出站链接违规；缺省时跳过', () => {
@@ -2304,68 +2352,128 @@ describe('runDocConsistencyChecks', () => {
     expect(runDocConsistencyChecks(baseInput()).some((x) => x.check === 'skill-outbound-links')).toBe(false);
   });
 
-  it('scripts 有变更且 baseline 缺失 → baseline-sync 违规', () => {
-    const input = baseInput({
-      scriptsChanged: true,
-      securityBaselineEntryCount: -1,
-    });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'baseline-sync');
-    expect(v.length).toBe(1);
-    expect(v[0]!.message).toContain('.eslintsecurity-baseline.json');
+  it('baseline-sync 矩阵（4 态：缺失违规 / 空违规 / 无变更放行 / 非空放行）', () => {
+    const cases: {
+      label: string;
+      scriptsChanged: boolean;
+      entryCount: number;
+      kind: 'hit' | 'clean';
+      marker?: string;
+    }[] = [
+      {
+        label: 'scripts 有变更且 baseline 缺失',
+        scriptsChanged: true,
+        entryCount: -1,
+        kind: 'hit',
+        marker: '.eslintsecurity-baseline.json',
+      },
+      {
+        label: 'scripts 有变更且 baseline 空',
+        scriptsChanged: true,
+        entryCount: 0,
+        kind: 'hit',
+        marker: '指纹条目为空',
+      },
+      { label: 'scripts 无变更即使 baseline 缺失', scriptsChanged: false, entryCount: -1, kind: 'clean' },
+      { label: 'scripts 有变更且 baseline 非空', scriptsChanged: true, entryCount: 42, kind: 'clean' },
+    ];
+    for (const c of cases) {
+      const input = baseInput({ scriptsChanged: c.scriptsChanged, securityBaselineEntryCount: c.entryCount });
+      const v = runDocConsistencyChecks(input).filter((x) => x.check === 'baseline-sync');
+      if (c.kind === 'hit') {
+        expect(v, `${c.label} 应恰 1 条违规`).toHaveLength(1);
+        expect(v[0]!.message, `${c.label} 应指名 ${c.marker}`).toContain(c.marker);
+      } else {
+        expect(v, `${c.label} 应零违规`).toEqual([]);
+      }
+    }
   });
 
-  it('scripts 有变更且 baseline 空 → baseline-sync 违规', () => {
-    const input = baseInput({
-      scriptsChanged: true,
-      securityBaselineEntryCount: 0,
-    });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'baseline-sync');
-    expect(v.length).toBe(1);
-    expect(v[0]!.message).toContain('指纹条目为空');
+  it('version-consistency 一致对照（2 态：七处一致 / CHANGELOG 版本节头一致）', () => {
+    const cases = [
+      { label: '版本七处一致', overrides: {} },
+      { label: 'CHANGELOG.md 版本节头一致', overrides: {} },
+    ] as const;
+    for (const c of cases) {
+      expect(
+        runDocConsistencyChecks(baseInput(c.overrides)).some((x) => x.check === 'version-consistency'),
+        `${c.label} 应零 version-consistency 违规`,
+      ).toBe(false);
+    }
   });
 
-  it('scripts 无变更即使 baseline 缺失 → 无 baseline-sync 违规', () => {
-    const input = baseInput({
-      scriptsChanged: false,
-      securityBaselineEntryCount: -1,
-    });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'baseline-sync')).toBe(false);
-  });
-
-  it('scripts 有变更且 baseline 非空 → 无 baseline-sync 违规', () => {
-    const input = baseInput({
-      scriptsChanged: true,
-      securityBaselineEntryCount: 42,
-    });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'baseline-sync')).toBe(false);
-  });
-
-  it('版本七处一致 → 零 version-consistency 违规', () => {
-    expect(runDocConsistencyChecks(baseInput()).some((x) => x.check === 'version-consistency')).toBe(false);
-  });
-
-  it('README 版本漂移 → 违规', () => {
-    const input = baseInput({
-      readme: '**当前版本**：`41.2.0`\n8 条核心操作行为',
-    });
-    const v = runDocConsistencyChecks(input);
-    expect(
-      v.some((x) => x.check === 'version-consistency' && x.message.includes('README') && x.message.includes('41.2.0')),
-    ).toBe(true);
-  });
-
-  it('package-lock 根 version 漂移 → version-consistency 违规', () => {
-    const input = baseInput({
-      lockJson: JSON.stringify({ name: 'x', version: '41.10.0' }),
-    });
-    const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'version-consistency' && x.message.includes('package-lock.json'))).toBe(true);
-  });
-
-  it('lockJson 缺省注入 → 不产生 package-lock version 违规', () => {
-    const input = baseInput({ lockJson: undefined });
-    const v = runDocConsistencyChecks(input);
-    expect(v.some((x) => x.check === 'version-consistency' && x.message.includes('package-lock.json'))).toBe(false);
+  it('version-consistency 漂移族（8 态：README/package-lock/lockJson 缺省/skill-metadata/SKILL frontmatter/INSTALL/CHANGELOG 缺头/CHANGELOG 漂移）', () => {
+    const cases: {
+      label: string;
+      overrides: Partial<DocConsistencyInput>;
+      kind: 'hit' | 'clean';
+      markers: string[];
+    }[] = [
+      {
+        label: 'README 版本漂移',
+        overrides: { readme: '**当前版本**：`41.2.0`\n8 条核心操作行为' },
+        kind: 'hit',
+        markers: ['README', '41.2.0'],
+      },
+      {
+        label: 'package-lock 根 version 漂移',
+        overrides: { lockJson: JSON.stringify({ name: 'x', version: '41.10.0' }) },
+        kind: 'hit',
+        markers: ['package-lock.json'],
+      },
+      {
+        label: 'lockJson 缺省注入（不产生 package-lock version 违规）',
+        overrides: { lockJson: undefined },
+        kind: 'clean',
+        markers: ['package-lock.json'],
+      },
+      {
+        label: 'skill-metadata.json 版本漂移',
+        overrides: { metaJson: JSON.stringify({ name: 'w-model-dev', version: '42.0.0' }) },
+        kind: 'hit',
+        markers: ['skill-metadata.json'],
+      },
+      {
+        label: 'SKILL.md frontmatter 版本漂移',
+        overrides: {
+          skill:
+            '---\nname: w-model-dev\nversion: 41.0.0\n---\n### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
+        },
+        kind: 'hit',
+        markers: ['SKILL.md frontmatter'],
+      },
+      {
+        label: 'INSTALL.md 激活示例版本漂移',
+        overrides: { installDoc: '## 5. 激活机制\n```yaml\nname: w-model-dev\nversion: 41.0.0\n```' },
+        kind: 'hit',
+        markers: ['INSTALL.md'],
+      },
+      {
+        label: 'CHANGELOG.md 缺版本节头',
+        overrides: { changelog: '# Changelog\n\n- 无版本节头\n' },
+        kind: 'hit',
+        markers: ['CHANGELOG', '41.11.0'],
+      },
+      {
+        label: 'CHANGELOG.md 版本节头漂移',
+        overrides: { changelog: '# Changelog\n\n## [41.10.0] - 2026-08-13\n\n- 旧条目\n' },
+        kind: 'hit',
+        markers: ['CHANGELOG', '41.10.0'],
+      },
+    ];
+    for (const c of cases) {
+      const v = runDocConsistencyChecks(baseInput(c.overrides));
+      const hit = v.some((x) => x.check === 'version-consistency' && c.markers.every((m) => x.message.includes(m)));
+      if (c.kind === 'hit') {
+        expect(hit, `${c.label} 应报 version-consistency（含 ${c.markers.join(' + ')}）`).toBe(true);
+      } else {
+        // 缺省注入的负向断言：不应出现对应文档的 version-consistency 违规
+        expect(
+          v.some((x) => x.check === 'version-consistency' && c.markers.some((m) => x.message.includes(m))),
+          `${c.label} 不应报（含 ${c.markers.join(' + ')}）`,
+        ).toBe(false);
+      }
+    }
   });
 
   it('package.json 为唯一源：其版本漂移导致其余四处报违规（自身不再直接报）', () => {
@@ -2380,38 +2488,6 @@ describe('runDocConsistencyChecks', () => {
     expect(v.some((x) => x.message.includes('package.json'))).toBe(false);
   });
 
-  it('skill-metadata.json 版本漂移 → 违规', () => {
-    const input = baseInput({
-      metaJson: JSON.stringify({ name: 'w-model-dev', version: '42.0.0' }),
-    });
-    expect(
-      runDocConsistencyChecks(input).some(
-        (x) => x.check === 'version-consistency' && x.message.includes('skill-metadata.json'),
-      ),
-    ).toBe(true);
-  });
-
-  it('SKILL.md frontmatter 版本漂移 → 违规', () => {
-    const input = baseInput({
-      skill:
-        '---\nname: w-model-dev\nversion: 41.0.0\n---\n### 八条操作行为\n| 8 | **Structure Over Persuasion** | ...',
-    });
-    expect(
-      runDocConsistencyChecks(input).some(
-        (x) => x.check === 'version-consistency' && x.message.includes('SKILL.md frontmatter'),
-      ),
-    ).toBe(true);
-  });
-
-  it('INSTALL.md 激活示例版本漂移 → 违规', () => {
-    const input = baseInput({
-      installDoc: '## 5. 激活机制\n```yaml\nname: w-model-dev\nversion: 41.0.0\n```',
-    });
-    expect(
-      runDocConsistencyChecks(input).some((x) => x.check === 'version-consistency' && x.message.includes('INSTALL.md')),
-    ).toBe(true);
-  });
-
   it('package.json 不可解析 → 违规（fail loud）', () => {
     const input = baseInput({ pkgJson: 'not-json{' });
     expect(
@@ -2419,131 +2495,134 @@ describe('runDocConsistencyChecks', () => {
     ).toBe(true);
   });
 
-  it('CHANGELOG.md 缺版本节头 → version-consistency 违规', () => {
-    const input = baseInput({ changelog: '# Changelog\n\n- 无版本节头\n' });
-    const v = runDocConsistencyChecks(input);
-    expect(
-      v.some(
-        (x) => x.check === 'version-consistency' && x.message.includes('CHANGELOG') && x.message.includes('41.11.0'),
-      ),
-    ).toBe(true);
+  it('ssot-headings 违规行（2 态：章节号缺号 / 未决占位标题 3.3.x）', () => {
+    const cases: { label: string; ssot: string; marker: string }[] = [
+      {
+        label: 'SSoT 顶层章节号缺号',
+        ssot: ['## 1. 项目概述', '## 2. 理论基础', '## 4. 工作流'].join('\n'),
+        marker: '缺 3',
+      },
+      {
+        label: 'SSoT 未决占位标题（3.3.x）',
+        ssot: '## 3. 技能架构设计\n\n### 3.3.x 外部工具集成\n\n## 4. 技能工作流程',
+        marker: '3.3.x',
+      },
+    ];
+    for (const c of cases) {
+      const v = runDocConsistencyChecks(baseInput({ ssot: c.ssot })).filter((x) => x.check === 'ssot-headings');
+      expect(
+        v.some((x) => x.message.includes(c.marker)),
+        `${c.label} 应报 ssot-headings（含 ${c.marker}）`,
+      ).toBe(true);
+    }
   });
 
-  it('CHANGELOG.md 版本节头漂移 → version-consistency 违规', () => {
-    const input = baseInput({
-      changelog: '# Changelog\n\n## [41.10.0] - 2026-08-13\n\n- 旧条目\n',
-    });
-    const v = runDocConsistencyChecks(input);
-    expect(
-      v.some(
-        (x) => x.check === 'version-consistency' && x.message.includes('CHANGELOG') && x.message.includes('41.10.0'),
-      ),
-    ).toBe(true);
+  it('ssot-headings 通过行（2 态：章节号连续含字母后缀章 / 无编号顶层章守卫跳过）', () => {
+    const cases: { label: string; ssot: string }[] = [
+      {
+        label: 'SSoT 顶层章节号连续（含字母后缀章 4A/10A/10C/11A）',
+        ssot: [
+          ...Array.from({ length: 11 }, (_, i) => `## ${i + 1}. 标题${i + 1}`),
+          '## 4A. 标题4',
+          '## 10A. 标题10',
+          '## 10C. 标题10',
+          '## 11A. 标题11',
+        ].join('\n'),
+      },
+      { label: 'SSoT 无编号顶层章（守卫跳过）', ssot: '### 4A.1 八条核心操作行为\n纯文本无章节号' },
+    ];
+    for (const c of cases) {
+      expect(
+        runDocConsistencyChecks(baseInput({ ssot: c.ssot })).some((x) => x.check === 'ssot-headings'),
+        `${c.label} 应零 ssot-headings 违规`,
+      ).toBe(false);
+    }
   });
 
-  it('CHANGELOG.md 版本节头一致 → 零 version-consistency 违规', () => {
-    const input = baseInput();
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'version-consistency')).toBe(false);
+  it('script-registry 违规行（2 态：dispatch-matrix 漏登记 / SKILL 声明计数不符）', () => {
+    const cases: { label: string; overrides: Partial<DocConsistencyInput>; markers: string[] }[] = [
+      {
+        label: 'dispatch-matrix 漏登记 check-tla-model',
+        overrides: {
+          dispatchMatrix: [
+            '# 分派矩阵',
+            ...CLI_SCRIPT_NAMES.filter((n) => n !== 'check-tla-model').map((n) => `- ${n}`),
+          ].join('\n'),
+        },
+        markers: ['check-tla-model', '未登记'],
+      },
+      {
+        label: 'SKILL.md 声明 .ts 计数与实测不符（43 vs 47）',
+        overrides: { skill: baseInput().skill.replace('（47 个 .ts）', '（43 个 .ts）') },
+        markers: ['43', '47'],
+      },
+    ];
+    for (const c of cases) {
+      const v = runDocConsistencyChecks(baseInput(c.overrides)).filter((x) => x.check === 'script-registry');
+      expect(
+        v.some((x) => c.markers.every((m) => x.message.includes(m))),
+        `${c.label} 应报 script-registry（含 ${c.markers.join(' + ')}）`,
+      ).toBe(true);
+    }
   });
 
-  it('SSoT 顶层章节号连续（含字母后缀章 4A/10C/11A）→ 零 ssot-headings 违规', () => {
-    const lines: string[] = [];
-    for (let n = 1; n <= 11; n++) lines.push(`## ${n}. 标题${n}`);
-    // 字母后缀章归并到基础号，不新增基础号：4A / 10A / 10C / 11A
-    lines.push('## 4A. 标题4', '## 10A. 标题10', '## 10C. 标题10', '## 11A. 标题11');
-    const input = baseInput({ ssot: lines.join('\n') });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'ssot-headings')).toBe(false);
-  });
-
-  it('SSoT 顶层章节号缺号 → ssot-headings 违规', () => {
-    const input = baseInput({
-      ssot: ['## 1. 项目概述', '## 2. 理论基础', '## 4. 工作流'].join('\n'),
-    });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'ssot-headings');
-    expect(v.some((x) => x.message.includes('缺 3'))).toBe(true);
-  });
-
-  it('SSoT 未决占位标题（3.3.x）→ ssot-headings 违规', () => {
-    const input = baseInput({
-      ssot: '## 3. 技能架构设计\n\n### 3.3.x 外部工具集成\n\n## 4. 技能工作流程',
-    });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'ssot-headings');
-    expect(v.some((x) => x.message.includes('3.3.x'))).toBe(true);
-  });
-
-  it('SSoT 无编号顶层章 → ssot-headings 守卫跳过（零违规）', () => {
-    const input = baseInput({
-      ssot: '### 4A.1 八条核心操作行为\n纯文本无章节号',
-    });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'ssot-headings')).toBe(false);
-  });
-
-  it('全部脚本已登记 + SKILL 计数一致 → 零 script-registry 违规', () => {
-    expect(runDocConsistencyChecks(baseInput()).some((x) => x.check === 'script-registry')).toBe(false);
-  });
-
-  it('dispatch-matrix 漏登记某脚本 → script-registry 违规', () => {
-    const input = baseInput({
-      dispatchMatrix: [
-        '# 分派矩阵',
-        ...CLI_SCRIPT_NAMES.filter((n) => n !== 'check-tla-model').map((n) => `- ${n}`),
-      ].join('\n'),
-    });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'script-registry');
-    expect(v.some((x) => x.message.includes('check-tla-model') && x.message.includes('未登记'))).toBe(true);
-  });
-
-  it('SKILL.md 声明 .ts 计数与实测不符 → script-registry 违规', () => {
-    const input = baseInput({
-      skill: baseInput().skill.replace('（47 个 .ts）', '（43 个 .ts）'),
-    });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'script-registry');
-    expect(v.some((x) => x.message.includes('43') && x.message.includes('47'))).toBe(true);
-  });
-
-  it('cliScriptFiles 为空 → script-registry 守卫跳过（零违规）', () => {
-    const input = baseInput({ cliScriptFiles: [] });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'script-registry')).toBe(false);
+  it('script-registry 通过行（2 态：全登记 + 计数一致 / cliScriptFiles 为空守卫跳过）', () => {
+    const cases: { label: string; overrides: Partial<DocConsistencyInput> }[] = [
+      { label: '全部脚本已登记 + SKILL 计数一致', overrides: {} },
+      { label: 'cliScriptFiles 为空（守卫跳过）', overrides: { cliScriptFiles: [] } },
+    ];
+    for (const c of cases) {
+      expect(
+        runDocConsistencyChecks(baseInput(c.overrides)).some((x) => x.check === 'script-registry'),
+        `${c.label} 应零 script-registry 违规`,
+      ).toBe(false);
+    }
   });
 });
 
 describe('run-log action 枚举语义同步（data-models.md interface vs schema enum）', () => {
-  it('interface 联合类型缺值时应报 run-log-action 漂移 violation', () => {
-    // dataModels 含「action enum（30 类）」文本但 interface 只有 15 值（复刻当前漂移）
-    const drifted = [
-      '### Schema 清单（4 份）',
-      '| `run-log` | ... | action enum（30 类） |',
-      '## RunLogEntry',
-      "  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'escalate';",
-    ].join('\n');
-    const input = baseInput({ dataModels: drifted });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'run-log-action');
-    expect(v.some((x) => x.message.includes('漂移'))).toBe(true);
-  });
-
-  it('interface 与 enum 完全一致时无漂移 violation', () => {
-    const synced = [
-      '### Schema 清单（4 份）',
-      '| `run-log` | ... | action enum（30 类） |',
-      '## RunLogEntry',
-      ACTION_UNION_30,
-    ].join('\n');
-    const input = baseInput({ dataModels: synced });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'run-log-action');
-    expect(v.some((x) => x.message.includes('漂移'))).toBe(false);
-  });
-
-  it('interface 含 enum 之外的额外值时应报带「多」的 run-log-action 漂移 violation', () => {
-    // 在 30 值基础上追加 enum 之外的多余值
-    const drifted = [
-      '### Schema 清单（4 份）',
-      '| `run-log` | ... | action enum（30 类） |',
-      '## RunLogEntry',
-      ACTION_UNION_30.replace("'plan_review';", "'plan_review' | 'bogus-action';"),
-    ].join('\n');
-    const input = baseInput({ dataModels: drifted });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'run-log-action');
-    expect(v.some((x) => x.message.includes('漂移') && x.message.includes('多 bogus-action'))).toBe(true);
+  it('run-log-action 漂移三态（缺值报漂移 / 完全一致无漂移 / 多值报带「多」漂移）', () => {
+    const header = ['### Schema 清单（4 份）', '| `run-log` | ... | action enum（30 类） |', '## RunLogEntry'];
+    const cases: { label: string; dataModels: string; kind: 'hit' | 'clean'; marker?: string }[] = [
+      {
+        label: 'interface 联合类型缺值（复刻 15 值漂移）',
+        dataModels: [
+          ...header,
+          "  action: 'chunk' | 'cross' | 'evolve' | 'produce' | 'review' | 'gate' | 'tla-gate' | 'graph-gate' | 'test' | 'checkpoint' | 'rework' | 'rollback' | 'rootcause' | 'fix' | 'escalate';",
+        ].join('\n'),
+        kind: 'hit',
+        marker: '漂移',
+      },
+      {
+        label: 'interface 与 enum 完全一致',
+        dataModels: [...header, ACTION_UNION_30].join('\n'),
+        kind: 'clean',
+      },
+      {
+        label: 'interface 含 enum 之外的额外值（多 bogus-action）',
+        dataModels: [...header, ACTION_UNION_30.replace("'plan_review';", "'plan_review' | 'bogus-action';")].join(
+          '\n',
+        ),
+        kind: 'hit',
+        marker: '多 bogus-action',
+      },
+    ];
+    for (const c of cases) {
+      const v = runDocConsistencyChecks(baseInput({ dataModels: c.dataModels })).filter(
+        (x) => x.check === 'run-log-action',
+      );
+      if (c.kind === 'hit') {
+        expect(
+          v.some((x) => x.message.includes('漂移') && (c.marker === undefined || x.message.includes(c.marker))),
+          `${c.label} 应报漂移违规（${c.marker ?? '少值方向'}）`,
+        ).toBe(true);
+      } else {
+        expect(
+          v.some((x) => x.message.includes('漂移')),
+          `${c.label} 不应报漂移违规`,
+        ).toBe(false);
+      }
+    }
   });
 });
 
@@ -2568,104 +2647,111 @@ describe('内链存在性检查（internal-links，C3）', () => {
     ]);
   });
 
-  it('linkDocs/linkExists 缺省 → 守卫跳过（零 internal-links 违规，fixture 兼容）', () => {
-    expect(runDocConsistencyChecks(baseInput()).some((x) => x.check === 'internal-links')).toBe(false);
-  });
-
-  it('内链全部存在 → 零违规', () => {
-    const input = baseInput({
-      linkDocs: [
-        {
-          name: 'SKILL.md',
-          content: '见 [操作行为](./references/operation-behaviors.md) 与 [约束](references/hard-constraints.md)。',
-          baseDir: 'w-model-dev',
+  it('internal-links 通过/跳过族（2 态：内链全部存在 / linkDocs+linkExists 缺省守卫跳过）', () => {
+    const cases: { label: string; overrides: Partial<DocConsistencyInput> }[] = [
+      {
+        label: '内链全部存在',
+        overrides: {
+          linkDocs: [
+            {
+              name: 'SKILL.md',
+              content: '见 [操作行为](./references/operation-behaviors.md) 与 [约束](references/hard-constraints.md)。',
+              baseDir: 'w-model-dev',
+            },
+            {
+              name: 'README.md',
+              content: '见 [SKILL](./w-model-dev/SKILL.md)。',
+              baseDir: '.',
+            },
+          ],
+          linkExists: (p) =>
+            [
+              'w-model-dev/references/operation-behaviors.md',
+              'w-model-dev/references/hard-constraints.md',
+              'w-model-dev/SKILL.md',
+            ].includes(p),
         },
-        {
-          name: 'README.md',
-          content: '见 [SKILL](./w-model-dev/SKILL.md)。',
-          baseDir: '.',
-        },
-      ],
-      linkExists: (p) =>
-        [
-          'w-model-dev/references/operation-behaviors.md',
-          'w-model-dev/references/hard-constraints.md',
-          'w-model-dev/SKILL.md',
-        ].includes(p),
-    });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'internal-links')).toBe(false);
-  });
-
-  it('断链 → violation 含文档名 + 归一化路径', () => {
-    const input = baseInput({
-      linkDocs: [
-        {
-          name: 'glossary.md',
-          content: '见 [旧名](./renamed-guide.md)。',
-          baseDir: 'w-model-dev/references',
-        },
-      ],
-      linkExists: () => false,
-    });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'internal-links');
-    expect(v).toHaveLength(1);
-    expect(v[0]!.message).toContain('glossary.md 内链断链：./renamed-guide.md');
-    expect(v[0]!.message).toContain('w-model-dev/references/renamed-guide.md');
-  });
-
-  it('../ 上溯目录 → POSIX 归一化路径正确（references → w-model-dev/SKILL.md）', () => {
-    const seen: string[] = [];
-    const input = baseInput({
-      linkDocs: [
-        {
-          name: 'glossary.md',
-          content: '见 [SKILL](../SKILL.md)。',
-          baseDir: 'w-model-dev/references',
-        },
-      ],
-      linkExists: (p) => {
-        seen.push(p);
-        return true;
       },
-    });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'internal-links')).toBe(false);
-    expect(seen).toEqual(['w-model-dev/SKILL.md']);
+      { label: 'linkDocs/linkExists 缺省（守卫跳过，fixture 兼容）', overrides: {} },
+    ];
+    for (const c of cases) {
+      expect(
+        runDocConsistencyChecks(baseInput(c.overrides)).some((x) => x.check === 'internal-links'),
+        `${c.label} 应零 internal-links 违规`,
+      ).toBe(false);
+    }
   });
 
-  it('根目录 baseDir="." → 归一化去除 ./ 前缀（README 链接形态）', () => {
-    const seen: string[] = [];
-    const input = baseInput({
-      linkDocs: [
-        {
-          name: 'README.md',
-          content: '见 [CHANGELOG](./CHANGELOG.md)。',
-          baseDir: '.',
+  it('internal-links 违规/归一化族（4 态：断链 / ../ 上溯 / ./ 前缀 / SSoT 错链，消息含文档名 + 归一化路径）', () => {
+    type LinkDoc = { name: string; content: string; baseDir: string };
+    const cases: {
+      label: string;
+      docs: LinkDoc[];
+      exists: (p: string, seen: string[]) => boolean;
+      verify: (v: ReturnType<typeof runDocConsistencyChecks>, seen: string[]) => void;
+    }[] = [
+      {
+        label: '断链（glossary.md → renamed-guide.md）',
+        docs: [{ name: 'glossary.md', content: '见 [旧名](./renamed-guide.md)。', baseDir: 'w-model-dev/references' }],
+        exists: () => false,
+        verify: (v) => {
+          expect(v, '断链应恰 1 条').toHaveLength(1);
+          expect(v[0]!.message, '应指名文档名 + 链接原文').toContain('glossary.md 内链断链：./renamed-guide.md');
+          expect(v[0]!.message, '应含归一化绝对路径').toContain('w-model-dev/references/renamed-guide.md');
         },
-      ],
-      linkExists: (p) => {
-        seen.push(p);
-        return true;
       },
-    });
-    expect(runDocConsistencyChecks(input).some((x) => x.check === 'internal-links')).toBe(false);
-    expect(seen).toEqual(['CHANGELOG.md']);
-  });
-
-  it('SSoT 内错误相对链接 → internal-links 违规', () => {
-    const input = baseInput({
-      linkDocs: [
-        {
-          name: 'docs/skill-design-document_SSoT.md',
-          content: '见 [CHANGELOG](../../CHANGELOG.md)。',
-          baseDir: 'docs',
+      {
+        label: '../ 上溯目录（references → w-model-dev/SKILL.md）',
+        docs: [{ name: 'glossary.md', content: '见 [SKILL](../SKILL.md)。', baseDir: 'w-model-dev/references' }],
+        exists: (p, seen) => {
+          seen.push(p);
+          return true;
         },
-      ],
-      linkExists: () => false,
-    });
-    const violations = runDocConsistencyChecks(input).filter((x) => x.check === 'internal-links');
-    expect(violations).toHaveLength(1);
-    expect(violations[0]!.message).toContain('docs/skill-design-document_SSoT.md');
-    expect(violations[0]!.message).toContain('../../CHANGELOG.md');
+        verify: (v, seen) => {
+          expect(
+            v.some((x) => x.check === 'internal-links'),
+            '上溯归一化后应存在 → 零违规',
+          ).toBe(false);
+          expect(seen, 'linkExists 应收到 POSIX 归一化路径').toEqual(['w-model-dev/SKILL.md']);
+        },
+      },
+      {
+        label: '根目录 baseDir="."（去除 ./ 前缀，README 链接形态）',
+        docs: [{ name: 'README.md', content: '见 [CHANGELOG](./CHANGELOG.md)。', baseDir: '.' }],
+        exists: (p, seen) => {
+          seen.push(p);
+          return true;
+        },
+        verify: (v, seen) => {
+          expect(
+            v.some((x) => x.check === 'internal-links'),
+            './ 前缀归一化后应零违规',
+          ).toBe(false);
+          expect(seen, 'linkExists 应收到去除 ./ 前缀的路径').toEqual(['CHANGELOG.md']);
+        },
+      },
+      {
+        label: 'SSoT 内错误相对链接（../../CHANGELOG.md）',
+        docs: [
+          {
+            name: 'docs/skill-design-document_SSoT.md',
+            content: '见 [CHANGELOG](../../CHANGELOG.md)。',
+            baseDir: 'docs',
+          },
+        ],
+        exists: () => false,
+        verify: (v) => {
+          expect(v, 'SSoT 错链应恰 1 条').toHaveLength(1);
+          expect(v[0]!.message, '应指名文档名').toContain('docs/skill-design-document_SSoT.md');
+          expect(v[0]!.message, '应指名链接原文').toContain('../../CHANGELOG.md');
+        },
+      },
+    ];
+    for (const c of cases) {
+      const seen: string[] = [];
+      const v = runDocConsistencyChecks(baseInput({ linkDocs: c.docs, linkExists: (p) => c.exists(p, seen) }));
+      c.verify(v, seen);
+    }
   });
 });
 
@@ -2673,17 +2759,51 @@ describe('S31 完整性审计双维度（orphan-reference / agents-nav-missing�
   /** S31 orphan-reference fixture 类型（name=相对技能包根 POSIX 路径；baseDir=所在目录） */
   type OrphanDoc = { name: string; content: string; baseDir: string };
 
-  it('references 孤儿文件（零入链）→ orphan-reference 违规，含文件名定位', () => {
-    const docs: OrphanDoc[] = [
-      { name: 'SKILL.md', content: '见 [图谱](references/graph-guide.md)。', baseDir: '.' },
-      { name: 'references/graph-guide.md', content: '见 [词汇表](glossary.md)。', baseDir: 'references' },
-      { name: 'references/orphan-draft.md', content: '# 草稿\n没有任何链接。', baseDir: 'references' },
+  it('orphan-reference 违规族（4 态：零入链孤儿 / 自链接 / 代码块内链不算入链 / 缺 SKILL 条目 fail-closed）', () => {
+    type OrphanDoc = { name: string; content: string; baseDir: string };
+    const cases: { label: string; docs: OrphanDoc[]; marker: string }[] = [
+      {
+        label: 'references 孤儿文件（零入链）',
+        docs: [
+          { name: 'SKILL.md', content: '见 [图谱](references/graph-guide.md)。', baseDir: '.' },
+          { name: 'references/graph-guide.md', content: '见 [词汇表](glossary.md)。', baseDir: 'references' },
+          { name: 'references/orphan-draft.md', content: '# 草稿\n没有任何链接。', baseDir: 'references' },
+        ],
+        marker: 'references/orphan-draft.md',
+      },
+      {
+        label: '自链接不计入入链（「其它 references」语义，仍判孤儿）',
+        docs: [
+          { name: 'SKILL.md', content: '', baseDir: '.' },
+          { name: 'references/self-link.md', content: '[自己](self-link.md)', baseDir: 'references' },
+        ],
+        marker: 'references/self-link.md',
+      },
+      {
+        label: '围栏代码块与行内 code span 内的链接不作为入链（剥离后无链 → 孤儿）',
+        docs: [
+          {
+            name: 'SKILL.md',
+            content: '```md\n[fake](references/a.md)\n```\n行内 `[fake2](references/a.md)` 不算。',
+            baseDir: '.',
+          },
+          { name: 'references/a.md', content: '无链接正文。', baseDir: 'references' },
+        ],
+        marker: 'references/a.md',
+      },
+      {
+        label: 'orphanAuditDocs 缺 SKILL.md 条目（入链来源不完整不静默放行）',
+        docs: [{ name: 'references/a.md', content: '', baseDir: 'references' }],
+        marker: 'SKILL.md',
+      },
     ];
-    const v = runDocConsistencyChecks(baseInput({ orphanAuditDocs: docs })).filter(
-      (x) => x.check === 'orphan-reference',
-    );
-    expect(v).toHaveLength(1);
-    expect(v[0]!.message).toContain('references/orphan-draft.md');
+    for (const c of cases) {
+      const v = runDocConsistencyChecks(baseInput({ orphanAuditDocs: c.docs })).filter(
+        (x) => x.check === 'orphan-reference',
+      );
+      expect(v, `${c.label} 应恰 1 条违规`).toHaveLength(1);
+      expect(v[0]!.message, `${c.label} 应指名 ${c.marker}`).toContain(c.marker);
+    }
   });
 
   it('SKILL.md 与 references 互链覆盖全部文件（./ 前缀 + 锚点剥离）→ 零违规', () => {
@@ -2697,18 +2817,6 @@ describe('S31 完整性审计双维度（orphan-reference / agents-nav-missing�
     ).toBe(false);
   });
 
-  it('自链接不计入入链（「其它 references」语义）→ 仍判孤儿', () => {
-    const docs: OrphanDoc[] = [
-      { name: 'SKILL.md', content: '', baseDir: '.' },
-      { name: 'references/self-link.md', content: '[自己](self-link.md)', baseDir: 'references' },
-    ];
-    const v = runDocConsistencyChecks(baseInput({ orphanAuditDocs: docs })).filter(
-      (x) => x.check === 'orphan-reference',
-    );
-    expect(v).toHaveLength(1);
-    expect(v[0]!.message).toContain('references/self-link.md');
-  });
-
   it('指向包根/包外的链接（../SKILL.md）不影响 references 目标判定', () => {
     const docs: OrphanDoc[] = [
       { name: 'SKILL.md', content: '[a](references/a.md)', baseDir: '.' },
@@ -2717,22 +2825,6 @@ describe('S31 完整性审计双维度（orphan-reference / agents-nav-missing�
     expect(
       runDocConsistencyChecks(baseInput({ orphanAuditDocs: docs })).some((x) => x.check === 'orphan-reference'),
     ).toBe(false);
-  });
-
-  it('围栏代码块与行内 code span 内的链接不作为入链（剥离后无链 → 孤儿）', () => {
-    const docs: OrphanDoc[] = [
-      {
-        name: 'SKILL.md',
-        content: '```md\n[fake](references/a.md)\n```\n行内 `[fake2](references/a.md)` 不算。',
-        baseDir: '.',
-      },
-      { name: 'references/a.md', content: '无链接正文。', baseDir: 'references' },
-    ];
-    const v = runDocConsistencyChecks(baseInput({ orphanAuditDocs: docs })).filter(
-      (x) => x.check === 'orphan-reference',
-    );
-    expect(v).toHaveLength(1);
-    expect(v[0]!.message).toContain('references/a.md');
   });
 
   it('豁免清单生效：豁免文件零违规，非豁免文件仍报（checkOrphanReferences 第二参注入）', () => {
@@ -2751,82 +2843,84 @@ describe('S31 完整性审计双维度（orphan-reference / agents-nav-missing�
     expect(ORPHAN_REFERENCE_EXEMPTIONS).toEqual([]);
   });
 
-  it('orphanAuditDocs 缺省注入 → 跳过检查（零违规，fixture 兼容）', () => {
-    expect(runDocConsistencyChecks(baseInput()).some((x) => x.check === 'orphan-reference')).toBe(false);
+  it('orphan-reference 跳过族（2 态：orphanAuditDocs 缺省注入 / checkOrphanReferences undefined 注入）', () => {
+    const cases = [
+      {
+        label: 'orphanAuditDocs 缺省注入（跳过检查，fixture 兼容）',
+        run: () => runDocConsistencyChecks(baseInput()).filter((x) => x.check === 'orphan-reference'),
+      },
+      { label: 'checkOrphanReferences undefined 注入（跳过）', run: () => checkOrphanReferences(undefined) },
+    ] as const;
+    for (const c of cases) {
+      expect(c.run(), `${c.label} 应零违规`).toEqual([]);
+    }
   });
 
-  it('orphanAuditDocs 缺 SKILL.md 条目 → fail-closed 违规（入链来源不完整不静默放行）', () => {
-    const docs: OrphanDoc[] = [{ name: 'references/a.md', content: '', baseDir: 'references' }];
-    const v = runDocConsistencyChecks(baseInput({ orphanAuditDocs: docs })).filter(
-      (x) => x.check === 'orphan-reference',
-    );
-    expect(v).toHaveLength(1);
-    expect(v[0]!.message).toContain('SKILL.md');
+  it('agents-nav-missing 违规族（4 态：缺基名 / §8 表外正文提及 / 相似前缀 / 表外代码块）', () => {
+    const cases: { label: string; agents: string; cliScriptFiles: string[]; marker?: string }[] = [
+      {
+        label: 'AGENTS.md 缺某 cli 基名',
+        agents: '# AGENTS\n## 8. 脚本导航表\n| wm-write.ts | 状态写 |',
+        cliScriptFiles: ['wm-write.ts', 'check-tla-model.ts'],
+        marker: 'check-tla-model',
+      },
+      {
+        label: '§8 表外正文提及基名（表格行被删，子串不再算登记）',
+        agents: [
+          '# AGENTS',
+          '正文顺带提到 check-tla-model 这个名字，但 §8 表里没有它的行。',
+          '## 8. 脚本导航表',
+          '| wm-write.ts | 状态写 |',
+        ].join('\n'),
+        cliScriptFiles: ['wm-write.ts', 'check-tla-model.ts'],
+        marker: 'check-tla-model',
+      },
+      {
+        label: '相似前缀行（check-foo-bar.ts）不能让 check-foo.ts 通过（精确名匹配）',
+        agents: '## 8. 脚本导航表\n| check-foo-bar.ts | 别的门禁 |',
+        cliScriptFiles: ['check-foo.ts'],
+        marker: 'check-foo.ts',
+      },
+      {
+        label: '§8 表外的同章节代码块不算登记（只认表格行首单元格）',
+        agents: '## 8. 脚本导航表\n\n```text\ncheck-tla-model.ts\n```\n',
+        cliScriptFiles: ['check-tla-model.ts'],
+      },
+    ];
+    for (const c of cases) {
+      const v = runDocConsistencyChecks(
+        baseInput({ agentsNav: { agents: c.agents, cliScriptFiles: c.cliScriptFiles } }),
+      ).filter((x) => x.check === 'agents-nav-missing');
+      expect(v, `${c.label} 应恰 1 条违规`).toHaveLength(1);
+      if (c.marker !== undefined) {
+        expect(v[0]!.message, `${c.label} 应指名 ${c.marker}`).toContain(c.marker);
+      }
+    }
   });
 
-  it('checkOrphanReferences undefined 注入 → 跳过（零违规）', () => {
-    expect(checkOrphanReferences(undefined)).toEqual([]);
-  });
-
-  it('AGENTS.md 缺某 cli 基名 → agents-nav-missing 违规，含基名定位', () => {
-    const v = runDocConsistencyChecks(
-      baseInput({
-        agentsNav: {
-          agents: '# AGENTS\n## 8. 脚本导航表\n| wm-write.ts | 状态写 |',
-          cliScriptFiles: ['wm-write.ts', 'check-tla-model.ts'],
-        },
-      }),
-    ).filter((x) => x.check === 'agents-nav-missing');
-    expect(v).toHaveLength(1);
-    expect(v[0]!.message).toContain('check-tla-model');
-  });
-
-  it('§8 表外正文提及基名（表格行被删）→ 仍报 agents-nav-missing（子串不再算登记）', () => {
-    const agents = [
-      '# AGENTS',
-      '正文顺带提到 check-tla-model 这个名字，但 §8 表里没有它的行。',
-      '## 8. 脚本导航表',
-      '| wm-write.ts | 状态写 |',
-    ].join('\n');
-    const v = runDocConsistencyChecks(
-      baseInput({ agentsNav: { agents, cliScriptFiles: ['wm-write.ts', 'check-tla-model.ts'] } }),
-    ).filter((x) => x.check === 'agents-nav-missing');
-    expect(v).toHaveLength(1);
-    expect(v[0]!.message).toContain('check-tla-model');
-  });
-
-  it('相似前缀行（check-foo-bar.ts）不能让 check-foo.ts 通过（精确名匹配，非子串）', () => {
-    const agents = '## 8. 脚本导航表\n| check-foo-bar.ts | 别的门禁 |';
-    const v = runDocConsistencyChecks(baseInput({ agentsNav: { agents, cliScriptFiles: ['check-foo.ts'] } })).filter(
-      (x) => x.check === 'agents-nav-missing',
-    );
-    expect(v).toHaveLength(1);
-    expect(v[0]!.message).toContain('check-foo.ts');
-  });
-
-  it('§8 表外的同章节代码块不算登记（只认表格行首单元格）', () => {
-    const agents = '## 8. 脚本导航表\n\n```text\ncheck-tla-model.ts\n```\n';
-    const v = runDocConsistencyChecks(
-      baseInput({ agentsNav: { agents, cliScriptFiles: ['check-tla-model.ts'] } }),
-    ).filter((x) => x.check === 'agents-nav-missing');
-    expect(v).toHaveLength(1);
-  });
-
-  it('全部 cli 基名以子串出现（§8 表含 .ts 后缀形态）→ 零 agents-nav-missing 违规', () => {
-    const agents = '## 8. 脚本导航表\n| check-tla-model.ts | TLA+ 门禁 |\n| wm-write.ts | 状态写 |';
-    expect(
-      runDocConsistencyChecks(
-        baseInput({ agentsNav: { agents, cliScriptFiles: ['check-tla-model.ts', 'wm-write.ts'] } }),
-      ).some((x) => x.check === 'agents-nav-missing'),
-    ).toBe(false);
-  });
-
-  it('agentsNav 缺省注入 → 跳过检查（零违规，fixture 兼容）', () => {
-    expect(runDocConsistencyChecks(baseInput()).some((x) => x.check === 'agents-nav-missing')).toBe(false);
-  });
-
-  it('checkAgentsNavCoverage undefined 注入 → 跳过（零违规）', () => {
-    expect(checkAgentsNavCoverage(undefined)).toEqual([]);
+  it('agents-nav 通过/跳过族（3 态：§8 表 .ts 形态全覆盖 / agentsNav 缺省 / checkAgentsNavCoverage undefined）', () => {
+    const cases = [
+      {
+        label: '全部 cli 基名以 §8 表行形态出现（.ts 后缀）',
+        run: () =>
+          runDocConsistencyChecks(
+            baseInput({
+              agentsNav: {
+                agents: '## 8. 脚本导航表\n| check-tla-model.ts | TLA+ 门禁 |\n| wm-write.ts | 状态写 |',
+                cliScriptFiles: ['check-tla-model.ts', 'wm-write.ts'],
+              },
+            }),
+          ).filter((x) => x.check === 'agents-nav-missing'),
+      },
+      {
+        label: 'agentsNav 缺省注入（跳过检查，fixture 兼容）',
+        run: () => runDocConsistencyChecks(baseInput()).filter((x) => x.check === 'agents-nav-missing'),
+      },
+      { label: 'checkAgentsNavCoverage undefined 注入（跳过）', run: () => checkAgentsNavCoverage(undefined) },
+    ] as const;
+    for (const c of cases) {
+      expect(c.run(), `${c.label} 应零违规`).toEqual([]);
+    }
   });
 
   // ---- tests-matrix：__tests__/README.md 覆盖矩阵 ↔ 在盘 *.test.ts 集合双向相等（任务 7）----
@@ -2835,37 +2929,53 @@ describe('S31 完整性审计双维度（orphan-reference / agents-nav-missing�
     expect(checkTestsMatrixCoverage(undefined)).toEqual([]);
   });
 
-  it('覆盖矩阵 README 缺失（null）→ tests-matrix-missing（不静默放行）', () => {
-    const v = checkTestsMatrixCoverage({ readme: null, testFiles: ['a.test.ts'] });
-    expect(v).toHaveLength(1);
-    expect(v[0]!.check).toBe('tests-matrix-missing');
-    expect(v[0]!.message).toContain('README.md');
-  });
-
-  it('在盘未登记 → tests-matrix-missing；表格行指向不存在文件 → tests-matrix-orphan', () => {
-    const readme = [
-      '| File | Area | What |',
-      '| --- | --- | --- |',
-      '| a.test.ts | A | x |',
-      '| ghost.test.ts | G | y |',
-    ].join('\n');
-    const v = checkTestsMatrixCoverage({ readme, testFiles: ['a.test.ts', 'b.test.ts'] });
-    expect(v.map((x) => x.check).sort()).toEqual(['tests-matrix-missing', 'tests-matrix-orphan']);
-    const joined = v.map((x) => x.message).join('\n');
-    expect(joined).toContain('b.test.ts');
-    expect(joined).toContain('ghost.test.ts');
-  });
-
-  it('同一测试文件登记多行 → tests-matrix-duplicate', () => {
-    const readme = [
-      '| File | Area | What |',
-      '| --- | --- | --- |',
-      '| a.test.ts | A | x |',
-      '| a.test.ts | A2 | y |',
-    ].join('\n');
-    const v = checkTestsMatrixCoverage({ readme, testFiles: ['a.test.ts'] });
-    expect(v).toHaveLength(1);
-    expect(v[0]!.check).toBe('tests-matrix-duplicate');
+  it('tests-matrix 违规族（3 态：矩阵缺失 / 未登记+孤儿 / 多行登记，违规码具名）', () => {
+    const tableHeader = ['| File | Area | What |', '| --- | --- | --- |'];
+    const cases: {
+      label: string;
+      input: { readme: string | null; testFiles: string[] };
+      verify: (v: ReturnType<typeof checkTestsMatrixCoverage>) => void;
+    }[] = [
+      {
+        label: '覆盖矩阵 README 缺失（null，不静默放行）',
+        input: { readme: null, testFiles: ['a.test.ts'] },
+        verify: (v) => {
+          expect(v, 'README 缺失应恰 1 条').toHaveLength(1);
+          expect(v[0]!.check, '违规码应为 tests-matrix-missing').toBe('tests-matrix-missing');
+          expect(v[0]!.message, '应指名 README.md').toContain('README.md');
+        },
+      },
+      {
+        label: '在盘未登记 + 表格行指向不存在文件',
+        input: {
+          readme: [...tableHeader, '| a.test.ts | A | x |', '| ghost.test.ts | G | y |'].join('\n'),
+          testFiles: ['a.test.ts', 'b.test.ts'],
+        },
+        verify: (v) => {
+          expect(v.map((x) => x.check).sort(), '应同时报 missing 与 orphan').toEqual([
+            'tests-matrix-missing',
+            'tests-matrix-orphan',
+          ]);
+          const joined = v.map((x) => x.message).join('\n');
+          expect(joined, '应点名未登记的 b.test.ts').toContain('b.test.ts');
+          expect(joined, '应点名孤儿的 ghost.test.ts').toContain('ghost.test.ts');
+        },
+      },
+      {
+        label: '同一测试文件登记多行',
+        input: {
+          readme: [...tableHeader, '| a.test.ts | A | x |', '| a.test.ts | A2 | y |'].join('\n'),
+          testFiles: ['a.test.ts'],
+        },
+        verify: (v) => {
+          expect(v, '多行登记应恰 1 条').toHaveLength(1);
+          expect(v[0]!.check, '违规码应为 tests-matrix-duplicate').toBe('tests-matrix-duplicate');
+        },
+      },
+    ];
+    for (const c of cases) {
+      c.verify(checkTestsMatrixCoverage(c.input));
+    }
   });
 
   it('矩阵与在盘集合双向相等 → 零违规', () => {
@@ -3228,47 +3338,40 @@ mktemp() {
 }
 
 describe('D4 动态元数据和本地证据文档治理', () => {
-  it('evidence-manifest / wm-export-evidence 缺登记与本地证据文档缺失均为 static violation', () => {
-    const input = baseInput({
-      dataModels: baseInput().dataModels.replace(
-        '| `evidence-manifest` | `evidence-manifest.schema.json` | ... |\n',
-        '',
-      ),
-      dispatchMatrix: baseInput().dispatchMatrix.replace('wm-export-evidence', ''),
-      localEvidenceDocs: [
-        {
-          name: 'README.md',
-          content: '仅说明安装。',
-        },
-      ],
-    } as DocConsistencyInput);
+  it('本地证据文档边界违规（形态 1：缺登记与文档缺失 → 三 check；形态 2：每份文档分别缺任一声明种类）', () => {
+    // 形态 1：schema/分派矩阵缺登记 + 本地证据文档缺全部声明
+    const missingRegistry = buildDocConsistencyReport(
+      baseInput({
+        dataModels: baseInput().dataModels.replace(
+          '| `evidence-manifest` | `evidence-manifest.schema.json` | ... |\n',
+          '',
+        ),
+        dispatchMatrix: baseInput().dispatchMatrix.replace('wm-export-evidence', ''),
+        localEvidenceDocs: [
+          {
+            name: 'README.md',
+            content: '仅说明安装。',
+          },
+        ],
+      } as DocConsistencyInput),
+    );
+    expect(
+      missingRegistry.staticViolations.some((x) => x.check === 'schema-list'),
+      '缺 evidence-manifest 登记应报 schema-list',
+    ).toBe(true);
+    expect(
+      missingRegistry.staticViolations.some((x) => x.check === 'script-registry'),
+      '缺 wm-export-evidence 登记应报 script-registry',
+    ).toBe(true);
+    expect(
+      missingRegistry.staticViolations.some((x) => x.check === 'local-evidence-artifacts'),
+      '本地证据文档缺声明应报 local-evidence-artifacts',
+    ).toBe(true);
 
-    const report = buildDocConsistencyReport(input);
-    expect(report.staticViolations.some((x) => x.check === 'schema-list')).toBe(true);
-    expect(report.staticViolations.some((x) => x.check === 'script-registry')).toBe(true);
-    expect(report.staticViolations.some((x) => x.check === 'local-evidence-artifacts')).toBe(true);
-  });
-
-  it('dynamic measurements 保留顶层兼容 violations 字段并分组 dynamic drift', () => {
-    const input = baseInput({ testFileCount: 41, vitestTestCount: 531, exit2ScriptCount: 34 });
-    const report = buildDocConsistencyReport(input);
-
-    expect([...report.staticViolations, ...report.dynamicViolations]).toEqual(report.violations);
-    expect(report.dynamicMeasurements).toMatchObject({
-      schemaCount: 5,
-      cliScriptCount: CLI_SCRIPT_NAMES.length,
-      exit2ScriptCount: 34,
-      testFileCount: 41,
-      vitestTestCount: 531,
-    });
-    expect(report.dynamicViolations.some((x) => x.check === 'vitest-tests')).toBe(false);
-  });
-
-  it('每份本地证据文档分别缺安全审阅、自动发布边界或 archive 边界时均为 static violation', () => {
+    // 形态 2：每份文档 × 每种声明缺失（消息含文档名 + 缺失声明种类）
     const fullContract =
       'coverage/ .zcode/ .w-model/ Git 忽略 默认不随 Git 交付 npm run wm:export-evidence -- <project-dir> <output-dir> 脱敏 SHA-256 安全策略审阅 不会自动提交或发布 docs/changes/archive/ 与 .w-model/ 边界';
     const docs = ['README.md', 'AGENTS.md', 'CONTRIBUTING.md', 'docs/INSTALL.md', 'SKILL.md', 'command-reference.md'];
-
     for (const [token, label] of [
       ['安全策略审阅', '安全审阅'],
       ['不会自动提交或发布', '自动发布边界'],
@@ -3291,6 +3394,21 @@ describe('D4 动态元数据和本地证据文档治理', () => {
         ).toBe(true);
       }
     }
+  });
+
+  it('dynamic measurements 保留顶层兼容 violations 字段并分组 dynamic drift', () => {
+    const input = baseInput({ testFileCount: 41, vitestTestCount: 531, exit2ScriptCount: 34 });
+    const report = buildDocConsistencyReport(input);
+
+    expect([...report.staticViolations, ...report.dynamicViolations]).toEqual(report.violations);
+    expect(report.dynamicMeasurements).toMatchObject({
+      schemaCount: 5,
+      cliScriptCount: CLI_SCRIPT_NAMES.length,
+      exit2ScriptCount: 34,
+      testFileCount: 41,
+      vitestTestCount: 531,
+    });
+    expect(report.dynamicViolations.some((x) => x.check === 'vitest-tests')).toBe(false);
   });
 
   it('D7C 每份活体文档都声明 source-bound/package-only provenance 边界，删任一声明即失败', async () => {
@@ -3560,90 +3678,116 @@ describe('pre-push hook 源契约（stdin ref 解析与 fail-closed 范围）', 
 });
 
 describe('gate-count-docs（活体文档门禁项数引用扫描，F1 反哺）', () => {
-  it('clean：四份白名单文档全 19 项 → 0 违规', () => {
+  it('stale clean/stale 对照（2 态：四份白名单文档全 19 项零违规 / 任一文档「17 项门禁」具名违规）', () => {
     const n = EXPECTED.prePushCount;
-    const input = baseInput({
-      gateCountDocs: [
-        { name: 'README.md', content: `本地 CI：${n} 项门禁（含 eval 语料断言）` },
-        { name: 'AGENTS.md', content: `手动跑推送前门禁（不实际推送，${n} 项门禁检查；` },
-        { name: 'CONTRIBUTING.md', content: `在 \`git push\` 时自动跑 ${n} 项检查；` },
-        { name: 'docs/troubleshooting.md', content: `未执行 ${n} 项门禁（exit 0 放行）` },
-      ],
-    });
-    expect(runDocConsistencyChecks(input).filter((v) => v.check === 'gate-count-docs')).toEqual([]);
+    const cases: {
+      label: string;
+      docs: { name: string; content: string }[];
+      verify: (v: ReturnType<typeof runDocConsistencyChecks>) => void;
+    }[] = [
+      {
+        label: `clean：四份白名单文档全 ${n} 项`,
+        docs: [
+          { name: 'README.md', content: `本地 CI：${n} 项门禁（含 eval 语料断言）` },
+          { name: 'AGENTS.md', content: `手动跑推送前门禁（不实际推送，${n} 项门禁检查；` },
+          { name: 'CONTRIBUTING.md', content: `在 \`git push\` 时自动跑 ${n} 项检查；` },
+          { name: 'docs/troubleshooting.md', content: `未执行 ${n} 项门禁（exit 0 放行）` },
+        ],
+        verify: (v) => {
+          expect(
+            v.filter((x) => x.check === 'gate-count-docs'),
+            'clean 形态应零违规',
+          ).toEqual([]);
+        },
+      },
+      {
+        label: 'stale：任一文档「17 项门禁」（消息含文件名与行号）',
+        docs: [{ name: 'docs/troubleshooting.md', content: '未执行 17 项门禁（exit 0 放行）' }],
+        verify: (v) => {
+          const hits = v.filter((x) => x.check === 'gate-count-docs');
+          expect(hits, 'stale 应恰 1 条违规').toHaveLength(1);
+          expect(hits[0]!.message, '应含文件名与行号').toContain('docs/troubleshooting.md:1');
+          expect(hits[0]!.message, '应含过期计数').toContain('17 项');
+        },
+      },
+    ];
+    for (const c of cases) {
+      c.verify(runDocConsistencyChecks(baseInput({ gateCountDocs: c.docs })));
+    }
   });
 
-  it('stale：任一文档「17 项门禁」→ 违规，消息含文件名与行号', () => {
-    const input = baseInput({
-      gateCountDocs: [{ name: 'docs/troubleshooting.md', content: '未执行 17 项门禁（exit 0 放行）' }],
-    });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs');
-    expect(v).toHaveLength(1);
-    expect(v[0]!.message).toContain('docs/troubleshooting.md:1');
-    expect(v[0]!.message).toContain('17 项');
-  });
-
-  it('index-exclusion：行含门禁标记的「第 14 项」下标引用不误报', () => {
-    const input = baseInput({
-      gateCountDocs: [{ name: 'CONTRIBUTING.md', content: 'pre-push 第 14 项 npm audit warn 并跳过（门禁不阻断）' }],
-    });
-    expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
-  });
-
-  it('index-exclusion：无空格「第14项」也不误报', () => {
-    const input = baseInput({
-      gateCountDocs: [{ name: 'CONTRIBUTING.md', content: 'pre-push 第14项 npm audit（门禁不阻断）' }],
-    });
-    expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
-  });
-
-  it('project-suffix：含门禁标记的「3 项目」不作为计数', () => {
-    const input = baseInput({
-      gateCountDocs: [{ name: 'AGENTS.md', content: '门禁说明：3 项目目录不计数' }],
-    });
-    expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
-  });
-
-  it('mixed-line：同一行跳过序数但捕获过期计数', () => {
-    const input = baseInput({
-      gateCountDocs: [{ name: 'README.md', content: '第 14 项 npm audit（门禁稳定）且 17 项门禁未同步' }],
-    });
-    const violations = runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs');
-    expect(violations).toHaveLength(1);
-    expect(violations[0]!.message).toContain('17 项');
-  });
-
-  it('marker-gate：无「门禁/检查」标记的行（5 项闭环脚本）不误报', () => {
-    const input = baseInput({
-      gateCountDocs: [
-        {
+  it('stale 计数误报防护（6 态：下标引用/无空格下标/项目后缀/混合行/无标记行/裸形态）', () => {
+    const cases: {
+      label: string;
+      doc: { name: string; content: string };
+      kind: 'clean' | 'hit';
+      marker?: string;
+    }[] = [
+      {
+        label: 'index-exclusion：行含门禁标记的「第 14 项」下标引用',
+        doc: { name: 'CONTRIBUTING.md', content: 'pre-push 第 14 项 npm audit warn 并跳过（门禁不阻断）' },
+        kind: 'clean',
+      },
+      {
+        label: 'index-exclusion：无空格「第14项」',
+        doc: { name: 'CONTRIBUTING.md', content: 'pre-push 第14项 npm audit（门禁不阻断）' },
+        kind: 'clean',
+      },
+      {
+        label: 'project-suffix：含门禁标记的「3 项目」不作为计数',
+        doc: { name: 'AGENTS.md', content: '门禁说明：3 项目目录不计数' },
+        kind: 'clean',
+      },
+      {
+        label: 'mixed-line：同一行跳过序数但捕获过期计数',
+        doc: { name: 'README.md', content: '第 14 项 npm audit（门禁稳定）且 17 项门禁未同步' },
+        kind: 'hit',
+        marker: '17 项',
+      },
+      {
+        label: 'marker-gate：无「门禁/检查」标记的行（5 项闭环脚本）',
+        doc: {
           name: 'README.md',
           content: 'G 还须跑 5 项闭环脚本（check-budget.ts / check-run-log.ts / check-maturity.ts）',
         },
-      ],
-    });
-    expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
+        kind: 'clean',
+      },
+      {
+        label: 'bare-form：行内含 `门禁` 标记的裸「N 项」（README:31 形态）',
+        doc: { name: 'README.md', content: '| 推送前门禁（本地 CI，17 项） |' },
+        kind: 'hit',
+        marker: '17 项',
+      },
+    ];
+    for (const c of cases) {
+      const v = runDocConsistencyChecks(baseInput({ gateCountDocs: [c.doc] })).filter(
+        (x) => x.check === 'gate-count-docs',
+      );
+      if (c.kind === 'clean') {
+        expect(v, `${c.label} 不应误报`).toEqual([]);
+      } else {
+        expect(v, `${c.label} 应具名捕获`).toHaveLength(1);
+        expect(v[0]!.message, `${c.label} 应含过期计数 ${c.marker}`).toContain(c.marker);
+      }
+    }
   });
 
-  it('bare-form：行内含 `门禁` 标记的裸「N 项」（README:31 形态）→ 违规', () => {
-    const input = baseInput({
-      gateCountDocs: [{ name: 'README.md', content: '| 推送前门禁（本地 CI，17 项） |' }],
-    });
-    const v = runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs');
-    expect(v).toHaveLength(1);
-    expect(v[0]!.message).toContain('17 项');
-  });
-
-  it('非白名单文档名（CHANGELOG.md）传入 → 不扫描（白名单函数内过滤）', () => {
-    const input = baseInput({
-      gateCountDocs: [{ name: 'CHANGELOG.md', content: '本次推送未执行 17 项门禁（历史记录，不可改）' }],
-    });
-    expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
-  });
-
-  it('undefined 注入 → 跳过（fixture 兼容）', () => {
-    const input = baseInput({ gateCountDocs: undefined });
-    expect(runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs')).toEqual([]);
+  it('非白名单/undefined 注入（2 态：CHANGELOG.md 不扫描 / gateCountDocs undefined 跳过）', () => {
+    const cases: { label: string; overrides: Partial<DocConsistencyInput> }[] = [
+      {
+        label: '非白名单文档名（CHANGELOG.md，白名单函数内过滤）',
+        overrides: {
+          gateCountDocs: [{ name: 'CHANGELOG.md', content: '本次推送未执行 17 项门禁（历史记录，不可改）' }],
+        },
+      },
+      { label: 'undefined 注入（fixture 兼容）', overrides: { gateCountDocs: undefined } },
+    ];
+    for (const c of cases) {
+      expect(
+        runDocConsistencyChecks(baseInput(c.overrides)).filter((x) => x.check === 'gate-count-docs'),
+        `${c.label} 应零违规`,
+      ).toEqual([]);
+    }
   });
 
   it('多文档多违规聚合', () => {

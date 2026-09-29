@@ -336,3 +336,95 @@
 3. 跨 describe 同构族（gate-enhancement 各 phase 引用块）如核体发现 phaseOption/fixture 构造不同构，则退回按 describe 内聚合，行数目标由其余族兜底（净减余量 ≈234）。
 4. 风险列「中（体未逐条核）」的族（l0-link-audit-logic symlink、gate-report 三族、evidence-provenance TOCTOU、iceberg 在场表、code-health-duplicates 等）执行时先回读函数体确认同构再动手。
 5. 断言消息必须指名条目（模板串嵌样本标识/fixture 名/形态名），保证聚合后失败仍可单点定位。
+
+## 执行登记 · 第 A 批
+
+- 日期：2026-09-29（Wave 3 用例合并第 A 批执行）
+- 文件：docs-consistency-logic / platform-deps-hook / gate-enhancement / run-log-logic / artifact-gate-assets（5 文件，73 族）
+- 形态纪律：全部为「循环内多断言 / 逐条具名断言」，it.each 已全部降级为循环；platform-deps-hook 与 artifact-gate-assets 的 phase/audit 族每迭代自备 fixture（临时目录在循环体内重建）。
+
+| 文件                           | 族                                         | 裁定                                                                                                                                                                      |
+| ------------------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| docs-consistency-logic.test.ts | 文档漂移检测矩阵·单断言族                  | 仍被覆盖（→「文档漂移检测矩阵·单断言族（21 态）」）                                                                                                                       |
+| docs-consistency-logic.test.ts | 漂移检测矩阵·多断言族                      | 仍被覆盖（→「文档漂移检测矩阵·多断言族（3 态）」）                                                                                                                        |
+| docs-consistency-logic.test.ts | version-consistency 漂移族                 | 仍被覆盖（→「version-consistency 漂移族（8 态）」）                                                                                                                       |
+| docs-consistency-logic.test.ts | version-consistency 一致对照               | 仍被覆盖（→「version-consistency 一致对照（2 态）」）                                                                                                                     |
+| docs-consistency-logic.test.ts | ssot-headings 矩阵                         | 仍被覆盖（→「ssot-headings 违规行 / 通过行」2 it）                                                                                                                        |
+| docs-consistency-logic.test.ts | script-registry 矩阵                       | 仍被覆盖（→「script-registry 违规行 / 通过行」2 it）                                                                                                                      |
+| docs-consistency-logic.test.ts | run-log-action 漂移三态                    | 仍被覆盖（→「run-log-action 漂移三态（3 态）」）                                                                                                                          |
+| docs-consistency-logic.test.ts | skill-outbound-links                       | 仍被覆盖（→「skill-outbound-links（2 态对照）」）                                                                                                                         |
+| docs-consistency-logic.test.ts | baseline-sync 矩阵                         | 仍被覆盖（→「baseline-sync 矩阵（4 态）」）                                                                                                                               |
+| docs-consistency-logic.test.ts | internal-links 违规族                      | 仍被覆盖（→「internal-links 违规/归一化族（4 态）」）                                                                                                                     |
+| docs-consistency-logic.test.ts | internal-links 通过/跳过                   | 仍被覆盖（→「internal-links 通过/跳过族（2 态）」）                                                                                                                       |
+| docs-consistency-logic.test.ts | orphan-reference 违规族                    | 仍被覆盖（→「orphan-reference 违规族（4 态）」）                                                                                                                          |
+| docs-consistency-logic.test.ts | orphan-reference 跳过族                    | 仍被覆盖（→「orphan-reference 跳过族（2 态）」）                                                                                                                          |
+| docs-consistency-logic.test.ts | agents-nav-missing 违规族                  | 仍被覆盖（→「agents-nav-missing 违规族（4 态）」）                                                                                                                        |
+| docs-consistency-logic.test.ts | agents-nav 通过/跳过族                     | 仍被覆盖（→「agents-nav 通过/跳过族（3 态）」）                                                                                                                           |
+| docs-consistency-logic.test.ts | tests-matrix 违规族                        | 仍被覆盖（→「tests-matrix 违规族（3 态）」）                                                                                                                              |
+| docs-consistency-logic.test.ts | 本地证据文档边界违规                       | 部分仍被覆盖（→「本地证据文档边界违规（形态 1+2）」；成员 D7C :3296 核体后退回——真实仓库文件读取 + 断言函数 throw 契约，与 runDocConsistencyChecks 违规流不同构，不硬凑） |
+| docs-consistency-logic.test.ts | PR 模板门禁项数                            | 仍被覆盖（→「PR 模板门禁项数（2 态）」）                                                                                                                                  |
+| docs-consistency-logic.test.ts | stale 计数误报防护                         | 仍被覆盖（→「stale 计数误报防护（6 态）」）                                                                                                                               |
+| docs-consistency-logic.test.ts | stale clean/stale                          | 仍被覆盖（→「stale clean/stale 对照（2 态）」）                                                                                                                           |
+| docs-consistency-logic.test.ts | 非白名单/undefined 注入                    | 仍被覆盖（→「非白名单/undefined 注入（2 态）」）                                                                                                                          |
+| docs-consistency-logic.test.ts | it.each R10 clause 全源变异                | 仍被覆盖（→「每条 R10 clause mutation（7 source 全源变异）」）                                                                                                            |
+| docs-consistency-logic.test.ts | it.each R10 反向语义                       | 仍被覆盖（→「R10 clause 反向/否定语义 fail-closed（7 clause）」）                                                                                                         |
+| docs-consistency-logic.test.ts | it.each A4 自动安装禁止句式                | 仍被覆盖（→「拒绝隔离的自动安装禁止句式（具名清单全量）」）                                                                                                               |
+| docs-consistency-logic.test.ts | it.each A4 mtime 安全主张                  | 仍被覆盖（→「拒绝隔离的 mtime 错误安全主张（具名清单全量）」）                                                                                                            |
+| docs-consistency-logic.test.ts | it.each vitest measurements fail-closed    | 仍被覆盖（→「成功测量的非法形态必须 fail-closed（6 态）」）                                                                                                               |
+| platform-deps-hook.test.ts     | it.each 未知参数（3 形态）                 | 仍被覆盖（→「rejects unsupported arguments（3 形态）」）                                                                                                                  |
+| platform-deps-hook.test.ts     | it.each 触发路径（3 路径）                 | 仍被覆盖（→「runs the gate for trigger paths（3 路径）」；每迭代自备临时目录 fixture）                                                                                    |
+| platform-deps-hook.test.ts     | it.each 路径过滤矩阵（8 行）               | 仍被覆盖（→「path filter: 8 行触发/不触发矩阵」；每迭代自备 fixture）                                                                                                     |
+| platform-deps-hook.test.ts     | it.each audit 瞬态跳过（6 形态）           | 仍被覆盖（→「skips an explicit transient audit failure（6 形态）」）                                                                                                      |
+| platform-deps-hook.test.ts     | it.each audit 阻断（7 形态）               | 仍被覆盖（→「blocks an audit non-transient failure（7 形态）」）                                                                                                          |
+| platform-deps-hook.test.ts     | it.each audit 边界 20 行表                 | 仍被覆盖（→「audit skip boundary: 20 行表驱动边界样例」）                                                                                                                 |
+| gate-enhancement.test.ts       | 样本正反对                                 | 仍被覆盖（→「样本正反对·违规行 / 通过行」2 it）                                                                                                                           |
+| gate-enhancement.test.ts       | REQ 阶段字段矩阵                           | 仍被覆盖（→「REQ 阶段字段矩阵·通过行 / 拒绝行」2 it）                                                                                                                     |
+| gate-enhancement.test.ts       | P2/P3/R11/R12 负例                         | 仍被覆盖（→「P2/P3/R11/R12 verifier 标准化负例（5 态）」）                                                                                                                |
+| gate-enhancement.test.ts       | 同规则正例对照                             | 仍被覆盖（→「R11/R12 正例对照（2 态）」）                                                                                                                                 |
+| gate-enhancement.test.ts       | phase1 引用块三件                          | 仍被覆盖（→「phase1 引用块三件（3 态）」；核体同构，按 describe 内聚合）                                                                                                  |
+| gate-enhancement.test.ts       | phase2 引用块四件                          | 仍被覆盖（→「phase2 引用块四件（4 态）」；同上）                                                                                                                          |
+| gate-enhancement.test.ts       | phase3 引用块三件                          | 仍被覆盖（→「phase3 引用块三件（3 态）」；同上）                                                                                                                          |
+| gate-enhancement.test.ts       | phase4 引用块三件                          | 仍被覆盖（→「phase4 引用块三件（3 态）」；同上）                                                                                                                          |
+| gate-enhancement.test.ts       | §8 判定 (a)(b)(c) 族                       | 仍被覆盖（→「§8 判定 (a)(b)(c) 负例矩阵（6 态）」）                                                                                                                       |
+| gate-enhancement.test.ts       | 模板结构缺失族                             | 仍被覆盖（→「模板结构缺失矩阵（6 态违规）」+ 通过行基线 it）                                                                                                              |
+| gate-enhancement.test.ts       | acceptance violation 族                    | 仍被覆盖（→「acceptance violation 族（3 态）」）                                                                                                                          |
+| gate-enhancement.test.ts       | acceptance 不误红族                        | 仍被覆盖（→「acceptance 不误红族（2 态）」）                                                                                                                              |
+| gate-enhancement.test.ts       | ADR violation 族                           | 仍被覆盖（→「ADR violation 族（2 态）」）                                                                                                                                 |
+| gate-enhancement.test.ts       | ADR 不误红族                               | 仍被覆盖（→「ADR 不误红族（2 态）」）                                                                                                                                     |
+| run-log-logic.test.ts          | R3/R7 扩展字段负例                         | 仍被覆盖（→「R1 扩展字段负例（3 态）」）                                                                                                                                  |
+| run-log-logic.test.ts          | S-fix / V 复审缺失对照                     | 仍被覆盖（→「R3 缺失对照（2 态）」）                                                                                                                                      |
+| run-log-logic.test.ts          | R7 时序负例对                              | 仍被覆盖（→「R7 时序负例（2 态）」）                                                                                                                                      |
+| run-log-logic.test.ts          | extractExitCode 四标记正例                 | 仍被覆盖（→「extractExitCode 从四类摘要标记提取（GATE/VERIFIER/ERROR/STATE_MACHINE）」）                                                                                  |
+| run-log-logic.test.ts          | extractExitCode 边界负例                   | 仍被覆盖（→「extractExitCode 边界负例（4 态）」）                                                                                                                         |
+| run-log-logic.test.ts          | buildGateLogKeys 归一化族                  | 仍被覆盖（→「buildGateLogKeys 归一化（4 态）」；各行 key 计数差异属断言本体逐行保留）                                                                                     |
+| run-log-logic.test.ts          | action-role 非法配对                       | 仍被覆盖（→「非法 action-role 配对（5 态）」）                                                                                                                            |
+| run-log-logic.test.ts          | R10 revertEvidence 负例                    | 仍被覆盖（→「R10 revertEvidence 负例（4 态）」）                                                                                                                          |
+| run-log-logic.test.ts          | qualityLevel 不触发族                      | 仍被覆盖（→「qualityLevel 不触发跨轮次评审不一致（3 态）」）                                                                                                              |
+| run-log-logic.test.ts          | variant 缺 blocker 负例                    | 仍被覆盖（→「已声明 variant 却缺 blocker（2 态）」）                                                                                                                      |
+| run-log-logic.test.ts          | cutoff 前/后 variant 吸收                  | 仍被覆盖（→「LEGACY_VARIANT cutoff 分界（2 态）」）                                                                                                                       |
+| run-log-logic.test.ts          | cutoff 前/后 reworkHints                   | 仍被覆盖（→「reworkHints cutoff 分界（2 态）」）                                                                                                                          |
+| run-log-logic.test.ts          | R11 不充数族                               | 仍被覆盖（→「R11 不充数（3 态）」）                                                                                                                                       |
+| run-log-logic.test.ts          | R11 时序边界                               | 仍被覆盖（→「R11 时序边界（2 态）」）                                                                                                                                     |
+| run-log-logic.test.ts          | it.each 根 JSON exitCode                   | 仍被覆盖（→「extractExitCode 从根 JSON 提取 exitCode（3 态）」）                                                                                                          |
+| run-log-logic.test.ts          | it.each fix outcome 无 credit              | 仍被覆盖（→「does not open R3/R8 credit for a non-success fix（3 态）」）                                                                                                 |
+| artifact-gate-assets.test.ts   | it.each TLA manifest fail-closed（3 形态） | 仍被覆盖（→「fails closed for invalid TLA manifest（3 态）」）                                                                                                            |
+| artifact-gate-assets.test.ts   | it.each Cucumber fail-closed（7 形态）     | 仍被覆盖（→「fails closed for invalid Cucumber evidence（7 态）」）                                                                                                       |
+| artifact-gate-assets.test.ts   | it.each 阶段证据 flag（8→2）               | 仍被覆盖（→「uses / does not use TLA/BDD project evidence（phases 1-4 / 5-8）」2 it）                                                                                     |
+| artifact-gate-assets.test.ts   | it.each 独立 sync 开关（8→2）              | 仍被覆盖（→「enables independent sync / runs sync only with complete pair coverage」2 it；每相位重建 mock fixture）                                                       |
+| artifact-gate-assets.test.ts   | it.each 完整 pair 接受（8→2）              | 仍被覆盖（→「accepts a real complete pair / fails closed on missing sync assets」2 it；每相位自备 fixture 文件）                                                          |
+| artifact-gate-assets.test.ts   | BDD 负例族（5→2）                          | 仍被覆盖（→「BDD manifest 负例（4 态）」+ 通过行 it）                                                                                                                     |
+| artifact-gate-assets.test.ts   | 子进程退出码族（3→2）                      | 仍被覆盖（→「子进程退出码非 0（2 态）」+ 双 0 通过行 it）                                                                                                                 |
+| artifact-gate-assets.test.ts   | 阶段证据对照对（2→1）                      | 仍被覆盖（→「阶段证据对照对（2 态）」）                                                                                                                                   |
+
+### 第 A 批对账
+
+| 文件                           | 表格目标（现例→聚合后） | 实测（HEAD 运行时 → 聚合后） | 偏差说明                                                                                                               |
+| ------------------------------ | ----------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| docs-consistency-logic.test.ts | 126→28（-98）           | 210→113（-97）               | 族 17 成员 D7C :3296 核体后退回（-1）；本文件全量回归 2 连跑全绿                                                       |
+| platform-deps-hook.test.ts     | 47→6（-41）             | 87→46（-41）                 | 6 族全部转换；bash fixture 每迭代重建；聚合 it 显式 timeout（180s/300s，覆盖 N×单次 hook 调用串行耗时，默认 30s 不足） |
+| gate-enhancement.test.ts       | 54→17（-37）            | 75→38（-37）                 | 跨 describe 引用块族核体同构，按 describe 内聚合（注意事项 #3 形态）                                                   |
+| run-log-logic.test.ts          | 48→16（-32）            | 132→100（-32）               | buildGateLogKeys 各行 key 计数断言逐行保留；反斜杠用例 cwd 输入保真修正                                                |
+| artifact-gate-assets.test.ts   | 44→13（-31）            | 63→32（-31）                 | 8 个 phase it.each 全部转循环，每相位自备 fixture                                                                      |
+| **合计**                       | **净减 239**            | **净减 238**                 | 差 1 = D7C 退回（宁可退回，不许硬凑）                                                                                  |
+
+> 排除面核对：docs-consistency-logic 的 exit-2 计数链路（:422/:979/:1033/:1244/:1430/:1701/:1952/:3661 等排除清单行）与 state-write-logic 并发/锁语义、run-sync 台账等全文件排除项一律未触碰；NEGATIVE-COVERAGE 载体面（docs-consistency-logic mutated-copy 类）各族的失败形态仍可由循环行具名触发。
