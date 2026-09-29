@@ -206,33 +206,32 @@ describe('E-2 方案 B：phase-1 自举时序端到端（真实子进程）', ()
     expect((report.diagnostics ?? []).some((d) => d.startsWith('BOOTSTRAP_VALIDATION:'))).toBe(true);
   });
 
-  it('零记录态 + checkpoint-log 无 phase-N 匹配 → check-checkpoint exit 1 且 R0 文案保留（fail-closed 回归）', async () => {
-    const preLog = await writeRunLog('pre-empty.jsonl', [
-      JSON.stringify(entry({ runId: 'a1', action: 'chunk', role: 'A' })),
-    ]);
-    const emptyClog = await writeCheckpointLog([]);
-    const run = runCli(CHECKPOINT_CLI, [preLog, `--checkpoint-log=${emptyClog}`, '--json']);
-    expect(run.code, `stderr=${run.stderr}\nstdout=${run.stdout}`).toBe(1);
-    const report = parseJsonReport(run.stdout);
-    expect(report.passed).toBe(false);
-    expect(report.reasons.some((v) => v.includes('零证据不等于合规'))).toBe(true);
-    expect((report.diagnostics ?? []).some((d) => d.startsWith('BOOTSTRAP_VALIDATION:'))).toBe(false);
-  });
-
-  it('零记录态 + checkpoint-log 仅含 phase-2 确认（无 phase-1）→ exit 1 且 R0 文案保留（相位缝隙负例，修复轮 1）', async () => {
-    // 审查复现态：加载器既有宽松（任意 `*-<数字>.txt` 计入 Map）使仅含 phase-2.txt 的目录
-    // 加载为非空 Map——初版「Map 非空」在此 exit 0，穿透「零证据不等于合规」。收紧为
-    // `get('1')` 非空白后，此态维持违规（零放行记录 ⇒ 下一次放行必为首放行，仅首放行
+  it('零记录态负例对（2 态：checkpoint-log 无 phase-N 匹配 / 仅含 phase-2 确认无 phase-1）→ exit 1 且 R0 文案保留（fail-closed 回归）', async () => {
+    // 第二态为审查复现态（修复轮 1）：加载器既有宽松（任意 `*-<数字>.txt` 计入 Map）使仅含
+    // phase-2.txt 的目录加载为非空 Map——初版「Map 非空」在此 exit 0，穿透「零证据不等于合规」。
+    // 收紧为 `get('1')` 非空白后，此态维持违规（零放行记录 ⇒ 下一次放行必为首放行，仅首放行
     // 确认可支撑自举）。
-    const preLog = await writeRunLog('pre-phase2only.jsonl', [
-      JSON.stringify(entry({ runId: 'a1', action: 'chunk', role: 'A' })),
-    ]);
-    const phase2Clog = await writeCheckpointLog(['phase-2.txt']);
-    const run = runCli(CHECKPOINT_CLI, [preLog, `--checkpoint-log=${phase2Clog}`, '--json']);
-    expect(run.code, `stderr=${run.stderr}\nstdout=${run.stdout}`).toBe(1);
-    const report = parseJsonReport(run.stdout);
-    expect(report.passed).toBe(false);
-    expect(report.reasons.some((v) => v.includes('零证据不等于合规'))).toBe(true);
-    expect((report.diagnostics ?? []).some((d) => d.startsWith('BOOTSTRAP_VALIDATION:'))).toBe(false);
+    const rows = [
+      { name: 'checkpoint-log 无 phase-N 匹配', clogFiles: [] as string[] },
+      { name: 'checkpoint-log 仅含 phase-2 确认（无 phase-1）', clogFiles: ['phase-2.txt'] },
+    ] as const;
+    for (const row of rows) {
+      const preLog = await writeRunLog('pre-negative.jsonl', [
+        JSON.stringify(entry({ runId: 'a1', action: 'chunk', role: 'A' })),
+      ]);
+      const clog = await writeCheckpointLog([...row.clogFiles]);
+      const run = runCli(CHECKPOINT_CLI, [preLog, `--checkpoint-log=${clog}`, '--json']);
+      expect(run.code, `${row.name}：应 exit 1（stderr=${run.stderr}\nstdout=${run.stdout}）`).toBe(1);
+      const report = parseJsonReport(run.stdout);
+      expect(report.passed, `${row.name}：应不通过`).toBe(false);
+      expect(
+        report.reasons.some((v) => v.includes('零证据不等于合规')),
+        `${row.name}：R0 文案保留`,
+      ).toBe(true);
+      expect(
+        (report.diagnostics ?? []).some((d) => d.startsWith('BOOTSTRAP_VALIDATION:')),
+        `${row.name}：不得出现 BOOTSTRAP_VALIDATION 诊断`,
+      ).toBe(false);
+    }
   });
 });

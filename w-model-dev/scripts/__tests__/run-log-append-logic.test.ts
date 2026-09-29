@@ -44,17 +44,33 @@ describe('planAppend：时间戳严格递增（裁定 A）', () => {
     expect(r.violations.join()).toMatch(/时间戳不递增/);
   });
 
-  it('时间戳倒退的拒绝文案点名末条时间与建议', () => {
-    const existing = [mkEntry({ runId: 'a', timestamp: '2026-09-25T10:00:00.000Z' })];
-    const r = planAppend(existing, [mkEntry({ runId: 'b', timestamp: '2026-09-25T10:00:00.000Z' })], {
-      now: '2026-09-25T10:00:00.000Z',
-    });
-    expect(r.accepted).toBe(false);
-    expect(codesOf(r)).toContain('TIMESTAMP_NOT_INCREASING');
-    const text = r.violations.join(' ');
-    expect(text).toMatch(/2026-09-25T10:00:00\.000Z/);
-    expect(text).toMatch(/--timestamp|--allow-clock-adjust/);
-    expect(r.appended).toBe(0);
+  it('时间戳倒退/不递增的拒绝文案（2 态：显式时间戳与末条相等 / now 早于末条时钟真倒退）点名末条时间与建议', () => {
+    const rows = [
+      {
+        name: '显式时间戳与末条相等',
+        incoming: mkEntry({ runId: 'b', timestamp: '2026-09-25T10:00:00.000Z' }),
+        now: '2026-09-25T10:00:00.000Z',
+        nowText: /2026-09-25T10:00:00\.000Z/,
+        suggest: /--timestamp|--allow-clock-adjust/,
+      },
+      {
+        name: 'now 早于末条时间（时钟真倒退）',
+        incoming: mkEntry({ runId: 'b' }),
+        now: '2026-09-25T09:00:00.000Z',
+        nowText: /now=2026-09-25T09:00:00\.000Z 早于末条时间 2026-09-25T10:00:00\.000Z/,
+        suggest: /--allow-clock-adjust/,
+      },
+    ] as const;
+    for (const row of rows) {
+      const existing = [mkEntry({ runId: 'a', timestamp: '2026-09-25T10:00:00.000Z' })];
+      const r = planAppend(existing, [row.incoming], { now: row.now });
+      expect(r.accepted, `${row.name}：应拒绝`).toBe(false);
+      expect(codesOf(r), `${row.name}：错误码 TIMESTAMP_NOT_INCREASING`).toContain('TIMESTAMP_NOT_INCREASING');
+      const text = r.violations.join(' ');
+      expect(text, `${row.name}：文案点名时间`).toMatch(row.nowText);
+      expect(text, `${row.name}：文案给出建议 flag`).toMatch(row.suggest);
+      expect(r.appended, `${row.name}：不产出新记录`).toBe(0);
+    }
   });
 
   it('未显式注入时使用 now 且严格递增', () => {
@@ -113,41 +129,43 @@ describe('planAppend：时间戳严格递增（裁定 A）', () => {
     expect(codesOf(r)).toContain('TIMESTAMP_NOT_INCREASING');
   });
 
-  it('--allow-clock-adjust 显式声明小步进：步进 +1ms 且 note 留 clock-adjust 理由', () => {
-    const r = planAppend([mkEntry({ runId: 'a', timestamp: '2026-09-25T10:00:00.000Z' })], [mkEntry({ runId: 'b' })], {
-      now: '2026-09-25T11:00:00.000Z',
-      timestamp: '2026-09-25T09:00:00.000Z',
-      allowClockAdjust: 'live-run-replay',
-    });
-    expect(r.accepted).toBe(true);
-    expect(Date.parse(r.entries[1]!.timestamp!)).toBe(Date.parse('2026-09-25T10:00:00.001Z'));
-    expect(r.entries[1]!.note).toMatch(/clock-adjust:live-run-replay/);
-    // 两条痕迹都必须保留：注入来源 + 小步进声明（裁定 A「绝不静默」）
-    expect(r.entries[1]!.note).toMatch(/clock-injected:2026-09-25T09:00:00\.000Z/);
-    expect(r.diagnostics.join()).toMatch(/时钟调整 \+\d+ms/);
-  });
-
-  it('now 早于末条时间（时钟真倒退）默认拒绝：文案点名末条时间与建议', () => {
-    const existing = [mkEntry({ runId: 'a', timestamp: '2026-09-25T10:00:00.000Z' })];
-    const r = planAppend(existing, [mkEntry({ runId: 'b' })], { now: '2026-09-25T09:00:00.000Z' });
-    expect(r.accepted).toBe(false);
-    expect(codesOf(r)).toContain('TIMESTAMP_NOT_INCREASING');
-    const text = r.violations.join(' ');
-    expect(text).toMatch(/now=2026-09-25T09:00:00\.000Z 早于末条时间 2026-09-25T10:00:00\.000Z/);
-    expect(text).toMatch(/--allow-clock-adjust/);
-    expect(r.appended).toBe(0);
-  });
-
-  it('now 早于末条时间 + --allow-clock-adjust：步进末条 +1ms 且 note 留理由痕迹', () => {
-    const existing = [mkEntry({ runId: 'a', timestamp: '2026-09-25T10:00:00.000Z' })];
-    const r = planAppend(existing, [mkEntry({ runId: 'b' })], {
-      allowClockAdjust: 'ntp-rollback',
-      now: '2026-09-25T09:00:00.000Z',
-    });
-    expect(r.accepted).toBe(true);
-    expect(Date.parse(r.entries[1]!.timestamp!)).toBe(Date.parse('2026-09-25T10:00:00.001Z'));
-    expect(r.entries[1]!.note).toMatch(/clock-adjust:auto\+\d+ms:ntp-rollback/);
-    expect(r.diagnostics.join()).toMatch(/时钟调整 \+\d+ms/);
+  it('--allow-clock-adjust 小步进对（2 态：显式 --timestamp 注入声明 / now 早于末条时钟倒退声明）步进 +1ms 且 note 留理由痕迹', () => {
+    const rows = [
+      {
+        name: '--timestamp 注入 + --allow-clock-adjust 显式声明',
+        now: '2026-09-25T11:00:00.000Z',
+        timestamp: '2026-09-25T09:00:00.000Z' as string | undefined,
+        allowClockAdjust: 'live-run-replay',
+        noteAdjust: /clock-adjust:live-run-replay/,
+        // 两条痕迹都必须保留：注入来源 + 小步进声明（裁定 A「绝不静默」）
+        noteInjected: /clock-injected:2026-09-25T09:00:00\.000Z/,
+      },
+      {
+        name: 'now 早于末条时间 + --allow-clock-adjust（时钟真倒退仍放行小步进）',
+        now: '2026-09-25T09:00:00.000Z',
+        timestamp: undefined,
+        allowClockAdjust: 'ntp-rollback',
+        noteAdjust: /clock-adjust:auto\+\d+ms:ntp-rollback/,
+        noteInjected: undefined,
+      },
+    ] as const;
+    for (const row of rows) {
+      const existing = [mkEntry({ runId: 'a', timestamp: '2026-09-25T10:00:00.000Z' })];
+      const r = planAppend(existing, [mkEntry({ runId: 'b' })], {
+        now: row.now,
+        ...(row.timestamp === undefined ? {} : { timestamp: row.timestamp }),
+        allowClockAdjust: row.allowClockAdjust,
+      });
+      expect(r.accepted, `${row.name}：应接受`).toBe(true);
+      expect(Date.parse(r.entries[1]!.timestamp!), `${row.name}：步进末条 +1ms`).toBe(
+        Date.parse('2026-09-25T10:00:00.001Z'),
+      );
+      expect(r.entries[1]!.note, `${row.name}：note 留 clock-adjust 理由`).toMatch(row.noteAdjust);
+      if (row.noteInjected !== undefined) {
+        expect(r.entries[1]!.note, `${row.name}：note 留 clock-injected 注入来源`).toMatch(row.noteInjected);
+      }
+      expect(r.diagnostics.join(), `${row.name}：时钟调整进入 diagnostics（非静默）`).toMatch(/时钟调整 \+\d+ms/);
+    }
   });
 
   it('历史末条用宽容口径：小写 t/z 时间戳仍作为单调下界（不被跳过）', () => {

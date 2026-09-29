@@ -55,42 +55,67 @@ function parseErrorJson(stdout: string): {
 }
 
 describe('loadTlaContents 解析基准（D-3）', () => {
-  it('basePath 存在时按 manifestDir + basePath + tlaPath 解析', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tla-bp-'));
-    await fs.mkdir(path.join(root, 'tla'), { recursive: true });
-    await fs.mkdir(path.join(root, '.w-model'), { recursive: true });
-    await fs.writeFile(path.join(root, 'tla', 'L2_x.tla'), '---- MODULE L2_x ----\n====\n');
-    const manifestPath = path.join(root, '.w-model', 'tla-manifest.json');
-    const manifest = {
-      basePath: '..',
-      specs: [{ id: 'L2_x', level: 'L2', tlaPath: 'tla/L2_x.tla' }],
-    } as unknown as TlaManifest;
-    await loadTlaContents(manifest, manifestPath);
-    expect(manifest.specs[0]?.tlaContent).toContain('MODULE L2_x');
-  });
-
-  it('文件缺失仍 fail-closed：抛 TlaSpecUnreadableError，cliError 四字段齐备且 file 为 basePath 解析后路径', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tla-bp-'));
-    await fs.mkdir(path.join(root, '.w-model'), { recursive: true });
-    const manifestPath = path.join(root, '.w-model', 'tla-manifest.json');
-    const manifest = {
-      basePath: '..',
-      specs: [{ id: 'L2_missing', level: 'L2', tlaPath: 'tla/none.tla' }],
-    } as unknown as TlaManifest;
-
-    const caught = await loadTlaContents(manifest, manifestPath).then(
-      () => null,
-      (e: unknown) => e,
-    );
-
-    expect(caught).toBeInstanceOf(TlaSpecUnreadableError);
-    const cliError = (caught as TlaSpecUnreadableError).cliError;
-    expect(cliError.category).toBe('FILE_NOT_FOUND');
-    expect(cliError.rule).toBe('D3/D4');
-    expect(cliError.exitCode).toBe(2);
-    // file = manifestDir + basePath + tlaPath（即 <root>/tla/none.tla），不是 <root>/.w-model/tla/none.tla
-    expect(cliError.file).toBe(path.resolve(root, 'tla', 'none.tla'));
-    expect(cliError.message).toContain('不可读');
+  /**
+   * 纯函数层双态（同流程：临时目录 fixture → loadTlaContents → 断言结论；仅数据/期望不同）：
+   *   - 成功态：basePath 存在时按 manifestDir + basePath + tlaPath 解析，tlaContent 装载；
+   *   - fail-closed 态：文件缺失抛 TlaSpecUnreadableError，cliError 四字段齐备且 file
+   *     为按 basePath 解析后的绝对路径。CLI 层退出码契约由下方真实子进程用例单独钉住。
+   */
+  it('basePath 解析成功态 / 文件缺失 fail-closed 态（2 态，每迭代自备临时目录 fixture）', async () => {
+    const rows: Array<{
+      name: string;
+      setup: (root: string) => Promise<TlaManifest>;
+      check: (outcome: { thrown: unknown; loaded: TlaManifest | null; root: string }) => void;
+    }> = [
+      {
+        name: 'basePath 存在时按 manifestDir + basePath + tlaPath 解析',
+        setup: async (root) => {
+          await fs.mkdir(path.join(root, 'tla'), { recursive: true });
+          await fs.writeFile(path.join(root, 'tla', 'L2_x.tla'), '---- MODULE L2_x ----\n====\n');
+          return {
+            basePath: '..',
+            specs: [{ id: 'L2_x', level: 'L2', tlaPath: 'tla/L2_x.tla' }],
+          } as unknown as TlaManifest;
+        },
+        check: ({ loaded }) => {
+          expect(loaded?.specs[0]?.tlaContent, '成功态：tlaContent 装载且含 MODULE L2_x').toContain('MODULE L2_x');
+        },
+      },
+      {
+        name: '文件缺失仍 fail-closed：抛 TlaSpecUnreadableError，cliError 四字段齐备且 file 为 basePath 解析后路径',
+        setup: async () =>
+          ({
+            basePath: '..',
+            specs: [{ id: 'L2_missing', level: 'L2', tlaPath: 'tla/none.tla' }],
+          }) as unknown as TlaManifest,
+        check: ({ thrown, root }) => {
+          expect(thrown, 'fail-closed 态：应抛 TlaSpecUnreadableError').toBeInstanceOf(TlaSpecUnreadableError);
+          const cliError = (thrown as TlaSpecUnreadableError).cliError;
+          expect(cliError.category, 'cliError.category').toBe('FILE_NOT_FOUND');
+          expect(cliError.rule, 'cliError.rule').toBe('D3/D4');
+          expect(cliError.exitCode, 'cliError.exitCode').toBe(2);
+          // file = manifestDir + basePath + tlaPath（即 <root>/tla/none.tla），不是 <root>/.w-model/tla/none.tla
+          expect(cliError.file, 'cliError.file 为 basePath 解析后路径').toBe(path.resolve(root, 'tla', 'none.tla'));
+          expect(cliError.message, 'cliError.message 含「不可读」').toContain('不可读');
+        },
+      },
+    ];
+    for (const row of rows) {
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tla-bp-'));
+      await fs.mkdir(path.join(root, '.w-model'), { recursive: true });
+      const manifest = await row.setup(root);
+      const manifestPath = path.join(root, '.w-model', 'tla-manifest.json');
+      let thrown: unknown = null;
+      let loaded: TlaManifest | null = null;
+      try {
+        await loadTlaContents(manifest, manifestPath);
+        loaded = manifest;
+      } catch (e) {
+        thrown = e;
+      }
+      row.check({ thrown, loaded, root });
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 
   it('CLI 真实子进程：规格文件缺失 → exit 2，ERROR_JSON.file 为 basePath 解析后路径（守卫 main 的 exitWithError + return）', async () => {

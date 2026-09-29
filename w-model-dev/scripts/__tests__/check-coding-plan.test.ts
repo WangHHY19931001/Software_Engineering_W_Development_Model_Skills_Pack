@@ -170,18 +170,37 @@ describe('check-coding-plan.ts CLI', () => {
     expect(r.stdout).toContain('ERROR_JSON');
   });
 
-  it('C8: --phase 99 非法值（空格形态越界）→ exit 2 ARG_INVALID', async () => {
-    const { root } = makeCodingPlanRepo(() => undefined);
-    const r = await runCli([root, '--phase', '99']);
-    expect(r.status).toBe(2);
-    expect(r.stderr).toContain('--phase=99');
-  });
-
-  it('C8b: 重复值 flag（--scope= 两次）→ exit 2 ARG_INVALID', async () => {
-    const { root } = makeCodingPlanRepo((r) => writeValidTree(r));
-    const r = await runCli([root, '--phase=5', '--scope=a.json', '--scope=b.json']);
-    expect(r.status).toBe(2);
-    expect(r.stdout).toMatch(/ERROR_JSON \{.*ARG_INVALID/);
+  it('C8/C8b 参数错误对（2 态：--phase 99 空格形态越界 / 重复值 flag --scope 两次）→ exit 2 ARG_INVALID', async () => {
+    const rows: Array<{
+      name: string;
+      prepare: (root: string) => void;
+      args: (root: string) => string[];
+      check: (r: { status: number; stdout: string; stderr: string }) => void;
+    }> = [
+      {
+        name: 'C8：--phase 99 非法值（空格形态越界）',
+        prepare: () => undefined,
+        args: (root) => [root, '--phase', '99'],
+        check: (r) => {
+          expect(r.status, 'C8 应 exit 2').toBe(2);
+          expect(r.stderr, 'C8 stderr 提示 --phase=99').toContain('--phase=99');
+        },
+      },
+      {
+        name: 'C8b：重复值 flag（--scope= 两次）',
+        prepare: (r) => writeValidTree(r),
+        args: (root) => [root, '--phase=5', '--scope=a.json', '--scope=b.json'],
+        check: (r) => {
+          expect(r.status, 'C8b 应 exit 2').toBe(2);
+          expect(r.stdout, 'C8b stdout ERROR_JSON ARG_INVALID').toMatch(/ERROR_JSON \{.*ARG_INVALID/);
+        },
+      },
+    ];
+    for (const row of rows) {
+      const { root } = makeCodingPlanRepo(row.prepare);
+      const r = await runCli(row.args(root));
+      row.check(r);
+    }
   });
 
   it('C2: 阶段 5-8 无 --scope → exit 1（附等号形态提示）', async () => {
@@ -385,27 +404,45 @@ describe('check-coding-plan.ts CLI', () => {
     expect(r.stdout).not.toContain('CODING_PLAN_JSON ');
   });
 
-  it('C9b: --preflight 缺一份 R3 审查 → exit 1 且 missing 具名（固定项不因变长项漂移）', async () => {
-    const { root, head } = makeCodingPlanRepo((r) => writeValidTree(r));
-    rmSync(join(root, '.w-model', 'r3-reviews', 'phase5-finalize-reliability.md'), { force: true });
-    writeScope(root, head);
-    const r = await runPreflight([root, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
-    expect(r.status).toBe(1);
-    expect(r.payload.required).toHaveLength(14);
-    expect(r.payload.missing).toEqual(['.w-model/r3-reviews/phase5-finalize-reliability.md']);
-    expect(r.payload.invalid).toEqual([]);
-  });
-
-  it('C9c: --preflight 产物在盘但 0 字节 → exit 1 且记入 invalid（与 missing 分列）', async () => {
-    const { root, head } = makeCodingPlanRepo((r) => {
-      writeValidTree(r);
-      writeFileSync(join(r, '.w-model', 'v-reviews', 'phase5-plan.md'), '');
-    });
-    writeScope(root, head);
-    const r = await runPreflight([root, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
-    expect(r.status).toBe(1);
-    expect(r.payload.missing).toEqual([]);
-    expect(r.payload.invalid).toEqual(['.w-model/v-reviews/phase5-plan.md']);
+  it('C9b/C9c preflight 负例对（2 态：缺一份 R3 审查记 missing / 产物 0 字节记 invalid，与 missing 分列；固定项不因变长项漂移）', async () => {
+    const rows: Array<{
+      name: string;
+      mutate: (root: string) => void;
+      check: (payload: { missing: string[]; invalid: string[]; required: string[] }) => void;
+    }> = [
+      {
+        name: 'C9b：--preflight 缺一份 R3 审查',
+        mutate: (root) =>
+          rmSync(join(root, '.w-model', 'r3-reviews', 'phase5-finalize-reliability.md'), { force: true }),
+        check: (payload) => {
+          expect(payload.required, 'C9b required 恒 14').toHaveLength(14);
+          expect(payload.missing, 'C9b missing 具名缺审产物').toEqual([
+            '.w-model/r3-reviews/phase5-finalize-reliability.md',
+          ]);
+          expect(payload.invalid, 'C9b invalid 为空').toEqual([]);
+        },
+      },
+      {
+        name: 'C9c：--preflight 产物在盘但 0 字节',
+        mutate: (root) => writeFileSync(join(root, '.w-model', 'v-reviews', 'phase5-plan.md'), ''),
+        check: (payload) => {
+          expect(payload.missing, 'C9c missing 为空').toEqual([]);
+          expect(payload.invalid, 'C9c invalid 具名 0 字节产物（与 missing 分列）').toEqual([
+            '.w-model/v-reviews/phase5-plan.md',
+          ]);
+        },
+      },
+    ];
+    for (const row of rows) {
+      const { root, head } = makeCodingPlanRepo((r) => {
+        writeValidTree(r);
+        row.mutate(r);
+      });
+      writeScope(root, head);
+      const r = await runPreflight([root, '--phase=5', '--scope=.w-model/scope.json', '--preflight']);
+      expect(r.status, `${row.name}：应 exit 1`).toBe(1);
+      row.check(r.payload);
+    }
   });
 
   it('C9d: --preflight 无 --scope/--change → exit 2 ARG_INVALID（清单无法确定 changeId）', async () => {

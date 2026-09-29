@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest';
+import { describe, expect, it, vi, afterEach, beforeEach, type MockInstance } from 'vitest';
 
 import { HandledCliError, exitWithError } from '../lib/cli-error.js';
 import { runMain } from '../lib/run-main.js';
@@ -23,36 +23,58 @@ describe('runMain（审计修复 P10：错误出口统一）', () => {
     process.exitCode = undefined;
   });
 
-  it('main 正常完成时不做任何事', async () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    runMain(async () => undefined);
-    await flush();
-    expect(spy).not.toHaveBeenCalled();
-    expect(process.exitCode).toBeUndefined();
-  });
-
-  it('main 抛 HandledCliError 时不重复输出（exitWithError 已处理）', async () => {
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    runMain(async () => {
-      exitWithError({ category: 'FILE_NOT_FOUND', message: '文件不存在', exitCode: 2 });
-      throw new HandledCliError();
-    });
-    await flush();
-    expect(process.exitCode).toBe(2);
-    expect(errSpy).toHaveBeenCalledTimes(1); // 仅 exitWithError 的一次
-    expect(logSpy).toHaveBeenCalledTimes(1); // 仅一条 ERROR_JSON
-  });
-
-  it('main 抛普通异常时输出 UNEXPECTED + exitCode 2', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    runMain(async () => {
-      throw new Error('boom');
-    });
-    await flush();
-    expect(process.exitCode).toBe(2);
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"UNEXPECTED"'));
+  it('main 异常路径（3 态：正常完成 / HandledCliError / 普通异常）', async () => {
+    const rows: Array<{
+      name: string;
+      main: () => Promise<undefined>;
+      check: (spies: { errSpy: MockInstance; logSpy: MockInstance }) => void;
+    }> = [
+      {
+        name: 'main 正常完成时不做任何事',
+        main: async () => undefined,
+        check: ({ errSpy }) => {
+          expect(errSpy, '正常完成：不应有任何错误输出').not.toHaveBeenCalled();
+          expect(process.exitCode, '正常完成：不应设置 exitCode').toBeUndefined();
+        },
+      },
+      {
+        name: 'main 抛 HandledCliError 时不重复输出（exitWithError 已处理）',
+        main: async () => {
+          exitWithError({ category: 'FILE_NOT_FOUND', message: '文件不存在', exitCode: 2 });
+          throw new HandledCliError();
+        },
+        check: ({ errSpy, logSpy }) => {
+          expect(process.exitCode, 'HandledCliError：exitCode 应为 2').toBe(2);
+          expect(errSpy, 'HandledCliError：仅 exitWithError 的一次错误输出').toHaveBeenCalledTimes(1);
+          expect(logSpy, 'HandledCliError：仅一条 ERROR_JSON').toHaveBeenCalledTimes(1);
+        },
+      },
+      {
+        name: 'main 抛普通异常时输出 UNEXPECTED + exitCode 2',
+        main: async () => {
+          throw new Error('boom');
+        },
+        check: ({ logSpy }) => {
+          expect(process.exitCode, '普通异常：exitCode 应为 2').toBe(2);
+          expect(logSpy, '普通异常：应输出 UNEXPECTED ERROR_JSON').toHaveBeenCalledWith(
+            expect.stringContaining('"UNEXPECTED"'),
+          );
+        },
+      },
+    ];
+    for (const row of rows) {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      try {
+        runMain(row.main);
+        await flush();
+        row.check({ errSpy, logSpy });
+      } finally {
+        // 每迭代自清理，等价原 beforeEach/afterEach 粒度（真实子进程语义不变）
+        vi.restoreAllMocks();
+        process.exitCode = undefined;
+      }
+    }
   });
 });
 

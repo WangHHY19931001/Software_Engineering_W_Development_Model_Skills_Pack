@@ -17,12 +17,6 @@ function parseFrontmatter(content: string): Record<string, string> {
 }
 
 describe('skill-metadata 双写一致性', () => {
-  it('SKILL.md frontmatter version 与 skill-metadata.json version 一致', () => {
-    const skill = readFileSync(join(ROOT, 'SKILL.md'), 'utf-8');
-    const meta = JSON.parse(readFileSync(join(ROOT, 'skill-metadata.json'), 'utf-8'));
-    expect(parseFrontmatter(skill).version).toBe(meta.version);
-  });
-
   it('skill-metadata.json name 与 SKILL.md frontmatter name 一致', () => {
     const skill = readFileSync(join(ROOT, 'SKILL.md'), 'utf-8');
     const meta = JSON.parse(readFileSync(join(ROOT, 'skill-metadata.json'), 'utf-8'));
@@ -34,26 +28,28 @@ describe('skill-metadata 双写一致性', () => {
     expect(meta.schemaVersion).toBe('1.0');
   });
 
-  it('package.json version 与 skill-metadata.json / SKILL.md frontmatter version 三处一致', () => {
+  it('版本镜像（3 态：SKILL frontmatter↔metadata / package.json 三处一致 / README·INSTALL 五处镜像）', () => {
     const skill = readFileSync(join(ROOT, 'SKILL.md'), 'utf-8');
     const meta = JSON.parse(readFileSync(join(ROOT, 'skill-metadata.json'), 'utf-8'));
     const pkg = JSON.parse(readFileSync(join(ROOT, '..', 'package.json'), 'utf-8'));
-    expect(pkg.version).toBe(meta.version);
-    expect(pkg.version).toBe(parseFrontmatter(skill).version);
+    // 态 1：SKILL.md frontmatter version 与 skill-metadata.json version 一致
+    expect(parseFrontmatter(skill).version, 'SKILL.md frontmatter version ↔ skill-metadata.json version').toBe(
+      meta.version,
+    );
+    // 态 2：package.json version 与 skill-metadata.json / SKILL.md frontmatter version 三处一致
+    expect(pkg.version, 'package.json version ↔ skill-metadata.json version').toBe(meta.version);
+    expect(pkg.version, 'package.json version ↔ SKILL.md frontmatter version').toBe(parseFrontmatter(skill).version);
+    // 态 3：README / INSTALL.md 版本与 package.json 一致（五处镜像的最后两处）
+    const readme = readFileSync(join(ROOT, '..', 'README.md'), 'utf-8');
+    const install = readFileSync(join(ROOT, '..', 'docs', 'INSTALL.md'), 'utf-8');
+    const readmeVersion = readme.match(/当前版本[^\d]*(\d+\.\d+\.\d+)/)?.[1];
+    const installVersion = install.match(/^version:\s*(\d+\.\d+\.\d+)\s*$/m)?.[1];
+    expect(readmeVersion, 'README 版本 ↔ package.json version').toBe(pkg.version);
+    expect(installVersion, 'INSTALL.md 版本 ↔ package.json version').toBe(pkg.version);
   });
 
   it('package.json doctor script 指向正式 doctor CLI', () => {
     const pkg = JSON.parse(readFileSync(join(ROOT, '..', 'package.json'), 'utf-8'));
     expect(pkg.scripts.doctor).toBe('tsx w-model-dev/scripts/cli/doctor.ts');
-  });
-
-  it('README / INSTALL.md 版本与 package.json 一致（五处镜像）', () => {
-    const pkg = JSON.parse(readFileSync(join(ROOT, '..', 'package.json'), 'utf-8'));
-    const readme = readFileSync(join(ROOT, '..', 'README.md'), 'utf-8');
-    const install = readFileSync(join(ROOT, '..', 'docs', 'INSTALL.md'), 'utf-8');
-    const readmeVersion = readme.match(/当前版本[^\d]*(\d+\.\d+\.\d+)/)?.[1];
-    const installVersion = install.match(/^version:\s*(\d+\.\d+\.\d+)\s*$/m)?.[1];
-    expect(readmeVersion).toBe(pkg.version);
-    expect(installVersion).toBe(pkg.version);
   });
 });

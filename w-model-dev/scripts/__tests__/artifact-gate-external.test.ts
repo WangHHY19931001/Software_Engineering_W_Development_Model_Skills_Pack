@@ -138,33 +138,59 @@ describe('aggregateExternalChecks（artifact gate 外部校验聚合）', () => 
     expect(r.summary.codingPlan.passed).toBe(true);
   });
 
-  it('E1b: codegraph 覆盖缺失不被 coding-plan/RTM 通过掩盖 → aggregate failed + 逐文件 reason', () => {
-    const { root } = fullPassProject();
-    // 变更里新增 src/forgotten.ts 但无查询覆盖它
-    const scope = makeScope({ changedFiles: ['src/main.ts', 'src/forgotten.ts'] });
-    const r = aggregateExternalChecks(root, 5, { scope, scopeViolations: [] });
-    expect(r.passed).toBe(false);
-    expect(r.reasons.some((v) => v.includes('src/forgotten.ts'))).toBe(true);
-    expect(r.summary.codegraph.passed).toBe(false);
-    expect(r.summary.codegraph.violationCount).toBeGreaterThan(0);
-    expect(r.summary.codegraph.requiredFileCount).toBe(2);
-    expect(r.summary.codegraph.coveredFileCount).toBe(1);
-  });
-
-  it('E1c: coding-plan 缺账本不被 codegraph 通过掩盖 → aggregate failed', () => {
-    const root = makeTmpDir();
-    mkdirSync(join(root, '.w-model', 'codegraph-queries'), { recursive: true });
-    writeFileSync(
-      join(root, '.w-model', 'codegraph-queries', 'phase5-a.json'),
-      queryJson('phase5-demo', ['src/main.ts']),
-    );
-    codingPlanTree(root, 'phase5-demo');
-    rmSync(join(root, '.superpowers', 'sdd', 'phase5-demo.plan', 'progress.md'), { force: true });
-    const r = aggregateExternalChecks(root, 5, { scope: makeScope(), scopeViolations: [] });
-    expect(r.passed).toBe(false);
-    expect(r.reasons.some((v) => v.includes('progress.md 缺失'))).toBe(true);
-    expect(r.summary.codingPlan.passed).toBe(false);
-    expect(r.summary.codingPlan.violationCount).toBeGreaterThan(0);
+  it('E1b/E1c 掩盖负例对（2 态：codegraph 覆盖缺失 / coding-plan 缺账本）不得被另一 checker 或 RTM 通过掩盖 → aggregate failed', () => {
+    const rows: Array<{
+      name: string;
+      prepare: () => { root: string };
+      options: Parameters<typeof aggregateExternalChecks>[2];
+      check: (r: ReturnType<typeof aggregateExternalChecks>) => void;
+    }> = [
+      {
+        name: 'E1b：codegraph 覆盖缺失不被 coding-plan/RTM 通过掩盖',
+        prepare: () => fullPassProject(),
+        options: { scope: makeScope({ changedFiles: ['src/main.ts', 'src/forgotten.ts'] }), scopeViolations: [] },
+        check: (r) => {
+          expect(r.passed, 'E1b aggregate 应 failed').toBe(false);
+          expect(
+            r.reasons.some((v) => v.includes('src/forgotten.ts')),
+            'E1b 逐文件 reason 具名',
+          ).toBe(true);
+          expect(r.summary.codegraph.passed, 'E1b codegraph 应 failed').toBe(false);
+          expect(r.summary.codegraph.violationCount, 'E1b codegraph 违规计数 > 0').toBeGreaterThan(0);
+          expect(r.summary.codegraph.requiredFileCount, 'E1b 须覆盖 2 文件').toBe(2);
+          expect(r.summary.codegraph.coveredFileCount, 'E1b 实覆盖 1 文件').toBe(1);
+        },
+      },
+      {
+        name: 'E1c：coding-plan 缺账本不被 codegraph 通过掩盖',
+        prepare: () => {
+          const root = makeTmpDir();
+          mkdirSync(join(root, '.w-model', 'codegraph-queries'), { recursive: true });
+          writeFileSync(
+            join(root, '.w-model', 'codegraph-queries', 'phase5-a.json'),
+            queryJson('phase5-demo', ['src/main.ts']),
+          );
+          codingPlanTree(root, 'phase5-demo');
+          rmSync(join(root, '.superpowers', 'sdd', 'phase5-demo.plan', 'progress.md'), { force: true });
+          return { root };
+        },
+        options: { scope: makeScope(), scopeViolations: [] },
+        check: (r) => {
+          expect(r.passed, 'E1c aggregate 应 failed').toBe(false);
+          expect(
+            r.reasons.some((v) => v.includes('progress.md 缺失')),
+            'E1c 账本缺失 reason 具名',
+          ).toBe(true);
+          expect(r.summary.codingPlan.passed, 'E1c coding-plan 应 failed').toBe(false);
+          expect(r.summary.codingPlan.violationCount, 'E1c coding-plan 违规计数 > 0').toBeGreaterThan(0);
+        },
+      },
+    ];
+    for (const row of rows) {
+      const { root } = row.prepare();
+      const r = aggregateExternalChecks(root, 5, row.options);
+      row.check(r);
+    }
   });
 
   it('E2: scope 为 null → 两 checker fail-closed（须提供变更上下文）且 summary 标记未提供', () => {
@@ -194,50 +220,76 @@ describe('aggregateExternalChecks（artifact gate 外部校验聚合）', () => 
     expect(r.reasons.some((v) => v.includes('headRef 过期'))).toBe(true);
   });
 
-  it('E3b: scope 已提供但 Git 绑定失败（scopeProvidedButFailed）不得输出"未提供 --scope"误导消息', () => {
-    const { root } = fullPassProject();
-    const r = aggregateExternalChecks(root, 5, {
+  it('E3b/E3c Git 绑定失败对（2 态：scopeProvidedButFailed 不得误导「未提供 --scope」/ D1 语义 provided=true + attemptedChangeId）', () => {
+    // 公共负例输入：scope 已提供但 Git 绑定失败（headRef 过期）
+    const failedBinding: {
+      scope: null;
+      scopeViolations: string[];
+      scopeProvidedButFailed: true;
+    } = {
       scope: null,
       scopeViolations: ['change-scope: headRef 过期（scope.headRef 不等于当前 HEAD）'],
       scopeProvidedButFailed: true,
-    });
-    expect(r.passed).toBe(false);
-    // 真实原因（scopeViolations）在
-    expect(r.reasons.some((v) => v.includes('headRef 过期'))).toBe(true);
-    // 不得出现与事实不符的"未提供 --scope"文案（纠正动作应指向更新过期 scope 而非补 scope 文件）
-    expect(r.reasons.some((v) => v.includes('未提供 --scope'))).toBe(false);
-    // summary 计数归零（未进入 strict 校验）
-    expect(r.summary.codegraph.violationCount).toBe(0);
-    expect(r.summary.codingPlan.violationCount).toBe(0);
-    // 控制组：未提供 scope 且未给 scopeProvidedButFailed 标志时仍输出"未提供"消息（既有语义）
-    const r2 = aggregateExternalChecks(root, 5, { scope: null, scopeViolations: [] });
-    expect(r2.reasons.some((v) => v.includes('未提供 --scope'))).toBe(true);
-  });
-
-  it('E3c: scope 已提供但 Git 绑定失败 → summary 标记 provided=true + 尝试绑定的 changeId（D1 语义）', () => {
-    const { root } = fullPassProject();
-    const attemptedChangeId = 'phase5-reviewfix';
-    const r = aggregateExternalChecks(root, 5, {
-      scope: null,
-      scopeViolations: ['change-scope: headRef 过期（scope.headRef 不等于当前 HEAD）'],
-      scopeProvidedButFailed: true,
-      attemptedChangeId,
-    });
-    expect(r.passed).toBe(false);
-    // 真实原因（scopeViolations）以 [scope] 前缀进 reasons
-    expect(r.reasons.some((v) => v.startsWith('[scope]') && v.includes('headRef 过期'))).toBe(true);
-    // 不得出现与事实不符的"未提供 --scope"误导文案（纠正动作应指向更新过期 scope）
-    expect(r.reasons.some((v) => v.includes('未提供 --scope'))).toBe(false);
-    // D1 语义：provided=true 含「提供后被 Git 绑定拒绝」；changeId 为尝试绑定的 change
-    expect(r.summary.codegraph.provided).toBe(true);
-    expect(r.summary.codegraph.changeId).toBe(attemptedChangeId);
-    expect(r.summary.codegraph.passed).toBe(false);
-    expect(r.summary.codingPlan.provided).toBe(true);
-    expect(r.summary.codingPlan.changeId).toBe(attemptedChangeId);
-    expect(r.summary.codingPlan.passed).toBe(false);
-    // violationCount 保持既有 [scope] 语义：计数归零（未进入 strict 校验）
-    expect(r.summary.codegraph.violationCount).toBe(0);
-    expect(r.summary.codingPlan.violationCount).toBe(0);
+    };
+    const rows: Array<{ name: string; check: () => void }> = [
+      {
+        name: 'E3b：不得输出「未提供 --scope」误导消息',
+        check: () => {
+          const { root } = fullPassProject();
+          const r = aggregateExternalChecks(root, 5, { ...failedBinding });
+          expect(r.passed, 'E3b aggregate 应 failed').toBe(false);
+          // 真实原因（scopeViolations）在
+          expect(
+            r.reasons.some((v) => v.includes('headRef 过期')),
+            'E3b 真实原因在 reasons',
+          ).toBe(true);
+          // 不得出现与事实不符的"未提供 --scope"文案（纠正动作应指向更新过期 scope 而非补 scope 文件）
+          expect(
+            r.reasons.some((v) => v.includes('未提供 --scope')),
+            'E3b 不得出现误导「未提供 --scope」文案',
+          ).toBe(false);
+          // summary 计数归零（未进入 strict 校验）
+          expect(r.summary.codegraph.violationCount, 'E3b codegraph violationCount 归零').toBe(0);
+          expect(r.summary.codingPlan.violationCount, 'E3b codingPlan violationCount 归零').toBe(0);
+          // 控制组：未提供 scope 且未给 scopeProvidedButFailed 标志时仍输出"未提供"消息（既有语义）
+          const r2 = aggregateExternalChecks(root, 5, { scope: null, scopeViolations: [] });
+          expect(
+            r2.reasons.some((v) => v.includes('未提供 --scope')),
+            'E3b 控制组保留「未提供」消息',
+          ).toBe(true);
+        },
+      },
+      {
+        name: 'E3c：summary 标记 provided=true + 尝试绑定的 changeId（D1 语义）',
+        check: () => {
+          const { root } = fullPassProject();
+          const attemptedChangeId = 'phase5-reviewfix';
+          const r = aggregateExternalChecks(root, 5, { ...failedBinding, attemptedChangeId });
+          expect(r.passed, 'E3c aggregate 应 failed').toBe(false);
+          // 真实原因（scopeViolations）以 [scope] 前缀进 reasons
+          expect(
+            r.reasons.some((v) => v.startsWith('[scope]') && v.includes('headRef 过期')),
+            'E3c 真实原因以 [scope] 前缀进 reasons',
+          ).toBe(true);
+          // 不得出现与事实不符的"未提供 --scope"误导文案（纠正动作应指向更新过期 scope）
+          expect(
+            r.reasons.some((v) => v.includes('未提供 --scope')),
+            'E3c 不得出现误导文案',
+          ).toBe(false);
+          // D1 语义：provided=true 含「提供后被 Git 绑定拒绝」；changeId 为尝试绑定的 change
+          expect(r.summary.codegraph.provided, 'E3c codegraph provided=true').toBe(true);
+          expect(r.summary.codegraph.changeId, 'E3c codegraph changeId=attemptedChangeId').toBe(attemptedChangeId);
+          expect(r.summary.codegraph.passed, 'E3c codegraph passed=false').toBe(false);
+          expect(r.summary.codingPlan.provided, 'E3c codingPlan provided=true').toBe(true);
+          expect(r.summary.codingPlan.changeId, 'E3c codingPlan changeId=attemptedChangeId').toBe(attemptedChangeId);
+          expect(r.summary.codingPlan.passed, 'E3c codingPlan passed=false').toBe(false);
+          // violationCount 保持既有 [scope] 语义：计数归零（未进入 strict 校验）
+          expect(r.summary.codegraph.violationCount, 'E3c codegraph violationCount 归零').toBe(0);
+          expect(r.summary.codingPlan.violationCount, 'E3c codingPlan violationCount 归零').toBe(0);
+        },
+      },
+    ];
+    for (const row of rows) row.check();
   });
 
   it('E4: summary 携带 changeId 与相对路径计数', () => {

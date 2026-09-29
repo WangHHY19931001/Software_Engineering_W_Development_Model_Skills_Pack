@@ -77,32 +77,53 @@ describe('check-budget CLI R6 用量实效接线（D-4b）', () => {
     expect(r.stdout).not.toContain('R6：');
   });
 
-  it('exit 0：--run-log 无有效 tokens（Σtokens=0）→ 跳过但显式告警「R6 未生效」', async () => {
-    const runLog = await writeRunLog(['{"phase":5,"action":"gate","role":"G","outcome":"success"}']);
-    const r = runCli([BUDGET_SAMPLE, `--run-log=${runLog}`, '--phase=5']);
-    expect(r.code).toBe(0);
-    expect(r.stderr).toContain('R6 未生效');
-  });
+  it('诊断行（3 态逐条：Σtokens=0 告警「R6 未生效」/ 未提供 run-log 未接线诊断 / 重复归账上界口径诊断）→ exit 0 不改判据', async () => {
+    const dup = (runId: string): string =>
+      `{"runId":"${runId}","timestamp":"2026-09-19T04:01:00Z","phase":1,"action":"r3-completeness","role":"R","duration_s":30,"tokens":1000,"outcome":"success"}`;
+    type CliResult = ReturnType<typeof runCli>;
+    const rows: Array<{ name: string; args: () => Promise<string[]>; check: (r: CliResult) => void }> = [
+      {
+        name: 'Σtokens=0：跳过但显式告警「R6 未生效」（跳过不等于通过）',
+        args: async () => {
+          const runLog = await writeRunLog(['{"phase":5,"action":"gate","role":"G","outcome":"success"}']);
+          return [BUDGET_SAMPLE, `--run-log=${runLog}`, '--phase=5'];
+        },
+        check: (r) => {
+          expect(r.code, 'Σtokens=0 行退出码 0').toBe(0);
+          expect(r.stderr, 'Σtokens=0 行 stderr 告警「R6 未生效」').toContain('R6 未生效');
+        },
+      },
+      {
+        name: '未提供 --run-log：非阻断诊断「R6/R5-b 未生效（未提供 run-log）」',
+        args: async () => [BUDGET_SAMPLE, '--phase=8'],
+        check: (r) => {
+          expect(r.code, '未提供行退出码 0').toBe(0);
+          expect(r.stdout + r.stderr, '未提供行应出未接线诊断').toMatch(/R6\/R5-b 未生效（未提供 run-log）/);
+        },
+      },
+      {
+        name: '同 (timestamp+tokens+duration_s) 多行：「疑似重复归账」上界口径诊断，退出码不变',
+        args: async () => {
+          // 3 条同键记录 = 1 组（1000×3 仍远低于样本上限 → 只出诊断，不改退出码）
+          const runLog = await writeRunLog([dup('r3-a'), dup('r3-b'), dup('r3-c')]);
+          return [BUDGET_SAMPLE, `--run-log=${runLog}`, '--phase=1'];
+        },
+        check: (r) => {
+          expect(r.code, '重复归账行退出码 0（诊断不改判据）').toBe(0);
+          expect(r.stdout + r.stderr, '重复归账行应报「疑似重复归账 1 组」').toMatch(/疑似重复归账 1 组/);
+          expect(r.stdout + r.stderr, '重复归账行应报「Σtokens 为上界口径」').toMatch(/Σtokens 为上界口径/);
+        },
+      },
+    ];
+    for (const row of rows) {
+      const args = await row.args();
+      const r = runCli(args);
+      row.check(r);
+    }
+  }, 180_000);
 });
 
 describe('check-budget CLI 未接线可见化与上界口径诊断（D-5② / N-6）', () => {
-  it('exit 0：未提供 --run-log → 非阻断诊断「R6/R5-b 未生效（未提供 run-log）」', () => {
-    const r = runCli([BUDGET_SAMPLE, '--phase=8']);
-    expect(r.code).toBe(0);
-    expect(r.stdout + r.stderr).toMatch(/R6\/R5-b 未生效（未提供 run-log）/);
-  });
-
-  it('exit 0：同 (timestamp+tokens+duration_s) 多行 → 「疑似重复归账」上界口径诊断，退出码不变', async () => {
-    const dup = (runId: string): string =>
-      `{"runId":"${runId}","timestamp":"2026-09-19T04:01:00Z","phase":1,"action":"r3-completeness","role":"R","duration_s":30,"tokens":1000,"outcome":"success"}`;
-    const runLog = await writeRunLog([dup('r3-a'), dup('r3-b'), dup('r3-c')]);
-    const r = runCli([BUDGET_SAMPLE, `--run-log=${runLog}`, '--phase=1']);
-    // 3 条同键记录 = 1 组（1000×3 仍远低于样本上限 → 只出诊断，不改退出码）
-    expect(r.code).toBe(0);
-    expect(r.stdout + r.stderr).toMatch(/疑似重复归账 1 组/);
-    expect(r.stdout + r.stderr).toMatch(/Σtokens 为上界口径/);
-  });
-
   it('exit 0：无重复归账（键互异）→ 不出现「疑似重复归账」诊断', async () => {
     const runLog = await writeRunLog([
       '{"runId":"a","timestamp":"2026-09-19T04:01:00Z","phase":1,"action":"gate","role":"G","duration_s":30,"tokens":1000,"outcome":"success"}',

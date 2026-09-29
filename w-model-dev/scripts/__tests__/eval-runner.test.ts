@@ -51,19 +51,24 @@ describe('eval corpus diff guard（R6 不虚增语料）', () => {
     );
   });
 
-  it('未声明 behavior change 时新增 prompt 被拒（reason 含 behavior change）', () => {
+  it('未声明 behavior change 时新增 prompt / mapping 被拒（2 态对称缺口，reason 含 behavior change）', () => {
+    // 态 1：新增 prompt
     const fakePrompt = { id: 99, scenario: 'fake', prompt: 'p99', expected: 'e99', route: 'enable' as const };
-    const problems = validateEvalDiff({
+    const promptProblems = validateEvalDiff({
       changedBehavior: false,
       prompts: [...originalPrompts, fakePrompt],
       mappings: originalMappings,
     });
-    expect(problems.some((problem) => problem.includes('behavior change'))).toBe(true);
-    expect(problems.some((problem) => problem.includes('id:99'))).toBe(true);
-  });
-
-  it('未声明 behavior change 时新增 mapping 被拒（对称缺口）', () => {
-    const problems = validateEvalDiff({
+    expect(
+      promptProblems.some((problem) => problem.includes('behavior change')),
+      '新增 prompt 未声明 behavior change 应被拒',
+    ).toBe(true);
+    expect(
+      promptProblems.some((problem) => problem.includes('id:99')),
+      '新增 prompt 应点名 id:99',
+    ).toBe(true);
+    // 态 2：新增 mapping（对称缺口）
+    const mappingProblems = validateEvalDiff({
       changedBehavior: false,
       prompts: originalPrompts,
       mappings: {
@@ -74,7 +79,10 @@ describe('eval corpus diff guard（R6 不虚增语料）', () => {
         ],
       },
     });
-    expect(problems.some((problem) => problem.includes('behavior change'))).toBe(true);
+    expect(
+      mappingProblems.some((problem) => problem.includes('behavior change')),
+      '新增 mapping 未声明 behavior change 应被拒（对称缺口）',
+    ).toBe(true);
   });
 
   it('显式声明 behavior change 后允许新增语料', () => {

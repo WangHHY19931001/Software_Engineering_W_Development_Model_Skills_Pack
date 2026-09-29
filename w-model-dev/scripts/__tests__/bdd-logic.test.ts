@@ -1042,92 +1042,68 @@ Scenario: 无 Given 无 Then
 //   - 用例 3：currentPhase=2 + 全覆盖（uncoveredSdNodes 空数组），应零 violation
 
 describe('D8 SD Coverage', () => {
-  it('designCoverage.uncoveredSdNodes 非空时应产生 D8 violations', () => {
-    const manifest = {
-      schemaVersion: '1.0',
-      projectId: 'test',
-      basePath: 'features/',
-      currentPhase: 1, // currentPhase=1 让 schema 放行非空 uncoveredSdNodes；phase 参数=2 触发业务层 D8 校验
-      features: [
-        {
-          id: 'L1_test-001',
-          level: 1,
-          filePath: 'L1/L1_test-001.feature',
-          scenarioCount: 1,
-          stateMachineId: 'SM-L1-test',
-          tlaSpecId: 'L1_test',
-          reqIds: ['REQ-001'],
-          designIds: ['SD-001'],
-          parentFeatureIds: [],
-          siblingFeatureIds: [],
-          childFeatureIds: [],
+  it('designCoverage 违规行（2 态：uncoveredSdNodes 非空 / designCoverage 缺失）应产生 D8 violations', () => {
+    const feature = {
+      id: 'L1_test-001',
+      level: 1,
+      filePath: 'L1/L1_test-001.feature',
+      scenarioCount: 1,
+      stateMachineId: 'SM-L1-test',
+      tlaSpecId: 'L1_test',
+      reqIds: ['REQ-001'],
+      designIds: ['SD-001'],
+      parentFeatureIds: [],
+      siblingFeatureIds: [],
+      childFeatureIds: [],
+    };
+    const stateMachine = {
+      id: 'SM-L1-test',
+      level: 1,
+      states: ['S1', 'S2'],
+      initialState: 'S1',
+      terminalStates: [],
+      acceptingStates: ['S2'],
+      rejectingStates: [],
+      transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
+      invariants: ['S2 => true'],
+    };
+    const rows = [
+      {
+        name: 'designCoverage.uncoveredSdNodes 非空',
+        designCoverage: {
+          totalSdNodes: 3,
+          coveredSdNodes: ['SD-001'],
+          uncoveredSdNodes: ['SD-002', 'SD-003'],
+          coverageRate: 0.333,
         },
-      ],
-      stateMachines: [
-        {
-          id: 'SM-L1-test',
-          level: 1,
-          states: ['S1', 'S2'],
-          initialState: 'S1',
-          terminalStates: [],
-          acceptingStates: ['S2'],
-          rejectingStates: [],
-          transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
-          invariants: ['S2 => true'],
-        },
-      ],
-      designCoverage: {
-        totalSdNodes: 3,
-        coveredSdNodes: ['SD-001'],
-        uncoveredSdNodes: ['SD-002', 'SD-003'],
-        coverageRate: 0.333,
+        marker: /SD-002|SD-003/,
+        expectFailed: true,
       },
-    } as any;
-    const result = checkBddModel({ manifest, phase: 2, parsedFeatures: [] });
-    expect(result.dimensions.sdCoverage.length).toBeGreaterThan(0);
-    expect(result.dimensions.sdCoverage.join(' ')).toMatch(/SD-002|SD-003/);
-    expect(result.passed).toBe(false);
-  });
-
-  it('designCoverage 缺失（phase>=2）应产生 D8 violations', () => {
-    const manifest = {
-      schemaVersion: '1.0',
-      projectId: 'test',
-      basePath: 'features/',
-      currentPhase: 1,
-      features: [
-        {
-          id: 'L1_test-001',
-          level: 1,
-          filePath: 'L1/L1_test-001.feature',
-          scenarioCount: 1,
-          stateMachineId: 'SM-L1-test',
-          tlaSpecId: 'L1_test',
-          reqIds: ['REQ-001'],
-          designIds: ['SD-001'],
-          parentFeatureIds: [],
-          siblingFeatureIds: [],
-          childFeatureIds: [],
-        },
-      ],
-      stateMachines: [
-        {
-          id: 'SM-L1-test',
-          level: 1,
-          states: ['S1', 'S2'],
-          initialState: 'S1',
-          terminalStates: [],
-          acceptingStates: ['S2'],
-          rejectingStates: [],
-          transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
-          invariants: ['S2 => true'],
-        },
-      ],
-    } as any;
-    // currentPhase=1 让 schema 放行；phase 参数=2 触发业务层缺失校验
-    const result = checkBddModel({ manifest, phase: 2, parsedFeatures: [] });
-    expect(result.dimensions.sdCoverage.length).toBeGreaterThan(0);
-    expect(result.dimensions.sdCoverage.join(' ')).toMatch(/designCoverage.*缺失|designCoverage.*missing/);
+      {
+        name: 'designCoverage 缺失（phase>=2）',
+        designCoverage: undefined,
+        marker: /designCoverage.*缺失|designCoverage.*missing/,
+        expectFailed: false,
+      },
+    ] as const;
+    for (const row of rows) {
+      // currentPhase=1 让 schema 放行非空 uncoveredSdNodes；phase 参数=2 触发业务层 D8 校验
+      const manifest = {
+        schemaVersion: '1.0',
+        projectId: 'test',
+        basePath: 'features/',
+        currentPhase: 1,
+        features: [feature],
+        stateMachines: [stateMachine],
+        ...(row.designCoverage === undefined ? {} : { designCoverage: row.designCoverage }),
+      } as any;
+      const result = checkBddModel({ manifest, phase: 2, parsedFeatures: [] });
+      expect(result.dimensions.sdCoverage.length, `${row.name} 应产生 D8 violations`).toBeGreaterThan(0);
+      expect(result.dimensions.sdCoverage.join(' '), `${row.name} 违规具名`).toMatch(row.marker);
+      if (row.expectFailed) {
+        expect(result.passed, `${row.name} 应整体不通过`).toBe(false);
+      }
+    }
   });
 
   it('designCoverage 全覆盖时 D8 violations 为空', () => {

@@ -44,17 +44,16 @@ describe('PHASES', () => {
 });
 
 describe('ARTIFACT_PATHS', () => {
-  it('.w-model 工件相对路径单点事实源', () => {
-    expect(ARTIFACT_PATHS).toEqual({
+  it('路径前缀（2 态：单点事实源 / 前缀断言）', () => {
+    // 态 1：单点事实源（完整对象锁定）
+    expect(ARTIFACT_PATHS, '单点事实源：完整对象锁定').toEqual({
       rtm: '.w-model/rtm.json',
       tlaManifest: '.w-model/tla-manifest.json',
       bddManifest: '.w-model/bdd-manifest.json',
     });
-  });
-
-  it('路径均以 .w-model/ 为前缀', () => {
+    // 态 2：路径均以 .w-model/ 为前缀
     for (const p of Object.values(ARTIFACT_PATHS)) {
-      expect(p.startsWith('.w-model/')).toBe(true);
+      expect(p.startsWith('.w-model/'), `${p} 应以 .w-model/ 为前缀`).toBe(true);
     }
   });
 });

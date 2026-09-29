@@ -135,46 +135,40 @@ describe('R0 首阶段自举形态（E-2 方案 B）', () => {
     expect(diagnostic).toContain('放行记录将于闭环门后写入');
   });
 
-  it('② 零记录 + 未提供 checkpointLog → R0 违规仍在（fail-closed 回归）', () => {
+  it('②③⑤ 零记录负例（3 态：未提供 checkpointLog / 空语义（missingReason 两态·空 Map）/ 仅 phase-2 或 phase-1 空白）→ R0 违规仍在（fail-closed 回归）', () => {
+    const expectR0Violation = (result: ReturnType<typeof checkCheckpoint>, name: string): void => {
+      expect(result.passed, `${name}：应不通过`).toBe(false);
+      expect(
+        result.violations.some((v) => v.includes('零证据不等于合规')),
+        `${name}：应含「零证据不等于合规」`,
+      ).toBe(true);
+      expect(result.diagnostics, `${name}：不得出现 BOOTSTRAP_VALIDATION 诊断`).toBeUndefined();
+    };
+    // 态 1：未提供 checkpointLog（undefined / 显式 undefined 两形态）
     for (const options of [undefined, { checkpointLog: undefined }]) {
-      const result = checkCheckpoint([], options);
-      expect(result.passed).toBe(false);
-      expect(result.violations.some((v) => v.includes('零证据不等于合规'))).toBe(true);
-      expect(result.diagnostics).toBeUndefined();
+      expectR0Violation(checkCheckpoint([], options), `未提供 checkpointLog（${String(options)}）`);
     }
-  });
-
-  it('③ 零记录 + checkpointLog 空语义（missingReason 两态 / 空 Map）→ R0 违规仍在（fail-closed 回归）', () => {
-    // 目录已提供但无 phase-N 匹配（S18 语义：CLI 传 undefined + missingReason）
+    // 态 2：空语义——目录已提供但无 phase-N 匹配（S18 语义）/ 不可读 / 空 Map
     const noMatch = checkCheckpoint([], { checkpointLog: undefined, checkpointLogMissingReason: 'no-phase-match' });
-    expect(noMatch.passed).toBe(false);
-    expect(noMatch.violations.some((v) => v.includes('零证据不等于合规'))).toBe(true);
-    expect(noMatch.violations.some((v) => v.includes('checkpoint-log 无 phase-N 匹配记录（目录已提供）'))).toBe(false); // 零记录时 R3 空转，reason 不出现
-    // 目录已提供但不可读
+    expectR0Violation(noMatch, '空语义·no-phase-match');
+    expect(
+      noMatch.violations.some((v) => v.includes('checkpoint-log 无 phase-N 匹配记录（目录已提供）')),
+      '零记录时 R3 空转，reason 不出现',
+    ).toBe(false);
     const unreadable = checkCheckpoint([], { checkpointLog: undefined, checkpointLogMissingReason: 'dir-unreadable' });
-    expect(unreadable.passed).toBe(false);
-    expect(unreadable.violations.some((v) => v.includes('零证据不等于合规'))).toBe(true);
-    // 目录已提供但加载结果为空 Map → 不走自举形态，原违规保留
+    expectR0Violation(unreadable, '空语义·dir-unreadable');
     const emptyMap = checkCheckpoint([], { checkpointLog: new Map() });
-    expect(emptyMap.passed).toBe(false);
-    expect(emptyMap.violations.some((v) => v.includes('零证据不等于合规'))).toBe(true);
-    expect(emptyMap.diagnostics).toBeUndefined();
-  });
-
-  it('⑤ 零记录 + Map 仅含 phase-2 确认（无 phase-1）→ R0 违规仍在（相位缝隙负例，修复轮 1）', () => {
+    expectR0Violation(emptyMap, '空语义·空 Map（不走自举形态，原违规保留）');
+    // 态 3：仅 phase-2 确认（无 phase-1）/ phase-1 条目空白——相位缝隙负例（修复轮 1）。
     // 审查复现态：零放行记录 + 目录仅 phase-2.txt → 初版「Map 非空」在此 exit 0（穿透
     // 「零证据不等于合规」）。收紧后：首放行的初级证据为零，自举形态不适用。
     const phase2Only = checkCheckpoint([], {
       checkpointLog: new Map([['2', '用户确认：放行进入阶段 3（user-id: bob）']]),
     });
-    expect(phase2Only.passed).toBe(false);
-    expect(phase2Only.violations.some((v) => v.includes('零证据不等于合规'))).toBe(true);
-    expect(phase2Only.diagnostics).toBeUndefined();
+    expectR0Violation(phase2Only, '仅 phase-2 确认（相位缝隙）');
     // 相位缝隙的另一半：phase-1 条目存在但为空白 → 同样不支撑自举（与 R3 空白同判）
     const blankPhase1 = checkCheckpoint([], { checkpointLog: new Map([['1', '   ']]) });
-    expect(blankPhase1.passed).toBe(false);
-    expect(blankPhase1.violations.some((v) => v.includes('零证据不等于合规'))).toBe(true);
-    expect(blankPhase1.diagnostics).toBeUndefined();
+    expectR0Violation(blankPhase1, 'phase-1 条目空白（相位缝隙）');
   });
 
   it('④ 有记录路径零变化：放行记录在场时不产生 BOOTSTRAP_VALIDATION 诊断（既有用例零回归）', () => {
@@ -283,19 +277,27 @@ describe('D-5 legacy 吸收谓词（两门同判）', () => {
     expect((result.diagnostics ?? []).some((d) => d.startsWith('LEGACY_REWORK_HINTS'))).toBe(true);
   });
 
-  it('同一 legacy 旧行：checkpoint 门不再报 [schema] 且整体通过（D-5 核心）', () => {
-    const result = checkCheckpoint([validCheckpoint, legacyFailedReview], confirmed);
-    expect(result.violations.filter((v) => v.includes('[schema]'))).toEqual([]);
-    expect(result.passed).toBe(true);
-  });
-
-  it('legacy 旧行（identity/variant 族）：checkpoint 门同样不再报 [schema] 且整体通过', () => {
-    const schemaResult = validateBySchema('run-log', legacyEmergencyFix);
-    expect(schemaResult.valid).toBe(false);
-    expect(isLegacyAbsorbableEntry(legacyEmergencyFix, schemaResult.errorMessages)).toBe(true);
-    const result = checkCheckpoint([validCheckpoint, legacyEmergencyFix], confirmed);
-    expect(result.violations.filter((v) => v.includes('[schema]'))).toEqual([]);
-    expect(result.passed).toBe(true);
+  it('checkpoint 门对两类 legacy 旧行（2 态：reworkHints 族 / identity·variant 族）均不再报 [schema] 且整体通过（D-5 核心）', () => {
+    // 判据不变量（规格 §5）：同一谓词两门同判——checkpoint 门对两类 legacy 旧行均按
+    // 非 blocking 吸收（修复前报 `[schema]` blocking）。
+    const rows = [
+      { name: 'legacy 旧行（reworkHints 族：cutoff 前 failed review 缺非空 reworkHints）', entry: legacyFailedReview },
+      {
+        name: 'legacy 旧行（identity/variant 族：cutoff 前 emergency-fix 未声明 variant）',
+        entry: legacyEmergencyFix,
+      },
+    ] as const;
+    for (const row of rows) {
+      const schemaResult = validateBySchema('run-log', row.entry);
+      expect(schemaResult.valid, `${row.name}：触发 schema required 失败（legacy 形态前提）`).toBe(false);
+      expect(isLegacyAbsorbableEntry(row.entry, schemaResult.errorMessages), `${row.name}：谓词为真`).toBe(true);
+      const result = checkCheckpoint([validCheckpoint, row.entry], confirmed);
+      expect(
+        result.violations.filter((v) => v.includes('[schema]')),
+        `${row.name}：不报 [schema]`,
+      ).toEqual([]);
+      expect(result.passed, `${row.name}：整体通过`).toBe(true);
+    }
   });
 
   it('真实类型错误仍 blocking，且两门同判（回归）', () => {

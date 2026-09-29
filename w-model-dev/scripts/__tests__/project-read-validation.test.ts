@@ -63,14 +63,39 @@ function runCli(script: string, args: string[]): { code: number | null; stdout: 
 }
 
 describe('project.json 读取侧 schema 校验（F-G4-14：三入口统一 fail-closed）', () => {
-  it('check-budget：--project 缺必填字段（无 updatedAt）→ exit 2 STRUCTURE_INVALID（原 warn-and-skip exit 0 场景反转）', async () => {
-    const budget = await write('budget.json', VALID_BUDGET);
-    const project = await write('project.json', '{"id":"smoke","name":"Smoke"}');
-    const r = runCli('check-budget.ts', [budget, `--project=${project}`]);
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('STRUCTURE_INVALID');
-    expect(r.stdout).toContain('ERROR_JSON ');
-  });
+  it('STRUCTURE_INVALID 三入口对照（3 态逐 CLI 具名：check-budget / check-maturity / wm-status）→ exit 2（原 warn-and-skip 场景反转）', async () => {
+    const rows: Array<{ name: string; prepare: () => Promise<ReturnType<typeof runCli>> }> = [
+      {
+        name: 'check-budget：--project 缺必填字段（无 updatedAt）',
+        prepare: async () => {
+          const budget = await write('budget.json', VALID_BUDGET);
+          const project = await write('project.json', '{"id":"smoke","name":"Smoke"}');
+          return runCli('check-budget.ts', [budget, `--project=${project}`]);
+        },
+      },
+      {
+        name: 'check-maturity：--project 缺必填字段（无 status/createdAt）',
+        prepare: async () => {
+          const maturity = await write('maturity.json', VALID_MATURITY);
+          const project = await write('project.json', '{"id":"smoke"}');
+          return runCli('check-maturity.ts', [maturity, `--project=${project}`]);
+        },
+      },
+      {
+        name: 'wm-status：project.json 缺必填字段（只读查询同样 fail-closed）',
+        prepare: async () => {
+          await write(path.join('.w-model', 'project.json'), '{"id":"smoke","name":"Smoke"}');
+          return runCli('wm-status.ts', [tmpDir]);
+        },
+      },
+    ];
+    for (const row of rows) {
+      const r = await row.prepare();
+      expect(r.code, `${row.name}：应 exit 2`).toBe(2);
+      expect(r.stderr, `${row.name}：应报 STRUCTURE_INVALID`).toContain('STRUCTURE_INVALID');
+      expect(r.stdout, `${row.name}：应输出 ERROR_JSON`).toContain('ERROR_JSON ');
+    }
+  }, 60_000);
 
   it('check-budget：合法 project → 正常业务路径（exit 0，R1 使用 projectUpdatedAt）', async () => {
     const budget = await write('budget.json', VALID_BUDGET);
@@ -80,28 +105,11 @@ describe('project.json 读取侧 schema 校验（F-G4-14：三入口统一 fail-
     expect(r.stdout).toContain('BUDGET_JSON');
   });
 
-  it('check-maturity：--project 缺必填字段（无 status/createdAt）→ exit 2 STRUCTURE_INVALID（原 warn-and-skip 场景反转）', async () => {
-    const maturity = await write('maturity.json', VALID_MATURITY);
-    const project = await write('project.json', '{"id":"smoke"}');
-    const r = runCli('check-maturity.ts', [maturity, `--project=${project}`]);
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('STRUCTURE_INVALID');
-    expect(r.stdout).toContain('ERROR_JSON ');
-  });
-
   it('check-maturity：合法 project → 正常业务路径（exit 0，R3/R4 使用 status/createdAt）', async () => {
     const maturity = await write('maturity.json', VALID_MATURITY);
     const project = await write('project.json', VALID_PROJECT);
     const r = runCli('check-maturity.ts', [maturity, `--project=${project}`]);
     expect(r.code).toBe(0);
     expect(r.stdout).toContain('MATURITY_JSON');
-  });
-
-  it('wm-status：project.json 缺必填字段 → exit 2 STRUCTURE_INVALID（只读查询同样 fail-closed）', async () => {
-    await write(path.join('.w-model', 'project.json'), '{"id":"smoke","name":"Smoke"}');
-    const r = runCli('wm-status.ts', [tmpDir]);
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('STRUCTURE_INVALID');
-    expect(r.stdout).toContain('ERROR_JSON ');
   });
 });

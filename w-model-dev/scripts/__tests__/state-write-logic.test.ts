@@ -503,18 +503,27 @@ describe('writeStateJson', () => {
     await expect(fs.access(path.join(lock, 'owner', 'metadata.json'))).resolves.toBeUndefined();
   });
 
-  it.each(['', '{broken'])('rejects an owner with %j metadata without deleting the unknown owner', async (metadata) => {
-    const p = target(`unknown-owner-${metadata === '' ? 'empty' : 'broken'}.json`);
-    const lock = `${p}.lock`;
-    const ownerMetadataPath = path.join(lock, 'owner', 'metadata.json');
-    await fs.mkdir(path.dirname(ownerMetadataPath), { recursive: true });
-    await fs.writeFile(ownerMetadataPath, metadata, 'utf-8');
+  it('rejects an owner with unknown metadata without deleting the unknown owner（2 态：空串 / 坏 JSON，元数据原样保留）', async () => {
+    const rows = [
+      { metadata: '', label: '空串 metadata', file: 'unknown-owner-empty.json' },
+      { metadata: '{broken', label: '坏 JSON metadata', file: 'unknown-owner-broken.json' },
+    ];
+    for (const row of rows) {
+      const p = target(row.file);
+      const lock = `${p}.lock`;
+      const ownerMetadataPath = path.join(lock, 'owner', 'metadata.json');
+      await fs.mkdir(path.dirname(ownerMetadataPath), { recursive: true });
+      await fs.writeFile(ownerMetadataPath, row.metadata, 'utf-8');
 
-    const result = await writeStateJson(p, '{"v":1}', { lockTimeoutMs: 5_000 });
+      const result = await writeStateJson(p, '{"v":1}', { lockTimeoutMs: 5_000 });
 
-    expect(result).toMatchObject({ ok: false, reason: 'STALE_LOCK' });
-    await expect(fs.readFile(ownerMetadataPath, 'utf-8')).resolves.toBe(metadata);
-    await fs.rm(lock, { recursive: true, force: true });
+      expect(result, `${row.label}：应 STALE_LOCK 拒绝`).toMatchObject({ ok: false, reason: 'STALE_LOCK' });
+      await expect(
+        fs.readFile(ownerMetadataPath, 'utf-8'),
+        `${row.label}：unknown owner 元数据应原样保留`,
+      ).resolves.toBe(row.metadata);
+      await fs.rm(lock, { recursive: true, force: true });
+    }
   });
 
   it('audits and recovers an owner with corrupt metadata only when explicitly requested', async () => {
@@ -800,9 +809,9 @@ describe('review round 1 ownership races', () => {
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"second"}');
   });
 
-  it.each(['.recovering-orphan', '.releasing-orphan'])(
-    'recovers stale orphan transition %s and writes',
-    async (transition) => {
+  it('recovers stale orphan transitions and writes（2 态逐具名：.recovering-orphan / .releasing-orphan）', async () => {
+    const rows = ['.recovering-orphan', '.releasing-orphan'] as const;
+    for (const transition of rows) {
       const p = target(`orphan-${transition.slice(1)}.json`);
       const transitionDir = path.join(`${p}.lock`, transition);
       await fs.mkdir(transitionDir, { recursive: true });
@@ -825,12 +834,15 @@ describe('review round 1 ownership races', () => {
         }),
       );
       const result = await writeStateJson(p, '{"v":"recovered"}', { staleLockTtlMs: 1 });
-      expect(result.ok).toBe(true);
-      await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"recovered"}');
+      expect(result.ok, `${transition}：恢复后写入成功`).toBe(true);
+      await expect(fs.readFile(p, 'utf-8'), `${transition}：目标内容为恢复值`).resolves.toBe('{"v":"recovered"}');
       const entries = await fs.readdir(`${p}.lock`);
-      expect(entries.some((entry) => entry.startsWith('.stale-'))).toBe(true);
-    },
-  );
+      expect(
+        entries.some((entry) => entry.startsWith('.stale-')),
+        `${transition}：.stale- 审计在盘`,
+      ).toBe(true);
+    }
+  });
 
   it('does not clean an active orphan transition', async () => {
     const p = target('active-transition.json');

@@ -426,32 +426,35 @@ describe('code-health phase 1 discovery', () => {
     expect(checkFalsePositiveGuards(lead, emptyContext).length).toBeGreaterThan(0);
   });
 
-  it.each([
-    ['exitCode=null', observedCommand(null)],
-    ['command observation=unverified', observedCommand(0, 'unverified')],
-  ])('command evidence %s 不算 exercised', (_label, command) => {
-    const staticReport = buildStaticInventory({
-      files: ['src/lonely.ts'],
-      sourceText: { 'src/lonely.ts': 'export const lonely = 1;\n' },
-      revision,
-    });
-    const leads = mergeDynamicTrace(staticReport, {
-      revision,
-      scenarios: [
-        {
-          id: 'fake-observed',
-          environment: 'current',
-          reached: true,
-          observation: 'observed',
-          command,
-        },
-      ],
-      rawTraceSha256: hash,
-    });
-    const lead = leads[0]!;
-    const violations = checkFalsePositiveGuards(lead, emptyContext);
-    expect(lead.classification).not.toBe('candidate');
-    expect(violations.length).toBeGreaterThan(0);
+  it('command evidence 两个非「已验证执行」形态不算 exercised（2 态：exitCode=null / command observation=unverified）', () => {
+    const rows = [
+      { label: 'exitCode=null', command: observedCommand(null) },
+      { label: 'command observation=unverified', command: observedCommand(0, 'unverified') },
+    ] as const;
+    for (const row of rows) {
+      const staticReport = buildStaticInventory({
+        files: ['src/lonely.ts'],
+        sourceText: { 'src/lonely.ts': 'export const lonely = 1;\n' },
+        revision,
+      });
+      const leads = mergeDynamicTrace(staticReport, {
+        revision,
+        scenarios: [
+          {
+            id: 'fake-observed',
+            environment: 'current',
+            reached: true,
+            observation: 'observed',
+            command: row.command,
+          },
+        ],
+        rawTraceSha256: hash,
+      });
+      const lead = leads[0]!;
+      const violations = checkFalsePositiveGuards(lead, emptyContext);
+      expect(lead.classification, `${row.label} 不算 exercised：不得升级为 candidate`).not.toBe('candidate');
+      expect(violations.length, `${row.label} guard 必须告警`).toBeGreaterThan(0);
+    }
   });
 
   it('真实 observed + 数字 exitCode 且无其他误报机制时 lead 才可为 candidate', () => {

@@ -42,14 +42,19 @@ describe('resolvePhaseDoc', () => {
     expect(resolvePhaseDoc(8, 'acceptance-test-phase8')).toBe('docs/phase8-acceptance-test/acceptance-test.md');
   });
 
-  it('未支持的 phase（含 5）抛错且消息含 conventions.md（目录约定）§1', () => {
-    expect(() => resolvePhaseDoc(5, 'system-design')).toThrow(/未支持的 phase=5/);
-    expect(() => resolvePhaseDoc(9, 'system-design')).toThrow(/未支持的 phase=9/);
-    expect(() => resolvePhaseDoc(5, 'any')).toThrow(/conventions\.md.*§1/);
-  });
-
-  it('未知 type 抛错且消息含映射信息', () => {
-    expect(() => resolvePhaseDoc(1, 'unknown-type')).toThrow(/无 type="unknown-type" 映射/);
-    expect(() => resolvePhaseDoc(3, 'system-design')).toThrow(/无 type="system-design" 映射/);
+  it('非法输入抛错（2 态：未支持 phase / 未知 type）', () => {
+    // 态 1：未支持的 phase（含 5）
+    expect(() => resolvePhaseDoc(5, 'system-design'), 'phase=5 应报未支持').toThrow(/未支持的 phase=5/);
+    expect(() => resolvePhaseDoc(9, 'system-design'), 'phase=9 应报未支持').toThrow(/未支持的 phase=9/);
+    expect(() => resolvePhaseDoc(5, 'any'), '未支持 phase 消息应含 conventions.md（目录约定）§1').toThrow(
+      /conventions\.md.*§1/,
+    );
+    // 态 2：未知 type
+    expect(() => resolvePhaseDoc(1, 'unknown-type'), '未知 type 消息应含映射信息').toThrow(
+      /无 type="unknown-type" 映射/,
+    );
+    expect(() => resolvePhaseDoc(3, 'system-design'), 'phase 3 无 system-design 映射').toThrow(
+      /无 type="system-design" 映射/,
+    );
   });
 });

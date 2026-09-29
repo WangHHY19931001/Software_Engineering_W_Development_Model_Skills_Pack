@@ -30,36 +30,47 @@ describe('state schema registry', () => {
     ).toEqual([null, null, null]);
   });
 
-  it('does not classify prefix-like or outside paths as project state targets', () => {
+  it('does not classify prefix-like or outside paths as project state targets（2 态：前缀形态 / 根外路径）', () => {
     const prefixLike = path.join(projectRoot, '.w-model-backup', 'custom.json');
     const outside = path.resolve('C:', 'workspace', 'other-project', '.w-model', 'custom.json');
-
-    expect(isProjectStateTarget(prefixLike, projectRoot)).toBe(false);
-    expect(isProjectStateTarget(outside, projectRoot)).toBe(false);
-    expect(resolveStateSchema(prefixLike, projectRoot)).toBeNull();
-    expect(resolveStateSchema(outside, projectRoot)).toBeNull();
+    const rows = [
+      { name: '前缀形态（.w-model-backup）', p: prefixLike },
+      { name: '根外路径（other-project）', p: outside },
+    ] as const;
+    for (const row of rows) {
+      expect(isProjectStateTarget(row.p, projectRoot), `${row.name} isProjectStateTarget 应为 false`).toBe(false);
+      expect(resolveStateSchema(row.p, projectRoot), `${row.name} resolveStateSchema 应为 null`).toBeNull();
+    }
   });
 
-  it('does not register a path outside the supplied project root', () => {
-    expect(
-      resolveStateSchema(path.resolve('C:', 'workspace', 'other-project', '.w-model', 'project.json'), projectRoot),
-    ).toBeNull();
-  });
-
-  it('uses one case-insensitive Windows key for registered and unregistered state targets', () => {
+  it('uses one case-insensitive Windows key / keeps POSIX matching case-sensitive（2 态平台口径）', () => {
+    // 态 1：Windows 不敏感（registered 与 unregistered 共用一个大小写不敏感键）
     const uppercaseProject = `${projectRoot}\\.W-MODEL\\PROJECT.JSON`;
     const uppercaseCustom = `${projectRoot}\\.W-MODEL\\CUSTOM.JSON`;
-
-    expect(resolveStateSchema(uppercaseProject, projectRoot, 'win32')).toMatchObject({ schemaName: 'project' });
-    expect(isProjectStateTarget(uppercaseProject, projectRoot, 'win32')).toBe(true);
-    expect(resolveStateSchema(uppercaseCustom, projectRoot, 'win32')).toBeNull();
-    expect(isProjectStateTarget(uppercaseCustom, projectRoot, 'win32')).toBe(true);
-    expect(resolveStateSchema('C:\\workspace\\other-project\\.W-MODEL\\PROJECT.JSON', projectRoot, 'win32')).toBeNull();
-  });
-
-  it('keeps POSIX state target matching case-sensitive', () => {
+    expect(
+      resolveStateSchema(uppercaseProject, projectRoot, 'win32'),
+      'win32 大写 registered 路径解析出 project',
+    ).toMatchObject({ schemaName: 'project' });
+    expect(isProjectStateTarget(uppercaseProject, projectRoot, 'win32'), 'win32 大写 registered 路径在盘认定').toBe(
+      true,
+    );
+    expect(resolveStateSchema(uppercaseCustom, projectRoot, 'win32'), 'win32 大写 unregistered 路径不注册').toBeNull();
+    expect(isProjectStateTarget(uppercaseCustom, projectRoot, 'win32'), 'win32 大写 unregistered 路径在盘认定').toBe(
+      true,
+    );
+    expect(
+      resolveStateSchema('C:\\workspace\\other-project\\.W-MODEL\\PROJECT.JSON', projectRoot, 'win32'),
+      'win32 根外大写路径不注册',
+    ).toBeNull();
+    // 态 2：POSIX 敏感
     const posixRoot = '/workspace/example-project';
-    expect(resolveStateSchema('/workspace/example-project/.W-MODEL/PROJECT.JSON', posixRoot, 'linux')).toBeNull();
-    expect(isProjectStateTarget('/workspace/example-project/.W-MODEL/CUSTOM.JSON', posixRoot, 'linux')).toBe(false);
+    expect(
+      resolveStateSchema('/workspace/example-project/.W-MODEL/PROJECT.JSON', posixRoot, 'linux'),
+      'linux 大写 registered 路径不注册（大小写敏感）',
+    ).toBeNull();
+    expect(
+      isProjectStateTarget('/workspace/example-project/.W-MODEL/CUSTOM.JSON', posixRoot, 'linux'),
+      'linux 大写 custom 路径不在盘认定（大小写敏感）',
+    ).toBe(false);
   });
 });
