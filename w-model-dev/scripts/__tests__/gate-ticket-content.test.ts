@@ -80,32 +80,34 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
     });
   });
 
-  it('黑名单第 1 条（台账 :696）：禁止占位短语 TODO/implement later → placeholder', () => {
-    const r = checkTicketContent(ticket(['- [ ] TODO: 补齐错误分支']));
-    expect(r.passed).toBe(false);
-    expect(r.summary.criticalMissing).toBe(1);
-    expect(r.violations.join('\n')).toMatch(/票据 01「样例票据」.*placeholder.*TODO.*S18 黑名单第 1 条/);
-  });
-
-  it('黑名单第 2 条（台账 :697）：无具体动作的祈使 → vague-imperative', () => {
-    const r = checkTicketContent(ticket(['- [ ] 加适当的错误处理']));
-    expect(r.passed).toBe(false);
-    expect(r.summary.criticalMissing).toBe(1);
-    expect(r.violations.join('\n')).toMatch(/票据 01「样例票据」.*vague-imperative.*S18 黑名单第 2 条/);
-  });
-
-  it('黑名单第 3 条（台账 :698）：要求写测试但无测试符号/用例名 → test-without-signature', () => {
-    const r = checkTicketContent(ticket(['- [ ] 为上述写测试']));
-    expect(r.passed).toBe(false);
-    expect(r.summary.criticalMissing).toBe(1);
-    expect(r.violations.join('\n')).toMatch(/票据 01「样例票据」.*test-without-signature.*S18 黑名单第 3 条/);
-  });
-
-  it('黑名单第 4 条（台账 :699）：类似任务 N 而无符号级重复说明 → similar-to-task', () => {
-    const r = checkTicketContent(ticket(['- [ ] 与任务 01 类似']));
-    expect(r.passed).toBe(false);
-    expect(r.summary.criticalMissing).toBe(1);
-    expect(r.violations.join('\n')).toMatch(/票据 01「样例票据」.*similar-to-task.*S18 黑名单第 4 条/);
+  it('黑名单第 1-4 条（台账 :696-:699）：占位短语 / 无动作祈使 / 写测试无符号 / 类似任务（4 态）', () => {
+    for (const [条款, bodyLine, 期望正则] of [
+      [
+        '第 1 条：禁止占位短语 TODO/implement later → placeholder',
+        '- [ ] TODO: 补齐错误分支',
+        /票据 01「样例票据」.*placeholder.*TODO.*S18 黑名单第 1 条/,
+      ],
+      [
+        '第 2 条：无具体动作的祈使 → vague-imperative',
+        '- [ ] 加适当的错误处理',
+        /票据 01「样例票据」.*vague-imperative.*S18 黑名单第 2 条/,
+      ],
+      [
+        '第 3 条：要求写测试但无测试符号/用例名 → test-without-signature',
+        '- [ ] 为上述写测试',
+        /票据 01「样例票据」.*test-without-signature.*S18 黑名单第 3 条/,
+      ],
+      [
+        '第 4 条：类似任务 N 而无符号级重复说明 → similar-to-task',
+        '- [ ] 与任务 01 类似',
+        /票据 01「样例票据」.*similar-to-task.*S18 黑名单第 4 条/,
+      ],
+    ] as const) {
+      const r = checkTicketContent(ticket([bodyLine]));
+      expect(r.passed, `${条款}: 应 fail`).toBe(false);
+      expect(r.summary.criticalMissing, `${条款}: criticalMissing 应为 1`).toBe(1);
+      expect(r.violations.join('\n'), `${条款}: 违规应含 ${期望正则}`).toMatch(期望正则);
+    }
   });
 
   it('黑名单第 5 条（台账 :700，符号类改写）：既无符号也无路径 → no-symbol-contract', () => {
@@ -393,55 +395,57 @@ describe('checkTicketContent（S18 六条黑名单 + Buildability，纯函数）
     });
   });
 
-  it('Buildability ①：缺接口签名且缺验收标准 → buildability-missing-signature-and-criteria', () => {
-    const r = checkTicketContent(
+  it('Buildability 负例（3 态：缺签名且缺标准 / 标准引用未定义符号 / 只给路径不给符号）', () => {
+    for (const [场景, lines, 期望正则, assertCriticalZero] of [
       [
-        '# 01 — 无线索票据',
-        '',
-        '**What to build:** 用 `Runner` 驱动 `Job` 流转，说明足够详细但未给签名',
-        '**Blocked by:** None',
-        '',
-      ].join('\n'),
-    );
-    expect(r.passed).toBe(false);
-    expect(r.summary.buildabilityMissing).toBe(1);
-    expect(r.violations.join('\n')).toMatch(/票据 01「无线索票据」.*Buildability.*缺接口签名且缺验收标准/);
-  });
-
-  it('Buildability ②：验收标准引用未定义符号 → buildability-undefined-symbol-in-criteria', () => {
-    const r = checkTicketContent(
+        '缺接口签名且缺验收标准 → buildability-missing-signature-and-criteria',
+        [
+          '# 01 — 无线索票据',
+          '',
+          '**What to build:** 用 `Runner` 驱动 `Job` 流转，说明足够详细但未给签名',
+          '**Blocked by:** None',
+          '',
+        ],
+        /票据 01「无线索票据」.*Buildability.*缺接口签名且缺验收标准/,
+        false,
+      ],
       [
-        '# 01 — 标准越界',
-        '',
-        '**What to build:** 接口签名 `Runner.run(job): Result`',
-        '**Blocked by:** None',
-        '',
-        '- [ ] `Runner.run` 触发 `TelemetrySink.emit`',
-        '',
-      ].join('\n'),
-    );
-    expect(r.passed).toBe(false);
-    expect(r.summary.buildabilityMissing).toBe(1);
-    expect(r.summary.criticalMissing).toBe(0);
-    expect(r.violations.join('\n')).toMatch(/票据 01「标准越界」.*Buildability.*`TelemetrySink\.emit`/);
-  });
-
-  it('Buildability ③：只给路径不给符号 → buildability-path-without-symbol', () => {
-    const r = checkTicketContent(
+        '验收标准引用未定义符号 → buildability-undefined-symbol-in-criteria',
+        [
+          '# 01 — 标准越界',
+          '',
+          '**What to build:** 接口签名 `Runner.run(job): Result`',
+          '**Blocked by:** None',
+          '',
+          '- [ ] `Runner.run` 触发 `TelemetrySink.emit`',
+          '',
+        ],
+        /票据 01「标准越界」.*Buildability.*`TelemetrySink\.emit`/,
+        true,
+      ],
       [
-        '# 01 — 路径票据',
-        '',
-        '**What to build:** 修改 `src/services/article-service.ts`',
-        '**Blocked by:** None',
-        '',
-        '- [ ] 静态检查通过',
-        '',
-      ].join('\n'),
-    );
-    expect(r.passed).toBe(false);
-    expect(r.summary.buildabilityMissing).toBe(1);
-    expect(r.summary.criticalMissing).toBe(0);
-    expect(r.violations.join('\n')).toMatch(/票据 01「路径票据」.*Buildability.*只给路径/);
+        '只给路径不给符号 → buildability-path-without-symbol',
+        [
+          '# 01 — 路径票据',
+          '',
+          '**What to build:** 修改 `src/services/article-service.ts`',
+          '**Blocked by:** None',
+          '',
+          '- [ ] 静态检查通过',
+          '',
+        ],
+        /票据 01「路径票据」.*Buildability.*只给路径/,
+        true,
+      ],
+    ] as const) {
+      const r = checkTicketContent(lines.join('\n'));
+      expect(r.passed, `${场景}: 应 fail`).toBe(false);
+      expect(r.summary.buildabilityMissing, `${场景}: buildabilityMissing 应为 1`).toBe(1);
+      if (assertCriticalZero) {
+        expect(r.summary.criticalMissing, `${场景}: criticalMissing 应为 0`).toBe(0);
+      }
+      expect(r.violations.join('\n'), `${场景}: 违规应含 ${期望正则}`).toMatch(期望正则);
+    }
   });
 
   it('未发现任何票据块 → fail-closed（不给空文件放行）', () => {
@@ -537,42 +541,45 @@ describe('check-artifact-gate.ts --tickets 参数契约（进程内，S18 §0.1.
     }
   });
 
-  it('项目内不存在的相对文件 → exit 2 FILE_NOT_FOUND（不静默忽略）', async () => {
-    const dir = await makeProject();
-    try {
-      const { status, stdout } = await runGate([dir, '--phase=8', '--tickets=nope-tickets.md']);
-      expect(status).toBe(2);
-      expect(stdout).toContain('ERROR_JSON');
-      expect(stdout).toMatch(/"category":"FILE_NOT_FOUND"/);
-    } finally {
-      await fs.rm(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('--phase<5 给定 --tickets → exit 2 ARG_INVALID（不静默忽略）', async () => {
-    const dir = await makeProject();
-    try {
-      const file = path.join(dir, 'tickets.md');
-      await fs.writeFile(file, VALID_TICKETS, 'utf-8');
-      const { status, stdout } = await runGate([dir, '--phase=4', '--tickets=tickets.md']);
-      expect(status).toBe(2);
-      expect(stdout).toMatch(/"category":"ARG_INVALID"/);
-    } finally {
-      await fs.rm(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('空格形态 / 空值 --tickets → exit 2 ARG_INVALID（只接受等号形态）', async () => {
-    const dir = await makeProject();
-    try {
-      const spaceForm = await runGate([dir, '--phase=8', '--tickets', path.join(dir, 'tickets.md')]);
-      expect(spaceForm.status).toBe(2);
-      expect(spaceForm.stdout).toMatch(/"category":"ARG_INVALID"/);
-      const emptyForm = await runGate([dir, '--phase=8', '--tickets=']);
-      expect(emptyForm.status).toBe(2);
-      expect(emptyForm.stdout).toMatch(/"category":"ARG_INVALID"/);
-    } finally {
-      await fs.rm(dir, { recursive: true, force: true });
+  it('--tickets CLI 负例（3 组：不存在 / phase<5 / 空格·空值形态，每行自备 project）', async () => {
+    for (const [场景, makeArgs, preWrite, 期望Category, expectErrorJson] of [
+      [
+        '项目内不存在的相对文件（不静默忽略）',
+        () => ['--phase=8', '--tickets=nope-tickets.md'],
+        false,
+        'FILE_NOT_FOUND',
+        true,
+      ],
+      [
+        '--phase<5 给定 --tickets（不静默忽略）',
+        () => ['--phase=4', '--tickets=tickets.md'],
+        true,
+        'ARG_INVALID',
+        false,
+      ],
+      [
+        '空格形态（只接受等号形态）',
+        (dir: string) => ['--phase=8', '--tickets', path.join(dir, 'tickets.md')],
+        true,
+        'ARG_INVALID',
+        false,
+      ],
+      ['空值（只接受等号形态）', () => ['--phase=8', '--tickets='], true, 'ARG_INVALID', false],
+    ] as const) {
+      const dir = await makeProject();
+      try {
+        if (preWrite) {
+          await fs.writeFile(path.join(dir, 'tickets.md'), VALID_TICKETS, 'utf-8');
+        }
+        const { status, stdout } = await runGate([dir, ...makeArgs(dir)]);
+        expect(status, `${场景}: 应 exit 2`).toBe(2);
+        if (expectErrorJson) {
+          expect(stdout, `${场景}: 应含 ERROR_JSON`).toContain('ERROR_JSON');
+        }
+        expect(stdout, `${场景}: 应为 ${期望Category}`).toMatch(new RegExp(`"category":"${期望Category}"`));
+      } finally {
+        await fs.rm(dir, { recursive: true, force: true });
+      }
     }
   });
 
@@ -676,51 +683,43 @@ describe('check-artifact-gate.ts --spec-dir 参数契约（进程内，阶段专
     return { status: r.exitCode, stdout: r.stdout };
   }
 
-  it('缺 --phase 时给定 --spec-dir → exit 2 ARG_INVALID（修复前：静默丢弃该参数，specStructure=null 且无任何提示）', async () => {
-    const dir = await makeProject();
-    try {
-      const { status, stdout } = await runGate([dir, `--spec-dir=${dir}`]);
-      expect(status).toBe(2);
-      expect(stdout).toContain('ERROR_JSON');
-      expect(stdout).toMatch(/"category":"ARG_INVALID"/);
-      expect(stdout).toContain('参数非法 --spec-dir');
-    } finally {
-      await fs.rm(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('--phase=8 给定 --spec-dir → exit 2 ARG_INVALID（与 --tickets 同口径：阶段不适用即拒，不静默跳过）', async () => {
-    const dir = await makeProject();
-    try {
-      const { status, stdout } = await runGate([dir, '--phase=8', `--spec-dir=${dir}`]);
-      expect(status).toBe(2);
-      expect(stdout).toContain('参数非法 --spec-dir');
-    } finally {
-      await fs.rm(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('空值 --spec-dir= → exit 2 ARG_INVALID（空值不是「未提供」，不得静默忽略）', async () => {
-    const dir = await makeProject();
-    try {
-      const { status, stdout } = await runGate([dir, '--phase=1', '--spec-dir=']);
-      expect(status).toBe(2);
-      expect(stdout).toContain('参数非法 --spec-dir');
-      expect(stdout).toContain('仅接受等号形态且值非空');
-    } finally {
-      await fs.rm(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('空格形态 --spec-dir <dir> → exit 2 ARG_INVALID（修复前被当作「未提供」，提示反说未提供）', async () => {
-    const dir = await makeProject();
-    try {
-      const { status, stdout } = await runGate([dir, '--phase=1', '--spec-dir', dir]);
-      expect(status).toBe(2);
-      expect(stdout).toContain('参数非法 --spec-dir');
-      expect(stdout).toContain('仅接受等号形态且值非空');
-    } finally {
-      await fs.rm(dir, { recursive: true, force: true });
+  it('--spec-dir ARG_INVALID（4 态：缺 --phase / phase=8 阶段不适用 / 空值 / 空格形态，每行自备 project）', async () => {
+    for (const [场景, makeArgs, expectErrorJson, expectFormHint] of [
+      [
+        '缺 --phase 时给定 --spec-dir（修复前：静默丢弃该参数）',
+        (dir: string) => [dir, `--spec-dir=${dir}`],
+        true,
+        false,
+      ],
+      [
+        '--phase=8 给定 --spec-dir（与 --tickets 同口径：阶段不适用即拒）',
+        (dir: string) => [dir, '--phase=8', `--spec-dir=${dir}`],
+        false,
+        false,
+      ],
+      ['空值 --spec-dir=（空值不是「未提供」）', (dir: string) => [dir, '--phase=1', '--spec-dir='], false, true],
+      [
+        '空格形态 --spec-dir <dir>（修复前被当作「未提供」）',
+        (dir: string) => [dir, '--phase=1', '--spec-dir', dir],
+        false,
+        true,
+      ],
+    ] as const) {
+      const dir = await makeProject();
+      try {
+        const { status, stdout } = await runGate(makeArgs(dir));
+        expect(status, `${场景}: 应 exit 2`).toBe(2);
+        expect(stdout, `${场景}: 应含「参数非法 --spec-dir」`).toContain('参数非法 --spec-dir');
+        if (expectErrorJson) {
+          expect(stdout, `${场景}: 应含 ERROR_JSON`).toContain('ERROR_JSON');
+          expect(stdout, `${场景}: 应为 ARG_INVALID`).toMatch(/"category":"ARG_INVALID"/);
+        }
+        if (expectFormHint) {
+          expect(stdout, `${场景}: 应提示「仅接受等号形态且值非空」`).toContain('仅接受等号形态且值非空');
+        }
+      } finally {
+        await fs.rm(dir, { recursive: true, force: true });
+      }
     }
   });
 

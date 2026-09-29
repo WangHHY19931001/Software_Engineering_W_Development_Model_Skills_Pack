@@ -66,29 +66,37 @@ function makeCodeFile(source: string, filePath = 'src/sample.ts'): CodeFile {
 // ==================== 维度1：SD→codeModule 映射 ====================
 
 describe('维度1 checkSdToCodeModule', () => {
-  it('SD 有对应 codeModule 时通过', () => {
-    // SD-AUTH → "auth" 子串匹配 codeModule "src/services/auth.service.ts"
-    const graph = makeGraph(['SD-AUTH']);
-    const rtm = makeRtm([{ requirementId: 'REQ-001', codeModule: 'src/services/auth.service.ts' }]);
-    const result = checkSdToCodeModule(graph, rtm);
-    expect(result.passed).toBe(true);
-    expect(result.checked).toBe(1);
-    expect(result.violations).toHaveLength(0);
-  });
-
-  it('SD 缺少 codeModule 映射时失败', () => {
-    const graph = makeGraph(['SD-AUTH', 'SD-REVIEW']);
-    const rtm = makeRtm([
-      { requirementId: 'REQ-001', codeModule: 'src/services/auth.service.ts' },
-      // SD-REVIEW 无对应 codeModule
-    ]);
-    const result = checkSdToCodeModule(graph, rtm);
-    expect(result.passed).toBe(false);
-    expect(result.checked).toBe(2);
-    expect(result.violations.length).toBeGreaterThanOrEqual(1);
-    expect(result.violations.some((v) => v.includes('SD-REVIEW'))).toBe(true);
-    // P1.4：violation 须明确指出回填时机（阶段5编码后必须回填 RTM.codeModule）
-    expect(result.violations.some((v) => v.includes('阶段5编码后必须回填'))).toBe(true);
+  it('SD 映射对（2 态：有 codeModule 通过 / 缺映射失败点名并提示回填时机）', () => {
+    for (const [场景, sds, mappings, 期望] of [
+      [
+        'SD 有对应 codeModule',
+        ['SD-AUTH'],
+        [{ requirementId: 'REQ-001', codeModule: 'src/services/auth.service.ts' }],
+        { passed: true, checked: 1, contains: [] as string[], minViolations: 0 },
+      ],
+      [
+        'SD 缺少 codeModule 映射（SD-REVIEW 无对应）',
+        ['SD-AUTH', 'SD-REVIEW'],
+        [{ requirementId: 'REQ-001', codeModule: 'src/services/auth.service.ts' }],
+        { passed: false, checked: 2, contains: ['SD-REVIEW', '阶段5编码后必须回填'], minViolations: 1 },
+      ],
+    ] as const) {
+      const graph = makeGraph([...sds]);
+      const rtm = makeRtm(mappings.map((m) => ({ ...m })));
+      const result = checkSdToCodeModule(graph, rtm);
+      expect(result.passed, `${场景}: passed 应为 ${期望.passed}`).toBe(期望.passed);
+      expect(result.checked, `${场景}: checked 应为 ${期望.checked}`).toBe(期望.checked);
+      expect(result.violations.length, `${场景}: violations 数量下限`).toBeGreaterThanOrEqual(期望.minViolations);
+      for (const marker of 期望.contains) {
+        expect(
+          result.violations.some((v) => v.includes(marker)),
+          `${场景}: 应含「${marker}」`,
+        ).toBe(true);
+      }
+      if (期望.minViolations === 0) {
+        expect(result.violations, `${场景}: 应零违规`).toHaveLength(0);
+      }
+    }
   });
 
   it('SD id 去 "SD-" 前缀转小写后做包含匹配', () => {
@@ -143,7 +151,7 @@ describe('维度2 extractCodeStateTransfers / checkCodeStateTransfer', () => {
     expect(extracted.conditionals.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('checkCodeStateTransfer 有赋值时通过', () => {
+  it('checkCodeStateTransfer 通过行（1 态：有赋值）', () => {
     const source = `let x = 1; x = 2;`;
     const file = makeCodeFile(source);
     const extracted = extractCodeStateTransfers(file.ast, file.path);
@@ -152,18 +160,24 @@ describe('维度2 extractCodeStateTransfers / checkCodeStateTransfer', () => {
     expect(result.checked).toBeGreaterThanOrEqual(1);
   });
 
-  it('checkCodeStateTransfer 无赋值时失败', () => {
-    const source = `const y = 1; function foo() { return y; }`;
-    const file = makeCodeFile(source);
-    const extracted = extractCodeStateTransfers(file.ast, file.path);
-    const result = checkCodeStateTransfer([extracted]);
-    expect(result.passed).toBe(false);
-    expect(result.violations.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('checkCodeStateTransfer 空文件列表时失败', () => {
-    const result = checkCodeStateTransfer([]);
-    expect(result.passed).toBe(false);
+  it('checkCodeStateTransfer 失败行（2 态：无赋值 / 空文件列表）', () => {
+    for (const [场景, source] of [
+      ['无赋值', `const y = 1; function foo() { return y; }`],
+      ['空文件列表', null],
+    ] as const) {
+      let result: ReturnType<typeof checkCodeStateTransfer>;
+      if (source === null) {
+        result = checkCodeStateTransfer([]);
+      } else {
+        const file = makeCodeFile(source);
+        const extracted = extractCodeStateTransfers(file.ast, file.path);
+        result = checkCodeStateTransfer([extracted]);
+      }
+      expect(result.passed, `${场景}: 应 fail`).toBe(false);
+      if (场景 === '无赋值') {
+        expect(result.violations.length, `${场景}: 应有违规`).toBeGreaterThanOrEqual(1);
+      }
+    }
   });
 });
 
@@ -177,40 +191,43 @@ Next ==
     \\/ Logout
 `;
 
-  it('Next 分支在代码中有对应函数时通过', () => {
-    const source = `
+  it('Next 分支对（2 态：有对应函数通过 checked=3 / 无对应失败点名 Register）', () => {
+    for (const [场景, source, 期望Passed, marker] of [
+      [
+        'Next 分支在代码中有对应函数',
+        `
       function register(user) { return user; }
       function login(u, p) { return true; }
       function logout(token) { return; }
-    `;
-    const file = makeCodeFile(source);
-    const result = checkNextBranchCoverage(tlaWithNext, [file]);
-    expect(result.passed).toBe(true);
-    expect(result.checked).toBe(3);
+    `,
+        true,
+        null,
+      ],
+      ['Next 分支无对应代码', `function doSomething() {}`, false, /Register/i],
+    ] as const) {
+      const file = makeCodeFile(source);
+      const result = checkNextBranchCoverage(tlaWithNext, [file]);
+      expect(result.passed, `${场景}: passed 应为 ${String(期望Passed)}`).toBe(期望Passed);
+      if (marker) {
+        expect(
+          result.violations.some((v) => marker.test(v)),
+          `${场景}: 应点名 ${marker}`,
+        ).toBe(true);
+      } else {
+        expect(result.checked, `${场景}: checked 应为 3`).toBe(3);
+      }
+    }
   });
 
-  it('Next 分支无对应代码时失败', () => {
-    const source = `function doSomething() {}`;
-    const file = makeCodeFile(source);
-    const result = checkNextBranchCoverage(tlaWithNext, [file]);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => /Register/i.test(v))).toBe(true);
-  });
-
-  it('驼峰匹配：Register → register', () => {
-    const tla = `Next == \\/ Register`;
-    const source = `function register() {}`;
-    const file = makeCodeFile(source);
-    const result = checkNextBranchCoverage(tla, [file]);
-    expect(result.passed).toBe(true);
-  });
-
-  it('包含匹配：LoginAction → login', () => {
-    const tla = `Next == \\/ LoginAction`;
-    const source = `function login() {}`;
-    const file = makeCodeFile(source);
-    const result = checkNextBranchCoverage(tla, [file]);
-    expect(result.passed).toBe(true);
+  it('Next 驼峰/包含匹配对（2 态：Register → register / LoginAction → login）', () => {
+    for (const [场景, tla, source] of [
+      ['驼峰匹配：Register → register', `Next == \\/ Register`, `function register() {}`],
+      ['包含匹配：LoginAction → login', `Next == \\/ LoginAction`, `function login() {}`],
+    ] as const) {
+      const file = makeCodeFile(source);
+      const result = checkNextBranchCoverage(tla, [file]);
+      expect(result.passed, `${场景}: 应通过`).toBe(true);
+    }
   });
 
   it('无 Next 定义时通过（无可校验项）', () => {
@@ -232,54 +249,60 @@ BusinessInvariant ==
     /\\ LoggedOutImpliesNoToken
 `;
 
-  it('代码含 assert 调用时通过', () => {
-    const source = `
+  it('断言调用族（3 态：assert / invariant / require 调用均通过）', () => {
+    for (const [形式, source, assertChecked] of [
+      [
+        'assert 调用',
+        `
       function check() {
         assert(tokenIssued === 1, 'token must be issued');
       }
-    `;
-    const file = makeCodeFile(source);
-    const result = checkInvariantCoverage(tlaWithInvariant, [file]);
-    expect(result.passed).toBe(true);
-    expect(result.checked).toBeGreaterThanOrEqual(1);
-  });
-
-  it('代码含 invariant 调用时通过', () => {
-    const source = `
+    `,
+        true,
+      ],
+      [
+        'invariant 调用',
+        `
       function verify() {
         invariant(state === 'ok');
       }
-    `;
-    const file = makeCodeFile(source);
-    const result = checkInvariantCoverage(tlaWithInvariant, [file]);
-    expect(result.passed).toBe(true);
-  });
-
-  it('代码含 require 调用时通过', () => {
-    const source = `
+    `,
+        false,
+      ],
+      [
+        'require 调用',
+        `
       function load(x) {
         require(x > 0, 'x must be positive');
       }
-    `;
-    const file = makeCodeFile(source);
-    const result = checkInvariantCoverage(tlaWithInvariant, [file]);
-    expect(result.passed).toBe(true);
+    `,
+        false,
+      ],
+    ] as const) {
+      const file = makeCodeFile(source);
+      const result = checkInvariantCoverage(tlaWithInvariant, [file]);
+      expect(result.passed, `代码含 ${形式} 时应通过`).toBe(true);
+      if (assertChecked) {
+        expect(result.checked, `代码含 ${形式} 时 checked 应 ≥1`).toBeGreaterThanOrEqual(1);
+      }
+    }
   });
 
-  it('代码无任何断言时失败', () => {
-    const source = `function foo() { return 1; }`;
-    const file = makeCodeFile(source);
-    const result = checkInvariantCoverage(tlaWithInvariant, [file]);
-    expect(result.passed).toBe(false);
-    expect(result.violations.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('无 BusinessInvariant 定义时通过（无可校验项）', () => {
-    const tla = `NoInvariantHere == 1`;
-    const file = makeCodeFile(`function foo() {}`);
-    const result = checkInvariantCoverage(tla, [file]);
-    expect(result.passed).toBe(true);
-    expect(result.checked).toBe(0);
+  it('无断言对照（2 态：无任何断言失败 / 无 BusinessInvariant 定义通过 checked=0）', () => {
+    for (const [场景, tla, source, 期望Passed, assertCheckedZero] of [
+      ['代码无任何断言', tlaWithInvariant, `function foo() { return 1; }`, false, false],
+      ['无 BusinessInvariant 定义', `NoInvariantHere == 1`, `function foo() {}`, true, true],
+    ] as const) {
+      const file = makeCodeFile(source);
+      const result = checkInvariantCoverage(tla, [file]);
+      expect(result.passed, `${场景}: passed 应为 ${String(期望Passed)}`).toBe(期望Passed);
+      if (!期望Passed) {
+        expect(result.violations.length, `${场景}: 应有违规`).toBeGreaterThanOrEqual(1);
+      }
+      if (assertCheckedZero) {
+        expect(result.checked, `${场景}: checked 应为 0`).toBe(0);
+      }
+    }
   });
 
   it('G-D D1: Invariants == 命名提取子不变式', () => {
@@ -358,19 +381,14 @@ BusinessInvariant ==
 // ==================== 辅助函数 toCamelCase ====================
 
 describe('toCamelCase 辅助函数', () => {
-  it('Register → register（首字母小写）', () => {
-    expect(toCamelCase('Register')).toBe('register');
-  });
-
-  it('LoginAction → loginAction（保持驼峰）', () => {
-    expect(toCamelCase('LoginAction')).toBe('loginAction');
-  });
-
-  it('Reset_Cycle → resetCycle（去下划线 + 后续单词首字母大写）', () => {
-    expect(toCamelCase('Reset_Cycle')).toBe('resetCycle');
-  });
-
-  it('空字符串返回空', () => {
-    expect(toCamelCase('')).toBe('');
+  it('命名矩阵（4 态：首字母小写 / 保持驼峰 / 去下划线 / 空串）', () => {
+    for (const [input, expected] of [
+      ['Register', 'register'],
+      ['LoginAction', 'loginAction'],
+      ['Reset_Cycle', 'resetCycle'],
+      ['', ''],
+    ] as const) {
+      expect(toCamelCase(input), `toCamelCase(${JSON.stringify(input)})`).toBe(expected);
+    }
   });
 });

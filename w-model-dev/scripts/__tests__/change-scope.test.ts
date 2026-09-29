@@ -151,11 +151,6 @@ describe('change-scope 字段级校验（validateChangeScope / schema）', () =>
     expect(validateChangeScope(makeScope({ headRef: '  ' })).length).toBeGreaterThan(0);
   });
 
-  it('scopeCreatedAt 非法 ISO date-time 被拒（日期缺时间 / 乱串）', () => {
-    expect(validateChangeScope(makeScope({ scopeCreatedAt: '2026-09-04' })).length).toBeGreaterThan(0);
-    expect(validateChangeScope(makeScope({ scopeCreatedAt: 'not-a-date' })).length).toBeGreaterThan(0);
-  });
-
   it('未知保留字段被 schema（additionalProperties:false）拒绝', () => {
     const scope = { ...makeScope(), retained: 'extra' };
     expect(validateChangeScope(scope).length).toBeGreaterThan(0);
@@ -193,31 +188,32 @@ describe('changedFilePathViolation（单路径规则）', () => {
     }
   });
 
-  it('非字符串返回违规', () => {
-    for (const p of [undefined, null, 42, ['x'], { p: 'x' }]) {
-      expect(changedFilePathViolation(p)).toContain('字符串');
-    }
-  });
-
-  it('绝对路径（/、\\、盘符）返回违规', () => {
-    for (const p of ['/etc/x', '\\windows\\x', 'C:/x.ts', 'c:\\x.ts']) {
+  it('changedFilePathViolation 违规族（4 组：非字符串 / 绝对路径 / 反斜杠·..·空段·空串 / `.` 段未规范化）', () => {
+    for (const [标签, p, 期望匹配] of [
+      ['非字符串 undefined', undefined, /字符串/],
+      ['非字符串 null', null, /字符串/],
+      ['非字符串 数字', 42, /字符串/],
+      ['非字符串 数组', ['x'], /字符串/],
+      ['非字符串 对象', { p: 'x' }, /字符串/],
+      ['绝对路径 POSIX', '/etc/x', /绝对路径/],
+      ['绝对路径 反斜杠', '\\windows\\x', /绝对路径/],
+      ['绝对路径 盘符正斜杠', 'C:/x.ts', /绝对路径/],
+      ['绝对路径 盘符反斜杠', 'c:\\x.ts', /绝对路径/],
+      ['反斜杠', 'a\\b.ts', null],
+      ['.. 段', 'a/../b', null],
+      ['空段', 'a//b', null],
+      ['尾斜杠', 'a/', null],
+      ['空串', '', null],
+      ['.. 前缀', '../x', null],
+      ['`./` 前缀', './x.ts', /`\.`|未规范化/],
+      ['裸 `.`', '.', /`\.`|未规范化/],
+      ['中段 `.`', 'a/./b.ts', /`\.`|未规范化/],
+    ] as const) {
       const v = changedFilePathViolation(p);
-      expect(v).not.toBeNull();
-      expect(v).toMatch(/绝对路径/);
-    }
-  });
-
-  it('反斜杠 / `..` 段 / 空段 / 空串返回违规', () => {
-    for (const p of ['a\\b.ts', 'a/../b', 'a//b', 'a/', '', '../x']) {
-      expect(changedFilePathViolation(p)).not.toBeNull();
-    }
-  });
-
-  it('`.` 段（./x.ts / . / a/./b）返回违规（路径未规范化）', () => {
-    for (const p of ['./x.ts', '.', 'a/./b.ts']) {
-      const v = changedFilePathViolation(p);
-      expect(v, p).not.toBeNull();
-      expect(v as string).toMatch(/`\.`|未规范化/);
+      expect(v, `${标签}（${String(p)}）: 应返回违规`).not.toBeNull();
+      if (期望匹配) {
+        expect(v, `${标签}（${String(p)}）: 违规应含「${期望匹配}」`).toMatch(期望匹配);
+      }
     }
     // 正常相对路径（含 dotfile 形态段名）不受影响
     expect(changedFilePathViolation('src/.eslintrc.cjs')).toBeNull();
@@ -295,32 +291,41 @@ describe('isCodeOrTestFile（文件分类纯函数）', () => {
 });
 
 describe('isIsoDateTimeString', () => {
-  it('UTC / 偏移 / 小数秒形式通过', () => {
+  it('scopeCreatedAt 合法形态（3 态：UTC / 偏移 / 小数秒）', () => {
     for (const s of ['2026-07-30T10:00:00Z', '2026-07-30T10:00:00+08:00', '2026-09-04T00:00:00.123Z']) {
       expect(isIsoDateTimeString(s), s).toBe(true);
     }
   });
-  it('缺时间 / 非日期 / 非法月份拒绝', () => {
-    for (const s of ['2026-09-04', 'not-a-date', '2026-13-04T10:00:00Z', '2026-09-04T25:00:00Z', 42]) {
-      expect(isIsoDateTimeString(s), String(s)).toBe(false);
-    }
-  });
-  it('小写 t / z 分隔符拒绝（A8/F-G4-04：仅接受大写 T/Z 字面）', () => {
-    for (const s of [
-      '2026-09-04t10:00:00z',
-      '2026-09-04t10:00:00Z',
-      '2026-09-04T10:00:00z',
-      '2026-09-04t10:00:00+08:00',
-      '2026-09-04 10:00:00Z',
-    ]) {
-      expect(isIsoDateTimeString(s), String(s)).toBe(false);
-    }
-  });
 
-  it('validateChangeScope 对 scopeCreatedAt 补同一校验：小写 t fixture 被拒（F-G4-04）', () => {
-    const violations = validateChangeScope(makeScope({ scopeCreatedAt: '2026-09-04t00:00:00z' }));
-    expect(violations.length).toBeGreaterThan(0);
-    expect(violations.some((v) => v.includes('scopeCreatedAt'))).toBe(true);
+  it('scopeCreatedAt 拒绝行（4 组：validate 缺时间/乱串 / iso 缺时间·非日期·非法月时 / 小写 t·z 与空格分隔 / validate 补校验点名）', () => {
+    for (const [场景, ts, via, expectNamedField] of [
+      ['validate: 日期缺时间', '2026-09-04', 'validate', false],
+      ['validate: 乱串', 'not-a-date', 'validate', false],
+      ['iso: 缺时间', '2026-09-04', 'iso', false],
+      ['iso: 非日期', 'not-a-date', 'iso', false],
+      ['iso: 非法月份', '2026-13-04T10:00:00Z', 'iso', false],
+      ['iso: 非法小时', '2026-09-04T25:00:00Z', 'iso', false],
+      ['iso: 非字符串数字', 42, 'iso', false],
+      ['iso: 小写 t z', '2026-09-04t10:00:00z', 'iso', false],
+      ['iso: 小写 t 大写 Z', '2026-09-04t10:00:00Z', 'iso', false],
+      ['iso: 大写 T 小写 z', '2026-09-04T10:00:00z', 'iso', false],
+      ['iso: 小写 t 带偏移', '2026-09-04t10:00:00+08:00', 'iso', false],
+      ['iso: 空格分隔（A8/F-G4-04 仅大写 T/Z 字面）', '2026-09-04 10:00:00Z', 'iso', false],
+      ['validate 补同一校验: 小写 t fixture（F-G4-04）', '2026-09-04t00:00:00z', 'validate', true],
+    ] as const) {
+      if (via === 'validate') {
+        const violations = validateChangeScope(makeScope({ scopeCreatedAt: ts as string }));
+        expect(violations.length, `${场景}（${ts}）: 应拒`).toBeGreaterThan(0);
+        if (expectNamedField) {
+          expect(
+            violations.some((v) => v.includes('scopeCreatedAt')),
+            `${场景}: 应点名 scopeCreatedAt`,
+          ).toBe(true);
+        }
+      } else {
+        expect(isIsoDateTimeString(ts), `${场景}（${String(ts)}）: 应拒`).toBe(false);
+      }
+    }
   });
 
   it('validateChangeScope：秒级 + 时区（无毫秒）scopeCreatedAt 合法（JSDoc 口径）', () => {
@@ -450,41 +455,34 @@ describe('verifyScopeGitBinding（真实 Git 精确比对）', () => {
 describe('resolveCliScope（CLI 参数解析 + scope 装载）', () => {
   const baseArgs = { phase: 5 };
 
-  it('无 --scope 且无薄封装参数 → missing（violations 语义，非 exit 0）', () => {
-    const root = makeTmpDir('wmodel-cs-cli-');
-    const r = resolveCliScope({ projectRoot: root, ...baseArgs, git: realGit(root) });
-    expect(r.kind).toBe('missing');
-    if (r.kind === 'missing') expect(r.reasons[0]).toMatch(/--scope/);
-  });
-
-  it('--scope 文件不存在 → invalid(FILE_NOT_FOUND)', () => {
-    const root = makeTmpDir('wmodel-cs-cli2-');
-    const r = resolveCliScope({ projectRoot: root, ...baseArgs, git: realGit(root), scopePath: 'nope.json' });
-    expect(r.kind).toBe('invalid');
-    if (r.kind === 'invalid') expect(r.category).toBe('FILE_NOT_FOUND');
-  });
-
-  it('--scope 文件非合法 JSON → invalid(FILE_PARSE)', () => {
-    const root = makeTmpDir('wmodel-cs-cli3-');
-    writeFileSync(join(root, 'scope.json'), '{ not json');
-    const r = resolveCliScope({ projectRoot: root, ...baseArgs, git: realGit(root), scopePath: 'scope.json' });
-    expect(r.kind).toBe('invalid');
-    if (r.kind === 'invalid') expect(r.category).toBe('FILE_PARSE');
-  });
-
-  it('--scope 违反 schema（缺字段 / 未知字段 / phase 越界）→ invalid(STRUCTURE_INVALID)', () => {
-    const root = makeTmpDir('wmodel-cs-cli4-');
-    writeFileSync(join(root, 'scope.json'), JSON.stringify({ phase: 5 }));
-    let r = resolveCliScope({ projectRoot: root, ...baseArgs, git: realGit(root), scopePath: 'scope.json' });
-    expect(r.kind).toBe('invalid');
-    if (r.kind === 'invalid') expect(r.category).toBe('STRUCTURE_INVALID');
-    writeFileSync(join(root, 'scope2.json'), VALID_SCOPE_JSON({ retained: 1 }));
-    r = resolveCliScope({ projectRoot: root, ...baseArgs, git: realGit(root), scopePath: 'scope2.json' });
-    expect(r.kind).toBe('invalid');
-    if (r.kind === 'invalid') expect(r.category).toBe('STRUCTURE_INVALID');
-    writeFileSync(join(root, 'scope3.json'), JSON.stringify({ ...JSON.parse(VALID_SCOPE_JSON()), phase: 9 }));
-    r = resolveCliScope({ projectRoot: root, ...baseArgs, git: realGit(root), scopePath: 'scope3.json' });
-    expect(r.kind).toBe('invalid');
+  it('resolveCliScope 负例（4 组：missing / FILE_NOT_FOUND / FILE_PARSE / STRUCTURE_INVALID×3，每行自备 tmp root）', () => {
+    for (const [场景, scopePath, scopeContent, 期望Category, reasonRegex] of [
+      ['无 --scope 且无薄封装参数', undefined, null, null, /--scope/],
+      ['--scope 文件不存在', 'nope.json', null, 'FILE_NOT_FOUND', null],
+      ['--scope 文件非合法 JSON', 'scope.json', '{ not json', 'FILE_PARSE', null],
+      ['--scope 缺字段（仅 phase）', 'scope.json', JSON.stringify({ phase: 5 }), 'STRUCTURE_INVALID', null],
+      ['--scope 未知字段', 'scope.json', VALID_SCOPE_JSON({ retained: 1 }), 'STRUCTURE_INVALID', null],
+      [
+        '--scope phase 越界',
+        'scope.json',
+        JSON.stringify({ ...JSON.parse(VALID_SCOPE_JSON()), phase: 9 }),
+        'STRUCTURE_INVALID',
+        null,
+      ],
+    ] as const) {
+      const root = makeTmpDir('wmodel-cs-cli-');
+      if (scopePath && scopeContent !== null) {
+        writeFileSync(join(root, scopePath), scopeContent);
+      }
+      const r = resolveCliScope({ projectRoot: root, ...baseArgs, git: realGit(root), scopePath });
+      expect(r.kind, `${场景}: 应为 invalid/missing`).toBe(期望Category === null ? 'missing' : 'invalid');
+      if (期望Category !== null && r.kind === 'invalid') {
+        expect(r.category, `${场景}: 错误码应为 ${期望Category}`).toBe(期望Category);
+      }
+      if (reasonRegex && r.kind === 'missing') {
+        expect(r.reasons[0], `${场景}: reason 应含 ${reasonRegex}`).toMatch(reasonRegex);
+      }
+    }
   });
 
   it('合法 --scope（真实 Git 一致）→ ok', () => {
@@ -577,21 +575,29 @@ describe('resolveCliScope（CLI 参数解析 + scope 装载）', () => {
     }
   });
 
-  it('薄封装 changeId 缺 phase<N>- 前缀 → invalid(ARG_INVALID)（exit 2 语义，A2）', () => {
-    const repo = makeGitProject();
-    for (const badChange of ['reviewfix', 'phase6-reviewfix']) {
+  it('薄封装 ARG_INVALID（3 组：缺 phase<N>- 前缀 / --scope 与薄封装同给 / 空串·空白 changeId，每行自备 repo）', () => {
+    for (const [场景, changeArg, withScopePath, messageRegex] of [
+      ['缺前缀 reviewfix', 'reviewfix', false, /phase5-/],
+      ['缺前缀 phase6-reviewfix', 'phase6-reviewfix', false, /phase5-/],
+      ['--scope 与薄封装参数同时给出（不许静默取一）', 'phase5-demo', true, null],
+      ['空串 changeId', '', false, /changeId/],
+      ['空白串 changeId', '   ', false, /changeId/],
+      ['tab changeId', '\t', false, /changeId/],
+    ] as const) {
+      const repo = makeGitProject();
       const r = resolveCliScope({
         projectRoot: repo.root,
-        phase: 5,
+        ...baseArgs,
         git: repo.git,
-        changeArg: badChange,
+        changeArg,
         baseArg: repo.baseSha,
         headArg: repo.headSha,
+        ...(withScopePath ? { scopePath: 'scope.json' } : {}),
       });
-      expect(r.kind, `changeId=${badChange}`).toBe('invalid');
-      if (r.kind === 'invalid') {
-        expect(r.category).toBe('ARG_INVALID');
-        expect(r.message).toMatch(/phase5-/); // 消息给出期望前缀
+      expect(r.kind, `changeId=${JSON.stringify(changeArg)}（${场景}）: 应 invalid`).toBe('invalid');
+      if (r.kind === 'invalid' && messageRegex) {
+        expect(r.category, `${场景}: 应为 ARG_INVALID`).toBe('ARG_INVALID');
+        expect(r.message, `${场景}: message 应含 ${messageRegex}`).toMatch(messageRegex);
       }
     }
   });
@@ -612,39 +618,6 @@ describe('resolveCliScope（CLI 参数解析 + scope 装载）', () => {
     if (r.kind === 'violations') {
       expect(r.attemptedChangeId).toBe('phase5-reviewfix');
       expect(r.violations[0]).toMatch(/baseRef/);
-    }
-  });
-
-  it('--scope 与薄封装参数同时给出 → invalid(ARG_INVALID)（不许静默取一）', () => {
-    const repo = makeGitProject();
-    const r = resolveCliScope({
-      projectRoot: repo.root,
-      ...baseArgs,
-      git: repo.git,
-      scopePath: 'scope.json',
-      changeArg: 'phase5-demo',
-      baseArg: repo.baseSha,
-      headArg: repo.headSha,
-    });
-    expect(r.kind).toBe('invalid');
-  });
-
-  it('薄封装 changeId 为空串 / 全空白 → invalid(ARG_INVALID)（exit 2 语义，不在下游兜底）', () => {
-    const repo = makeGitProject();
-    for (const badChange of ['', '   ', '\t']) {
-      const r = resolveCliScope({
-        projectRoot: repo.root,
-        ...baseArgs,
-        git: repo.git,
-        changeArg: badChange,
-        baseArg: repo.baseSha,
-        headArg: repo.headSha,
-      });
-      expect(r.kind, `changeId=${JSON.stringify(badChange)}`).toBe('invalid');
-      if (r.kind === 'invalid') {
-        expect(r.category).toBe('ARG_INVALID');
-        expect(r.message).toMatch(/changeId/);
-      }
     }
   });
 

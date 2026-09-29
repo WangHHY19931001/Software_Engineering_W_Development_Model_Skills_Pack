@@ -622,28 +622,24 @@ describe('state schema registry fixture-only schemas', () => {
 });
 
 describe('checkVerifierOutput 集成：schema 前置校验', () => {
-  it('additionalProperties 错误以 [schema] 前缀返回', async () => {
-    const data = await loadJson(schemaSamplesDir, 'bad-additional-props.json');
-    const result = checkVerifierOutput(data);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => /\[schema\]/.test(r))).toBe(true);
-    expect(result.reasons.some((r) => /additionalProperties/.test(r))).toBe(true);
-  });
-
-  it('required 错误以 [schema] 前缀返回', async () => {
-    const data = await loadJson(schemaSamplesDir, 'bad-missing-required.json');
-    const result = checkVerifierOutput(data);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => /\[schema\]/.test(r))).toBe(true);
-    expect(result.reasons.some((r) => /required/.test(r))).toBe(true);
-  });
-
-  it('type 错误以 [schema] 前缀返回', async () => {
-    const data = await loadJson(schemaSamplesDir, 'bad-wrong-type.json');
-    const result = checkVerifierOutput(data);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((r) => /\[schema\]/.test(r))).toBe(true);
-    expect(result.reasons.some((r) => /type/.test(r))).toBe(true);
+  it('schema 拒绝样本错误以 [schema] 前缀返回（3 态：additionalProperties / required / type）', async () => {
+    for (const [fixture, keyword] of [
+      ['bad-additional-props.json', 'additionalProperties'],
+      ['bad-missing-required.json', 'required'],
+      ['bad-wrong-type.json', 'type'],
+    ] as const) {
+      const data = await loadJson(schemaSamplesDir, fixture);
+      const result = checkVerifierOutput(data);
+      expect(result.passed, `${fixture}: passed 应为 false`).toBe(false);
+      expect(
+        result.reasons.some((r) => /\[schema\]/.test(r)),
+        `${fixture}: 应含 [schema] 前缀`,
+      ).toBe(true);
+      expect(
+        result.reasons.some((r) => new RegExp(keyword).test(r)),
+        `${fixture}: 应含错误关键字 ${keyword}`,
+      ).toBe(true);
+    }
   });
 
   it('schema 校验通过后业务逻辑仍能捕获数值错误', async () => {
@@ -658,167 +654,106 @@ describe('checkVerifierOutput 集成：schema 前置校验', () => {
   });
 });
 
-describe('tla-manifest sdCoverage (phase>=2)', () => {
-  it('phase>=2 时 sdCoverage 缺失应校验失败', () => {
-    const manifest = {
-      version: 1,
-      project: 'test',
-      currentPhase: 2,
-      basePath: '.',
-      tools: { jarPath: 'tla2tools.jar', javaMinVersion: 11 },
-      specs: [
-        {
-          id: 'L1_Test',
-          level: 'L1',
-          phase: 1,
-          system: 'test',
-          requirementIds: ['REQ-001'],
-          designRef: 'docs/phase1-requirements/requirement-spec.md:§1',
-          tlaPath: 'L1_Test.tla',
-          cfgPath: 'L1_Test.cfg',
-          parent: null,
-          siblings: [],
-          children: [],
-          variableCombination: 100,
-          decompositionDecision: 'kept-below-threshold',
-          syntaxChecked: true,
-          tlcChecked: true,
-          deadlockFree: true,
-          invariantsHold: true,
-          stateExplosion: false,
-        },
-      ],
-    };
-    const result = validateBySchema('tla-manifest', manifest);
-    expect(result.valid).toBe(false);
-    expect(result.errorMessages.join(' ')).toMatch(/sdCoverage/);
-  });
-
-  it('phase>=2 时 sdCoverage.uncoveredSdNodes 非空应通过 schema（由业务层 checkTlaModel 校验）', () => {
-    const manifest = {
-      version: 1,
-      project: 'test',
-      currentPhase: 2,
-      basePath: '.',
-      tools: { jarPath: 'tla2tools.jar', javaMinVersion: 11 },
-      specs: [
-        {
-          id: 'L1_Test',
-          level: 'L1',
-          phase: 1,
-          system: 'test',
-          requirementIds: ['REQ-001'],
-          designRef: 'docs/phase1-requirements/requirement-spec.md:§1',
-          tlaPath: 'L1_Test.tla',
-          cfgPath: 'L1_Test.cfg',
-          parent: null,
-          siblings: [],
-          children: [],
-          variableCombination: 100,
-          decompositionDecision: 'kept-below-threshold',
-          syntaxChecked: true,
-          tlcChecked: true,
-          deadlockFree: true,
-          invariantsHold: true,
-          stateExplosion: false,
-        },
-      ],
-      sdCoverage: {
-        totalSdNodes: 3,
-        coveredSdNodes: ['SD-001', 'SD-002'],
-        uncoveredSdNodes: ['SD-003'],
-        coverageRate: 0.667,
+describe('phase>=2 coverage 字段（tla-manifest sdCoverage / bdd-manifest designCoverage）', () => {
+  const tlaManifest = {
+    version: 1,
+    project: 'test',
+    currentPhase: 2,
+    basePath: '.',
+    tools: { jarPath: 'tla2tools.jar', javaMinVersion: 11 },
+    specs: [
+      {
+        id: 'L1_Test',
+        level: 'L1',
+        phase: 1,
+        system: 'test',
+        requirementIds: ['REQ-001'],
+        designRef: 'docs/phase1-requirements/requirement-spec.md:§1',
+        tlaPath: 'L1_Test.tla',
+        cfgPath: 'L1_Test.cfg',
+        parent: null,
+        siblings: [],
+        children: [],
+        variableCombination: 100,
+        decompositionDecision: 'kept-below-threshold',
+        syntaxChecked: true,
+        tlcChecked: true,
+        deadlockFree: true,
+        invariantsHold: true,
+        stateExplosion: false,
       },
-    };
-    const result = validateBySchema('tla-manifest', manifest);
-    expect(result.valid).toBe(true);
-  });
-});
-
-describe('bdd-manifest designCoverage (phase>=2)', () => {
-  it('phase>=2 时 designCoverage 缺失应校验失败', () => {
-    const manifest = {
-      schemaVersion: '1.0',
-      projectId: 'test',
-      basePath: 'features/',
-      currentPhase: 2,
-      features: [
-        {
-          id: 'L1_test-001',
-          level: 1,
-          filePath: 'L1/L1_test-001.feature',
-          scenarioCount: 1,
-          stateMachineId: 'SM-L1-test',
-          tlaSpecId: 'L1_test',
-          reqIds: ['REQ-001'],
-          designIds: ['SD-001'],
-          parentFeatureIds: [],
-          siblingFeatureIds: [],
-          childFeatureIds: [],
-        },
-      ],
-      stateMachines: [
-        {
-          id: 'SM-L1-test',
-          level: 1,
-          states: ['S1', 'S2'],
-          initialState: 'S1',
-          terminalStates: [],
-          acceptingStates: ['S2'],
-          rejectingStates: [],
-          transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
-          invariants: ['S2 => true'],
-        },
-      ],
-    };
-    const result = validateBySchema('bdd-manifest', manifest);
-    expect(result.valid).toBe(false);
-    expect(result.errorMessages.join(' ')).toMatch(/designCoverage/);
-  });
-
-  it('phase>=2 时 designCoverage.uncoveredSdNodes 非空应通过 schema（非空由业务层 D8 校验）', () => {
-    const manifest = {
-      schemaVersion: '1.0',
-      projectId: 'test',
-      basePath: 'features/',
-      currentPhase: 2,
-      features: [
-        {
-          id: 'L1_test-001',
-          level: 1,
-          filePath: 'L1/L1_test-001.feature',
-          scenarioCount: 1,
-          stateMachineId: 'SM-L1-test',
-          tlaSpecId: 'L1_test',
-          reqIds: ['REQ-001'],
-          designIds: ['SD-001'],
-          parentFeatureIds: [],
-          siblingFeatureIds: [],
-          childFeatureIds: [],
-        },
-      ],
-      stateMachines: [
-        {
-          id: 'SM-L1-test',
-          level: 1,
-          states: ['S1', 'S2'],
-          initialState: 'S1',
-          terminalStates: [],
-          acceptingStates: ['S2'],
-          rejectingStates: [],
-          transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
-          invariants: ['S2 => true'],
-        },
-      ],
-      designCoverage: {
-        totalSdNodes: 3,
-        coveredSdNodes: ['SD-001'],
-        uncoveredSdNodes: ['SD-002', 'SD-003'],
-        coverageRate: 0.333,
+    ],
+  };
+  const bddManifest = {
+    schemaVersion: '1.0',
+    projectId: 'test',
+    basePath: 'features/',
+    currentPhase: 2,
+    features: [
+      {
+        id: 'L1_test-001',
+        level: 1,
+        filePath: 'L1/L1_test-001.feature',
+        scenarioCount: 1,
+        stateMachineId: 'SM-L1-test',
+        tlaSpecId: 'L1_test',
+        reqIds: ['REQ-001'],
+        designIds: ['SD-001'],
+        parentFeatureIds: [],
+        siblingFeatureIds: [],
+        childFeatureIds: [],
       },
-    };
-    const result = validateBySchema('bdd-manifest', manifest);
-    expect(result.valid).toBe(true);
+    ],
+    stateMachines: [
+      {
+        id: 'SM-L1-test',
+        level: 1,
+        states: ['S1', 'S2'],
+        initialState: 'S1',
+        terminalStates: [],
+        acceptingStates: ['S2'],
+        rejectingStates: [],
+        transitions: [{ from: 'S1', event: 'e', to: 'S2' }],
+        invariants: ['S2 => true'],
+      },
+    ],
+  };
+
+  it('phase>=2 时 coverage 字段缺失应校验失败（2 态：sdCoverage / designCoverage）', () => {
+    for (const [manifestName, schemaName, manifest, keyword] of [
+      ['tla-manifest', 'tla-manifest', tlaManifest, 'sdCoverage'],
+      ['bdd-manifest', 'bdd-manifest', bddManifest, 'designCoverage'],
+    ] as const) {
+      const result = validateBySchema(schemaName, manifest);
+      expect(result.valid, `${manifestName}: coverage 缺失应校验失败`).toBe(false);
+      expect(result.errorMessages.join(' '), `${manifestName}: 应点名 ${keyword}`).toMatch(new RegExp(keyword));
+    }
+  });
+
+  it('phase>=2 时 uncoveredSdNodes 非空应通过 schema（2 态：由业务层校验）', () => {
+    for (const [manifestName, schemaName, manifest, coverage] of [
+      [
+        'tla-manifest',
+        'tla-manifest',
+        tlaManifest,
+        { totalSdNodes: 3, coveredSdNodes: ['SD-001', 'SD-002'], uncoveredSdNodes: ['SD-003'], coverageRate: 0.667 },
+      ],
+      [
+        'bdd-manifest',
+        'bdd-manifest',
+        bddManifest,
+        { totalSdNodes: 3, coveredSdNodes: ['SD-001'], uncoveredSdNodes: ['SD-002', 'SD-003'], coverageRate: 0.333 },
+      ],
+    ] as const) {
+      const result = validateBySchema(schemaName, {
+        ...manifest,
+        [manifestName === 'tla-manifest' ? 'sdCoverage' : 'designCoverage']: coverage,
+      });
+      expect(
+        result.valid,
+        `${manifestName}: uncoveredSdNodes 非空应通过 schema（非空由业务层校验）: ${result.errorMessages.join('; ')}`,
+      ).toBe(true);
+    }
   });
 });
 
@@ -862,47 +797,36 @@ describe('run-log schema fix/emergency-fix variant conditional', () => {
     artifacts: ['src/app.ts'],
   };
 
-  it('action=fix 无 variant → valid（向后兼容旧样本）', () => {
-    expect(validateBySchema('run-log', { ...fixBase, action: 'fix' }).valid).toBe(true);
-  });
-
-  it('action=fix + variant=fix → valid', () => {
-    expect(validateBySchema('run-log', { ...fixBase, action: 'fix', variant: 'fix' }).valid).toBe(true);
-  });
-
-  it('action=fix + variant=emergency-fix → invalid（variant 与 action 不符）', () => {
-    expect(validateBySchema('run-log', { ...fixBase, action: 'fix', variant: 'emergency-fix' }).valid).toBe(false);
-  });
-
-  it('action=emergency-fix 无 variant → invalid（schema 强制 variant+blocker）', () => {
-    expect(validateBySchema('run-log', { ...fixBase, action: 'emergency-fix' }).valid).toBe(false);
-  });
-
-  it('action=emergency-fix + variant=emergency-fix + blocker → valid', () => {
-    expect(
-      validateBySchema('run-log', {
-        ...fixBase,
-        action: 'emergency-fix',
-        variant: 'emergency-fix',
-        blocker: '构建失败阻塞推进',
-        fixedLocation: 'w-model-dev/scripts/cli/check-run-log.ts',
-        fixBasedOn: 'S-self-assessment',
-      }).valid,
-    ).toBe(true);
-  });
-
-  it('action=emergency-fix + variant=emergency-fix 但缺 blocker → invalid', () => {
-    expect(validateBySchema('run-log', { ...fixBase, action: 'emergency-fix', variant: 'emergency-fix' }).valid).toBe(
-      false,
-    );
-  });
-
-  it('action=emergency-fix + variant=fix → invalid（const 不符）', () => {
-    expect(validateBySchema('run-log', { ...fixBase, action: 'emergency-fix', variant: 'fix' }).valid).toBe(false);
-  });
-
-  it('variant 非法枚举值 → invalid', () => {
-    expect(validateBySchema('run-log', { ...fixBase, action: 'fix', variant: 'hotfix' }).valid).toBe(false);
+  it('action×variant×blocker 组合矩阵（8 态）', () => {
+    for (const [组合描述, patch, expectValid] of [
+      ['fix 无 variant（向后兼容旧样本）', { action: 'fix' }, true],
+      ['fix + variant=fix', { action: 'fix', variant: 'fix' }, true],
+      ['fix + variant=emergency-fix（variant 与 action 不符）', { action: 'fix', variant: 'emergency-fix' }, false],
+      ['emergency-fix 无 variant（schema 强制 variant+blocker）', { action: 'emergency-fix' }, false],
+      [
+        'emergency-fix + variant=emergency-fix + blocker',
+        {
+          action: 'emergency-fix',
+          variant: 'emergency-fix',
+          blocker: '构建失败阻塞推进',
+          fixedLocation: 'w-model-dev/scripts/cli/check-run-log.ts',
+          fixBasedOn: 'S-self-assessment',
+        },
+        true,
+      ],
+      [
+        'emergency-fix + variant=emergency-fix 但缺 blocker',
+        { action: 'emergency-fix', variant: 'emergency-fix' },
+        false,
+      ],
+      ['emergency-fix + variant=fix（const 不符）', { action: 'emergency-fix', variant: 'fix' }, false],
+      ['variant 非法枚举值 hotfix', { action: 'fix', variant: 'hotfix' }, false],
+    ] as Array<[string, Record<string, unknown>, boolean]>) {
+      expect(
+        validateBySchema('run-log', { ...fixBase, ...patch }).valid,
+        `${组合描述} → valid 应为 ${expectValid}`,
+      ).toBe(expectValid);
+    }
   });
 });
 
@@ -914,27 +838,29 @@ describe('preventive-review schema passed=false 与 findings 约束', () => {
     dimension: 'completeness',
   };
 
-  it('passed=false + findings=[] → invalid', () => {
-    expect(validateBySchema('preventive-review', { ...reviewBase, passed: false, findings: [] }).valid).toBe(false);
-  });
-
-  it('passed=true + findings=[] → valid（无问题可空发现通过）', () => {
-    expect(validateBySchema('preventive-review', { ...reviewBase, passed: true, findings: [] }).valid).toBe(true);
-  });
-
-  it('passed=false + findings 含一条有效发现 → valid', () => {
-    expect(
-      validateBySchema('preventive-review', {
-        ...reviewBase,
-        passed: false,
-        findings: [
-          {
-            severity: 'Required',
-            description: '缺字段',
-            evidence: 'requirement-spec.md §3',
-          },
-        ],
-      }).valid,
-    ).toBe(true);
+  it('passed×findings 约束矩阵（3 态）', () => {
+    for (const [场景, patch, expectValid] of [
+      ['passed=false + findings=[]（无发现不可失败）', { passed: false, findings: [] }, false],
+      ['passed=true + findings=[]（无问题可空发现通过）', { passed: true, findings: [] }, true],
+      [
+        'passed=false + findings 含一条有效发现',
+        {
+          passed: false,
+          findings: [
+            {
+              severity: 'Required',
+              description: '缺字段',
+              evidence: 'requirement-spec.md §3',
+            },
+          ],
+        },
+        true,
+      ],
+    ] as Array<[string, Record<string, unknown>, boolean]>) {
+      expect(
+        validateBySchema('preventive-review', { ...reviewBase, ...patch }).valid,
+        `${场景} → valid 应为 ${expectValid}`,
+      ).toBe(expectValid);
+    }
   });
 });

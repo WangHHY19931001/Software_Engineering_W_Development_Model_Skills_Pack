@@ -98,36 +98,40 @@ describe('Persona Verifier CLI regressions', () => {
     });
   });
 
-  it.each([
-    '[Critical] 演示阻断性安全缺陷',
-    'Critical: 演示阻断性安全缺陷',
-    '[Required] 演示必修缺陷',
-    'Required: 演示必修缺陷',
-  ])('显式 %s reworkHint 必须拒绝放行但保留分数映射等级', async (hint) => {
-    const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier/persona-code-reviewer.json');
-    const fixture = JSON.parse(await readFile(fixturePath, 'utf-8')) as Record<string, unknown>;
-    fixture.reworkHints = [hint];
-    fixture.passed = true;
+  it('显式阻断性 reworkHint 必须拒绝放行但保留分数映射等级（4 形态，每迭代自备 fixture）', async () => {
+    for (const hint of [
+      '[Critical] 演示阻断性安全缺陷',
+      'Critical: 演示阻断性安全缺陷',
+      '[Required] 演示必修缺陷',
+      'Required: 演示必修缺陷',
+    ]) {
+      const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier/persona-code-reviewer.json');
+      const fixture = JSON.parse(await readFile(fixturePath, 'utf-8')) as Record<string, unknown>;
+      fixture.reworkHints = [hint];
+      fixture.passed = true;
 
-    const tempDir = await mkdtemp(resolve(tmpdir(), 'verifier-cli-'));
-    const negativeFixturePath = resolve(tempDir, 'persona-code-reviewer-blocking.json');
-    try {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary fixture path
-      await writeFile(negativeFixturePath, JSON.stringify(fixture), 'utf-8');
-      const result = await runVerifierCli(negativeFixturePath);
-      const report = JSON.parse(result.stdout) as Record<string, unknown>;
+      const tempDir = await mkdtemp(resolve(tmpdir(), 'verifier-cli-'));
+      const negativeFixturePath = resolve(tempDir, 'persona-code-reviewer-blocking.json');
+      try {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary fixture path
+        await writeFile(negativeFixturePath, JSON.stringify(fixture), 'utf-8');
+        const result = await runVerifierCli(negativeFixturePath);
+        const report = JSON.parse(result.stdout) as Record<string, unknown>;
 
-      expect(result.code).toBe(1);
-      expect(report).toMatchObject({
-        type: 'verifier-output',
-        passed: false,
-        qualityLevel: 'A',
-        exitCode: 1,
-      });
-      expect(report.reasons).toEqual(expect.arrayContaining([expect.stringContaining('reworkHints[1]')]));
-    } finally {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary directory
-      await rm(tempDir, { recursive: true, force: true });
+        expect(result.code, `hint=${hint}: 应退出 1`).toBe(1);
+        expect(report, `hint=${hint}: 应拒但保留 qualityLevel A`).toMatchObject({
+          type: 'verifier-output',
+          passed: false,
+          qualityLevel: 'A',
+          exitCode: 1,
+        });
+        expect(report.reasons, `hint=${hint}: 应点名 reworkHints[1]`).toEqual(
+          expect.arrayContaining([expect.stringContaining('reworkHints[1]')]),
+        );
+      } finally {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary directory
+        await rm(tempDir, { recursive: true, force: true });
+      }
     }
   });
 
@@ -254,22 +258,12 @@ describe('evidence 格式校验', () => {
     expect(result.vagueItems).toEqual([]);
   });
 
-  it('"C1-C10 全通过" 应判定为空泛声明', () => {
-    const result = validateEvidenceFormat(['C1-C10 全通过']);
-    expect(result.valid).toBe(false);
-    expect(result.vagueItems).toContain('C1-C10 全通过');
-  });
-
-  it('"质量良好" 应判定为空泛声明', () => {
-    const result = validateEvidenceFormat(['质量良好']);
-    expect(result.valid).toBe(false);
-    expect(result.vagueItems).toContain('质量良好');
-  });
-
-  it('"评审通过" 应判定为空泛声明', () => {
-    const result = validateEvidenceFormat(['评审通过']);
-    expect(result.valid).toBe(false);
-    expect(result.vagueItems).toContain('评审通过');
+  it('空泛声明应判定 invalid 并记入 vagueItems（3 态）', () => {
+    for (const declaration of ['C1-C10 全通过', '质量良好', '评审通过']) {
+      const result = validateEvidenceFormat([declaration]);
+      expect(result.valid, `声明「${declaration}」: 应判 invalid`).toBe(false);
+      expect(result.vagueItems, `声明「${declaration}」: 应记入 vagueItems`).toContain(declaration);
+    }
   });
 });
 
@@ -304,43 +298,39 @@ describe('V 产物形态负样本（D-10：等差改进指引 / 双 L 文案区�
 });
 
 describe('R13 单轴下限（反模式 #41）', () => {
-  it('全部子标准 ≥ 0.70 应无违规', () => {
-    const subCriteria = [
+  it('R13 阈值矩阵（3 态：全过 / 命中含子标准名 / 边界 0.70 含等号不命中）', () => {
+    const passing = [
       { name: 'completeness', score: 0.9 },
       { name: 'clarity', score: 0.85 },
       { name: 'consistency', score: 0.7 },
       { name: 'testability', score: 0.8 },
       { name: 'traceability', score: 0.95 },
     ];
-    const violations = checkR13SingleAxisFloor(subCriteria);
-    expect(violations).toEqual([]);
-  });
-
-  it('任一子标准 < 0.70 应命中违规（含子标准名）', () => {
-    const subCriteria = [
+    const hit = [
       { name: 'completeness', score: 0.65 },
       { name: 'clarity', score: 0.95 },
       { name: 'consistency', score: 0.95 },
       { name: 'testability', score: 0.95 },
       { name: 'traceability', score: 0.95 },
     ];
-    const violations = checkR13SingleAxisFloor(subCriteria);
-    expect(violations).toHaveLength(1);
-    expect(violations[0]).toContain('completeness');
-    expect(violations[0]).toContain('0.65');
-    expect(violations[0]).toContain('0.7');
-  });
-
-  it('边界值 0.70 本身不应命中（B 级分界含等号）', () => {
-    const subCriteria = [
+    const boundary = [
       { name: 'completeness', score: 0.7 },
       { name: 'clarity', score: 0.7 },
       { name: 'consistency', score: 0.7 },
       { name: 'testability', score: 0.7 },
       { name: 'traceability', score: 0.7 },
     ];
-    const violations = checkR13SingleAxisFloor(subCriteria);
-    expect(violations).toEqual([]);
+    for (const [场景, subCriteria] of [
+      ['全部子标准 ≥ 0.70', passing],
+      ['边界值 0.70 本身（B 级分界含等号）', boundary],
+    ] as const) {
+      expect(checkR13SingleAxisFloor(subCriteria), `${场景}: 应无违规`).toEqual([]);
+    }
+    const violations = checkR13SingleAxisFloor(hit);
+    expect(violations, '任一子标准 < 0.70: 应命中 1 条违规').toHaveLength(1);
+    expect(violations[0], '任一子标准 < 0.70: 违规应含子标准名').toContain('completeness');
+    expect(violations[0], '任一子标准 < 0.70: 违规应含实际分').toContain('0.65');
+    expect(violations[0], '任一子标准 < 0.70: 违规应含下限').toContain('0.7');
   });
 
   it('非数组输入应返回空违规列表', () => {
@@ -485,17 +475,16 @@ describe('evidence 扣分后 passed 重算', () => {
 });
 
 describe('EVIDENCE_PATTERN 冒号格式', () => {
-  it('应接受 path:§section=statement 格式', () => {
-    const result = validateEvidenceFormat(['docs/phase1-requirements/requirement-spec.md:§1.1=32 需求齐全']);
-    expect(result.valid).toBe(true);
+  it('应接受冒号格式（2 态：path:§section / path:L42-58）', () => {
+    for (const evidence of [
+      'docs/phase1-requirements/requirement-spec.md:§1.1=32 需求齐全',
+      'src/auth.ts:L42-58=JWT 签发逻辑',
+    ]) {
+      expect(validateEvidenceFormat([evidence]).valid, `${evidence}: 应接受`).toBe(true);
+    }
   });
 
-  it('应接受 path:L42=statement 格式', () => {
-    const result = validateEvidenceFormat(['src/auth.ts:L42-58=JWT 签发逻辑']);
-    expect(result.valid).toBe(true);
-  });
-
-  it('应拒绝 path.field=value 点号格式', () => {
+  it('应拒绝点号格式（1 态：path.field=value）', () => {
     const result = validateEvidenceFormat(['coverage.json.matrices.stakeholder.coverage=100%']);
     expect(result.valid).toBe(false);
   });
@@ -567,28 +556,36 @@ describe('targetKind=rootcause（§7.5 V 复审根因报告）', () => {
     expect(result.reasons).toHaveLength(0);
   });
 
-  it('rootcause 误用 test 集合子标准名称应被拦截', () => {
-    const bad = {
-      ...baseRootcause,
-      subCriteria: baseRootcause.subCriteria.map((sc) => ({
-        ...sc,
-        name: sc.name === 'correctness' ? 'coverage' : sc.name,
-      })),
-    };
-    const result = checkVerifierOutput(bad);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((m: string) => /subCriteria.*name 应为/.test(m))).toBe(true);
-  });
-
-  it('rootcause 子标准权重被改动应被拦截', () => {
-    const bad = {
-      ...baseRootcause,
-      subCriteria: baseRootcause.subCriteria.map((sc, i) => (i === 0 ? { ...sc, weight: 0.3 } : sc)),
-      compositeScore: 0.901,
-    };
-    const result = checkVerifierOutput(bad);
-    expect(result.passed).toBe(false);
-    expect(result.reasons.some((m: string) => /weight 应为/.test(m))).toBe(true);
+  it('rootcause 负例（2 态：误用 test 集合子标准名 / 权重被改动）', () => {
+    for (const [场景, build, 期望正则] of [
+      [
+        '误用 test 集合子标准名称',
+        () => ({
+          ...baseRootcause,
+          subCriteria: baseRootcause.subCriteria.map((sc) => ({
+            ...sc,
+            name: sc.name === 'correctness' ? 'coverage' : sc.name,
+          })),
+        }),
+        /subCriteria.*name 应为/,
+      ],
+      [
+        '子标准权重被改动',
+        () => ({
+          ...baseRootcause,
+          subCriteria: baseRootcause.subCriteria.map((sc, i) => (i === 0 ? { ...sc, weight: 0.3 } : sc)),
+          compositeScore: 0.901,
+        }),
+        /weight 应为/,
+      ],
+    ] as const) {
+      const result = checkVerifierOutput(build());
+      expect(result.passed, `${场景}: 应拒绝`).toBe(false);
+      expect(
+        result.reasons.some((m: string) => 期望正则.test(m)),
+        `${场景}: reasons 应含 ${期望正则}`,
+      ).toBe(true);
+    }
   });
 
   it('非法 targetKind 仍被枚举拦截（rootcause 之外的任意值）', () => {
@@ -604,7 +601,7 @@ describe('targetKind=rootcause（§7.5 V 复审根因报告）', () => {
 });
 
 describe('R18 分辨力下限（A-3d 校准偏移，D19）', () => {
-  it('rawScores 非全等但方差坍缩（极近值）→ 命中，含子标准名与方差', () => {
+  it('rawScores 非全等但方差坍缩（极近值）→ 命中，含子标准名与方差（1 态）', () => {
     const violations = checkR18ResolutionFloor([
       { name: 'completeness', rawScores: [0.9001, 0.9002, 0.9] },
       { name: 'clarity', rawScores: [0.2, 0.9, 0.5] },
@@ -615,26 +612,22 @@ describe('R18 分辨力下限（A-3d 校准偏移，D19）', () => {
     expect(violations[0]).toContain('分辨力');
   });
 
-  it('rawScores 完全相等 → 不由 R18 报（既有全等检测已覆盖，避免重复报）', () => {
-    const violations = checkR18ResolutionFloor([{ name: 'completeness', rawScores: [0.9, 0.9, 0.9] }]);
-    expect(violations).toEqual([]);
-  });
-
-  it('rawScores 正常离散 → 无违规', () => {
-    const violations = checkR18ResolutionFloor([
-      { name: 'completeness', rawScores: [0.1, 0.5, 0.9] },
-      { name: 'clarity', rawScores: [0.2, 0.95, 0.4] },
-    ]);
-    expect(violations).toEqual([]);
-  });
-
-  it('rawScores 少于 3 个数据点 → 跳过（样本不足以判定分布坍缩）', () => {
-    expect(checkR18ResolutionFloor([{ name: 'completeness', rawScores: [0.9001, 0.9002] }])).toEqual([]);
-  });
-
-  it('非数组/缺 rawScores 的子标准 → 跳过而非抛错', () => {
-    expect(checkR18ResolutionFloor([{ name: 'x' }, { name: 'y', rawScores: 'nope' }])).toEqual([]);
-    expect(checkR18ResolutionFloor(undefined as unknown as unknown[])).toEqual([]);
+  it('R18 跳过行（5 态：全等不重复报 / 正常离散 / 样本不足 / 缺 rawScores / 非数组输入）', () => {
+    for (const [场景, input] of [
+      ['rawScores 完全相等（既有全等检测已覆盖，避免重复报）', [{ name: 'completeness', rawScores: [0.9, 0.9, 0.9] }]],
+      [
+        'rawScores 正常离散',
+        [
+          { name: 'completeness', rawScores: [0.1, 0.5, 0.9] },
+          { name: 'clarity', rawScores: [0.2, 0.95, 0.4] },
+        ],
+      ],
+      ['rawScores 少于 3 个数据点（样本不足）', [{ name: 'completeness', rawScores: [0.9001, 0.9002] }]],
+      ['子标准缺 rawScores', [{ name: 'x' }, { name: 'y', rawScores: 'nope' }]],
+    ] as const) {
+      expect(checkR18ResolutionFloor([...input]), `${场景}: 应跳过`).toEqual([]);
+    }
+    expect(checkR18ResolutionFloor(undefined as unknown as unknown[]), '非数组输入: 应跳过而非抛错').toEqual([]);
   });
 
   it('RESOLUTION_FLOOR 为导出的可校准常量（端到端调测后可调整）', () => {

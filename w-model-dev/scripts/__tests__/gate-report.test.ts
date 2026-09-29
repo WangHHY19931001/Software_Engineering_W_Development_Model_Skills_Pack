@@ -335,9 +335,8 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     }
   });
 
-  it.each(['--gate-logs=', '--gate-logs'])(
-    '显式 gate-logs 参数 %s 缺少目录值时返回结构化 exit 2',
-    async (gateLogsArg) => {
+  it('显式 gate-logs 参数缺少目录值时返回结构化 exit 2（2 形态：--gate-logs= / --gate-logs，每迭代自备 fixture）', async () => {
+    for (const gateLogsArg of ['--gate-logs=', '--gate-logs']) {
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
       try {
         const runLog = path.join(tmpDir, 'run-log.jsonl');
@@ -346,18 +345,17 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
         const result = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, gateLogsArg], {
           cwd: tmpDir,
         });
-        expect(result.status).toBe(2);
-        expect(result.stdout).toContain('ERROR_JSON');
-        expect(result.stdout).toContain('"exitCode":2');
+        expect(result.status, `flag=${gateLogsArg}: 应 exit 2`).toBe(2);
+        expect(result.stdout, `flag=${gateLogsArg}: 应含 ERROR_JSON`).toContain('ERROR_JSON');
+        expect(result.stdout, `flag=${gateLogsArg}: 应含 "exitCode":2`).toContain('"exitCode":2');
       } finally {
         await fs.rm(tmpDir, { recursive: true, force: true });
       }
-    },
-  );
+    }
+  });
 
-  it.each(['--gate-logs', '--gate-logs='])(
-    '有效 gate-logs 后重复出现空参数 %s 时仍返回结构化 exit 2',
-    async (emptyGateLogsArg) => {
+  it('有效 gate-logs 后重复出现空参数时仍返回结构化 exit 2（2 形态：--gate-logs / --gate-logs=，每迭代自备 fixture）', async () => {
+    for (const emptyGateLogsArg of ['--gate-logs', '--gate-logs=']) {
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
       try {
         const runLog = path.join(tmpDir, 'run-log.jsonl');
@@ -368,14 +366,14 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
           [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, `--gate-logs=${tmpDir}`, emptyGateLogsArg],
           { cwd: tmpDir },
         );
-        expect(result.status).toBe(2);
-        expect(result.stdout).toContain('ERROR_JSON');
-        expect(result.stdout).toContain('"exitCode":2');
+        expect(result.status, `flag=${emptyGateLogsArg}: 应 exit 2`).toBe(2);
+        expect(result.stdout, `flag=${emptyGateLogsArg}: 应含 ERROR_JSON`).toContain('ERROR_JSON');
+        expect(result.stdout, `flag=${emptyGateLogsArg}: 应含 "exitCode":2`).toContain('"exitCode":2');
       } finally {
         await fs.rm(tmpDir, { recursive: true, force: true });
       }
-    },
-  );
+    }
+  });
 
   it('协议无效的 gate-log 不得进入 R6 Map，R6 必须报告未找到合法证据', async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
@@ -431,156 +429,105 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     }
   });
 
-  it('显式 --gate-logs 下的子目录读取失败为 blocking violation', async () => {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
-    try {
-      const gateLogsDir = path.join(tmpDir, 'gate-logs');
-      const unreadableEntry = path.join(gateLogsDir, 'not-a-file');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- unreadableEntry is beneath the test-owned mkdtemp fixture
-      await fs.mkdir(unreadableEntry, { recursive: true });
-      const runLog = path.join(tmpDir, 'run-log.jsonl');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
-      await fs.writeFile(runLog, makeRunLogEntry('not-a-file', 0) + '\n', 'utf8');
-      const result = runSync(
-        process.execPath,
-        [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, `--gate-logs=${gateLogsDir}`],
-        { cwd: tmpDir },
-      );
-      expect(result.status).toBe(1);
-      expect(result.stdout).toContain('gate-log 文件读取失败');
-    } finally {
-      await fs.rm(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it('显式 --gate-logs 下缺根 exitCode 的 JSON 为 blocking violation', async () => {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
-    try {
-      const gateLogsDir = path.join(tmpDir, 'gate-logs');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- gateLogsDir is beneath the test-owned mkdtemp fixture
-      await fs.mkdir(gateLogsDir);
-      const payload = makeGatePayload(0) as Record<string, unknown>;
-      delete payload.exitCode;
-      delete (payload.reportSummary as Record<string, unknown>).exitCode;
-      delete (payload.stdoutSummary as Record<string, unknown>).exitCode;
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
-      await fs.writeFile(path.join(gateLogsDir, 'missing-exit-code.json'), JSON.stringify(payload), 'utf8');
-      const runLog = path.join(tmpDir, 'run-log.jsonl');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
-      await fs.writeFile(runLog, makeRunLogEntry('missing-exit-code.json', 0) + '\n', 'utf8');
-      const result = runSync(
-        process.execPath,
-        [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, `--gate-logs=${gateLogsDir}`],
-        { cwd: tmpDir },
-      );
-      expect(result.status).toBe(1);
-      expect(result.stdout).toContain('未提取到合法 exitCode');
-    } finally {
-      await fs.rm(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it('显式 --gate-logs 的损坏文件为 blocking violation，不静默跳过', async () => {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
-    try {
-      const gateLogsDir = path.join(tmpDir, 'gate-logs');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- gateLogsDir is beneath the test-owned mkdtemp fixture
-      await fs.mkdir(gateLogsDir);
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
-      await fs.writeFile(path.join(gateLogsDir, 'broken.json'), '{not-json', 'utf8');
-      const runLog = path.join(tmpDir, 'run-log.jsonl');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
-      await fs.writeFile(runLog, makeRunLogEntry('broken.json', 0) + '\n', 'utf8');
-      const result = runSync(
-        process.execPath,
-        [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, `--gate-logs=${gateLogsDir}`],
-        {
-          cwd: tmpDir,
+  it('显式 --gate-logs 读取失败行（2 态：子目录当作文件读 / --gate-logs 目录缺失）', async () => {
+    for (const [形态名, setup, gateLogsTarget, marker] of [
+      [
+        '子目录读取失败（entry 为目录）',
+        async (tmpDir: string) => {
+          const gateLogsDir = path.join(tmpDir, 'gate-logs');
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- gateLogsDir is beneath the test-owned mkdtemp fixture
+          await fs.mkdir(path.join(gateLogsDir, 'not-a-file'), { recursive: true });
+          return { gateLogsDir, entry: 'not-a-file' };
         },
-      );
-      expect(result.status).toBe(1);
-      expect(JSON.parse(result.stdout ?? '')).toMatchObject({ passed: false, exitCode: 1 });
-      expect(result.stdout).toContain('未提取到合法 exitCode');
-    } finally {
-      await fs.rm(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it('显式 --gate-logs 目录读取失败为 blocking violation', async () => {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
-    try {
-      const missingDir = path.join(tmpDir, 'missing-gate-logs');
-      const runLog = path.join(tmpDir, 'run-log.jsonl');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
-      await fs.writeFile(runLog, makeRunLogEntry('missing.json', 0) + '\n', 'utf8');
-      const result = runSync(
-        process.execPath,
-        [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, `--gate-logs=${missingDir}`],
-        {
-          cwd: tmpDir,
+        (gateLogsDir: string) => gateLogsDir,
+        'gate-log 文件读取失败',
+      ],
+      [
+        '目录读取失败（--gate-logs 指向不存在目录）',
+        async (tmpDir: string) => {
+          const gateLogsDir = path.join(tmpDir, 'gate-logs');
+          return { gateLogsDir, entry: 'missing.json' };
         },
-      );
-      expect(result.status).toBe(1);
-      expect(JSON.parse(result.stdout ?? '')).toMatchObject({ passed: false, exitCode: 1 });
-      expect(result.stdout).toContain('gate-logs 目录读取失败');
-    } finally {
-      await fs.rm(tmpDir, { recursive: true, force: true });
+        (gateLogsDir: string) => path.join(path.dirname(gateLogsDir), 'missing-gate-logs'),
+        'gate-logs 目录读取失败',
+      ],
+    ] as const) {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
+      try {
+        const { gateLogsDir, entry } = await setup(tmpDir);
+        const runLog = path.join(tmpDir, 'run-log.jsonl');
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
+        await fs.writeFile(runLog, makeRunLogEntry(entry, 0) + '\n', 'utf8');
+        const result = runSync(
+          process.execPath,
+          [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, `--gate-logs=${gateLogsTarget(gateLogsDir)}`],
+          { cwd: tmpDir },
+        );
+        expect(result.status, `${形态名}: 应 exit 1`).toBe(1);
+        expect(result.stdout, `${形态名}: 应含「${marker}」`).toContain(marker);
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
     }
-  });
+  }, 120_000);
 
-  it('根字段与摘要字段矛盾为 blocking violation', async () => {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
-    try {
-      const gateLogsDir = path.join(tmpDir, 'gate-logs');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- gateLogsDir is beneath the test-owned mkdtemp fixture
-      await fs.mkdir(gateLogsDir);
-      const payload = makeGatePayload(0);
-      payload.stdoutSummary = { exitCode: 1, passed: false };
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
-      await fs.writeFile(path.join(gateLogsDir, 'mismatch.json'), JSON.stringify(payload), 'utf8');
-      const runLog = path.join(tmpDir, 'run-log.jsonl');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
-      await fs.writeFile(runLog, makeRunLogEntry('mismatch.json', 0) + '\n', 'utf8');
-      const result = runSync(
-        process.execPath,
-        [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, `--gate-logs=${gateLogsDir}`],
-        {
-          cwd: tmpDir,
+  it('显式 --gate-logs 内容无效行（4 态：缺根 exitCode / 损坏文件 / 根摘要矛盾 / schema 无效，不静默跳过）', async () => {
+    for (const [形态名, entryName, makeContent, marker, assertJsonShape] of [
+      [
+        '缺根 exitCode',
+        'missing-exit-code.json',
+        () => {
+          const payload = makeGatePayload(0) as Record<string, unknown>;
+          delete payload.exitCode;
+          delete (payload.reportSummary as Record<string, unknown>).exitCode;
+          delete (payload.stdoutSummary as Record<string, unknown>).exitCode;
+          return JSON.stringify(payload);
         },
-      );
-      expect(result.status).toBe(1);
-      expect(JSON.parse(result.stdout ?? '')).toMatchObject({ passed: false, exitCode: 1 });
-      expect(result.stdout).toContain('stdoutSummary');
-    } finally {
-      await fs.rm(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it('schema 无效的根 JSON 为 blocking violation', async () => {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
-    try {
-      const gateLogsDir = path.join(tmpDir, 'gate-logs');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- gateLogsDir is beneath the test-owned mkdtemp fixture
-      await fs.mkdir(gateLogsDir);
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
-      await fs.writeFile(path.join(gateLogsDir, 'invalid.json'), JSON.stringify({ exitCode: 0, passed: true }), 'utf8');
-      const runLog = path.join(tmpDir, 'run-log.jsonl');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
-      await fs.writeFile(runLog, makeRunLogEntry('invalid.json', 0) + '\n', 'utf8');
-      const result = runSync(
-        process.execPath,
-        [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, `--gate-logs=${gateLogsDir}`],
-        {
-          cwd: tmpDir,
+        '未提取到合法 exitCode',
+        false,
+      ],
+      ['损坏文件（非 JSON）', 'broken.json', () => '{not-json', '未提取到合法 exitCode', true],
+      [
+        '根字段与摘要字段矛盾',
+        'mismatch.json',
+        () => {
+          const payload = makeGatePayload(0);
+          payload.stdoutSummary = { exitCode: 1, passed: false };
+          return JSON.stringify(payload);
         },
-      );
-      expect(result.status).toBe(1);
-      expect(JSON.parse(result.stdout ?? '')).toMatchObject({ passed: false, exitCode: 1 });
-      expect(result.stdout).toContain('[schema]');
-    } finally {
-      await fs.rm(tmpDir, { recursive: true, force: true });
+        'stdoutSummary',
+        true,
+      ],
+      ['schema 无效的根 JSON', 'invalid.json', () => JSON.stringify({ exitCode: 0, passed: true }), '[schema]', true],
+    ] as const) {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
+      try {
+        const gateLogsDir = path.join(tmpDir, 'gate-logs');
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- gateLogsDir is beneath the test-owned mkdtemp fixture
+        await fs.mkdir(gateLogsDir);
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
+        await fs.writeFile(path.join(gateLogsDir, entryName), makeContent(), 'utf8');
+        const runLog = path.join(tmpDir, 'run-log.jsonl');
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
+        await fs.writeFile(runLog, makeRunLogEntry(entryName, 0) + '\n', 'utf8');
+        const result = runSync(
+          process.execPath,
+          [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog, `--gate-logs=${gateLogsDir}`],
+          { cwd: tmpDir },
+        );
+        expect(result.status, `${形态名}: 应 exit 1`).toBe(1);
+        if (assertJsonShape) {
+          expect(JSON.parse(result.stdout ?? ''), `${形态名}: 判定应 fail-closed`).toMatchObject({
+            passed: false,
+            exitCode: 1,
+          });
+        }
+        expect(result.stdout, `${形态名}: 应含「${marker}」`).toContain(marker);
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
     }
-  });
+  }, 150_000);
 
   it('未传 --gate-logs 时不强制要求 gate-log', async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
@@ -719,56 +666,37 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     }
   });
 
-  it('空文件 → exit 1（fail-closed：无任何 run-log 证据）', async () => {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-run-log-empty-'));
-    try {
-      const logFile = path.join(tmpDir, 'run-log.jsonl');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
-      await fs.writeFile(logFile, '', 'utf-8');
-      const r = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', logFile], {});
-      expect(r.status).toBe(1);
-      const parsed = JSON.parse(r.stdout ?? '') as { passed: boolean; reasons: string[]; lifecycleStatus: string };
-      expect(parsed.passed).toBe(false);
-      expect(parsed.reasons.join(' ')).toMatch(/fail-closed/);
-      expect(parsed.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
-    } finally {
-      await fs.rm(tmpDir, { recursive: true, force: true });
+  it('空文件 fail-closed 族（3 态：空文件 / 仅空行 / malformed-only）→ exit 1 且 lifecycleStatus=NOT_CLOSED_NOT_PROVEN', async () => {
+    for (const [文件形态, content, marker, parseIncomplete] of [
+      ['空文件', '', /fail-closed/, false],
+      ['空白文件（仅空行）', '\n  \n\r\n', /fail-closed/, false],
+      ['malformed-only 文件', 'not-json\n{also bad}\n', /PARSE_INCOMPLETE/, true],
+    ] as const) {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-run-log-empty-'));
+      try {
+        const logFile = path.join(tmpDir, 'run-log.jsonl');
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
+        await fs.writeFile(logFile, content, 'utf-8');
+        const r = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', logFile], {});
+        expect(r.status, `${文件形态}: 应 exit 1`).toBe(1);
+        const parsed = JSON.parse(r.stdout ?? '') as { passed: boolean; reasons: string[]; lifecycleStatus: string };
+        expect(parsed.passed, `${文件形态}: 应 fail-closed`).toBe(false);
+        if (parseIncomplete) {
+          expect(
+            parsed.reasons.filter((reason) => reason.startsWith('PARSE_INCOMPLETE')).length,
+            `${文件形态}: PARSE_INCOMPLETE 应 ≥2`,
+          ).toBeGreaterThanOrEqual(2);
+        } else {
+          expect(parsed.reasons.join(' '), `${文件形态}: reasons 应含 ${marker}`).toMatch(marker);
+        }
+        expect(parsed.lifecycleStatus, `${文件形态}: lifecycleStatus 应为 NOT_CLOSED_NOT_PROVEN`).toBe(
+          'NOT_CLOSED_NOT_PROVEN',
+        );
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
     }
-  });
-
-  it('空白文件（仅空行）→ exit 1（fail-closed）', async () => {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-run-log-blank-'));
-    try {
-      const logFile = path.join(tmpDir, 'run-log.jsonl');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
-      await fs.writeFile(logFile, '\n  \n\r\n', 'utf-8');
-      const r = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', logFile], {});
-      expect(r.status).toBe(1);
-      const parsed = JSON.parse(r.stdout ?? '') as { passed: boolean; reasons: string[]; lifecycleStatus: string };
-      expect(parsed.passed).toBe(false);
-      expect(parsed.reasons.join(' ')).toMatch(/fail-closed/);
-      expect(parsed.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
-    } finally {
-      await fs.rm(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it('malformed-only 文件 → exit 1（PARSE_INCOMPLETE blocking）', async () => {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-run-log-malformed-'));
-    try {
-      const logFile = path.join(tmpDir, 'run-log.jsonl');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
-      await fs.writeFile(logFile, 'not-json\n{also bad}\n', 'utf-8');
-      const r = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', logFile], {});
-      expect(r.status).toBe(1);
-      const parsed = JSON.parse(r.stdout ?? '') as { passed: boolean; reasons: string[]; lifecycleStatus: string };
-      expect(parsed.passed).toBe(false);
-      expect(parsed.reasons.filter((reason) => reason.startsWith('PARSE_INCOMPLETE')).length).toBeGreaterThanOrEqual(2);
-      expect(parsed.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
-    } finally {
-      await fs.rm(tmpDir, { recursive: true, force: true });
-    }
-  });
+  }, 120_000);
 });
 
 describe('check-role-dispatch.ts --json（子进程冒烟：空输入 fail-closed 与 R3 维度明细）', () => {
@@ -1093,92 +1021,63 @@ describe('check-artifact-gate.ts phase 1 evidence boundary', () => {
 
   // 成熟度豁免（2026-09-17 审查修复）：文档承诺 L0/L1 阶段 1-4 可不产出 TLA+/BDD 资产，
   // 而门禁此前无 maturity 输入 → 合法 L1 项目必被阻断。三臂：豁免命中 / L2 不命中 / 阶段 5 不命中。
-  it('maturity L1 + 阶段 1 → TLA+/BDD 资产要求被豁免（其余门禁照跑）', async () => {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-artifact-maturity-l1-'));
-    try {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
-      await fs.mkdir(path.join(tmpDir, '.w-model'), { recursive: true });
-      const rtm = await fs.readFile(
-        path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/gate/valid-rtm.json'),
-        'utf-8',
-      );
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
-      await fs.writeFile(path.join(tmpDir, '.w-model/rtm.json'), rtm, 'utf-8');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
-      await fs.writeFile(
-        path.join(tmpDir, '.w-model/maturity.json'),
-        JSON.stringify({
-          level: 'L1',
-          history: [],
-          lastUpdated: '2026-09-17T00:00:00.000Z',
-        }),
-        'utf-8',
-      );
-      const r = runSync(process.execPath, [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, tmpDir, '--phase=1', '--json'], {});
-      const report = JSON.parse(r.stdout ?? '') as {
-        tlaBddWaived: boolean | null;
-        maturityLevel: string | null;
-        reasons: string[];
-      };
-      expect(report.maturityLevel).toBe('L1');
-      expect(report.tlaBddWaived).toBe(true);
-      expect(report.reasons.some((x) => x.includes('[artifact:tla]'))).toBe(false);
-      expect(report.reasons.some((x) => x.includes('[artifact:bdd'))).toBe(false);
-    } finally {
-      await fs.rm(tmpDir, { recursive: true, force: true });
+  it('maturity 豁免矩阵（3 态：L1+阶段1 豁免 / L2+阶段1 不豁免 / L1+阶段5 不豁免）', async () => {
+    for (const [场景, level, phase, 期望Waived, assertMaturityLevel, assertNoTlaReasons, assertTlaReason] of [
+      ['L1 + 阶段 1 → 豁免', 'L1', 1, true, true, true, false],
+      ['L2 + 阶段 1 → 不豁免', 'L2', 1, null, false, false, true],
+      ['L1 + 阶段 5 → 不豁免（豁免只覆盖阶段 1-4）', 'L1', 5, null, false, false, false],
+    ] as const) {
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), `wm-artifact-maturity-${level.toLowerCase()}-`));
+      try {
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
+        await fs.mkdir(path.join(tmpDir, '.w-model'), { recursive: true });
+        const rtm = await fs.readFile(
+          path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/gate/valid-rtm.json'),
+          'utf-8',
+        );
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
+        await fs.writeFile(path.join(tmpDir, '.w-model/rtm.json'), rtm, 'utf-8');
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
+        await fs.writeFile(
+          path.join(tmpDir, '.w-model/maturity.json'),
+          JSON.stringify({ level, history: [], lastUpdated: '2026-09-17T00:00:00.000Z' }),
+          'utf-8',
+        );
+        const r = runSync(
+          process.execPath,
+          [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, tmpDir, `--phase=${phase}`, '--json'],
+          {},
+        );
+        const report = JSON.parse(r.stdout ?? '') as {
+          tlaBddWaived: boolean | null;
+          maturityLevel: string | null;
+          reasons: string[];
+        };
+        expect(report.tlaBddWaived, `${场景}: tlaBddWaived 应为 ${String(期望Waived)}`).toBe(期望Waived);
+        if (assertMaturityLevel) {
+          expect(report.maturityLevel, `${场景}: maturityLevel 应为 ${level}`).toBe(level);
+        }
+        if (assertNoTlaReasons) {
+          expect(
+            report.reasons.some((x) => x.includes('[artifact:tla]')),
+            `${场景}: 不应报 [artifact:tla]`,
+          ).toBe(false);
+          expect(
+            report.reasons.some((x) => x.includes('[artifact:bdd')),
+            `${场景}: 不应报 [artifact:bdd]`,
+          ).toBe(false);
+        }
+        if (assertTlaReason) {
+          expect(
+            report.reasons.some((x) => x.includes('[artifact:tla]')),
+            `${场景}: 应报 [artifact:tla]`,
+          ).toBe(true);
+        }
+      } finally {
+        await fs.rm(tmpDir, { recursive: true, force: true });
+      }
     }
-  });
-
-  it('maturity L2 + 阶段 1 → 不豁免（TLA 资产缺失仍报）', async () => {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-artifact-maturity-l2-'));
-    try {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
-      await fs.mkdir(path.join(tmpDir, '.w-model'), { recursive: true });
-      const rtm = await fs.readFile(
-        path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/gate/valid-rtm.json'),
-        'utf-8',
-      );
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
-      await fs.writeFile(path.join(tmpDir, '.w-model/rtm.json'), rtm, 'utf-8');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
-      await fs.writeFile(
-        path.join(tmpDir, '.w-model/maturity.json'),
-        JSON.stringify({ level: 'L2', history: [], lastUpdated: '2026-09-17T00:00:00.000Z' }),
-        'utf-8',
-      );
-      const r = runSync(process.execPath, [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, tmpDir, '--phase=1', '--json'], {});
-      const report = JSON.parse(r.stdout ?? '') as { tlaBddWaived: boolean | null; reasons: string[] };
-      expect(report.tlaBddWaived).toBeNull();
-      expect(report.reasons.some((x) => x.includes('[artifact:tla]'))).toBe(true);
-    } finally {
-      await fs.rm(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it('maturity L1 + 阶段 5 → 不豁免（豁免只覆盖阶段 1-4）', async () => {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-artifact-maturity-p5-'));
-    try {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
-      await fs.mkdir(path.join(tmpDir, '.w-model'), { recursive: true });
-      const rtm = await fs.readFile(
-        path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/gate/valid-rtm.json'),
-        'utf-8',
-      );
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
-      await fs.writeFile(path.join(tmpDir, '.w-model/rtm.json'), rtm, 'utf-8');
-      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
-      await fs.writeFile(
-        path.join(tmpDir, '.w-model/maturity.json'),
-        JSON.stringify({ level: 'L1', history: [], lastUpdated: '2026-09-17T00:00:00.000Z' }),
-        'utf-8',
-      );
-      const r = runSync(process.execPath, [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, tmpDir, '--phase=5', '--json'], {});
-      const report = JSON.parse(r.stdout ?? '') as { tlaBddWaived: boolean | null };
-      expect(report.tlaBddWaived).toBeNull();
-    } finally {
-      await fs.rm(tmpDir, { recursive: true, force: true });
-    }
-  });
+  }, 120_000);
 });
 
 describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路径保留 ICEBERG_JSON 前缀）', () => {

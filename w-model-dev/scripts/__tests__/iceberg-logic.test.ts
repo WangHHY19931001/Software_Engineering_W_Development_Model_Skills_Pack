@@ -35,42 +35,18 @@ describe('checkIcebergSweep', () => {
     expect(r.reasons).toHaveLength(0);
   });
 
-  it('icebergRound=0 越界 → passed=false（R2）', () => {
-    const r = checkIcebergSweep(validReport({ icebergRound: 0 }));
-    expect(r.passed).toBe(false);
-    expect(r.reasons.some((m) => m.includes('icebergRound'))).toBe(true);
+  it('icebergRound 越界 → passed=false（R2，2 态：round=0 / round=6）', () => {
+    for (const round of [0, 6]) {
+      const r = checkIcebergSweep(validReport({ icebergRound: round }));
+      expect(r.passed, `round=${round}: 应拒绝`).toBe(false);
+      expect(
+        r.reasons.some((m) => m.includes('icebergRound')),
+        `round=${round}: 应点名 icebergRound`,
+      ).toBe(true);
+    }
   });
 
-  it('icebergRound=6 越界 → passed=false（R2）', () => {
-    const r = checkIcebergSweep(validReport({ icebergRound: 6 }));
-    expect(r.passed).toBe(false);
-    expect(r.reasons.some((m) => m.includes('icebergRound'))).toBe(true);
-  });
-
-  it('findingId 与 previousFindings 重复 → passed=false（R3）', () => {
-    const r = checkIcebergSweep(
-      validReport({
-        线索来源: { reworkHintsHistory: [], fixedPoints: [], previousFindings: ['IF-phase3-1-01'] },
-        newFindings: [
-          {
-            findingId: 'IF-phase3-1-01',
-            severity: 'Required',
-            category: 'same-defect-class',
-            location: 'docs/phase3-outline/blog-system-outline-design.md:L42',
-            description: '重复发现的转移守卫缺陷',
-            evidence: '状态机图 §3.2 缺 archived 守卫',
-            hypothesis: '若补齐守卫，archived 状态不可发布',
-            relatedFixedPoint: 'IS-phase3-1-01',
-          },
-        ],
-        passed: false,
-      }),
-    );
-    expect(r.passed).toBe(false);
-    expect(r.reasons.some((m) => m.includes('已在上一轮发现'))).toBe(true);
-  });
-
-  it('findingId 在 newFindings 内部重复（两条同名）→ passed=false（R3 内部去重，r2 ice-internal-dup 形态）', () => {
+  it('R3 findingId 重复 → passed=false（2 态：对 previous / 内部重复）', () => {
     const dupFinding = {
       findingId: 'IF-phase3-1-09',
       severity: 'Required' as const,
@@ -81,15 +57,42 @@ describe('checkIcebergSweep', () => {
       hypothesis: '若补齐守卫，archived 状态不可发布',
       relatedFixedPoint: 'IS-phase3-1-01',
     };
-    const r = checkIcebergSweep(
-      validReport({
-        线索来源: { reworkHintsHistory: [], fixedPoints: [], previousFindings: [] },
-        newFindings: [dupFinding, { ...dupFinding, location: '...:L99' }],
-        passed: false,
-      }),
-    );
-    expect(r.passed).toBe(false);
-    expect(r.reasons.some((m) => m.includes('IF-phase3-1-09') && m.includes('在 newFindings 内部重复'))).toBe(true);
+    const prevDupReport = validReport({
+      线索来源: { reworkHintsHistory: [], fixedPoints: [], previousFindings: ['IF-phase3-1-01'] },
+      newFindings: [
+        {
+          findingId: 'IF-phase3-1-01',
+          severity: 'Required',
+          category: 'same-defect-class',
+          location: 'docs/phase3-outline/blog-system-outline-design.md:L42',
+          description: '重复发现的转移守卫缺陷',
+          evidence: '状态机图 §3.2 缺 archived 守卫',
+          hypothesis: '若补齐守卫，archived 状态不可发布',
+          relatedFixedPoint: 'IS-phase3-1-01',
+        },
+      ],
+      passed: false,
+    });
+    const internalDupReport = validReport({
+      线索来源: { reworkHintsHistory: [], fixedPoints: [], previousFindings: [] },
+      newFindings: [dupFinding, { ...dupFinding, location: '...:L99' }],
+      passed: false,
+    });
+    for (const [场景, report, markers] of [
+      ['findingId 与 previousFindings 重复（R3）', prevDupReport, ['已在上一轮发现']],
+      [
+        'findingId 在 newFindings 内部重复（两条同名，r2 ice-internal-dup 形态）',
+        internalDupReport,
+        ['IF-phase3-1-09', '在 newFindings 内部重复'],
+      ],
+    ] as const) {
+      const r = checkIcebergSweep(report);
+      expect(r.passed, `${场景}: 应拒绝`).toBe(false);
+      expect(
+        r.reasons.some((m) => markers.every((k) => m.includes(k))),
+        `${场景}: 应含具名标记 ${markers.join(' + ')}`,
+      ).toBe(true);
+    }
   });
 
   it('newFindings 内部重复且与 previousFindings 重复同时报（两条独立 violation）', () => {
@@ -178,53 +181,112 @@ describe('checkIcebergSweep', () => {
 });
 
 describe('A-3b 三视角对账', () => {
-  it('两视角应扫集合存在差异 → violation（R6）', () => {
-    const r = checkIcebergSweep(validReport(), {
-      viewSets: { graph: ['SD-001', 'SD-002'], tla: ['SD-001'], rtm: ['SD-001', 'SD-002'] },
-    });
-    expect(r.passed).toBe(false);
-    expect(r.reasons.some((m) => m.includes('R6') && m.includes('视角间存在未对账差异'))).toBe(true);
-    // 差异项须被逐条列出（不归一化、不取并集后放行）
-    expect(r.reasons.some((m) => m.includes('SD-002'))).toBe(true);
-  });
-
-  it('三视角完全一致 → 无 R6 violation', () => {
+  it('R6 对账（2 态：有差异 / 一致）', () => {
     const converged = ['docs/phase3-outline/blog-system-outline-design.md'];
-    const r = checkIcebergSweep(validReport(), { viewSets: { graph: converged, tla: converged, rtm: converged } });
-    expect(r.reasons.some((m) => m.includes('R6'))).toBe(false);
-    expect(r.passed).toBe(true);
+    for (const [场景, viewSets, 差异项] of [
+      [
+        '两视角应扫集合存在差异（R6）',
+        { graph: ['SD-001', 'SD-002'], tla: ['SD-001'], rtm: ['SD-001', 'SD-002'] },
+        'SD-002',
+      ],
+      ['三视角完全一致 → 无 R6 violation', { graph: converged, tla: converged, rtm: converged }, null],
+    ] as const) {
+      const r = checkIcebergSweep(validReport(), { viewSets });
+      if (差异项 === null) {
+        expect(
+          r.reasons.some((m) => m.includes('R6')),
+          `${场景}: 不应有 R6 violation`,
+        ).toBe(false);
+        expect(r.passed, `${场景}: 应通过`).toBe(true);
+      } else {
+        expect(r.passed, `${场景}: 应拒绝`).toBe(false);
+        expect(
+          r.reasons.some((m) => m.includes('R6') && m.includes('视角间存在未对账差异')),
+          `${场景}: 应报 R6 未对账差异`,
+        ).toBe(true);
+        // 差异项须被逐条列出（不归一化、不取并集后放行）
+        expect(
+          r.reasons.some((m) => m.includes(差异项)),
+          `${场景}: 差异项 ${差异项} 须被逐条列出`,
+        ).toBe(true);
+      }
+    }
   });
 
-  it('视角缺席但未在 sweepCoverage.absentViews 声明 → violation（R7，禁止静默跳过）', () => {
-    // 阶段 3 的在场表为 graph/tla/rtm；只提供 graph/tla → rtm 缺席且未声明
-    const r = checkIcebergSweep(validReport(), { viewSets: { graph: ['SD-001'], tla: ['SD-001'] } });
-    expect(r.passed).toBe(false);
-    expect(r.reasons.some((m) => m.includes('R7') && m.includes('rtm'))).toBe(true);
-  });
-
-  it('视角缺席但已在 absentViews 显式声明 → 无 R7 violation', () => {
+  it('R7 视角缺席（2 态：未声明 / 已声明）', () => {
     const converged = ['docs/phase3-outline/blog-system-outline-design.md'];
-    const r = checkIcebergSweep(
-      validReport({
-        sweepCoverage: {
-          sweptArtifacts: converged,
-          sweptDimensions: ['completeness', 'reliability', 'security'],
-          absentViews: ['rtm'],
+    for (const [场景, report, viewSets, 声明了缺席] of [
+      // 阶段 3 的在场表为 graph/tla/rtm；只提供 graph/tla → rtm 缺席且未声明
+      [
+        '视角缺席但未在 sweepCoverage.absentViews 声明（R7，禁止静默跳过）',
+        validReport(),
+        { graph: ['SD-001'], tla: ['SD-001'] },
+        false,
+      ],
+      [
+        '视角缺席但已在 absentViews 显式声明 → 无 R7 violation',
+        validReport({
+          sweepCoverage: {
+            sweptArtifacts: converged,
+            sweptDimensions: ['completeness', 'reliability', 'security'],
+            absentViews: ['rtm'],
+          },
+        }),
+        { graph: converged, tla: converged },
+        true,
+      ],
+    ] as const) {
+      const r = checkIcebergSweep(report, { viewSets });
+      expect(
+        r.reasons.some((m) => m.includes('R7')),
+        `${场景}: R7 判定应符合`,
+      ).toBe(!声明了缺席);
+      if (!声明了缺席) {
+        expect(r.passed, `${场景}: 应拒绝`).toBe(false);
+        expect(
+          r.reasons.some((m) => m.includes('R7') && m.includes('rtm')),
+          `${场景}: 应点名缺席视角 rtm`,
+        ).toBe(true);
+      } else {
+        expect(r.passed, `${场景}: 应通过`).toBe(true);
+      }
+    }
+  });
+
+  it('R8 违规行（2 态：收敛集合为空 / 分母未覆盖）', () => {
+    for (const [场景, report, viewSets, 文案] of [
+      [
+        '零发现但收敛集合为空 → violation（R8，无法证明扫掠发生）',
+        validReport(),
+        { graph: [], tla: [], rtm: [] },
+        '零发现但收敛集合为空',
+      ],
+      [
+        'sweptArtifacts 未覆盖收敛集合 → violation（R8 分母未覆盖）',
+        validReport({
+          sweepCoverage: {
+            sweptArtifacts: ['docs/phase3-outline/other.md'],
+            sweptDimensions: ['completeness', 'reliability', 'security'],
+          },
+        }),
+        {
+          graph: ['docs/phase3-outline/blog-system-outline-design.md'],
+          tla: ['docs/phase3-outline/blog-system-outline-design.md'],
+          rtm: ['docs/phase3-outline/blog-system-outline-design.md'],
         },
-      }),
-      { viewSets: { graph: converged, tla: converged } },
-    );
-    expect(r.reasons.some((m) => m.includes('R7'))).toBe(false);
-    expect(r.passed).toBe(true);
+        '未覆盖',
+      ],
+    ] as const) {
+      const r = checkIcebergSweep(report, { viewSets });
+      expect(r.passed, `${场景}: 应拒绝`).toBe(false);
+      expect(
+        r.reasons.some((m) => m.includes('R8') && m.includes(文案)),
+        `${场景}: 应报 ${文案}`,
+      ).toBe(true);
+    }
   });
 
-  it('零发现但收敛集合为空 → violation（R8，无法证明扫掠发生）', () => {
-    const r = checkIcebergSweep(validReport(), { viewSets: { graph: [], tla: [], rtm: [] } });
-    expect(r.passed).toBe(false);
-    expect(r.reasons.some((m) => m.includes('R8') && m.includes('零发现但收敛集合为空'))).toBe(true);
-  });
-
-  it('零发现且收敛集合非空且 sweptArtifacts 已覆盖 → 无 R8 violation', () => {
+  it('R8 通过行：零发现且收敛集合非空且 sweptArtifacts 已覆盖 → 无 R8 violation', () => {
     const converged = ['docs/phase3-outline/blog-system-outline-design.md'];
     const r = checkIcebergSweep(validReport(), { viewSets: { graph: converged, tla: converged, rtm: converged } });
     expect(r.reasons.some((m) => m.includes('R8'))).toBe(false);
@@ -234,26 +296,6 @@ describe('A-3b 三视角对账', () => {
     const r = checkIcebergSweep(validReport());
     expect(r.passed).toBe(true);
     expect(r.reasons).toHaveLength(0);
-  });
-
-  it('sweptArtifacts 未覆盖收敛集合 → violation（R8 分母未覆盖）', () => {
-    const r = checkIcebergSweep(
-      validReport({
-        sweepCoverage: {
-          sweptArtifacts: ['docs/phase3-outline/other.md'],
-          sweptDimensions: ['completeness', 'reliability', 'security'],
-        },
-      }),
-      {
-        viewSets: {
-          graph: ['docs/phase3-outline/blog-system-outline-design.md'],
-          tla: ['docs/phase3-outline/blog-system-outline-design.md'],
-          rtm: ['docs/phase3-outline/blog-system-outline-design.md'],
-        },
-      },
-    );
-    expect(r.passed).toBe(false);
-    expect(r.reasons.some((m) => m.includes('R8') && m.includes('未覆盖'))).toBe(true);
   });
 
   it('无法从 report.phase 解析阶段号 → 报错而非静默按 0 处理', () => {
@@ -294,46 +336,71 @@ describe('A-3b 三视角对账', () => {
 });
 
 describe('deriveViewSets（CLI 侧上游产物 → 各视角应扫集合）', () => {
-  it('阶段 3 存在 graph/tla/rtm 三份产物 → 三视角均派生，且只取设计 ID 命名空间', () => {
-    const sets = deriveViewSets(3, {
+  it('在场表派生·正常派生行（4 态：阶段 3 三份 / 阶段 3 缺 tla / 阶段 1 不在场 / 阶段 5 scope）', () => {
+    const fullArtifacts = {
       graph: { nodes: [{ id: 'SD-001' }, { id: 'REQ-001' }, { id: 'INTF-002' }] },
       tlaManifest: { sdCoverage: { coveredSdNodes: ['SD-001'] } },
       rtm: { rows: [{ requirementId: 'REQ-001', designDoc: 'docs/x.md:§3 SD-001' }] },
-    });
-    expect(sets.graph).toEqual(['SD-001', 'INTF-002']);
-    expect(sets.tla).toEqual(['SD-001']);
-    expect(sets.rtm).toEqual(['SD-001']);
+    };
+    for (const [场景, phase, artifacts, 期望键值, 期望键检查] of [
+      [
+        '阶段 3 存在 graph/tla/rtm 三份产物 → 三视角均派生，且只取设计 ID 命名空间',
+        3,
+        fullArtifacts,
+        { graph: ['SD-001', 'INTF-002'], tla: ['SD-001'], rtm: ['SD-001'] },
+        {},
+      ],
+      [
+        '阶段 3 缺 tla-manifest → tla 键缺席（不合成空集合，交由 R7 要求显式声明）',
+        3,
+        {
+          graph: { nodes: [{ id: 'SD-001' }] },
+          rtm: { rows: [{ requirementId: 'REQ-001', designDoc: 'docs/x.md:§3 SD-001' }] },
+        },
+        { tla: undefined },
+        { notContains: 'tla' },
+      ],
+      [
+        '阶段 1 的在场表为 graph/rtm → 不派生 tla/scope（即使在盘也不在场）',
+        1,
+        fullArtifacts,
+        {},
+        { exact: ['graph', 'rtm'] },
+      ],
+      [
+        '阶段 5 的在场表为 tla/rtm/scope → scope 从 change-scope.changedFiles 派生',
+        5,
+        {
+          changeScope: { changedFiles: ['src/a.ts', 'src/b.ts'] },
+          tlaManifest: { sdCoverage: { coveredSdNodes: ['SD-001'] } },
+          rtm: { rows: [{ requirementId: 'REQ-001', designDoc: 'docs/x.md:§3 SD-001' }] },
+        },
+        { scope: ['src/a.ts', 'src/b.ts'], graph: undefined },
+        {},
+      ],
+    ] as const) {
+      const sets = deriveViewSets(phase, artifacts);
+      for (const [view, val] of Object.entries(期望键值)) {
+        if (val === undefined) {
+          expect(sets[view as keyof typeof sets], `${场景}: ${view} 应缺席`).toBeUndefined();
+        } else {
+          expect(sets[view as keyof typeof sets], `${场景}: ${view} 派生值`).toEqual(val);
+        }
+      }
+      if ('exact' in 期望键检查) {
+        expect(Object.keys(sets).sort(), `${场景}: 键集合精确为 ${期望键检查.exact?.join('/')}`).toEqual(
+          期望键检查.exact,
+        );
+      }
+      if ('notContains' in 期望键检查) {
+        expect(Object.keys(sets), `${场景}: 键集合不应含 ${期望键检查.notContains}`).not.toContain(
+          期望键检查.notContains,
+        );
+      }
+    }
   });
 
-  it('阶段 3 缺 tla-manifest → tla 键缺席（不合成空集合，交由 R7 要求显式声明）', () => {
-    const sets = deriveViewSets(3, {
-      graph: { nodes: [{ id: 'SD-001' }] },
-      rtm: { rows: [{ requirementId: 'REQ-001', designDoc: 'docs/x.md:§3 SD-001' }] },
-    });
-    expect(sets.tla).toBeUndefined();
-    expect(Object.keys(sets)).not.toContain('tla');
-  });
-
-  it('阶段 1 的在场表为 graph/rtm → 不派生 tla/scope（即使在盘也不在场）', () => {
-    const sets = deriveViewSets(1, {
-      graph: { nodes: [{ id: 'SD-001' }] },
-      tlaManifest: { sdCoverage: { coveredSdNodes: ['SD-001'] } },
-      rtm: { rows: [{ requirementId: 'REQ-001', designDoc: 'docs/x.md:§3 SD-001' }] },
-    });
-    expect(Object.keys(sets).sort()).toEqual(['graph', 'rtm']);
-  });
-
-  it('阶段 5 的在场表为 tla/rtm/scope → scope 从 change-scope.changedFiles 派生', () => {
-    const sets = deriveViewSets(5, {
-      changeScope: { changedFiles: ['src/a.ts', 'src/b.ts'] },
-      tlaManifest: { sdCoverage: { coveredSdNodes: ['SD-001'] } },
-      rtm: { rows: [{ requirementId: 'REQ-001', designDoc: 'docs/x.md:§3 SD-001' }] },
-    });
-    expect(sets.scope).toEqual(['src/a.ts', 'src/b.ts']);
-    expect(sets.graph).toBeUndefined();
-  });
-
-  it('上游产物形状非法（非数组）→ 相应视角键缺席而非抛错', () => {
+  it('上游产物形状非法（非数组）→ 相应视角键缺席而非抛错（1 态）', () => {
     const sets = deriveViewSets(3, { graph: { nodes: 'not-an-array' }, tlaManifest: {}, rtm: {} });
     expect(Object.keys(sets)).toHaveLength(0);
   });
@@ -343,58 +410,97 @@ describe('R6 命名空间分池', () => {
   // 视角命名空间不同宽：graph/rtm 抽 SD/DD/INTF 全量（design-wide），tla 只有 SD（design-sd，
   // sdCoverage.coveredSdNodes），scope 是文件路径（path）。同池两两精确比对会把命名空间结构性
   // 噪声报成缺口（D-1/N-1），故分池：宽池精确相等、窄池对 SD 切片相等、path 不参与集合比对。
-  it('graph 与 rtm 在设计 ID 全宽上精确相等（含 DD/INTF）→ 通过', () => {
-    const sets = { graph: ['SD-001', 'INTF-002', 'DD-003'], rtm: ['SD-001', 'INTF-002', 'DD-003'], tla: ['SD-001'] };
-    expect(checkIcebergSweep(validReport(), { viewSets: sets }).reasons.filter((v) => v.includes('R6'))).toEqual([]);
+  it('分池对账矩阵·通过行（3 态：宽池全等 / 窄池子集 / scope 不参与）', () => {
+    for (const [场景, sets, check] of [
+      [
+        'graph 与 rtm 在设计 ID 全宽上精确相等（含 DD/INTF）→ 通过',
+        { graph: ['SD-001', 'INTF-002', 'DD-003'], rtm: ['SD-001', 'INTF-002', 'DD-003'], tla: ['SD-001'] },
+        'R6',
+      ],
+      [
+        'tla 落在 SD 子集内 → 通过（宽视角含 INTF/DD 不构成差异）',
+        { graph: ['SD-001', 'INTF-002'], rtm: ['SD-001', 'INTF-002'], tla: ['SD-001'] },
+        'R6',
+      ],
+      [
+        'scope（文件路径命名空间）不参与 R6 与 R8 收敛集',
+        { graph: ['SD-001'], rtm: ['SD-001'], tla: ['SD-001'], scope: ['src/counter.ts'] },
+        'R6+R8',
+      ],
+    ] as const) {
+      const r = checkIcebergSweep(
+        check === 'R6'
+          ? validReport()
+          : validReport({
+              reportId: 'IS-phase5-1-01',
+              phase: 'phase5-coding',
+              sweepCoverage: {
+                sweptArtifacts: ['SD-001'],
+                sweptDimensions: ['completeness', 'reliability', 'security'],
+              },
+            }),
+        { viewSets: sets },
+      );
+      expect(
+        r.reasons.filter((v) => v.includes('R6') || (check === 'R6+R8' && v.includes('R8'))),
+        `${场景}: 应无违规`,
+      ).toEqual([]);
+    }
   });
 
-  it('graph 与 rtm 的 DD 漂移仍被检出 → 违规', () => {
-    const sets = { graph: ['SD-001', 'DD-003'], rtm: ['SD-001'], tla: ['SD-001'] };
-    const v = checkIcebergSweep(validReport(), { viewSets: sets }).reasons;
-    expect(v.some((x) => x.includes('R6') && x.includes('graph↔rtm') && x.includes('DD-003'))).toBe(true);
-  });
-
-  it('tla 落在 SD 子集内 → 通过（宽视角含 INTF/DD 不构成差异）', () => {
-    const sets = { graph: ['SD-001', 'INTF-002'], rtm: ['SD-001', 'INTF-002'], tla: ['SD-001'] };
-    expect(checkIcebergSweep(validReport(), { viewSets: sets }).reasons.filter((v) => v.includes('R6'))).toEqual([]);
-  });
-
-  it('tla 含 graph 之外的 SD → 违规（子集方向仍有牙）', () => {
-    const sets = { graph: ['SD-001'], rtm: ['SD-001'], tla: ['SD-001', 'SD-009'] };
-    const v = checkIcebergSweep(validReport(), { viewSets: sets }).reasons;
-    expect(v.some((x) => x.includes('R6') && x.includes('SD-009'))).toBe(true);
-    // 池标签须可锁定（宽池侧已由 design-wide 断言覆盖，窄池侧不可缺）
-    expect(v.some((x) => x.includes('R6[design-sd]') && x.includes('SD-009'))).toBe(true);
-  });
-
-  it('宽视角 SD 项未进入 tla（tla 漏 SD）→ 仍违规（SD 命名空间内差异不得被分池豁免）', () => {
-    // 依据：该不变量在阶段 1-4 由 check-tla-model（--graph，uncoveredSdNodes 空 + graphSdNodes
-    // 交叉校验）建立；阶段 5-8 该门不再复检，故该方向由 R6 窄池双向判据守护。
-    const sets = { graph: ['SD-001', 'SD-002'], rtm: ['SD-001', 'SD-002'], tla: ['SD-001'] };
-    const v = checkIcebergSweep(validReport(), { viewSets: sets }).reasons;
-    expect(v.some((x) => x.includes('R6') && x.includes('SD-002'))).toBe(true);
-    expect(v.some((x) => x.includes('R6[design-sd]') && x.includes('SD-002'))).toBe(true);
-  });
-
-  it('tla 含重复 ID → 违规文案去重（同一 ID 只列一次）', () => {
-    const sets = { graph: ['SD-001'], rtm: ['SD-001'], tla: ['SD-001', 'SD-009', 'SD-009'] };
-    const r6 = checkIcebergSweep(validReport(), { viewSets: sets })
-      .reasons.filter((x) => x.includes('R6[design-sd]'))
-      .join('');
-    expect(r6.match(/SD-009/g)?.length).toBe(1);
-  });
-
-  it('scope（文件路径命名空间）不参与 R6 与 R8 收敛集', () => {
-    const sets = { graph: ['SD-001'], rtm: ['SD-001'], tla: ['SD-001'], scope: ['src/counter.ts'] };
-    const r = checkIcebergSweep(
-      validReport({
-        reportId: 'IS-phase5-1-01',
-        phase: 'phase5-coding',
-        sweepCoverage: { sweptArtifacts: ['SD-001'], sweptDimensions: ['completeness', 'reliability', 'security'] },
-      }),
-      { viewSets: sets },
-    );
-    expect(r.reasons.filter((v) => v.includes('R6') || v.includes('R8'))).toEqual([]);
+  it('分池对账矩阵·违规行（4 态：DD 漂移 / 窄池越界 / 漏 SD / 重复 ID 去重）', () => {
+    for (const [场景, sets, id, markers, narrowPool, dedup] of [
+      [
+        'graph 与 rtm 的 DD 漂移仍被检出 → 违规',
+        { graph: ['SD-001', 'DD-003'], rtm: ['SD-001'], tla: ['SD-001'] },
+        'DD-003',
+        ['graph↔rtm'],
+        false,
+        false,
+      ],
+      [
+        'tla 含 graph 之外的 SD → 违规（子集方向仍有牙）',
+        { graph: ['SD-001'], rtm: ['SD-001'], tla: ['SD-001', 'SD-009'] },
+        'SD-009',
+        [],
+        true,
+        false,
+      ],
+      [
+        '宽视角 SD 项未进入 tla（tla 漏 SD）→ 仍违规（SD 命名空间内差异不得被分池豁免）',
+        { graph: ['SD-001', 'SD-002'], rtm: ['SD-001', 'SD-002'], tla: ['SD-001'] },
+        'SD-002',
+        [],
+        true,
+        false,
+      ],
+      [
+        'tla 含重复 ID → 违规文案去重（同一 ID 只列一次）',
+        { graph: ['SD-001'], rtm: ['SD-001'], tla: ['SD-001', 'SD-009', 'SD-009'] },
+        'SD-009',
+        [],
+        true,
+        true,
+      ],
+    ] as const) {
+      const v = checkIcebergSweep(validReport(), { viewSets: sets }).reasons;
+      if (dedup) {
+        // 池标签须可锁定（design-sd 窄池侧不可缺）
+        const r6 = v.filter((x) => x.includes('R6[design-sd]')).join('');
+        expect(r6.match(new RegExp(id, 'g'))?.length, `${场景}: ${id} 只列一次`).toBe(1);
+      } else {
+        expect(
+          v.some((x) => x.includes('R6') && markers.every((k) => x.includes(k)) && x.includes(id)),
+          `${场景}: 应报 R6 并点名 ${[...markers, id].join(' + ')}`,
+        ).toBe(true);
+        if (narrowPool) {
+          expect(
+            v.some((x) => x.includes('R6[design-sd]') && x.includes(id)),
+            `${场景}: 池标签 R6[design-sd] 须可锁定并点名 ${id}`,
+          ).toBe(true);
+        }
+      }
+    }
   });
 
   it('宽视角全缺 + tla 在盘 → 窄池跳过比对 + 诊断（无基准无从比对，G2-6）', () => {

@@ -132,17 +132,19 @@ describe('code-health file verifier', () => {
     expect(result.actualSha256).toBe(createHash('sha256').update(bytes).digest('hex'));
   });
 
-  it.each([
-    ['../outside.log', 'STRUCTURE_INVALID'],
-    [path.resolve('outside.log'), 'STRUCTURE_INVALID'],
-    ['evidence/missing.log', 'EVIDENCE_INVALID'],
-    ['nested/missing.log', 'EVIDENCE_INVALID'],
-  ] as ReadonlyArray<readonly [string, ErrorCode]>)('拒绝路径越界或缺失文件：%s', async (relativePath, code) => {
-    const root = await tempRoot();
-    const result = await verifier.verifyRegularNonSymlinkFile({ root, relativePath, expectedSha256: '0'.repeat(64) });
-    expect(result.ok).toBe(false);
-    expect(result.code).toBe(code);
-    expect(result.reason ?? '').not.toContain(root);
+  it('拒绝路径越界或缺失文件（4 形态：../ 越界 / 绝对路径 / evidence 缺失 / nested 缺失，每行自备 root）', async () => {
+    for (const [relativePath, code] of [
+      ['../outside.log', 'STRUCTURE_INVALID'],
+      [path.resolve('outside.log'), 'STRUCTURE_INVALID'],
+      ['evidence/missing.log', 'EVIDENCE_INVALID'],
+      ['nested/missing.log', 'EVIDENCE_INVALID'],
+    ] as const) {
+      const root = await tempRoot();
+      const result = await verifier.verifyRegularNonSymlinkFile({ root, relativePath, expectedSha256: '0'.repeat(64) });
+      expect(result.ok, `path=${relativePath}: 应拒绝`).toBe(false);
+      expect(result.code, `path=${relativePath}: 应报 ${code}`).toBe(code);
+      expect(result.reason ?? '', `path=${relativePath}: reason 不得泄漏 root`).not.toContain(root);
+    }
   });
 
   it('拒绝目录、文件 symlink 和父目录 symlink，且不读取 link 指向内容', async () => {
@@ -190,24 +192,23 @@ describe('code-health file verifier', () => {
     expect(insideLinkResult.code).toBe('SECURITY_BLOCKED');
   });
 
-  it.each([
-    ['', 'STRUCTURE_INVALID'],
-    ['C:\\outside\\raw.log', 'STRUCTURE_INVALID'],
-    ['/outside/raw.log', 'STRUCTURE_INVALID'],
-    ['evidence\\raw.log', 'STRUCTURE_INVALID'],
-    ['evidence//raw.log', 'STRUCTURE_INVALID'],
-    ['evidence/./raw.log', 'STRUCTURE_INVALID'],
-    ['evidence/../raw.log', 'STRUCTURE_INVALID'],
-    ['evidence/raw.log\u0000', 'STRUCTURE_INVALID'],
-  ] as ReadonlyArray<readonly [string, ErrorCode]>)(
-    '拒绝非法 repository-relative 路径：%s',
-    async (relativePath, code) => {
+  it('拒绝非法 repository-relative 路径（8 形态：空串/盘符/POSIX 绝对/反斜杠/空段/点段/../NUL，每行自备 root）', async () => {
+    for (const [relativePath, code] of [
+      ['', 'STRUCTURE_INVALID'],
+      ['C:\\outside\\raw.log', 'STRUCTURE_INVALID'],
+      ['/outside/raw.log', 'STRUCTURE_INVALID'],
+      ['evidence\\raw.log', 'STRUCTURE_INVALID'],
+      ['evidence//raw.log', 'STRUCTURE_INVALID'],
+      ['evidence/./raw.log', 'STRUCTURE_INVALID'],
+      ['evidence/../raw.log', 'STRUCTURE_INVALID'],
+      ['evidence/raw.log\u0000', 'STRUCTURE_INVALID'],
+    ] as const) {
       const root = await tempRoot();
       const result = await verifier.verifyRegularNonSymlinkFile({ root, relativePath, expectedSha256: '0'.repeat(64) });
-      expect(result.ok).toBe(false);
-      expect(result.code).toBe(code);
-    },
-  );
+      expect(result.ok, `path=${JSON.stringify(relativePath)}: 应拒绝`).toBe(false);
+      expect(result.code, `path=${JSON.stringify(relativePath)}: 应报 ${code}`).toBe(code);
+    }
+  });
 
   it('拒绝错误 SHA-256、非 64 位 expected hash 和非目录 root', async () => {
     const root = await tempRoot();

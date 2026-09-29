@@ -194,48 +194,50 @@ describe('wm-append-runlog：正确追加（exit 0）', () => {
  *   - 无换行结尾：`composeAppendedText` 只补一个分隔 LF（不改动任何既有字节）→ exit 0。
  */
 describe('wm-append-runlog：历史文件边界形态（G2-5）', () => {
-  it('CRLF 行尾的历史文件：解析吸收、exit 0，历史字节前缀不变', async () => {
-    const existingText = `${line(record())}\r\n`;
-    await seed(existingText);
-    const r = run([runLogPath, '--stdin'], line(record({ runId: 'b', timestamp: undefined })));
-    expect(r.stderr).not.toContain('✗');
-    expect(r.code).toBe(0);
-    expect(appendPayload(r.stdout).appended).toBe(1);
-    const raw = await fs.readFile(runLogPath, 'utf-8');
-    expect(raw.startsWith(existingText)).toBe(true); // 历史（含 CRLF 行尾）逐字节保留
-    const entries = raw
-      .split(/\r?\n/)
-      .filter((l) => l.trim() !== '')
-      .map((l) => JSON.parse(l) as { runId: string });
-    expect(entries.map((e) => e.runId)).toEqual(['a', 'b']);
-  });
-
-  it('BOM 头的历史文件：解析吸收（剥离 BOM）、exit 0，历史字节（含 BOM 三字节）不变', async () => {
-    const existingText = `\uFEFF${line(record())}\n`;
-    await seed(existingText);
-    const r = run([runLogPath, '--stdin'], line(record({ runId: 'b', timestamp: undefined })));
-    expect(r.stderr).not.toContain('✗');
-    expect(r.code).toBe(0);
-    const raw = await fs.readFile(runLogPath, 'utf-8');
-    expect(raw.startsWith(existingText)).toBe(true);
-    // 字节层：BOM 仍在文件首（历史行逐字节保留，未被就地剥离/重写）
-    const buf = await fs.readFile(runLogPath);
-    expect([...buf.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
-  });
-
-  it('无换行结尾的历史文件：只补分隔 LF，exit 0，历史字节前缀不变', async () => {
-    const existingText = line(record()); // 末尾无 \n
-    await seed(existingText);
-    const r = run([runLogPath, '--stdin'], line(record({ runId: 'b', timestamp: undefined })));
-    expect(r.stderr).not.toContain('✗');
-    expect(r.code).toBe(0);
-    const raw = await fs.readFile(runLogPath, 'utf-8');
-    expect(raw.startsWith(existingText)).toBe(true);
-    // 新增的唯一字节 = 分隔 LF + 新记录行；既有文本零改写
-    expect(raw.charAt(existingText.length)).toBe('\n');
-    const appended = JSON.parse(raw.slice(existingText.length + 1).trim()) as { runId: string };
-    expect(appended.runId).toBe('b');
-  });
+  it('文件格式吸收（3 态：CRLF 行尾 / BOM 头 / 无换行结尾；历史字节前缀不变断言逐行保留）', async () => {
+    for (const { format, existingText, verify } of [
+      {
+        format: 'CRLF',
+        existingText: `${line(record())}\r\n`,
+        verify: async (r: { stdout: string }, raw: string): Promise<void> => {
+          expect(appendPayload(r.stdout).appended).toBe(1);
+          // 历史（含 CRLF 行尾）逐字节保留
+          const entries = raw
+            .split(/\r?\n/)
+            .filter((l) => l.trim() !== '')
+            .map((l) => JSON.parse(l) as { runId: string });
+          expect(entries.map((e) => e.runId)).toEqual(['a', 'b']);
+        },
+      },
+      {
+        format: 'BOM',
+        existingText: `\uFEFF${line(record())}\n`,
+        verify: async (_r: { stdout: string }, _raw: string): Promise<void> => {
+          // 字节层：BOM 仍在文件首（历史行逐字节保留，未被就地剥离/重写）
+          const buf = await fs.readFile(runLogPath);
+          expect([...buf.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+        },
+      },
+      {
+        format: '无换行',
+        existingText: line(record()), // 末尾无 \n
+        verify: async (_r: { stdout: string }, raw: string, text: string): Promise<void> => {
+          // 新增的唯一字节 = 分隔 LF + 新记录行；既有文本零改写
+          expect(raw.charAt(text.length)).toBe('\n');
+          const appended = JSON.parse(raw.slice(text.length + 1).trim()) as { runId: string };
+          expect(appended.runId).toBe('b');
+        },
+      },
+    ]) {
+      await seed(existingText);
+      const r = run([runLogPath, '--stdin'], line(record({ runId: 'b', timestamp: undefined })));
+      expect(r.stderr, `format=${format}: 不应报错`).not.toContain('✗');
+      expect(r.code, `format=${format}: 应 exit 0`).toBe(0);
+      const raw = await fs.readFile(runLogPath, 'utf-8');
+      expect(raw.startsWith(existingText), `format=${format}: 历史字节前缀应逐字节不变`).toBe(true);
+      await verify(r, raw, existingText);
+    }
+  }, 120_000);
 });
 
 describe('wm-append-runlog：时间戳倒退（exit 1，写入拒绝）', () => {
@@ -261,51 +263,126 @@ describe('wm-append-runlog：时间戳倒退（exit 1，写入拒绝）', () => 
 });
 
 describe('wm-append-runlog：非法输入（exit 2）', () => {
-  it('未知 flag → exit 2 + ERROR_JSON ARG_INVALID，且不建任何文件', async () => {
-    const r = run([runLogPath, '--d4-invalid-argument']);
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('✗ [ARG_INVALID]');
-    expect(r.stdout).toMatch(/ERROR_JSON .*"category":"ARG_INVALID".*"exitCode":2/);
-    expect(await fs.stat(runLogPath).catch(() => null)).toBeNull();
-  });
+  it('ARG_INVALID 目标文件保护组（5 态：未知 flag / 重复 flag / 单破折号 / 未知 runId / schema 违规；文件未被修改断言逐行保留）', async () => {
+    for (const [形态名, args, stdin, seedText, fileUnchanged, expectStderr, expectStdout] of [
+      [
+        '未知 flag',
+        () => [runLogPath, '--d4-invalid-argument'],
+        undefined,
+        null,
+        'absent',
+        /✗ \[ARG_INVALID\]/,
+        /ERROR_JSON .*"category":"ARG_INVALID".*"exitCode":2/,
+      ],
+      [
+        '重复值 flag（--timestamp 两次）',
+        () => [runLogPath, '--stdin', '--timestamp=2026-09-25T11:00:00.000Z', '--timestamp=2026-09-25T11:00:01.000Z'],
+        line(record({ runId: 'b', timestamp: undefined })),
+        null,
+        'absent',
+        /重复的命令行参数 --timestamp/,
+        /ERROR_JSON .*"category":"ARG_INVALID"/,
+      ],
+      [
+        '单破折号未知选项（不得被当作目标路径）',
+        () => ['-x', '--stdin'],
+        line(record({ runId: 'b', timestamp: undefined })),
+        null,
+        'absent',
+        /✗ \[ARG_INVALID\]/,
+        null,
+      ],
+      [
+        '--correct 引用不存在的 runId',
+        () => [runLogPath, '--stdin', '--correct=nope'],
+        line({ note: '更正' }),
+        `${line(record())}\n`,
+        'sha',
+        /✗ \[ARG_INVALID\]/,
+        null,
+      ],
+      [
+        '待追加记录不符 run-log schema（缺 action）',
+        () => [runLogPath, '--stdin'],
+        line(
+          (() => {
+            const bad: Record<string, unknown> = { ...record({ runId: 'b' }) };
+            delete bad.action;
+            return bad;
+          })(),
+        ),
+        `${line(record())}\n`,
+        'sha',
+        /✗ \[STRUCTURE_INVALID\]/,
+        null,
+      ],
+    ] as const) {
+      if (seedText !== null) {
+        await seed(seedText);
+      }
+      const before = fileUnchanged === 'sha' ? await sha256(runLogPath) : null;
+      const r = run(args(), stdin);
+      expect(r.code, `${形态名}: 应 exit 2（${r.stderr}）`).toBe(2);
+      if (expectStderr) {
+        expect(r.stderr, `${形态名}: stderr 应含 ${expectStderr}`).toMatch(expectStderr);
+      }
+      if (expectStdout) {
+        expect(r.stdout, `${形态名}: stdout 应含 ${expectStdout}`).toMatch(expectStdout);
+      }
+      if (fileUnchanged === 'absent') {
+        expect(await fs.stat(runLogPath).catch(() => null), `${形态名}: 目标文件不应被创建`).toBeNull();
+      } else if (fileUnchanged === 'sha') {
+        expect(await sha256(runLogPath), `${形态名}: 目标文件 sha256 应不变`).toBe(before);
+      }
+    }
+  }, 150_000);
 
-  it('重复值 flag（--timestamp 两次）→ exit 2 ARG_INVALID，文件未被创建', async () => {
-    const r = run(
-      [runLogPath, '--stdin', '--timestamp=2026-09-25T11:00:00.000Z', '--timestamp=2026-09-25T11:00:01.000Z'],
-      line(record({ runId: 'b', timestamp: undefined })),
-    );
-    expect(r.code).toBe(2);
-    expect(r.stderr).toMatch(/重复的命令行参数 --timestamp/);
-    expect(r.stdout).toMatch(/ERROR_JSON .*"category":"ARG_INVALID"/);
-    expect(await fs.stat(runLogPath).catch(() => null)).toBeNull();
-  });
-
-  it('--correct 引用不存在的 runId → exit 2，文件未被修改', async () => {
-    await seed(`${line(record())}\n`);
-    const before = await sha256(runLogPath);
-    const r = run([runLogPath, '--stdin', '--correct=nope'], line({ note: '更正' }));
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('✗ [ARG_INVALID]');
-    expect(await sha256(runLogPath)).toBe(before);
-  });
-
-  it('待追加记录不符 run-log schema（缺 action）→ exit 2 STRUCTURE_INVALID，文件未被修改', async () => {
-    await seed(`${line(record())}\n`);
-    const before = await sha256(runLogPath);
-    const bad = { ...record({ runId: 'b' }), action: undefined };
-    delete (bad as Record<string, unknown>).action;
-    const r = run([runLogPath, '--stdin'], line(bad));
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('✗ [STRUCTURE_INVALID]');
-    expect(await sha256(runLogPath)).toBe(before);
-  });
-
-  it('单破折号未知选项 → exit 2 ARG_INVALID（不得被当作目标路径）', async () => {
-    const r = run(['-x', '--stdin'], line(record({ runId: 'b', timestamp: undefined })));
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('✗ [ARG_INVALID]');
-    expect(await fs.stat(runLogPath).catch(() => null)).toBeNull();
-  });
+  it('ARG_INVALID 参数组合组（3 态：--stdin 与 --from 互斥 / 双缺输入 / --correct 多条载荷）', async () => {
+    for (const [形态名, prepare, args, stdin, expectStderr, expectStdout] of [
+      [
+        '--stdin 与 --from 互斥',
+        async () => {
+          const payload = path.join(tmpDir, 'payload.jsonl');
+          await fs.writeFile(payload, `${line(record())}\n`, 'utf-8');
+          return payload;
+        },
+        (payload: string) => [runLogPath, '--stdin', '--from', payload],
+        line(record({ runId: 'b' })),
+        null,
+        /ERROR_JSON .*"category":"ARG_INVALID"/,
+      ],
+      [
+        '既无 --stdin 也无 --from 且非 --correct',
+        async () => null,
+        () => [runLogPath],
+        undefined,
+        /--stdin|--from/,
+        null,
+      ],
+      [
+        '--correct 搭配多条载荷（非单条 patch）',
+        async () => null,
+        () => [runLogPath, '--stdin', '--correct=a'],
+        `${line(record({ runId: 'b' }))}\n${line(record({ runId: 'c' }))}`,
+        null,
+        /ERROR_JSON .*"category":"ARG_INVALID"/,
+      ],
+    ] as const) {
+      const seeded = 形态名.includes('多条载荷');
+      if (seeded) {
+        await seed(`${line(record())}\n`);
+      }
+      const payload = await prepare();
+      const r = run(args(payload as string), stdin);
+      expect(r.code, `${形态名}: 应 exit 2`).toBe(2);
+      if (expectStderr) {
+        expect(r.stderr, `${形态名}: stderr 应含 ${expectStderr}`).toMatch(expectStderr);
+      }
+      if (expectStdout) {
+        expect(r.stdout, `${形态名}: stdout 应含 ${expectStdout}`).toMatch(expectStdout);
+      }
+    }
+  }, 120_000);
 
   it('legacy 历史行（不符当前 schema）不阻断追加：exit 0 + 非阻断诊断 + 历史前缀逐字节不变', async () => {
     // 历史行带 schema 未登记字段（additionalProperties:false 违规）但语法合法：append 口径只强制校验
@@ -360,47 +437,22 @@ describe('wm-append-runlog：非法输入（exit 2）', () => {
     expect(await fs.readFile(runLogPath, 'utf-8')).toMatch(/clock-adjust:auto\+\d+ms:ntp-rollback/);
   });
 
-  it('--stdin 与 --from 互斥 → exit 2 ARG_INVALID', async () => {
-    const payload = path.join(tmpDir, 'payload.jsonl');
-    await fs.writeFile(payload, `${line(record())}\n`, 'utf-8');
-    const r = run([runLogPath, '--stdin', '--from', payload], line(record({ runId: 'b' })));
-    expect(r.code).toBe(2);
-    expect(r.stdout).toMatch(/ERROR_JSON .*"category":"ARG_INVALID"/);
-  });
-
-  it('既无 --stdin 也无 --from 且非 --correct → exit 2 ARG_INVALID', async () => {
-    const r = run([runLogPath]);
-    expect(r.code).toBe(2);
-    expect(r.stderr).toMatch(/--stdin|--from/);
-  });
-
-  it.each(['abc', '-1', '1e3'])(
-    '--lock-timeout=%s 非法值 → exit 2 ARG_INVALID（点名非法值），文件未被修改',
-    async (raw) => {
+  it('--lock-timeout 非法值（3 态：abc / -1 / 1e3）→ exit 2 ARG_INVALID（点名非法值），文件未被修改', async () => {
+    for (const raw of ['abc', '-1', '1e3']) {
       await seed(`${line(record())}\n`);
       const before = await sha256(runLogPath);
       const r = run(
         [runLogPath, '--stdin', `--lock-timeout=${raw}`],
         line(record({ runId: 'b', timestamp: undefined })),
       );
-      expect(r.code).toBe(2);
-      expect(r.stderr).toContain('✗ [ARG_INVALID]');
-      expect(r.stderr).toContain('--lock-timeout 需为非负安全整数（毫秒）');
-      expect(r.stderr).toContain(`收到: ${raw}`);
-      expect(r.stdout).toMatch(/ERROR_JSON .*"category":"ARG_INVALID".*"exitCode":2/);
-      expect(await sha256(runLogPath)).toBe(before);
-    },
-  );
-
-  it('--correct 搭配多条载荷（非单条 patch）→ exit 2 ARG_INVALID', async () => {
-    await seed(`${line(record())}\n`);
-    const r = run(
-      [runLogPath, '--stdin', '--correct=a'],
-      `${line(record({ runId: 'b' }))}\n${line(record({ runId: 'c' }))}`,
-    );
-    expect(r.code).toBe(2);
-    expect(r.stdout).toMatch(/ERROR_JSON .*"category":"ARG_INVALID"/);
-  });
+      expect(r.code, `value=${raw}: 应 exit 2`).toBe(2);
+      expect(r.stderr, `value=${raw}: 应含 ✗ [ARG_INVALID]`).toContain('✗ [ARG_INVALID]');
+      expect(r.stderr, `value=${raw}: 应含口径文案`).toContain('--lock-timeout 需为非负安全整数（毫秒）');
+      expect(r.stderr, `value=${raw}: 应点名非法值`).toContain(`收到: ${raw}`);
+      expect(r.stdout, `value=${raw}: 应含 ERROR_JSON`).toMatch(/ERROR_JSON .*"category":"ARG_INVALID".*"exitCode":2/);
+      expect(await sha256(runLogPath), `value=${raw}: 目标文件 sha256 应不变`).toBe(before);
+    }
+  }, 120_000);
 });
 
 describe('wm-append-runlog：更正记录（--correct，裁定 B）', () => {

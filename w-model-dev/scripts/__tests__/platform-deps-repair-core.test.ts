@@ -113,33 +113,26 @@ describe('verifyPlatformDependency', () => {
     ).toEqual([tempDir]);
   });
 
-  it('rejects a lockfile that is not version 3', async () => {
-    await expect(
-      verifyPlatformDependency({
-        ...makeOptions(),
-        lockfile: makeLockfile({}, { lockfileVersion: 2 }),
-      }),
-    ).rejects.toMatchObject({ code: 'lockfile-version' });
-  });
-
-  it('rejects a lockfile that is not valid JSON', async () => {
-    await expect(verifyPlatformDependency({ ...makeOptions(), lockfile: 'not json {' })).rejects.toMatchObject({
-      code: 'lockfile-json',
-    });
-  });
-
-  it('rejects a lockfile without the target package entry', async () => {
-    await expect(
-      verifyPlatformDependency({
-        ...makeOptions(),
-        lockfile: JSON.stringify({
+  it('rejects corrupt lockfiles（3 态：非 v3 / 非法 JSON / 缺包条目）', async () => {
+    for (const [形态, lockfile, code] of [
+      ['非 v3（lockfileVersion=2）', makeLockfile({}, { lockfileVersion: 2 }), 'lockfile-version'],
+      ['非法 JSON', 'not json {', 'lockfile-json'],
+      [
+        '缺目标包条目（packages 空）',
+        JSON.stringify({
           name: 'fixture',
           version: '1.0.0',
           lockfileVersion: 3,
           packages: {},
         }),
-      }),
-    ).rejects.toMatchObject({ code: 'lockfile-package' });
+        'lockfile-package',
+      ],
+    ] as const) {
+      await expect(
+        verifyPlatformDependency({ ...makeOptions(), lockfile }),
+        `${形态}: 应拒 ${code}`,
+      ).rejects.toMatchObject({ code });
+    }
   });
 
   it('rejects a registry URL whose host is not allowlisted', async () => {
@@ -164,7 +157,20 @@ describe('verifyPlatformDependency', () => {
     ).rejects.toMatchObject({ code: 'registry-protocol' });
   });
 
-  it('rejects an archive whose SHA-512 SRI does not match the lockfile', async () => {
+  it('rejects malformed SHA-512 SRI（3 态：非规范 unpadded / 非 64 字节 / 非 SHA-512 前缀）', async () => {
+    for (const [形态, sri] of [
+      ['非规范 unpadded（解码仍为 64 字节）', `${integrity.replace(/==$/, '')}`],
+      ['base64 载荷非 64 字节', 'sha512-QUJD'],
+      ['非 SHA-512 前缀', 'sha1-QUJD'],
+    ] as const) {
+      await expect(
+        verifyPlatformDependency({ ...makeOptions(), lockfile: makeLockfile({ integrity: sri }) }),
+        `SRI 形态「${形态}」: 应拒 integrity`,
+      ).rejects.toMatchObject({ code: 'integrity' });
+    }
+  });
+
+  it('rejects an archive whose SHA-512 SRI does not match the lockfile（读取前置拦截）', async () => {
     let readCalled = false;
     await expect(
       verifyPlatformDependency({
@@ -181,34 +187,6 @@ describe('verifyPlatformDependency', () => {
     expect(readCalled).toBe(false);
   });
 
-  it('rejects a non-canonical (unpadded) SHA-512 SRI even when it decodes to 64 bytes', async () => {
-    const unpadded = `${integrity.replace(/==$/, '')}`;
-    await expect(
-      verifyPlatformDependency({
-        ...makeOptions(),
-        lockfile: makeLockfile({ integrity: unpadded }),
-      }),
-    ).rejects.toMatchObject({ code: 'integrity' });
-  });
-
-  it('rejects an SRI whose base64 payload is not 64 bytes', async () => {
-    await expect(
-      verifyPlatformDependency({
-        ...makeOptions(),
-        lockfile: makeLockfile({ integrity: 'sha512-QUJD' }),
-      }),
-    ).rejects.toMatchObject({ code: 'integrity' });
-  });
-
-  it('rejects an SRI with a non-SHA-512 prefix', async () => {
-    await expect(
-      verifyPlatformDependency({
-        ...makeOptions(),
-        lockfile: makeLockfile({ integrity: 'sha1-QUJD' }),
-      }),
-    ).rejects.toMatchObject({ code: 'integrity' });
-  });
-
   it('accepts a conventional trailing slash on a safe tar directory entry', async () => {
     const entries = makeEntries();
     entries[0] = { path: 'package/', type: 'directory' };
@@ -218,135 +196,105 @@ describe('verifyPlatformDependency', () => {
     });
   });
 
-  it.each([
-    '/absolute/file',
-    '../outside/file',
-    'package/../../outside/file',
-    'C:\\outside\\file',
-    '\\\\server\\share\\file',
-  ])('rejects unsafe tar entry path %s', async (entryPath) => {
-    await expect(
-      verifyPlatformDependency(makeOptions([{ path: entryPath, type: 'file', content: 'bad' }])),
-    ).rejects.toMatchObject({ code: 'archive-path' });
+  it('rejects unsafe tar entry paths（5 路径，path 具名）', async () => {
+    for (const entryPath of [
+      '/absolute/file',
+      '../outside/file',
+      'package/../../outside/file',
+      'C:\\outside\\file',
+      '\\\\server\\share\\file',
+    ]) {
+      await expect(
+        verifyPlatformDependency(makeOptions([{ path: entryPath, type: 'file', content: 'bad' }])),
+        `path=${entryPath}: 应拒 archive-path`,
+      ).rejects.toMatchObject({ code: 'archive-path' });
+    }
   });
 
-  it('rejects symbolic-link tar entries before extraction', async () => {
-    let extracted = false;
-    await expect(
-      verifyPlatformDependency(
-        makeOptions(
-          [
-            {
-              path: 'package/native.node',
-              type: 'symlink',
-              linkname: '/outside/native.node',
-            },
-          ],
-          {
+  it('rejects link-bearing tar entries before extraction（3 态：symlink / hardlink / file 带 linkname，含未抽取断言）', async () => {
+    for (const [label, entry, appendToEntries, guardExtraction] of [
+      [
+        'symlink entry',
+        { path: 'package/native.node', type: 'symlink', linkname: '/outside/native.node' } as ArchiveEntry,
+        false,
+        true,
+      ],
+      [
+        'hardlink entry',
+        { path: 'package/native.node', type: 'hardlink', linkname: 'lib/native.node' } as ArchiveEntry,
+        true,
+        true,
+      ],
+      [
+        'file entry that carries a linkname',
+        { path: 'package/weird.node', type: 'file', content: 'x', linkname: '/etc/passwd' } as ArchiveEntry,
+        true,
+        false,
+      ],
+    ] as const) {
+      let extracted = false;
+      await expect(
+        verifyPlatformDependency(
+          makeOptions(appendToEntries ? makeEntries(entry) : [entry], {
             extractArchive: async () => {
               extracted = true;
             },
-          },
-        ),
-      ),
-    ).rejects.toMatchObject({ code: 'archive-link' });
-    expect(extracted).toBe(false);
-  });
-
-  it('rejects hard-link tar entries before extraction', async () => {
-    let extracted = false;
-    await expect(
-      verifyPlatformDependency(
-        makeOptions(
-          makeEntries({
-            path: 'package/native.node',
-            type: 'hardlink',
-            linkname: 'lib/native.node',
-          }),
-          {
-            extractArchive: async () => {
-              extracted = true;
-            },
-          },
-        ),
-      ),
-    ).rejects.toMatchObject({ code: 'archive-link' });
-    expect(extracted).toBe(false);
-  });
-
-  it('rejects a file entry that carries a linkname', async () => {
-    await expect(
-      verifyPlatformDependency(
-        makeOptions(
-          makeEntries({
-            path: 'package/weird.node',
-            type: 'file',
-            content: 'x',
-            linkname: '/etc/passwd',
           }),
         ),
-      ),
-    ).rejects.toMatchObject({ code: 'archive-link' });
+        `${label}: 应拒 archive-link`,
+      ).rejects.toMatchObject({ code: 'archive-link' });
+      if (guardExtraction) {
+        expect(extracted, `${label}: 抽取不得发生`).toBe(false);
+      }
+    }
   });
 
-  it('rejects an empty archive entry path', async () => {
-    await expect(verifyPlatformDependency(makeOptions([{ path: '', type: 'directory' }]))).rejects.toMatchObject({
-      code: 'archive-path',
-    });
+  it('rejects malformed archive entry paths（3 态：空路径 / NUL / 空段）', async () => {
+    for (const [形态, entry] of [
+      ['空路径', { path: '', type: 'directory' } as ArchiveEntry],
+      ['NUL 字节', { path: 'package\0x', type: 'file' } as ArchiveEntry],
+      ['空段', { path: 'package//evil', type: 'file', content: 'x' } as ArchiveEntry],
+    ] as const) {
+      await expect(
+        verifyPlatformDependency(makeOptions([entry])),
+        `path=${JSON.stringify(entry.path)}（${形态}）: 应拒 archive-path`,
+      ).rejects.toMatchObject({ code: 'archive-path' });
+    }
   });
 
-  it('rejects an archive entry path containing NUL bytes', async () => {
-    await expect(verifyPlatformDependency(makeOptions([{ path: 'package\0x', type: 'file' }]))).rejects.toMatchObject({
-      code: 'archive-path',
-    });
+  it('rejects package identity mismatches（2 态：name / version）', async () => {
+    for (const [label, identity, code] of [
+      ['name 不符', { name: 'different-package', version: packageVersion }, 'package-name'],
+      ['version 不符', { name: packageName, version: '9.9.9' }, 'package-version'],
+    ] as const) {
+      const entries = makeEntries();
+      entries[1] = {
+        path: 'package/package.json',
+        type: 'file',
+        content: JSON.stringify(identity),
+      };
+      await expect(verifyPlatformDependency(makeOptions(entries)), `${label}: 应拒 ${code}`).rejects.toMatchObject({
+        code,
+      });
+    }
   });
 
-  it('rejects an archive entry path with an empty path segment', async () => {
-    await expect(
-      verifyPlatformDependency(makeOptions([{ path: 'package//evil', type: 'file', content: 'x' }])),
-    ).rejects.toMatchObject({ code: 'archive-path' });
-  });
-
-  it('rejects package.json name mismatches', async () => {
-    const entries = makeEntries();
-    entries[1] = {
-      path: 'package/package.json',
-      type: 'file',
-      content: JSON.stringify({
-        name: 'different-package',
-        version: packageVersion,
-      }),
-    };
-
-    await expect(verifyPlatformDependency(makeOptions(entries))).rejects.toMatchObject({ code: 'package-name' });
-  });
-
-  it('rejects package.json version mismatches', async () => {
-    const entries = makeEntries();
-    entries[1] = {
-      path: 'package/package.json',
-      type: 'file',
-      content: JSON.stringify({ name: packageName, version: '9.9.9' }),
-    };
-
-    await expect(verifyPlatformDependency(makeOptions(entries))).rejects.toMatchObject({ code: 'package-version' });
-  });
-
-  it('rejects an archive that lacks package/package.json', async () => {
-    await expect(verifyPlatformDependency(makeOptions([{ path: 'package', type: 'directory' }]))).rejects.toMatchObject(
-      { code: 'package-json' },
-    );
-  });
-
-  it('rejects an archive whose package/package.json is not valid JSON', async () => {
-    await expect(
-      verifyPlatformDependency(
-        makeOptions([
-          { path: 'package', type: 'directory' },
-          { path: 'package/package.json', type: 'file', content: '{bad json' },
-        ]),
-      ),
-    ).rejects.toMatchObject({ code: 'package-json' });
+  it('rejects missing or corrupt package/package.json（2 态：缺失 / 非法 JSON）', async () => {
+    for (const [label, entries] of [
+      ['缺 package/package.json', [{ path: 'package', type: 'directory' } as ArchiveEntry]],
+      [
+        'package/package.json 非法 JSON',
+        [
+          { path: 'package', type: 'directory' } as ArchiveEntry,
+          { path: 'package/package.json', type: 'file', content: '{bad json' } as ArchiveEntry,
+        ],
+      ],
+    ] as const) {
+      await expect(
+        verifyPlatformDependency(makeOptions([...entries])),
+        `${label}: 应拒 package-json`,
+      ).rejects.toMatchObject({ code: 'package-json' });
+    }
   });
 
   it('cleans the isolated temporary directory when module loading fails', async () => {

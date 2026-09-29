@@ -455,41 +455,31 @@ describe('pre-commit staged snapshot', () => {
     expect(await temporaryHookDirs(fixture.root)).toEqual([]);
   });
 
-  it('passes when staged content is valid and the worktree copy is invalid', async () => {
-    const fixture = await initFixture('VALID_STAGED\n');
-    await fs.writeFile(fixture.worktree, 'VALID_STAGED\n', 'utf8');
-    git(fixture.root, ['add', 'src.ts']);
-    const beforeHash = indexHash(fixture.index);
-    await fs.writeFile(fixture.worktree, 'INVALID_WORKTREE\n', 'utf8');
+  it('staged/worktree 恢复矩阵（2 态：worktree 坏 → 通过并保 worktree / staged 坏 → 拒绝并保 staged）', async () => {
+    for (const [场景, baseline, stagedContent, worktreeContent, 期望Status, assertStderrGuards] of [
+      ['staged 合法 + worktree 坏', 'VALID_STAGED\n', 'VALID_STAGED\n', 'INVALID_WORKTREE\n', 0, true],
+      ['staged 坏 + worktree 合法', 'VALID_WORKTREE\n', 'INVALID_STAGED\n', 'VALID_WORKTREE\n', 1, false],
+    ] as const) {
+      const fixture = await initFixture(baseline);
+      await fs.writeFile(fixture.worktree, stagedContent, 'utf8');
+      git(fixture.root, ['add', 'src.ts']);
+      const beforeHash = indexHash(fixture.index);
+      await fs.writeFile(fixture.worktree, worktreeContent, 'utf8');
 
-    const result = runHook(fixture.root, fixture.index);
+      const result = runHook(fixture.root, fixture.index);
 
-    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
-    expect(await fs.readFile(fixture.worktree, 'utf8')).toBe('INVALID_WORKTREE\n');
-    expect(indexHash(fixture.index)).toBe(beforeHash);
-    expect(gitShow(fixture.root, ':src.ts')).toBe('VALID_STAGED\n');
-    expect(existsSync(fixture.index)).toBe(true);
-    expect(await temporaryHookDirs(fixture.root)).toEqual([]);
-    expect(result.stderr).not.toContain('exit127');
-    expect(result.stderr).not.toContain('EBUSY');
-  });
-
-  it('fails when staged content is invalid and the worktree copy is valid', async () => {
-    const fixture = await initFixture('VALID_WORKTREE\n');
-    await fs.writeFile(fixture.worktree, 'INVALID_STAGED\n', 'utf8');
-    git(fixture.root, ['add', 'src.ts']);
-    const beforeHash = indexHash(fixture.index);
-    await fs.writeFile(fixture.worktree, 'VALID_WORKTREE\n', 'utf8');
-
-    const result = runHook(fixture.root, fixture.index);
-
-    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
-    expect(await fs.readFile(fixture.worktree, 'utf8')).toBe('VALID_WORKTREE\n');
-    expect(indexHash(fixture.index)).toBe(beforeHash);
-    expect(gitShow(fixture.root, ':src.ts')).toBe('INVALID_STAGED\n');
-    expect(existsSync(fixture.index)).toBe(true);
-    expect(await temporaryHookDirs(fixture.root)).toEqual([]);
-  });
+      expect(result.status, `${场景}: ${result.stdout}\n${result.stderr}`).toBe(期望Status);
+      expect(await fs.readFile(fixture.worktree, 'utf8'), `${场景}: worktree 内容应保留`).toBe(worktreeContent);
+      expect(indexHash(fixture.index), `${场景}: index 应不被改写`).toBe(beforeHash);
+      expect(gitShow(fixture.root, ':src.ts'), `${场景}: staged 快照应保留`).toBe(stagedContent);
+      expect(existsSync(fixture.index), `${场景}: index 应在盘`).toBe(true);
+      expect(await temporaryHookDirs(fixture.root), `${场景}: 临时快照目录应清理`).toEqual([]);
+      if (assertStderrGuards) {
+        expect(result.stderr, `${场景}: 不应出现 exit127`).not.toContain('exit127');
+        expect(result.stderr, `${场景}: 不应出现 EBUSY`).not.toContain('EBUSY');
+      }
+    }
+  }, 120_000);
 
   it('materializes a staged external symlink as a safe ordinary snapshot file', async (context) => {
     if (symlinkUnavailable !== undefined) {
@@ -591,21 +581,20 @@ describe('pre-commit staged snapshot', () => {
     expect(await temporaryHookDirs(typecheckFixture.root)).toEqual([]);
   });
 
-  it.each([
-    { batchResponse: 'missing', label: 'missing object', message: '批量读取 index blob 缺失' },
-    { batchResponse: 'non-blob', label: 'non-blob response', message: '批量读取 index blob header 类型或 size 非法' },
-    {
-      batchResponse: 'malformed-header',
-      label: 'malformed header',
-      message: '批量读取 index blob header 类型或 size 非法',
-    },
-    { batchResponse: 'short-header', label: 'short header', message: '批量读取 index blob header 短流' },
-    { batchResponse: 'short-payload', label: 'short payload', message: '批量读取 index blob 短流' },
-    { batchResponse: 'missing-delimiter', label: 'missing delimiter', message: '批量读取 index blob 短流' },
-    { batchResponse: 'bad-delimiter', label: 'bad delimiter', message: '批量读取 index blob 分隔符非法或短流' },
-  ] as Array<{ batchResponse: Exclude<BatchResponse, 'happy' | 'hang'>; label: string; message: string }>)(
-    'fails closed for a batch $label response without changing the index or sentinel',
-    async ({ batchResponse, message }) => {
+  it('fails closed for a batch response without changing the index or sentinel（7 形态，每迭代自备 fixture）', async () => {
+    for (const { batchResponse, label, message } of [
+      { batchResponse: 'missing', label: 'missing object', message: '批量读取 index blob 缺失' },
+      { batchResponse: 'non-blob', label: 'non-blob response', message: '批量读取 index blob header 类型或 size 非法' },
+      {
+        batchResponse: 'malformed-header',
+        label: 'malformed header',
+        message: '批量读取 index blob header 类型或 size 非法',
+      },
+      { batchResponse: 'short-header', label: 'short header', message: '批量读取 index blob header 短流' },
+      { batchResponse: 'short-payload', label: 'short payload', message: '批量读取 index blob 短流' },
+      { batchResponse: 'missing-delimiter', label: 'missing delimiter', message: '批量读取 index blob 短流' },
+      { batchResponse: 'bad-delimiter', label: 'bad delimiter', message: '批量读取 index blob 分隔符非法或短流' },
+    ] as Array<{ batchResponse: Exclude<BatchResponse, 'happy' | 'hang'>; label: string; message: string }>) {
       const fixture = await initFixture('VALID_STAGED\n');
       const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-pre-commit-batch-sentinel-'));
       tempRoots.push(outside);
@@ -625,15 +614,15 @@ describe('pre-commit staged snapshot', () => {
         batchResponse,
       });
 
-      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
-      expect(result.stderr).toContain(message);
-      expect(await fs.readFile(sentinel, 'utf8')).toBe('DO NOT TOUCH\n');
-      expect(await fs.readFile(fixture.worktree, 'utf8')).toBe('VALID_STAGED\n');
-      expect(gitShow(fixture.root, ':src.ts')).toBe('VALID_STAGED\n');
-      expect(indexHash(fixture.index)).toBe(beforeHash);
-      expect(await temporaryHookDirs(fixture.root)).toEqual([]);
-    },
-  );
+      expect(result.status, `label=${label}: ${result.stdout}\n${result.stderr}`).toBe(1);
+      expect(result.stderr, `label=${label}: 应含「${message}」`).toContain(message);
+      expect(await fs.readFile(sentinel, 'utf8'), `label=${label}: sentinel 不得被触碰`).toBe('DO NOT TOUCH\n');
+      expect(await fs.readFile(fixture.worktree, 'utf8'), `label=${label}: worktree 应保留`).toBe('VALID_STAGED\n');
+      expect(gitShow(fixture.root, ':src.ts'), `label=${label}: staged 快照应保留`).toBe('VALID_STAGED\n');
+      expect(indexHash(fixture.index), `label=${label}: index 应不被改写`).toBe(beforeHash);
+      expect(await temporaryHookDirs(fixture.root), `label=${label}: 临时快照目录应清理`).toEqual([]);
+    }
+  }, 180_000);
 
   it('terminates the batch helper process tree on snapshot timeout and reclaims its temp dirs', async () => {
     const fixture = await initFixture('VALID_STAGED\n');
@@ -678,79 +667,81 @@ describe('pre-commit staged snapshot', () => {
     expect(await temporaryHookDirs(fixture.root)).toEqual([]);
   });
 
-  it.each([
-    {
-      label: 'parent symlink',
-      message: 'snapshot 路径组件不是目录',
-      records: [
-        {
-          mode: '120000',
-          object: '1111111111111111111111111111111111111111',
-          path: 'parent',
-        },
-        {
-          mode: '100644',
-          object: '2222222222222222222222222222222222222222',
-          path: 'parent/child.ts',
-        },
-      ],
-    },
-    {
-      label: 'nested symlink',
-      message: 'snapshot 路径组件不是目录',
-      records: [
-        {
-          mode: '120000',
-          object: '3333333333333333333333333333333333333333',
-          path: 'nested/link',
-        },
-        {
-          mode: '100644',
-          object: '4444444444444444444444444444444444444444',
-          path: 'nested/link/child.ts',
-        },
-      ],
-    },
-    {
-      label: 'absolute path',
-      message: '拒绝越界 index 路径',
-      records: [
-        {
-          mode: '100644',
-          object: '5555555555555555555555555555555555555555',
-          path: '/absolute.ts',
-        },
-      ],
-    },
-    {
-      label: 'traversal path',
-      message: '拒绝越界 index 路径',
-      records: [
-        {
-          mode: '100644',
-          object: '6666666666666666666666666666666666666666',
-          path: 'nested/../../escape.ts',
-        },
-      ],
-    },
-  ])('fails closed for a staged $label record without touching an external sentinel', async ({ records, message }) => {
-    const fixture = await initFixture('VALID_STAGED\n');
-    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-pre-commit-record-sentinel-'));
-    tempRoots.push(outside);
-    const sentinel = path.join(outside, 'sentinel.txt');
-    await fs.writeFile(sentinel, 'DO NOT TOUCH\n', 'utf8');
-    const beforeHash = indexHash(fixture.index);
+  it('fails closed for a staged record without touching an external sentinel（4 形态：parent/nested symlink、absolute/traversal path，每迭代自备 fixture）', async () => {
+    for (const { label, message, records } of [
+      {
+        label: 'parent symlink',
+        message: 'snapshot 路径组件不是目录',
+        records: [
+          {
+            mode: '120000',
+            object: '1111111111111111111111111111111111111111',
+            path: 'parent',
+          },
+          {
+            mode: '100644',
+            object: '2222222222222222222222222222222222222222',
+            path: 'parent/child.ts',
+          },
+        ],
+      },
+      {
+        label: 'nested symlink',
+        message: 'snapshot 路径组件不是目录',
+        records: [
+          {
+            mode: '120000',
+            object: '3333333333333333333333333333333333333333',
+            path: 'nested/link',
+          },
+          {
+            mode: '100644',
+            object: '4444444444444444444444444444444444444444',
+            path: 'nested/link/child.ts',
+          },
+        ],
+      },
+      {
+        label: 'absolute path',
+        message: '拒绝越界 index 路径',
+        records: [
+          {
+            mode: '100644',
+            object: '5555555555555555555555555555555555555555',
+            path: '/absolute.ts',
+          },
+        ],
+      },
+      {
+        label: 'traversal path',
+        message: '拒绝越界 index 路径',
+        records: [
+          {
+            mode: '100644',
+            object: '6666666666666666666666666666666666666666',
+            path: 'nested/../../escape.ts',
+          },
+        ],
+      },
+    ]) {
+      const fixture = await initFixture('VALID_STAGED\n');
+      const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-pre-commit-record-sentinel-'));
+      tempRoots.push(outside);
+      const sentinel = path.join(outside, 'sentinel.txt');
+      await fs.writeFile(sentinel, 'DO NOT TOUCH\n', 'utf8');
+      const beforeHash = indexHash(fixture.index);
 
-    const result = await runWithFakeIndexRecords(fixture, records, sentinel.replaceAll('\\', '/'));
+      const result = await runWithFakeIndexRecords(fixture, records, sentinel.replaceAll('\\', '/'));
 
-    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(1);
-    expect(result.stderr).toContain(message);
-    expect(await fs.readFile(sentinel, 'utf8')).toBe('DO NOT TOUCH\n');
-    expect(await fs.readFile(fixture.worktree, 'utf8')).toBe('VALID_STAGED\n');
-    expect(gitShow(fixture.root, ':src.ts')).toBe('VALID_STAGED\n');
-    expect(indexHash(fixture.index)).toBe(beforeHash);
-    expect(await temporaryHookDirs(fixture.root)).toEqual([]);
-  });
+      expect(result.status, `label=${label}: ${result.stdout}\n${result.stderr}`).toBe(1);
+      expect(result.stderr, `label=${label}: 应含「${message}」`).toContain(message);
+      expect(await fs.readFile(sentinel, 'utf8'), `label=${label}: sentinel 不得被触碰`).toBe('DO NOT TOUCH\n');
+      expect(await fs.readFile(fixture.worktree, 'utf8'), `label=${label}: worktree 应保留`).toBe('VALID_STAGED\n');
+      expect(gitShow(fixture.root, ':src.ts'), `label=${label}: staged 快照应保留`).toBe('VALID_STAGED\n');
+      expect(indexHash(fixture.index), `label=${label}: index 应不被改写`).toBe(beforeHash);
+      expect(await temporaryHookDirs(fixture.root), `label=${label}: 临时快照目录应清理`).toEqual([]);
+    }
+  }, 120_000);
 });
 
 it('materializes 200 staged blobs through one batch protocol within the snapshot budget', async () => {

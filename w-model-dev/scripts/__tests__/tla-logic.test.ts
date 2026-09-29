@@ -95,34 +95,32 @@ function makeValidManifestWithoutBasePath(): unknown {
 // ==================== P1.1 basePath 强制字段校验 ====================
 
 describe('P1.1 manifest.basePath 强制字段校验', () => {
-  it('manifest 缺 basePath → checkTlaModel 返回 passed=false，violations 含 "basePath 缺失"', () => {
-    const m = makeValidManifestWithoutBasePath();
-    const result = checkTlaModel(m, 2);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => v.includes('basePath 缺失'))).toBe(true);
+  it('basePath 违规行（3 态：缺失 / 空串 schema 前置 / 非字符串 schema 前置）', () => {
+    for (const [场景, basePath, marker, assertPassedFalse] of [
+      ['manifest 缺 basePath', undefined, /basePath 缺失/, true],
+      ['basePath 空字符串（schema minLength:1 前置拦截，业务规则不再触达）', '', /\[schema\].*basePath/, false],
+      ['basePath 非字符串（schema type:string 前置拦截，业务规则不再触达）', 123, /\[schema\].*basePath/, false],
+    ] as const) {
+      const m = makeValidManifestWithoutBasePath() as { basePath?: unknown };
+      if (basePath !== undefined) {
+        m.basePath = basePath;
+      }
+      const result = checkTlaModel(m, 2);
+      if (assertPassedFalse) {
+        expect(result.passed, `${场景}: 应 passed=false`).toBe(false);
+      }
+      expect(
+        result.violations.some((v) => marker.test(v)),
+        `${场景}: violations 应含 ${marker}`,
+      ).toBe(true);
+    }
   });
 
-  it('manifest basePath 存在 → 不报缺失', () => {
+  it('basePath 通过行（1 态：basePath 存在 → 不报缺失）', () => {
     const m = makeValidManifestWithoutBasePath() as { basePath?: unknown };
     m.basePath = '.';
     const result = checkTlaModel(m, 2);
     expect(result.violations.some((v) => v.includes('basePath 缺失'))).toBe(false);
-  });
-
-  it('basePath 为空字符串 → 报缺失', () => {
-    const m = makeValidManifestWithoutBasePath() as { basePath?: unknown };
-    m.basePath = '';
-    const result = checkTlaModel(m, 2);
-    // schema minLength:1 前置拦截空字符串（[schema] 前缀），业务规则 basePath 缺失不再触达
-    expect(result.violations.some((v) => /\[schema\].*basePath/.test(v))).toBe(true);
-  });
-
-  it('basePath 为非字符串 → 报缺失', () => {
-    const m = makeValidManifestWithoutBasePath() as { basePath?: unknown };
-    m.basePath = 123;
-    const result = checkTlaModel(m, 2);
-    // schema type:string 前置拦截非字符串（[schema] 前缀），业务规则 basePath 缺失不再触达
-    expect(result.violations.some((v) => /\[schema\].*basePath/.test(v))).toBe(true);
   });
 });
 
@@ -148,21 +146,22 @@ describe('P1.2 SD 覆盖率 spec 方向校验', () => {
     stateExplosion: false,
   };
 
-  it('spec 缺 requirementIds（空数组）→ violation', () => {
-    const specs = [{ ...baseSpec, id: 'L1_system', requirementIds: [] }];
-    const result = checkCoverage(specs as TlaSpec[], ['SD-001']);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => v.includes('L1_system 缺 requirementIds'))).toBe(true);
+  it('requirementIds 违规行（2 态：空数组缺 requirementIds / 无 SD-xxx 标识）', () => {
+    for (const [场景, requirementIds, marker] of [
+      ['spec 缺 requirementIds（空数组）', [], 'L1_system 缺 requirementIds'],
+      ['spec requirementIds 无 SD-xxx 标识', ['REQ-001'], '无 SD 标识'],
+    ] as const) {
+      const specs = [{ ...baseSpec, id: 'L1_system', requirementIds: [...requirementIds] }];
+      const result = checkCoverage(specs as TlaSpec[], ['SD-001']);
+      expect(result.passed, `${场景}: 应 fail`).toBe(false);
+      expect(
+        result.violations.some((v) => v.includes(marker)),
+        `${场景}: 应含「${marker}」`,
+      ).toBe(true);
+    }
   });
 
-  it('spec requirementIds 无 SD-xxx 标识 → violation', () => {
-    const specs = [{ ...baseSpec, id: 'L1_system', requirementIds: ['REQ-001'] }];
-    const result = checkCoverage(specs as TlaSpec[], ['SD-001']);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => v.includes('无 SD 标识'))).toBe(true);
-  });
-
-  it('spec requirementIds 含 SD-xxx → 通过 spec 方向', () => {
+  it('requirementIds 通过行（1 态：含 SD-xxx → 通过 spec 方向）', () => {
     const specs = [{ ...baseSpec, id: 'L1_system', requirementIds: ['SD-001', 'REQ-001'] }];
     const result = checkCoverage(specs as TlaSpec[], ['SD-001']);
     // 注意：只要 SD-001 被覆盖且 spec 含 SD 标识就通过
@@ -180,99 +179,95 @@ describe('P1.2 SD 覆盖率 spec 方向校验', () => {
   });
 });
 
-// ==================== G-D D1：Invariants == 命名兼容 ====================
+// ==================== G-D D1/D2：cfg INVARIANT 一致性与格式（七态三循环） ====================
 
-describe('G-D D1 cfg-tla 不变式命名兼容 Invariants ==', () => {
-  const tlaInvariants = `
+describe('G-D D1/D2 cfg INVARIANT 一致性与格式', () => {
+  const invariantsDef = `
 Invariants ==
     /\\ TypeOK
     /\\ AuthInvariant
 `;
-
-  it('tla 用 Invariants == 定义，cfg 用 INVARIANT 逐行声明 → passed=true', () => {
-    const cfg = 'SPECIFICATION Spec\nINVARIANT TypeOK\nINVARIANT AuthInvariant';
-    const result = checkCfgInvariantsConsistency(tlaInvariants, cfg);
-    expect(result.passed).toBe(true);
-    expect(result.violations).toHaveLength(0);
-  });
-
-  it('tla 用 Invariants == 定义，cfg 缺一项 → 报缺失不变式', () => {
-    const cfg = 'SPECIFICATION Spec\nINVARIANT TypeOK';
-    const result = checkCfgInvariantsConsistency(tlaInvariants, cfg);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => v.includes('缺失不变式'))).toBe(true);
-  });
-
-  it('tla 用 BusinessInvariant == 定义（向后兼容）→ passed=true', () => {
-    const tla = `
+  const businessDef = `
 BusinessInvariant ==
     /\\ TypeOK
     /\\ AuthInvariant
 `;
-    const cfg = 'SPECIFICATION Spec\nINVARIANT TypeOK\nINVARIANT AuthInvariant';
-    const result = checkCfgInvariantsConsistency(tla, cfg);
-    expect(result.passed).toBe(true);
-    expect(result.violations).toHaveLength(0);
+
+  it('cfg INVARIANT 通过行（4 态：Invariants== 命名兼容 / BusinessInvariant== 向后兼容 / INVARIANT 带名 / INVARIANTS 列表）', () => {
+    for (const [场景, run, assertNoViolations] of [
+      [
+        'tla 用 Invariants == 定义，cfg 用 INVARIANT 逐行声明（D1 一致性）',
+        () =>
+          checkCfgInvariantsConsistency(invariantsDef, 'SPECIFICATION Spec\nINVARIANT TypeOK\nINVARIANT AuthInvariant'),
+        true,
+      ],
+      [
+        'tla 用 BusinessInvariant == 定义（向后兼容，D1 一致性）',
+        () =>
+          checkCfgInvariantsConsistency(businessDef, 'SPECIFICATION Spec\nINVARIANT TypeOK\nINVARIANT AuthInvariant'),
+        true,
+      ],
+      [
+        'cfg INVARIANT 后跟不变式名（D2 结构）',
+        () => checkCfgStructure('SPECIFICATION Spec\nINVARIANT TypeOK\nINIT Init'),
+        false,
+      ],
+      [
+        'cfg INVARIANTS 关键字跟列表（不变式行本身不报错，D2 结构）',
+        () => checkCfgStructure('SPECIFICATION Spec\nINVARIANTS TypeOK AuthInvariant\nINIT Init'),
+        false,
+      ],
+    ] as const) {
+      const result = run();
+      expect(result.passed, `${场景}: 应 passed=true`).toBe(true);
+      if (assertNoViolations) {
+        expect(result.violations, `${场景}: 应零违规`).toHaveLength(0);
+      }
+    }
   });
-});
 
-// ==================== G-D D2：INVARIANT 格式死分支 ====================
-
-describe('G-D D2 cfg INVARIANT 格式死分支', () => {
-  it('cfg 含裸 INVARIANT（无不变式名）→ 报缺少不变式名', () => {
-    const result = checkCfgStructure('SPECIFICATION Spec\nINVARIANT\nINIT Init');
+  it('cfg INVARIANT 违规行（1 态：cfg 缺一项 → 报缺失不变式）', () => {
+    const cfg = 'SPECIFICATION Spec\nINVARIANT TypeOK';
+    const result = checkCfgInvariantsConsistency(invariantsDef, cfg);
     expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => v.includes('INVARIANT 缺少不变式名'))).toBe(true);
+    expect(result.violations.some((v) => v.includes('缺失不变式'))).toBe(true);
   });
 
-  it('cfg 含裸 INVARIANT 带尾随空格 → 报缺少不变式名', () => {
-    const result = checkCfgStructure('SPECIFICATION Spec\nINVARIANT   \nINIT Init');
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => v.includes('INVARIANT 缺少不变式名'))).toBe(true);
-  });
-
-  it('cfg INVARIANT 后跟不变式名 → passed=true', () => {
-    const result = checkCfgStructure('SPECIFICATION Spec\nINVARIANT TypeOK\nINIT Init');
-    expect(result.passed).toBe(true);
-  });
-
-  it('cfg INVARIANTS 关键字跟列表 → passed=true（不变式行本身不报错）', () => {
-    const result = checkCfgStructure('SPECIFICATION Spec\nINVARIANTS TypeOK AuthInvariant\nINIT Init');
-    expect(result.passed).toBe(true);
+  it('cfg 含裸 INVARIANT（无不变式名）→ 报缺少不变式名（2 态：裸关键字 / 尾随空格）', () => {
+    for (const [场景, cfg] of [
+      ['裸 INVARIANT', 'SPECIFICATION Spec\nINVARIANT\nINIT Init'],
+      ['裸 INVARIANT 带尾随空格', 'SPECIFICATION Spec\nINVARIANT   \nINIT Init'],
+    ] as const) {
+      const result = checkCfgStructure(cfg);
+      expect(result.passed, `${场景}: 应 fail`).toBe(false);
+      expect(
+        result.violations.some((v) => v.includes('INVARIANT 缺少不变式名')),
+        `${场景}: 应报缺少不变式名`,
+      ).toBe(true);
+    }
   });
 });
 
 // ==================== G-D D3：@phase 严格 ====================
 
 describe('G-D D3 @phase 解析拒绝非整数', () => {
-  it('@phase="4x" 通过 validateHeader 应触发 violation', () => {
-    const header: Record<string, string | null> = {
-      system: 'test',
-      phase: '4x',
-    };
-    const spec = { id: 'L1-test', level: 'L1' as const, phase: 4 };
-    const violations = validateHeader(header, spec as never);
-    expect(violations.some((v) => v.includes('@phase="4x"'))).toBe(true);
-  });
-
-  it('@phase="3.9" 通过 validateHeader 应触发 violation', () => {
-    const header: Record<string, string | null> = {
-      system: 'test',
-      phase: '3.9',
-    };
-    const spec = { id: 'L1-test', level: 'L1' as const, phase: 3 };
-    const violations = validateHeader(header, spec as never);
-    expect(violations.some((v) => v.includes('@phase="3.9"'))).toBe(true);
-  });
-
-  it('@phase="4" 正常整数 → 不触发 violation', () => {
-    const header: Record<string, string | null> = {
-      system: 'test',
-      phase: '4',
-    };
-    const spec = { id: 'L1-test', level: 'L1' as const, phase: 4 };
-    const violations = validateHeader(header, spec as never);
-    expect(violations.some((v) => v.includes('@phase'))).toBe(false);
+  it('@phase 三态（"4x" / "3.9" 拒绝；"4" 正常整数不触发）', () => {
+    for (const [phaseValue, specPhase, marker, 期望违规] of [
+      ['4x', 4, '@phase="4x"', true],
+      ['3.9', 3, '@phase="3.9"', true],
+      ['4', 4, '@phase', false],
+    ] as const) {
+      const header: Record<string, string | null> = {
+        system: 'test',
+        phase: phaseValue,
+      };
+      const spec = { id: 'L1-test', level: 'L1' as const, phase: specPhase };
+      const violations = validateHeader(header, spec as never);
+      expect(
+        violations.some((v) => v.includes(marker)),
+        `@phase="${phaseValue}": ${期望违规 ? `应触发含「${marker}」的 violation` : `不应触发含「${marker}」的 violation`}`,
+      ).toBe(期望违规);
+    }
   });
 });
 
@@ -411,49 +406,8 @@ describe('checkCoverage sdCoverage 回填', () => {
 // 不算 manifest 缺失」；未命中一律保留原文案（判定结果不变，仍拦截）。
 
 describe('S2 checkHierarchy 区分 phase 过滤掉的 child/parent/sibling', () => {
-  it('reports children filtered out by phase as later-phase specs, not as unregistered paths', () => {
-    const l1 = {
-      id: 'L1_counter',
-      level: 'L1',
-      phase: 1,
-      tlaPath: 'tla/L1_counter.tla',
-      cfgPath: 'tla/L1_counter.cfg',
-      parent: null,
-      children: ['tla/L2_counter_service.tla'],
-      siblings: [],
-    } as unknown as TlaSpec;
-    const violations = checkHierarchy([l1], {
-      filteredOutPaths: new Set(['tla/L2_counter_service.tla']),
-      fullPhaseByPath: new Map([['tla/L2_counter_service.tla', 2]]),
-      phase: 1,
-    });
-    expect(violations).toHaveLength(1);
-    expect(violations[0]).toContain('属后续阶段');
-    expect(violations[0]).toContain('phase=2');
-    expect(violations[0]).not.toContain('不在 manifest 中');
-  });
-
-  it('still reports genuinely unregistered children as missing from the manifest', () => {
-    const l1 = {
-      id: 'L1_counter',
-      level: 'L1',
-      phase: 1,
-      tlaPath: 'tla/L1_counter.tla',
-      cfgPath: 'tla/L1_counter.cfg',
-      parent: null,
-      children: ['tla/L9_ghost.tla'],
-      siblings: [],
-    } as unknown as TlaSpec;
-    const violations = checkHierarchy([l1], {
-      filteredOutPaths: new Set<string>(),
-      fullPhaseByPath: new Map<string, number>(),
-      phase: 1,
-    });
-    expect(violations[0]).toContain('不在 manifest 中');
-  });
-
-  it('parent 分支同款：被 phase 过滤掉的 parent 报「属后续阶段」，不报 manifest 缺失', () => {
-    const root = {
+  it('被 phase 过滤掉的关系路径报「属后续阶段」而非 manifest 缺失（3 态：child / parent / sibling）', () => {
+    const rootOnly = {
       id: 'L1_counter',
       level: 'L1',
       phase: 1,
@@ -473,39 +427,74 @@ describe('S2 checkHierarchy 区分 phase 过滤掉的 child/parent/sibling', () 
       children: [],
       siblings: [],
     } as unknown as TlaSpec;
-    const violations = checkHierarchy([root, child], {
-      filteredOutPaths: new Set(['tla/L4_counter_impl.tla']),
-      fullPhaseByPath: new Map([['tla/L4_counter_impl.tla', 4]]),
-      phase: 1,
-    });
-    expect(violations).toHaveLength(1);
-    expect(violations[0]).toContain('parent="tla/L4_counter_impl.tla"');
-    expect(violations[0]).toContain('属后续阶段');
-    expect(violations[0]).toContain('phase=4');
-    expect(violations[0]).not.toContain('不在 manifest 中');
+    for (const [场景, specs, options, 期望片段] of [
+      [
+        'child 被过滤',
+        [
+          {
+            ...rootOnly,
+            children: ['tla/L2_counter_service.tla'],
+          } as unknown as TlaSpec,
+        ],
+        {
+          filteredOutPaths: new Set(['tla/L2_counter_service.tla']),
+          fullPhaseByPath: new Map([['tla/L2_counter_service.tla', 2]]),
+          phase: 1,
+        },
+        ['属后续阶段', 'phase=2'],
+      ],
+      [
+        'parent 被过滤',
+        [rootOnly, { ...child, parent: 'tla/L4_counter_impl.tla' } as unknown as TlaSpec],
+        {
+          filteredOutPaths: new Set(['tla/L4_counter_impl.tla']),
+          fullPhaseByPath: new Map([['tla/L4_counter_impl.tla', 4]]),
+          phase: 1,
+        },
+        ['parent="tla/L4_counter_impl.tla"', '属后续阶段', 'phase=4'],
+      ],
+      [
+        'sibling 被过滤',
+        [
+          {
+            ...rootOnly,
+            siblings: ['tla/L3_counter_deep.tla'],
+          } as unknown as TlaSpec,
+        ],
+        {
+          filteredOutPaths: new Set(['tla/L3_counter_deep.tla']),
+          fullPhaseByPath: new Map([['tla/L3_counter_deep.tla', 3]]),
+          phase: 1,
+        },
+        ['sibling="tla/L3_counter_deep.tla"', '属后续阶段', 'phase=3'],
+      ],
+    ] as const) {
+      const violations = checkHierarchy([...specs], options);
+      expect(violations, `${场景}: 应恰 1 条`).toHaveLength(1);
+      for (const fragment of 期望片段) {
+        expect(violations[0], `${场景}: 应含「${fragment}」`).toContain(fragment);
+      }
+      expect(violations[0], `${场景}: 不应报「不在 manifest 中」`).not.toContain('不在 manifest 中');
+    }
   });
 
-  it('sibling 分支同款：被 phase 过滤掉的 sibling 报「属后续阶段」，不报 manifest 缺失', () => {
-    const root = {
+  it('缺失行（1 态：未注册 child 仍报 manifest 缺失）', () => {
+    const l1 = {
       id: 'L1_counter',
       level: 'L1',
       phase: 1,
       tlaPath: 'tla/L1_counter.tla',
       cfgPath: 'tla/L1_counter.cfg',
       parent: null,
-      children: [],
-      siblings: ['tla/L3_counter_deep.tla'],
+      children: ['tla/L9_ghost.tla'],
+      siblings: [],
     } as unknown as TlaSpec;
-    const violations = checkHierarchy([root], {
-      filteredOutPaths: new Set(['tla/L3_counter_deep.tla']),
-      fullPhaseByPath: new Map([['tla/L3_counter_deep.tla', 3]]),
+    const violations = checkHierarchy([l1], {
+      filteredOutPaths: new Set<string>(),
+      fullPhaseByPath: new Map<string, number>(),
       phase: 1,
     });
-    expect(violations).toHaveLength(1);
-    expect(violations[0]).toContain('sibling="tla/L3_counter_deep.tla"');
-    expect(violations[0]).toContain('属后续阶段');
-    expect(violations[0]).toContain('phase=3');
-    expect(violations[0]).not.toContain('不在 manifest 中');
+    expect(violations[0]).toContain('不在 manifest 中');
   });
 
   it('缺省 options 时行为与文案逐字不变（未命中 filteredOutPaths 仍报 manifest 缺失）', () => {

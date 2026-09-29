@@ -156,31 +156,34 @@ describe('M07 测试证据门禁规则（E1-E4，严格证据模式）', () => {
   });
 
   // ==================== E1 配对 ====================
-  it('E1: 只有 rawOutputPath（缺 rawOutputSha256）→ 红', () => {
-    const result = run(
-      makeMatrix({
-        unitTest: makeSummary({
-          evidence: makeEvidence({ rawOutputPath: 'artifacts/run.txt' }),
+  it('E1 单边缺失（2 态：只有 rawOutputPath / 只有 rawOutputSha256）→ 红', () => {
+    for (const [场景, patch, 期望正则, 禁现正则] of [
+      [
+        '只有 rawOutputPath（缺 rawOutputSha256）',
+        { rawOutputPath: 'artifacts/run.txt' },
+        /E1[\s\S]*必须成对出现（当前只有 rawOutputPath）/,
+        /当前只有 rawOutputSha256/,
+      ],
+      [
+        '只有 rawOutputSha256（缺 rawOutputPath）',
+        { rawOutputSha256: 'a'.repeat(64) },
+        /E1[\s\S]*当前只有 rawOutputSha256/,
+        null,
+      ],
+    ] as const) {
+      const result = run(
+        makeMatrix({
+          unitTest: makeSummary({ evidence: makeEvidence({ ...patch }) }),
         }),
-      }),
-    );
-    expect(result.passed).toBe(false);
-    // 正则须锚定消息尾部的「当前只有 <缺失字段>」：只写 /E1…rawOutputPath…rawOutputSha256/
-    // 会同时命中「必须成对出现」前缀里的两个字段名，对字段顺序/缺失方毫无鉴别力（任务 2 审查移交）。
-    expect(result.reasons.join('\n')).toMatch(/E1[\s\S]*必须成对出现（当前只有 rawOutputPath）/);
-    expect(result.reasons.join('\n')).not.toMatch(/当前只有 rawOutputSha256/);
-  });
-
-  it('E1: 只有 rawOutputSha256（缺 rawOutputPath）→ 红', () => {
-    const result = run(
-      makeMatrix({
-        unitTest: makeSummary({
-          evidence: makeEvidence({ rawOutputSha256: 'a'.repeat(64) }),
-        }),
-      }),
-    );
-    expect(result.passed).toBe(false);
-    expect(result.reasons.join('\n')).toMatch(/E1[\s\S]*当前只有 rawOutputSha256/);
+      );
+      expect(result.passed, `${场景}: 应 fail`).toBe(false);
+      // 正则须锚定消息尾部的「当前只有 <缺失字段>」：只写 /E1…rawOutputPath…rawOutputSha256/
+      // 会同时命中「必须成对出现」前缀里的两个字段名，对字段顺序/缺失方毫无鉴别力（任务 2 审查移交）。
+      expect(result.reasons.join('\n'), `${场景}: 应含 ${期望正则}`).toMatch(期望正则);
+      if (禁现正则) {
+        expect(result.reasons.join('\n'), `${场景}: 不应含 ${禁现正则}`).not.toMatch(禁现正则);
+      }
+    }
   });
 
   // ==================== E2 哈希核验 ====================
@@ -210,23 +213,58 @@ describe('M07 测试证据门禁规则（E1-E4，严格证据模式）', () => {
     expect(result.passed).toBe(true);
   });
 
-  it('E2: sha256 与文件实际摘要不符 → 红', () => {
-    const root = makeTmpDir();
-    mkdirSync(join(root, 'artifacts'), { recursive: true });
-    writeFileSync(join(root, 'artifacts', 'run.txt'), 'real\n', 'utf-8');
-    const result = run(
-      makeMatrix({
-        unitTest: makeSummary({
-          evidence: makeEvidence({
-            rawOutputPath: 'artifacts/run.txt',
-            rawOutputSha256: 'b'.repeat(64),
+  it('E2 负例（3 态：摘要不符 / 文件不存在 / 未提供 projectRoot fail-closed，每行自备 root）', () => {
+    for (const [场景, prepare, rawOutputPath, sha, withRoot, 期望正则, assertE2Count] of [
+      [
+        'sha256 与文件实际摘要不符',
+        () => {
+          const root = makeTmpDir();
+          mkdirSync(join(root, 'artifacts'), { recursive: true });
+          writeFileSync(join(root, 'artifacts', 'run.txt'), 'real\n', 'utf-8');
+          return root;
+        },
+        'artifacts/run.txt',
+        'b'.repeat(64),
+        true,
+        /E2[\s\S]*SHA-256[\s\S]*不符/,
+        false,
+      ],
+      [
+        'rawOutputPath 指向的文件不存在',
+        () => makeTmpDir(),
+        'artifacts/missing.txt',
+        'c'.repeat(64),
+        true,
+        /E2[\s\S]*不存在/,
+        false,
+      ],
+      [
+        '携 rawOutputPath + rawOutputSha256 但未提供 projectRoot（无法核验不得放行）',
+        () => null,
+        'artifacts/run.txt',
+        'd'.repeat(64),
+        false,
+        /E2[\s\S]*未提供项目根[\s\S]*fail-closed/,
+        true,
+      ],
+    ] as const) {
+      // 锁死 fail-closed 契约（任务 2 审查移交）：调用方漏传项目根时，E2 必须拒绝而非静默跳过——
+      // 否则「声明了哈希」反而因无法核验被放行，E2 形同虚设。
+      const root = prepare();
+      const result = run(
+        makeMatrix({
+          unitTest: makeSummary({
+            evidence: makeEvidence({ rawOutputPath, rawOutputSha256: sha }),
           }),
         }),
-      }),
-      { projectRoot: root },
-    );
-    expect(result.passed).toBe(false);
-    expect(result.reasons.join('\n')).toMatch(/E2[\s\S]*SHA-256[\s\S]*不符/);
+        withRoot ? { projectRoot: root } : {},
+      );
+      expect(result.passed, `${场景}: 应 fail`).toBe(false);
+      expect(result.reasons.join('\n'), `${场景}: 应含 ${期望正则}`).toMatch(期望正则);
+      if (assertE2Count) {
+        expect(result.testEvidence?.e2, `${场景}: e2 计数应为 1`).toBe(1);
+      }
+    }
   });
 
   it('E2: 项目内 evidence output 指向项目外 symlink → checkArtifactGate fail-closed 且可观察 e2', () => {
@@ -255,41 +293,6 @@ describe('M07 测试证据门禁规则（E1-E4，严格证据模式）', () => {
     expect(result.reasons.join('\n')).toMatch(/E2[\s\S]*单元测试[\s\S]*非法[\s\S]*link/);
   });
 
-  it('E2: rawOutputPath 指向的文件不存在 → 红', () => {
-    const root = makeTmpDir();
-    const result = run(
-      makeMatrix({
-        unitTest: makeSummary({
-          evidence: makeEvidence({
-            rawOutputPath: 'artifacts/missing.txt',
-            rawOutputSha256: 'c'.repeat(64),
-          }),
-        }),
-      }),
-      { projectRoot: root },
-    );
-    expect(result.passed).toBe(false);
-    expect(result.reasons.join('\n')).toMatch(/E2[\s\S]*不存在/);
-  });
-
-  it('E2: 携 rawOutputPath + rawOutputSha256 但未提供 projectRoot → 红（fail-closed，无法核验不得放行）', () => {
-    // 锁死 fail-closed 契约（任务 2 审查移交）：调用方漏传项目根时，E2 必须拒绝而非静默跳过——
-    // 否则「声明了哈希」反而因无法核验被放行，E2 形同虚设。
-    const result = run(
-      makeMatrix({
-        unitTest: makeSummary({
-          evidence: makeEvidence({
-            rawOutputPath: 'artifacts/run.txt',
-            rawOutputSha256: 'd'.repeat(64),
-          }),
-        }),
-      }),
-    );
-    expect(result.passed).toBe(false);
-    expect(result.reasons.join('\n')).toMatch(/E2[\s\S]*未提供项目根[\s\S]*fail-closed/);
-    expect(result.testEvidence?.e2).toBe(1);
-  });
-
   it('E2: 路径越出项目根 → resolveTestEvidenceOutputPath 拒绝；根内相对路径接受', () => {
     const root = makeTmpDir();
     const resolve = gateLogic.resolveTestEvidenceOutputPath;
@@ -311,195 +314,155 @@ describe('M07 测试证据门禁规则（E1-E4，严格证据模式）', () => {
   });
 
   // ==================== E3 结果一致性 ====================
-  it('E3: failed>0（阶段外层）而 exitCode=0 → 红（有失败必来自非零退出）', () => {
-    const result = run(
-      makeMatrix({
-        unitTest: makeSummary({ total: 1, passed: 1, coverage: 85 }),
-        integrationTest: makeSummary({
-          total: 3,
-          passed: 0,
-          failed: 3,
-          pending: 0,
-          coverage: 0,
-          evidence: makeEvidence({ exitCode: 0 }),
-        }),
-        systemTest: makeSummaryNoEvidence({
-          total: 0,
-          passed: 0,
-          failed: 0,
-          pending: 0,
-          coverage: 0,
-        }),
-        acceptanceTest: makeSummaryNoEvidence({
-          total: 0,
-          passed: 0,
-          failed: 0,
-          pending: 0,
-          coverage: 0,
-        }),
-      }),
-      { phaseOption: 5 },
-    );
-    expect(result.passed).toBe(false);
-    expect(result.reasons.join('\n')).toMatch(/E3[\s\S]*failed=3[\s\S]*exitCode=0/);
+  it('E3 矩阵·违规行（2 态：failed>0 而 exitCode=0 / 全绿而 exitCode=1）', () => {
+    for (const [场景, matrix, 期望正则] of [
+      [
+        'failed>0（阶段外层）而 exitCode=0（有失败必来自非零退出）',
+        {
+          unitTest: makeSummary({ total: 1, passed: 1, coverage: 85 }),
+          integrationTest: makeSummary({
+            total: 3,
+            passed: 0,
+            failed: 3,
+            pending: 0,
+            coverage: 0,
+            evidence: makeEvidence({ exitCode: 0 }),
+          }),
+          systemTest: makeSummaryNoEvidence({ total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 }),
+          acceptanceTest: makeSummaryNoEvidence({ total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 }),
+        },
+        /E3[\s\S]*failed=3[\s\S]*exitCode=0/,
+      ],
+      [
+        'failed=0 && pending=0 而 exitCode=1（全绿不可能来自非零退出）',
+        {
+          unitTest: makeSummary({
+            total: 2,
+            passed: 2,
+            failed: 0,
+            pending: 0,
+            coverage: 85,
+            evidence: makeEvidence({ exitCode: 1 }),
+          }),
+        },
+        /E3[\s\S]*exitCode=1/,
+      ],
+    ] as const) {
+      const result = run(makeMatrix(matrix), { phaseOption: 5 });
+      expect(result.passed, `${场景}: 应 fail`).toBe(false);
+      expect(result.reasons.join('\n'), `${场景}: 应含 ${期望正则}`).toMatch(期望正则);
+    }
   });
 
-  it('E3: failed>0 而 exitCode=1 → 无 E3 违规（阶段外层因此全绿）', () => {
-    const result = run(
-      makeMatrix({
-        unitTest: makeSummary({ total: 1, passed: 1, coverage: 85 }),
-        integrationTest: makeSummary({
-          total: 3,
-          passed: 0,
-          failed: 3,
-          pending: 0,
-          coverage: 0,
-          evidence: makeEvidence({ exitCode: 1 }),
-        }),
-        systemTest: makeSummaryNoEvidence({
-          total: 0,
-          passed: 0,
-          failed: 0,
-          pending: 0,
-          coverage: 0,
-        }),
-        acceptanceTest: makeSummaryNoEvidence({
-          total: 0,
-          passed: 0,
-          failed: 0,
-          pending: 0,
-          coverage: 0,
-        }),
-      }),
-      { phaseOption: 5 },
-    );
-    expect(result.reasons.join('\n')).not.toMatch(/E3/);
-    expect(result.passed).toBe(true);
-  });
-
-  it('E3: failed=0 && pending=0 而 exitCode=1 → 红（全绿不可能来自非零退出）', () => {
-    const result = run(
-      makeMatrix({
-        unitTest: makeSummary({
-          total: 2,
-          passed: 2,
-          failed: 0,
-          pending: 0,
-          coverage: 85,
-          evidence: makeEvidence({ exitCode: 1 }),
-        }),
-      }),
-      { phaseOption: 5 },
-    );
-    expect(result.passed).toBe(false);
-    expect(result.reasons.join('\n')).toMatch(/E3[\s\S]*exitCode=1/);
-  });
-
-  it('E3: failed=0 && pending>0 不约束（exitCode=1 不报 E3；阶段外层全绿）', () => {
-    const result = run(
-      makeMatrix({
-        unitTest: makeSummary({ total: 1, passed: 1, coverage: 85 }),
-        integrationTest: makeSummary({
-          total: 3,
-          passed: 1,
-          failed: 0,
-          pending: 2,
-          coverage: 0,
-          evidence: makeEvidence({ exitCode: 1 }),
-        }),
-        systemTest: makeSummaryNoEvidence({
-          total: 0,
-          passed: 0,
-          failed: 0,
-          pending: 0,
-          coverage: 0,
-        }),
-        acceptanceTest: makeSummaryNoEvidence({
-          total: 0,
-          passed: 0,
-          failed: 0,
-          pending: 0,
-          coverage: 0,
-        }),
-      }),
-      { phaseOption: 5 },
-    );
-    expect(result.reasons.join('\n')).not.toMatch(/E3/);
-    expect(result.passed).toBe(true);
+  it('E3 矩阵·放行行（2 态：failed>0 且 exitCode=1 / failed=0 && pending>0）', () => {
+    for (const [场景, matrix] of [
+      [
+        'failed>0 而 exitCode=1（阶段外层因此全绿）',
+        {
+          unitTest: makeSummary({ total: 1, passed: 1, coverage: 85 }),
+          integrationTest: makeSummary({
+            total: 3,
+            passed: 0,
+            failed: 3,
+            pending: 0,
+            coverage: 0,
+            evidence: makeEvidence({ exitCode: 1 }),
+          }),
+          systemTest: makeSummaryNoEvidence({ total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 }),
+          acceptanceTest: makeSummaryNoEvidence({ total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 }),
+        },
+      ],
+      [
+        'failed=0 && pending>0 不约束（exitCode=1 不报 E3；阶段外层全绿）',
+        {
+          unitTest: makeSummary({ total: 1, passed: 1, coverage: 85 }),
+          integrationTest: makeSummary({
+            total: 3,
+            passed: 1,
+            failed: 0,
+            pending: 2,
+            coverage: 0,
+            evidence: makeEvidence({ exitCode: 1 }),
+          }),
+          systemTest: makeSummaryNoEvidence({ total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 }),
+          acceptanceTest: makeSummaryNoEvidence({ total: 0, passed: 0, failed: 0, pending: 0, coverage: 0 }),
+        },
+      ],
+    ] as const) {
+      const result = run(makeMatrix(matrix), { phaseOption: 5 });
+      expect(result.reasons.join('\n'), `${场景}: 不应报 E3`).not.toMatch(/E3/);
+      expect(result.passed, `${场景}: 应通过`).toBe(true);
+    }
   });
 
   // ==================== E4 存在性 ====================
-  it('E4: 阶段内层 total>0 缺 evidence → 红', () => {
-    const result = run(
-      makeMatrix({
-        unitTest: makeSummaryNoEvidence(),
-        integrationTest: makeSummaryNoEvidence(),
-      }),
-      { phaseOption: 6 },
-    );
-    expect(result.passed).toBe(false);
-    expect(result.reasons.join('\n')).toMatch(/E4[\s\S]*单元测试[\s\S]*缺 evidence/);
-    expect(result.reasons.join('\n')).toMatch(/E4[\s\S]*集成测试/);
+  it('E4 违规行（3 态：缺 evidence / 旧 cutoff 仍阻断 / 空白 command）', () => {
+    for (const [场景, overrides, options, markers, assertCounts, assertLegacyEmpty] of [
+      [
+        '阶段内层 total>0 缺 evidence',
+        { unitTest: makeSummaryNoEvidence(), integrationTest: makeSummaryNoEvidence() },
+        { phaseOption: 6 },
+        [/E4[\s\S]*单元测试[\s\S]*缺 evidence/, /E4[\s\S]*集成测试/],
+        false,
+        false,
+      ],
+      [
+        'lastUpdated 早于旧 cutoff 仍须阻断，时间戳不得作为 legacy 放行',
+        { lastUpdated: BEFORE_CUTOFF, unitTest: makeSummaryNoEvidence(), integrationTest: makeSummaryNoEvidence() },
+        { phaseOption: 6 },
+        [/E4[\s\S]*单元测试[\s\S]*缺 evidence/],
+        false,
+        true,
+      ],
+      [
+        'evidence.command 仅空白时须阻断，不能以对象存在替代可执行命令',
+        { unitTest: makeSummary({ evidence: makeEvidence({ command: '   ' }) }) },
+        {},
+        [/\[schema\][\s\S]*command/, /E4[\s\S]*单元测试[\s\S]*无效/],
+        true,
+        true,
+      ],
+    ] as const) {
+      const result = run(makeMatrix(overrides), options);
+      expect(result.passed, `${场景}: 应 fail`).toBe(false);
+      for (const marker of markers) {
+        expect(result.reasons.join('\n'), `${场景}: 应含 ${marker}`).toMatch(marker);
+      }
+      if (assertCounts) {
+        expect(result.testEvidence, `${场景}: e-rule 计数应锁定`).toMatchObject({
+          checked: 4,
+          withEvidence: 3,
+          missing: 1,
+          e4: 1,
+          legacy: 0,
+        });
+      }
+      if (assertLegacyEmpty) {
+        expect(result.legacy ?? [], `${场景}: legacy 放行通道应为空`).toEqual([]);
+      }
+    }
   });
 
-  it('E4: lastUpdated 早于旧 cutoff 仍须阻断，时间戳不得作为 legacy 放行', () => {
-    const result = run(
-      makeMatrix({
-        lastUpdated: BEFORE_CUTOFF,
-        unitTest: makeSummaryNoEvidence(),
-        integrationTest: makeSummaryNoEvidence(),
-      }),
-      { phaseOption: 6 },
-    );
-    expect(result.passed).toBe(false);
-    expect(result.reasons.join('\n')).toMatch(/E4[\s\S]*单元测试[\s\S]*缺 evidence/);
-    expect(result.legacy ?? []).toEqual([]);
-  });
-
-  it('E4: evidence.command 仅空白时须阻断，不能以对象存在替代可执行命令', () => {
-    const result = run(
-      makeMatrix({
-        unitTest: makeSummary({ evidence: makeEvidence({ command: '   ' }) }),
-      }),
-    );
-    expect(result.passed).toBe(false);
-    expect(result.reasons.join('\n')).toMatch(/\[schema\][\s\S]*command/);
-    expect(result.reasons.join('\n')).toMatch(/E4[\s\S]*单元测试[\s\S]*无效/);
-    expect(result.testEvidence).toMatchObject({
-      checked: 4,
-      withEvidence: 3,
-      missing: 1,
-      e4: 1,
-      legacy: 0,
-    });
-    expect(result.legacy ?? []).toEqual([]);
-  });
-
-  it('E4: lastUpdated 不可解析 → 红（时间戳不参与放行）', () => {
-    const result = run(
-      makeMatrix({
-        lastUpdated: 'not-a-date',
-        unitTest: makeSummaryNoEvidence(),
-        integrationTest: makeSummaryNoEvidence(),
-      }),
-      { phaseOption: 6 },
-    );
-    expect(result.passed).toBe(false);
-    expect(result.reasons.join('\n')).toMatch(/E4/);
-    expect(result.legacy ?? []).toEqual([]);
-  });
-
-  it('E4: lastUpdated 缺失 → 红（时间戳不参与放行）', () => {
-    const result = run(
-      makeMatrix({
-        lastUpdated: undefined,
-        unitTest: makeSummaryNoEvidence(),
-        integrationTest: makeSummaryNoEvidence(),
-      }),
-      { phaseOption: 6 },
-    );
-    expect(result.passed).toBe(false);
-    expect(result.reasons.join('\n')).toMatch(/E4/);
+  it('E4 时间戳不参与放行行（2 态：lastUpdated 不可解析 / lastUpdated 缺失）', () => {
+    for (const [场景, overrides, assertLegacyEmpty] of [
+      [
+        'lastUpdated 不可解析',
+        { lastUpdated: 'not-a-date', unitTest: makeSummaryNoEvidence(), integrationTest: makeSummaryNoEvidence() },
+        true,
+      ],
+      [
+        'lastUpdated 缺失',
+        { lastUpdated: undefined, unitTest: makeSummaryNoEvidence(), integrationTest: makeSummaryNoEvidence() },
+        false,
+      ],
+    ] as const) {
+      const result = run(makeMatrix(overrides), { phaseOption: 6 });
+      expect(result.passed, `${场景}: 应 fail`).toBe(false);
+      expect(result.reasons.join('\n'), `${场景}: 应报 E4`).toMatch(/E4/);
+      if (assertLegacyEmpty) {
+        expect(result.legacy ?? [], `${场景}: legacy 放行通道应为空`).toEqual([]);
+      }
+    }
   });
 
   it('E4: total=0 的层不要求 evidence（不产生 E4 违规；由既有「无用例」规则拦截）', () => {

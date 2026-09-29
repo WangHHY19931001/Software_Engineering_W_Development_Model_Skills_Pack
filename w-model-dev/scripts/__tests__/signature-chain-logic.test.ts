@@ -23,22 +23,25 @@ describe('signature-chain-logic R1-R10', () => {
     expect(result.rulesFailed).not.toContain('R1');
   });
 
-  it('R1 bad-missing-V 失败', () => {
-    const entries = loadJsonl('bad-missing-V.jsonl');
-    const result = checkSignatureChain(entries, { phase: 1 });
-    expect(result.rulesFailed).toContain('R1');
-  });
-
-  it('R2 bad-broken-chain 失败', () => {
-    const entries = loadJsonl('bad-broken-chain.jsonl');
-    const result = checkSignatureChain(entries, { phase: 1 });
-    expect(result.rulesFailed).toContain('R2');
-  });
-
-  it('R3 bad-backdated 失败', () => {
-    const entries = loadJsonl('bad-backdated.jsonl');
-    const result = checkSignatureChain(entries, { phase: 1 });
-    expect(result.rulesFailed).toContain('R3');
+  it('R1-R10 负例 fixtures（10 个 bad-*.jsonl 逐 fixture 具名，R8 附 existingPaths 选项）', () => {
+    const rows: Array<[fixture: string, 期望规则: string, options?: { existingPaths?: Set<string> }]> = [
+      ['bad-missing-V.jsonl', 'R1'],
+      ['bad-broken-chain.jsonl', 'R2'],
+      ['bad-backdated.jsonl', 'R3'],
+      ['bad-O-self-sign.jsonl', 'R5'],
+      ['bad-tampered-hash.jsonl', 'R6'],
+      ['bad-dangling-source.jsonl', 'R7'],
+      ['bad-missing-artifact.jsonl', 'R8', { existingPaths: new Set<string>() }],
+      ['bad-S-consumes-G.jsonl', 'R9'],
+      ['bad-R-consumes-S.jsonl', 'R9'],
+      ['bad-O-bypass-G.jsonl', 'R10'],
+    ];
+    for (const [fixture, 期望规则, options] of rows) {
+      const entries = loadJsonl(fixture);
+      // R8 needs existingPaths — pass an empty set so the missing artifact is detected
+      const result = checkSignatureChain(entries, { phase: 1, ...options });
+      expect(result.rulesFailed, `${fixture}: 应报 ${期望规则}`).toContain(期望规则);
+    }
   });
 
   it('bad-O-produce（非法角色 X）被 schema role enum 前置拦截', () => {
@@ -46,49 +49,6 @@ describe('signature-chain-logic R1-R10', () => {
     const result = checkSignatureChain(entries, { phase: 1 });
     expect(result.rulesFailed).toContain('R1');
     expect(result.violations.some((v) => v.startsWith('[schema]'))).toBe(true);
-  });
-
-  it('R5 bad-O-self-sign 失败（代签检测）', () => {
-    const entries = loadJsonl('bad-O-self-sign.jsonl');
-    const result = checkSignatureChain(entries, { phase: 1 });
-    expect(result.rulesFailed).toContain('R5');
-  });
-
-  it('R6 bad-tampered-hash 失败（防篡改）', () => {
-    const entries = loadJsonl('bad-tampered-hash.jsonl');
-    const result = checkSignatureChain(entries, { phase: 1 });
-    expect(result.rulesFailed).toContain('R6');
-  });
-
-  it('R7 bad-dangling-source 失败（悬空来源）', () => {
-    const entries = loadJsonl('bad-dangling-source.jsonl');
-    const result = checkSignatureChain(entries, { phase: 1 });
-    expect(result.rulesFailed).toContain('R7');
-  });
-
-  it('R8 bad-missing-artifact 失败（缺失产物）', () => {
-    const entries = loadJsonl('bad-missing-artifact.jsonl');
-    // R8 needs existingPaths — pass an empty set so the missing artifact is detected
-    const result = checkSignatureChain(entries, { phase: 1, existingPaths: new Set<string>() });
-    expect(result.rulesFailed).toContain('R8');
-  });
-
-  it('R9 bad-S-consumes-G 失败（越权消费）', () => {
-    const entries = loadJsonl('bad-S-consumes-G.jsonl');
-    const result = checkSignatureChain(entries, { phase: 1 });
-    expect(result.rulesFailed).toContain('R9');
-  });
-
-  it('R9 bad-R-consumes-S 失败（R 不得消费 S）', () => {
-    const entries = loadJsonl('bad-R-consumes-S.jsonl');
-    const result = checkSignatureChain(entries, { phase: 1 });
-    expect(result.rulesFailed).toContain('R9');
-  });
-
-  it('R10 bad-O-bypass-G 失败（绕过门禁）', () => {
-    const entries = loadJsonl('bad-O-bypass-G.jsonl');
-    const result = checkSignatureChain(entries, { phase: 1 });
-    expect(result.rulesFailed).toContain('R10');
   });
 
   it('computeSigHash 一致性', () => {
@@ -150,7 +110,7 @@ function entry(over: {
   role?: SignatureChainEntry['role'];
   action?: string;
   targetKind?: SignatureChainEntry['targetKind'];
-  sourceRoles?: SignatureChainEntry['inputProvenance']['sourceArtifacts'][number]['sourceRole'][];
+  sourceRoles?: readonly SignatureChainEntry['inputProvenance']['sourceArtifacts'][number]['sourceRole'][];
 }): SignatureChainEntry {
   const role = over.role ?? 'S';
   const sourceRoles = over.sourceRoles ?? [];
@@ -180,48 +140,63 @@ function entry(over: {
 }
 
 describe('signature-chain-logic D-1 返工来源例外', () => {
-  it('S + fix + 消费 R → 放行（D-1 例外，反模式 #18 守护的正面路径）', () => {
-    const r = checkSignatureChain([entry({ role: 'S', action: 'fix', sourceRoles: ['R'] })]);
-    expect(r.violations.filter((v) => v.startsWith('R9'))).toEqual([]);
-    expect(r.rulesFailed).not.toContain('R9');
+  it('D-1 放行行（3 态：S@fix 消费 R / V@rootcause 消费 R / R@preventive 消费 S）', () => {
+    for (const [场景, over, schemaClean] of [
+      [
+        'S + fix + 消费 R → 放行（D-1 例外，反模式 #18 守护的正面路径）',
+        { role: 'S', action: 'fix', sourceRoles: ['R'] },
+        false,
+      ],
+      [
+        'V + review + targetKind=rootcause + 消费 R → 放行（V 复审 RootCauseReport）',
+        { role: 'V', action: 'review', sourceRoles: ['R'], targetKind: 'rootcause' },
+        true,
+      ],
+      [
+        'R + locate + targetKind=preventive + 消费 S → 放行（R3 预防性审查）',
+        { role: 'R', action: 'locate', sourceRoles: ['S'], targetKind: 'preventive' },
+        true,
+      ],
+    ] as const) {
+      const r = checkSignatureChain([entry(over)]);
+      if (schemaClean) {
+        expect(
+          r.violations.filter((v) => v.startsWith('[schema]')),
+          `${场景}: targetKind 须通过 schema`,
+        ).toEqual([]);
+      }
+      expect(
+        r.violations.filter((v) => v.startsWith('R9')),
+        `${场景}: 应无 R9 violation`,
+      ).toEqual([]);
+      expect(r.rulesFailed, `${场景}: R9 不应失败`).not.toContain('R9');
+    }
   });
 
-  it('S + produce + 消费 R → 仍拒（#18 守护：例外仅限 fix/emergency-fix）', () => {
-    const r = checkSignatureChain([entry({ role: 'S', action: 'produce', sourceRoles: ['R'] })]);
-    expect(r.violations).toEqual(expect.arrayContaining([expect.stringMatching(/R9: .*角色 S 不得消费 R/)]));
-    expect(r.rulesFailed).toContain('R9');
-  });
-
-  it('V + review + targetKind=rootcause + 消费 R → 放行（V 复审 RootCauseReport）', () => {
-    const r = checkSignatureChain([
-      entry({ role: 'V', action: 'review', sourceRoles: ['R'], targetKind: 'rootcause' }),
-    ]);
-    expect(r.violations.filter((v) => v.startsWith('[schema]'))).toEqual([]); // targetKind 须通过 schema
-    expect(r.violations.filter((v) => v.startsWith('R9'))).toEqual([]);
-    expect(r.rulesFailed).not.toContain('R9');
-  });
-
-  it('V + review + targetKind=standard + 消费 R → 仍拒', () => {
-    const r = checkSignatureChain([entry({ role: 'V', action: 'review', sourceRoles: ['R'], targetKind: 'standard' })]);
-    expect(r.violations).toEqual(expect.arrayContaining([expect.stringMatching(/R9: .*角色 V 不得消费 R/)]));
-    expect(r.rulesFailed).toContain('R9');
-  });
-
-  it('R + locate + targetKind=preventive + 消费 S → 放行（R3 预防性审查）', () => {
-    const r = checkSignatureChain([
-      entry({ role: 'R', action: 'locate', sourceRoles: ['S'], targetKind: 'preventive' }),
-    ]);
-    expect(r.violations.filter((v) => v.startsWith('[schema]'))).toEqual([]);
-    expect(r.violations.filter((v) => v.startsWith('R9'))).toEqual([]);
-    expect(r.rulesFailed).not.toContain('R9');
-  });
-
-  it('R + locate + targetKind=rootcause + 消费 S → 仍拒', () => {
-    const r = checkSignatureChain([
-      entry({ role: 'R', action: 'locate', sourceRoles: ['S'], targetKind: 'rootcause' }),
-    ]);
-    expect(r.violations).toEqual(expect.arrayContaining([expect.stringMatching(/R9: .*角色 R 不得消费 S/)]));
-    expect(r.rulesFailed).toContain('R9');
+  it('D-1 拒绝行（3 态：S@produce 消费 R / V@standard 消费 R / R@rootcause 消费 S）', () => {
+    for (const [场景, over, 期望片段] of [
+      [
+        'S + produce + 消费 R → 仍拒（#18 守护：例外仅限 fix/emergency-fix）',
+        { role: 'S', action: 'produce', sourceRoles: ['R'] },
+        '角色 S 不得消费 R',
+      ],
+      [
+        'V + review + targetKind=standard + 消费 R → 仍拒',
+        { role: 'V', action: 'review', sourceRoles: ['R'], targetKind: 'standard' },
+        '角色 V 不得消费 R',
+      ],
+      [
+        'R + locate + targetKind=rootcause + 消费 S → 仍拒',
+        { role: 'R', action: 'locate', sourceRoles: ['S'], targetKind: 'rootcause' },
+        '角色 R 不得消费 S',
+      ],
+    ] as const) {
+      const r = checkSignatureChain([entry(over)]);
+      expect(r.violations, `${场景}: 应报 R9 并含「${期望片段}」`).toEqual(
+        expect.arrayContaining([expect.stringMatching(new RegExp(`R9: .*${期望片段}`))]),
+      );
+      expect(r.rulesFailed, `${场景}: R9 应失败`).toContain('R9');
+    }
   });
 
   // 裁定 A：targetKind 是不入哈希的元数据——改哈希公式会让全部既有签名链（demo 125 环）失效

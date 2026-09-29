@@ -84,43 +84,41 @@ describe('check-budget --phase 形态统一（D3/I-4）', () => {
 });
 
 describe('check-state-machine-consistency 结构门（D3/I-5）', () => {
-  it('顶层数组输入 → exit 2 STRUCTURE_INVALID（原「全空合法图」exit 0）', async () => {
-    const f = path.join(tmpDir, 'array.json');
-    await fs.writeFile(f, '[{"designStates":["a"]}]', 'utf-8');
-    const r = runCli('check-state-machine-consistency.ts', [f]);
-    expect(r.code).toBe(2);
-    expect(errorCategory(r.stdout)).toBe('STRUCTURE_INVALID');
-  });
-
-  it('顶层标量输入 → exit 2 STRUCTURE_INVALID', async () => {
-    const f = path.join(tmpDir, 'scalar.json');
-    await fs.writeFile(f, '"just-a-string"', 'utf-8');
-    const r = runCli('check-state-machine-consistency.ts', [f]);
-    expect(r.code).toBe(2);
-    expect(errorCategory(r.stdout)).toBe('STRUCTURE_INVALID');
-  });
-
-  it('顶层对象缺四数组字段 → exit 2 STRUCTURE_INVALID（字段形状门）', async () => {
-    const f = path.join(tmpDir, 'wrong-fields.json');
-    await fs.writeFile(f, '{"designStates":"not-an-array"}', 'utf-8');
-    const r = runCli('check-state-machine-consistency.ts', [f]);
-    expect(r.code).toBe(2);
-    expect(errorCategory(r.stdout)).toBe('STRUCTURE_INVALID');
-  });
+  it('顶层非对象输入 → exit 2 STRUCTURE_INVALID（4 态：数组 / 标量 / 缺字段对象 / check-tla-model 非对象）', async () => {
+    for (const [形状名, script, fileName, content] of [
+      [
+        '顶层数组输入（原「全空合法图」exit 0）',
+        'check-state-machine-consistency.ts',
+        'array.json',
+        '[{"designStates":["a"]}]',
+      ],
+      ['顶层标量输入', 'check-state-machine-consistency.ts', 'scalar.json', '"just-a-string"'],
+      [
+        '顶层对象缺四数组字段（字段形状门）',
+        'check-state-machine-consistency.ts',
+        'wrong-fields.json',
+        '{"designStates":"not-an-array"}',
+      ],
+      [
+        'check-tla-model 顶层非对象 manifest（未传 --phase，原 ARG_INVALID「无法确定 phase」）',
+        'check-tla-model.ts',
+        'array-manifest.json',
+        '[{"specs":[]}]',
+      ],
+    ] as const) {
+      const f = path.join(tmpDir, fileName);
+      await fs.writeFile(f, content, 'utf-8');
+      const r = runCli(script, [f]);
+      expect(r.code, `${形状名}: 应 exit 2`).toBe(2);
+      expect(errorCategory(r.stdout), `${形状名}: ERROR_JSON.category 应为 STRUCTURE_INVALID`).toBe(
+        'STRUCTURE_INVALID',
+      );
+    }
+  }, 150_000);
 
   it('合法对象输入 → exit 0（行为不变）', () => {
     const r = runCli('check-state-machine-consistency.ts', [VALID_STATE_MACHINE]);
     expect(r.code).toBe(0);
-  });
-});
-
-describe('check-tla-model 顶层分类对齐（F-G3-04）', () => {
-  it('顶层非对象 manifest（未传 --phase）→ exit 2 STRUCTURE_INVALID（原 ARG_INVALID「无法确定 phase」）', async () => {
-    const f = path.join(tmpDir, 'array-manifest.json');
-    await fs.writeFile(f, '[{"specs":[]}]', 'utf-8');
-    const r = runCli('check-tla-model.ts', [f]);
-    expect(r.code).toBe(2);
-    expect(errorCategory(r.stdout)).toBe('STRUCTURE_INVALID');
   });
 });
 
@@ -133,74 +131,68 @@ describe('check-preventive-review 裸 --phase 提示（D3/I-4）', () => {
   });
 });
 
-describe('plan-chunks 重复 --phase（D3/I-3 + 报错值与生效值一致）', () => {
-  it('--phase=1 --phase 9 重复 → exit 2「重复」（原 first-wins 放行）', async () => {
-    const f = path.join(tmpDir, 'input.md');
-    await fs.writeFile(f, '# A\\nbody', 'utf-8');
-    const r = runCli('plan-chunks.ts', [f, '--phase=1', '--phase', '9', '--node-type=REQ']);
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('ARG_INVALID');
-    expect(r.stderr).toContain('重复');
-  });
-
-  it('--phase=1 --phase=9 重复（同形态）→ exit 2「重复」', async () => {
-    const f = path.join(tmpDir, 'input.md');
-    await fs.writeFile(f, '# A\\nbody', 'utf-8');
-    const r = runCli('plan-chunks.ts', [f, '--node-type=REQ', '--phase=1', '--phase=9']);
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('重复');
-  });
-});
-
-describe('ensure-codegraph 重复 --phase（D3/I-3）', () => {
-  it('--phase 5 --phase=6 重复 → exit 2「重复」（原等号 last-wins）', () => {
-    const r = runCli('ensure-codegraph.ts', ['--phase', '5', '--phase=6', '--project-root', tmpDir, '--mode', 'light']);
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('ARG_INVALID');
-    expect(r.stderr).toContain('重复');
-  });
-
-  it('重复 --mode → exit 2「重复」（原 last-wins）', () => {
-    const r = runCli('ensure-codegraph.ts', [
-      '--phase=5',
-      '--project-root',
-      tmpDir,
-      '--mode',
-      'light',
-      '--mode',
-      'quick',
-    ]);
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('重复');
-  });
-});
-
-describe('check-code-tla-consistency 重复值 flag（D3/I-3）', () => {
-  it('重复 --manifest → exit 2 ARG_INVALID「重复」（原 first-wins 后续 FILE_NOT_FOUND）', () => {
-    const r = runCli('check-code-tla-consistency.ts', [
-      '--manifest=a.json',
-      '--manifest=b.json',
-      '--graph=g.json',
-      '--rtm=r.json',
-      '--src=.',
-    ]);
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('ARG_INVALID');
-    expect(r.stderr).toContain('重复');
-  });
-});
-
-describe('check-artifact-gate 重复值 flag（D3/I-3，Task 9 修复轮 1 守护）', () => {
-  // 守护进程内化 wrapper 的 DuplicateFlagError 分支：parseTicketsArg 的 parseFlagValue
-  // 对重复 --tickets= 直抛（check-artifact-gate.ts 4 处直抛点之一）。修复前该异常被
-  // main wrapper 归入 UNEXPECTED「脚本异常」（category 退化，违反 D3/I-3 契约）；
-  // 修复后与 runMain.catch 一致转 ARG_INVALID。真实子进程形态同样经 wrapper（runMain
-  // 调 main），本探针同时守护两形态的 ERROR_JSON.category。
-  it('重复 --tickets → exit 2 且 ERROR_JSON.category=ARG_INVALID「重复」（非 UNEXPECTED）', () => {
-    const r = runCli('check-artifact-gate.ts', ['--tickets=a.md', '--tickets=b.md']);
-    expect(r.code).toBe(2);
-    expect(r.stderr).toContain('ARG_INVALID');
-    expect(r.stderr).toContain('重复');
-    expect(errorCategory(r.stdout)).toBe('ARG_INVALID');
-  });
+describe('重复值 flag 统一（D3/I-3：六形态跨 CLI，报错值与生效值一致；Task 9 修复轮 1 守护）', () => {
+  // 守护进程内化 wrapper 的 DuplicateFlagError 分支：check-artifact-gate 行锁定 category
+  // 不退化（修复前 parseTicketsArg 的 DuplicateFlagError 被 main wrapper 归入 UNEXPECTED
+  // 「脚本异常」，违反 D3/I-3 契约；修复后与 runMain.catch 一致转 ARG_INVALID。真实子进程
+  // 形态同样经 wrapper（runMain 调 main），该行同时守护两形态的 ERROR_JSON.category。
+  it('重复值 flag（6 态跨 5 CLI）→ exit 2 ARG_INVALID「重复」', async () => {
+    for (const { 形态名, script, makeArgs, assertCategory } of [
+      {
+        形态名: 'plan-chunks --phase=1 --phase 9（混合形态，原 first-wins 放行）',
+        script: 'plan-chunks.ts',
+        makeArgs: async () => {
+          const f = path.join(tmpDir, 'input.md');
+          await fs.writeFile(f, '# A\\nbody', 'utf-8');
+          return [f, '--phase=1', '--phase', '9', '--node-type=REQ'];
+        },
+        assertCategory: false,
+      },
+      {
+        形态名: 'plan-chunks --phase=1 --phase=9（同形态）',
+        script: 'plan-chunks.ts',
+        makeArgs: async () => {
+          const f = path.join(tmpDir, 'input-equal.md');
+          await fs.writeFile(f, '# A\\nbody', 'utf-8');
+          return [f, '--node-type=REQ', '--phase=1', '--phase=9'];
+        },
+        assertCategory: false,
+      },
+      {
+        形态名: 'ensure-codegraph --phase 5 --phase=6（原等号 last-wins）',
+        script: 'ensure-codegraph.ts',
+        makeArgs: async () => ['--phase', '5', '--phase=6', '--project-root', tmpDir, '--mode', 'light'],
+        assertCategory: false,
+      },
+      {
+        形态名: 'ensure-codegraph 重复 --mode（原 last-wins）',
+        script: 'ensure-codegraph.ts',
+        makeArgs: async () => ['--phase=5', '--project-root', tmpDir, '--mode', 'light', '--mode', 'quick'],
+        assertCategory: false,
+      },
+      {
+        形态名: 'check-code-tla-consistency 重复 --manifest（原 first-wins 后续 FILE_NOT_FOUND）',
+        script: 'check-code-tla-consistency.ts',
+        makeArgs: async () => ['--manifest=a.json', '--manifest=b.json', '--graph=g.json', '--rtm=r.json', '--src=.'],
+        assertCategory: false,
+      },
+      {
+        形态名: 'check-artifact-gate 重复 --tickets（Task 9 守护：非 UNEXPECTED）',
+        script: 'check-artifact-gate.ts',
+        makeArgs: async () => ['--tickets=a.md', '--tickets=b.md'],
+        assertCategory: true,
+      },
+    ] as const) {
+      const args = await makeArgs();
+      const r = runCli(script, args);
+      expect(r.code, `${形态名}: 应 exit 2`).toBe(2);
+      expect(r.stderr, `${形态名}: stderr 应含 ARG_INVALID`).toContain('ARG_INVALID');
+      expect(r.stderr, `${形态名}: stderr 应含「重复」`).toContain('重复');
+      if (assertCategory) {
+        expect(errorCategory(r.stdout), `${形态名}: ERROR_JSON.category 应为 ARG_INVALID（非 UNEXPECTED）`).toBe(
+          'ARG_INVALID',
+        );
+      }
+    }
+  }, 180_000);
 });
