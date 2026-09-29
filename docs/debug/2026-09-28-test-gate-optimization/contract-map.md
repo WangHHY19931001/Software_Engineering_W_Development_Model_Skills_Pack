@@ -1,5 +1,7 @@
 # Wave 1 契约依赖地图（test-gate-optimization）
 
+> 勘误（2026-09-30）：统计节存在口径混用（如 83/85、6/8、4/2），以各节正文枚举为准；本文件为 Wave 1 时点证据快照，数字保留原貌不改写。
+
 > **用途**：Wave 2（改 SUBPROCESS 清单/测试文件）、Wave 4（重组 prepush 执行结构）、Wave 5（coverage 单口径化、audit 收敛）都会动到「有别的门禁/文档在断言的契约」。本地图登记四类契约的全部断言落点，让后续改动知道**谁在看着这些契约**——改动前先查本表，同步全部活体落点。
 >
 > **基线**：worktree `.worktrees/test-gate-optimization`，分支 `feat/test-gate-optimization`，HEAD `73ee2b23`（2026-09-28）。

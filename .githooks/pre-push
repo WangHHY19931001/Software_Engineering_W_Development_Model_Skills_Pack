@@ -322,7 +322,7 @@ audit_can_skip() {
     return 1
   fi
   grep -qiE \
-    '^npm (error|warn|err!)[[:space:]]+((code|errno)[[:space:]]+(ENOTFOUND|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|ECONNRESET|ENOTSUP|ENOAUDIT|E429)|(audit[[:space:]]+)?network([[:space:]:]|$)|problem related to network|NOT_IMPLEMENTED|does not support audit endpoint|.*socket hang up)' \
+    '^npm (error|warn|err!)[[:space:]]+((code|errno)[[:space:]]+(ENOTFOUND|ETIMEDOUT|ECONNREFUSED|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|ECONNRESET|ENOTSUP|ENOAUDIT|E429)|(audit[[:space:]]+)?network([[:space:]:]|$)|problem related to network connectivity|NOT_IMPLEMENTED|does not support audit endpoint|.*socket hang up)' \
     "$tmp_log"
 }
 
@@ -464,7 +464,7 @@ par_expect 12 "vitest 单元测试 + coverage 采集通过" 0 \
 #     skip 判定为枚举短表（2026-09-28 Wave 5/T2 收敛，详见 audit_can_skip 注释）：仅识别
 #     npm error/warn/err! 前缀行上的网络错误码枚举（ENOTFOUND/ETIMEDOUT/ECONNREFUSED/
 #     EAI_AGAIN/ENETUNREACH/EHOSTUNREACH/ECONNRESET/ENOTSUP/ENOAUDIT/E429）、network 词面
-#     （npm7 形态 `npm warn audit network` 亦识别）、problem related to network、
+#     （npm7 形态 `npm warn audit network` 亦识别）、problem related to network connectivity、
 #     NOT_IMPLEMENTED、does not support audit endpoint、socket hang up；原「registry 上下文
 #     404」「状态词同行 network/registry/request 锚定」「5xx errno/状态文本」等分支已撤销——
 #     未识别一律 fail-closed 阻断（裸 code E404、裸状态词保持阻断）。任意漏洞报告、JSON

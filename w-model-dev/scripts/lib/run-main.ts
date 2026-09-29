@@ -12,6 +12,9 @@ import { DuplicateFlagError } from './parse-args.js';
 export function runMain(main: () => Promise<void>): void {
   // Wave 2 进程内调用层：vitest worker 内 import 时不自执行（helpers/cli-invoker.ts
   // 显式调用 main(argv)）；真实子进程（tsx 直跑）永不设置 VITEST。
+  // 契约：真实子进程（tsx 直跑）的运行环境若被外部显式导出 VITEST，main 会被静默
+  // 跳过（无输出 exit 0）——CLI 运行环境不得设置 VITEST；这是进程内调用层的既定
+  // 权衡（vitest 内 import 不自执行 ⇄ 外部环境禁设）。
   if (process.env.VITEST) return;
   main().catch((err: unknown) => {
     if (err instanceof HandledCliError) return;
