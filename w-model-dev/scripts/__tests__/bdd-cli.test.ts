@@ -148,24 +148,30 @@ Invariant == state = "B" => done
     expect(JSON.parse(result.stdout)).toMatchObject({ exitCode: 0, passed: true });
   });
 
-  it.each([
-    ['phase 5 TLA requirement', 5, '--require-tla-equivalence'],
-    ['phase 1 cucumber requirement', 1, '--require-cucumber-report'],
-    ['phase 5 TLA assignment form', 5, '--require-tla-equivalence=true'],
-    ['phase 1 cucumber assignment form', 1, '--require-cucumber-report=true'],
-    ['misspelled require flag', 5, '--require-cucumber-reports'],
-    ['unknown require-like flag', 1, '--require-tla-equivalences'],
-    ['unknown flag', 5, '--not-a-real-flag'],
-  ])('rejects %s as an exit 2 argument combination', async (_caseName, phase, flag) => {
-    const manifest = await writeJson('.w-model/bdd-manifest.json', baseManifest(phase));
-    const graph = phase >= 2 ? await writeJson('.w-model/graph.json', { nodes: [] }) : undefined;
+  it('rejects all seven invalid require-flag combinations as exit 2 argument errors', async () => {
+    const combinations: Array<[string, number, string]> = [
+      ['phase 5 TLA requirement', 5, '--require-tla-equivalence'],
+      ['phase 1 cucumber requirement', 1, '--require-cucumber-report'],
+      ['phase 5 TLA assignment form', 5, '--require-tla-equivalence=true'],
+      ['phase 1 cucumber assignment form', 1, '--require-cucumber-report=true'],
+      ['misspelled require flag', 5, '--require-cucumber-reports'],
+      ['unknown require-like flag', 1, '--require-tla-equivalences'],
+      ['unknown flag', 5, '--not-a-real-flag'],
+    ];
 
-    const result = run([manifest, `--phase=${phase}`, ...(graph ? [`--graph=${graph}`] : []), flag]);
+    for (const [index, [caseName, phase, flag]] of combinations.entries()) {
+      // Each iteration prepares its own fixture/manifest so one failure cannot pollute the next.
+      const fixtureDir = `.w-model/require-combo-${index}`;
+      const manifest = await writeJson(`${fixtureDir}/bdd-manifest.json`, baseManifest(phase));
+      const graph = phase >= 2 ? await writeJson(`${fixtureDir}/graph.json`, { nodes: [] }) : undefined;
 
-    expect(result.code).toBe(2);
-    expect(result.stdout).toMatch(/^ERROR_JSON /);
-    expect(result.stdout).toContain(flag);
-  });
+      const result = run([manifest, `--phase=${phase}`, ...(graph ? [`--graph=${graph}`] : []), flag]);
+
+      expect(result.code, `case=${caseName} (flag=${flag}): expected exit code 2`).toBe(2);
+      expect(result.stdout, `case=${caseName} (flag=${flag}): expected an ERROR_JSON summary`).toMatch(/^ERROR_JSON /);
+      expect(result.stdout, `case=${caseName}: ERROR_JSON must echo the offending flag`).toContain(flag);
+    }
+  }, 60_000);
 
   it('rejects duplicate require flags as exit 2 instead of silently accepting a repeated option', async () => {
     const manifest = await writeJson('.w-model/bdd-manifest.json', baseManifest(5));
@@ -184,60 +190,76 @@ Invariant == state = "B" => done
     expect(result.stdout).toContain('--require-cucumber-report');
   });
 
-  it.each([
-    ['empty object', {}],
-    ['top-level array', []],
-    ['empty elements', { elements: [] }],
-    ['a step result without an execution status', { elements: [{ steps: [{ result: {} }] }] }],
-  ])('fails D5 with exit 1 for a required cucumber report containing %s', async (_caseName, reportValue) => {
-    const manifest = await writeJson('.w-model/bdd-manifest.json', baseManifest(5));
-    const graph = await writeJson('.w-model/graph.json', { nodes: [] });
-    const report = await writeJson('.w-model/cucumber-report.json', reportValue);
+  it('fails D5 with exit 1 for every invalid shape of a required cucumber report', async () => {
+    const shapes: Array<[string, unknown]> = [
+      ['empty object', {}],
+      ['top-level array', []],
+      ['empty elements', { elements: [] }],
+      ['a step result without an execution status', { elements: [{ steps: [{ result: {} }] }] }],
+    ];
 
-    const result = run([
-      manifest,
-      '--phase=5',
-      `--graph=${graph}`,
-      `--cucumber-report=${report}`,
-      '--require-cucumber-report',
-    ]);
+    for (const [index, [shapeName, reportValue]] of shapes.entries()) {
+      const fixtureDir = `.w-model/report-shape-${index}`;
+      const manifest = await writeJson(`${fixtureDir}/bdd-manifest.json`, baseManifest(5));
+      const graph = await writeJson(`${fixtureDir}/graph.json`, { nodes: [] });
+      const report = await writeJson(`${fixtureDir}/cucumber-report.json`, reportValue);
 
-    expect(result.code).toBe(1);
-    expect(JSON.parse(result.stdout)).toMatchObject({
-      exitCode: 1,
-      reasons: expect.arrayContaining([expect.stringContaining('[D5] required cucumber report')]),
-    });
-  });
+      const result = run([
+        manifest,
+        '--phase=5',
+        `--graph=${graph}`,
+        `--cucumber-report=${report}`,
+        '--require-cucumber-report',
+      ]);
 
-  it.each([
-    ['a fabricated status', { elements: [{ name: 'forged scenario', steps: [{ result: { status: 'fabricated' } }] }] }],
-    ['a skipped status', { elements: [{ name: 'skipped scenario', steps: [{ result: { status: 'skipped' } }] }] }],
-    ['a pending status', { elements: [{ name: 'pending scenario', steps: [{ result: { status: 'pending' } }] }] }],
-    [
-      'an undefined status',
-      { elements: [{ name: 'undefined scenario', steps: [{ result: { status: 'undefined' } }] }] },
-    ],
-    ['a failed status', { elements: [{ name: 'failed scenario', steps: [{ result: { status: 'failed' } }] }] }],
-    ['an anonymous element', { elements: [{ steps: [{ result: { status: 'passed' } }] }] }],
-  ])('fails D5 with exit 1 for required cucumber evidence containing %s', async (_caseName, reportValue) => {
-    const manifest = await writeJson('.w-model/bdd-manifest.json', baseManifest(5));
-    const graph = await writeJson('.w-model/graph.json', { nodes: [] });
-    const report = await writeJson('.w-model/cucumber-report.json', reportValue);
+      expect(result.code, `shape=${shapeName}: expected exit code 1`).toBe(1);
+      expect(
+        JSON.parse(result.stdout),
+        `shape=${shapeName}: expected a [D5] required cucumber report reason`,
+      ).toMatchObject({
+        exitCode: 1,
+        reasons: expect.arrayContaining([expect.stringContaining('[D5] required cucumber report')]),
+      });
+    }
+  }, 60_000);
 
-    const result = run([
-      manifest,
-      '--phase=5',
-      `--graph=${graph}`,
-      `--cucumber-report=${report}`,
-      '--require-cucumber-report',
-    ]);
+  it('fails D5 with exit 1 for required cucumber evidence containing an illegal execution status', async () => {
+    const statuses: Array<[string, unknown]> = [
+      [
+        'a fabricated status',
+        { elements: [{ name: 'forged scenario', steps: [{ result: { status: 'fabricated' } }] }] },
+      ],
+      ['a skipped status', { elements: [{ name: 'skipped scenario', steps: [{ result: { status: 'skipped' } }] }] }],
+      ['a pending status', { elements: [{ name: 'pending scenario', steps: [{ result: { status: 'pending' } }] }] }],
+      [
+        'an undefined status',
+        { elements: [{ name: 'undefined scenario', steps: [{ result: { status: 'undefined' } }] }] },
+      ],
+      ['a failed status', { elements: [{ name: 'failed scenario', steps: [{ result: { status: 'failed' } }] }] }],
+      ['an anonymous element', { elements: [{ steps: [{ result: { status: 'passed' } }] }] }],
+    ];
 
-    expect(result.code).toBe(1);
-    expect(JSON.parse(result.stdout)).toMatchObject({
-      exitCode: 1,
-      reasons: expect.arrayContaining([expect.stringContaining('[D5]')]),
-    });
-  });
+    for (const [index, [statusName, reportValue]] of statuses.entries()) {
+      const fixtureDir = `.w-model/execution-status-${index}`;
+      const manifest = await writeJson(`${fixtureDir}/bdd-manifest.json`, baseManifest(5));
+      const graph = await writeJson(`${fixtureDir}/graph.json`, { nodes: [] });
+      const report = await writeJson(`${fixtureDir}/cucumber-report.json`, reportValue);
+
+      const result = run([
+        manifest,
+        '--phase=5',
+        `--graph=${graph}`,
+        `--cucumber-report=${report}`,
+        '--require-cucumber-report',
+      ]);
+
+      expect(result.code, `status=${statusName}: expected exit code 1`).toBe(1);
+      expect(JSON.parse(result.stdout), `status=${statusName}: expected a [D5] reason`).toMatchObject({
+        exitCode: 1,
+        reasons: expect.arrayContaining([expect.stringContaining('[D5]')]),
+      });
+    }
+  }, 60_000);
 
   it('keeps a named passed Cucumber scenario as required execution evidence', async () => {
     const manifest = await writeJson('.w-model/bdd-manifest.json', baseManifest(5));

@@ -299,7 +299,7 @@
 | **净减量**        | **755（≥531 ✓）**          |
 | 对账              | 2631 − 755 = 1876 ≤ 2100 ✓ |
 
-> 合计由脚本对表格第 3/4 列现算复核（276 行全部通过 `cells[3]`/`cells[4]` 数值解析）；每行 聚合后例数 = 循环组数（含违规/通过分组）。审查修复记录：A4 两行 10→9（源码 9+9 实数，初版 grep 误计类型声明字段）；补 state-write-logic 两行（:506/:803 回读后确认为同构数据表，4→2）。
+> 合计由脚本对表格第 3/4 列现算复核（276 行全部通过 `cells[3]`/`cells[4]` 数值解析）；每行 聚合后例数 = 循环组数（含违规/通过分组）。审查修复记录：A4 两行 10→9（源码 9+9 实数，初版 grep 误计类型声明字段）；补 state-write-logic 两行（:506/:803 回读后确认为同构数据表，4→2）。已裁定口径（修复轮 3 订正）：候选 276 族 / 已裁定 276 族（补遗后，见文末「执行登记 · 补遗（修复轮 3）」）。
 
 ## 排除登记（不碰清单，未列入候选表）
 
@@ -340,7 +340,7 @@
 ## 执行登记 · 第 A 批
 
 - 日期：2026-09-29（Wave 3 用例合并第 A 批执行）
-- 文件：docs-consistency-logic / platform-deps-hook / gate-enhancement / run-log-logic / artifact-gate-assets（5 文件，73 族）
+- 文件：docs-consistency-logic / platform-deps-hook / gate-enhancement / run-log-logic / artifact-gate-assets（5 文件，70 族）
 - 形态纪律：全部为「循环内多断言 / 逐条具名断言」，it.each 已全部降级为循环；platform-deps-hook 与 artifact-gate-assets 的 phase/audit 族每迭代自备 fixture（临时目录在循环体内重建）。
 
 | 文件                           | 族                                         | 裁定                                                                                                                                                                      |
@@ -774,3 +774,18 @@
 | **合计**                            | **净减 42**                   | **净减 42（267→225）**              | 零退回；23 文件逐文件 vitest 全绿 + 23 文件合并复跑全绿；prettier 全过；typecheck 全过 |
 
 > 排除面核对：本批 23 文件的排除清单行与非候选（state-write-logic 并发/锁语义主体与 --recover-stale-lock 审计链、check-coding-plan C1/C1b exit-2 基础探针同参行与 git fixture 用例、run-main VITEST 守卫两例、gate-logic/state-machine-logic 正向与 transitionKey/结构完整性 it、security-scan 基线豁免/新发现/源行不可读三 it、budget-cli-wiring R6 触发 exit 1 / 未提供跳过 / --json 三 it、bdd-logic D8 全覆盖通过行与全文件其余 39 例、checkpoint-logic R3/S18 describe 与 R0 ①④ 正向态、eval-runner self-check 双 it、skill-metadata name/schemaVersion/doctor 三 it、check-code-tla-consistency CLI 真实子进程守卫 it 等）一律未触碰；NEGATIVE-COVERAGE 登记面（fixture 载体：state-machine-logic / gate-logic；invocation 载体：budget-cli-wiring / checkpoint-r0-bootstrap-cli / project-read-validation / check-code-tla-consistency）聚合后循环行逐条具名，登记所需失败形态仍可由循环行具名触发。
+
+## 执行登记 · 补遗（修复轮 3）
+
+- 日期：2026-09-29（审查修复轮 3：批次切分遗漏补全）
+- 文件：bdd-cli（1 文件，3 族，17→3，-14 例）
+- 遗漏原因：五批文件清单切分时遗漏 rank 15 文件 bdd-cli.test.ts（候选表 3 行在表、却未分派进任何批次），致登记实数 273 ≠ 候选 276；控制者账本已记该遗漏。
+- 形态纪律：三族均按候选表保全方式转为**标准循环内多断言**（禁 it.each）；expect 消息逐条目指名（`case=` / `shape=` / `status=` + flag 回显）；require 组合族每迭代自备 manifest/graph 夹具（独立子目录 `.w-model/require-combo-N`，临时目录仍由 beforeEach 每测试重建）；聚合 it 显式 timeout 60s；D5 真实 TLA+ 快照等价路径等非候选用例一律未触碰。
+
+| 文件            | 族                                 | 裁定                                                                                                                                               |
+| --------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| bdd-cli.test.ts | it.each require 参数组合（7 组合） | 仍被覆盖（→「rejects all seven invalid require-flag combinations as exit 2 argument errors」单 it 循环，`case=<名>` 具名 + flag 回显断言逐行保留） |
+| bdd-cli.test.ts | it.each D5 报告形状（4 形态）      | 仍被覆盖（→「fails D5 with exit 1 for every invalid shape of a required cucumber report」单 it 循环，`shape=<名>` 具名）                           |
+| bdd-cli.test.ts | it.each 非法执行状态（6 形态）     | 仍被覆盖（→「fails D5 with exit 1 for required cucumber evidence containing an illegal execution status」单 it 循环，`status=<名>` 具名）          |
+
+- 补遗后口径：候选 276 族 / 已裁定 276 族（补遗后）。bdd-cli 文件级实测 27→13（-14），全量预期 1888→1874（以补遗后收口运行 JSON 为准）。
