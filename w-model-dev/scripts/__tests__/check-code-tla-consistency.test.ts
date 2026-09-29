@@ -17,8 +17,8 @@
  *      不直接调用 main。
  *
  * 本文件含真实子进程（经 lib/run-sync.ts 的 runSync（见用例 3）），故已登记进
- * `config/vitest.config.ts` 的 SUBPROCESS_TEST_FILES（cli-serial-a/b/c/d
- * 组内串行、组间并行，2026-09-29 Wave 2.3 拆两组、2026-09-30 用户裁定拆四组负载均衡）。
+ * `config/vitest.config.ts` 的 SUBPROCESS_TEST_FILES（cli-serial-a / cli-serial-b
+ * 组内串行、组间并行，2026-09-29 Wave 2.3 拆两组）。
  */
 
 import { promises as fs } from 'node:fs';
