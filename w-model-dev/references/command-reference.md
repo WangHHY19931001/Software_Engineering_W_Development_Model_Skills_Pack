@@ -455,7 +455,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 
 - **速查行**：`npx tsx w-model-dev/scripts/cli/check-docs-consistency.ts [repo-root] [--json] [--spawn-vitest]`（`repo-root` 缺省 cwd；`--json` 输出单行机器可读报告；`--spawn-vitest` 为显式自采集逃生口，见下）
 - **Vitest 动态 facts 三态（门禁瘦身 T3）**：
-  1. **受控工件快路径**：`WM_VITEST_COUNT_FILE` + `WM_VITEST_PROVENANCE_FILE` 在场（pre-push 第 15 项注入）→ 直接读取同次成功运行，不 spawn；**fail-closed 一字不变**（provenance 缺失、hash / commitSha / 成功状态任一不可信 → exit 1）；
+  1. **受控工件快路径**：`WM_VITEST_COUNT_FILE` + `WM_VITEST_PROVENANCE_FILE` 在场（pre-push 第 15 项注入；Wave 4 三车道重组后第 15 项为 L3 尾车道项——跑完全部 L1/L2 车道并汇总后执行，复用 L2 同次 JSON 与 provenance）→ 直接读取同次成功运行，不 spawn；**fail-closed 一字不变**（provenance 缺失、hash / commitSha / 成功状态任一不可信 → exit 1）；
   2. **显式自采集**：工件不在场且显式 `--spawn-vitest` → spawn 全量 vitest 并自生成同目录 provenance（墙钟上限 `VITEST_SPAWN_TIMEOUT_MS`；全量套件约 30 分钟），供无 prepush 场景；
   3. **跳过（独立运行缺省）**：工件不在场且无 flag → **不 spawn**；`diagnostics` 输出非阻断诊断 `○ 动态 facts 未校验：未提供受控 vitest 工件（WM_VITEST_COUNT_FILE / WM_VITEST_PROVENANCE_FILE）；终局验收经 npm run prepush 覆盖（fail-closed）。如需自采集请显式加 --spawn-vitest（约 30 分钟）。`，`dynamicMeasurements` 置 `null`（JSON 键保持在场、形状稳定；`null` = 本次跳过，不是「测量为 0」）；静态检查全跑，退出码仅由静态违规决定。
 - **弱校验前提**：态 3 只用于任务级 / 文档级快速迭代；**终局验收一律 `npm run prepush`**（AGENTS §6「迭代可走快速车道，验收必须全量」）——prepush 内该门禁走态 1，动态 facts 仍 fail-closed。

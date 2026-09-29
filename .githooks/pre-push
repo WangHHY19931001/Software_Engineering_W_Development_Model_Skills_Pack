@@ -17,6 +17,9 @@
 #   - eval/**：评估资产（语料 / mappings / runner）——触发边界断言是活体门禁（第 19 项）
 #   - docs/*.md（* 跨 /：实际命中 docs/ 任意层级 *.md，含 docs/changes、docs/superpowers
 #     归档——保持历史触发语义，不做收窄）
+#
+# 执行为三车道并行（Wave 4）：L1 并行车道 + L2 主车道同时发起、L3 尾车道复用 L2 产物；
+# 19 项清单与退出码契约不变；首错即停→全量汇总（跑完全部车道再判定，任一不符 exit 1）。
 
 set -euo pipefail
 
