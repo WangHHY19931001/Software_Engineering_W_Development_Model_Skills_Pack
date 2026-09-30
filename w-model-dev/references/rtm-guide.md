@@ -84,7 +84,7 @@ NFR/CON 行的 acceptanceTest 允许为 null（横切治理类豁免，由 `isCr
 - **E3 结果一致性**（只要该层填写了 `evidence` 即强制，与该层是否属于当前阶段、与 cutoff 无关）：`failed=0 && pending=0` ⇒ `exitCode=0`；`failed>0` ⇒ `exitCode≥1`（记录里有失败，就不可能来自一次绿色运行）；`failed=0 && pending>0` 不作约束（部分执行两种退出码都合理，如实不编码）。
 - **E4 存在性**：`lastUpdated` 不早于 cutoff 时，**当前阶段须校验的层**（阶段 5 = `unitTest`；6 = +`integrationTest`；7 = +`systemTest`；8 = +`acceptanceTest`）只要 `total>0` 就必须携带 `evidence`；缺失 → 违规（携带的 evidence 再由 E1~E3 校验合法性）。
 
-**阶段作用域**（`gate-logic.ts`）：**E4 只作用于当前阶段必须存在的层**（`PHASE_TEST_LAYERS`；阶段 1~4 无层，不触发 E4）——未到该阶段、或 `total=0` 的层不进入 `checked`，一律不触发 E4。**E1~E3 与阶段无关**：任何层（含未到阶段的层）只要携带 `evidence` 即强制校验（证据一旦出现就必须自洽）；未携带 `evidence` 的层不触发 E1~E3。
+**阶段作用域**（`gate-logic.ts`）：**E4 只作用于当前阶段必须存在的层**（`PHASE_TEST_LAYERS`；阶段 1~~4 无层，不触发 E4）——未到该阶段、或 `total=0` 的层不进入 `checked`，一律不触发 E4。**E1~E3 与阶段无关**：任何层（含未到阶段的层）只要携带 `evidence` 即强制校验（证据一旦出现就必须自洽）；未携带 `evidence` 的层不触发 E1~~E3。
 
 **cutoff 吸收**：cutoff = `2026-09-15T00:00:00Z`（M07/D-2 批准日零点 UTC）。
 
@@ -93,16 +93,16 @@ NFR/CON 行的 acceptanceTest 允许为 null（横切治理类豁免，由 `isCr
 
 **`GATE_JSON.testEvidence` 完整形状（8 键，键恒存在；结构失败早退路径不产出该对象）**：
 
-| 键             | 类型   | 含义                                                                            |
-| -------------- | ------ | ------------------------------------------------------------------------------- |
-| `checked`      | number | 阶段范围内且 `total>0`、进入 E4 存在性判定的层数                                 |
-| `withEvidence` | number | `checked` 中携带 `evidence` 对象的层数                                           |
+| 键             | 类型   | 含义                                                                                   |
+| -------------- | ------ | -------------------------------------------------------------------------------------- |
+| `checked`      | number | 阶段范围内且 `total>0`、进入 E4 存在性判定的层数                                       |
+| `withEvidence` | number | `checked` 中携带 `evidence` 对象的层数                                                 |
 | `missing`      | number | `checked` 中 cutoff 后缺 `evidence` 的层数（`=== e4`，即因缺证据未通过的存在性检查数） |
-| `legacy`       | number | `checked` 中 `lastUpdated` 早于 cutoff、被非阻断吸收的层数                       |
-| `e1`           | number | E1 配对违规计数                                                                  |
-| `e2`           | number | E2 哈希核验违规计数                                                              |
-| `e3`           | number | E3 结果一致性违规计数                                                            |
-| `e4`           | number | E4 存在性违规计数（`=== missing`）                                               |
+| `legacy`       | number | `checked` 中 `lastUpdated` 早于 cutoff、被非阻断吸收的层数                             |
+| `e1`           | number | E1 配对违规计数                                                                        |
+| `e2`           | number | E2 哈希核验违规计数                                                                    |
+| `e3`           | number | E3 结果一致性违规计数                                                                  |
+| `e4`           | number | E4 存在性违规计数（`=== missing`）                                                     |
 
 > **同名不同型，勿混用**：`testEvidence.legacy` 是**数值**（被 legacy 吸收的层数）；`GATE_JSON` **顶层** `legacy` 是**非阻断诊断字符串数组**（`LEGACY_TEST_EVIDENCE` 消息，仅非空时出现）。二者名字相同，但类型、层级与作用均不同。
 
@@ -163,14 +163,14 @@ RTM 与各阶段文档使用两套 ID，按用途区分，不可混用：
 
 `codeModule` 字段须按行类型填写不同格式：
 
-| 行类型 | 格式 | 正则 | 示例 |
-| ------ | ---- | ---- | ---- |
-| REQ 行 | `SD-<id>:src/<path>:L<start>[-<end>]` | `^SD-[^:]+:src\/[^:]+:L\d+(-\d+)?$` | `SD-5.2.1:src/auth/login.ts:L42-58` |
+| 行类型 | 格式                                        | 正则                                   | 示例                                 |
+| ------ | ------------------------------------------- | -------------------------------------- | ------------------------------------ |
+| REQ 行 | `SD-<id>:src/<path>:L<start>[-<end>]`       | `^SD-[^:]+:src\/[^:]+:L\d+(-\d+)?$`    | `SD-5.2.1:src/auth/login.ts:L42-58`  |
 | NFR 行 | `src/<path>:L<start>[-<end>]` 或整格 `横切` | `^src\/[^:]+:L\d+(-\d+)?$` 或 `^横切$` | `src/middleware/rateLimit.ts:L10-24` |
-| CON 行 | 同 NFR | 同 NFR | `横切` |
+| CON 行 | 同 NFR                                      | 同 NFR                                 | `横切`                               |
 
 **校验时机**：`check-artifact-gate.ts --phase=5` 强制校验。
-**校验逻辑**：按 `requirementId` 前缀（`REQ-` / `NFR-` / `CON-`）分支匹配正则。
+**校验逻辑**：按 `requirementId` 前缀（`REQ-` / `NFR-` / `CON-`）分支匹配正则。锚点行号约束：`start ≥ 1` 且 `start ≤ 该文件总行数`（开放形态无 `end` 亦受此约束）；若有 `end` 则 `end ≥ start` 且 `end ≤ 总行数`——SDMAP-3/4 经 CLI 注入面校验，覆盖 REQ/NFR/CON 全部行类型的条目。
 
 ### 2. 覆盖率计算公式
 
