@@ -15,7 +15,8 @@
  *
  * 调用方：
  *   - CLI 脚本 check-code-tla-consistency.ts（阶段5 编码后由 G 子代理执行）
- *   - gate-logic.ts 终检（仅复用维度1逻辑，校验 SD→codeModule 映射）
+ *   - gate-logic.ts 终检（批次1 起为独立 SDMAP 实现 checkSdToCodeModuleMapping；本文件 D1 反向
+ *     复用 gate-logic 的 parseCodeModuleEntries 做条目解析，保证两门禁同一 SDMAP 前缀精确语义）
  */
 
 import { createRequire } from 'node:module';
@@ -24,6 +25,7 @@ import type * as TsType from 'typescript';
 
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 import type { StructuredViolation } from '../lib/types.js';
+import { parseCodeModuleEntries, type CodeModuleEntry } from './gate-logic.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
@@ -34,8 +36,10 @@ const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
  * 命名：CODE_TLA_<类别>，对应四维度判定规则；INPUT/SCHEMA 对应输入形状与 schema 前置校验。
  *
  * 规则 ID → 设计依据映射（设计依据 SSoT §10.8.1 四维度算法）：
- *   - D1：维度1 SD→codeModule 映射完整性（SSoT §10.8.1 算法 1；阶段约束 P1.4：阶段5编码完成后
- *        必须回填 RTM.codeModule 列，格式 `SD-xxx:src/path/to/file.ts`，缺失即维度1 违规）
+ *   - D1：维度1 SD→codeModule 映射完整性（批次1 起为 SDMAP 前缀精确对账，与 gate-logic 同语义：
+ *        REQ 条目 SD 前缀与图节点 id 全等；结构化规则 ID 用 SDMAP-1/SDMAP-2，与 gate-logic 对齐。
+ *        P1.4：阶段5编码完成后必须回填 RTM.codeModule 列，格式
+ *        `SD-xxx:src/path/to/file.ts:L<start>[-<end>]`，缺失即维度1 违规）
  *   - D2：维度2 代码状态转移抽取（SSoT §10.8.1 算法 2：AST 抽取赋值/条件分支，无赋值即违规）
  *   - D3：维度3 Next 分支对应（SSoT §10.8.1 算法 3 + SSoT §3.4.6 P2.8 PascalCase→camelCase 自动映射 +
  *        P3.9 遍历 manifest 全部 specs 的 Next actions，不再仅限 L4）
@@ -154,30 +158,29 @@ export interface CodeTlaConsistencyInput {
 // ==================== 维度1：SD→codeModule 映射完整性 ====================
 
 /**
- * 维度1：SD→codeModule 映射完整性校验（spec §3.4.2 维度1；SSoT §10.8.1 算法 1）
+ * 维度1：SD→codeModule 映射完整性校验（批次1 SDMAP 前缀精确对账；规格 §4.2，与 gate-logic 同语义）
  *
  * 设计依据：
+ *   - 批次1 SDMAP（规格 §4.2）：废除拆段子串回退与 `${id}:` 数字特判，统一为 REQ 条目
+ *     SD 前缀与图节点 id 全等。条目解析复用 gate-logic 的 parseCodeModuleEntries（单一解析事实，
+ *     不复制第二份解析），保证同一 rtm/graph 输入两门禁同判定。
  *   - SSoT §10.8.1「代码-TLA+ 一致性回归」维度1：读取 graph.json 中所有 type=SD 节点，
- *     核验 rtm.json 中每个 SD 节点均有对应 codeModule 映射（多段匹配：SD id 分段后
- *     任一段长度≥2 出现在 codeModule 路径中），违反 → sdToCodeModule 维度失败。
+ *     核验 rtm.json 中每个 SD 节点均有对应 codeModule 映射，违反 → sdToCodeModule 维度失败。
  *   - SSoT §3.4.6 P1.4「RTM codeModule 回填时机」：阶段5编码完成后、code-TLA 一致性检查前
- *     必须回填 RTM.codeModule 列（格式 `SD-xxx:src/path/to/file.ts`，多个模块用逗号分隔），
- *     缺失 → 本维度退出码 1。
- *   - SSoT §3.4.18「codeModule 格式规范」：REQ 行匹配 `^SD-[\d.]+:src/.+\.(ts|js|py|java)$`。
- *   - verifier-spec.md §2.2：阶段 5 源代码评审用 targetKind=`code`，与 code-tla-consistency
- *     维度命名对齐。
+ *     必须回填 RTM.codeModule 列，缺失 → 本维度退出码 1。
  *
- * 校验逻辑：
- *   - 读 graph.json 提取所有 type=SD 的节点
- *   - 读 rtm.json 每行的 codeModule 字段
- *   - 校验：每个 SD 节点须有至少一个 codeModule 映射
- *   - 映射判定：SD id 去 "SD-" 前缀转小写 → 检查 codeModule 路径是否包含该 key
+ * 校验逻辑（双向，与 gate-logic checkSdToCodeModuleMapping 一致）：
+ *   - 第一向 图→RTM（SDMAP-1）：每个图 SD 节点 id 须存在至少一个 REQ 条目 sdId 全等
+ *   - 第二向 RTM→图（SDMAP-2）：REQ 条目 sdId 须在图 SD 节点集内（幽灵前缀拒收）
+ *   - 仅统计 requirementId 以 REQ- 开头的行；graph 无 SD 节点时双向均跳过（无可校验项，
+ *     与 gate-logic sdNodes 为空早退一致）
  *
  * 边界处理：
- *   - rtm 缺失 codeModule 行（codeModules 为空数组）时，所有 SD 节点均无法匹配 →
+ *   - rtm 缺失 codeModule 行（reqEntries 为空数组）时，所有 SD 节点均无法匹配 →
  *     视为违规逐条上报，而非跳过（「无 codeModule 时视为违规而非跳过」，与 P1.4
  *     阶段5必须回填的硬约束一致）
- *   - SD id 为空或无可识别段（去前缀拆段后无长度≥2 的段）→ 直接视为违规并提示回填格式
+ *   - 无前缀条目（如 `src/auth.ts`）解析为 sdId=null，不参与匹配 → SDMAP-1 失败
+ *     （条目语法本身由 gate-logic SDMAP-5 负责，本维度不重复报格式）
  *
  * @param graph 图谱（含 SD 节点）
  * @param rtm   RTM 矩阵（含 codeModule 字段）
@@ -191,7 +194,14 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
       passed: false,
       checked: 0,
       violations: ['graph.nodes 必须为数组'],
-      structuredViolations: [{ rule: CODE_TLA_RULES.D1, field: 'graph.nodes', message: 'graph.nodes 必须为数组' }],
+      structuredViolations: [
+        {
+          rule: CODE_TLA_RULES.D1,
+          field: 'graph.nodes',
+          message: 'graph.nodes 必须为数组',
+          classification: 'semantic',
+        },
+      ],
     };
   }
   if (!rtm || !Array.isArray(rtm.rows)) {
@@ -199,52 +209,65 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
       passed: false,
       checked: 0,
       violations: ['rtm.rows 必须为数组'],
-      structuredViolations: [{ rule: CODE_TLA_RULES.D1, field: 'rtm.rows', message: 'rtm.rows 必须为数组' }],
+      structuredViolations: [
+        {
+          rule: CODE_TLA_RULES.D1,
+          field: 'rtm.rows',
+          message: 'rtm.rows 必须为数组',
+          classification: 'semantic',
+        },
+      ],
     };
   }
 
   // 仅取 type=SD 节点（SSoT §10.8.1 算法 1：graph.json 中所有 type=SD 节点）
   const sdNodes = graph.nodes.filter((n) => n && n.type === 'SD');
-  const codeModules: string[] = [];
+  const sdNodeIds = new Set(sdNodes.map((n) => String(n.id ?? '')));
+
+  // REQ 条目解析（批次1：复用 gate-logic parseCodeModuleEntries，不复制第二份解析）
+  const reqEntries: Array<{ rowId: string; entry: CodeModuleEntry }> = [];
   for (const row of rtm.rows) {
-    if (row && typeof row.codeModule === 'string' && row.codeModule.trim() !== '') {
-      codeModules.push(row.codeModule);
+    if (!row || typeof row.codeModule !== 'string' || row.codeModule.trim() === '') continue;
+    if (!String(row.requirementId ?? '').startsWith('REQ-')) continue;
+    for (const entry of parseCodeModuleEntries(row.codeModule)) {
+      if (entry.sdId !== null) reqEntries.push({ rowId: String(row.requirementId), entry });
     }
   }
 
   let checked = 0;
+  if (sdNodes.length === 0) {
+    // graph 无 SD 节点：双向均无可校验项（与 gate-logic 早退一致）
+    return { passed: true, checked, violations, structuredViolations };
+  }
+
+  // 第一向：图→RTM（SDMAP-1 前缀精确对账：REQ 条目 sdId 与图节点 id 全等）
   for (const [idx, sd] of sdNodes.entries()) {
     checked++;
     const id = String(sd.id ?? '');
-
-    // 主匹配：SD ID 前缀精确匹配（codeModule 格式 SD-xxx:src/path per phase-5-coding.md）
-    // 处理数字 ID（如 SD-5.2.1）和命名 ID（如 SD-AUTH），最可靠的反向追溯方式
-    const prefixMatch = codeModules.some((cm) => cm.includes(`${id}:`));
-    if (prefixMatch) continue;
-
-    // 回退匹配：SD id 去 "SD-" 前缀，转小写，按 -/_/. 拆分成多段
-    // 任一段（长度 >= 2）在 codeModule 路径中出现即视为映射（适用于命名 SD ID 如 SD-AUTH）
-    // 长度 >= 2 为 SSoT §10.8.1 算法 1 规定的分段阈值：过滤单字符噪声段（如 a/i/o 等）
-    const raw = id.replace(/^SD-/i, '');
-    const segments = raw
-      .split(/[-_.]+/)
-      .map((s) => s.toLowerCase())
-      .filter((s) => s.length >= 2);
-    if (segments.length === 0) {
-      const msg = `SD 节点 id 为空或无可识别段，无法映射 codeModule: ${id}（阶段5编码后必须回填 RTM.codeModule，格式：SD-xxx:src/path/to/file.ts）`;
-      violations.push(msg);
-      structuredViolations.push({ rule: CODE_TLA_RULES.D1, field: `graph.nodes[${idx}].id`, message: msg });
-      continue;
-    }
-    const matched = codeModules.some((cm) => {
-      const cmLower = cm.toLowerCase();
-      return segments.some((seg) => cmLower.includes(seg));
+    if (reqEntries.some(({ entry }) => entry.sdId === id)) continue;
+    // P1.4：错误信息须明确指出回填时机（阶段5编码后必须回填 RTM.codeModule）与格式；
+    // 保留「无对应 codeModule」子串（self-test CODE_TLA_CASES 正则依赖）
+    const msg = `SD 节点 ${id} 无对应 codeModule（SDMAP-1 前缀精确对账失败；阶段5编码后必须回填 RTM.codeModule，REQ 条目格式：SD-xxx:src/path/to/file.ts:L<n>[-<m>]，SD 前缀须与节点 id 全等）`;
+    violations.push(msg);
+    structuredViolations.push({
+      rule: 'SDMAP-1',
+      field: `graph.nodes[${idx}].id`,
+      message: msg,
+      classification: 'semantic',
     });
-    if (!matched) {
-      // P1.4：错误信息须明确指出回填时机（阶段5编码后必须回填 RTM.codeModule）与格式
-      const msg = `SD 节点 ${id} 无对应 codeModule（阶段5编码后必须回填 RTM.codeModule，格式：SD-xxx:src/path/to/file.ts；期望路径包含以下任一段: ${segments.join(', ')}）`;
+  }
+
+  // 第二向：RTM→图（SDMAP-2 幽灵 SD 前缀，与 gate-logic 同语义）
+  for (const { rowId, entry } of reqEntries) {
+    if (!sdNodeIds.has(entry.sdId!)) {
+      const msg = `SDMAP-2 幽灵 SD 前缀：REQ 行 ${rowId} 条目 "${entry.raw}" 的 SD 前缀 ${entry.sdId} 不在图 SD 节点集`;
       violations.push(msg);
-      structuredViolations.push({ rule: CODE_TLA_RULES.D1, field: `graph.nodes[${idx}].id`, message: msg });
+      structuredViolations.push({
+        rule: 'SDMAP-2',
+        field: `rtm[${rowId}].codeModule`,
+        message: msg,
+        classification: 'semantic',
+      });
     }
   }
 
@@ -350,7 +373,12 @@ export function checkCodeStateTransfer(files: CodeFile[]): DimensionResult {
       checked: 0,
       violations: ['codeFiles 为空，无代码状态转移可校验'],
       structuredViolations: [
-        { rule: CODE_TLA_RULES.D2, field: 'codeFiles', message: 'codeFiles 为空，无代码状态转移可校验' },
+        {
+          rule: CODE_TLA_RULES.D2,
+          field: 'codeFiles',
+          message: 'codeFiles 为空，无代码状态转移可校验',
+          classification: 'topology',
+        },
       ],
     };
   }
@@ -363,7 +391,12 @@ export function checkCodeStateTransfer(files: CodeFile[]): DimensionResult {
   if (totalAssignments === 0) {
     const msg = '代码中未抽取到任何赋值语句（BinaryExpression + =），无法与 TLA+ Next 状态转移对应';
     violations.push(msg);
-    structuredViolations.push({ rule: CODE_TLA_RULES.D2, field: 'codeFiles[*].assignments', message: msg });
+    structuredViolations.push({
+      rule: CODE_TLA_RULES.D2,
+      field: 'codeFiles[*].assignments',
+      message: msg,
+      classification: 'topology',
+    });
   }
 
   return {
@@ -514,7 +547,12 @@ export function checkNextBranchCoverage(tlaContent: string, files: CodeFile[]): 
     } else {
       const msg = `TLA+ Next 分支 "${action}" 在代码中无对应函数/方法实现（驼峰名 "${camel}"）`;
       violations.push(msg);
-      structuredViolations.push({ rule: CODE_TLA_RULES.D3, field: 'tlaContent', message: msg });
+      structuredViolations.push({
+        rule: CODE_TLA_RULES.D3,
+        field: 'tlaContent',
+        message: msg,
+        classification: 'topology',
+      });
     }
   }
 
@@ -589,7 +627,12 @@ export function checkInvariantCoverage(tlaContent: string, files: CodeFile[]): D
   const invariants = extractBusinessInvariants(tlaContent);
   if (invariants.length === 0) {
     // 无 BusinessInvariant/Invariants 定义时跳过
-    return { passed: true, checked: 0, violations: [], structuredViolations: [] };
+    return {
+      passed: true,
+      checked: 0,
+      violations: [],
+      structuredViolations: [],
+    };
   }
 
   // 统计代码中的断言数
@@ -605,7 +648,12 @@ export function checkInvariantCoverage(tlaContent: string, files: CodeFile[]): D
   if (totalAssertions === 0) {
     const msg = `代码中未抽取到任何断言（assert/invariant/require），无法覆盖 TLA+ BusinessInvariant 的 ${invariants.length} 个子不变式`;
     violations.push(msg);
-    structuredViolations.push({ rule: CODE_TLA_RULES.D4, field: 'codeFiles[*].assertions', message: msg });
+    structuredViolations.push({
+      rule: CODE_TLA_RULES.D4,
+      field: 'codeFiles[*].assertions',
+      message: msg,
+      classification: 'semantic',
+    });
   }
 
   return {
@@ -650,13 +698,24 @@ export function checkCodeTlaConsistency(input: CodeTlaConsistencyInput): Consist
     return {
       passed: false,
       dimensions: {
-        sdToCodeModule: { passed: false, checked: 0, violations: ['input 必须为对象'] },
+        sdToCodeModule: {
+          passed: false,
+          checked: 0,
+          violations: ['input 必须为对象'],
+        },
         codeStateTransfer: { passed: false, checked: 0, violations: [] },
         nextBranchCoverage: { passed: false, checked: 0, violations: [] },
         invariantCoverage: { passed: false, checked: 0, violations: [] },
       },
       violations: [{ dimension: 'input', message: 'input 必须为对象' }],
-      structuredViolations: [{ rule: CODE_TLA_RULES.INPUT, field: 'input', message: 'input 必须为对象' }],
+      structuredViolations: [
+        {
+          rule: CODE_TLA_RULES.INPUT,
+          field: 'input',
+          message: 'input 必须为对象',
+          classification: 'semantic',
+        },
+      ],
     };
   }
 
@@ -690,8 +749,32 @@ export function checkCodeTlaConsistency(input: CodeTlaConsistencyInput): Consist
         rule: CODE_TLA_RULES.SCHEMA,
         field: 'manifest/graph/rtm',
         message: v.message,
+        classification: 'semantic',
       })),
     };
+  }
+
+  // 批次1 A2：比对键零交集 fail-closed（规格 §5.3）——图 SD 集与 REQ 条目 SD 集均非空且零交集时，
+  // 两套键根本无法指向同一系统，任何「一致/不一致」结论都不可证，必须 fail-closed 拒判。
+  // 三态区分：双集均非空且零交集 → 本守卫；任一集为空 → 既有逐点校验（零证据守卫语义不变）；
+  // 部分交集 → 正常逐点差异（SDMAP-1/SDMAP-2 上报），不触发本守卫。
+  const graphSdIds = new Set((input.graph?.nodes ?? []).filter((n) => n?.type === 'SD').map((n) => String(n.id ?? '')));
+  const rtmSdIds = new Set<string>();
+  for (const row of input.rtm?.rows ?? []) {
+    if (typeof row?.codeModule === 'string' && String(row.requirementId ?? '').startsWith('REQ-')) {
+      for (const e of parseCodeModuleEntries(row.codeModule)) if (e.sdId) rtmSdIds.add(e.sdId);
+    }
+  }
+  let noSharedSd = false;
+  if (graphSdIds.size > 0 && rtmSdIds.size > 0 && ![...graphSdIds].some((id) => rtmSdIds.has(id))) {
+    noSharedSd = true;
+    const msg = '无共享设计 ID（cannot prove same system），不判一致：graph SD 集 与 rtm REQ 条目 SD 前缀集 零交集';
+    violations.push({ dimension: 'input', message: msg });
+    structuredViolations.push({
+      rule: 'INPUT-NO-SHARED-SD',
+      message: '无共享设计 ID（cannot prove same system）',
+      classification: 'topology',
+    });
   }
 
   // 维度1：SD→codeModule 映射
@@ -800,7 +883,11 @@ export function checkCodeTlaConsistency(input: CodeTlaConsistencyInput): Consist
   }
 
   const passed =
-    sdToCodeModule.passed && codeStateTransfer.passed && nextBranchCoverage.passed && invariantCoverage.passed;
+    !noSharedSd &&
+    sdToCodeModule.passed &&
+    codeStateTransfer.passed &&
+    nextBranchCoverage.passed &&
+    invariantCoverage.passed;
 
   return {
     passed,
