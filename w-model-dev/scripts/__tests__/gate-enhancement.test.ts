@@ -1931,3 +1931,20 @@ describe('checkPhaseSpecStructure fs 注入契约（合并 checkRequirementSpecS
     expect(v.refs.some((m) => m.includes('缺 readdirSync'))).toBe(true);
   });
 });
+
+import type { StructuredViolation } from '../lib/types';
+
+describe('批次1 ChangeClassification 类型契约', () => {
+  it('classification 为可选三值字段', () => {
+    const v1: StructuredViolation = { rule: 'SDMAP-1', message: 'x' };
+    const v2: StructuredViolation = { rule: 'SDMAP-3', message: 'x', classification: 'evidence-only' };
+    const v3: StructuredViolation = { rule: 'SDMAP-1', message: 'x', classification: 'semantic' };
+    const v4: StructuredViolation = { rule: 'SDMAP-2', message: 'x', classification: 'topology' };
+    expect([v1.classification, v2.classification, v3.classification, v4.classification]).toEqual([
+      undefined,
+      'evidence-only',
+      'semantic',
+      'topology',
+    ]);
+  });
+});

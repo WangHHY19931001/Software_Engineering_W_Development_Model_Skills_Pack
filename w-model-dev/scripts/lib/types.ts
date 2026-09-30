@@ -7,11 +7,16 @@
  */
 export type { Phase } from './constants.js';
 
+/** 一致性差异分类（批次总纲 §4.1 唯一权威；cosmetic 明确不引入） */
+export type ChangeClassification = 'semantic' | 'topology' | 'evidence-only';
+
 /** 结构化违规（rule/field/message 三要素） */
 export interface StructuredViolation {
   rule: string;
   field?: string;
   message: string;
+  /** 批次 1（总纲 §4.2）：可选分类，向后兼容；语义见总纲 §4.1 */
+  classification?: ChangeClassification;
 }
 
 /** 门禁校验通用结果（兼容现有 violations: string[]，structuredViolations 为过渡可选字段） */
@@ -63,6 +68,10 @@ export interface JsonReport {
     criticalMissing: number;
     buildabilityMissing: number;
   } | null;
+  /** SDMAP 锚点校验执行态（照 specStructure 先例：checked=已校验/skipped=注入面缺失/null=phase<5 未触发） */
+  sdAnchorCheck?: 'checked' | 'skipped' | null;
+  /** SDMAP 结构化违规（含 classification）；通过且已校验时空数组 */
+  sdmapViolations?: StructuredViolation[];
   /**
    * 阶段 1-4 设计级结构校验（引用块 / SSOT / DoD / §8 拒绝登记）的执行态（check-artifact-gate --json）：
    * `checked`=已传 `--spec-dir` 并执行；`skipped`=阶段 1-4 未传 `--spec-dir`（整组跳过，必须可见，
