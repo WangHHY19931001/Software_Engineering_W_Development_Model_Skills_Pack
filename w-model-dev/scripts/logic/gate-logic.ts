@@ -295,7 +295,8 @@ function checkSdToCodeModuleMapping(graph: GateGraph, rows: RTMRowShape[]): stri
  * codeModule 格式校验（按行类型分支；批次1 SDMAP-5 锚点条目语法）。
  * - REQ 行：逐条目 `SD-<id>:src/<path>:L<start>[-<end>]`（多条目逗号分隔）
  * - NFR/CON 行：逐条目 `src/<path>:L<start>[-<end>]` 或整格 "横切"
- * - 倒序区间（end < start）与双 L 区间（L5-L9）均拒收
+ * - 倒序区间（end < start）、双 L 区间（L5-L9）、start < 1、
+ *   NFR/CON 行携带 SD- 前缀条目（行类型×条目形态交叉）均拒收
  */
 export function checkCodeModuleFormat(rows: RTMRowShape[]): string[] {
   const violations: string[] = [];
@@ -305,9 +306,16 @@ export function checkCodeModuleFormat(rows: RTMRowShape[]): string[] {
     if (id.startsWith('NFR-') || id.startsWith('CON-')) {
       if (row.codeModule.trim() === '横切') continue;
       for (const e of parseCodeModuleEntries(row.codeModule)) {
-        if (e.srcPath === null || e.anchorStart === null || (e.anchorEnd !== null && e.anchorEnd < e.anchorStart)) {
+        // sdId !== null：REQ 形态条目（SD- 前缀）不得出现在 NFR/CON 行（解析器先试 REQ 正则且与行类型无关）
+        if (
+          e.sdId !== null ||
+          e.srcPath === null ||
+          e.anchorStart === null ||
+          e.anchorStart < 1 ||
+          (e.anchorEnd !== null && e.anchorEnd < e.anchorStart)
+        ) {
           violations.push(
-            `codeModule 格式错误：${id.startsWith('NFR-') ? 'NFR' : 'CON'} 行 ${id} 的条目 "${e.raw}" 须匹配 src/<path>:L<start>[-<end>]（start≥1，end≥start；多条目逗号分隔；或整格"横切"）`,
+            `codeModule 格式错误：${id.startsWith('NFR-') ? 'NFR' : 'CON'} 行 ${id} 的条目 "${e.raw}" 须匹配 src/<path>:L<start>[-<end>]（start≥1，end≥start；不得携带 SD- 前缀；多条目逗号分隔；或整格"横切"）`,
           );
         }
       }

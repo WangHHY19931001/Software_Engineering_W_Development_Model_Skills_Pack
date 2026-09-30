@@ -938,6 +938,21 @@ describe('P0-2 codeModule 格式校验', () => {
       expect(fmt([{ requirementId: 'NFR-003', codeModule: 'src/a.ts:L5-L9' }]).length).toBe(1);
       expect(fmt([{ requirementId: 'NFR-004', codeModule: 'src/a.ts:L9-5' }]).length).toBe(1);
     });
+    it('违规：NFR 行锚点 L0（start≥1 与 REQ 分支对称）', () => {
+      const v = fmt([{ requirementId: 'NFR-005', codeModule: 'src/a.ts:L0' }]);
+      expect(v.length).toBe(1);
+      expect(v[0]).toMatch(/codeModule 格式错误/);
+    });
+    it('违规：NFR 行混入 REQ 形态条目（行类型×条目形态交叉）', () => {
+      const v = fmt([{ requirementId: 'NFR-006', codeModule: 'SD-2:src/auth.ts:L1' }]);
+      expect(v.length).toBe(1);
+      expect(v[0]).toMatch(/codeModule 格式错误/);
+    });
+    it('违规：CON 行倒序区间（CON 分支冒烟）', () => {
+      const v = fmt([{ requirementId: 'CON-001', codeModule: 'src/a.ts:L2-1' }]);
+      expect(v.length).toBe(1);
+      expect(v[0]).toMatch(/codeModule 格式错误/);
+    });
   });
 });
 
