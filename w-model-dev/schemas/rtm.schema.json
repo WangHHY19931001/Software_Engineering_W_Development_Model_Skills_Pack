@@ -57,7 +57,7 @@
             "type": ["string", "null"]
           },
           "codeModule": {
-            "description": "代码模块路径，阶段 5 回填；REQ 行须匹配 ^SD-数字.数字:src/路径 格式，NFR/CON 行须匹配 ^src/路径 或等于 \"横切\"；可空（允许 null）",
+            "description": "代码模块映射锚点。REQ 行条目格式 `SD-<id>:src/<path>:L<start>[-<end>]`（如 `SD-5.2.1:src/auth/login.ts:L42-58`），NFR/CON 行条目 `src/<path>:L<start>[-<end>]`，单格逗号分隔多条目，NFR/CON 允许整格 `横切`。行号须落在文件总行数内（门禁 SDMAP 校验）。",
             "type": ["string", "null"]
           },
           "unitTest": {

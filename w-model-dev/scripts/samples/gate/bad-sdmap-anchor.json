@@ -1,13 +1,10 @@
 {
-  "schemaVersion": "1.0",
-  "projectId": "test-test-evidence",
-  "currentPhase": 6,
   "rows": [
     {
       "requirementId": "REQ-001",
-      "description": "用户登录",
-      "designDoc": "SD-1.1",
-      "codeModule": "SD-1.1:src/auth/login.ts:L1",
+      "description": "用户注册",
+      "designDoc": "SD-2.1",
+      "codeModule": "SD-2.1:src/real.ts:L1-3, SD-2.1:src/nope.ts:L1, SD-2.1:src/real.ts:L99-100",
       "unitTest": "UT-001",
       "integrationTest": "IT-001",
       "systemTest": "ST-001",
@@ -17,21 +14,16 @@
   ],
   "executionSummary": {
     "unitTest": {
-      "total": 3,
-      "passed": 3,
+      "total": 18,
+      "passed": 18,
       "failed": 0,
       "pending": 0,
       "coverage": 92,
-      "evidence": {
-        "command": "npx vitest run --project=unit",
-        "exitCode": 0,
-        "observedAt": "2026-09-15T10:00:00.000Z",
-        "rawOutputPath": "test-evidence-output.txt"
-      }
+      "evidence": { "command": "npx vitest run", "exitCode": 0, "observedAt": "2026-09-15T10:00:00.000Z" }
     },
     "integrationTest": {
-      "total": 2,
-      "passed": 2,
+      "total": 8,
+      "passed": 8,
       "failed": 0,
       "pending": 0,
       "coverage": 100,
@@ -42,11 +34,11 @@
       }
     },
     "systemTest": {
-      "total": 2,
-      "passed": 2,
+      "total": 12,
+      "passed": 12,
       "failed": 0,
       "pending": 0,
-      "coverage": 0,
+      "coverage": 100,
       "evidence": {
         "command": "npx vitest run --project=system",
         "exitCode": 0,
@@ -54,11 +46,11 @@
       }
     },
     "acceptanceTest": {
-      "total": 1,
-      "passed": 1,
+      "total": 5,
+      "passed": 5,
       "failed": 0,
       "pending": 0,
-      "coverage": 0,
+      "coverage": 100,
       "evidence": {
         "command": "npx vitest run --project=acceptance",
         "exitCode": 0,

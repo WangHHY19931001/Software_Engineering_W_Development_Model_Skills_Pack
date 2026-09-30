@@ -69,6 +69,7 @@
 > 对应约束 #14 + 反模式 #38。阶段 5-8 任何代码/测试文件 `Edit`/`Write` 前，S-coding 须先经 **codegraph CLI** 查询目标符号影响半径（`codegraph query <符号>`；宿主 MCP 工具若可用为可选加速，非依赖）。
 
 **修改前流程**（ChangeScope 绑定，2026-09-04 audit-gate-closure）：
+
 1. **变更上下文**：阶段 5-8 门禁要求 codegraph 查询与实际变更绑定——S-coding 须维护 ChangeScope manifest（`schemas/change-scope.schema.json`，落盘如 `.w-model/change-scope.json`：`changeId` 含 `phaseN-` 前缀 / `phase` / `baseRef` / `headRef` / `scopeCreatedAt` / `changedFiles`），保证 `headRef=当前 HEAD`、`changedFiles` 与实际 Git 变更集合精确一致（门禁重算比对，不符 fail-closed）
 2. `codegraph query <目标符号>`（codegraph CLI，宿主 MCP 工具为可选加速）→ 查询 callers / callees / blast radius
 3. 落盘结果到 `.w-model/codegraph-queries/phase<N>-<ticket>-<symbol>.json`：除 querySymbol / callers[] / callees[] / blastRadius / queryTimestamp 外，strict 模式（阶段 5-8 CLI）**必须含 `changeId`（精确等于 scope.changeId）与 `targetFiles`（本次查询服务的变更文件，全部属于 scope.changedFiles；每条查询至少声明一个目标文件）**；`queryTimestamp` 不得晚于 scopeCreatedAt；**另须声明证据形态 `evidenceKind` 且与索引实际状态一致**（三形态判据与字段枚举见 [`command-reference.md`](command-reference.md)「阶段 5-8 codegraph/coding-plan 门禁 CLI」节的 codegraph checker 条目）。记录结构见 `schemas/codegraph-query.schema.json`
@@ -92,6 +93,7 @@
 > 阶段 5-8 以 superpowers 编码链做规格级规划与执行（superpowers 替换 opsx 批次 2；方法论见 [superpowers-adoption.md](superpowers-adoption.md)）。旧 OpenSpec opsx 制品链路（`check-opsx-artifacts.ts`）**已于 2026-09-21 退役**（含 self-test 用例与 `samples/opsx-artifacts/` fixture；语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）；新链路不再读取 `openspec/changes/`。
 
 **编码链分派**（制品契约由 [`check-coding-plan.ts`](../scripts/cli/check-coding-plan.ts) R1-R6 强制）：
+
 ```
 S-plan     → writing-plans 产出 docs/plans/<changeId>.plan.md（目标节 + 任务节，每任务节含验证命令行）→ R3×3 + V
 S-coding   → subagent-driven-development（SDD）逐任务执行 + TDD 红-绿-重构；
@@ -102,6 +104,7 @@ G          → check-coding-plan.ts <project-root> --phase=<5|6|7|8> --scope=<ch
 ```
 
 **制品路径契约**（逐项与 `logic/coding-plan-logic.ts` 的 R1-R6 对应）：
+
 - **编码计划**（R1/R2）：`docs/plans/<changeId>.plan.md`——`changeId` 须含 `phase<N>-` 前缀；计划须含目标节（标题文本含「目标」）+ ≥1 个任务节（标题含 `Task N` / `任务 N`），每个任务节含 ≥1 条行首「`验证：`」/「`Verify:`」命令行，命令体非空且禁 `;` `&` `|`。
 - **执行账本**（R3）：`.superpowers/sdd/<plan-基名>/progress.md`（plan-基名 = plan 文件名去扩展名）——首行身份为 `# SDD ledger — plan: <计划文件路径>`（路径须以 plan 文件名结尾），`Task N: complete` 行须具名覆盖 plan 全部任务节。
 - **任务三件套**（R4）：账本目录内每个已完成任务 N 的 `task-<N>-brief.md` 与 `task-<N>-report.md` 存在且非空，且至少一个 `review-*.diff`（任务评审包证据）。
@@ -130,13 +133,15 @@ G          → check-coding-plan.ts <project-root> --phase=<5|6|7|8> --scope=<ch
 ## Tracer-bullet 票据拆解
 
 ### 票据清单
-| # | 标题 | Blocked by | What it delivers | Status |
-|---|---|---|---|---|
-| 01 | <标题> | None | <端到端行为，用户视角> | ready-for-agent |
-| 02 | <标题> | 01 | <端到端行为> | blocked |
-| ... | | | | |
+
+| #   | 标题   | Blocked by | What it delivers       | Status          |
+| --- | ------ | ---------- | ---------------------- | --------------- |
+| 01  | <标题> | None       | <端到端行为，用户视角> | ready-for-agent |
+| 02  | <标题> | 01         | <端到端行为>           | blocked         |
+| ... |        |            |                        |                 |
 
 ### Wide refactor（如有）
+
 - <refactor-1>: <机械改动描述> — blast radius <范围>
   - Expand: <ticket-id>（添加新形式，旧形式不破坏）
   - Migrate batch 1: <ticket-id>（blocked by Expand）
@@ -145,12 +150,14 @@ G          → check-coding-plan.ts <project-root> --phase=<5|6|7|8> --scope=<ch
 ```
 
 ### vertical-slice 规则
+
 - 每片贯穿全层（schema + service + store + 单元测试），不是单层切片
 - 每片可独立 demo 或验证（独立跑测试通过）
 - 每片大小适配单个新鲜上下文窗口（与"子代理任务 ≤1000 词"约束协同）
 - 优先 prefactor：先做让实现更容易的预备改动（to-tickets 原则）
 
 ### Wide refactor 例外
+
 - 单一机械改动（重命名/重类型）blast radius 跨全代码库时，不强制 tracer-bullet
 - 用 expand-contract 序列：expand（新旧并存）→ migrate batches（每批 CI 绿）→ contract（删旧）
 - 每批大小按 blast radius（按目录/按包）
@@ -187,11 +194,12 @@ G          → check-coding-plan.ts <project-root> --phase=<5|6|7|8> --scope=<ch
 - 票据引用术语统一用 [conventions.md](conventions.md) 术语表规范名（如 `codeModule` / `mappingType`），不得自造别名
 
 ### Blocking edges 依赖图
+
 - blocking edges 形成有向无环图（DAG）
 - frontier = blockers 全完成的票据（可立即开始）
 - 纯线性链：top to bottom
 - 编排者按 frontier 一次性分派全部可启动票据（串行执行时按票据号顺序处理，与"主机不支持并行则串行"约束协同）
-- 每张票据对应 RTM `codeModule` 字段的 ≥1 条目（SD-xxx:src/path 格式不变）
+- 每张票据对应 RTM `codeModule` 字段的 ≥1 条目（格式为锚点文法，见下「codeModule 格式规范」节）
 - 票据 ID（NN）不写入 RTM（RTM 保持现有 schema，不污染数据模型）
 - 票据的 Next 分支实现必须与 TLA+ Action 名对应（与约束"TLA+ Next 分支 PascalCase ↔ code camelCase"协同）
 
@@ -204,14 +212,14 @@ G          → check-coding-plan.ts <project-root> --phase=<5|6|7|8> --scope=<ch
 - **裁定**：扫描发现的每项冲突须在开工前裁定完毕，裁定以阶段 1-4 产物（需求 / spec / RTM / TLA+ 不变式）为约束权威、票据文本为被审对象；每项裁定记录在其冲突行旁。扫描干净则不作评论、直接推进 S-coding。
 - **与 V/G 的分工**：本表只拦「票据文本之间 / 票据与全局约束之间」的静态冲突；实现期才暴露的冲突仍由 V/G 评审回路兜底，本表不替代 V/G。
 
-| 冲突对（符号级） | 扫描动作（逐对扫一遍） | 发现冲突的处置 |
-|---|---|---|
-| 两票同时改**同一符号的契约**（接口签名 / 类型约束 / 状态转移） | 抽取全部票据声明的符号契约，按符号名配对，比对同一符号是否被给出**同一**终态签名 / 类型 / 状态转移 | 改为扩展式拆分：一票只做向后兼容的新形式，另一票 `Blocked by` 它；或把两处改动**合并**为一票 |
-| 一票**新增字段 / 新增符号**，另一票假设其**不存在**（按旧类型约束或旧状态集消费） | 对每个被新增的类型字段 / 符号，扫描其余票据是否仍断言旧形状（旧可选性 / 旧字段集 / 旧状态集） | 把假设不存在的票 `Blocked by` 新增票；或改写该票为「新旧两种形状均接受」的向后兼容消费 |
-| **迁移票与其消费者票顺序倒置**（消费者先于迁移落地） | 对每条迁移票据，列出消费该符号新形式的票据，检查其 `Blocked by` 是否指向迁移票 | 调整 `Blocked by`（消费者票 blocked by 迁移票）；若两票本就不可分离，**合并**为一票 |
-| 一票的**产出符号**与另一票的**消费符号**同名但形状不一致（参数签名 / 返回类型 / 事件字段名） | 对每条「产出符号」声明配合同名的「消费符号」声明，逐字段比对形状 | 对齐两端为同一签名 / 类型约束；无法对齐则拆出独立适配符号并明确归属 |
-| 两票对**同一状态机**给出互斥转移，或同一不变式被一票加强、被另一票放松 | 抽取各票声明的状态转移与不变式，按 Action 名 / 不变式名配对，检查是否与 TLA+ 既有 Action 及不变式相容 | 以 TLA+（阶段 1-4 产物）为权威统一转移语义并改票对齐；若属真实语义变更，退回阶段 1-4 走需求 / 设计变更流程 |
-| 单票**自相矛盾**（其验收标准与它声明的符号契约不符；或它新建的符号与它随后修改的符号冲突） | 对每张票据单独通读：验收标准能否只凭本票声明的符号契约判定；同票内新建 / 修改的符号是否互斥 | 修正票内文本使其自洽；无法自洽则拆票 |
+| 冲突对（符号级）                                                                             | 扫描动作（逐对扫一遍）                                                                                | 发现冲突的处置                                                                                             |
+| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 两票同时改**同一符号的契约**（接口签名 / 类型约束 / 状态转移）                               | 抽取全部票据声明的符号契约，按符号名配对，比对同一符号是否被给出**同一**终态签名 / 类型 / 状态转移    | 改为扩展式拆分：一票只做向后兼容的新形式，另一票 `Blocked by` 它；或把两处改动**合并**为一票               |
+| 一票**新增字段 / 新增符号**，另一票假设其**不存在**（按旧类型约束或旧状态集消费）            | 对每个被新增的类型字段 / 符号，扫描其余票据是否仍断言旧形状（旧可选性 / 旧字段集 / 旧状态集）         | 把假设不存在的票 `Blocked by` 新增票；或改写该票为「新旧两种形状均接受」的向后兼容消费                     |
+| **迁移票与其消费者票顺序倒置**（消费者先于迁移落地）                                         | 对每条迁移票据，列出消费该符号新形式的票据，检查其 `Blocked by` 是否指向迁移票                        | 调整 `Blocked by`（消费者票 blocked by 迁移票）；若两票本就不可分离，**合并**为一票                        |
+| 一票的**产出符号**与另一票的**消费符号**同名但形状不一致（参数签名 / 返回类型 / 事件字段名） | 对每条「产出符号」声明配合同名的「消费符号」声明，逐字段比对形状                                      | 对齐两端为同一签名 / 类型约束；无法对齐则拆出独立适配符号并明确归属                                        |
+| 两票对**同一状态机**给出互斥转移，或同一不变式被一票加强、被另一票放松                       | 抽取各票声明的状态转移与不变式，按 Action 名 / 不变式名配对，检查是否与 TLA+ 既有 Action 及不变式相容 | 以 TLA+（阶段 1-4 产物）为权威统一转移语义并改票对齐；若属真实语义变更，退回阶段 1-4 走需求 / 设计变更流程 |
+| 单票**自相矛盾**（其验收标准与它声明的符号契约不符；或它新建的符号与它随后修改的符号冲突）   | 对每张票据单独通读：验收标准能否只凭本票声明的符号契约判定；同票内新建 / 修改的符号是否互斥           | 修正票内文本使其自洽；无法自洽则拆票                                                                       |
 
 ### 票据动态重排规则
 
@@ -222,6 +230,7 @@ G          → check-coding-plan.ts <project-root> --phase=<5|6|7|8> --scope=<ch
 - **与需求变更的关系**：重排不替代需求变更流程——新需求须先进阶段 1（或 Loop 3 事件接驳），不得直接插队改票。
 
 ### Out of 票据化的例外
+
 - 单一 bug 修复：可免除票据拆解，但**不得**绕过 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。
 - 单一 TLA+ 不变式违反修复：同样可免除票据拆解，但不得直接 R→S-fix；普通失败必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。
 - 阶段 5 仅 1 个 SD 子系统且改动 ≤1 文件时：可直接编码而不拆票据；若出现普通 V/G 失败，必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。
@@ -231,12 +240,12 @@ G          → check-coding-plan.ts <project-root> --phase=<5|6|7|8> --scope=<ch
 
 ## 执行方法论
 
-| 步骤 | 工具 / 命令 | 阈值 |
-|---|---|---|
-| 单元测试执行 | `npx vitest run`（或 `jest`/`pytest` 等价运行器） | 全部通过 |
-| 覆盖率统计 | `npx vitest run --coverage` | 分支 + 行覆盖率 ≥ 80% |
-| 规范检查 | `npx eslint . --max-warnings=0` + `npx prettier --check .` | 0 error，0 warning |
-| 编译验证 | `npx tsc --noEmit`（TS）/ `npm run build` | 退出码 0 |
+| 步骤         | 工具 / 命令                                                | 阈值                  |
+| ------------ | ---------------------------------------------------------- | --------------------- |
+| 单元测试执行 | `npx vitest run`（或 `jest`/`pytest` 等价运行器）          | 全部通过              |
+| 覆盖率统计   | `npx vitest run --coverage`                                | 分支 + 行覆盖率 ≥ 80% |
+| 规范检查     | `npx eslint . --max-warnings=0` + `npx prettier --check .` | 0 error，0 warning    |
+| 编译验证     | `npx tsc --noEmit`（TS）/ `npm run build`                  | 退出码 0              |
 
 ## worktree 纪律（S23）
 
@@ -256,13 +265,13 @@ D-6 裁定原文（`:133`）：「worktree 内**禁止**写 `.w-model`；跨 wor
 
 ### 五条隔离纪律
 
-| # | 纪律 | 为什么 |
-|---|---|---|
-| 1 | **Step0 已隔离检测 + submodule 守卫**：动手前先判定自己是否已在 worktree 内，再用 `git rev-parse --show-superproject-working-tree` 守卫 submodule 场景 | 已在隔离区再建一层，会得到 harness 看不见的双重工作树 |
-| 2 | **建前取用户同意**：创建 worktree 前必须取得用户明确同意 | worktree 改变工作区语义，属用户决策，不是 Agent 自决 |
-| 3 | **原生工具优先**：一律用 `git worktree` 原生命令，不用平台工具或手工目录绕过 | **绕过会产生 harness 看不见的 phantom state** |
-| 4 | **`git check-ignore` 强制**：`git check-ignore <path>` 未命中即先加入 `.gitignore` 并 commit，再建 worktree | 未忽略的隔离目录会被误纳入变更集合，污染 ChangeScope 与评审包 |
-| 5 | **clean baseline 强制**：开工前工作区与暂存区必须干净（"A dirty baseline makes every later failure ambiguous"） | **脏基线会让后续每一次失败都变得不可归因**，无法区分新缺陷与旧污染 |
+| #   | 纪律                                                                                                                                                   | 为什么                                                             |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| 1   | **Step0 已隔离检测 + submodule 守卫**：动手前先判定自己是否已在 worktree 内，再用 `git rev-parse --show-superproject-working-tree` 守卫 submodule 场景 | 已在隔离区再建一层，会得到 harness 看不见的双重工作树              |
+| 2   | **建前取用户同意**：创建 worktree 前必须取得用户明确同意                                                                                               | worktree 改变工作区语义，属用户决策，不是 Agent 自决               |
+| 3   | **原生工具优先**：一律用 `git worktree` 原生命令，不用平台工具或手工目录绕过                                                                           | **绕过会产生 harness 看不见的 phantom state**                      |
+| 4   | **`git check-ignore` 强制**：`git check-ignore <path>` 未命中即先加入 `.gitignore` 并 commit，再建 worktree                                            | 未忽略的隔离目录会被误纳入变更集合，污染 ChangeScope 与评审包      |
+| 5   | **clean baseline 强制**：开工前工作区与暂存区必须干净（"A dirty baseline makes every later failure ambiguous"）                                        | **脏基线会让后续每一次失败都变得不可归因**，无法区分新缺陷与旧污染 |
 
 ### 清理拥有权判定与 `prune` 自愈
 
@@ -277,13 +286,13 @@ D-6 裁定原文（`:133`）：「worktree 内**禁止**写 `.w-model`；跨 wor
 
 ## 测试用例设计（本阶段执行单元测试）
 
-| 用例 ID | 测试场景 | 输入 | 预期输出 | 优先级 |
-|---|---|---|---|---|
-| TC-COD-001 | 代码生成 | 详细设计文档 | 可编译运行的代码 | 高 |
-| TC-COD-002 | 代码质量检查 | 生成的代码 | 无语法错误、符合代码规范 | 高 |
-| TC-COD-003 | 单元测试生成 | 代码文件 | 覆盖核心逻辑的单元测试用例 | 高 |
-| TC-COD-004 | 单元测试代码覆盖率 | 执行单元测试 | 单元测试代码覆盖率 ≥ 80% | 高 |
-| TC-COD-005 | 边界条件处理 | 边界输入 | 正确处理并返回预期结果 | 中 |
+| 用例 ID    | 测试场景           | 输入         | 预期输出                   | 优先级 |
+| ---------- | ------------------ | ------------ | -------------------------- | ------ |
+| TC-COD-001 | 代码生成           | 详细设计文档 | 可编译运行的代码           | 高     |
+| TC-COD-002 | 代码质量检查       | 生成的代码   | 无语法错误、符合代码规范   | 高     |
+| TC-COD-003 | 单元测试生成       | 代码文件     | 覆盖核心逻辑的单元测试用例 | 高     |
+| TC-COD-004 | 单元测试代码覆盖率 | 执行单元测试 | 单元测试代码覆盖率 ≥ 80%   | 高     |
+| TC-COD-005 | 边界条件处理       | 边界输入     | 正确处理并返回预期结果     | 中     |
 
 ## 并行任务（强制）
 
@@ -298,24 +307,26 @@ D-6 裁定原文（`:133`）：「worktree 内**禁止**写 `.w-model`；跨 wor
 在 [templates/rtm.md](../templates/rtm.md) 中补登：代码模块列（实现文件路径）。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。
 
 > **强制条款（P1.4）**：编码完成后、code-TLA 一致性检查前，必须回填 RTM.codeModule 列。
-> 格式：`SD-xxx:src/path/to/file.ts`（多个模块用逗号分隔）。
+> 格式：`SD-<id>:src/<path>:L<start>[-<end>]`（多个条目逗号分隔）。
 > 缺失 → `check-code-tla-consistency.ts` 维度1 退出码 1，violation 明确指出回填时机。
 
 ### codeModule 格式规范
 
 `codeModule` 字段须按以下格式填写，由 `check-artifact-gate.ts --phase=5` 强制校验：
 
-| 行类型 | 格式 | 正则 | 示例 |
-|---|---|---|---|
-| REQ 行 | `SD-xxx:src/path/to/file.ts` | `^SD-[\d.]+:src/.+\.(ts\|js\|py\|java)$` | `SD-5.2.1:src/auth/login.ts` |
-| NFR 行 | `src/path/to/file.ts` 或 `横切` | `^src/.+\.(ts\|js\|py\|java)$` 或 `^横切$` | `src/middleware/rateLimit.ts` |
-| CON 行 | 同 NFR | 同 NFR | `横切` |
+| 行类型 | 格式                                        | 正则                                   | 示例                                 |
+| ------ | ------------------------------------------- | -------------------------------------- | ------------------------------------ |
+| REQ 行 | `SD-<id>:src/<path>:L<start>[-<end>]`       | `^SD-[^:]+:src\/[^:]+:L\d+(-\d+)?$`    | `SD-5.2.1:src/auth/login.ts:L42-58`  |
+| NFR 行 | `src/<path>:L<start>[-<end>]` 或整格 `横切` | `^src\/[^:]+:L\d+(-\d+)?$` 或 `^横切$` | `src/middleware/rateLimit.ts:L10-24` |
+| CON 行 | 同 NFR                                      | 同 NFR                                 | `横切`                               |
 
 **校验逻辑**：
-- REQ 行（`requirementId` 以 `REQ-` 开头）：校验 `codeModule` 匹配 `^SD-[\d.]+:src/.+`
-- NFR 行（`requirementId` 以 `NFR-` 开头）：校验 `codeModule` 匹配 `^src/.+` 或 `=== "横切"`
+
+- REQ 行（`requirementId` 以 `REQ-` 开头）：逐条目校验匹配 `^SD-[^:]+:src\/[^:]+:L\d+(-\d+)?$`（`start ≥ 1` 且 `end ≥ start`）
+- NFR 行（`requirementId` 以 `NFR-` 开头）：逐条目校验匹配 `^src\/[^:]+:L\d+(-\d+)?$`（`start ≥ 1` 且 `end ≥ start`，不得携带 SD- 前缀），或整格 `横切`
 - CON 行（`requirementId` 以 `CON-` 开头）：同 NFR
 - 格式不匹配 → check-artifact-gate.ts 退出码 1，reasons 列出具体 requirementId
+- 锚点行号约束：`start ≥ 1` 且 `start ≤ 该文件总行数`（开放形态无 `end` 亦受此约束）；若有 `end` 则 `end ≥ start` 且 `end ≤ 总行数`——SDMAP-3/4 经 CLI 注入面校验，覆盖 REQ/NFR/CON 全部行类型的条目
 
 ### NFR/CON codeModule 回填
 
@@ -323,15 +334,17 @@ D-6 裁定原文（`:133`）：「worktree 内**禁止**写 `.w-model`；跨 wor
 
 **字段回填要求**：
 
-| 行类型 | `codeModule` 回填要求 | 示例值 |
-|---|---|---|
-| `NFR-001~005` | 填写涉及的源码文件清单（多文件用逗号分隔）或填 `"横切"`（多文件横切时） | NFR-001 性能 → `"src/utils/cache.ts,src/services/recommend.service.ts"`；NFR-003 可观测性 → `"横切"` |
-| `CON-001~003` | 填写技术栈配置文件或填 `"横切"` | CON-001 TypeScript strict → `"tsconfig.json"`；CON-002 npm 包管理 → `"package.json"`；CON-003 全局约束 → `"横切"` |
+| 行类型        | `codeModule` 回填要求                                                   | 示例值                                                                                                     |
+| ------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `NFR-001~005` | 填写涉及的源码文件锚点（多文件用逗号分隔）或填 `"横切"`（多文件横切时） | NFR-001 性能 → `"src/utils/cache.ts:L1,src/services/recommend.service.ts:L1"`；NFR-003 可观测性 → `"横切"` |
+| `CON-001~003` | 填写技术约束在 src 内的落点锚点或填 `"横切"`                            | CON-001 TypeScript strict → `"横切"`；CON-002 npm 包管理 → `"横切"`；CON-003 全局约束 → `"横切"`           |
+
+> 注：指向非 src 配置文件（如 tsconfig.json）的文法待后续裁定，当前以 `横切` 或 src 内锚点表达。
 
 **与 REQ 行的差别**：
 
-- REQ 行 `codeModule` 格式严格为 `SD-xxx:src/path/to/file.ts`（须带 SD 前缀，便于 `check-code-tla-consistency.ts` 维度 1 反向追溯）。
-- NFR/CON 行因横切多个 SD 或对应全局配置文件，**不带 SD 前缀**，直接填文件路径或 `"横切"` 标识。
+- REQ 行 `codeModule` 格式严格为 `SD-<id>:src/<path>:L<start>[-<end>]`（须带 SD 前缀，便于 `check-code-tla-consistency.ts` 维度 1 反向追溯）。
+- NFR/CON 行因横切多个 SD 或对应全局配置文件，**不带 SD 前缀**，条目直接填 `src/<path>:L<start>[-<end>]` 锚点或整格 `"横切"` 标识。
 
 **阶段 5 门禁校验**：`check-artifact-gate.ts --phase=5` 校验 NFR/CON 行的 `codeModule` 字段非空（非 `null`、非空字符串）。缺失即门禁退出码 1，作为 R 定位线索并执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；仅在用户 CHECKPOINT 确认后，按 R 结论补回填。
 
@@ -353,7 +366,7 @@ PORT=3000
 
 ```typescript
 // src/app.ts 首行
-import 'dotenv/config';
+import "dotenv/config";
 // process.env.JWT_SECRET 自动可用
 ```
 
@@ -375,6 +388,7 @@ import 'dotenv/config';
 ### Windows PowerShell 适配
 
 `cross-env` 在 PowerShell 下可能失效，建议用以下方式之一：
+
 - `$env:JWT_SECRET="test-secret-blog-demo"` 临时设置
 - 使用 `dotenv` 包（推荐）
 
@@ -411,21 +425,21 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 
 ## 禁止行为
 
-| # | 禁止行为 | 正确做法 |
-|---|---|---|
-| 1 | 生成无断言的占位单元测试 | 每个用例必须有明确断言（期望值 vs 实际值） |
-| 2 | 只为 happy path 生成单元测试 | 必须覆盖边界条件、异常输入、错误路径 |
-| 3 | 让单元测试依赖外部服务（DB/网络） | 用 mock/stub 隔离，单元测试不得发起真实网络或 DB 调用 |
-| 4 | 用 `// eslint-disable` 绕过规范检查 | 修复违规源，禁止整文件 disable |
-| 5 | 覆盖率不达标时调低阈值放行 | 阈值固定 ≥ 80%，不达标必须补测试 |
-| 6 | 伪造实现（TODO/stub）当完成 | 缺失依赖必须暂停标注，不得伪造业务逻辑 |
-| 7 | 路由层或控制器入口仅校验 token 存在未校验角色（如 `authRequired=true` 但未校验 `user`/`reader`/`blogger` 角色） | 路由层或控制器入口必须显式校验 `requiredRole`，与需求/设计中的角色枚举一致；token 解码后须断言 `token.role ∈ requiredRoles`，否则返回 403 Forbidden。详见下方「角色校验清单」节 |
-| 8 | 响应体字段返回副作用自增前的旧值（如 `viewCount` 自增后响应体仍返回旧值） | 副作用（如计数器自增、状态变更、关联记录创建）须在响应体构造前完成；响应体字段须反映已生效的状态。详见下方「副作用时序一致性清单」节 |
-| 9 | 复制粘贴重复代码段 | 须提炼函数/类消除重复（坏味道清单 #1） |
-| 10 | 单函数超 ~40 行不拆分 | 按单一职责拆分，保持函数短小（坏味道清单 #2） |
-| 11 | 使用布尔标记参数 | 拆分为两个意图明确的函数或枚举参数（坏味道清单 #4） |
-| 12 | 有返回值函数还产生可见副作用 | 命令与查询分离：有返回值的函数不修改状态（坏味道清单 #5） |
-| 13 | 裸全局可变数据跨模块共享 | 封装变量 / 限制共享数据作用域（坏味道清单 #6 + concurrency-guide） |
+| #   | 禁止行为                                                                                                        | 正确做法                                                                                                                                                                        |
+| --- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 生成无断言的占位单元测试                                                                                        | 每个用例必须有明确断言（期望值 vs 实际值）                                                                                                                                      |
+| 2   | 只为 happy path 生成单元测试                                                                                    | 必须覆盖边界条件、异常输入、错误路径                                                                                                                                            |
+| 3   | 让单元测试依赖外部服务（DB/网络）                                                                               | 用 mock/stub 隔离，单元测试不得发起真实网络或 DB 调用                                                                                                                           |
+| 4   | 用 `// eslint-disable` 绕过规范检查                                                                             | 修复违规源，禁止整文件 disable                                                                                                                                                  |
+| 5   | 覆盖率不达标时调低阈值放行                                                                                      | 阈值固定 ≥ 80%，不达标必须补测试                                                                                                                                                |
+| 6   | 伪造实现（TODO/stub）当完成                                                                                     | 缺失依赖必须暂停标注，不得伪造业务逻辑                                                                                                                                          |
+| 7   | 路由层或控制器入口仅校验 token 存在未校验角色（如 `authRequired=true` 但未校验 `user`/`reader`/`blogger` 角色） | 路由层或控制器入口必须显式校验 `requiredRole`，与需求/设计中的角色枚举一致；token 解码后须断言 `token.role ∈ requiredRoles`，否则返回 403 Forbidden。详见下方「角色校验清单」节 |
+| 8   | 响应体字段返回副作用自增前的旧值（如 `viewCount` 自增后响应体仍返回旧值）                                       | 副作用（如计数器自增、状态变更、关联记录创建）须在响应体构造前完成；响应体字段须反映已生效的状态。详见下方「副作用时序一致性清单」节                                            |
+| 9   | 复制粘贴重复代码段                                                                                              | 须提炼函数/类消除重复（坏味道清单 #1）                                                                                                                                          |
+| 10  | 单函数超 ~40 行不拆分                                                                                           | 按单一职责拆分，保持函数短小（坏味道清单 #2）                                                                                                                                   |
+| 11  | 使用布尔标记参数                                                                                                | 拆分为两个意图明确的函数或枚举参数（坏味道清单 #4）                                                                                                                             |
+| 12  | 有返回值函数还产生可见副作用                                                                                    | 命令与查询分离：有返回值的函数不修改状态（坏味道清单 #5）                                                                                                                       |
+| 13  | 裸全局可变数据跨模块共享                                                                                        | 封装变量 / 限制共享数据作用域（坏味道清单 #6 + concurrency-guide）                                                                                                              |
 
 ## 角色校验清单
 
@@ -497,6 +511,7 @@ G 子代理跑 [`check-design-contract-consistency.ts`](../scripts/cli/check-des
 ## L4 features 作为 TDD 夹具
 
 S-code 子代理在编码时遵循 TDD 红-绿-重构循环，以 L4 BDD features 作为夹具：
+
 1. 先跑 `npx cucumber-js features/L4/` 观察 all scenarios fail（红）
 2. 实现 step definitions（`features/step_definitions/L4_*.steps.ts`）+ 业务代码
 3. 重跑 cucumber 直到 all scenarios pass（绿）
@@ -507,6 +522,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 ## 返工路径
 
 阶段门评审不通过时，以下内容仅作为 **R 定位线索**，不能直接触发 S 或跨阶段回退：
+
 - 设计文档字段缺失/类型不明：R 核验是否为阶段 4 上游缺陷
 - 技术栈未登记：暂停并由用户确认技术栈
 - 依赖未定义：标注缺失依赖并暂停，不得伪造实现

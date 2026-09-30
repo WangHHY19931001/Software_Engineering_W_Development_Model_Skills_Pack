@@ -24,7 +24,7 @@
 
 | 票据 ID | 实现契约（符号级） | 代码模块（RTM codeModule） | 状态 |
 |---|---|---|---|
-| 01 | {{实现 XX 契约：入参/返回/状态转移}} | SD-5.2.1:src/services/article.service.ts | ✅ 完成 |
+| 01 | {{实现 XX 契约：入参/返回/状态转移}} | SD-5.2.1:src/services/article.service.ts:L42-58 | ✅ 完成 |
 
 > 票据主体为符号级契约（接口 / 类型 / 行为），文件路径由 codegraph 查询落盘决定（见 [phase-5-coding.md](../references/phase-5-coding.md)「票据内容 durability」）。
 
@@ -69,8 +69,8 @@
 
 ## 6. RTM 登记
 
-- [ ] REQ 行 `codeModule` 已回填（格式 `SD-xxx:src/path/to/file.ts`，多个用逗号分隔）
-- [ ] NFR/CON 行 `codeModule` 已回填（文件清单或 `横切`）
+- [ ] REQ 行 `codeModule` 已回填（条目格式 `SD-<id>:src/<path>:L<start>[-<end>]`，如 `SD-5.2.1:src/auth/login.ts:L42-58`，多个条目逗号分隔）
+- [ ] NFR/CON 行 `codeModule` 已回填（条目带锚点或整格 `横切`）
 
 ## 7. 校验
 

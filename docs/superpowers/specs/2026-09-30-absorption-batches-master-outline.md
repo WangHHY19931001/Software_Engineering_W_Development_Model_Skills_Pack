@@ -69,7 +69,26 @@
 
 | 批次 | 规格 | 实现计划 | 状态 |
 |---|---|---|---|
-| 1 | 2026-09-30-design-code-consistency-anchors-design.md（commit 31730600） | — | 待计划 |
+| 1 | 2026-09-30-design-code-consistency-anchors-design.md（commit 31730600） | 2026-09-30-design-code-consistency-anchors.md（fa05d196） | **已实现**（16 提交 fa05d196..d0a180a9；最终审查 4 Important 修复波完成并定向复审批准；prepush 19/19；版本 42.6.0），待合并 |
+
+### 5.1 批次 1 延后项与后续项登记（2026-10-01，工作区账本销毁前的持久化）
+
+**后续项（批次 3 同期落地，届时才有真实消费者）：**
+- CLI `check-state-machine-consistency.ts` 增 `differences` 透传（约 1 行）+ R/reworkHints 消费路径闭环。
+- SDMAP-5 结构化形态与 classification 标签（现为字符串违规，R 拿不到分类）。
+- 双实现一致性 property 测试：「同一 rtm/graph 输入两门禁违规集合等价」（把人工推演承诺变回归资产）。
+- state-machine 零交集守卫 sharedTransition 救场路径测试 + classification 改引用 ChangeClassification 权威类型。
+
+**文档对齐候选（非阻断）：**
+- `quick-self-check.md:21` 与 `schemas/code-tla-manifest.schema.json:159` 仍用省略锚点简写「格式 SD-xxx:src/path」（与批次 1 修复的 phase-5:194 同族）。
+- `check-artifact-gate.ts` countUtf8Lines 与 graph CLI countContentLines 行数口径分叉（尾换行 off-by-one）——收拢为 lib 共享函数。
+- `check-artifact-gate.ts:508` containment 注释措辞失实（`..` 段可越出 projectDir，只读统计无实质风险）。
+- SSoT §10.8「两实现语义一致」过度声明（①-⑤ 实际仅 gate 全实现）；SSoT:2306 权威指针指向内部规划目录。
+
+**待人类设计裁定：**
+- CON 行指向非 src 配置文件（如 tsconfig.json/package.json）的文法（当前以 `横切` 或 src 内锚点表达，phase-5-coding.md:342 已留注）。
+
+**流程教训（后续批次简报规范）：** 规格泛称「条目」而简报转译成 REQ-only 代码曾造成两个缺口（SDMAP-3/4 行类型、开放锚点）——后续简报须携带规格原文约束行并显式声明「本任务收窄/不收窄」；文档硬切清单可考虑给 docs-consistency 增加旧文法示例扫描。
 | 2 | — | — | 未立项 |
 | 3 | — | — | 未立项 |
 | 4 | — | — | 未立项 |

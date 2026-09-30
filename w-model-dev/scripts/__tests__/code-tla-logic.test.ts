@@ -66,19 +66,39 @@ function makeCodeFile(source: string, filePath = 'src/sample.ts'): CodeFile {
 // ==================== 维度1：SD→codeModule 映射 ====================
 
 describe('维度1 checkSdToCodeModule', () => {
-  it('SD 映射对（2 态：有 codeModule 通过 / 缺映射失败点名并提示回填时机）', () => {
+  it('SD 映射对（2 态：前缀条目通过 / 缺映射 SDMAP-1 失败点名并提示回填时机）', () => {
     for (const [场景, sds, mappings, 期望] of [
       [
-        'SD 有对应 codeModule',
+        'SD 有对应 codeModule（前缀精确条目）',
         ['SD-AUTH'],
-        [{ requirementId: 'REQ-001', codeModule: 'src/services/auth.service.ts' }],
-        { passed: true, checked: 1, contains: [] as string[], minViolations: 0 },
+        [
+          {
+            requirementId: 'REQ-001',
+            codeModule: 'SD-AUTH:src/services/auth.service.ts:L1-9',
+          },
+        ],
+        {
+          passed: true,
+          checked: 1,
+          contains: [] as string[],
+          minViolations: 0,
+        },
       ],
       [
         'SD 缺少 codeModule 映射（SD-REVIEW 无对应）',
         ['SD-AUTH', 'SD-REVIEW'],
-        [{ requirementId: 'REQ-001', codeModule: 'src/services/auth.service.ts' }],
-        { passed: false, checked: 2, contains: ['SD-REVIEW', '阶段5编码后必须回填'], minViolations: 1 },
+        [
+          {
+            requirementId: 'REQ-001',
+            codeModule: 'SD-AUTH:src/services/auth.service.ts:L1-9',
+          },
+        ],
+        {
+          passed: false,
+          checked: 2,
+          contains: ['SD-REVIEW 无对应 codeModule', 'SDMAP-1', '阶段5编码后必须回填'],
+          minViolations: 1,
+        },
       ],
     ] as const) {
       const graph = makeGraph([...sds]);
@@ -99,10 +119,28 @@ describe('维度1 checkSdToCodeModule', () => {
     }
   });
 
-  it('SD id 去 "SD-" 前缀转小写后做包含匹配', () => {
-    // SD-Article-Service → "articleservice" 应匹配 "src/controllers/article.controller.ts"
+  it('批次1 前缀精确后子串包含不再通过（SD-Article-Service → article.controller.ts 为 SDMAP-1 失败）', () => {
+    // 旧语义：SD-Article-Service 拆段 "articleservice" 包含匹配路径即通过（已废除）
     const graph = makeGraph(['SD-Article-Service']);
-    const rtm = makeRtm([{ requirementId: 'REQ-002', codeModule: 'src/controllers/article.controller.ts' }]);
+    const rtm = makeRtm([
+      {
+        requirementId: 'REQ-002',
+        codeModule: 'src/controllers/article.controller.ts',
+      },
+    ]);
+    const result = checkSdToCodeModule(graph, rtm);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => v.includes('SDMAP-1'))).toBe(true);
+  });
+
+  it('前缀形态正例：SD-Article-Service:src/controllers/article.controller.ts:L1-9 通过', () => {
+    const graph = makeGraph(['SD-Article-Service']);
+    const rtm = makeRtm([
+      {
+        requirementId: 'REQ-002',
+        codeModule: 'SD-Article-Service:src/controllers/article.controller.ts:L1-9',
+      },
+    ]);
     const result = checkSdToCodeModule(graph, rtm);
     expect(result.passed).toBe(true);
   });
@@ -329,6 +367,69 @@ Invariants ==
   });
 });
 
+// ==================== 批次1：D1 前缀精确 + classification + 零交集守卫 ====================
+
+describe('批次1 D1 前缀精确 + 分类 + 零交集', () => {
+  function sdGraph(ids: string[]): Graph {
+    return { nodes: ids.map((id) => ({ id, type: 'SD' })), edges: [] };
+  }
+  function rtmWith(codeModule: string): Rtm {
+    return { rows: [{ requirementId: 'REQ-001', codeModule }] };
+  }
+  function makeInput(overrides: Partial<CodeTlaConsistencyInput> = {}): CodeTlaConsistencyInput {
+    return {
+      manifest: makeManifest(),
+      graph: sdGraph([]),
+      rtm: rtmWith('src/x.ts:L1-9'),
+      codeFiles: [],
+      ...overrides,
+    };
+  }
+
+  it('D1 前缀精确：SD-AUTH 条目须为 SD-AUTH:src/…（无前缀 src/auth.ts 不再通过）', () => {
+    const r = checkCodeTlaConsistency(
+      makeInput({
+        graph: sdGraph(['SD-AUTH']),
+        rtm: rtmWith('src/auth.ts:L1-9'),
+      }),
+    );
+    expect(r.dimensions.sdToCodeModule.passed).toBe(false);
+    expect(r.dimensions.sdToCodeModule.structuredViolations?.some((v) => v.rule === 'SDMAP-1')).toBe(true);
+  });
+
+  it('D1 语义违规 classification=semantic', () => {
+    const r = checkCodeTlaConsistency(
+      makeInput({
+        graph: sdGraph(['SD-AUTH']),
+        rtm: rtmWith('SD-BILLING:src/b.ts:L1'),
+      }),
+    );
+    expect(r.dimensions.sdToCodeModule.structuredViolations?.find((v) => v.rule === 'SDMAP-1')?.classification).toBe(
+      'semantic',
+    );
+  });
+
+  it('零交集守卫：图 SD 集与 REQ 条目 SD 集均非空且无交集 → cannot prove same system', () => {
+    const r = checkCodeTlaConsistency(makeInput({ graph: sdGraph(['SD-A']), rtm: rtmWith('SD-B:src/b.ts:L1') }));
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.message.includes('cannot prove same system'))).toBe(true);
+    expect(r.structuredViolations?.some((v) => v.rule === 'INPUT-NO-SHARED-SD')).toBe(true);
+    expect(r.structuredViolations?.find((v) => v.rule === 'INPUT-NO-SHARED-SD')?.classification).toBe('topology');
+  });
+
+  it('部分交集不触发守卫：SD-REVIEW 缺映射仍由 SDMAP-1 正常差异上报（无 INPUT-NO-SHARED-SD）', () => {
+    const graph = sdGraph(['SD-AUTH', 'SD-REVIEW']);
+    const rtm: Rtm = {
+      rows: [{ requirementId: 'REQ-001', codeModule: 'SD-AUTH:src/auth.ts:L1-9' }],
+    };
+    const r = checkCodeTlaConsistency(makeInput({ graph, rtm }));
+    expect(r.passed).toBe(false);
+    expect(r.structuredViolations?.some((v) => v.rule === 'INPUT-NO-SHARED-SD')).toBe(false);
+    // 「无对应 codeModule」子串为 self-test CODE_TLA_CASES 正则（/SD-REVIEW 无对应 codeModule/）依赖
+    expect(r.dimensions.sdToCodeModule.violations.some((v) => v.includes('SD-REVIEW 无对应 codeModule'))).toBe(true);
+  });
+});
+
 // ==================== 主入口 checkCodeTlaConsistency ====================
 
 describe('主入口 checkCodeTlaConsistency', () => {
@@ -350,7 +451,7 @@ BusinessInvariant ==
     const input: CodeTlaConsistencyInput = {
       manifest: makeManifest([{ level: 'L2' }]),
       graph: makeGraph(['SD-AUTH']),
-      rtm: makeRtm([{ requirementId: 'REQ-001', codeModule: 'src/auth.ts' }]),
+      rtm: makeRtm([{ requirementId: 'REQ-001', codeModule: 'SD-AUTH:src/auth.ts:L1-9' }]),
       codeFiles: [file],
     };
     // 注入 tlaContent（CLI 读取后注入）

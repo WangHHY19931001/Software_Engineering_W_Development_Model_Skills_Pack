@@ -243,7 +243,7 @@
 1. **根因收敛**：≥⌈N×0.6⌉ 个 persona 收敛到同一根因 → 采纳
 2. **分歧仲裁**：根因分散时，R-lead 须记录分歧 + 选择主根因 + 标注 minority 视角
 3. **证据合并**：合并所有 persona 的 evidence，去重
-4. **fixRecommendation 合并**：按根因收敛度排序
+4. **fixRecommendation 合并**：按根因收敛度排序；消费一致性门禁差异时按 classification 排序（semantic/topology 优先于 evidence-only）
 5. **upstreamDefect 仲裁**：任一 persona 标记则 R-lead 须复核
 6. **reality-check 硬约束**：规范 persona 为 `testing-reality-checker`，其 confidence < 0.5 → 最终 `passed=false`；为兼容已有合法归档，`reality-checker` 仅在 canonical 缺失时作 legacy fallback。若两者同时出现，canonical 优先且同 artifact 不重复计数；跨 artifact 或异常重复/冲突由 R10 fail-closed。
 

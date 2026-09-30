@@ -7,6 +7,21 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [42.6.0] - 2026-09-30
+
+> 来源：「批次 1：设计↔代码一致性证据化对账」批——规格 `docs/superpowers/specs/2026-09-30-design-code-consistency-anchors-design.md`、批次总纲 `docs/superpowers/specs/2026-09-30-absorption-batches-master-outline.md`、计划 `docs/superpowers/plans/2026-09-30-design-code-consistency-anchors.md`，账本 `.superpowers/sdd/2026-09-30-design-code-consistency-anchors/`（gitignored 账本；逐任务三件套 `task-N-{brief,report}.md` + `review-*.diff`）。**版本 bump 42.5.0 → 42.6.0**（判据：minor 级门禁行为变更——SD→codeModule 对账语义重写 + codeModule 条目语法硬切升级 + GATE_JSON 新增两键）。**破坏性变更（硬切）**：RTM 的 codeModule 条目由文件级升级为行号锚点级语法，**存量项目的 codeModule 条目须补锚点**（子串匹配与数字 id 特判同步废除），未升级条目将被 SDMAP-5 拒收。**计数影响**：schema 34 / exit-2 脚本 46 / prepush 19 / CLI 47 / persona 33 / references 44 均不变，零新增门禁脚本；eval 语料 60/60（mappings.json 仅 fileExists 断言，本批实测零影响）。
+
+### 设计↔代码一致性证据化对账（SDMAP / 锚点语法 / ChangeClassification / 零交集守卫）
+
+- **SD→codeModule 双向精确对账重写（SDMAP-1/2）**：废除 `gate-logic.ts` 拆段子串逻辑与数字 id `${id}:` 特判，统一为前缀解析精确对账——第一向（图→RTM）每个 SD 图节点须有 ≥1 条 REQ 条目其 `SD-<id>:` 前缀精确等于该节点 id（缺映射 SDMAP-1）；第二向（RTM→图）每条 REQ 条目的 SD 前缀须 ∈ 图 SD 节点集合（幽灵 SD 引用 SDMAP-2）；`SD-001` 词形数字与 `SD-2.1` 数字层级两种 id 形态天然兼容。
+- **codeModule 锚点条目语法（SDMAP-5，破坏性硬切）**：条目从文件级升级为行号锚点级——REQ 行 `SD-<id>:<src路径>:L<start>(-<end>)?`、NFR/CON 行 `<src路径>:L<start>(-<end>)?`（整格「横切」特例免锚点），逗号多值逐条目校验（原正则对逗号串整体放行属侥幸，一并修正）；新增 `parseCodeModuleEntries` 解析器；倒序区间与双 L 形态拒收。
+- **存在性 + 行号校验（SDMAP-3/4）经 srcLineCounts 注入面**：纯函数层不读盘，CLI（`check-artifact-gate.ts` 生产路径恒传 projectRoot）读盘构建 `path → 总行数` 表注入；条目 src 路径不存在 → SDMAP-3，行号违反约束（start<1 / end<start / end>总行数）→ SDMAP-4；注入面缺失时该两子项记 `skipped` 计数（不冒充 `passed`、不判违规），早退分支 skipped 口径统一为 injected 判定。
+- **GATE_JSON 扩展（向后兼容）**：`JsonReport` 新增 `sdAnchorCheck` 与 `sdmapViolations` 两键，SDMAP-1..5 进 violations 分布与 structuredViolations；`check-artifact-gate.ts` 接线 srcLineCounts 读盘构建。
+- **ChangeClassification 三值词汇 + 零交集守卫**：`topology`（集合成员差异）/ `semantic`（语义/映射/不变式内容差异）/ `evidence-only`（仅证据位置失效）三值；`StructuredViolation` 增可选 `classification` 字段，state-machine 四差异数组与 code-tla 四维度、SDMAP structuredViolations 分类标注（阻断性不变，仅供 R 根因定位与 reworkHints 排序消费）；**零交集 fail-closed 守卫**（cannot prove same system）：设计文档与代码无任何共享 ID 时 state-machine 对账 fail-closed（既有零证据守卫的扩展，两者分开报）；state-machine 新增分类差异清单。
+- **code-tla D1 前缀精确对账同步**：代码-TLA+ 一致性回归维度 1（SD→codeModule 映射）与 gate-logic SDMAP 语义对齐，废除子串回退（`!` 行为收紧）。
+- **文档与资产同步**：SSoT 先行（双向对账 + 锚点语法 + 分类词汇）；rtm/coding 模板、rtm-guide、phase-5-coding（格式规范与完成判据）、iceberg-sweep-guide §8.7、root-cause-locator（classification 消费排序）、conventions 术语表 3 条、command-reference SDMAP 条目；**B6 悬空引用修复**（`operational-recovery.md` 删除指向 `hard-constraints.md` 不存在锚「错误聚集与超标丢弃」的括注，改为指向本文「超标模块重写」节）；负向样本 ×2 入 NEGATIVE-COVERAGE 登记册 + self-test 用例（48 条 exit-2 探针零漂移）。
+- **收口轮（prepush 驱动修复，2026-09-30）**：security-scan 首轮报 4 条新增发现——`import/order` ×2（`gate-enhancement.test.ts` 文件中部 `import type` 上移至顶部 import 块、`code-tla-logic.ts` parent/sibling 组间补空行，均为纯空白/搬移、行为零变化）**代码修复**；`detect-unsafe-regex` ×2（SDMAP-5 锚点正则的「可选 `-<end>` 行段」构造，与既有豁免先例 `iceberg-sweep-logic.ts` `EVIDENCE_ANCHOR_PATTERN` 的 `L\d+(?:-\d+)?` 同构，单正则无法消去嵌套量词）按扫描输出指引方案 2 `--regenerate` 重生成 baseline（265 指纹 / 366 豁免，v2 内容敏感指纹不变）；另有 `npm audit fix` 修复 brace-expansion（high，GHSA-q2hr-2g5m-vwhr 等上游新公告）与 fast-uri / markdown-it（moderate）传递依赖（仅 `package-lock.json`，9 包 semver 兼容 bump，`package.json` 未动），audit 归零。eval 语料 60/60（批次零影响实测）。
+
 ## [42.5.0] - 2026-09-29
 
 ### 测试/门禁优化（五波；规格 `docs/superpowers/specs/2026-09-28-test-gate-optimization-design.md`，裁定表 `docs/debug/2026-09-28-test-gate-optimization/teeth-adjudication.md`）

@@ -32,6 +32,13 @@ export interface StateMachineConsistencyResult {
   extraInCode: Transition[];
   missingStatesInCode: string[];
   extraStatesInCode: string[];
+  /** 批次1 A2：分类差异清单（本比对器全部差异为 topology；供 R/reworkHints 统一消费） */
+  differences?: Array<{
+    kind: 'state' | 'transition';
+    direction: 'missing-in-code' | 'extra-in-code';
+    subject: string;
+    classification: 'topology';
+  }>;
 }
 
 export function transitionKey(t: Transition): string {
@@ -66,6 +73,16 @@ export function checkStateMachineConsistency(input: StateMachineConsistencyInput
   const designTransitionKeys = new Set(designTransitions.map(transitionKey));
   const codeTransitionKeys = new Set(codeTransitions.map(transitionKey));
 
+  // 零交集守卫（批次1 A2）：两侧均有证据但状态/转移均无交集时，无法证明是同一状态机——
+  // 不得按「全量缺失的差异报告」语义放行比对器，fail-closed（与 task 6 code-tla 同款语义）。
+  const designNonEmpty = designStates.length + designTransitions.length > 0;
+  const codeNonEmpty = codeStates.length + codeTransitions.length > 0;
+  const sharedState = designStates.some((s) => codeStateSet.has(s));
+  const sharedTransition = designTransitions.some((t) => codeTransitionKeys.has(transitionKey(t)));
+  if (designNonEmpty && codeNonEmpty && !sharedState && !sharedTransition) {
+    reasons.push('无共享状态与转移（cannot prove same system），不判一致');
+  }
+
   const missingInCode = designTransitions.filter((t) => !codeTransitionKeys.has(transitionKey(t)));
   const extraInCode = codeTransitions.filter((t) => !designTransitionKeys.has(transitionKey(t)));
 
@@ -75,6 +92,35 @@ export function checkStateMachineConsistency(input: StateMachineConsistencyInput
   if (extraInCode.length > 0) {
     reasons.push(`代码状态机多转移（代码有但设计文档缺）：${extraInCode.map(transitionKey).join(', ')}`);
   }
+
+  // 分类差异清单（批次1 A2）：从既有 missing/extra 四数组构建（missing→missing-in-code、extra→extra-in-code；
+  // state 的 subject=状态名、transition 的 subject=transitionKey(t)；本比对器全部差异 classification=topology）。
+  const differences: StateMachineConsistencyResult['differences'] = [
+    ...missingStatesInCode.map((s) => ({
+      kind: 'state' as const,
+      direction: 'missing-in-code' as const,
+      subject: s,
+      classification: 'topology' as const,
+    })),
+    ...extraStatesInCode.map((s) => ({
+      kind: 'state' as const,
+      direction: 'extra-in-code' as const,
+      subject: s,
+      classification: 'topology' as const,
+    })),
+    ...missingInCode.map((t) => ({
+      kind: 'transition' as const,
+      direction: 'missing-in-code' as const,
+      subject: transitionKey(t),
+      classification: 'topology' as const,
+    })),
+    ...extraInCode.map((t) => ({
+      kind: 'transition' as const,
+      direction: 'extra-in-code' as const,
+      subject: transitionKey(t),
+      classification: 'topology' as const,
+    })),
+  ];
 
   return {
     passed: reasons.length === 0,
@@ -87,5 +133,6 @@ export function checkStateMachineConsistency(input: StateMachineConsistencyInput
     extraInCode,
     missingStatesInCode,
     extraStatesInCode,
+    differences,
   };
 }

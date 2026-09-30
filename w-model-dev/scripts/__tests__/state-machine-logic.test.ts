@@ -104,7 +104,11 @@ describe('state-machine-logic', () => {
     // 与 CLI 头注「不得按『全空合法图』放行」矛盾——抽取失败会表现为两侧都空而非差异，
     // 属「零证据=通过」类 fail-open，已改为 fail-closed。
     const rows = [
-      { name: '空输入（缺省字段降级为空数组）', input: {} as StateMachineConsistencyInput, deep: true },
+      {
+        name: '空输入（缺省字段降级为空数组）',
+        input: {} as StateMachineConsistencyInput,
+        deep: true,
+      },
       {
         name: '四数组显式全空',
         input: {
@@ -137,5 +141,44 @@ describe('state-machine-logic', () => {
     expect(r.codeStates).toEqual(input.codeStates);
     expect(r.designTransitions).toEqual(input.designTransitions);
     expect(r.codeTransitions).toEqual(input.codeTransitions);
+  });
+});
+
+describe('批次1 A2：分类差异 + 零交集守卫', () => {
+  it('差异条目附 classification=topology', () => {
+    const r = checkStateMachineConsistency({
+      designStates: ['idle', 'running'],
+      codeStates: ['idle'],
+      designTransitions: [{ from: 'idle', to: 'running' }],
+      codeTransitions: [],
+    });
+    expect(r.differences).toContainEqual(
+      expect.objectContaining({
+        kind: 'transition',
+        direction: 'missing-in-code',
+        subject: 'idle→running',
+        classification: 'topology',
+      }),
+    );
+  });
+  it('零交集：两侧非空且状态/转移均无交集 → cannot prove same system，passed=false', () => {
+    const r = checkStateMachineConsistency({
+      designStates: ['a'],
+      codeStates: ['x'],
+      designTransitions: [{ from: 'a', to: 'a' }],
+      codeTransitions: [{ from: 'x', to: 'x' }],
+    });
+    expect(r.passed).toBe(false);
+    expect(r.reasons).toContain('无共享状态与转移（cannot prove same system），不判一致');
+  });
+  it('部分交集不触发守卫（正常差异报告）', () => {
+    const r = checkStateMachineConsistency({
+      designStates: ['a', 'b'],
+      codeStates: ['a'],
+      designTransitions: [{ from: 'a', to: 'b' }],
+      codeTransitions: [],
+    });
+    expect(r.reasons).not.toContain('无共享状态与转移（cannot prove same system），不判一致');
+    expect(r.passed).toBe(false);
   });
 });

@@ -8,7 +8,7 @@
       "requirementId": "REQ-001",
       "description": "测试需求",
       "designDoc": "SD-001",
-      "codeModule": "SD-001:src/foo.ts",
+      "codeModule": "SD-001:src/foo.ts:L1",
       "unitTest": "TC-UNIT-001",
       "integrationTest": null,
       "systemTest": null,
