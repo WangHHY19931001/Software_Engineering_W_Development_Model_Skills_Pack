@@ -387,7 +387,7 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 
 ##### P1.4 RTM codeModule 回填时机
 
-- 阶段5编码完成后、code-TLA 一致性检查前，必须回填 RTM.codeModule 列
+- 阶段5编码完成后、code-TLA 一致性检查前，必须回填 RTM.codeModule 列。回填值须为行号锚点语法（见 §10.8 SD-codeModule 双向精确对账）；`check-artifact-gate.ts --phase>=5` 与 `check-code-tla-consistency.ts` 同步校验。
 - 格式：`SD-xxx:src/path/to/file.ts`（多个模块用逗号分隔）
 - 缺失 → `check-code-tla-consistency.ts` 维度1 退出码 1
 
@@ -1587,7 +1587,7 @@ npx tsx w-model-dev/scripts/cli/check-tla-model.ts "<tla-manifest.json>" [--phas
 - **cfg 结构**：`.cfg` 文件禁止含 `MODULE` 声明（`MODULE` 属 `.tla` 头部，混入 `.cfg` 会触发 TLC 解析错误）；`INVARIANT` 行格式须合法（`INVARIANT <Name>`，`<Name>` 为合法 TLA+ 标识符，禁止空值/表达式/注释尾随）——违反 → `cfgStructureViolation`，exitCode=1。
 - **代码状态转移一致性**（check-code-tla-consistency.ts 维度3）：代码状态转移须与 TLA+ `Next` 分支对应——违反 → exitCode=1。
 - **代码断言覆盖不变式**（check-code-tla-consistency.ts 维度4）：代码断言须覆盖 TLA+ 不变式——违反 → exitCode=1。
-- **SD-codeModule 对应**（check-code-tla-consistency.ts 维度1 + check-artifact-gate.ts 终检）：每个 SD 子系统须有对应 codeModule——违反 → exitCode=1。
+- **SD-codeModule 双向精确对账**（check-code-tla-consistency.ts 维度1 + check-artifact-gate.ts 终检，两实现语义一致）：codeModule 值为行号锚点语法（REQ 条目 `SD-<id>:src/<path>:L<start>[-<end>]`，NFR/CON 条目 `src/<path>:L<start>[-<end>]`，单格逗号多值逐条目校验，`横切` 整格特例免锚点）。双向对账：①每个 SD 图节点须有 ≥1 条 REQ 条目前缀精确等于其 id（SDMAP-1）；②每条 REQ 条目 SD 前缀须存在于图 SD 节点集（SDMAP-2）；③条目 src 路径须在注入表中存在（SDMAP-3）；④锚点行号须落在文件总行数内（SDMAP-4）；⑤条目须匹配锚点语法（SDMAP-5）。SDMAP-3/4 依赖 CLI 注入面（path→总行数表），注入缺失时该两子项记 skipped（不冒充 passed，`GATE_JSON.sdAnchorCheck` 三态：checked/skipped/null）。违反任一 → exitCode=1。完成判据：每个 codeModule 断言有源证据锚点；无数量目标——不设锚点数/行数凑数指标。
 
 ### 10.8.1 代码-TLA+ 一致性回归（check-code-tla-consistency.ts）
 
@@ -1609,7 +1609,7 @@ npx tsx w-model-dev/scripts/cli/check-code-tla-consistency.ts \
 
 **四维度校验算法**（确定性，无 LLM；使用 TypeScript Compiler API 解析 AST）：
 
-1. **维度1：SD→codeModule 映射完整性**（`checkSdToCodeModule`）：读取 `graph.json` 中所有 `type=SD` 节点，核验 `rtm.json` 中每个 SD 节点均有对应 `codeModule` 映射（多段匹配：SD id 分段后任一段长度≥2 出现在 codeModule 路径中）。违反 → `sdToCodeModule` 维度失败。
+1. **维度1：SD→codeModule 映射完整性**（`checkSdToCodeModule`）：读取 `graph.json` 中所有 `type=SD` 节点，核验 `rtm.json` 中每个 SD 节点均有对应 `codeModule` 映射（前缀精确对账（解析 REQ 条目 `SD-<id>:` 前缀与图节点 id 全等比较；映射语义与 check-artifact-gate.ts SDMAP 一致，见 §10.8 追加项））。违反 → `sdToCodeModule` 维度失败。
 2. **维度2：代码状态转移抽取**（`extractCodeStateTransfers` + `checkCodeStateTransfer`）：用 `ts.createSourceFile` 解析 `src/` 下所有 `.ts` 文件 AST，抽取 `BinaryExpression(=)` 赋值语句与 `IfStatement` / `SwitchStatement` 条件分支；无赋值则维度失败（代码无状态转移）。
 3. **维度3：Next 分支对应**（`checkNextBranchCoverage`）：正则抽取 TLA+ `Next` 分支动作名，驼峰匹配代码方法名（如 `Logout` → `logout`，`StartNewArticle` → `startNewArticle`）；每个 Next 分支须有对应代码方法。违反 → `nextBranchCoverage` 维度失败。
 4. **维度4：断言覆盖不变式**（`checkInvariantCoverage`）：抽取 `.tla` 文件 `BusinessInvariant` 子不变式名，匹配代码中 `assert` / `invariant` / `require` 调用；宽松策略——有断言即认为覆盖。违反 → `invariantCoverage` 维度失败。
@@ -2301,7 +2301,11 @@ interface RunLogEntry {
   R8 零发现但收敛集合为空或 `sweptArtifacts` 未覆盖（**收敛集只取设计 ID 视角的并集**，`scope` 的文件路径不进入）。
 - **schema 强化**：`sweepCoverage.sweptArtifacts` 加 `minItems: 1`；新增可选 `sweepCoverage.absentViews`。
 
-### 10L.4 三类评审偏移检测（权威定义）
+### 10L.4 一致性差异分类（ChangeClassification）
+
+一致性门禁（check-state-machine-consistency / check-code-tla-consistency / check-artifact-gate SDMAP）的差异输出附可选 `classification` 字段，取值三态（唯一权威定义见 docs/superpowers/specs/2026-09-30-absorption-batches-master-outline.md §4.1）：`semantic`（语义/映射/不变式内容差异）、`topology`（集合成员差异）、`evidence-only`（断言未变、仅证据位置失效）。分类仅供 R 根因定位与 reworkHints 排序消费，不改变阻断语义——任何真实差异仍判违规。两侧比对键均非空且零交集时 fail-closed：「无共享设计 ID（cannot prove same system）」，不判一致。
+
+### 10L.5 三类评审偏移检测（权威定义）
 
 V 评审的失效不止"评错"，还包括"评审者漂移"：
 
@@ -2322,7 +2326,7 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
   不得当作可阻断流程的检查项，也不得因"未接入 CI"判定其失效。
 - **参数无需改动**：`k=5` / `temperature=4.0` / `repeatTimes≥3` 与方差坍缩正交，调整它们不会修复坍缩。
 
-### 10L.5 `exemption` 第 6 类：`evidence-anchor-pending`
+### 10L.6 `exemption` 第 6 类：`evidence-anchor-pending`
 
 - **权威定义**：`graph.json` 中 `evidenceStatus=pending` 的节点在阶段门放行前的**合法出口**，
   复用完整 E1-E9 审批链（S→R→V→人类四阶段、justification ≥20 字符、evidence 非空、时间戳时序），**不新增逻辑**。
@@ -2330,7 +2334,7 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
   （正是 R15e 要防的"自报"）。给出合法出口比堵死更安全。
 - **与 R15e 的分工**：`confirmed` 须有签名链证据（R15e）；尚未验证则如实标 `pending` 并走本类豁免，而非标 `confirmed`。
 
-### 10L.6 阶段门 pending 常态扫描
+### 10L.7 阶段门 pending 常态扫描
 
 `quick-self-check.md` DoD 自检含「未验证证据锚点已清零」项：阶段门放行前 `graph.json` 中
 `evidenceStatus === 'pending'` 的节点数须为 0。**常态触发、非返工触发**——pending 表示"还没做功课"，
