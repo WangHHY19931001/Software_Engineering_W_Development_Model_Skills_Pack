@@ -196,6 +196,54 @@ export interface CheckArtifactGateOptions {
   ticketsText?: string;
 }
 
+// ==================== SDMAP 锚点条目解析（批次1，规格 §4.1/§4.2）====================
+export interface CodeModuleEntry {
+  raw: string;
+  /** REQ 条目的 SD 前缀 id（首个 ":" 前，id 本身不含冒号）；NFR/CON 条目为 null */
+  sdId: string | null;
+  srcPath: string | null;
+  anchorStart: number | null;
+  anchorEnd: number | null;
+}
+
+const CODE_MODULE_REQ_ENTRY = /^SD-([^:]+):(src\/[^:]+):L(\d+)(?:-(\d+))?$/;
+const CODE_MODULE_NFR_ENTRY = /^(src\/[^:]+):L(\d+)(?:-(\d+))?$/;
+
+/** 解析单格 codeModule（逗号多值逐条目）；无法解析的条目字段为 null（由 SDMAP-5 报格式） */
+export function parseCodeModuleEntries(value: string): CodeModuleEntry[] {
+  return value.split(',').map((part) => {
+    const raw = part.trim();
+    const req = CODE_MODULE_REQ_ENTRY.exec(raw);
+    // 组 1-3 结构上必非空（仅组 4 可选）；守卫为 noUncheckedIndexedAccess 类型收窄，与 tla-logic 既有惯例一致
+    if (req && req[1] && req[2] && req[3]) {
+      return {
+        raw,
+        sdId: `SD-${req[1]}`,
+        srcPath: req[2],
+        anchorStart: Number(req[3]),
+        anchorEnd: req[4] === undefined ? null : Number(req[4]),
+      };
+    }
+    const nfr = CODE_MODULE_NFR_ENTRY.exec(raw);
+    if (nfr && nfr[1] && nfr[2]) {
+      return {
+        raw,
+        sdId: null,
+        srcPath: nfr[1],
+        anchorStart: Number(nfr[2]),
+        anchorEnd: nfr[3] === undefined ? null : Number(nfr[3]),
+      };
+    }
+    return {
+      raw,
+      sdId: null,
+      srcPath: null,
+      anchorStart: null,
+      anchorEnd: null,
+    };
+  });
+}
+
 /**
  * SD→codeModule 映射校验（spec §3.4.4 第2项，逻辑同 code-tla-logic.ts 维度1）。
  *
@@ -242,33 +290,40 @@ function checkSdToCodeModuleMapping(graph: GateGraph, rows: RTMRowShape[]): stri
   return violations;
 }
 
-// ==================== codeModule 格式校验（P0-2） ====================
+// ==================== codeModule 格式校验（P0-2 / SDMAP-5） ====================
 /**
- * codeModule 格式校验（按行类型分支）。
- * - REQ 行：^SD-[\d.]+:src/.+
- * - NFR/CON 行：^src/.+ 或 === "横切"
+ * codeModule 格式校验（按行类型分支；批次1 SDMAP-5 锚点条目语法）。
+ * - REQ 行：逐条目 `SD-<id>:src/<path>:L<start>[-<end>]`（多条目逗号分隔）
+ * - NFR/CON 行：逐条目 `src/<path>:L<start>[-<end>]` 或整格 "横切"
+ * - 倒序区间（end < start）与双 L 区间（L5-L9）均拒收
  */
 export function checkCodeModuleFormat(rows: RTMRowShape[]): string[] {
   const violations: string[] = [];
-  const reqPattern = /^SD-[\d.]+:src\/.+/;
-  const nfrPattern = /^src\/.+/;
-
   for (const row of rows) {
     if (!row || typeof row.codeModule !== 'string' || row.codeModule.trim() === '') continue;
-
     const id = row.requirementId;
-    const cm = row.codeModule.trim();
-
-    if (id.startsWith('REQ-')) {
-      if (!reqPattern.test(cm)) {
-        violations.push(
-          `codeModule 格式错误：REQ 行 ${id} 的 codeModule "${cm}" 须匹配 ^SD-[\\d.]+:src/.+（示例：SD-5.2.1:src/auth/login.ts）`,
-        );
+    if (id.startsWith('NFR-') || id.startsWith('CON-')) {
+      if (row.codeModule.trim() === '横切') continue;
+      for (const e of parseCodeModuleEntries(row.codeModule)) {
+        if (e.srcPath === null || e.anchorStart === null || (e.anchorEnd !== null && e.anchorEnd < e.anchorStart)) {
+          violations.push(
+            `codeModule 格式错误：${id.startsWith('NFR-') ? 'NFR' : 'CON'} 行 ${id} 的条目 "${e.raw}" 须匹配 src/<path>:L<start>[-<end>]（start≥1，end≥start；多条目逗号分隔；或整格"横切"）`,
+          );
+        }
       }
-    } else if (id.startsWith('NFR-') || id.startsWith('CON-')) {
-      if (cm !== '横切' && !nfrPattern.test(cm)) {
+      continue;
+    }
+    if (!id.startsWith('REQ-')) continue;
+    for (const e of parseCodeModuleEntries(row.codeModule)) {
+      const ok =
+        e.sdId !== null &&
+        e.srcPath !== null &&
+        e.anchorStart !== null &&
+        e.anchorStart >= 1 &&
+        (e.anchorEnd === null || e.anchorEnd >= e.anchorStart);
+      if (!ok) {
         violations.push(
-          `codeModule 格式错误：${id.startsWith('NFR-') ? 'NFR' : 'CON'} 行 ${id} 的 codeModule "${cm}" 须匹配 ^src/.+ 或 === "横切"`,
+          `codeModule 格式错误：REQ 行 ${id} 的条目 "${e.raw}" 须匹配 SD-<id>:src/<path>:L<start>[-<end>]（示例：SD-5.2.1:src/auth/login.ts:L42-58；多条目逗号分隔）`,
         );
       }
     }
@@ -1363,7 +1418,11 @@ function summarizeM07SchemaFailure(
 export function computeRtmTraceCoverage(
   rows: ReadonlyArray<unknown>,
   phase: number,
-): { rowReasons: string[]; missingItems: Array<{ requirementId: string; fields: string[] }>; coveragePercent: number } {
+): {
+  rowReasons: string[];
+  missingItems: Array<{ requirementId: string; fields: string[] }>;
+  coveragePercent: number;
+} {
   const phaseFields = PHASE_TRACE_FIELDS[phase] ?? REQUIRED_TRACE_FIELDS;
   const rowReasons: string[] = [];
   const missingItems: Array<{ requirementId: string; fields: string[] }> = [];

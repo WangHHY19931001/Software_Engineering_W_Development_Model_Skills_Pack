@@ -22,6 +22,7 @@ import { checkTlaModel, checkCoverage, type TlaManifest, type TlaSpec } from '..
 import { checkVerifierOutput, type VerifierOutputShape } from '../logic/verifier-logic.js';
 import {
   checkArtifactGate,
+  checkCodeModuleFormat,
   checkPhaseSpecStructure,
   checkTemplatesStructure,
   checkUatPathMappingBackfill,
@@ -206,7 +207,9 @@ describe('Part A 门禁增强回归测试', () => {
           'phase=6 合法场景：unit+integration 通过，system+acceptance pending',
           () => {
             const matrix = loadGateSample('valid-phase6.json');
-            const result = checkArtifactGate(matrix, { phaseOption: 6 as PhaseOption });
+            const result = checkArtifactGate(matrix, {
+              phaseOption: 6 as PhaseOption,
+            });
             expect(result.passed, '合法 phase6 应通过').toBe(true);
             expect(result.reasons, '合法 phase6 reasons 应为空').toEqual([]);
           },
@@ -221,7 +224,9 @@ describe('Part A 门禁增强回归测试', () => {
           'phase=6 REQ 缺 integrationTest',
           () => {
             const matrix = loadGateSample('bad-phase6-pending-system.json');
-            const result = checkArtifactGate(matrix, { phaseOption: 6 as PhaseOption });
+            const result = checkArtifactGate(matrix, {
+              phaseOption: 6 as PhaseOption,
+            });
             expect(result.passed, '缺 integrationTest 应 fail').toBe(false);
             expect(
               result.reasons.some((r) => r.includes('REQ-001') && r.includes('integrationTest')),
@@ -233,7 +238,9 @@ describe('Part A 门禁增强回归测试', () => {
           'phase=5 REQ 缺 codeModule',
           () => {
             const matrix = loadGateSample('bad-phase5-missing-codemodule.json');
-            const result = checkArtifactGate(matrix, { phaseOption: 5 as PhaseOption });
+            const result = checkArtifactGate(matrix, {
+              phaseOption: 5 as PhaseOption,
+            });
             expect(result.passed, '缺 codeModule 应 fail').toBe(false);
             expect(
               result.reasons.some((r) => r.includes('REQ-001') && r.includes('codeModule')),
@@ -245,7 +252,9 @@ describe('Part A 门禁增强回归测试', () => {
           'phase=5 bad 样本在 phase=8 终检',
           () => {
             const matrix = loadGateSample('bad-phase5-missing-codemodule.json');
-            const result = checkArtifactGate(matrix, { phaseOption: 8 as PhaseOption });
+            const result = checkArtifactGate(matrix, {
+              phaseOption: 8 as PhaseOption,
+            });
             expect(result.passed, 'phase8 终检应 fail').toBe(false);
           },
         ],
@@ -253,7 +262,9 @@ describe('Part A 门禁增强回归测试', () => {
           'phase=6 合法场景在 phase=8 终检（system/acceptance pending）',
           () => {
             const matrix = loadGateSample('valid-phase6.json');
-            const result = checkArtifactGate(matrix, { phaseOption: 8 as PhaseOption });
+            const result = checkArtifactGate(matrix, {
+              phaseOption: 8 as PhaseOption,
+            });
             expect(result.passed, 'pending 场景 phase8 终检应 fail').toBe(false);
             expect(
               result.reasons.some((r) => r.includes('待执行')),
@@ -863,7 +874,7 @@ describe('P0-2 codeModule 格式校验', () => {
           requirementId: 'REQ-001',
           description: '登录',
           designDoc: 'SD-1',
-          codeModule: 'SD-1.1:src/auth/login.ts',
+          codeModule: 'SD-1.1:src/auth/login.ts:L1',
           unitTest: 'UT-001',
           integrationTest: '',
           systemTest: '',
@@ -892,6 +903,42 @@ describe('P0-2 codeModule 格式校验', () => {
     const result = checkArtifactGate(matrix, { phaseOption: 5 });
     expect(result.reasons.some((r) => r.includes('codeModule 格式错误'))).toBe(false);
   });
+
+  describe('SDMAP-5 锚点条目格式（批次1）', () => {
+    const row = (cm: string) => ({
+      requirementId: 'REQ-001',
+      description: 'd',
+      designDoc: 'SD-2.1',
+      codeModule: cm,
+      acceptanceTest: 'UAT-001',
+    });
+    const fmt = (rows: unknown[]) => checkCodeModuleFormat(rows as never);
+
+    it('合法：REQ 单条目带区间锚点', () => {
+      expect(fmt([row('SD-2.1:src/auth/login.ts:L42-58')])).toEqual([]);
+    });
+    it('合法：REQ 逗号多值逐条目', () => {
+      expect(fmt([row('SD-2.1:src/a.ts:L1, SD-2.1:src/b.ts:L5-9')])).toEqual([]);
+    });
+    it('合法：NFR 单锚点与整格横切', () => {
+      expect(fmt([{ requirementId: 'NFR-001', codeModule: 'src/a.ts:L3' }])).toEqual([]);
+      expect(fmt([{ requirementId: 'NFR-002', codeModule: '横切' }])).toEqual([]);
+    });
+    it('违规：REQ 条目缺锚点', () => {
+      const v = fmt([row('SD-2.1:src/auth/login.ts')]);
+      expect(v.length).toBe(1);
+      expect(v[0]).toMatch(/codeModule 格式错误/);
+    });
+    it('违规：多值中混入缺锚点条目（逐条目报）', () => {
+      const v = fmt([row('SD-2.1:src/a.ts:L1, SD-2.1:src/b.ts')]);
+      expect(v.length).toBe(1);
+      expect(v[0]).toContain('src/b.ts');
+    });
+    it('违规：NFR 双 L 区间与倒序区间', () => {
+      expect(fmt([{ requirementId: 'NFR-003', codeModule: 'src/a.ts:L5-L9' }]).length).toBe(1);
+      expect(fmt([{ requirementId: 'NFR-004', codeModule: 'src/a.ts:L9-5' }]).length).toBe(1);
+    });
+  });
 });
 
 // ==================== gate-logic 修正 ====================
@@ -904,7 +951,7 @@ describe('gate-logic 修正', () => {
             requirementId: 'REQ-001',
             description: '登录',
             designDoc: 'SD-5.2.1',
-            codeModule: 'SD-5.2.1:src/auth/login.ts',
+            codeModule: 'SD-5.2.1:src/auth/login.ts:L1',
             unitTest: 'UT-001',
             integrationTest: 'IT-001',
             systemTest: 'ST-001',
@@ -921,7 +968,11 @@ describe('gate-logic 修正', () => {
             failed: 0,
             pending: 0,
             coverage: 90,
-            evidence: { command: 'npx vitest run', exitCode: 0, observedAt: '2026-09-15T10:00:00.000Z' },
+            evidence: {
+              command: 'npx vitest run',
+              exitCode: 0,
+              observedAt: '2026-09-15T10:00:00.000Z',
+            },
           },
           integrationTest: {
             total: 1,
@@ -929,7 +980,11 @@ describe('gate-logic 修正', () => {
             failed: 0,
             pending: 0,
             coverage: 90,
-            evidence: { command: 'npx vitest run', exitCode: 0, observedAt: '2026-09-15T10:00:00.000Z' },
+            evidence: {
+              command: 'npx vitest run',
+              exitCode: 0,
+              observedAt: '2026-09-15T10:00:00.000Z',
+            },
           },
           systemTest: {
             total: 1,
@@ -937,7 +992,11 @@ describe('gate-logic 修正', () => {
             failed: 0,
             pending: 0,
             coverage: 90,
-            evidence: { command: 'npx vitest run', exitCode: 0, observedAt: '2026-09-15T10:00:00.000Z' },
+            evidence: {
+              command: 'npx vitest run',
+              exitCode: 0,
+              observedAt: '2026-09-15T10:00:00.000Z',
+            },
           },
           acceptanceTest: {
             total: 1,
@@ -945,7 +1004,11 @@ describe('gate-logic 修正', () => {
             failed: 0,
             pending: 0,
             coverage: 90,
-            evidence: { command: 'npx vitest run', exitCode: 0, observedAt: '2026-09-15T10:00:00.000Z' },
+            evidence: {
+              command: 'npx vitest run',
+              exitCode: 0,
+              observedAt: '2026-09-15T10:00:00.000Z',
+            },
           },
         },
       };
@@ -964,7 +1027,7 @@ describe('gate-logic 修正', () => {
             requirementId: 'REQ-A',
             description: '完整行',
             designDoc: 'SD-1.1',
-            codeModule: 'SD-1.1:src/a.ts',
+            codeModule: 'SD-1.1:src/a.ts:L1',
             unitTest: 'UT-A',
             integrationTest: 'IT-A',
             systemTest: 'ST-A',
@@ -975,7 +1038,7 @@ describe('gate-logic 修正', () => {
             requirementId: 'REQ-B',
             description: '缺验收',
             designDoc: 'SD-2.1',
-            codeModule: 'SD-2.1:src/b.ts',
+            codeModule: 'SD-2.1:src/b.ts:L1',
             unitTest: 'UT-B',
             integrationTest: 'IT-B',
             systemTest: 'ST-B',
@@ -1146,7 +1209,15 @@ describe('Phase 1 §8 拒绝登记结构校验（M08）', () => {
     files[path.join(dir, 'discipline-dod.md')] = Array(9).fill('- [ ] x').join('\n');
     const v = checkPhaseSpecStructure(1, dir, mkFs(files));
     // 断言各桶计数：既锁定「恰好报该违规」，也证明未误伤其他桶
-    return { v, counts: { refs: v.refs.length, ssot: v.ssot.length, dod: v.dod.length, oos: v.outOfScope.length } };
+    return {
+      v,
+      counts: {
+        refs: v.refs.length,
+        ssot: v.ssot.length,
+        dod: v.dod.length,
+        oos: v.outOfScope.length,
+      },
+    };
   };
 
   it('合规表格（rejected + reconsidered + 显式 `-` 回链）→ 无违规', () => {
@@ -1240,7 +1311,12 @@ describe('Phase 1 §8 拒绝登记结构校验（M08）', () => {
     ];
     for (const [label, section, marker] of cases) {
       const { counts, v } = run(section);
-      expect(counts, `${label} 四桶计数应恰 1 条 oos`).toEqual({ refs: 0, ssot: 0, dod: 0, oos: 1 });
+      expect(counts, `${label} 四桶计数应恰 1 条 oos`).toEqual({
+        refs: 0,
+        ssot: 0,
+        dod: 0,
+        oos: 1,
+      });
       expect(v.outOfScope[0], `${label} 应命中 ${marker}`).toMatch(marker);
     }
   });
@@ -1766,7 +1842,11 @@ describe('§4.2 验收标准可量化校验（phase 1）与 §5 ADR 三列校验
     '| 需求 ID | level | priority | reqGroup | parent | 类型 | 描述 | 验收标准 | evidenceAnchor |\n|---|---|---|---|---|---|---|---|---|';
 
   it('acceptance violation 族（3 态：level=4 空 / 主观词「快速」/ NFR 指标「高可用」）', () => {
-    const cases: { label: string; tableBody: string; assert: (v: { acceptance: string[] }) => void }[] = [
+    const cases: {
+      label: string;
+      tableBody: string;
+      assert: (v: { acceptance: string[] }) => void;
+    }[] = [
       {
         label: 'level=4 行验收标准为空（—）',
         tableBody: `| REQ-004 | 4 | P1 | REQ-001 | REQ-003 | acceptance | 提交订单 | — | x |`,
@@ -1809,7 +1889,10 @@ describe('§4.2 验收标准可量化校验（phase 1）与 §5 ADR 三列校验
           `| REQ-001 | 1 | P0 | REQ-001 | — | domain | 领域 | — | x |\n` +
           `| REQ-004 | 4 | P1 | REQ-001 | REQ-003 | acceptance | 提交订单 | 响应 < 2s 且操作 ≤ 3 步 | x |`,
       },
-      { label: '无 §4.2 表（表完整性不由本判据承担）', tableBody: '（本规格未含层级节点表）' },
+      {
+        label: '无 §4.2 表（表完整性不由本判据承担）',
+        tableBody: '（本规格未含层级节点表）',
+      },
     ];
     for (const c of cases) {
       const files = phase1Files(`${REQ_TABLE_HEADER}\n${c.tableBody}`);
@@ -1841,7 +1924,11 @@ describe('§4.2 验收标准可量化校验（phase 1）与 §5 ADR 三列校验
   const ADR_TABLE_HEADER = '| ADR 编号 | 决策 | 上下文 | 后果 |\n|---|---|---|---|';
 
   it('ADR violation 族（2 态：缺「后果」/ 占位符未填）', () => {
-    const cases: { label: string; archBody: string; assert: (v: { adr: string[] }) => void }[] = [
+    const cases: {
+      label: string;
+      archBody: string;
+      assert: (v: { adr: string[] }) => void;
+    }[] = [
       {
         label: 'ADR 行缺「后果」（FM-SD-02 此前零实现）',
         archBody: `${ADR_TABLE_HEADER}\n| ADR-001 | 采用分布式锁 | 并发竞价冲突 | — |`,
@@ -1873,7 +1960,10 @@ describe('§4.2 验收标准可量化校验（phase 1）与 §5 ADR 三列校验
         label: 'ADR 行三列齐全',
         archBody: `${ADR_TABLE_HEADER}\n| ADR-001 | 采用分布式锁 | 并发竞价冲突 | 正面：判定收敛；负面：运维成本上升 |`,
       },
-      { label: 'ADR 表为空或缺节（不强制条数 ≥1）', archBody: '## 4. 架构原则\n\n- 分层单向依赖\n' },
+      {
+        label: 'ADR 表为空或缺节（不强制条数 ≥1）',
+        archBody: '## 4. 架构原则\n\n- 分层单向依赖\n',
+      },
     ];
     for (const c of cases) {
       const files = phase2Files(c.archBody);
@@ -1937,9 +2027,21 @@ import type { StructuredViolation } from '../lib/types';
 describe('批次1 ChangeClassification 类型契约', () => {
   it('classification 为可选三值字段', () => {
     const v1: StructuredViolation = { rule: 'SDMAP-1', message: 'x' };
-    const v2: StructuredViolation = { rule: 'SDMAP-3', message: 'x', classification: 'evidence-only' };
-    const v3: StructuredViolation = { rule: 'SDMAP-1', message: 'x', classification: 'semantic' };
-    const v4: StructuredViolation = { rule: 'SDMAP-2', message: 'x', classification: 'topology' };
+    const v2: StructuredViolation = {
+      rule: 'SDMAP-3',
+      message: 'x',
+      classification: 'evidence-only',
+    };
+    const v3: StructuredViolation = {
+      rule: 'SDMAP-1',
+      message: 'x',
+      classification: 'semantic',
+    };
+    const v4: StructuredViolation = {
+      rule: 'SDMAP-2',
+      message: 'x',
+      classification: 'topology',
+    };
     expect([v1.classification, v2.classification, v3.classification, v4.classification]).toEqual([
       undefined,
       'evidence-only',

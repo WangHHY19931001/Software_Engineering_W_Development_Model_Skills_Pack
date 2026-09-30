@@ -114,7 +114,7 @@ const makeRow = (): Row => ({
   requirementId: 'REQ-001',
   description: '登录',
   designDoc: 'SD-1.1',
-  codeModule: 'SD-1.1:src/a.ts',
+  codeModule: 'SD-1.1:src/a.ts:L1',
   unitTest: 'UT-001',
   integrationTest: 'IT-001',
   systemTest: 'ST-001',

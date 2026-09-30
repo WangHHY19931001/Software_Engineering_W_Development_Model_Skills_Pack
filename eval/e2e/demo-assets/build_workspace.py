@@ -649,10 +649,10 @@ write_json('.w-model/bdd/reports/report.json', {
 # NFR/CON 行按横切治理口径登记其横切 SD 清单（templates/requirement-spec.md §12.1），不属于 REQ 行的设计链登记。
 rows = [
   {'requirementId': 'REQ-001', 'description': '环形计数器取值 [0,10]', 'designDoc': 'SD-001,INTF-001,DD-001',
-   'codeModule': 'SD-001:src/counter.ts', 'unitTest': 'TC-UNIT-001', 'integrationTest': 'TC-INT-001',
+   'codeModule': 'SD-001:src/counter.ts:L1', 'unitTest': 'TC-UNIT-001', 'integrationTest': 'TC-INT-001',
    'systemTest': 'TC-SYS-001', 'acceptanceTest': 'docs/acceptance-test-design.md#UAT-001', 'coverageStatus': '完整'},
   {'requirementId': 'REQ-002', 'description': 'Inc 自增与 Reset 复位', 'designDoc': 'SD-001,INTF-001,DD-001',
-   'codeModule': 'SD-001:src/counter.ts', 'unitTest': 'TC-UNIT-002', 'integrationTest': 'TC-INT-002',
+   'codeModule': 'SD-001:src/counter.ts:L1', 'unitTest': 'TC-UNIT-002', 'integrationTest': 'TC-INT-002',
    'systemTest': 'TC-SYS-002', 'acceptanceTest': 'docs/acceptance-test-design.md#UAT-002', 'coverageStatus': '完整'},
   {'requirementId': 'NFR-001', 'description': '响应时间 P95 ≤ 200ms', 'designDoc': 'SD-001',
    'codeModule': '横切', 'unitTest': '', 'integrationTest': '', 'systemTest': '', 'acceptanceTest': '',
@@ -684,7 +684,7 @@ DECISIONS = {
   2: ['系统拆分为 SD-001 计数器子系统承载 REQ-002', '架构采用零依赖 TypeScript 模块 + 内存状态设计'],
   3: ['接口 INTF-001 定义 POST /counter/inc 与 /counter/reset 及 GET /counter 三端点', '模块交互采用同步过程调用契约'],
   4: ['详细设计 DD-001 定义 Counter 类字段与状态转移算法', '数据结构采用 number 内存字段与 zeroed/counting 状态机'],
-  5: ['编码实现 SD-001:src/counter.ts 与 TC-UNIT-001~003 单元测试', '代码模块状态转移与 TLA+ Next 分支 Inc/Reset 保持一致'],
+  5: ['编码实现 SD-001:src/counter.ts:L1 与 TC-UNIT-001~003 单元测试', '代码模块状态转移与 TLA+ Next 分支 Inc/Reset 保持一致'],
   6: ['集成测试 TC-INT-001/002 验证 inc→reset 流转与边界', '集成契约与接口 INTF-001 端点行为一致'],
   7: ['系统测试 TC-SYS-001/002 覆盖端到端计数路径', '性能基线：GET /counter 接口 P95 远低于 200ms 阈值达标'],
   8: ['验收测试 UAT-001/002 按 SPEC 冻结规格与接口契约全部通过', '归档产物与 RTM 100% 覆盖及模块清单核对一致'],
@@ -760,7 +760,7 @@ AXES = {
   'test': [('coverage', .3), ('correctness', .25), ('independence', .2), ('clarity', .15), ('priority-reasonableness', .1)],
 }
 KIND = {1: 'requirement', 2: 'design', 3: 'design', 4: 'design', 5: 'code', 6: 'test', 7: 'test', 8: 'test'}
-TARGET = {1: 'REQ-001', 2: 'SD-001', 3: 'INTF-001', 4: 'DD-001', 5: 'SD-001:src/counter.ts', 6: 'TC-INT-001', 7: 'TC-SYS-001', 8: 'UAT-001'}
+TARGET = {1: 'REQ-001', 2: 'SD-001', 3: 'INTF-001', 4: 'DD-001', 5: 'SD-001:src/counter.ts:L1', 6: 'TC-INT-001', 7: 'TC-SYS-001', 8: 'UAT-001'}
 BASE = {1: .92, 2: .90, 3: .91, 4: .90, 5: .93, 6: .91, 7: .92, 8: .93}
 for p in range(1, 9):
   kind, axes, b = KIND[p], AXES[KIND[p]], BASE[p]
@@ -787,7 +787,7 @@ V_ARTIFACTS = {
   2: (['SD-001'], 'docs/system-design.md'),
   3: (['INTF-001'], 'docs/interface-design.md'),
   4: (['DD-001'], 'docs/detailed-design.md'),
-  5: (['SD-001:src/counter.ts'], 'src/counter.ts'),
+  5: (['SD-001:src/counter.ts:L1'], 'src/counter.ts'),
   6: (['TC-INT-001', 'TC-INT-002'], 'test/integration/counter-flow.test.ts'),
   7: (['TC-SYS-001', 'TC-SYS-002'], 'test/system/counter-sys.test.ts'),
   8: (['UAT-001', 'UAT-002'], 'test/acceptance/counter-uat.test.ts'),

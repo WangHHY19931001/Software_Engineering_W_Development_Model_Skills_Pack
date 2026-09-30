@@ -57,7 +57,7 @@ describe('buildStatusReport', () => {
     const complete = {
       description: 'd',
       designDoc: 'docs/x.md#1',
-      codeModule: 'SD-001:src/counter.ts',
+      codeModule: 'SD-001:src/counter.ts:L1',
       unitTest: 'TC-UNIT-001',
       acceptanceTest: 'docs/y.md#UAT-001',
       coverageStatus: '100%',
@@ -88,7 +88,7 @@ describe('buildStatusReport', () => {
           requirementId,
           description: 'd',
           designDoc: 'docs/x.md#1',
-          codeModule: 'SD-001:src/counter.ts',
+          codeModule: 'SD-001:src/counter.ts:L1',
           unitTest: 'TC-UNIT-001',
           integrationTest: 'TC-INT-001',
           systemTest: 'TC-SYS-001',
@@ -110,10 +110,10 @@ describe('buildStatusReport', () => {
             coverageStatus: '完整',
           } as Record<string, string>;
           return [
-            { requirementId: 'REQ-001', codeModule: 'SD-001:src/counter.ts', ...base },
+            { requirementId: 'REQ-001', codeModule: 'SD-001:src/counter.ts:L1', ...base },
             { requirementId: 'REQ-002', codeModule: '', ...base },
-            { requirementId: 'REQ-003', codeModule: 'SD-002:src/x.ts', ...base },
-            { requirementId: 'REQ-004', codeModule: 'SD-003:src/y.ts', ...base },
+            { requirementId: 'REQ-003', codeModule: 'SD-002:src/x.ts:L1', ...base },
+            { requirementId: 'REQ-004', codeModule: 'SD-003:src/y.ts:L1', ...base },
           ];
         })(),
         expected: { covered: 3, total: 4, percent: 75 },

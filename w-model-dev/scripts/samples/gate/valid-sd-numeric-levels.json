@@ -4,7 +4,7 @@
       "requirementId": "REQ-001",
       "description": "用户认证",
       "designDoc": "SD-5.2.1",
-      "codeModule": "SD-5.2.1:src/auth/login.ts",
+      "codeModule": "SD-5.2.1:src/auth/login.ts:L1",
       "unitTest": "UT-001",
       "integrationTest": "",
       "systemTest": "",

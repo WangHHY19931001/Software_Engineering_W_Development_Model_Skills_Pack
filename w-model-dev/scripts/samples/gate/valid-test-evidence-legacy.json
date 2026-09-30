@@ -8,7 +8,7 @@
       "requirementId": "REQ-001",
       "description": "用户登录",
       "designDoc": "SD-1.1",
-      "codeModule": "SD-1.1:src/auth/login.ts",
+      "codeModule": "SD-1.1:src/auth/login.ts:L1",
       "unitTest": "UT-001",
       "integrationTest": "IT-001",
       "systemTest": "ST-001",

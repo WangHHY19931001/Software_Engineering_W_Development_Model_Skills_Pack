@@ -19,7 +19,7 @@ import { invokeCli } from './helpers/cli-invoker.js';
 const PROJECT_JSON =
   '{"id":"smoke","name":"Smoke","description":"","status":"编码","techStack":{"frontend":[],"backend":[],"database":[],"others":[]},"createdAt":"2026-08-05T00:00:00Z","updatedAt":"2026-08-05T01:00:00Z"}';
 const RTM_JSON =
-  '{"rows":[{"requirementId":"R1","description":"d","designDoc":"docs/x.md#1","codeModule":"SD-001:src/a.ts","unitTest":"TC-UNIT-001","acceptanceTest":"docs/y.md#UAT-001","coverageStatus":"100%"},{"requirementId":"R2","description":"d","designDoc":"docs/x.md#2","coverageStatus":"部分"}],"executionSummary":{"unitTest":{"total":10,"passed":9,"failed":1,"pending":0},"integrationTest":{"total":5,"passed":5,"failed":0,"pending":0},"systemTest":{"total":3,"passed":3,"failed":0,"pending":0},"acceptanceTest":{"total":8,"passed":8,"failed":0,"pending":0}}}';
+  '{"rows":[{"requirementId":"R1","description":"d","designDoc":"docs/x.md#1","codeModule":"SD-001:src/a.ts:L1","unitTest":"TC-UNIT-001","acceptanceTest":"docs/y.md#UAT-001","coverageStatus":"100%"},{"requirementId":"R2","description":"d","designDoc":"docs/x.md#2","coverageStatus":"部分"}],"executionSummary":{"unitTest":{"total":10,"passed":9,"failed":1,"pending":0},"integrationTest":{"total":5,"passed":5,"failed":0,"pending":0},"systemTest":{"total":3,"passed":3,"failed":0,"pending":0},"acceptanceTest":{"total":8,"passed":8,"failed":0,"pending":0}}}';
 const RUN_LOG_JSONL =
   '{"runId":"a","timestamp":"t1","phase":5,"action":"produce","role":"S","outcome":"success","gateExitCode":null}\n' +
   '{"runId":"b","timestamp":"t2","phase":5,"action":"gate","role":"G","outcome":"success","gateExitCode":0}\n';
