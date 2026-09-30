@@ -2102,4 +2102,50 @@ describe('SDMAP 双向精确对账（批次1）', () => {
     expect(r.violations).toEqual([]);
     expect(r.skipped).toBe(true); // 未传 srcLineCounts → SDMAP-3/4 skipped
   });
+
+  it('SDMAP-3/4 覆盖全部行类型：NFR 行条目路径不存在 + 行号越界 → 各一条（evidence-only）', () => {
+    const graph = { nodes: [{ id: 'SD-2.1', type: 'SD' }] };
+    const rows = [
+      {
+        requirementId: 'REQ-001',
+        description: 'd',
+        designDoc: 'SD-2.1',
+        codeModule: 'SD-2.1:src/real.ts:L1-3',
+        unitTest: 'UT-001',
+        acceptanceTest: 'UAT-001',
+      },
+      {
+        requirementId: 'NFR-001',
+        description: '性能',
+        designDoc: '横切',
+        codeModule: 'src/nope.ts:L99-999, src/real.ts:L99-999',
+        unitTest: 'UT-002',
+        acceptanceTest: 'UAT-002',
+      },
+    ] as never;
+    // 注入表含 REQ 条目引用的其它文件（保证表非空、checked）；NFR 行 nope.ts 不在表 → SDMAP-3，real.ts 行号越界 → SDMAP-4
+    const r = checkSdToCodeModuleMapping(graph, rows, new Map([['src/real.ts', 3]]));
+    const s3 = r.structured.filter((s) => s.rule === 'SDMAP-3');
+    const s4 = r.structured.filter((s) => s.rule === 'SDMAP-4');
+    expect(s3).toHaveLength(1);
+    expect(s4).toHaveLength(1);
+    expect(s3[0]?.classification).toBe('evidence-only');
+    expect(s4[0]?.classification).toBe('evidence-only');
+    expect(r.violations.some((v: string) => v.includes('NFR-001') && v.includes('SDMAP-3'))).toBe(true);
+    expect(r.violations.some((v: string) => v.includes('NFR-001') && v.includes('SDMAP-4'))).toBe(true);
+    expect(r.skipped).toBe(false);
+  });
+
+  it('开放形态锚点 start>count（无 end）→ SDMAP-4', () => {
+    const graph = { nodes: [{ id: 'SD-2.1', type: 'SD' }] };
+    // 3 行文件 + 开放形态 L99：旧语义（仅 e!==null 才比 end）不触发，收紧后 start>count 即判死
+    const r = checkSdToCodeModuleMapping(
+      graph,
+      rowsOf('SD-2.1:src/real.ts:L99') as never,
+      new Map([['src/real.ts', 3]]),
+    );
+    expect(r.structured.filter((s) => s.rule === 'SDMAP-4')).toHaveLength(1);
+    expect(r.structured.find((s) => s.rule === 'SDMAP-4')?.classification).toBe('evidence-only');
+    expect(r.skipped).toBe(false);
+  });
 });

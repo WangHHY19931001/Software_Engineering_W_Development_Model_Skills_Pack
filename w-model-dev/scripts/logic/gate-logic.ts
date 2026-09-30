@@ -199,7 +199,7 @@ export interface CheckArtifactGateOptions {
    * 纯函数不读盘：文件不存在 / 参数非法的 exit 2 判定由 CLI 层负责。
    */
   ticketsText?: string;
-  /** 批次1 SDMAP-3/4 注入面：src 路径 → 文件总行数；未注入则该两子项 skipped（CLI 生产路径恒注入） */
+  /** 批次1 SDMAP-3/4 注入面：src 路径 → 文件总行数；未注入则该两子项 skipped（CLI 生产路径恒注入）。校验面覆盖全部行类型（REQ+NFR/CON）条目 */
   srcLineCounts?: ReadonlyMap<string, number>;
 }
 
@@ -277,11 +277,17 @@ export function checkSdToCodeModuleMapping(
   const sdNodeIds = new Set(sdNodes.map((n) => String(n.id ?? '')));
 
   const reqEntries: Array<{ rowId: string; entry: CodeModuleEntry }> = [];
+  // SDMAP-3/4 存在性/行号校验面：全部行类型（REQ+NFR/CON）的全部条目（最终审查修复波；
+  // 无 srcPath 的不可解析条目由 SDMAP-5 报格式，循环内守卫跳过。SDMAP-1/2 双向对账仍 REQ-only，
+  // 规格 §4.2 两向限定 REQ 条目）
+  const anchorEntries: Array<{ rowId: string; entry: CodeModuleEntry }> = [];
   for (const row of rows) {
     if (!row || typeof row.codeModule !== 'string' || row.codeModule.trim() === '') continue;
-    if (!String(row.requirementId ?? '').startsWith('REQ-')) continue;
+    const rowId = String(row.requirementId);
+    const isReq = rowId.startsWith('REQ-');
     for (const entry of parseCodeModuleEntries(row.codeModule)) {
-      if (entry.sdId !== null) reqEntries.push({ rowId: String(row.requirementId), entry });
+      anchorEntries.push({ rowId, entry });
+      if (isReq && entry.sdId !== null) reqEntries.push({ rowId, entry });
     }
   }
 
@@ -311,13 +317,13 @@ export function checkSdToCodeModuleMapping(
       });
     }
   }
-  // 注入面：SDMAP-3/4（skipped 语义：未注入不判、不冒充通过）
+  // 注入面：SDMAP-3/4（skipped 语义：未注入不判、不冒充通过）；遍历全部行类型条目（anchorEntries）
   if (injected) {
-    for (const { rowId, entry } of reqEntries) {
+    for (const { rowId, entry } of anchorEntries) {
       if (entry.srcPath === null) continue; // 格式错由 SDMAP-5 报
       const count = srcLineCounts.get(entry.srcPath);
       if (count === undefined) {
-        const msg = `SDMAP-3 路径不存在：REQ 行 ${rowId} 条目 "${entry.raw}" 的 ${entry.srcPath} 不在项目内`;
+        const msg = `SDMAP-3 路径不存在：行 ${rowId} 条目 "${entry.raw}" 的 ${entry.srcPath} 不在项目内`;
         violations.push(msg);
         structured.push({
           rule: 'SDMAP-3',
@@ -329,9 +335,9 @@ export function checkSdToCodeModuleMapping(
       }
       const s = entry.anchorStart ?? 0;
       const e = entry.anchorEnd;
-      const bad = s < 1 || (e !== null && (e < s || e > count));
+      const bad = s < 1 || s > count || (e !== null && (e < s || e > count));
       if (bad) {
-        const msg = `SDMAP-4 锚点行号非法：REQ 行 ${rowId} 条目 "${entry.raw}"（文件共 ${count} 行，须 1 ≤ start ≤ end ≤ 总行数）`;
+        const msg = `SDMAP-4 锚点行号非法：行 ${rowId} 条目 "${entry.raw}"（文件共 ${count} 行，须 1 ≤ start ≤ 总行数；若有 end 则 start ≤ end ≤ 总行数）`;
         violations.push(msg);
         structured.push({
           rule: 'SDMAP-4',

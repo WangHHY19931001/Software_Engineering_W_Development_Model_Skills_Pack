@@ -664,9 +664,10 @@ describe('批次1 SDMAP 注入面（CLI 子进程）', () => {
 
   it('真实文件 + 越界行号 → SDMAP-4；真实文件 + 合法锚点 → 该子项通过', () => {
     // 越界：end=100 > 3 行 → SDMAP-4（经 logic 侧 `e > count` 路径）。
-    // 注意：开放形态 L99（无 end、仅 start 越界）在任务 4 既有语义下不触发
-    // （gate-logic: bad = s<1 || (e!==null && (e<s||e>count))，start>count 无 end 不判）——
-    // 本用例取 end 有界形态，当前与未来收紧语义下均触发，钉住注入面端到端可达。
+    // 开放形态 L99（无 end、仅 start 越界）在最终审查修复波收紧后同样触发
+    // （gate-logic: bad = s<1 || s>count || (e!==null && (e<s||e>count))，start>count 即判死；
+    // 纯函数侧开放形态用例见 gate-enhancement.test.ts SDMAP describe）——
+    // 本用例取 end 有界形态，钉住注入面端到端可达。
     const overDir = makeSdmapProject('SD-2.1:src/real.ts:L99-100');
     try {
       const over = runGate([overDir, '--phase=5', '--json']);
