@@ -81,8 +81,18 @@
 
 ### codeModule
 
-- **规范定义**：代码模块映射标识，格式 `SD-xxx:src/path.ts`（SD 概要设计 ID + 冒号 + 相对项目根的代码路径）。check-artifact-gate 强制格式校验。
+- **规范定义**：代码模块映射标识，REQ 行条目格式 `SD-<id>:src/<path>:L<start>[-<end>]`（SD 概要设计 ID + 冒号 + 相对项目根的代码路径 + 行号锚点），NFR/CON 行条目 `src/<path>:L<start>[-<end>]` 或整格 `横切`，多条目逗号分隔。check-artifact-gate 强制格式校验（SDMAP-5）。
 - **_Avoid_**：codeFile/module/路径（「codeFile」是 code-TLA+ 输入里的代码文件对象，不同结构）。
+
+### 代码锚点
+
+- **规范定义**：codeModule 条目携带的源证据定位 `src/<path>:L<start>[-<end>]`，行号区间须落在真实文件内（SDMAP-3/4 校验）。
+- **_Avoid_**：codeAnchor/sourceRef/裸路径（无 :L 行号）。
+
+### ChangeClassification
+
+- **规范定义**：一致性差异三值分类 semantic / topology / evidence-only（SSoT §10L.4），仅供 R 定位与 reworkHints 排序，不改变阻断。
+- **_Avoid_**：cosmetic/geometry（明确不引入）、blocking-level（分类≠阻断级）。
 
 ### signatureHash
 

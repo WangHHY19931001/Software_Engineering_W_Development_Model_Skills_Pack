@@ -298,7 +298,7 @@ D-6 裁定原文（`:133`）：「worktree 内**禁止**写 `.w-model`；跨 wor
 在 [templates/rtm.md](../templates/rtm.md) 中补登：代码模块列（实现文件路径）。RTM 维护规则见 [rtm-guide.md](rtm-guide.md)。
 
 > **强制条款（P1.4）**：编码完成后、code-TLA 一致性检查前，必须回填 RTM.codeModule 列。
-> 格式：`SD-xxx:src/path/to/file.ts`（多个模块用逗号分隔）。
+> 格式：`SD-<id>:src/<path>:L<start>[-<end>]`（多个条目逗号分隔）。
 > 缺失 → `check-code-tla-consistency.ts` 维度1 退出码 1，violation 明确指出回填时机。
 
 ### codeModule 格式规范
@@ -307,13 +307,13 @@ D-6 裁定原文（`:133`）：「worktree 内**禁止**写 `.w-model`；跨 wor
 
 | 行类型 | 格式 | 正则 | 示例 |
 |---|---|---|---|
-| REQ 行 | `SD-xxx:src/path/to/file.ts` | `^SD-[\d.]+:src/.+\.(ts\|js\|py\|java)$` | `SD-5.2.1:src/auth/login.ts` |
-| NFR 行 | `src/path/to/file.ts` 或 `横切` | `^src/.+\.(ts\|js\|py\|java)$` 或 `^横切$` | `src/middleware/rateLimit.ts` |
+| REQ 行 | `SD-<id>:src/<path>:L<start>[-<end>]` | `^SD-[^:]+:src\/[^:]+:L\d+(-\d+)?$` | `SD-5.2.1:src/auth/login.ts:L42-58` |
+| NFR 行 | `src/<path>:L<start>[-<end>]` 或整格 `横切` | `^src\/[^:]+:L\d+(-\d+)?$` 或 `^横切$` | `src/middleware/rateLimit.ts:L10-24` |
 | CON 行 | 同 NFR | 同 NFR | `横切` |
 
 **校验逻辑**：
-- REQ 行（`requirementId` 以 `REQ-` 开头）：校验 `codeModule` 匹配 `^SD-[\d.]+:src/.+`
-- NFR 行（`requirementId` 以 `NFR-` 开头）：校验 `codeModule` 匹配 `^src/.+` 或 `=== "横切"`
+- REQ 行（`requirementId` 以 `REQ-` 开头）：逐条目校验匹配 `^SD-[^:]+:src\/[^:]+:L\d+(-\d+)?$`（`start ≥ 1` 且 `end ≥ start`）
+- NFR 行（`requirementId` 以 `NFR-` 开头）：逐条目校验匹配 `^src\/[^:]+:L\d+(-\d+)?$`（`start ≥ 1` 且 `end ≥ start`，不得携带 SD- 前缀），或整格 `横切`
 - CON 行（`requirementId` 以 `CON-` 开头）：同 NFR
 - 格式不匹配 → check-artifact-gate.ts 退出码 1，reasons 列出具体 requirementId
 
@@ -330,8 +330,8 @@ D-6 裁定原文（`:133`）：「worktree 内**禁止**写 `.w-model`；跨 wor
 
 **与 REQ 行的差别**：
 
-- REQ 行 `codeModule` 格式严格为 `SD-xxx:src/path/to/file.ts`（须带 SD 前缀，便于 `check-code-tla-consistency.ts` 维度 1 反向追溯）。
-- NFR/CON 行因横切多个 SD 或对应全局配置文件，**不带 SD 前缀**，直接填文件路径或 `"横切"` 标识。
+- REQ 行 `codeModule` 格式严格为 `SD-<id>:src/<path>:L<start>[-<end>]`（须带 SD 前缀，便于 `check-code-tla-consistency.ts` 维度 1 反向追溯）。
+- NFR/CON 行因横切多个 SD 或对应全局配置文件，**不带 SD 前缀**，条目直接填 `src/<path>:L<start>[-<end>]` 锚点或整格 `"横切"` 标识。
 
 **阶段 5 门禁校验**：`check-artifact-gate.ts --phase=5` 校验 NFR/CON 行的 `codeModule` 字段非空（非 `null`、非空字符串）。缺失即门禁退出码 1，作为 R 定位线索并执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；仅在用户 CHECKPOINT 确认后，按 R 结论补回填。
 

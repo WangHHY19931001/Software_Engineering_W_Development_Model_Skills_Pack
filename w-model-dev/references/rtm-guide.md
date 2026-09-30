@@ -159,13 +159,15 @@ RTM 与各阶段文档使用两套 ID，按用途区分，不可混用：
 
 ### codeModule 格式规范
 
+回填完成判据：每个 codeModule 断言有源证据锚点（path+行号区间落在真实文件内，门禁 SDMAP 校验）；**无数量目标**——不设锚点数/行数凑数指标。
+
 `codeModule` 字段须按行类型填写不同格式：
 
-| 行类型 | 格式                            | 正则                                       | 示例                          |
-| ------ | ------------------------------- | ------------------------------------------ | ----------------------------- |
-| REQ 行 | `SD-xxx:src/path/to/file.ts`    | `^SD-[\d.]+:src/.+\.(ts\|js\|py\|java)$`   | `SD-5.2.1:src/auth/login.ts`  |
-| NFR 行 | `src/path/to/file.ts` 或 `横切` | `^src/.+\.(ts\|js\|py\|java)$` 或 `^横切$` | `src/middleware/rateLimit.ts` |
-| CON 行 | 同 NFR                          | 同 NFR                                     | `横切`                        |
+| 行类型 | 格式 | 正则 | 示例 |
+| ------ | ---- | ---- | ---- |
+| REQ 行 | `SD-<id>:src/<path>:L<start>[-<end>]` | `^SD-[^:]+:src\/[^:]+:L\d+(-\d+)?$` | `SD-5.2.1:src/auth/login.ts:L42-58` |
+| NFR 行 | `src/<path>:L<start>[-<end>]` 或整格 `横切` | `^src\/[^:]+:L\d+(-\d+)?$` 或 `^横切$` | `src/middleware/rateLimit.ts:L10-24` |
+| CON 行 | 同 NFR | 同 NFR | `横切` |
 
 **校验时机**：`check-artifact-gate.ts --phase=5` 强制校验。
 **校验逻辑**：按 `requirementId` 前缀（`REQ-` / `NFR-` / `CON-`）分支匹配正则。

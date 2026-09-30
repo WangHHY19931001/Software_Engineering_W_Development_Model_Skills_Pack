@@ -407,6 +407,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - phase 1-4 的项目阶段门同时有两条不同证据路径：BDD D4 required equivalence 固定传 `--require-tla-equivalence --tla-manifest=<项目路径>`；独立文件级 pair sync 则仅在本阶段契约生效、TLA/BDD manifest 均通过真实 schema/资产校验、且 manifest 配对集合满足 TLA→BDD 与 BDD→TLA 双向覆盖时，按 pair 调用 `check-tla-bdd-sync.ts`。D4 不是 pair sync 的替代品，pair sync 也不是 D4 的替代品。
 - 缺失/非法 JSON/schema 畸形/空资产/关联 `.tla`、`.cfg` 或 `.feature` 文件缺失均由各自 evidence gate 产生 blocking violation；不得把缺资产转化为 sync skip。配对孤儿、路径映射不完整、无完整 pair、转移/状态/不变式不一致或 sync 子进程失败同样阻断。phase 5-8 不启用该 TLA↔BDD 文件同步，改用 required Cucumber 执行证据。
 - 该项目阶段门与本地 pre-push fixture 回归分层：pre-push 不调用本 CLI，不启用上述 project-only required flags，也不运行项目 TLA、TLA↔BDD pair sync 或 Cucumber 证据。
+- **SDMAP 锚点对账（批次1）**：`codeModule` 条目格式 `SD-<id>:src/<path>:L<start>[-<end>]`（NFR/CON `src/...:L...`，`横切` 特例）；规则 SDMAP-1（图→RTM 缺映射）/SDMAP-2（幽灵 SD 前缀）/SDMAP-3（路径不存在，注入面）/SDMAP-4（行号越界，注入面）/SDMAP-5（格式）；`GATE_JSON.sdAnchorCheck` 三态（checked/skipped/null，skipped=注入面缺失不冒充通过）+ `sdmapViolations[]`（含 classification）。
 
 ### §8 拒绝登记结构校验（M08，phase 1）
 

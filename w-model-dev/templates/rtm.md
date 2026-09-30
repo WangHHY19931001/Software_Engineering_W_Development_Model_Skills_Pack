@@ -12,9 +12,11 @@
 
 | 需求 ID | 需求描述 | 设计文档 | 代码模块 | 单元测试 | 集成测试 | 系统测试 | 验收测试 | 覆盖状态 |
 |---|---|---|---|---|---|---|---|---|
-| REQ-001 | {{描述}} | {{SD-3.2.1}} | {{userController.ts}} | {{UT-001 \| BDD-L4-blog_system_user_controller-001.feature}} | {{IT-001 \| BDD-L3-blog_system_auth-001.feature}} | {{ST-001 \| BDD-L2-blog_system_auth-001.feature}} | {{UAT-001 \| BDD-L1-blog_system-001.feature}} | {{100%}} |
+| REQ-001 | {{描述}} | {{SD-3.2.1}} | {{SD-3.2.1:src/user/userController.ts:L42-58}} | {{UT-001 \| BDD-L4-blog_system_user_controller-001.feature}} | {{IT-001 \| BDD-L3-blog_system_auth-001.feature}} | {{ST-001 \| BDD-L2-blog_system_auth-001.feature}} | {{UAT-001 \| BDD-L1-blog_system-001.feature}} | {{100%}} |
 | REQ-002 | {{描述}} | — | — | — | — | — | {{UAT-002}} | {{部分}} |
 | REQ-003 | {{描述}} | — | — | — | — | — | — | {{待覆盖}} |
+
+- 代码模块列：多条目逗号分隔；NFR/CON 允许整格 `横切`。
 
 ## 状态说明
 

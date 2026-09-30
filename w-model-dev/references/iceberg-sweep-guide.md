@@ -248,3 +248,7 @@
 
 - `sweepCoverage.sweptArtifacts`：**`minItems: 1`**，空数组使零发现不可对账，schema 直接拒绝。
 - `sweepCoverage.absentViews`：可选；本阶段确认不参与的视角须显式列入，否则 R7 触发。
+
+### 8.7 一致性差异分类词汇（ChangeClassification）
+
+R 定位冰山差异项时按三值分类（SSoT §10L.4 / 批次总纲 §4.1 唯一权威）：`semantic`（语义/映射/不变式）、`topology`（集合成员差异）、`evidence-only`（断言未变、仅证据位置失效）。R6/R7/R8 差异项的 reasons 池前缀不变；本表只作 R 分析与 reworkHints 排序词汇（semantic/topology 优先于 evidence-only），不改变阻断语义。
