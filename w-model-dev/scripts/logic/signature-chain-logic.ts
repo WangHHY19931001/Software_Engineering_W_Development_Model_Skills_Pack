@@ -5,7 +5,7 @@
  * 供 check-signature-chain.ts（CLI）调用，校验 signature-chain.jsonl 的：
  *   R1 角色齐全 + R2 链连续 + R3 时序单调 + R4 角色匹配 + R5 代签检测
  *   + R6 防篡改 + R7 悬空来源 + R8 缺失产物 + R9 越权消费 + R10 绕过门禁
- *   + 跨阶段消费者校验。
+ *   + R11 v2 条目来源 sha256 必填 + 跨阶段消费者校验。
  *
  * 单点事实源，不依赖任何 I/O 与 LLM。
  */
@@ -18,10 +18,15 @@ import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 export type Role = 'O' | 'S' | 'A' | 'V' | 'G' | 'R';
 
+/** sigHash 公式版本；缺省 v1（批次3 v2：公式版本化，artifacts 与 sourceArtifacts 整体纳入内容哈希） */
+export type SigHashAlgo = 'v1' | 'v2';
+
 export interface SourceArtifact {
   path: string;
   sourceSigId: string;
   sourceRole: Role;
+  /** 来源产物内容哈希（v2 链必填，R11 校验格式 ^[a-fA-F0-9]{64}$） */
+  sha256?: string;
 }
 
 export interface InputProvenance {
@@ -43,6 +48,8 @@ export interface SignatureChainEntry {
   prevSigId: string;
   prevSigHash: string;
   sigHash: string;
+  /** sigHash 公式版本；缺省 v1。v2 条目适用 R11（来源 sha256 必填）且 R6 按 v2 公式分流重算 */
+  sigHashAlgo?: SigHashAlgo;
   signedAt: string;
   signer: string;
   gateExitCode?: number | null;
@@ -113,7 +120,7 @@ function isAllowedSource(role: Role, entry: SignatureChainEntry, srcRole: Role):
 // ==================== sigHash 重算 ====================
 
 /**
- * 重算 sigHash（R6 防篡改校验）
+ * 重算 sigHash（R6 防篡改校验，v1 公式——逐字节兼容既有链，不得改动）
  * sigHash = sha256(sigId + phase + role + action + runId + artifacts + prevSigHash + signedAt + signer + inputProvenance)
  */
 export function computeSigHash(entry: Omit<SignatureChainEntry, 'sigHash'>): string {
@@ -121,6 +128,30 @@ export function computeSigHash(entry: Omit<SignatureChainEntry, 'sigHash'>): str
   const provenanceStr = JSON.stringify(entry.inputProvenance);
   const input = `${entry.sigId}|${entry.phase}|${entry.role}|${entry.action}|${entry.runId}|${artifactsStr}|${entry.prevSigHash}|${entry.signedAt}|${entry.signer}|${provenanceStr}`;
   return 'sha256:' + createHash('sha256').update(input, 'utf8').digest('hex');
+}
+
+/**
+ * v2 公式的 artifacts 清单：artifacts 与 sourceArtifacts 两清单整体（含 sha256）结构化纳入内容哈希。
+ */
+function artifactsV2(entry: SignatureChainEntry): string {
+  return JSON.stringify({ artifacts: entry.artifacts, sourceArtifacts: entry.inputProvenance?.sourceArtifacts ?? [] });
+}
+
+/**
+ * 重算 sigHash（v2 公式）：与 v1 的差别仅在槽位 6 换为 artifactsV2（两清单整体含 sha256）。
+ * v2 条目（sigHashAlgo==='v2'）适用；来源 sha256 必填由 R11 单独校验。
+ */
+export function computeSigHashV2(entry: Omit<SignatureChainEntry, 'sigHash'>): string {
+  const input = `${entry.sigId}|${entry.phase}|${entry.role}|${entry.action}|${entry.runId}|${artifactsV2(entry as SignatureChainEntry)}|${entry.prevSigHash}|${entry.signedAt}|${entry.signer}|${JSON.stringify(entry.inputProvenance)}`;
+  return 'sha256:' + createHash('sha256').update(input, 'utf8').digest('hex');
+}
+
+/**
+ * 按条目 sigHashAlgo 分流重算：'v2' → computeSigHashV2，缺省/v1 → computeSigHash（v1 路径逐字节不变）。
+ * R6 防篡改统一入口。
+ */
+export function computeSigHashFor(entry: Omit<SignatureChainEntry, 'sigHash'>): string {
+  return (entry as SignatureChainEntry).sigHashAlgo === 'v2' ? computeSigHashV2(entry) : computeSigHash(entry);
 }
 
 // ==================== 主校验函数 ====================
@@ -302,9 +333,9 @@ export function checkSignatureChain(
     rulesPassed.push('R5');
   }
 
-  // ==================== R6: 防篡改 ====================
+  // ==================== R6: 防篡改（按条目 sigHashAlgo 分流重算） ====================
   for (const entry of phaseEntries) {
-    const recomputed = computeSigHash(entry);
+    const recomputed = computeSigHashFor(entry);
     if (recomputed !== entry.sigHash) {
       violations.push(`R6: sigHash 篡改检测：${entry.sigId} 重算 sigHash 与记录不一致`);
       rulesFailed.push('R6');
@@ -384,6 +415,22 @@ export function checkSignatureChain(
   }
   if (!rulesFailed.includes('R10')) {
     rulesPassed.push('R10');
+  }
+
+  // ==================== R11: v2 条目来源 sha256 必填 ====================
+  // 仅 sigHashAlgo==='v2' 条目适用：v2 公式将来源 sha256 纳入内容哈希，缺 sha256 即失去内容绑定意义。
+  // v1 条目（含缺省）不触发——既有 14 个 v1 样本零破坏。
+  for (const entry of phaseEntries) {
+    if (entry.sigHashAlgo !== 'v2') continue;
+    for (const srcArtifact of entry.inputProvenance?.sourceArtifacts ?? []) {
+      if (!srcArtifact.sha256 || !/^[a-fA-F0-9]{64}$/.test(srcArtifact.sha256)) {
+        violations.push(`R11: ${entry.sigId} v2 条目来源 sha256 缺失或非法`);
+        rulesFailed.push('R11');
+      }
+    }
+  }
+  if (!rulesFailed.includes('R11')) {
+    rulesPassed.push('R11');
   }
 
   // ==================== 跨阶段消费者校验（archive 模式） ====================

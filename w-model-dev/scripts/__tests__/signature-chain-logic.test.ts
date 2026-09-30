@@ -1,9 +1,16 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 
 import { describe, it, expect } from 'vitest';
 
-import { checkSignatureChain, computeSigHash, type SignatureChainEntry } from '../logic/signature-chain-logic.js';
+import {
+  checkSignatureChain,
+  computeSigHash,
+  computeSigHashFor,
+  computeSigHashV2,
+  type SignatureChainEntry,
+} from '../logic/signature-chain-logic.js';
 
 const SAMPLES_DIR = path.join(__dirname, '..', 'samples', 'signature-chain');
 
@@ -211,5 +218,119 @@ describe('signature-chain-logic D-1 返工来源例外', () => {
     const r = checkSignatureChain([withTk]);
     expect(r.violations.filter((v) => v.startsWith('[schema]'))).toEqual([]); // schema 接受 targetKind
     expect(r.rulesFailed).not.toContain('R6'); // R6 重算仍一致
+  });
+});
+
+// ==================== 批次3 sigHash v2（公式分流 + R11） ====================
+
+describe('批次3 sigHash v2', () => {
+  const base = {
+    sigId: 'sig-v2-1',
+    phase: 5,
+    role: 'G' as const,
+    action: 'gate',
+    runId: 'r1',
+    artifacts: ['out/gate.json'],
+    prevSigId: '',
+    prevSigHash: '',
+    signedAt: '2026-10-01T00:00:00.000Z',
+    signer: 'G',
+    inputProvenance: {
+      sourceSigIds: [],
+      sourceArtifacts: [
+        { path: 'out/gate.json', sourceSigId: 'sig-0', sourceRole: 'G' as const, sha256: 'a'.repeat(64) },
+      ],
+      transformDescription: 't',
+    },
+    sigHashAlgo: 'v2' as const,
+  };
+  it('v2 公式纳入 sha256：篡改 sha256 → R6', () => {
+    const tampered = {
+      ...base,
+      inputProvenance: {
+        ...base.inputProvenance,
+        sourceArtifacts: [{ ...base.inputProvenance.sourceArtifacts[0]!, sha256: 'b'.repeat(64) }],
+      },
+    };
+    expect(computeSigHash(tampered as never)).not.toBe(computeSigHash(base as never));
+    // 分流断言：sigHashAlgo==='v2' 条目经 computeSigHashFor 路由至 v2 公式（≠ v1 直调结果）
+    expect(computeSigHashFor(base as never)).toBe(computeSigHashV2(base as never));
+    expect(computeSigHashFor(base as never)).not.toBe(computeSigHash(base as never));
+    // v2 公式逐字段手工拼串独立重算（artifactsV2 槽位 6 = artifacts+sourceArtifacts 结构化整体）
+    const artifactsV2Str = JSON.stringify({
+      artifacts: base.artifacts,
+      sourceArtifacts: base.inputProvenance.sourceArtifacts,
+    });
+    const v2Input = `${base.sigId}|${base.phase}|${base.role}|${base.action}|${base.runId}|${artifactsV2Str}|${base.prevSigHash}|${base.signedAt}|${base.signer}|${JSON.stringify(base.inputProvenance)}`;
+    const expectedV2 = 'sha256:' + createHash('sha256').update(v2Input, 'utf8').digest('hex');
+    expect(computeSigHashV2(base as never)).toBe(expectedV2);
+    // 篡改 sha256 → v2 重算变化（内容哈希真正覆盖 sha256）
+    expect(computeSigHashV2(tampered as never)).not.toBe(computeSigHashV2(base as never));
+  });
+  it('v1 链缺省重算与现状逐字节一致', () => {
+    const v1 = { ...base };
+    delete (v1 as Record<string, unknown>).sigHashAlgo;
+    delete (v1.inputProvenance.sourceArtifacts[0]! as Record<string, unknown>).sha256;
+    expect(computeSigHash(v1 as never)).toBe(computeSigHash(v1 as never)); // 幂等
+    // 有判别力断言：按 v1 公式逐字段手工拼串 + createHash 独立重算，证明 v1 路径公式未变
+    const v1Input = `${v1.sigId}|${v1.phase}|${v1.role}|${v1.action}|${v1.runId}|${JSON.stringify(v1.artifacts)}|${v1.prevSigHash}|${v1.signedAt}|${v1.signer}|${JSON.stringify(v1.inputProvenance)}`;
+    const expectedV1 = 'sha256:' + createHash('sha256').update(v1Input, 'utf8').digest('hex');
+    expect(computeSigHash(v1 as never)).toBe(expectedV1);
+    // 分流断言：v1（缺省 algo）条目经 computeSigHashFor 分流后与 computeSigHash 直调结果相等
+    expect(computeSigHashFor(v1 as never)).toBe(computeSigHash(v1 as never));
+  });
+  it('R11：v2 条目 sha256 缺失/非 64-hex → 违规；v1 条目不触发', () => {
+    // schema 合法形态（sigId/prevSigHash/sigHash 须过 schema 门，否则到不了 R11）
+    const missing = {
+      ...base,
+      sigId: 'wm5-r1-G1',
+      prevSigId: 'genesis',
+      prevSigHash: '0',
+      sigHash: 'sha256:' + 'a'.repeat(64),
+      inputProvenance: {
+        ...base.inputProvenance,
+        sourceArtifacts: [{ path: 'x', sourceSigId: 's', sourceRole: 'G' as const }],
+      },
+    };
+    const r = checkSignatureChain([missing]);
+    expect(r.violations.some((v: string) => v.startsWith('R11'))).toBe(true);
+    // 非 64-hex：schema 层前置拦截（sha256 pattern 不通过 → [schema] 违规提前返回），
+    // R11 的格式校验为纵深防御；公开路径断言整体被拒且违规指向 sha256
+    const badFormat = {
+      ...missing,
+      inputProvenance: {
+        ...missing.inputProvenance,
+        sourceArtifacts: [{ path: 'x', sourceSigId: 's', sourceRole: 'G' as const, sha256: 'not-hex' }],
+      },
+    };
+    const badFormatResult = checkSignatureChain([badFormat]);
+    expect(badFormatResult.passed).toBe(false);
+    expect(badFormatResult.violations.some((v: string) => v.includes('sha256'))).toBe(true);
+    const v1Entry = { ...missing, sigHashAlgo: undefined };
+    expect(checkSignatureChain([v1Entry]).violations.some((v: string) => v.startsWith('R11'))).toBe(false);
+  });
+});
+
+describe('批次3 sigHash v2 fixtures（samples/signature-chain）', () => {
+  it('valid-v2 全链 v2 公式 + sha256 齐全 → 通过（R11 入 rulesPassed）', () => {
+    const entries = loadJsonl('valid-v2.jsonl');
+    const result = checkSignatureChain(entries, { phase: 1 });
+    expect(result.passed).toBe(true);
+    expect(result.rulesFailed).toEqual([]);
+    expect(result.rulesPassed).toContain('R11');
+  });
+
+  it('bad-v2-missing-sha256 → R11', () => {
+    const entries = loadJsonl('bad-v2-missing-sha256.jsonl');
+    const result = checkSignatureChain(entries, { phase: 1 });
+    expect(result.rulesFailed).toContain('R11');
+    expect(result.violations.some((v) => v === 'R11: wm1-r001-S v2 条目来源 sha256 缺失或非法')).toBe(true);
+  });
+
+  it('bad-v2-tampered-sha256 → R6（v2 公式含 sha256，篡改不重算必检出不一致）', () => {
+    const entries = loadJsonl('bad-v2-tampered-sha256.jsonl');
+    const result = checkSignatureChain(entries, { phase: 1 });
+    expect(result.rulesFailed).toContain('R6');
+    expect(result.rulesFailed).not.toContain('R11'); // 篡改后仍为合法 64-hex，R11 不误报
   });
 });
