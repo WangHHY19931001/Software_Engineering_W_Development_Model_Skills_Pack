@@ -488,6 +488,28 @@ async function runArtifactGate(argv: string[]): Promise<void> {
   }
   const matrix = await readJsonClassified<RTMMatrixShape>(rtmFile);
 
+  // 批次1 SDMAP-3/4 注入面：按 codeModule 条目收集 src 路径，读盘统计总行数（语义同 check-requirement-graph.ts countContentLines；不存在则不入表 → SDMAP-3）
+  function countUtf8Lines(abs: string): number | null {
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs 由 rtm.codeModule 条目正则收集并 path.resolve 到 projectDir 下，仅只读统计行数
+      return nodeFs.readFileSync(abs, 'utf8').split('\n').length;
+    } catch {
+      return null;
+    }
+  }
+  const srcLineCounts = new Map<string, number>();
+  for (const row of matrix.rows) {
+    if (!row || typeof row.codeModule !== 'string' || row.codeModule.trim() === '') continue;
+    for (const part of row.codeModule.split(',')) {
+      // eslint-disable-next-line security/detect-unsafe-regex -- 可选组仅一次尝试（? 非星号）且字符类 [^:] 有界，无嵌套星号、无指数回溯
+      const m = /^\s*(?:SD-[^:]+:)?(src\/[^:]+):L/.exec(part);
+      // !m[1] 为 noUncheckedIndexedAccess 类型收窄守卫（组 1 结构上必非空），与 gate-logic.ts parseCodeModuleEntries 同款
+      if (!m || !m[1] || srcLineCounts.has(m[1])) continue;
+      const n = countUtf8Lines(path.resolve(projectDir, m[1]));
+      if (n !== null) srcLineCounts.set(m[1], n);
+    }
+  }
+
   // ==================== TLA+ 资产读取（spec §3.4.4） ====================
   // P2.6 graph 资产自动发现：按优先级查找 .w-model/ingestion/ 下的 graph 资产
   const ingestionDir = path.resolve(projectDir, '.w-model', 'ingestion');
@@ -557,6 +579,8 @@ async function runArtifactGate(argv: string[]): Promise<void> {
     projectRoot: projectDir,
     // S18：--tickets 缺省时为 undefined → 纯函数不触发票据校验（既有调用方零影响）
     ticketsText,
+    // 批次1 SDMAP-3/4 注入面：上面读盘构建的行数表（纯函数不读盘；self-test 纯函数路径不传 → skipped）
+    srcLineCounts,
   });
 
   // ==================== 终检调用 TLA+/BDD model 校验（设计文档 §3.3.8） ====================
@@ -664,6 +688,9 @@ async function runArtifactGate(argv: string[]): Promise<void> {
         testEvidence: testEvidenceSummary,
         // S18：票据内容校验计数（缺省不触发时为 null）
         tickets: ticketsSummary,
+        // 批次1：SDMAP 锚点校验执行态与结构化违规（键恒存在；phase<5 或无 graph 时为 null/[]，便于编排消费）
+        sdAnchorCheck: result.sdAnchorCheck ?? null,
+        sdmapViolations: result.sdmapViolations ?? [],
         // 阶段 1-4 设计级结构校验（引用块/SSOT/DoD/§8）的执行态：
         // checked=已传 --spec-dir 并执行；skipped=阶段 1-4 未传（整组跳过，必须可见）；
         // null=阶段 5-8 不适用。键恒存在，便于编排消费与审计区分「通过」与「未执行」。
@@ -771,6 +798,9 @@ async function runArtifactGate(argv: string[]): Promise<void> {
       testEvidence: testEvidenceSummary,
       // S18：票据内容校验计数（键恒存在；缺省不触发时为 null）
       tickets: ticketsSummary,
+      // 批次1：SDMAP 锚点校验执行态与结构化违规（键恒存在；phase<5 或无 graph 时为 null/[]，便于编排消费）
+      sdAnchorCheck: result.sdAnchorCheck ?? null,
+      sdmapViolations: result.sdmapViolations ?? [],
     },
     exitCode,
   );

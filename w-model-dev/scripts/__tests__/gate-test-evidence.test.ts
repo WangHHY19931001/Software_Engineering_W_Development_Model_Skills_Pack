@@ -592,3 +592,98 @@ describe('M07 CLI 三态链路（真实子进程）', () => {
     expect(result.stderr).toMatch(/✗ \[/);
   }, 120_000);
 });
+
+// ==================== 批次1 SDMAP 注入面（CLI 子进程，任务 5） ====================
+
+/**
+ * 纯函数侧（gate-logic）已钉住 srcLineCounts 注入语义；本组钉住「CLI 把它接到了子进程边界」：
+ * CLI 读 rtm.json 后按 codeModule 条目收集 src 路径读盘统计行数注入，GATE_JSON / --json
+ * 两路输出 sdAnchorCheck/sdmapViolations。未接线时 SDMAP-3/4 不触发且两键缺位（RED 形态）。
+ *
+ * fixture 照本文件既有 CLI 组形态（valid-rtm.json 拷改 + mkdtemp 子进程）补齐 phase=5 必填字段；
+ * graph 只需 nodes 数组（discoverGraphAsset 仅校验 nodes 是数组），SD 节点与 RTM 前缀对齐
+ * 使 SDMAP-1/2 不触发，专测注入面 SDMAP-3/4。
+ */
+describe('批次1 SDMAP 注入面（CLI 子进程）', () => {
+  const tsxCli = createRequire(import.meta.url).resolve('tsx/cli');
+  const gateScript = join(import.meta.dirname, '../cli/check-artifact-gate.ts');
+  const validRtmSource = readFileSync(join(import.meta.dirname, '../samples/gate/valid-rtm.json'), 'utf-8');
+
+  function makeSdmapProject(codeModule: string): string {
+    const dir = makeTmpDir('wm-sdmap-cli-');
+    mkdirSync(join(dir, '.w-model', 'ingestion'), { recursive: true });
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    // 3 行真实文件（无尾换行：countUtf8Lines 按 '\n' split 计数 = 3，L1-3 合法、L99 越界）
+    writeFileSync(join(dir, 'src', 'real.ts'), 'a\nb\nc', 'utf-8');
+    writeFileSync(
+      join(dir, '.w-model', 'ingestion', 'graph.json'),
+      JSON.stringify({ nodes: [{ id: 'SD-2.1', type: 'SD' }] }),
+      'utf-8',
+    );
+    const rtm = JSON.parse(validRtmSource) as Record<string, unknown>;
+    rtm.rows = [
+      {
+        requirementId: 'REQ-001',
+        description: 'd',
+        designDoc: 'SD-2.1',
+        codeModule,
+        unitTest: 'UT-001',
+        integrationTest: 'IT-001',
+        systemTest: 'ST-001',
+        acceptanceTest: 'UAT-001',
+        coverageStatus: '100%',
+      },
+    ];
+    writeFileSync(join(dir, '.w-model', 'rtm.json'), JSON.stringify(rtm), 'utf-8');
+    return dir;
+  }
+
+  function runGate(args: readonly string[]): { status: number | null; stdout: string; stderr: string } {
+    const result = runSync(process.execPath, [tsxCli, gateScript, ...args], { timeout: 120_000 });
+    return { status: result.status, stdout: String(result.stdout ?? ''), stderr: String(result.stderr ?? '') };
+  }
+
+  it('路径不存在 → SDMAP-3，exitCode=1，sdAnchorCheck=checked', () => {
+    // 同格第二条目指向真实文件：注入表非空是 checked 的前提（空 Map = skipped，任务 4 语义）
+    const dir = makeSdmapProject('SD-2.1:src/nope.ts:L1,SD-2.1:src/real.ts:L1');
+    try {
+      // --json 路：单行可 parse 报告，两键与 SDMAP-3 均可见
+      const json = runGate([dir, '--phase=5', '--json']);
+      expect(json.status).toBe(1);
+      expect(json.stdout).toContain('SDMAP-3');
+      expect(json.stdout).toContain('"sdAnchorCheck":"checked"');
+      // GATE_JSON 路（人类可读路径收尾摘要）：两键置于 tickets 之后（键序钉死）
+      const gate = runGate([dir, '--phase=5']);
+      expect(gate.status).toBe(1);
+      expect(gate.stdout).toContain('SDMAP-3');
+      expect(gate.stdout).toContain('"tickets":null,"sdAnchorCheck":"checked","sdmapViolations":[');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 240_000);
+
+  it('真实文件 + 越界行号 → SDMAP-4；真实文件 + 合法锚点 → 该子项通过', () => {
+    // 越界：end=100 > 3 行 → SDMAP-4（经 logic 侧 `e > count` 路径）。
+    // 注意：开放形态 L99（无 end、仅 start 越界）在任务 4 既有语义下不触发
+    // （gate-logic: bad = s<1 || (e!==null && (e<s||e>count))，start>count 无 end 不判）——
+    // 本用例取 end 有界形态，当前与未来收紧语义下均触发，钉住注入面端到端可达。
+    const overDir = makeSdmapProject('SD-2.1:src/real.ts:L99-100');
+    try {
+      const over = runGate([overDir, '--phase=5', '--json']);
+      expect(over.status).toBe(1);
+      expect(over.stdout).toContain('SDMAP-4');
+    } finally {
+      rmSync(overDir, { recursive: true, force: true });
+    }
+
+    // 合法：L1-3 恰为文件总行数 → 锚点子项全过（不含任何 SDMAP- 文案；
+    // overall 仍由其它项决定——scope/cucumber/bdd 缺失照常非零，不在本用例断言范围）
+    const legalDir = makeSdmapProject('SD-2.1:src/real.ts:L1-3');
+    try {
+      const legal = runGate([legalDir, '--phase=5', '--json']);
+      expect(legal.stdout).not.toContain('SDMAP-');
+    } finally {
+      rmSync(legalDir, { recursive: true, force: true });
+    }
+  }, 240_000);
+});
