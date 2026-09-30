@@ -24,6 +24,7 @@ import {
   checkArtifactGate,
   checkCodeModuleFormat,
   checkPhaseSpecStructure,
+  checkSdToCodeModuleMapping,
   checkTemplatesStructure,
   checkUatPathMappingBackfill,
   type GateGraph,
@@ -1030,7 +1031,7 @@ describe('gate-logic 修正', () => {
       const graph: GateGraph = { nodes: [{ id: 'SD-5.2.1', type: 'SD' }] };
       const result = checkArtifactGate(matrix, { graph, phaseOption: 8 });
       expect(result.passed).toBe(true);
-      expect(result.reasons.some((r) => r.includes('TLA+ 资产校验失败'))).toBe(false);
+      expect(result.reasons.some((r) => /SDMAP-1/.test(r))).toBe(false);
     });
   });
 
@@ -2063,5 +2064,42 @@ describe('批次1 ChangeClassification 类型契约', () => {
       'semantic',
       'topology',
     ]);
+  });
+});
+
+describe('SDMAP 双向精确对账（批次1）', () => {
+  const rowsOf = (cm: string) =>
+    [
+      {
+        requirementId: 'REQ-001',
+        description: 'd',
+        designDoc: 'SD-2.1',
+        codeModule: cm,
+        unitTest: 'UT-001',
+        acceptanceTest: 'UAT-001',
+      },
+    ] as never;
+
+  it('SDMAP-1：图节点无前缀精确匹配条目 → 违规（semantic）', () => {
+    const graph = { nodes: [{ id: 'SD-2.2', type: 'SD' }] };
+    const r = checkSdToCodeModuleMapping(graph, rowsOf('SD-2.1:src/a.ts:L1') as never);
+    expect(r.violations.some((v: string) => v.includes('SD-2.2') && v.includes('SDMAP-1'))).toBe(true);
+    expect(r.structured.find((s) => s.rule === 'SDMAP-1')?.classification).toBe('semantic');
+  });
+  it('词形 id 不再子串放行：SD-USER 不命中 SD-user_service 前缀条目', () => {
+    const graph = { nodes: [{ id: 'SD-USER', type: 'SD' }] };
+    const r = checkSdToCodeModuleMapping(graph, rowsOf('SD-USER-SVC:src/user_service.ts:L1') as never);
+    expect(r.violations.some((v: string) => v.includes('SDMAP-1'))).toBe(true);
+  });
+  it('SDMAP-2：REQ 条目 SD 前缀不在图节点集（幽灵 SD）→ 违规', () => {
+    const graph = { nodes: [{ id: 'SD-2.1', type: 'SD' }] };
+    const r = checkSdToCodeModuleMapping(graph, rowsOf('SD-2.1:src/a.ts:L1, SD-9.9:src/b.ts:L2') as never);
+    expect(r.violations.some((v: string) => v.includes('SD-9.9') && v.includes('SDMAP-2'))).toBe(true);
+  });
+  it('数字层级 id 前缀精确匹配仍通过（兼容 SD-5.2.1 形态）', () => {
+    const graph = { nodes: [{ id: 'SD-5.2.1', type: 'SD' }] };
+    const r = checkSdToCodeModuleMapping(graph, rowsOf('SD-5.2.1:src/auth/login.ts:L42-58') as never);
+    expect(r.violations).toEqual([]);
+    expect(r.skipped).toBe(true); // 未传 srcLineCounts → SDMAP-3/4 skipped
   });
 });

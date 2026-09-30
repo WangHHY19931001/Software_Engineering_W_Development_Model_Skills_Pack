@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { RTM_FIELDS } from '../lib/constants.js';
 import { SafeProjectPathError, resolveProjectRelativeRegularFile } from '../lib/safe-project-path.js';
+import type { StructuredViolation } from '../lib/types.js';
 
 import { parseMarkdownTable } from './graph-logic.js';
 
@@ -87,6 +88,10 @@ export interface ArtifactGateResult {
   testEvidence?: ArtifactGateTestEvidenceSummary;
   /** S18 票据内容校验计数；未给定票据文本（`options.ticketsText` 缺省）或结构失败早退时不产出 */
   tickets?: TicketContentSummary;
+  /** 批次1 SDMAP 锚点校验执行态：phase>=5 且提供 graph 时 'checked'/'skipped'；phase<5 或无 graph 时保持 undefined（CLI 归一为 null） */
+  sdAnchorCheck?: 'checked' | 'skipped' | null;
+  /** 批次1 SDMAP 结构化违规（含 classification）；已校验且通过时为空数组；未触发时保持 undefined */
+  sdmapViolations?: StructuredViolation[];
 }
 
 /** E2 相对路径解析结果；ok=false 时 reason 为人类可读拒绝原因。 */
@@ -194,6 +199,8 @@ export interface CheckArtifactGateOptions {
    * 纯函数不读盘：文件不存在 / 参数非法的 exit 2 判定由 CLI 层负责。
    */
   ticketsText?: string;
+  /** 批次1 SDMAP-3/4 注入面：src 路径 → 文件总行数；未注入则该两子项 skipped（CLI 生产路径恒注入） */
+  srcLineCounts?: ReadonlyMap<string, number>;
 }
 
 // ==================== SDMAP 锚点条目解析（批次1，规格 §4.1/§4.2）====================
@@ -244,50 +251,97 @@ export function parseCodeModuleEntries(value: string): CodeModuleEntry[] {
   });
 }
 
+export interface SdToCodeModuleResult {
+  violations: string[];
+  structured: StructuredViolation[];
+  /** true = 注入面缺失（SDMAP-3/4 未执行；不冒充通过，CLI 生产路径恒注入） */
+  skipped: boolean;
+}
+
 /**
- * SD→codeModule 映射校验（spec §3.4.4 第2项，逻辑同 code-tla-logic.ts 维度1）。
- *
- * 校验：每个 SD 节点须有至少一个 codeModule 映射。
- * 映射判定：SD id 去 "SD-" 前缀，按 -/_/. 拆段（长度 >= 2），任一段在 codeModule 路径中出现。
+ * SD→codeModule 双向精确对账（批次1 SDMAP；规格 §4.2）。
+ * 废除拆段子串与 `${id}:` 数字特判，统一为 REQ 条目前缀与图节点 id 全等。
  */
-function checkSdToCodeModuleMapping(graph: GateGraph, rows: RTMRowShape[]): string[] {
+export function checkSdToCodeModuleMapping(
+  graph: GateGraph,
+  rows: RTMRowShape[],
+  srcLineCounts?: ReadonlyMap<string, number>,
+): SdToCodeModuleResult {
   const violations: string[] = [];
-  if (!graph || !Array.isArray(graph.nodes)) return violations;
+  const structured: StructuredViolation[] = [];
+  if (!graph || !Array.isArray(graph.nodes)) return { violations, structured, skipped: srcLineCounts === undefined };
   const sdNodes = graph.nodes.filter((n) => n && n.type === 'SD');
-  if (sdNodes.length === 0) return violations;
+  if (sdNodes.length === 0) return { violations, structured, skipped: srcLineCounts === undefined };
+  const sdNodeIds = new Set(sdNodes.map((n) => String(n.id ?? '')));
 
-  const codeModules: string[] = [];
+  const reqEntries: Array<{ rowId: string; entry: CodeModuleEntry }> = [];
   for (const row of rows) {
-    if (row && typeof row.codeModule === 'string' && row.codeModule.trim() !== '') {
-      codeModules.push(row.codeModule);
+    if (!row || typeof row.codeModule !== 'string' || row.codeModule.trim() === '') continue;
+    if (!String(row.requirementId ?? '').startsWith('REQ-')) continue;
+    for (const entry of parseCodeModuleEntries(row.codeModule)) {
+      if (entry.sdId !== null) reqEntries.push({ rowId: String(row.requirementId), entry });
     }
   }
 
-  for (const sd of sdNodes) {
-    const id = String(sd.id ?? '');
-    const stripped = id.replace(/^SD-/, '');
-    const segments = stripped
-      .split(/[-_.]+/)
-      .map((s) => s.toLowerCase())
-      .filter((s) => s.length >= 2);
-    if (id !== '' && segments.length === 0 && codeModules.some((m: string) => m.includes(`${id}:`))) {
-      continue; // 数字层级 id（如 SD-5.2.1）命中 codeModule 前缀映射
-    }
-    if (segments.length === 0) {
-      violations.push(`TLA+ 资产校验失败：SD 节点 id 为空或无可识别段，无法映射 codeModule: ${id}`);
-      continue;
-    }
-    const matched = codeModules.some((cm) => {
-      const cmLower = cm.toLowerCase();
-      return segments.some((seg) => cmLower.includes(seg));
-    });
-    if (!matched) {
-      violations.push(
-        `TLA+ 资产校验失败：SD 节点 ${id} 无对应 codeModule（期望 codeModule 路径包含以下任一段: ${segments.join(', ')}）`,
-      );
+  // 第一向：图→RTM（SDMAP-1）
+  for (const id of sdNodeIds) {
+    if (!reqEntries.some(({ entry }) => entry.sdId === id)) {
+      const msg = `SDMAP-1 图→RTM 缺映射：SD 节点 ${id} 无任何前缀精确等于其 id 的 REQ codeModule 条目`;
+      violations.push(msg);
+      structured.push({
+        rule: 'SDMAP-1',
+        field: `graph.SD[${id}]`,
+        message: msg,
+        classification: 'semantic',
+      });
     }
   }
-  return violations;
+  // 第二向：RTM→图（SDMAP-2）
+  for (const { rowId, entry } of reqEntries) {
+    if (!sdNodeIds.has(entry.sdId!)) {
+      const msg = `SDMAP-2 幽灵 SD 前缀：REQ 行 ${rowId} 条目 "${entry.raw}" 的 SD 前缀 ${entry.sdId} 不在图 SD 节点集`;
+      violations.push(msg);
+      structured.push({
+        rule: 'SDMAP-2',
+        field: `rtm[${rowId}].codeModule`,
+        message: msg,
+        classification: 'semantic',
+      });
+    }
+  }
+  // 注入面：SDMAP-3/4（skipped 语义：未注入不判、不冒充通过）
+  const injected = srcLineCounts !== undefined && srcLineCounts.size > 0;
+  if (injected) {
+    for (const { rowId, entry } of reqEntries) {
+      if (entry.srcPath === null) continue; // 格式错由 SDMAP-5 报
+      const count = srcLineCounts.get(entry.srcPath);
+      if (count === undefined) {
+        const msg = `SDMAP-3 路径不存在：REQ 行 ${rowId} 条目 "${entry.raw}" 的 ${entry.srcPath} 不在项目内`;
+        violations.push(msg);
+        structured.push({
+          rule: 'SDMAP-3',
+          field: `rtm[${rowId}].codeModule`,
+          message: msg,
+          classification: 'evidence-only',
+        });
+        continue;
+      }
+      const s = entry.anchorStart ?? 0;
+      const e = entry.anchorEnd;
+      const bad = s < 1 || (e !== null && (e < s || e > count));
+      if (bad) {
+        const msg = `SDMAP-4 锚点行号非法：REQ 行 ${rowId} 条目 "${entry.raw}"（文件共 ${count} 行，须 1 ≤ start ≤ end ≤ 总行数）`;
+        violations.push(msg);
+        structured.push({
+          rule: 'SDMAP-4',
+          field: `rtm[${rowId}].codeModule`,
+          message: msg,
+          classification: 'evidence-only',
+        });
+      }
+    }
+  }
+  return { violations, structured, skipped: !injected };
 }
 
 // ==================== codeModule 格式校验（P0-2 / SDMAP-5） ====================
@@ -1743,10 +1797,11 @@ export function checkArtifactGate(
   if (options && options.manifestExists === false) {
     reasons.push('TLA+ 资产校验失败：tla-manifest.json 不存在或 specs 为空');
   }
-  // 2. SD→codeModule 映射：graph 提供时执行（仅 phase >= 5 时校验，因为 codeModule 在 phase 5 才进入 RTM 追溯字段）
+  // 2. SD→codeModule 双向精确对账：graph 提供时执行（仅 phase >= 5 时校验，因为 codeModule 在 phase 5 才进入 RTM 追溯字段）
+  let sdResult: SdToCodeModuleResult | undefined;
   if (options && options.graph && phase >= 5) {
-    const sdViolations = checkSdToCodeModuleMapping(options.graph, matrix.rows);
-    for (const v of sdViolations) reasons.push(v);
+    sdResult = checkSdToCodeModuleMapping(options.graph, matrix.rows, options.srcLineCounts);
+    for (const v of sdResult.violations) reasons.push(v);
   }
 
   // ==================== codeModule 格式校验（P0-2，仅 phase >= 5） ====================
@@ -1774,5 +1829,12 @@ export function checkArtifactGate(
     legacy: [],
     testEvidence: testEvidenceCounts,
     ...(tickets !== undefined ? { tickets } : {}),
+    // 批次1 透传：phase>=5 且提供 graph 时填充执行态与结构化违规；否则保持 undefined（CLI 归一为 null）
+    ...(sdResult
+      ? {
+          sdAnchorCheck: sdResult.skipped ? ('skipped' as const) : ('checked' as const),
+          sdmapViolations: sdResult.structured,
+        }
+      : {}),
   };
 }
