@@ -90,6 +90,8 @@ structuredViolations 沿用现有形态 `StructuredViolation{rule, field, messag
 
 ### 5.1 ChangeClassification 词汇表（三值；cosmetic 不引入——archify 的 geometry 类比在流程一致性域无对应物）
 
+> **唯一权威**：词汇定义与演进规则以[批次总纲 §4.1](./2026-09-30-absorption-batches-master-outline.md)为准；本节为批次 1 视角的落点映射。
+
 | 分类 | 定义 | 批次 1 的产出点 |
 |---|---|---|
 | `topology` | 集合成员差异（状态/转移/分支的缺余） | state-machine 全部差异；code-tla 维度 2（状态转移）、维度 3（Next 分支） |
