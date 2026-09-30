@@ -20,7 +20,7 @@ import { describe, it, expect } from 'vitest';
 
 import { checkTlaModel, checkCoverage, type TlaManifest, type TlaSpec } from '../logic/tla-logic.js';
 import { checkVerifierOutput, type VerifierOutputShape } from '../logic/verifier-logic.js';
-import type { StructuredViolation } from '../lib/types';
+import type { JsonReport, StructuredViolation } from '../lib/types';
 import {
   checkArtifactGate,
   checkCodeModuleFormat,
@@ -2147,5 +2147,29 @@ describe('SDMAP 双向精确对账（批次1）', () => {
     expect(r.structured.filter((s) => s.rule === 'SDMAP-4')).toHaveLength(1);
     expect(r.structured.find((s) => s.rule === 'SDMAP-4')?.classification).toBe('evidence-only');
     expect(r.skipped).toBe(false);
+  });
+});
+
+describe('批次3 诊断面类型契约', () => {
+  it('subject/fixHints 可选且 fixHints 为字符串数组', () => {
+    const v: StructuredViolation = {
+      rule: 'SDMAP-1',
+      message: 'x',
+      classification: 'semantic',
+      subject: 'SD-2.2',
+      fixHints: ['补条目', '核对 graph'],
+    };
+    expect(v.subject).toBe('SD-2.2');
+    expect(v.fixHints).toHaveLength(2);
+  });
+  it('JsonReport.verifiedArtifacts 可选三字段', () => {
+    const r: JsonReport = {
+      type: 'artifact-gate',
+      passed: true,
+      reasons: [],
+      violations: [],
+      verifiedArtifacts: [{ path: '.w-model/rtm.json', sha256: 'a'.repeat(64), bytes: 10 }],
+    };
+    expect(r.verifiedArtifacts![0]!.bytes).toBe(10);
   });
 });
