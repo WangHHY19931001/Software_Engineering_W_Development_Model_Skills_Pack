@@ -25,6 +25,7 @@ import type * as TsType from 'typescript';
 
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 import type { StructuredViolation } from '../lib/types.js';
+
 import { parseCodeModuleEntries, type CodeModuleEntry } from './gate-logic.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;

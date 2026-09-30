@@ -20,6 +20,7 @@ import { describe, it, expect } from 'vitest';
 
 import { checkTlaModel, checkCoverage, type TlaManifest, type TlaSpec } from '../logic/tla-logic.js';
 import { checkVerifierOutput, type VerifierOutputShape } from '../logic/verifier-logic.js';
+import type { StructuredViolation } from '../lib/types';
 import {
   checkArtifactGate,
   checkCodeModuleFormat,
@@ -2037,8 +2038,6 @@ describe('checkPhaseSpecStructure fs 注入契约（合并 checkRequirementSpecS
     expect(v.refs.some((m) => m.includes('缺 readdirSync'))).toBe(true);
   });
 });
-
-import type { StructuredViolation } from '../lib/types';
 
 describe('批次1 ChangeClassification 类型契约', () => {
   it('classification 为可选三值字段', () => {
