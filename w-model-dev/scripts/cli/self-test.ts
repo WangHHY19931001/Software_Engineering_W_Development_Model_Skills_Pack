@@ -160,6 +160,8 @@ interface GateCase {
    * （`ticketsFile` 与 `file` / `auxFiles` 同为覆盖矩阵的可识别引用字段）。
    */
   ticketsFile?: string;
+  /** 批次1 SDMAP-3/4：手写注入表（path→总行数）；缺省不注入 → sdAnchorCheck=skipped */
+  srcLineCounts?: Record<string, number>;
 }
 
 const VERIFIER_CASES: VerifierCase[] = [
@@ -459,6 +461,24 @@ const GATE_CASES: GateCase[] = [
     graph: { nodes: [{ id: 'SD-5.2.1', type: 'SD' }] },
     description:
       'SD 数字层级 id（SD-5.2.1）经 checkSdToCodeModuleMapping 识别为数字层级，命中 codeModule 前缀映射应通过',
+  },
+  // -------------------- 批次1 SDMAP 负向样本（SDMAP-1/2/5 与 SDMAP-3/4 注入面） --------------------
+  {
+    file: 'bad-sdmap-mapping.json',
+    expectedPassed: false,
+    phaseOption: 5,
+    graph: { nodes: [{ id: 'SD-2.2', type: 'SD' }] },
+    expectedReasonPatterns: [/SDMAP-1/, /SDMAP-2/, /codeModule 格式错误/],
+    description: '批次1：图→RTM 缺映射 + 幽灵 SD 前缀 + 格式不符',
+  },
+  {
+    file: 'bad-sdmap-anchor.json',
+    expectedPassed: false,
+    phaseOption: 5,
+    graph: { nodes: [{ id: 'SD-2.1', type: 'SD' }] },
+    srcLineCounts: { 'src/real.ts': 3 },
+    expectedReasonPatterns: [/SDMAP-3/, /SDMAP-4/],
+    description: '批次1：路径不存在 + 锚点行号越界（注入面）',
   },
   // -------------------- 孤儿样本（check-samples-coverage 引用登记） --------------------
   {
@@ -3342,6 +3362,8 @@ async function runGateCases(samplesDir: string): Promise<CaseResult[]> {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控仓库固定路径（samples/gate/ 下的用例声明 fixture），仅只读
       options.ticketsText = await fs.readFile(path.join(samplesDir, 'gate', c.ticketsFile), 'utf-8');
     }
+    // 批次1 SDMAP-3/4：用例声明的注入表转 ReadonlyMap 传给纯函数（缺省 undefined → sdAnchorCheck=skipped，与 CLI 生产路径注入态区分）
+    options.srcLineCounts = c.srcLineCounts ? new Map(Object.entries(c.srcLineCounts)) : undefined;
     const r = checkArtifactGate(parsed as never, Object.keys(options).length > 0 ? (options as never) : undefined);
 
     const details: string[] = [];
