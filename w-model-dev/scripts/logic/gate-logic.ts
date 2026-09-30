@@ -269,9 +269,11 @@ export function checkSdToCodeModuleMapping(
 ): SdToCodeModuleResult {
   const violations: string[] = [];
   const structured: StructuredViolation[] = [];
-  if (!graph || !Array.isArray(graph.nodes)) return { violations, structured, skipped: srcLineCounts === undefined };
+  // 注入面判定（三处共用，含早退）：undefined 或空 Map 均为未注入 → skipped=true（不冒充通过）
+  const injected = srcLineCounts !== undefined && srcLineCounts.size > 0;
+  if (!graph || !Array.isArray(graph.nodes)) return { violations, structured, skipped: !injected };
   const sdNodes = graph.nodes.filter((n) => n && n.type === 'SD');
-  if (sdNodes.length === 0) return { violations, structured, skipped: srcLineCounts === undefined };
+  if (sdNodes.length === 0) return { violations, structured, skipped: !injected };
   const sdNodeIds = new Set(sdNodes.map((n) => String(n.id ?? '')));
 
   const reqEntries: Array<{ rowId: string; entry: CodeModuleEntry }> = [];
@@ -310,7 +312,6 @@ export function checkSdToCodeModuleMapping(
     }
   }
   // 注入面：SDMAP-3/4（skipped 语义：未注入不判、不冒充通过）
-  const injected = srcLineCounts !== undefined && srcLineCounts.size > 0;
   if (injected) {
     for (const { rowId, entry } of reqEntries) {
       if (entry.srcPath === null) continue; // 格式错由 SDMAP-5 报

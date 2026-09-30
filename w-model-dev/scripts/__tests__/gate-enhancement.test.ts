@@ -2085,6 +2085,7 @@ describe('SDMAP 双向精确对账（批次1）', () => {
     const r = checkSdToCodeModuleMapping(graph, rowsOf('SD-2.1:src/a.ts:L1') as never);
     expect(r.violations.some((v: string) => v.includes('SD-2.2') && v.includes('SDMAP-1'))).toBe(true);
     expect(r.structured.find((s) => s.rule === 'SDMAP-1')?.classification).toBe('semantic');
+    expect(r.skipped).toBe(true); // 未注入 → SDMAP-1/2 照判且 skipped=true（不冒充通过）
   });
   it('词形 id 不再子串放行：SD-USER 不命中 SD-user_service 前缀条目', () => {
     const graph = { nodes: [{ id: 'SD-USER', type: 'SD' }] };
