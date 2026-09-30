@@ -1169,6 +1169,7 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 要点：
 
 - **链式约束**：`prevSigId` 指向同阶段前一环签名；`sigHash = sha256(sigId + phase + role + action + runId + artifacts + prevSigHash + signedAt + signer + inputProvenance)`；首环 `prevSigId = "genesis"`，`prevSigHash = "0"`。
+- **sigHash 公式版本化 `sigHashAlgo`（可选字段，批次 3/D6）**：`SignatureChainEntry` 增 `sigHashAlgo?: 'v1' | 'v2'`，**字段缺失按 v1**——历史链按 v1 公式（上式）重算，零破坏。v2 公式：`sha256(sigId|phase|role|action|runId|artifactsV2|prevSigHash|signedAt|signer|inputProvenance)`，其中 `artifactsV2 = JSON.stringify({ artifacts, sourceArtifacts })`（两产物清单整体、含 sha256，纳入公式）；`computeSigHash` 按 `entry.sigHashAlgo ?? 'v1'` 分流。`SourceArtifact` 增 `sha256?: string`（64-hex；v2 链必填，v1 链忽略）。校验器（check-signature-chain / signature-chain-logic）：R6 按 algo 分流重算（v1 条目行为与现状逐字节一致）；新规则 **R11**：`sigHashAlgo === 'v2'` 的条目，`inputProvenance.sourceArtifacts[]` 每条 `sha256` 必填且匹配 `^[a-fA-F0-9]{64}$`，v1 条目不触发 R11。**增益边界（知情声明，D6 已裁定接受）**：v2 使「字节声明」不可抵赖（篡改声明字段→R6 重算失败）并为未来自动核查铺路；「声明 vs 真实字节」的自动核查需 gate-log 索引基建，本批不建、登记后续。
 - **角色签名顺序**（强制链）：`genesis → O(chunk) → A(cross) → S(produce) → V(review) → G(gate) → O(checkpoint-用户确认)`；阶段 5 无 A，阶段 6-8 视具体阶段调整。
 - **产出来源正确性**（`inputProvenance`）：各角色产出须声明上游签名 + 上游产物 + 变换描述；强制来源/禁止来源矩阵见 [`signature-chain-guide.md`](../w-model-dev/references/signature-chain-guide.md) §3。
 - **返工链语义分类 `targetKind`（可选字段，D-1）**：`rootcause`（该环复审 R 报告）/ `preventive`（该环为 R3 预防性审查）/ `iceberg`（该环为冰山扫掠报告）/ `standard`（缺省即此值——既有链无该字段时走 standard 路径，行为不变）。**不入 sigHash**：上式哈希输入不含该字段，带与不带 `targetKind` 的同一环 sigHash 相同。注意其与 run-log schema 的同名 `targetKind`（requirement/design/code/test 等词表）是**不同 schema 中的不同词表**，重叠值仅 `rootcause` 且语义一致。
@@ -1180,7 +1181,7 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
   | V 复审 R 报告      | `role=V` ∧ `srcRole=R` ∧ `targetKind=rootcause`          | V 复审 RootCauseReport（返工链 V→G 必经环节，反模式 #19 守护）   |
   | R 预防性审查消费 S | `role=R` ∧ `srcRole=S` ∧ `targetKind=preventive`         | R3 预防性审查须以 S 产物为输入（独立定位与预防性审查是两类动作） |
 
-- **G 角色校验职责**：G 跑门禁脚本前先跑 `check-signature-chain.ts`（R1-R10）；O checkpoint 前须跑签名链校验 + 用户确认签名。
+- **G 角色校验职责**：G 跑门禁脚本前先跑 `check-signature-chain.ts`（R1-R11）；O checkpoint 前须跑签名链校验 + 用户确认签名。
 - **归档**：`signature-chain.jsonl` 须纳入归档完整性强制快照清单（由 `check-archive-integrity.ts` 校验）。
 
 ### 7.10 证据导出与 source provenance 边界（2026-09-27，live-run 修复 ⑥/N-7 销项）
@@ -1476,7 +1477,7 @@ DoD 不替代阶段产物的验收标准（见各 [`phase-N-*.md`](../w-model-de
 | RTM              | 需求 / 设计 / 代码 / 测试映射同步                                                                           | `.w-model/rtm.json` 字段无空缺；覆盖率不下降                              | 补登记 RTM 字段                           |
 | 状态             | `Project.status` / `Requirement.status` 如实反映                                                            | 字段值与磁盘产物一致                                                      | 修正 `status` 字段                        |
 | **理解证据**     | 阶段门放行须有用户理解证据                                                                                  | run-log acknowledgedDecisions 非空且含 ≥1 关键决策摘要（非"确认"/"同意"） | 拒绝放行；要求用户填入理解证据（O4 命中） |
-| **签名链完整性** | 每阶段每角色动作完成后写入 `signature-chain.jsonl`；G 跑门禁前校验 R1-R10 全通过；断裂视为 #32 命中拒绝放行 | `check-signature-chain.ts` R1-R10                                         | 补齐缺失角色签名与来源证明                |
+| **签名链完整性** | 每阶段每角色动作完成后写入 `signature-chain.jsonl`；G 跑门禁前校验 R1-R11 全通过；断裂视为 #32 命中拒绝放行 | `check-signature-chain.ts` R1-R11                                         | 补齐缺失角色签名与来源证明                |
 
 > 第六维度「理解证据」吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/concepts.md` 的 Comprehension Debt 概念，对抗用户对阶段产物 rubber-stamp。放行 ≠ 理解；acknowledgedDecisions 非空才算放行。
 
@@ -1658,19 +1659,19 @@ npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts "<rootcause-report.jso
 
 **校验规则（R1-R11，确定性，无 LLM）**：
 
-| 规则 | 校验内容                                                                                                                                                                                                                                                                                                                                                                       | 失败动作 |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
-| R1   | Schema 完整性：所有必填字段非空                                                                                                                                                                                                                                                                                                                                                | 退出码 1 |
-| R2   | `rootCauseChain` 长度 ∈ [2, 5]，每步 `evidence` 非空                                                                                                                                                                                                                                                                                                                           | 退出码 1 |
-| R3   | `rootCause.falsifiabilityCheck` 非空且含假设句式（「若...则...」）                                                                                                                                                                                                                                                                                                             | 退出码 1 |
-| R4   | `fixRecommendation` 每条含 `target`/`location`/`action`/`rationale` 四字段                                                                                                                                                                                                                                                                                                     | 退出码 1 |
-| R5   | `prevention` 每条含 `scope`/`measure`/`owner` 三字段                                                                                                                                                                                                                                                                                                                           | 退出码 1 |
-| R6   | `upstreamDefect.present=true` 时，`upstreamPhase`/`upstreamArtifactId`/`defectDescription` 非空                                                                                                                                                                                                                                                                                | 退出码 1 |
-| R7   | `qualityLevel ∈ {A,B,C,D}`，`passed` 与 `qualityLevel` 一致（A/B→true，C/D→false）                                                                                                                                                                                                                                                                                             | 退出码 1 |
-| R8   | `meta.reportId` 格式 `^RC-[a-z0-9]+-\d+-\d+$`                                                                                                                                                                                                                                                                                                                                  | 退出码 1 |
-| R9   | 多角度场景（dispatchMode ∈ {parallel, serial, degraded}）：附录 PartialReport 路径非空                                                                                                                                                                                                                                                                                         | 退出码 1 |
-| R10  | 多角度场景：canonical `testing-reality-checker` persona 的 confidence ≥ 0.5；legacy `reality-checker` 仅在 canonical 缺失时作 fallback。canonical 优先，同 artifact 不重复计数；跨 artifact 或异常重复/冲突 fail-closed                                                                                                                                                        | 退出码 1 |
-| R11  | 多角度场景（`method=combined`）且非 `noRootCause` 分支：`partialReports[].personaSlice` 必须为矩阵内已知 persona（`R_PERSONA_MATRIX` ∪ `R_PERSONA_SIGNAL_MATRIX` ∪ reality-checker；legacy `reality-checker` 归一化为 canonical 后参与比较），且与 `rootCause.category` 第一键行候选集有交集。`partialReports` 缺失由 R9 判失败、`noRootCause` 分支无 category——两者均跳过 R11 | 退出码 1 |
+| 规则 | 校验内容                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | 失败动作 |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| R1   | Schema 完整性：所有必填字段非空                                                                                                                                                                                                                                                                                                                                                                                                                                          | 退出码 1 |
+| R2   | `rootCauseChain` 长度 ∈ [2, 5]，每步 `evidence` 非空                                                                                                                                                                                                                                                                                                                                                                                                                     | 退出码 1 |
+| R3   | `rootCause.falsifiabilityCheck` 非空且含假设句式（「若...则...」）                                                                                                                                                                                                                                                                                                                                                                                                       | 退出码 1 |
+| R4   | `fixRecommendation` 每条含 `target`/`location`/`action`/`rationale` 四字段 **+ `scope`（批次 3/D8-D9：`{allowed, forbidden}` 双数组进入 items.required，至少一侧非空数组、每项非空字符串——缺失/空双数组/非字符串项 → R4 违规，不做 glob 语法深验。V scoped re-review 对照消费：fix diff 触碰 forbidden 或超出 allowed → 该 finding NOT ADDRESSED / 上报 CHECKPOINT）**——唯一权威定义见 [批次 3 设计规格](./superpowers/specs/2026-10-01-gate-engineering-design.md) §6.1 | 退出码 1 |
+| R5   | `prevention` 每条含 `scope`/`measure`/`owner` 三字段                                                                                                                                                                                                                                                                                                                                                                                                                     | 退出码 1 |
+| R6   | `upstreamDefect.present=true` 时，`upstreamPhase`/`upstreamArtifactId`/`defectDescription` 非空                                                                                                                                                                                                                                                                                                                                                                          | 退出码 1 |
+| R7   | `qualityLevel ∈ {A,B,C,D}`，`passed` 与 `qualityLevel` 一致（A/B→true，C/D→false）                                                                                                                                                                                                                                                                                                                                                                                       | 退出码 1 |
+| R8   | `meta.reportId` 格式 `^RC-[a-z0-9]+-\d+-\d+$`                                                                                                                                                                                                                                                                                                                                                                                                                            | 退出码 1 |
+| R9   | 多角度场景（dispatchMode ∈ {parallel, serial, degraded}）：附录 PartialReport 路径非空                                                                                                                                                                                                                                                                                                                                                                                   | 退出码 1 |
+| R10  | 多角度场景：canonical `testing-reality-checker` persona 的 confidence ≥ 0.5；legacy `reality-checker` 仅在 canonical 缺失时作 fallback。canonical 优先，同 artifact 不重复计数；跨 artifact 或异常重复/冲突 fail-closed                                                                                                                                                                                                                                                  | 退出码 1 |
+| R11  | 多角度场景（`method=combined`）且非 `noRootCause` 分支：`partialReports[].personaSlice` 必须为矩阵内已知 persona（`R_PERSONA_MATRIX` ∪ `R_PERSONA_SIGNAL_MATRIX` ∪ reality-checker；legacy `reality-checker` 归一化为 canonical 后参与比较），且与 `rootCause.category` 第一键行候选集有交集。`partialReports` 缺失由 R9 判失败、`noRootCause` 分支无 category——两者均跳过 R11                                                                                           | 退出码 1 |
 
 > **R11 强制面边界（如实陈述）**：门禁只校验 persona 选择的**合法性**（矩阵内）与**第一键交集**。数量约束（默认 3 / 上限 5）与 `incident-response-commander` 必含**不门禁强制**——它们是分派默认，由编排者按 `agent-personas.md` §4 与 token 预算（`budget-logic.ts` R4-A）执行。第二键（风险域信号）因报告未声明信号字段亦不门禁强制，仅作分派指导。
 
@@ -2359,6 +2360,10 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 `evidenceStatus === 'pending'` 的节点数须为 0。**常态触发、非返工触发**——pending 表示"还没做功课"，
 不是"产物有缺陷"，走 R 会把前者误判为后者；若补验证后发现结论站不住，那才触发返工链。
 
+### 10L.8 门禁诊断结构化面（StructuredViolation.subject/fixHints）
+
+`StructuredViolation` 增两个可选字段（总纲 §4.2 路线兑现，唯一权威定义见 docs/superpowers/specs/2026-10-01-gate-engineering-design.md §5）：`subject?: string`（符号/位置，面向修复者 LLM）与 `fixHints?: string[]`（≤3 条祈使句）——只增可选、既有字段不动。四热点门禁先行填充（D7 裁定 A）：check-artifact-gate（SDMAP-1..5 + verifiedArtifacts）的 subject 取 `SD-<id>` / `rtm[REQ-x].codeModule`（field 值升级为符号语义），fixHints 为每规则 1-3 条固定话术（常量表，照 archify 修复话术表先例）；check-design-contract-consistency 的 subject 取 `<uatPath> → <routePath>`，fixHints 从现有 message 内嵌修复指引抽出为结构化数组；check-code-tla-consistency 四维度的 subject 分别取 SD id / transitionKey / action 名 / invariant 名，按维度固定话术；check-verifier-output 的 subject 取 `subCriterion.name`，按失败形态固定话术（如 score<0.70 → 补 evidence 定位后重评）。budget/maturity 等非热点门禁后续批次渐进。消费契约（R 消费）：R 引用 `subject` 定位根因；reworkHints 按 classification 排序（§10L.4）并转写 fixHints（至多 3 条）。
+
 ---
 
 ## 10.10 系统层级树与多层图谱
@@ -2413,20 +2418,21 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
 ```
 
-**校验规则**（R1-R10）：
+**校验规则**（R1-R11）：
 
-| 规则 | 校验内容                                                                                                                | 失败后果                        |
-| ---- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| R1   | 当前阶段所有强制角色签名齐全                                                                                            | exitCode=1，标注缺失角色        |
-| R2   | 签名链连续（prevSigHash 匹配）                                                                                          | exitCode=1，标注断裂点          |
-| R3   | 时间戳单调递增                                                                                                          | exitCode=1，标注时序异常        |
-| R4   | 签名角色与阶段角色清单匹配                                                                                              | exitCode=1，标注越权角色        |
-| R5   | O checkpoint 签名 signer 为用户 ID（非 O 角色）                                                                         | exitCode=1，标注代签（O4 命中） |
-| R6   | sigHash 重算一致（防篡改）                                                                                              | exitCode=1，标注篡改签名        |
-| R7   | 各角色 sourceSigIds 均存在于签名链中                                                                                    | exitCode=1，标注悬空来源        |
-| R8   | 各角色 sourceArtifacts 路径存在于磁盘（仅当解析到含 .w-model/project.json 的真实项目根时启用；独立链文件/夹具自动跳过） | exitCode=1，标注缺失产物        |
-| R9   | 各角色来源符合"强制来源/禁止来源"矩阵                                                                                   | exitCode=1，标注越权消费        |
-| R10  | O checkpoint 的 sourceArtifacts 含 G gate 产物 + 用户确认记录                                                           | exitCode=1，标注绕过门禁        |
+| 规则 | 校验内容                                                                                                                                   | 失败后果                         |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
+| R1   | 当前阶段所有强制角色签名齐全                                                                                                               | exitCode=1，标注缺失角色         |
+| R2   | 签名链连续（prevSigHash 匹配）                                                                                                             | exitCode=1，标注断裂点           |
+| R3   | 时间戳单调递增                                                                                                                             | exitCode=1，标注时序异常         |
+| R4   | 签名角色与阶段角色清单匹配                                                                                                                 | exitCode=1，标注越权角色         |
+| R5   | O checkpoint 签名 signer 为用户 ID（非 O 角色）                                                                                            | exitCode=1，标注代签（O4 命中）  |
+| R6   | sigHash 重算一致（防篡改；按 `sigHashAlgo` 分流 v1/v2 公式，v1 条目行为与现状逐字节一致）                                                  | exitCode=1，标注篡改签名         |
+| R7   | 各角色 sourceSigIds 均存在于签名链中                                                                                                       | exitCode=1，标注悬空来源         |
+| R8   | 各角色 sourceArtifacts 路径存在于磁盘（仅当解析到含 .w-model/project.json 的真实项目根时启用；独立链文件/夹具自动跳过）                    | exitCode=1，标注缺失产物         |
+| R9   | 各角色来源符合"强制来源/禁止来源"矩阵                                                                                                      | exitCode=1，标注越权消费         |
+| R10  | O checkpoint 的 sourceArtifacts 含 G gate 产物 + 用户确认记录                                                                              | exitCode=1，标注绕过门禁         |
+| R11  | `sigHashAlgo === 'v2'` 条目的 `inputProvenance.sourceArtifacts[]` 每条 `sha256` 必填且匹配 `^[a-fA-F0-9]{64}$`（v1 条目不触发；批次 3/D6） | exitCode=1，标注缺失/非法 sha256 |
 
 **跨阶段消费者校验**（`--stage=archive` 时）：
 

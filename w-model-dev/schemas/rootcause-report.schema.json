@@ -192,19 +192,29 @@
       }
     },
     "fixRecommendation": {
-      "description": "修复建议列表（R4 校验非空且每项四字段齐全）",
+      "description": "修复建议列表（R4 校验非空且每项 target/location/action/rationale 四字段 + scope 合规）",
       "type": "array",
       "minItems": 1,
       "items": {
-        "description": "单条修复建议（target + location + action + rationale）",
+        "description": "单条修复建议（target + location + action + rationale + scope）",
         "type": "object",
         "additionalProperties": false,
-        "required": ["target", "location", "action", "rationale"],
+        "required": ["target", "location", "action", "rationale", "scope"],
         "properties": {
           "target": { "description": "修复目标（产物/模块/流程环节）", "type": "string", "minLength": 1 },
           "location": { "description": "修复位置（文件路径/行号/节点 ID）", "type": "string", "minLength": 1 },
           "action": { "description": "修复动作描述（做什么、怎么做）", "type": "string", "minLength": 1 },
-          "rationale": { "description": "修复理由（为何如此修）", "type": "string", "minLength": 1 }
+          "rationale": { "description": "修复理由（为何如此修）", "type": "string", "minLength": 1 },
+          "scope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["allowed", "forbidden"],
+            "properties": {
+              "allowed": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+              "forbidden": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+            },
+            "description": "修复范围声明：allowed=允许触碰面，forbidden=禁改面（测试/语义/证据）。R4 强制：至少一侧非空。V scoped re-review 对照消费"
+          }
         }
       }
     },

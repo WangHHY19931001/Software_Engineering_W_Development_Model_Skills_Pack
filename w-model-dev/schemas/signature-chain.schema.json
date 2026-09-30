@@ -57,9 +57,14 @@
       "pattern": "^sha256:[0-9a-f]{64}$|^0$"
     },
     "sigHash": {
-      "description": "本条签名哈希（格式 sha256:<64 位 hex>；R6 防篡改：重算 sigHash=sha256(sigId|phase|role|action|runId|artifacts|prevSigHash|signedAt|signer|inputProvenance)，不一致即报篡改）",
+      "description": "本条签名哈希（格式 sha256:<64 位 hex>；R6 防篡改：重算 sigHash=sha256(sigId|phase|role|action|runId|artifacts|prevSigHash|signedAt|signer|inputProvenance)，不一致即报篡改；该式为 v1 公式，v2 条目按 sigHashAlgo 分流）",
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sigHashAlgo": {
+      "description": "sigHash 公式版本；缺省 v1。v2 将 artifacts 与 sourceArtifacts 两清单整体（含 sha256）纳入公式；v2 条目适用 R11",
+      "type": "string",
+      "enum": ["v1", "v2"]
     },
     "signedAt": {
       "description": "签名时间（ISO 8601；R3 校验按链序时间戳单调递增）",
@@ -87,7 +92,7 @@
           "description": "上游产物数组（每条声明来源路径 + 来源签名 + 来源角色；R8 产物存在性校验）",
           "type": "array",
           "items": {
-            "description": "单条输入来源证明（SourceArtifact：path + sourceSigId + sourceRole）",
+            "description": "单条输入来源证明（SourceArtifact：path + sourceSigId + sourceRole + sha256）",
             "type": "object",
             "additionalProperties": false,
             "required": ["path", "sourceSigId", "sourceRole"],
@@ -98,6 +103,11 @@
                 "description": "该产物的来源角色：O/A/S/V/G/R（R9 越权消费：禁止来源矩阵校验，如 S 不得消费 V/G/R 产物；返工例外见 targetKind 与 signature-chain-guide.md §3）",
                 "type": "string",
                 "enum": ["O", "S", "A", "V", "G", "R"]
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{64}$",
+                "description": "来源产物内容哈希（v2 链必填，R11）"
               }
             }
           }

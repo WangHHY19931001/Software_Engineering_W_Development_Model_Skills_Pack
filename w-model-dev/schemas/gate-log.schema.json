@@ -43,6 +43,25 @@
         "passed": { "type": "boolean", "description": "与 stdout 机器摘要同源的通过旗标；必须与 payload 主结论一致。" }
       },
       "description": "与 stdout 机器摘要同源的受约束事实；必须与 payload 主结论一致。"
+    },
+    "verifiedArtifacts": {
+      "type": "array",
+      "description": "本次门禁判定承重输入文件字节清单（消费前可复验同一字节）",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "单个承重输入文件（path + sha256 + bytes）",
+        "required": ["path", "sha256", "bytes"],
+        "properties": {
+          "path": { "type": "string", "description": "承重输入文件路径" },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$",
+            "description": "该文件内容的 SHA-256（64 位 hex）"
+          },
+          "bytes": { "type": "number", "minimum": 0, "description": "该文件字节数" }
+        }
+      }
     }
   },
   "allOf": [
