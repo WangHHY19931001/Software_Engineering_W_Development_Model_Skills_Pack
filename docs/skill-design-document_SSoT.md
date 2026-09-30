@@ -388,7 +388,7 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 ##### P1.4 RTM codeModule 回填时机
 
 - 阶段5编码完成后、code-TLA 一致性检查前，必须回填 RTM.codeModule 列。回填值须为行号锚点语法（见 §10.8 SD-codeModule 双向精确对账）；`check-artifact-gate.ts --phase>=5` 与 `check-code-tla-consistency.ts` 同步校验。
-- 格式：`SD-xxx:src/path/to/file.ts`（多个模块用逗号分隔）
+- 格式：`SD-<id>:src/<path>:L<start>[-<end>]`（多条目逗号分隔）
 - 缺失 → `check-code-tla-consistency.ts` 维度1 退出码 1
 
 ##### P2.5 UAT 路径映射表
