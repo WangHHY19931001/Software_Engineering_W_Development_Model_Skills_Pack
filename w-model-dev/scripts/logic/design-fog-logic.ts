@@ -63,7 +63,10 @@ export function checkDesignFog(input: { markdown: string; phase: number }): Desi
     for (let i = headerIndex + 1; i < sectionLines.length; i++) {
       const line = sectionLines[i]!.trim();
       if (!line.startsWith('|')) continue;
-      if (/^\|[\s:|-]+\|?$/.test(line)) continue; // 分隔行
+      // 分隔行仅认表头紧邻一行（GFM 规范）：此后所有 | 开头行一律按数据行解析——
+      // 否则全空（|  |…|）/占位横线（| - |…|）等合法数据行会被旧正则静默吞掉，
+      // 不计入 total、不触发 R3/R4（fail-open 缺口；终审 Important 修复）。
+      if (i === headerIndex + 1 && /^\|[\s:|-]+\|?$/.test(line)) continue;
       dataRows.push(splitRow(line));
     }
   }

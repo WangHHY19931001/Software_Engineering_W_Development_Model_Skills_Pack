@@ -59,6 +59,19 @@ describe('checkDesignFog（批次2 设计期迷雾登记册）', () => {
     expect(r.violations.filter((v) => v.startsWith('R4')).length).toBe(2);
     expect(r.fogStats).toEqual({ total: 2, terminal: 0, unresolved: 2 });
   });
+  it('终审修复回归：全空数据行不被分隔行吞掉 → R3+R4 双违规且 total=1', () => {
+    const md = SECTION(['|  |  |  |  |  |  |']);
+    const r = checkDesignFog({ markdown: md, phase: 2 });
+    expect(r.violations.filter((v) => v.startsWith('R3')).length).toBe(1);
+    expect(r.violations.filter((v) => v.startsWith('R4')).length).toBe(1);
+    expect(r.fogStats).toEqual({ total: 1, terminal: 0, unresolved: 1 });
+  });
+  it('终审修复回归：占位横线数据行不被分隔行吞掉 → 按数据行解析命中 R3', () => {
+    const md = SECTION(['| - | - | - | - | - | - |']);
+    const r = checkDesignFog({ markdown: md, phase: 2 });
+    expect(r.violations.filter((v) => v.startsWith('R3')).length).toBe(1);
+    expect(r.fogStats.total).toBe(1);
+  });
   it('R5：标记与数据行互斥（两侧各一违规态）', () => {
     const both = checkDesignFog({ markdown: SECTION([ROW('FOG-P2-01', '已毕业→SD-001')], true), phase: 2 });
     expect(both.violations.some((v) => v.startsWith('R5'))).toBe(true);
