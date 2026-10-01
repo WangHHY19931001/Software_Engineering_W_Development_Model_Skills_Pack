@@ -303,4 +303,157 @@ describe('design-contract-logic', () => {
       }
     });
   });
+
+  describe('批次3 双轨：structuredViolations（rule/subject/fixHints）', () => {
+    it('D1 路径不一致：rule=dimension、subject="uatId → actualPath"、fixHints 非空', () => {
+      const r = checkDesignContractConsistency(
+        makeInput({
+          routeDefinitions: [
+            { method: 'PUT', path: '/api/posts/:id', params: [], successStatus: 200, responseFields: [] },
+          ],
+          uatPathMappings: [
+            {
+              uatId: 'UAT-006',
+              designPath: 'PUT/DELETE /api/posts/:id',
+              actualPath: 'PUT /api/posts/:id、DELETE /api/comments/:id',
+              mappingType: '直接',
+            },
+          ],
+        }),
+      );
+      expect(r.passed, 'D1 场景: 应失败').toBe(false);
+      expect(r.violations, 'D1 场景: 恰 1 条违规').toHaveLength(1);
+      const v = r.violations[0]!;
+      expect(v.dimension).toBe('D1');
+      const sv = r.structuredViolations[0]!;
+      expect(sv.rule, 'structured.rule 应等于 dimension').toBe(v.dimension);
+      expect(sv.message, 'structured.message 保留原文（消费者兼容）').toBe(v.message);
+      expect(sv.classification, '契约一致性全为 semantic').toBe('semantic');
+      expect(sv.subject, 'D1 subject = "<uatId> → <actualPath>"').toBe(
+        'UAT-006 → PUT /api/posts/:id、DELETE /api/comments/:id',
+      );
+      expect(Array.isArray(sv.fixHints), 'fixHints 为数组且非空').toBe(true);
+      expect(sv.fixHints!.length).toBeGreaterThan(0);
+    });
+
+    it('D2 参数不一致：subject=参数名', () => {
+      const r = checkDesignContractConsistency(
+        makeInput({
+          routeDefinitions: [
+            { method: 'GET', path: '/api/posts', params: ['pageSize'], successStatus: 200, responseFields: ['data'] },
+          ],
+          acceptanceAssertions: [
+            {
+              uatId: 'UAT-001',
+              method: 'GET',
+              path: '/api/posts',
+              params: ['limit'],
+              expectedStatus: 200,
+              assertedFields: ['data'],
+            },
+          ],
+        }),
+      );
+      expect(r.passed).toBe(false);
+      const d2 = r.structuredViolations.find((sv) => sv.rule === 'D2')!;
+      expect(d2).toBeDefined();
+      expect(d2.subject, 'D2 subject = 参数名').toBe('limit');
+      expect(d2.fixHints!.length).toBeGreaterThan(0);
+      expect(d2.classification).toBe('semantic');
+    });
+
+    it('D3 状态码不一致：subject=状态码对', () => {
+      const r = checkDesignContractConsistency(
+        makeInput({
+          routeDefinitions: [
+            { method: 'DELETE', path: '/api/posts/:id', params: [], successStatus: 200, responseFields: [] },
+          ],
+          acceptanceAssertions: [
+            {
+              uatId: 'UAT-001',
+              method: 'DELETE',
+              path: '/api/posts/:id',
+              params: [],
+              expectedStatus: 204,
+              assertedFields: [],
+            },
+          ],
+        }),
+      );
+      expect(r.passed).toBe(false);
+      const d3 = r.structuredViolations.find((sv) => sv.rule === 'D3')!;
+      expect(d3).toBeDefined();
+      expect(d3.subject, 'D3 subject = 状态码对（断言预期 → 路由实际）').toBe('204 → 200');
+      expect(d3.fixHints!.length).toBeGreaterThan(0);
+      expect(d3.classification).toBe('semantic');
+    });
+
+    it('D4 响应字段不一致：subject=字段名', () => {
+      const r = checkDesignContractConsistency(
+        makeInput({
+          routeDefinitions: [
+            { method: 'GET', path: '/api/posts', params: [], successStatus: 200, responseFields: ['data'] },
+          ],
+          acceptanceAssertions: [
+            {
+              uatId: 'UAT-001',
+              method: 'GET',
+              path: '/api/posts',
+              params: [],
+              expectedStatus: 200,
+              assertedFields: ['createdAt'],
+            },
+          ],
+        }),
+      );
+      expect(r.passed).toBe(false);
+      const d4 = r.structuredViolations.find((sv) => sv.rule === 'D4')!;
+      expect(d4).toBeDefined();
+      expect(d4.subject, 'D4 subject = 字段名').toBe('createdAt');
+      expect(d4.fixHints!.length).toBeGreaterThan(0);
+      expect(d4.classification).toBe('semantic');
+    });
+
+    it('路由缺失三连报（D2/D3/D4）：subject=路由字面', () => {
+      const r = checkDesignContractConsistency(
+        makeInput({
+          routeDefinitions: [
+            { method: 'GET', path: '/api/posts', params: ['page'], successStatus: 200, responseFields: ['data'] },
+          ],
+          acceptanceAssertions: [
+            {
+              uatId: 'UAT-030',
+              method: 'POST',
+              path: '/api/not-exist',
+              params: ['x'],
+              expectedStatus: 201,
+              assertedFields: ['y'],
+            },
+          ],
+        }),
+      );
+      expect(r.passed).toBe(false);
+      const notFound = r.structuredViolations.filter((sv) => sv.rule === 'D2' || sv.rule === 'D3' || sv.rule === 'D4');
+      expect(notFound, '路由缺失时 D2/D3/D4 各派生一条 structured').toHaveLength(3);
+      for (const sv of notFound) {
+        expect(sv.subject, '路由缺失场景 subject = "<method> <path>" 路由字面').toBe('POST /api/not-exist');
+        expect(sv.fixHints!.length).toBeGreaterThan(0);
+        expect(sv.classification).toBe('semantic');
+      }
+    });
+
+    it('通过时 structuredViolations 恒在场（空数组，恒存在先例）', () => {
+      const r = checkDesignContractConsistency(makeInput());
+      expect(r.passed).toBe(true);
+      expect(Array.isArray(r.structuredViolations)).toBe(true);
+      expect(r.structuredViolations).toHaveLength(0);
+    });
+
+    it('null 输入：structuredViolations 恒在场（空数组）', () => {
+      const r = checkDesignContractConsistency(null);
+      expect(r.passed).toBe(false);
+      expect(Array.isArray(r.structuredViolations)).toBe(true);
+      expect(r.structuredViolations).toHaveLength(0);
+    });
+  });
 });

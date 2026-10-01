@@ -36,7 +36,8 @@
  * @module
  */
 
-import { promises as fs } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { promises as fs, readFileSync } from 'node:fs';
 import * as path from 'node:path';
 
 import {
@@ -55,8 +56,12 @@ import { printGateReport, printJsonReport } from '../lib/gate-report.js';
 
 // ==================== uat-path-mapping.md 解析 ====================
 
-async function parseUatPathMapping(filePath: string): Promise<UatPathMapping[]> {
+/** 批次3 任务6：verifiedArtifacts 读登记回调——每成功 readFile 一个承重输入文件即登记（不存在不入表） */
+type RegisterRead = (filePath: string) => void;
+
+async function parseUatPathMapping(filePath: string, registerRead?: RegisterRead): Promise<UatPathMapping[]> {
   const content = await fs.readFile(filePath, 'utf-8');
+  registerRead?.(filePath);
   // 宽松解析（默认非 strict）：畸形行静默跳过，对齐 design-contract 历史行为。
   // 实现收敛：统一复用 design-contract-logic.parseUatPathMappingContent，
   // 字段映射到 uatId/designPath/actualPath/mappingType；violations 在宽松语义下不消费。
@@ -71,7 +76,7 @@ async function parseUatPathMapping(filePath: string): Promise<UatPathMapping[]> 
 
 // ==================== 路由定义提取 ====================
 
-async function parseRouteDefinitions(routesDir: string): Promise<RouteDefinition[]> {
+async function parseRouteDefinitions(routesDir: string, registerRead?: RegisterRead): Promise<RouteDefinition[]> {
   const routes: RouteDefinition[] = [];
   let entries: string[];
   try {
@@ -83,6 +88,7 @@ async function parseRouteDefinitions(routesDir: string): Promise<RouteDefinition
     if (!fileName.endsWith('.ts')) continue;
     const filePath = path.join(routesDir, fileName);
     const content = await fs.readFile(filePath, 'utf-8');
+    registerRead?.(filePath);
     const routeRegex = /router\.(get|post|put|delete|patch)\s*\(\s*['"`]([^'"`]+)['"`]/g;
     const positions: { method: string; path: string; start: number }[] = [];
     let match;
@@ -149,7 +155,10 @@ function extractResponseFields(content: string): string[] {
 
 // ==================== 验收测试断言提取 ====================
 
-async function parseAcceptanceAssertions(testDir: string): Promise<AcceptanceTestAssertion[]> {
+async function parseAcceptanceAssertions(
+  testDir: string,
+  registerRead?: RegisterRead,
+): Promise<AcceptanceTestAssertion[]> {
   const assertions: AcceptanceTestAssertion[] = [];
   let entries: string[];
   try {
@@ -161,6 +170,7 @@ async function parseAcceptanceAssertions(testDir: string): Promise<AcceptanceTes
     if (!fileName.endsWith('.test.ts')) continue;
     const filePath = path.join(testDir, fileName);
     const content = await fs.readFile(filePath, 'utf-8');
+    registerRead?.(filePath);
     // 提取 request(app).get/post/put/delete('path').expect(N) 形式
     const testRegex =
       /request\(app\)\.(get|post|put|delete|patch)\s*\(\s*['"`]([^'"`]+)['"`][\s\S]*?\.expect\((\d+)\)/g;
@@ -221,6 +231,26 @@ async function main(): Promise<void> {
   const projectDir = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? '.';
   const projectDirAbs = path.resolve(projectDir);
 
+  // ==================== verifiedArtifacts（批次3 任务6：承重输入文件字节清单） ====================
+  // 对本次判定实际被 parse 的文件登记 path/sha256/bytes（消费前可复验同一字节）；
+  // 读不到的文件不入表（不冒充登记，照任务 5 addVerified 先例）。path 一律项目相对 posix 形态。
+  // 仅 --json 报告承载该键（恒在场，可为空数组）；人类可读路径 GATE_JSON 手写清单不动（偏差 4）。
+  const verifiedArtifacts: Array<{ path: string; sha256: string; bytes: number }> = [];
+  const addVerified = (abs: string): void => {
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs 由本 CLI 前序步骤解析（mappingPath 常量拼接 / readdir 枚举产物），仅只读
+      const buf = readFileSync(abs);
+      verifiedArtifacts.push({
+        path: path.relative(projectDirAbs, abs).replace(/\\/g, '/'),
+        sha256: createHash('sha256').update(buf).digest('hex'),
+        bytes: buf.length,
+      });
+    } catch {
+      /* 不存在不入表 */
+    }
+  };
+  const registerRead: RegisterRead = (filePath) => addVerified(filePath);
+
   const mappingPath = path.join(projectDirAbs, 'docs', 'uat-path-mapping.md');
   const routesDir = path.join(projectDirAbs, 'src', 'routes');
   const testDir = path.join(projectDirAbs, 'tests', 'acceptance');
@@ -241,6 +271,7 @@ async function main(): Promise<void> {
           actual: '文件不存在',
         },
       ],
+      structuredViolations: [],
     };
     console.log(
       `CONTRACT_JSON: ${JSON.stringify(
@@ -265,9 +296,9 @@ async function main(): Promise<void> {
     return;
   }
 
-  const uatPathMappings = await parseUatPathMapping(mappingPath);
-  const routeDefinitions = await parseRouteDefinitions(routesDir);
-  const acceptanceAssertions = await parseAcceptanceAssertions(testDir);
+  const uatPathMappings = await parseUatPathMapping(mappingPath, registerRead);
+  const routeDefinitions = await parseRouteDefinitions(routesDir, registerRead);
+  const acceptanceAssertions = await parseAcceptanceAssertions(testDir, registerRead);
 
   const input: DesignContractCheckInput = {
     uatPathMappings,
@@ -289,6 +320,8 @@ async function main(): Promise<void> {
         passed: result.passed,
         reasons: result.violations.map((v) => `[${v.dimension}] ${v.message}`),
         violations: [...byDimension.entries()].map(([rule, count]) => ({ rule, count })),
+        // 批次3 任务6：承重输入文件字节清单（键恒在场，可为空数组；仅 --json 承载，偏差 4）
+        verifiedArtifacts,
         durationMs: Date.now() - startTime,
       },
       exitCode,
