@@ -50,6 +50,7 @@
  * @module
  */
 
+import { createHash } from 'node:crypto';
 import * as nodeFs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -515,6 +516,25 @@ async function runArtifactGate(argv: string[]): Promise<void> {
   const ingestionDir = path.resolve(projectDir, '.w-model', 'ingestion');
   const { graph, graphSource } = await discoverGraphAsset(ingestionDir);
 
+  // ==================== verifiedArtifacts（批次3 任务5：承重输入文件字节清单） ====================
+  // rtm/graph/tickets 读取完成后构建：对本次判定实际承重的输入文件登记 path/sha256/bytes
+  //（消费前可复验同一字节）；读不到的文件不入表（不冒充登记）。path 一律项目相对 posix 形态
+  //（与 ARTIFACT_PATHS.rtm 及 check-archive-integrity.ts 相对路径先例同口径，跨平台稳定）。
+  const verifiedArtifacts: Array<{ path: string; sha256: string; bytes: number }> = [];
+  const addVerified = (abs: string, rel: string): void => {
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs 由本 CLI 前序步骤解析（rtm 常量键 / discoverGraphAsset 产物 / resolveProjectRelativeRegularFile 验证），仅只读
+      const buf = nodeFs.readFileSync(abs);
+      verifiedArtifacts.push({ path: rel, sha256: createHash('sha256').update(buf).digest('hex'), bytes: buf.length });
+    } catch {
+      /* 不存在不入表 */
+    }
+  };
+  addVerified(rtmFile, ARTIFACT_PATHS.rtm);
+  const graphAssetPath = graphSource ? path.join(ingestionDir, graphSource) : '';
+  if (graphAssetPath) addVerified(graphAssetPath, path.relative(projectDir, graphAssetPath).replace(/\\/g, '/'));
+  if (ticketsFile) addVerified(ticketsFile, path.relative(projectDir, ticketsFile).replace(/\\/g, '/'));
+
   // 2. 检查 tla-manifest.json 存在性 + specs 非空
   const manifestFile = path.resolve(projectDir, ARTIFACT_PATHS.tlaManifest);
   const tlaAsset = await readTlaManifest(manifestFile);
@@ -585,7 +605,7 @@ async function runArtifactGate(argv: string[]): Promise<void> {
 
   // ==================== 终检调用 TLA+/BDD model 校验（设计文档 §3.3.8） ====================
   // phase 1 不依赖 graph；phase 2-4 在已有 graph 时叠加 graph 参数；phase 5-8 强制 Cucumber 证据。
-  const graphPath = graphSource ? path.join(ingestionDir, graphSource) : '';
+  const graphPath = graphAssetPath;
   const modelCheckViolations = tlaBddWaived
     ? []
     : runModelChecks({
@@ -691,6 +711,8 @@ async function runArtifactGate(argv: string[]): Promise<void> {
         // 批次1：SDMAP 锚点校验执行态与结构化违规（键恒存在；phase<5 或无 graph 时为 null/[]，便于编排消费）
         sdAnchorCheck: result.sdAnchorCheck ?? null,
         sdmapViolations: result.sdmapViolations ?? [],
+        // 批次3 B2：本次判定承重输入文件字节清单（path/sha256/bytes；键恒存在，可为空数组——照 sdmapViolations 先例）
+        verifiedArtifacts,
         // 阶段 1-4 设计级结构校验（引用块/SSOT/DoD/§8）的执行态：
         // checked=已传 --spec-dir 并执行；skipped=阶段 1-4 未传（整组跳过，必须可见）；
         // null=阶段 5-8 不适用。键恒存在，便于编排消费与审计区分「通过」与「未执行」。
@@ -801,6 +823,8 @@ async function runArtifactGate(argv: string[]): Promise<void> {
       // 批次1：SDMAP 锚点校验执行态与结构化违规（键恒存在；phase<5 或无 graph 时为 null/[]，便于编排消费）
       sdAnchorCheck: result.sdAnchorCheck ?? null,
       sdmapViolations: result.sdmapViolations ?? [],
+      // 批次3 B2：本次判定承重输入文件字节清单（键恒存在，可为空数组——照 sdmapViolations 先例）
+      verifiedArtifacts,
     },
     exitCode,
   );

@@ -914,7 +914,8 @@ describe('P0-2 codeModule 格式校验', () => {
       codeModule: cm,
       acceptanceTest: 'UAT-001',
     });
-    const fmt = (rows: unknown[]) => checkCodeModuleFormat(rows as never);
+    // 批次3 任务5：checkCodeModuleFormat 双轨返回，既有用例断言 violations 轨（structured 轨见下方批次3 用例）
+    const fmt = (rows: unknown[]) => checkCodeModuleFormat(rows as never).violations;
 
     it('合法：REQ 单条目带区间锚点', () => {
       expect(fmt([row('SD-2.1:src/auth/login.ts:L42-58')])).toEqual([]);
@@ -2147,6 +2148,20 @@ describe('SDMAP 双向精确对账（批次1）', () => {
     expect(r.structured.filter((s) => s.rule === 'SDMAP-4')).toHaveLength(1);
     expect(r.structured.find((s) => s.rule === 'SDMAP-4')?.classification).toBe('evidence-only');
     expect(r.skipped).toBe(false);
+  });
+  it('批次3 SDMAP structured 带 subject 与 fixHints', () => {
+    const graph = { nodes: [{ id: 'SD-2.2', type: 'SD' }] };
+    const r = checkSdToCodeModuleMapping(graph, rowsOf('SD-2.1:src/a.ts:L1') as never, new Map([['src/a.ts', 3]]));
+    const s1 = r.structured.find((s) => s.rule === 'SDMAP-1')!;
+    expect(s1.subject).toBe('SD-2.2');
+    expect(s1.fixHints!.length).toBeGreaterThan(0);
+    expect(s1.fixHints!.length).toBeLessThanOrEqual(3);
+  });
+  it('批次3 SDMAP-5 结构化收编 sdmapViolations（semantic）', () => {
+    // checkCodeModuleFormat 产出 structured（rule 'SDMAP-5'，classification 'semantic'，subject=条目 raw）
+    const v = checkCodeModuleFormat(rowsOf('SD-2.1:src/bad.ts') as never);
+    expect(v.structured?.[0]?.rule).toBe('SDMAP-5');
+    expect(v.structured?.[0]?.classification).toBe('semantic');
   });
 });
 

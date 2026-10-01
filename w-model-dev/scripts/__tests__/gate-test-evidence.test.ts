@@ -687,4 +687,29 @@ describe('批次1 SDMAP 注入面（CLI 子进程）', () => {
       rmSync(legalDir, { recursive: true, force: true });
     }
   }, 240_000);
+
+  it('批次3 verifiedArtifacts：rtm/graph 三字段登记 + --json/GATE_JSON 两路键恒存在', () => {
+    const dir = makeSdmapProject('SD-2.1:src/real.ts:L1-3');
+    try {
+      // --json 路：键恒存在且 rtm/graph（discoverGraphAsset 实际文件路径）以相对 posix 路径登记
+      const json = runGate([dir, '--phase=5', '--json']);
+      const report = JSON.parse(json.stdout) as {
+        verifiedArtifacts?: Array<{ path: string; sha256: string; bytes: number }>;
+      };
+      expect(Array.isArray(report.verifiedArtifacts)).toBe(true);
+      const entries = report.verifiedArtifacts ?? [];
+      expect(entries.map((a) => a.path)).toContain('.w-model/rtm.json');
+      expect(entries.map((a) => a.path)).toContain('.w-model/ingestion/graph.json');
+      for (const a of entries) {
+        expect(a.sha256).toMatch(/^[0-9a-f]{64}$/);
+        expect(typeof a.bytes).toBe('number');
+        expect(a.bytes).toBeGreaterThan(0);
+      }
+      // GATE_JSON 路（人类可读路径收尾摘要）：键同样恒存在（置于 sdmapViolations 之后，键序钉死）
+      const gate = runGate([dir, '--phase=5']);
+      expect(gate.stdout).toContain('"verifiedArtifacts":[');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 240_000);
 });
