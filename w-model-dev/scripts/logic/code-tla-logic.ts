@@ -263,7 +263,9 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
   }
 
   // 第一向：图→RTM（SDMAP-1 前缀精确对账：REQ 条目 sdId 与图节点 id 全等）
-  for (const [idx, sd] of sdNodes.entries()) {
+  // field 定位标签与 gate-logic 对齐（批次3 任务10 双实现 property 测试裁定）：
+  // 按 id 键（graph.SD[<id>]）比按索引键（graph.nodes[<idx>].id）更具定位性且在节点增删后不漂移
+  for (const sd of sdNodes) {
     checked++;
     const id = String(sd.id ?? '');
     if (reqEntries.some(({ entry }) => entry.sdId === id)) continue;
@@ -273,7 +275,7 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
     violations.push(msg);
     structuredViolations.push({
       rule: 'SDMAP-1',
-      field: `graph.nodes[${idx}].id`,
+      field: `graph.SD[${id}]`,
       message: msg,
       classification: 'semantic',
       subject: id,
@@ -827,7 +829,7 @@ export function checkCodeTlaConsistency(input: CodeTlaConsistencyInput): Consist
   for (const v of sdToCodeModule.violations) {
     violations.push({ dimension: 'sdToCodeModule', message: v });
   }
-  // 结构化违规双轨：直接透传子维度结构化违规（保留 graph.nodes[3].id 等细粒度 field），不再字符串重新派生粗粒度 field
+  // 结构化违规双轨：直接透传子维度结构化违规（保留 graph.SD[SD-xxx] 等细粒度 field，与 gate-logic 同形态），不再字符串重新派生粗粒度 field
   if (sdToCodeModule.structuredViolations && sdToCodeModule.structuredViolations.length > 0) {
     structuredViolations.push(...sdToCodeModule.structuredViolations);
   }
