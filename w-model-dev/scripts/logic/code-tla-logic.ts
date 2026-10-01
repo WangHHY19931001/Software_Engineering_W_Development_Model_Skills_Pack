@@ -57,6 +57,23 @@ const CODE_TLA_RULES = {
   SCHEMA: 'CODE_TLA_SCHEMA',
 } as const;
 
+/**
+ * 代码-TLA+ 修复建议常量表（批次3 任务7）：structuredViolations.fixHints 的单一事实来源。
+ * 键与 structured.rule 一致；每条祈使句，面向修复者 LLM。
+ * D1 主现场（缺映射/幽灵前缀）结构化 rule 为 SDMAP-1/SDMAP-2（与 gate-logic 对齐）；
+ * 形状守卫现场（graph.nodes/rtm.rows 非数组）rule 为 CODE_TLA_D1、表中无键，经 `?? []` 归一为空数组。
+ */
+const CODE_TLA_FIX_HINTS: Record<string, string[]> = {
+  'SDMAP-1': ['为该 SD 在 rtm.json 补前缀精确的 codeModule 条目'],
+  'SDMAP-2': ['删除该幽灵前缀条目或先补图节点'],
+  CODE_TLA_D2: ['在设计文档补该状态转移或修正代码状态机实现'],
+  CODE_TLA_D3: ['为该 action 补实现或修正 TLA+ Next 分支'],
+  CODE_TLA_D4: ['为该不变量补代码侧断言或测试'],
+  'INPUT-NO-SHARED-SD': ['核对 graph 与 rtm 是否描述同一系统；版本错位则回退到对应阶段产物'],
+  CODE_TLA_INPUT: ['修正 manifest/graph/rtm 输入路径与结构'],
+  CODE_TLA_SCHEMA: ['按 code-tla-manifest schema 修正字段'],
+};
+
 export interface TlaManifest {
   specs: TlaSpec[];
   [k: string]: unknown;
@@ -201,6 +218,8 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
           field: 'graph.nodes',
           message: 'graph.nodes 必须为数组',
           classification: 'semantic',
+          subject: 'graph.nodes',
+          fixHints: CODE_TLA_FIX_HINTS[CODE_TLA_RULES.D1] ?? [],
         },
       ],
     };
@@ -216,6 +235,8 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
           field: 'rtm.rows',
           message: 'rtm.rows 必须为数组',
           classification: 'semantic',
+          subject: 'rtm.rows',
+          fixHints: CODE_TLA_FIX_HINTS[CODE_TLA_RULES.D1] ?? [],
         },
       ],
     };
@@ -255,6 +276,8 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
       field: `graph.nodes[${idx}].id`,
       message: msg,
       classification: 'semantic',
+      subject: id,
+      fixHints: CODE_TLA_FIX_HINTS['SDMAP-1'] ?? [],
     });
   }
 
@@ -268,6 +291,8 @@ export function checkSdToCodeModule(graph: Graph, rtm: Rtm): DimensionResult {
         field: `rtm[${rowId}].codeModule`,
         message: msg,
         classification: 'semantic',
+        subject: entry.sdId!,
+        fixHints: CODE_TLA_FIX_HINTS['SDMAP-2'] ?? [],
       });
     }
   }
@@ -369,6 +394,9 @@ export function checkCodeStateTransfer(files: CodeFile[]): DimensionResult {
   const violations: string[] = [];
   const structuredViolations: StructuredViolation[] = [];
   if (!Array.isArray(files) || files.length === 0) {
+    // 批次3 subject 取名（维度2 两处现场均为聚合形态）：本维度抽取的是赋值/条件/断言，
+    // 违规现场不存在 from→to 转移对（transitionKey 形态属 state-machine-logic 的设计↔代码
+    // 状态机比对器），故以现场聚合标识（与 field 同源）为 subject。
     return {
       passed: false,
       checked: 0,
@@ -379,6 +407,8 @@ export function checkCodeStateTransfer(files: CodeFile[]): DimensionResult {
           field: 'codeFiles',
           message: 'codeFiles 为空，无代码状态转移可校验',
           classification: 'topology',
+          subject: 'codeFiles',
+          fixHints: CODE_TLA_FIX_HINTS[CODE_TLA_RULES.D2] ?? [],
         },
       ],
     };
@@ -397,6 +427,8 @@ export function checkCodeStateTransfer(files: CodeFile[]): DimensionResult {
       field: 'codeFiles[*].assignments',
       message: msg,
       classification: 'topology',
+      subject: 'codeFiles[*].assignments',
+      fixHints: CODE_TLA_FIX_HINTS[CODE_TLA_RULES.D2] ?? [],
     });
   }
 
@@ -553,6 +585,8 @@ export function checkNextBranchCoverage(tlaContent: string, files: CodeFile[]): 
         field: 'tlaContent',
         message: msg,
         classification: 'topology',
+        subject: action,
+        fixHints: CODE_TLA_FIX_HINTS[CODE_TLA_RULES.D3] ?? [],
       });
     }
   }
@@ -654,6 +688,8 @@ export function checkInvariantCoverage(tlaContent: string, files: CodeFile[]): D
       field: 'codeFiles[*].assertions',
       message: msg,
       classification: 'semantic',
+      subject: invariants.join(', '),
+      fixHints: CODE_TLA_FIX_HINTS[CODE_TLA_RULES.D4] ?? [],
     });
   }
 
@@ -715,6 +751,8 @@ export function checkCodeTlaConsistency(input: CodeTlaConsistencyInput): Consist
           field: 'input',
           message: 'input 必须为对象',
           classification: 'semantic',
+          subject: 'input',
+          fixHints: CODE_TLA_FIX_HINTS[CODE_TLA_RULES.INPUT] ?? [],
         },
       ],
     };
@@ -751,6 +789,9 @@ export function checkCodeTlaConsistency(input: CodeTlaConsistencyInput): Consist
         field: 'manifest/graph/rtm',
         message: v.message,
         classification: 'semantic',
+        // 纯逻辑层无文件系统路径，以三输入键名（对应 manifest/graph/rtm 三文件）为现场标识
+        subject: 'manifest/graph/rtm',
+        fixHints: CODE_TLA_FIX_HINTS[CODE_TLA_RULES.SCHEMA] ?? [],
       })),
     };
   }
@@ -775,6 +816,9 @@ export function checkCodeTlaConsistency(input: CodeTlaConsistencyInput): Consist
       rule: 'INPUT-NO-SHARED-SD',
       message: '无共享设计 ID（cannot prove same system）',
       classification: 'topology',
+      // subject = 零交集的两个对账键集（graph SD 节点集 ∩ rtm REQ 条目 SD 前缀集）
+      subject: 'graph.SD ∩ rtm.SD',
+      fixHints: CODE_TLA_FIX_HINTS['INPUT-NO-SHARED-SD'] ?? [],
     });
   }
 

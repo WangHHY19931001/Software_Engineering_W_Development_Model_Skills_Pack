@@ -157,4 +157,100 @@ describe('loadTlaContents 解析基准（D-3）', () => {
     expect(errorJson?.file).toBe(path.resolve(root, 'tla', 'missing.tla'));
     expect(String(r.stderr)).toContain('不可读');
   });
+
+  it('批次3 verifiedArtifacts：三输入 JSON + .tla 登记（--json 单行报告键恒存在，path/sha256/bytes）', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tla-va-'));
+    try {
+      const manifestDir = path.join(root, '.w-model');
+      const tlaDir = path.join(root, 'tla');
+      const srcDir = path.join(root, 'src');
+      await fs.mkdir(manifestDir, { recursive: true });
+      await fs.mkdir(tlaDir, { recursive: true });
+      await fs.mkdir(srcDir, { recursive: true });
+      const manifestPath = path.join(manifestDir, 'tla-manifest.json');
+      const graphPath = path.join(root, 'graph.json');
+      const rtmPath = path.join(root, 'rtm.json');
+      const tlaPath = path.join(tlaDir, 'L2_auth.tla');
+      // 四维度全通过的 fixture：D1 前缀精确映射 + D2 赋值 + D3 register↔Register + D4 assert 覆盖
+      const manifest = {
+        // basePath 相对 manifestDir（.w-model）解析：'..' 指向项目根，tlaPath=tla/L2_auth.tla 落在 <root>/tla/
+        basePath: '..',
+        specs: [
+          {
+            id: 'L2_auth',
+            level: 'L2',
+            phase: 2,
+            system: 'demo',
+            requirementIds: ['REQ-001'],
+            tlaPath: 'tla/L2_auth.tla',
+            cfgPath: 'tla/L2_auth.cfg',
+            parent: null,
+            children: [],
+          },
+        ],
+      };
+      await fs.writeFile(manifestPath, JSON.stringify(manifest));
+      await fs.writeFile(graphPath, JSON.stringify({ nodes: [{ id: 'SD-AUTH', type: 'SD' }], edges: [] }));
+      await fs.writeFile(
+        rtmPath,
+        JSON.stringify({ rows: [{ requirementId: 'REQ-001', codeModule: 'SD-AUTH:src/auth.ts:L1-2' }] }),
+      );
+      await fs.writeFile(
+        tlaPath,
+        [
+          '---- MODULE L2_auth ----',
+          'Next ==',
+          '    \\/ Register',
+          '',
+          'BusinessInvariant ==',
+          '    /\\ TypeInvariant',
+          '====',
+          '',
+        ].join('\n'),
+      );
+      await fs.writeFile(
+        path.join(srcDir, 'auth.ts'),
+        [
+          "let state = 'init';",
+          'export function register(): void { state = "registered"; assert(state !== undefined); }',
+          '',
+        ].join('\n'),
+      );
+
+      const r = runSync(
+        process.execPath,
+        [
+          tsxCli,
+          CLI_PATH,
+          `--manifest=${manifestPath}`,
+          `--graph=${graphPath}`,
+          `--rtm=${rtmPath}`,
+          `--src=${srcDir}`,
+          '--json',
+        ],
+        { timeout: 30_000 },
+      );
+
+      expect(r.status, `应全通过 exit 0（stdout=${String(r.stdout)}）`).toBe(0);
+      const report = JSON.parse(String(r.stdout)) as {
+        verifiedArtifacts?: Array<{ path: string; sha256: string; bytes: number }>;
+      };
+      // 键恒存在：三输入 JSON + loadTlaContents 成功读取的 .tla 文件均登记
+      expect(Array.isArray(report.verifiedArtifacts)).toBe(true);
+      const toRel = (abs: string): string => path.relative(process.cwd(), abs).replace(/\\/g, '/');
+      const paths = (report.verifiedArtifacts ?? []).map((a) => a.path);
+      expect(paths, 'manifest/graph/rtm 三输入 JSON 登记').toEqual(
+        expect.arrayContaining([toRel(manifestPath), toRel(graphPath), toRel(rtmPath)]),
+      );
+      expect(paths, 'loadTlaContents 成功读取的 .tla 文件登记').toContain(toRel(tlaPath));
+      expect(paths, 'cfg 文件未被读取、不入表').not.toContain(toRel(path.join(tlaDir, 'L2_auth.cfg')));
+      for (const a of report.verifiedArtifacts ?? []) {
+        expect(a.sha256, 'sha256 为 64 位十六进制字节摘要').toMatch(/^[0-9a-f]{64}$/);
+        expect(typeof a.bytes).toBe('number');
+        expect(a.bytes).toBeGreaterThan(0);
+      }
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
 });

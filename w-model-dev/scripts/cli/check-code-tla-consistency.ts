@@ -41,7 +41,8 @@
  * @module
  */
 
-import { promises as fs } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { promises as fs, readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { createRequire } from 'node:module';
 
@@ -165,8 +166,16 @@ export class TlaSpecUnreadableError extends Error {
  * 解析基准（D-3，与 check-tla-model.ts 同口径，避免同一 manifest 两门结论不一致）：
  * `tlaAbs = resolve(manifestDir, basePath ?? '.', tlaPath)`——basePath 自身相对 manifest
  * 文件所在目录。此前只按 manifest 目录解析，导致真实项目必须用 `.w-model/tla` 目录联结绕过。
+ *
+ * 批次3 任务7：`onTlaLoaded` 为可选登记回调——每成功 readFile 一个 .tla 文件即以解析后
+ * 绝对路径回调（CLI 用其构建 verifiedArtifacts 字节清单）；内联 tlaContent 兜底（文件读不到）
+ * 不回调，保持「读不到不入表」语义。不传回调时行为与此前完全一致（既有单测零适配）。
  */
-export async function loadTlaContents(manifest: TlaManifest, manifestFile: string): Promise<void> {
+export async function loadTlaContents(
+  manifest: TlaManifest,
+  manifestFile: string,
+  onTlaLoaded?: (absPath: string) => void,
+): Promise<void> {
   const manifestDir = path.dirname(path.resolve(manifestFile));
   // 缺省回退 '.'（与 check-tla-model.ts 一致；纯逻辑已对缺失 basePath 报违反）
   const basePath = typeof manifest.basePath === 'string' && manifest.basePath.trim() !== '' ? manifest.basePath : '.';
@@ -178,6 +187,7 @@ export async function loadTlaContents(manifest: TlaManifest, manifestFile: strin
     const inlineContent = typeof spec.tlaContent === 'string' && spec.tlaContent.trim() !== '';
     try {
       spec.tlaContent = await fs.readFile(tlaAbs, 'utf-8');
+      onTlaLoaded?.(tlaAbs);
     } catch (err) {
       // 规格文件读不到时必须 fail-closed：原先统一置空串会让维度 3（Next 分支）与维度 4（不变式）
       // 因「零动作/零不变式」静默判通过——删文件即放行。
@@ -222,9 +232,34 @@ async function main(): Promise<void> {
   const graph = await readJsonOrExit<Graph>(graphFile);
   const rtm = await readJsonOrExit<Rtm>(rtmFile);
 
+  // ==================== verifiedArtifacts（批次3 任务7：承重输入文件字节清单） ====================
+  // 对本次判定实际承重的输入文件登记 path/sha256/bytes（消费前可复验同一字节）；读不到的文件
+  // 不入表（不冒充登记，照任务 5/6 addVerified 先例）。本 CLI 无 projectDir 参数，输入路径按
+  // 惯例相对项目根（= 进程 cwd）给定，故 path 基准取 cwd 并 posix 归一（跨平台稳定）。
+  // 登记范围（简报口径）：readJsonOrExit 三输入 JSON + loadTlaContents 成功读取的 .tla 文件；
+  // --src 代码文件不登记。仅 --json 报告承载该键（恒在场）；人类可读路径 GATE_JSON 不动（偏差 4）。
+  const verifiedArtifacts: Array<{ path: string; sha256: string; bytes: number }> = [];
+  const addVerified = (file: string): void => {
+    const abs = path.resolve(file);
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs 由本 CLI 前序步骤解析（--manifest/--graph/--rtm 参数与 loadTlaContents 的 resolve 产物），仅只读
+      const buf = readFileSync(abs);
+      verifiedArtifacts.push({
+        path: path.relative(process.cwd(), abs).replace(/\\/g, '/'),
+        sha256: createHash('sha256').update(buf).digest('hex'),
+        bytes: buf.length,
+      });
+    } catch {
+      /* 读不到不入表 */
+    }
+  };
+  addVerified(manifestFile);
+  addVerified(graphFile);
+  addVerified(rtmFile);
+
   // 读取 L2/L3 spec 的 .tla 内容（装载基准与 check-tla-model 对齐；不可读时 fail-closed）
   try {
-    await loadTlaContents(manifest, manifestFile);
+    await loadTlaContents(manifest, manifestFile, (tlaAbs) => addVerified(tlaAbs));
   } catch (err) {
     if (err instanceof TlaSpecUnreadableError) {
       // 纯函数层只抛错，输出与退出码由 CLI 层承担；return 保证不会继续算出 passed=true 覆盖退出码。
@@ -258,6 +293,8 @@ async function main(): Promise<void> {
           ? result.structuredViolations.map((v) => v.message)
           : result.violations.map((v) => `[${v.dimension}] ${v.message}`),
         violations: buildViolationDistribution(result.violations.length, result.structuredViolations),
+        // 批次3 任务7 B2：本次判定承重输入文件字节清单（键恒在场，可为空数组——照任务 5 sdmapViolations 先例）
+        verifiedArtifacts,
         durationMs: Date.now() - startTime,
       },
       exitCode,

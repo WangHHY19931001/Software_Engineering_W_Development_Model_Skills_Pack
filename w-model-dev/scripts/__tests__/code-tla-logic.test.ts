@@ -479,6 +479,70 @@ BusinessInvariant ==
   });
 });
 
+// ==================== 批次3：四维度 structured subject/fixHints ====================
+
+describe('批次3 双轨：四维度 structured subject/fixHints', () => {
+  function sdGraph(ids: string[]): Graph {
+    return { nodes: ids.map((id) => ({ id, type: 'SD' })), edges: [] };
+  }
+  function rtmWith(codeModule: string): Rtm {
+    return { rows: [{ requirementId: 'REQ-001', codeModule }] };
+  }
+  function makeInput(overrides: Partial<CodeTlaConsistencyInput> = {}): CodeTlaConsistencyInput {
+    return {
+      // 携带一个 L2 spec（tlaContent 由各用例按需注入）；批次1 块的同名 helper 空 specs 即可，此处维度3/4 需注入
+      manifest: makeManifest([{ level: 'L2' }]),
+      graph: sdGraph([]),
+      rtm: rtmWith('src/x.ts:L1-9'),
+      codeFiles: [],
+      ...overrides,
+    };
+  }
+
+  it('批次3 四维度 structured 带 subject/fixHints（D2 缺转移现场，照批次1 makeInput）', () => {
+    const r = checkCodeTlaConsistency(makeInput());
+    const d2 = r.dimensions.codeStateTransfer.structuredViolations?.[0];
+    expect(d2?.subject).toBeDefined();
+    expect(d2?.fixHints!.length).toBeGreaterThan(0);
+  });
+
+  it('D1 两向：SDMAP-1 subject=SD 节点 id / SDMAP-2 subject=幽灵前缀', () => {
+    const r = checkCodeTlaConsistency(makeInput({ graph: sdGraph(['SD-AUTH']), rtm: rtmWith('SD-GHOST:src/g.ts:L1') }));
+    const svs = r.dimensions.sdToCodeModule.structuredViolations ?? [];
+    const m1 = svs.find((v) => v.rule === 'SDMAP-1');
+    const m2 = svs.find((v) => v.rule === 'SDMAP-2');
+    expect(m1?.subject, 'SDMAP-1 subject = 缺映射的 SD 节点 id').toBe('SD-AUTH');
+    expect(m2?.subject, 'SDMAP-2 subject = 幽灵 SD 前缀').toBe('SD-GHOST');
+    expect(m1?.fixHints!.length).toBeGreaterThan(0);
+    expect(m2?.fixHints!.length).toBeGreaterThan(0);
+  });
+
+  it('D3 Next 无对应：subject=action 名', () => {
+    const input = makeInput({ codeFiles: [makeCodeFile('function other() {}')] });
+    input.manifest.specs[0]!.tlaContent = 'Next ==\n    \\/ Register\n';
+    const r = checkCodeTlaConsistency(input);
+    const d3 = r.dimensions.nextBranchCoverage.structuredViolations?.[0];
+    expect(d3?.subject, 'D3 subject = TLA+ action 名').toBe('Register');
+    expect(d3?.fixHints!.length).toBeGreaterThan(0);
+  });
+
+  it('D4 无断言：subject=不变式名清单', () => {
+    const input = makeInput({ codeFiles: [makeCodeFile('function foo() { return 1; }')] });
+    input.manifest.specs[0]!.tlaContent = 'BusinessInvariant ==\n    /\\ TypeOK\n    /\\ AuthOK\n';
+    const r = checkCodeTlaConsistency(input);
+    const d4 = r.dimensions.invariantCoverage.structuredViolations?.[0];
+    expect(d4?.subject, 'D4 subject = 未能覆盖的子不变式名').toBe('TypeOK, AuthOK');
+    expect(d4?.fixHints!.length).toBeGreaterThan(0);
+  });
+
+  it('INPUT-NO-SHARED-SD 守卫：subject+fixHints（零交集现场标识）', () => {
+    const r = checkCodeTlaConsistency(makeInput({ graph: sdGraph(['SD-A']), rtm: rtmWith('SD-B:src/b.ts:L1') }));
+    const guard = r.structuredViolations?.find((v) => v.rule === 'INPUT-NO-SHARED-SD');
+    expect(guard?.subject).toBeDefined();
+    expect(guard?.fixHints!.length).toBeGreaterThan(0);
+  });
+});
+
 // ==================== 辅助函数 toCamelCase ====================
 
 describe('toCamelCase 辅助函数', () => {
