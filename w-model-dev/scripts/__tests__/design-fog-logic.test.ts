@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { checkDesignFog } from '../logic/design-fog-logic';
 
 const TABLE = (

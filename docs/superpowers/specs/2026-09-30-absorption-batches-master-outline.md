@@ -69,7 +69,11 @@
 
 | 批次 | 规格 | 实现计划 | 状态 |
 |---|---|---|---|
-| 1 | 2026-09-30-design-code-consistency-anchors-design.md（commit 31730600） | 2026-09-30-design-code-consistency-anchors.md（fa05d196） | **已实现**（16 提交 fa05d196..d0a180a9；最终审查 4 Important 修复波完成并定向复审批准；prepush 19/19；版本 42.6.0），待合并 |
+| 1 | 2026-09-30-design-code-consistency-anchors-design.md（commit 31730600） | 2026-09-30-design-code-consistency-anchors.md（fa05d196） | **已实现并合入 main**（16 提交 fa05d196..d0a180a9；合并提交 6a2029df；合并结果全量测试 1900/1900；版本 42.6.0） |
+| 2 | 2026-10-02-design-phase-fog-and-optional-capability-design.md（commit dea72625） | 2026-10-02-design-phase-fog.md | **实现中**（D1-D5 已裁定：A4 方案 A / A3 文档+脚本 / 三选一+回退 / 复用四字段） |
+| 3 | 2026-10-01-gate-engineering-design.md（commit 00778532） | 2026-10-01-gate-engineering.md（ef59d54a） | **已实现并合入 main**（13 提交 6a2029df..73cab34d；合并提交 9b2a2125；合并结果全量测试 1942/1942；版本 42.7.0） |
+| 4 | — | — | 未立项 |
+| 5 | — | — | 未立项（条件见 §3） |
 
 ### 5.1 批次 1 延后项与后续项登记（2026-10-01，工作区账本销毁前的持久化）
 
@@ -94,10 +98,6 @@
 - `readJsonOrExit` 返回原始 buffer：统一四热点 verifiedArtifacts 哈希与 JSON parse 同一字节源，消除哈希/解析两段独立读盘的三处 TOCTOU。
 
 **流程教训（后续批次简报规范）：** 规格泛称「条目」而简报转译成 REQ-only 代码曾造成两个缺口（SDMAP-3/4 行类型、开放锚点）——后续简报须携带规格原文约束行并显式声明「本任务收窄/不收窄」；文档硬切清单可考虑给 docs-consistency 增加旧文法示例扫描。
-| 2 | — | — | 未立项 |
-| 3 | — | — | 未立项 |
-| 4 | — | — | 未立项 |
-| 5 | — | — | 未立项（条件见 §3） |
 
 ## 6. 已裁定决策登记
 
