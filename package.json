@@ -13,6 +13,7 @@
     "check:coverage": "tsx w-model-dev/scripts/cli/check-requirement-coverage.ts",
     "check:exemption": "tsx w-model-dev/scripts/cli/check-exemption.ts",
     "check:docs-consistency": "tsx w-model-dev/scripts/cli/check-docs-consistency.ts",
+    "check:fog": "tsx w-model-dev/scripts/cli/check-design-fog.ts",
     "//2 测试类": "单元测试与回归",
     "test": "vitest run --config config/vitest.config.ts",
     "test:affected": "node scripts/test-affected.cjs",

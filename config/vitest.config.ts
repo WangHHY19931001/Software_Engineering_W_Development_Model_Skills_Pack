@@ -64,6 +64,7 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'code-health-task1-integration.test.ts',
   'code-health-tests.test.ts',
   'coverage-logic.test.ts',
+  'design-fog-cli.test.ts',
   'docs-consistency-logic.test.ts',
   'doctor-logic.test.ts',
   'eval-runner.test.ts',
