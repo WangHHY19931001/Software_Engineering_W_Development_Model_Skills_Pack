@@ -177,6 +177,7 @@ R6 校验规则：对每条签名记录，用上述公式重算 sigHash，与记
 - **v2 公式**：与 v1 的差别仅在槽位 6——`artifacts` 清单换为 `artifactsV2 = JSON.stringify({ artifacts, sourceArtifacts })`，即 artifacts 与 sourceArtifacts 两清单整体（含每条 `sha256`）纳入内容哈希；其余槽位不变。
 - **R11（仅 v2 条目适用）**：`inputProvenance.sourceArtifacts[]` 每条 `sha256` 必填且匹配 `^[a-fA-F0-9]{64}$`，缺失或非法即违规（`R11: <sigId> v2 条目来源 sha256 缺失或非法`）；v1 条目（含缺省）不触发 R11。
 - **R6 按条目分流重算**：`sigHashAlgo==='v2'` 走 v2 公式，缺省/`v1` 走 v1 公式（权威实现：`signature-chain-logic.ts` `computeSigHashFor`）；v1 路径逐字节不变，既有链零破坏。
+- **v1/v2 增益澄清（42.7.0 终审勘误）**：v1 公式槽 10 已将 `inputProvenance` 整体（含 `sourceArtifacts` 及其任何字段）纳入内容哈希，v1 链篡改来源声明同样会被 R6 抓获；v2 的真实增益是公式显式版本化（`sigHashAlgo` 可演进）、槽位 6 产物清单显式化（artifacts 与 sourceArtifacts 分列）、R11 强制 `sourceArtifacts[].sha256` 必填——而非「v1 抓不到来源篡改」。
 
 **sha256 抄录约定**：v2 条目签名时，`sourceArtifacts[].sha256` 须从上游 GATE_JSON 的 `verifiedArtifacts`（本次门禁判定承重输入文件字节清单 `Array<{path, sha256, bytes}>`，四热点门禁 `--json` 恒存在、空数组允许）按 path 对应抄录——保证「签名声明的字节 = 上游门禁实际校验的字节」；无上游清单（`verifiedArtifacts` 为空或缺该 path）的来源按磁盘现算。抄录后的 sha256 随 v2 公式进入内容哈希：事后篡改该字段而不改 `sigHash`，会被 R6 重算抓获（篡改声明的其他字段同理）。知情边界：「声明 vs 真实字节」的自动核查需 gate-log 索引基建，v2 本批只绑定声明不可抵赖（D6 已裁定接受）。
 

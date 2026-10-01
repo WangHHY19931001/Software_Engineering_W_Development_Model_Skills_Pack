@@ -22,7 +22,7 @@ function loadJsonl(filename: string): SignatureChainEntry[] {
     .map((l) => JSON.parse(l));
 }
 
-describe('signature-chain-logic R1-R10', () => {
+describe('signature-chain-logic R1-R11', () => {
   it('R1 valid-all-roles 通过', () => {
     const entries = loadJsonl('valid-all-roles.jsonl');
     const result = checkSignatureChain(entries, { phase: 1 });
@@ -30,7 +30,7 @@ describe('signature-chain-logic R1-R10', () => {
     expect(result.rulesFailed).not.toContain('R1');
   });
 
-  it('R1-R10 负例 fixtures（10 个 bad-*.jsonl 逐 fixture 具名，R8 附 existingPaths 选项）', () => {
+  it('R1-R11 负例 fixtures（10 个 bad-*.jsonl 逐 fixture 具名，R8 附 existingPaths 选项）', () => {
     const rows: Array<[fixture: string, 期望规则: string, options?: { existingPaths?: Set<string> }]> = [
       ['bad-missing-V.jsonl', 'R1'],
       ['bad-broken-chain.jsonl', 'R2'],
@@ -271,7 +271,6 @@ describe('批次3 sigHash v2', () => {
     const v1 = { ...base };
     delete (v1 as Record<string, unknown>).sigHashAlgo;
     delete (v1.inputProvenance.sourceArtifacts[0]! as Record<string, unknown>).sha256;
-    expect(computeSigHash(v1 as never)).toBe(computeSigHash(v1 as never)); // 幂等
     // 有判别力断言：按 v1 公式逐字段手工拼串 + createHash 独立重算，证明 v1 路径公式未变
     const v1Input = `${v1.sigId}|${v1.phase}|${v1.role}|${v1.action}|${v1.runId}|${JSON.stringify(v1.artifacts)}|${v1.prevSigHash}|${v1.signedAt}|${v1.signer}|${JSON.stringify(v1.inputProvenance)}`;
     const expectedV1 = 'sha256:' + createHash('sha256').update(v1Input, 'utf8').digest('hex');

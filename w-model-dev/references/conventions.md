@@ -12,6 +12,8 @@
 > 每条含「规范定义 + `_Avoid_` 指令」（禁用别名 / 易混词），防止术语同义异写。
 >
 > 来源：外部 domain-modeling/CONTEXT-FORMAT.md 的 GLOSSARY + `_Avoid_` 治理实践。
+>
+> **R 编号命名空间注**：R 编号跨门禁同号不同义（如 R11 在 signature-chain 指 v2 来源 sha256 必填、在 rootcause 指 persona 选择矩阵合法性与第一键交集、在 run-log 指闭环五脚本校验；R10 在 signature-chain 指 O 绕过 G 门禁（checkpoint 来源缺 G 产物/用户确认记录）、在 rootcause 指 reality-checker 冲突、在 run-log 指 revertEvidence 回滚证伪），按门禁命名空间理解——文档与消息中引用 R 编号须能从上下文判定所属门禁，跨门禁引用时带门禁名前缀（如「signature-chain R11」）。
 
 ### 1. 评审相关
 
@@ -106,12 +108,12 @@
 
 ### subject
 
-- **规范定义**：`StructuredViolation` 可选字段（批次 3），违规的符号级定位、面向修复者 LLM（如 `SD-<id>` / `rtm[REQ-x].codeModule` / transitionKey / invariant 名 / `subCriterion.name`），由四热点门禁（artifact-gate / design-contract / code-tla / verifier）填充；R 按 subject 锚定根因位置，不解析自由文本 message。
+- **规范定义**：`StructuredViolation` 可选字段（批次 3），违规的符号级定位、面向修复者 LLM（如 `SD-<id>` / `rtm[REQ-x].codeModule` / transitionKey / invariant 名 / 违规字段路径——verifier 门禁实际取 `meta.targetKind` / `subCriteria[1].score` 等，42.7.0 终审勘误：非 `subCriterion.name`），由四热点门禁（artifact-gate / design-contract / code-tla / verifier）填充；R 按 subject 锚定根因位置，不解析自由文本 message。**现状边界**：经 `--json` 机器可读暴露 structuredViolations 的当前仅 `check-artifact-gate`（经 `sdmapViolations` 键）；design-contract / code-tla / verifier 三热点透传已登记总纲 §5.1 后续批次，R 在该三热点暂以 reasons/message 为消费面。
 - **_Avoid_**：location/target/position（字段名固定「subject」；「location」「target」是 RootCauseReport.fixRecommendation 与 VerifierOutput 的不同字段）。
 
 ### fixHints
 
-- **规范定义**：`StructuredViolation` 可选字段（批次 3），≤3 条祈使句的结构化修复建议，四热点门禁按规则固定话术常量表填充；R 转写进 reworkHints（按 classification 排序后），S-fix 按条定向修复。
+- **规范定义**：`StructuredViolation` 可选字段（批次 3），≤3 条祈使句的结构化修复建议，四热点门禁按规则固定话术常量表填充；权威数据流（SSoT §10L.8）：G 产出 fixHints → R 转写进 reworkHints（按 classification 排序后）→ S-fix 按条定向修复。
 - **_Avoid_**：hints/suggestions/修复提示（字段名固定「fixHints」；「reworkHints」是 V 产物与 run-log 的不同字段）。
 
 ### verifiedArtifacts
