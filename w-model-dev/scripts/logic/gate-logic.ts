@@ -259,6 +259,24 @@ export interface SdToCodeModuleResult {
 }
 
 /**
+ * SDMAP 修复建议常量表（批次3 任务5）：structured.fixHints 的单一事实来源。
+ * 每条 ≤3 项祈使句，面向修复者 LLM；SDMAP-5（checkCodeModuleFormat）与 SDMAP-1..4 共用。
+ */
+const SDMAP_FIX_HINTS: Record<string, string[]> = {
+  'SDMAP-1': [
+    '在 rtm.json 对应 REQ 行 codeModule 增加前缀为该 SD id 的条目',
+    '确认该 SD 节点属本阶段设计范围，否则修正 graph.json',
+  ],
+  'SDMAP-2': ['删除或修正该条目的 SD 前缀', '若为新增子系统，先补 graph.json SD 节点再回填 RTM'],
+  'SDMAP-3': ['修正 src 路径拼写', '若文件已删除，更新 RTM 指向现存实现或移除该条目'],
+  'SDMAP-4': ['校正行号区间到文件真实行数内', '用编辑器行号或 git diff 定位真实位置'],
+  'SDMAP-5': [
+    '按 SD-<id>:src/<path>:L<start>[-<end>] 语法补齐条目',
+    'NFR/CON 行不得携带 SD- 前缀，配置类约束用「横切」',
+  ],
+};
+
+/**
  * SD→codeModule 双向精确对账（批次1 SDMAP；规格 §4.2）。
  * 废除拆段子串与 `${id}:` 数字特判，统一为 REQ 条目前缀与图节点 id 全等。
  */
@@ -301,6 +319,8 @@ export function checkSdToCodeModuleMapping(
         field: `graph.SD[${id}]`,
         message: msg,
         classification: 'semantic',
+        subject: id,
+        fixHints: SDMAP_FIX_HINTS['SDMAP-1'],
       });
     }
   }
@@ -314,6 +334,8 @@ export function checkSdToCodeModuleMapping(
         field: `rtm[${rowId}].codeModule`,
         message: msg,
         classification: 'semantic',
+        subject: entry.sdId!,
+        fixHints: SDMAP_FIX_HINTS['SDMAP-2'],
       });
     }
   }
@@ -330,6 +352,8 @@ export function checkSdToCodeModuleMapping(
           field: `rtm[${rowId}].codeModule`,
           message: msg,
           classification: 'evidence-only',
+          subject: entry.srcPath,
+          fixHints: SDMAP_FIX_HINTS['SDMAP-3'],
         });
         continue;
       }
@@ -344,6 +368,8 @@ export function checkSdToCodeModuleMapping(
           field: `rtm[${rowId}].codeModule`,
           message: msg,
           classification: 'evidence-only',
+          subject: entry.srcPath,
+          fixHints: SDMAP_FIX_HINTS['SDMAP-4'],
         });
       }
     }
@@ -352,15 +378,25 @@ export function checkSdToCodeModuleMapping(
 }
 
 // ==================== codeModule 格式校验（P0-2 / SDMAP-5） ====================
+/** checkCodeModuleFormat 双轨返回（批次3 任务5）：violations 兼容既有 string[]，structured 为 SDMAP-5 结构化违规。 */
+export interface CodeModuleFormatResult {
+  violations: string[];
+  structured: StructuredViolation[];
+}
+
 /**
  * codeModule 格式校验（按行类型分支；批次1 SDMAP-5 锚点条目语法）。
  * - REQ 行：逐条目 `SD-<id>:src/<path>:L<start>[-<end>]`（多条目逗号分隔）
  * - NFR/CON 行：逐条目 `src/<path>:L<start>[-<end>]` 或整格 "横切"
  * - 倒序区间（end < start）、双 L 区间（L5-L9）、start < 1、
  *   NFR/CON 行携带 SD- 前缀条目（行类型×条目形态交叉）均拒收
+ * 批次3 任务5：violations 文案前缀「codeModule 格式错误」保留（self-test 用例依赖）；
+ * structured（rule 'SDMAP-5'，classification 'semantic'，subject=条目 raw）由主函数并入
+ * result.sdmapViolations，与 SDMAP-1..4 同池。
  */
-export function checkCodeModuleFormat(rows: RTMRowShape[]): string[] {
+export function checkCodeModuleFormat(rows: RTMRowShape[]): CodeModuleFormatResult {
   const violations: string[] = [];
+  const structured: StructuredViolation[] = [];
   for (const row of rows) {
     if (!row || typeof row.codeModule !== 'string' || row.codeModule.trim() === '') continue;
     const id = row.requirementId;
@@ -375,9 +411,16 @@ export function checkCodeModuleFormat(rows: RTMRowShape[]): string[] {
           e.anchorStart < 1 ||
           (e.anchorEnd !== null && e.anchorEnd < e.anchorStart)
         ) {
-          violations.push(
-            `codeModule 格式错误：${id.startsWith('NFR-') ? 'NFR' : 'CON'} 行 ${id} 的条目 "${e.raw}" 须匹配 src/<path>:L<start>[-<end>]（start≥1，end≥start；不得携带 SD- 前缀；多条目逗号分隔；或整格"横切"）`,
-          );
+          const msg = `codeModule 格式错误：${id.startsWith('NFR-') ? 'NFR' : 'CON'} 行 ${id} 的条目 "${e.raw}" 须匹配 src/<path>:L<start>[-<end>]（start≥1，end≥start；不得携带 SD- 前缀；多条目逗号分隔；或整格"横切"）`;
+          violations.push(msg);
+          structured.push({
+            rule: 'SDMAP-5',
+            field: `rtm[${id}].codeModule`,
+            message: msg,
+            classification: 'semantic',
+            subject: e.raw,
+            fixHints: SDMAP_FIX_HINTS['SDMAP-5'],
+          });
         }
       }
       continue;
@@ -391,13 +434,20 @@ export function checkCodeModuleFormat(rows: RTMRowShape[]): string[] {
         e.anchorStart >= 1 &&
         (e.anchorEnd === null || e.anchorEnd >= e.anchorStart);
       if (!ok) {
-        violations.push(
-          `codeModule 格式错误：REQ 行 ${id} 的条目 "${e.raw}" 须匹配 SD-<id>:src/<path>:L<start>[-<end>]（示例：SD-5.2.1:src/auth/login.ts:L42-58；多条目逗号分隔）`,
-        );
+        const msg = `codeModule 格式错误：REQ 行 ${id} 的条目 "${e.raw}" 须匹配 SD-<id>:src/<path>:L<start>[-<end>]（示例：SD-5.2.1:src/auth/login.ts:L42-58；多条目逗号分隔）`;
+        violations.push(msg);
+        structured.push({
+          rule: 'SDMAP-5',
+          field: `rtm[${id}].codeModule`,
+          message: msg,
+          classification: 'semantic',
+          subject: e.raw,
+          fixHints: SDMAP_FIX_HINTS['SDMAP-5'],
+        });
       }
     }
   }
-  return violations;
+  return { violations, structured };
 }
 
 // ==================== S18 票据内容校验（No Placeholders 黑名单 + Buildability） ====================
@@ -1806,6 +1856,7 @@ export function checkArtifactGate(
   }
   // 2. SD→codeModule 双向精确对账：graph 提供时执行（仅 phase >= 5 时校验，因为 codeModule 在 phase 5 才进入 RTM 追溯字段）
   let sdResult: SdToCodeModuleResult | undefined;
+  let formatResult: CodeModuleFormatResult | undefined;
   if (options && options.graph && phase >= 5) {
     sdResult = checkSdToCodeModuleMapping(options.graph, matrix.rows, options.srcLineCounts);
     for (const v of sdResult.violations) reasons.push(v);
@@ -1813,8 +1864,8 @@ export function checkArtifactGate(
 
   // ==================== codeModule 格式校验（P0-2，仅 phase >= 5） ====================
   if (phase >= 5) {
-    const formatViolations = checkCodeModuleFormat(matrix.rows);
-    for (const v of formatViolations) reasons.push(v);
+    formatResult = checkCodeModuleFormat(matrix.rows);
+    for (const v of formatResult.violations) reasons.push(v);
   }
 
   // ==================== S18 票据内容校验（给定票据文本时） ====================
@@ -1836,11 +1887,13 @@ export function checkArtifactGate(
     legacy: [],
     testEvidence: testEvidenceCounts,
     ...(tickets !== undefined ? { tickets } : {}),
-    // 批次1 透传：phase>=5 且提供 graph 时填充执行态与结构化违规；否则保持 undefined（CLI 归一为 null）
-    ...(sdResult
+    // 批次1 透传 + 批次3 任务5：SDMAP-5（checkCodeModuleFormat）structured 与 SDMAP-1..4 同池——
+    // phase>=5 即 SDMAP 家族已执行（无论有无 graph），sdmapViolations 恒含全部 SDMAP-* 结构化违规；
+    // sdAnchorCheck 语义不变：仅 graph 提供时产出（CLI 将缺省归一为 null）
+    ...(sdResult || formatResult
       ? {
-          sdAnchorCheck: sdResult.skipped ? ('skipped' as const) : ('checked' as const),
-          sdmapViolations: sdResult.structured,
+          ...(sdResult ? { sdAnchorCheck: sdResult.skipped ? ('skipped' as const) : ('checked' as const) } : {}),
+          sdmapViolations: [...(sdResult?.structured ?? []), ...(formatResult?.structured ?? [])],
         }
       : {}),
   };

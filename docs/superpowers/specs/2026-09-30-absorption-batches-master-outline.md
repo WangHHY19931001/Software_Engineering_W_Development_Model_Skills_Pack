@@ -88,6 +88,11 @@
 **待人类设计裁定：**
 - CON 行指向非 src 配置文件（如 tsconfig.json/package.json）的文法（当前以 `横切` 或 src 内锚点表达，phase-5-coding.md:342 已留注）。
 
+**批次 3 终审遗留（2026-10-01，终审修复浪潮登记的后续批次候选）：**
+- 三热点 structuredViolations CLI 透传（I-1 方案 b）：JsonReport 通用键 + design-contract / code-tla / verifier 三 CLI `printJsonReport` 透传 + gate-log schema 跟随 + 测试（42.7.0 终审裁定先做最小勘误，文档已按现状标注，见 SSoT §10L.8 / root-cause-locator §4.4 / conventions.md subject 条目）。
+- design-contract pre-existing 提取局限：`extractSuccessStatus`（check-design-contract-consistency.ts:135）仅取首个 `res.status(N)` 正则匹配，链式 `res.status(201).json({…})` 场景使 D4 responseFields 落空、缺 `res.status(N)` 时 D3 默认按 200——「门禁通过 ≠ 契约真一致」的静默盲区。
+- `readJsonOrExit` 返回原始 buffer：统一四热点 verifiedArtifacts 哈希与 JSON parse 同一字节源，消除哈希/解析两段独立读盘的三处 TOCTOU。
+
 **流程教训（后续批次简报规范）：** 规格泛称「条目」而简报转译成 REQ-only 代码曾造成两个缺口（SDMAP-3/4 行类型、开放锚点）——后续简报须携带规格原文约束行并显式声明「本任务收窄/不收窄」；文档硬切清单可考虑给 docs-consistency 增加旧文法示例扫描。
 | 2 | — | — | 未立项 |
 | 3 | — | — | 未立项 |

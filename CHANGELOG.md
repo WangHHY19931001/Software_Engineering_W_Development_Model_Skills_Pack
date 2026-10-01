@@ -7,6 +7,32 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [42.7.0] - 2026-10-01
+
+> 来源：「批次 3：门禁工程」批——规格 `docs/superpowers/specs/2026-10-01-gate-engineering-design.md`、计划 `docs/superpowers/plans/2026-10-01-gate-engineering.md`，账本 `.superpowers/sdd/2026-10-01-gate-engineering/`（gitignored 账本；逐任务三件套 `task-N-{brief,report}.md` + `review-*.diff`）。**版本 bump 42.6.0 → 42.7.0**（判据：minor 级门禁行为变更——sigHash 公式版本化 + 新规则 R11 + R4 scope 强制 + 四热点结构化双轨与 GATE_JSON 新键）。**向后兼容**：sigHashAlgo 缺省按 v1（既有链逐字节零破坏）；verifiedArtifacts / subject / fixHints / differences 均为只增可选键。**计数影响**：schema 34 / exit-2 脚本 46 / prepush 19 / CLI 47 / persona 33 / references 44 均不变，零新增门禁脚本；samples 新增 4 fixture（signature-chain 14→17：valid-v2 / bad-v2-missing-sha256 / bad-v2-tampered-sha256；rootcause 16→17：bad-r4-scope-missing）；eval 语料 60/60（本批零影响实测）。
+
+### 签名链字节绑定（B2：sigHash v2 版本化 + R11 + verifiedArtifacts）
+
+- **sigHash 公式版本化（D6 裁定 C）**：`SignatureChainEntry` 增可选 `sigHashAlgo`（枚举 `v1`|`v2`，**缺省按 v1**）；v2 公式与 v1 的差别仅在槽位 6 换为 `artifactsV2 = JSON.stringify({ artifacts, sourceArtifacts })`——artifacts 与 sourceArtifacts 两清单整体（含每条 sha256）纳入内容哈希；R6 按条目 `sigHashAlgo` 分流重算（权威入口 `computeSigHashFor`），v1 路径逐字节不变。schema 同步（SourceArtifact 增 `sha256` 64-hex、条目层增 `sigHashAlgo`，`additionalProperties: false` 先行）。
+- **新规则 R11（仅 v2 条目适用）**：`inputProvenance.sourceArtifacts[]` 每条 `sha256` 必填且匹配 `^[a-fA-F0-9]{64}$`，缺失或非法即违规（`R11: <sigId> v2 条目来源 sha256 缺失或非法`）；v1 条目（含缺省）不触发，既有样本零破坏。新 fixture ×3（valid-v2 / bad-v2-missing-sha256 / bad-v2-tampered-sha256——后者验证篡改 sha256 字段被 R6 重算抓获）。
+- **GATE_JSON `verifiedArtifacts`**：`JsonReport` 与 `gate-log.schema.json` 增顶层可选 `verifiedArtifacts?: Array<{path, sha256, bytes}>`——本次门禁判定承重输入文件字节清单，消费前可复验「门禁验的与消费的是同一字节」；四热点门禁 `--json` 恒存在（空数组允许）。v2 签名方的 `sourceArtifacts[].sha256` 从上游 verifiedArtifacts 按 path 抄录（无上游清单按磁盘现算，见 signature-chain-guide.md §6.2）；「声明 vs 真实字节」的自动核查需 gate-log 索引基建，本批不建（规格 §4.1 知情边界，D6 已裁定接受）。
+
+### 四热点结构化双轨（B1：subject / fixHints，D7 裁定 A）
+
+- `StructuredViolation` 增可选 `subject`（符号级定位，面向修复者 LLM）与 `fixHints`（≤3 条祈使句）——只增可选、既有字段不动。四热点填充：check-artifact-gate（SDMAP_FIX_HINTS 常量表；SDMAP-5 结构化收编为 structuredViolations（rule `SDMAP-5`、classification `semantic`、subject=条目 raw）并入 `sdmapViolations`）、check-design-contract-consistency（structuredViolations 为必填键；subject=`<uatPath> → <routePath>`）、check-code-tla-consistency（CODE_TLA_FIX_HINTS 8 键 11 填充点；subject 按维度取 SD id / transitionKey / action 名 / invariant 名）、check-verifier-output（VERIFIER_FIX_HINTS 5 键 49 填充点；subject=`subCriterion.name`，structuredViolations 为可选键）。budget/maturity 等非热点门禁后续批次渐进。
+- **R 消费契约**：R 引用 `subject` 定位根因；reworkHints 按 classification 排序（批次 1 已立）并转写 fixHints（至多 3 条）（root-cause-locator.md §4.4 第 7 条）。
+
+### fixRecommendation scope 强制（B3，D8-D9 裁定）
+
+- `rootcause-report.schema.json` fixRecommendation.items 增 `scope`（`{allowed, forbidden}` 双数组进入 items.required，至少一侧非空数组、每项非空字符串，不做 glob 语法深验）；`root-cause-logic.ts` R4 扩展强制——缺失/空双数组/非字符串项 → R4 违规，消息 `R4: fixRecommendation[N] 缺合规 scope（…）`；存量 samples/rootcause 全量补 scope（硬切）+ 新负向 fixture bad-r4-scope-missing。
+- **V scoped re-review 对照消费**：fix diff 触碰 `scope.forbidden` 或超出 `scope.allowed` → 该 finding NOT ADDRESSED / 上报 🔴 CHECKPOINT（subagent-delegation.md §3.4.2；scope 撰写指引 root-cause-locator.md §3 第 6 条）。
+
+### 同期四项（总纲 §5.1）
+
+- `check-state-machine-consistency.ts`：`differences[].classification` 挂钩权威类型 `Extract<ChangeClassification,'topology'>`（type-only import）；CLI `--json` 透传 `differences` 键（`result.differences ?? []`）；sharedTransition 救场路径用例（状态零交集 + 转移同侧有交集不再误报 `cannot prove same system`）。
+- **双实现一致性 property 测试**（`code-gate-parity.test.ts`，5 用例）：表驱动 (graph, rtm) 组合下断言 checkArtifactGate SDMAP structured 集合 ≡ checkCodeTlaConsistency 维度 1 集合（按 rule@field 投影相等）；SDMAP-1 field 对齐（code-tla 侧改 `graph.SD[<id>]` id 键形态）。
+- **文档与术语同步**：signature-chain-guide（§4 R1-R11 表 + 新 §6.2「v2 签名与 sha256 抄录」）、root-cause-locator（§3 第 6 条 scope 撰写指引 + §4.4 第 7 条 structured 诊断消费）、subagent-delegation（§3.4.2 scope 对照）、command-reference（R4 scope 强制 + state-machine `--json` differences 键）、conventions 术语表 4 条（subject / fixHints / verifiedArtifacts / sigHashAlgo）、SSoT §10.9 / §10L.8 权威措辞修正、AGENTS.md §8 两行（check-signature-chain R11、check-rootcause-report R4 强制 scope）。
+
 ## [42.6.0] - 2026-09-30
 
 > 来源：「批次 1：设计↔代码一致性证据化对账」批——规格 `docs/superpowers/specs/2026-09-30-design-code-consistency-anchors-design.md`、批次总纲 `docs/superpowers/specs/2026-09-30-absorption-batches-master-outline.md`、计划 `docs/superpowers/plans/2026-09-30-design-code-consistency-anchors.md`，账本 `.superpowers/sdd/2026-09-30-design-code-consistency-anchors/`（gitignored 账本；逐任务三件套 `task-N-{brief,report}.md` + `review-*.diff`）。**版本 bump 42.5.0 → 42.6.0**（判据：minor 级门禁行为变更——SD→codeModule 对账语义重写 + codeModule 条目语法硬切升级 + GATE_JSON 新增两键）。**破坏性变更（硬切）**：RTM 的 codeModule 条目由文件级升级为行号锚点级语法，**存量项目的 codeModule 条目须补锚点**（子串匹配与数字 id 特判同步废除），未升级条目将被 SDMAP-5 拒收。**计数影响**：schema 34 / exit-2 脚本 46 / prepush 19 / CLI 47 / persona 33 / references 44 均不变，零新增门禁脚本；eval 语料 60/60（mappings.json 仅 fileExists 断言，本批实测零影响）。
@@ -84,16 +110,16 @@
 
 #### T4 · 枚举权威表（8 簇，枚举只允许出现在权威一处）
 
-| 簇 | 枚举权威（判定） | 其余落点（≤1 句摘要 + 指针） |
-| --- | --- | --- |
-| ① 时间戳三态（①②③ + 两个逃生口） | `command-reference.md`（`wm-append-runlog.ts` 条目「时间戳三态」） | AGENTS §6 / §8、SSoT §10D.6、`data-models.md`、`operational-recovery.md`、`subagent-delegation.md`、`wm-append-runlog.ts` 与 `run-log-append-logic.ts` 头注（实现短式） |
-| ② 非空本质判定族（`isFile()` 且 `size > 0`） | `command-reference.md`（「阶段 5-8 codegraph/coding-plan 门禁 CLI」节 coding-plan checker（R5）条） | `hard-constraints.md`、`subagent-delegation.md`、`phase-5-coding.md`、SSoT §10D.8、`templates/coding-plan.md`、`scripts/samples/README.md` |
-| ③ `parentDispatchId` 键句与上界口径 | `data-models.md`（「用量实效校验（R6）」段） | SSoT §10D.7、`operational-recovery.md`、`toolbox.md`、`subagent-delegation.md`、`check-budget.ts` 注释（短式）、`run-log.schema.json` 字段 description（字段语义短式保留） |
-| ④ 记录边界前缀三态 | `command-reference.md`（「归档前缀性（L4，D-3b）」条） | `archive-integrity-logic.ts` / `check-archive-integrity.ts`（实现短式 + 运行文案）、`data-models.md`、`lib/types.ts` 字段语义注 |
-| ⑤ 预算接线口径（未接线诊断 / 必带 / 上界） | `data-models.md`（「用量实效校验（R6）」段） | SSoT §10D.7、`operational-recovery.md`（调用时机表 + 硬线段）、`toolbox.md`、`subagent-delegation.md` |
-| ⑥ 五门闭环与放行三步顺序 | `SKILL.md`「阶段门放行三步」（复用既有权威：五门清单与调用顺序 = `operational-recovery.md`「调用时机」节；D-6 后置窗口 = 同文件「阶段 1 自举豁免（R11 后置窗口，D-6）」节） | `operational-recovery.md`、SSoT §10.6 / §10D.4 / §10D.7、`data-models.md`（R11 条）、`hard-constraints.md`（约束 #11）、`command-reference.md`（check-run-log R11 条） |
-| ⑦ 导出白名单与 provenance 形态 | 枚举 → `command-reference.md`「证据 provenance 与导出验证」节（+「Source-bound provenance 边界」节）；设计决策 → SSoT §7.10（只写决策与指针） | AGENTS §1 两节 / §8、`docs/INSTALL.md`、`README.md`、`CONTRIBUTING.md`、`data-models.md`（`evidence-provenance` 结构行保留字段语义短式） |
-| ⑧ codegraph 降级契约 | 设计决策 → SSoT :283 段；操作枚举 → `command-reference.md`「阶段 5-8 …」节 codegraph checker 条（「证据形态声明（D-6，三形态判据）」） | `phase-5-coding.md`、`hard-constraints.md`（约束 #14）、`data-models.md`（`codegraph-query` 结构行）、AGENTS §1、SSoT §10K.5、`scripts/samples/README.md` |
+| 簇                                           | 枚举权威（判定）                                                                                                                                                            | 其余落点（≤1 句摘要 + 指针）                                                                                                                                               |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ① 时间戳三态（①②③ + 两个逃生口）             | `command-reference.md`（`wm-append-runlog.ts` 条目「时间戳三态」）                                                                                                          | AGENTS §6 / §8、SSoT §10D.6、`data-models.md`、`operational-recovery.md`、`subagent-delegation.md`、`wm-append-runlog.ts` 与 `run-log-append-logic.ts` 头注（实现短式）    |
+| ② 非空本质判定族（`isFile()` 且 `size > 0`） | `command-reference.md`（「阶段 5-8 codegraph/coding-plan 门禁 CLI」节 coding-plan checker（R5）条）                                                                         | `hard-constraints.md`、`subagent-delegation.md`、`phase-5-coding.md`、SSoT §10D.8、`templates/coding-plan.md`、`scripts/samples/README.md`                                 |
+| ③ `parentDispatchId` 键句与上界口径          | `data-models.md`（「用量实效校验（R6）」段）                                                                                                                                | SSoT §10D.7、`operational-recovery.md`、`toolbox.md`、`subagent-delegation.md`、`check-budget.ts` 注释（短式）、`run-log.schema.json` 字段 description（字段语义短式保留） |
+| ④ 记录边界前缀三态                           | `command-reference.md`（「归档前缀性（L4，D-3b）」条）                                                                                                                      | `archive-integrity-logic.ts` / `check-archive-integrity.ts`（实现短式 + 运行文案）、`data-models.md`、`lib/types.ts` 字段语义注                                            |
+| ⑤ 预算接线口径（未接线诊断 / 必带 / 上界）   | `data-models.md`（「用量实效校验（R6）」段）                                                                                                                                | SSoT §10D.7、`operational-recovery.md`（调用时机表 + 硬线段）、`toolbox.md`、`subagent-delegation.md`                                                                      |
+| ⑥ 五门闭环与放行三步顺序                     | `SKILL.md`「阶段门放行三步」（复用既有权威：五门清单与调用顺序 = `operational-recovery.md`「调用时机」节；D-6 后置窗口 = 同文件「阶段 1 自举豁免（R11 后置窗口，D-6）」节） | `operational-recovery.md`、SSoT §10.6 / §10D.4 / §10D.7、`data-models.md`（R11 条）、`hard-constraints.md`（约束 #11）、`command-reference.md`（check-run-log R11 条）     |
+| ⑦ 导出白名单与 provenance 形态               | 枚举 → `command-reference.md`「证据 provenance 与导出验证」节（+「Source-bound provenance 边界」节）；设计决策 → SSoT §7.10（只写决策与指针）                               | AGENTS §1 两节 / §8、`docs/INSTALL.md`、`README.md`、`CONTRIBUTING.md`、`data-models.md`（`evidence-provenance` 结构行保留字段语义短式）                                   |
+| ⑧ codegraph 降级契约                         | 设计决策 → SSoT :283 段；操作枚举 → `command-reference.md`「阶段 5-8 …」节 codegraph checker 条（「证据形态声明（D-6，三形态判据）」）                                      | `phase-5-coding.md`、`hard-constraints.md`（约束 #14）、`data-models.md`（`codegraph-query` 结构行）、AGENTS §1、SSoT §10K.5、`scripts/samples/README.md`                  |
 
 **规格外同域命中（grep 发现后一并改，逐条登记）**：`AGENTS.md:159` / `scripts/samples/README.md:21`（T4-A）、SSoT §10.6 :1466（T4-B）、`CONTRIBUTING.md:7` / SSoT §10K.5 :2223 / `scripts/samples/README.md:42`（T4-C）——均为本簇枚举的额外复述，属同域收敛，非扩面。
 
@@ -101,14 +127,14 @@
 
 #### 牙齿替代对照（规格 §5 逐行）
 
-| 删除 | 原牙齿 | 替代承载 |
-| --- | --- | --- |
-| 手写锚证据与多锚语法（T1） | 「证据位置」指向 self-test 引用 | 门禁**派生**锚（同信息、机器现算、永不回填）+ 既有 rule 1 覆盖强制 + 「fixture 被 self-test 覆盖**恰一处**」新断言 |
-| 非失败样本占行（T1 收紧） | 无（本就无牙） | **fixture 机制行**的覆盖条目须为**期望失败**（`negative-coverage-not-failing` / `-ambiguous-coverage`，静态可校验的 `FAILURE_EXPECTATION_PATTERNS` 闭集）；门禁级「真实失败」由 **48 条探针**承担（行粒度 = 门禁粒度） |
-| L0 精确计数断言（T2） | 检测链接增删 | `violations`（悬空 / L1 隔离 / 占位符形态）——检测「错」不是「变」；三计数仍由 CLI 输出可观测；rebaseline 协议与 `helpers/l0-baseline.ts` 整体退役 |
-| 独立运行动态 facts（T3） | 无工件时自采集成强校验 | prepush 第 15 项 **fail-closed 不变**（受控 vitest 工件路径一字未改）+ 独立运行**显式非阻断诊断** + `--spawn-vitest` 逃生口（**语义降级登记**，前提「终局一律 prepush」已成文 AGENTS §6） |
-| 跨文件枚举复述（T4） | 靠门禁 / 审查在 N 处同步 | 单一权威 + 指针；「枚举短语在权威外命中 == 0（摘要句除外）」可 grep 校验（逐簇证据见任务报告 §3） |
-| 易漂注释计数（T5） | 无牙（纯漂移债） | 自描述表述（「以运行输出 / 目录实测为准」，**无数字可漂**） |
+| 删除                       | 原牙齿                          | 替代承载                                                                                                                                                                                                               |
+| -------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 手写锚证据与多锚语法（T1） | 「证据位置」指向 self-test 引用 | 门禁**派生**锚（同信息、机器现算、永不回填）+ 既有 rule 1 覆盖强制 + 「fixture 被 self-test 覆盖**恰一处**」新断言                                                                                                     |
+| 非失败样本占行（T1 收紧）  | 无（本就无牙）                  | **fixture 机制行**的覆盖条目须为**期望失败**（`negative-coverage-not-failing` / `-ambiguous-coverage`，静态可校验的 `FAILURE_EXPECTATION_PATTERNS` 闭集）；门禁级「真实失败」由 **48 条探针**承担（行粒度 = 门禁粒度） |
+| L0 精确计数断言（T2）      | 检测链接增删                    | `violations`（悬空 / L1 隔离 / 占位符形态）——检测「错」不是「变」；三计数仍由 CLI 输出可观测；rebaseline 协议与 `helpers/l0-baseline.ts` 整体退役                                                                      |
+| 独立运行动态 facts（T3）   | 无工件时自采集成强校验          | prepush 第 15 项 **fail-closed 不变**（受控 vitest 工件路径一字未改）+ 独立运行**显式非阻断诊断** + `--spawn-vitest` 逃生口（**语义降级登记**，前提「终局一律 prepush」已成文 AGENTS §6）                              |
+| 跨文件枚举复述（T4）       | 靠门禁 / 审查在 N 处同步        | 单一权威 + 指针；「枚举短语在权威外命中 == 0（摘要句除外）」可 grep 校验（逐簇证据见任务报告 §3）                                                                                                                      |
+| 易漂注释计数（T5）         | 无牙（纯漂移债）                | 自描述表述（「以运行输出 / 目录实测为准」，**无数字可漂**）                                                                                                                                                            |
 
 **WS-T7 的牙齿对照（规格 §9，2026-09-28 追加）**：行级哈希 / 放行锚移除后的替代承载 = R7 追加序 + R8 轨迹模板 + R9-R11 语义判据（源派生）+ 交付时文件级证据链（导出清单 SHA-256 / provenance / 角色签名链）；**逐条与诚实边界见下方 WS-T7 小节**。
 
@@ -298,7 +324,7 @@ iceberg `tla` 视角不加宽到 DD/INTF（规约冲突，WS-1 方案 B 否决�
 > 来源：8 阶段全流程真实调测（`docs/debug/2026-09-20-wm-8phase-live-run/README.md`，快照 main @ `fefd56fc`）披露的 8 项「门禁对合法返工链形态误报/漏报」契约缺口；规格见 `docs/superpowers/specs/2026-09-20-gate-contract-fixes-design.md`、计划见 `docs/superpowers/plans/2026-09-20-gate-contract-fixes.md`，逐任务报告与评审 diff 存 `.superpowers/sdd/2026-09-20-gate-contract-fixes/`。版本保持 42.2.1，**不 bump**。
 
 - **D-1 签名链返工来源例外（`logic/signature-chain-logic.ts`）**：`SignatureChainEntry` 新增可选 `targetKind`（`rootcause`/`preventive`/`iceberg`/`standard`，**不入 sigHash**，缺省即 `standard`——既有链行为不变），R9 在禁止来源矩阵之上开三个 role×action×targetKind 具名例外：S@fix/emergency-fix 消费 R（反模式 #18 守护）、V@rootcause 复审 R 报告（反模式 #19 守护）、R@preventive 消费 S（R3 预防性审查）；其余组合一律仍拒。`references/signature-chain-guide.md` §1/§2/§3 已同步（§2 注明 `iceberg` 当前不解锁 R9 例外）。
-- **D-2 run-log R3/R7 配对接受 V 重发记录（`logic/run-log-logic.ts`）**：VerifierOutput/预防性报告类缺陷由 V 重发其自有产物修复、无 S-fix 记录时，R3 rootcause↔fix 配对与 R7 返工时序（legacy phase<8 路径）将 `review + role=V + outcome=success + basedOnReport 非空 + artifacts 非空且全命中 V 自有前缀（`.w-model/verifier-outputs/` / `.w-model/v-reviews/` / `.w-model/preventive-reviews/`）`的记录等价视为一次成功修复证据；缺 `basedOnReport`、artifacts 非 V 前缀或 `outcome≠success` 不充数；phase 8 严格分支不变。`subagent-delegation.md` / `data-models.md` 已补段。
+- **D-2 run-log R3/R7 配对接受 V 重发记录（`logic/run-log-logic.ts`）**：VerifierOutput/预防性报告类缺陷由 V 重发其自有产物修复、无 S-fix 记录时，R3 rootcause↔fix 配对与 R7 返工时序（legacy phase<8 路径）将 `review + role=V + outcome=success + basedOnReport 非空 + artifacts 非空且全命中 V 自有前缀（`.w-model/verifier-outputs/`/`.w-model/v-reviews/`/`.w-model/preventive-reviews/`）`的记录等价视为一次成功修复证据；缺 `basedOnReport`、artifacts 非 V 前缀或 `outcome≠success` 不充数；phase 8 严格分支不变。`subagent-delegation.md` / `data-models.md` 已补段。
 - **D-3 code-tla 装载按 manifest.basePath 解析（`cli/check-code-tla-consistency.ts`）**：`tlaAbs = resolve(manifestDir, basePath ?? '.', tlaPath)`，与 `check-tla-model.ts` 同口径（basePath 空/缺省回退 `.`），消除同一 manifest 两门结论不一致；CLI 装载失败 exit 2 契约由回归用例锁定，`tla-plus.md` §2.1 已注。
 - **D-4a killSwitch 返工计数对齐真实事件（`cli/check-budget.ts`）**：`reworkCount` = `action ∈ {rework, fix, emergency-fix}` **或** `outcome ∈ {fail, rework}` 的**累计**条数（`countReworks` 导出供测试），替换「只数 `action=rework`」旧口径——真实调测 run-log 中该 action 一条都没有，旧护栏静默失灵；`tlaReworkCount` 仍为其中 note/target 含 TLA 的子集。
 - **D-4b budget 用量实效校验 R6 + burnRate 告警（`logic/budget-logic.ts`）**：新增 R6——Σtokens(阶段) 严格大于 `perPhase.maxTokens` 或 Σtokens(全量) 严格大于 `project.maxTokensTotal` → blocking（消息 `R6：` 前缀，附超限占比）；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` → killSwitch 用量告警（消息 `R5-b：` 前缀，R5 既有文案逐字不变）。tokens 由 CLI `sumTokens` 从 run-log 累计（NaN/Infinity/负数/非数字一律剔除，防 Σ=NaN 使判定恒假）；未提供 `--run-log` 时 R5 触发检测与 R6/R5-b 行为与新增前一字不变，Σtokens=0 时输出「R6 未生效」非阻断警告。`data-models.md` 与两文件头已注。
@@ -409,7 +435,7 @@ iceberg `tla` 视角不加宽到 DD/INTF（规约冲突，WS-1 方案 B 否决�
 > 续第一批，处理审查清单中的「建议」级与超范围项；实施记录见 `docs/superpowers/plans/2026-09-17-skill-audit-remediation.md` §8。
 
 - **成熟度豁免落地（行为变更，本批唯一的门禁放宽）**：`check-artifact-gate.ts` 读 `.w-model/maturity.json` 的 `level`；L0/L1（教学 / demo / 小工具）且阶段 1-4 时豁免 TLA+/BDD 资产与同步要求。此前文档承诺该豁免但门禁无 maturity 输入 → 合法 L1 项目按文档走必被阻断。GATE_JSON 新增 `maturityLevel` / `tlaBddWaived`（键恒存在）+ 人类横幅；**缺文件或 level 非法 → 不豁免**（保持严格）。三臂回归：L1+阶段 1 命中豁免、L2+阶段 1 不豁免、L1+阶段 5 不豁免。
-- **覆盖率口径：完成测量与归因，问题未解决（如实记录）**。根因确认：**被测试 import 的文件总会进入报告**，`coverage.include` 只影响未被 import 的文件——全量实测 83 个文件（logic 37 / lib 30 / cli 10 / infrastructure 3 / application 2 / __tests__ 1），合并值 stmts **76.83** / branch 71.64 / funcs 87.86 / lines 78.88，statements 距阈值仅 **+1.83pp**。两种 `exclude` 写法（相对路径、`**/` 前缀）在**聚焦运行生效、全量运行均不生效**（机制未查明）→ **已回退配置改动**，不发布"已限定口径"的不实声明；阈值维持 75/65/85/75，风险与两次失败尝试如实写入 `config/vitest.config.ts` 注释。
+- **覆盖率口径：完成测量与归因，问题未解决（如实记录）**。根因确认：**被测试 import 的文件总会进入报告**，`coverage.include` 只影响未被 import 的文件——全量实测 83 个文件（logic 37 / lib 30 / cli 10 / infrastructure 3 / application 2 / **tests** 1），合并值 stmts **76.83** / branch 71.64 / funcs 87.86 / lines 78.88，statements 距阈值仅 **+1.83pp**。两种 `exclude` 写法（相对路径、`**/` 前缀）在**聚焦运行生效、全量运行均不生效**（机制未查明）→ **已回退配置改动**，不发布"已限定口径"的不实声明；阈值维持 75/65/85/75，风险与两次失败尝试如实写入 `config/vitest.config.ts` 注释。
 - **弱断言加固（4 处）**：`fileParallelism ?? true).toBe(true)`（恒真）→ `not.toBe(false)`；三处仅断言 `typeof` 的计数/字节/耗时改为可证伪断言（覆盖计数等于必需数、字节等于磁盘实际大小、耗时整数且有界）。
 - **fixture 去伪**：删除与 `valid-manifest.json` 逐字节相同的 `bad-no-rtm-mapping.manifest.json`（其「坏」由 `rtmRows` 参数注入），用例改为直接引用前者；samples/README 增「同字节复用」说明（两对 coverage fixture 的差异同样由参数注入，保留并文档化）。
 - **规则层如实化**：反模式 #10 的「signature-chain 检测 O 越权」**经复核实现不存在**（R4 允许 O 出现在任意位置）→ 改为标注「无自动化检测，属人工核验」；#36/#43 的「G 门禁人工校验」改为「V 评审人工核验」（G 的允许动作不含核验）；约束 #11 标注「门禁不校验 5 脚本是否执行」；信息密度阈值统一为「< 2/章节 即命中」（消除 [1,2) 空档）；#20 的伪 action 枚举与 #21 的 `phaseOption` 伪字段改为真实判据；清理 4 处悬空括号。
@@ -423,6 +449,7 @@ iceberg `tla` 视角不加宽到 DD/INTF（规约冲突，WS-1 方案 B 否决�
 > 实施记录见 `docs/superpowers/plans/2026-09-17-skill-audit-remediation.md`。
 
 **第 1 批 · 堵「零证据=通过」（6 处，逐条探针复现）**
+
 - `check-checkpoint`：run-log 无 checkpoint success 记录时由 exit 0 改为 **R0 零证据守卫** exit 1（原状态还打印「已跳过 R3 校验」，自证跳过）。
 - `check-state-machine-consistency`：四数组全空由 exit 0 改为 exit 1——CLI 头注本就写着「不得按全空合法图放行」，而单测固化了相反语义，单测已按新语义更新。
 - `check-code-tla-consistency`：manifest 指向的 `.tla` 不可读时由「置空串继续」改为 **exit 2 / FILE_NOT_FOUND**（`tlaContent` 内联的自包含 manifest 保留可用）；实现时踩到 `exitWithError` 只设退出码不中断调用链的坑，探针复现后补 `throw new HandledCliError()`。
@@ -431,17 +458,20 @@ iceberg `tla` 视角不加宽到 DD/INTF（规约冲突，WS-1 方案 B 否决�
 - `wm-status --json`：未初始化时输出机器可读对象（原为空 stdout，调用方无法区分「未初始化」与「正常空报告」）。
 
 **第 1 批 · 可见性（把静默跳过变成显式可查）**
+
 - `check-artifact-gate`：阶段 1-4 未传 `--spec-dir` 时 GATE_JSON 新增 `specStructure: checked|skipped|null` + 人类横幅提示（原先整组设计级校验静默不执行且输出侧不可分辨）。
 - `check-signature-chain`：未提供 `existingPaths` 时 R8 不再计入 `rulesPassed`，新增 `rulesSkipped` 并修正横幅（原先打印「R1-R10 全通过」）。
 - `check-verifier-output` R12：原 `!hasSpecificRef && e.length < 20` 放行「长而无引用」→ 改为**仅结构化引用**（文件路径 / §章节 / 第 N 章节行 / L 级 / 仓库 ID）；收紧时发现裸词根 `行/节/章` 会让「执行」「细节」「文章」误判为引用，故模式改为结构化形态。
 - R13：非数值 `score` 不再静默跳过，改为显式违规。
 
 **第 2 批 · 治理证据链**
+
 - 负向覆盖登记册：实测 **29 条 fixture 行号全部漂移**（门禁此前只校验「文件存在 + 行号在范围内」）→ 一次性回填（含 3 条 `sampleDir` 目录型），并给 `check-samples-coverage` 新增**内容锚点**规则（`negative-coverage-evidence-anchor`：引用行内容必须出现该 fixture 名）；正/负两臂验证（注入 +3 漂移即精确报出该行）。
 - `selfTestSamples` 与 6 处活体文档：352 → **354**（AST 实测：各 `*_CASES` 实加 353 + 1 元数据用例 = 354）。该常量位于 code-health 删除授权判定链上，诚实声明 354 的候选原先会被误判为矛盾。
 - R11 负载性：新增 7 行正向 + 5 行负向测试（此前仅 `design-flaw` / `coding-error` 两行被钉住——变异实验证明 `tool-gap` 行换成任意两个真实 persona 后仍全绿）。
 
 **第 3 批 · 文档矛盾（13 项）**
+
 - 冰山放行判据统一为「`newFindings=[]` **且** R6/R7/R8 三视角对账通过；达 `MAX_ICEBERG_ROUNDS` 走 🔴 CHECKPOINT 由用户裁定」（原 `hard-constraints` 的「或达上限即放行」与 guide「零发现不构成终止」冲突）；规则集号 R1-R5 → R1-R8。
 - BDD D2（gherkinSyntax）如实标注**未实装为脚本门禁**（门禁 7 维度，D2 由 V 评审人工核验）；`AGENTS.md` / `hard-constraints.md` 同步。
 - code-health 发现者角色三方对齐（CLI 由 O 只读 / G 执行，A 只解读并登记发现）；V 规则枚举 R1-R13 → R1-R18；`verifier-spec` targetKind 4 值 → 5 值；删除 `--skip-tlc` 残留描述；maturity L0 与交付层 L0 同名澄清；模板脆锚修正；examples 份数；**矩阵外 6 份人格入册**（V 可按需指定、R 受 R11 限制不可选）并修正指向它们的换人指针。
@@ -461,6 +491,7 @@ iceberg `tla` 视角不加宽到 DD/INTF（规约冲突，WS-1 方案 B 否决�
 - **接入矩阵**：R 第一键 `upstream-defect` 行 + 代码库入职引导；R 第二键「安全相关 Critical」+ 应用安全、「性能相关 Critical」+ SRE；V「系统设计评审」+ SRE、「代码评审」+ 应用安全、「测试评审」+ 无障碍审核；**新增 V 行**「返工修复评审（S-fix 产出）」= 最小变更 + code-reviewer + evidence-collector（3 候选）。`R_PERSONA_MATRIX` / `R_PERSONA_SIGNAL_MATRIX` 与 `agent-personas.md` §2 两张表同步（`rootcause-persona-matrix` 逐行对账，本轮实测 0 违规）。
 - **来源与收录策略入册**：`agent-personas.md` 新增「人格库来源与收录策略」节（来源 URL / 导入基线 / 收录判据 / 收录规模 / 本地契约 / 已知偏离）——此前仓库内除导入提交信息外**无任何来源记录**，无法判断上游是否更新。
 - **计数同步**：README / AGENTS / INSTALL / agent-personas 的人格数 28 → 33（README 的「N 个人格文件」是 `checkAssetCounts` 的解析点，改漏即 exit 1）。
+
 ### M 程序：外部技能采纳 P0–P6（expanded-external-skill-adoption，2026-09-14 ~ 2026-09-16）
 
 > 采纳判据与逐项验收见 `docs/superpowers/specs/2026-09-14-expanded-external-skill-adoption-design.md` §13（AC-0…AC-12）；各期提交序列、评审轮次与收口实测记于 `docs/superpowers/plans/2026-09-14-external-absorption-adjudication.md`、`2026-09-14-p1-meta-theory-absorption.md`、`2026-09-14-p2a-gate-negative-coverage-and-atomicity.md`、`2026-09-15-p2b-rule-loadbearing-and-completeness.md`、`2026-09-15-m07-rtm-test-evidence.md`、`2026-09-15-p3-role-independence-and-review.md`、`2026-09-15-p4-test-quality-and-design-rules.md`、`2026-09-16-p5-debug-ops-interaction.md`、`2026-09-16-p6-rejection-knowledge-base.md` 的收尾节。**本节计数一律取收口实测**，不沿用各期文档写作时的中间值（43 / 44 / 332 / 340 / 344）。

@@ -8,6 +8,7 @@
  */
 
 import { validateBySchema } from '../infrastructure/schema-loader.js';
+import type { StructuredViolation } from '../lib/types.js';
 
 // ==================== 类型定义 ====================
 
@@ -23,6 +24,8 @@ export interface DesignContractCheckResult {
   passed: boolean;
   reasons: string[];
   violations: DesignContractViolation[];
+  /** 批次3 任务6：结构化双轨的结构化形态（rule/subject/fixHints）；键恒在场，通过时为空数组 */
+  structuredViolations: StructuredViolation[];
 }
 
 // ==================== 输入类型 ====================
@@ -133,10 +136,26 @@ export interface DesignContractCheckInput {
 // ==================== 主校验函数 ====================
 
 /**
+ * 设计契约修复建议常量表（批次3 任务6）：structuredViolations.fixHints 的单一事实来源。
+ * 语义抽取自各违规现场 message 的内嵌指引（「（应……）」段），每条 ≤3 项祈使句，面向修复者 LLM。
+ * 键为「维度 × 子场景」：D2/D3/D4 的「路由缺失」子场景指引相同（message 文案亦逐字相同），共享同一数组。
+ */
+const ROUTE_NOT_FOUND_FIX_HINTS = ['先在 routeDefinitions 中补登该路由，再对齐验收断言'];
+const DESIGN_CONTRACT_FIX_HINTS: Record<string, string[]> = {
+  D1: ['修正 uat-path-mapping 该行 actualPath 为已登记路由', '或在 routeDefinitions 中补登该路由后回填 actualPath'],
+  'D2-route': ROUTE_NOT_FOUND_FIX_HINTS,
+  'D2-param': ['在路由定义 params 中补登该参数', '或从验收断言 params 中移除该参数'],
+  'D3-route': ROUTE_NOT_FOUND_FIX_HINTS,
+  'D3-status': ['按设计文档核对该路由成功状态码后统一两侧'],
+  'D4-route': ROUTE_NOT_FOUND_FIX_HINTS,
+  'D4-field': ['在路由定义 responseFields 中补登该字段', '或从验收断言 assertedFields 中移除该字段'],
+};
+
+/**
  * 校验编码与验收设计一致性。
  *
  * @param input 设计契约校验输入（路径映射 + 路由定义 + 验收断言）
- * @returns 校验结果（passed + reasons + violations）
+ * @returns 校验结果（passed + reasons + violations + structuredViolations 双轨）
  */
 export function checkDesignContractConsistency(
   input: DesignContractCheckInput | null | undefined,
@@ -146,6 +165,7 @@ export function checkDesignContractConsistency(
       passed: false,
       reasons: ['设计契约输入为空'],
       violations: [],
+      structuredViolations: [],
     };
   }
 
@@ -156,10 +176,26 @@ export function checkDesignContractConsistency(
       passed: false,
       reasons: schemaResult.errorMessages.map((m) => `[schema] ${m}`),
       violations: [],
+      structuredViolations: [],
     };
   }
 
   const violations: DesignContractViolation[] = [];
+  const structuredViolations: StructuredViolation[] = [];
+  // 批次3 任务6：双轨同源——每个 DesignContractViolation 恰派生一条 StructuredViolation
+  //（rule=dimension、message 保留原文、classification='semantic'、subject 取违规现场标识、fixHints 取常量表）。
+  // subject 取值逻辑：D1="<uatId> → <actualPath>"；D2/D4 参数/字段不一致=参数名/字段名；
+  // D3 状态码不一致="<断言预期> → <路由实际>" 状态码对；D2/D3/D4 路由缺失="<method> <path>" 路由字面。
+  function pushViolation(v: DesignContractViolation, subject: string, fixHints: string[]): void {
+    violations.push(v);
+    structuredViolations.push({
+      rule: v.dimension,
+      message: v.message,
+      classification: 'semantic',
+      subject,
+      fixHints,
+    });
+  }
 
   // D1 路径一致性：映射表中「实际路径」须在路由定义中存在
   // actualPath 可能是纯路径 "/api/posts" 或含方法前缀 "POST /api/posts"
@@ -218,13 +254,17 @@ export function checkDesignContractConsistency(
     const normalizedPaths = normalizeActualPathVariants(mapping.actualPath);
     const found = normalizedPaths.length > 0 && normalizedPaths.every(isDefinedRoute);
     if (!found) {
-      violations.push({
-        dimension: 'D1',
-        severity: 'error',
-        message: `UAT 路径映射 ${mapping.uatId} 的实际路径 "${mapping.actualPath}" 在路由定义中不存在（应修正 actualPath 为已登记路由，或在 routeDefinitions 中补登该路由；示例：actualPath 填 "/api/auth/login"，对应 routeDefinitions 中 { method: "POST", path: "/api/auth/login" } 条目）`,
-        expected: mapping.actualPath,
-        actual: '路由定义中未找到',
-      });
+      pushViolation(
+        {
+          dimension: 'D1',
+          severity: 'error',
+          message: `UAT 路径映射 ${mapping.uatId} 的实际路径 "${mapping.actualPath}" 在路由定义中不存在（应修正 actualPath 为已登记路由，或在 routeDefinitions 中补登该路由；示例：actualPath 填 "/api/auth/login"，对应 routeDefinitions 中 { method: "POST", path: "/api/auth/login" } 条目）`,
+          expected: mapping.actualPath,
+          actual: '路由定义中未找到',
+        },
+        `${mapping.uatId} → ${mapping.actualPath}`,
+        DESIGN_CONTRACT_FIX_HINTS['D1']!,
+      );
     }
   }
 
@@ -245,24 +285,32 @@ export function checkDesignContractConsistency(
   for (const assertion of data.acceptanceAssertions) {
     const route = findRoute(assertion.method, assertion.path);
     if (!route) {
-      violations.push({
-        dimension: 'D2',
-        severity: 'error',
-        message: `路由 ${assertion.method} ${assertion.path} 未在路由定义中找到（应先在 routeDefinitions 中补登该路由；示例：{ method: "GET", path: "/api/posts", params: [], successStatus: 200, responseFields: ["id"] }）`,
-        expected: `${assertion.method} ${assertion.path}`,
-        actual: '路由定义中未找到',
-      });
+      pushViolation(
+        {
+          dimension: 'D2',
+          severity: 'error',
+          message: `路由 ${assertion.method} ${assertion.path} 未在路由定义中找到（应先在 routeDefinitions 中补登该路由；示例：{ method: "GET", path: "/api/posts", params: [], successStatus: 200, responseFields: ["id"] }）`,
+          expected: `${assertion.method} ${assertion.path}`,
+          actual: '路由定义中未找到',
+        },
+        `${assertion.method} ${assertion.path}`,
+        DESIGN_CONTRACT_FIX_HINTS['D2-route']!,
+      );
       continue;
     }
     for (const param of assertion.params) {
       if (!route.params.includes(param)) {
-        violations.push({
-          dimension: 'D2',
-          severity: 'error',
-          message: `验收断言 ${assertion.uatId} 使用参数 "${param}" 但路由 ${assertion.method} ${assertion.path} 定义中未包含该参数（应取齐两侧：在路由定义 params 中补登 "${param}"，或从断言 params 中移除该参数）`,
-          expected: param,
-          actual: route.params.join(', '),
-        });
+        pushViolation(
+          {
+            dimension: 'D2',
+            severity: 'error',
+            message: `验收断言 ${assertion.uatId} 使用参数 "${param}" 但路由 ${assertion.method} ${assertion.path} 定义中未包含该参数（应取齐两侧：在路由定义 params 中补登 "${param}"，或从断言 params 中移除该参数）`,
+            expected: param,
+            actual: route.params.join(', '),
+          },
+          param,
+          DESIGN_CONTRACT_FIX_HINTS['D2-param']!,
+        );
       }
     }
   }
@@ -271,23 +319,31 @@ export function checkDesignContractConsistency(
   for (const assertion of data.acceptanceAssertions) {
     const route = findRoute(assertion.method, assertion.path);
     if (!route) {
-      violations.push({
-        dimension: 'D3',
-        severity: 'error',
-        message: `路由 ${assertion.method} ${assertion.path} 未在路由定义中找到（应先在 routeDefinitions 中补登该路由；示例：{ method: "GET", path: "/api/posts", params: [], successStatus: 200, responseFields: ["id"] }）`,
-        expected: `${assertion.method} ${assertion.path}`,
-        actual: '路由定义中未找到',
-      });
+      pushViolation(
+        {
+          dimension: 'D3',
+          severity: 'error',
+          message: `路由 ${assertion.method} ${assertion.path} 未在路由定义中找到（应先在 routeDefinitions 中补登该路由；示例：{ method: "GET", path: "/api/posts", params: [], successStatus: 200, responseFields: ["id"] }）`,
+          expected: `${assertion.method} ${assertion.path}`,
+          actual: '路由定义中未找到',
+        },
+        `${assertion.method} ${assertion.path}`,
+        DESIGN_CONTRACT_FIX_HINTS['D3-route']!,
+      );
       continue;
     }
     if (assertion.expectedStatus !== route.successStatus) {
-      violations.push({
-        dimension: 'D3',
-        severity: 'error',
-        message: `验收断言 ${assertion.uatId} 预期状态码 ${assertion.expectedStatus} 但路由 ${assertion.method} ${assertion.path} 实际返回 ${route.successStatus}（应按设计文档核对该路由的成功状态码后统一两侧；示例：查询成功统一 200、创建统一 201、删除统一 204）`,
-        expected: String(assertion.expectedStatus),
-        actual: String(route.successStatus),
-      });
+      pushViolation(
+        {
+          dimension: 'D3',
+          severity: 'error',
+          message: `验收断言 ${assertion.uatId} 预期状态码 ${assertion.expectedStatus} 但路由 ${assertion.method} ${assertion.path} 实际返回 ${route.successStatus}（应按设计文档核对该路由的成功状态码后统一两侧；示例：查询成功统一 200、创建统一 201、删除统一 204）`,
+          expected: String(assertion.expectedStatus),
+          actual: String(route.successStatus),
+        },
+        `${assertion.expectedStatus} → ${route.successStatus}`,
+        DESIGN_CONTRACT_FIX_HINTS['D3-status']!,
+      );
     }
   }
 
@@ -295,24 +351,32 @@ export function checkDesignContractConsistency(
   for (const assertion of data.acceptanceAssertions) {
     const route = findRoute(assertion.method, assertion.path);
     if (!route) {
-      violations.push({
-        dimension: 'D4',
-        severity: 'error',
-        message: `路由 ${assertion.method} ${assertion.path} 未在路由定义中找到（应先在 routeDefinitions 中补登该路由；示例：{ method: "GET", path: "/api/posts", params: [], successStatus: 200, responseFields: ["id"] }）`,
-        expected: `${assertion.method} ${assertion.path}`,
-        actual: '路由定义中未找到',
-      });
+      pushViolation(
+        {
+          dimension: 'D4',
+          severity: 'error',
+          message: `路由 ${assertion.method} ${assertion.path} 未在路由定义中找到（应先在 routeDefinitions 中补登该路由；示例：{ method: "GET", path: "/api/posts", params: [], successStatus: 200, responseFields: ["id"] }）`,
+          expected: `${assertion.method} ${assertion.path}`,
+          actual: '路由定义中未找到',
+        },
+        `${assertion.method} ${assertion.path}`,
+        DESIGN_CONTRACT_FIX_HINTS['D4-route']!,
+      );
       continue;
     }
     for (const field of assertion.assertedFields) {
       if (!route.responseFields.includes(field)) {
-        violations.push({
-          dimension: 'D4',
-          severity: 'error',
-          message: `验收断言 ${assertion.uatId} 断言字段 "${field}" 但路由 ${assertion.method} ${assertion.path} 响应体中未包含该字段（应取齐两侧：在路由定义 responseFields 中补登 "${field}"，或从断言 assertedFields 中移除该字段）`,
-          expected: field,
-          actual: route.responseFields.join(', '),
-        });
+        pushViolation(
+          {
+            dimension: 'D4',
+            severity: 'error',
+            message: `验收断言 ${assertion.uatId} 断言字段 "${field}" 但路由 ${assertion.method} ${assertion.path} 响应体中未包含该字段（应取齐两侧：在路由定义 responseFields 中补登 "${field}"，或从断言 assertedFields 中移除该字段）`,
+            expected: field,
+            actual: route.responseFields.join(', '),
+          },
+          field,
+          DESIGN_CONTRACT_FIX_HINTS['D4-field']!,
+        );
       }
     }
   }
@@ -322,5 +386,6 @@ export function checkDesignContractConsistency(
     passed: violations.length === 0,
     reasons,
     violations,
+    structuredViolations,
   };
 }

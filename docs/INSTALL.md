@@ -226,18 +226,18 @@ W-Model 的方法论参考类文件可脱离编排单独拷贝到其他 Agent �
 
 **可单独拷贝**（方法论自包含，不依赖编排/状态/门禁脚本）：
 
-| 文件                                                      | 可复用能力                                           |
-| --------------------------------------------------------- | ---------------------------------------------------- |
-| `references/root-cause-locator.md`                        | 根因分析方法论（5-Why / 鱼骨图 / 缺陷链追溯）        |
-| `references/asset-authoring.md`                           | 技能资产编写方法论（渐进披露阈值 / no-op test / 授权不写） |
-| `references/iceberg-sweep-guide.md`                       | 隐藏问题深挖扫掠方法                                 |
+| 文件                                                       | 可复用能力                                                          |
+| ---------------------------------------------------------- | ------------------------------------------------------------------- |
+| `references/root-cause-locator.md`                         | 根因分析方法论（5-Why / 鱼骨图 / 缺陷链追溯）                       |
+| `references/asset-authoring.md`                            | 技能资产编写方法论（渐进披露阈值 / no-op test / 授权不写）          |
+| `references/iceberg-sweep-guide.md`                        | 隐藏问题深挖扫掠方法                                                |
 | `references/agent-personas.md` + `subagent/`（评审人格库） | 评审角色提示词与多角度分析（含能力声明四字段与 R-persona 两键矩阵） |
-| `references/conventions.md`                               | 术语表 / 格式 / 目录约定                             |
-| `references/estimation-guide.md`                          | 工作量估算方法                                       |
-| `references/context-management-guide.md`                  | 上下文分层与修剪纪律                                 |
-| `references/coding-quality.md`                            | 设计模式 / 重构 / 坏味道                             |
-| `references/toolbox.md`                                   | 工具箱                                               |
-| `references/activation-guide.md`                          | 触发边界判定（作为其他技能编写反例登记册的参考模板） |
+| `references/conventions.md`                                | 术语表 / 格式 / 目录约定                                            |
+| `references/estimation-guide.md`                           | 工作量估算方法                                                      |
+| `references/context-management-guide.md`                   | 上下文分层与修剪纪律                                                |
+| `references/coding-quality.md`                             | 设计模式 / 重构 / 坏味道                                            |
+| `references/toolbox.md`                                    | 工具箱                                                              |
+| `references/activation-guide.md`                           | 触发边界判定（作为其他技能编写反例登记册的参考模板）                |
 
 **不可单独拷贝**（依赖编排状态机 / `.w-model/` 状态 / 门禁脚本，离开技能整体无意义）：`references/phase-N-*.md`、`subagent-delegation.md`、`signature-chain-guide.md`、`rtm-guide.md`、`graph-guide.md`、`hard-constraints.md`。
 
@@ -251,7 +251,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 42.6.0
+version: 42.7.0
 # description 不在此处复制：SKILL.md 的 frontmatter 是其唯一权威来源
 # （本节曾逐字镜像该字段，已发生过一次漂移，故改为指向而非复述）
 ```
@@ -297,9 +297,9 @@ Remove-Item -Recurse -Force "<agent-specific-skills>\w-model-dev"
 | JSON Schema 文件（draft-07，34 份，含 change-scope / codegraph-query 与 evidence-manifest / evidence-provenance） | [../w-model-dev/schemas/](../w-model-dev/schemas)                                                                                                                                                           |
 | Schema 加载与校验工具                                                                                             | [../w-model-dev/scripts/infrastructure/schema-loader.ts](../w-model-dev/scripts/infrastructure/schema-loader.ts)                                                                                            |
 | 安全扫描脚本（baseline v2 内容敏感指纹豁免）                                                                      | [../w-model-dev/scripts/cli/security-scan.ts](../w-model-dev/scripts/cli/security-scan.ts)                                                                                                                  |
-| 回归基线脚本（用例数以运行输出为准）                                                                                        | [../w-model-dev/scripts/cli/self-test.ts](../w-model-dev/scripts/cli/self-test.ts)                                                                                                                          |
+| 回归基线脚本（用例数以运行输出为准）                                                                              | [../w-model-dev/scripts/cli/self-test.ts](../w-model-dev/scripts/cli/self-test.ts)                                                                                                                          |
 | 测试 coverage 矩阵                                                                                                | [../w-model-dev/scripts/**tests**/README.md](../w-model-dev/scripts/__tests__/README.md)                                                                                                                    |
-| 评审 persona 文件库（数量以 `subagent/` 目录实测为准）                                                           | [../w-model-dev/subagent/](../w-model-dev/subagent)                                                                                                                                                         |
+| 评审 persona 文件库（数量以 `subagent/` 目录实测为准）                                                            | [../w-model-dev/subagent/](../w-model-dev/subagent)                                                                                                                                                         |
 | Verifier 输出校验逻辑                                                                                             | [../w-model-dev/scripts/logic/verifier-logic.ts](../w-model-dev/scripts/logic/verifier-logic.ts)                                                                                                            |
 | Verifier 输出校验 CLI                                                                                             | [../w-model-dev/scripts/cli/check-verifier-output.ts](../w-model-dev/scripts/cli/check-verifier-output.ts)                                                                                                  |
 | 工件质量门逻辑                                                                                                    | [../w-model-dev/scripts/logic/gate-logic.ts](../w-model-dev/scripts/logic/gate-logic.ts)                                                                                                                    |

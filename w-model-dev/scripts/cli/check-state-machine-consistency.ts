@@ -104,6 +104,7 @@ async function main(): Promise<void> {
         passed: result.passed,
         reasons: result.reasons,
         violations: buildViolationDistribution(result.reasons.length),
+        differences: result.differences ?? [], // 批次3 任务9：分类差异清单透传（R/reworkHints 统一消费走 --json，偏差 4）
         durationMs: Date.now() - startTime,
       },
       exitCode,

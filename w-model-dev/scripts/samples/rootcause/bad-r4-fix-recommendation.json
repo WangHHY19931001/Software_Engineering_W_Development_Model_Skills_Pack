@@ -51,7 +51,11 @@
     {
       "target": "w-model-dev-demo/src/services/auth.service.ts",
       "location": "auth.service.ts:26 login() 入口",
-      "action": "增加 if (!password || password.trim() === '') throw new ValidationError('密码不能为空')"
+      "action": "增加 if (!password || password.trim() === '') throw new ValidationError('密码不能为空')",
+      "scope": {
+        "allowed": ["w-model-dev-demo/src/services/auth.service.ts"],
+        "forbidden": ["w-model-dev-demo/e2e/auth-flows/**"]
+      }
     }
   ],
   "prevention": [

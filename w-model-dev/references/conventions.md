@@ -12,6 +12,8 @@
 > 每条含「规范定义 + `_Avoid_` 指令」（禁用别名 / 易混词），防止术语同义异写。
 >
 > 来源：外部 domain-modeling/CONTEXT-FORMAT.md 的 GLOSSARY + `_Avoid_` 治理实践。
+>
+> **R 编号命名空间注**：R 编号跨门禁同号不同义（如 R11 在 signature-chain 指 v2 来源 sha256 必填、在 rootcause 指 persona 选择矩阵合法性与第一键交集、在 run-log 指闭环五脚本校验；R10 在 signature-chain 指 O 绕过 G 门禁（checkpoint 来源缺 G 产物/用户确认记录）、在 rootcause 指 reality-checker 冲突、在 run-log 指 revertEvidence 回滚证伪），按门禁命名空间理解——文档与消息中引用 R 编号须能从上下文判定所属门禁，跨门禁引用时带门禁名前缀（如「signature-chain R11」）。
 
 ### 1. 评审相关
 
@@ -74,7 +76,7 @@
 
 ### operationalFailureModes（RunLogEntry）
 
-- **规范定义**：RunLogEntry 的可选字段，O 系列运维失败模式（`O1`~`O6`）的**机器可读标注**数组（枚举取值、`uniqueItems`）；`check-maturity.ts` R5 的唯一真值通道。`note` 中的 O1~O6 字样视为引用（含评审规则编号同名情形，如 O3 既是运维失败模式也是 V 门禁 evidence 扣分规则名），不计入 R5，仅触发非阻断引用诊断。
+- **规范定义**：RunLogEntry 的可选字段，O 系列运维失败模式（`O1`~~`O6`）的**机器可读标注**数组（枚举取值、`uniqueItems`）；`check-maturity.ts` R5 的唯一真值通道。`note` 中的 O1~~O6 字样视为引用（含评审规则编号同名情形，如 O3 既是运维失败模式也是 V 门禁 evidence 扣分规则名），不计入 R5，仅触发非阻断引用诊断。
 - **_Avoid_**：note 标注/O 命中/失败模式列表（字段名必须为「operationalFailureModes」；不得用 note 词法命中作为 R5 判据）。
 
 ### 3. 工程资产相关
@@ -103,6 +105,26 @@
 
 - **规范定义**：签名链条目输入来源证明（上游产物路径 + 角色），S 子代理产出时强制回填（反模式 #32 守护）。
 - **_Avoid_**：来源/inputSource/provenance（字段名固定「inputProvenance」）。
+
+### subject
+
+- **规范定义**：`StructuredViolation` 可选字段（批次 3），违规的符号级定位、面向修复者 LLM（如 `SD-<id>` / `rtm[REQ-x].codeModule` / transitionKey / invariant 名 / 违规字段路径——verifier 门禁实际取 `meta.targetKind` / `subCriteria[1].score` 等，42.7.0 终审勘误：非 `subCriterion.name`），由四热点门禁（artifact-gate / design-contract / code-tla / verifier）填充；R 按 subject 锚定根因位置，不解析自由文本 message。**现状边界**：经 `--json` 机器可读暴露 structuredViolations 的当前仅 `check-artifact-gate`（经 `sdmapViolations` 键）；design-contract / code-tla / verifier 三热点透传已登记总纲 §5.1 后续批次，R 在该三热点暂以 reasons/message 为消费面。
+- **_Avoid_**：location/target/position（字段名固定「subject」；「location」「target」是 RootCauseReport.fixRecommendation 与 VerifierOutput 的不同字段）。
+
+### fixHints
+
+- **规范定义**：`StructuredViolation` 可选字段（批次 3），≤3 条祈使句的结构化修复建议，四热点门禁按规则固定话术常量表填充；权威数据流（SSoT §10L.8）：G 产出 fixHints → R 转写进 reworkHints（按 classification 排序后）→ S-fix 按条定向修复。
+- **_Avoid_**：hints/suggestions/修复提示（字段名固定「fixHints」；「reworkHints」是 V 产物与 run-log 的不同字段）。
+
+### verifiedArtifacts
+
+- **规范定义**：GATE_JSON（`--json`）顶层可选字段（批次 3），本次门禁判定承重输入文件字节清单 `Array<{path, sha256, bytes}>`（四热点门禁恒存在、空数组允许）；下游 v2 签名的 `sourceArtifacts[].sha256` 从此清单按 path 抄录，消费前可复验「门禁验的与消费的是同一字节」。
+- **_Avoid_**：artifacts/inputs/字节清单混写（字段名固定「verifiedArtifacts」；「artifacts」是签名链条目的路径清单字段，不含哈希）。
+
+### sigHashAlgo
+
+- **规范定义**：签名链条目可选字段（批次 3），sigHash 公式版本枚举 `v1` | `v2`，缺省即 `v1`；v2 将 artifacts 与 sourceArtifacts 两清单整体（含 sha256）纳入内容哈希，v2 条目另受 R11（来源 sha256 必填且 64-hex）约束，R6 按条目分流重算（`computeSigHashFor`），v1 路径逐字节不变。
+- **_Avoid_**：algo/hashVersion/version（字段名固定「sigHashAlgo」；「signatureHash」指哈希值本身，不同概念）。
 
 ### plan 任务 vs 执行账本 vs tickets.md
 

@@ -60,6 +60,16 @@ export type RootCauseCategory =
 export type QualityLevel = 'A' | 'B' | 'C' | 'D';
 export type NoRootCauseKind = 'environmental' | 'timing' | 'external';
 
+/** 单条修复建议（R4 校验四字段 + scope 合规；scope 双数组至少一侧非空，项为非空字符串——批次3 任务4） */
+export interface RootCauseFixRecommendation {
+  target: string;
+  location: string;
+  action: string;
+  rationale: string;
+  /** 修复范围声明：allowed=允许触碰面，forbidden=禁改面（测试/语义/证据）；V scoped re-review 对照消费 */
+  scope: { allowed: string[]; forbidden: string[] };
+}
+
 export interface RootCauseReportShape {
   schemaVersion: string;
   meta: {
@@ -107,12 +117,7 @@ export interface RootCauseReportShape {
     defectDescription?: string;
     rollbackRecommended: boolean;
   };
-  fixRecommendation: Array<{
-    target: string;
-    location: string;
-    action: string;
-    rationale: string;
-  }>;
+  fixRecommendation: RootCauseFixRecommendation[];
   prevention: Array<{
     scope: string;
     measure: string;
@@ -239,7 +244,7 @@ function isIso8601(value: unknown): value is string {
  *   R1 Schema 完整性
  *   R2 rootCauseChain 长度 [2,5] + evidence 非空
  *   R3 falsifiabilityCheck 含「若...则」句式
- *   R4 fixRecommendation 四字段
+ *   R4 fixRecommendation 四字段 + scope 合规（{allowed,forbidden} 双数组至少一侧非空，项为非空字符串；批次3 任务4）
  *   R5 prevention 三字段
  *   R6 upstreamDefect.present=true 时后续字段非空
  *   R7 qualityLevel 与 passed 一致
@@ -403,6 +408,26 @@ export function checkRootCauseReport(input: unknown): RootCauseCheckResult {
       if (!isNonEmptyString(f.action)) reasons.push(`fixRecommendation[${i}].action 必填且非空`);
       if (!isNonEmptyString(f.rationale)) reasons.push(`fixRecommendation[${i}].rationale 必填且非空`);
     }
+
+    // R4 scope 强制（批次3 任务4）：{allowed,forbidden} 双数组必填、至少一侧非空、项为非空字符串（trim 后）。
+    // 「缺 scope 键 / 空串项」由 schema（required + items minLength:1）前置拦截；
+    // 本业务校验承接 schema 放行面（双数组均空、空白项等）的合规判定。
+    const recs: readonly RootCauseFixRecommendation[] = r.fixRecommendation;
+    recs.forEach((rec: RootCauseFixRecommendation, i: number) => {
+      const s = rec.scope;
+      const ok =
+        !!s &&
+        Array.isArray(s.allowed) &&
+        Array.isArray(s.forbidden) &&
+        (s.allowed.length > 0 || s.forbidden.length > 0) &&
+        s.allowed.every(isNonEmptyString) &&
+        s.forbidden.every(isNonEmptyString);
+      if (!ok) {
+        reasons.push(
+          `R4: fixRecommendation[${i}] 缺合规 scope（{allowed,forbidden} 双数组必填，至少一侧非空，项为非空字符串）`,
+        );
+      }
+    });
   }
 
   // R5 prevention 三字段

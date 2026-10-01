@@ -17,6 +17,10 @@ export interface StructuredViolation {
   message: string;
   /** 批次 1（总纲 §4.2）：可选分类，向后兼容；语义见总纲 §4.1 */
   classification?: ChangeClassification;
+  /** 批次 3（总纲 §4.2）：符号级定位（面向修复者 LLM），四热点门禁填充 */
+  subject?: string;
+  /** 批次 3：修复建议（≤3 条祈使句） */
+  fixHints?: string[];
 }
 
 /** 门禁校验通用结果（兼容现有 violations: string[]，structuredViolations 为过渡可选字段） */
@@ -72,6 +76,10 @@ export interface JsonReport {
   sdAnchorCheck?: 'checked' | 'skipped' | null;
   /** SDMAP 结构化违规（含 classification）；通过且已校验时空数组 */
   sdmapViolations?: StructuredViolation[];
+  /** 批次 3 B2：本次判定承重输入文件字节清单（消费前可复验同一字节）；四热点门禁填充 */
+  verifiedArtifacts?: Array<{ path: string; sha256: string; bytes: number }>;
+  /** 批次 3 任务 9：分类差异清单透传（state-machine-consistency --json 填充；条目含 kind/direction/subject/classification，由 logic 层构建） */
+  differences?: unknown[];
   /**
    * 阶段 1-4 设计级结构校验（引用块 / SSOT / DoD / §8 拒绝登记）的执行态（check-artifact-gate --json）：
    * `checked`=已传 `--spec-dir` 并执行；`skipped`=阶段 1-4 未传 `--spec-dir`（整组跳过，必须可见，

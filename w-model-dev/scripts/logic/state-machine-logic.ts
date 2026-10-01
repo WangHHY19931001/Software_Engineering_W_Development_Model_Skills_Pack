@@ -8,6 +8,8 @@
  * 不触碰 process 的退出 / 参数 / 环境 / 标准流（见 __tests__/README.md「pure/IO 函数边界」）。
  */
 
+import type { ChangeClassification } from '../lib/types.js';
+
 export interface Transition {
   from: string;
   to: string;
@@ -32,12 +34,16 @@ export interface StateMachineConsistencyResult {
   extraInCode: Transition[];
   missingStatesInCode: string[];
   extraStatesInCode: string[];
-  /** 批次1 A2：分类差异清单（本比对器全部差异为 topology；供 R/reworkHints 统一消费） */
+  /**
+   * 批次1 A2：分类差异清单（本比对器全部差异为 topology；供 R/reworkHints 统一消费）。
+   * 批次3 任务9：classification 挂钩权威类型——`Extract<ChangeClassification, 'topology'>`
+   * （ChangeClassification 唯一权威见 lib/types.ts / 总纲 §4.1），不再内联字面量。
+   */
   differences?: Array<{
     kind: 'state' | 'transition';
     direction: 'missing-in-code' | 'extra-in-code';
     subject: string;
-    classification: 'topology';
+    classification: Extract<ChangeClassification, 'topology'>;
   }>;
 }
 

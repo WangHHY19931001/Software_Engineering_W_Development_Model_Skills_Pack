@@ -51,7 +51,11 @@
       "target": "w-model-dev-demo/src/services/comment.service.ts",
       "location": "comment.service.ts:78 create() 入口",
       "action": "增加 articleId 存在性校验，不存在时 throw new NotFoundError('文章不存在')",
-      "rationale": "消除根因（articleId 未校验），与 INTF-COMMENT-001 补充条款一致"
+      "rationale": "消除根因（articleId 未校验），与 INTF-COMMENT-001 补充条款一致",
+      "scope": {
+        "allowed": ["w-model-dev-demo/src/services/comment.service.ts"],
+        "forbidden": ["w-model-dev-demo/test/comment.service.test.ts"]
+      }
     }
   ],
   "prevention": [
