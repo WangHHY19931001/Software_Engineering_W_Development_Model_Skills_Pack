@@ -78,6 +78,8 @@ export interface JsonReport {
   sdmapViolations?: StructuredViolation[];
   /** 批次 3 B2：本次判定承重输入文件字节清单（消费前可复验同一字节）；四热点门禁填充 */
   verifiedArtifacts?: Array<{ path: string; sha256: string; bytes: number }>;
+  /** 批次 3 任务 9：分类差异清单透传（state-machine-consistency --json 填充；条目含 kind/direction/subject/classification，由 logic 层构建） */
+  differences?: unknown[];
   /**
    * 阶段 1-4 设计级结构校验（引用块 / SSOT / DoD / §8 拒绝登记）的执行态（check-artifact-gate --json）：
    * `checked`=已传 `--spec-dir` 并执行；`skipped`=阶段 1-4 未传 `--spec-dir`（整组跳过，必须可见，

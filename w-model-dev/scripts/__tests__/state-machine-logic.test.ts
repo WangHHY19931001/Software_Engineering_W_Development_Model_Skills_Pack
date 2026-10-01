@@ -11,8 +11,9 @@ import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, expectTypeOf } from 'vitest';
 
+import type { ChangeClassification } from '../lib/types.js';
 import {
   checkStateMachineConsistency,
   transitionKey,
@@ -180,5 +181,26 @@ describe('批次1 A2：分类差异 + 零交集守卫', () => {
     });
     expect(r.reasons).not.toContain('无共享状态与转移（cannot prove same system），不判一致');
     expect(r.passed).toBe(false);
+  });
+});
+
+describe('批次3 任务9：classification 权威类型挂钩 + sharedTransition 救场', () => {
+  it('批次3 classification 挂钩权威类型 + sharedTransition 救场', () => {
+    const cls: ChangeClassification = 'topology';
+    const r = checkStateMachineConsistency({
+      designStates: ['a'],
+      codeStates: ['x'], // 状态零交集
+      designTransitions: [{ from: 'a', to: 'b' }],
+      codeTransitions: [{ from: 'a', to: 'b' }], // 转移有交集
+    });
+    expect(r.reasons.some((s: string) => s.includes('cannot prove same system'))).toBe(false); // 救场路径
+    expect(r.differences!.every((d) => d.classification === cls)).toBe(true);
+  });
+
+  it("编译期类型挂钩验证：differences[].classification 与权威类型同一（Extract<ChangeClassification, 'topology'>）", () => {
+    // 双向同一性断言（漂移即编译失败）：若 classification 被加宽为全量 ChangeClassification
+    // 或退化为 string，toEqualTypeOf 不再成立（tsc/vitest typecheck 阶段失败）。
+    type ClassificationOf = NonNullable<StateMachineConsistencyResult['differences']>[number]['classification'];
+    expectTypeOf<ClassificationOf>().toEqualTypeOf<Extract<ChangeClassification, 'topology'>>();
   });
 });
