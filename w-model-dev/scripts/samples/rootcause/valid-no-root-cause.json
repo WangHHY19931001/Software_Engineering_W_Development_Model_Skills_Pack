@@ -34,7 +34,11 @@
       "target": "w-model-dev-demo/src/services/external.service.ts",
       "location": "external.service.ts 第三方调用边界",
       "action": "增加有界重试、超时、错误提示与结构化边界日志",
-      "rationale": "在不可归因到仓内根因时降低外部抖动影响，并为再次发生保留可追踪证据"
+      "rationale": "在不可归因到仓内根因时降低外部抖动影响，并为再次发生保留可追踪证据",
+      "scope": {
+        "allowed": ["w-model-dev-demo/src/services/external.service.ts"],
+        "forbidden": ["w-model-dev-demo/test/external.service.test.ts", "w-model-dev-demo/docs/runbook/**"]
+      }
     }
   ],
   "prevention": [

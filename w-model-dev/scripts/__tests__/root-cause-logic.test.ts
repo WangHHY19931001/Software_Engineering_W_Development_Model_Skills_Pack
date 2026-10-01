@@ -5,7 +5,7 @@
  *   - R1 Schema 完整性（必填字段非空）
  *   - R2 rootCauseChain 长度 [2,5] + evidence 非空
  *   - R3 falsifiabilityCheck 含「若...则」句式
- *   - R4 fixRecommendation 四字段
+ *   - R4 fixRecommendation 四字段 + scope 强制（批次3 任务4：{allowed,forbidden} 双数组至少一侧非空，项为非空字符串）
  *   - R5 prevention 三字段
  *   - R6 upstreamDefect.present=true 时后续字段非空
  *   - R7 qualityLevel 与 passed 一致
@@ -22,7 +22,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import { checkRootCauseReport, type RootCauseReportShape } from '../logic/root-cause-logic.js';
 
@@ -343,5 +343,86 @@ describe('noRootCause 合法出口', () => {
     const result = checkRootCauseReport(report);
     expect(result.passed).toBe(false);
     expect(result.reasons.some((reason) => /noRootCause.*investigation/.test(reason))).toBe(true);
+  });
+});
+
+// ==================== 批次3 任务4：R4 scope 强制 ====================
+
+/**
+ * makeReport：以 valid.json 为底版深拷贝，仅覆盖 fixRecommendation。
+ *
+ * 覆盖项类型取 Partial：本组用例的输入是「schema 非法 / 业务不合法」的校验对象
+ * （缺 scope 键、双数组均空、空白项），不参与类型收敛——checkRootCauseReport 入参即 unknown。
+ */
+let validBase: RootCauseReportShape;
+
+beforeAll(async () => {
+  validBase = await loadSample('valid.json');
+});
+
+function makeReport(overrides: {
+  fixRecommendation?: Array<Partial<RootCauseReportShape['fixRecommendation'][number]>>;
+}): unknown {
+  return { ...structuredClone(validBase), ...overrides };
+}
+
+describe('批次3 R4 scope 强制', () => {
+  it('缺 scope 键 → 失败且违规含 scope（schema required 前置拦截，R4 业务兜底被短路）', () => {
+    const r = checkRootCauseReport(
+      makeReport({ fixRecommendation: [{ target: 't', location: 'l', action: 'a', rationale: 'r' }] }),
+    );
+    expect(r.passed).toBe(false);
+    expect(r.reasons.some((v: string) => v.includes('scope'))).toBe(true);
+  });
+
+  it('空双数组 / 空白项 → R4 违规（含 R4 且 scope）；空串项由 schema minLength 前置拦截（违规含 scope）', () => {
+    // 双数组均空：schema 无数组长度下限 → 放行，R4 业务校验拦截（至少一侧非空）
+    expect(
+      checkRootCauseReport(
+        makeReport({
+          fixRecommendation: [
+            { target: 't', location: 'l', action: 'a', rationale: 'r', scope: { allowed: [], forbidden: [] } },
+          ],
+        }),
+      ).reasons.some((v: string) => v.includes('R4') && v.includes('scope')),
+    ).toBe(true);
+    // 空白字符串项：schema items minLength=1 放行 → R4 trim 判空拦截
+    expect(
+      checkRootCauseReport(
+        makeReport({
+          fixRecommendation: [
+            { target: 't', location: 'l', action: 'a', rationale: 'r', scope: { allowed: ['   '], forbidden: [] } },
+          ],
+        }),
+      ).reasons.some((v: string) => v.includes('R4') && v.includes('scope')),
+    ).toBe(true);
+    // 空字符串项：schema items minLength=1 前置拦截（错误路径含 scope），R4 兜底被短路
+    expect(
+      checkRootCauseReport(
+        makeReport({
+          fixRecommendation: [
+            { target: 't', location: 'l', action: 'a', rationale: 'r', scope: { allowed: [''], forbidden: [] } },
+          ],
+        }),
+      ).reasons.some((v: string) => v.includes('scope')),
+    ).toBe(true);
+  });
+
+  it('合规 scope（单侧非空）→ 通过且无 scope 相关违规', () => {
+    const r = checkRootCauseReport(
+      makeReport({
+        fixRecommendation: [
+          {
+            target: 't',
+            location: 'l',
+            action: 'a',
+            rationale: 'r',
+            scope: { allowed: ['src/auth/**'], forbidden: ['src/auth/login.test.ts'] },
+          },
+        ],
+      }),
+    );
+    expect(r.passed).toBe(true);
+    expect(r.reasons.filter((v: string) => v.includes('scope'))).toEqual([]);
   });
 });

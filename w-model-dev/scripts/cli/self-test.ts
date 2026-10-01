@@ -1739,6 +1739,12 @@ const ROOTCAUSE_CASES: RootCauseCase[] = [
     description: 'R4 缺 rationale',
   },
   {
+    file: 'bad-r4-scope-missing.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R4.*scope/],
+    description: 'R4 fixRecommendation.scope 双数组均空（缺合规 scope：allowed/forbidden 至少一侧非空）',
+  },
+  {
     file: 'bad-r5-prevention.json',
     expectedPassed: false,
     expectedReasonPatterns: [/prevention.*owner/],
