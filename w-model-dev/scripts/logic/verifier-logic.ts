@@ -19,6 +19,7 @@
  */
 
 import { validateBySchema } from '../infrastructure/schema-loader.js';
+import type { StructuredViolation } from '../lib/types.js';
 
 // ==================== 自包含类型形状 ====================
 
@@ -117,6 +118,10 @@ export const SUB_CRITERIA: Record<TargetKind, Array<{ name: string; weight: numb
 export interface VerifierCheckResult {
   passed: boolean;
   reasons: string[];
+  /** 批次3 任务8：结构化双轨（rule/subject/fixHints），与 reasons 同源单点派生、恒一一对应；
+   *  message 逐字保留 reasons 原文（既有消费者兼容）。类型保持可选（照任务 2 JsonReport 键 /
+   *  GateCheckResult 既有形态），但本函数全部 6 个结果构造点均填充（运行时恒在场）。 */
+  structuredViolations?: StructuredViolation[];
   /** 综合分数（直接读取自输出，不重算） */
   compositeScore: number;
   /** 重新计算的期望综合分数（用于与输出对比） */
@@ -124,6 +129,56 @@ export interface VerifierCheckResult {
   qualityLevel: string;
   /** 防漂移警告（非致命，不改变 passed），如 text-parse 扰动范围 < 0.01 */
   reworkHints?: string[];
+}
+
+// ==================== 结构化双轨（批次3 任务8：rule/subject/fixHints） ====================
+
+/** VERIFIER-* 结构化规则 ID（键集合 = VERIFIER_FIX_HINTS 常量表） */
+export type VerifierRuleId =
+  'VERIFIER-SCHEMA' | 'VERIFIER-SCORE' | 'VERIFIER-VARIANCE' | 'VERIFIER-EVIDENCE' | 'VERIFIER-STRUCTURE';
+
+/**
+ * 修复建议常量表（批次3 任务8）：structuredViolations[].fixHints 的单一事实来源，
+ * 取值逐字来自批次3 任务8 简报；`?? []` 归一（照任务 5/7 常量表先例）。
+ * rule 分派口径（与各违规现场一一对应，subject 一律字段路径）：
+ *   VERIFIER-SCHEMA    —— 值域/类型/枚举/边界违规（schema 前置拦截 + 业务层加严边界）
+ *   VERIFIER-SCORE     —— 分数一致性（compositeScore ≠ Σ、qualityLevel 映射、R13 单轴下限）
+ *   VERIFIER-VARIANCE  —— 方差/分布（超阈值、谎报方差、全同、完美等差、扰动越界、R18 分辨力）
+ *   VERIFIER-EVIDENCE  —— evidence 内容（R12 具体引用、格式不符、空泛声明）
+ *   VERIFIER-STRUCTURE —— 字段缺失/结构形态/一致性（passed、reworkHints、ranking 数组、summary）
+ */
+const VERIFIER_FIX_HINTS: Record<string, string[]> = {
+  'VERIFIER-SCHEMA': ['按 verifier-output schema 修正 schemaVersion 与必填字段'],
+  'VERIFIER-SCORE': ['对低于 0.70 的子标准补 evidence 定位后重评，不得改分数'],
+  'VERIFIER-VARIANCE': ['方差超阈值属不可重复评审：换 Persona/新上下文重评'],
+  'VERIFIER-EVIDENCE': ['evidence 补 <路径>:<定位>=<值> 形态；禁裸声明'],
+  'VERIFIER-STRUCTURE': ['补齐缺失字段后重新提交'],
+};
+
+/**
+ * 双轨单点派生工厂（批次3 任务8）：message 逐字保留 reasons 原文（既有消费者兼容），
+ * classification 恒 'semantic'，fixHints 取常量表 + `?? []` 归一。
+ */
+function makeStructured(rule: VerifierRuleId, subject: string, message: string): StructuredViolation {
+  return {
+    rule,
+    message,
+    classification: 'semantic',
+    subject,
+    // eslint-disable-next-line security/detect-object-injection -- rule 参数为 VerifierRuleId 五值封闭联合（键集合 = VERIFIER_FIX_HINTS 常量表自身），非外部输入
+    fixHints: VERIFIER_FIX_HINTS[rule] ?? [],
+  };
+}
+
+/**
+ * schema 前置拦截的 subject 提取：ajv 格式化消息形如 `/meta/repeatTimes: must be integer [type]`
+ * （formatAjvError：instancePath 为空时为 `/`）。提取 JSON-pointer 字段路径并转点号形态，
+ * 与业务层 subject 的 `subCriteria[N].field` 形态对齐；根级/无路径 → 'schema'。
+ */
+function schemaErrorSubject(message: string): string {
+  const m = /^\/([^:]*):/.exec(message);
+  const pointer = m?.[1] ?? '';
+  return pointer === '' ? 'schema' : pointer.replace(/\//g, '.');
 }
 
 // ==================== 工具函数 ====================
@@ -211,24 +266,43 @@ export function checkR12EvidenceSpecificity(evidence: unknown, idx: number): str
  * R13 单轴下限校验（反模式 #41 加权平均掩盖单轴失败）。
  * 防止 compositeScore 加权平均 ≥0.70 放行时，存在子标准低于 B 级（<0.70）被其余高分掩盖。
  * 返回低于下限的子标准违规列表；空数组 = 全部子标准 ≥ 下限。
+ *
+ * 批次3 任务8：reasons/structured 双轨收集收敛于 collectR13SingleAxisFloor 单点，
+ * 本导出函数为兼容签名（string[]）的薄包装。
  */
 export function checkR13SingleAxisFloor(subCriteria: Array<Record<string, unknown>> | unknown[]): string[] {
-  if (!Array.isArray(subCriteria)) return [];
-  const violations: string[] = [];
+  return collectR13SingleAxisFloor(subCriteria).reasons;
+}
+
+/** 双轨同源收集结果（批次3 任务8）：reasons 与 structured 恒一一对应 */
+interface DualTrackViolations {
+  reasons: string[];
+  structured: StructuredViolation[];
+}
+
+/** R13 单轴下限的双轨收集（批次3 任务8）：单点派生，导出 wrapper 只取 reasons 轨。 */
+function collectR13SingleAxisFloor(subCriteria: Array<Record<string, unknown>> | unknown[]): DualTrackViolations {
+  const reasons: string[] = [];
+  const structured: StructuredViolation[] = [];
+  if (!Array.isArray(subCriteria)) return { reasons, structured };
   for (let i = 0; i < subCriteria.length; i++) {
     const sc = subCriteria[i] as Record<string, unknown>;
     if (!sc || typeof sc !== 'object') continue;
     const name = typeof sc.name === 'string' && sc.name.trim() !== '' ? sc.name : `subCriteria[${i + 1}]`;
     if (typeof sc.score === 'number' && !Number.isNaN(sc.score)) {
       if (sc.score < SINGLE_AXIS_MIN_SCORE) {
-        violations.push(`子标准 ${name} 得分 ${sc.score} < ${SINGLE_AXIS_MIN_SCORE}（单轴下限，反模式 #41）`);
+        const msg = `子标准 ${name} 得分 ${sc.score} < ${SINGLE_AXIS_MIN_SCORE}（单轴下限，反模式 #41）`;
+        reasons.push(msg);
+        structured.push(makeStructured('VERIFIER-SCORE', `subCriteria[${i + 1}].score`, msg));
       }
     } else {
       // 非数值 score 不得静默跳过：无法参与下限判定的子标准必须显式暴露
-      violations.push(`子标准 ${name} 的 score 非有限数值（实际 ${JSON.stringify(sc.score)}），无法参与单轴下限校验`);
+      const msg = `子标准 ${name} 的 score 非有限数值（实际 ${JSON.stringify(sc.score)}），无法参与单轴下限校验`;
+      reasons.push(msg);
+      structured.push(makeStructured('VERIFIER-STRUCTURE', `subCriteria[${i + 1}].score`, msg));
     }
   }
-  return violations;
+  return { reasons, structured };
 }
 
 /**
@@ -247,12 +321,21 @@ export function checkR13SingleAxisFloor(subCriteria: Array<Record<string, unknow
  * 仓库内无真实历史评审可回测（`.w-model/` 为 gitignored 本地生成物）。
  * 取值保守（显著低于正常评分离散度）以避免假阳性。
  *
- * 纯函数、无 I/O；与 checkR13SingleAxisFloor 同形态，便于独立定位与测试。
+ * 纯函数、无 I/O；与 R13 同形态，便于独立定位与测试。
  * 返回违规列表；空数组 = 无分辨力塌缩信号。
+ *
+ * 批次3 任务8：reasons/structured 双轨收集收敛于 collectR18ResolutionFloor 单点，
+ * 本导出函数为兼容签名（string[]）的薄包装。
  */
 export function checkR18ResolutionFloor(subCriteria: Array<Record<string, unknown>> | unknown[]): string[] {
-  if (!Array.isArray(subCriteria)) return [];
-  const violations: string[] = [];
+  return collectR18ResolutionFloor(subCriteria).reasons;
+}
+
+/** R18 分辨力下限的双轨收集（批次3 任务8）：单点派生，导出 wrapper 只取 reasons 轨。 */
+function collectR18ResolutionFloor(subCriteria: Array<Record<string, unknown>> | unknown[]): DualTrackViolations {
+  const reasons: string[] = [];
+  const structured: StructuredViolation[] = [];
+  if (!Array.isArray(subCriteria)) return { reasons, structured };
   for (let i = 0; i < subCriteria.length; i++) {
     const sc = subCriteria[i] as Record<string, unknown>;
     if (!sc || typeof sc !== 'object') continue;
@@ -268,12 +351,12 @@ export function checkR18ResolutionFloor(subCriteria: Array<Record<string, unknow
     if (!Number.isFinite(variance)) continue;
     if (variance < RESOLUTION_FLOOR) {
       const name = typeof sc.name === 'string' && sc.name.trim() !== '' ? sc.name : `subCriteria[${i + 1}]`;
-      violations.push(
-        `R18 子标准 ${name} 的 rawScores 方差 ${variance} < 分辨力下限 ${RESOLUTION_FLOOR}（非全等但分布坍缩，疑似 V 无区分能力）`,
-      );
+      const msg = `R18 子标准 ${name} 的 rawScores 方差 ${variance} < 分辨力下限 ${RESOLUTION_FLOOR}（非全等但分布坍缩，疑似 V 无区分能力）`;
+      reasons.push(msg);
+      structured.push(makeStructured('VERIFIER-VARIANCE', `subCriteria[${i + 1}].rawScores`, msg));
     }
   }
-  return violations;
+  return { reasons, structured };
 }
 
 /**
@@ -382,9 +465,15 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   // 通过后才进入下方业务规则校验（数值合理性 / 防漂移 / 权重匹配等）。
   const schemaResult = validateBySchema('verifier-output', raw);
   if (!schemaResult.valid) {
+    // 批次3 任务8：schema 前置拦截路径同样双轨同源——每条 [schema] 原文恰派生一条
+    // VERIFIER-SCHEMA 结构化违规（subject 由 schemaErrorSubject 提取字段路径）
+    const schemaReasons = schemaResult.errorMessages.map((m) => `[schema] ${m}`);
     return {
       passed: false,
-      reasons: schemaResult.errorMessages.map((m) => `[schema] ${m}`),
+      reasons: schemaReasons,
+      structuredViolations: schemaResult.errorMessages.map((m) =>
+        makeStructured('VERIFIER-SCHEMA', schemaErrorSubject(m), `[schema] ${m}`),
+      ),
       compositeScore: 0,
       expectedCompositeScore: 0,
       qualityLevel: 'N/A',
@@ -393,11 +482,19 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
 
   const reasons: string[] = [];
   const reworkHints: string[] = [];
+  // 批次3 任务8：结构化双轨——与 reasons 同源单点派生（pushViolation 恒成对），一一对应
+  const structuredViolations: StructuredViolation[] = [];
+  function pushViolation(reason: string, rule: VerifierRuleId, subject: string): void {
+    reasons.push(reason);
+    structuredViolations.push(makeStructured(rule, subject, reason));
+  }
 
   if (!raw || typeof raw !== 'object') {
+    pushViolation('输出不是合法 JSON 对象', 'VERIFIER-STRUCTURE', 'root');
     return {
       passed: false,
-      reasons: ['输出不是合法 JSON 对象'],
+      reasons,
+      structuredViolations,
       compositeScore: 0,
       expectedCompositeScore: 0,
       qualityLevel: 'N/A',
@@ -408,15 +505,21 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
 
   // 1. schemaVersion
   if (o.schemaVersion !== SCHEMA_VERSION) {
-    reasons.push(`schemaVersion 必须为 "${SCHEMA_VERSION}"，实际为 ${JSON.stringify(o.schemaVersion)}`);
+    pushViolation(
+      `schemaVersion 必须为 "${SCHEMA_VERSION}"，实际为 ${JSON.stringify(o.schemaVersion)}`,
+      'VERIFIER-SCHEMA',
+      'schemaVersion',
+    );
   }
 
   // 2. meta
   const meta = o.meta as Record<string, unknown> | undefined;
   if (!meta || typeof meta !== 'object') {
+    pushViolation('meta 字段缺失或非对象', 'VERIFIER-STRUCTURE', 'meta');
     return {
       passed: false,
-      reasons: ['meta 字段缺失或非对象'],
+      reasons,
+      structuredViolations,
       compositeScore: 0,
       expectedCompositeScore: 0,
       qualityLevel: 'N/A',
@@ -427,12 +530,15 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   // P2.5 targetKind 枚举标准化：'testcase'/'file' 已废弃；'rootcause' 用于返工循环 V 复审根因报告（§7.5）
   const allowedKinds: TargetKind[] = ['requirement', 'design', 'code', 'test', 'rootcause'];
   if (!allowedKinds.includes(targetKind as TargetKind)) {
-    reasons.push(
+    pushViolation(
       `meta.targetKind 必须为 ${allowedKinds.join(' / ')}，实际为 ${JSON.stringify(targetKind)}（P2.5: 'testcase'/'file' 已废弃，分别用 'test'/'code'）`,
+      'VERIFIER-SCHEMA',
+      'meta.targetKind',
     );
     return {
       passed: false,
       reasons,
+      structuredViolations,
       compositeScore: 0,
       expectedCompositeScore: 0,
       qualityLevel: 'N/A',
@@ -440,36 +546,51 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   }
 
   if (typeof meta.target !== 'string' || meta.target.trim() === '') {
-    reasons.push('meta.target 必须为非空字符串');
+    pushViolation('meta.target 必须为非空字符串', 'VERIFIER-STRUCTURE', 'meta.target');
   }
   if (typeof meta.agent !== 'string' || meta.agent.trim() === '') {
-    reasons.push('meta.agent 必须为非空字符串');
+    pushViolation('meta.agent 必须为非空字符串', 'VERIFIER-STRUCTURE', 'meta.agent');
   }
 
   const scoringMethod = meta.scoringMethod as string;
   if (!['logits', 'text-parse'].includes(scoringMethod)) {
-    reasons.push(`meta.scoringMethod 必须为 logits / text-parse，实际为 ${JSON.stringify(scoringMethod)}`);
+    pushViolation(
+      `meta.scoringMethod 必须为 logits / text-parse，实际为 ${JSON.stringify(scoringMethod)}`,
+      'VERIFIER-SCHEMA',
+      'meta.scoringMethod',
+    );
   }
 
   const repeatTimes = meta.repeatTimes;
   if (!isNumber(repeatTimes) || !Number.isInteger(repeatTimes) || repeatTimes < MIN_REPEAT_TIMES) {
-    reasons.push(`meta.repeatTimes 必须为整数且 ≥ ${MIN_REPEAT_TIMES}，实际为 ${JSON.stringify(repeatTimes)}`);
+    pushViolation(
+      `meta.repeatTimes 必须为整数且 ≥ ${MIN_REPEAT_TIMES}，实际为 ${JSON.stringify(repeatTimes)}`,
+      'VERIFIER-SCHEMA',
+      'meta.repeatTimes',
+    );
   }
 
   const varianceThreshold = isNumber(meta.varianceThreshold) ? meta.varianceThreshold : Number.NaN;
   if (!inRange(varianceThreshold, 0, MAX_VARIANCE_THRESHOLD)) {
-    reasons.push(
+    pushViolation(
       `meta.varianceThreshold 必须在 [0,${MAX_VARIANCE_THRESHOLD}] 范围内，实际为 ${JSON.stringify(meta.varianceThreshold)}`,
+      'VERIFIER-SCHEMA',
+      'meta.varianceThreshold',
     );
   }
 
   // 3. subCriteria
   const subCriteria = o.subCriteria;
   if (!Array.isArray(subCriteria) || subCriteria.length < 3) {
-    reasons.push(`subCriteria 必须为数组且长度 ≥ 3，实际为 ${JSON.stringify(subCriteria)?.slice(0, 80)}`);
+    pushViolation(
+      `subCriteria 必须为数组且长度 ≥ 3，实际为 ${JSON.stringify(subCriteria)?.slice(0, 80)}`,
+      'VERIFIER-STRUCTURE',
+      'subCriteria',
+    );
     return {
       passed: false,
       reasons,
+      structuredViolations,
       compositeScore: 0,
       expectedCompositeScore: 0,
       qualityLevel: 'N/A',
@@ -478,7 +599,11 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
 
   const expected = SUB_CRITERIA[targetKind as TargetKind];
   if (subCriteria.length !== expected.length) {
-    reasons.push(`targetKind=${targetKind} 应有 ${expected.length} 个子标准，实际 ${subCriteria.length} 个`);
+    pushViolation(
+      `targetKind=${targetKind} 应有 ${expected.length} 个子标准，实际 ${subCriteria.length} 个`,
+      'VERIFIER-STRUCTURE',
+      'subCriteria',
+    );
   }
 
   // 子标准名称与权重逐一比对
@@ -487,37 +612,61 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
     const sc = subCriteria[i] as Record<string, unknown>;
     const idx = i + 1;
     if (!sc || typeof sc !== 'object') {
-      reasons.push(`subCriteria[${idx}] 非对象`);
+      pushViolation(`subCriteria[${idx}] 非对象`, 'VERIFIER-STRUCTURE', `subCriteria[${idx}]`);
       continue;
     }
     if (typeof sc.name !== 'string' || sc.name.trim() === '') {
-      reasons.push(`subCriteria[${idx}].name 缺失或非字符串`);
+      pushViolation(`subCriteria[${idx}].name 缺失或非字符串`, 'VERIFIER-STRUCTURE', `subCriteria[${idx}].name`);
     } else {
       actualNames.push(sc.name);
     }
     if (!isNumber(sc.weight) || !inRange(sc.weight, 0, 1)) {
-      reasons.push(`subCriteria[${idx}].weight 必须在 [0,1]，实际为 ${JSON.stringify(sc.weight)}`);
+      pushViolation(
+        `subCriteria[${idx}].weight 必须在 [0,1]，实际为 ${JSON.stringify(sc.weight)}`,
+        'VERIFIER-SCHEMA',
+        `subCriteria[${idx}].weight`,
+      );
     }
     if (!isNumber(sc.score) || !inRange(sc.score, 0, 1)) {
-      reasons.push(`subCriteria[${idx}].score 必须在 [0,1]，实际为 ${JSON.stringify(sc.score)}`);
+      pushViolation(
+        `subCriteria[${idx}].score 必须在 [0,1]，实际为 ${JSON.stringify(sc.score)}`,
+        'VERIFIER-SCHEMA',
+        `subCriteria[${idx}].score`,
+      );
     }
     if (!Array.isArray(sc.rawScores)) {
-      reasons.push(`subCriteria[${idx}].rawScores 必须为数组`);
+      pushViolation(`subCriteria[${idx}].rawScores 必须为数组`, 'VERIFIER-STRUCTURE', `subCriteria[${idx}].rawScores`);
     } else {
       if (isNumber(repeatTimes) && sc.rawScores.length !== repeatTimes) {
-        reasons.push(`subCriteria[${idx}].rawScores 长度 ${sc.rawScores.length} ≠ meta.repeatTimes ${repeatTimes}`);
+        pushViolation(
+          `subCriteria[${idx}].rawScores 长度 ${sc.rawScores.length} ≠ meta.repeatTimes ${repeatTimes}`,
+          'VERIFIER-STRUCTURE',
+          `subCriteria[${idx}].rawScores`,
+        );
       }
       for (let j = 0; j < sc.rawScores.length; j++) {
         const v = sc.rawScores[j];
         if (!isNumber(v) || !inRange(v, 0, 1)) {
-          reasons.push(`subCriteria[${idx}].rawScores[${j + 1}] 不在 [0,1]：${JSON.stringify(v)}`);
+          pushViolation(
+            `subCriteria[${idx}].rawScores[${j + 1}] 不在 [0,1]：${JSON.stringify(v)}`,
+            'VERIFIER-SCHEMA',
+            `subCriteria[${idx}].rawScores[${j + 1}]`,
+          );
         }
       }
     }
     if (!isNumber(sc.variance) || sc.variance < 0) {
-      reasons.push(`subCriteria[${idx}].variance 必须为非负数，实际为 ${JSON.stringify(sc.variance)}`);
+      pushViolation(
+        `subCriteria[${idx}].variance 必须为非负数，实际为 ${JSON.stringify(sc.variance)}`,
+        'VERIFIER-SCHEMA',
+        `subCriteria[${idx}].variance`,
+      );
     } else if (sc.variance > varianceThreshold) {
-      reasons.push(`subCriteria[${idx}].variance ${sc.variance} > 阈值 ${varianceThreshold}（不可重复，需重评）`);
+      pushViolation(
+        `subCriteria[${idx}].variance ${sc.variance} > 阈值 ${varianceThreshold}（不可重复，需重评）`,
+        'VERIFIER-VARIANCE',
+        `subCriteria[${idx}].variance`,
+      );
     }
 
     // 防漂移规则 5（§3.2.1）：重算 rawScores 方差并与 variance 字段对比。
@@ -530,9 +679,8 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
       if (numericScores.length === sc.rawScores.length && numericScores.length >= 2 && isNumber(sc.variance)) {
         const recomputed = computeVariance(numericScores);
         if (Number.isFinite(recomputed) && Math.abs(recomputed - sc.variance) > VARIANCE_EPSILON) {
-          reasons.push(
-            `subCriteria[${idx}].variance ${sc.variance} ≠ 由 rawScores 重算的方差 ${recomputed.toFixed(6)}（误差 > ${VARIANCE_EPSILON}，疑似谎报方差）`,
-          );
+          const msg = `subCriteria[${idx}].variance ${sc.variance} ≠ 由 rawScores 重算的方差 ${recomputed.toFixed(6)}（误差 > ${VARIANCE_EPSILON}，疑似谎报方差）`;
+          pushViolation(msg, 'VERIFIER-VARIANCE', `subCriteria[${idx}].variance`);
         }
       }
     }
@@ -543,7 +691,8 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
     if (Array.isArray(sc.rawScores) && sc.rawScores.length > 1) {
       const numericScores = sc.rawScores.filter(isNumber) as number[];
       if (numericScores.length === sc.rawScores.length && numericScores.every((v) => v === numericScores[0])) {
-        reasons.push(`维度 ${dimName} 的 rawScores 全同 [${numericScores.join(',')}], 疑似手工填写`);
+        const msg = `维度 ${dimName} 的 rawScores 全同 [${numericScores.join(',')}], 疑似手工填写`;
+        pushViolation(msg, 'VERIFIER-VARIANCE', `subCriteria[${idx}].rawScores`);
       }
     }
 
@@ -564,9 +713,11 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
           }
         }
         if (isArithmetic && Math.abs(diff - 0.01) < 1e-9) {
-          reasons.push(
+          pushViolation(
             `维度 ${dimName} 的 rawScores 为完美等差数列 [${numericScores.join(',')}]（公差 0.01），疑似构造数据；` +
               '请改用真实离散值（相邻打分差值不得恒等、不得为 0.01 完美等差）',
+            'VERIFIER-VARIANCE',
+            `subCriteria[${idx}].rawScores`,
           );
         }
       }
@@ -579,7 +730,8 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
       if (numericScores.length === sc.rawScores.length) {
         const spread = Math.max(...numericScores) - Math.min(...numericScores);
         if (spread > 0.1) {
-          reasons.push(`维度 ${dimName} 的 rawScores 扰动范围 ${spread.toFixed(4)} > 0.10, 扰动越界`);
+          const msg = `维度 ${dimName} 的 rawScores 扰动范围 ${spread.toFixed(4)} > 0.10, 扰动越界`;
+          pushViolation(msg, 'VERIFIER-VARIANCE', `subCriteria[${idx}].rawScores`);
         } else if (spread < 0.01) {
           reworkHints.push(`维度 ${dimName} 的 rawScores 扰动范围 ${spread.toFixed(4)} < 0.01, 疑似未扰动`);
         }
@@ -587,11 +739,15 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
     }
 
     if (typeof sc.evidence !== 'string' || sc.evidence.trim() === '') {
-      reasons.push(`subCriteria[${idx}].evidence 必须为非空字符串（引用目标内具体片段）`);
+      pushViolation(
+        `subCriteria[${idx}].evidence 必须为非空字符串（引用目标内具体片段）`,
+        'VERIFIER-STRUCTURE',
+        `subCriteria[${idx}].evidence`,
+      );
     } else {
       // R12（sig-002）：evidence 须含具体引用，禁止纯描述
       const r12 = checkR12EvidenceSpecificity(sc.evidence, idx);
-      if (r12) reasons.push(r12);
+      if (r12) pushViolation(r12, 'VERIFIER-EVIDENCE', `subCriteria[${idx}].evidence`);
     }
   }
 
@@ -602,10 +758,18 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
     const act = subCriteria[i] as Record<string, unknown> | undefined;
     if (!act) continue;
     if (act.name !== exp.name) {
-      reasons.push(`subCriteria[${i + 1}].name 应为 "${exp.name}"，实际为 ${JSON.stringify(act.name)}`);
+      pushViolation(
+        `subCriteria[${i + 1}].name 应为 "${exp.name}"，实际为 ${JSON.stringify(act.name)}`,
+        'VERIFIER-STRUCTURE',
+        `subCriteria[${i + 1}].name`,
+      );
     }
     if (isNumber(act.weight) && Math.abs(act.weight - exp.weight) > EPSILON) {
-      reasons.push(`subCriteria[${i + 1}].weight 应为 ${exp.weight}，实际为 ${act.weight}（权重不得改动）`);
+      pushViolation(
+        `subCriteria[${i + 1}].weight 应为 ${exp.weight}，实际为 ${act.weight}（权重不得改动）`,
+        'VERIFIER-SCHEMA',
+        `subCriteria[${i + 1}].weight`,
+      );
     }
   }
 
@@ -620,9 +784,17 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   expectedComposite = Math.round(expectedComposite * 1e4) / 1e4;
 
   if (!isNumber(compositeScore) || !inRange(compositeScore, 0, 1)) {
-    reasons.push(`compositeScore 必须在 [0,1]，实际为 ${JSON.stringify(compositeScore)}`);
+    pushViolation(
+      `compositeScore 必须在 [0,1]，实际为 ${JSON.stringify(compositeScore)}`,
+      'VERIFIER-SCHEMA',
+      'compositeScore',
+    );
   } else if (Math.abs(compositeScore - expectedComposite) > EPSILON) {
-    reasons.push(`compositeScore ${compositeScore} ≠ Σ(score*weight) ${expectedComposite}（误差 > ${EPSILON}）`);
+    pushViolation(
+      `compositeScore ${compositeScore} ≠ Σ(score*weight) ${expectedComposite}（误差 > ${EPSILON}）`,
+      'VERIFIER-SCORE',
+      'compositeScore',
+    );
   }
 
   // 5. evidence 格式校验（先于 qualityLevel/passed 判定，evidence 扣分后重新判定两者）
@@ -641,15 +813,22 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
       // 匹配后命中 VAGUE_EVIDENCE_PATTERNS → 保留空泛声明（O3）文案。两者扣分与
       // qualityLevel/passed 重判定路径完全一致，只有诊断归因不同。
       if (evidenceResult.formatMismatchItems.length > 0) {
-        reasons.push(
+        pushViolation(
           `evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt；行号区间合法写法 path:L51-53=stmt，双 L 非法）：${evidenceResult.formatMismatchItems.join('; ')}`,
+          'VERIFIER-EVIDENCE',
+          // 聚合文案跨多个子标准，无单一索引 → 取集合级字段路径
+          'subCriteria.evidence',
         );
       }
       const vagueItemsOnly = evidenceResult.vagueItems.filter(
         (item) => !evidenceResult.formatMismatchItems.includes(item),
       );
       if (vagueItemsOnly.length > 0) {
-        reasons.push(`evidence 格式校验失败（空泛声明，O3 命中）：${vagueItemsOnly.join('; ')}`);
+        pushViolation(
+          `evidence 格式校验失败（空泛声明，O3 命中）：${vagueItemsOnly.join('; ')}`,
+          'VERIFIER-EVIDENCE',
+          'subCriteria.evidence',
+        );
       }
     }
   }
@@ -658,11 +837,19 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   let qualityLevel = o.qualityLevel;
   const allowedLevels: QualityLevel[] = ['A', 'B', 'C', 'D'];
   if (!allowedLevels.includes(qualityLevel as QualityLevel)) {
-    reasons.push(`qualityLevel 必须为 A/B/C/D，实际为 ${JSON.stringify(qualityLevel)}`);
+    pushViolation(
+      `qualityLevel 必须为 A/B/C/D，实际为 ${JSON.stringify(qualityLevel)}`,
+      'VERIFIER-SCHEMA',
+      'qualityLevel',
+    );
   } else if (isNumber(compositeScore)) {
     const expectedLevel = determineQualityLevel(compositeScore);
     if (qualityLevel !== expectedLevel) {
-      reasons.push(`qualityLevel ${qualityLevel} 与综合分数 ${compositeScore} 应映射为 ${expectedLevel}（§6.1）`);
+      pushViolation(
+        `qualityLevel ${qualityLevel} 与综合分数 ${compositeScore} 应映射为 ${expectedLevel}（§6.1）`,
+        'VERIFIER-SCORE',
+        'qualityLevel',
+      );
     }
   }
   // evidence 扣分后，qualityLevel 重新判定（覆盖可能的 text-parse 降级）
@@ -683,40 +870,49 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
       if (!match) return;
       hasBlockingReworkHint = true;
       const severity = match[1] ?? match[2];
-      reasons.push(
+      pushViolation(
         `reworkHints[${index + 1}] 标记为 ${severity}，属于阻断性返工提示；不得与 passed=true 并存（verifier-spec.md §7.4A.2）`,
+        'VERIFIER-STRUCTURE',
+        `reworkHints[${index + 1}]`,
       );
     });
   }
   const passed = o.passed;
-  const singleAxisViolations = checkR13SingleAxisFloor(subCriteria);
+  // 批次3 任务8：R13/R18 双轨收集单点汇入（reasons 与 structured 恒成对）
+  const singleAxis = collectR13SingleAxisFloor(subCriteria);
   // R18：分辨力下限（A-3d 校准偏移）。与 R13 同形态、同层级接入 reasons，
   // 不改变 passed 判定公式本身——R18 的影响经由 reasons 长度传导（任何 reasons 即 passed=false）。
-  const resolutionViolations = checkR18ResolutionFloor(subCriteria);
+  const resolution = collectR18ResolutionFloor(subCriteria);
   const expectedPassed =
-    !hasBlockingReworkHint && (qualityLevel === 'A' || qualityLevel === 'B') && singleAxisViolations.length === 0;
+    !hasBlockingReworkHint && (qualityLevel === 'A' || qualityLevel === 'B') && singleAxis.reasons.length === 0;
   if (typeof passed !== 'boolean') {
-    reasons.push(`passed 必须为布尔值，实际为 ${JSON.stringify(passed)}`);
+    pushViolation(`passed 必须为布尔值，实际为 ${JSON.stringify(passed)}`, 'VERIFIER-STRUCTURE', 'passed');
   } else if (passed !== expectedPassed) {
-    reasons.push(`passed ${passed} 与 qualityLevel ${qualityLevel} 不一致（应 = ${expectedPassed}）`);
+    pushViolation(
+      `passed ${passed} 与 qualityLevel ${qualityLevel} 不一致（应 = ${expectedPassed}）`,
+      'VERIFIER-STRUCTURE',
+      'passed',
+    );
   }
-  reasons.push(...singleAxisViolations);
-  reasons.push(...resolutionViolations);
+  reasons.push(...singleAxis.reasons);
+  structuredViolations.push(...singleAxis.structured);
+  reasons.push(...resolution.reasons);
+  structuredViolations.push(...resolution.structured);
 
   // 8. summary（R1 非空）
   if (typeof o.summary !== 'string' || o.summary.trim() === '') {
-    reasons.push('summary 必须为非空字符串');
+    pushViolation('summary 必须为非空字符串', 'VERIFIER-STRUCTURE', 'summary');
   }
 
   // 9. reworkHints
   if (expectedPassed === false) {
     if (!Array.isArray(o.reworkHints) || o.reworkHints.length === 0) {
-      reasons.push('passed=false 时 reworkHints 必须为非空数组');
+      pushViolation('passed=false 时 reworkHints 必须为非空数组', 'VERIFIER-STRUCTURE', 'reworkHints');
     } else {
       for (let i = 0; i < o.reworkHints.length; i++) {
         const h = o.reworkHints[i];
         if (typeof h !== 'string' || h.trim() === '') {
-          reasons.push(`reworkHints[${i + 1}] 必须为非空字符串`);
+          pushViolation(`reworkHints[${i + 1}] 必须为非空字符串`, 'VERIFIER-STRUCTURE', `reworkHints[${i + 1}]`);
         }
       }
     }
@@ -726,35 +922,49 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   if (o.ranking !== undefined) {
     const r = o.ranking as Record<string, unknown>;
     if (!r || typeof r !== 'object') {
-      reasons.push('ranking 必须为对象');
+      pushViolation('ranking 必须为对象', 'VERIFIER-STRUCTURE', 'ranking');
     } else {
       if (r.algorithm !== 'PPT') {
-        reasons.push(`ranking.algorithm 必须为 "PPT"，实际为 ${JSON.stringify(r.algorithm)}`);
+        pushViolation(
+          `ranking.algorithm 必须为 "PPT"，实际为 ${JSON.stringify(r.algorithm)}`,
+          'VERIFIER-SCHEMA',
+          'ranking.algorithm',
+        );
       }
       if (!isNumber(r.k) || !Number.isInteger(r.k) || r.k < MIN_RANKING_K || r.k > MAX_RANKING_K) {
-        reasons.push(`ranking.k 必须为整数且 ∈ [${MIN_RANKING_K}, ${MAX_RANKING_K}]，实际为 ${JSON.stringify(r.k)}`);
+        pushViolation(
+          `ranking.k 必须为整数且 ∈ [${MIN_RANKING_K}, ${MAX_RANKING_K}]，实际为 ${JSON.stringify(r.k)}`,
+          'VERIFIER-SCHEMA',
+          'ranking.k',
+        );
       }
       if (!isNumber(r.temperature) || r.temperature <= MIN_TEMPERATURE || r.temperature > MAX_TEMPERATURE) {
-        reasons.push(
+        pushViolation(
           `ranking.temperature 必须为正数且 ≤ ${MAX_TEMPERATURE}（过大 sigmoid 失去区分度），实际为 ${JSON.stringify(r.temperature)}`,
+          'VERIFIER-SCHEMA',
+          'ranking.temperature',
         );
       }
       if (!isNumber(r.rounds) || !Number.isInteger(r.rounds) || r.rounds < MIN_RANKING_ROUNDS) {
-        reasons.push(`ranking.rounds 必须为 ≥${MIN_RANKING_ROUNDS} 的整数，实际为 ${JSON.stringify(r.rounds)}`);
+        pushViolation(
+          `ranking.rounds 必须为 ≥${MIN_RANKING_ROUNDS} 的整数，实际为 ${JSON.stringify(r.rounds)}`,
+          'VERIFIER-SCHEMA',
+          'ranking.rounds',
+        );
       }
       if (!Array.isArray(r.ordered) || r.ordered.length < 2) {
-        reasons.push('ranking.ordered 必须为长度 ≥2 的字符串数组');
+        pushViolation('ranking.ordered 必须为长度 ≥2 的字符串数组', 'VERIFIER-STRUCTURE', 'ranking.ordered');
       } else {
         const ordered = r.ordered as unknown[];
         if (ordered.some((item) => typeof item !== 'string' || item.trim() === '')) {
-          reasons.push('ranking.ordered 的每项必须为非空字符串');
+          pushViolation('ranking.ordered 的每项必须为非空字符串', 'VERIFIER-STRUCTURE', 'ranking.ordered');
         }
         const unique = new Set(ordered.filter((item): item is string => typeof item === 'string'));
         if (unique.size !== ordered.length) {
-          reasons.push('ranking.ordered 不得包含重复候选项');
+          pushViolation('ranking.ordered 不得包含重复候选项', 'VERIFIER-STRUCTURE', 'ranking.ordered');
         }
         if (isNumber(r.k) && Number.isInteger(r.k) && r.k > ordered.length) {
-          reasons.push(`ranking.k ${r.k} 不得大于候选项数量 ${ordered.length}`);
+          pushViolation(`ranking.k ${r.k} 不得大于候选项数量 ${ordered.length}`, 'VERIFIER-SCHEMA', 'ranking.k');
         }
       }
     }
@@ -763,6 +973,7 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   return {
     passed: reasons.length === 0,
     reasons,
+    structuredViolations,
     reworkHints,
     compositeScore: isNumber(compositeScore) ? compositeScore : 0,
     expectedCompositeScore: expectedComposite,

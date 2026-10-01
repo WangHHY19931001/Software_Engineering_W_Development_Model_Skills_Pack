@@ -37,6 +37,8 @@
  * @module
  */
 
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 
 import { checkVerifierOutput, type VerifierOutputShape } from '../logic/verifier-logic.js';
@@ -78,6 +80,26 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   } catch (err) {
     if (err instanceof HandledCliError) return;
     throw err;
+  }
+
+  // ==================== verifiedArtifacts（批次3 任务8：被验 JSON 文件字节清单） ====================
+  // B2：对本次判定实际承重的输入（被验 VerifierOutput JSON 文件）登记 path/sha256/bytes，
+  // 消费前可复验同一字节。readJsonOrExit 成功即文件存在可读，此处防御性 catch——读不到不入表、
+  // 不冒充登记（照任务 5/6/7 addVerified 先例）。本 CLI 无 projectDir 参数，path 取 cwd 相对
+  // posix 形态（照任务 7 先例，跨平台稳定）。仅 --json 报告承载该键（恒在场）；
+  // 人类可读路径 printGateReport（VERIFIER_JSON）不动（偏差 4）。--s-output 仅做路径比较、
+  // 不读取内容，不登记。
+  const verifiedArtifacts: Array<{ path: string; sha256: string; bytes: number }> = [];
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs 由 <output.json> 参数 path.resolve 而来，仅只读
+    const buf = readFileSync(abs);
+    verifiedArtifacts.push({
+      path: path.relative(process.cwd(), abs).replace(/\\/g, '/'),
+      sha256: createHash('sha256').update(buf).digest('hex'),
+      bytes: buf.length,
+    });
+  } catch {
+    /* 读不到不入表 */
   }
 
   const result = checkVerifierOutput(parsed);
@@ -122,6 +144,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
         qualityLevel: result.qualityLevel,
         reasons: allReasons,
         violations: buildViolationDistribution(allReasons.length),
+        // 批次3 任务8 B2：被验 JSON 文件字节清单（键恒在场，可为空数组——照任务 5 sdmapViolations 先例）
+        verifiedArtifacts,
         durationMs: Date.now() - startTime,
       },
       exitCode,

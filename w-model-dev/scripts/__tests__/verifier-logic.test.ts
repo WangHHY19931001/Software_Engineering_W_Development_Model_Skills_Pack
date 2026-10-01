@@ -14,6 +14,9 @@
  * CLI 层用例（Persona Verifier CLI regressions / V 负样本）为进程内模式：
  * 经 helpers/cli-invoker.ts 调用导出的 main(argv)（runMain 的 VITEST 守卫阻止 import 自执行）；
  * 真实子进程保真由 cli-subprocess-smoke.test.ts 承载。
+ *
+ * 批次3 任务8：structuredViolations 双轨（rule/subject/fixHints，与 reasons 同源 1:1）+
+ * CLI --json verifiedArtifacts（被验 JSON 文件字节清单，键恒在场）。
  */
 
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -201,6 +204,33 @@ describe('Persona Verifier CLI regressions', () => {
     expect(result.stdout).toContain('Verifier 输出校验');
     expect(result.stdout).toContain('VERIFIER_JSON ');
     expect(result.stdout).toContain('"qualityLevel":"A"');
+  });
+
+  it('--json 报告恒带 verifiedArtifacts（被验 JSON 文件字节清单，sha256/bytes 可复验）', async () => {
+    const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier/persona-code-reviewer.json');
+    const result = await runVerifierCli(fixturePath);
+    const report = JSON.parse(result.stdout) as {
+      verifiedArtifacts?: Array<{ path: string; sha256: string; bytes: number }>;
+    };
+
+    expect(result.code).toBe(0);
+    expect(Array.isArray(report.verifiedArtifacts), 'verifiedArtifacts 键恒在场').toBe(true);
+    expect(report.verifiedArtifacts).toHaveLength(1);
+    const artifact = report.verifiedArtifacts![0]!;
+    expect(artifact.path).toContain('persona-code-reviewer.json');
+    expect(artifact.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(artifact.bytes).toBeGreaterThan(0);
+  });
+
+  it('--json 校验失败报告同样恒带 verifiedArtifacts（读不到不入表，读得到必登记）', async () => {
+    const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier/bad-variance-drift.json');
+    const result = await runVerifierCli(fixturePath);
+    const report = JSON.parse(result.stdout) as { verifiedArtifacts?: unknown[]; passed?: boolean };
+
+    expect(result.code).toBe(1);
+    expect(report.passed).toBe(false);
+    expect(Array.isArray(report.verifiedArtifacts)).toBe(true);
+    expect(report.verifiedArtifacts).toHaveLength(1);
   });
 
   it('缺失输入文件通过 --json 输出 ERROR_JSON 并退出 2', async () => {
@@ -711,5 +741,124 @@ describe('R18 端到端接线（checkVerifierOutput.reasons 消费，非仅 help
     const result = checkVerifierOutput(output);
     expect(result.reasons.some((r) => r.includes('R18'))).toBe(false);
     expect(result.passed).toBe(true);
+  });
+});
+
+describe('批次3 双轨：structuredViolations（rule/subject/fixHints）', () => {
+  // 照「R18 端到端接线」用例构造形态（varianceOf + 逐维度子标准）：completeness 的 rawScores
+  // 分布可注入——正常离散（SPREAD）为零违规合法产物；超阈值分布恰命中单条 VERIFIER-VARIANCE。
+  const varianceOf = (n: number[]): number => {
+    const m = n.reduce((a, b) => a + b, 0) / n.length;
+    return n.reduce((a, b) => a + (b - m) ** 2, 0) / n.length;
+  };
+  const SPREAD = [0.88, 0.9, 0.92];
+  const evidenceOf = (name: string): string => `requirements.md:§3.2=REQ-001 ${name} 具体引用`;
+  const makeOutput = (completenessRaw: number[]) => ({
+    schemaVersion: '1.0',
+    meta: {
+      targetKind: 'requirement',
+      target: 'REQ-001',
+      reviewedAt: '2026-07-31T00:00:00Z',
+      agent: 'test-agent',
+      scoringMethod: 'logits',
+      repeatTimes: 3,
+      varianceThreshold: 0.1,
+    },
+    subCriteria: (
+      [
+        ['completeness', 0.3, completenessRaw],
+        ['clarity', 0.25, SPREAD],
+        ['consistency', 0.2, SPREAD],
+        ['testability', 0.15, SPREAD],
+        ['traceability', 0.1, SPREAD],
+      ] as const
+    ).map(([name, weight, raw]) => ({
+      name,
+      weight,
+      score: 0.9,
+      rawScores: [...raw],
+      // variance 字段与重算方差一致：隔离「超阈值」单因子，不触发谎报方差（防漂移规则 5）
+      variance: varianceOf([...raw]),
+      evidence: evidenceOf(name),
+    })),
+    compositeScore: 0.9,
+    qualityLevel: 'A',
+    passed: true,
+    summary: '本次评审覆盖五个子标准，全部达标，结论为 A 级可放行，无阻断性返工提示，评审方法为 logits 连续评分。',
+    reworkHints: [],
+  });
+  // 负样本：completeness 重算方差 0.1473… > 阈值 0.1 → 恰命中「variance 超阈值」单条 VERIFIER-VARIANCE
+  const makeBadVarianceOutput = () => makeOutput([0.03, 0.5, 0.97]);
+
+  it('批次3 双轨：verifier 违规带 rule/subject/fixHints', () => {
+    const r = checkVerifierOutput(makeBadVarianceOutput());
+    const v = r.structuredViolations?.find((s) => s.rule === 'VERIFIER-VARIANCE');
+    expect(v?.subject).toContain('subCriteria');
+    // 简报原式 `v?.fixHints!.length` 与仓内 lint（no-non-null-asserted-optional-chain）冲突，
+    // 断言语义等价改写：v 缺失或 fixHints 空均失败
+    expect(v?.fixHints?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it('双轨同源：structuredViolations 与 reasons 一一对应，message=reasons 原文逐字保留（既有消费者兼容）', () => {
+    const r = checkVerifierOutput(makeBadVarianceOutput());
+    expect(r.passed).toBe(false);
+    expect(r.reasons.length).toBeGreaterThan(0);
+    expect(r.structuredViolations, '每条 reason 恰派生一条结构化违规（恒成对）').toHaveLength(r.reasons.length);
+    for (const s of r.structuredViolations ?? []) {
+      expect(r.reasons, `message 须为 reasons 原文：${s.message}`).toContain(s.message);
+      expect(s.classification, '分类恒 semantic').toBe('semantic');
+    }
+  });
+
+  it('VERIFIER-VARIANCE：subject=字段路径 subCriteria[N].variance、fixHints=常量表原文', () => {
+    const r = checkVerifierOutput(makeBadVarianceOutput());
+    const v = (r.structuredViolations ?? []).find((s) => s.rule === 'VERIFIER-VARIANCE');
+    expect(v, 'VERIFIER-VARIANCE 结构化违规应在场').toBeDefined();
+    expect(v?.subject).toBe('subCriteria[1].variance');
+    expect(v?.fixHints).toEqual(['方差超阈值属不可重复评审：换 Persona/新上下文重评']);
+  });
+
+  it('schema 前置拦截路径：全部 rule=VERIFIER-SCHEMA，subject 提取字段路径（根级 → schema）', () => {
+    const r = checkVerifierOutput({
+      schemaVersion: '1.0',
+      meta: {
+        targetKind: 'requirement',
+        target: 'REQ-001',
+        reviewedAt: 'not-a-date',
+        agent: 'test-agent',
+        scoringMethod: 'logits',
+        repeatTimes: 3,
+        varianceThreshold: 0.1,
+      },
+    });
+    expect(r.passed).toBe(false);
+    expect(r.reasons.length).toBeGreaterThan(0);
+    expect(r.structuredViolations, 'schema 路径双轨同源（1:1）').toHaveLength(r.reasons.length);
+    for (const s of r.structuredViolations ?? []) {
+      expect(s.rule).toBe('VERIFIER-SCHEMA');
+    }
+    const subjects = (r.structuredViolations ?? []).map((s) => s.subject);
+    expect(subjects, '根级 required（缺 subCriteria 等）→ schema').toContain('schema');
+    expect(subjects, '嵌套路径 format:date-time → 点号字段路径').toContain('meta.reviewedAt');
+  });
+
+  it('R12 缺具体引用 → rule=VERIFIER-EVIDENCE、subject=subCriteria[N].evidence、fixHints=常量表原文', () => {
+    const output = makeOutput(SPREAD) as Record<string, unknown>;
+    const subCriteria = output.subCriteria as Array<Record<string, unknown>>;
+    subCriteria[4]!['evidence'] = '整体结论良好且风险可控'; // 无文件路径/行号/章节/ID → R12 命中
+    const r = checkVerifierOutput(output);
+    const ev = r.structuredViolations?.find((s) => s.rule === 'VERIFIER-EVIDENCE');
+    expect(ev?.subject).toBe('subCriteria[5].evidence');
+    expect(ev?.classification).toBe('semantic');
+    expect(ev?.fixHints).toEqual(['evidence 补 <路径>:<定位>=<值> 形态；禁裸声明']);
+    expect(r.reasons).toContain(ev?.message);
+  });
+
+  it('合规 VerifierOutput：structuredViolations 恒在场且为空数组（与 reasons 同源零违规）', () => {
+    const r = checkVerifierOutput(makeOutput(SPREAD));
+    expect(r.passed).toBe(true);
+    expect(r.reasons).toEqual([]);
+    expect(Array.isArray(r.structuredViolations)).toBe(true);
+    expect(r.structuredViolations).toEqual([]);
   });
 });
