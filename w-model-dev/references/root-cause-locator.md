@@ -249,7 +249,7 @@
 4. **fixRecommendation 合并**：按根因收敛度排序；消费一致性门禁差异时按 classification 排序（semantic/topology 优先于 evidence-only）
 5. **upstreamDefect 仲裁**：任一 persona 标记则 R-lead 须复核
 6. **reality-check 硬约束**：规范 persona 为 `testing-reality-checker`，其 confidence < 0.5 → 最终 `passed=false`；为兼容已有合法归档，`reality-checker` 仅在 canonical 缺失时作 legacy fallback。若两者同时出现，canonical 优先且同 artifact 不重复计数；跨 artifact 或异常重复/冲突由 R10 fail-closed。
-7. **structured 诊断消费（批次 3）**：R 引用门禁 `structuredViolations[].subject`（符号级定位）锚定根因位置，不解析自由文本 message；数据流为 G 产出 `structuredViolations.fixHints` → R 转写为 reworkHints（按 classification 排序，semantic/topology 优先于 evidence-only，见上条 4）→ S-fix 按条定向修复（≤3 条祈使句）。**现状边界（42.7.0 终审勘误）**：经 `--json` 机器可读暴露 structuredViolations 的当前仅 `check-artifact-gate`（经 `sdmapViolations` 键）；design-contract / code-tla / verifier 三热点的 structuredViolations 透传已登记后续批次（总纲 §5.1），R 在该三热点暂以 reasons/message 为消费面。
+7. **structured 诊断消费（批次 3）**：R 引用门禁 `structuredViolations[].subject`（符号级定位）锚定根因位置，不解析自由文本 message；数据流为 G 产出 `structuredViolations.fixHints` → R 转写为 reworkHints（按 classification 排序，semantic/topology 优先于 evidence-only，见上条 4）→ S-fix 按条定向修复（≤3 条祈使句）。**现状边界（42.7.0 终审勘误）**：经 `--json` 机器可读暴露 structuredViolations 的当前仅 `check-artifact-gate`（经 `sdmapViolations` 键）；design-contract / code-tla / verifier 三热点的 structuredViolations 透传已登记后续批次（总纲 §5.1），R 在该三热点暂以 reasons/message 为消费面。（本转写消费发生在普通 V/G 失败链的 R 环节，V/G 不通过后的完整返工循环各环不缺省，循环口径见 AGENTS.md「R 报告须 V 复审 + G 门禁」节。）
 
 R10 维护契约：
 <r10-contract id="canonical-name" relation='{"canonicalPersona":"testing-reality-checker"}'>canonical persona is testing-reality-checker</r10-contract>
