@@ -105,27 +105,28 @@ R 签名插入在 V/G 失败之后、S-fix 之前；S-fix 须包含 R 报告作�
 
 > 注意：签名链 schema 的 `targetKind` 与 run-log schema 的同名 `targetKind`（requirement/design/code/test 等词表）是**不同 schema 中的不同词表**，重叠值仅 `rootcause` 且语义一致。`targetKind` 不参与 sigHash 计算（见 §1）。
 
-## 4. G 角色校验职责（R1-R10）
+## 4. G 角色校验职责（R1-R11）
 
 G 角色在跑门禁脚本前，**先调用 `check-signature-chain.ts` 校验签名链完整性 + 产出来源正确性**：
 
-| 规则 | 校验内容                                                                           | 失败后果                             |
-| ---- | ---------------------------------------------------------------------------------- | ------------------------------------ |
-| R1   | 当前阶段所有强制角色签名齐全                                                       | 门禁失败（exitCode=1），标注缺失角色 |
-| R2   | 签名链连续（prevSigHash 匹配）+ 跨阶段连续链语义                                   | 门禁失败，标注断裂点                 |
-| R3   | 时间戳单调递增                                                                     | 门禁失败，标注时序异常               |
-| R4   | 签名角色与阶段角色清单匹配                                                         | 门禁失败，标注越权角色               |
-| R5   | O checkpoint 签名 signer 为用户 ID                                                 | 门禁失败，标注代签（O4 命中）        |
-| R6   | sigHash 重算一致（防篡改）                                                         | 门禁失败，标注篡改签名               |
-| R7   | 各角色 sourceSigIds 均存在于签名链中（--phase=N 模式来源并集 = 本阶段 ∪ 上一阶段） | 门禁失败，标注悬空来源               |
-| R8   | 各角色 sourceArtifacts 路径存在于磁盘                                              | 门禁失败，标注缺失产物               |
-| R9   | 各角色来源符合"强制来源/禁止来源"矩阵                                              | 门禁失败，标注越权消费               |
-| R10  | O checkpoint 的 sourceArtifacts 含 G gate 产物 + 用户确认记录                      | 门禁失败，标注绕过门禁               |
+| 规则 | 校验内容                                                                                                 | 失败后果                             |
+| ---- | -------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| R1   | 当前阶段所有强制角色签名齐全                                                                             | 门禁失败（exitCode=1），标注缺失角色 |
+| R2   | 签名链连续（prevSigHash 匹配）+ 跨阶段连续链语义                                                         | 门禁失败，标注断裂点                 |
+| R3   | 时间戳单调递增                                                                                           | 门禁失败，标注时序异常               |
+| R4   | 签名角色与阶段角色清单匹配                                                                               | 门禁失败，标注越权角色               |
+| R5   | O checkpoint 签名 signer 为用户 ID                                                                       | 门禁失败，标注代签（O4 命中）        |
+| R6   | sigHash 重算一致（防篡改；按条目 `sigHashAlgo` 分流重算，见 §6.2）                                       | 门禁失败，标注篡改签名               |
+| R7   | 各角色 sourceSigIds 均存在于签名链中（--phase=N 模式来源并集 = 本阶段 ∪ 上一阶段）                       | 门禁失败，标注悬空来源               |
+| R8   | 各角色 sourceArtifacts 路径存在于磁盘                                                                    | 门禁失败，标注缺失产物               |
+| R9   | 各角色来源符合"强制来源/禁止来源"矩阵                                                                    | 门禁失败，标注越权消费               |
+| R10  | O checkpoint 的 sourceArtifacts 含 G gate 产物 + 用户确认记录                                            | 门禁失败，标注绕过门禁               |
+| R11  | v2 条目（`sigHashAlgo='v2'`）的 sourceArtifacts[].sha256 必填且匹配 64-hex（v1 条目不触发，语义见 §6.2） | 门禁失败，标注缺失/非法来源 sha256   |
 
 **校验时机**：
 
-- G 跑每个 gate 脚本前：`check-signature-chain.ts --phase=N --stage=pre-gate`（R1-R10 全通过）
-- O 在 checkpoint 前：`check-signature-chain.ts --phase=N --stage=pre-checkpoint`（R1-R10 + R5 用户确认）
+- G 跑每个 gate 脚本前：`check-signature-chain.ts --phase=N --stage=pre-gate`（R1-R11 全通过）
+- O 在 checkpoint 前：`check-signature-chain.ts --phase=N --stage=pre-checkpoint`（R1-R11 + R5 用户确认）
 - 归档时：`check-signature-chain.ts --phase=all --stage=archive`（全阶段链完整性 + 来源正确性）
 
 ## 5. 跨阶段消费者校验
@@ -169,9 +170,19 @@ R6 校验规则：对每条签名记录，用上述公式重算 sigHash，与记
 - 仅在 CLI 注入签名链条目时校验。阶段 1 早期签名链文件可能尚不存在，此时**跳过**而非报错（规格 §5：不得误红）。
 - 锚点格式非法时跳过 R15e（path 部分不可信，避免二次噪声违规）。
 
+### 6.2 v2 签名与 sha256 抄录（批次 3）
+
+签名链条目可选 `sigHashAlgo`（枚举 `v1` | `v2`，**缺省即 `v1`**）声明其 sigHash 公式版本（SSoT §7.9）：
+
+- **v2 公式**：与 v1 的差别仅在槽位 6——`artifacts` 清单换为 `artifactsV2 = JSON.stringify({ artifacts, sourceArtifacts })`，即 artifacts 与 sourceArtifacts 两清单整体（含每条 `sha256`）纳入内容哈希；其余槽位不变。
+- **R11（仅 v2 条目适用）**：`inputProvenance.sourceArtifacts[]` 每条 `sha256` 必填且匹配 `^[a-fA-F0-9]{64}$`，缺失或非法即违规（`R11: <sigId> v2 条目来源 sha256 缺失或非法`）；v1 条目（含缺省）不触发 R11。
+- **R6 按条目分流重算**：`sigHashAlgo==='v2'` 走 v2 公式，缺省/`v1` 走 v1 公式（权威实现：`signature-chain-logic.ts` `computeSigHashFor`）；v1 路径逐字节不变，既有链零破坏。
+
+**sha256 抄录约定**：v2 条目签名时，`sourceArtifacts[].sha256` 须从上游 GATE_JSON 的 `verifiedArtifacts`（本次门禁判定承重输入文件字节清单 `Array<{path, sha256, bytes}>`，四热点门禁 `--json` 恒存在、空数组允许）按 path 对应抄录——保证「签名声明的字节 = 上游门禁实际校验的字节」；无上游清单（`verifiedArtifacts` 为空或缺该 path）的来源按磁盘现算。抄录后的 sha256 随 v2 公式进入内容哈希：事后篡改该字段而不改 `sigHash`，会被 R6 重算抓获（篡改声明的其他字段同理）。知情边界：「声明 vs 真实字节」的自动核查需 gate-log 索引基建，v2 本批只绑定声明不可抵赖（D6 已裁定接受）。
+
 ## 7. 与反模式 #32 的对应关系
 
-反模式 #32（签名链断裂）检测信号：`check-signature-chain.ts` R1-R10 任一失败。详见 [`hard-constraints.md`](./hard-constraints.md) #32。
+反模式 #32（签名链断裂）检测信号：`check-signature-chain.ts` R1-R11 任一失败。详见 [`hard-constraints.md`](./hard-constraints.md) #32。
 
 ## 8. 与归档完整性清单的协同
 

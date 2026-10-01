@@ -4,7 +4,7 @@
  *
  * 对应 SSoT §7.9 SignatureChainEntry schema + §10.11 签名链门禁。
  * 供 G 子代理跑每个 gate 脚本前 + O 子代理 checkpoint 前 + 归档时调用，
- * 校验 signature-chain.jsonl 的：R1-R10 + 跨阶段消费者校验。
+ * 校验 signature-chain.jsonl 的：R1-R11 + 跨阶段消费者校验。
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl> [--phase=N] [--stage=pre-gate|pre-checkpoint|archive]
@@ -195,7 +195,7 @@ async function main(): Promise<void> {
     const passedText =
       skipped.length > 0
         ? `签名链符合规范：已执行规则全通过（未执行：${skipped.join(', ')}——缺对应输入，不计入通过）`
-        : '签名链符合规范：R1-R10 全通过';
+        : '签名链符合规范：R1-R11 全通过';
     console.log(`${passedText}${stage === 'archive' ? ' + 跨阶段消费者校验通过' : ''}。`);
     console.log(`通过规则：${result.rulesPassed.join(', ')}`);
   } else {

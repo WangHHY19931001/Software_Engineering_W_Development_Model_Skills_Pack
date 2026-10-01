@@ -219,6 +219,8 @@ npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts "<rootcause-report.jso
 
 R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence >= 0.5`；已有合法归档中的 `reality-checker` 仅在 canonical 缺失时作 legacy fallback。canonical 与 legacy 同时出现时，canonical 优先；若两者指向同一 artifact，不重复计算 persona 语义；跨 artifact 或异常重复/冲突 fail-closed。该命令保持 `0=通过 / 1=校验失败 / 2=输入错误` 及既有 `ROOTCAUSE_JSON` / `ERROR_JSON` 输出合同。只有 G 返回 exit 0，且 R 报告已由 V 复审通过，才允许分派 S-fix；run-log 的中间态 exit 1 不得伪造为通过。
 
+**R4 scope 强制（批次 3）**：`fixRecommendation` 每条必带合规 `scope`——`{allowed, forbidden}` 双数组必填、至少一侧非空、每项非空字符串（trim 后判定，不做 glob 语法深验）；缺失、空双数组或非字符串项即 R4 违规，消息形态 `R4: fixRecommendation[N] 缺合规 scope（{allowed,forbidden} 双数组必填，至少一侧非空，项为非空字符串）`。V scoped re-review 对照消费：fix diff 触碰 `scope.forbidden` 或超出 `scope.allowed` → 该 finding NOT ADDRESSED / 上报 CHECKPOINT（scope 撰写指引见 [root-cause-locator.md](root-cause-locator.md) §3 第 6 条；权威定义见 SSoT §10.9 R4 行）。
+
 <r10-contract id="canonical-name" relation='{"canonicalPersona":"testing-reality-checker"}'>canonical persona is testing-reality-checker</r10-contract>
 <r10-contract id="threshold" relation='{"canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5}'>testing-reality-checker confidence >= 0.5</r10-contract>
 <r10-contract id="legacy-fallback" relation='{"legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"}'>legacy reality-checker is fallback only when canonical is absent</r10-contract>
@@ -226,6 +228,10 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 <r10-contract id="cross-artifact-conflict" relation='{"artifactRelation":"different","conflict":"fail-closed"}'>different artifact conflict is fail-closed</r10-contract>
 <r10-contract id="canonical-duplicate" relation='{"persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>canonical > 1 duplicate is fail-closed</r10-contract>
 <r10-contract id="legacy-duplicate" relation='{"persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>legacy > 1 duplicate is fail-closed</r10-contract>
+
+## 状态机一致性 `--json` `differences` 键（check-state-machine-consistency，批次 3 任务 9）
+
+`check-state-machine-consistency.ts` 的 `--json` 单行 JSON 恒含 `differences` 键（`result.differences ?? []`，位于 `violations` 之后、`durationMs` 之前）：设计↔代码状态机对账差异清单（kind=state/transition × direction × subject），每项附 `classification`（恒为 `topology`，权威类型 `Extract<ChangeClassification, 'topology'>`），供 R 根因定位与 reworkHints 按 classification 排序统一消费（R 消费走 `--json`；人类可读报告 printGateReport 不输出该键）。退出码合同不变：0=一致 / 1=不一致 / 2=输入错误。
 
 ## `/wm status`
 
