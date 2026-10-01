@@ -23,6 +23,7 @@
 - [ ] 无占位词：TBD/TODO/undefined/待补建/待定 不在正式交付中
 - [ ] 图谱校验通过：`check-requirement-graph.ts --phase=2` 退出码 0
 - [ ] BDD/TLA+ 项目门通过：`check-bdd-model.ts --phase=2 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json` + `check-tla-model.ts` 退出码 0
+- [ ] 设计期迷雾清空：迷雾登记册每项有终结处置结果（或标注「本阶段无未终结迷雾项」）；check-design-fog.ts --phase=2 退出码 0
 - [ ] 记录与审计：变更在文末变更记录留痕
 
 > DoD 门禁：`check-artifact-gate.ts --phase=2` 校验本文件 `- [ ]` 项 ≥ 8 条（批 3 实现）。
