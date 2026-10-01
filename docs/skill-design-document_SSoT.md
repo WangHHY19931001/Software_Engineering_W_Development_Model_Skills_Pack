@@ -1055,7 +1055,7 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 要点：
 
 - **节点类型**（每阶段一种，设计文档 §2.1）：阶段 1 `REQ` / 阶段 2 `SD` / 阶段 3 `INTF` / 阶段 4 `DD`；另含边界节点 `EXT-IN`（合法外部信息源，DFD terminator）/ `EXT-OUT`（合法外部信息汇），二者豁免黑洞/奇迹判定且不参与 `parent` 单根树。节点 schema 统一含 `id` / `type` / `phase` / `sourcePath` / `summary` 等字段（设计文档 §2.2）。
-- **可选字段 evidenceAnchor**：节点结论的前提事实锚点（产出期声明，A 子代理 ingestion 时写、S 规格 §4.2 只读同步、G 门禁 R15 格式校验）；未声明不阻断（向后兼容）。
+- **evidenceAnchor（必填）**：节点结论的前提事实锚点（产出期声明，A 子代理 ingestion 时写、S 规格 §4.2 只读同步、G 门禁 R15 格式校验）；graph.schema.json 已列为 required——历史「可选、未声明不阻断」口径已被升级取代（批量迁移是升级动作，不是可选清理，见本文『批量迁移』同族口径）。
 - **REQ level 自适应层级深度**：每个 REQ 节点须标注 level（正整数，从 1 开始单调递增，无上限）
   - 最小层级深度 = 2（domain → acceptance，适用极小项目）
   - 推荐层级深度 = 4（domain → module → feature → acceptance）
@@ -1492,6 +1492,7 @@ DoD 与工件质量门的关系：
 >
 > 实现位置：[`w-model-dev/scripts/cli/check-requirement-graph.ts`](../w-model-dev/scripts/cli/check-requirement-graph.ts)（CLI）+ [`w-model-dev/scripts/logic/graph-logic.ts`](../w-model-dev/scripts/logic/graph-logic.ts)（校验纯逻辑，单点事实源）。
 > 触发方：G 子代理在每轮 A-cross/A-evolve 产出 `consolidated.json` 后跑（编排者不跑，反模式 #10）。
+> 图内无可选语义（批次 2 A4，方案 A）：节点/边只承载本次交付承诺的运行时事实；可选能力不建图节点/边，登记于设计文档迷雾登记册/非目标——权威节见 §10M。
 
 **CLI 接口**：
 
