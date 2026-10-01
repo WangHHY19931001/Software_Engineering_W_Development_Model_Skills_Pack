@@ -115,6 +115,7 @@ import {
 import { checkCodingPlan } from '../logic/coding-plan-logic.js';
 import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
+import { runSync } from '../lib/run-sync.js';
 
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
 // 预算疑似重复归账样本（N-6/G3-7/G3-15）：复用 check-budget.ts 导出的分组计数函数，
@@ -4749,6 +4750,106 @@ async function runCoverageScopeCases(samplesDir: string): Promise<CaseResult[]> 
   return results;
 }
 
+// -------------------- DesignFog（设计期迷雾登记册：spawn check-design-fog CLI 子进程，断言 exit code + FOG_JSON violations 规则集） --------------------
+
+interface DesignFogCase {
+  /** 样本文件名（相对 samples/design-fog/） */
+  file: string;
+  /** 透传给 check-design-fog 的 --phase（2|3|4） */
+  phase: number;
+  /** 期望校验是否通过（exit code 0/1 随之断言） */
+  expectedPassed: boolean;
+  /** 期望 FOG_JSON violations 规则集（通过态缺省不校验且实际须为空） */
+  expectedRulesFailed?: string[];
+  /** 用例说明 */
+  description: string;
+}
+
+const DESIGN_FOG_CASES: DesignFogCase[] = [
+  { file: 'valid-all-terminal.md', phase: 2, expectedPassed: true, description: '全终结迷雾册：exit 0' },
+  { file: 'valid-no-fog-marker.md', phase: 2, expectedPassed: true, description: '合法无雾标记：exit 0' },
+  {
+    file: 'bad-unresolved-fog.md',
+    phase: 2,
+    expectedPassed: false,
+    expectedRulesFailed: ['R4'],
+    description: '未终结迷雾项（空/待定）：R4',
+  },
+  {
+    file: 'bad-missing-section.md',
+    phase: 2,
+    expectedPassed: false,
+    expectedRulesFailed: ['R1'],
+    description: '缺迷雾登记册节：R1 fail-closed',
+  },
+  {
+    file: 'bad-marker-conflict.md',
+    phase: 2,
+    expectedPassed: false,
+    expectedRulesFailed: ['R5'],
+    description: '标记与数据行并存：R5',
+  },
+];
+
+async function runDesignFogCases(samplesDir: string): Promise<CaseResult[]> {
+  // CLI 路径与 tsx runtime 入口均在本目录受控解析（self-test 自身即经 tsx 运行，node_modules 恒在）
+  const tsxCli = createRequire(import.meta.url).resolve('tsx/cli');
+  const designFogCli = path.join(path.dirname(fileURLToPath(import.meta.url)), 'check-design-fog.ts');
+  const results: CaseResult[] = [];
+  for (const c of DESIGN_FOG_CASES) {
+    const abs = path.join(samplesDir, 'design-fog', c.file);
+    const r = runSync(process.execPath, [tsxCli, designFogCli, `--doc=${abs}`, `--phase=${c.phase}`], {
+      // tsx 冷启动在满载下可超 runSync 缺省 15s（与 design-fog-cli.test.ts / check-coverage-scope.test.ts 同理由取 60s）
+      timeout: 60_000,
+    });
+    const expectedExit = c.expectedPassed ? 0 : 1;
+    const jsonLine = (r.stdout ?? '').split(/\r?\n/).find((l) => l.startsWith('FOG_JSON '));
+
+    const details: string[] = [];
+    if ((r.status ?? -1) !== expectedExit) {
+      details.push(
+        `  - 期望 exit code=${expectedExit}，实际 ${r.status ?? -1}（stderr=${(r.stderr ?? '').trim().slice(0, 200)}）`,
+      );
+    }
+    if (jsonLine === undefined) {
+      details.push('  - stdout 未含 FOG_JSON 行');
+    } else {
+      let fog: { passed?: unknown; violations?: unknown } | null = null;
+      try {
+        fog = parseJsonSafe(jsonLine.slice('FOG_JSON '.length));
+      } catch {
+        details.push(`  - FOG_JSON 行不可解析：${jsonLine.slice(0, 200)}`);
+      }
+      if (fog !== null) {
+        if (fog.passed !== c.expectedPassed) {
+          details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${JSON.stringify(fog.passed)}`);
+        }
+        const rules = Array.isArray(fog.violations)
+          ? (fog.violations as Array<{ rule?: unknown }>).map((v) => String(v?.rule ?? '')).sort()
+          : [];
+        if (c.expectedRulesFailed !== undefined) {
+          const expected = [...c.expectedRulesFailed].sort();
+          if (rules.join(',') !== expected.join(',')) {
+            details.push(
+              `  - 期望 violations 规则集=${JSON.stringify(expected)}，实际 ${JSON.stringify(rules)}（${jsonLine.slice(0, 240)}）`,
+            );
+          }
+        } else if (rules.length > 0) {
+          details.push(`  - 期望无违规，实际 violations 规则集=${JSON.stringify(rules)}`);
+        }
+      }
+    }
+
+    results.push({
+      name: `design-fog/${c.file}`,
+      passed: details.length === 0,
+      description: c.description,
+      details: details.length > 0 ? details : undefined,
+    });
+  }
+  return results;
+}
+
 async function runExemptionCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of EXEMPTION_CASES) {
@@ -5372,6 +5473,7 @@ async function main(): Promise<void> {
   console.log(`BDD 用例       : ${BDD_CASES.length}`);
   console.log(`Coverage 用例  : ${COVERAGE_CASES.length}`);
   console.log(`CoverageScope 用例 : ${COVERAGE_SCOPE_CASES.length}`);
+  console.log(`DesignFog 用例 : ${DESIGN_FOG_CASES.length}`);
   console.log(`Exemption 用例 : ${EXEMPTION_CASES.length}`);
   console.log(`SignatureChain 用例 : ${SIGNATURE_CHAIN_CASES.length}`);
   console.log(`ArchiveIntegrity 用例: ${ARCHIVE_INTEGRITY_CASES.length}`);
@@ -5429,6 +5531,7 @@ async function main(): Promise<void> {
     codeHealthPhase1StaticResults,
     codeHealthPhase1GuardResults,
     codeHealthPhase1DynamicResults,
+    designFogResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -5471,6 +5574,7 @@ async function main(): Promise<void> {
     runCodeHealthPhase1StaticCases(samplesDir),
     runCodeHealthPhase1GuardCases(samplesDir),
     runCodeHealthPhase1DynamicCases(samplesDir),
+    runDesignFogCases(samplesDir),
   ]);
   const runLogAppendResults = runRunLogAppendCases();
   const codeHealthResults = await runCodeHealthCases(samplesDir);
@@ -5522,6 +5626,7 @@ async function main(): Promise<void> {
     ...codeHealthPhase1StaticResults,
     ...codeHealthPhase1GuardResults,
     ...codeHealthPhase1DynamicResults,
+    ...designFogResults,
     ...codeHealthApplyResults,
     ...codeHealthGapResults,
     ...codeHealthTestResults,

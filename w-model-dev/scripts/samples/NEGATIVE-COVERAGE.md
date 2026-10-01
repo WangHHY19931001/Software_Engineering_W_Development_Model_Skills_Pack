@@ -1,7 +1,7 @@
 # 负向覆盖登记册（Negative Coverage Register）
 
 > 本表由 `check-samples-coverage.ts` 的第 4 / 5 条规则强制：`w-model-dev/scripts/cli/*.ts` 减去
-> `self-test.ts` 的**每一个 exit-2 门禁**都必须登记一条**会失败的**负向案例。全表 46 行，每门禁恰一行。
+> `self-test.ts` 的**每一个 exit-2 门禁**都必须登记一条**会失败的**负向案例。全表 47 行，每门禁恰一行。
 >
 > - **第 4 条（登记完整性）**：未登记 → `negative-coverage-missing`（exit 1）。
 > - **第 5 条（严格 + 真实探针）**：四列形态 `| 门禁 | fixture | 机制 | 所防回归 |`。
@@ -36,11 +36,11 @@
 >     半成品」（共享根只能做弱归因）；探针数量以 `lib/exit2-probe-registry.ts` 注册表为准，墙钟随机器与
 >     并发度变化（串行 → 有界并发显著缩短，均不写死数字），断言一字未减。tsx 不可用等探针不可用情形按
 >     失败处理，不静默跳过（→ `negative-coverage-probe-failed`）。
-> - 口径与中心探针一致（46 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
+> - 口径与中心探针一致（47 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
 >   `metrics-report.ts` 使用特殊探针参数，但仍计入集合）。
 > - **所防回归**：若该负向案例被删掉 / 放宽，会漏掉的那一个具体回归；禁止「防止出错」这类空话。
 
-## 一、`fixture` 机制（28 行）
+## 一、`fixture` 机制（29 行）
 
 | 门禁脚本                          | fixture                                                   | 机制    | 所防回归（一句话）                                                                                                                                                               |
 | --------------------------------- | --------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -72,6 +72,7 @@
 | code-health-duplicates            | `samples/code-health/phase4/bad-test-only.json`           | fixture | 放宽 abstraction guard 将漏掉 test-only 调用点被当作可抽象权威而错误授权合并                                                                                                     |
 | code-health-phase1                | `samples/code-health/phase1/static/blocked.json`          | fixture | 放宽只读发现将漏掉源文件不可读时产出 dead 结论（把「未知」误判为「可删」）                                                                                                       |
 | check-tla-bdd-sync                | `samples/tla-bdd-sync/bad-transition-mismatch.json`       | fixture | 去掉转移等价断言后 TLA+ 转移在 BDD 中缺对应 When 步骤仍判等价                                                                                                                    |
+| check-design-fog                  | `samples/design-fog/bad-unresolved-fog.md`                | fixture | 放宽 R4 终结性（处置结果空/待定放行）将让未毕业迷雾项静默通过阶段门，迷雾逃逸设计义务且绕过三选一毕业处置                                                                        |
 
 ## 二、`invocation` / `mutated-copy` 机制（18 行）
 
