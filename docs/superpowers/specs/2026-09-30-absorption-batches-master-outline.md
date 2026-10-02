@@ -70,7 +70,7 @@
 | 批次 | 规格 | 实现计划 | 状态 |
 |---|---|---|---|
 | 1 | 2026-09-30-design-code-consistency-anchors-design.md（commit 31730600） | 2026-09-30-design-code-consistency-anchors.md（fa05d196） | **已实现并合入 main**（16 提交 fa05d196..d0a180a9；合并提交 6a2029df；合并结果全量测试 1900/1900；版本 42.6.0） |
-| 2 | 2026-10-02-design-phase-fog-and-optional-capability-design.md（commit dea72625） | 2026-10-02-design-phase-fog.md | **实现中**（D1-D5 已裁定：A4 方案 A / A3 文档+脚本 / 三选一+回退 / 复用四字段） |
+| 2 | 2026-10-02-design-phase-fog-and-optional-capability-design.md（commit dea72625） | 2026-10-02-design-phase-fog.md | **已实现**（11 提交 cf127687..f7d61139 + 终审修复；prepush 19/19 全绿 1595s；版本 42.8.0；D1-D5 已裁定：A4 方案 A / A3 文档+脚本 / 三选一+回退 / 复用四字段），待合并 |
 | 3 | 2026-10-01-gate-engineering-design.md（commit 00778532） | 2026-10-01-gate-engineering.md（ef59d54a） | **已实现并合入 main**（13 提交 6a2029df..73cab34d；合并提交 9b2a2125；合并结果全量测试 1942/1942；版本 42.7.0） |
 | 4 | — | — | 未立项 |
 | 5 | — | — | 未立项（条件见 §3） |

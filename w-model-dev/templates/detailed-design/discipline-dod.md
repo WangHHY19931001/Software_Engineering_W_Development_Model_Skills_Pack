@@ -19,7 +19,7 @@
 - [ ] 结构性校验：§1/§2/§4/§5/§6/§7 引用块指向文件存在、类图/ER 图 mermaid 块配平、追踪矩阵字段一致
 - [ ] 证据充分：方法定义含前置/后置/异常、表结构含字段/索引/关系、验收判据可量化
 - [ ] 无越界：不回溯重定义接口契约（FM-DD-06 闭合）
-- [ ] 无占位词：TBD/TODO/undefined/待补建/待定 不在正式交付中
+- [ ] 无占位词：TBD/TODO/undefined/待补建/待定 不在正式交付中（非目标显式标注与迷雾登记册节除外）
 - [ ] 图谱校验通过：`check-requirement-graph.ts --phase=4` 退出码 0
 - [ ] BDD/TLA+ 项目门通过：`check-bdd-model.ts --phase=4 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json` + `check-tla-model.ts` 退出码 0
 - [ ] 设计期迷雾清空：迷雾登记册每项有终结处置结果（或标注「本阶段无未终结迷雾项」）；check-design-fog.ts --phase=4 退出码 0

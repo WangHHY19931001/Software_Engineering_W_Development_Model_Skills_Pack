@@ -13,8 +13,8 @@
 
 ### 设计期迷雾登记册（A3：checkDesignFog R1-R6 + check-design-fog CLI + 三模板/三阶段机制）
 
-- **文档机制**：阶段 2-4 设计主模板（system-design / interface-design / detailed-design）新增「迷雾登记册」节——六列表（迷雾项 ID / 模糊描述 / 疑点 / 疑似归属 / 毕业方向 / 毕业处置结果）+ 无雾标记（「无未决迷雾项」单行声明）+ check-design-fog 门禁引用；占位词白名单扩「非目标显式标注与迷雾登记册节」。锐利性判据为「能否精确陈述该设计决策的问题」（非能否回答）；毕业三选一：毕业为正式设计项 / 判入非目标 / 需求级回退；CHECKPOINT 前强制清空（未终结项 exit 1 一律返工，披露于迷雾清空披露项）。
-- **纯函数门禁（R1-R6）**：`logic/design-fog-logic.ts` `checkDesignFog({markdown, phase})`——R1 节存在 fail-closed / R2 表或无雾标记二选一 / R3 迷雾项 ID 须符合 `FOG-P{phase}-NN` 格式（两位起数字）+ 表行解析（分隔行判定收窄为表头紧邻行，全空/占位横线数据行 fail-closed 命中 R3+R4，终审 Important 修复）/ R4 毕业处置终结性（空/待定即 unresolved 计入 fogStats）/ R5 表数据行与无雾标记互斥 / R6 迷雾项 ID 归属阶段与 `--phase` 一致。
+- **文档机制**：阶段 2-4 设计主模板（system-design / interface-design / detailed-design）新增「迷雾登记册」节——六列表（迷雾项 ID / 模糊描述 / 疑点 / 疑似归属 / 毕业方向 / 毕业处置结果）+ 无雾标记（「本阶段无未终结迷雾项」单行声明）+ check-design-fog 门禁引用；占位词白名单扩「非目标显式标注与迷雾登记册节」。锐利性判据为「能否精确陈述该设计决策的问题」（非能否回答）；毕业三选一：毕业为正式设计项 / 判入非目标 / 需求级回退；CHECKPOINT 前强制清空（未终结项 exit 1 一律返工，披露于迷雾清空披露项）。
+- **纯函数门禁（R1-R6）**：`logic/design-fog-logic.ts` `checkDesignFog({markdown, phase})`——R1 节存在 fail-closed / R2 表或无雾标记二选一 / R3 迷雾项 ID 须符合 `FOG-P{phase}-NN` 格式（两位起数字，fogId 阶段前缀与 `--phase` 一致）+ 表行解析（分隔行判定收窄为表头紧邻行，全空/占位横线数据行 fail-closed 命中 R3+R4，终审 Important 修复）/ R4 毕业处置终结性（空/待定即 unresolved 计入 fogStats）/ R5 表数据行与无雾标记互斥 / R6 毕业方向=设计项须疑似归属非空（设计项归属一致性）。
 - **CLI**：`cli/check-design-fog.ts`（`--doc` / `--phase` 单值，重复值 flag 一律 `ARG_INVALID`；stdout 单行 `FOG_JSON` 键序 type/passed/doc/phase/reasons/violations/fogStats/exitCode；exit 0/1/2 结构化错误走 `lib/cli-error.ts`）；npm alias `check:fog`；NEGATIVE-COVERAGE 登记（bad-unresolved-fog：放宽 R4 终结性将让未毕业迷雾项静默通过阶段门）。
 - **流程接线**：phase-2 / phase-3 / phase-4 机制节（迷雾登记册运作 + 毕业三选一 + 四通道划界 + 失败模式 FM-{SD,OD,DD}-08 迷雾滥用：信号 A 把可精确陈述的决策塞入迷雾册逃避设计义务 / 信号 B CHECKPOINT 前存在未终结项）+ CHECKPOINT 接线（迷雾清空披露 + exit 1 一律返工）+ discipline-dod×3 迷雾清空勾选项 + 验收标准条。
 

@@ -20,7 +20,7 @@
 - [ ] 证据充分：技术选型 5 维度评分齐全、ADR 有上下文与后果、验收判据可量化
 - [ ] 架构图完整：含数据流标注、非纯文字（FM-SD-01 闭合）
 - [ ] 无循环依赖：模块划分 DFS 三色染色无环（FM-SD-03 闭合）
-- [ ] 无占位词：TBD/TODO/undefined/待补建/待定 不在正式交付中
+- [ ] 无占位词：TBD/TODO/undefined/待补建/待定 不在正式交付中（非目标显式标注与迷雾登记册节除外）
 - [ ] 图谱校验通过：`check-requirement-graph.ts --phase=2` 退出码 0
 - [ ] BDD/TLA+ 项目门通过：`check-bdd-model.ts --phase=2 --require-tla-equivalence --tla-manifest=.w-model/tla-manifest.json --graph=.w-model/ingestion/graph.json` + `check-tla-model.ts` 退出码 0
 - [ ] 设计期迷雾清空：迷雾登记册每项有终结处置结果（或标注「本阶段无未终结迷雾项」）；check-design-fog.ts --phase=2 退出码 0
