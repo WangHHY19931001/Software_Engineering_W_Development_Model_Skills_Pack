@@ -201,7 +201,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 
 交接意图藏在含糊措辞里会降低命中率，甚至把该由人执行的动作写成"由子代理调用"。以下三条为硬性**书写规则**；交接目录与 `status.json` 结构等机制细则见「文件落地交接协议与编排者状态日志」节。
 
-1. **依赖必须写成显式动作句。** 交接写「分派 S 子代理产出 `<X>`，输入为 `<上游路径>`，产出落到 `<下游路径>`」——把**角色 / 产物 / 输入路径 / 落盘路径**四件事写全。不写裸命令式提及（如只出现「见 references/xxx.md」或「/wm test」而不说谁执行、产出落到哪），也不写 `../other/FILE.md` 式跨目录深链：深链假定目标可在包内解析，而跨阶段交接的接收者是子代理而非当前文件，深链不会触发任何加载，命中率随之下滑。
+1. **依赖必须写成显式动作句。** 交接写「分派 S 子代理产出 `<X>`，输入为 `<上游路径>`，产出落到 `<下游路径>`」——把**角色 / 产物 / 输入路径 / 落盘路径**四件事写全。不写裸命令式提及（如只出现「见 references/xxx.md」或「/wm test」而不说谁执行、产出落到哪），也不写 `../other/FILE.md` 式跨目录深链：深链假定目标可在包内解析，而跨阶段交接的接收者是子代理而非当前文件，深链不会触发任何加载，命中率随之下滑。完整派单还须携带派单契约两段（前置条件 / 可验证终态，见「派单契约：前置条件与可验证终态」节）——四件事写全交接定位，两段契约写全完成判定。
 2. **一个动作一个接收者。** 一次分派只指派一个角色做一件事；需要两个角色或两个动作时写两句（「先派 R 子代理定位根因，再派 S 子代理修复」），不写「请 A 和 B 一起处理」——后者会被读成一次调用同时承担两件事，导致其中一件被漏掉。
 3. **人类入口不可被模型代达。** 当某步骤的前置是**人类入口**（`/wm` 命令本身、🔴 CHECKPOINT 用户确认等）时，必须写成「告诉用户执行 `<X>`」，不得写成「由子代理调用 `<X>`」——后者命中反模式 #8（越过 🔴 CHECKPOINT 自动推进）与反模式 #10（编排者越权实施）。
 
@@ -579,11 +579,11 @@ phase: <N - 名称>
 
 每个分派目录固定三文件：
 
-| 文件          | 写入者              | 内容                                                                      | O 是否可读               |
-| ------------- | ------------------- | ------------------------------------------------------------------------- | ------------------------ |
-| `brief.md`    | O（指针型，非内容） | 任务一句话定位 + 输入产物**路径列表** + 产出契约 + 禁止项                 | 否（O 已知路径，无需读） |
-| `output.md`   | 子代理              | 完整产出（报告 / VerifierOutput JSON 内容 / diff 摘要 / 根因报告 / 证据） | **否**                   |
-| `status.json` | 子代理              | 信标（< 200 字节）                                                        | **是（唯一可读）**       |
+| 文件          | 写入者              | 内容                                                                              | O 是否可读               |
+| ------------- | ------------------- | --------------------------------------------------------------------------------- | ------------------------ |
+| `brief.md`    | O（指针型，非内容） | 任务一句话定位 + 输入产物**路径列表** + 前置条件 + 产出契约 + 可验证终态 + 禁止项 | 否（O 已知路径，无需读） |
+| `output.md`   | 子代理              | 完整产出（报告 / VerifierOutput JSON 内容 / diff 摘要 / 根因报告 / 证据）         | **否**                   |
+| `status.json` | 子代理              | 信标（< 200 字节）                                                                | **是（唯一可读）**       |
 
 `status.json` Schema：
 
@@ -599,6 +599,8 @@ phase: <N - 名称>
   "next_hint": "派 V 评审 handoff/phase1-S-01/output.md"
 }
 ```
+
+`state=DONE` 以派单契约「可验证终态」判据证据为前提；`BLOCKED` / `NEEDS_CONTEXT` 对应前置条件失守路径（schema 本体零改动，语义注释级对齐，见「派单契约：前置条件与可验证终态」节）。
 
 **禁止转发规则（核心）**：
 
@@ -765,6 +767,9 @@ O 分派时声明的**任务开始前必须成立的可核验命题**清单。�
 角色：产出子代理（S）
 当前 W 模型阶段：<阶段 N - 名称>
 任务：按 phase-<N>-*.md 产出本阶段开发产物 + 同步测试设计 + 更新 RTM 实体
+前置条件（派单契约，O 派单前逐条自证）：
+  - 上游产物路径已落盘且可 Read（O 贴路径清单）
+  - 当前 RTM（.w-model/rtm.json）可解析且含上游实体
 上下文：
   - 项目状态：.w-model/project.json（已附）
   - 当前 RTM：.w-model/rtm.json（已附）
@@ -779,6 +784,9 @@ O 分派时声明的**任务开始前必须成立的可核验命题**清单。�
   2. 同步测试设计：<按并行对应表>
   3. RTM 实体更新：<列出本次新增 / 修改的实体 ID>
   4. 返回编排者：{产物路径, RTM diff 摘要, 自检结果（按 phase-N 验收标准）}
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：产出文件全部落盘且含 phase-N 规定结构锚点
+  - 回填判据：status.json state=DONE 且 run-log action=produce outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 禁止：
   - 跑 check-verifier-output.ts / check-artifact-gate.ts
   - 越阶段产出
@@ -792,6 +800,9 @@ O 分派时声明的**任务开始前必须成立的可核验命题**清单。�
 评审目标：<targetKind> / <targetId>
 任务：按 agent-personas.md 对应 Persona + verifier-spec.md §8 提示词产出 VerifierOutput JSON
 模型档位：<显式指定，不得省略（省略即静默继承编排者会话模型）；按 diff 规模/复杂度/风险定档，小 fix delta 的 scoped re-review 可用便宜到中档；修复轮次 4-5 时至少比卡住的实现者高一档（本仓库把同轮评审一并纳入升级） — 判据见 estimation-guide.md「模型档位 × 修复轮次 escalation」>
+前置条件（派单契约，O 派单前逐条自证）：
+  - 待评审批产物路径已落盘且可 Read
+  - R3 三份报告路径已落盘（V 须读取，反模式 #33）
 上下文：
   - 待评审批产物路径：<列出 S 子代理产出的文件路径>
   - 上游产物路径（用于追溯）：<列出>
@@ -805,6 +816,9 @@ O 分派时声明的**任务开始前必须成立的可核验命题**清单。�
   2. 必须满足 verifier-spec.md §6 Schema（subCriteria / compositeScore / qualityLevel / passed / reworkHints）
   3. Severity 标签作为 reworkHints 前缀（[Critical] / [Required] / [Optional] / [Nit] / [FYI]）
   4. 返回编排者：{VerifierOutput JSON 路径, summary 摘要}
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：VerifierOutput JSON 落盘且含 verifier-spec §6 Schema 必需键（subCriteria / compositeScore / qualityLevel / passed / reworkHints）
+  - 回填判据：status.json state=DONE 且 run-log action=review outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 
 V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返工重评）：
   1. rawScores 须为真实离散值：禁全同（复制填入）；禁 0.01 完美等差（构造数据）；text-parse 模式下 max - min ∈ [0.01, 0.10]
@@ -823,6 +837,8 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 ```
 角色：门禁子代理（G）
 任务：跑确定性门禁脚本 + 回填证据摘要
+前置条件（派单契约，O 派单前逐条自证）：
+  - 待校验文件路径已落盘（V 子代理产出的 VerifierOutput JSON / project-dir 产物齐备）
 上下文：
   - 待校验文件路径：<V 子代理产出的 VerifierOutput JSON / project-dir>
 执行：
@@ -851,6 +867,9 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
      - 阶段门：{exitCode, qualityLevel, passed, reworkHints, tlaModelExitCode, bddModelExitCode}
      - 终检：{exitCode, GATE_JSON 摘要（RTM 覆盖率 / 四级测试结果 / Model 校验结果）}
   3. 返回编排者：上述结构化摘要
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - gate 判据：受派门禁全部执行完毕（O 分派清单逐脚本跑过）
+  - 回填判据：结构化证据摘要 / GATE_JSON 摘要返回编排者——exit 1 也是有效完成（回填真实测量值），exit 2 除外
 禁止：
   - 改产物文件
   - 产出 VerifierOutput JSON
@@ -864,6 +883,9 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 角色：分析子代理-分块变体（A-chunk）
 当前 W 模型阶段：<阶段 N - 名称>
 任务：读单个 chunk，提取本阶段节点类型实体，产出 <chunk-id>.{md,json}
+前置条件（派单契约，O 派单前逐条自证）：
+  - chunk 路径存在且可 Read
+  - 图谱分析上下文材料已附（全局目录树摘要 + 相邻 chunk 标题列表，见下方上下文）
 上下文：
   - chunk 路径：<文件路径>
   - chunk-id：<chunk-001>
@@ -877,6 +899,9 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
   1. 文件路径：.w-model/ingestion/<chunk-id>.md + <chunk-id>.json
   2. JSON 须满足 ingestion-chunk.md schema（nodes/edges/crossChunkHints）
   3. 返回编排者：{role:"A", variant:"chunk", chunkId, entities, edges, blocked?}
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：<chunk-id>.md + <chunk-id>.json 落盘（.w-model/ingestion/）且 JSON 满足 ingestion-chunk.md schema 键（nodes / edges / crossChunkHints）
+  - 回填判据：status.json state=DONE 且 run-log action=chunk outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 禁止：
   - 跑 check-requirement-graph.ts
   - 写正式阶段产物
@@ -888,6 +913,9 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 ```
 角色：分析子代理-合并/演进变体（A-cross 阶段1 / A-evolve 阶段2-4）
 任务：合并所有 chunk.json 建图，确认跨块边，产出 consolidated.json + reworkHints
+前置条件（派单契约，O 派单前逐条自证）：
+  - 全部 chunk.json 已落盘且可 Read（.w-model/ingestion/*.json 全集）
+  - 现有 graph.json 存在且可 Read（仅 A-evolve 需要）
 上下文：
   - .w-model/ingestion/*.json 全集
   - 现有 graph.json（仅 A-evolve）
@@ -899,6 +927,9 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
   1. 文件路径：.w-model/ingestion/consolidated.json + cross-analysis-report.md
   2. reworkHints 指向具体 chunkId 与原因
   3. 返回编排者：{role:"A", variant:"cross|evolve", totalEntities, totalEdges, isolatedNodes, connectedComponents, roots, reworkHints}
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：consolidated.json + cross-analysis-report.md 落盘（.w-model/ingestion/）
+  - 回填判据：status.json state=DONE 且 run-log action=cross|evolve（按变体）outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 禁止：
   - 跑 check-requirement-graph.ts（G 负责）
   - 写正式阶段产物
@@ -924,6 +955,12 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 当前 W 模型阶段：<阶段 N - 名称>
 任务：产出开发文档 + 同步测试设计 + 更新 RTM 实体（不产出 TLA+ / BDD 实体）
 依据：references/phase-<N>-*.md + templates/<对应模板>.md + references/rtm-guide.md
+前置条件（派单契约，O 派单前逐条自证）：
+  - 已放行上游产物路径已落盘且可 Read
+  - templates/<对应模板>.md 与 references/phase-<N>-*.md 可加载
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：开发文档 + 同步测试设计 + RTM 实体更新落盘
+  - 回填判据：status.json state=DONE 且 run-log action=produce outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 产出：
   1. 开发文档（按 phase-N 定义）
   2. 同步测试设计（按并行对应表）
@@ -942,6 +979,12 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 当前 W 模型阶段：<阶段 N - 名称>
 任务：产出对应层级 TLA+ 规格 + 更新 tla-manifest.json；`.tla` 文件头部须含 `@designIds` 字段，列出覆盖的 SD 节点 ID
 依据：references/tla-plus.md + templates/tla-spec-template.md + S-doc 已产出的设计文档
+前置条件（派单契约，O 派单前逐条自证）：
+  - S-doc 已产出的设计文档路径已落盘且可 Read（依赖声明，见「S 拆分机制」节）
+  - .w-model/ingestion/graph.json 可 Read（提取 SD 节点列表依据）
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：.tla 头部含 @designIds 字段 + .cfg 落盘 + tla-manifest.json 基础字段更新落盘（不含 sdCoverage）
+  - 回填判据：status.json state=DONE 且 run-log action=produce outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 产出：
   1. .tla（按 phase-N 层级：L1/L2/L3/L4）——头部须含 @designIds 字段，列出覆盖的 SD 节点 ID
   2. .cfg（TLC 模型检查配置）
@@ -963,6 +1006,12 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 当前 W 模型阶段：<阶段 N - 名称>
 任务：产出对应层级 BDD features + 更新 bdd-manifest.json
 依据：references/bdd.md + templates/feature.template + templates/bdd-manifest.template.json + S-doc 已产出的设计文档 + S-tla 已产出的 TLA+ 规格（用于 BDD↔TLA+ 等价性对齐）
+前置条件（派单契约，O 派单前逐条自证）：
+  - S-doc 已产出的设计文档路径已落盘且可 Read
+  - S-tla 已产出的 TLA+ 规格（.tla / .cfg）路径已落盘且可 Read
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：.feature 文件头部 10 个 @ 字段齐全 + bdd-manifest.json 基础字段更新落盘（不含 designCoverage）+ RTM 测试列追加 BDD 引用
+  - 回填判据：status.json state=DONE 且 run-log action=produce outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 产出：
   1. .feature（按 phase-N 层级：L1/L2/L3/L4，每个 REQ/SD/INTF/DD ≥1 个 .feature 文件）——头部须含 @designIds 字段，列出覆盖的 SD 节点 ID
   2. bdd-manifest.json 实体更新（features + stateMachines + tlaSpecId 关联，不含 designCoverage——由 S-ingest-bdd 回填）
@@ -987,6 +1036,9 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 当前 W 模型阶段：<阶段 N - 名称>
 任务：从 .tla 文件提取 @designIds + 比对 graph.json SD 节点 → 回填 tla-manifest.json sdCoverage
 依据：references/conventions.md + references/tla-plus.md §10
+前置条件（派单契约，O 派单前逐条自证）：
+  - .tla 文件路径列表已落盘且可 Read（S-tla 已产出）
+  - tla-manifest.json 与 .w-model/ingestion/graph.json 路径已落盘且可 Read
 输入：
   - .tla 文件路径列表（S-tla 已产出）
   - tla-manifest.json 路径
@@ -994,6 +1046,9 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 产出：
   1. tla-manifest.json 的 sdCoverage 字段回填（totalSdNodes / coveredSdNodes / uncoveredSdNodes / coverageRate）
   2. 返回：{manifest 路径, sdCoverage 摘要, uncovered 列表}
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：manifest sdCoverage 四键（totalSdNodes / coveredSdNodes / uncoveredSdNodes / coverageRate）回填且 uncoveredSdNodes 与 graph.json SD 节点比对结果一致
+  - 回填判据：status.json state=DONE 且 run-log action=produce outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 不产出：
   - .tla / .cfg 文件（由 S-tla 负责，S-ingest 只读不写 .tla）
   - 开发文档 / 测试设计 / RTM 实体
@@ -1011,6 +1066,9 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 当前 W 模型阶段：<阶段 N - 名称>
 任务：从 .feature 文件提取 @designIds + 比对 graph.json SD 节点 → 回填 bdd-manifest.json designCoverage
 依据：references/conventions.md + references/bdd.md D8
+前置条件（派单契约，O 派单前逐条自证）：
+  - .feature 文件路径列表已落盘且可 Read（S-bdd 已产出）
+  - bdd-manifest.json 与 .w-model/ingestion/graph.json 路径已落盘且可 Read
 输入：
   - .feature 文件路径列表（S-bdd 已产出）
   - bdd-manifest.json 路径
@@ -1018,6 +1076,9 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 产出：
   1. bdd-manifest.json 的 designCoverage 字段回填（totalSdNodes / coveredSdNodes / uncoveredSdNodes / coverageRate）
   2. 返回：{manifest 路径, designCoverage 摘要, uncovered 列表}
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：manifest designCoverage 四键（totalSdNodes / coveredSdNodes / uncoveredSdNodes / coverageRate）回填且 uncoveredSdNodes 与 graph.json SD 节点比对结果一致
+  - 回填判据：status.json state=DONE 且 run-log action=produce outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 不产出：
   - .feature 文件（由 S-bdd 负责，S-ingest 只读不写 .feature）
   - 开发文档 / 测试设计 / RTM 实体
@@ -1034,25 +1095,31 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 
 #### S-plan 子代理分派模板
 
+- **前置条件**（派单契约，O 派单前逐条自证）：当前阶段 spec + 上游产物路径已落盘且可 Read；codegraph 图谱已 init（`codegraph` CLI 探针可用，见「阶段 5-8 编码链 S 分派」节）
 - **输入**：当前阶段 spec + 上游产物 + codegraph 图谱（已 init）
 - **调用**：superpowers `writing-plans`（规格级规划）+ `codegraph query <符号>`（影响初判，CLI 优先；宿主 MCP 工具为可选加速）；任务内可兼任 S-tickets 拆解 → tickets.md（tracer-bullet + blocking edges DAG）
 - **产出**：`docs/plans/<changeId>.plan.md`（目标节 + 任务节，每任务节 ≥1 条「验证：/Verify:」命令行；changeId 须含 `phase<N>-` 前缀）+ `tickets.md`
+- **可验证终态**（selfCheck.terminalState 逐条核验）：产物判据——`docs/plans/<changeId>.plan.md` 每任务节 ≥1 条「验证：/Verify:」命令行且 `tickets.md` 落盘；回填判据——status.json state=DONE 且 run-log action=plan_propose outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 - **审查**：R3×3（completeness/reliability/security）→ V 评审 → 不合格打回
 - **职责边界**：plan 任务节（what/why，编码链执行单元）与 tickets.md（how，代码级垂直切片）职责分离。反模式 #40 禁止混淆。
 
 #### S-coding 子代理分派模板
 
+- **前置条件**（派单契约，O 派单前逐条自证）：`docs/plans/<changeId>.plan.md` 已 R3×3 + V 审查通过（O 贴 R3/V 产物路径与结论）；codegraph CLI 可用（`codegraph` 探针）
 - **输入**：S-plan 产物（`docs/plans/<changeId>.plan.md` 任务节）+ R3/V 审查通过
 - **调用**：按 plan 任务节逐任务执行（`subagent-driven-development`）+ TDD 红-绿-重构；每任务 `Edit`/`Write` 前先 `codegraph query <目标符号>` → 落盘 `.w-model/codegraph-queries/` → 代码 + 单元测试 → 该任务 code-TLA+ 一致性校验；任务完成写账本 `Task N: complete`（`.superpowers/sdd/<plan-基名>/progress.md`）
 - **产出**：代码 + 测试 + `.w-model/codegraph-queries/` + TLA 校验报告 + 账本 + 任务三件套（`task-<N>-{brief,report}.md`）+ `review-*.diff`
+- **可验证终态**（selfCheck.terminalState 逐条核验）：测试判据——本任务单元测试全绿（N passed / 0 failed）；产物判据——账本 `Task N: complete` + 任务三件套 + `review-*.diff` + `.w-model/codegraph-queries/` 落盘；回填判据——status.json state=DONE 且 run-log action=plan_task outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 - **审查**：R3×3 → V 评审 → 不合格打回（指定返工任务）
 - **约束 #14**：任何 Edit/Write 前须经 codegraph CLI 查询（`codegraph query <符号>`；宿主 MCP 工具为可选加速），否则命中反模式 #38
 
 #### S-finalize 子代理分派模板
 
+- **前置条件**（派单契约，O 派单前逐条自证）：S-coding 产物（账本 + 三件套 + review diff）路径已落盘且可 Read，且 R3×3 + V 审查通过（O 贴 R3/V 产物路径与结论）
 - **输入**：S-coding 产物（账本 + 三件套 + review diff）+ R3/V 审查通过
 - **调用**：收口沉淀——只读核验 plan / 账本完成覆盖 / 任务三件套 / stage 级 R3×9+V×3 制品齐备（**S 不跑门禁**，门禁由 G 执行）；阶段 8 另把编码计划制品沉淀为归档快照（`docs/changes/archive/<日期>-<changeId>/` 内 `<changeId>.plan.md` + `progress.md` + 三件套）
 - **产出**：收口产物（制品齐备声明 + （阶段 8）归档快照）；门禁结论与证据摘要由 **G** 产出——`check-coding-plan.ts <project-root> --phase=<N> --scope=<change-scope.json>`（R1-R6，exit 0）→ `CODING_PLAN_JSON`，阶段 8 归档后 `check-archive-integrity.ts <archive-dir>` → `ARCHIVE_INTEGRITY_JSON`
+- **可验证终态**（selfCheck.terminalState 逐条核验）：产物判据——制品齐备声明落盘（阶段 8 另含归档快照落盘）；回填判据——status.json state=DONE 且 run-log action=produce outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 - **审查**：R3×3 → V 评审 → 不合格打回（回 S-coding 补任务产物）
 
 ### R 子代理分派模板
@@ -1063,6 +1130,10 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 返工轮次：<round，从 1 开始>
 模型档位：<显式指定，不得省略（省略即静默继承编排者会话模型）；返工轮次 4-5 时至少比卡住的实现者高一档 — 判据见 estimation-guide.md「模型档位 × 修复轮次 escalation」>
 任务：诊断 V/G 命中的返工问题根因，产出 RootCauseReport
+
+前置条件（派单契约，O 派单前逐条自证）：
+  - V/G 的 reworkHints（原文）与失败产物路径已附
+  - 失败产物路径已落盘且可 Read
 
 上下文：
   - 返工来源：<verifier | gate>
@@ -1092,6 +1163,10 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
   3. 必须满足 RootCauseReport Schema（见 spec §4）
   4. 返回编排者：{role:"R", reportId, reportPath, rootCauseCategory, upstreamDefect: {present, rollbackRecommended}, qualityLevel, passed, summary}
 
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：RootCauseReport JSON + .md 落盘（.w-model/rootcause/<reportId>.{json,md}）且满足 RootCauseReport Schema
+  - 回填判据：run-log action=rootcause outcome=success（由 G 门禁 check-rootcause-report.ts exit 0 复核；角色禁令优先：gate 验证由下游 G 承担）
+
 禁止：
   - 改任何产物文件（由 S 修复）
   - 跑门禁脚本（由 G 负责）
@@ -1120,6 +1195,8 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 
 `check-preventive-review.ts` 支持 `--variant=standard|fix|emergency|ingest` 参数校验对应路径（ingest 须显式传参）；`--auto-trigger` 模式从 run-log 推断 S 变体。
 
+**前置条件**（派单契约，O 派单前逐条自证）：当前阶段产物路径与上游产物路径已落盘可 Read（见「派单契约：前置条件与可验证终态」节）。
+
 **R3 子代理输入**：
 
 - 当前阶段产物路径
@@ -1127,6 +1204,8 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 - 审查维度（completeness / reliability / security）
 
 **R3 子代理产出**：`.w-model/preventive-reviews/<phase>[-fix|-emergency]-{completeness,reliability,security}.json`
+
+**可验证终态**（selfCheck.terminalState 逐条核验）：三份 PreventiveReview JSON 落盘且逐份含 findings 字段；run-log action=r3-completeness / r3-reliability / r3-security 各一条 outcome=success（角色禁令优先：gate 验证由下游 G 承担）。
 
 **阶段 5-8 编码链 stage 级 R3+V 产物**：
 
@@ -1179,6 +1258,10 @@ superpowers 编码链（S-plan → S-coding → S-finalize）每段须额外产�
 
 任务：以已发现/已修复问题为线索，对全阶段产物做多视角深挖扫掠，产出 IcebergSweepReport
 
+前置条件（派单契约，O 派单前逐条自证）：
+  - 线索来源齐备：reworkHints 历史 / fixedPoints / 关联 RootCauseReport 路径（icebergRound>1 另加上一轮 IcebergSweepReport 路径）
+  - 全阶段产物路径已附且可 Read
+
 上下文：
   - 线索来源：
     - reworkHints 历史：<本阶段所有 V/G reworkHints 数组>
@@ -1206,6 +1289,10 @@ superpowers 编码链（S-plan → S-coding → S-finalize）每段须额外产�
   3. 必须满足 IcebergSweepReport Schema
   4. newFindings 每项须含可证伪 hypothesis + 具体 evidence
   5. 返回编排者：{role:"R", variant:"iceberg", reportId, reportPath, newFindingsCount, passed, summary}
+
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：IcebergSweepReport JSON + .md 落盘（.w-model/iceberg/<reportId>.{json,md}）且满足 IcebergSweepReport Schema、newFindings 各含可证伪 hypothesis + 具体 evidence
+  - 回填判据：status.json state=DONE 且 run-log action=iceberg-sweep outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 
 禁止：
   - 改任何产物文件（由 S-fix 修复）
@@ -1235,6 +1322,10 @@ superpowers 编码链（S-plan → S-coding → S-finalize）每段须额外产�
 评审目标：targetKind=rootcause / <reportId>
 任务：复审 R 的根因报告准确性
 
+前置条件（派单契约，O 派单前逐条自证）：
+  - R 报告 JSON + .md 路径已落盘且可 Read
+  - 失败产物路径与上游产物路径已附且可 Read
+
 上下文：
   - 待复审 R 报告 JSON 路径：<路径>
   - 待复审 R 报告 .md 路径：<路径>
@@ -1259,6 +1350,10 @@ superpowers 编码链（S-plan → S-coding → S-finalize）每段须额外产�
   3. reworkHints 含 [Critical]/[Required] 时表示根因报告不准确，须重派 R
   4. 返回编排者：{role:"V", targetKind:"rootcause", qualityLevel, passed, reworkHints}
 
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：VerifierOutput JSON 落盘（.w-model/verifier/<reportId>-review.json）且 verifier-spec §6 Schema 必需键齐
+  - 回填判据：status.json state=DONE 且 run-log action=review outcome=success（角色禁令优先：gate 验证由下游 G 承担）
+
 V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返工重评）：
   1. rawScores 须为真实离散值：禁全同（复制填入）；禁 0.01 完美等差（构造数据）；text-parse 模式下 max - min ∈ [0.01, 0.10]
   2. evidence 每条须为 `path:§sec=陈述` 或 `path:Lnn=陈述`（单 L 形态）；禁双 L 区间 `path:L51-L53=`
@@ -1281,6 +1376,10 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 模型档位：<显式指定，不得省略（省略即静默继承编排者会话模型）；返工轮次 4-5 时至少比卡住的实现者高一档 — 判据见 estimation-guide.md「模型档位 × 修复轮次 escalation」>
 任务：按 R 报告的 fixRecommendation 修复产物 + 更新 RTM
 
+前置条件（派单契约，O 派单前逐条自证）：
+  - R 报告已 V 复审通过且 check-rootcause-report.ts 上次运行 exit 0（O 贴门禁 exit code）
+  - 待修复产物路径存在且可 Read
+
 上下文：
   - R 报告 JSON 路径（已 V 复审通过）：<路径>
   - R 报告 .md 路径：<路径>
@@ -1299,6 +1398,10 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
   3. 返回编排者：{role:"S", variant:"fix", artifacts:<修复文件路径>, rtmDiff, fixBasedOn:"<reportId>", selfCheck}
   4. selfCheck 须含 fixRecommendation 落实情况逐条核验
 
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：修复后的产物文件覆盖落盘 + RTM diff 回填
+  - 回填判据：status.json state=DONE 且 run-log action=fix outcome=success；selfCheck 含 fixRecommendation 落实情况逐条核验（角色禁令优先：gate 验证由下游 G 承担）
+
 禁止：
   - 无视 R 报告自行修复（命中反模式 #18）
   - 跑门禁脚本
@@ -1314,6 +1417,10 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 当前 W 模型阶段：<阶段 N - 名称>
 返工轮次：<round>
 任务：分派 N 个 R-persona 子代理（并行或串行均可，依宿主能力）→ 聚合产出最终 RootCauseReport
+
+前置条件（派单契约，O 派单前逐条自证）：
+  - 同 R 模板前置：V/G reworkHints（原文）与失败产物路径已附，失败产物可 Read
+  - persona 选择矩阵候选（rootCause.category 初判）与宿主分派方式（parallel | serial | single-session-degraded）已在上下文声明
 
 上下文：
   - 返工来源 + reworkHints（同 R 模板）
@@ -1339,6 +1446,10 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
   1. 最终 RootCauseReport JSON + .md（同 spec §4 Schema）
   2. 附录：N 份 PartialRootCauseReport 路径
   3. 返回编排者：{role:"R", variant:"lead", reportId, partialReports:[<id>], aggregationMethod, dispatchMode:<"parallel"|"serial"|"degraded">, rootCauseCategory, upstreamDefect, qualityLevel, passed, summary, disagreementResolved:<bool>}
+
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：最终 RootCauseReport JSON + .md 落盘（同 spec §4 Schema）且 N 份 PartialRootCauseReport 路径齐备（附录列出）
+  - 回填判据：status.json state=DONE 且 run-log action=rootcause outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 
 禁止：
   - 跳过 persona 直接产出报告（强制多角度场景，不论并行/串行）
@@ -1371,6 +1482,10 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
   }
 }
 ```
+
+**selfCheck.terminalState（派单契约，见「派单契约：前置条件与可验证终态」节）**：S 回填时逐条列出该派单「可验证终态」判据的核验结果与证据指针（落盘路径 / 行号 / O 贴过的 exit code / run-log 条目）。该字段是**任务级**完成判定，与 `acceptanceCriteriaMet`（**阶段级**自检，按 phase-N 验收标准）分层并存、互不替代；不新增必填 Schema 键，S 在 selfCheck 对象内并列携带。
+
+**V 消费（终态证据）**：V 评审须核对 S 回填 `terminalState` 证据真实性；伪造终态证据按既有约束 #4（真实执行）/#9（门禁退出码不可伪）走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节；权威措辞见「派单契约：前置条件与可验证终态」节「V 消费」段）。
 
 **RTM 实体回填强制职责**：
 
@@ -1644,12 +1759,17 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 ```
 角色：产出子代理（S）- 豁免请求变体
 任务：识别需豁免项，产出 exemption-request.json
+前置条件（派单契约，O 派单前逐条自证）：
+  - 豁免申请材料已附且可 Read（V 评审 reworkHints 中的覆盖缺失/conflicts-with/覆盖率不达标项 + 需求规格路径）
 上下文：
   - 豁免来源：<V 评审 reworkHints 中的覆盖缺失/conflicts-with/覆盖率不达标项>
   - 需求规格路径：<路径>
 产出契约：
   1. exemption-request.json：含 exemptionId / 豁免理由 / 影响范围 / 替代方案 / 关联 FM ID
   2. 返回编排者：{role:"S", variant:"exemption-request", requestPath, exemptionId}
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：exemption-request.json 落盘且含 exemptionId / 豁免理由 / 影响范围 / 替代方案 / 关联 FM ID
+  - 回填判据：status.json state=DONE 且 run-log action=produce outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 禁止：
   - 自行决定豁免生效（FM-EXEMPT-01）
   - 用豁免掩盖需求遗漏（FM-EXEMPT-05）
@@ -1660,6 +1780,8 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 ```
 角色：根因定位子代理（R）- 豁免审查变体
 任务：按 root-cause-locator.md 方法论审查豁免请求
+前置条件（派单契约，O 派单前逐条自证）：
+  - exemption-request.json 路径已落盘且可 Read
 上下文：
   - exemption-request.json 路径：<路径>
   - 需求规格路径：<路径>
@@ -1668,6 +1790,9 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 产出契约：
   1. exemption-review.json：含 reviewDecision / rootCauseAnalysis（5-Why）/ upstreamTrace（上游回溯）/ falsifiabilityCheck（可证伪性）/ conditions
   2. 返回编排者：{role:"R", variant:"exemption-review", reviewPath, reviewDecision}
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：exemption-review.json 落盘且含 reviewDecision / rootCauseAnalysis / upstreamTrace / falsifiabilityCheck / conditions
+  - 回填判据：status.json state=DONE 且 run-log action=rootcause outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 禁止：
   - 直接批准豁免生效（FM-EXEMPT-02）
   - 模板化审查（缺 5-Why/上游回溯/可证伪性）
@@ -1678,12 +1803,17 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 ```
 角色：评审子代理（V）- 豁免校验变体
 任务：校验 R 的豁免审查质量
+前置条件（派单契约，O 派单前逐条自证）：
+  - exemption-review.json 路径已落盘且可 Read，且 R 审查已通过（O 贴 R 返回结论）
 上下文：
   - exemption-request.json 路径：<路径>
   - exemption-review.json 路径：<路径>
 产出契约：
   1. exemption-verification.json：含 passed / reworkHints（校验 reviewDecision/rootCauseAnalysis/falsifiabilityCheck/conditions）
   2. 返回编排者：{role:"V", variant:"exemption-verification", verificationPath, passed}
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：exemption-verification.json 落盘且含 passed / reworkHints
+  - 回填判据：status.json state=DONE 且 run-log action=review outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 禁止：
   - 跳过校验直接放行（FM-EXEMPT-03）
 ```
@@ -1717,19 +1847,19 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 
 ## 失败模式与回退
 
-| 失败场景                                                                                                  | 处理                                                                                                                              |
-| --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| S 子代理产出未通过自检（`acceptanceCriteriaMet=false`）                                                   | 记录为 R 定位线索；普通失败完成完整链后再由 S-fix 返工：普通 V/G 失败链（hard-constraints）                                       |
-| V 子代理产出 JSON 不满足 Schema                                                                           | G 子代理 `check-verifier-output.ts` 退出码 2 → 编排者分派 V 重新产出                                                              |
-| G 子代理 `check-verifier-output.ts` 退出码 1（评审未通过）                                                | `reworkHints` 仅作 R 定位线索；必须执行普通 V/G 失败链（hard-constraints）后再由 S-fix 返工                                       |
-| G 子代理 `check-artifact-gate.ts` 退出码 1（质量门未通过）                                                | 记录为 R 定位线索；必须执行普通 V/G 失败链（hard-constraints）后再由 S-fix 回阶段 5 返工                                          |
-| 编排者自身越权实施（命中反模式 #10）                                                                      | 回到当前阶段起点，已越权产出的实体作废重做                                                                                        |
-| 子代理无法独立完成（如 BLOCKED 状态）                                                                     | 子代理返回 `{"status": "BLOCKED", "reason": "..."}`；编排者向用户澄清后重新分派                                                   |
-| R 自评不通过（`passed=false` 或 `qualityLevel∈{C,D}`）                                                    | 编排者重派 R（同一 round，不递增）；同一 round 内 R 重派 ≥2 次仍不通过 → 🔴 CHECKPOINT 介入（人工根因分析或调整 maxReworkRounds） |
-| V 复审根因不通过（targetKind=rootcause `passed=false`）                                                   | 编排者重派 R（带 V 的 rootcause reworkHints，同一 round）；同一 round 内 V 复审不通过 ≥2 次 → 🔴 CHECKPOINT 介入（用户裁定根因）  |
-| G 门禁不通过（`check-rootcause-report.ts` exitCode=1）                                                    | 编排者重派 R（带 G 的校验失败原因，同一 round）；通常为 Schema 不合规，R 修正报告即可                                             |
-| S-fix 修复后 V/G 仍不通过                                                                                 | `round++` → 重新分派 R（不沿用上轮 R 报告，因产物已变化）；round 达 maxReworkRounds → 🔴 CHECKPOINT 升级（见场景 5 阶段回退）     |
-| 阶段回退（场景 5：round≥2 + R 标记 upstreamDefect.present=true 且 rollbackRecommended=true + V 复审通过） | 强制 🔴 CHECKPOINT · 阶段回退决策，展示返工历史 + R 的 upstreamDefect 详情 + V 复审结论 + 建议回退阶段编号，由用户选择 A/B/C      |
+| 失败场景                                                                                                  | 处理                                                                                                                                                                           |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| S 子代理产出未通过自检（`acceptanceCriteriaMet=false`）                                                   | 记录为 R 定位线索；普通失败完成完整链后再由 S-fix 返工：普通 V/G 失败链（hard-constraints）                                                                                    |
+| V 子代理产出 JSON 不满足 Schema                                                                           | G 子代理 `check-verifier-output.ts` 退出码 2 → 编排者分派 V 重新产出                                                                                                           |
+| G 子代理 `check-verifier-output.ts` 退出码 1（评审未通过）                                                | `reworkHints` 仅作 R 定位线索；必须执行普通 V/G 失败链（hard-constraints）后再由 S-fix 返工                                                                                    |
+| G 子代理 `check-artifact-gate.ts` 退出码 1（质量门未通过）                                                | 记录为 R 定位线索；必须执行普通 V/G 失败链（hard-constraints）后再由 S-fix 回阶段 5 返工                                                                                       |
+| 编排者自身越权实施（命中反模式 #10）                                                                      | 回到当前阶段起点，已越权产出的实体作废重做                                                                                                                                     |
+| 子代理无法独立完成（如 BLOCKED 状态）                                                                     | 子代理返回 `{"status": "BLOCKED", "reason": "..."}`；编排者向用户澄清后重新分派                                                                                                |
+| R 自评不通过（`passed=false` 或 `qualityLevel∈{C,D}`）                                                    | 编排者重派 R（同一 round，不递增）；同一 round 内 R 重派 ≥2 次仍不通过 → 🔴 CHECKPOINT 介入（人工根因分析或调整 maxReworkRounds）→ L1→L4 升级（见「分层反馈回路（L0-L4）」节） |
+| V 复审根因不通过（targetKind=rootcause `passed=false`）                                                   | 编排者重派 R（带 V 的 rootcause reworkHints，同一 round）；同一 round 内 V 复审不通过 ≥2 次 → 🔴 CHECKPOINT 介入（用户裁定根因）→ L1→L4 升级（见「分层反馈回路（L0-L4）」节）  |
+| G 门禁不通过（`check-rootcause-report.ts` exitCode=1）                                                    | 编排者重派 R（带 G 的校验失败原因，同一 round）；通常为 Schema 不合规，R 修正报告即可                                                                                          |
+| S-fix 修复后 V/G 仍不通过                                                                                 | `round++` → 重新分派 R（不沿用上轮 R 报告，因产物已变化）；round 达 maxReworkRounds → 🔴 CHECKPOINT 升级（见场景 5 阶段回退）                                                  |
+| 阶段回退（场景 5：round≥2 + R 标记 upstreamDefect.present=true 且 rollbackRecommended=true + V 复审通过） | 强制 🔴 CHECKPOINT · 阶段回退决策，展示返工历史 + R 的 upstreamDefect 详情 + V 复审结论 + 建议回退阶段编号，由用户选择 A/B/C                                                   |
 
 ## 与 addyosmani/agent-skills 的差异
 
