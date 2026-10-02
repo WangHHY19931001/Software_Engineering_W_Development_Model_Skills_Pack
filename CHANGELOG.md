@@ -7,6 +7,17 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [42.10.0] - 2026-10-03
+
+### 批次 5：治理与叙事（吸收批次总纲批次 5；规格 D1-D5 已裁定，文档先行）
+
+- **新增 `references/agent-threat-model.md`（C2，D1 文档叙事形态）**：agent 流水线威胁目录 T1-T7（提示注入 / 证据伪造 / 门禁结果冒充 / 字节篡改与抵赖 / 越权实施 / 敏感数据泄漏 / 输出漂移）→ 既有缓解机制映射（覆盖强度：阻断/检测/提示），三不承诺（不建自动化守卫脚本 / 不新增检测信号 / 不改 G 门禁）；`verifier-spec.md` §7.4A 注入提示行边界细化（原句保留 + D1 裁定声明 + 指针）。references 计数 44→45（`checkReferencesCount` 门禁同步）。
+- **新增 campaign 级「整批否决权与回收路径」治理规则（C4，D2 纯文档）**：整批否决 = 批量 CHECKPOINT 编组语义（批量判定不新增权限 / 非降门槛 / 逐候选落账）；回收 = 系统性问题触发、人类 CHECKPOINT 发起、逐候选既有回滚原语编组（不建一键回滚）；缺口披露：已外发脱敏证据包不可召回。落 `quality-standards.md` + `code-health-governance.md` §6；零新脚本零 schema。
+- **新增 SSoT §10K.7「Phase 5–8 迁移设计锚点（素材，待需求输入）」（C1，D3 需求框架先行）**：定义 + `migrate-code`/`migrate-test` 占位 + 五字段待输入表；维持「未实现（不得据此执行）」，实现单独立项。
+- **SSoT §10O 权威摘要节 + §10A 追溯行；AGENTS.md 机制索引句 + §2 表行；总纲 §1/§5 批次 5 状态登记**。
+- **纯文档批次**：零新脚本（门禁脚本 48 个 .ts 不变）、零 schema 改动（34 份不变）、零 eval 语料变更（总纲批次 5 改动面不含 eval）；向后兼容（既有句子原样保留，只追加/细化）。
+- prepush 19 项全绿（对 3757eb5f 实测 1991s）。
+
 ## [42.9.0] - 2026-10-02
 
 > 来源：「批次 4：派单与流程契约」批——规格 `docs/superpowers/specs/2026-10-02-batch4-dispatch-contract-design.md`（78396d90）、计划 `docs/superpowers/plans/2026-10-02-batch4-dispatch-contract.md`（78396d90 同提交），账本 `.superpowers/sdd/2026-10-02-batch4-dispatch-contract/`（gitignored 账本；逐任务三件套 `task-N-{brief,report}.md` + `review-*.diff`），实现 6 提交 d463ad68..bb95e023（分支 feature/batch4-dispatch-contract，自规格/计划提交 78396d90 开启，该基点不计入 6 提交计数）。**版本 bump 42.8.0 → 42.9.0**（判据：minor 级流程契约变更——22 个分派模板新增强制「前置条件 / 可验证终态」两段 + 分层反馈回路（L0-L4）权威视图 + hard-constraints 候选区 C2 登记）。**向后兼容**：纯文档机制零脚本零 schema 零门禁行为变化；分派模板新增段为产出披露要求，既有字段与既有产出物零破坏；eval 仅追加。**计数影响**：schema 34 / prepush 19 / persona 33 / references 44 / exit-2 脚本 47 / CLI 48 全不变；eval 语料 60 → 64（+4 条 L2，routeTotals {12/8/22} 不变）；反模式正式清单仍 48 条（C2 为候选区登记，pending V 复审，不计入活体计数）。**prepush 19/19 全绿**（终值 1949s，对终审修复浪潮提交 fa4a24c2 实测；此前对收口提交 ca5fc151 亦 19/19 全绿 2513s）。

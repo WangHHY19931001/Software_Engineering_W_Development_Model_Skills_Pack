@@ -262,6 +262,18 @@ expect(buildSearchQuery({ tag: 'urgent' })).toBe('tag:"urgent"');
 - [ ] 失败走 code-health 失败链 `gate-failure → blocked → R → V → G → S(rework) → evidenced`，顺序不可跳过
 - [ ] 归档为真实实现（`code-health-archive.ts`）：`--verify` 无 `--source-project` 只报 package-only，绝不表述为 verified source；不执行未实现的 Phase 5–8 迁移；无 `.codegraph/` 索引时不得伪造查询
 
+### 整批否决权与回收路径（campaign 级，批次 5）
+
+> 治理规则文档：零新脚本、零 schema、零新自动化能力。「整批」= 逐候选既有原语的**编组语义**，不是新机制。
+
+- **整批否决权（batch veto）**：campaign 收口 🔴 CHECKPOINT（既有「候选放行」CHECKPOINT 的批量形态）处，人类可对同 campaign 候选清单**整批** reject / defer。三条语义锚定：
+  1. **批量判定** = 逐候选既有 CHECKPOINT 判定的编组，不新增权限（human 唯一授权者不变，工具与 LLM 输出仍不能授权任何事）；
+  2. **非降门槛**——整批放行 ≠ 单候选证据豁免：放行的每个候选仍须各自满足证据链（`CommandEvidence` observed + revision 绑定 + 可回滚）；混合判定（部分 reject / 部分 approve / 部分 defer）合法；
+  3. **逐候选落账**——整批否决后每候选各自登记既有 `rejected` / `deferred` ledger 事件（append-only 原语不变，禁止合并为单个批量事件）。
+- **回收路径（recall）**：已 `archivedAsPassed` 的 campaign 发现**系统性问题**（判据示例：某等价证明方法学缺陷影响整批结论，且逐候选受影响可证明）→ 人类 CHECKPOINT 发起整批回收：逐候选走既有回滚原语（受控 patch `git apply -R` + pre-change 快照回读证明，见 [code-health-governance.md](code-health-governance.md) §6）→ ledger 逐候选登记 `rolled-back` → archive 重新 produce（回收候选以终态**非成功**证据归档，`archivedAsPassed=false`）。**不建**「一键回滚」。
+- **与阶段级对称**：W 模型阶段 5-8 的「整批」形态已存在 = 阶段回退（[workflow.md](workflow.md)「阶段切换与回退」）；本节补 campaign 级。
+- **缺口披露**：已外发的脱敏证据包**不可召回**，只能补发更正包（交付边界见 AGENTS.md「本地生成物与审计证据」节）。
+
 ## 工具缺失与降级处理（边界条件）
 
 > 当质量门检查清单中引用的工具未安装或运行失败时，按以下降级路径处理，**禁止因工具缺失而跳过检查或放行**。

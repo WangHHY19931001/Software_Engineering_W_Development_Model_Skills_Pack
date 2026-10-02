@@ -394,4 +394,24 @@ git commit -m "docs(batch5): 收尾记录回填——提交清单 + prepush 终�
 
 ## 收尾记录（任务 6 回填）
 
-（待回填：实现提交区间 / prepush 终值 / DoD grep 结果）
+**实现提交区间**（`git log --oneline main..HEAD` 实测，共 6 提交 46cfdb46..3757eb5f）：
+
+```
+3757eb5f chore(release): 42.10.0 批次 5 收口准备——总纲批次 5 状态登记 + CHANGELOG 条目 + 版本七处同步
+3e80bc6b docs(batch5): task1-fix——agent-threat-model 引言 D1 引文对齐「既有机制映射」口径（审查发现）
+a2d80bfd docs(batch5): SSoT §10O 权威摘要节（四件套：目标/落点表/能力分工不夸大/判据披露）+ §10A 追溯行
+e545ffb8 docs(batch5): C1 Phase 5-8 迁移素材——SSoT §10K.7 设计锚点（定义+动作枚举占位+五字段待输入表，D3 需求框架先行）+ code-health-governance 头部指针
+6763b327 docs(batch5): C4 整批否决权/回收路径治理规则——quality-standards 权威披露（批量 CHECKPOINT 三语义锚定+非降门槛+缺口披露）+ code-health-governance §6 操作小节（D2 纯文档，零新机制）
+46cfdb46 docs(batch5): C2 agent 威胁模型——references/agent-threat-model.md（T1-T7→既有机制映射，三不承诺）+ verifier-spec:671 边界细化（D1）+ 计数 44→45 + AGENTS 登记
+```
+
+**prepush 终值**：19/19 全绿，exit 0，1991s（对 3757eb5f 干净工作区实测；总时长 = prepush.end − prepush.start = 1790976938 − 1790974947，门禁自报总耗时 1989s；最长车道 vitest 单元测试 + coverage 采集 1971s）。
+
+**DoD grep 核验**（规格 DoD 第 6 条）：
+
+- `grep -rn "整批否决" w-model-dev/scripts/ w-model-dev/schemas/ eval/ | wc -l` = **0**（无脚本/schema/eval 误接线）。
+- `grep -rln "整批否决" w-model-dev/references/ docs/ AGENTS.md | sort` = 恰 7 文件：`w-model-dev/references/agent-threat-model.md`、`w-model-dev/references/code-health-governance.md`、`w-model-dev/references/quality-standards.md`、`docs/skill-design-document_SSoT.md`、总纲、本规格（2026-10-03-batch5-governance-narrative-design.md）、本计划；`CHANGELOG.md:15` 另经补充核验命中（其位于仓库根，在简报 grep 范围 `docs/`+`references/` 之外）；AGENTS.md 0 命中（与预期清单一致）。
+
+**前向引用锚点闭环**（任务 1-2 审查账本记录项）：`w-model-dev/references/quality-standards.md:265`（「### 整批否决权与回收路径（campaign 级，批次 5）」）与 `docs/skill-design-document_SSoT.md:2411`（「## 10O. agent 威胁模型、整批否决权与迁移素材（批次 5，2026-10-03）」）均命中——闭环。
+
+**收口回填提交**：2c761575（本节与总纲 §5 行终值由该提交写入；短哈希由哈希盖章提交补记——提交哈希无法自引用，批次 4 终值回填哈希追溯补记先例）。

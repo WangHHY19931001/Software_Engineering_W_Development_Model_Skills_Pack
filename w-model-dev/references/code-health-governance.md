@@ -2,7 +2,7 @@
 
 > 权威定义：`docs/skill-design-document_SSoT.md` §10K。本文件是 `/wm code-health` 的可执行参考，说明已实现的 Phase 1–4 命令、角色边界、退出语义与失败路径。
 > 交付层：全部资产属 L1（`w-model-dev/scripts/**`），不在 L0 纯 skill 副本内；判定为纯函数 + 确定性 CLI，不调用 LLM。
-> **实现边界**：本仓库实现并验收 Phase 1–4，以及 campaign 归档（真实 producer/consumer/verifier）。Phase 5–8 迁移能力仍**未实现**，不得据本文或计划文本执行迁移。归档的验证分两级：`--verify` 不带 `--source-project` 只能是 **package-only**（与 `wm-export-evidence --verify` 语义一致），只有显式传 `--source-project` 才做 source-bound 重验（当前 HEAD / source hash / run 身份 / gate measurements）；package-only **不得**表述为 verified source。旧的 `logic/code-health-phase-boundaries.ts` 占位模块已删除。
+> **实现边界**：本仓库实现并验收 Phase 1–4，以及 campaign 归档（真实 producer/consumer/verifier）。Phase 5–8 迁移能力仍**未实现**，不得据本文或计划文本执行迁移。归档的验证分两级：`--verify` 不带 `--source-project` 只能是 **package-only**（与 `wm-export-evidence --verify` 语义一致），只有显式传 `--source-project` 才做 source-bound 重验（当前 HEAD / source hash / run 身份 / gate measurements）；package-only **不得**表述为 verified source。旧的 `logic/code-health-phase-boundaries.ts` 占位模块已删除。Phase 5–8 迁移的设计锚点素材见 SSoT §10K.7（待需求输入）。
 
 ## 1. 何时使用
 
@@ -76,6 +76,10 @@ npx tsx w-model-dev/scripts/cli/code-health-archive.ts --verify <package-dir> [-
 - **回滚**：任何失败的应用必须回滚到 pre-change revision——记录受控 patch 并 `git apply -R` 反向应用，随后以真实 `git status` 回读证明工作树回到 pre-change 快照（工作树原本干净时**不弱于** `git diff --exit-code` 为 0：状态快照还覆盖 untracked / staged 项；原本有本地改动时按各自快照比对，不误报）；反向应用失败或仍有残留即**显式失败**——`code-health-apply.ts` 在被拒绝的 commit 结果中同时给出受控 patch、回滚计划（含 `patchSha256`）与回滚校验结论，绝不静默声称工作树干净。P3 `--guard` 在最终证明失败时回滚已应用的删除并证明工作树已还原，无法还原同样显式失败。
 - **回滚证的精度（不是内容级证明）**：`verifyRollbackRestored` 比对的是 `git status --porcelain` 的**路径集合**（XY 状态字母被丢弃），因此对「运行前已存在、运行后内容变化但状态字母不变」的**非 scope** 路径没有内容级证明。scope 文件不受此限：受控 patch 内嵌运行前的完整字节，`git apply -R` 成功即字节级还原，失败即显式违规。
 - **exact-scope 回读的前置条件（否则 fail-closed 拒绝，而不是照删不误）**：commit 的 exact-scope 判定统计「运行后**新增**的 status 路径条目」。若被批准的 scope 文件在运行前已出现在 status 中——**untracked（未入 index）**，或**已跟踪但工作区被本地修改**——删除它不产生新增条目，`appliedFiles` 必然少于 scope 大小 → `SCOPE_MISMATCH` fail-closed 并回滚还原（两类情形实测均逐字节还原，2026-09-18 临时仓探针）。clean 工作树（scope 文件已跟踪且无本地改动）才是正常删除路径。
+- **整批否决与回收（campaign 级操作，批次 5 治理规则；权威披露见 [quality-standards.md](quality-standards.md)「整批否决权与回收路径」节与 SSoT §10O）**：
+  - **整批 CHECKPOINT 展示清单**：campaign id + 候选清单（候选 ID / action / 精确 scope / scopeHash 逐候选列出）+ 拟议批量判定；人类可整批 approve / reject / defer 或混合裁定。
+  - **整批 reject 后落账顺序**：逐候选 `ledger append` 登记 `rejected`（或 `deferred`）事件——一次一候选、一候选一事件，禁止把多候选合并为单个 ledger 事件（append-only 原语不识别批量语义）。
+  - **回收步骤**：① 人类 CHECKPOINT 发起（判据 = 系统性问题 + 逐候选受影响证明）；② 逐候选回滚（受控 patch `git apply -R` + pre-change 快照回读证明，同本节既有回滚语义）；③ 逐候选登记 `rolled-back`；④ archive 重新 produce——回收候选以终态非成功证据归档（`archivedAsPassed=false`），原 package 不覆盖、不删除（原子写入语义不变）。
 
 ## 7. 脱敏与边界
 
