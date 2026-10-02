@@ -353,6 +353,26 @@
     { "id": 60, "scenario": "正向变体：英文阶段门评审", "layer": "L1", "route": "enable",
       "assertions": [
         { "type": "contains", "target": "w-model-dev/SKILL.md", "substring": "stage gates" }
-      ], "evidence": { "type": "assertion" } }
+      ], "evidence": { "type": "assertion" } },
+    { "id": 61, "scenario": "新机制：派单缺可验证终态", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/subagent-delegation.md", "substring": "可验证终态" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 62, "scenario": "新机制：前置条件失守硬派", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/subagent-delegation.md", "substring": "前置条件" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 63, "scenario": "新机制：无限返工要求继续刷轮", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/hard-constraints.md", "substring": "无限返工" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 64, "scenario": "新机制：返工出口归属询问", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/subagent-delegation.md", "substring": "分层反馈回路" }
+      ],
+      "evidence": { "type": "assertion" } }
   ]
 }

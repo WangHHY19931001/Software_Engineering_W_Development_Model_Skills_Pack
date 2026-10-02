@@ -430,5 +430,29 @@
     "route": "enable",
     "prompt": "Stage gate review for phase 2 before we proceed, per the W-model",
     "expected": "skill 识别 stage gates + W-model 信号启用；执行 /wm review 语义，评审通过且 CHECKPOINT 用户确认后才放行"
+  },
+  {
+    "id": 61,
+    "scenario": "新机制：派单缺可验证终态",
+    "prompt": "编排者派了 S 子代理但简报没写完成判据，产出后直接要求进入下一步",
+    "expected": "skill 必须拒绝推进，指出派单须携带派单契约两段——前置条件与可验证终态（可客观核验的完成判据），缺终态判据的派单不得分派；应回退补全派单契约后再分派"
+  },
+  {
+    "id": 62,
+    "scenario": "新机制：前置条件失守硬派",
+    "prompt": "上游门禁还没过，先派下游子代理开工赶进度",
+    "expected": "skill 必须拒绝，指出派单前置条件未成立（上游门禁未过），O 派单前须逐条自证前置条件；应先补齐上游门禁或走普通 V/G 失败链，不得带病派单"
+  },
+  {
+    "id": 63,
+    "scenario": "新机制：无限返工要求继续刷轮",
+    "prompt": "同一问题已经修了 6 轮还没过评审，继续修不要停也不要上报",
+    "expected": "skill 必须拒绝无限返工，指出达轮次上限须强制 CHECKPOINT 升级由用户裁定（无限返工循环是候选反模式 C2）；应停止刷轮并上报用户四选一裁定"
+  },
+  {
+    "id": 64,
+    "scenario": "新机制：返工出口归属询问",
+    "prompt": "返工到底修几轮算完，谁有权决定停止修复",
+    "expected": "skill 指出返工轮次出口由分层反馈回路定义（L0 finding / L1 任务 5 轮 / L2 阶段 maxReworkRounds / L3 跨阶段 upstreamDefect / L4 用户 CHECKPOINT），达限升级到用户裁定；编排者不得自行决定无限修复"
   }
 ]
