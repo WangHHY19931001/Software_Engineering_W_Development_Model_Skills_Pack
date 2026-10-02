@@ -113,4 +113,10 @@
 
 ## 收尾记录
 
-（实现完成后回填：提交清单、prepush 终值、eval 终值、总纲状态登记提交号。）
+（2026-10-02 回填）**子代理驱动执行**（superpowers:subagent-driven-development）：任务 1-7 各「实现者+任务审查者」双角色分派，全部规格✅+质量通过；最终宽范围审查「可合并」（DoD 1-4 ✅，DoD 5 待终值）+ 终审修复浪潮 fa4a24c2（F1-F6 全 ADDRESSED，定向复审通过）。
+
+- 提交清单：立项 78396d90（规格+计划，main）；实现 d463ad68（t1 两权威节）→ c35aaed6（t2 22 模板）→ 31f6f503（t3 phase-5）→ d90aeb94（t4 C2）→ 39246f37（t5 eval）→ bb95e023（t6 SSoT/AGENTS）→ ca5fc151（t7 版本收口）→ fa4a24c2（终审修复浪潮）→ ab7b2f43（终值回填）。
+- prepush 终值：**19/19 全绿**（对 ca5fc151 2513s；对 fa4a24c2 1949s——终值）。
+- eval 终值：**64/64**（routeTotals {12/8/22} 不变）；typecheck / docs-consistency / audit:l0-links 全绿。
+- 合并：main ← feature/batch4-dispatch-contract（--no-ff，合并提交 453b22f2）；总纲批次 4 状态登记「已实现并合入 main」。
+- 延后项（账本 minor deferred，移交后续批次/终审）：§10A 批次不对称（批次 2/3 无行属既有现状）；CHANGELOG:12 双括注措辞观感；被改表格的 prettier 管道对齐（.md 不在格式门禁面）。
