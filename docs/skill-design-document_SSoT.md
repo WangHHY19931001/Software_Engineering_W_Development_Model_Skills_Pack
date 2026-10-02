@@ -2376,6 +2376,22 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 
 ---
 
+## 10N. 派单契约与分层反馈回路（批次 4，2026-10-02）
+
+**目标**：给派单简报补两段契约——**前置条件**（开工前须成立的可核验命题，O 派单前逐条自证，无法自证的条件不得写入）与**可验证终态**（任务完成的客观判据，第三方可复核、禁 LLM 自评词）；同时把散落五处的返工轮次治理收敛为 **L0-L4 分层反馈回路**权威视图（L0 finding → L1 任务 → L2 阶段 → L3 跨阶段 → L4 用户，信号源全部既有机制与既有数值，不新增轮次数值）；「无限返工循环」登记为候选反模式 **C2**（pending V 复审）。本节为权威层摘要，机制细则按落点表分节承载，不在此重复。
+
+| 面 | 落点与内容 | 实现位置 |
+| --- | --- | --- |
+| 派单契约权威 | 「派单契约：前置条件与可验证终态」节：前置四形态（路径存在性 / 内容结构性判据 / 门禁判据 / 环境判据）/ 终态四形态（gate / 测试 / 产物 / 回填判据）/ 自评词禁则（终态须第三方可复核）/ 角色禁令优先（非 G 角色终态落在产物+回填判据）/ selfCheck.terminalState 与 acceptanceCriteriaMet 分层并存；22 个分派模板同构携带两段 | `w-model-dev/references/subagent-delegation.md` |
+| 分层反馈回路权威 | 「分层反馈回路（L0-L4）」节：L0 finding（scoped re-review 逐条裁决）→ L1 任务（fix 循环每任务 5 轮）→ L2 阶段（`maxReworkRounds` 预算门禁 + R3×3 + ICEBERG-A/B maxIcebergRounds=5）→ L3 跨阶段（R 报告 `upstreamDefect` 唯一合法回退建议源）→ L4 用户（🔴 CHECKPOINT）；信号源全部既有机制与既有数值；升级单调性 | 同文件；`w-model-dev/references/phase-5-coding.md`「任务分配规则」「返工路径」节交叉引用 |
+| C2 候选 | 候选区「C2（候选，pending V 复审）无限返工循环」：症状（达限不 CHECKPOINT / 换 finding 编号重开循环 / 循环中改写 finding 定义）/ 违反原则 / 检测信号 / 修正——复审转正前不作为强制反模式执行；达限 CHECKPOINT 义务是既有强制约束，独立于候选状态 | `w-model-dev/references/hard-constraints.md` 候选区 |
+| eval 锚定 | L2 语料 id 61-64：派单缺可验证终态 / 前置条件失守硬派 / 无限返工要求继续刷轮 / 返工出口归属询问 | `eval/mappings.json` + `eval/w-model-dev-test-prompts.json` |
+
+- **能力分工（不得夸大）**：派单契约与分层回路为**纯文档机制，无脚本门禁**（D12 知情声明）——执行靠 O/V 遵循与既有闭环门禁（`check-run-log` / `check-budget` / `check-role-dispatch`）间接承载；若实测漂移，后续批次可评估以 run-log 断言补强。
+- **判据披露**：可验证终态 = **第三方可复核**（O/V 只读证据，不读子代理自评心智）；非 G 角色不以 gate 判据为终态（角色禁令优先）；分层回路是**收敛视图**不是新机制（零新增轮次数值——每任务 5 轮 / `maxReworkRounds` / maxIcebergRounds=5 均为既有值引用）；C2 候选在 V 复审转正前**不作为强制反模式执行**，但达上限 CHECKPOINT 义务独立于候选状态。
+
+---
+
 ## 10.10 系统层级树与多层图谱
 
 > 本节确立系统层级树 + 7 层图谱模型。
@@ -2492,6 +2508,7 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | 10F 事件驱动循环（Loop 3）                   | EventIngress schema + 棕地条件性路由（L2+ 激活，事件→单阶段）+ 高风险路径强制 CHECKPOINT + 编排者路由逻辑                                                                                                                                                                                                                                                      | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §2（权威定义）+ `w-model-dev/references/event-ingress-guide.md` + `w-model-dev/references/data-models.md`（EventIngress schema）+ `w-model-dev/references/operational-recovery.md`「事件驱动与棕地维护」节                                     | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 3 Event-driven；不引入调度基础设施，消费方自行实现触发器；L2+ 激活，L0/L1 不支持；高风险路径强制 CHECKPOINT 不违反约束2）                 |
 | 10G 爬坡循环（Loop 4）                       | HarnessImprovementReport（确定性分析 run-log，无 LLM）+ 信号检测逻辑 + 触发时机 + 与外部工具边界 + 报告消费流程                                                                                                                                                                                                                                                | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §3（权威定义）+ `w-model-dev/references/hill-climbing-guide.md` + `w-model-dev/references/data-models.md`（HarnessImprovementReport schema）+ `w-model-dev/references/hard-constraints.md`「C1（候选，pending V 复审）」节                     | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 4 Hill Climbing；只产出改进信号不自动改 harness，保持"技能自演化不在本仓库"原则；外部 SkillOpt/darwin-skill 消费信号；人审后手动应用）    |
 | §10H SkillOpt 方法论吸收                     | SkillOpt「bounded edit + validation gate」方法论吸收（Loop 4 信号消费路径）+ 六段式循环类比映射 + bounded edit 边界 + validation gate 标准 + 人审流程 + 与 §11 协调                                                                                                                                                                                            | `w-model-dev/references/skillopt-adoption.md`（可执行细则）                                                                                                                                                                                                                                                                        | 完整（吸收 SkillOpt 方法论而非工具运行；不引入 Python 依赖/LLM；消费 Loop 4 信号；与 §11「技能自演化不在本仓库」协调——方法论吸收类比 §10.8 TLA+）                                                   |
+| §10N 派单契约与分层反馈回路 | 派单契约两段（前置条件四形态 / 可验证终态四形态 / 自评词禁则 / 角色禁令优先 / selfCheck.terminalState 分层）+ 分层反馈回路 L0-L4 收敛视图（零新增轮次数值）+ 候选反模式 C2（无限返工循环，pending V 复审）+ eval L2 语料 id 61-64 | `w-model-dev/references/subagent-delegation.md`「派单契约：前置条件与可验证终态」节 +「分层反馈回路（L0-L4）」节（22 分派模板同构携带两段）+ `w-model-dev/references/phase-5-coding.md`「任务分配规则」「返工路径」节交叉引用 + `w-model-dev/references/hard-constraints.md` 候选区 C2 + `eval/mappings.json` / `eval/w-model-dev-test-prompts.json` | 完整（纯文档机制，无脚本门禁，D12 知情声明；执行靠 O/V 遵循与既有闭环门禁间接承载；见 [批次 4 设计规格](./superpowers/specs/2026-10-02-batch4-dispatch-contract-design.md)） |
 | 11A 采用路径                                 | greenfield vs brownfield 引入 W 模型                                                                                                                                                                                                                                                                                                                           | `docs/adoption-guide.md`                                                                                                                                                                                                                                                                                                           | 完整（吸收自 addyosmani/agent-skills `docs/adoption-guide.md`）                                                                                                                                     |
 
 ---

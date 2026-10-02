@@ -7,6 +7,33 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [42.9.0] - 2026-10-02
+
+> 来源：「批次 4：派单与流程契约」批——规格 `docs/superpowers/specs/2026-10-02-batch4-dispatch-contract-design.md`（78396d90）、计划 `docs/superpowers/plans/2026-10-02-batch4-dispatch-contract.md`（78396d90 同提交），账本 `.superpowers/sdd/2026-10-02-batch4-dispatch-contract/`（gitignored 账本；逐任务三件套 `task-N-{brief,report}.md` + `review-*.diff`），实现 6 提交 d463ad68..bb95e023（分支 feature/batch4-dispatch-contract，自规格/计划提交 78396d90 开启，该基点不计入 6 提交计数）。**版本 bump 42.8.0 → 42.9.0**（判据：minor 级流程契约变更——22 个分派模板新增强制「前置条件 / 可验证终态」两段 + 分层反馈回路（L0-L4）权威视图 + hard-constraints 候选区 C2 登记）。**向后兼容**：纯文档机制零脚本零 schema 零门禁行为变化；分派模板新增段为产出披露要求，既有字段与既有产出物零破坏；eval 仅追加。**计数影响**：schema 34 / prepush 19 / persona 33 / references 44 / exit-2 脚本 47 / CLI 48 全不变；eval 语料 60 → 64（+4 条 L2，routeTotals {12/8/22} 不变）；反模式正式清单仍 48 条（C2 为候选区登记，pending V 复审，不计入活体计数）。**prepush 19/19 全绿**（终值 1949s，对终审修复浪潮提交 fa4a24c2 实测；此前对收口提交 ca5fc151 亦 19/19 全绿 2513s）。
+
+### 派单契约（B4：前置条件 + 可验证终态）
+
+- **权威节**：`subagent-delegation.md` 新增「派单契约：前置条件与可验证终态」节——分派简报在 §3.3「四件事」（角色 / 产物 / 输入路径 / 落盘路径）之外必须携带两段契约，叠加不互替：**前置条件**（任务开始前必须成立的可核验命题，四类合法形态：路径存在性 / 内容结构性判据 / 门禁判据 / 环境判据；O 派单前逐条自证，无法自证的条件不得写入；S 侧核验义务与既有质疑权双轨执行，任一前置不成立走既有质疑权出口 `blockers[]` / `state=NEEDS_CONTEXT`，禁止「先做着看看」）；**可验证终态**（任务完成的客观判据，产出契约新增第 5 项，四类合法形态：gate 判据 / 测试判据 / 产物判据 / 回填判据）。
+- **自评词禁则与角色禁令优先**：LLM 自评词（「质量良好 / 基本完成 / 已优化」等）不得作为终态判据——终态判据必须第三方可复核（O/V 只读证据，不读子代理自评心智）；被禁止跑门禁脚本的角色（S / V / R / A 系）不以 gate 判据为终态判据，其 gate 验证由下游 G 子代理承担，终态落在产物判据 + 回填判据；G 自身的 gate 判据语义为「受派门禁全部执行完毕 + 结构化证据摘要回填」（exit 1 也是有效完成——回填真实测量值，exit 1 触发失败链而非「任务未完成」）。
+- **任务级 vs 阶段级划界与回填对齐**：可验证终态是任务级判定，phase-N 验收标准是阶段级判定——任务终态是阶段验收的必要非充分条件，不替代阶段门（放行仍走 V/G 证据 + 🔴 CHECKPOINT 用户确认）；回填契约 selfCheck 新增 `terminalState` 证据字段（逐条终态判据的核验结果与证据指针），与既有 `acceptanceCriteriaMet`（阶段级自检）分层并存；status.json `state=DONE` 以终态判据证据为前提、`BLOCKED` / `NEEDS_CONTEXT` 对应前置失守路径（schema 本体零改动，语义注释级对齐）。V 评审须核对 `terminalState` 证据真实性，伪造终态证据按既有约束 #4（真实执行）/#9（门禁退出码不可伪）处置，走普通 V/G 失败链——不新增反模式。
+- **22 个分派模板同构携带两段**：S / V / G / R / A 系全部分派模板统一插入「前置条件（派单契约，O 派单前逐条自证）」与「可验证终态（selfCheck.terminalState 逐条核验）」两段。
+- **交接书写与交叉引用**：`brief.md` 契约格由四件扩为六件（+前置条件 / +可验证终态）；§3.3 书写规则追加句（完整派单书写 = 四件事 + 两段契约）；phase-5-coding.md「任务分配规则」节交叉引用派单契约权威节。
+
+### 分层反馈回路（B5：L0-L4 收敛视图 + C2 候选）
+
+- **权威节**：`subagent-delegation.md` 新增「分层反馈回路（L0-L4）」节——返工 / 失败信号的收敛视图，按作用域分层、不按缺陷类型分流：L0 单条 finding（scoped re-review 逐条裁决）→ L1 单次派单任务（fix 循环每任务最多 5 轮，达限 → L4，不放松 `budget.json.perPhase.maxReworkRounds`，两者取更严者）→ L2 当前阶段（`maxReworkRounds` 预算门禁 + R3×3 + 冰山 ICEBERG-A/B maxIcebergRounds=5）→ L3 跨阶段（R 报告 `upstreamDefect` 唯一合法回退建议源，用户 🔴 CHECKPOINT 裁定回退）→ L4 项目级（🔴 CHECKPOINT 用户裁定）。信号源全部为既有机制与既有数值，零新增上限、零新机制。
+- **升级单调性与词汇约束**：循环内不得绕过达限升级——换 finding 编号 / 改名重开循环、重置轮次计数、循环中改写 finding 定义使裁决永不收敛，均属架空轮次治理，登记为候选 C2；「普通 V/G 失败链」是 L1 的具体展开，分层回路不改变失败链任何步骤顺序；返工原因分类须引用总纲 §4.1 ChangeClassification 词汇（`semantic` / `topology` / `evidence-only`），不另造近义词——本批次不引入 classification 分流。
+- **失败模式表归属标注与交叉引用**：「失败模式与回退」表 R 自评不通过 / V 复审根因不通过两行补 L1→L4 升级归属标注；phase-5-coding.md「返工路径」节交叉引用分层出口与升级路径（本节「仅作为 R 定位线索」的线索化纪律不变）。
+- **hard-constraints.md 候选区 C2「无限返工循环」**：五字段（症状 / 违反原则 / 检测信号 / 修正 / 状态）仿 C1 登记（违反原则指向约束 #4 + 约束 #2）；候选状态 pending V 复审，复审转正前不作为强制反模式执行——达上限 CHECKPOINT 义务本身是既有强制约束（每任务 5 轮上限与 `maxReworkRounds` 预算门禁），独立于候选状态；反模式活体计数 48 条零触碰。
+
+### eval 语料（+4 条 L2）
+
+- `eval/mappings.json` + `eval/w-model-dev-test-prompts.json` 追加 id 61-64 四条 L2 机制存在性断言，锚定批次 4 新机制：61 派单缺可验证终态 / 62 前置条件失守硬派 / 63 无限返工要求继续刷轮 / 64 返工出口归属询问；`mappings.json` 顶层 `description` 条数口径同步 60 → 64；`npm run eval` 64/64 通过。
+
+### 索引与权威对齐
+
+- SSoT 新增 §10N 摘要节（批次 4 四件套：派单契约权威 / 分层反馈回路权威 / C2 候选 / eval 锚定，含能力分工与判据披露两句——纯文档机制无脚本门禁为 D12 知情声明）+ §10A 追溯表增 §10N 行；AGENTS.md §1「编排者最小化」段追加派单契约与分层回路摘要句（双权威指针）；总纲 `2026-09-30-absorption-batches-master-outline.md` §5 批次 4 状态登记（本提交）。
+
 ## [42.8.0] - 2026-10-02
 
 > 来源：「批次 2：设计期未决问题」批——规格 `docs/superpowers/specs/2026-10-02-design-phase-fog-and-optional-capability-design.md`（dea72625）、计划 `docs/superpowers/plans/2026-10-02-design-phase-fog.md`，账本 `.superpowers/sdd/2026-10-02-design-phase-fog/`（gitignored 账本；逐任务三件套 `task-N-{brief,report}.md` + `review-*.diff`），实现 8 提交 56020c75..8d248ee9。**版本 bump 42.7.0 → 42.8.0**（判据：minor 级门禁行为变更——新增 check-design-fog 门禁脚本（R1-R6）与三主模板强制「迷雾登记册」节 + 阶段 2-4 CHECKPOINT 迷雾清空接线）。**向后兼容**：check-design-fog 为新增独立门禁脚本，既有门禁脚本行为与退出码面零变化；三主模板迷雾节与 discipline-dod 勾选项均为产出模板增列，既有字段零改动。**计数影响**：schema 34 / prepush 19 / persona 33 / references 44 均不变；exit-2 脚本 46 → 47、CLI 47 → 48（+check-design-fog，门禁脚本 48 个 .ts）；samples 新增 5 fixture（design-fog：valid-all-terminal / valid-no-fog-marker / bad-missing-section / bad-unresolved-fog / bad-marker-conflict）；self-test 392 用例（+5 DESIGN_FOG_CASES 样本回归，非 vitest）；vitest 用例 1942 → 1958（+16：design-fog-logic.test.ts 12 / design-fog-cli.test.ts 3 / exit2-failure-atomicity 逐门禁派生 +1，本批收口轮同步修正 docs-consistency-logic 测试的计数锚 46→47 / 47→48 / 48→49）；eval 语料 60/60（本批零影响实测）。

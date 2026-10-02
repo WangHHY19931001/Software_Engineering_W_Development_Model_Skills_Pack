@@ -157,7 +157,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
 - 失败模式与运维失败模式导航（F1~F10 见 [operation-behaviors.md](operation-behaviors.md)；O1~O6 见 SSoT §4A.2a）
-- 候选反模式（C1，来自 Loop 4 爬坡循环）
+- 候选反模式（C1/C2，pending V 复审；C1 来自 Loop 4 爬坡循环，C2 来自批次 4 分层反馈回路）
 
 ### 反模式-硬约束映射
 
@@ -544,6 +544,18 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 **修正**：强化 verifier-spec.md §6 summary 三要素要求（sig-001 已应用）；V 子代理重写 summary 含具体决策+结构+风险。
 
 **状态**：候选（pending V 复审）。本候选由 Loop 4 信号驱动提出，需 V 子代理复审转正后正式编号入清单。复审前不作为强制反模式执行。
+
+### C2（候选，pending V 复审）无限返工循环
+
+**症状**：同一 finding / 任务在 L0-L1 循环内反复修复不升级——达每任务 5 轮上限不 CHECKPOINT；换 finding 编号 / 改名重开循环绕过轮次计数；循环中改写 finding 定义使 ADDRESSED 裁决永不收敛；以「部分修复」反复刷轮消耗返工预算。
+
+**违反原则**：真实执行（约束 #4）+ 阶段门放行（约束 #2）——轮次上限被架空，🔴 CHECKPOINT 不可绕过被实质绕过。
+
+**检测信号**：run-log 中同 target 连续 `action=rework` 记录数超过轮次上限；同轮次号重复出现（计数被重置）；同 id finding 在循环轮次间定义发生语义改写。
+
+**修正**：达限强制 🔴 CHECKPOINT 升级（L1→L4，用户裁定：继续修复 / 接受剩余项并放行 / 阶段回退 / 终止）；禁止升级单调性列出的绕过手段——分层出口与升级路径见 [subagent-delegation.md](subagent-delegation.md)「分层反馈回路（L0-L4）」节。
+
+**状态**：候选（pending V 复审）。复审前不作为强制反模式执行——达上限 CHECKPOINT 义务本身是既有强制约束（subagent-delegation.md scoped re-review 每任务 5 轮上限与 `budget.json.perPhase.maxReworkRounds` 预算门禁），不受候选状态影响；V 子代理复审转正后正式编号 #49 并同步活体计数。
 
 ### #28 schema 前置校验缺失（借鉴点 2 — Task 3）
 

@@ -33,6 +33,7 @@
 - **产品化类任务**（判据住代码内，agent 擅长）：补文档、测试、类型注解、错误处理、边界情况、重构 → 优先分派 S 子代理。
 - **系统集成类判断**（判据住大系统处境里，agent 不擅长）：对接外部系统、生产环境适配、跨模块契约裁决、版本兼容决策 → 必须由人/主刀持有，不得外包给 agent。
 - 完成度判定："agent 跑通了"只证明左下角（1x 一次性脚本）；交付到右上角（可依赖构件产品）须产品化轴与系统集成轴逐项自检（见 [quick-self-check.md](quick-self-check.md)「完成定义（DoD）」节「完成度矩阵自检」）。
+- 派单须携带派单契约两段（前置条件 / 可验证终态，O 派单前逐条自证），权威定义见 [subagent-delegation.md](subagent-delegation.md)「派单契约：前置条件与可验证终态」节。
 
 ## 增量集成纪律
 
@@ -531,6 +532,8 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 - 覆盖率 < 80%：作为测试/实现缺口证据，禁止调低阈值
 
 任何普通 V/G 失败均先走 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）。R 的 `upstreamDefect` 才能建议回阶段 1-4；O 只在展示证据后的用户 CHECKPOINT 执行获批准的阶段切换。
+
+返工轮次的分层出口与升级路径（L0 finding → L1 任务 → L2 阶段 → L3 跨阶段 → L4 用户）见 [subagent-delegation.md](subagent-delegation.md)「分层反馈回路（L0-L4）」节；本节「仅作为 R 定位线索」的线索化纪律不变。
 
 ## 退出状态
 
