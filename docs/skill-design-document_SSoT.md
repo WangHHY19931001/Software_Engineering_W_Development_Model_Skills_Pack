@@ -2408,6 +2408,22 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 
 ---
 
+## 10O. agent 威胁模型、整批否决权与迁移素材（批次 5，2026-10-03）
+
+**目标**：① C2（前置裁定 D1）——agent 流水线威胁目录 T1-T7 映射既有缓解机制，载体为叙事文档 `agent-threat-model.md`，`verifier-spec.md` §7.4A「不构建完整守卫体系」细化为「不构建自动化守卫脚本；威胁登记与机制映射属 R3 叙事层」；② C4（D2）——campaign 级整批否决权（批量 CHECKPOINT 编组语义）与回收路径（系统性问题触发的逐候选既有原语编组），纯治理规则文档；③ C1（D3）——Phase 5-8 迁移设计锚点素材（定义 + 动作枚举占位 + 待输入字段表），维持「未实现（不得据此执行）」。本节为权威层摘要，细则按落点表分节承载。
+
+| 面 | 落点与内容 | 实现位置 |
+| --- | --- | --- |
+| C2 威胁模型 | 定位三不承诺 + 消费角色（R3 security / V security-auditor）+ T1-T7 目录（威胁/攻击面/机制映射+覆盖强度/缺口）+ 缺口总览 + 维护规则 | `w-model-dev/references/agent-threat-model.md`（新增） |
+| C2 边界细化 | §7.4A 注入提示行：原句保留 + D1 细化声明 + 指针（兼 orphan 审计入链） | `w-model-dev/references/verifier-spec.md` §7.4A |
+| C4 整批否决权/回收 | 批量 CHECKPOINT 三语义锚定（批量判定/非降门槛/逐候选落账）+ 回收四步 + 阶段级对称句 + 外发包不可召回披露 | `w-model-dev/references/quality-standards.md`「代码健康治理质量门」节内子节 + `w-model-dev/references/code-health-governance.md` §6 |
+| C1 迁移素材 | §10K.7：定义 + `migrate-code`/`migrate-test` 占位 + 五字段待输入表 + 继承警告 | 本文档 §10K.7 + `code-health-governance.md` 头部指针 |
+
+- **能力分工（不得夸大）**：威胁模型是**叙事映射**不是守卫体系——不新增脚本/检测信号/门禁判定（D1 三不承诺）；整批否决/回收是**编组语义**不是新自动化能力——全部复用既有 CHECKPOINT / ledger / 回滚原语，零新脚本零 schema；迁移素材是**待输入设计锚点**不是可用能力——维持「未实现（不得据此执行）」，实现单独立项。
+- **判据披露**：D1 裁定（2026-10-03，用户）细化全文 = 「不构建**自动化守卫脚本**；威胁登记与既有机制映射属 R3 叙事层」；T1-T7 为本仓自有编号（不复用 STRIDE）；缺口如实登记（T1 无自动注入检测 / T4 gate-log↔签名链自动核查未建 / T6 已外发包不可召回）——登记不构成补强承诺。
+
+---
+
 ## 10.10 系统层级树与多层图谱
 
 > 本节确立系统层级树 + 7 层图谱模型。
@@ -2525,6 +2541,7 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | 10G 爬坡循环（Loop 4）                       | HarnessImprovementReport（确定性分析 run-log，无 LLM）+ 信号检测逻辑 + 触发时机 + 与外部工具边界 + 报告消费流程                                                                                                                                                                                                                                                | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §3（权威定义）+ `w-model-dev/references/hill-climbing-guide.md` + `w-model-dev/references/data-models.md`（HarnessImprovementReport schema）+ `w-model-dev/references/hard-constraints.md`「C1（候选，pending V 复审）」节                     | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 4 Hill Climbing；只产出改进信号不自动改 harness，保持"技能自演化不在本仓库"原则；外部 SkillOpt/darwin-skill 消费信号；人审后手动应用）    |
 | §10H SkillOpt 方法论吸收                     | SkillOpt「bounded edit + validation gate」方法论吸收（Loop 4 信号消费路径）+ 六段式循环类比映射 + bounded edit 边界 + validation gate 标准 + 人审流程 + 与 §11 协调                                                                                                                                                                                            | `w-model-dev/references/skillopt-adoption.md`（可执行细则）                                                                                                                                                                                                                                                                        | 完整（吸收 SkillOpt 方法论而非工具运行；不引入 Python 依赖/LLM；消费 Loop 4 信号；与 §11「技能自演化不在本仓库」协调——方法论吸收类比 §10.8 TLA+）                                                   |
 | §10N 派单契约与分层反馈回路 | 派单契约两段（前置条件四形态 / 可验证终态四形态 / 自评词禁则 / 角色禁令优先 / selfCheck.terminalState 分层）+ 分层反馈回路 L0-L4 收敛视图（零新增轮次数值）+ 候选反模式 C2（无限返工循环，pending V 复审）+ eval L2 语料 id 61-64 | `w-model-dev/references/subagent-delegation.md`「派单契约：前置条件与可验证终态」节 +「分层反馈回路（L0-L4）」节（22 分派模板同构携带两段）+ `w-model-dev/references/phase-5-coding.md`「任务分配规则」「返工路径」节交叉引用 + `w-model-dev/references/hard-constraints.md` 候选区 C2 + `eval/mappings.json` / `eval/w-model-dev-test-prompts.json` | 完整（纯文档机制，无脚本门禁，D12 知情声明；执行靠 O/V 遵循与既有闭环门禁间接承载；见 [批次 4 设计规格](./superpowers/specs/2026-10-02-batch4-dispatch-contract-design.md)） |
+| §10O agent 威胁模型、整批否决权与迁移素材 | 威胁目录 T1-T7→既有机制映射（叙事层三不承诺）+ §7.4A 边界细化 + campaign 整批否决权/回收路径（编组语义，零新机制）+ Phase 5-8 迁移设计锚点素材（待需求输入） | `w-model-dev/references/agent-threat-model.md` + `w-model-dev/references/verifier-spec.md` §7.4A + `w-model-dev/references/quality-standards.md`「整批否决权与回收路径」节 + `w-model-dev/references/code-health-governance.md` §6 与头部指针 + 本文档 §10K.7 | 完整（纯文档批次，零新脚本零 schema；D1-D5 已裁定，见 [批次 5 设计规格](./superpowers/specs/2026-10-03-batch5-governance-narrative-design.md)） |
 | 11A 采用路径                                 | greenfield vs brownfield 引入 W 模型                                                                                                                                                                                                                                                                                                                           | `docs/adoption-guide.md`                                                                                                                                                                                                                                                                                                           | 完整（吸收自 addyosmani/agent-skills `docs/adoption-guide.md`）                                                                                                                                     |
 
 ---
