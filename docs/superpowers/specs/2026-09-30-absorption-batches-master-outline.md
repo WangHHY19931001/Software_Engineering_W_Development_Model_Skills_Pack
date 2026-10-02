@@ -73,7 +73,7 @@
 | 2 | 2026-10-02-design-phase-fog-and-optional-capability-design.md（commit dea72625） | 2026-10-02-design-phase-fog.md | **已实现**（11 提交 cf127687..f7d61139 + 终审修复；prepush 19/19 全绿 1595s；版本 42.8.0；D1-D5 已裁定：A4 方案 A / A3 文档+脚本 / 三选一+回退 / 复用四字段），待合并 |
 | 3 | 2026-10-01-gate-engineering-design.md（commit 00778532） | 2026-10-01-gate-engineering.md（ef59d54a） | **已实现并合入 main**（13 提交 6a2029df..73cab34d；合并提交 9b2a2125；合并结果全量测试 1942/1942；版本 42.7.0） |
 | 4 | 2026-10-02-batch4-dispatch-contract-design.md（commit 78396d90） | 2026-10-02-batch4-dispatch-contract.md（78396d90） | **已实现并合入 main**（实现 6 提交 d463ad68..bb95e023 + 终审修复浪潮 fa4a24c2 + 终值回填 ab7b2f43；合并提交 453b22f2；prepush 19/19 全绿 1949s（对 fa4a24c2）；eval 64/64；版本 42.9.0） |
-| 5 | 2026-10-03-batch5-governance-narrative-design.md（b6ead5d0 + 版本勘误） | 2026-10-03-batch5-governance-narrative.md（2552c259） | **已实现**（46cfdb46..〈收口提交短哈希，由哈希盖章提交补记〉；prepush 19/19 全绿 1991s；版本 42.10.0），待合并 |
+| 5 | 2026-10-03-batch5-governance-narrative-design.md（b6ead5d0 + 版本勘误） | 2026-10-03-batch5-governance-narrative.md（2552c259） | **已实现**（46cfdb46..2c761575；prepush 19/19 全绿 1991s（对 3757eb5f）；版本 42.10.0），待合并 |
 
 ### 5.1 批次 1 延后项与后续项登记（2026-10-01，工作区账本销毁前的持久化）
 
