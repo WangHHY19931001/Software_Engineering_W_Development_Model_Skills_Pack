@@ -2242,6 +2242,22 @@ interface RunLogEntry {
 - **两级验证（不得混淆）**：`produce`/`verify` 的 `--verification-level` **可省略，缺省即 `package-only`**（不因省略而升级）；`--verify` 不带 `--source-project` **只能是 package-only**（与 `wm-export-evidence --verify` 语义一致），package-only **不得**表述为 verified source；只有传 `--source-project` 才做 source-bound 重验（HEAD / source hash / run 身份 / gate measurements），复用 `verifySourceProvenance` 规则。
 - **归档不代替 CHECKPOINT**：归档仍需人类 approval，`ARCHIVE` 不能作为阶段放行或授权的替代。
 
+### 10K.7 Phase 5-8 迁移设计锚点（素材，待需求输入）
+
+> **未实现（不得据此执行）**——继承本节头部既有边界：本节是设计锚点**素材**，不构成可用能力，不得文档化为可用、不得据此执行任何迁移；实现单独立项（先例：[deferred-closeout 设计](./superpowers/specs/2026-09-27-deferred-closeout-design.md)「体量差两个数量级，单独立项」）。总纲 §3：实现立项前须先有需求输入。
+
+- **定义**：迁移 = 在 W 模型阶段 5-8 受 code-health 治理的代码/测试迁移类变更（move / relocate），复用 P1-P4 的「人类授权 + 证据锚定 + 可回滚」骨架（§10K.1-§10K.5）；语境先例：code-health 治理计划「Phase 5-8 若迁移代码/测试」纪律行（docs/superpowers/plans/2026-09-07-code-health-governance.md:1085）。
+- **动作枚举占位（待需求输入后定稿，不入任何 schema/类型）**：`migrate-code` / `migrate-test`。
+- **待输入字段表（需求征集清单）**：
+
+| 字段 | 待输入内容 | 状态 |
+| --- | --- | --- |
+| 目标迁移类型 | 文件迁移 / 符号迁移 / 测试归属迁移 / 其他 | 待输入 |
+| 规模上界 | 单 campaign 候选数上限 / 单候选 diff 规模 | 待输入 |
+| 边界 | 哪些变更不算迁移（→ 走正常阶段 5-8 流程） | 待输入 |
+| 接线形态 | 与 codegraph 前置（约束 #14）、编码计划制品（R1-R6）的接线 | 待输入 |
+| 宿主前提 | `.codegraph` 索引要求、目标仓 git 形态 | 待输入 |
+
 ---
 
 ## 10L. 证据事实对账（门禁完整性战役）
