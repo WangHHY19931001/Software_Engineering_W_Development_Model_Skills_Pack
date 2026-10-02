@@ -7,6 +7,26 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [42.8.0] - 2026-10-02
+
+> 来源：「批次 2：设计期未决问题」批——规格 `docs/superpowers/specs/2026-10-02-design-phase-fog-and-optional-capability-design.md`（dea72625）、计划 `docs/superpowers/plans/2026-10-02-design-phase-fog.md`，账本 `.superpowers/sdd/2026-10-02-design-phase-fog/`（gitignored 账本；逐任务三件套 `task-N-{brief,report}.md` + `review-*.diff`），实现 8 提交 56020c75..8d248ee9。**版本 bump 42.7.0 → 42.8.0**（判据：minor 级门禁行为变更——新增 check-design-fog 门禁脚本（R1-R6）与三主模板强制「迷雾登记册」节 + 阶段 2-4 CHECKPOINT 迷雾清空接线）。**向后兼容**：check-design-fog 为新增独立门禁脚本，既有门禁脚本行为与退出码面零变化；三主模板迷雾节与 discipline-dod 勾选项均为产出模板增列，既有字段零改动。**计数影响**：schema 34 / prepush 19 / persona 33 / references 44 均不变；exit-2 脚本 46 → 47、CLI 47 → 48（+check-design-fog，门禁脚本 48 个 .ts）；samples 新增 5 fixture（design-fog：valid-all-terminal / valid-no-fog-marker / bad-missing-section / bad-unresolved-fog / bad-marker-conflict）；self-test 392 用例（+5 DESIGN_FOG_CASES 样本回归，非 vitest）；vitest 用例 1942 → 1958（+16：design-fog-logic.test.ts 12 / design-fog-cli.test.ts 3 / exit2-failure-atomicity 逐门禁派生 +1，本批收口轮同步修正 docs-consistency-logic 测试的计数锚 46→47 / 47→48 / 48→49）；eval 语料 60/60（本批零影响实测）。
+
+### 设计期迷雾登记册（A3：checkDesignFog R1-R6 + check-design-fog CLI + 三模板/三阶段机制）
+
+- **文档机制**：阶段 2-4 设计主模板（system-design / interface-design / detailed-design）新增「迷雾登记册」节——六列表（迷雾项 ID / 模糊描述 / 疑点 / 疑似归属 / 毕业方向 / 毕业处置结果）+ 无雾标记（「本阶段无未终结迷雾项」单行声明）+ check-design-fog 门禁引用；占位词白名单扩「非目标显式标注与迷雾登记册节」。锐利性判据为「能否精确陈述该设计决策的问题」（非能否回答）；毕业三选一：毕业为正式设计项 / 判入非目标 / 需求级回退；CHECKPOINT 前强制清空（未终结项 exit 1 一律返工，披露于迷雾清空披露项）。
+- **纯函数门禁（R1-R6）**：`logic/design-fog-logic.ts` `checkDesignFog({markdown, phase})`——R1 节存在 fail-closed / R2 表或无雾标记二选一 / R3 迷雾项 ID 须符合 `FOG-P{phase}-NN` 格式（两位起数字，fogId 阶段前缀与 `--phase` 一致）+ 表行解析（分隔行判定收窄为表头紧邻行，全空/占位横线数据行 fail-closed 命中 R3+R4，终审 Important 修复）/ R4 毕业处置终结性（空/待定即 unresolved 计入 fogStats）/ R5 表数据行与无雾标记互斥 / R6 毕业方向=设计项须疑似归属非空（设计项归属一致性）。
+- **CLI**：`cli/check-design-fog.ts`（`--doc` / `--phase` 单值，重复值 flag 一律 `ARG_INVALID`；stdout 单行 `FOG_JSON` 键序 type/passed/doc/phase/reasons/violations/fogStats/exitCode；exit 0/1/2 结构化错误走 `lib/cli-error.ts`）；npm alias `check:fog`；NEGATIVE-COVERAGE 登记（bad-unresolved-fog：放宽 R4 终结性将让未毕业迷雾项静默通过阶段门）。
+- **流程接线**：phase-2 / phase-3 / phase-4 机制节（迷雾登记册运作 + 毕业三选一 + 四通道划界 + 失败模式 FM-{SD,OD,DD}-08 迷雾滥用：信号 A 把可精确陈述的决策塞入迷雾册逃避设计义务 / 信号 B CHECKPOINT 前存在未终结项）+ CHECKPOINT 接线（迷雾清空披露 + exit 1 一律返工）+ discipline-dod×3 迷雾清空勾选项 + 验收标准条。
+
+### 可选能力边界（A4：可选能力≠运行时边）
+
+- **graph-guide 新增「可选能力边界」节**：进图 = 承诺运行时事实；设计提及但非本次承诺的可选能力（未来扩展/可选集成/降级路径）不建图节点、不建边——未决的登记迷雾登记册，明确不做/暂缓的登记非目标（附决策引用）；**P2（可以）≠ 可选能力**（priority 是需求排序语义，范围内 P2 照常建 REQ/SD 节点并承担全部不变量）；可选能力后续转正 = 正式变更（走迷雾毕业或需求变更流程）；方案 A 下不设任何豁免标记，SDMAP/codeModule 对账面零受扰（可选能力不产生 SD 节点即无对账义务）。
+- **表达位**：system-architecture 模板 §2 注记 + §7 可选能力清单位；phase-2/3/4 禁止行为新增「可选能力建图节点/边」条目；SSoT §10.7 边界句。
+
+### 索引与权威对齐
+
+- ingestion-cross 固化句修订（§4-§7 为阶段 1 专用增强；需求层迷雾于阶段 1 固化，设计层未决项由阶段 2-4 迷雾登记册维护）+ A-evolve 步骤 6（登记入对应阶段主模板迷雾登记册节）；AGENTS.md 机制索引「阶段 1-4 迷雾登记册」双段扩写；SSoT 新增 §10M 摘要节（批次 2 四件套：机制 / 脚本 / 边界 / 权威）+ §10.7 前向引用闭合 + evidenceAnchor 必填口径统一（§4A.1b 两句 + §10A 追溯表行）。
+
 ## [42.7.0] - 2026-10-01
 
 > 来源：「批次 3：门禁工程」批——规格 `docs/superpowers/specs/2026-10-01-gate-engineering-design.md`、计划 `docs/superpowers/plans/2026-10-01-gate-engineering.md`，账本 `.superpowers/sdd/2026-10-01-gate-engineering/`（gitignored 账本；逐任务三件套 `task-N-{brief,report}.md` + `review-*.diff`）。**版本 bump 42.6.0 → 42.7.0**（判据：minor 级门禁行为变更——sigHash 公式版本化 + 新规则 R11 + R4 scope 强制 + 四热点结构化双轨与 GATE_JSON 新键）。**向后兼容**：sigHashAlgo 缺省按 v1（既有链逐字节零破坏）；verifiedArtifacts / subject / fixHints / differences 均为只增可选键。**计数影响**：schema 34 / exit-2 脚本 46 / prepush 19 / CLI 47 / persona 33 / references 44 均不变，零新增门禁脚本；samples 新增 4 fixture（signature-chain 14→17：valid-v2 / bad-v2-missing-sha256 / bad-v2-tampered-sha256；rootcause 16→17：bad-r4-scope-missing）；eval 语料 60/60（本批零影响实测）。

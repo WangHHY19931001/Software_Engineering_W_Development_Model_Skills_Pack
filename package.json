@@ -1,6 +1,6 @@
 {
   "name": "w-model-dev-skill",
-  "version": "42.7.0",
+  "version": "42.8.0",
   "private": true,
   "description": "W-Model AI Assistant Skill — 编排 + 校验脚本技能包（提示词 + 模板 + 自包含门禁脚本，不内置 LLM 调用）",
   "type": "module",
@@ -13,6 +13,7 @@
     "check:coverage": "tsx w-model-dev/scripts/cli/check-requirement-coverage.ts",
     "check:exemption": "tsx w-model-dev/scripts/cli/check-exemption.ts",
     "check:docs-consistency": "tsx w-model-dev/scripts/cli/check-docs-consistency.ts",
+    "check:fog": "tsx w-model-dev/scripts/cli/check-design-fog.ts",
     "//2 测试类": "单元测试与回归",
     "test": "vitest run --config config/vitest.config.ts",
     "test:affected": "node scripts/test-affected.cjs",
