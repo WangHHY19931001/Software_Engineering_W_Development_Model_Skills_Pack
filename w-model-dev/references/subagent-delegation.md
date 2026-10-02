@@ -471,10 +471,12 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 - 主刀职责映射表
 - 文件落地交接协议与编排者状态日志
 - 每阶段分派时序
+- 派单契约：前置条件与可验证终态
 - 子代理分派模板（含 R3 预防性审查 + R-iceberg 冰山扫掠 + V 复审根因 + R-lead）
 - 回填契约
 - 强制约束
 - 与现有约束的兼容性
+- 分层反馈回路（L0-L4）
 - 失败模式与回退
 
 ## 角色划分（六类核心角色 O / S / V / G / A / R + R-iceberg 变体）
@@ -709,6 +711,49 @@ O: 用户确认 → 编排者更新 project.status = 验收通过 → 项目完�
 ```
 
 > **阶段 5-8 门禁顺序与 ChangeScope（2026-09-04 audit-gate-closure）**：阶段 5-8 的 G 侧执行顺序为 **codegraph/coding-plan strict 校验 → artifact gate（聚合）→（阶段 8）编码计划归档快照 → check-archive-integrity.ts（归档完整性 + 编码计划归档快照后置校验；2026-09-21 自 check-openspec-archive 退役并入）→ CHECKPOINT**。`check-artifact-gate.ts --phase=5..8` 与 `check-codegraph-queries.ts` / `check-coding-plan.ts` 均须绑定变更上下文：`--scope=<change-scope.json>`（或 `--change=<changeId> --base=<ref> --head=<ref>` 薄封装），缺失 → exit 1（fail-closed；S-coding 须随阶段产物产出并更新 scope，`headRef` 过期或 `changedFiles` 与实际 Git 变更集合不符同样 fail-closed）。artifact gate 把两个 strict checker 的 violations 并入 reasons/exitCode（不得被 RTM 通过掩盖；coding-plan violations 以 `[coding-plan]` 前缀、`GATE_JSON.external.codingPlan` 计数），`GATE_JSON` 含 external summary；归档后置校验已并入 `check-archive-integrity.ts`（codingPlanSnapshot 清单项，自动派生），不在 pre-archive 的 artifact gate 内强制。旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役（不在 pre-push 路径上；规格级规划层门禁是 `check-coding-plan.ts`）。
+
+## 派单契约：前置条件与可验证终态
+
+> **定位**：分派简报在「四件事」书写规则（角色 / 产物 / 输入路径 / 落盘路径，见 §3.3「跨阶段与跨角色交接的书写规则」）之外，必须携带两段契约：**前置条件**（任务开始前必须成立的可核验命题）与**可验证终态**（任务完成的客观判据）。两段契约与四件事叠加不互替（见下文「与既有机制划界」节）。
+
+### 前置条件（preconditions）
+
+O 分派时声明的**任务开始前必须成立的可核验命题**清单。四类合法形态（只允许这四类）：
+
+1. **路径存在性**：`<上游产物路径> 已落盘且可 Read`；
+2. **内容结构性判据**：`<文件> 含 <结构锚点>`（如「rtm.json 含 REQ-12 实体」「graph.json 无 unresolved 边」）；
+3. **门禁判据**：`<check 脚本> 上次运行 exit 0`（O 贴 exit code / GATE_JSON 摘要）；
+4. **环境判据**：`<工具/依赖> 就绪`（版本号 / 探针输出）。
+
+**O 派单前自证义务**：逐条自证前置成立（贴路径 / exit code / 版本号）；无法自证的条件不得写入——要么先满足（分派上游补齐），要么不派单。
+
+**S 侧核验义务（质疑权升级，双轨）**：S 收简报后按「前置条件」清单**逐项核验**，叠加既有自发可执行性评估（见「S 子代理简报质疑权」节）**双轨**执行；任一前置不成立 → 走既有质疑权出口（`blockers[]` 返回、status.json `state=NEEDS_CONTEXT`）；**禁止**前置失守时「先做着看看」——命中即按普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）回退。
+
+### 可验证终态（verifiable terminal state）
+
+产出契约新增第 5 项：声明**任务完成的客观判据**，至少一条，四类合法形态：
+
+1. **gate 判据**：`npx tsx <check 脚本> … exit 0`；
+2. **测试判据**：`<测试命令> 全绿（N passed / 0 failed）`；
+3. **产物判据**：`<落盘路径> 存在且 <结构性判据>`（如「含迷雾登记册节且 R4 全终结」）；
+4. **回填判据**：`status.json state=DONE 且 run-log <action> outcome=success`。
+
+**自评词禁则（第三方可复核原则）**：LLM 自评词（「质量良好 / 基本完成 / 已优化 / 大致可用」）**不得**作为终态判据——终态判据必须**第三方可复核**（O/V 只读证据，不读子代理自评心智）。
+
+**角色禁令优先**：被禁止跑门禁脚本的角色（S / V / R / A 系，见各分派模板「禁止」段）不得以 gate 判据为终态判据——其 gate 验证由下游 G 子代理承担，终态落在**产物判据 + 回填判据**。G 自身可用 gate 判据，其语义为「受派门禁全部执行完毕 + 结构化证据摘要回填」——exit 1 也是有效完成（回填的是真实测量值；exit 1 触发的是失败链，不是「任务未完成」）。
+
+### 任务级 vs 阶段级划界
+
+可验证终态是**任务级**判定（本派单交付物的完成判定）；phase-N 验收标准是**阶段级**判定（阶段门 🔴 CHECKPOINT 判定）。任务终态是阶段验收的**必要非充分**条件——不替代阶段门，阶段门放行仍走既有流程（V/G 证据 + 🔴 CHECKPOINT 用户确认）。
+
+### 与既有机制划界（四重划界）
+
+1. **四件事 = 交接定位**：§3.3「跨阶段与跨角色交接的书写规则」的四件事（角色 / 产物 / 输入路径 / 落盘路径）负责**交接定位**；本契约两段是**契约内容**。叠加不互替——完整派单书写 = 四件事 + 两段契约。
+2. **质疑权 = 前置失守出口**：S 质疑权是前置条件失守的**既有出口**（`blockers[]` 字段复用，不新增字段，见「S 子代理简报质疑权」节）。
+3. **status.json = 回填信标对齐**：status.json 信标的 `state=DONE` 以终态判据证据为前提；`BLOCKED` / `NEEDS_CONTEXT` 对应前置失守路径（schema 零改动，语义注释级对齐，见「文件落地交接协议与编排者状态日志」节）。
+4. **selfCheck.terminalState 与 acceptanceCriteriaMet 分层并存**：回填契约 selfCheck 新增 `terminalState` 证据字段（逐条终态判据的核验结果与证据指针）；**`acceptanceCriteriaMet` 不动**（阶段级自检，与本字段分层并存，见「回填契约」节）。
+
+**V 消费**：V 评审须核对 S 回填的 `terminalState` 证据真实性；伪造终态证据按既有约束 #4（真实执行）/#9（门禁退出码不可伪）处置（[hard-constraints.md](hard-constraints.md)），走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）——不新增反模式。
 
 ## 子代理分派模板
 
@@ -1653,6 +1698,22 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 - **[`verifier-spec.md`](verifier-spec.md) §7.6「外部 Agent 执行」**：V 子代理即「外部 Agent」，边界一致。
 - **[`agent-personas.md`](agent-personas.md) 4 个 Persona**：V 子代理按 `targetKind` 选用，无改动。
 - **技能不内置 LLM**：V 子代理由编排者通过宿主 Agent 的子代理机制（如 Task 工具）启动，技能包自身仍只含提示词 + 脚本，不引入 LLM 调用。
+
+## 分层反馈回路（L0-L4）
+
+> **定位**：本节是返工 / 失败信号的**收敛视图**——把散落在各节的轮次上限与升级出口按作用域分五层排列。信号源全部引用既有机制与既有数值，**零新增上限、零新机制**；按作用域分层，不按缺陷类型分流。
+
+| 层  | 作用域       | 反馈信号源（既有机制）                                                                          | 本级出口                                                | 达限升级                                                                                                      |
+| --- | ------------ | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| L0  | 单条 finding | scoped re-review 逐条裁决（ADDRESSED / NOT ADDRESSED / FALSE-POSITIVE-CHALLENGE，见 §3.4.3）    | 全部 ADDRESSED 或挑战成立                               | NOT ADDRESSED → 进入 L1 下一轮                                                                                |
+| L1  | 单次派单任务 | fix 循环轮次（一轮 = 一次 fix 分派 + 一次 scoped re-review，见 §3.4.2）                         | loop 关闭                                               | 每任务最多 5 轮；达限 → L4 🔴 CHECKPOINT（强制，不放松 `budget.json.perPhase.maxReworkRounds`，两者取更严者） |
+| L2  | 当前阶段     | `budget.json.perPhase.maxReworkRounds` 预算门禁 + R3×3 + 冰山 ICEBERG-A/B（maxIcebergRounds=5） | 阶段门放行（G 全绿 + 🔴 CHECKPOINT 用户确认）           | 达 `maxReworkRounds` → L4；达 maxIcebergRounds=5 → L4 用户三选一（继续深挖 / 接受剩余项并放行 / 阶段回退）    |
+| L3  | 跨阶段       | R 报告 `upstreamDefect` 判定（唯一合法回退建议源，phase-5-coding.md「返工路径」节）             | 用户 🔴 CHECKPOINT 裁定回退                             | 回退执行走对应阶段变更流程；O 不得自行切换阶段                                                                |
+| L4  | 项目级       | 🔴 CHECKPOINT                                                                                   | 用户裁定：继续修复 / 接受剩余项并放行 / 阶段回退 / 终止 | —                                                                                                             |
+
+- **升级单调性（原则表述，不是新机制）**：循环内不得绕过达限升级——换 finding 编号 / 改名重开循环、重置轮次计数、循环中改写 finding 定义使裁决永不收敛，均属架空轮次治理，显名登记为候选反模式（hard-constraints.md 候选区 C2，pending V 复审；复审转正前不作为强制反模式执行）。
+- **与「普通 V/G 失败链」的关系**：「普通 V/G 失败链」（hard-constraints.md「普通 V/G 失败链」节）是 L1 的具体展开；分层回路不改变失败链的任何步骤顺序。
+- **ChangeClassification 词汇引用约束**：若需登记返工原因分类，引用总纲 §4.1 ChangeClassification 词汇（`semantic` / `topology` / `evidence-only`；总纲 = `2026-09-30-absorption-batches-master-outline.md`），不得另造近义词——本批次不引入 classification 分流（按作用域分层，不按缺陷类型分流，防过度设计）。
 
 ## 失败模式与回退
 
