@@ -1165,7 +1165,7 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 
 可验证终态（selfCheck.terminalState 逐条核验）：
   - 产物判据：RootCauseReport JSON + .md 落盘（.w-model/rootcause/<reportId>.{json,md}）且满足 RootCauseReport Schema
-  - 回填判据：run-log action=rootcause outcome=success（由 G 门禁 check-rootcause-report.ts exit 0 复核；角色禁令优先：gate 验证由下游 G 承担）
+  - 回填判据：status.json state=DONE 且 run-log action=rootcause outcome=success（由 G 门禁 check-rootcause-report.ts exit 0 复核；角色禁令优先：gate 验证由下游 G 承担）
 
 禁止：
   - 改任何产物文件（由 S 修复）
@@ -1205,7 +1205,7 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 
 **R3 子代理产出**：`.w-model/preventive-reviews/<phase>[-fix|-emergency]-{completeness,reliability,security}.json`
 
-**可验证终态**（selfCheck.terminalState 逐条核验）：三份 PreventiveReview JSON 落盘且逐份含 findings 字段；run-log action=r3-completeness / r3-reliability / r3-security 各一条 outcome=success（角色禁令优先：gate 验证由下游 G 承担）。
+**可验证终态**（selfCheck.terminalState 逐条核验）：三份 PreventiveReview JSON 落盘且逐份含 findings 字段；status.json state=DONE 且 run-log action=r3-completeness / r3-reliability / r3-security 各一条 outcome=success（角色禁令优先：gate 验证由下游 G 承担）。
 
 **阶段 5-8 编码链 stage 级 R3+V 产物**：
 
@@ -1835,7 +1835,7 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 
 | 层  | 作用域       | 反馈信号源（既有机制）                                                                          | 本级出口                                                | 达限升级                                                                                                      |
 | --- | ------------ | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| L0  | 单条 finding | scoped re-review 逐条裁决（ADDRESSED / NOT ADDRESSED / FALSE-POSITIVE-CHALLENGE，见 §3.4.3）    | 全部 ADDRESSED 或挑战成立                               | NOT ADDRESSED → 进入 L1 下一轮                                                                                |
+| L0  | 单条 finding | scoped re-review 逐条裁决（ADDRESSED / NOT ADDRESSED / FALSE-POSITIVE-CHALLENGE，见 §3.4.3 与 §3.4.5）    | 全部 ADDRESSED 或挑战成立                               | NOT ADDRESSED → 进入 L1 下一轮                                                                                |
 | L1  | 单次派单任务 | fix 循环轮次（一轮 = 一次 fix 分派 + 一次 scoped re-review，见 §3.4.2）                         | loop 关闭                                               | 每任务最多 5 轮；达限 → L4 🔴 CHECKPOINT（强制，不放松 `budget.json.perPhase.maxReworkRounds`，两者取更严者） |
 | L2  | 当前阶段     | `budget.json.perPhase.maxReworkRounds` 预算门禁 + R3×3 + 冰山 ICEBERG-A/B（maxIcebergRounds=5） | 阶段门放行（G 全绿 + 🔴 CHECKPOINT 用户确认）           | 达 `maxReworkRounds` → L4；达 maxIcebergRounds=5 → L4 用户三选一（继续深挖 / 接受剩余项并放行 / 阶段回退）    |
 | L3  | 跨阶段       | R 报告 `upstreamDefect` 判定（唯一合法回退建议源，phase-5-coding.md「返工路径」节）             | 用户 🔴 CHECKPOINT 裁定回退                             | 回退执行走对应阶段变更流程；O 不得自行切换阶段                                                                |

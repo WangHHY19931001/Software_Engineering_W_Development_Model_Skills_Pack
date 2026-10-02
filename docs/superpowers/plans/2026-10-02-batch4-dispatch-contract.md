@@ -36,11 +36,13 @@
 | `eval/mappings.json` + `eval/w-model-dev-test-prompts.json`              | 修改 | 各 +4 条（id 61-64，L2）                                                                                      |
 | `docs/skill-design-document_SSoT.md`                                     | 修改 | §10N 摘要节 + §10A 追溯表行                                                                                   |
 | `AGENTS.md`                                                              | 修改 | §1 机制索引摘要句                                                                                             |
-| `package.json`                                                           | 修改 | version 42.9.0                                                                                                |
+| `package.json`                                                           | 修改 | version 42.9.0（+版本镜像五文件：skill-metadata.json / SKILL.md frontmatter / README 当前版本 / INSTALL 激活 YAML / package-lock 两处——docs-consistency version-consistency 七处强制口径）                                                                                                |
 | `CHANGELOG.md`                                                           | 修改 | 42.9.0 条目                                                                                                   |
 | `docs/superpowers/specs/2026-09-30-absorption-batches-master-outline.md` | 修改 | §5 状态表批次 4 登记（收口任务）                                                                              |
 
 **不新增**：脚本 / schema / pre-push 项 / 正式反模式编号 / SKILL.md 与 conventions.md 改动 / routeTotals 触碰。
+
+版本镜像五文件为 version bump 的门禁强制连带（docs-consistency-logic.ts checkVersionConsistency），非机制改动。
 
 ---
 

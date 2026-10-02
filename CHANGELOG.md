@@ -9,7 +9,7 @@
 
 ## [42.9.0] - 2026-10-02
 
-> 来源：「批次 4：派单与流程契约」批——规格 `docs/superpowers/specs/2026-10-02-batch4-dispatch-contract-design.md`（78396d90）、计划 `docs/superpowers/plans/2026-10-02-batch4-dispatch-contract.md`（78396d90 同提交），账本 `.superpowers/sdd/2026-10-02-batch4-dispatch-contract/`（gitignored 账本；逐任务三件套 `task-N-{brief,report}.md` + `review-*.diff`），实现 5 提交 d463ad68..bb95e023（分支 feature/batch4-dispatch-contract）。**版本 bump 42.8.0 → 42.9.0**（判据：minor 级流程契约变更——22 个分派模板新增强制「前置条件 / 可验证终态」两段 + 分层反馈回路（L0-L4）权威视图 + hard-constraints 候选区 C2 登记）。**向后兼容**：纯文档机制零脚本零 schema 零门禁行为变化；分派模板新增段为产出披露要求，既有字段与既有产出物零破坏；eval 仅追加。**计数影响**：schema 34 / prepush 19 / persona 33 / references 44 / exit-2 脚本 47 / CLI 48 全不变；eval 语料 60 → 64（+4 条 L2，routeTotals {12/8/22} 不变）；反模式正式清单仍 48 条（C2 为候选区登记，pending V 复审，不计入活体计数）。
+> 来源：「批次 4：派单与流程契约」批——规格 `docs/superpowers/specs/2026-10-02-batch4-dispatch-contract-design.md`（78396d90）、计划 `docs/superpowers/plans/2026-10-02-batch4-dispatch-contract.md`（78396d90 同提交），账本 `.superpowers/sdd/2026-10-02-batch4-dispatch-contract/`（gitignored 账本；逐任务三件套 `task-N-{brief,report}.md` + `review-*.diff`），实现 6 提交 78396d90..bb95e023（d463ad68 起步于分支首个实现提交）（分支 feature/batch4-dispatch-contract）。**版本 bump 42.8.0 → 42.9.0**（判据：minor 级流程契约变更——22 个分派模板新增强制「前置条件 / 可验证终态」两段 + 分层反馈回路（L0-L4）权威视图 + hard-constraints 候选区 C2 登记）。**向后兼容**：纯文档机制零脚本零 schema 零门禁行为变化；分派模板新增段为产出披露要求，既有字段与既有产出物零破坏；eval 仅追加。**计数影响**：schema 34 / prepush 19 / persona 33 / references 44 / exit-2 脚本 47 / CLI 48 全不变；eval 语料 60 → 64（+4 条 L2，routeTotals {12/8/22} 不变）；反模式正式清单仍 48 条（C2 为候选区登记，pending V 复审，不计入活体计数）。
 
 ### 派单契约（B4：前置条件 + 可验证终态）
 
