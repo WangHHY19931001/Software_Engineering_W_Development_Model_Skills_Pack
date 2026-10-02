@@ -20,7 +20,7 @@
 | D1 | C2 边界裁定（总纲 §3 前置） | **文档叙事形态**：威胁模型 = 文档叙事 + 既有机制映射，**不属「守卫体系」**；新增 `references/agent-threat-model.md`（零新脚本、零 schema、零新检测信号）；`:671` 边界句细化为「不构建自动化守卫脚本；威胁登记与机制映射属 R3 叙事层」 |
 | D2 | C4 强度 | **纯文档治理规则**：整批否决 = campaign 级批量 CHECKPOINT 语义（整批 reject/defer 后逐候选登记既有 ledger 事件）；回收 = 整批 rolled-back 编组规则（逐候选复用既有 `git apply -R` + 快照证明原语）；落 `quality-standards` + `code-health-governance` + SSoT 权威节；零新脚本零 schema |
 | D3 | C1 需求输入 | **需求框架先行**：SSoT §10K 新增「Phase 5-8 迁移设计锚点（素材）」节 = 定义句 + 迁移类型分类学占位 + 规模/边界待输入字段表 + 需求征集清单；全程维持「未实现（不得据此执行）」；实现仍单独立项（2026-09-27 勘误先例：「体量差两个数量级」） |
-| D4 | 版本与分支 | **43.0.0**（7 处版本镜像同步，批次 4 先例）；**文档先行**——本规格先提交 main，实现分支 `feature/batch5-governance-narrative` 待规格获批后自 main 开启 |
+| D4 | 版本与分支 | **42.10.0**（七处版本同步；批次 1-4 每吸收批次 minor 递增先例：42.6.0→42.7.0→42.8.0→42.9.0，无破坏性变更不作 major）；**文档先行**——本规格先提交 main，实现分支 `feature/batch5-governance-narrative` 待规格获批后自 main 开启 |
 | D5 | 范围 | C2+C4+C1 三项全做；**不做**：新脚本/schema/CLI、pre-push 扩项、全局反模式新增（含 hard-constraints 候选 C1/C2 的 V 复审——不在总纲批次 5 清单）、Phase 5-8 迁移实现、C3 指标、eval mappings 扩（总纲批次 5 改动面不含 eval）、persona 文件与模板改动 |
 
 ## 2. C2 设计：`references/agent-threat-model.md`（新增）
@@ -88,7 +88,7 @@
 ## 5. SSoT §10O、版本与总纲状态
 
 - **SSoT 新增 `## 10O. agent 威胁模型、整批否决权与迁移素材（批次 5，2026-10-03）`**（插在 §10N 之后、§10.10 之前），四件套形态（批次 2/4 先例）：目标 + 落点表（6-7 行）+ 能力分工不夸大（威胁模型=叙事映射非守卫体系；整批=编组语义非新自动化；素材=待输入非可用能力）+ 判据披露（D1 裁定与 :671 细化全文）。§10A 追溯表加一行。
-- **版本 43.0.0**：`package.json` + 5 处镜像（`skill-metadata.json` / SKILL.md frontmatter / README / INSTALL / `package-lock.json` ×2）——批次 4 七处同步先例，`checkVersionConsistency` 门禁强制。
+- **版本 42.10.0**：`package.json` + 5 处镜像（`skill-metadata.json` / SKILL.md frontmatter / README / INSTALL / `package-lock.json` ×2）——批次 4 七处同步先例，`checkVersionConsistency` 门禁强制。
 - **总纲状态**：§1 总览表批次 5 行状态改「规格已提交（2026-10-03，D1-D3 阻塞裁定已解除）」；§5 状态表批次 5 行登记规格文件名（实现后再回填终值）。
 
 ## 6. 范围与改动面锁定
@@ -103,7 +103,7 @@
 | `AGENTS.md` | 修改（§2 references 表新行 + §1 机制索引一句） |
 | `docs/skill-design-document_SSoT.md` | 修改（§10K.7 新子节 + §10O 新节 + §10A 行） |
 | `docs/superpowers/specs/2026-09-30-absorption-batches-master-outline.md` | 修改（§1/§5 批次 5 状态） |
-| `CHANGELOG.md`（43.0.0）+ 7 处版本镜像 | 修改 |
+| `CHANGELOG.md`（42.10.0）+ 7 处版本镜像 | 修改 |
 | 本规格 + 实现计划（docs/superpowers/specs、plans） | 新增 |
 
 **明确不做**（D5）：新脚本/schema/CLI/eval/pre-push 扩项/全局反模式（含候选 C1/C2 V 复审，仅指认 `hard-constraints.md:536-558` 为既有 pending 状态）/Phase 5-8 迁移实现/C3 指标/persona 文件/templates 改动/`quality-standards.md:263` 勾选项改写。
@@ -114,7 +114,7 @@
 2. `verifier-spec.md:671` 修订在场：原句保留 + D1 细化声明 + 指针；指针即 orphan 审计入链，`check-docs-consistency` exit 0（含 `references-count` 44→45 同步）。
 3. C4 三落点在场：quality-standards 子节（批量 CHECKPOINT 语义 + 非降门槛 + 缺口披露）、code-health-governance §6 操作小节、SSoT 权威句；零新脚本零 schema（脚本 48 .ts、schema 34 份计数不变）。
 4. C1 §10K.7 在场：继承警告 + 定义句 + 动作枚举占位 + 五字段待输入表；code-health-governance 头部指针句；§10K 头部既有「未实现」边界句不删。
-5. SSoT §10O 四件套 + §10A 行；AGENTS.md §2 表行 + §1 索引句；总纲 §1/§5 批次 5 状态；CHANGELOG 43.0.0 + 版本七处同步（`package.json` / skill-metadata / SKILL.md frontmatter / README / INSTALL / package-lock ×2，批次 4 先例）。
+5. SSoT §10O 四件套 + §10A 行；AGENTS.md §2 表行 + §1 索引句；总纲 §1/§5 批次 5 状态；CHANGELOG 42.10.0 + 版本七处同步（`package.json` / skill-metadata / SKILL.md frontmatter / README / INSTALL / package-lock ×2，批次 4 先例）。
 6. `npm run prepush` 19 项全绿收口；全仓 `grep` 证明「整批」新语义只在三个文档落点出现（无脚本/schema 误接线）。
 
 ## 8. 风险与已知代价
