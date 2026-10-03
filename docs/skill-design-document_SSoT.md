@@ -2442,6 +2442,24 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 
 ---
 
+## 10Q. 测试系统工程类型学、模块显式化与冒烟准入（用户规范模型吸收；独立立项，2026-10-04）
+
+**目标**：测试类型学总登记 + 模块测试显式化 + 冒烟准入 + 测试设计协同绑定（独立立项，用户 2026-10-04 规范模型指令，不属五批次吸收计划）——类型学按层级（单元/模块/集成/系统/验收）× 方法（黑盒/白盒/行为[BDD]/边界/覆盖）× 策略（冒烟/边界/覆盖）三维登记，逐维度映射 W 模型左右 V 阶段与四级门禁，**登记不改变任何既有门禁判定**；GJB 模块测试以「集成的子层」显式化落位（阶段 3 集成测试设计模块维度 → 阶段 6 前置执行，D2，四级门禁零改动）；阶段 6/7/8 完整套件开跑前先跑冒烟子集（test-case 冒烟标记列筛出），冒烟不过不开跑（文档时序机制 + 知情声明，零新脚本，D3）；四阶段测试设计产物 = 多角色讨论共识纪要的承接产物（复用 42.11.0 机制，零新角色集，D5）；登记面同步 SKILL.md 阶段表注与 AGENTS.md §1 索引句。本节为权威层摘要，细则按落点表分节承载，不在此重复。
+
+| 面 | 落点与内容 | 实现位置 |
+| --- | --- | --- |
+| 类型学总登记 | 层级 × 方法 × 策略三维登记表（11 行：层级 5 / 方法 3 / 策略 3）+ 三注（正交 / 模块=集成子层 / 冒烟不改 passed 判定）+ 冒烟准入权威段——**是登记，不改变任何既有门禁判定** | `w-model-dev/references/quality-standards.md`「测试系统工程类型学（层级 × 方法 × 策略）」节 |
+| 冒烟准入三细则 | 阶段 6/7/8 各一节同形态（时序：完整套件开跑前先跑冒烟子集、失败走普通 V/G 失败链、结果 `/wm test result=` 真实回填 + 「零新脚本」知情声明 + 权威指针） | `w-model-dev/references/phase-6-integration-test.md` / `phase-7-system-test.md` / `phase-8-acceptance-test.md` 各「冒烟准入（测试系统工程）」节 |
+| test-case 冒烟标记列 | 用例表「冒烟」列（✓ = 属于该阶段冒烟子集；空 = 不属于）+ 列注 | `w-model-dev/templates/test-case.md` 用例表 |
+| 协同承接 + 模块维度 | 四阶段「测试用例设计」节承接句（测试设计 = 多角色讨论共识纪要的承接产物之一，V 评审核验）+ 阶段 3 集成测试设计模块维度句（GJB 模块测试=模块级集成测试，阶段 6 集成执行的前置子集组织，D2） | `w-model-dev/references/phase-1-requirements.md` / `phase-2-system-design.md` / `phase-3-outline-design.md` / `phase-4-detailed-design.md` 各「测试用例设计」节 + `phase-3-outline-design.md` 模块维度句 |
+| verifier 测试设计核验扩尾 | §7.1 / §7.2 既有参考句扩尾：测试设计产物（验收/系统/集成/单元测试设计）的角色关注面承接核验同此口径（非独立门禁，不新增子标准名与权重） | `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 |
+| BDD 术语对齐 | 行为测试 = BDD features（类型学方法维度登记指针）；机制零改动 | `w-model-dev/references/bdd.md` 头部 |
+
+- **能力分工（不得夸大）**：类型学是**登记**不是新门禁——不改变任何既有门禁判定（四级测试门禁 / BDD 门禁 / 覆盖率门禁判定口径零改动）；冒烟准入是**文档时序机制**不是机器门禁——零新脚本，执行纪律靠 O 与测试团队遵循（与派单契约同款文档机制形态，D3 知情声明），冒烟不改变四级 passed 判定；模块测试是**集成的子层**——四级门禁不变，不做四级→五级升级（D2）；协同绑定是**复用 42.11.0 多角色讨论机制**——零新角色集、零新 CHECKPOINT（D5），V 承接核验为降分参考项非独立门禁。
+- **判据披露**：D1 全量批次（四缺口一次收口）/ D2 模块测试=集成的子层 / D3 冒烟=准入机制（零新脚本）——**D1-D3 为推荐采定，用户审查设计规格可推翻**（见 [设计规格](./superpowers/specs/2026-10-04-test-systems-engineering-design.md) §1）；D4-D6 按推荐采定（类型学落点 quality-standards / 协同绑定形态 / 版本 42.12.0）；**用户指令来源：2026-10-04 用户测试系统工程规范模型指令**（单元/模块/集成/系统/验收/黑盒/白盒/冒烟/行为/边界/覆盖多目的测试，测试经理组织测试/设计/开发/需求团队在合适阶段设计；独立立项，不属五批次吸收计划）。
+
+---
+
 ## 10.10 系统层级树与多层图谱
 
 > 本节确立系统层级树 + 7 层图谱模型。
@@ -2561,6 +2579,7 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | §10N 派单契约与分层反馈回路 | 派单契约两段（前置条件四形态 / 可验证终态四形态 / 自评词禁则 / 角色禁令优先 / selfCheck.terminalState 分层）+ 分层反馈回路 L0-L4 收敛视图（零新增轮次数值）+ 候选反模式 C2（无限返工循环，pending V 复审）+ eval L2 语料 id 61-64 | `w-model-dev/references/subagent-delegation.md`「派单契约：前置条件与可验证终态」节 +「分层反馈回路（L0-L4）」节（22 分派模板同构携带两段）+ `w-model-dev/references/phase-5-coding.md`「任务分配规则」「返工路径」节交叉引用 + `w-model-dev/references/hard-constraints.md` 候选区 C2 + `eval/mappings.json` / `eval/w-model-dev-test-prompts.json` | 完整（纯文档机制，无脚本门禁，D12 知情声明；执行靠 O/V 遵循与既有闭环门禁间接承载；见 [批次 4 设计规格](./superpowers/specs/2026-10-02-batch4-dispatch-contract-design.md)） |
 | §10O agent 威胁模型、整批否决权与迁移素材 | 威胁目录 T1-T7→既有机制映射（叙事层三不承诺）+ §7.4A 边界细化 + campaign 整批否决权/回收路径（编组语义，零新机制）+ Phase 5–8 迁移设计锚点素材（待需求输入） | `w-model-dev/references/agent-threat-model.md` + `w-model-dev/references/verifier-spec.md` §7.4A + `w-model-dev/references/quality-standards.md`「整批否决权与回收路径」节 + `w-model-dev/references/code-health-governance.md` §6 与头部指针 + 本文档 §10K.7 | 完整（纯文档批次，零新脚本零 schema；D1-D5 已裁定，见 [批次 5 设计规格](./superpowers/specs/2026-10-03-batch5-governance-narrative-design.md)） |
 | §10P 阶段 1-4 多角色讨论分析 | A-lead 按「阶段角色集矩阵」并行分派 N persona 视角分析 + 并行多轮交叉至收敛（收敛判据为主、5 轮安全阀为辅）+ 共识纪要承载（S 唯一落笔）+ run-log perspective/consensus 留痕 + `check-role-dispatch` 三新维度（覆盖 phaseRoleCoverage / 时序 / 互异）+ 研制要求子模板（子模板 10 种→11 种）+ V 覆盖核验参考项 | `w-model-dev/references/agent-personas.md`「阶段角色集矩阵」节 + `w-model-dev/subagent/` 3 新 persona + `w-model-dev/references/subagent-delegation.md`「A-lead」节 + `w-model-dev/scripts/logic/role-dispatch-logic.ts` + `w-model-dev/templates/requirement-spec/development-requirements.md` + `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 + 本文档 §10P | 完整（讨论=分析动作，语义质量归 V；D1-D9 已裁定，见 [设计规格](./superpowers/specs/2026-10-03-phase-multi-role-analysis-design.md)） |
+| §10Q 测试系统工程类型学与冒烟准入 | 类型学总登记（层级×方法×策略三维，逐维度映射左右 V 阶段与四级门禁；登记不改变任何既有门禁判定）+ 模块测试显式化（集成的子层，阶段 3 模块维度→阶段 6 前置，D2）+ 冒烟准入（阶段 6/7/8 文档时序机制，零新脚本，D3）+ 测试设计协同绑定（复用 42.11.0 多角色机制，零新角色集，D5） | `w-model-dev/references/quality-standards.md`「测试系统工程类型学」节 + `w-model-dev/references/phase-6-integration-test.md` / `phase-7-system-test.md` / `phase-8-acceptance-test.md`「冒烟准入」节 + `w-model-dev/templates/test-case.md` 冒烟列 + `w-model-dev/references/phase-1-requirements.md` / `phase-2-system-design.md` / `phase-3-outline-design.md` / `phase-4-detailed-design.md`「测试用例设计」承接句 + `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 + `w-model-dev/references/bdd.md` + 本文档 §10Q | 完整（纯文档批次，零新脚本零 schema；D1-D3 推荐采定用户可推翻，见 [设计规格](./superpowers/specs/2026-10-04-test-systems-engineering-design.md)） |
 | 11A 采用路径                                 | greenfield vs brownfield 引入 W 模型                                                                                                                                                                                                                                                                                                                           | `docs/adoption-guide.md`                                                                                                                                                                                                                                                                                                           | 完整（吸收自 addyosmani/agent-skills `docs/adoption-guide.md`）                                                                                                                                     |
 
 ---
