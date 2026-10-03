@@ -240,4 +240,19 @@ git commit -m "docs(closeout): 登记面——总纲 §4.4 收口状态句 + AGE
 
 ## 收尾记录（任务 2 回填）
 
-（待回填：任务提交清单 / check:docs-consistency 与 DoD grep 结果 / prepush 终值）
+**任务提交清单**（`git log --oneline main..HEAD` 实查；本节随任务推进分段回填）：
+
+```
+63e0cbad docs(closeout): task1-fix——I1 verifiedArtifacts 混写剔除 + §8 并入 §7/§9 删除（规格结构契约优先）+ §0 B2 权威节勘正 + 三处标签对齐（审查发现）   ← 任务 1 终态（总纲 §4.4 状态句引用此哈希）
+6d70af6d docs(closeout): ai-native-sdlc-adoption 收口对账文档——六段骨架×13 项（§0 证据层级声明/§1 判定总表/§2-§6 六段表/§7 维护规则），纯导航层不复制权威内容
+```
+
+**机器验证（check:docs-consistency，任务 2 步骤 3）**：exit 0——静态违规 0 / 动态违规 0，`✓ 全部一致`；schema 文件 34、exit-2 脚本 47、persona 文件 33 均不变（版本 42.10.0 / references 计数 45 不在本次变更面——docs/ 不在 references-count 面）；非阻断诊断仅「动态 facts 未校验（未提供受控 vitest 工件），终局验收经 npm run prepush 覆盖（fail-closed）」。
+
+**DoD grep（规格 §5，任务 2 步骤 4）**：
+
+- `grep -c "^| " docs/ai-native-sdlc-adoption.md` = **92**（分节实查：§1 22 行 = 判定总表 1 表头 + 14 数据行（A1-A4/B1-B6/C1-C4 含 C3 排除行）+ 明确不吸收清单表 1 表头 + 6 数据行；§2-§6 各 14 行 = 1 表头 + 13 数据行；`|---|` 分隔行不计入 grep 口径）
+- `grep -n "证据层级声明\|维护规则"` → §0（:19）与 §7（:162）均在场
+- `grep -rn "ai-native-sdlc-adoption" AGENTS.md docs/superpowers/specs/2026-09-30-absorption-batches-master-outline.md | wc -l` = **3**（≥2 ✓：AGENTS §5 第 9 项 1 处 + 总纲 §4.4 原句与状态句 2 处）
+
+**prepush 终值**：（待回填——任务 2 步骤 6 后台全量运行，完成后由终值回填提交补记）

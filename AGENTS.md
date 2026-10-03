@@ -122,6 +122,7 @@ W 模型 8 阶段端到端调测的完整产物，验证「编排逻辑 + LLM-as
 6. [CONTRIBUTING.md](./CONTRIBUTING.md) — 贡献与文档维护规则
 7. [CHANGELOG.md](./CHANGELOG.md) — 变更历史
 8. [`w-model-dev/references/bdd.md`](./w-model-dev/references/bdd.md) — BDD 建模指南（L1-L4 分层 features + 状态机七要素 + BDD↔TLA+ 协作）
+9. [docs/ai-native-sdlc-adoption.md](./docs/ai-native-sdlc-adoption.md) — 13 来源吸收收口对账（五批次收官交付物：判定/映射/落点/门禁/划界/人审锚六段对账，纯导航层）
 
 ## 6. 行动约束
 
