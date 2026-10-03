@@ -1979,6 +1979,26 @@ const ROLE_DISPATCH_CASES: RoleDispatchCase[] = [
     expectedReasonPatterns: [/有效 R3 维度记录不足.*缺：reliability\/security/],
     description: '阶段 1 仅有 1 条 R3 记录（缺 reliability/security），R3 无条件强制应被拦截',
   },
+  {
+    file: 'valid-phase-role.jsonl',
+    expectedPassed: true,
+    description:
+      '阶段 1-4 多角色机制 valid：6 persona 视角分析（矩阵全集）+ consensus + produce 晚于全部 perspective——覆盖/时序/互异三新维度全过（task 3）',
+  },
+  {
+    file: 'bad-phase-role-missing-persona.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/阶段 1 多角色覆盖不足：缺 persona=engineering-algorithm-expert/],
+    description:
+      '阶段 1 视角分析缺 engineering-algorithm-expert（矩阵 6 缺 1 且未声明 lite），phaseRoleCoverage.missingPersonas 具名拦截（task 3 覆盖维度）',
+  },
+  {
+    file: 'bad-phase-role-timing.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/阶段 1 多角色时序违规：produce 记录 runId=btp1 未严格晚于全部 perspective 记录/],
+    description:
+      '阶段 1 design-ux-architect 视角分析晚于 produce 产出（04:00 > 03:00），时序维度拦截——多角色讨论须先于 S 产出（task 3 时序维度）',
+  },
 ];
 
 // -------------------- P1 状态机一致性校验 --------------------

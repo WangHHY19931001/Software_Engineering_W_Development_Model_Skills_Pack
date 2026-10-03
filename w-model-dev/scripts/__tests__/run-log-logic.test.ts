@@ -2060,6 +2060,18 @@ describe('run-log action-role 配对（blocking，logic 层强制）', () => {
       { label: 'gate 由 S 执行', action: 'gate', role: 'S', runId: 'run-gate' },
       { label: 'tla-gate 由 S 执行', action: 'tla-gate', role: 'S', runId: 'run-tla-gate' },
       { label: 'graph-gate 由 S 执行', action: 'graph-gate', role: 'S', runId: 'run-graph-gate' },
+      {
+        label: 'perspective 由 S 执行（阶段 1-4 多角色机制，须 role=A）',
+        action: 'perspective',
+        role: 'S',
+        runId: 'run-perspective',
+      },
+      {
+        label: 'consensus 由 V 执行（A-lead 汇总，须 role=A）',
+        action: 'consensus',
+        role: 'V',
+        runId: 'run-consensus',
+      },
     ];
     for (const c of cases) {
       const result = checkRunLog([baseEntry(c.action, c.role, c.runId)]);
@@ -2095,6 +2107,24 @@ describe('run-log action-role 配对（blocking，logic 层强制）', () => {
     expect(result.violations.some((v) => v.includes('[schema]'))).toBe(false);
     expect(result.violations.some((v) => v.startsWith('action-role 配对'))).toBe(false);
     expect(result.violations.some((v) => v.includes('plan_'))).toBe(false);
+  });
+
+  it('perspective/consensus 由 A 执行 + persona 字段通过 schema 校验且无配对违规（阶段 1-4 多角色机制，task 3）', () => {
+    const entries = [
+      { ...baseEntry('perspective', 'A', 'mr-p1'), persona: 'product-requirements-analyst' },
+      { ...baseEntry('consensus', 'A', 'mr-c1'), persona: 'A-lead' },
+      { ...baseEntry('consensus', 'A', 'mr-c2'), persona: '' }, // consensus 允许 persona 留空（以 role=A 判定）
+    ];
+    const result = checkRunLog(entries);
+    expect(result.violations.some((v) => v.includes('[schema]'))).toBe(false);
+    expect(result.violations.some((v) => v.startsWith('action-role 配对'))).toBe(false);
+  });
+
+  it('schema additionalProperties:false 不回归：persona 合法化后未知字段仍被拒绝（bad-additional-props）', () => {
+    const bad = { ...baseEntry('perspective', 'A', 'mr-typo'), persna: 'typo-field' } as unknown as RunLogEntry;
+    const result = checkRunLog([bad]);
+    expect(result.passed).toBe(false);
+    expect(result.violations.join(' ')).toMatch(/\[schema\]/);
   });
 });
 

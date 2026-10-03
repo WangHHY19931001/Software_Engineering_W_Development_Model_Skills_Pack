@@ -13,7 +13,7 @@ import { checkRoleDispatch, type RoleDispatchEntry } from '../logic/role-dispatc
 describe('role-dispatch-logic: R≥3 无条件', () => {
   it('缺 R3 记录应失败（不再需要 r3Enabled flag）', () => {
     const entries = [
-      { phase: 1, role: 'S', action: 'produce', outcome: 'success' },
+      { phase: 1, role: 'S', action: 'test', outcome: 'success' },
       { phase: 1, role: 'V', action: 'review', outcome: 'success' },
       { phase: 1, role: 'G', action: 'gate', outcome: 'success' },
       // 仅 1 条 R3，缺 reliability/security
@@ -28,7 +28,7 @@ describe('role-dispatch-logic: R≥3 无条件', () => {
 
   it('S/V/G/R≥3 齐全应通过', () => {
     const entries = [
-      { phase: 1, role: 'S', action: 'produce', outcome: 'success' },
+      { phase: 1, role: 'S', action: 'test', outcome: 'success' },
       { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
       { phase: 1, role: 'R', action: 'r3-reliability', outcome: 'success' },
       { phase: 1, role: 'R', action: 'r3-security', outcome: 'success' },
@@ -42,7 +42,7 @@ describe('role-dispatch-logic: R≥3 无条件', () => {
 
   it('缺角色族（3 态：缺 V / 缺 S / 缺 G）应失败且具名缺失角色', () => {
     const base: RoleDispatchEntry[] = [
-      { phase: 1, role: 'S', action: 'produce', outcome: 'success' },
+      { phase: 1, role: 'S', action: 'test', outcome: 'success' },
       { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
       { phase: 1, role: 'R', action: 'r3-reliability', outcome: 'success' },
       { phase: 1, role: 'R', action: 'r3-security', outcome: 'success' },
@@ -63,7 +63,7 @@ describe('role-dispatch-logic: R≥3 无条件', () => {
 
   it('R3 记录多于 3 条应通过', () => {
     const entries = [
-      { phase: 1, role: 'S', action: 'produce', outcome: 'success' },
+      { phase: 1, role: 'S', action: 'test', outcome: 'success' },
       { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
       { phase: 1, role: 'R', action: 'r3-reliability', outcome: 'success' },
       { phase: 1, role: 'R', action: 'r3-security', outcome: 'success' },
@@ -77,14 +77,14 @@ describe('role-dispatch-logic: R≥3 无条件', () => {
 
   it('多阶段：阶段2缺R应只报阶段2', () => {
     const entries = [
-      { phase: 1, role: 'S', action: 'produce', outcome: 'success' },
+      { phase: 1, role: 'S', action: 'test', outcome: 'success' },
       { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
       { phase: 1, role: 'R', action: 'r3-reliability', outcome: 'success' },
       { phase: 1, role: 'R', action: 'r3-security', outcome: 'success' },
       { phase: 1, role: 'V', action: 'review', outcome: 'success' },
       { phase: 1, role: 'G', action: 'gate', outcome: 'success' },
       // 阶段 2 缺 R
-      { phase: 2, role: 'S', action: 'produce', outcome: 'success' },
+      { phase: 2, role: 'S', action: 'test', outcome: 'success' },
       { phase: 2, role: 'V', action: 'review', outcome: 'success' },
       { phase: 2, role: 'G', action: 'gate', outcome: 'success' },
     ];
@@ -96,7 +96,7 @@ describe('role-dispatch-logic: R≥3 无条件', () => {
 
   it('非法/缺字段条目应被跳过不崩溃', () => {
     const entries = [
-      { phase: 1, role: 'S', action: 'produce', outcome: 'success' },
+      { phase: 1, role: 'S', action: 'test', outcome: 'success' },
       null as unknown as Record<string, unknown>,
       { role: 'R' }, // 缺 phase
       { phase: 'x' }, // 非法 phase
@@ -112,7 +112,7 @@ describe('role-dispatch-logic: R≥3 无条件', () => {
 
   it('phaseSummary 含 roles 计数与 missing 列表', () => {
     const entries = [
-      { phase: 1, role: 'S', action: 'produce', outcome: 'success' },
+      { phase: 1, role: 'S', action: 'test', outcome: 'success' },
       { phase: 1, role: 'R', action: 'r3-completeness', outcome: 'success' },
       // 缺 reliability/security + V + G
     ];
@@ -138,10 +138,13 @@ describe('role-dispatch-logic: R≥3 无条件', () => {
  *   - 重复维度作为真实重工记录不报错（三维度各 ≥1 即通过）
  */
 describe('role-dispatch-logic: 空输入 fail-closed 与 R3 维度精确语义', () => {
+  // S 记录 action 用 'test'（S 类合法动作）：本文件夹具多为阶段 1-2，若用 'produce'
+  // 会误触阶段 1-4 多角色三新维度的 produce 触发判据（role-dispatch 只校验角色计数，
+  // action 对本门为装饰值；produce 触发域的行为由「阶段 1-4 多角色三新维度」describe 专测）。
   const svg = (phase: number, role: 'S' | 'V' | 'G') => ({
     phase,
     role,
-    action: role === 'S' ? 'produce' : role === 'V' ? 'review' : 'gate',
+    action: role === 'S' ? 'test' : role === 'V' ? 'review' : 'gate',
     outcome: 'success',
   });
 
@@ -169,7 +172,7 @@ describe('role-dispatch-logic: 空输入 fail-closed 与 R3 维度精确语义',
     const svg = (phase: number, role: 'S' | 'V' | 'G'): RoleDispatchEntry => ({
       phase,
       role,
-      action: role === 'S' ? 'produce' : role === 'V' ? 'review' : 'gate',
+      action: role === 'S' ? 'test' : role === 'V' ? 'review' : 'gate',
       outcome: 'success',
     });
     for (const { caseName, r3Entries, missingMessage, expectUnderflowMessage, expectR3Missing, expectRolesR } of [
@@ -309,5 +312,319 @@ describe('role-dispatch-logic: 空输入 fail-closed 与 R3 维度精确语义',
     expect(r.passed).toBe(false);
     expect(r.violations.join(' ')).toMatch(/阶段 1 缺失 role=R 记录/);
     expect(r.violations.join(' ')).not.toMatch(/有效 R3 维度记录不足/);
+  });
+});
+
+/**
+ * 阶段 1-4 多角色讨论分析机制三新维度（task 3，TDD）：
+ *   ① 覆盖——action=perspective 且 persona 非空集合 ⊇ 阶段角色集矩阵 persona 集
+ *     （矩阵常量权威 = agent-personas.md「3A. 阶段角色集矩阵」节，6/7/7）；
+ *     lite 形态（consensus 记录 note/纪要路径含 phase-role-lite）按实际分派 N 通过。
+ *   ② 时序——本阶段 action=produce 时间戳须严格晚于全部 perspective 记录（同秒不算晚）。
+ *   ③ 互异——同阶段 persona 重复违规。
+ * 触发判据：仅当阶段 1-4 存在 action=produce 记录（无 produce 的历史 run 零回归）。
+ * 结果字段 phaseRoleCoverage 经 CLI stdout JSON 同键透出。
+ */
+describe('role-dispatch-logic: 阶段 1-4 多角色三新维度（覆盖/时序/互异）', () => {
+  /** 与 agent-personas.md「3A. 阶段角色集矩阵」节 persona 映射列逐字一致（6/7/7） */
+  const PHASE1_MATRIX = [
+    'product-requirements-analyst',
+    'product-manager',
+    'testing-test-manager',
+    'engineering-software-architect',
+    'design-ux-architect',
+    'engineering-algorithm-expert',
+  ];
+  const PHASE2_MATRIX = [
+    'testing-test-manager',
+    'engineering-software-architect',
+    'engineering-senior-developer',
+    'product-manager',
+    'engineering-database-optimizer',
+    'design-ux-architect',
+    'engineering-algorithm-expert',
+  ];
+
+  let seq = 0;
+  const entry = (
+    phase: number,
+    action: string,
+    role: string,
+    timestamp: string,
+    extra: Record<string, unknown> = {},
+  ): RoleDispatchEntry => ({
+    runId: `mr-${++seq}`,
+    phase,
+    role,
+    action,
+    outcome: 'success',
+    timestamp,
+    ...extra,
+  });
+
+  /** 阶段全矩阵多角色记录：N 条 perspective（01:00 起每 persona 1 分钟）+ 1 条 consensus */
+  const perspectiveRecords = (phase: number, personas: string[], consensusExtra: Record<string, unknown> = {}) => [
+    ...personas.map((persona, i) =>
+      entry(phase, 'perspective', 'A', `2026-10-03T01:${String(i).padStart(2, '0')}:00Z`, { persona }),
+    ),
+    entry(phase, 'consensus', 'A', '2026-10-03T02:00:00Z', {
+      persona: 'A-lead',
+      note: '共识纪要 consensus-minutes.md（交叉 2 轮收敛）',
+      ...consensusExtra,
+    }),
+  ];
+
+  /** 既有四角色基线（S/V/G + R3 三维度；S 用 action=test 避免误触 produce 判据） */
+  const roleBaseline = (phase: number) => [
+    entry(phase, 'test', 'S', '2026-10-03T05:00:00Z'),
+    entry(phase, 'review', 'V', '2026-10-03T06:00:00Z'),
+    entry(phase, 'gate', 'G', '2026-10-03T07:00:00Z'),
+    entry(phase, 'r3-completeness', 'R', '2026-10-03T06:30:00Z'),
+    entry(phase, 'r3-reliability', 'R', '2026-10-03T06:31:00Z'),
+    entry(phase, 'r3-security', 'R', '2026-10-03T06:32:00Z'),
+  ];
+
+  it('表驱动：valid 全矩阵 / 缺 persona / 时序倒置 / 同秒不算晚 / persona 重复 / lite 降级通过 / lite 零 perspective 失败', () => {
+    const cases: {
+      label: string;
+      entries: RoleDispatchEntry[];
+      expectPassed: boolean;
+      expectCoverage: Array<{
+        phase: number;
+        missingPersonas: string[];
+        timingViolations: number;
+        duplicatePersonas: string[];
+      }>;
+      violationPattern?: RegExp;
+    }[] = [
+      {
+        label: 'valid 全矩阵（阶段 1+2 双阶段，produce 晚于全部 perspective）→ 通过',
+        entries: [
+          ...perspectiveRecords(1, PHASE1_MATRIX),
+          entry(1, 'produce', 'S', '2026-10-03T03:00:00Z'),
+          ...roleBaseline(1),
+          ...perspectiveRecords(2, PHASE2_MATRIX),
+          entry(2, 'produce', 'S', '2026-10-03T03:30:00Z'),
+          ...roleBaseline(2),
+        ],
+        expectPassed: true,
+        expectCoverage: [
+          {
+            phase: 1,
+            missingPersonas: [],
+            timingViolations: 0,
+            duplicatePersonas: [],
+          },
+          {
+            phase: 2,
+            missingPersonas: [],
+            timingViolations: 0,
+            duplicatePersonas: [],
+          },
+        ],
+      },
+      {
+        label: '缺 persona（阶段 1 少 engineering-algorithm-expert 一条 perspective）→ missingPersonas 具名',
+        entries: [
+          ...perspectiveRecords(
+            1,
+            PHASE1_MATRIX.filter((p) => p !== 'engineering-algorithm-expert'),
+          ),
+          entry(1, 'produce', 'S', '2026-10-03T03:00:00Z'),
+          ...roleBaseline(1),
+        ],
+        expectPassed: false,
+        expectCoverage: [
+          {
+            phase: 1,
+            missingPersonas: ['engineering-algorithm-expert'],
+            timingViolations: 0,
+            duplicatePersonas: [],
+          },
+        ],
+        violationPattern: /阶段 1 多角色覆盖不足：缺 persona=engineering-algorithm-expert/,
+      },
+      {
+        label: '时序倒置（perspective 晚于 produce）→ timingViolations=1',
+        entries: [
+          // design-ux-architect 唯一记录放在 produce 之后：隔离时序维度（不引入 persona 重复/缺失）
+          ...perspectiveRecords(
+            1,
+            PHASE1_MATRIX.filter((p) => p !== 'design-ux-architect'),
+          ),
+          entry(1, 'produce', 'S', '2026-10-03T03:00:00Z'),
+          entry(1, 'perspective', 'A', '2026-10-03T04:00:00Z', {
+            persona: 'design-ux-architect',
+            runId: 'mr-late',
+          }),
+          ...roleBaseline(1),
+        ],
+        expectPassed: false,
+        expectCoverage: [
+          {
+            phase: 1,
+            missingPersonas: [],
+            timingViolations: 1,
+            duplicatePersonas: [],
+          },
+        ],
+        violationPattern: /阶段 1 多角色时序违规：produce 记录 runId=.*未严格晚于全部 perspective 记录（同秒不算晚）/,
+      },
+      {
+        label: '同秒不算晚（perspective 与 produce 同时间戳）→ timingViolations=1',
+        entries: [
+          // product-manager 唯一记录与 produce 同秒：隔离时序严格性（不引入 persona 重复/缺失）
+          ...perspectiveRecords(
+            1,
+            PHASE1_MATRIX.filter((p) => p !== 'product-manager'),
+          ),
+          entry(1, 'produce', 'S', '2026-10-03T03:00:00Z'),
+          entry(1, 'perspective', 'A', '2026-10-03T03:00:00Z', {
+            persona: 'product-manager',
+            runId: 'mr-same-sec',
+          }),
+          ...roleBaseline(1),
+        ],
+        expectPassed: false,
+        expectCoverage: [
+          {
+            phase: 1,
+            missingPersonas: [],
+            timingViolations: 1,
+            duplicatePersonas: [],
+          },
+        ],
+      },
+      {
+        label: 'persona 重复（product-manager 两条 perspective）→ duplicatePersonas 具名',
+        entries: [
+          ...perspectiveRecords(1, PHASE1_MATRIX),
+          entry(1, 'perspective', 'A', '2026-10-03T01:30:00Z', {
+            persona: 'product-manager',
+            runId: 'mr-dup',
+          }),
+          entry(1, 'produce', 'S', '2026-10-03T03:00:00Z'),
+          ...roleBaseline(1),
+        ],
+        expectPassed: false,
+        expectCoverage: [
+          {
+            phase: 1,
+            missingPersonas: [],
+            timingViolations: 0,
+            duplicatePersonas: ['product-manager'],
+          },
+        ],
+        violationPattern: /阶段 1 多角色 persona 重复：product-manager/,
+      },
+      {
+        label: 'lite 降级（consensus note 含 phase-role-lite + 实际 2 persona）→ 按实际 N 通过',
+        entries: [
+          entry(1, 'perspective', 'A', '2026-10-03T01:00:00Z', {
+            persona: 'product-requirements-analyst',
+          }),
+          entry(1, 'perspective', 'A', '2026-10-03T01:01:00Z', {
+            persona: 'product-manager',
+          }),
+          entry(1, 'consensus', 'A', '2026-10-03T02:00:00Z', {
+            persona: 'A-lead',
+            note: '共识纪要（lite 降级 phase-role-lite：L0 成熟度单视角）',
+          }),
+          entry(1, 'produce', 'S', '2026-10-03T03:00:00Z'),
+          ...roleBaseline(1),
+        ],
+        expectPassed: true,
+        expectCoverage: [
+          {
+            phase: 1,
+            missingPersonas: [],
+            timingViolations: 0,
+            duplicatePersonas: [],
+          },
+        ],
+      },
+      {
+        label: 'lite 降级但零 perspective（consensus 标 lite 却无任何 persona 留痕）→ missingPersonas=全矩阵',
+        entries: [
+          entry(1, 'consensus', 'A', '2026-10-03T02:00:00Z', {
+            note: '共识纪要（phase-role-lite）',
+          }),
+          entry(1, 'produce', 'S', '2026-10-03T03:00:00Z'),
+          ...roleBaseline(1),
+        ],
+        expectPassed: false,
+        expectCoverage: [
+          {
+            phase: 1,
+            missingPersonas: [...PHASE1_MATRIX],
+            timingViolations: 0,
+            duplicatePersonas: [],
+          },
+        ],
+        violationPattern: /阶段 1 多角色覆盖不足：缺 persona=product-requirements-analyst/,
+      },
+    ];
+    for (const c of cases) {
+      const r = checkRoleDispatch(c.entries);
+      expect(r.passed, `${c.label}: passed`).toBe(c.expectPassed);
+      expect(r.phaseRoleCoverage, `${c.label}: phaseRoleCoverage`).toEqual(c.expectCoverage);
+      if (c.violationPattern) {
+        expect(r.violations.join(' '), `${c.label}: violation 消息`).toMatch(c.violationPattern);
+      }
+    }
+  });
+
+  it('阶段 5-8 produce 记录不触发新维度（零回归：phaseRoleCoverage 不含该阶段）', () => {
+    const entries = [
+      entry(5, 'produce', 'S', '2026-10-03T03:00:00Z'),
+      entry(5, 'review', 'V', '2026-10-03T04:00:00Z'),
+      entry(5, 'gate', 'G', '2026-10-03T05:00:00Z'),
+      entry(5, 'r3-completeness', 'R', '2026-10-03T04:30:00Z'),
+      entry(5, 'r3-reliability', 'R', '2026-10-03T04:31:00Z'),
+      entry(5, 'r3-security', 'R', '2026-10-03T04:32:00Z'),
+    ];
+    const r = checkRoleDispatch(entries);
+    expect(r.passed).toBe(true);
+    expect(r.phaseRoleCoverage).toEqual([]);
+  });
+
+  it('无 produce 的阶段 1-4（历史 run 纯 chunk/cross 形态）不触发新维度（零回归）', () => {
+    const entries = [
+      entry(1, 'chunk', 'A', '2026-10-03T01:00:00Z'),
+      entry(1, 'cross', 'S', '2026-10-03T02:00:00Z'),
+      entry(1, 'test', 'S', '2026-10-03T05:00:00Z'),
+      entry(1, 'review', 'V', '2026-10-03T06:00:00Z'),
+      entry(1, 'gate', 'G', '2026-10-03T07:00:00Z'),
+      entry(1, 'r3-completeness', 'R', '2026-10-03T06:30:00Z'),
+      entry(1, 'r3-reliability', 'R', '2026-10-03T06:31:00Z'),
+      entry(1, 'r3-security', 'R', '2026-10-03T06:32:00Z'),
+    ];
+    const r = checkRoleDispatch(entries);
+    expect(r.passed).toBe(true);
+    expect(r.phaseRoleCoverage).toEqual([]);
+  });
+
+  it('persona 字段误用（非 perspective/consensus 记录携带非空 persona）→ violation（schema description「其他 action 不得出现」）', () => {
+    const entries = [
+      entry(5, 'produce', 'S', '2026-10-03T03:00:00Z', {
+        persona: 'product-manager',
+      }),
+      entry(5, 'review', 'V', '2026-10-03T04:00:00Z'),
+      entry(5, 'gate', 'G', '2026-10-03T05:00:00Z'),
+      entry(5, 'r3-completeness', 'R', '2026-10-03T04:30:00Z'),
+      entry(5, 'r3-reliability', 'R', '2026-10-03T04:31:00Z'),
+      entry(5, 'r3-security', 'R', '2026-10-03T04:32:00Z'),
+    ];
+    const r = checkRoleDispatch(entries);
+    expect(r.passed).toBe(false);
+    expect(r.violations.join(' ')).toMatch(/persona 字段误用：条目 runId=.*action=produce 不得携带 persona/);
+    expect(r.phaseRoleCoverage).toEqual([]);
+  });
+
+  it('空输入 fail-closed 既有行为不回归（phaseRoleCoverage=[]）', () => {
+    const r = checkRoleDispatch([]);
+    expect(r.passed).toBe(false);
+    expect(r.phaseRoleCoverage).toEqual([]);
+    expect(r.violations.join(' ')).toMatch(/无任何可校验阶段/);
   });
 });

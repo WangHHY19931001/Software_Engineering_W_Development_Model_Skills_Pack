@@ -185,7 +185,7 @@
       "minLength": 1
     },
     "action": {
-      "description": "动作类型枚举（共 30 值）：chunk=A 子代理 ingestion 分块（阶段1-4必需）；cross=A 子代理跨块交叉合并（阶段1-4必需）；evolve=A 子代理图谱演进增量更新（A-evolve，阶段2-4 在现有 graph.json 上追加节点/边）；produce=S 产出阶段产物（阶段5-8必需）；review=V 评审（阶段5-8必需）；gate=G 工件质量门（check-artifact-gate.ts）；tla-gate=G TLA+ 行为门禁（check-tla-model.ts）；graph-gate=G 图谱门禁（check-requirement-graph.ts）；test=S 测试执行；checkpoint=O 阶段门 CHECKPOINT 放行；rework=返工；rollback=阶段回退；rootcause=R 根因定位（须含 reportId/rootCauseCategory/upstreamDefect/rollbackRecommended）；fix=S 兼 F 修复（须含 basedOnReport/artifacts）；emergency-fix=S 紧急修复变体；escalate=升级（upstreamDefect 触发阶段回退升级时记录 reportId）；r3-completeness/r3-reliability/r3-security=R 预防性审查三报告（约束 #11 无条件强制）；codegraph_query=S-coding 修改前符号级影响分析查询（约束 #14）；opsx_explore/opsx_propose/opsx_apply/opsx_archive=（LEGACY——历史 run-log 合法，新日志须改用 plan_* 三动作）OpenSpec 规格驱动变更四动作；ensure_deps=O 编排者依赖检测（`ensure-codegraph.ts`：codegraph CLI + superpowers 三层检测；缺失时自动安装 codegraph，superpowers 只检测不安装；OpenSpec 项已退役）；iceberg-sweep=R-iceberg 冰山扫掠分派（须含 triggerType/icebergRound/reportPath/newFindingsCount/passed）；iceberg-review=V 复审冰山报告（须含 reportId/passed/validFindings/reworkHints）；plan_propose=S 产编码计划 docs/plans/<changeId>.plan.md（writing-plans）；plan_task=S 按计划执行一个任务（SDD 逐任务）；plan_review=V 对计划任务产出做评审（不在 reworkHints 强制族：配对非强制，约束 #8 审计面）。动作与角色配对：配对强制子集由 check-run-log.ts logic 层 blocking 执行（r3-completeness/r3-reliability/r3-security→R、fix/emergency-fix/produce→S、review→V、gate/tla-gate/graph-gate→G）；其余动作（test/rootcause/iceberg-sweep/checkpoint/ensure_deps/chunk/cross/evolve/codegraph_query/iceberg-review/opsx_*/plan_* 等）与角色的配对语义见本 description 上文逐动作罗列，非强制子集违反时按 R5/role-action 审计处理（约束 #8 角色分派完整性）",
+      "description": "动作类型枚举（共 32 值）：chunk=A 子代理 ingestion 分块（阶段1-4必需）；cross=A 子代理跨块交叉合并（阶段1-4必需）；evolve=A 子代理图谱演进增量更新（A-evolve，阶段2-4 在现有 graph.json 上追加节点/边）；produce=S 产出阶段产物（阶段5-8必需）；review=V 评审（阶段5-8必需）；gate=G 工件质量门（check-artifact-gate.ts）；tla-gate=G TLA+ 行为门禁（check-tla-model.ts）；graph-gate=G 图谱门禁（check-requirement-graph.ts）；test=S 测试执行；checkpoint=O 阶段门 CHECKPOINT 放行；rework=返工；rollback=阶段回退；rootcause=R 根因定位（须含 reportId/rootCauseCategory/upstreamDefect/rollbackRecommended）；fix=S 兼 F 修复（须含 basedOnReport/artifacts）；emergency-fix=S 紧急修复变体；escalate=升级（upstreamDefect 触发阶段回退升级时记录 reportId）；r3-completeness/r3-reliability/r3-security=R 预防性审查三报告（约束 #11 无条件强制）；codegraph_query=S-coding 修改前符号级影响分析查询（约束 #14）；opsx_explore/opsx_propose/opsx_apply/opsx_archive=（LEGACY——历史 run-log 合法，新日志须改用 plan_* 三动作）OpenSpec 规格驱动变更四动作；ensure_deps=O 编排者依赖检测（`ensure-codegraph.ts`：codegraph CLI + superpowers 三层检测；缺失时自动安装 codegraph，superpowers 只检测不安装；OpenSpec 项已退役）；iceberg-sweep=R-iceberg 冰山扫掠分派（须含 triggerType/icebergRound/reportPath/newFindingsCount/passed）；iceberg-review=V 复审冰山报告（须含 reportId/passed/validFindings/reworkHints）；plan_propose=S 产编码计划 docs/plans/<changeId>.plan.md（writing-plans）；plan_task=S 按计划执行一个任务（SDD 逐任务）；plan_review=V 对计划任务产出做评审（不在 reworkHints 强制族：配对非强制，约束 #8 审计面）；perspective=A persona 子代理按 agent-personas 阶段角色集矩阵单 persona 视角分析（阶段1-4 多角色机制；须含 persona 字段且非空、与 persona id 一致）；consensus=A-lead 汇总分歧/交叉轮调度/共识纪要（多轮逐轮记录；persona 可为 A-lead 或空——以 role=A 判定）。动作与角色配对：配对强制子集由 check-run-log.ts logic 层 blocking 执行（r3-completeness/r3-reliability/r3-security→R、fix/emergency-fix/produce→S、review→V、gate/tla-gate/graph-gate→G、perspective/consensus→A）；其余动作（test/rootcause/iceberg-sweep/checkpoint/ensure_deps/chunk/cross/evolve/codegraph_query/iceberg-review/opsx_*/plan_* 等）与角色的配对语义见本 description 上文逐动作罗列，非强制子集违反时按 R5/role-action 审计处理（约束 #8 角色分派完整性）",
       "enum": [
         "chunk",
         "cross",
@@ -216,7 +216,9 @@
         "iceberg-review",
         "plan_propose",
         "plan_task",
-        "plan_review"
+        "plan_review",
+        "perspective",
+        "consensus"
       ]
     },
     "role": {
@@ -409,6 +411,10 @@
       "type": "number",
       "minimum": 0,
       "maximum": 1
+    },
+    "persona": {
+      "description": "多视角分析的 persona 标识（action=perspective/consensus 时须非空；取值=agent-personas 阶段角色集矩阵 persona id）；其他 action 不得出现（role-dispatch logic 校验）",
+      "type": "string"
     }
   }
 }

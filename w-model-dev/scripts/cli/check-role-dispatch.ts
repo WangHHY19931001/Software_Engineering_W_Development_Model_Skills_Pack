@@ -79,18 +79,20 @@ async function main(): Promise<void> {
   const passed = allViolations.length === 0;
   const exitCode = passed ? 0 : 1;
 
+  // 机器可读摘要（--json 通道；既有键形不变，仅追加 phaseRoleCoverage——
+  // 阶段 1-4 多角色三新维度结果，仅触发阶段（1-4 且有 produce 记录）出现）
+  const summary = {
+    type: 'role-dispatch',
+    passed,
+    reasons: allViolations,
+    violations: buildViolationDistribution(allViolations.length),
+    durationMs: Date.now() - startTime,
+    phaseRoleCoverage: result.phaseRoleCoverage,
+  };
+
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
-    printJsonReport(
-      {
-        type: 'role-dispatch',
-        passed,
-        reasons: allViolations,
-        violations: buildViolationDistribution(allViolations.length),
-        durationMs: Date.now() - startTime,
-      },
-      exitCode,
-    );
+    printJsonReport(summary, exitCode);
     process.exitCode = exitCode;
     return;
   }
@@ -118,6 +120,19 @@ async function main(): Promise<void> {
         `        R3 缺失维度: ${dims.missingDimensions.join('/')}（须 role=R 的 r3-completeness/r3-reliability/r3-security 各 1 条 success）`,
       );
     }
+    // 阶段 1-4 多角色三新维度明细（task 3）：仅触发阶段（1-4 且有 produce 记录）出现在 phaseRoleCoverage
+    const coverage = result.phaseRoleCoverage.find((entry) => entry.phase === p.phase);
+    if (coverage) {
+      const parts: string[] = [];
+      if (coverage.missingPersonas.length > 0) parts.push(`缺 persona: ${coverage.missingPersonas.join('/')}`);
+      if (coverage.timingViolations > 0) parts.push(`时序违规: ${coverage.timingViolations} 条 produce`);
+      if (coverage.duplicatePersonas.length > 0) parts.push(`persona 重复: ${coverage.duplicatePersonas.join('/')}`);
+      console.log(
+        parts.length > 0
+          ? `        多角色三维度: ${parts.join('；')}（agent-personas 阶段角色集矩阵；覆盖/时序/互异）`
+          : `        多角色三维度: ✓ 覆盖/时序/互异全过（agent-personas 阶段角色集矩阵）`,
+      );
+    }
   }
 
   if (!passed) {
@@ -128,7 +143,9 @@ async function main(): Promise<void> {
     }
   }
 
-  // 末尾 JSON 摘要（r3Enabled 恒为 true，向后兼容历史消费者）
+  // 末尾 JSON 摘要（r3Enabled 恒为 true，向后兼容历史消费者）；
+  // violations 键保持既有形态 = 全量违规数组（--json 通道的 violations = rule/count 分布，两通道既有约定不同）；
+  // phaseRoleCoverage 同键透出（F2 形态：{phase, missingPersonas, timingViolations, duplicatePersonas}）
   printGateReport(
     'ROLE_DISPATCH',
     {
@@ -137,6 +154,7 @@ async function main(): Promise<void> {
       r3Enabled: true,
       phaseCount: result.phaseSummary.length,
       violations: allViolations,
+      phaseRoleCoverage: result.phaseRoleCoverage,
     },
     exitCode,
   );

@@ -56,7 +56,7 @@
 
 ### action（RunLogEntry）
 
-- **规范定义**：run-log 动作类型枚举（共 30 值，以 `run-log.schema.json` 为准）：`chunk` / `cross` / `evolve` / `produce` / `review`（V 评审）/ `gate` / `tla-gate` / `graph-gate` / `test` / `checkpoint` / `rework` / `rollback` / `rootcause` / `fix` / `emergency-fix` / `escalate` / `r3-completeness` / `r3-reliability` / `r3-security` / `codegraph_query` / `opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive`（以上四值为 LEGACY——历史 run-log 合法，新日志须改用 plan_* 三动作）/ `ensure_deps` / `iceberg-sweep` / `iceberg-review` / `plan_propose`（S 产编码计划 docs/plans/<changeId>.plan.md）/ `plan_task`（S 按计划执行一个任务）/ `plan_review`（V 对计划任务产出做评审）。
+- **规范定义**：run-log 动作类型枚举（共 32 值，以 `run-log.schema.json` 为准）：`chunk` / `cross` / `evolve` / `produce` / `review`（V 评审）/ `gate` / `tla-gate` / `graph-gate` / `test` / `checkpoint` / `rework` / `rollback` / `rootcause` / `fix` / `emergency-fix` / `escalate` / `r3-completeness` / `r3-reliability` / `r3-security` / `codegraph_query` / `opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive`（以上四值为 LEGACY——历史 run-log 合法，新日志须改用 plan_* 三动作）/ `ensure_deps` / `iceberg-sweep` / `iceberg-review` / `plan_propose`（S 产编码计划 docs/plans/<changeId>.plan.md）/ `plan_task`（S 按计划执行一个任务）/ `plan_review`（V 对计划任务产出做评审）/ `perspective`（A persona 子代理按阶段角色集矩阵单 persona 视角分析，须含 persona 字段且非空）/ `consensus`（A-lead 汇总分歧/交叉轮调度/共识纪要，多轮逐轮记录；persona 可为 A-lead 或空——以 role=A 判定）。
 - **_Avoid_**：operation/op/行为/事件（「action」字段名固定；EventIngress 的同类字段是 `eventType`）。
 
 ### checkRounds
