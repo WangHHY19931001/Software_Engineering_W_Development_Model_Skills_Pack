@@ -15,8 +15,6 @@
 - [5. 与既有机制划界](#5-与既有机制划界)
 - [6. 人审锚](#6-人审锚)
 - [7. 维护规则](#7-维护规则)
-- [8. 附录：锚点复核命令（维护用）](#8-附录锚点复核命令维护用)
-- [9. 附录：五批次规格与 SSoT 权威节对照](#9-附录五批次规格与-ssot-权威节对照)
 
 ## 0. 证据层级声明
 
@@ -24,7 +22,7 @@
 
 1. **五批次规格**（`docs/superpowers/specs/` 下 2026-09-30-design-code-consistency-anchors-design.md / 2026-10-01-gate-engineering-design.md / 2026-10-02-design-phase-fog-and-optional-capability-design.md / 2026-10-02-batch4-dispatch-contract-design.md / 2026-10-03-batch5-governance-narrative-design.md）——逐项范围与裁定的实现侧权威；
 2. **总纲 §1/§3/§7**（批次划分、C3 排除、明确不吸收清单）——跨批次契约权威；
-3. **SSoT 权威节**（§10.8 / §10L / §10M / §10N / §10O / §10K.7）——已实现机制的摘要权威；
+3. **SSoT 权威节**（§10.8 / §10L / §10M / §10N / §10O / §10K.7；B2 签名链权威另见 §7.9 / §10.11）——已实现机制的摘要权威；
 4. **CHANGELOG 42.6.0-42.10.0**——逐批次交付终值。
 
 ## 1. 吸收/不吸收判定总表
@@ -48,7 +46,7 @@
 
 **明确不吸收清单**（转载总纲 §7，防重复讨论）：archify 视觉设计系统/渲染器/viewer；DHH「可以不看代码」（域限定个人激进态）；Anthropic managed settings/egress/沙箱具体配置；Stripe devbox/Toolshed/goose fork、Spotify 自研 CLI 等基建实现；Basecamp agent-accessible 产品策略；Endless execution 哲学抒情。
 
-**锚点约定**：§2-§6 全部「文件+节」锚点写入前已逐一实查（grep 节标题/关键词于 2026-10-03 收口时点的 HEAD），实查不符的以实查为准修正；本文锚点一律不写行号——行号随版本漂移，节名以所在文件当前版本为准。锚点失效时按 §7 维护规则修锚，机械复核方式见 §8。
+**锚点约定**：§2-§6 全部「文件+节」锚点写入前已逐一实查（grep 节标题/关键词于 2026-10-03 收口时点的 HEAD），实查不符的以实查为准修正；本文锚点一律不写行号——行号随版本漂移，节名以所在文件当前版本为准。锚点失效时按 §7 维护规则修锚，机械复核命令见 §7 末尾。
 
 **六段骨架导读**：
 
@@ -83,7 +81,7 @@
 
 ## 3. 落点（权威文件+节）
 
-权威落点全部指向 SSoT、references、schemas/scripts 或批次规格节；辅助落点为消费方、模板或旁证。全部锚点实查于 2026-10-03（其中 B6 按「实读批次 1 规格」落笔，见 §8）。
+权威落点全部指向 SSoT、references、schemas/scripts 或批次规格节；辅助落点为消费方、模板或旁证。全部锚点实查于 2026-10-03（其中 B6 按「实读批次 1 规格」确认落点后落笔）。
 
 | 项 | 权威落点（文件+节） | 辅助落点 |
 |---|---|---|
@@ -112,12 +110,12 @@
 | B6 | 文档纪律+链接审计 | 批次 1 交付=悬空括注删除（grep 复核核验）；既有审计面 audit:l0-links（分层链接边界）+ check-docs-consistency（出站链接检查） |
 | A3 | 脚本门禁 | check-design-fog.ts R1-R6（存在未终结项 exit 1 阻断放行；phase-2/3/4 验收清单接线） |
 | A4 | 无脚本门禁（知情声明） | 靠 V 评审 + phase-2/3/4 图谱禁止行为条目承载；图模型无可选语义使可选能力天然不产生对账义务 |
-| B1 | 门禁输出扩展 | 四热点 structuredViolations（`--json` 机器可读当前仅 check-artifact-gate 的 `sdmapViolations`/`verifiedArtifacts` 键；三热点透传登记总纲 §5.1 后续批次——SSoT §10L.8 勘误如实转述） |
+| B1 | 门禁输出扩展 | 四热点 structuredViolations（`--json` 机器可读当前仅 check-artifact-gate 的 `sdmapViolations` 键；三热点透传登记总纲 §5.1 后续批次——SSoT §10L.8 勘误如实转述） |
 | B2 | 脚本门禁 | check-signature-chain.ts R6 按 sigHashAlgo 分流重算（signature-chain-logic.ts）+ R11（v2 链 sha256 必填） |
 | B3 | 脚本门禁 | check-rootcause-report.ts R4（每条 fixRecommendation 必带合规 scope：{allowed,forbidden} 至少一侧非空） |
 | B4 | 无脚本门禁（知情声明，批次 4 D12 形态） | 执行靠 O/V 遵循 + 既有闭环门禁（check-run-log / check-budget / check-role-dispatch）间接承载 |
 | B5 | 无脚本（收敛视图） | 轮次上限义务由既有 check-budget / check-run-log R11 / ICEBERG maxIcebergRounds=5（hard-constraints.md 反模式 #44）承载；候选反模式 C2 pending V 复审不作为强制反模式执行 |
-| C2 | 无脚本（三不承诺） | R3 security 与 V security-auditor 叙事层参考消费；不新增检测信号、不改任何 G 门禁判定（agent-threat-model.md 定位节） |
+| C2 | 无脚本（三不承诺） | R3 security 与 V security-auditor 叙事层参考消费；不新增检测信号、不改任何 G 门禁判定（agent-threat-model.md 文件头定位 blockquote） |
 | C4 | 无脚本（编组语义） | 全部复用既有 code-health ledger / git apply -R 回滚 / archive produce 原语；零新脚本零 schema（quality-standards.md 回收路径节） |
 | C1 | 无（未实现） | SSoT §10K.7「未实现（不得据此执行）」；实现立项前须用户需求输入 |
 
@@ -138,7 +136,7 @@
 | B4 | 派单契约 vs 角色边界 | 契约管「派什么/怎么验」；同文件角色边界管「谁能做什么」——两节互补不重复 |
 | B5 | L0-L4 视图 vs 既有轮次数值 | 收敛视图零新增数值：每任务 5 轮 / maxReworkRounds / maxIcebergRounds=5 均既有值引用（subagent-delegation.md L1/L2 行） |
 | C2 | 威胁叙事 vs 守卫体系 | 叙事层不建自动化守卫（批次 5 D1）；守卫唯一执行体仍是门禁脚本+硬约束 |
-| C4 | campaign 整批 vs 阶段回退 | 阶段 5-8 的「整批」形态已存在=阶段回退（references/workflow.md 回退目标阶段映射）；本机制补 campaign 级 |
+| C4 | campaign 整批 vs 阶段回退 | 阶段 5-8 的「整批」形态已存在=阶段回退（references/workflow.md「回退路径阶段编号映射」节）；本机制补 campaign 级 |
 | C1 | 迁移素材 vs 正常阶段流程 | 待输入字段表将定义「哪些变更不算迁移」；当前一切照常走阶段 5-8 流程 |
 
 ## 6. 人审锚
@@ -165,9 +163,7 @@
 
 机制演进时本表随之维护：已实现机制变更落点或退役 → 同步 §3/§4 对应行（退役在 §1 判定列加注）；新增吸收项（后续批次/立项）→ §1 总表续行 + §2-§6 各补一行；锚点失效（文件/节改名）→ 修锚不改判定。与 [agent-threat-model.md](../w-model-dev/references/agent-threat-model.md) §4、SSoT §10A 追溯表同款纪律；本文由批次规格流程修改，常规 `/wm` 运行不写本文。
 
-## 8. 附录：锚点复核命令（维护用）
-
-§7「修锚不改判定」的机械核验方式——下列命令逐一执行，预期各命中 ≥1（命中行号随版本漂移，以命中节标题为准）；B6 行的落点以批次 1 规格实读为准。上列 §2-§6 锚点于 2026-10-03 收口时全部实查命中。
+修锚的机械复核方式——下列命令逐一执行，预期各命中 ≥1（命中行号随版本漂移，以命中节标题为准）；B6 行的落点以批次 1 规格实读为准。§2-§6 锚点于 2026-10-03 收口时全部实查命中。
 
 ```bash
 # A1：SSoT §10.8 对账节
@@ -187,17 +183,3 @@ grep -n "整批否决权与回收路径" w-model-dev/references/quality-standard
 # B6：批次 1 规格 B6 节与交付记录
 grep -n "B6\|悬空" docs/superpowers/specs/2026-09-30-design-code-consistency-anchors-design.md
 ```
-
-## 9. 附录：五批次规格与 SSoT 权威节对照
-
-规格文件均在 `docs/superpowers/specs/` 下；SSoT 指 `docs/skill-design-document_SSoT.md`。
-
-| 批次 | 版本 | 规格文件 | SSoT 权威节 |
-|---|---|---|---|
-| 1 | 42.6.0 | 2026-09-30-design-code-consistency-anchors-design.md | §10.8 / §10.8.1（A1 对账）；§10L.4（A2 分类词条） |
-| 3 | 42.7.0 | 2026-10-01-gate-engineering-design.md | §10L（10L.1/10L.2/10L.8 等）；§7.9 + §10.11（B2 签名链） |
-| 2 | 42.8.0 | 2026-10-02-design-phase-fog-and-optional-capability-design.md | §10M（A3/A4） |
-| 4 | 42.9.0 | 2026-10-02-batch4-dispatch-contract-design.md | §10N（B4/B5） |
-| 5 | 42.10.0 | 2026-10-03-batch5-governance-narrative-design.md | §10O（C2/C4）；§10K.7（C1 素材） |
-
-逐批次交付终值见 [CHANGELOG.md](../CHANGELOG.md) 的 42.6.0 / 42.7.0 / 42.8.0 / 42.9.0 / 42.10.0 五条目。
