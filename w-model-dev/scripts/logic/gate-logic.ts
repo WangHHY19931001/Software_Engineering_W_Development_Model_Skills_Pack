@@ -1255,8 +1255,8 @@ function checkOutOfScopeRegister(spec: string): string[] {
   return v;
 }
 
-/** 各阶段独立产物布局（主文档后缀 + 6 独立文件）
- *  phase=1: requirement-spec.md 主文档 + 6 子文件（无前缀）
+/** 各阶段独立产物布局（主文档后缀 + 独立子模板文件）
+ *  phase=1: requirement-spec.md 主文档 + 7 子文件（无前缀）
  *  phase=2: {module}-system-design.md 主文档 + 6 子文件（带 {module}- 前缀）
  */
 const PHASE_SPEC_LAYOUT: Record<number, { mainSuffix: string; refs: string[] }> = {
@@ -1269,6 +1269,7 @@ const PHASE_SPEC_LAYOUT: Record<number, { mainSuffix: string; refs: string[] }> 
       'behavior-spec.md',
       'discipline-dod.md',
       'uml-modeling.md',
+      'development-requirements.md',
     ],
   },
   2: {

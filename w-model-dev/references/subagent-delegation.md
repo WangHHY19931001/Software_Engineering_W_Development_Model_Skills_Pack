@@ -496,7 +496,7 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 ### A-lead（多视角分析协调者，A 类 lead 变体）
 
 - **定位**：阶段 1-4 产出前的多角色讨论协调者——按 [agent-personas.md](agent-personas.md)「阶段角色集矩阵」分派 N 个 persona 视角分析、汇总分歧、调度并行多轮交叉质询、产出共识纪要。**属 A 类分析动作**：A-lead 与 persona 子代理均不产出阶段交付物、不改迷雾册（未决分歧的登记义务在 S 产出侧）、不跑门禁。
-- **派单契约（O → A-lead，两段）**：前置条件 = 阶段角色集矩阵节与 N 份 persona 文件实存 + 前阶段产物就绪 + `phase-analyses/phase-<N>/` 目录可写；可验证终态 = `.w-model/phase-analyses/phase-<N>/consensus-minutes.md` 落盘（含每分歧决议/迷雾去向与实际交叉轮次）+ run-log 含 N 条 `action=perspective`（persona 非空互异）与 ≥1 条 `action=consensus`，第三方可复核。
+- **派单契约（O → A-lead，两段）**：前置条件 = 阶段角色集矩阵节与 N 份 persona 文件实存 + 前阶段产物就绪 + `phase-analyses/phase-<N>/` 目录可写；可验证终态 = `.w-model/phase-analyses/phase-<N>/consensus-minutes.md` 落盘（含每分歧决议+理由，或迷雾册去向与实际交叉轮次）+ run-log 含 N 条 `action=perspective`（persona 非空互异）与 ≥1 条 `action=consensus`，第三方可复核。
 - **升级路径**：交叉 5 轮未收敛 → A-lead 停止并上报 O → 🔴 CHECKPOINT（加轮 / 未决项全登记迷雾册收口 / 终止阶段）——升级单调性同分层反馈回路。
 
 ## 主刀职责映射表
@@ -1490,7 +1490,7 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
   1. 并行分派 N 个 A persona 视角分析（用「A persona 视角分析分派模板」），首轮输入=前阶段产物路径+视角关注面（矩阵行逐字）
   2. 汇总 N 份报告的分歧点候选 → 调度并行多轮交叉质询直到收敛（收敛判据=单轮零新增分歧 ∧ 全部分歧已决或登记迷雾册；每轮输入附共识纪要当前版）
   3. 交叉 5 轮未收敛 → A-lead 停止并上报 O → 🔴 CHECKPOINT（加轮 / 未决项全登记迷雾册收口 / 终止阶段）
-  4. 产出共识纪要（含每分歧决议/迷雾去向与实际交叉轮次；lite 降级时纪要注明）
+  4. 产出共识纪要（含每分歧决议+理由，或迷雾册去向与实际交叉轮次；lite 降级时纪要注明）
 
 产出契约：
   1. 文件路径：.w-model/phase-analyses/phase-<N>/consensus-minutes.md
@@ -1498,7 +1498,7 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
   3. 返回编排者：{role:"A", variant:"lead", phase:<N>, personas:[<id>], crossRounds:<k>, minutesPath, disputesResolved:<bool>, fogItems:[<未决分歧>]}
 
 可验证终态（selfCheck.terminalState 逐条核验）：
-  - 产物判据：`.w-model/phase-analyses/phase-<N>/consensus-minutes.md` 落盘（含每分歧决议/迷雾去向与实际交叉轮次）
+  - 产物判据：`.w-model/phase-analyses/phase-<N>/consensus-minutes.md` 落盘（含每分歧决议+理由，或迷雾册去向与实际交叉轮次）
   - 回填判据：run-log 含 N 条 `action=perspective`（persona 非空互异）与 ≥1 条 `action=consensus`，第三方可复核（角色禁令优先：gate 验证由下游 G 承担）
 
 禁止：

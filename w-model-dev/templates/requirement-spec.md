@@ -348,6 +348,10 @@ graph TD
 
 > Phase 1 工程纪律与 DoD 详见 [discipline-dod.md](./requirement-spec/discipline-dod.md)（§1 需求阶段纪律 + §2 DoD 可勾选清单）。
 
+## 18. 研制要求
+
+> 研制要求详见 [development-requirements.md](./requirement-spec/development-requirements.md)（顶层技术要求条目化，逐条追溯 REQ；阶段无条目时保留「无研制要求项」标记）。
+
 ## 附录 A. UML 需求建模
 
 > UML 需求建模详见 [uml-modeling.md](./requirement-spec/uml-modeling.md)（A.1 用例图 / A.2 领域类图 / A.3 活动图，mermaid）。

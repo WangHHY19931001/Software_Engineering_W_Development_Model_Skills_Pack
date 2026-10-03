@@ -1145,6 +1145,7 @@ describe('Phase 1 需求规格结构校验', () => {
       'behavior-spec.md',
       'discipline-dod.md',
       'uml-modeling.md',
+      'development-requirements.md',
     ];
     const mkSpec = (refs: string[], extra = '') =>
       refs.map((r) => `> 详见 [x](./${r})`).join('\n') +
@@ -1205,6 +1206,7 @@ describe('Phase 1 §8 拒绝登记结构校验（M08）', () => {
     'behavior-spec.md',
     'discipline-dod.md',
     'uml-modeling.md',
+    'development-requirements.md',
   ];
   const mkFs = (files: Record<string, string>) => ({
     readFileSync(p: string): string {
@@ -1664,6 +1666,7 @@ describe('模板漂移校验（--validate-templates，C9）', () => {
         'behavior-spec.md',
         'discipline-dod.md',
         'uml-modeling.md',
+        'development-requirements.md',
       ],
       prefixed: false,
     },
@@ -1835,7 +1838,7 @@ describe('§4.2 验收标准可量化校验（phase 1）与 §5 ADR 三列校验
     },
   });
 
-  /** 阶段 1 spec-dir：主文档（含给定 §4.2 表）+ 6 引用 + DoD≥8 */
+  /** 阶段 1 spec-dir：主文档（含给定 §4.2 表）+ 7 引用 + DoD≥8 */
   function phase1Files(tableBody: string): Record<string, string> {
     const dir = path.join('docs', 'phase1-requirements');
     const refs = [
@@ -1845,6 +1848,7 @@ describe('§4.2 验收标准可量化校验（phase 1）与 §5 ADR 三列校验
       'behavior-spec.md',
       'discipline-dod.md',
       'uml-modeling.md',
+      'development-requirements.md',
     ];
     let spec = refs.map((r) => `> 详见 [x](./${r})`).join('\n');
     spec += '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
@@ -2020,6 +2024,7 @@ describe('checkPhaseSpecStructure fs 注入契约（合并 checkRequirementSpecS
       'behavior-spec.md',
       'discipline-dod.md',
       'uml-modeling.md',
+      'development-requirements.md',
     ];
     let spec = refs.map((r) => `> 详见 [x](./${r})`).join('\n');
     spec += '\n> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n';
