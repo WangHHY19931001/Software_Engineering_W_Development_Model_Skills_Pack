@@ -7,6 +7,15 @@
 
 基于《需求规格说明书》进行系统架构设计，并**同步设计系统测试用例**。系统设计子模块产出系统架构图、技术选型建议、模块划分方案。
 
+## 多角色讨论分析（阶段角色集矩阵，批次 multi-role）
+
+- **时序**：O 路由确认后、S 产出派单前——O 派单 A-lead（[subagent-delegation.md](subagent-delegation.md)「A-lead」节契约两段）→ 并行分派 7 persona 视角分析（矩阵行：测试经理/系统架构师/软件工程师/产品经理/数据库专家/UX 专家/算法专家）→ 汇总分歧 → 并行多轮交叉直到收敛（单轮零新增分歧 ∧ 全部分歧已决或登记迷雾册；5 轮安全阀 → 🔴 CHECKPOINT）→ 共识纪要 → S 依纪要产出（派单前置条件=纪要实存且 N 视角齐备）。讨论分析仅发生在本阶段首轮 produce 之前；produce 之后再新增 perspective 即属出格行为（门禁时序维度将拦截）——如需重开讨论，走阶段回退。
+- **分歧出口**：未决分歧由 S 产出时登记入本阶段设计期迷雾登记册（[phase-2-system-design.md](phase-2-system-design.md)「设计期迷雾登记册」节）；A-lead 与 persona 不改迷雾册。
+- **门禁**：阶段门 `check-role-dispatch` 含 `phaseRoleCoverage` 维度（覆盖/时序/互异，exit 1 阻断放行）；run-log 须有 `perspective`×N + `consensus`≥1 + `produce` 晚于全部 perspective。
+- **lite**：L0/L1 或用户显式 `--lite` → 单视角（系统架构师）+ 纪要注明降级；门禁按实际 N。
+
+> 矩阵 persona 顺序以 [agent-personas.md](agent-personas.md)『阶段角色集矩阵』节为准，本节不维护独立副本。
+
 ## 系统设计算法
 
   1. 系统架构建模
@@ -249,6 +258,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 - [ ] {module}-traceability-matrix.md（SD×需求 + 测试层级矩阵）与主模板 §3/phase1 矩阵一致，主模板 §7 引用块成立
 - [ ] {module}-uml-modeling.md 四图与主模板 §1/§3 对应、mermaid 块配平，主模板附录 A 引用块成立
 - [ ] {module}-behavior-spec.md + {module}-discipline-dod.md 已产出，主模板 §8/§9 引用块成立
+- [ ] `check-role-dispatch` exit 0（含 `phaseRoleCoverage` 维度）
 
 > 🔴 **CHECKPOINT · 阶段门放行**：系统设计 + 系统测试用例产出后暂停。Agent 必须向用户展示「架构图 / 技术选型 / 模块划分 / 系统测试用例（含端到端 + 性能基线 + 安全基线）/ 设计期迷雾清空披露 / RTM 补登」，由用户确认「放行进入阶段 3」或「返工」。架构图缺失或系统测试用例未含性能/安全基线 → 一律返工。迷雾登记册存在未终结项（check-design-fog exit 1）→ 一律返工。
 

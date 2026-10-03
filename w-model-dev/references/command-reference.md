@@ -498,6 +498,18 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - **「吞掉测试失败只看产物」语义**：逐文件定位「存在测试失败痕迹（锁残留 / 覆盖率产物 / vitest 输出 JSON）但工作区产物却被判通过」的污染形态——失败信号被吞掉、只留下产物；本 CLI 把这些痕迹逐项列出，供污染源二分定位使用。
 - **退出码**：0=干净（stdout 单行 `POLLUTION_JSON {type,passed,project,findings,findingCount,exitCode}`）/ 1=发现污染源（逐项 `✗ [kind] path — reason` 列表 + `POLLUTION_JSON`）/ 2=输入错误（未知/重复 flag、`--project` 空值或不存在、多余位置参数 → `ARG_INVALID`/`FILE_NOT_FOUND`，在任何扫描前拒绝、零副作用）。
 
+## 角色分派完整性门禁 CLI（check-role-dispatch）
+
+- **速查行**：`npx tsx w-model-dev/scripts/cli/check-role-dispatch.ts <run-log.jsonl> [--json]`（`--r3-enabled` 为 no-op 向后兼容保留；`--json` 输出单行机器可读报告）
+- **基础语义（约束 #8 + 反模式 #34）**：每阶段 S/V/G 三角色各 ≥1 条记录；R3 预防性审查无条件须 role=R + outcome=success 的 r3-completeness/r3-reliability/r3-security 三维度各 ≥1（只按精确动作计数）；空/坏行 fail-closed（坏行以 `PARSE_INCOMPLETE` 并入 blocking violations，口径与 check-run-log 一致）。
+- **阶段 1-4 多角色三新维度**（触发判据=仅当该阶段 1-4 存在 `action=produce` 记录；无 produce 的阶段——历史 run 纯 chunk/cross 形态、阶段 5-8——不触发，`phaseRoleCoverage` 不含该阶段）：
+  - **覆盖**：`action=perspective` 且 `persona` 非空记录的 persona 集合 ⊇ 阶段角色集矩阵 persona 集（权威 = [agent-personas.md](agent-personas.md)『阶段角色集矩阵』节；机器常量 `PHASE_ROLE_MATRIX` 与矩阵行逐字一致，覆盖判定只比集合）；lite 降级形态（该阶段存在 consensus 记录且 `note`/`artifacts` 含 `phase-role-lite` 标记）按实际分派 N 通过，不冒充全矩阵。
+  - **时序**：本阶段 `action=produce` 记录时间戳须严格晚于全部 perspective 记录（毫秒严格比较，同秒不算晚；时间戳缺失/不可解析按 fail-closed 处理）。
+  - **互异**：同阶段 perspective 记录 `persona` 重复违规（一 persona 一报告；空 persona 不计入）。
+- **`phaseRoleCoverage` JSON 键**：仅触发阶段出现的数组，元素形态 `{phase, missingPersonas, timingViolations, duplicatePersonas}`（维度全过时三字段为空数组 / 0）；`--json` 通道与人类可读收尾 `ROLE_DISPATCH_JSON` 摘要同键透出。
+- **退出码**：0=通过 / 1=校验失败（含坏行 blocking）/ 2=输入错误（缺 `<run-log.jsonl>` → `ARG_INVALID`，文件不存在/不可读 → `FILE_NOT_FOUND`）。
+- **guide 链接**：[agent-personas.md](agent-personas.md)（『阶段角色集矩阵』节 + lite 降级注）与 [subagent-delegation.md](subagent-delegation.md)（A-lead 分派契约两段与两分派模板）。
+
 ## Verifier 校准（**可选，非门禁**）
 
 - **速查行**：无固定 CLI——校准由外部 Agent 按 [samples/verifier-calibration/README.md](../scripts/samples/verifier-calibration/README.md) 的步骤直接调用逻辑层函数（`checkVerifierOutput` / `checkRunLog`）跑锚定样本，比对 V 判定与人工 `expectedVerdict`。

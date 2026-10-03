@@ -413,7 +413,7 @@
       "maximum": 1
     },
     "persona": {
-      "description": "多视角分析的 persona 标识（action=perspective/consensus 时须非空；取值=agent-personas 阶段角色集矩阵 persona id）；其他 action 不得出现（role-dispatch logic 校验）",
+      "description": "多视角分析的 persona 标识（action=perspective 时须非空；action=consensus 时可为 A-lead 标识或省略；取值=agent-personas 阶段角色集矩阵 persona id）；其他 action 不得出现（role-dispatch logic 校验）",
       "type": "string"
     }
   }

@@ -7,6 +7,15 @@
 
 基于系统设计进行模块接口设计，定义模块间交互契约，并**同步设计集成测试用例**。概要设计聚焦模块边界与接口，**不深入类 / 方法内部**（类/方法级设计属阶段 4 详细设计职责，越界即返工）。
 
+## 多角色讨论分析（阶段角色集矩阵，批次 multi-role）
+
+- **时序**：O 路由确认后、S 产出派单前——O 派单 A-lead（[subagent-delegation.md](subagent-delegation.md)「A-lead」节契约两段）→ 并行分派 7 persona 视角分析（矩阵行：测试经理/系统架构师/软件工程师/产品经理/数据库专家/UX 专家/算法专家）→ 汇总分歧 → 并行多轮交叉直到收敛（单轮零新增分歧 ∧ 全部分歧已决或登记迷雾册；5 轮安全阀 → 🔴 CHECKPOINT）→ 共识纪要 → S 依纪要产出（派单前置条件=纪要实存且 N 视角齐备）。讨论分析仅发生在本阶段首轮 produce 之前；produce 之后再新增 perspective 即属出格行为（门禁时序维度将拦截）——如需重开讨论，走阶段回退。
+- **分歧出口**：未决分歧由 S 产出时登记入本阶段设计期迷雾登记册（[phase-3-outline-design.md](phase-3-outline-design.md)「设计期迷雾登记册」节）；A-lead 与 persona 不改迷雾册。
+- **门禁**：阶段门 `check-role-dispatch` 含 `phaseRoleCoverage` 维度（覆盖/时序/互异，exit 1 阻断放行）；run-log 须有 `perspective`×N + `consensus`≥1 + `produce` 晚于全部 perspective。
+- **lite**：L0/L1 或用户显式 `--lite` → 单视角（系统架构师）+ 纪要注明降级；门禁按实际 N。
+
+> 矩阵 persona 顺序以 [agent-personas.md](agent-personas.md)『阶段角色集矩阵』节为准，本节不维护独立副本。
+
 ## 概要设计算法
 
   1. 接口识别与契约定义
@@ -275,6 +284,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 - [ ] {module}-traceability-matrix.md（INTF×SD + 测试层级矩阵）与主文档 §2/phase2 矩阵一致，主文档 §5 引用块成立
 - [ ] {module}-uml-modeling.md 三图与主文档 §1/§2 对应、mermaid 块配平，主文档附录 A 引用块成立
 - [ ] {module}-behavior-spec.md + {module}-discipline-dod.md 已产出，主文档 §6/§7 引用块成立
+- [ ] `check-role-dispatch` exit 0（含 `phaseRoleCoverage` 维度）
 
 > 🔴 **CHECKPOINT · 阶段门放行**：接口设计 + 集成测试用例产出后暂停。Agent 必须向用户展示「接口契约清单（含错误码）/ 调用关系图（无循环依赖）/ 集成测试用例（含参数校验 + 跨模块 + 异常路径）/ 设计期迷雾清空披露 / RTM 补登」，由用户确认「放行进入阶段 4」或「返工」。存在循环依赖或接口契约缺错误码 → 一律返工。迷雾登记册存在未终结项（check-design-fog exit 1）→ 一律返工。
 
