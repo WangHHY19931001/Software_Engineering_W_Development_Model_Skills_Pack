@@ -251,7 +251,7 @@ refactor(skill): /wm review 编排指引精简
 w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可独立拷贝分发）
 ├── SKILL.md            # 编排逻辑 + 命令接口 + 架构定位（frontmatter version 与 package.json 镜像）
 ├── references/         # 阶段细则 + verifier-spec + 数据模型 + 负面知识库 + 各指南（按需加载）
-├── subagent/           # 人格库（33 个 Markdown 文件，分 engineering/testing/design/product/project 5 类）
+├── subagent/           # 人格库（36 个 Markdown 文件，分 engineering/testing/design/product/project 5 类）
 ├── schemas/            # JSON Schema (draft-07) 文件（34 份，含 change-scope / codegraph-query 等）
 ├── scripts/            # 只做门禁 / 校验，不调用 LLM（自包含，仅依赖 tsx）
 │   ├── *-logic.ts / check-*.ts    # 纯逻辑层 + CLI 入口层（gate / verifier / graph / tla / code-tla / budget / run-log / maturity / checkpoint / root-cause / signature-chain / archive-integrity / preventive-review / iceberg-sweep / tla-bdd-sync / role-dispatch / design-contract / coverage / exemption / bdd / state-machine）
@@ -262,7 +262,7 @@ w-model-dev/            # Skill 资产（标准 skill 结构，自包含、可�
 │   ├── self-test.ts               # 校验逻辑自检（样本回归基线，用例数以运行输出为准；samples/ 驱动）
 │   ├── __tests__/                 # vitest 单元测试（文件数与用例数以当前命令输出为准 + README.md coverage 矩阵）
 │   └── samples/                   # 端到端样本（verifier/ + gate/ + graph/ + coverage/ + exemption/ + tla/ + bdd/ + signature-chain/ 等）
-├── templates/          # 文档模板（需求/设计/测试/RTM 等，阶段 1-4 含主模板 + 6 独立子模板）
+├── templates/          # 文档模板（需求/设计/测试/RTM 等，阶段 1-4 含主模板 + 独立子模板（阶段 1 为 7 个，其余阶段 6 个，跨阶段共 11 种））
 ├── examples/           # 交互示例
 └── skill-metadata.json # 版本号镜像（与 SKILL.md frontmatter 双写）
 docs/                   # 设计文档统一存放（SSoT、集成设计、安装指南等）

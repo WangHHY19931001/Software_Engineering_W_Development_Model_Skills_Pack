@@ -4,7 +4,7 @@
 
 ## 阶段 × 主模板 × 子模板 映射表
 
-| 阶段 | 主模板 | 子模板（6 个/阶段） |
+| 阶段 | 主模板 | 子模板（阶段 1 为 7 个，其余阶段 6 个） |
 | --- | --- | --- |
 | 阶段 1（需求规格） | `requirement-spec.md` | `requirement-spec/system-context.md`、`requirement-spec/glossary.md`、`requirement-spec/traceability-matrix.md`、`requirement-spec/behavior-spec.md`、`requirement-spec/discipline-dod.md`、`requirement-spec/uml-modeling.md`、`requirement-spec/development-requirements.md` |
 | 阶段 2（系统设计） | `system-design.md`（产出 `{module}-system-design.md`） | `system-design/system-architecture.md`、`system-design/glossary.md`、`system-design/traceability-matrix.md`、`system-design/behavior-spec.md`、`system-design/discipline-dod.md`、`system-design/uml-modeling.md` |

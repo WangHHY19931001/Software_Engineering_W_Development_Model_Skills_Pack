@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "description": "64 条评估提示词 → 技能资产锚点映射。断言分层：L1 触发词断言（正向 enable 与歧义 ask）、L1N 负向触发断言（skip 反例，锚定 activation-guide 类别节 + notContains 守卫 + 「不启用」行锚点）、L2 机制存在性断言。顶层 matrix 为覆盖矩阵声明，由 runner coverageMatrix 五项校验强制。每条映射另以 evidence 字段做行为证据映射。",
+  "description": "65 条评估提示词 → 技能资产锚点映射。断言分层：L1 触发词断言（正向 enable 与歧义 ask）、L1N 负向触发断言（skip 反例，锚定 activation-guide 类别节 + notContains 守卫 + 「不启用」行锚点）、L2 机制存在性断言。顶层 matrix 为覆盖矩阵声明，由 runner coverageMatrix 五项校验强制。每条映射另以 evidence 字段做行为证据映射。",
   "matrix": {
     "routeTotals": { "enable": 12, "ask": 8, "skip": 22 },
     "minPerCategory": 2,
@@ -372,6 +372,11 @@
     { "id": 64, "scenario": "新机制：返工出口归属询问", "layer": "L2",
       "assertions": [
         { "type": "contains", "target": "w-model-dev/references/subagent-delegation.md", "substring": "分层反馈回路" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 65, "scenario": "新机制：阶段产出直接派单 S 没有多角色讨论分析", "layer": "L2",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/agent-personas.md", "substring": "阶段角色集矩阵" }
       ],
       "evidence": { "type": "assertion" } }
   ]
