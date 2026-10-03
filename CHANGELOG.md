@@ -16,7 +16,7 @@
 - **机器门禁**：run-log schema 先行（`persona` 字段 + `perspective`/`consensus` 动作）；`check-role-dispatch` 三新维度（覆盖/时序/互异，`phaseRoleCoverage` 键，fail-closed）；脚本数 48 不变。
 - **研制要求子模板**：阶段 1 第 7 个子模板（DEVREQ 条目化，六类枚举，逐条追溯 REQ）；`PHASE_SPEC_LAYOUT` 同步 + 存量 fixtures 硬切；子模板 10 种→11 种。
 - **登记面**：四阶段细则节 + CHECKPOINT 行 + verifier-spec 参考项 + SSoT §10P/§10A + eval id 65 + 全部计数面。
-- prepush 19 项全绿（终值由收口任务回填）。
+- prepush 19 项全绿（对 9555b9be 实测 2655s）。
 
 ## [42.10.1] - 2026-10-03
 

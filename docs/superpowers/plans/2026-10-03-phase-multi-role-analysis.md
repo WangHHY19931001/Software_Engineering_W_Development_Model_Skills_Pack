@@ -261,4 +261,31 @@ phase-2/3/4 节与上同构，差异逐字替换：阶段角色集行（阶段 2
 
 ## 收尾记录（任务 8 回填）
 
-（待回填：提交清单 / prepush 终值 / DoD 结果）
+- **prepush 终值（钩子自报口径）**：19/19 全绿，exit 0，总耗时 **2655s**（2026-10-04 03:23:13 → 04:07:30 +0800，对 9555b9be 实测；wall-clock 文件差 2657s）。全三轮记录：
+  - 首轮（对 c66e8e26）：18/19，exit 1，1999s——唯一失败 security-scan（`role-dispatch-logic.ts:295` 新增 `detect-object-injection` 风险）→ 任务 3 实现者以 9555b9be 定点豁免修复（复审 ADDRESSED）。
+  - 二轮（对 9555b9be）：17/19，exit 1，2976s——vitest + prettier 双失败，经单跑定性为**环境性**（两树仅差 1 行注释：prettier 单跑 exit 0；全量 vitest 单跑至 480+ 用例全绿零失败后终止释放机器）。
+  - 三轮（对 9555b9be）：**19/19 全绿，2655s（终值）**——含 security-scan ✓ 44s / vitest 全量+coverage ✓ 2626s / prettier ✓ 46s / docs-consistency ✓ / 覆盖口径 ✓。
+- **分支提交清单**（`git log --oneline main..HEAD`，13 提交 9f44d04e..9555b9be：规格 2 + 计划 1 + vendor 源料 1 + 实现 8 + 修复 1；另有本收口回填 docs-only 提交不入列）：
+  - 9555b9be fix(multi-role): task3-fix——role-dispatch 矩阵查表定点 security 豁免（detect-object-injection 误报，phase 经 schema 整数校验）
+  - c66e8e26 chore(release): 42.11.0——多角色机制收口版本同步
+  - 5831fb01 feat(multi-role): SKILL 时序句 + SSoT §10P 权威节 + eval id 65 + AGENTS 索引 + 计数面全同步（hard-constraints 32 值等）
+  - 5a2578e5 feat(multi-role): 四阶段细则多角色讨论分析节 + CHECKPOINT 门禁行 + verifier-spec 覆盖核验参考项 + command-reference/conventions 登记
+  - 67376c43 feat(multi-role): 研制要求子模板（DEVREQ 条目化，追溯 REQ）+ PHASE_SPEC_LAYOUT phase1 refs 同步 + 存量 fixtures 硬切 + 10 种→11 种计数面
+  - 5bfeecfc feat(multi-role): run-log schema persona+perspective/consensus 先行，check-role-dispatch 三新维度（覆盖/时序/互异）+ 单测/CASES/fixtures/NEGATIVE-COVERAGE 全套登记
+  - af732c68 feat(multi-role): subagent-delegation——A-lead 定义与派单契约 + 视角分析分派模板 + dispatch-matrix 登记
+  - 2ec37b8a docs(multi-role): task1-fix——agent-personas 速查表 33→36 补齐（审查 Important）
+  - c33802dc feat(multi-role): 3 新 persona（需求分析师/测试经理/算法专家）+ agent-personas 阶段角色集矩阵节 + 计数 33→36
+  - dc8c7da2 docs(sources): vendor agency-agents-zh 8 份角色源料（MIT，commit 811e51c3）——多角色机制 3 persona 改编源，含提取映射与改编义务 README
+  - 25e4c19d docs(plan): 多角色机制实现计划——8 任务，F1-F15 事实核查表
+  - f63f8b5c docs(spec): D9 追加裁定——交叉质询改并行多轮交叉直到收敛，5 轮安全阀升级 CHECKPOINT
+  - 9f44d04e docs(spec): 阶段多角色讨论分析机制设计规格——D1-D8 已裁定，独立立项待审查
+- **DoD 逐条结果**（规格 §8，grep 留证，全部通过）：
+  - ① 矩阵节 + 36 persona：`agent-personas.md`「### 3A. 阶段角色集矩阵（A-lead 多视角分析）」；`w-model-dev/subagent/*.md` 计数 = 36。
+  - ② 三维度实证：任务 3 报告数据（15 新增用例 / `ROLE_DISPATCH_CASES` 3→6 / 3 fixtures + NEGATIVE-COVERAGE 登记 / 393 fixtures 闭环 / CLI 同键透出 `phaseRoleCoverage`）；收口另跑 `role-dispatch-logic.test.ts` 20/20 passed；全量 vitest ✓。
+  - ③ 研制要求模板 + PHASE_SPEC_LAYOUT + 硬切零红：`development-requirements.md` DEVREQ 头注（多角色共识纪要承载）；`gate-logic.ts` `PHASE_SPEC_LAYOUT[1].refs` 含 `development-requirements.md`；self-test / 全量 vitest / samples 覆盖矩阵全绿（prepush 三轮覆盖）。
+  - ④ 四细则节 + CHECKPOINT 行：phase-1:42 / phase-2:10 / phase-3:10 / phase-4:10 各有「## 多角色讨论分析（阶段角色集矩阵，批次 multi-role）」节，节内各含「5 轮安全阀 → 🔴 CHECKPOINT」。
+  - ⑤ verifier 参考项 + SSoT：`verifier-spec.md:571`/`:615` 两处『阶段角色集矩阵』核验参考；SSoT §10P 节 + §10A 追溯表 §10P 行。
+  - ⑥ 计数面残留：`33 个/33 人格/33 份/30 值` 零残留；「10 种」3 处均为合法口径（`subagent-delegation.md:41` S 变体；SSoT 迁移表述「10 种→11 种」两处）。
+  - ⑦ 版本七处 42.11.0：package.json / CHANGELOG / docs/INSTALL.md / README.md / skill-metadata.json / SKILL.md / SSoT D8 判据披露，docs-consistency 全绿。
+- **SSoT §10P 版本行核对**：收口期间版本号未改号，§10P D8「独立立项（版本 42.11.0）」与实况一致 → 零改动。
+- **总纲核验**：总纲（absorption-batches-master-outline）§5 为五批次专属登记表，无独立机制登记位；§4.4「五批次吸收计划全部收官」与本机制无关且仍准确 → 不改总纲。
