@@ -7,6 +7,17 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [42.11.0] - 2026-10-03
+
+### 阶段多角色讨论分析机制（用户规范模型吸收；独立立项，规格 D1-D9）
+
+- **阶段角色集矩阵（agent-personas 新节）**：阶段 1 六角色 / 阶段 2+3 与 4 七角色（用户角色集逐字），映射 5 既有 persona + 3 新增（`product-requirements-analyst` / `testing-test-manager` / `engineering-algorithm-expert`）；与 R/V 矩阵三分划界。persona 库 33→36。
+- **A-lead 并行多轮交叉协议**：O 派单 → 并行 N persona 视角分析 → 汇总分歧 → 并行多轮交叉直到收敛（单轮零新增分歧 ∧ 全部分歧已决/入迷雾册；5 轮安全阀升级 🔴 CHECKPOINT）→ 共识纪要 → S 依纪要产出（落笔唯一性不变）；未决分歧登记既有迷雾登记册（零新通道）；lite 降级形态。
+- **机器门禁**：run-log schema 先行（`persona` 字段 + `perspective`/`consensus` 动作）；`check-role-dispatch` 三新维度（覆盖/时序/互异，`phaseRoleCoverage` 键，fail-closed）；脚本数 48 不变。
+- **研制要求子模板**：阶段 1 第 7 个子模板（DEVREQ 条目化，六类枚举，逐条追溯 REQ）；`PHASE_SPEC_LAYOUT` 同步 + 存量 fixtures 硬切；子模板 10 种→11 种。
+- **登记面**：四阶段细则节 + CHECKPOINT 行 + verifier-spec 参考项 + SSoT §10P/§10A + eval id 65 + 全部计数面。
+- prepush 19 项全绿（终值由收口任务回填）。
+
 ## [42.10.1] - 2026-10-03
 
 ### 依赖安全修复（外部 advisory 强制，非批次交付）
