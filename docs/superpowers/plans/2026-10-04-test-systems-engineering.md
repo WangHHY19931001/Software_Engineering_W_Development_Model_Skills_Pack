@@ -123,4 +123,19 @@
 
 ## 收尾记录（任务 5 回填）
 
-（待回填：提交清单 / prepush 终值 / DoD 结果）
+- **提交清单（本批次 6 提交，abf9fd11 起）**：
+  - `abf9fd11` docs(spec)：测试系统工程批次设计规格——D1-D6 采定
+  - `424dd89d` docs(plan)：本实现计划——5 任务，F1-F14 事实核查表
+  - `caabbfde` feat(test-se)：测试系统工程类型学（11 行三维登记）+ test-case 冒烟标记列 + 行为测试=BDD 术语对齐（任务 1）
+  - `ff9af824` feat(test-se)：四阶段测试设计协同承接句 + phase-3 模块维度 + verifier-spec 测试设计核验扩尾（任务 2）
+  - `5afe6325` feat(test-se)：冒烟准入三细则节（零新脚本知情声明）+ SKILL/AGENTS 类型学登记（任务 3）
+  - `26000005` chore(release)：42.12.0——测试系统工程收口版本同步（任务 4）
+  - （本收口提交：`docs(test-se): 收口终值回填——prepush 终值 + DoD 核验`，见 git log）
+- **prepush 终值（钩子自报口径）**：19/19 全绿，exit 0，总耗时 **1779s**（2026-10-04 05:33:11 → 06:02:52 +0800，对 26000005 实测；wall-clock 文件差 1781s）。关键项：self-test ✓ 18s / vitest 全量+coverage ✓ 1763s / security-scan ✓ 30s / samples 覆盖矩阵 ✓ 30s / prettier ✓ 27s / tsc ✓ 22s / docs-consistency ✓ 10s / eval ✓ 4s / 覆盖口径 ✓ 1s / npm audit ✓ 2s。
+- **DoD 逐条核验（规格 §6 六条）**：
+  1. ✅ 类型学节在场：`quality-standards.md:253`「测试系统工程类型学（层级 × 方法 × 策略）」，11 数据行（层级 5 + 方法 3 + 策略 3）+ 三条表注（①正交 ②模块=集成子层 D2 ③冒烟不改四级判定 D3）；黑盒/白盒/行为/边界/覆盖五方法策略均有登记位。
+  2. ✅ 模块测试显式化：类型学「模块测试」行（显式化 D2）+ `phase-3-outline-design.md:201` 模块维度句；本批次（5799afb7..26000005）`check-artifact-gate.ts` 与 `gate-logic.ts` diff 为空——四级门禁零改动。
+  3. ✅ 冒烟准入：phase-6/7/8 三细则「## 冒烟准入（测试系统工程）」节同构（各 :6）+ `templates/test-case.md:50/:52` 冒烟列（表头说明 + 用例表「冒烟」列）；消费点实查结论=零结构消费（任务 1 报告登记）；`ls w-model-dev/scripts/cli/*.ts | wc -l` = **48 不变**（零新脚本）。
+  4. ✅ 协同绑定：承接句 ×4（`phase-1-requirements.md:258` / `phase-2-system-design.md:174` / `phase-3-outline-design.md:199` / `phase-4-detailed-design.md:107`）+ verifier-spec :571/:615 扩尾「测试设计产物（验收/系统/集成/单元测试设计）的角色关注面承接核验同此口径」；本批次 `agent-personas.md` 与 `subagent-delegation.md` 零触碰（多角色机制零改动，纯引用）。
+  5. ✅ SSoT：`## 10Q` 权威节（SSoT:2445，四件套）+ §10A 表 §10Q 行（SSoT:2582）；SKILL:138 表注句 / AGENTS:17 索引句 / bdd.md:6 术语对齐句登记；CHANGELOG 42.12.0 + 版本七处同步（package.json / skill-metadata / SKILL frontmatter / README / INSTALL / package-lock ×2），六镜像文件 42.11.0 残留=0。
+  6. ✅ `npm run prepush` 19 项全绿收口（终值见上）。
