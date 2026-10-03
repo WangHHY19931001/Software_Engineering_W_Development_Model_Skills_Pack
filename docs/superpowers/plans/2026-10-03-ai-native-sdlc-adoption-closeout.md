@@ -240,14 +240,16 @@ git commit -m "docs(closeout): 登记面——总纲 §4.4 收口状态句 + AGE
 
 ## 收尾记录（任务 2 回填）
 
-**任务提交清单**（`git log --oneline main..HEAD` 实查；本节随任务推进分段回填）：
+**任务提交清单**（`git log --oneline main..HEAD` 实查于终值回填前；本终值回填提交自身不列入）：
 
 ```
+2b87e0fe fix(deps): 42.10.1——GHSA-vfj7-8cjw-p6xm audit 12 high 修复（@typescript-eslint 8 升级 + docsify-cli 链处置），恢复 prepush audit 门禁   ← audit 阻断专项修复（CHANGELOG 42.10.1）
+90e5ec39 docs(closeout): 登记面——总纲 §4.4 收口状态句 + AGENTS §5 必读文档第 9 项 + 收尾记录   ← 任务 2（登记面）
 63e0cbad docs(closeout): task1-fix——I1 verifiedArtifacts 混写剔除 + §8 并入 §7/§9 删除（规格结构契约优先）+ §0 B2 权威节勘正 + 三处标签对齐（审查发现）   ← 任务 1 终态（总纲 §4.4 状态句引用此哈希）
-6d70af6d docs(closeout): ai-native-sdlc-adoption 收口对账文档——六段骨架×13 项（§0 证据层级声明/§1 判定总表/§2-§6 六段表/§7 维护规则），纯导航层不复制权威内容
+6d70af6d docs(closeout): ai-native-sdlc-adoption 收口对账文档——六段骨架×13 项（§0 证据层级声明/§1 判定总表/§2-§6 六段表/§7 维护规则），纯导航层不复制权威内容   ← 任务 1 初稿
 ```
 
-**机器验证（check:docs-consistency，任务 2 步骤 3）**：exit 0——静态违规 0 / 动态违规 0，`✓ 全部一致`；schema 文件 34、exit-2 脚本 47、persona 文件 33 均不变（版本 42.10.0 / references 计数 45 不在本次变更面——docs/ 不在 references-count 面）；非阻断诊断仅「动态 facts 未校验（未提供受控 vitest 工件），终局验收经 npm run prepush 覆盖（fail-closed）」。
+**机器验证（check:docs-consistency，任务 2 步骤 3）**：exit 0——静态违规 0 / 动态违规 0，`✓ 全部一致`；schema 文件 34、exit-2 脚本 47、persona 文件 33 均不变（运行时点版本 42.10.0；42.10.1 修复提交后复核再次 exit 0——audit-fix-report §7；references 计数 45 不在本次变更面——docs/ 不在 references-count 面）；非阻断诊断仅「动态 facts 未校验（未提供受控 vitest 工件），终局验收经 npm run prepush 覆盖（fail-closed）」。
 
 **DoD grep（规格 §5，任务 2 步骤 4）**：
 
@@ -255,4 +257,8 @@ git commit -m "docs(closeout): 登记面——总纲 §4.4 收口状态句 + AGE
 - `grep -n "证据层级声明\|维护规则"` → §0（:19）与 §7（:162）均在场
 - `grep -rn "ai-native-sdlc-adoption" AGENTS.md docs/superpowers/specs/2026-09-30-absorption-batches-master-outline.md | wc -l` = **3**（≥2 ✓：AGENTS §5 第 9 项 1 处 + 总纲 §4.4 原句与状态句 2 处）
 
-**prepush 终值**：（待回填——任务 2 步骤 6 后台全量运行，完成后由终值回填提交补记）
+**prepush 终值（任务 2 步骤 6）**：
+
+- 第 1 轮（对 90e5ec39，2026-10-03 10:24:31–10:53:20 +08:00，wall-clock 1729s）：17 ✓ / 1 ✗——唯一失败 `npm audit`（GHSA-vfj7-8cjw-p6xm 12 high，注册表侧 advisory，与本任务 docs 变更无关：分支对 package.json/package-lock.json 零变更；全部内容性门禁含 vitest 全量 1725s 全绿）。证据：`.superpowers/sdd/2026-10-03-ai-native-sdlc-adoption-closeout/prepush-run1.*`（gitignored 留档）。
+- 阻断解除：专项修复提交 `2b87e0fe`（42.10.1，`@typescript-eslint` 7.18.0→8.71.0 + docsify-cli 移除改 `npx -y docsify-cli@4.3.0` 即用；`npm audit --audit-level=high` 12 high → 0 vulnerabilities）。
+- 第 2 轮（对 2b87e0fe，2026-10-03 11:23:41–11:56:14 +08:00，wall-clock 1953s）：**19/19 全绿，总耗时 1952s**（vitest 单元测试 + coverage 采集 ✓ 1933s；npm audit ✓ 2s——阻断项转绿；docs-consistency 活体文档一致 ✓；规则层覆盖口径达阈值 ✓；末行「全部门禁通过，允许推送 ✓」）。证据：同目录 `prepush.log` / `prepush.start` / `prepush.end` / `prepush.exit`=0。

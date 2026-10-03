@@ -13,7 +13,7 @@
 
 - **修复 `npm audit` 12 high（GHSA-vfj7-8cjw-p6xm，braces 全版本无上游修复版）**：① `@typescript-eslint` 7.18.0→8.71.0（typescript-estree 弃 globby 改 tinyglobby，braces 出树；lint 配置兼容性调整见提交）；② docsify-cli 链处置（移除 devDep，`docs:site` 改 `npx -y docsify-cli@4.3.0 serve docs` 按需运行、不进项目依赖树——降级 4.3.0 实查仍中招：其依赖 `livereload ^0.7.0` 解析至 0.7.0，落在另一 advisory 的 vulnerable 区间 `0.6.0 - 0.8.2`（chokidar 1.7.0 链），且旧版 update-notifier/marked/got 链使 audit 不降反升至 21 vulnerabilities（11 high）；docsify-cli 全版本系（1.1.0-4.4.4 与 >=4.4.0 两区间合计全覆盖）无安全版本）。advisory 库在批次 5 prepush 基线（1991s，2026-10-03 早间）之后更新，main 同样被阻断——本修复为仓库级维护，不属收口项目交付面。
 - `config/.eslintrc.cjs` 最小调整（@typescript-eslint v8 兼容）：`no-unused-vars` 补 `caughtErrors: 'none'`（v8 将该默认值由 `none` 改为 `all`，显式恢复 v7 语义；v8 升级产生的唯一新发现即此默认变化产物，非真实缺陷，baseline 未重生成）。
-- prepush 19 项全绿（终值由修复后重跑回填）。
+- prepush 19 项全绿（对 2b87e0fe 实测 1952s）。
 
 ## [42.10.0] - 2026-10-03
 
