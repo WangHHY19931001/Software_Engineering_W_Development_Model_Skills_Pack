@@ -23,7 +23,7 @@
 | performance-auditor | 性能基线与回归，Quick/Deep 模式，Metric-Honesty Rule，阶段 7 | Persona 4 |
 | Severity 标签 | Critical/Required/Optional/Nit/FYI（reworkHints 前缀） | Persona 1 + verifier-spec §7.4A.2 |
 | 与 R 的关系 | R 不调用 Persona，Persona 不调用 R，两者互补 | 「与 root-cause-locator.md 的关系」节 |
-| 与 subagent/ 人格库 | 4 Persona ↔ subagent/ 33 人格映射 | 「与 subagent/ 人格库的关系」节 |
+| 与 subagent/ 人格库 | 4 Persona ↔ subagent/ 36 人格映射 | 「与 subagent/ 人格库的关系」节 |
 | 多角度分派 | 多角度 > 并行；N 份 PartialReport 独立产出 | 「多角度分派说明」节 |
 | self-as-verifier | S/V/G/R 兼任时产物路径独立（反模式 #35） | 「self-as-verifier 兼任规则」节 |
 
