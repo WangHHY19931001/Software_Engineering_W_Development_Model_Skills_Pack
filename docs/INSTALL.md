@@ -60,7 +60,7 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\\w-model-dev"
   - **devDependencies**（在仓库根目录 `npm install` 一次即可，参见 [`package.json`](../package.json)）：
     - `ajv` + `ajv-formats` — JSON Schema (draft-07) 强约束，由 `w-model-dev/scripts/infrastructure/schema-loader.ts` 在 `*-logic.ts` 顶部自动 import（runtime 依赖）
     - `eslint` + `@typescript-eslint/parser` + `@typescript-eslint/eslint-plugin` + `eslint-plugin-security` + `eslint-plugin-import` — 安全扫描 / 静态检查基线（`npm run lint:security` 时使用，devDep）；ESLint 配置集中于 `config/.eslintrc.cjs`（含 import/order 规则），security-scan 以 `--no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore` 显式调用
-    - `prettier` / `typedoc` / `docsify-cli` — 工程工具 devDep（`npm run format` / `npm run docs:build` / `npm run docs:site`）
+    - `prettier` / `typedoc` — 工程工具 devDep（`npm run format` / `npm run docs:build`）；`docs:site` 不需要本地 devDep（经 `npx -y docsify-cli@4.3.0 serve docs` 按需拉取，不经 `npm install` 进项目依赖树）
     - （无 BDD 专属 devDep）— BDD features 场景解析为手写正则（`w-model-dev/scripts/logic/bdd-logic.ts` 的 `parseFeatureFile`），由 `w-model-dev/scripts/cli/check-bdd-model.ts` 在阶段 1-8 BDD 模型门禁时调用（纯 features 静态校验，无需 Cucumber 运行器）
 
 > 纯 Markdown 技能资产（`SKILL.md` / `references/` / `templates/` / `subagent/`）零依赖、零 Node.js、零 `npm install`，可整目录拷贝分发；Node.js/npm/tsx/devDeps 仅用于执行 `scripts/*.ts` 的确定性门禁与回归基线。
@@ -251,7 +251,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 42.10.0
+version: 42.10.1
 # description 不在此处复制：SKILL.md 的 frontmatter 是其唯一权威来源
 # （本节曾逐字镜像该字段，已发生过一次漂移，故改为指向而非复述）
 ```
@@ -345,7 +345,7 @@ Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支�
 
 - **runtime devDep**：`ajv` + `ajv-formats`（由 `infrastructure/schema-loader.ts` 在 `*-logic.ts` 顶部自动 import，提供 JSON Schema draft-07 强约束）
 - **devDep（仅安全扫描用）**：`eslint` + `@typescript-eslint/*` + `eslint-plugin-security` + `eslint-plugin-import`（由 `security-scan.ts` 以 `--no-eslintrc --config config/.eslintrc.cjs --ignore-path config/.eslintignore` 调用，对比 `.eslintsecurity-baseline.json` v2 内容敏感指纹豁免；ESLint 配置集中于 `config/.eslintrc.cjs`，含 import/order 规则）
-- **devDep（工程工具）**：`prettier`（`npm run format`）/ `typedoc`（`npm run docs:build`）/ `docsify-cli`（`npm run docs:site`）
+- **devDep（工程工具）**：`prettier`（`npm run format`）/ `typedoc`（`npm run docs:build`）；`docs:site` 经 `npx -y docsify-cli@4.3.0` 按需运行，不占 devDep
 - **runtime**：`tsx`（运行 ESM TypeScript）
 - **devDep（测试）**：`vitest` + `@vitest/coverage-v8`（`w-model-dev/scripts/__tests__/` 单元测试，文件数与用例数以当前命令输出为准）
 
