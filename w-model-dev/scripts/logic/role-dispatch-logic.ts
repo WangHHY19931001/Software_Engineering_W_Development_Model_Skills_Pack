@@ -292,6 +292,7 @@ export function checkRoleDispatch(entries: RoleDispatchEntry[]): RoleDispatchRes
     const { phaseEntries } = bucket;
     if (!phaseEntries.some((e) => e.action === 'produce')) continue;
 
+    // eslint-disable-next-line security/detect-object-injection -- phase 为 run-log schema 上游 integer 字段（run-log.schema.json "type":"integer", minimum 1/maximum 8；本 logic 结构扫描另要求 typeof phase === "number" 并以 phase<1||phase>4 守卫域）；PHASE_ROLE_MATRIX 为仅含数字键 1-4 的字面量常量（Record<number, readonly string[]>），无原型链污染面
     const matrixRow = PHASE_ROLE_MATRIX[phase] ?? [];
     const perspectives = phaseEntries.filter((e) => e.action === 'perspective');
 
