@@ -64,6 +64,8 @@ export function parsePhaseArg(argv: string[], opts?: ParsePhaseOptions): PhasePa
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
+    // noUncheckedIndexedAccess 下 argv[i] 类型为 string|undefined，本守卫为类型承重（运行时
+    // argv 元素非 undefined）；值吞噬契约见下方 --phase 分支与 parse-phase.test.ts C21 用例。
     if (arg === undefined) continue;
     if (arg === '--phase') {
       return check(argv[i + 1]);

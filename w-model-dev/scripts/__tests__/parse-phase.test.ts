@@ -9,6 +9,8 @@
  *   - 无 --phase → undefined
  *   - 重复 --phase（任意形态合并计数）→ DuplicateFlagError（D3/I-3）
  *   - phaseFlagPresent 形态无关存在性判定（D3/I-4）
+ *   - C21 值吞噬契约：--phase 后跟 flag 形态 → flag 在而值缺失，解析结果 undefined 且不抛错
+ *     （非法值门控由调用方以 phaseFlagPresent 输出 ARG_INVALID，2026-10-04 audit-deep-dive）
  *
  * 同质用例已按「循环内多断言 + 逐行具名消息」聚合（wave 3 第 B 批）。
  */
@@ -121,6 +123,18 @@ describe('parsePhaseArg', () => {
       expect(phaseFlagPresent(['--phase=3'])).toBe(true);
       expect(phaseFlagPresent(['data.json'])).toBe(false);
       expect(phaseFlagPresent([])).toBe(false);
+    });
+  });
+
+  describe('C21 --phase 值吞噬契约（audit-deep-dive C21，类型承重守卫保留）', () => {
+    it('--phase 后跟 flag 形态时：flag 在而值缺失 → undefined 且不抛错（ARG_INVALID 门控由调用方 phaseFlagPresent 承担）', () => {
+      expect(phaseFlagPresent(['--phase', '--json']), 'flag 形态无关存在性应为 true（flag 在）').toBe(true);
+      expect(() => parsePhaseArg(['--phase', '--json']), '值吞噬不得抛错').not.toThrow();
+      expect(parsePhaseArg(['--phase', '--json']), '--json 被作为值吞噬，解析结果应为 undefined').toBeUndefined();
+    });
+
+    it('--phase=4 正常解析为 4', () => {
+      expect(parsePhaseArg(['--phase=4']), '--phase=4 应正常解析').toEqual({ phase: 4, raw: '4' });
     });
   });
 });
