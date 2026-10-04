@@ -17,7 +17,7 @@
 - 《需求规格说明书》（套用 [templates/requirement-spec.md](../templates/requirement-spec.md)）
 - 验收测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=验收测试）
 - 需求风险评估报告（含风险等级与缓解措施）
-- `docs/uat-path-mapping.md`：UAT 路径映射表（**强制产出**）。阶段1产出初始模板，阶段5回填实际路径，阶段8验收时校验完整性。格式见 [phase-8-acceptance-test.md](phase-8-acceptance-test.md) §UAT 路径映射表。
+- `docs/uat-path-mapping.md`：UAT 路径映射表（**强制产出**）。阶段1产出初始模板，阶段5回填实际路径，阶段8验收时校验完整性。格式权威定义见本文件下方『uat-path-mapping 格式（权威定义）』节。
 - 独立产物文件：
   - `system-context.md`：系统上下文（外部实体清单 + 边界原则）
   - `glossary.md`：术语表（需求域子集）
@@ -25,6 +25,36 @@
   - `behavior-spec.md`：行为规格模型（引用 .feature 文件关系，不内联 feature 块）
   - `discipline-dod.md`：工程纪律与 DoD 可勾选清单
   - `uml-modeling.md`：UML 需求建模（用例图 + 领域类图 + 活动图）
+
+## uat-path-mapping 格式（权威定义）
+
+> 本节是 `docs/uat-path-mapping.md` 的**格式唯一权威定义**（阶段 1 为该文件生产者与格式定义方）。阶段 8 为消费者，按此格式执行 UAT 追溯，见 [phase-8-acceptance-test.md](phase-8-acceptance-test.md)「UAT 路径映射表」节。
+
+> 阶段1设计 UAT 时须同时产出 `docs/uat-path-mapping.md`；阶段5编码后回填实际路径列。
+
+| UAT ID | 设计路径（阶段1） | 实际路径（阶段5回填） | 映射类型 | 说明 |
+|---|---|---|---|---|
+| UAT-001 | POST /api/site/config | _待阶段5回填_ | _待填_ | |
+
+**映射类型**：
+- `直接`：路径完全一致
+- `等价`：路径不同但语义等价（如路由分组调整）
+- `替代`：因技术约束替代（须说明原因）
+
+**流程**：
+1. 阶段1设计 UAT 时产出初始表（设计路径列）
+2. 阶段5编码后回填实际路径列 + 映射类型
+3. 阶段8验收测试编写时按此表映射，禁止凭主观判断
+
+### 强制校验说明
+
+`docs/uat-path-mapping.md` 为阶段1强制产出，阶段5回填实际路径，阶段8验收时校验完整性。
+
+**校验规则**（由 `check-artifact-gate.ts` 执行）：
+- phase=1：校验 `docs/uat-path-mapping.md` 文件存在性
+- phase=5：校验每条 UAT-NNN 的「实际路径」列非 `_待阶段5回填_`，且 `mappingType` ∈ `["直接","等价","替代"]`
+- phase=8：终检校验所有 UAT-NNN 的映射行格式完整（≥4 列），缺失或格式不符 → 退出码 1，reasons 列出违规行详情
+- 缺失文件或未回填项 → 退出码 1，reasons 列出具体 UAT ID
 
 ## AI 能力应用
 
