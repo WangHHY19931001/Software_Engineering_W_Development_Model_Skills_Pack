@@ -295,6 +295,8 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 
 锁内依次执行 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复；回滚不会直接 copyFile 到目标或直接 unlink 目标。备份保留与恢复均由 `wm-write` 处理。
 
+锁的存活判定依赖 `process.kill(pid, 0)`，为**单主机**语义：跨进程（本机）安全；`.w-model` 必须位于本机文件系统，置于网络盘/共享卷时 PID 判定失效，禁止此部署形态。
+
 > 并发写入处理不改变数据模型 schema，仅约定状态写协议。
 
 ## 成本预算模型（budget.json）

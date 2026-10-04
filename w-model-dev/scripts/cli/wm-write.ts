@@ -4,6 +4,7 @@
  *
  * 状态写协议：`<target>.lock` 持久目录与可转移 owner 对象在跨进程锁内保护
  * mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复；本脚本是唯一 CLI 写入口。
+ * 锁为**单主机**语义：跨进程（本机）安全；`.w-model` 置于网络盘/共享卷时 PID 判定失效，禁止此部署形态。
  *
  * 用法：
  *   echo '{"k":1}' | npx tsx w-model-dev/scripts/cli/wm-write.ts <target.json> --stdin

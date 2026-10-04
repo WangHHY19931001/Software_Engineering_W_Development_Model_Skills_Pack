@@ -27,6 +27,11 @@ export interface StateWriteOptions {
   afterLockAcquired?: () => void | Promise<void>;
   beforeCommit?: () => void | Promise<void>;
   afterStaleMetadataRead?: () => void | Promise<void>;
+  /**
+   * Injectable only for state-write tests; fires inside `staleOwnerState` after the initial owner-metadata
+   * read misses, before the transition/absence probes — instruments the C3 read→stat 跨界缝隙 window.
+   */
+  afterOwnerReadMiss?: () => void | Promise<void>;
   afterRecoveryOwnershipMoved?: () => void | Promise<void>;
   afterReleaseOwnershipMoved?: () => void | Promise<void>;
   beforeRollback?: () => void | Promise<void>;
@@ -75,6 +80,9 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 const ownerPathFor = (lockDir: string) => path.join(lockDir, 'owner');
 const metadataPathFor = (ownerDir: string) => path.join(ownerDir, 'metadata.json');
 const transitionPathFor = (ownerDir: string) => path.join(ownerDir, 'transition.json');
+
+/** C3：`fs.mkdir(ownerDir)` 成功与 `metadata.json` 原子落位之间的竞争宽限（目录龄 < 该值 → busy 等待）。 */
+const METADATA_GRACE_MS = 10_000;
 
 interface TransitionMetadata {
   kind: 'recovering' | 'releasing';
@@ -125,6 +133,7 @@ async function rotateBackups(absPath: string, keep: number): Promise<void> {
   }
 }
 
+// C8 单主机语义：`process.kill(pid, 0)` 仅在本机有效；`.w-model` 不得置于网络文件系统（见 wm-write.ts 头注）。
 function isPidRunning(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -155,6 +164,19 @@ async function readMetadata(ownerDir: string): Promise<StateLockMetadata | undef
     return isValidLockMetadata(parsed) ? parsed : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * metadata 文件是否**缺失**（区别于「存在但不可解析」：后者维持既有 unknown-owner fail-closed 语义，不进 busy 宽限）。
+ * 缺失正是 C3 竞争窗口——mkdir(ownerDir) 已成功、metadata.json 尚未原子落位——的可观测形态。
+ */
+async function metadataFileAbsent(ownerDir: string): Promise<boolean> {
+  try {
+    await fs.stat(metadataPathFor(ownerDir));
+    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT';
   }
 }
 
@@ -207,9 +229,14 @@ async function hasTransition(lockDir: string): Promise<boolean> {
   }
 }
 
-async function staleOwnerState(lockDir: string, opts: StateWriteOptions): Promise<'none' | 'stale' | 'recoverable'> {
-  const metadata = await readMetadata(ownerPathFor(lockDir));
+async function staleOwnerState(
+  lockDir: string,
+  opts: StateWriteOptions,
+): Promise<'none' | 'busy' | 'stale' | 'recoverable'> {
+  const ownerDir = ownerPathFor(lockDir);
+  const metadata = await readMetadata(ownerDir);
   if (!metadata) {
+    await opts.afterOwnerReadMiss?.();
     // A missing owner directory is NOT by itself proof of a stale lock: `releaseLock` / `recoverLockIfStale`
     // move the owner aside into a `.releasing-*` / `.recovering-*` transition directory that is removed only
     // after the handoff completes. During that window there is no owner metadata but a live writer is still
@@ -218,6 +245,22 @@ async function staleOwnerState(lockDir: string, opts: StateWriteOptions): Promis
     // expires and `recoverOrphanTransitions` reclaims it). This preserves fail-closed semantics: a genuinely
     // orphaned transition is still reclaimed/surfaced by the TTL check, never silently adopted.
     if (await hasTransition(lockDir)) return 'none';
+    // C3 竞争窗口：mkdir(ownerDir) 成功与 metadata.json 原子落位之间，竞争方会观察到「owner 目录在、
+    // metadata 文件缺失」。目录龄 < METADATA_GRACE_MS 时判定持锁者正在落位（busy），让调用方重试等待；
+    // ≥ 宽限期才维持既有孤儿回收分流（recoverStaleLock 显式恢复 / 否则 stale fail-closed）。
+    if (await metadataFileAbsent(ownerDir)) {
+      try {
+        if (Date.now() - (await fs.stat(ownerDir)).mtimeMs < METADATA_GRACE_MS) return 'busy';
+      } catch {
+        /* owner 目录已消失：维持既有语义（stale / recoverable 分流） */
+      }
+    } else if (await readMetadata(ownerDir)) {
+      // 跨界缝隙收口（review Important）：readMetadata 读时缺失、metadataFileAbsent 查时已在——
+      // 竞争方的 rename 恰在两次探测之间落位。重读成功（有效可解析）→ 未决（'none'），让调用方走
+      // 既有 sleep(10) 有界重试，下一轮 readMetadata 命中正常存活判定，绝不落入 unknown-owner
+      // fall-through 误报 stale；重读仍失败 → 文件确属损坏，维持既有 unknown-owner fail-closed 分流。
+      return 'none';
+    }
     return opts.recoverStaleLock === true ? 'recoverable' : 'stale';
   }
   const expired = Date.now() - Date.parse(metadata.createdAt) > (opts.staleLockTtlMs ?? 60_000);
@@ -286,12 +329,37 @@ async function acquireLock(absPath: string, opts: StateWriteOptions): Promise<Ac
         continue;
       }
       await fs.mkdir(ownerDir);
-      await fs.writeFile(metadataPathFor(ownerDir), JSON.stringify(metadata), 'utf-8');
+      // C3：metadata 经 tmp+rename 原子落位——消除「owner 目录在、metadata 截断半截写」的可见窗口。
+      const metadataTmp = path.join(ownerDir, `metadata.json.tmp-${randomUUID()}`);
+      await fs.writeFile(metadataTmp, JSON.stringify(metadata), 'utf-8');
+      try {
+        await fs.rename(metadataTmp, metadataPathFor(ownerDir));
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        // EEXIST：目标 metadata 已由他方落位（本方失去落位权）；ENOENT：本方 owner 目录已被回收移走。
+        // 两者同为竞争形态，丢弃 tmp 回到外层循环重新竞争；tmp 清理 best-effort（Windows 句柄未释放可 EBUSY/EPERM）。
+        if (code === 'EEXIST' || code === 'ENOENT') {
+          try {
+            await fs.rm(metadataTmp, { force: true });
+          } catch {
+            /* best effort：残留 tmp 不参与任何协议判定 */
+          }
+          await sleep(10);
+          continue;
+        }
+        throw error;
+      }
       return { lockDir, ownerDir, metadata };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       const owner = await staleOwnerState(lockDir, opts);
       if (owner === 'stale') return 'STALE_LOCK';
+      // C3：owner 目录新鲜但 metadata 尚未落位（mkdir→metadata 竞争窗口）→ busy 等待重试，不误报 STALE_LOCK。
+      // 等待仍受外层 deadline（lockTimeoutMs）约束，超时自然降级 LOCK_TIMEOUT，不引入无上界等待。
+      if (owner === 'busy') {
+        await sleep(10);
+        continue;
+      }
       if (owner === 'recoverable' && (await recoverLockIfStale(lockDir, opts))) continue;
       await sleep(10);
     }
