@@ -28,9 +28,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   validateEvidenceFormat,
+  checkR12EvidenceSpecificity,
   checkR13SingleAxisFloor,
   checkR18ResolutionFloor,
   checkVerifierOutput,
+  ajvErrorSubject,
   RESOLUTION_FLOOR,
 } from '../logic/verifier-logic.js';
 
@@ -860,5 +862,163 @@ describe('批次3 双轨：structuredViolations（rule/subject/fixHints）', () 
     expect(r.reasons).toEqual([]);
     expect(Array.isArray(r.structuredViolations)).toBe(true);
     expect(r.structuredViolations).toEqual([]);
+  });
+});
+
+// ==================== C11/C16/C17（任务 4：verifier 域三项修复） ====================
+
+describe('C11 Windows 路径 evidence', () => {
+  /** 构造含目标 evidence 的 VerifierOutput（除 subCriteria[1] 外全部合规），端到端走 R12/evidence 格式判据 */
+  const makeOutputWithEvidence = (ev: string) => ({
+    schemaVersion: '1.0',
+    meta: {
+      targetKind: 'requirement',
+      target: 'REQ-001',
+      reviewedAt: '2026-07-31T00:00:00Z',
+      agent: 'test-agent',
+      scoringMethod: 'logits',
+      repeatTimes: 3,
+      varianceThreshold: 0.1,
+    },
+    subCriteria: (
+      [
+        ['completeness', 0.3],
+        ['clarity', 0.25],
+        ['consistency', 0.2],
+        ['testability', 0.15],
+        ['traceability', 0.1],
+      ] as const
+    ).map(([name, weight], i) => ({
+      name,
+      weight,
+      score: 0.9,
+      rawScores: [0.89, 0.9, 0.91],
+      variance: 0.0000667,
+      evidence: i === 0 ? ev : 'requirements.md:§3.2=REQ-001 需求覆盖',
+    })),
+    compositeScore: 0.9,
+    qualityLevel: 'A',
+    summary: '本次评审覆盖五个子标准，全部达标，结论为 A 级可放行，无阻断性返工提示，评审方法为 logits 连续评分。',
+    passed: true,
+  });
+
+  // 注：简报样例 `D:\proj\x.ts:L1-L5=…` 的双 L 区间是 D-10① 钉死的非法形态（行号区间须写
+  // 单 L `:L1-5`，见 bad-evidence-double-l.json / 既有「双 L 文案区分」用例），C11 的实质是
+  // 盘符前缀 + 反斜杠，与区间语法正交——正例取合法单 L 区间 `L1-5`，双 L 拒绝语义不变。
+  it.each(['src\\utils\\a.ts:L12=认证模块边界清晰', 'D:\\proj\\x.ts:L1-5=盘符前缀路径行号区间引用'])(
+    '%s 应通过 evidence 格式校验',
+    (ev) => {
+      // R12 单判据：Windows 路径须被识别为具体引用
+      expect(checkR12EvidenceSpecificity(ev, 1), `${ev}: R12 应不命中`).toBeNull();
+      // evidence 格式单判据：反斜杠/盘符前缀路径 + :Lnn= 定位合法
+      const fmt = validateEvidenceFormat([ev]);
+      expect(fmt.valid, `${ev}: 格式校验应通过`).toBe(true);
+      expect(fmt.formatMismatchItems, `${ev}: 不应记入格式不符`).toEqual([]);
+      // 端到端：无 evidence 格式/R12 violation
+      const r = checkVerifierOutput(makeOutputWithEvidence(ev));
+      expect(
+        r.reasons.some((m) => /evidence 格式不符|缺具体引用/.test(m)),
+        `${ev}: 端到端应无格式 violation`,
+      ).toBe(false);
+      expect(r.passed, `${ev}: 端到端应通过`).toBe(true);
+    },
+  );
+});
+
+describe('C16 Ajv 结构化字段优先', () => {
+  it('instancePath/params.missingProperty 可用时不再依赖文案正则', () => {
+    // 合成 ajv 错误对象驱动：required 错误的字段名在 params.missingProperty、父路径在 instancePath，
+    // 结构化提取 = 父路径 + 缺失字段（旧文案正则只能取到 '/meta:' 前的父路径）
+    expect(ajvErrorSubject({ instancePath: '/gateExitCode', params: { missingProperty: 'runId' } })).toBe(
+      'gateExitCode.runId',
+    );
+    // 非 required 错误：instancePath 即完整字段路径（JSON pointer → 点号形态）
+    expect(ajvErrorSubject({ instancePath: '/meta/reviewedAt' })).toBe('meta.reviewedAt');
+    // 根级（instancePath 空/根）无字段路径 → undefined（由调用方回退文案正则 → 'schema'，既有钉死语义不变）
+    expect(ajvErrorSubject({ instancePath: '', params: { missingProperty: 'subCriteria' } })).toBeUndefined();
+    expect(ajvErrorSubject({ instancePath: '/' })).toBeUndefined();
+    expect(ajvErrorSubject(undefined)).toBeUndefined();
+  });
+
+  it('无结构化字段时回退旧正则：根级 required 仍报 subject=schema', () => {
+    const r = checkVerifierOutput({ schemaVersion: '1.0' });
+    expect(r.passed).toBe(false);
+    const subjects = (r.structuredViolations ?? []).map((s) => s.subject);
+    expect(subjects.length).toBeGreaterThan(0);
+    expect(subjects).toContain('schema');
+  });
+
+  it('端到端：嵌套 required 的 subject 取 instancePath+missingProperty（旧文案正则只能取到父路径）', () => {
+    const r = checkVerifierOutput({
+      schemaVersion: '1.0',
+      meta: {
+        targetKind: 'requirement',
+        target: 'REQ-001',
+        reviewedAt: '2026-07-31T00:00:00Z',
+        agent: 'test-agent',
+        scoringMethod: 'logits',
+        // 缺 repeatTimes / varianceThreshold（嵌套 required）
+      },
+      subCriteria: [],
+      compositeScore: 0.9,
+      qualityLevel: 'A',
+      summary: '本次评审覆盖五个子标准，全部达标，结论为 A 级可放行，无阻断性返工提示，评审方法为 logits 连续评分。',
+      passed: true,
+    });
+    expect(r.passed).toBe(false);
+    const subjects = (r.structuredViolations ?? []).map((s) => s.subject);
+    expect(subjects).toContain('meta.repeatTimes');
+    expect(subjects).toContain('meta.varianceThreshold');
+    expect(subjects).not.toContain('meta');
+  });
+});
+
+describe('C17 长度不符降噪', () => {
+  it('subCriteria 长度不符时只报一条长度 violation，不叠加错位比对', () => {
+    // SUB_CRITERIA 五类 targetKind 均恰 5 项（无「expected 3」形态可构造），取 expected 5 / got 4：
+    // 缺首项 completeness → 共享下标 0-3 全部错位，旧实现 = 1 条长度 + 4 条「name 应为」叠加误报
+    const output = {
+      schemaVersion: '1.0',
+      meta: {
+        targetKind: 'requirement',
+        target: 'REQ-001',
+        reviewedAt: '2026-07-31T00:00:00Z',
+        agent: 'test-agent',
+        scoringMethod: 'logits',
+        repeatTimes: 3,
+        varianceThreshold: 0.1,
+      },
+      subCriteria: (
+        [
+          ['clarity', 0.25],
+          ['consistency', 0.2],
+          ['testability', 0.15],
+          ['traceability', 0.1],
+        ] as const
+      ).map(([name, weight]) => ({
+        name,
+        weight,
+        score: 0.9,
+        rawScores: [0.89, 0.9, 0.91],
+        variance: 0.0000667,
+        evidence: 'requirements.md:§3.2=REQ-001 需求覆盖',
+      })),
+      // 其余字段全部自洽（Σ = 0.9 × 0.7 = 0.63 → C 级 → expectedPassed=false），隔离长度单因子
+      compositeScore: 0.63,
+      qualityLevel: 'C',
+      summary: '子标准数量不足的 VerifierOutput，应只报一条数量不符 violation，不叠加按下标错位比对误报。',
+      passed: false,
+      reworkHints: ['补齐缺失的 completeness 子标准后重新提交'],
+    };
+    const r = checkVerifierOutput(output);
+    expect(r.passed).toBe(false);
+    // 恰 1 条长度不符项
+    expect(r.reasons).toHaveLength(1);
+    expect(r.reasons[0]).toMatch(/数量不符（expected 5, got 4）/);
+    // 无逐项错位项（「name 应为」类按下标比对）
+    expect(r.reasons.some((m) => /name 应为/.test(m))).toBe(false);
+    // 双轨同源：structuredViolations 恰 1 条
+    expect(r.structuredViolations).toHaveLength(1);
+    expect(r.structuredViolations?.[0]?.subject).toBe('subCriteria');
   });
 });

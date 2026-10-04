@@ -176,9 +176,11 @@ if (!allowedKinds.includes(targetKind as TargetKind)) {
 ```typescript
 const expected = SUB_CRITERIA[targetKind as TargetKind];
 if (subCriteria.length !== expected.length) {
-  reasons.push(`targetKind=${targetKind} 应有 ${expected.length} 个子标准，实际 ${subCriteria.length} 个`);
+  // C17：长度不符即结构错位，单条数量不符 violation 后立即返回，不进入按下标比对（避免错位叠加误报）
+  reasons.push(`subCriteria 数量不符（expected ${expected.length}, got ${subCriteria.length}）`);
+  return;
 }
-// 逐项校验 name 与 weight
+// 长度相等时逐项校验 name 与 weight
 ```
 
 > 8 阶段对照通过 `targetKind` 推断阶段实现（phase 2/3/4 共用 `design`，phase 6/7/8 共用 `test`）；subCriteria 标准按 targetKind × 5 项组织（`rootcause` 按 §7.5 集合）。

@@ -1844,10 +1844,10 @@
       "reason": "Generic Object Injection Sink"
     },
     {
-      "hash": "2deef376b8c175d8479760a7921628ca1149f53b37aa34b318b0a62dfb1e980d",
+      "hash": "5aa4c63729631dc3986af275a8bdc81735314f0d6c6299cb5b561766d16e05a8",
       "rule_id": "security/detect-unsafe-regex",
       "file": "w-model-dev/scripts/logic/verifier-logic.ts",
-      "line": 401,
+      "line": 436,
       "reason": "Unsafe Regular Expression"
     },
     {

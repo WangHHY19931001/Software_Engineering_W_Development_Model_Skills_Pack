@@ -171,11 +171,39 @@ function makeStructured(rule: VerifierRuleId, subject: string, message: string):
 }
 
 /**
+ * C16：Ajv 错误对象的 subject 提取（结构化字段优先，防文案正则随 Ajv 升级失效）。
+ *   - 优先消费 `instancePath`（JSON pointer → 点号字段路径，如 `/meta/reviewedAt` → `meta.reviewedAt`）；
+ *   - required 错误的字段名在 `params.missingProperty`，与父级 instancePath 拼接
+ *     （`/meta` + `agent` → `meta.agent`，比文案正则只能取到父路径更精确）；
+ *   - 根级（instancePath 为 `''`/`'/'`）无字段路径 → 返回 undefined，由调用方回退文案正则
+ *     （既有「根级 → schema」钉死语义不变；且文案正则对根级消息解析失败时同样兜底 'schema'，
+ *     故 Ajv 升级改变文案形态不影响 subject 提取）。
+ * 纯函数、无 I/O；导出供单元测试以合成错误对象直接驱动。
+ */
+export function ajvErrorSubject(
+  err: { instancePath?: string; params?: { missingProperty?: string } } | null | undefined,
+): string | undefined {
+  if (!err || typeof err !== 'object') return undefined;
+  const rawPath = typeof err.instancePath === 'string' ? err.instancePath : '';
+  if (rawPath === '' || rawPath === '/') return undefined; // 根级：交由文案正则回退（→ 'schema'）
+  const missing = typeof err.params?.missingProperty === 'string' ? err.params.missingProperty : '';
+  const pointer = missing !== '' ? `${rawPath}/${missing}` : rawPath;
+  return pointer.replace(/^\/+/, '').replace(/\/+/g, '.');
+}
+
+/**
  * schema 前置拦截的 subject 提取：ajv 格式化消息形如 `/meta/repeatTimes: must be integer [type]`
  * （formatAjvError：instancePath 为空时为 `/`）。提取 JSON-pointer 字段路径并转点号形态，
  * 与业务层 subject 的 `subCriteria[N].field` 形态对齐；根级/无路径 → 'schema'。
+ * C16：优先消费 Ajv 错误对象的结构化字段（ajvErrorSubject），undefined 再走现有文案正则回退
+ * ——errorMessages 与 errors 由 schema-loader 1:1 map(formatAjvError) 派生，按下标 zip 安全。
  */
-function schemaErrorSubject(message: string): string {
+function schemaErrorSubject(
+  message: string,
+  err?: { instancePath?: string; params?: { missingProperty?: string } } | null,
+): string {
+  const structured = ajvErrorSubject(err);
+  if (structured !== undefined) return structured;
   const m = /^\/([^:]*):/.exec(message);
   const pointer = m?.[1] ?? '';
   return pointer === '' ? 'schema' : pointer.replace(/\//g, '.');
@@ -239,12 +267,15 @@ function inRange(x: number, lo: number, hi: number, inclusive = true): boolean {
  * R12 具体引用的结构化判据（模块级常量，便于测试与复用）：
  *   文件路径（带扩展名，可选 `:L45`/`:45` 行号）| §章节号 | 第 N[章节行] | L 级（L1-L4）| 仓库 ID 编号前缀
  * 刻意**不含**裸「行」「节」「章」——见 checkR12EvidenceSpecificity 的判据演进注释。
+ * C11（Windows 路径）同构扩展：扩展名分支对路径分隔符不敏感（`src\mod\a.ts` 中的 `.ts`
+ * 照常命中），另补 **盘符前缀分支** `\b[A-Za-z]:[\\/]`——`D:\proj\notes:L5=…` 这类无已登记
+ * 扩展名的 Windows 绝对路径也是具体文件引用（无内部量词，star height 0）。
  */
 const R12_SPECIFIC_REF_PATTERN =
-  // 判据只需「出现具体引用」，故每个分支都以**字面锚点**起始（`.` + 已知扩展名 / `§` / `第` / `L` / `line` / ID 前缀），
+  // 判据只需「出现具体引用」，故每个分支都以**字面锚点**起始（`.` + 已知扩展名 / `§` / `第` / `L` / `line` / ID 前缀 / 盘符前缀），
   // 且**不含「含量词的组再被量化」形态**（star height ≤1；`(?::L?\d+)?` 这类写法虽线性也会被
   // security/detect-unsafe-regex 判为不安全，且对判据无贡献——`:L45` 前置必然已有 `.ts` 扩展名）。
-  /(?:\.(?:md|ts|tsx|js|jsx|mjs|cjs|json|ya?ml|py|java|go|rs|rb|php|sql|tla|cfg|feature|html|css|sh|txt|log|csv|xml|toml|ini)|§\s*[\d.]+|第\s*[\d.]+\s*[章节行]|\bL\d\b|\bline\s*\d+|\b(?:REQ|SD|DD|INTF|TC|UAT|RC|PUB|M|F|R)-\d+)/;
+  /(?:\.(?:md|ts|tsx|js|jsx|mjs|cjs|json|ya?ml|py|java|go|rs|rb|php|sql|tla|cfg|feature|html|css|sh|txt|log|csv|xml|toml|ini)|§\s*[\d.]+|第\s*[\d.]+\s*[章节行]|\bL\d\b|\bline\s*\d+|\b(?:REQ|SD|DD|INTF|TC|UAT|RC|PUB|M|F|R)-\d+|\b[A-Za-z]:[\\/])/;
 
 export function checkR12EvidenceSpecificity(evidence: unknown, idx: number): string | null {
   if (typeof evidence !== 'string') return null; // 类型校验由 R4 负责
@@ -397,8 +428,12 @@ export function determineQualityLevel(score: number): QualityLevel {
  *   合法格式：path:§section=statement 或 path:L42=statement 或 path:L42-58=statement
  *   非法格式：path.field=value（点号，已废弃）/ 纯文件名无定位 / 双 L 区间 `path:L51-L53=statement`
  *     （行号区间须写 `path:L51-53=statement`，单 L 形态）/ 空泛声明
+ *   C11（Windows 路径）：路径段字符集补反斜杠 `[\w/.\-\\]`，路径首允许盘符前缀
+ *     `(?:[A-Za-z]:)?`——`src\utils\a.ts:L12=…` 与 `D:\proj\x.ts:L1-5=…` 均为合法形态。
+ *     回溯安全：盘符组为无内部量词的字面二字符（star height 1），路径段为单字符类一次
+ *     量化（无「含量词的组再被量化」形态），双 L 区间仍被 `=` 锚点拒绝（`-L53` 不匹配 `-\d+`）。
  */
-const EVIDENCE_PATTERN = /^(?:[\w/.-]+:§[\w.-]+|[\w/.-]+:L\d+(?:-\d+)?)=.+$/;
+const EVIDENCE_PATTERN = /^(?:(?:[A-Za-z]:)?[\w/.\-\\]+:§[\w.-]+|(?:[A-Za-z]:)?[\w/.\-\\]+:L\d+(?:-\d+)?)=.+$/;
 const VAGUE_EVIDENCE_PATTERNS = [
   /^(C\d+-C\d+\s*全通过)/,
   /^(质量良好|评审通过|校验通过|全部通过)/,
@@ -466,13 +501,15 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   const schemaResult = validateBySchema('verifier-output', raw);
   if (!schemaResult.valid) {
     // 批次3 任务8：schema 前置拦截路径同样双轨同源——每条 [schema] 原文恰派生一条
-    // VERIFIER-SCHEMA 结构化违规（subject 由 schemaErrorSubject 提取字段路径）
+    // VERIFIER-SCHEMA 结构化违规（subject 由 schemaErrorSubject 提取字段路径；
+    // C16：errorMessages 与 errors 1:1（schema-loader map(formatAjvError)），zip 后优先结构化字段）
     const schemaReasons = schemaResult.errorMessages.map((m) => `[schema] ${m}`);
     return {
       passed: false,
       reasons: schemaReasons,
-      structuredViolations: schemaResult.errorMessages.map((m) =>
-        makeStructured('VERIFIER-SCHEMA', schemaErrorSubject(m), `[schema] ${m}`),
+      structuredViolations: schemaResult.errorMessages.map((m, i) =>
+        // eslint-disable-next-line security/detect-object-injection -- i 为 errorMessages 与 errors 的 1:1 zip 下标（schema-loader map(formatAjvError) 派生），非外部可控键
+        makeStructured('VERIFIER-SCHEMA', schemaErrorSubject(m, schemaResult.errors?.[i]), `[schema] ${m}`),
       ),
       compositeScore: 0,
       expectedCompositeScore: 0,
@@ -599,11 +636,22 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
 
   const expected = SUB_CRITERIA[targetKind as TargetKind];
   if (subCriteria.length !== expected.length) {
+    // C17：长度不符即结构错位，继续按下标比对只会叠加错位误报（如缺首项后共享下标全部移位，
+    // 连权重都逐项错位）。单条清晰 violation 后立即返回，不再进入逐项/按下标比对循环；
+    // 方向仍 fail-closed（passed=false，下游字段校验对本形态无增量信息）。
     pushViolation(
-      `targetKind=${targetKind} 应有 ${expected.length} 个子标准，实际 ${subCriteria.length} 个`,
+      `subCriteria 数量不符（expected ${expected.length}, got ${subCriteria.length}）`,
       'VERIFIER-STRUCTURE',
       'subCriteria',
     );
+    return {
+      passed: false,
+      reasons,
+      structuredViolations,
+      compositeScore: 0,
+      expectedCompositeScore: 0,
+      qualityLevel: 'N/A',
+    };
   }
 
   // 子标准名称与权重逐一比对

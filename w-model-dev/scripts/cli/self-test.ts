@@ -330,6 +330,12 @@ const VERIFIER_CASES: VerifierCase[] = [
     description: 'targetKind=rootcause 合法 VerifierOutput（§7.5 子标准集合 + 权重），应通过全部校验',
   },
   {
+    file: 'valid-windows-evidence.json',
+    expectedPassed: true,
+    description:
+      'C11 Windows 路径 evidence 正例（反斜杠 src\\mod\\a.ts:L3= + 盘符前缀 D:\\proj\\rootcause.json:L1-5=，子标准集合同 valid-rootcause），应通过 evidence 格式与 R12 校验',
+  },
+  {
     file: 'bad-rootcause-subcriteria.json',
     expectedPassed: false,
     expectedReasonPatterns: [/subCriteria.*name 应为/],
