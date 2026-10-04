@@ -327,7 +327,7 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 - `codeModule`：阶段 1 留空，由阶段 5 回填（详见 [phase-5-coding.md](phase-5-coding.md)「NFR/CON codeModule 回填」节）。
 - `unitTest` / `integrationTest` / `systemTest` / `acceptanceTest`：NFR/CON 行可填对应测试用例 ID 或 `null`（横切测试在阶段 5–8 补充）。
 
-**阶段 1 门禁校验**：`check-artifact-gate.ts --phase=1` 校验 NFR/CON 行的 `designDoc` 字段非空（非 `null`、非空字符串）。缺失即门禁退出码 1，作为 R 定位线索并执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；只有用户 CHECKPOINT 确认后，才可按 R 结论回阶段 1 补登记。
+**阶段 1 门禁校验**：`check-artifact-gate.ts --phase=1` 校验 NFR/CON 行的 `designDoc` 字段非空（非 `null`、非空字符串）。缺失即门禁退出码 1，作为 R 定位线索并执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；只有用户 CHECKPOINT 确认后，才可按 R 结论回阶段 1 补登记。阶段 1 门禁电池完整清单以 [subagent-delegation.md](subagent-delegation.md) §6.3 为唯一权威，本节仅保留与本字段判据直接相关的提及。
 
 > 与 REQ 行的差别：REQ 行在阶段 1 登记时 `designDoc` 可暂留空（待阶段 2 系统设计后映射到 SD-xxx）；NFR/CON 行**必须在阶段 1 完成横切登记**，因为 NFR/CON 是横切治理类需求，不挂在具体 SD 上会丢失治理关系。
 
@@ -452,7 +452,7 @@ V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions �
 | 13 | 追踪矩阵字段与主规格 §4/§7/§12 不一致 | 步骤 9 须对齐 traceability-matrix.md 与主规格层级树/覆盖矩阵/RTM 登记（FM-3D-08） |
 | 14 | UML 图表与层级树/User Stories 脱节 | uml-modeling.md 三图须对应主规格 §4 REQ/§3 stakeholder/§3 正常场景（FM-3D-09） |
 
-> **门禁强制（第 3 条）**：`check-artifact-gate.ts --phase=1 --spec-dir=<dir>` 的 `acceptance` 桶逐行校验主规格 §4.2 表的「验收标准」列——`类型=acceptance` 行不得为空，任一行不得含不可测量表述（词表见 `w-model-dev/scripts/logic/gate-logic.ts` 的 `SUBJECTIVE_ACCEPTANCE_WORDS`，来源即本表第 3 条与 `templates/requirement-spec.md` §4.2 的 NFR 提示）。**判据边界**：脚本只判字面命中，「标准是否真的可测」仍由 V 评审 `testability` 轴承担。
+> **门禁强制（第 3 条）**：`check-artifact-gate.ts --phase=1 --spec-dir=<dir>` 的 `acceptance` 桶逐行校验主规格 §4.2 表的「验收标准」列——`类型=acceptance` 行不得为空，任一行不得含不可测量表述（词表见 `w-model-dev/scripts/logic/gate-logic.ts` 的 `SUBJECTIVE_ACCEPTANCE_WORDS`，来源即本表第 3 条与 `templates/requirement-spec.md` §4.2 的 NFR 提示）。**判据边界**：脚本只判字面命中，「标准是否真的可测」仍由 V 评审 `testability` 轴承担。本条为该门在阶段 1 电池中的局部语境提及；完整阶段门禁电池以 [subagent-delegation.md](subagent-delegation.md) §6.3 为唯一权威。
 
 ## 返工路径
 

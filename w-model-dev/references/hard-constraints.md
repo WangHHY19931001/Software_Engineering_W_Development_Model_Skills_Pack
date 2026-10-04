@@ -524,7 +524,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 **回退动作**：回到阶段 N 起点，强制跑 `--phase=N`。
 
 **例外**：
-- 阶段 1-4 不强制跑 `check-artifact-gate`（设计阶段，无测试汇总校验）
+- 阶段 1-4 的 `check-artifact-gate` 触发形态以 [subagent-delegation.md](subagent-delegation.md) §6.3 阶段专属清单为唯一权威——阶段 1/2 须带 `--spec-dir=<dir>` 强制跑设计级结构校验（2026-10-04 D5 权威合一更正：原例外「阶段 1-4 不强制跑 `check-artifact-gate`」与 phase-1-requirements.md「阶段 1 门禁校验 / 门禁强制（第 3 条）」及 phase-2-system-design.md「门禁强制（FM-SD-02 的 ADR 半边）」冲突，废止）；本反模式的检测域（跳过中间 `--phase=N` 直接跑 `--phase=8` 终检）不变，仍以阶段 5-8 为典型
 - 阶段 5 以 `check-code-tla-consistency` 为主，`--phase=5` 为辅
 
 **与反模式 #1 的关系**：#1 是"跳过阶段门评审直接进入下一阶段"（完全不跑门禁），#21 是"跑了门禁但跳过阶段级校验直接跑终检"（跑了但参数错误）。前者完全不校验，后者校验粒度错误。
