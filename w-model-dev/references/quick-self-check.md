@@ -40,7 +40,7 @@
 ## 完成定义（DoD）
 
 
-> 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `references/definition-of-done.md`。
+> 来源：[addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) 的 definition-of-done（外部仓库路径 `references/definition-of-done.md`，非本仓文件；DoD 内容内嵌于本文件「完成定义（DoD）」节）。
 > SSoT §10.6（`docs/skill-design-document_SSoT.md`） 为权威定义，本节为可执行细则。
 >
 > **与工件质量门的关系**：§10.5 工件质量门（`docs/skill-design-document_SSoT.md`） / [`check-artifact-gate.ts`](../scripts/cli/check-artifact-gate.ts) 是「验收阶段的硬门禁」（退出码 0 才放行）；DoD 是「每次变更的日常标准」（每个 `/wm code` / `/wm test` 后自检）。二者不互替。
