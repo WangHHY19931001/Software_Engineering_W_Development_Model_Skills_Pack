@@ -2,7 +2,7 @@
 
 > **定位：叙事/映射文档。** 本文件登记 W 模型 agent 流水线自身的威胁目录（T1-T7），并把每类威胁映射到**既有**缓解机制。三条不承诺开宗明义：**不构建自动化守卫脚本、不新增检测信号、不改变任何 G 门禁判定**——「守卫」的唯一执行体仍是既有门禁脚本与硬约束（[hard-constraints.md](hard-constraints.md)）；本文件只回答「威胁是什么、既有机制覆盖到哪、缺口在哪」。
 > **边界裁定（批次 5 D1，2026-10-03）**：[verifier-spec.md](verifier-spec.md) §7.4A「不构建完整守卫体系，仅作为 R3 security 提示项」经裁定细化为「不构建**自动化守卫脚本**；威胁登记与既有机制映射属 R3 叙事层」——本文件即该叙事层的载体。权威摘要见 SSoT §10O。
-> **覆盖强度图例**：**阻断** = 违规在写入/执行前被拒（fail-closed）；**检测** = 事后由门禁脚本/评审抓获；**提示** = 依赖人/agent 自律的叙事约束（无机器判定）。
+> **覆盖强度图例**：**阻断** = 违规在写入/执行前被拒（fail-closed）；**检测** = 事后由门禁脚本/评审抓获；**提示** = 依赖人/agent 自律的叙事约束（无机器判定）。**评级基准（N4 订正，2026-10-04）**：以**绕过官方工具/通道的对抗面**为准——机制在其官方入口内的 fail-closed 行为如实标注「工具内阻断」，但绕过入口不可检测时整体评级不高于**检测**。
 
 ## 1. 消费角色
 
@@ -26,13 +26,13 @@
 
 - **威胁**：伪造或回溯改写运行证据（run-log 时间戳、历史行、gate 记录），使流程看起来已执行。
 - **攻击面示例**：手改 run-log 历史行让闭环五脚本检查通过；时间戳回溯伪造时序。
-- **既有机制映射**：`wm-append-runlog` 时间戳三态 + 反伪造（历史行禁改，更正走 `--correct` 追加通道）（**阻断**，[command-reference.md](command-reference.md) `wm-append-runlog.ts` 条目）；`check-run-log` R0-R11 时序 / revertEvidence / 闭环五脚本机器核验（**检测**，[subagent-delegation.md](subagent-delegation.md) §6 登记行）。
+- **既有机制映射**：`wm-append-runlog` 时间戳三态 + 反伪造（历史行禁改，更正走 `--correct` 追加通道）（**检测**——时间戳三态在**官方追加器内**阻断；绕过工具直写 run-log 文件不可检测（无行级完整性，WS-T7 去哈希化裁定），故整体为检测级，[command-reference.md](command-reference.md) `wm-append-runlog.ts` 条目）；`check-run-log` R0-R11 时序 / revertEvidence / 闭环五脚本机器核验（**检测**，[subagent-delegation.md](subagent-delegation.md) §6 登记行）。
 
 ### T3 门禁结果冒充（谎报退出码 / 自评放行）
 
 - **威胁**：不真实运行门禁而谎报退出码；以 LLM 估算替代脚本判定；子代理自评代替独立评审。
 - **攻击面示例**：O 自评「应该能过」直接放行；手写 GATE_JSON 而不跑脚本。
-- **既有机制映射**：既有约束 #9（门禁退出码不可伪）+ 既有约束 #4（真实执行）——Agent 在 🔴 CHECKPOINT 处以脚本退出码为准，不得 LLM 估算（**流程 + 检测**，[hard-constraints.md](hard-constraints.md)）；gate 记录由 G 角色独占产出（**流程**，[subagent-delegation.md](subagent-delegation.md) 角色边界）；`check-verifier-output` R13 单轴下限防评审漂移（**检测**）。
+- **既有机制映射**：既有约束 #9（门禁退出码不可伪）+ 既有约束 #4（真实执行）——Agent 在 🔴 CHECKPOINT 处以脚本退出码为准，不得 LLM 估算（**检测**——退出码与 process.exit 强一致在**官方门禁链内**成立，约束本身属流程约束；绕过官方链谎报退出码 / 手写 gate 记录不可检测，故整体为检测级，[hard-constraints.md](hard-constraints.md)）；gate 记录由 G 角色独占产出（**流程**，[subagent-delegation.md](subagent-delegation.md) 角色边界）；`check-verifier-output` R13 单轴下限防评审漂移（**检测**）。
 
 ### T4 字节篡改与抵赖（产物改后声明不变）
 
