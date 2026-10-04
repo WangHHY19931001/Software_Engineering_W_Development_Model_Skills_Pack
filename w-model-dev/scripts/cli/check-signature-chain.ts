@@ -45,6 +45,7 @@ import * as path from 'node:path';
 import { checkSignatureChain, type SignatureChainEntry } from '../logic/signature-chain-logic.js';
 import { readJsonlOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg, phaseFlagPresent } from '../lib/parse-phase.js';
@@ -227,4 +228,7 @@ async function main(): Promise<void> {
   return;
 }
 
-runMain(main);
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main
+if (isDirectInvocation(import.meta.url)) {
+  runMain(main);
+}

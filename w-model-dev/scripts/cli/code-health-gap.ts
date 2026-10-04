@@ -30,6 +30,7 @@ import { GAP_DIMENSIONS, findGaps } from '../logic/code-health-gap-logic.js';
 import { validateGapMatrix, validateRedGreenEvidence } from '../logic/code-health-ledger-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 
 const VALUE_FLAGS = ['matrix'] as const;
@@ -194,4 +195,7 @@ async function main(): Promise<void> {
   process.exitCode = 0;
 }
 
-runMain(main);
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main
+if (isDirectInvocation(import.meta.url)) {
+  runMain(main);
+}

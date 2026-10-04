@@ -36,6 +36,7 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 import { exitWithError, HandledCliError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import {
   PlatformDependencyVerificationError,
   isUnsafeArchivePath,
@@ -705,7 +706,8 @@ export async function main(): Promise<void> {
   }
 }
 
-// 直接执行（`npx tsx .../platform-deps-install.ts`）时才跑 main；被测试 import 时不触发。
-if (process.argv[1] !== undefined && process.argv[1].endsWith('platform-deps-install.ts')) {
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：直接执行（`npx tsx .../platform-deps-install.ts`）时才跑 main；被测试 import 时不触发
+// （取代原 argv[1].endsWith 字面后缀比对——统一走双侧 realpath 判定，防路径异形误判）
+if (isDirectInvocation(import.meta.url)) {
   runMain(main);
 }

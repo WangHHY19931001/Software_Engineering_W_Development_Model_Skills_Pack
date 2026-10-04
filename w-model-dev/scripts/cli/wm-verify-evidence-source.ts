@@ -3,6 +3,7 @@
 import * as path from 'node:path';
 
 import { exitWithError, HandledCliError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { produceSourceProvenance } from '../logic/evidence-provenance-logic.js';
 
@@ -36,4 +37,7 @@ async function main(): Promise<void> {
   }
 }
 
-runMain(main);
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main
+if (isDirectInvocation(import.meta.url)) {
+  runMain(main);
+}

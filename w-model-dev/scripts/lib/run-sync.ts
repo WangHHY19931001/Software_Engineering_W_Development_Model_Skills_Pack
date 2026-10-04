@@ -246,6 +246,15 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
     timeout: { required: true, status: 'present' },
   },
   {
+    api: 'spawnSync',
+    file: '__tests__/checkpoint-r0-bootstrap-cli.test.ts',
+    anchor: 'const result = spawnSync(process.execPath, [tsxCli, WM_STATUS_CLI], {',
+    symbol: 'C1 反证：VITEST=1 子进程不自证旁路',
+    reason:
+      'C1（2026-10-04）反证用例需以显式 env（VITEST=1）spawn 真实 CLI——runSync 的 childProcessEnv 会剥离 VITEST，无法构造旁路形态，故保留直接同步调用；显式 60 秒超时（对齐本文件 runCli 的 tsx 冷启动口径）。',
+    timeout: { required: true, status: 'present' },
+  },
+  {
     api: 'execSync',
     file: '__tests__/eval-runner.test.ts',
     anchor: "const r = runSync(process.execPath, [tsxCli, join(repoRoot, 'eval', 'runner.ts'), '--self-check'], {",
@@ -478,9 +487,9 @@ function boundedPositiveNumber(value: number | undefined, fallback: number): num
 /**
  * 子进程环境：剥离 vitest worker 泄漏的 VITEST 变量。
  * 真实 CLI 调用（tsx 直跑 / 终端）永不设置 VITEST；vitest worker 内 spawn 的
- * CLI 子进程若继承它，runMain 的 VITEST 守卫会误跳过自执行（Wave 2 进程内
- * 调用层前提）。options.env 显式给出时以其为基底（多数测试传入的 curated
- * env 本就无 VITEST，剥离为幂等 no-op）。
+ * CLI 子进程不应继承 worker 专属变量（C1 后 runMain 已无 VITEST 旁路，剥离
+ * 仅为子进程环境保真——与终端直跑同形）。options.env 显式给出时以其为基底
+ * （多数测试传入的 curated env 本就无 VITEST，剥离为幂等 no-op）。
  */
 export function childProcessEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const child = { ...env };

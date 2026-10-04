@@ -35,6 +35,7 @@ import * as fs from 'node:fs/promises';
 
 import { checkTlaBddSync } from '../logic/tla-bdd-sync-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { hasFlag } from '../lib/parse-args.js';
 import { printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
@@ -163,4 +164,7 @@ async function main(): Promise<void> {
   }
 }
 
-runMain(main);
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main
+if (isDirectInvocation(import.meta.url)) {
+  runMain(main);
+}

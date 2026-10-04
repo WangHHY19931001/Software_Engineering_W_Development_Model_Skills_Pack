@@ -7,10 +7,9 @@ import { runMain } from '../lib/run-main.js';
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 describe('runMain（审计修复 P10：错误出口统一）', () => {
-  // Wave 2 起 runMain 带 VITEST 自执行守卫（见下方「runMain VITEST 守卫」describe）。
-  // 本组用例进程内直调 runMain（非 spawn 子进程），spawn 层的 childProcessEnv 剥离
-  // 帮不了这里——钩子摘除 VITEST 是正确适配：模拟真实子进程语义（tsx 直跑时 VITEST
-  // 未设置），断言口径与守卫落地前完全一致。
+  // 本组用例进程内直调 runMain（非 spawn 子进程）。钩子摘除 VITEST 是为了模拟真实
+  // 子进程语义（tsx 直跑时 VITEST 未设置，与 spawn 层 childProcessEnv 剥离同口径）；
+  // C1 修复后 runMain 不再读取任何环境变量，此钩子仅为子进程语义保真。
   const prevVitest = process.env.VITEST;
 
   beforeEach(() => {
@@ -79,28 +78,24 @@ describe('runMain（审计修复 P10：错误出口统一）', () => {
 });
 
 /**
- * runMain VITEST 守卫（Wave 2 进程内调用层前提）
+ * runMain 无环境旁路（C1，2026-10-04）
  *
- * vitest 进程内动态 import CLI 模块时，模块底部的 runMain(main) 不得自执行——
- * 否则 import 即触发真实 CLI 运行。守卫条件 process.env.VITEST 仅在 vitest
- * worker 内为真；真实子进程（tsx 直跑）永不设置。
+ * 旧实现带 `if (process.env.VITEST) return;` 全局旁路——任何 CLI 在 VITEST 环境变量
+ * 非空时被静默跳过（无输出 exit 0，门禁链旁路）。现已删除：vitest worker 内 import
+ * 的自执行防护改由各 cli/*.ts 尾部 isDirectInvocation 守卫承担（见
+ * __tests__/cli-entry-guard.test.ts），runMain 对环境变量零依赖。
  */
-describe('runMain VITEST 守卫', () => {
-  it('vitest 环境下不自执行 main（进程内调用层前提）', () => {
-    const main = vi.fn().mockResolvedValue(undefined);
-    runMain(main);
-    expect(main).not.toHaveBeenCalled();
-  });
-
-  it('非 vitest 环境自执行 main（临时删除 VITEST 后恢复）', async () => {
+describe('runMain 无环境旁路（C1）', () => {
+  it('vitest 环境下仍执行 main（不得以 VITEST 静默跳过）', async () => {
     const prev = process.env.VITEST;
-    delete process.env.VITEST;
+    process.env.VITEST = '1';
     try {
       const main = vi.fn().mockResolvedValue(undefined);
       runMain(main);
       await vi.waitFor(() => expect(main).toHaveBeenCalledTimes(1));
     } finally {
       if (prev !== undefined) process.env.VITEST = prev;
+      else delete process.env.VITEST;
     }
   });
 });

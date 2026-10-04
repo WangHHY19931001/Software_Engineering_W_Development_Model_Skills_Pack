@@ -21,6 +21,7 @@
  * （vitest-project-split 双向守护）。**不 spawn 全量 vitest**。
  */
 
+import { spawnSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import { createRequire } from 'node:module';
 import * as os from 'node:os';
@@ -38,6 +39,7 @@ const REPO_ROOT = path.resolve(TEST_DIR, '..', '..', '..');
 const CLI_DIR = path.join(REPO_ROOT, 'w-model-dev', 'scripts', 'cli');
 const RUN_LOG_CLI = path.join(CLI_DIR, 'check-run-log.ts');
 const CHECKPOINT_CLI = path.join(CLI_DIR, 'check-checkpoint.ts');
+const WM_STATUS_CLI = path.join(CLI_DIR, 'wm-status.ts');
 
 let tmpDir: string;
 
@@ -233,5 +235,25 @@ describe('E-2 方案 B：phase-1 自举时序端到端（真实子进程）', ()
         `${row.name}：不得出现 BOOTSTRAP_VALIDATION 诊断`,
       ).toBe(false);
     }
+  });
+});
+
+describe('CLI 入口无 VITEST 环境旁路（C1 反证，真实子进程）', () => {
+  it('VITEST=1 环境下 CLI 必须正常执行而非静默 exit 0（C1 反证）', () => {
+    // 直接 spawnSync 而非 runSync：runSync 的 childProcessEnv 会剥离 VITEST，
+    // 无法构造「子进程带 VITEST」的旁路形态；台账登记见 lib/run-sync.ts
+    // SYNC_PROCESS_EXCEPTIONS（本文件唯一直接同步调用）。
+    const result = spawnSync(process.execPath, [tsxCli, WM_STATUS_CLI], {
+      cwd: REPO_ROOT,
+      timeout: 60_000,
+      encoding: 'utf-8',
+      env: { ...process.env, VITEST: '1' },
+    });
+    // 断言「有输出/有行为」，杜绝静默通过：旧旁路（run-main.ts 的
+    // `if (process.env.VITEST) return;`）下本用例形态 = exit 0 且零输出。
+    expect(
+      (result.stdout ?? '') !== '' || (result.stderr ?? '') !== '' || result.status !== 0,
+      `VITEST=1 下 CLI 被静默跳过（status=${String(result.status)}，stdout=${JSON.stringify(result.stdout)}，stderr=${JSON.stringify(result.stderr)}）`,
+    ).toBe(true);
   });
 });

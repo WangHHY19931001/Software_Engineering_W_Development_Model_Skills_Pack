@@ -67,6 +67,7 @@ import { promisify } from 'node:util';
 import { exitWithError } from '../lib/cli-error.js';
 import { buildExit2Probes, EXIT2_ERROR_CATEGORIES, listGateScripts } from '../lib/exit2-probe-registry.js';
 import { printGateReport, printJsonReport } from '../lib/gate-report.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 
@@ -1103,5 +1104,7 @@ function countFixtures(samplesRoot: string): number {
   return count;
 }
 
-// 统一入口（lib/run-main.ts）：main() 异常统一为 UNEXPECTED + ERROR_JSON + exit 2（S20 兜底）
-runMain(main);
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main
+if (isDirectInvocation(import.meta.url)) {
+  runMain(main);
+}
