@@ -2536,7 +2536,7 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 
 - 阶段 N+1 的 O chunk 签名 sourceSigIds 含阶段 N 的 O checkpoint 签名
 - 阶段 5 的 S produce 签名 sourceSigIds 含阶段 1-4 全部 G gate 签名
-- 阶段 8 的 G gate 签名 sourceSigIds 含阶段 1-7 全部签名链根 hash
+- 阶段 8 的 G gate（终检）的全链完整性由 archive 模式 R2 连续链校验承担——签名链在 `signature-chain.jsonl` 内自包含闭环（全链首条 `prevSigId="genesis"` / `prevSigHash="0"` 锚定）；run-log 不承载链根字段（run-log.schema.json `additionalProperties: false`），`sourceSigIds` 均为 sigId 引用、无独立「链根 hash」消费点
 
 违反任一规则即命中反模式 #32（签名链断裂），拒绝放行。
 
