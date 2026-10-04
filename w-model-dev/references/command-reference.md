@@ -203,7 +203,7 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>"
 4. 编排者（O）分派 V 子代理按 Persona 产出 `VerifierOutput` JSON，再分派 G 子代理跑上述命令。
 5. 编排者（O）说明 A/B 且 `passed=true` 才能进入用户放行检查点；C/D 仅作为 R 定位线索，普通失败必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），不得直接分派 S。
 
-**self-as-verifier 模式**（仅限 demo / 非生产 / 教学演示项目，生产项目禁止；前置：`project.status` 标记 `selfAsVerifier: true`，V 评审须切换 Persona 视角并在 `summary` 注明，详见 SKILL.md「self-as-verifier 模式」节与 verifier-spec §13）：单 Agent 兼任 S/V 时，V 评审后用 `--self-as-verifier --s-output=<S产出路径>` 校验 VerifierOutput 路径与 S 产出路径不同（反模式 #35）：
+**self-as-verifier 模式**（仅限 demo / 非生产 / 教学演示项目，生产项目禁止；前置：`project.status` 标记 `selfAsVerifier: true`，V 评审须切换 Persona 视角并在 `summary` 注明，详见 [subagent-delegation.md「self-as-verifier 模式（demo/教学例外）」节](subagent-delegation.md#self-as-verifier-模式demo教学例外)与 verifier-spec §13；权威定义见 SSoT §7.6A）：单 Agent 兼任 S/V 时，V 评审后用 `--self-as-verifier --s-output=<S产出路径>` 校验 VerifierOutput 路径与 S 产出路径不同（反模式 #35）：
 
 ```bash
 npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>" --self-as-verifier --s-output="<S产出路径>"

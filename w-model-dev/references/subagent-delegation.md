@@ -1989,12 +1989,14 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 
 ### 豁免条件
 
+#### self-as-verifier 模式（demo/教学例外）
+
 **self-as-verifier 模式豁免**（仅 demo 项目 / 非生产项目）：
 
 - S/V/G/R 任两角色由同一 Agent 兼任时，run-log 中可同一 `runId` 条目标记多角色（如 `role="S/V"`），但须满足：
   1. 产出各角色独立产物文件（VerifierOutput JSON / RootCauseReport / gate-logs JSON / PreventiveReview JSON 三份路径不同）
   2. run-log 条目的 `artifacts` 字段列出各角色独立产物路径
-- 详见 SKILL.md「self-as-verifier 模式」节与反模式 #35。
+- 详见 [verifier-spec.md](verifier-spec.md)「self-as-verifier 模式」节（§13）与反模式 #35；权威定义见 SSoT §7.6A（本节为编排面细则承载）。
 
 ### 校验命令
 

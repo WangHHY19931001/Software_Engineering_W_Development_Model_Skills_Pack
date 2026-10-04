@@ -339,7 +339,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #32（签名链断裂） | 全阶段 | [signature-chain-guide.md](signature-chain-guide.md) + [`check-signature-chain.ts`](../scripts/cli/check-signature-chain.ts) |
 | #33（跳过 R3 预防性审查） | 全阶段（所有 S 变体） | 约束 #11 + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) |
 | #34（编排者漏派角色） | 全阶段 | 约束 #8 + [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) |
-| #35（self-as-verifier 产物混合） | 全阶段（self-as-verifier 模式） | SKILL.md「self-as-verifier 模式」节 |
+| #35（self-as-verifier 产物混合） | 全阶段（self-as-verifier 模式） | [subagent-delegation.md](subagent-delegation.md)「self-as-verifier 模式（demo/教学例外）」节 |
 | #36（路由顺序错误） | 阶段 5/6 | [phase-5-coding.md](phase-5-coding.md) + 集成测试用例 |
 | #37（产物膨胀核心决策稀疏） | 阶段 1-4 | 各 phase-N「产物要求」节 |
 | #38（修改前未查询 codegraph） | 阶段 5-8 | 约束 #14 + [`check-codegraph-queries.ts`](../scripts/cli/check-codegraph-queries.ts) |
