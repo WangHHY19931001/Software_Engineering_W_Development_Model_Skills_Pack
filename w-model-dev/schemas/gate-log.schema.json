@@ -46,7 +46,7 @@
     },
     "verifiedArtifacts": {
       "type": "array",
-      "description": "本次门禁判定承重输入文件字节清单（消费前可复验同一字节）",
+      "description": "本次门禁判定承重输入文件字节清单；取证留存字段：sha256 供人工/外部审计复验，当前无仓内自动消费者重验",
       "items": {
         "type": "object",
         "additionalProperties": false,
