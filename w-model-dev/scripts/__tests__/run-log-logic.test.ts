@@ -3104,3 +3104,41 @@ describe('run-log D-2: R3/R7 配对接受 V 重发记录（V 自有产物重发 
     expect(r.violations.some((v) => v.startsWith('R7: rootcause 记录') && v.includes('successful fix'))).toBe(true);
   });
 });
+
+// ==================== C9：R7 时间戳不可解析 fail-closed ====================
+
+describe('C9 R7 时间戳不可解析 fail-closed', () => {
+  it('相邻行 timestamp 非法（Date.parse NaN）→ blocking violation，而非静默跳过', () => {
+    // 后一条使用闰秒形态 23:59:60Z：run-log schema（RFC3339 full 模式）接受该形态，
+    // 但 V8 Date.parse 返回 NaN——schema 拦不住、JS 又解析不了。C9 前该行会被静默
+    // 跳过（Invalid Date 参与比较恒为 false），现改为 fail-closed blocking。
+    const entries: RunLogEntry[] = [
+      makeEntry({ runId: 'c9-1', timestamp: '2026-01-01T00:00:00Z' }),
+      makeEntry({ runId: 'c9-2', timestamp: '2026-01-01T23:59:60Z' }),
+    ];
+    const result = checkRunLog(entries);
+    expect(result.passed).toBe(false);
+    expect(result.violations).toEqual(['R7: 记录 c9-2 时间戳不可解析（2026-01-01T23:59:60Z），时序校验 fail-closed']);
+  });
+});
+
+// ==================== C15：R5 越权检测形态补全 ====================
+
+describe('C15 R5 越权检测形态补全', () => {
+  it.each([
+    "node -e \"require('fs').appendFileSync('.w-model/rtm.json','x')\"",
+    "require('fs').appendFileSync('.w-model/rtm.json','x')",
+    "fs.promises.writeFile('.w-model/rtm.json', 'x')",
+    "fsPromises.writeFile('.w-model/rtm.json', 'x')",
+    'node --eval=console.log(1)',
+    "python -c \"open('.w-model/rtm.json','w').write('x')\"",
+  ])('检测 %s 形态', (cmd) => {
+    // 单条 produce（无 checkpoint → 不触发 R1/R4/R11），gateLogs 携带含越权命令的
+    // gate-log 内容；R5 扫描 gateLogs content 命中即 blocking。
+    const entries: RunLogEntry[] = [makeEntry({ runId: 'c15-1' })];
+    const gateLogs = new Map([['gate-logs/o-direct.log', { exitCode: 0, content: cmd }]]);
+    const result = checkRunLog(entries, { gateLogs });
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => v.startsWith('R5:'))).toBe(true);
+  });
+});

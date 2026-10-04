@@ -5,7 +5,7 @@
  * 与 w-model-dev/references/operational-recovery.md §5.2。
  * 校验：R1 阶段动作完整性 + R2 tokens 非负 + R3 返工记录一致
  *       + R4 acknowledgedDecisions 非空 + R5 O 越权检测 + R6 exitCode 一致
- *       + R7 append-only 时序（相邻时间戳单调递增）。
+ *       + R7 append-only 时序（相邻时间戳非递减，允许相等）。
  *       + R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint）
  *       + R9 跨轮次评审一致性 + R10 revertEvidence 回滚证伪
  *       + R11 闭环五脚本机器核验（约束 #11）
@@ -49,8 +49,10 @@ export const REVIEW_LEVEL_ORDER: Record<string, number> = {
  * exitCode=0 为前提才可放行。R11 把该约束做成机器可核验判定——
  * 凡出现 checkpoint 放行（action=checkpoint 且 outcome=success）的阶段，
  * 放行前必须已有这 5 个脚本各自一条 role=G / outcome=success /
- * gateExitCode=0 的 gate 记录；缺失或未严格早于放行（同秒不算）均 blocking
- * （无时间戳豁免）。唯一例外是阶段 1 的 `check-checkpoint.ts`（D-6 自举豁免）：
+ * gateExitCode=0 的 gate 记录；缺失或未严格早于放行均 blocking（无时间戳豁免）。
+ * 比较为毫秒精度：gate 时间戳须严格毫秒早于放行记录才充数；同毫秒（含无毫秒部分
+ * 的秒级时间戳）不算早于。官方追加器强制毫秒递增，毫秒序为真实信息（DEC-3）。
+ * 唯一例外是阶段 1 的 `check-checkpoint.ts`（D-6 自举豁免）：
  * 该脚本自身要求 run-log 中已存在 checkpoint 记录才可能 exit 0，故 `phase===1`
  * 时允许其记录晚于放行，但须早于下一放行（无下一放行时无上界）；其余四脚本与
  * `phase>=2` 的放行判据不变。
@@ -498,6 +500,17 @@ function isLegacyMissingReworkHints(raw: RunLogEntry): boolean {
 }
 
 /**
+ * C6（D-5 拷贝合一）：legacy 吸收判定中，从「其他 schema 错误」里排除的消息子串。
+ * `isLegacyAbsorbableEntry` 与 `checkRunLog` 的 reworkHints 族承接分派共用同一份——
+ * 两处被排除的消息集合必须逐字一致（否则同一记录在两门得到不同裁定）。
+ */
+const LEGACY_ABSORB_EXCLUSIONS: readonly string[] = [
+  'reworkHints',
+  'must match "then" schema',
+  'must match "if" schema',
+];
+
+/**
  * 共享谓词（D-5）：该条目的 schema 失败是否属可吸收的 legacy 形态。
  * 与 checkRunLog 的两条吸收分支等价（reworkHints 族 + identity/variant 族），
  * 供 check-checkpoint 复用，消除「同一记录两门裁定不一致」。
@@ -517,10 +530,7 @@ function isLegacyMissingReworkHints(raw: RunLogEntry): boolean {
 export function isLegacyAbsorbableEntry(raw: unknown, errorMessages: string[]): boolean {
   if (isFailedReviewMissingReworkHints(raw)) {
     const otherMessages = errorMessages.filter(
-      (message) =>
-        !message.includes('reworkHints') &&
-        !message.includes('must match "then" schema') &&
-        !message.includes('must match "if" schema'),
+      (message) => !LEGACY_ABSORB_EXCLUSIONS.some((exclusion) => message.includes(exclusion)),
     );
     if (otherMessages.length === 0 || isLegacySchemaFailure(raw, otherMessages)) {
       return isLegacyMissingReworkHints(raw as RunLogEntry);
@@ -584,6 +594,487 @@ export function recordTimestampMs(value: unknown): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
+// ==================== 规则段提取函数（C4：checkRunLog 原位拆分） ====================
+//
+// 以下五个函数是 checkRunLog 对应规则段的原位提取（纯机械搬移）：判定逻辑与
+// violation push 顺序与拆分前逐字节一致，checkRunLog 退化为编排器，按原执行
+// 顺序依次调用并展平 violations。段间共享的只读状态（completedPhases 来自 R1 段、
+// strictLifecycleScopes / isStrictLifecycleEntry / isPhase8IdentityIncomplete 来自
+// R3 段、phaseEntries 索引来自 R3 预防审查段、diagnostics 累积器）以参数显式
+// 传递，不改判定语义。
+
+/**
+ * R6 段整体：gateExitCode 回填检查 + gate-log 交叉一致（R6）+
+ * check-rootcause-report.ts gate 须有 exitCode（R6 扩展）。
+ */
+function checkGateLogCrossReference(valid: RunLogEntry[], options?: RunLogCheckOptions): string[] {
+  const violations: string[] = [];
+
+  // R6 gateExitCode 回填检查：gateLogPath 存在但 gateExitCode 非 number → 始终报
+  for (const e of valid) {
+    if (e.gateLogPath && typeof e.gateExitCode !== 'number') {
+      violations.push(`R6: 条目 ${e.runId ?? '?'} gateLogPath 已设但 gateExitCode 未回填`);
+    }
+  }
+
+  // R6 exitCode 一致（可选校验：仅当 gateLogs 提供时执行）
+  // 交叉校验 run-log 条目 gateExitCode 与 gate-log 存档 exitCode 一致（SSoT §10E 防伪造）
+  if (options?.gateLogs) {
+    for (const e of valid) {
+      if (e.gateLogPath && typeof e.gateExitCode === 'number') {
+        const logData = options.gateLogs.get(e.gateLogPath);
+        if (!logData) {
+          violations.push(`R6: 条目 ${e.runId ?? '?'} gateLogPath=${e.gateLogPath} 在 gate-logs 中未找到`);
+        } else if (logData.exitCode === undefined) {
+          violations.push(`R6: gate-log ${e.gateLogPath} 未提取到 exitCode`);
+        } else if (e.gateExitCode !== logData.exitCode) {
+          violations.push(
+            `R6: 条目 ${e.runId ?? '?'} gateExitCode=${e.gateExitCode} 与 gate-log ${e.gateLogPath} exitCode=${logData.exitCode} 不一致`,
+          );
+        }
+      }
+    }
+  }
+
+  // R6 扩展：check-rootcause-report.ts gate 须有 exitCode（spec §7.6）
+  const rootcauseGateActions = valid.filter((e) => e.action === 'gate' && e.script === 'check-rootcause-report.ts');
+  for (const g of rootcauseGateActions) {
+    if (typeof g.gateExitCode !== 'number' || g.gateExitCode === null) {
+      violations.push(`R6: check-rootcause-report.ts gate 记录 ${g.runId} 缺 gateExitCode`);
+    }
+  }
+
+  return violations;
+}
+
+/**
+ * R7 段整体：append-only 时序（R7，相邻时间戳非递减、允许相等）+
+ * 返工路径按同身份 segment 检查（R7 扩展）。
+ *
+ * C9：比较两侧时间戳统一经 recordTimestampMs 宽容解析，任一侧不可解析
+ * （Date.parse NaN / 非字符串 / 空白）→ blocking violation（fail-closed），不比较。
+ */
+function checkTimestampOrdering(
+  valid: RunLogEntry[],
+  strictLifecycleScopes: Set<string>,
+  diagnostics: string[],
+): string[] {
+  const violations: string[] = [];
+
+  // R7 append-only（时间戳非递减，允许相等）
+  let prev: RunLogEntry | undefined;
+  for (const e of valid) {
+    if (prev !== undefined) {
+      const prevMs = recordTimestampMs(prev.timestamp);
+      const curMs = recordTimestampMs(e.timestamp);
+      if (prevMs === null) {
+        violations.push(`R7: 记录 ${prev.runId ?? '?'} 时间戳不可解析（${prev.timestamp}），时序校验 fail-closed`);
+      } else if (curMs === null) {
+        violations.push(`R7: 记录 ${e.runId ?? '?'} 时间戳不可解析（${e.timestamp}），时序校验 fail-closed`);
+      } else if (curMs < prevMs) {
+        violations.push(
+          `R7: 条目 ${e.runId ?? '?'} 时间戳 ${e.timestamp} 早于前一条 ${prev.timestamp}（非 append-only）`,
+        );
+      }
+    }
+    prev = e;
+  }
+
+  // R7 扩展：返工路径按同身份 segment 检查，禁止跨 report/targetKind 借动作。
+  const checkedRootcauseSegments = new Set<string>();
+  for (let i = 0; i < valid.length; i++) {
+    const curEntry = valid[i];
+    if (!curEntry || curEntry.action !== 'rootcause') continue;
+    const rootIdentity = lifecycleIdentity(curEntry);
+    const strictForRoot = strictLifecycleScopes.has(lifecycleScopeKey(rootIdentity));
+    if (strictForRoot && completeRootcauseIdentity(rootIdentity)) {
+      const segmentKey = lifecycleKey(rootIdentity);
+      if (checkedRootcauseSegments.has(segmentKey)) continue;
+      checkedRootcauseSegments.add(segmentKey);
+    }
+    if (strictForRoot && completeRootcauseIdentity(rootIdentity)) {
+      const rootReviewIndex = valid.findIndex(
+        (candidate, index) =>
+          index > i &&
+          hasPassedReview(candidate) &&
+          candidate.targetKind === 'rootcause' &&
+          lifecycleIdentity(candidate).phase === rootIdentity.phase &&
+          lifecycleIdentity(candidate).round === rootIdentity.round &&
+          lifecycleIdentity(candidate).reportId === rootIdentity.reportId &&
+          candidate.target === rootIdentity.reportId &&
+          candidate.basedOnReport === rootIdentity.reportId,
+      );
+      if (rootReviewIndex < 0) {
+        diagnostics.push(
+          `pending-pre-approval: rootcause ${curEntry.reportId} 同身份缺 review(targetKind=rootcause)，不判定为 exact-fix omission`,
+        );
+        continue;
+      }
+      const fixIndex = valid.findIndex((candidate, index) => {
+        if (index <= rootReviewIndex || !['fix', 'emergency-fix'].includes(candidate.action)) return false;
+        const fixIdentity = lifecycleIdentity(candidate);
+        return (
+          hasExactFixEvidence(candidate) &&
+          fixIdentity.phase === rootIdentity.phase &&
+          fixIdentity.round === rootIdentity.round &&
+          fixIdentity.reportId === rootIdentity.reportId &&
+          fixIdentity.basedOnReport === rootIdentity.reportId
+        );
+      });
+      if (fixIndex < 0) {
+        const hasNonExactFix = valid.slice(rootReviewIndex + 1).some((candidate) => {
+          if (!['fix', 'emergency-fix'].includes(candidate.action)) return false;
+          const candidateIdentity = lifecycleIdentity(candidate);
+          return (
+            candidateIdentity.phase === rootIdentity.phase &&
+            candidateIdentity.round === rootIdentity.round &&
+            (candidateIdentity.reportId !== rootIdentity.reportId ||
+              candidateIdentity.basedOnReport !== rootIdentity.reportId ||
+              candidate.target !== candidateIdentity.implementationTarget ||
+              !Array.isArray(candidate.artifacts) ||
+              !candidate.artifacts.includes(candidateIdentity.implementationTarget ?? ''))
+          );
+        });
+        const hasDeferredFix = valid.slice(rootReviewIndex + 1).some((candidate) => {
+          if (!['fix', 'emergency-fix'].includes(candidate.action)) return false;
+          const candidateIdentity = lifecycleIdentity(candidate);
+          return (
+            candidateIdentity.phase === rootIdentity.phase &&
+            candidateIdentity.round === rootIdentity.round &&
+            candidateIdentity.basedOnReport === rootIdentity.reportId &&
+            !completeImplementationIdentity(candidate)
+          );
+        });
+        if (hasDeferredFix) {
+          diagnostics.push(`LEGACY_UNSCOPED: rootcause ${curEntry.reportId} exact fix identity incomplete; deferred`);
+        } else if (hasNonExactFix) {
+          violations.push(`R7: rootcause ${curEntry.reportId} exact fix target/artifacts/reportId relation mismatch`);
+        } else {
+          violations.push(`R7: rootcause ${curEntry.reportId} 同身份缺 exact basedOnReport fix`);
+        }
+      }
+      continue;
+    }
+
+    // Legacy path retains its original targetKind-aware ordering semantics.
+    let j = i + 1;
+    while (j < valid.length && !(valid[j]?.action === 'review' && valid[j]?.targetKind === 'rootcause')) j++;
+    if (j >= valid.length) {
+      violations.push(`R7: rootcause 记录 ${curEntry.runId} 后须有 review(targetKind=rootcause)`);
+      continue;
+    }
+    // D-2：V 重发记录（review + role=V + basedOnReport + V 自有 artifacts）同样视为修复证据。
+    const successfulFix = valid.slice(j + 1).find(isSuccessfulRepair);
+    if (!successfulFix) violations.push(`R7: rootcause 记录 ${curEntry.runId} 后须有 successful fix 记录`);
+  }
+
+  return violations;
+}
+
+/**
+ * R8 段整体：轨迹模板校验——R8-1/R8-2（checkpoint 终点 + gate 先于 checkpoint）、
+ * R8-3（V 失败后须先 rootcause，反模式 #18）、R8-4（严格生命周期独立窗口）+
+ * legacy 链序校验。GATE_ACTIONS 统一消费模块级常量（C5 单源）。
+ */
+function checkTrajectoryTemplate(
+  valid: RunLogEntry[],
+  completedPhases: Set<number>,
+  strictLifecycleScopes: Set<string>,
+  phaseEntries: Map<number, Array<{ entry: RunLogEntry; index: number }>>,
+  isStrictLifecycleEntry: (entry: RunLogEntry) => boolean,
+  isPhase8IdentityIncomplete: (entry: RunLogEntry) => boolean,
+): string[] {
+  const violations: string[] = [];
+
+  // R8 轨迹模板校验（agentic Ch19 轨迹符合性）
+  // 理想阶段轨迹：S 变体(produce/fix/emergency-fix) → R3×3 → V(review) → G(gate 类) → checkpoint(阶段最后)。
+  // R8 校验「轨迹正确」（R7 仅「时序正确」）：偏离理想动作序列即违规。
+  for (const phase of completedPhases) {
+    const phaseEntries = valid.filter((e) => e.phase === phase);
+    const checkpointIndexes = phaseEntries
+      .map((e, i) => (e.action === 'checkpoint' && e.outcome === 'success' ? i : -1))
+      .filter((i) => i >= 0);
+    const lastCheckpoint = checkpointIndexes.length > 0 ? checkpointIndexes[checkpointIndexes.length - 1]! : -1;
+
+    // R8-1: checkpoint 必须是该阶段最后一条记录（阶段结束后再无后续动作）
+    if (lastCheckpoint >= 0 && lastCheckpoint !== phaseEntries.length - 1) {
+      violations.push(
+        `R8: 阶段 ${phase} checkpoint 非阶段最后记录（checkpoint 之后仍有 ${phaseEntries.length - 1 - lastCheckpoint} 条动作，理想轨迹中 checkpoint 为阶段终点）`,
+      );
+    }
+
+    // R8-2: gate 类动作必须出现在最后一个 checkpoint 之前
+    for (let i = 0; i < phaseEntries.length; i++) {
+      const entry = phaseEntries[i];
+      if (entry && GATE_ACTIONS.has(entry.action) && lastCheckpoint >= 0 && i > lastCheckpoint) {
+        violations.push(
+          `R8: 阶段 ${phase} gate 动作(${entry.action})出现在 checkpoint 之后，理想轨迹中 gate 先于 checkpoint`,
+        );
+      }
+    }
+  }
+
+  // R8-3: V(review) 失败后不得直接 S 变体——须先 rootcause（反模式 #18 轨迹检测）
+  // 独立于 completedPhases 遍历所有阶段：反模式 #18 是行为级违规，
+  // 未完成阶段（尚无 checkpoint success）同样禁止 V 失败后跳过 R 直接 S 返工。
+  const r8PhaseGroups = new Map<number, RunLogEntry[]>();
+  for (const e of valid) {
+    if (!r8PhaseGroups.has(e.phase)) r8PhaseGroups.set(e.phase, []);
+    r8PhaseGroups.get(e.phase)!.push(e);
+  }
+  for (const [, phaseEntries] of r8PhaseGroups) {
+    for (let i = 0; i < phaseEntries.length; i++) {
+      const entry = phaseEntries[i];
+      if (!entry || entry.action !== 'review' || entry.outcome !== 'fail') continue;
+      // Phase-8 incomplete identity is diagnostic-only: it must not consume
+      // legacy R8-3 credit or create a cross-segment violation.
+      if (isPhase8IdentityIncomplete(entry)) continue;
+      const failedIdentity = lifecycleIdentity(entry);
+      const strictReview = entry.phase === 8 && completeImplementationIdentity(entry);
+      for (let j = i + 1; j < phaseEntries.length; j++) {
+        const next = phaseEntries[j];
+        if (!next) continue;
+        if (next.action === 'rootcause') {
+          const rootIdentity = lifecycleIdentity(next);
+          const sameSegmentRootcause = strictReview
+            ? completeRootcauseIdentity(rootIdentity) &&
+              rootIdentity.phase === failedIdentity.phase &&
+              rootIdentity.round === failedIdentity.round &&
+              rootIdentity.reportId === failedIdentity.reportId &&
+              failedIdentity.basedOnReport === rootIdentity.reportId
+            : true;
+          if (sameSegmentRootcause) break; // 正确路径：同 segment 先 R 再 S-fix
+          continue;
+        }
+        if (S_VARIANTS.includes(next.action)) {
+          violations.push(
+            `R8: 阶段 ${entry.phase} V(review) 失败(${entry.runId})后直接 S(${next.action})(${next.runId})，理想轨迹须先同身份 rootcause 再 S-fix（反模式 #18）`,
+          );
+          break;
+        }
+        if (next.action === 'checkpoint' && next.outcome === 'success') break; // 阶段结束，不再追溯
+      }
+    }
+  }
+
+  // R8-4：严格生命周期按每个 fix 的独立窗口校验。窗口在下一 fix 或
+  // 第一个成功 checkpoint（terminal event）处结束，后续记录不能掩盖前段顺序。
+  if (strictLifecycleScopes.size > 0) {
+    for (const [phase, phaseEntryList] of phaseEntries) {
+      for (let start = 0; start < phaseEntryList.length; start++) {
+        const startEntry = phaseEntryList.at(start)!.entry;
+        if (startEntry.role !== 'S' || !['fix', 'emergency-fix'].includes(startEntry.action)) continue;
+        if (!isStrictLifecycleEntry(startEntry) || !isSuccessfulFix(startEntry)) continue;
+        if (!completeImplementationIdentity(startEntry)) continue;
+        const identity = lifecycleIdentity(startEntry);
+        const nextFix = phaseEntryList.findIndex(
+          ({ entry }, index) => index > start && entry.role === 'S' && ['fix', 'emergency-fix'].includes(entry.action),
+        );
+        const terminal = phaseEntryList.findIndex(
+          ({ entry }, index) => index > start && entry.action === 'checkpoint' && entry.outcome === 'success',
+        );
+        const boundaries = [phaseEntryList.length];
+        if (nextFix >= 0) boundaries.push(nextFix);
+        if (terminal >= 0) boundaries.push(terminal + 1);
+        const windowEnd = Math.min(...boundaries);
+        const window = phaseEntryList.slice(start, windowEnd);
+        const exactEntry = (entry: RunLogEntry): boolean => sameIdentity(lifecycleIdentity(entry), identity);
+        const firstIndex = (pred: (e: RunLogEntry) => boolean): number => window.findIndex(({ entry }) => pred(entry));
+        const chain: Array<[string, number]> = [
+          ['S(fix|emergency-fix)', 0],
+          [
+            'R3(r3-completeness|r3-reliability|r3-security)',
+            firstIndex((entry) => exactEntry(entry) && hasExactR3Evidence(entry)),
+          ],
+          [
+            'V(implementation review)',
+            firstIndex((entry) => exactEntry(entry) && hasExactImplementationReviewEvidence(entry)),
+          ],
+          [
+            'G(implementation gate)',
+            firstIndex(
+              (entry) =>
+                exactEntry(entry) && GATE_ACTIONS.has(entry.action) && hasExactImplementationGateEvidence(entry),
+            ),
+          ],
+          ['checkpoint', firstIndex((entry) => entry.action === 'checkpoint' && entry.outcome === 'success')],
+        ];
+        const [, r3Index] = chain[1]!;
+        const [, reviewIndex] = chain[2]!;
+        const [, gateIndex] = chain[3]!;
+        if (gateIndex >= 0 && reviewIndex < 0) {
+          violations.push(
+            `R8: 阶段 ${phase} identity segment ${identity.reportId} fix ${startEntry.runId} 在窗口内先出现 implementation G，但缺同窗口 implementation V；后续 fix/terminal event 不得回填前段`,
+          );
+        }
+        if (reviewIndex >= 0 && r3Index < 0) {
+          violations.push(
+            `R8: 阶段 ${phase} identity segment ${identity.reportId} fix ${startEntry.runId} 在窗口内出现 implementation V，但缺同窗口 R3`,
+          );
+        }
+        for (let a = 0; a < chain.length - 1; a++) {
+          for (let b = a + 1; b < chain.length; b++) {
+            const [nameA, idxA] = chain[a]!;
+            const [nameB, idxB] = chain[b]!;
+            if (idxA >= 0 && idxB >= 0 && idxA > idxB) {
+              violations.push(
+                `R8: 阶段 ${phase} identity segment ${identity.reportId} fix ${startEntry.runId} 轨迹顺序倒置：${nameA}(第 ${idxA + 1} 条) 晚于 ${nameB}(第 ${idxB + 1} 条)，窗口须按 S → R3 → V → G → checkpoint 独立闭合`,
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+  {
+    const legacyR3Actions = ['r3-completeness', 'r3-reliability', 'r3-security'];
+    for (const [, allPhaseEntries] of r8PhaseGroups) {
+      // Never let one strict phase-8 segment suppress an unrelated legacy
+      // segment. Incomplete phase-8 identity rows stay diagnostic-only and
+      // therefore do not become legacy R8 credit or chain heads.
+      const phaseEntries =
+        allPhaseEntries[0]?.phase === 8
+          ? allPhaseEntries.filter((entry) => !isStrictLifecycleEntry(entry) && !isPhase8IdentityIncomplete(entry))
+          : allPhaseEntries;
+      if (phaseEntries.length === 0) continue;
+      const firstIndex = (pred: (e: RunLogEntry) => boolean): number => phaseEntries.findIndex(pred);
+      const lastIndex = (pred: (e: RunLogEntry) => boolean): number => {
+        for (let i = phaseEntries.length - 1; i >= 0; i--) if (pred(phaseEntries.at(i)!)) return i;
+        return -1;
+      };
+      const phaseNo = phaseEntries[0]?.phase;
+      const chain: Array<[string, number]> = [
+        ['S(produce|fix|emergency-fix)', firstIndex((e) => e.action === 'produce' || isSuccessfulFix(e))],
+        ['R3(r3-completeness|r3-reliability|r3-security)', firstIndex((e) => legacyR3Actions.includes(e.action))],
+        ['V(review)', firstIndex((e) => e.action === 'review')],
+        ['G(gate 类)', lastIndex((e) => GATE_ACTIONS.has(e.action))],
+        ['checkpoint', lastIndex((e) => e.action === 'checkpoint' && e.outcome === 'success')],
+      ];
+      for (let a = 0; a < chain.length - 1; a++) {
+        for (let b = a + 1; b < chain.length; b++) {
+          const [nameA, idxA] = chain[a]!;
+          const [nameB, idxB] = chain[b]!;
+          if (idxA >= 0 && idxB >= 0 && idxA > idxB) {
+            violations.push(
+              `R8: 阶段 ${phaseNo} 轨迹顺序倒置：${nameA}(第 ${idxA + 1} 条) 晚于 ${nameB}(第 ${idxB + 1} 条)，理想链为 S → R3 → V → G → checkpoint（修法：按链序补录缺失动作或用 /wm 修正轨迹后重跑门禁）`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  return violations;
+}
+
+/**
+ * R10 段整体：revertEvidence 回滚证伪协议（P2-B / S27 / AC-8）。
+ * 返回 violations 与 r10Counts（checkRunLog 结果对象 revertEvidence 计数所需结构）。
+ */
+function checkRevertEvidence(valid: RunLogEntry[]): {
+  violations: string[];
+  counts: { checked: number; missing: number; legacy: number };
+} {
+  const violations: string[] = [];
+
+  // R10: revertEvidence 回滚证伪协议（P2-B / S27 / AC-8）。
+  //
+  // fix/emergency-fix 记录必须携带合法 revertEvidence.command（非空字符串）：执行该
+  // 命令使 S-fix 的复现测试回到失败态，证明测试确实锚定被修缺陷——反模式 #45
+  // 「改断言让测试通过」的确定性挂点（命令本身由 S 在真实执行中出示，此处只验
+  // 载体存在与形态）。
+  //
+  // timestamp 仅为日志元数据，不参与证据信任判定；缺失/非法声明始终 blocking。
+  const r10Counts = { checked: 0, missing: 0, legacy: 0 };
+  for (const e of valid) {
+    if (!['fix', 'emergency-fix'].includes(e.action)) continue;
+    r10Counts.checked++;
+    if (hasValidRevertEvidence(e)) continue;
+    r10Counts.missing++;
+    violations.push(
+      `R10: ${e.action} 动作 ${e.runId} 须携带合法 revertEvidence.command（非空字符串；S-fix 复现测试的回滚证伪声明，执行后复现测试回到失败态，AC-8）`,
+    );
+  }
+  return { violations, counts: r10Counts };
+}
+
+/**
+ * R11 段整体：闭环五脚本机器核验（约束 #11 / SSoT §10C）。
+ * releaseTimes 预计算在函数内自算（输入依赖不变：仅消费 valid）。
+ * 返回 violations 与 closureReleases/missingCount（checkRunLog 结果对象
+ * closure 计数所需结构：closureReleases.length=checkedGates）。
+ */
+function checkClosureReleases(valid: RunLogEntry[]): {
+  violations: string[];
+  closureReleases: Array<{ phase: number; proven: Set<string> }>;
+  missingCount: number;
+} {
+  const violations: string[] = [];
+
+  // R11: 闭环五脚本机器核验（约束 #11 / SSoT §10C）。
+  //
+  // 触发域是「checkpoint 放行」（action=checkpoint 且 outcome=success）——只有放行
+  // 过的阶段才有闭环义务，无放行的 run-log（如 fix 变体）不受约束。对每个放行，
+  // 统计放行前（timestamp < 放行 timestamp，严格早于放行）已存在的闭环脚本 gate
+  // 记录：action=gate + role=G + outcome=success + gateExitCode=0 +
+  // script ∈ RUN_LOG_CLOSURE_SCRIPTS。非 G 角色、exitCode≠0、outcome≠success 或
+  // 时间戳不早于放行的同名脚本记录一律不充数（无时间戳豁免）。比较为毫秒精度：
+  // gate 时间戳须严格毫秒早于放行记录才充数；同毫秒（含无毫秒部分的秒级时间戳）
+  // 不算早于——官方追加器强制毫秒递增，毫秒序为真实信息（DEC-3）。缺失即
+  // blocking 并指明阶段与脚本名。同一阶段多次放行逐个核验（不合并）。
+  //
+  // D-6 阶段 1 后置窗口（**历史日志兼容形态**——E-2 方案 B 落地后的重定性，判据零变化）：
+  // `phase===1` 的 `check-checkpoint.ts` 允许落在后置窗口 (releaseAt, nextReleaseAt)：
+  // nextReleaseAt 取全部阶段中时间戳严格晚于本放行的最早一条放行记录，不存在下一放行时
+  // 无上界（只要求晚于本放行）。后置窗口是**增补**而非替换——早于放行的同脚本记录照旧
+  // 充数（既有 run-log 不受影响）；窗口只放宽时间轴，记录仍须属本阶段（phase 相同）。
+  // 其余四脚本与 phase>=2 的放行判据完全不变。
+  // 定性沿革：本窗口合入时（D-6，2026-09-21）用于绕开「check-checkpoint 自身要求 run-log
+  // 已有放行记录才可能 exit 0」与 R11 严格早于判据的首阶段自举死锁（先跑门则门红，先放行
+  // 则 R11 红）。E-2 方案 B（2026-09-22 规格修正案，R0 首阶段自举形态：run-log 零放行记录
+  // 时以 checkpoint-log 用户确认为初级证据，见 checkpoint-logic.ts）使自然时序「确认落盘 →
+  // 闭环五门 → 最后写放行记录」合法——新建项目常态满足上方严格判据，不再产生后置形态；
+  // 本窗口仅保留用于兼容以旧时序写入的历史 run-log（删除会使其变红）。注意：后置形态仍
+  // 违反 R8 轨迹模板（R8 零改动，后置记录照常报 R8 三条），新建项目不应产生该形态。
+  const releaseTimes = valid
+    .filter((e) => e.action === 'checkpoint' && e.outcome === 'success')
+    .map((e) => Date.parse(e.timestamp))
+    .sort((a, b) => a - b);
+  const closureReleases: Array<{ phase: number; proven: Set<string> }> = [];
+  let closureMissingCount = 0;
+  for (const e of valid) {
+    if (e.action !== 'checkpoint' || e.outcome !== 'success' || typeof e.phase !== 'number') continue;
+    const releaseAt = Date.parse(e.timestamp);
+    const proven = new Set<string>();
+    for (const g of valid) {
+      if (g.phase !== e.phase || g.action !== 'gate' || g.role !== 'G' || g.outcome !== 'success') continue;
+      if (g.gateExitCode !== 0) continue;
+      if (typeof g.script !== 'string' || !RUN_LOG_CLOSURE_SCRIPTS.includes(g.script)) continue;
+      const gateAt = Date.parse(g.timestamp);
+      if (g.script === 'check-checkpoint.ts' && e.phase === 1) {
+        const nextReleaseAt = releaseTimes.find((t) => t > releaseAt);
+        if (gateAt < releaseAt || (gateAt > releaseAt && (nextReleaseAt === undefined || gateAt < nextReleaseAt))) {
+          proven.add(g.script);
+        }
+        continue;
+      }
+      if (gateAt < releaseAt) proven.add(g.script);
+    }
+    closureReleases.push({ phase: e.phase, proven });
+  }
+  for (const release of closureReleases) {
+    for (const script of RUN_LOG_CLOSURE_SCRIPTS) {
+      if (release.proven.has(script)) continue;
+      closureMissingCount++;
+      violations.push(
+        `R11: 阶段 ${release.phase} 的 checkpoint 放行缺少闭环脚本 ${script} 的成功 gate 记录（须 role=G、gateExitCode=0 且早于放行；约束 #11：闭环五脚本每阶段门 exitCode=0）`,
+      );
+    }
+  }
+
+  return { violations, closureReleases, missingCount: closureMissingCount };
+}
+
 // ==================== 校验入口 ====================
 
 export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): RunLogCheckResult {
@@ -628,10 +1119,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       // （absorb → LEGACY_REWORK_HINTS 诊断 / 不 absorb → [rework-hints] blocking）。
       if (isFailedReviewMissingReworkHints(raw)) {
         const otherMessages = schemaResult.errorMessages.filter(
-          (message) =>
-            !message.includes('reworkHints') &&
-            !message.includes('must match "then" schema') &&
-            !message.includes('must match "if" schema'),
+          (message) => !LEGACY_ABSORB_EXCLUSIONS.some((exclusion) => message.includes(exclusion)),
         );
         if (otherMessages.length === 0 || isLegacySchemaFailure(raw, otherMessages)) {
           if (isLegacyAbsorbableEntry(raw, schemaResult.errorMessages)) {
@@ -1072,11 +1560,17 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   // 注意：gateLogs Map 可能因 gateLogPath 匹配策略（basename + 绝对路径 + 相对路径）
   //       对同一文件存多 key，此处按 content 去重，避免对同一日志重复报告。
   if (options?.gateLogs) {
+    // 以下模式为启发式检测信号，非安全边界（C15：形态补全不改变该定性）。
     const suspiciousPatterns = [
       /node\s+-e\s+/i, // node -e 直接执行
       /node\s+--eval\s+/i, // node --eval
       /writeFileSync\s*\(\s*['"].*\.w-model\//i, // writeFileSync('.w-model/...')
       /writeFile\s*\(\s*['"].*\.w-model\//i, // writeFile('.w-model/...')
+      // C15 追加四类形态：appendFileSync / fs.promises|fsPromises.writeFile / --eval= / python -c
+      /appendFileSync\s*\(\s*['"].*\.w-model\//i, // appendFileSync('.w-model/...')
+      /(fs\.promises|fsPromises)\.writeFile\s*\(\s*['"].*\.w-model\//i, // fs.promises.writeFile('.w-model/...')
+      /node\s+--eval=/i, // node --eval=...（等号形态）
+      /python\s+-c\s+/i, // python -c 直接执行
     ];
     const scannedContents = new Set<string>();
     for (const [logPath, logData] of options.gateLogs) {
@@ -1090,319 +1584,23 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
-  // R6 gateExitCode 回填检查：gateLogPath 存在但 gateExitCode 非 number → 始终报
-  for (const e of valid) {
-    if (e.gateLogPath && typeof e.gateExitCode !== 'number') {
-      violations.push(`R6: 条目 ${e.runId ?? '?'} gateLogPath 已设但 gateExitCode 未回填`);
-    }
-  }
+  // R6 段（C4 提取）：gateExitCode 回填 + gate-log 交叉一致 + rootcause gate exitCode
+  violations.push(...checkGateLogCrossReference(valid, options));
 
-  // R6 exitCode 一致（可选校验：仅当 gateLogs 提供时执行）
-  // 交叉校验 run-log 条目 gateExitCode 与 gate-log 存档 exitCode 一致（SSoT §10E 防伪造）
-  if (options?.gateLogs) {
-    for (const e of valid) {
-      if (e.gateLogPath && typeof e.gateExitCode === 'number') {
-        const logData = options.gateLogs.get(e.gateLogPath);
-        if (!logData) {
-          violations.push(`R6: 条目 ${e.runId ?? '?'} gateLogPath=${e.gateLogPath} 在 gate-logs 中未找到`);
-        } else if (logData.exitCode === undefined) {
-          violations.push(`R6: gate-log ${e.gateLogPath} 未提取到 exitCode`);
-        } else if (e.gateExitCode !== logData.exitCode) {
-          violations.push(
-            `R6: 条目 ${e.runId ?? '?'} gateExitCode=${e.gateExitCode} 与 gate-log ${e.gateLogPath} exitCode=${logData.exitCode} 不一致`,
-          );
-        }
-      }
-    }
-  }
+  // R7 段（C4 提取）：append-only 时序（C9 不可解析 fail-closed）+ 返工路径同身份 segment 检查
+  violations.push(...checkTimestampOrdering(valid, strictLifecycleScopes, diagnostics));
 
-  // R6 扩展：check-rootcause-report.ts gate 须有 exitCode（spec §7.6）
-  const rootcauseGateActions = valid.filter((e) => e.action === 'gate' && e.script === 'check-rootcause-report.ts');
-  for (const g of rootcauseGateActions) {
-    if (typeof g.gateExitCode !== 'number' || g.gateExitCode === null) {
-      violations.push(`R6: check-rootcause-report.ts gate 记录 ${g.runId} 缺 gateExitCode`);
-    }
-  }
-
-  // R7 append-only（时间戳单调递增）
-  let prevTimestamp: string | undefined;
-  for (const e of valid) {
-    if (typeof e.timestamp === 'string' && typeof prevTimestamp === 'string') {
-      if (new Date(e.timestamp) < new Date(prevTimestamp)) {
-        violations.push(
-          `R7: 条目 ${e.runId ?? '?'} 时间戳 ${e.timestamp} 早于前一条 ${prevTimestamp}（非 append-only）`,
-        );
-      }
-    }
-    prevTimestamp = e.timestamp;
-  }
-
-  // R7 扩展：返工路径按同身份 segment 检查，禁止跨 report/targetKind 借动作。
-  const checkedRootcauseSegments = new Set<string>();
-  for (let i = 0; i < valid.length; i++) {
-    const curEntry = valid[i];
-    if (!curEntry || curEntry.action !== 'rootcause') continue;
-    const rootIdentity = lifecycleIdentity(curEntry);
-    const strictForRoot = strictLifecycleScopes.has(lifecycleScopeKey(rootIdentity));
-    if (strictForRoot && completeRootcauseIdentity(rootIdentity)) {
-      const segmentKey = lifecycleKey(rootIdentity);
-      if (checkedRootcauseSegments.has(segmentKey)) continue;
-      checkedRootcauseSegments.add(segmentKey);
-    }
-    if (strictForRoot && completeRootcauseIdentity(rootIdentity)) {
-      const rootReviewIndex = valid.findIndex(
-        (candidate, index) =>
-          index > i &&
-          hasPassedReview(candidate) &&
-          candidate.targetKind === 'rootcause' &&
-          lifecycleIdentity(candidate).phase === rootIdentity.phase &&
-          lifecycleIdentity(candidate).round === rootIdentity.round &&
-          lifecycleIdentity(candidate).reportId === rootIdentity.reportId &&
-          candidate.target === rootIdentity.reportId &&
-          candidate.basedOnReport === rootIdentity.reportId,
-      );
-      if (rootReviewIndex < 0) {
-        diagnostics.push(
-          `pending-pre-approval: rootcause ${curEntry.reportId} 同身份缺 review(targetKind=rootcause)，不判定为 exact-fix omission`,
-        );
-        continue;
-      }
-      const fixIndex = valid.findIndex((candidate, index) => {
-        if (index <= rootReviewIndex || !['fix', 'emergency-fix'].includes(candidate.action)) return false;
-        const fixIdentity = lifecycleIdentity(candidate);
-        return (
-          hasExactFixEvidence(candidate) &&
-          fixIdentity.phase === rootIdentity.phase &&
-          fixIdentity.round === rootIdentity.round &&
-          fixIdentity.reportId === rootIdentity.reportId &&
-          fixIdentity.basedOnReport === rootIdentity.reportId
-        );
-      });
-      if (fixIndex < 0) {
-        const hasNonExactFix = valid.slice(rootReviewIndex + 1).some((candidate) => {
-          if (!['fix', 'emergency-fix'].includes(candidate.action)) return false;
-          const candidateIdentity = lifecycleIdentity(candidate);
-          return (
-            candidateIdentity.phase === rootIdentity.phase &&
-            candidateIdentity.round === rootIdentity.round &&
-            (candidateIdentity.reportId !== rootIdentity.reportId ||
-              candidateIdentity.basedOnReport !== rootIdentity.reportId ||
-              candidate.target !== candidateIdentity.implementationTarget ||
-              !Array.isArray(candidate.artifacts) ||
-              !candidate.artifacts.includes(candidateIdentity.implementationTarget ?? ''))
-          );
-        });
-        const hasDeferredFix = valid.slice(rootReviewIndex + 1).some((candidate) => {
-          if (!['fix', 'emergency-fix'].includes(candidate.action)) return false;
-          const candidateIdentity = lifecycleIdentity(candidate);
-          return (
-            candidateIdentity.phase === rootIdentity.phase &&
-            candidateIdentity.round === rootIdentity.round &&
-            candidateIdentity.basedOnReport === rootIdentity.reportId &&
-            !completeImplementationIdentity(candidate)
-          );
-        });
-        if (hasDeferredFix) {
-          diagnostics.push(`LEGACY_UNSCOPED: rootcause ${curEntry.reportId} exact fix identity incomplete; deferred`);
-        } else if (hasNonExactFix) {
-          violations.push(`R7: rootcause ${curEntry.reportId} exact fix target/artifacts/reportId relation mismatch`);
-        } else {
-          violations.push(`R7: rootcause ${curEntry.reportId} 同身份缺 exact basedOnReport fix`);
-        }
-      }
-      continue;
-    }
-
-    // Legacy path retains its original targetKind-aware ordering semantics.
-    let j = i + 1;
-    while (j < valid.length && !(valid[j]?.action === 'review' && valid[j]?.targetKind === 'rootcause')) j++;
-    if (j >= valid.length) {
-      violations.push(`R7: rootcause 记录 ${curEntry.runId} 后须有 review(targetKind=rootcause)`);
-      continue;
-    }
-    // D-2：V 重发记录（review + role=V + basedOnReport + V 自有 artifacts）同样视为修复证据。
-    const successfulFix = valid.slice(j + 1).find(isSuccessfulRepair);
-    if (!successfulFix) violations.push(`R7: rootcause 记录 ${curEntry.runId} 后须有 successful fix 记录`);
-  }
-
-  // R8 轨迹模板校验（agentic Ch19 轨迹符合性）
-  // 理想阶段轨迹：S 变体(produce/fix/emergency-fix) → R3×3 → V(review) → G(gate 类) → checkpoint(阶段最后)。
-  // R8 校验「轨迹正确」（R7 仅「时序正确」）：偏离理想动作序列即违规。
-  const GATE_ACTIONS = new Set(['gate', 'tla-gate', 'graph-gate']);
-  for (const phase of completedPhases) {
-    const phaseEntries = valid.filter((e) => e.phase === phase);
-    const checkpointIndexes = phaseEntries
-      .map((e, i) => (e.action === 'checkpoint' && e.outcome === 'success' ? i : -1))
-      .filter((i) => i >= 0);
-    const lastCheckpoint = checkpointIndexes.length > 0 ? checkpointIndexes[checkpointIndexes.length - 1]! : -1;
-
-    // R8-1: checkpoint 必须是该阶段最后一条记录（阶段结束后再无后续动作）
-    if (lastCheckpoint >= 0 && lastCheckpoint !== phaseEntries.length - 1) {
-      violations.push(
-        `R8: 阶段 ${phase} checkpoint 非阶段最后记录（checkpoint 之后仍有 ${phaseEntries.length - 1 - lastCheckpoint} 条动作，理想轨迹中 checkpoint 为阶段终点）`,
-      );
-    }
-
-    // R8-2: gate 类动作必须出现在最后一个 checkpoint 之前
-    for (let i = 0; i < phaseEntries.length; i++) {
-      const entry = phaseEntries[i];
-      if (entry && GATE_ACTIONS.has(entry.action) && lastCheckpoint >= 0 && i > lastCheckpoint) {
-        violations.push(
-          `R8: 阶段 ${phase} gate 动作(${entry.action})出现在 checkpoint 之后，理想轨迹中 gate 先于 checkpoint`,
-        );
-      }
-    }
-  }
-
-  // R8-3: V(review) 失败后不得直接 S 变体——须先 rootcause（反模式 #18 轨迹检测）
-  // 独立于 completedPhases 遍历所有阶段：反模式 #18 是行为级违规，
-  // 未完成阶段（尚无 checkpoint success）同样禁止 V 失败后跳过 R 直接 S 返工。
-  const r8PhaseGroups = new Map<number, RunLogEntry[]>();
-  for (const e of valid) {
-    if (!r8PhaseGroups.has(e.phase)) r8PhaseGroups.set(e.phase, []);
-    r8PhaseGroups.get(e.phase)!.push(e);
-  }
-  for (const [, phaseEntries] of r8PhaseGroups) {
-    for (let i = 0; i < phaseEntries.length; i++) {
-      const entry = phaseEntries[i];
-      if (!entry || entry.action !== 'review' || entry.outcome !== 'fail') continue;
-      // Phase-8 incomplete identity is diagnostic-only: it must not consume
-      // legacy R8-3 credit or create a cross-segment violation.
-      if (isPhase8IdentityIncomplete(entry)) continue;
-      const failedIdentity = lifecycleIdentity(entry);
-      const strictReview = entry.phase === 8 && completeImplementationIdentity(entry);
-      for (let j = i + 1; j < phaseEntries.length; j++) {
-        const next = phaseEntries[j];
-        if (!next) continue;
-        if (next.action === 'rootcause') {
-          const rootIdentity = lifecycleIdentity(next);
-          const sameSegmentRootcause = strictReview
-            ? completeRootcauseIdentity(rootIdentity) &&
-              rootIdentity.phase === failedIdentity.phase &&
-              rootIdentity.round === failedIdentity.round &&
-              rootIdentity.reportId === failedIdentity.reportId &&
-              failedIdentity.basedOnReport === rootIdentity.reportId
-            : true;
-          if (sameSegmentRootcause) break; // 正确路径：同 segment 先 R 再 S-fix
-          continue;
-        }
-        if (S_VARIANTS.includes(next.action)) {
-          violations.push(
-            `R8: 阶段 ${entry.phase} V(review) 失败(${entry.runId})后直接 S(${next.action})(${next.runId})，理想轨迹须先同身份 rootcause 再 S-fix（反模式 #18）`,
-          );
-          break;
-        }
-        if (next.action === 'checkpoint' && next.outcome === 'success') break; // 阶段结束，不再追溯
-      }
-    }
-  }
-
-  // R8-4：严格生命周期按每个 fix 的独立窗口校验。窗口在下一 fix 或
-  // 第一个成功 checkpoint（terminal event）处结束，后续记录不能掩盖前段顺序。
-  if (strictLifecycleScopes.size > 0) {
-    for (const [phase, phaseEntryList] of phaseEntries) {
-      for (let start = 0; start < phaseEntryList.length; start++) {
-        const startEntry = phaseEntryList.at(start)!.entry;
-        if (startEntry.role !== 'S' || !['fix', 'emergency-fix'].includes(startEntry.action)) continue;
-        if (!isStrictLifecycleEntry(startEntry) || !isSuccessfulFix(startEntry)) continue;
-        if (!completeImplementationIdentity(startEntry)) continue;
-        const identity = lifecycleIdentity(startEntry);
-        const nextFix = phaseEntryList.findIndex(
-          ({ entry }, index) => index > start && entry.role === 'S' && ['fix', 'emergency-fix'].includes(entry.action),
-        );
-        const terminal = phaseEntryList.findIndex(
-          ({ entry }, index) => index > start && entry.action === 'checkpoint' && entry.outcome === 'success',
-        );
-        const boundaries = [phaseEntryList.length];
-        if (nextFix >= 0) boundaries.push(nextFix);
-        if (terminal >= 0) boundaries.push(terminal + 1);
-        const windowEnd = Math.min(...boundaries);
-        const window = phaseEntryList.slice(start, windowEnd);
-        const exactEntry = (entry: RunLogEntry): boolean => sameIdentity(lifecycleIdentity(entry), identity);
-        const firstIndex = (pred: (e: RunLogEntry) => boolean): number => window.findIndex(({ entry }) => pred(entry));
-        const chain: Array<[string, number]> = [
-          ['S(fix|emergency-fix)', 0],
-          [
-            'R3(r3-completeness|r3-reliability|r3-security)',
-            firstIndex((entry) => exactEntry(entry) && hasExactR3Evidence(entry)),
-          ],
-          [
-            'V(implementation review)',
-            firstIndex((entry) => exactEntry(entry) && hasExactImplementationReviewEvidence(entry)),
-          ],
-          [
-            'G(implementation gate)',
-            firstIndex(
-              (entry) =>
-                exactEntry(entry) && GATE_ACTIONS.has(entry.action) && hasExactImplementationGateEvidence(entry),
-            ),
-          ],
-          ['checkpoint', firstIndex((entry) => entry.action === 'checkpoint' && entry.outcome === 'success')],
-        ];
-        const [, r3Index] = chain[1]!;
-        const [, reviewIndex] = chain[2]!;
-        const [, gateIndex] = chain[3]!;
-        if (gateIndex >= 0 && reviewIndex < 0) {
-          violations.push(
-            `R8: 阶段 ${phase} identity segment ${identity.reportId} fix ${startEntry.runId} 在窗口内先出现 implementation G，但缺同窗口 implementation V；后续 fix/terminal event 不得回填前段`,
-          );
-        }
-        if (reviewIndex >= 0 && r3Index < 0) {
-          violations.push(
-            `R8: 阶段 ${phase} identity segment ${identity.reportId} fix ${startEntry.runId} 在窗口内出现 implementation V，但缺同窗口 R3`,
-          );
-        }
-        for (let a = 0; a < chain.length - 1; a++) {
-          for (let b = a + 1; b < chain.length; b++) {
-            const [nameA, idxA] = chain[a]!;
-            const [nameB, idxB] = chain[b]!;
-            if (idxA >= 0 && idxB >= 0 && idxA > idxB) {
-              violations.push(
-                `R8: 阶段 ${phase} identity segment ${identity.reportId} fix ${startEntry.runId} 轨迹顺序倒置：${nameA}(第 ${idxA + 1} 条) 晚于 ${nameB}(第 ${idxB + 1} 条)，窗口须按 S → R3 → V → G → checkpoint 独立闭合`,
-              );
-            }
-          }
-        }
-      }
-    }
-  }
-  {
-    const legacyR3Actions = ['r3-completeness', 'r3-reliability', 'r3-security'];
-    for (const [, allPhaseEntries] of r8PhaseGroups) {
-      // Never let one strict phase-8 segment suppress an unrelated legacy
-      // segment. Incomplete phase-8 identity rows stay diagnostic-only and
-      // therefore do not become legacy R8 credit or chain heads.
-      const phaseEntries =
-        allPhaseEntries[0]?.phase === 8
-          ? allPhaseEntries.filter((entry) => !isStrictLifecycleEntry(entry) && !isPhase8IdentityIncomplete(entry))
-          : allPhaseEntries;
-      if (phaseEntries.length === 0) continue;
-      const firstIndex = (pred: (e: RunLogEntry) => boolean): number => phaseEntries.findIndex(pred);
-      const lastIndex = (pred: (e: RunLogEntry) => boolean): number => {
-        for (let i = phaseEntries.length - 1; i >= 0; i--) if (pred(phaseEntries.at(i)!)) return i;
-        return -1;
-      };
-      const phaseNo = phaseEntries[0]?.phase;
-      const chain: Array<[string, number]> = [
-        ['S(produce|fix|emergency-fix)', firstIndex((e) => e.action === 'produce' || isSuccessfulFix(e))],
-        ['R3(r3-completeness|r3-reliability|r3-security)', firstIndex((e) => legacyR3Actions.includes(e.action))],
-        ['V(review)', firstIndex((e) => e.action === 'review')],
-        ['G(gate 类)', lastIndex((e) => GATE_ACTIONS.has(e.action))],
-        ['checkpoint', lastIndex((e) => e.action === 'checkpoint' && e.outcome === 'success')],
-      ];
-      for (let a = 0; a < chain.length - 1; a++) {
-        for (let b = a + 1; b < chain.length; b++) {
-          const [nameA, idxA] = chain[a]!;
-          const [nameB, idxB] = chain[b]!;
-          if (idxA >= 0 && idxB >= 0 && idxA > idxB) {
-            violations.push(
-              `R8: 阶段 ${phaseNo} 轨迹顺序倒置：${nameA}(第 ${idxA + 1} 条) 晚于 ${nameB}(第 ${idxB + 1} 条)，理想链为 S → R3 → V → G → checkpoint（修法：按链序补录缺失动作或用 /wm 修正轨迹后重跑门禁）`,
-            );
-          }
-        }
-      }
-    }
-  }
+  // R8 段（C4 提取）：轨迹模板校验（R8-1~R8-4 + legacy 链）；段间共享只读状态显式传参
+  violations.push(
+    ...checkTrajectoryTemplate(
+      valid,
+      completedPhases,
+      strictLifecycleScopes,
+      phaseEntries,
+      isStrictLifecycleEntry,
+      isPhase8IdentityIncomplete,
+    ),
+  );
 
   // R9: 跨轮次评审一致性（A-3d 标准偏移检测）。
   //
@@ -1439,84 +1637,13 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
-  // R10: revertEvidence 回滚证伪协议（P2-B / S27 / AC-8）。
-  //
-  // fix/emergency-fix 记录必须携带合法 revertEvidence.command（非空字符串）：执行该
-  // 命令使 S-fix 的复现测试回到失败态，证明测试确实锚定被修缺陷——反模式 #45
-  // 「改断言让测试通过」的确定性挂点（命令本身由 S 在真实执行中出示，此处只验
-  // 载体存在与形态）。
-  //
-  // timestamp 仅为日志元数据，不参与证据信任判定；缺失/非法声明始终 blocking。
-  const r10Counts = { checked: 0, missing: 0, legacy: 0 };
-  for (const e of valid) {
-    if (!['fix', 'emergency-fix'].includes(e.action)) continue;
-    r10Counts.checked++;
-    if (hasValidRevertEvidence(e)) continue;
-    r10Counts.missing++;
-    violations.push(
-      `R10: ${e.action} 动作 ${e.runId} 须携带合法 revertEvidence.command（非空字符串；S-fix 复现测试的回滚证伪声明，执行后复现测试回到失败态，AC-8）`,
-    );
-  }
+  // R10 段（C4 提取）：revertEvidence 回滚证伪（r10Counts 随返回值带出）
+  const { violations: r10Violations, counts: r10Counts } = checkRevertEvidence(valid);
+  violations.push(...r10Violations);
 
-  // R11: 闭环五脚本机器核验（约束 #11 / SSoT §10C）。
-  //
-  // 触发域是「checkpoint 放行」（action=checkpoint 且 outcome=success）——只有放行
-  // 过的阶段才有闭环义务，无放行的 run-log（如 fix 变体）不受约束。对每个放行，
-  // 统计放行前（timestamp < 放行 timestamp，严格早于放行）已存在的闭环脚本 gate
-  // 记录：action=gate + role=G + outcome=success + gateExitCode=0 +
-  // script ∈ RUN_LOG_CLOSURE_SCRIPTS。非 G 角色、exitCode≠0、outcome≠success 或
-  // 时间戳不早于放行的同名脚本记录一律不充数（无时间戳豁免；schema 的 timestamp 为
-  // RFC3339 date-time，同秒内先后不可判定，故同秒不算「早于放行」），缺失即
-  // blocking 并指明阶段与脚本名。同一阶段多次放行逐个核验（不合并）。
-  //
-  // D-6 阶段 1 后置窗口（**历史日志兼容形态**——E-2 方案 B 落地后的重定性，判据零变化）：
-  // `phase===1` 的 `check-checkpoint.ts` 允许落在后置窗口 (releaseAt, nextReleaseAt)：
-  // nextReleaseAt 取全部阶段中时间戳严格晚于本放行的最早一条放行记录，不存在下一放行时
-  // 无上界（只要求晚于本放行）。后置窗口是**增补**而非替换——早于放行的同脚本记录照旧
-  // 充数（既有 run-log 不受影响）；窗口只放宽时间轴，记录仍须属本阶段（phase 相同）。
-  // 其余四脚本与 phase>=2 的放行判据完全不变。
-  // 定性沿革：本窗口合入时（D-6，2026-09-21）用于绕开「check-checkpoint 自身要求 run-log
-  // 已有放行记录才可能 exit 0」与 R11 严格早于判据的首阶段自举死锁（先跑门则门红，先放行
-  // 则 R11 红）。E-2 方案 B（2026-09-22 规格修正案，R0 首阶段自举形态：run-log 零放行记录
-  // 时以 checkpoint-log 用户确认为初级证据，见 checkpoint-logic.ts）使自然时序「确认落盘 →
-  // 闭环五门 → 最后写放行记录」合法——新建项目常态满足上方严格判据，不再产生后置形态；
-  // 本窗口仅保留用于兼容以旧时序写入的历史 run-log（删除会使其变红）。注意：后置形态仍
-  // 违反 R8 轨迹模板（R8 零改动，后置记录照常报 R8 三条），新建项目不应产生该形态。
-  const releaseTimes = valid
-    .filter((e) => e.action === 'checkpoint' && e.outcome === 'success')
-    .map((e) => Date.parse(e.timestamp))
-    .sort((a, b) => a - b);
-  const closureReleases: Array<{ phase: number; proven: Set<string> }> = [];
-  let closureMissingCount = 0;
-  for (const e of valid) {
-    if (e.action !== 'checkpoint' || e.outcome !== 'success' || typeof e.phase !== 'number') continue;
-    const releaseAt = Date.parse(e.timestamp);
-    const proven = new Set<string>();
-    for (const g of valid) {
-      if (g.phase !== e.phase || g.action !== 'gate' || g.role !== 'G' || g.outcome !== 'success') continue;
-      if (g.gateExitCode !== 0) continue;
-      if (typeof g.script !== 'string' || !RUN_LOG_CLOSURE_SCRIPTS.includes(g.script)) continue;
-      const gateAt = Date.parse(g.timestamp);
-      if (g.script === 'check-checkpoint.ts' && e.phase === 1) {
-        const nextReleaseAt = releaseTimes.find((t) => t > releaseAt);
-        if (gateAt < releaseAt || (gateAt > releaseAt && (nextReleaseAt === undefined || gateAt < nextReleaseAt))) {
-          proven.add(g.script);
-        }
-        continue;
-      }
-      if (gateAt < releaseAt) proven.add(g.script);
-    }
-    closureReleases.push({ phase: e.phase, proven });
-  }
-  for (const release of closureReleases) {
-    for (const script of RUN_LOG_CLOSURE_SCRIPTS) {
-      if (release.proven.has(script)) continue;
-      closureMissingCount++;
-      violations.push(
-        `R11: 阶段 ${release.phase} 的 checkpoint 放行缺少闭环脚本 ${script} 的成功 gate 记录（须 role=G、gateExitCode=0 且早于放行；约束 #11：闭环五脚本每阶段门 exitCode=0）`,
-      );
-    }
-  }
+  // R11 段（C4 提取）：闭环五脚本机器核验（releaseTimes 预计算在函数内自算）
+  const { violations: r11Violations, closureReleases, missingCount: closureMissingCount } = checkClosureReleases(valid);
+  violations.push(...r11Violations);
 
   const passed = violations.length === 0;
   return {
