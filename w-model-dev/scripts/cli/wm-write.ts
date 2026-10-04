@@ -100,6 +100,8 @@ async function main(): Promise<void> {
         break;
       case '--expect-mtime': {
         countFlag('expect-mtime');
+        // 有意宽于 --lock-timeout：调用方常直接字符串化 `stat.mtimeMs`（浮点毫秒），
+        // 有限非负 + floor 语义正确；--lock-timeout 为纯整数语义故严格 `/^\d+$/`。
         const raw = args[++index];
         const parsed = raw === undefined ? NaN : Number(raw);
         if (!Number.isFinite(parsed) || parsed < 0) {
