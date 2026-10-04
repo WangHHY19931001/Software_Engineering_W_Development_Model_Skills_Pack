@@ -603,7 +603,7 @@ AI: 执行测试中...测试通过
 - **阶段 2/3/4（S→A）**：S 先产出正式设计文档 → A-chunk 分块提取 SD/INTF/DD 节点 → A-evolve 图谱演进 → G 跑 `check-requirement-graph.ts --phase=N`（递增追溯项：implements/defines/realizes）→ 收敛循环 → V 评审 → G 跑 `check-verifier-output.ts`。
 - **阶段 4 硬约束**：`--phase=4` 零违反（DD realizes 全覆盖）才放行进阶段 5 编码。
 
-ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不可绕过（约束 2）。收敛判定由 G 跑脚本退出码决定，不由 A 的 LLM 输出决定（约束 4，反模式 #12）。完整设计见 [`docs/ingestion-graph-convergence-design.md`](./ingestion-graph-convergence-design.md)；可执行细则见 [`w-model-dev/references/ingestion-chunk.md`](../w-model-dev/references/ingestion-chunk.md) / [`ingestion-cross.md`](../w-model-dev/references/ingestion-cross.md) / [`graph-guide.md`](../w-model-dev/references/graph-guide.md)。
+ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不可绕过（约束 2）。收敛判定由 G 跑脚本退出码决定，不由 A 的 LLM 输出决定（约束 4，反模式 #12）。**收敛安全阀出口（阶段 1 ingestion，D11）**：第 `MAX_ROUNDS=5` 轮仍不收敛 → 🔴 CHECKPOINT 由用户三选一裁定：回退重分块（调整 chunk 粒度重跑 plan-chunks）/ 显式加轮（记录加轮理由，上限再 5 轮）/ 终止阶段 1 并登记迷雾项（未决项登记入阶段 1 迷雾登记册显式留痕、不隐式消失，阶段重启后毕业处置仍按其三选一承接）；与多角色讨论 5 轮安全阀（§10P）同构。完整设计见 [`docs/ingestion-graph-convergence-design.md`](./ingestion-graph-convergence-design.md)；可执行细则见 [`w-model-dev/references/ingestion-chunk.md`](../w-model-dev/references/ingestion-chunk.md) / [`ingestion-cross.md`](../w-model-dev/references/ingestion-cross.md) / [`graph-guide.md`](../w-model-dev/references/graph-guide.md)。
 
 ---
 
@@ -1519,7 +1519,7 @@ npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json or conso
    - 边界完整性（阶段 1 起）：`EXT-IN ≥ 1 ∧ EXT-OUT ≥ 1`，否则 `boundary.complete=false`。
 6. **汇总**：`passed = (connectedComponents=1) ∧ (isolatedNodes=[]) ∧ (roots.length=1) ∧ (orphans=[]) ∧ (multiParent=[]) ∧ (所有追溯违反=0) ∧ dataflowOk`，其中 `dataflowOk = (blackHoles=[]) ∧ (miracles=[]) ∧ (deadModules=[]) ∧ boundary.complete`。
 
-**收敛准则**（设计文档 §3.4）：`passed=true`（零违反）即收敛；`violations` 跨轮应单调递减，不降反升则分派 A 返工而非加轮；`round = MAX_GRAPH_ROUNDS(5)` 未收敛 → 🔴 CHECKPOINT 介入（展示 violations + reworkHints，用户决定补漏/强制接受标注/取消）。
+**收敛准则**（机制源自设计文档 §3.4；耗尽出口菜单经 D11 修订，权威口径见 §4.4「收敛安全阀出口（阶段 1 ingestion，D11）」）：`passed=true`（零违反）即收敛；`violations` 跨轮应单调递减——**循环中段**不降反升属 A 产出漂移，分派 A 返工而非加轮（「显式加轮」仅是耗尽时点的用户裁定选项，两个时点不同、语义不冲突）；`round = MAX_GRAPH_ROUNDS(5)` 未收敛 → 🔴 CHECKPOINT 介入（展示 violations + reworkHints），该 CHECKPOINT 的用户裁定菜单以 §4.4 D11 三选一为准（回退重分块 / 显式加轮（上限再 5 轮）/ 终止阶段 1 并登记迷雾项）。
 
 **轮次上限校验（MAX_GRAPH_ROUNDS=5）**：`graph.json` 校验记录含必填 `round` 字段（schema 已必填），`check-requirement-graph.ts` 校验 `round > MAX_GRAPH_ROUNDS(5)` → 判为 violation（退出码 1）。常量 `MAX_GRAPH_ROUNDS = 5` 定义于 [`w-model-dev/scripts/lib/constants.ts`](../w-model-dev/scripts/lib/constants.ts)，为单点事实源，与收敛准则中的轮次上限保持一致。
 
