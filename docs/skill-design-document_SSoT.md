@@ -1946,7 +1946,7 @@ interface RunLogEntry {
 - **不引入 LLM 估算**（约束 4）：tokensEstimate 由宿主 Agent 报告实际消耗（estimated=false）；estimated=true 违反约束4，应避免。
 - **预算检查不替代门禁脚本**（反模式 #3/#6）：预算超限触发的是暂停/告警，不是放行/否决；放行仍由 G 子代理退出码决定。
 - **kill switch 是暂停不是终止**：触发 kill switch 后须 🔴 CHECKPOINT 展示消耗明细，由用户决定增预算/降范围/取消。
-- **run-log 是 append-only**：不得修改历史记录；运行时读取可跳过损坏行并记录 note，但门禁对空/坏行 **fail-closed**（见 §10D.8），不得把坏行静默当作证据缺失放行。
+- **run-log 是 append-only**：不得修改历史记录；运行时读取不得以「跳过坏行继续」处置——坏行的唯一合法出口是法定重建程序（CHECKPOINT 批准 → 快照 → 仅剔坏行重写 → `rebuild-of:` 追加记录 → 复跑门禁；见 `w-model-dev/references/operational-recovery.md`「run-log 坏行法定重建程序」节），且门禁对空/坏行 **fail-closed**（见 §10D.8），不得把坏行静默当作证据缺失放行。
 - **run-log 时间戳真值 + 禁止回溯改写（D-5①，反伪造）**：run-log 记录的时间戳必须为**写入时刻真值**；**禁止回溯改写历史行或重排时间戳**（改时间戳 / 改 note / 删行 / 插行后重排时间轴同样禁止；可检测性由 R7 追加序（相邻时间戳单调）+ R8 轨迹模板 + R9-R11 语义判据，连同交付时的文件级导出清单 SHA-256 / provenance 与角色签名链承担）；记录修正**只允许**经 O 侧统一追加器 `wm-append-runlog` **追加更正记录**——`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin --correct=<runId>`（更正记录 `note` 含 `correction-of:<runId>`，历史行逐字节不变），不得手改历史行；禁令与替代动作成对，手搓改行不是合法路径。追加器另强制时间戳严格递增（**时间戳三态**，②与③不得合并叙述；完整口径与逃生口语义见 `w-model-dev/references/command-reference.md` 的 `wm-append-runlog.ts` 条目「时间戳三态」）——① 显式 ≤ 末条拒绝；② 无显式且时钟真倒退拒绝；③ 无显式且同毫秒/批内冲突良性步进。**去 hash 化后的可检出边界（WS-T7，2026-09-28 用户裁定「禁止为了 hash 而 hash」）**：记录级 / 行级哈希（记录前驱摘要与 checkpoint 放行时的历史前缀摘要）已移除，**不主张任何行级哈希保证**——R7 追加序**只约束相邻时间戳单调**，故**改 note / 删中段行 / 保持单调的时间戳改写均不再可检出**（这三类改写的可证伪性由交付时的文件级证据链承担，不由读侧判据承担）；完整性可检测性由 R7 追加序 + R8 轨迹模板 + R9-R11 语义判据 + 交付时的**文件级**证据链（导出清单 SHA-256 / provenance / 角色签名链）承担；本边界即 `w-model-dev/references/data-models.md`「时间戳真值 + 禁止回溯改写」条目所指的单一承载处。
 
 ### 10D.7 预算与运行日志强制校验项（check-budget.ts / check-run-log.ts）

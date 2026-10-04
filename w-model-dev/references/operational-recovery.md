@@ -223,9 +223,20 @@ appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
 | 场景 | 动作 |
 |---|---|
 | `run-log.jsonl` 不存在 | 项目未初始化或被误删；引导 `/wm analyze` 初始化，或从 git 恢复 |
-| `run-log.jsonl` 解析失败（某行非合法 JSON） | 跳过损坏行，记录到 run-log 末尾一条 note=「日志损坏行已跳过」；不停止流程 |
+| `run-log.jsonl` 解析失败（某行非合法 JSON） | 停止流程，按下方「run-log 坏行法定重建程序」执行（唯一合法出口，跳过/继续均违规） |
 | `run-log.jsonl` 需要导出运行历史 | `/wm export` 包含 `run-log.jsonl`；可离线分析成本与返工模式 |
 | `budget.json` 字段缺失或类型错误 | 按 [data-models.md](data-models.md) schema 校验；修复后重跑预算检查 |
+
+#### run-log 坏行法定重建程序
+
+run-log 出现坏行（非法 JSON）时的法定重建程序（唯一合法出口，跳过/继续均违规）：
+
+1. 停止流程，🔴 CHECKPOINT 向用户呈示坏行内容与数量，获得重建批准；
+2. 快照原文件为 `run-log.jsonl.corrupt-<YYYYMMDD-HHmmss>`（证据保全，事后不得删除）；
+3. 重写 run-log：**仅剔除坏行**，合法行逐字节不变、顺序不变；
+4. 经 `wm-append-runlog --stdin` 追加一条 note 记录（note 含 `rebuild-of:<快照名>` 与坏行数）；
+5. 复跑 `check-run-log.ts` 至 exit 0 后方可继续。
+   工具化（专用重建 CLI）登记为候选区条目，不在当前版本实施。
 
 ### rootcause / fix 动作 token 计量
 
