@@ -13,8 +13,12 @@
  * 参数：
  *   run-log.jsonl          run-log.jsonl 文件路径
  *   --checkpoint-log=<dir> checkpoint-log 目录路径（强制，R3 用户确认存在校验）
- *                         目录下按 phase 命名的文件（如 phase-1.txt / 1.txt / checkpoint-1.md）
- *                         内容即用户确认原文，key=phase
+ *                         目录下用户确认文件 canonical 形态为 phase-<N>.md（UTF-8 纯文本，
+ *                         42.13.0 起；如 phase-1.md），内容即用户确认原文，key=phase-N。
+ *                         非 canonical 命名（phase-N.txt / checkpoint-N.md / N.log 等）不再
+ *                         计入加载（无 canonical 命中 → R3 fail-closed）；同 phase 双候选
+ *                         （如 phase-1.md 与 phase-1.txt 并存）→ 歧义 fail-closed（exit 1，
+ *                         消息列出冲突路径）
  *   --json                机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
@@ -66,17 +70,35 @@ function parseArgs(argv: string[]): ParsedArgs {
  * 加载 checkpoint-log 目录下的用户确认记录，构建 Map。
  * key = phase（如 "1"/"2"），value = 用户确认原文。
  *
- * 文件命名约定：匹配 phase-N 模式（phase-1.txt / checkpoint-1.md / 1.log 等），
- *              提取 N 作为 phase key。
+ * canonical 形态（D3，42.13.0 起）：仅 `phase-<N>.md`（UTF-8 纯文本）计入加载；
+ * 旧宽松形态（`phase-N.txt` / `checkpoint-N.md` / `N.log` 等）不再计入——目录内无
+ * canonical 命中即 no-phase-match（R3 fail-closed 兜底）。
  *
- * 返回值区分加载结果（S18）：loaded / dir-unreadable / no-phase-match，
+ * 歧义 fail-closed（C14）：同 phase 双候选文件（如 phase-1.md 与 phase-1.txt 并存）
+ * → 返回 ambiguous 并列出全部冲突路径，由既有 violation 失败路径 exit 1 消费——
+ * 不再由 readdir 顺序静默择一胜出。
+ *
+ * 返回值区分加载结果（S18 + C14）：loaded / dir-unreadable / no-phase-match / ambiguous，
  * 供 R3 违规 reason 表述实际语义（不再一律误导为「未提供 --checkpoint-log」）。
  * 容错：目录读取失败/无匹配只警告不 exit。
  */
 type CheckpointLogOutcome =
-  { kind: 'loaded'; map: Map<string, string> } | { kind: 'dir-unreadable' } | { kind: 'no-phase-match' };
+  | { kind: 'loaded'; map: Map<string, string> }
+  | { kind: 'dir-unreadable' }
+  | { kind: 'no-phase-match' }
+  | { kind: 'ambiguous'; files: string[] };
 
-async function loadCheckpointLog(checkpointLogDir: string): Promise<CheckpointLogOutcome> {
+/** canonical 文件名：phase-<N>.md（D3 定稿；`\d+` 捕获组必为数值，无 isNaN 分支必要）。 */
+const CANONICAL_PHASE_FILE = /^phase-(\d+)\.md$/;
+/** phase 候选（任意扩展名）：仅用于同 phase 双候选歧义探测（fail-closed）。 */
+const PHASE_CANDIDATE_FILE = /^phase-(\d+)\.[^.]+$/;
+
+/** 捕获组 N 归一为 phase key（前导零归一：phase-01 → "1"；\d+ 保证可数值化）。 */
+function phaseKey(capturedDigits: string): string {
+  return String(Number(capturedDigits));
+}
+
+export async function loadCheckpointLog(checkpointLogDir: string): Promise<CheckpointLogOutcome> {
   const dirAbs = path.resolve(checkpointLogDir);
   let files: string[];
   try {
@@ -87,26 +109,42 @@ async function loadCheckpointLog(checkpointLogDir: string): Promise<CheckpointLo
     return { kind: 'dir-unreadable' };
   }
 
-  const map = new Map<string, string>();
-  // 匹配 phase-N 模式：phase-1.txt / checkpoint-1.md / 1.log 等
-  const phasePattern = /(?:phase-|checkpoint-)?(\d+)\.(?:txt|md|log)$/;
+  // 同 phase 双候选探测（C14）：phase-<N>.<任意扩展名> 并存为命名歧义 → fail-closed
+  // 列出全部冲突路径（排序保证消息确定性），不再由 readdir 顺序决定胜出。
+  const candidatesByPhase = new Map<string, string[]>();
   for (const file of files) {
-    const match = file.match(phasePattern);
+    const match = file.match(PHASE_CANDIDATE_FILE);
     if (!match) continue;
-    const phaseNum = parseInt(match[1]!, 10);
-    if (isNaN(phaseNum)) continue;
-    const phase = String(phaseNum);
+    const phase = phaseKey(match[1]!);
+    const bucket = candidatesByPhase.get(phase);
+    if (bucket) bucket.push(file);
+    else candidatesByPhase.set(phase, [file]);
+  }
+  const ambiguousFiles = [...candidatesByPhase.values()]
+    .filter((names) => names.length > 1)
+    .flat()
+    .sort();
+  if (ambiguousFiles.length > 0) {
+    return { kind: 'ambiguous', files: ambiguousFiles.map((f) => path.join(dirAbs, f)) };
+  }
+
+  const map = new Map<string, string>();
+  // canonical 形态：仅 phase-<N>.md 计入加载（正则提取 N，无 parseInt/isNaN 死分支）
+  for (const file of files) {
+    const match = file.match(CANONICAL_PHASE_FILE);
+    if (!match) continue;
+    const phase = phaseKey(match[1]!);
     const fileAbs = path.join(dirAbs, file);
     try {
       const content = await fs.readFile(fileAbs, 'utf-8');
-      if (phase) map.set(phase, content);
+      map.set(phase, content);
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
       console.error(`⚠ checkpoint-log 文件读取失败，已跳过: ${fileAbs}（${e.code ?? e.message}）`);
     }
   }
   if (map.size === 0) {
-    console.error(`⚠ checkpoint-log 目录未匹配到 phase-N 文件，跳过 R3 用户确认校验: ${dirAbs}`);
+    console.error(`⚠ checkpoint-log 目录未匹配到 canonical 形态 phase-<N>.md 文件，跳过 R3 用户确认校验: ${dirAbs}`);
     return { kind: 'no-phase-match' };
   }
   return { kind: 'loaded', map };
@@ -149,13 +187,20 @@ async function main(): Promise<void> {
 
   // 强制输入：--checkpoint-log（读失败只警告不 exit，但 R3 逻辑会报违规）
   let checkpointLog: Map<string, string> | undefined;
-  let checkpointLogMissingReason: 'dir-unreadable' | 'no-phase-match' | undefined;
+  let checkpointLogMissingReason: 'dir-unreadable' | 'no-phase-match' | 'ambiguous-phase-files' | undefined;
+  let checkpointLogAmbiguity: string | undefined;
   let checkpointLogFileCount = 0;
   if (checkpointLogDir) {
     const loaded = await loadCheckpointLog(checkpointLogDir);
     if (loaded.kind === 'loaded') {
       checkpointLog = loaded.map;
       checkpointLogFileCount = loaded.map.size;
+    } else if (loaded.kind === 'ambiguous') {
+      // C14/D3：同 phase 双候选 → 既有 violation 失败路径 exit 1（消息列出冲突路径）；
+      // 不走 exitWithError（那是 exit 2 ARG_INVALID 域，歧义属校验失败而非输入缺形）
+      checkpointLogMissingReason = 'ambiguous-phase-files';
+      checkpointLogAmbiguity = `R3: checkpoint-log 同 phase 双候选文件歧义（fail-closed，canonical 形态仅 phase-<N>.md，须消歧后重跑）: ${loaded.files.join(' 与 ')}`;
+      console.error(`⚠ ${checkpointLogAmbiguity}`);
     } else {
       // S18：目录已提供但加载失败，R3 违规 reason 按实际语义表述
       checkpointLogMissingReason = loaded.kind;
@@ -163,7 +208,7 @@ async function main(): Promise<void> {
   }
 
   // 构建 options 并调用纯逻辑校验
-  const result = checkCheckpoint(entries, { checkpointLog, checkpointLogMissingReason });
+  const result = checkCheckpoint(entries, { checkpointLog, checkpointLogMissingReason, checkpointLogAmbiguity });
   const exitCode = result.passed ? 0 : 1;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置

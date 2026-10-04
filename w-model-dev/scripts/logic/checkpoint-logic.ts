@@ -21,24 +21,56 @@ import { isLegacyAbsorbableEntry } from './run-log-logic.js';
 
 // ==================== 自包含类型形状 ====================
 
+/**
+ * run-log action 枚举全集（与 `schemas/run-log.schema.json` 的 `properties.action.enum`
+ * 保持同步——C10 同源化，set 相等测试强制（`__tests__/checkpoint-logic.test.ts`
+ * 「C10 action 枚举同源」）；schema 为单一事实来源，本常量与派生类型不得窄于/偏离 schema。
+ *
+ * 历史注记：本文件曾内联 12 值子集联合（schema 枚举扩容后类型对 schema 撒谎，
+ * 合法 action 被 TS 判非法），42.13.0 起改为常量派生。
+ */
+export const RUN_LOG_ACTION_VALUES = [
+  'chunk',
+  'cross',
+  'evolve',
+  'produce',
+  'review',
+  'gate',
+  'tla-gate',
+  'graph-gate',
+  'test',
+  'checkpoint',
+  'rework',
+  'rollback',
+  'rootcause',
+  'fix',
+  'emergency-fix',
+  'escalate',
+  'r3-completeness',
+  'r3-reliability',
+  'r3-security',
+  'codegraph_query',
+  'opsx_explore',
+  'opsx_propose',
+  'opsx_apply',
+  'opsx_archive',
+  'ensure_deps',
+  'iceberg-sweep',
+  'iceberg-review',
+  'plan_propose',
+  'plan_task',
+  'plan_review',
+  'perspective',
+  'consensus',
+] as const;
+
 export interface RunLogEntry {
   runId: string;
   timestamp: string;
   phase: number;
   phaseName: string;
-  action:
-    | 'chunk'
-    | 'cross'
-    | 'evolve'
-    | 'produce'
-    | 'review'
-    | 'gate'
-    | 'tla-gate'
-    | 'graph-gate'
-    | 'test'
-    | 'checkpoint'
-    | 'rework'
-    | 'rollback';
+  /** 动作类型（与 run-log.schema.json action 枚举同源，见 RUN_LOG_ACTION_VALUES） */
+  action: (typeof RUN_LOG_ACTION_VALUES)[number];
   role: 'O' | 'A' | 'S' | 'V' | 'G';
   duration_s: number;
   tokens: number;
@@ -59,8 +91,16 @@ export interface CheckpointCheckOptions {
    * R3 语义补充（S18）：--checkpoint-log 目录已提供但加载失败时的原因，
    * 使 R3 违规 reason 区分「目录已提供但无匹配记录/不可读」与「目录未提供」，
    * 避免误导排查方向。未提供目录时省略本字段（保持原文案）。
+   * `ambiguous-phase-files`（C14/D3）：目录内同 phase 双候选文件（如 phase-1.md 与
+   * phase-1.txt 并存）——歧义态，reason 表述命名歧义而非「未提供」。
    */
-  checkpointLogMissingReason?: 'dir-unreadable' | 'no-phase-match';
+  checkpointLogMissingReason?: 'dir-unreadable' | 'no-phase-match' | 'ambiguous-phase-files';
+  /**
+   * C14/D3：checkpoint-log 同 phase 双候选文件歧义消息（含全部冲突路径，由 CLI 层
+   * loader 探测后传入）。提供时**无条件**记 violation（fail-closed）——歧义态不得
+   * 由 readdir 顺序静默择一胜出，也不得因 run-log 形态（含零记录自举形态）被放行。
+   */
+  checkpointLogAmbiguity?: string;
 }
 
 export interface CheckpointCheckResult {
@@ -220,6 +260,12 @@ export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptio
     valid.push(e as RunLogEntry);
   }
 
+  // C14/D3：同 phase 双候选文件歧义 → 无条件 fail-closed（先于 R0/R1-R5：无论 run-log
+  // 形态如何，歧义态不得放行；消息含全部冲突路径，由 CLI loader 探测后传入）。
+  if (options?.checkpointLogAmbiguity) {
+    violations.push(options.checkpointLogAmbiguity);
+  }
+
   // 收集 checkpoint success 记录（R1-R4 的校验对象）
   const checkpoints = valid.filter((e) => e.action === 'checkpoint' && e.outcome === 'success');
 
@@ -290,13 +336,16 @@ export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptio
   // R3 用户确认存在（强制校验，拒绝代签）
   if (!options?.checkpointLog) {
     // 未提供 checkpointLog → 所有 checkpoint 均报 R3 违规；
-    // 目录已提供但加载失败（空目录/无 phase-N 匹配/不可读）时按实际语义表述，不误导排查方向（S18）
+    // 目录已提供但加载失败（歧义/空目录/无 phase-N 匹配/不可读）时按实际语义表述，
+    // 不误导排查方向（S18；ambiguous-phase-files 为 C14/D3 歧义态）
     const providedReason =
       options?.checkpointLogMissingReason === 'no-phase-match'
         ? 'checkpoint-log 无 phase-N 匹配记录（目录已提供）'
         : options?.checkpointLogMissingReason === 'dir-unreadable'
           ? 'checkpoint-log 目录不可读（目录已提供）'
-          : '未提供 --checkpoint-log，强制';
+          : options?.checkpointLogMissingReason === 'ambiguous-phase-files'
+            ? 'checkpoint-log 同 phase 双候选文件歧义（目录已提供，fail-closed）'
+            : '未提供 --checkpoint-log，强制';
     for (const e of checkpoints) {
       violations.push(`R3: 阶段 ${e.phase} checkpoint 缺用户确认记录（${providedReason}）`);
     }

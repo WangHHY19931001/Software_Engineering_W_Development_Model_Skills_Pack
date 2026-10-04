@@ -5,13 +5,22 @@
  *   - 未提供 checkpointLog → 所有 checkpoint 报 R3 违规
  *   - checkpointLog 含真实用户确认 → R3 通过
  *   - checkpointLog 提供但对应 phase 缺确认 → R3 违规（疑似代签）
+ *   - C10：RUN_LOG_ACTION_VALUES 与 run-log.schema.json action 枚举 set 相等（同源守护）
+ *   - C14/D3：checkpointLogAmbiguity（同 phase 双候选文件歧义）→ 无条件 fail-closed
  */
+
+import { readFileSync } from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { checkCheckpoint } from '../logic/checkpoint-logic.js';
+import { checkCheckpoint, RUN_LOG_ACTION_VALUES } from '../logic/checkpoint-logic.js';
 import { checkRunLog, isLegacyAbsorbableEntry } from '../logic/run-log-logic.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url)); // w-model-dev/scripts/__tests__
+const RUN_LOG_SCHEMA_PATH = path.join(HERE, '..', '..', 'schemas', 'run-log.schema.json');
 
 describe('R3 强制用户确认', () => {
   const checkpointEntry = {
@@ -109,10 +118,11 @@ describe('R3 目录已提供但无匹配记录的 reason 文案（S18）', () =>
  * 有记录路径零变化。
  *
  * 收紧依据（修复轮 1，评审发现的相位缝隙）：零放行记录 ⇒ 下一次放行必为首放行，
- * 故仅 phase-1 确认可支撑自举——初版「Map 非空」条件在「目录仅含 phase-2.txt」时
- * 会放行一个首放行初级证据为零的态。加载器既有宽松（`cli/check-checkpoint.ts` 的
- * `(?:phase-|checkpoint-)?(\d+)\.(?:txt|md|log)$` 使任意 `*-<数字>.txt` 计入 Map）在此
- * 成为承重面：Map 里可能有任意后阶段键，由 `get('1')` 收紧兜住。
+ * 故仅 phase-1 确认可支撑自举——初版「Map 非空」条件在「目录仅含 phase-2 确认」时
+ * 会放行一个首放行初级证据为零的态。加载器历史宽松形态（canonical 化前的
+ * `(?:phase-|checkpoint-)?(\d+)\.(?:txt|md|log)$`，任意 `*-<数字>.txt` 计入 Map）在此
+ * 曾成为承重面：Map 里可能有任意后阶段键，由 `get('1')` 收紧兜住；42.13.0 起 loader
+ * 已收窄为仅 canonical 形态 `phase-<N>.md`（C14/D3），非 canonical 文件不再计入。
  *
  * 背景：阶段 1 自举死锁（R0 × R11/D-6 × R8 三批规则联合）——自然时序「确认落盘 →
  * 闭环五门 → 最后写放行记录」下 check-checkpoint 运行时 run-log 尚无放行记录，
@@ -160,8 +170,9 @@ describe('R0 首阶段自举形态（E-2 方案 B）', () => {
     const emptyMap = checkCheckpoint([], { checkpointLog: new Map() });
     expectR0Violation(emptyMap, '空语义·空 Map（不走自举形态，原违规保留）');
     // 态 3：仅 phase-2 确认（无 phase-1）/ phase-1 条目空白——相位缝隙负例（修复轮 1）。
-    // 审查复现态：零放行记录 + 目录仅 phase-2.txt → 初版「Map 非空」在此 exit 0（穿透
-    // 「零证据不等于合规」）。收紧后：首放行的初级证据为零，自举形态不适用。
+    // 审查复现态：零放行记录 + 目录仅 phase-2 确认（canonical 形态 phase-2.md）→ 初版
+    // 「Map 非空」在此 exit 0（穿透「零证据不等于合规」）。收紧后：首放行的初级证据为零，
+    // 自举形态不适用。
     const phase2Only = checkCheckpoint([], {
       checkpointLog: new Map([['2', '用户确认：放行进入阶段 3（user-id: bob）']]),
     });
@@ -310,5 +321,70 @@ describe('D-5 legacy 吸收谓词（两门同判）', () => {
     expect(checkpointResult.violations.some((v) => v.includes('[schema]'))).toBe(true);
     const runLogResult = checkRunLog([broken]);
     expect(runLogResult.violations.some((v) => v.includes('[schema]'))).toBe(true);
+  });
+});
+
+/**
+ * C10（2026-10-04 audit-deep-dive）：checkpoint-logic 的 RunLogEntry.action 曾内联
+ * 12 值子集联合——schema 枚举已扩至 32 值，类型对 schema 撒谎（合法 action 被 TS 判非法）。
+ * 修复：导出 RUN_LOG_ACTION_VALUES 常量（as const，32 值）并派生类型；本组以
+ * set 相等测试锁定「常量 ↔ schema 枚举」同源（schema 为单一事实来源）。
+ */
+describe('C10 action 枚举同源', () => {
+  it('RUN_LOG_ACTION_VALUES 与 run-log.schema.json 的 action 枚举 set 相等', () => {
+    const schema = JSON.parse(readFileSync(RUN_LOG_SCHEMA_PATH, 'utf-8')) as {
+      properties: { action: { enum?: string[] } };
+    };
+    const schemaEnum: string[] = schema.properties.action.enum ?? [];
+    expect(schemaEnum.length, 'schema action enum 应非空（读取路径漂移时显式红）').toBeGreaterThan(0);
+    expect(new Set(RUN_LOG_ACTION_VALUES)).toEqual(new Set(schemaEnum));
+  });
+});
+
+/**
+ * C14/D3（2026-10-04 audit-deep-dive）：checkpoint-log 同 phase 双候选文件歧义
+ * （如 phase-1.md 与 phase-1.txt 并存）→ 既有 violation 失败路径 fail-closed
+ * （exit 1，消息列出冲突路径；不走 exit 2 ARG_INVALID 域）。CLI 层
+ * （cli/check-checkpoint.ts）探测歧义并把消息经 checkpointLogAmbiguity 传入；
+ * 逻辑层无条件记 violation——歧义态不得因 run-log 形态（含零记录自举形态）被放行。
+ */
+describe('C14/D3 同 phase 双候选文件歧义 fail-closed', () => {
+  const ambiguityMessage = 'checkpoint-log 同 phase 双候选文件歧义（fail-closed）: /a/phase-1.md 与 /a/phase-1.txt';
+
+  it('有 checkpoint success 记录 + 歧义 → 不通过，violations 原文承载冲突路径', () => {
+    const checkpointEntry = {
+      runId: 'cp1',
+      timestamp: '2026-10-04T00:00:00Z',
+      phase: 1,
+      phaseName: '需求与范围',
+      action: 'checkpoint',
+      role: 'O',
+      duration_s: 10,
+      tokens: 2000,
+      estimated: false,
+      subagentSpawns: 0,
+      gateExitCode: null,
+      outcome: 'success',
+      acknowledgedDecisions: ['需求 REQ-1.1：采用 REST + JWT 认证方案'],
+    };
+    const result = checkCheckpoint([checkpointEntry], {
+      checkpointLog: undefined,
+      checkpointLogMissingReason: 'ambiguous-phase-files',
+      checkpointLogAmbiguity: ambiguityMessage,
+    });
+    expect(result.passed).toBe(false);
+    expect(result.violations).toContain(ambiguityMessage);
+  });
+
+  it('零记录态 + 歧义 → 不通过（R0 与歧义 violation 并存，自举形态不得穿透歧义）', () => {
+    const result = checkCheckpoint([], {
+      checkpointLog: undefined,
+      checkpointLogMissingReason: 'ambiguous-phase-files',
+      checkpointLogAmbiguity: ambiguityMessage,
+    });
+    expect(result.passed).toBe(false);
+    expect(result.violations).toContain(ambiguityMessage);
+    expect(result.violations.some((v) => v.includes('零证据不等于合规'))).toBe(true);
+    expect(result.diagnostics, '歧义态不得出现 BOOTSTRAP_VALIDATION 诊断').toBeUndefined();
   });
 });
