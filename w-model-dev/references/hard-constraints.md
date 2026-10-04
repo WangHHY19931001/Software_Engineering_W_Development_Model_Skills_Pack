@@ -2,6 +2,26 @@
 
 > 14 条硬红线：**命中即回退**（回到当前阶段起点），与「核心操作行为」（日常准则，违反不回退）互补。
 
+## 目录
+
+- [#1 测试设计前置](#1-测试设计前置)
+- [#2 阶段门放行（含豁免审批）](#2-阶段门放行含豁免审批)
+- [#3 RTM 为事实源 + 每阶段回填](#3-rtm-为事实源--每阶段回填)
+- [#4 真实执行](#4-真实执行)
+- [#5 失败即回退](#5-失败即回退)
+- [#6 按需加载](#6-按需加载)
+- [#7 如实状态](#7-如实状态)
+- [#8 编排者最小化 + 角色分派完整性](#8-编排者最小化--角色分派完整性)
+- [#9 门禁退出码不可伪](#9-门禁退出码不可伪)
+- [#10 系统层级树 + REQ 层级标注](#10-系统层级树--req-层级标注)
+- [#11 闭环机制强制校验 + R3 预防性审查](#11-闭环机制强制校验--r3-预防性审查)（细则子节：#11-a R11 时序细则 / #11-b 自举语义（R0/E-2） / #11-c 历史兼容窗口（D-6） / #11-d 闭环五门调用参数）
+- [#12 返工必经根因定位](#12-返工必经根因定位)
+- [#13 行为门禁按成熟度分级（TLA+ + BDD）](#13-行为门禁按成熟度分级tla--bdd)
+- [#14 代码改动前后门禁（codegraph + 回归）](#14-代码改动前后门禁codegraph--回归)
+- [代码健康治理硬边界（Phase 1–4）](#代码健康治理硬边界phase-14)
+- [普通 V/G 失败链](#普通-vg-失败链)
+- [反模式（48 条）](#反模式48-条)
+
 ## #1 测试设计前置
 
 阶段 1–4 的开发产物完成后，立即产出对应测试设计，不得推迟到编码后。
@@ -52,9 +72,33 @@
 
 ## #11 闭环机制强制校验 + R3 预防性审查
 
-闭环五门（**清单与调用顺序见 [`operational-recovery.md`](operational-recovery.md)「调用时机」节；放行三步顺序见 [`SKILL.md`](../SKILL.md)「阶段门放行三步」**；无条件）须在每个阶段门执行，`exitCode=0` 才可放行；任一脚本非 0 视为闭环未达成，回到当前阶段起点（SSoT §10C/§10D）。**机器核验（2026-09-18 起由 `check-run-log.ts` R11 强制）**：凡 run-log 中出现 `checkpoint` 放行记录（`action=checkpoint` 且 `outcome=success`）的阶段，放行前必须已有五门各自的 `role=G`、`outcome=success`、`gateExitCode=0` gate 记录，且时间戳**严格毫秒早于**放行时间（毫秒精度比较：同毫秒（含无毫秒部分的秒级时间戳，Date.parse 后相等）不算「早于放行」，无时间戳豁免）；缺失任一或**未严格早于放行（含同毫秒）**即 blocking，违规消息列出缺失脚本名（同一阶段多次放行逐个核验，不合并）。**run-log 时间戳真值纪律（D-5①，反伪造）**：run-log 记录的时间戳必须为写入时刻**真值**；**禁止回溯改写历史行或重排时间戳**（改时间戳 / 改 note / 删行 / 插行后重排时间轴同样禁止）；记录修正**只允许**经 `wm-append-runlog --correct=<runId>` **追加更正记录**——`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin --correct=<runId>`（更正记录 `note` 含 `correction-of:<runId>`，历史行逐字节不变），不得手改历史行；禁令与替代动作成对，手搓改行不是合法路径。**首阶段自举语义（E-2 方案 B，2026-09-22；修复轮 1 收紧）**：阶段 1 首次放行前 run-log 尚无 checkpoint 记录，`check-checkpoint.ts` 以 R0 首阶段自举形态达成 exit 0——`--checkpoint-log` 已提供且含 **phase-1 用户确认**（`get('1')` 非空白；零放行记录 ⇒ 下一次放行必为首放行，仅首放行确认可支撑自举）时不视为零证据，改推非阻断 `BOOTSTRAP_VALIDATION` 诊断（checkpoint-log 用户确认为初级证据，SSoT §10.6 6.0）；未提供/空/无 phase-1 条目/不可读仍违规；五脚本无条件每阶段执行的要求不变。**phase-1 后置窗口的历史兼容例外（D-6）**：`phase===1` × `check-checkpoint.ts` 的 R11 后置窗口是**唯一**放宽「严格早于放行」的例外——**窗口判据与定性见 [`operational-recovery.md`](operational-recovery.md)「阶段 1 自举豁免」节（R11 后置窗口，D-6）**；它仅为**历史日志兼容**而保留，只兼容以旧时序（先写放行记录、后补 `check-checkpoint.ts` gate 记录）写入的历史 run-log，删除会使这些历史日志变红；E-2 方案 B 落地后的新建项目走自然时序（**阶段门放行三步顺序**，枚举见 [`SKILL.md`](../SKILL.md)「阶段门放行三步」）**不应产生该形态**（后置形态仍被 R8 轨迹模板拦截，反伪造语义不得据此回退、改写记录或伪造时间戳）。`phase>=2` 无任何后置窗口。无 checkpoint 放行的 run（如 fix/emergency 变体）不触发 R11。`check-preventive-review.ts` 支持 `--auto-trigger` 模式：从 run-log 读取当前阶段，自动校验对应阶段的 3 份 R3 报告（completeness/reliability/security），exitCode=0 方可进入 V 评审。
+闭环五门（**清单与调用顺序见 [`operational-recovery.md`](operational-recovery.md)「调用时机」节；放行三步顺序见 [`SKILL.md`](../SKILL.md)「阶段门放行三步」**；无条件）须在每个阶段门执行，`exitCode=0` 才可放行；任一脚本非 0 视为闭环未达成，回到当前阶段起点（SSoT §10C/§10D）。
 
-**R3 预防性审查强制**（原约束 #17 并入，无条件，覆盖所有 S 变体）：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。**无条件强制**，覆盖所有 S 变体（S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-plan / S-coding / S-finalize / **S-fix** / **S-emergency-fix**），无 flag，无「启用时」措辞。S-fix 走 `<phase>-fix-{dim}.json` 路径，S-emergency-fix 走 `<phase>-emergency-{dim}.json` 路径，S-ingest-tla / S-ingest-bdd 走 `<phase>-ingest-{dim}.json` 路径。V 评审前 G 子代理须跑 [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts)（支持 `--variant=standard|fix|emergency|ingest`）校验报告完整性。`preventive-review.schema.json` 强制 `passed=false ⇒ findings ≥1`——无发现的失败审查不得以空 findings 通过 schema。跳过 R3 直接进入 V 评审命中反模式 #33；S-fix / emergency-fix 后跳过 R3+V 命中反模式 #42。阶段 5-8 superpowers 编码链（S-plan → S-coding → S-finalize，stage ∈ plan/execute/finalize）每段另有 stage 级 R3 审查：产出 `.w-model/r3-reviews/phase<N>-{plan,execute,finalize}-{completeness,reliability,security}.md` ×9 + `.w-model/v-reviews/phase<N>-{plan,execute,finalize}.md` ×3（与 `check-coding-plan.ts` 的 R5 一致；**非空且为普通文件为阻断下限**（0 字节或非普通文件即违规；判定与违规分类见 [`command-reference.md`](command-reference.md)「阶段 5-8 codegraph/coding-plan 门禁 CLI」节的 coding-plan checker（R5）条目），行级证据锚为非阻断诊断）。**编码链双轨契约（两门互不替代）**：stage 级 12 份 MD 由 `check-coding-plan.ts --phase=5|6|7|8`（strict 绑定 changeId）校验，证「每段审查跑过」；phase 级三份 `.w-model/preventive-reviews/<N>-{completeness,reliability,security}.json` 由 `check-preventive-review.ts` 按 `preventive-review.schema.json` 校验（`passed=false ⇒ findings ≥1`），证「三维度结论与 findings」；stage 级 MD 不校验 findings 结构，phase 级 JSON 不承载 stage 粒度——合并双轨会丢 schema 强制项与反模式 #33 的机器挂点。S 产出前可用 `check-coding-plan.ts --preflight` 一次性对齐固定 14 项清单（9 R3 + 3 V + plan + 账本；变长任务三件套/review diff 单列 `artifacts` 不计数）。详见 [subagent-delegation.md](subagent-delegation.md)「R3 预防性审查分派模板」。
+**R3 预防性审查强制**（原约束 #17 并入，无条件，覆盖所有 S 变体）：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。**无条件强制**，覆盖所有 S 变体（S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-plan / S-coding / S-finalize / **S-fix** / **S-emergency-fix**），无 flag，无「启用时」措辞。S-fix 走 `<phase>-fix-{dim}.json` 路径，S-emergency-fix 走 `<phase>-emergency-{dim}.json` 路径，S-ingest-tla / S-ingest-bdd 走 `<phase>-ingest-{dim}.json` 路径。`preventive-review.schema.json` 强制 `passed=false ⇒ findings ≥1`——无发现的失败审查不得以空 findings 通过 schema。跳过 R3 直接进入 V 评审命中反模式 #33；S-fix / emergency-fix 后跳过 R3+V 命中反模式 #42。详见 [subagent-delegation.md](subagent-delegation.md)「R3 预防性审查分派模板」。
+
+**细则子节**（正文逐字迁移，判据不变）：R11 时序细则与 run-log 时间戳真值纪律见「约束 #11-a R11 时序细则」；首阶段自举语义（R0/E-2）见「约束 #11-b 自举语义（R0/E-2）」；phase-1 历史兼容窗口（D-6）见「约束 #11-c 历史兼容窗口（D-6）」；闭环五门调用参数（含 R3 门 `--variant` / `--auto-trigger`、编码链 stage 级 R3 与双轨契约）见「约束 #11-d 闭环五门调用参数」。
+
+### 约束 #11-a R11 时序细则
+
+**机器核验（2026-09-18 起由 `check-run-log.ts` R11 强制）**：凡 run-log 中出现 `checkpoint` 放行记录（`action=checkpoint` 且 `outcome=success`）的阶段，放行前必须已有五门各自的 `role=G`、`outcome=success`、`gateExitCode=0` gate 记录，且时间戳**严格毫秒早于**放行时间（毫秒精度比较：同毫秒（含无毫秒部分的秒级时间戳，Date.parse 后相等）不算「早于放行」，无时间戳豁免）；缺失任一或**未严格早于放行（含同毫秒）**即 blocking，违规消息列出缺失脚本名（同一阶段多次放行逐个核验，不合并）。无 checkpoint 放行的 run（如 fix/emergency 变体）不触发 R11。
+
+**run-log 时间戳真值纪律（D-5①，反伪造）**：run-log 记录的时间戳必须为写入时刻**真值**；**禁止回溯改写历史行或重排时间戳**（改时间戳 / 改 note / 删行 / 插行后重排时间轴同样禁止）；记录修正**只允许**经 `wm-append-runlog --correct=<runId>` **追加更正记录**——`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin --correct=<runId>`（更正记录 `note` 含 `correction-of:<runId>`，历史行逐字节不变），不得手改历史行；禁令与替代动作成对，手搓改行不是合法路径。
+
+### 约束 #11-b 自举语义（R0/E-2）
+
+**首阶段自举语义（E-2 方案 B，2026-09-22；修复轮 1 收紧）**：阶段 1 首次放行前 run-log 尚无 checkpoint 记录，`check-checkpoint.ts` 以 R0 首阶段自举形态达成 exit 0——`--checkpoint-log` 已提供且含 **phase-1 用户确认**（`get('1')` 非空白；零放行记录 ⇒ 下一次放行必为首放行，仅首放行确认可支撑自举）时不视为零证据，改推非阻断 `BOOTSTRAP_VALIDATION` 诊断（checkpoint-log 用户确认为初级证据，SSoT §10.6 6.0）；未提供/空/无 phase-1 条目/不可读仍违规；五脚本无条件每阶段执行的要求不变。
+
+### 约束 #11-c 历史兼容窗口（D-6）
+
+**phase-1 后置窗口的历史兼容例外（D-6）**：`phase===1` × `check-checkpoint.ts` 的 R11 后置窗口是**唯一**放宽「严格早于放行」的例外——**窗口判据与定性见 [`operational-recovery.md`](operational-recovery.md)「阶段 1 自举豁免」节（R11 后置窗口，D-6）**；它仅为**历史日志兼容**而保留，只兼容以旧时序（先写放行记录、后补 `check-checkpoint.ts` gate 记录）写入的历史 run-log，删除会使这些历史日志变红；E-2 方案 B 落地后的新建项目走自然时序（**阶段门放行三步顺序**，枚举见 [`SKILL.md`](../SKILL.md)「阶段门放行三步」）**不应产生该形态**（后置形态仍被 R8 轨迹模板拦截，反伪造语义不得据此回退、改写记录或伪造时间戳）。`phase>=2` 无任何后置窗口。
+
+### 约束 #11-d 闭环五门调用参数
+
+`check-preventive-review.ts` 支持 `--auto-trigger` 模式：从 run-log 读取当前阶段，自动校验对应阶段的 3 份 R3 报告（completeness/reliability/security），exitCode=0 方可进入 V 评审。
+
+V 评审前 G 子代理须跑 [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts)（支持 `--variant=standard|fix|emergency|ingest`）校验报告完整性。
+
+阶段 5-8 superpowers 编码链（S-plan → S-coding → S-finalize，stage ∈ plan/execute/finalize）每段另有 stage 级 R3 审查：产出 `.w-model/r3-reviews/phase<N>-{plan,execute,finalize}-{completeness,reliability,security}.md` ×9 + `.w-model/v-reviews/phase<N>-{plan,execute,finalize}.md` ×3（与 `check-coding-plan.ts` 的 R5 一致；**非空且为普通文件为阻断下限**（0 字节或非普通文件即违规；判定与违规分类见 [`command-reference.md`](command-reference.md)「阶段 5-8 codegraph/coding-plan 门禁 CLI」节的 coding-plan checker（R5）条目），行级证据锚为非阻断诊断）。**编码链双轨契约（两门互不替代）**：stage 级 12 份 MD 由 `check-coding-plan.ts --phase=5|6|7|8`（strict 绑定 changeId）校验，证「每段审查跑过」；phase 级三份 `.w-model/preventive-reviews/<N>-{completeness,reliability,security}.json` 由 `check-preventive-review.ts` 按 `preventive-review.schema.json` 校验（`passed=false ⇒ findings ≥1`），证「三维度结论与 findings」；stage 级 MD 不校验 findings 结构，phase 级 JSON 不承载 stage 粒度——合并双轨会丢 schema 强制项与反模式 #33 的机器挂点。S 产出前可用 `check-coding-plan.ts --preflight` 一次性对齐固定 14 项清单（9 R3 + 3 V + plan + 账本；变长任务三件套/review diff 单列 `artifacts` 不计数）。
 
 ## #12 返工必经根因定位
 
