@@ -81,6 +81,8 @@ O: 若通过 → 🔴 CHECKPOINT · 阶段门放行（展示 G 证据 + RTM cove
 O: 用户放行 → 更新 project.status → 进入下一阶段
 ```
 
+> 本图为精简时序，省略两个强制环节：阶段 1-4 的「A-lead 多角色讨论分析」（persona 矩阵见 agent-personas.md「阶段角色集矩阵」节）与阶段门放行前的「ICEBERG-B 冰山扫掠」（见 iceberg-sweep-guide.md）。全量时序（含 V/G 失败链与 ICEBERG-A/B 回路）以本文正文「每阶段分派时序」节的全版图为准。
+
 > 阶段 1-4 ingestion 子流程（A→G 路径）：O 跑 plan-chunks.ts → A-chunk ×N → A-cross/A-evolve → G 跑 check-requirement-graph.ts → 收敛循环（MAX_ROUNDS=5）→ CHECKPOINT 收敛确认 → S 产出。
 
 > 阶段 8 终检额外分派 G 跑 check-artifact-gate.ts（无 --phase 参数，终检）。
@@ -682,8 +684,14 @@ V-01: Read handoff/phase1-S-01/output.md → 产出 → Write output.md + status
 ```
 O: 路由 + 读状态 + 检查前置产物 + 加载最小引用集（SKILL.md + 当前阶段 phase-N）
 O: 🔴 CHECKPOINT · 项目初始化（首次）或阶段进入确认
+  ↓ 阶段 1-4：分派 A-lead 多角色讨论分析（并行多轮交叉至收敛，persona 按 agent-personas.md「阶段角色集矩阵」选用；阶段 5-8 跳过本步）
+A-lead: 多视角分析 → 共识纪要（S 唯一落笔）
   ↓ 分派 S
 S: 产出开发文档 + 同步测试设计 + 更新 RTM 实体 → 返回 {产物路径, RTM diff}
+  ↓ 分派 R3 ×3（completeness / reliability / security，可并行）
+R3: 三份 PreventiveReview JSON
+  ↓ 分派 G 跑 check-preventive-review.ts（V 评审前必须 exitCode=0）
+G: check-preventive-review.ts 证据
   ↓ 分派 V
 V: 按 targetKind 路由 Persona → 产出 VerifierOutput JSON
   ↓ 分派 G
