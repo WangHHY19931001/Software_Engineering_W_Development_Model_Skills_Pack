@@ -28,11 +28,13 @@ async function main(): Promise<void> {
   const result = await produceSourceProvenance(path.resolve(positional[0]!), { noGitOk });
   console.log('EVIDENCE_SOURCE_JSON ' + JSON.stringify({ script: 'wm-verify-evidence-source.ts', ...result }));
   if (!result.ok) {
+    // 失败路径 exitCode ∈ {1,2}：0 仅由成功态（ok:true）产生；失败态只出自 ProvenanceFailure(1|2)
+    // 与 catch-all 兜底 1（evidence-provenance-logic.ts fail()），故断言收窄为 1|2（C19，零运行时变化）。
     exitWithError({
       category: result.exitCode === 2 ? 'FILE_NOT_FOUND' : 'STRUCTURE_INVALID',
       rule: result.reason,
       message: 'source provenance 验证失败',
-      exitCode: result.exitCode,
+      exitCode: result.exitCode as 1 | 2,
     });
   }
 }

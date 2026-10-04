@@ -19,8 +19,8 @@ export interface CliError {
   category: ErrorCategory;
   /** 人类可读描述（不含 ✗ 前缀与路径后缀；由 formatCliError 组装） */
   message: string;
-  /** 退出码：当前均为 2（输入错误） */
-  exitCode: 0 | 1 | 2;
+  /** 退出码：当前调用为 1（wm-export-evidence / wm-verify-evidence-source 的 evidence 失败透传）与 2（ARG_INVALID/UNEXPECTED）；0 不可达故不入联合 */
+  exitCode: 1 | 2;
   /** 相关文件绝对路径（可选） */
   file?: string;
   /** 违规规则链（可选），如 'P0-1' / 'R1-R5' / 'D7' */
