@@ -223,7 +223,7 @@ export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptio
     return { passed: false, violations: ['checkpoint entries 必须为数组'] };
   }
 
-  // 结构校验：narrow 每个元素为 Partial<RunLogEntry>，缺失必需字段则跳过并记录（容错，不 crash）
+  // 结构校验：narrow 每个元素为 Partial<RunLogEntry>，缺失必需字段则记 violation 并继续（非跳过）
   // 必需字段为 R1-R5 实际访问的核心字段：runId / phase / action / outcome
   const valid: RunLogEntry[] = [];
   for (let i = 0; i < entries.length; i++) {
