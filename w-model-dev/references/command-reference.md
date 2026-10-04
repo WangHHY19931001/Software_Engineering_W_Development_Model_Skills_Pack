@@ -542,8 +542,8 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 
 | CHECKPOINT           | 触发点                                      | 确认对象                                                                      |
 | -------------------- | ------------------------------------------- | ----------------------------------------------------------------------------- |
-| 项目初始化           | 首次进入阶段前（SKILL.md 执行工作流步骤 5） | 进入阶段 / 同步测试设计 / 预期产物清单                                        |
-| ingestion 规划确认   | 阶段 1-4 plan-chunks 产出后（步骤 5.5）     | 分块计划与 A-chunk 分派                                                       |
+| 项目初始化           | 首次进入阶段前（SKILL.md 执行工作流步骤 4） | 进入阶段 / 同步测试设计 / 预期产物清单                                        |
+| ingestion 规划确认   | 阶段 1-4 plan-chunks 产出后（SKILL.md 步骤 5 内子步骤，见 [phase-1-requirements.md](phase-1-requirements.md)「ingestion 子流程」节） | 分块计划与 A-chunk 分派                                                       |
 | ingestion 收敛确认   | 收敛循环结束（MAX_ROUNDS=5 或通过）         | 图谱收敛结果                                                                  |
 | 阶段门放行           | G 门禁通过后（步骤 9）                      | 质量等级 / 子标准分 / reworkHints → 放行或返工                                |
 | 发布放行             | 阶段 8 终检 exitCode=0 后                   | RTM 覆盖率 / 四级测试 / GATE_JSON → 发布或回退                                |
