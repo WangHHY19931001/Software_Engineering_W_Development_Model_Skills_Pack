@@ -229,9 +229,9 @@
 
 | 产出物 | 落地方式 | 文件命名 |
 |---|---|---|
-| 需求规格说明书 | 套用 `templates/requirement-spec.md` 模板，按"功能 / 非功能 / 约束"三类填充 | `<模块>-requirement-spec.md` |
-| 验收测试用例 | 套用 `templates/test-case.md` 模板，`type=验收测试`，每个功能点 ≥ 1 条用例 | `<模块>-acceptance-test.md` |
-| 风险评估报告 | 产出风险等级（高 / 中 / 低）+ 缓解措施表格；冲突对与缺失项单独列出 | `<模块>-risk-assessment.md` |
+| 需求规格说明书 | 套用 `templates/requirement-spec.md` 模板，按"功能 / 非功能 / 约束"三类填充 | `docs/phase1-requirements/requirement-spec.md` |
+| 验收测试用例 | 套用 `templates/test-case.md` 模板，`type=验收测试`，每个功能点 ≥ 1 条用例 | `docs/phase1-requirements/acceptance-test.md` |
+| 风险评估报告 | 产出风险等级（高 / 中 / 低）+ 缓解措施表格；冲突对与缺失项单独列出 | `docs/phase1-requirements/risk-assessment.md` |
 | graph.json | A 子代理产出，记录 REQ 节点与 parent/depends-on 边 | `.w-model/ingestion/graph.json`（跨阶段演进） |
 | 系统上下文 | 套用 `templates/requirement-spec/system-context.md` | `docs/phase1-requirements/system-context.md` |
 | 术语表 | 套用 `templates/requirement-spec/glossary.md` | `docs/phase1-requirements/glossary.md` |
@@ -240,6 +240,8 @@
 | 行为规格模型 | 套用 `templates/requirement-spec/behavior-spec.md`（引用 .feature 文件，不内联） | `docs/phase1-requirements/behavior-spec.md` |
 | 工程纪律与 DoD | 套用 `templates/requirement-spec/discipline-dod.md` | `docs/phase1-requirements/discipline-dod.md` |
 | 主规格 | 套用 `templates/requirement-spec.md`（骨架 + §0 SSOT 头 + 引用块指向上述 6 文件） | `docs/phase1-requirements/requirement-spec.md` |
+
+> **固定文件名契约**：阶段 1 产物统一为固定文件名——`--spec-dir` 契约要求固定文件名，模块区分由目录承载（阶段 1 主文档与 7 个独立子文件均为无前缀固定名，由 `check-artifact-gate.ts --spec-dir` 的布局校验强制；阶段 2-4 主文档按 `{module}-` 前缀 glob 定位，前缀仅适用于阶段 2-4）。
 
 **执行顺序**：需求解析算法（步骤 1-4）→ 套用模板产出需求规格 → 同步产出验收测试用例（覆盖正常 + 异常 + 边界）→ 产出风险评估报告 → RTM 登记。
 

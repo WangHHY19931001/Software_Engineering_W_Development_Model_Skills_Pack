@@ -96,7 +96,7 @@
 
 | targetKind | 产出阶段 | 产物示例 |
 |---|---|---|
-| `requirement` | 阶段 1 需求分析 | 需求规格说明书（`*-requirement-spec.md`） |
+| `requirement` | 阶段 1 需求分析 | 需求规格说明书（`requirement-spec.md`，`--spec-dir` 固定名） |
 | `design` | 阶段 2 系统设计 / 阶段 3 概要设计 / 阶段 4 详细设计 | 系统设计/接口设计/详细设计文档 |
 | `test` | 阶段 1~4（设计）/ 阶段 5~8（执行） | 验收/系统/集成/单元测试用例 |
 | `code` | 阶段 5 编码 | 源代码文件（`.ts` / `.py` / `.java` 等） |
