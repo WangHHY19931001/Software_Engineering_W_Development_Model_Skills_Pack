@@ -1699,18 +1699,19 @@ R10 维护契约（docs-consistency source×clause 语义门）：
 
 当前每个 🔴 CHECKPOINT 都等用户，等于强制最高介入度（L0）。大项目/成熟团队无法"毕业"，CHECKPOINT 密度成为瓶颈。loop-engineering 的 L0~L3 阶梯按成熟度选择性激活 CHECKPOINT，使团队可渐进到低介入度。
 
-**关键约束**：不违反约束 2（CHECKPOINT 不可绕过）——L3 仍保留高风险路径人工 gate，只是低风险 CHECKPOINT 自动放行。
+**关键约束**：不违反约束 2（CHECKPOINT 不可绕过）——L3 仍保留高风险路径人工 gate，只是低风险操作型 CHECKPOINT 自动放行；阶段门放行始终用户确认（HOTL 固定，硬约束 #2），不随成熟度自动化。
 
 ### 10C.2 CHECKPOINT 分类
 
-现有 🔴 CHECKPOINT 分为两类，按成熟度选择性激活：
+现有 🔴 CHECKPOINT 分为三类，按成熟度选择性激活（阶段门放行除外——始终用户确认，不随成熟度自动化）：
 
 | CHECKPOINT 类型                              | 示例                                                                                      | L0        | L1          | L2          | L3                          |
 | -------------------------------------------- | ----------------------------------------------------------------------------------------- | --------- | ----------- | ----------- | --------------------------- |
 | **决策型**（设计方向/技术选型/范围变更）     | 项目初始化、阶段进入确认、设计选型、ingestion 规划确认                                    | ✅ 等用户 | ✅ 等用户   | ✅ 等用户   | ✅ 等用户（高风险路径强制） |
-| **操作型**（已跑脚本/已执行测试/已产出产物） | 阶段门放行（V 评审通过 + G 退出码 0）、ingestion 收敛确认（G 退出码 0）、测试结果回填确认 | ✅ 等用户 | ⚡ 自动放行 | ⚡ 自动放行 | ⚡ 自动放行                 |
+| **操作型**（已跑脚本/已执行测试/已产出产物） | ingestion 收敛确认（G 退出码 0）、测试结果回填确认                                        | ✅ 等用户 | ⚡ 自动放行 | ⚡ 自动放行 | ⚡ 自动放行                 |
+| **阶段门放行**（V 评审通过 + G 退出码 0）     | 每阶段推进唯一放行点（🔴 CHECKPOINT · 阶段门放行）                                        | ✅ 等用户 | ✅ 等用户   | ✅ 等用户   | ✅ 等用户（HOTL 固定）      |
 
-> 「决策型」始终等用户（L3 亦然）——设计方向不可自动决定。「操作型」在 L1+ 可自动放行——已有脚本退出码作为客观证据，人工确认是冗余。
+> 「决策型」始终等用户（L3 亦然）——设计方向不可自动决定。「阶段门放行」**始终用户确认（HOTL 固定，硬约束 #2）**——L1/L2/L3 差异仅体现在文档仪式与 TLA+/BDD 强度，不降低用户确认。「操作型」（阶段门放行除外）在 L1+ 可自动放行——已有脚本退出码作为客观证据，人工确认是冗余。
 
 ### 10C.3 L0~L3 放行矩阵
 
@@ -1720,6 +1721,8 @@ R10 维护契约（docs-consistency source×clause 语义门）：
 | **L1（操作确认自动化）**       | ✅ 等用户                                          | ⚡ 自动放行（脚本退出码=0 即放行，run-log 记录） | ✅ 每次返工都暂停询问                                              | ✅ 等用户                        | L0 稳定运行 ≥1 个完整 8 阶段周期，无 O 系列失败模式命中                       |
 | **L2（返工自主化）**           | ✅ 等用户                                          | ⚡ 自动放行                                      | ⚡ 阶段 5-7 返工可自主（带 attempt cap=maxReworkRounds，超限升级） | ✅ 等用户                        | L1 稳定运行 ≥2 周，attempt cap 达标率 ≥80%，无 Token Burn/O3 Verifier Theater |
 | **L3（高风险路径外的全自主）** | ✅ 等用户（仅高风险路径：auth/加密/发布/架构变更） | ⚡ 自动放行                                      | ⚡ 全阶段返工可自主（带 attempt cap）                              | ✅ 等用户（发布门始终 attended） | L2 稳定运行 ≥2 周，误判率 ≤10%，用户显式申请升级                              |
+
+> **阶段门放行不适用「操作型 CHECKPOINT」列**：始终等用户（HOTL 固定，硬约束 #2），任何级别不得自动放行；L1/L2/L3 差异仅体现在文档仪式与 TLA+/BDD 强度。
 
 > **L2+ 事件驱动激活**：成熟度达 L2 后，事件驱动循环（Loop 3，详见 §10F）激活。消费方自行实现触发器写入 `event-ingress.jsonl`，编排者 O 按事件类型路由到单阶段（非完整 8 阶段）。L0/L1 不支持事件驱动。
 
@@ -1765,8 +1768,8 @@ interface MaturityConfig {
 编排者 O 在每个 🔴 CHECKPOINT 处读取 maturity.json，按当前 level 决定 CHECKPOINT 类型：
 
 1. 读取 maturity.json.level
-2. 识别当前 CHECKPOINT 类型（决策型 / 操作型）
-3. 查 L0~L3 放行矩阵：✅ 等用户 → 执行 CHECKPOINT 暂停；⚡ 自动放行 → 跳过暂停，run-log append 记录
+2. 识别当前 CHECKPOINT 类型（决策型 / 操作型 / 阶段门放行）
+3. 查 L0~L3 放行矩阵：✅ 等用户 → 执行 CHECKPOINT 暂停；⚡ 自动放行 → 跳过暂停，run-log append 记录（仅操作型适用；阶段门放行在任何级别都等用户，硬约束 #2）
 4. 检查高风险路径（仅 L3）：命中高风险路径表 → 即使 L3 也强制决策型 CHECKPOINT
 5. 升级判定（每次阶段 8 完成后）：汇总 unlockConditions，若全部达标 → 询问用户是否升级（决策型 CHECKPOINT，不可自动升级）
 6. 降级判定（每次 O 系列失败模式命中后）：若 operationalFailures ≥ downgradeTriggers.operationalFailureStreak → 自动降级到 L0（R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）
@@ -1775,6 +1778,7 @@ interface MaturityConfig {
 
 - **L1+ 自动放行是操作型 CHECKPOINT 的选择性激活，非绕过**（约束 2）：自动放行仍在 run-log 记录 action=checkpoint outcome=success，保留可追溯性。
 - **决策型 CHECKPOINT 在所有级别均等用户**：设计方向不可自动决定。
+- **阶段门放行在所有级别均等用户**（HOTL 固定，硬约束 #2）：不随成熟度自动化；L1/L2/L3 差异仅体现在文档仪式与 TLA+/BDD 强度。
 - **升级不可自动**：升级是决策型 CHECKPOINT，须用户显式确认。
 - **降级可自动**：O 系列失败模式连续命中触发自动降级回 L0（R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）。
 
@@ -2569,7 +2573,7 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | 10.8 TLA+ 行为门禁                           | 阶段 1–4 TLA+ 层次化状态机建模行为正确性门禁（环境/manifest/文件头/层次一致性/拆解决策/SANY 语法/TLC 模型检查）                                                                                                                                                                                                                                                | `docs/tla-plus-modeling-design.md` §3（权威定义）+ `w-model-dev/scripts/logic/tla-logic.ts`（校验纯逻辑，含 `parseTlaHeader`/`validateHeader`/`checkHierarchy`/`checkDecomposition`）+ `w-model-dev/scripts/cli/check-tla-model.ts`（CLI）+ `w-model-dev/references/tla-plus.md`                                                   | 完整（与 §10.7 图谱门禁正交：行为层 vs 结构层+信息流层；阶段 4 TLA+ 零违反 ∧ 图谱零违反才放行进编码；守护反模式 #14/#15/#16/#17）                                                                   |
 | 10.8.1 代码-TLA+ 一致性回归                  | 阶段 5 代码与 TLA+ 规格一致性回归门禁（四维度：SD→codeModule 映射 / 代码状态转移抽取 / Next 分支对应 / 断言覆盖不变式）                                                                                                                                                                                                                                        | `w-model-dev/scripts/logic/code-tla-logic.ts`（校验纯逻辑，含 `checkSdToCodeModule`/`extractCodeStateTransfers`/`checkNextBranchCoverage`/`checkInvariantCoverage`）+ `w-model-dev/scripts/cli/check-code-tla-consistency.ts`（CLI，使用 TypeScript Compiler API 解析 AST）                                                        | 完整（与 §10.8 TLA+ 行为门禁互补：行为门禁校验 TLA+ 规格自身，一致性回归校验代码是否符合 TLA+ 规格；维度1 与 `check-artifact-gate.ts` 终检双向守护；`self-test.ts` 含 5 条样本）                    |
 | 10.9 根因报告门禁                            | 返工循环 R 子代理 `RootCauseReport` 校验门禁（R1-R11：Schema 完整性 / 根因链 / 可证伪假设 / fixRecommendation / prevention / upstreamDefect / qualityLevel / reportId / 多角度 PartialReport / canonical `testing-reality-checker` confidence，legacy `reality-checker` fallback / 多角度 persona 选择矩阵合法性与第一键交集）                                 | `w-model-dev/scripts/cli/check-rootcause-report.ts`（CLI，与 `check-verifier-output.ts` 平级）+ 校验纯逻辑（单点事实源）                                                                                                                                                                                                           | 完整（G 子代理在 V 复审根因报告后跑，exitCode=0 才可分派 S-fix；守护反模式 #18/#19；详见 [根因定位者设计 spec](./superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) §4）    |
-| 10C 自主成熟度阶梯                           | L0~L3 成熟度 + CHECKPOINT 放行矩阵（决策型始终 attended，操作型按级别自动放行）+ 高风险路径强制人工 gate + maturity.json schema + 升级/降级逻辑                                                                                                                                                                                                                | `docs/loop-engineering-adoption-design.md` §2（权威定义）+ `w-model-dev/references/operational-recovery.md`「成熟度与 CHECKPOINT 放行」节 + `w-model-dev/references/data-models.md`（maturity schema）                                                                                                                             | 完整（吸收自 cobusgreyling/loop-engineering `docs/loop-design-checklist.md` L0~L3 阶梯；不违反约束2：L1+ 自动放行是操作型 CHECKPOINT 选择性激活，非绕过；L3 高风险路径强制人工 gate）               |
+| 10C 自主成熟度阶梯                           | L0~L3 成熟度 + CHECKPOINT 放行矩阵（决策型与阶段门放行始终 attended——阶段门放行 HOTL 固定、硬约束 #2，其余操作型按级别自动放行）+ 高风险路径强制人工 gate + maturity.json schema + 升级/降级逻辑                                                                                                                                                                                                                                | `docs/loop-engineering-adoption-design.md` §2（权威定义）+ `w-model-dev/references/operational-recovery.md`「成熟度与 CHECKPOINT 放行」节 + `w-model-dev/references/data-models.md`（maturity schema）                                                                                                                             | 完整（吸收自 cobusgreyling/loop-engineering `docs/loop-design-checklist.md` L0~L3 阶梯；不违反约束2：L1+ 自动放行是操作型 CHECKPOINT 选择性激活，非绕过，阶段门放行始终用户确认；L3 高风险路径强制人工 gate）               |
 | 10D 成本预算与运行日志                       | budget.json（perPhase/project 预算 + killSwitch + onExceed）+ run-log.jsonl（append-only 运行历史 + acknowledgedDecisions）+ 编排者预算检查逻辑                                                                                                                                                                                                                | `docs/loop-engineering-adoption-design.md` §1（权威定义）+ `w-model-dev/references/operational-recovery.md`「成本预算与运行日志」节 + `w-model-dev/references/data-models.md`（budget / run-log schema）                                                                                                                           | 完整（吸收自 cobusgreyling/loop-engineering `docs/operating-loops.md` loop-budget + loop-run-log + kill switch；不引入 LLM 估算 token，由宿主 Agent 报告实际消耗，遵守约束4）                       |
 | 10D.8 角色分派与 run-log fail-closed         | R3 三种证明路径矩阵（standard / fix-emergency identity window / 编码链 stage plan/execute/finalize 9+3）+ role-dispatch 精确语义（空/全无效 fail-closed、R3 只计 role=R 的 r3-* success、r3Missing 明细）+ run-log 空/坏行 blocking、action-role 配对、variant/blocker 与 LEGACY_VARIANT/LEGACY_UNSCOPED 吸收 + preventive-review `passed=false ⇒ findings ≥1` | `w-model-dev/references/subagent-delegation.md`（R3 矩阵 + dispatch 表）+ `w-model-dev/references/data-models.md`（run-log / preventive-review schema）+ `w-model-dev/scripts/logic/role-dispatch-logic.ts` + `w-model-dev/scripts/logic/run-log-logic.ts` + `w-model-dev/scripts/cli/check-role-dispatch.ts` / `check-run-log.ts` | 完整（R3 无条件强制与维度语义由 logic 层守护；`--r3-enabled` no-op；坏行并入 blocking 不静默）                                                                                                      |
 | 10.5.2 阶段 5-8 外部校验聚合                 | ChangeScope 绑定 + codegraph/coding-plan strict 校验聚合进 artifact gate（violations 并入 reasons/exitCode、GATE_JSON external summary、scopeProvidedButFailed 抑制误导文案）+ 归档快照为 phase 8 后置门（codingPlanSnapshot 条件项）                                                                                                                          | `w-model-dev/references/command-reference.md`（Artifact Gate 节）+ `w-model-dev/scripts/lib/change-scope.ts` + `check-codegraph-queries.ts` / `check-coding-plan.ts` / `check-archive-integrity.ts` / `check-artifact-gate.ts`（CLI，strict 一律经 resolveCliScope）                                                               | 完整（`gate-logic.ts` externalChecks 透传已删除；`check-opsx-artifacts.ts` 旧链路与其 legacy 纯逻辑已于 2026-09-21 一并退役，语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）                     |
