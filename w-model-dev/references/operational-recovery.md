@@ -115,7 +115,7 @@ writeFileSync(path, JSON.stringify(data, null, 2), 'utf-8');
 
 - **Node.js `fs.writeFileSync`**：跨平台、UTF-8 无 BOM、深度无限制、中文不乱码
 - 适用于所有 JSON 文件写入：
-  - `.w-model/run-log.jsonl`（每行 JSON append，使用 `appendFileSync` 等价 API）
+  - `.w-model/run-log.jsonl`（追加**唯一合法入口**是 `wm-append-runlog.ts`，见下文「JSONL 文件追加」；本节 `writeFileSync` 指引不适用于 run-log 追加场景）
   - `.w-model/maturity.json` / `budget.json` / `graph.json` / `project.json`
   - `.w-model/tla-manifest.json` / `rtm.json`
   - 各阶段产物中所有 JSON 文件
@@ -133,13 +133,15 @@ writeFileSync(path, JSON.stringify(data, null, 2), 'utf-8');
 
 ### JSONL 文件追加（run-log.jsonl / event-ingress.jsonl）
 
-```javascript
-import { appendFileSync } from 'node:fs';
-appendFileSync(path, JSON.stringify(entry) + '\n', 'utf-8');
+run-log（`.w-model/run-log.jsonl`）追加**唯一合法入口**是 `wm-append-runlog.ts`（时间戳三态 + 反伪造在工具内强制）：
+
+```bash
+npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin
 ```
 
-- 每行一条 JSON 记录，末尾换行 `\n`（Unix 风格，跨平台一致）
-- 不得用 PowerShell `Add-Content` 追加（同上 BOM + 乱码问题）
+手搓追加脚本（appendFileSync/fs.writeFile 直写）绕过时间戳纪律，属违规操作（[command-reference.md](command-reference.md)「wm-append-runlog.ts」条目）。
+
+`event-ingress.jsonl` 由消费方自行追加（无官方工具，示例见 [event-ingress-guide.md](event-ingress-guide.md)）：每行一条 JSON 记录，末尾换行 `\n`（Unix 风格，跨平台一致）；不得用 PowerShell `Add-Content` 追加（同上 BOM + 乱码问题）。
 
 ### 敏感信息禁令
 
