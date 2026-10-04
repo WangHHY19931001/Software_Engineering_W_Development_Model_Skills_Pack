@@ -103,7 +103,9 @@ export interface RunLogEntry {
     | 'iceberg-review'
     | 'plan_propose'
     | 'plan_task'
-    | 'plan_review';
+    | 'plan_review'
+    | 'perspective'
+    | 'consensus';
   role: 'O' | 'A' | 'S' | 'V' | 'G' | 'R';
   duration_s: number;
   tokens: number;
@@ -117,6 +119,8 @@ export interface RunLogEntry {
   artifacts?: string[];
   /** 决策置信度（可选，0.0-1.0；agentic Ch18） */
   decisionConfidence?: number;
+  /** 多视角分析的 persona 标识（action=perspective/consensus 时须非空；取值=agent-personas 阶段角色集矩阵 persona id；其他 action 不得出现——role-dispatch logic 校验） */
+  persona?: string;
   // ---- rootcause/fix 扩展字段（spec §5.5）----
   /** rootcause: R 报告 ID；fix: 所基于的 R 报告 ID */
   reportId?: string;
@@ -545,7 +549,7 @@ const R3_DIMENSIONS = ['completeness', 'reliability', 'security'];
  * 由 checkRunLog logic 层强制（blocking violation），不放 schema 强制以避免
  * 破坏既有历史样本；schema 的 action/role description 已注明由 checkRunLog 强制。
  */
-const ACTION_ROLE_PAIRING: Record<string, 'S' | 'V' | 'G' | 'R'> = {
+const ACTION_ROLE_PAIRING: Record<string, 'A' | 'S' | 'V' | 'G' | 'R'> = {
   produce: 'S',
   fix: 'S',
   'emergency-fix': 'S',
@@ -556,6 +560,8 @@ const ACTION_ROLE_PAIRING: Record<string, 'S' | 'V' | 'G' | 'R'> = {
   'r3-completeness': 'R',
   'r3-reliability': 'R',
   'r3-security': 'R',
+  perspective: 'A',
+  consensus: 'A',
 };
 
 // ==================== 历史行时间戳宽容解析 ====================
@@ -706,7 +712,8 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
 
   // action-role 配对强制（审计修复 task 3）：对每条 schema-valid 记录，
   // action∈{r3-*} 须 role=R；{fix,emergency-fix,produce} 须 role=S；{review} 须
-  // role=V；{gate,tla-gate,graph-gate} 须 role=G。违反即 blocking（含 runId/action/role）。
+  // role=V；{gate,tla-gate,graph-gate} 须 role=G；{perspective,consensus} 须 role=A
+  // （阶段 1-4 多角色机制）。违反即 blocking（含 runId/action/role）。
   for (const e of valid) {
     const requiredRole = ACTION_ROLE_PAIRING[e.action];
     if (requiredRole !== undefined && e.role !== requiredRole) {

@@ -514,7 +514,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 **检测信号**（sig-008）：子代理响应中**无 `tool_use` 块且未附产物路径**（见 [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节的四条行为要求）；规划产物（spec/plan）存在但无对应执行产物。
 >
-> 2026-09-17 审查更正：原文写作「run-log 中存在 `action=plan` 但无后续 `action=implement`/`action=verify`」——该三值**不在 run-log 30 值 action 枚举内**（写入即 schema 违规），属伪字段信号。
+> 2026-09-17 审查更正：原文写作「run-log 中存在 `action=plan` 但无后续 `action=implement`/`action=verify`」——该三值**不在 run-log 32 值 action 枚举内**（写入即 schema 违规），属伪字段信号。
 
 ### #21 阶段级门禁跳过（self-as-verifier 模式下跳过中间阶段门禁直接跑终检）
 

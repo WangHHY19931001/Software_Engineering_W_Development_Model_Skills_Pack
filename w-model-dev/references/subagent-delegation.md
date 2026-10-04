@@ -493,6 +493,12 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 
 > **只读脚本例外**：编排者可执行 `npx tsx w-model-dev/scripts/cli/check-*.ts`、`git status`、`ls` 等确定性只读命令以核验状态/展示证据，但不得**写入或修改**任何产物/评审/RTM 内容。门禁脚本本身为确定性 TypeScript，不含 LLM 调用，编排者跑它仅用于"看退出码"，不构成实施，也**不替代 G 子代理的回填职责**——G 子代理必须独立跑一次并产出证据摘要。
 
+### A-lead（多视角分析协调者，A 类 lead 变体）
+
+- **定位**：阶段 1-4 产出前的多角色讨论协调者——按 [agent-personas.md](agent-personas.md)「阶段角色集矩阵」分派 N 个 persona 视角分析、汇总分歧、调度并行多轮交叉质询、产出共识纪要。**属 A 类分析动作**：A-lead 与 persona 子代理均不产出阶段交付物、不改迷雾册（未决分歧的登记义务在 S 产出侧）、不跑门禁。
+- **派单契约（O → A-lead，两段）**：前置条件 = 阶段角色集矩阵节与 N 份 persona 文件实存 + 前阶段产物就绪 + `phase-analyses/phase-<N>/` 目录可写；可验证终态 = `.w-model/phase-analyses/phase-<N>/consensus-minutes.md` 落盘（含每分歧决议+理由，或迷雾册去向与实际交叉轮次）+ run-log 含 N 条 `action=perspective`（persona 非空互异）与 ≥1 条 `action=consensus`，第三方可复核。
+- **升级路径**：交叉 5 轮未收敛 → A-lead 停止并上报 O → 🔴 CHECKPOINT（加轮 / 未决项全登记迷雾册收口 / 终止阶段）——升级单调性同分层反馈回路。
+
 ## 主刀职责映射表
 
 > 吸收自《agent 时代的人月神话》第 3 章「外科手术队伍」。概念完整性只能从"一个头脑的持续持有"里长出来——主刀由人坐，支持角色全部可由 agent 出任。
@@ -1456,6 +1462,87 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
   - 串行分派时让后一个 persona 读取前一个 persona 的产出（须独立产出）
   - 无视 reality-checker 的 low confidence（须 passed=false）
   - 改产物 / 跑门禁 / 改 RTM
+```
+
+### A-lead 多视角分析分派模板（O → A-lead，阶段 1-4，动作 perspective/consensus 调度）
+
+> dispatch-matrix 登记：A-lead（阶段 1-4，动作 perspective/consensus 调度）。派单契约两段与角色定义见 [「A-lead（多视角分析协调者，A 类 lead 变体）」节](#a-lead多视角分析协调者a-类-lead-变体)；协议摘要见 [agent-personas.md](agent-personas.md)「阶段角色集矩阵」节。
+
+```
+角色：分析子代理-多视角协调变体（A-lead）
+当前 W 模型阶段：<阶段 N - 名称（N=1-4）>
+任务：按 agent-personas.md「阶段角色集矩阵」分派 N 个 persona 视角分析（并行）→ 汇总分歧 → 调度并行多轮交叉质询直到收敛 → 产出共识纪要（S 依纪要产出；纪要是 S 产出的上游输入，不是阶段交付物替代品）
+
+前置条件（派单契约，O 派单前逐条自证）：
+  - 阶段角色集矩阵节与 N 份 persona 文件实存 + 前阶段产物就绪 + `phase-analyses/phase-<N>/` 目录可写
+  - persona 集与顺序以 agent-personas.md「阶段角色集矩阵」节为准（本模板不手抄副本）
+
+上下文：
+  - 前阶段产物路径：<列出已放行的前阶段产物路径>
+  - 阶段角色集矩阵行：<阶段 N 的 persona 集（以 agent-personas.md「阶段角色集矩阵」节为准）>
+  - lite 降级判定：<L0/L1 成熟度或用户显式 --lite 时单视角（需求阶段=需求分析师；设计阶段=系统架构师）；否则全矩阵>
+
+必读：
+  - references/agent-personas.md（「阶段角色集矩阵（A-lead 多视角分析）」节）
+  - w-model-dev/subagent/<矩阵行 persona 文件>（N 份，按矩阵行顺序）
+
+执行：
+  1. 并行分派 N 个 A persona 视角分析（用「A persona 视角分析分派模板」），首轮输入=前阶段产物路径+视角关注面（矩阵行逐字）
+  2. 汇总 N 份报告的分歧点候选 → 调度并行多轮交叉质询直到收敛（收敛判据=单轮零新增分歧 ∧ 全部分歧已决或登记迷雾册；每轮输入附共识纪要当前版）
+  3. 交叉 5 轮未收敛 → A-lead 停止并上报 O → 🔴 CHECKPOINT（加轮 / 未决项全登记迷雾册收口 / 终止阶段）
+  4. 产出共识纪要（含每分歧决议+理由，或迷雾册去向与实际交叉轮次；lite 降级时纪要注明）
+
+产出契约：
+  1. 文件路径：.w-model/phase-analyses/phase-<N>/consensus-minutes.md
+  2. 附录：N 份视角分析报告路径（.w-model/phase-analyses/phase-<N>/<persona>.md，由 A persona 子代理落盘，A-lead 只聚合引用不代写）
+  3. 返回编排者：{role:"A", variant:"lead", phase:<N>, personas:[<id>], crossRounds:<k>, minutesPath, disputesResolved:<bool>, fogItems:[<未决分歧>]}
+
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：`.w-model/phase-analyses/phase-<N>/consensus-minutes.md` 落盘（含每分歧决议+理由，或迷雾册去向与实际交叉轮次）
+  - 回填判据：run-log 含 N 条 `action=perspective`（persona 非空互异）与 ≥1 条 `action=consensus`，第三方可复核（角色禁令优先：gate 验证由下游 G 承担）
+
+禁止：
+  - 产出阶段交付物（属 A 类分析动作；落笔唯一在 S）
+  - 改迷雾册（未决分歧的登记义务在 S 产出侧）
+  - 跑门禁脚本 / 写正式阶段产物 / 越阶段分析
+  - 跳过 persona 代写视角分析（lite 降级亦须实际分派 persona 并留痕，不冒充全矩阵）
+```
+
+### A persona 视角分析分派模板（A-lead → A persona，阶段 1-4，动作 perspective）
+
+> dispatch-matrix 登记：A persona 视角分析（阶段 1-4，动作 perspective）。分派者为 A-lead（非 O）；一 persona 一报告，persona 字段与 persona id 一致留痕。
+
+```
+角色：分析子代理-视角分析变体（A persona）
+当前 W 模型阶段：<阶段 N - 名称（N=1-4）>
+任务：按阶段角色集矩阵本 persona 行的视角关注面产出单一视角分析报告（四节），供 A-lead 汇总分歧与交叉质询调度
+
+前置条件（派单契约，A-lead 派单前逐条自证）：
+  - persona 文件实存（w-model-dev/subagent/<persona-id>.md）
+  - 输入路径实存（前阶段产物路径可 Read；交叉轮时共识纪要当前版可 Read）
+
+上下文 / 输入：
+  - 前阶段产物路径：<列出>
+  - 视角关注面：<该 persona 矩阵行逐字——以 agent-personas.md「阶段角色集矩阵」节为准，不手抄副本>
+  - 共识纪要当前版：.w-model/phase-analyses/phase-<N>/consensus-minutes.md（交叉轮时附；首轮无）
+
+必读：
+  - w-model-dev/subagent/<persona-id>.md（本 persona 人格文件，含「视角关注面（多角色讨论）」节）
+  - references/agent-personas.md（「阶段角色集矩阵（A-lead 多视角分析）」节）
+
+产出契约：
+  1. 文件路径：.w-model/phase-analyses/phase-<N>/<persona>.md
+  2. 报告四节：发现 / 风险 / 约束建议 / 分歧点候选（分歧点候选供 A-lead 交叉质询调度）
+  3. 返回 A-lead：{role:"A", variant:"persona", persona:"<id>", reportPath, disputes:[<分歧点候选>]}
+
+可验证终态（selfCheck.terminalState 逐条核验）：
+  - 产物判据：报告四节齐备落盘（.w-model/phase-analyses/phase-<N>/<persona>.md）
+  - 回填判据：run-log `action=perspective, persona=<id>` 记录（persona 非空；角色禁令优先：gate 验证由下游 G 承担）
+
+禁止：
+  - 产出阶段交付物 / 改迷雾册（未决分歧的登记义务在 S 产出侧）/ 跑门禁脚本
+  - 写正式阶段产物 / 越阶段分析
+  - 代替其他 persona 产出视角（一 persona 一报告；run-log persona 字段须与本 persona id 一致）
 ```
 
 ## 回填契约

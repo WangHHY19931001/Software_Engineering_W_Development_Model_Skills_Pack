@@ -1,12 +1,12 @@
 # 模板布局说明（README）
 
-本目录存放 W 开发模型各阶段的文档模板。布局与 `scripts/logic/gate-logic.ts` 中的 `PHASE_SPEC_LAYOUT` 常量保持一致：每个阶段由 **1 个主模板** + **6 个独立子模板** 组成，跨阶段共 **10 种** 独立子模板。
+本目录存放 W 开发模型各阶段的文档模板。布局与 `scripts/logic/gate-logic.ts` 中的 `PHASE_SPEC_LAYOUT` 常量保持一致：每个阶段由 **1 个主模板** + **6 个独立子模板** 组成（阶段 1 为 7 个），跨阶段共 **11 种** 独立子模板。
 
 ## 阶段 × 主模板 × 子模板 映射表
 
-| 阶段 | 主模板 | 子模板（6 个/阶段） |
+| 阶段 | 主模板 | 子模板（阶段 1 为 7 个，其余阶段 6 个） |
 | --- | --- | --- |
-| 阶段 1（需求规格） | `requirement-spec.md` | `requirement-spec/system-context.md`、`requirement-spec/glossary.md`、`requirement-spec/traceability-matrix.md`、`requirement-spec/behavior-spec.md`、`requirement-spec/discipline-dod.md`、`requirement-spec/uml-modeling.md` |
+| 阶段 1（需求规格） | `requirement-spec.md` | `requirement-spec/system-context.md`、`requirement-spec/glossary.md`、`requirement-spec/traceability-matrix.md`、`requirement-spec/behavior-spec.md`、`requirement-spec/discipline-dod.md`、`requirement-spec/uml-modeling.md`、`requirement-spec/development-requirements.md` |
 | 阶段 2（系统设计） | `system-design.md`（产出 `{module}-system-design.md`） | `system-design/system-architecture.md`、`system-design/glossary.md`、`system-design/traceability-matrix.md`、`system-design/behavior-spec.md`、`system-design/discipline-dod.md`、`system-design/uml-modeling.md` |
 | 阶段 3（接口设计） | `interface-design.md`（产出 `{module}-interface-design.md`） | `interface-design/interface-contract.md`、`interface-design/glossary.md`、`interface-design/traceability-matrix.md`、`interface-design/behavior-spec.md`、`interface-design/discipline-dod.md`、`interface-design/uml-modeling.md` |
 | 阶段 4（详细设计） | `detailed-design.md`（产出 `{module}-detailed-design.md`） | `detailed-design/class-design.md`、`detailed-design/data-model.md`、`detailed-design/glossary.md`、`detailed-design/traceability-matrix.md`、`detailed-design/behavior-spec.md`、`detailed-design/discipline-dod.md` |
@@ -22,7 +22,7 @@
 | `interface-design.md` | 阶段 3 接口设计主文档，定义模块间接口契约与交互 |
 | `detailed-design.md` | 阶段 4 详细设计主文档，细化类设计与数据模型 |
 
-## 子模板用途（跨阶段共 10 种）
+## 子模板用途（跨阶段共 11 种）
 
 | 子模板 | 用途 |
 | --- | --- |
@@ -36,6 +36,7 @@
 | `behavior-spec.md` | 行为规格，描述系统/模块行为与状态（阶段 1/2/3/4） |
 | `discipline-dod.md` | 纪律 DoD 清单，阶段完成定义（须 ≥ 8 项，阶段 1/2/3/4） |
 | `uml-modeling.md` | UML 建模，绘制用例/时序/类图等（阶段 1/2/3） |
+| `development-requirements.md` | 研制要求，顶层技术要求条目化，逐条追溯 REQ（阶段 1） |
 
 ## 其他模板
 

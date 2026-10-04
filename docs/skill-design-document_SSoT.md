@@ -1899,7 +1899,7 @@ interface RunLogEntry {
 }
 ```
 
-**action 词表口径（30 值）**：`plan_propose` / `plan_task` / `plan_review` 为 superpowers 编码链新增（S-plan 计划提案 / 计划任务推进 / V 任务评审，2026-09-21 起）；`opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive` 同批转为 **LEGACY**（位置不变，历史记录仍可解析，新流程不再产生）。词表口径与 `data-models.md` / `conventions.md` 一致，`check-run-log.ts` 的 action-role 配对同步生效。
+**action 词表口径（32 值）**：`plan_propose` / `plan_task` / `plan_review` 为 superpowers 编码链新增（S-plan 计划提案 / 计划任务推进 / V 任务评审，2026-09-21 起）；`perspective` / `consensus` 为阶段 1-4 多角色讨论分析新增（A persona 视角分析 / A-lead 共识纪要逐轮留痕，2026-10-03 起，见 §10P）；`opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive` 同批转为 **LEGACY**（位置不变，历史记录仍可解析，新流程不再产生）。词表口径与 `data-models.md` / `conventions.md` 一致，`check-run-log.ts` 的 action-role 配对同步生效。
 
 **D8 lifecycle identity contract（phase 8）：** `check-run-log.ts` 按完整 `(phase, round, reportId, targetKind, basedOnReport, implementationTarget)` 关联 lifecycle segment。rootcause R/V/G 仅相互关联同一 reportId/round/targetKind；fix、emergency-fix、implementation V/G/R3 必须显式声明并 exact 对齐 `target===implementationTarget`，且 fix/R3/V/G artifacts 包含 exact target；rootcause review 不计入 implementation V，也不满足 R3。R3 仅在同身份 `S-fix → R3 completeness/reliability/security → implementation V` 窗口计数，R8 在 segment 内校验，禁止 phase/round bucket 或 phase-wide 首索引。缺字段输出 `LEGACY_UNSCOPED`/deferred diagnostics，legacy 证据不进入 credit；生命周期机器状态统一为 `CLOSED_UNDER_CURRENT_RULES` 或 `NOT_CLOSED_NOT_PROVEN`，exit 0 仍不单独证明 closed。诊断不会修改 append-only raw JSONL。
 
@@ -2424,6 +2424,42 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 
 ---
 
+## 10P. 阶段 1-4 多角色讨论分析（A-lead 并行多轮交叉，2026-10-03）
+
+**目标**：在阶段 1-4 产出前插入一个多角色讨论分析动作（独立立项，用户 2026-10-03 规范模型指令）——O 在 🔴 CHECKPOINT 进入确认后分派 A-lead，A-lead 按「阶段角色集矩阵」并行分派 N 个 persona 视角分析（`action=perspective` 留痕）并**并行多轮交叉质询直到收敛**（D9），产出共识纪要（`.w-model/phase-analyses/phase-<N>/consensus-minutes.md`）作为 S 产出的前置输入；机器面 = run-log 结构化留痕 + `check-role-dispatch` 三新维度（D2「讨论+门禁」，fail-closed），讨论质量语义不做机器门禁、仍归 V 评审。本节为权威层摘要，细则按落点表分节承载，不在此重复。
+
+| 面 | 落点与内容 | 实现位置 |
+| --- | --- | --- |
+| 阶段角色集矩阵 | 三行角色集（阶段 1 六角色 / 阶段 2-3 七角色 / 阶段 4 七角色，顺序=分派顺序）+ 八类视角关注面 + 与 R/V 矩阵划界（三者互不替代）+ 协议摘要 + lite 降级规则——**权威 = 本矩阵节，SSoT 本行只摘要不复制角色集** | `w-model-dev/references/agent-personas.md`「阶段角色集矩阵（A-lead 多视角分析）」节 |
+| persona 资产 ×3 | 3 份新 persona 文件（需求分析师 / 测试经理 / 算法专家），frontmatter 四字段契约（capabilities / inputs / outputs / boundaries）；另复用 5 份既有 persona（D4） | `w-model-dev/subagent/product-requirements-analyst.md` + `w-model-dev/subagent/testing-test-manager.md` + `w-model-dev/subagent/engineering-algorithm-expert.md` |
+| A-lead 协议 | A-lead = A 类 lead 变体（D5）：角色定义（只做分析协调，不产出交付物）+ 派单契约两段（终态 = 共识纪要落盘 + perspective/consensus 留痕）+ 升级路径（5 轮安全阀 → 🔴 CHECKPOINT）+ 分派模板（dispatch-matrix 登记，动作 perspective/consensus 调度） | `w-model-dev/references/subagent-delegation.md`「A-lead（多视角分析协调者，A 类 lead 变体）」节 +「A-lead 多视角分析分派模板」节 |
+| 门禁三维度 | run-log `action=perspective`（persona 非空互异）/ `action=consensus`（A-lead 逐轮）留痕；`check-role-dispatch` 阶段 1-4 三新维度 fail-closed：覆盖（`phaseRoleCoverage`：perspective persona 集 ⊇ 矩阵集）/ 时序（本阶段 produce 严格晚于全部 perspective）/ 互异（一 persona 一报告） | `w-model-dev/scripts/logic/role-dispatch-logic.ts` + `w-model-dev/scripts/cli/check-role-dispatch.ts` + `w-model-dev/schemas/run-log.schema.json`（`persona` 可选字段）+ `w-model-dev/references/conventions.md`「run-log 动作类型枚举」节（32 值） |
+| 研制要求子模板 | 阶段 1 新子模板：研制要求 DEVREQ 条目化（类别六类枚举 / 量化指标可验证 / 验证层级与判据）+ 逐条追溯 ≥1 REQ；跨阶段子模板 10 种→11 种（D3，`PHASE_SPEC_LAYOUT` 单一事实源同步） | `w-model-dev/templates/requirement-spec/development-requirements.md` + `w-model-dev/scripts/logic/gate-logic.ts` `PHASE_SPEC_LAYOUT` |
+| V 参考项 | 阶段 1-4 评审额外参考矩阵——核验共识纪要 N 视角关注面在产出中的承接（缺任一关注面承接 → 对应子标准降分依据；非独立门禁，不新增子标准名与权重） | `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 |
+
+- **能力分工（不得夸大）**：讨论是**分析动作**不是产出动作——A-lead 与 persona 子代理均不产出阶段交付物、不跑门禁、不改迷雾册（未决分歧的登记义务在 S 产出侧，D5/D6），阶段交付物仍 **S 唯一落笔**；**收敛判据为主、5 轮安全阀为辅**——单轮零新增分歧 ∧ 全部分歧已决或登记迷雾册即收敛，5 轮未收敛必须 🔴 CHECKPOINT（不静默续跑也不静默掐断，D9）；lite 降级（L0/L1 成熟度或用户显式 `--lite`）只允许单视角且纪要注明降级，**不冒充全矩阵**（门禁按实际 N 校验）；机器门禁只判留痕结构与覆盖/时序/互异，**不判讨论语义质量**（D2，语义归 V）。
+- **判据披露**：D1 全量批次（阶段 1-4 全量接入）/ D2 讨论+门禁 / D3 阶段 1 新子模板（10 种→11 种）/ D4 3 新 persona + 5 既有复用 / D5 A-lead = A 类 lead 变体、S 唯一落笔 / D6 未决分歧走既有迷雾登记册通道（零新机制）/ D7 schema 先行 `persona` 字段 + 三新维度 fail-closed / D8 独立立项（版本 42.11.0）/ D9 并行多轮交叉直到收敛 + 5 轮安全阀（用户 2026-10-03 追加裁定）；**用户角色集逐字来源：2026-10-03 用户规范模型指令**（阶段 1 六角色 / 阶段 2-4 七角色，逐字采用；视角关注面为 [设计规格](./superpowers/specs/2026-10-03-phase-multi-role-analysis-design.md) §2 定义）。
+
+---
+
+## 10Q. 测试系统工程类型学、模块显式化与冒烟准入（用户规范模型吸收；独立立项，2026-10-04）
+
+**目标**：测试类型学总登记 + 模块测试显式化 + 冒烟准入 + 测试设计协同绑定（独立立项，用户 2026-10-04 规范模型指令，不属五批次吸收计划）——类型学按层级（单元/模块/集成/系统/验收）× 方法（黑盒/白盒/行为[BDD]/边界/覆盖）× 策略（冒烟/边界/覆盖）三维登记，逐维度映射 W 模型左右 V 阶段与四级门禁，**登记不改变任何既有门禁判定**；GJB 模块测试以「集成的子层」显式化落位（阶段 3 集成测试设计模块维度 → 阶段 6 前置执行，D2，四级门禁零改动）；阶段 6/7/8 完整套件开跑前先跑冒烟子集（test-case 冒烟标记列筛出），冒烟不过不开跑（文档时序机制 + 知情声明，零新脚本，D3）；四阶段测试设计产物 = 多角色讨论共识纪要的承接产物（复用 42.11.0 机制，零新角色集，D5）；登记面同步 SKILL.md 阶段表注与 AGENTS.md §1 索引句。本节为权威层摘要，细则按落点表分节承载，不在此重复。
+
+| 面 | 落点与内容 | 实现位置 |
+| --- | --- | --- |
+| 类型学总登记 | 层级 × 方法 × 策略三维登记表（11 行：层级 5 / 方法 3 / 策略 3）+ 三注（正交 / 模块=集成子层 / 冒烟不改 passed 判定）+ 冒烟准入权威段——**是登记，不改变任何既有门禁判定** | `w-model-dev/references/quality-standards.md`「测试系统工程类型学（层级 × 方法 × 策略）」节 |
+| 冒烟准入三细则 | 阶段 6/7/8 各一节同形态（时序：完整套件开跑前先跑冒烟子集、失败走普通 V/G 失败链、结果 `/wm test result=` 真实回填 + 「零新脚本」知情声明 + 权威指针） | `w-model-dev/references/phase-6-integration-test.md` / `phase-7-system-test.md` / `phase-8-acceptance-test.md` 各「冒烟准入（测试系统工程）」节 |
+| test-case 冒烟标记列 | 用例表「冒烟」列（✓ = 属于该阶段冒烟子集；空 = 不属于）+ 列注 | `w-model-dev/templates/test-case.md` 用例表 |
+| 协同承接 + 模块维度 | 四阶段「测试用例设计」节承接句（测试设计 = 多角色讨论共识纪要的承接产物之一，V 评审核验）+ 阶段 3 集成测试设计模块维度句（GJB 模块测试=模块级集成测试，阶段 6 集成执行的前置子集组织，D2） | `w-model-dev/references/phase-1-requirements.md` / `phase-2-system-design.md` / `phase-3-outline-design.md` / `phase-4-detailed-design.md` 各「测试用例设计」节 + `phase-3-outline-design.md` 模块维度句 |
+| verifier 测试设计核验扩尾 | §7.1 / §7.2 既有参考句扩尾：测试设计产物（验收/系统/集成/单元测试设计）的角色关注面承接核验同此口径（非独立门禁，不新增子标准名与权重） | `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 |
+| BDD 术语对齐 | 行为测试 = BDD features（类型学方法维度登记指针）；机制零改动 | `w-model-dev/references/bdd.md` 头部 |
+
+- **能力分工（不得夸大）**：类型学是**登记**不是新门禁——不改变任何既有门禁判定（四级测试门禁 / BDD 门禁 / 覆盖率门禁判定口径零改动）；冒烟准入是**文档时序机制**不是机器门禁——零新脚本，执行纪律靠 O 与测试团队遵循（与派单契约同款文档机制形态，D3 知情声明），冒烟不改变四级 passed 判定；模块测试是**集成的子层**——四级门禁不变，不做四级→五级升级（D2）；协同绑定是**复用 42.11.0 多角色讨论机制**——零新角色集、零新 CHECKPOINT（D5），V 承接核验为降分参考项非独立门禁。
+- **判据披露**：D1 全量批次（四缺口一次收口）/ D2 模块测试=集成的子层 / D3 冒烟=准入机制（零新脚本）——**D1-D3 为推荐采定，用户审查设计规格可推翻**（见 [设计规格](./superpowers/specs/2026-10-04-test-systems-engineering-design.md) §1）；D4-D6 按推荐采定（类型学落点 quality-standards / 协同绑定形态 / 版本 42.12.0）；**用户指令来源：2026-10-04 用户测试系统工程规范模型指令**（单元/模块/集成/系统/验收/黑盒/白盒/冒烟/行为/边界/覆盖多目的测试，测试经理组织测试/设计/开发/需求团队在合适阶段设计；独立立项，不属五批次吸收计划）。
+
+---
+
 ## 10.10 系统层级树与多层图谱
 
 > 本节确立系统层级树 + 7 层图谱模型。
@@ -2542,6 +2578,8 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | §10H SkillOpt 方法论吸收                     | SkillOpt「bounded edit + validation gate」方法论吸收（Loop 4 信号消费路径）+ 六段式循环类比映射 + bounded edit 边界 + validation gate 标准 + 人审流程 + 与 §11 协调                                                                                                                                                                                            | `w-model-dev/references/skillopt-adoption.md`（可执行细则）                                                                                                                                                                                                                                                                        | 完整（吸收 SkillOpt 方法论而非工具运行；不引入 Python 依赖/LLM；消费 Loop 4 信号；与 §11「技能自演化不在本仓库」协调——方法论吸收类比 §10.8 TLA+）                                                   |
 | §10N 派单契约与分层反馈回路 | 派单契约两段（前置条件四形态 / 可验证终态四形态 / 自评词禁则 / 角色禁令优先 / selfCheck.terminalState 分层）+ 分层反馈回路 L0-L4 收敛视图（零新增轮次数值）+ 候选反模式 C2（无限返工循环，pending V 复审）+ eval L2 语料 id 61-64 | `w-model-dev/references/subagent-delegation.md`「派单契约：前置条件与可验证终态」节 +「分层反馈回路（L0-L4）」节（22 分派模板同构携带两段）+ `w-model-dev/references/phase-5-coding.md`「任务分配规则」「返工路径」节交叉引用 + `w-model-dev/references/hard-constraints.md` 候选区 C2 + `eval/mappings.json` / `eval/w-model-dev-test-prompts.json` | 完整（纯文档机制，无脚本门禁，D12 知情声明；执行靠 O/V 遵循与既有闭环门禁间接承载；见 [批次 4 设计规格](./superpowers/specs/2026-10-02-batch4-dispatch-contract-design.md)） |
 | §10O agent 威胁模型、整批否决权与迁移素材 | 威胁目录 T1-T7→既有机制映射（叙事层三不承诺）+ §7.4A 边界细化 + campaign 整批否决权/回收路径（编组语义，零新机制）+ Phase 5–8 迁移设计锚点素材（待需求输入） | `w-model-dev/references/agent-threat-model.md` + `w-model-dev/references/verifier-spec.md` §7.4A + `w-model-dev/references/quality-standards.md`「整批否决权与回收路径」节 + `w-model-dev/references/code-health-governance.md` §6 与头部指针 + 本文档 §10K.7 | 完整（纯文档批次，零新脚本零 schema；D1-D5 已裁定，见 [批次 5 设计规格](./superpowers/specs/2026-10-03-batch5-governance-narrative-design.md)） |
+| §10P 阶段 1-4 多角色讨论分析 | A-lead 按「阶段角色集矩阵」并行分派 N persona 视角分析 + 并行多轮交叉至收敛（收敛判据为主、5 轮安全阀为辅）+ 共识纪要承载（S 唯一落笔）+ run-log perspective/consensus 留痕 + `check-role-dispatch` 三新维度（覆盖 phaseRoleCoverage / 时序 / 互异）+ 研制要求子模板（子模板 10 种→11 种）+ V 覆盖核验参考项 | `w-model-dev/references/agent-personas.md`「阶段角色集矩阵」节 + `w-model-dev/subagent/` 3 新 persona + `w-model-dev/references/subagent-delegation.md`「A-lead」节 + `w-model-dev/scripts/logic/role-dispatch-logic.ts` + `w-model-dev/templates/requirement-spec/development-requirements.md` + `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 + 本文档 §10P | 完整（讨论=分析动作，语义质量归 V；D1-D9 已裁定，见 [设计规格](./superpowers/specs/2026-10-03-phase-multi-role-analysis-design.md)） |
+| §10Q 测试系统工程类型学与冒烟准入 | 类型学总登记（层级×方法×策略三维，逐维度映射左右 V 阶段与四级门禁；登记不改变任何既有门禁判定）+ 模块测试显式化（集成的子层，阶段 3 模块维度→阶段 6 前置，D2）+ 冒烟准入（阶段 6/7/8 文档时序机制，零新脚本，D3）+ 测试设计协同绑定（复用 42.11.0 多角色机制，零新角色集，D5） | `w-model-dev/references/quality-standards.md`「测试系统工程类型学」节 + `w-model-dev/references/phase-6-integration-test.md` / `phase-7-system-test.md` / `phase-8-acceptance-test.md`「冒烟准入」节 + `w-model-dev/templates/test-case.md` 冒烟列 + `w-model-dev/references/phase-1-requirements.md` / `phase-2-system-design.md` / `phase-3-outline-design.md` / `phase-4-detailed-design.md`「测试用例设计」承接句 + `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 + `w-model-dev/references/bdd.md` + 本文档 §10Q | 完整（纯文档批次，零新脚本零 schema；D1-D3 推荐采定用户可推翻，见 [设计规格](./superpowers/specs/2026-10-04-test-systems-engineering-design.md)） |
 | 11A 采用路径                                 | greenfield vs brownfield 引入 W 模型                                                                                                                                                                                                                                                                                                                           | `docs/adoption-guide.md`                                                                                                                                                                                                                                                                                                           | 完整（吸收自 addyosmani/agent-skills `docs/adoption-guide.md`）                                                                                                                                     |
 
 ---

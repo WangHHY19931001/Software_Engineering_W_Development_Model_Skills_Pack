@@ -882,7 +882,7 @@ const SPEC_STRUCTURE_CASES: SpecStructureCase[] = [
   {
     file: 'valid-requirement-spec-structure.json',
     expectedPassed: true,
-    description: '结构校验通过：6 引用块 + SSOT 头 + DoD 9 项',
+    description: '结构校验通过：7 引用块 + SSOT 头 + DoD 9 项',
   },
   {
     file: 'bad-refs-missing.json',
@@ -905,14 +905,14 @@ const SPEC_STRUCTURE_CASES: SpecStructureCase[] = [
 ];
 
 // ==================== Phase 1 §8 拒绝登记结构校验（M08） ====================
-// **内联用例（零新增 fixture 文件）**：只改 §8 段，其余 6 引用块 + §0 SSOT 头四项 +
+// **内联用例（零新增 fixture 文件）**：只改 §8 段，其余 7 引用块 + §0 SSOT 头四项 +
 // DoD 9 项由 runner 统一补齐 —— 因此 expectedBucketCounts 里 refs/ssot/dod 恒为 0
 // 就等价于断言「新校验不误伤其他桶」（恰好报该违规）。
 //
 // 边界：门禁**只校验登记结构**（节 / 表格 / 列 / 键唯一 / 状态枚举 / 回链非空）。
 // 「概念相似度」由阶段 1 入口读取动作以语义匹配承担，确定性脚本不校验语义。
 
-/** §8 之前的主规格前缀（6 引用块 + §0 SSOT 头四项），所有内联用例共用。 */
+/** §8 之前的主规格前缀（7 引用块 + §0 SSOT 头四项），所有内联用例共用。 */
 const OOS_SPEC_PREFIX =
   '> **文档版本**\n> **SSOT 声明**\n> **自身校验**\n> **禁止占位词**\n' +
   '> 系统上下文详见 [x](./system-context.md)\n' +
@@ -920,7 +920,8 @@ const OOS_SPEC_PREFIX =
   '> 需求追踪矩阵详见 [x](./traceability-matrix.md)\n' +
   '> 行为规格模型详见 [x](./behavior-spec.md)\n' +
   '> Phase 1 工程纪律与 DoD 详见 [x](./discipline-dod.md)\n' +
-  '> UML 需求建模详见 [x](./uml-modeling.md)\n';
+  '> UML 需求建模详见 [x](./uml-modeling.md)\n' +
+  '> 研制要求详见 [x](./development-requirements.md)\n';
 
 const OOS_TABLE_HEADER = '| conceptKey | 拒绝理由 | Prior requests | 状态 | 来源 |\n| --- | --- | --- | --- | --- |';
 
@@ -1978,6 +1979,26 @@ const ROLE_DISPATCH_CASES: RoleDispatchCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/有效 R3 维度记录不足.*缺：reliability\/security/],
     description: '阶段 1 仅有 1 条 R3 记录（缺 reliability/security），R3 无条件强制应被拦截',
+  },
+  {
+    file: 'valid-phase-role.jsonl',
+    expectedPassed: true,
+    description:
+      '阶段 1-4 多角色机制 valid：6 persona 视角分析（矩阵全集）+ consensus + produce 晚于全部 perspective——覆盖/时序/互异三新维度全过（task 3）',
+  },
+  {
+    file: 'bad-phase-role-missing-persona.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/阶段 1 多角色覆盖不足：缺 persona=engineering-algorithm-expert/],
+    description:
+      '阶段 1 视角分析缺 engineering-algorithm-expert（矩阵 6 缺 1 且未声明 lite），phaseRoleCoverage.missingPersonas 具名拦截（task 3 覆盖维度）',
+  },
+  {
+    file: 'bad-phase-role-timing.jsonl',
+    expectedPassed: false,
+    expectedReasonPatterns: [/阶段 1 多角色时序违规：produce 记录 runId=btp1 未严格晚于全部 perspective 记录/],
+    description:
+      '阶段 1 design-ux-architect 视角分析晚于 produce 产出（04:00 > 03:00），时序维度拦截——多角色讨论须先于 S 产出（task 3 时序维度）',
   },
 ];
 
@@ -3533,7 +3554,7 @@ async function runSpecStructureCases(samplesDir: string): Promise<CaseResult[]> 
 }
 
 // 内存 fs stub（内联用例）：键用 path.join 构造，与 checkPhaseSpecStructure
-// 内部 path.join 一致（Windows 反斜杠）。§8 之前的 6 引用块 + §0 四项 + DoD 9 项
+// 内部 path.join 一致（Windows 反斜杠）。§8 之前的 7 引用块 + §0 四项 + DoD 9 项
 // 由本 runner 统一补齐，使 §8 成为唯一变量。
 const OOS_REF_FILES = [
   'system-context.md',
@@ -3542,6 +3563,7 @@ const OOS_REF_FILES = [
   'behavior-spec.md',
   'discipline-dod.md',
   'uml-modeling.md',
+  'development-requirements.md',
 ];
 
 async function runSpecStructureOutOfScopeCases(): Promise<CaseResult[]> {

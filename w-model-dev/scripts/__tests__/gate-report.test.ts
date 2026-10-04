@@ -769,6 +769,9 @@ describe('check-role-dispatch.ts --json（子进程冒烟：空输入 fail-close
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-role-dispatch-valid-'));
     try {
       const logFile = path.join(tmpDir, 'run-log.jsonl');
+      // S 记录 action 用 'test'：阶段 1 夹具若用 'produce' 会误触阶段 1-4 多角色三新维度
+      // （phaseRoleCoverage 覆盖维度）导致本「合法三维度」正例转红；该维度由
+      // role-dispatch-logic.test.ts 与 self-test ROLE_DISPATCH_CASES（valid-phase-role.jsonl 等）专测。
       const entry = (runId: string, action: string, role: string): string =>
         JSON.stringify({
           runId,
@@ -788,7 +791,7 @@ describe('check-role-dispatch.ts --json（子进程冒烟：空输入 fail-close
       await fs.writeFile(
         logFile,
         [
-          entry('r1', 'produce', 'S'),
+          entry('r1', 'test', 'S'),
           entry('r2', 'review', 'V'),
           entry('r3', 'gate', 'G'),
           entry('r4', 'r3-completeness', 'R'),

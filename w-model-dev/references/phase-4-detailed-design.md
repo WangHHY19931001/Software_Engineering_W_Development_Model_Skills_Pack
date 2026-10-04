@@ -7,6 +7,15 @@
 
 基于概要设计进行类 / 方法级设计，并**同步设计单元测试用例**。详细设计子模块产出类图、数据库设计、方法级定义。
 
+## 多角色讨论分析（阶段角色集矩阵，批次 multi-role）
+
+- **时序**：O 路由确认后、S 产出派单前——O 派单 A-lead（[subagent-delegation.md](subagent-delegation.md)「A-lead」节契约两段）→ 并行分派 7 persona 视角分析（矩阵行：测试经理/系统架构师/软件工程师/产品经理/UX 专家/数据库专家/算法专家）→ 汇总分歧 → 并行多轮交叉直到收敛（单轮零新增分歧 ∧ 全部分歧已决或登记迷雾册；5 轮安全阀 → 🔴 CHECKPOINT）→ 共识纪要 → S 依纪要产出（派单前置条件=纪要实存且 N 视角齐备）。讨论分析仅发生在本阶段首轮 produce 之前；produce 之后再新增 perspective 即属出格行为（门禁时序维度将拦截）——如需重开讨论，走阶段回退。
+- **分歧出口**：未决分歧由 S 产出时登记入本阶段设计期迷雾登记册（[phase-4-detailed-design.md](phase-4-detailed-design.md)「设计期迷雾登记册」节）；A-lead 与 persona 不改迷雾册。
+- **门禁**：阶段门 `check-role-dispatch` 含 `phaseRoleCoverage` 维度（覆盖/时序/互异，exit 1 阻断放行）；run-log 须有 `perspective`×N + `consensus`≥1 + `produce` 晚于全部 perspective。
+- **lite**：L0/L1 或用户显式 `--lite` → 单视角（系统架构师）+ 纪要注明降级；门禁按实际 N。
+
+> 矩阵 persona 顺序以 [agent-personas.md](agent-personas.md)『阶段角色集矩阵』节为准，本节不维护独立副本。
+
 ## 详细设计算法
 
   1. 类设计
@@ -94,6 +103,8 @@
 |---|---|---|---|---|
 | TC-DES-002 | 类图生成 | 详细需求描述 | 符合 UML 规范的类图 | 高 |
 | TC-DES-003 | 数据库设计 | 数据需求 | ER 图、表结构定义、索引设计 | 高 |
+
+本阶段测试设计为多角色讨论共识纪要的承接产物之一——测试经理视角（可测试性/验收判据）与各角色关注面的承接情况经 V 评审核验（[agent-personas.md](agent-personas.md)『阶段角色集矩阵』），协同过程见各阶段『多角色讨论分析』节。
 
 ## 测试 seam 决策
 
@@ -268,6 +279,7 @@ G 子代理跑 [`check-bdd-model.ts`](../scripts/cli/check-bdd-model.ts) `--phas
 - [ ] {module}-traceability-matrix.md（DD×INTF + 测试层级矩阵）与主文档 §1/§2/phase3 矩阵一致，主文档 §5 引用块成立
 - [ ] {module}-glossary.md + {module}-behavior-spec.md 已产出，主文档 §4/§6 引用块成立
 - [ ] {module}-discipline-dod.md 已产出（DoD ≥ 8 项），主文档 §7 引用块成立
+- [ ] `check-role-dispatch` exit 0（含 `phaseRoleCoverage` 维度）
 
 > 🔴 **CHECKPOINT · 阶段门放行**：详细设计 + 单元测试用例产出后暂停。Agent 必须向用户展示「类图 / ER 图 / 方法定义（签名+前置后置条件）/ 单元测试用例（含断言格式 + 边界清单）/ 设计期迷雾清空披露 / RTM 补登」，由用户确认「放行进入阶段 5」或「返工」。单元测试用例存在无断言占位或边界清单未覆盖 → 一律返工。迷雾登记册存在未终结项（check-design-fog exit 1）→ 一律返工。
 

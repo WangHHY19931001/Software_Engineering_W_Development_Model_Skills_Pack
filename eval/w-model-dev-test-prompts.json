@@ -454,5 +454,11 @@
     "scenario": "新机制：返工出口归属询问",
     "prompt": "返工到底修几轮算完，谁有权决定停止修复",
     "expected": "skill 指出返工轮次出口由分层反馈回路定义（L0 finding / L1 任务 5 轮 / L2 阶段 maxReworkRounds / L3 跨阶段 upstreamDefect / L4 用户 CHECKPOINT），达限升级到用户裁定；编排者不得自行决定无限修复"
+  },
+  {
+    "id": 65,
+    "scenario": "新机制：阶段产出直接派单 S 没有多角色讨论分析",
+    "prompt": "阶段产出直接派 S 子代理写文档，跳过多角色讨论分析这一步",
+    "expected": "skill 必须拒绝跳过多角色讨论分析，指出阶段 1-4 产出前须由 A-lead 按 agent-personas「阶段角色集矩阵」分派 N persona 视角分析并并行多轮交叉至收敛，共识纪要是 S 产出的前置输入（讨论=分析动作，S 唯一落笔）；机器面由 check-role-dispatch 覆盖/时序/互异三维度守护，lite 降级须纪要注明且不冒充全矩阵"
   }
 ]

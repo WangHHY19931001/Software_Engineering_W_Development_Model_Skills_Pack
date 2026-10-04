@@ -23,7 +23,7 @@
 | performance-auditor | 性能基线与回归，Quick/Deep 模式，Metric-Honesty Rule，阶段 7 | Persona 4 |
 | Severity 标签 | Critical/Required/Optional/Nit/FYI（reworkHints 前缀） | Persona 1 + verifier-spec §7.4A.2 |
 | 与 R 的关系 | R 不调用 Persona，Persona 不调用 R，两者互补 | 「与 root-cause-locator.md 的关系」节 |
-| 与 subagent/ 人格库 | 4 Persona ↔ subagent/ 33 人格映射 | 「与 subagent/ 人格库的关系」节 |
+| 与 subagent/ 人格库 | 4 Persona ↔ subagent/ 36 人格映射 | 「与 subagent/ 人格库的关系」节 |
 | 多角度分派 | 多角度 > 并行；N 份 PartialReport 独立产出 | 「多角度分派说明」节 |
 | self-as-verifier | S/V/G/R 兼任时产物路径独立（反模式 #35） | 「self-as-verifier 兼任规则」节 |
 
@@ -516,7 +516,7 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts \
 
 > 对应 spec §9.1（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） 现有人格库盘点。
 
-[`w-model-dev/subagent/`](../subagent/) 含 33 个人格文件，分 5 类（engineering 16 / testing 8 / design 3 / product 4 / project 2），供 R-lead / V-lead 在多角度分析时加载。本文件定义的 4 个 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）与 `subagent/` 人格库的关系：
+[`w-model-dev/subagent/`](../subagent/) 含 36 个人格文件，分 5 类（engineering 17 / testing 9 / design 3 / product 5 / project 2），供 R-lead / V-lead 在多角度分析时加载。本文件定义的 4 个 Persona（code-reviewer / test-engineer / security-auditor / performance-auditor）与 `subagent/` 人格库的关系：
 
 | 本文件 Persona | subagent/ 对应人格 | 关系 |
 |---|---|---|
@@ -578,7 +578,7 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 
 > **定位**：R-lead / V-lead 在多角度分析时选择 persona 的参考矩阵。
 > **关联 spec**：`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md` §9.3 + §9.4
-> **人格库**：[w-model-dev/subagent/](../subagent/) 含 33 个人格文件，分 5 类。
+> **人格库**：[w-model-dev/subagent/](../subagent/) 含 36 个人格文件，分 5 类。
 
 ---
 
@@ -586,10 +586,10 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 
 | 类别 | 数量 | 人格 | R/V 适用性 |
 |---|---|---|---|
-| **engineering** | 16 | code-reviewer, senior-developer, software-architect, backend-architect, frontend-developer, ai-engineer, data-engineer, database-optimizer, autonomous-optimization-architect, incident-response-commander, threat-detection-engineer, security-engineer, sre, minimal-change-engineer, codebase-onboarding-engineer, technical-writer | R + V |
-| **testing** | 8 | api-tester, performance-benchmarker, reality-checker, evidence-collector, test-results-analyzer, tool-evaluator, workflow-optimizer, accessibility-auditor | R + V |
+| **engineering** | 17 | code-reviewer, senior-developer, software-architect, backend-architect, frontend-developer, ai-engineer, algorithm-expert, data-engineer, database-optimizer, autonomous-optimization-architect, incident-response-commander, threat-detection-engineer, security-engineer, sre, minimal-change-engineer, codebase-onboarding-engineer, technical-writer | R + V |
+| **testing** | 9 | api-tester, performance-benchmarker, reality-checker, evidence-collector, test-results-analyzer, tool-evaluator, workflow-optimizer, accessibility-auditor, test-manager | R + V |
 | **design** | 3 | ui-designer, ux-architect, ux-researcher | V（阶段 2-3 设计评审） |
-| **product** | 4 | product-manager, feedback-synthesizer, trend-researcher, behavioral-nudge-engine | V（阶段 1 需求评审） |
+| **product** | 5 | product-manager, feedback-synthesizer, trend-researcher, behavioral-nudge-engine, requirements-analyst | V（阶段 1 需求评审） |
 | **project** | 2 | project-manager-senior, experiment-tracker | V（阶段 1-2 流程评审） |
 
 > **矩阵外自由裁量（6 份）**：`design-ui-designer` / `design-ux-researcher` / `engineering-data-engineer` / `product-behavioral-nudge-engine` / `product-trend-researcher` / `project-experiment-tracker` 不在 R/V 矩阵任何行内——V-lead 可按需直接指定；R 多角度受 R11 限制不可选（矩阵外 persona 会 exit 1）。
@@ -603,7 +603,7 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 - **来源**：[jnMetaCode/agency-agents-zh](https://github.com/jnMetaCode/agency-agents-zh)（上游是多领域人格库，含 engineering / security / marketing / finance 等 20+ 类目录）。
 - **导入基线**：commit `550a29fa`（2026-07-24）首次导入；收录时取其中 engineering / testing / design / product / project-management 五类里与软件开发流程相关者。
 - **收录判据**：该人格能否成为 R（根因定位）或 V（评审）的一个有效视角。纯领域专属（嵌入式 / FPGA / IoT / 电商平台集成 / 云厂商专属等）与营销、财务、法务、人力等非软件开发流程角色不收录。
-- **收录规模**：33 份（2026-09-17 扩充 5 份：应用安全 / SRE / 最小变更 / 无障碍审核 / 代码库入职引导）。
+- **收录规模**：36 份（2026-09-17 扩充 5 份：应用安全 / SRE / 最小变更 / 无障碍审核 / 代码库入职引导；2026-10-03 多角色机制扩充 3 份：需求分析师/测试经理/算法专家）。
 - **本地契约**：收录后一律按 §1.5 补 `capabilities` / `inputs` / `outputs` / `boundaries` 四字段（门禁强制）；正文默认保持上游原文，任何本地增强须在 CHANGELOG 留痕。
 - **已知偏离上游**：`engineering-code-reviewer` 增「Fowler 12 坏味道固定基线」；`engineering-technical-writer` 的占位符与外链本地化（L0 安全形态）；6 份未跟随上游把 frontmatter `color` 改为十六进制值（本仓不渲染颜色，无功能影响）。
 
@@ -611,7 +611,7 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 
 > 吸收自 Agentic Design Patterns ch15「Agent 卡片」能力清单理念（不吸收 A2A 协议本身）。
 
-每个 `subagent/*.md` 的 YAML frontmatter **必须**含四项单行非空字段（33 份全覆盖，由 `check-docs-consistency.ts` 的 `persona-capability-declarations` 检查强制；缺一即 exit 1）：
+每个 `subagent/*.md` 的 YAML frontmatter **必须**含四项单行非空字段（36 份全覆盖，由 `check-docs-consistency.ts` 的 `persona-capability-declarations` 检查强制；缺一即 exit 1）：
 
 | 字段 | 内容 | 用途 |
 |---|---|---|
@@ -692,6 +692,24 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 - **舞蹈强度 = 论据强度**：评审意见须附证据链（evidence 具体引用，signature-chain inputProvenance），无证据的意见不参与加权。
 - **与白箱优先兼容**：每个"舞蹈"（评审意见）必须白箱可见（可追溯来源），不存在凌驾于证据之上的中心权威。
 - **与「多评审分歧上缴人裁决」的关系**：共识在证据层收敛；证据仍分歧时上缴人裁决（不自动共识）。
+
+---
+
+### 3A. 阶段角色集矩阵（A-lead 多视角分析）
+
+> **定位**：A-lead 在阶段 1-4 产出前分派多视角 persona 分析的选择矩阵。关联 spec：`docs/superpowers/specs/2026-10-03-phase-multi-role-analysis-design.md` §2（角色集逐字采用用户 2026-10-03 指令；视角关注面为该规格定义）。
+
+| 阶段 | 角色集（顺序=分派顺序） | persona 映射 |
+|---|---|---|
+| 1 需求分析 | 需求分析师 → 产品经理 → 测试经理 → 系统架构师 → UX 专家 → 算法专家（6） | `product-requirements-analyst` / `product-manager` / `testing-test-manager` / `engineering-software-architect` / `design-ux-architect` / `engineering-algorithm-expert` |
+| 2 系统设计 / 3 概要设计 | 测试经理 → 系统架构师 → 软件工程师 → 产品经理 → 数据库专家 → UX 专家 → 算法专家（7） | `testing-test-manager` / `engineering-software-architect` / `engineering-senior-developer` / `product-manager` / `engineering-database-optimizer` / `design-ux-architect` / `engineering-algorithm-expert` |
+| 4 详细设计 | 测试经理 → 系统架构师 → 软件工程师 → 产品经理 → UX 专家 → 数据库专家 → 算法专家（7） | `testing-test-manager` / `engineering-software-architect` / `engineering-senior-developer` / `product-manager` / `design-ux-architect` / `engineering-database-optimizer` / `engineering-algorithm-expert`（集合同 2/3，顺序随本行角色序） |
+
+**各角色视角关注面（矩阵列，指导视角分析报告）**：需求分析师=需求分解与追溯完整性；产品经理=范围/优先级/价值；测试经理=可测试性与验收判据（测试左移——与 W 模型阶段 1 产验收测试设计同源）；系统架构师=边界/分层/架构约束；软件工程师=实现可行性与复杂度；数据库专家=数据模型与一致性；UX 专家=交互与可用性；算法专家=模型选型/复杂度/精度约束。
+
+> **与 R/V 矩阵划界**：R-persona 两键矩阵服务根因定位（`rootCause.category` + 风险域），V-lead 多角度矩阵服务评审，本矩阵**只服务 A-lead 阶段产出前分析**——三者互不替代、互不复用选择判据。
+> **协议摘要**：O 派单 A-lead → 并行分派 N persona 视角分析（`action=perspective`、`persona` 字段留痕）→ 汇总分歧 → 并行多轮交叉直到收敛（单轮零新增分歧 ∧ 全部分歧已决或登记迷雾册；5 轮安全阀升级 🔴 CHECKPOINT）→ 共识纪要（含实际轮次）→ S 依纪要产出。分派契约与纪要形态见 [subagent-delegation.md](subagent-delegation.md)「A-lead 多视角分析」节。
+> **lite 降级**：L0/L1 成熟度或用户显式 `--lite` 时允许单视角（需求阶段=需求分析师；设计阶段=系统架构师），纪要注明降级；门禁按实际 N 校验（`check-role-dispatch` phaseRoleCoverage 维度），不冒充全矩阵。
 
 ---
 

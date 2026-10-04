@@ -56,7 +56,7 @@
 
 ### action（RunLogEntry）
 
-- **规范定义**：run-log 动作类型枚举（共 30 值，以 `run-log.schema.json` 为准）：`chunk` / `cross` / `evolve` / `produce` / `review`（V 评审）/ `gate` / `tla-gate` / `graph-gate` / `test` / `checkpoint` / `rework` / `rollback` / `rootcause` / `fix` / `emergency-fix` / `escalate` / `r3-completeness` / `r3-reliability` / `r3-security` / `codegraph_query` / `opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive`（以上四值为 LEGACY——历史 run-log 合法，新日志须改用 plan_* 三动作）/ `ensure_deps` / `iceberg-sweep` / `iceberg-review` / `plan_propose`（S 产编码计划 docs/plans/<changeId>.plan.md）/ `plan_task`（S 按计划执行一个任务）/ `plan_review`（V 对计划任务产出做评审）。
+- **规范定义**：run-log 动作类型枚举（共 32 值，以 `run-log.schema.json` 为准）：`chunk` / `cross` / `evolve` / `produce` / `review`（V 评审）/ `gate` / `tla-gate` / `graph-gate` / `test` / `checkpoint` / `rework` / `rollback` / `rootcause` / `fix` / `emergency-fix` / `escalate` / `r3-completeness` / `r3-reliability` / `r3-security` / `codegraph_query` / `opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive`（以上四值为 LEGACY——历史 run-log 合法，新日志须改用 plan_* 三动作）/ `ensure_deps` / `iceberg-sweep` / `iceberg-review` / `plan_propose`（S 产编码计划 docs/plans/<changeId>.plan.md）/ `plan_task`（S 按计划执行一个任务）/ `plan_review`（V 对计划任务产出做评审）/ `perspective`（A persona 子代理按阶段角色集矩阵单 persona 视角分析，须含 persona 字段且非空）/ `consensus`（A-lead 汇总分歧/交叉轮调度/共识纪要，多轮逐轮记录；persona 可为 A-lead 或空——以 role=A 判定）。
 - **_Avoid_**：operation/op/行为/事件（「action」字段名固定；EventIngress 的同类字段是 `eventType`）。
 
 ### checkRounds
@@ -160,6 +160,31 @@
 
 - **规范定义**：V/G 任一门禁不通过后的返工链（V/G 失败 → R 根因定位 → V 复审 RootCauseReport → G 根因报告门禁 → S-fix → R3×3 预防性审查 → V/G 复验 → CHECKPOINT），权威全句定义见 [hard-constraints.md](hard-constraints.md)「普通 V/G 失败链」节：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。全包其余文档以短名引用本节：正文用 `普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）`，表格用 `普通 V/G 失败链（hard-constraints）`，不再内联全句（examples/ 教学示例除外）。
 - **_Avoid_**：完整失败链/标准返工链/失败处理链/完整普通失败链/普通失败链/普通失败返工链/普通失败完整链/完整返工链/普通返工链（非规范叫法；统一短名「普通 V/G 失败链」并指向 hard-constraints 权威节）。
+
+### 阶段角色集矩阵
+
+- **规范定义**：阶段 1-4 产出前 A-lead 多视角分析的 persona 选择矩阵，权威 = [agent-personas.md](agent-personas.md)「3A. 阶段角色集矩阵」节：阶段 1 六角色，阶段 2/3 与阶段 4 各七角色（集合同、行序不同，顺序=分派顺序，覆盖判定只比集合）；与 R-persona 两键矩阵（服务根因定位）、V-lead 多角度矩阵（服务评审）三分划界互不复用。机器权威副本为 `role-dispatch-logic.ts` 的 `PHASE_ROLE_MATRIX` 常量（与矩阵行逐字一致，权威在 agent-personas 节）。
+- **_Avoid_**：角色矩阵/分析矩阵等泛称，或与 R-persona 矩阵、V 多角度矩阵混称（三个矩阵服务不同环节，选择判据互不复用）。
+
+### A-lead
+
+- **规范定义**：阶段 1-4 产出前多角色讨论分析的 A 类 lead 变体——按阶段角色集矩阵分派 N persona 视角分析、汇总分歧、调度并行多轮交叉直到收敛（单轮零新增分歧 ∧ 全部分歧已决或登记迷雾册；5 轮安全阀 → 🔴 CHECKPOINT）、产出共识纪要；A-lead 与 persona 均不产出阶段交付物、不改迷雾册（未决分歧登记义务在 S 产出侧）。run-log 以 role=A + action=consensus 留痕，分派契约见 [subagent-delegation.md](subagent-delegation.md)「A-lead」节。
+- **_Avoid_**：分析组长/讨论主持/lead-analyst（固定称呼「A-lead」；不是独立六类角色，属 A 类变体）。
+
+### perspective（RunLogEntry）
+
+- **规范定义**：run-log 动作枚举值：A persona 子代理按阶段角色集矩阵单 persona 视角分析的留痕记录，须含 `persona` 字段且非空、与 persona id 一致；同阶段每 persona 恰一条（重复=互异违规），produce 须晚于全部 perspective（时序维度）。
+- **_Avoid_**：视角记录/单视角分析等自由叫法（动作名固定「perspective」；「consensus」是 A-lead 侧动作，不同概念）。
+
+### consensus（RunLogEntry）
+
+- **规范定义**：run-log 动作枚举值：A-lead 汇总分歧/交叉轮调度/共识纪要的留痕记录，多轮逐轮记录；`persona` 可为 A-lead 标识或省略（以 role=A 判定，不强制非空）；lite 降级经 `note`/`artifacts` 携带 `phase-role-lite` 标记声明。
+- **_Avoid_**：共识记录/汇总会等别称（动作名固定「consensus」；「共识纪要」指纪要产物本身，不同概念）。
+
+### 共识纪要
+
+- **规范定义**：A-lead 交叉收敛后落盘 `.w-model/phase-analyses/phase-<N>/consensus-minutes.md` 的纪要产物（含每分歧决议+理由，或迷雾册去向与实际交叉轮次；lite 降级时注明），是 S 产出派单的前置条件之一（纪要实存且 N 视角齐备）；不是阶段交付物替代品。
+- **_Avoid_**：会议纪要/共识文档/结论汇总（固定称呼「共识纪要」；路径固定 consensus-minutes.md，不新设 schema 产物）。
 
 ---
 

@@ -7,6 +7,36 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [42.12.0] - 2026-10-04
+
+### 测试系统工程批次（用户规范模型吸收；独立立项）
+
+- **测试系统工程类型学**（quality-standards 新节）：层级（单元/模块/集成/系统/验收）× 方法（黑盒/白盒/行为[BDD]/边界/覆盖）× 策略（冒烟/边界/覆盖）三维登记，逐维度映射 W 模型左右 V 阶段与四级门禁；登记不改变任何既有门禁判定。
+- **模块测试显式化**：GJB 层级以「集成的子层」落位（阶段 3 集成测试设计模块维度 → 阶段 6 前置执行），四级门禁零改动。
+- **冒烟准入机制**：阶段 6/7/8 完整套件开跑前先跑冒烟子集（test-case 冒烟标记列筛出），冒烟不过不开跑；零新脚本（文档时序机制 + 知情声明）。
+- **测试设计协同绑定**：四阶段测试设计产物 = 多角色讨论共识纪要的承接产物（复用 42.11.0 机制，零新角色集）；verifier-spec 测试设计核验扩尾。
+- **登记面**：BDD 术语对齐（行为测试=BDD features）+ SKILL/AGENTS/SSoT §10Q。
+- prepush 19 项全绿（对 26000005 实测 1779s）。
+
+## [42.11.0] - 2026-10-03
+
+### 阶段多角色讨论分析机制（用户规范模型吸收；独立立项，规格 D1-D9）
+
+- **阶段角色集矩阵（agent-personas 新节）**：阶段 1 六角色 / 阶段 2+3 与 4 七角色（用户角色集逐字），映射 5 既有 persona + 3 新增（`product-requirements-analyst` / `testing-test-manager` / `engineering-algorithm-expert`）；与 R/V 矩阵三分划界。persona 库 33→36。
+- **A-lead 并行多轮交叉协议**：O 派单 → 并行 N persona 视角分析 → 汇总分歧 → 并行多轮交叉直到收敛（单轮零新增分歧 ∧ 全部分歧已决/入迷雾册；5 轮安全阀升级 🔴 CHECKPOINT）→ 共识纪要 → S 依纪要产出（落笔唯一性不变）；未决分歧登记既有迷雾登记册（零新通道）；lite 降级形态。
+- **机器门禁**：run-log schema 先行（`persona` 字段 + `perspective`/`consensus` 动作）；`check-role-dispatch` 三新维度（覆盖/时序/互异，`phaseRoleCoverage` 键，fail-closed）；脚本数 48 不变。
+- **研制要求子模板**：阶段 1 第 7 个子模板（DEVREQ 条目化，六类枚举，逐条追溯 REQ）；`PHASE_SPEC_LAYOUT` 同步 + 存量 fixtures 硬切；子模板 10 种→11 种。
+- **登记面**：四阶段细则节 + CHECKPOINT 行 + verifier-spec 参考项 + SSoT §10P/§10A + eval id 65 + 全部计数面。
+- prepush 19 项全绿（对 9555b9be 实测 2655s）。
+
+## [42.10.1] - 2026-10-03
+
+### 依赖安全修复（外部 advisory 强制，非批次交付）
+
+- **修复 `npm audit` 12 high（GHSA-vfj7-8cjw-p6xm，braces 全版本无上游修复版）**：① `@typescript-eslint` 7.18.0→8.71.0（typescript-estree 弃 globby 改 tinyglobby，braces 出树；lint 配置兼容性调整见提交）；② docsify-cli 链处置（移除 devDep，`docs:site` 改 `npx -y docsify-cli@4.3.0 serve docs` 按需运行、不进项目依赖树——降级 4.3.0 实查仍中招：其依赖 `livereload ^0.7.0` 解析至 0.7.0，落在另一 advisory 的 vulnerable 区间 `0.6.0 - 0.8.2`（chokidar 1.7.0 链），且旧版 update-notifier/marked/got 链使 audit 不降反升至 21 vulnerabilities（11 high）；docsify-cli 全版本系（1.1.0-4.4.4 与 >=4.4.0 两区间合计全覆盖）无安全版本）。advisory 库在批次 5 prepush 基线（1991s，2026-10-03 早间）之后更新，main 同样被阻断——本修复为仓库级维护，不属收口项目交付面。
+- `config/.eslintrc.cjs` 最小调整（@typescript-eslint v8 兼容）：`no-unused-vars` 补 `caughtErrors: 'none'`（v8 将该默认值由 `none` 改为 `all`，显式恢复 v7 语义；v8 升级产生的唯一新发现即此默认变化产物，非真实缺陷，baseline 未重生成）。
+- prepush 19 项全绿（对 2b87e0fe 实测 1952s）。
+
 ## [42.10.0] - 2026-10-03
 
 ### 批次 5：治理与叙事（吸收批次总纲批次 5；规格 D1-D5 已裁定，文档先行）
