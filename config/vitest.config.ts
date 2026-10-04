@@ -79,6 +79,7 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'platform-deps-hook.test.ts',
   'platform-deps-install.test.ts',
   'pre-commit-hook.test.ts',
+  'preventive-review-cli.test.ts',
   'project-read-validation.test.ts',
   'review-package-cli.test.ts',
   'run-sync.test.ts',
