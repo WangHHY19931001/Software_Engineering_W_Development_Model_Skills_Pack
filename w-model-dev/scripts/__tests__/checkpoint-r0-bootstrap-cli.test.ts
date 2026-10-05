@@ -298,6 +298,9 @@ describe('CLI 入口无 VITEST 环境旁路（C1 反证，真实子进程）', (
       encoding: 'utf-8',
       env: { ...process.env, VITEST: '1' },
     });
+    // spawn 级失败（如 ENOENT / 超时被杀）时 status 为 null，下方三支断言的
+    // `status !== 0` 分支恒真 → 空洞通过；先断言无 spawn 错误再查旁路形态。
+    expect(result.error).toBeUndefined();
     // 断言「有输出/有行为」，杜绝静默通过：旧旁路（run-main.ts 的
     // `if (process.env.VITEST) return;`）下本用例形态 = exit 0 且零输出。
     expect(
