@@ -7,6 +7,18 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [42.13.1] - 2026-10-05
+
+### 42.13.0 最终审查登记剩余项收尾批（3 提交 693d768f..6a76760e，全部过审）
+
+- **测试加固（审查延后项 A1/A2，`693d768f`）**：cli-entry-guard 守卫测试由抽样式断言扩展为 `lib/` 全目录遍历（逐文件断言 isDirectInvocation 守卫存在，防新增 lib 文件漏守卫）；补反证用例 spawn 失败断言（守卫真拦截而非静默通过）；RED 实证入账本。
+- **R5 越权检测收紧（`7be0cdec`）**：`node --eval=` 与 `python -c` 两形态改为「形态 + `.w-model/` 路径」复合判定（requiresWModelPath），gate-log 中良性提及不再构成越权信号（降误报）；去除 `fs.promises|fsPromises.writeFile` 冗余形态（其匹配串必含 `writeFile('….w-model/`，被 writeFile 模式覆盖，无增量检测力）；既有 4 条正则与 appendFileSync 形态一字未动，「启发式检测信号、非安全边界」定性不变；run-log-logic 测试样本 109→111。
+- **叙事对齐三处 + 一处连带（`6a76760e`）**：SSoT §10.11 sourceSigIds 如实化——阶段 5 机器校验面为相邻阶段 O 链接（archive R7 引用校验），阶段 1-4 全部 G gate 签名全量交叉核对**无机器门禁**、由人工/外部审计承载（与 agent-threat-model T4 已知缺口一致）；§10C.3 张力句对齐 §10C.2 三分类（操作型 CHECKPOINT L1+ 随成熟度自动放行 / 决策型与阶段门放行恒等用户确认）；T5 wm-write 项补检测级限定（工具内阻断、绕过直写不可检测、整体评级不高于检测）+ §10O N4 bullet 同构句；signature-chain-guide §5 消费者表阶段 5 行同款宣称连带同步。
+- **计数影响**：零新增 CLI/schema/references/persona（48/34/45/36 全不变）；测试文件 112 不变（无新建文件，仅既有 3 个测试文件扩展）；门禁脚本 48 不变。
+- **lint:security 处置**：A1 的 lib 全目录遍历引入 2 条 `detect-non-literal-fs-filename` 新增命中（`cli-entry-guard.test.ts:12/14`，readdirSync/readFileSync 非字面量路径），与 42.13.0 已豁免的 12 条同类（测试夹具经 join/readdirSync 读仓内文件，by-design 非漏洞）；`security-scan --regenerate` 重生成 baseline 281→283 指纹，`npm run lint:security` 恢复 exit 0。
+- **并行车道加固**：新增 `.prettierignore` 排除 `w-model-dev/scripts/**/.d2-boundary-fixture-*`（dependency-boundaries.test.ts 于 logic/ 内瞬态写入的边界校验夹具，与 pre-push 并行车道的 prettier 扫描存在生灭窗口竞态，实测以 ENOENT 打红 prettier 车道一次；夹具创建者 548899fb，属既有潜在间歇竞态的本批实测暴露）。
+- **验证记录**：同内容树全量 vitest 五次全绿（npm test / coverage 单跑 ×2 / prepush R1、R5 车道；R2-R4 的 vitest 车道在 prepush 内间歇失败且钩子 temp 清理致失败名不可得，受控精确参数复现（含 `--reporter=json` 与 self-test 前置）全绿、非内容回归——登记为既有并行 flakiness 类间歇，待后续以可保留输出的方式定位）；prepush 19 项全绿（R5 实测 1840s）。
+
 ## [42.13.0] - 2026-10-04
 
 ### 深度审计 41 项问题全量修复（独立立项；规格 [`docs/superpowers/specs/2026-10-04-audit-deep-dive-fixes-design.md`](./docs/superpowers/specs/2026-10-04-audit-deep-dive-fixes-design.md)）

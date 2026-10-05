@@ -1,0 +1,4 @@
+# dependency-boundaries.test.ts 在 logic/ 内瞬态写入的边界校验夹具：
+# 并行 pre-push 车道（vitest 写删 × prettier 扫描）竞态会以 ENOENT 打红 prettier 车道
+# （2026-10-05 42.13.1 收尾批实测），故显式排除。
+w-model-dev/scripts/**/.d2-boundary-fixture-*
