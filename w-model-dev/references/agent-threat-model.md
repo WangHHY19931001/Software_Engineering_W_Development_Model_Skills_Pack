@@ -45,7 +45,7 @@
 
 - **威胁**：编排者 O 直接实施修改；绕过受控通道直写状态 / 代码 / 测试。
 - **攻击面示例**：O 越权代 S 修改产物；绕过 `code-health-apply` 直接 `git rm`。
-- **既有机制映射**：编排者最小化 + 反模式 #10（**流程**，[subagent-delegation.md](subagent-delegation.md)、hard-constraints 反模式 #10）；`.w-model/*.json` 写入统一走 `wm-write`（锁 + mtime 校验 + 原子写）（**阻断**）；code-health 人类 approval + exact-scope 回读 fail-closed（**阻断**，[code-health-governance.md](code-health-governance.md) §5/§6）。
+- **既有机制映射**：编排者最小化 + 反模式 #10（**流程**，[subagent-delegation.md](subagent-delegation.md)、hard-constraints 反模式 #10）；`.w-model/*.json` 写入统一走 `wm-write`（锁 + mtime 校验 + 原子写）（**工具内阻断**——wm-write 锁在**官方状态写入口内**阻断；绕过工具直写文件不可检测，整体评级不高于**检测**，评级基准见头部「覆盖强度图例」）；code-health 人类 approval + exact-scope 回读 fail-closed（**阻断**，[code-health-governance.md](code-health-governance.md) §5/§6）。
 
 ### T6 敏感数据泄漏与不当外发
 

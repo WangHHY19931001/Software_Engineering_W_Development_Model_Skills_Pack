@@ -1726,7 +1726,7 @@ R10 维护契约（docs-consistency source×clause 语义门）：
 
 > **L2+ 事件驱动激活**：成熟度达 L2 后，事件驱动循环（Loop 3，详见 §10F）激活。消费方自行实现触发器写入 `event-ingress.jsonl`，编排者 O 按事件类型路由到单阶段（非完整 8 阶段）。L0/L1 不支持事件驱动。
 
-> **全面禁止代签**：任何场景（含技能包内部 dogfooding）均须真实用户确认。编排者 O 不得代替用户在 🔴 CHECKPOINT 处签字放行。`acknowledgedDecisions` 须由用户陈述，O 不得代填（违反反模式 #10）。即使 L3 自动放行路径，CHECKPOINT 节点仍须真实用户确认（仅降低其他门禁的强制程度，不降低用户确认）。签名链 R5 校验 O checkpoint 签名 signer 须为用户 ID（非 O 角色）。
+> **全面禁止代签**：任何场景（含技能包内部 dogfooding）均须真实用户确认。编排者 O 不得代替用户在 🔴 CHECKPOINT 处签字放行。`acknowledgedDecisions` 须由用户陈述，O 不得代填（违反反模式 #10）。与 §10C.2 三分类一致——操作型 CHECKPOINT（如 ingestion 收敛确认、测试结果回填确认）在 L1+ 随成熟度自动放行、无暂停点；决策型与阶段门放行（attended 节点）在任何成熟度下始终等真实用户确认（硬约束 #2，仅降低其他门禁的强制程度，不降低用户确认）。签名链 R5 校验 O checkpoint 签名 signer 须为用户 ID（非 O 角色）。
 
 ### 10C.4 L3 高风险路径定义（强制人工 gate，不可自动放行）
 
@@ -2425,7 +2425,7 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 
 - **能力分工（不得夸大）**：威胁模型是**叙事映射**不是守卫体系——不新增脚本/检测信号/门禁判定（D1 三不承诺）；整批否决/回收是**编组语义**不是新自动化能力——全部复用既有 CHECKPOINT / ledger / 回滚原语，零新脚本零 schema；迁移素材是**待输入设计锚点**不是可用能力——维持「未实现（不得据此执行）」，实现单独立项。
 - **判据披露**：D1 裁定（2026-10-03，用户）细化全文 = 「不构建**自动化守卫脚本**；威胁登记与既有机制映射属 R3 叙事层」；T1-T7 为本仓自有编号（不复用 STRIDE）；缺口如实登记（T1 无自动注入检测 / T4 gate-log↔签名链自动核查未建 / T6 已外发包不可召回）——登记不构成补强承诺。
-- **覆盖强度订正（N4，2026-10-04）**：T2/T3 整体覆盖强度由「阻断」订正为**检测级**——T2 的时间戳三态与反伪造仅在**官方追加器内**阻断，绕过工具直写 run-log 文件不可检测（run-log 无行级完整性，WS-T7 去哈希化裁定，边界句见 §10D.6）；T3 的退出码强一致（约束 #9/#4）在**官方门禁链内**成立、约束本身属流程约束，绕过面谎报退出码 / 伪造 gate 记录无检测。工具内阻断事实保留，降级的是对绕过对抗面的整体评级；限定语详见 `agent-threat-model.md` T2/T3 行。
+- **覆盖强度订正（N4，2026-10-04）**：T2/T3 整体覆盖强度由「阻断」订正为**检测级**——T2 的时间戳三态与反伪造仅在**官方追加器内**阻断，绕过工具直写 run-log 文件不可检测（run-log 无行级完整性，WS-T7 去哈希化裁定，边界句见 §10D.6）；T3 的退出码强一致（约束 #9/#4）在**官方门禁链内**成立、约束本身属流程约束，绕过面谎报退出码 / 伪造 gate 记录无检测。工具内阻断事实保留，降级的是对绕过对抗面的整体评级；限定语详见 `agent-threat-model.md` T2/T3 行。T5 与 T2 同构（2026-10-05 顺手收口）：`wm-write` 锁仅在**官方状态写入口内**阻断，绕过工具直写 `.w-model/*.json` 不可检测，整体评级不高于**检测**——限定语详见 `agent-threat-model.md` T5 行。
 
 ---
 
@@ -2536,7 +2536,7 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 **跨阶段消费者校验**（`--stage=archive` 时）：
 
 - 阶段 N+1 的 O chunk 签名 sourceSigIds 含阶段 N 的 O checkpoint 签名
-- 阶段 5 的 S produce 签名 sourceSigIds 含阶段 1-4 全部 G gate 签名
+- 阶段 5 的 S produce 签名 sourceSigIds 按 archive 跨阶段校验（signature-chain-logic R7）引用 sigId——当前机器校验面为相邻阶段 O 链接（N+1 O chunk 消费 N O checkpoint）；阶段 1-4 全部 G gate 签名的全量交叉核对**无机器门禁**，由人工/外部审计承载（与 [agent-threat-model.md](../w-model-dev/references/agent-threat-model.md) T4 已知缺口一致）
 - 阶段 8 的 G gate（终检）的全链完整性由 archive 模式 R2 连续链校验承担——签名链在 `signature-chain.jsonl` 内自包含闭环（全链首条 `prevSigId="genesis"` / `prevSigHash="0"` 锚定）；run-log 不承载链根字段（run-log.schema.json `additionalProperties: false`），`sourceSigIds` 均为 sigId 引用、无独立「链根 hash」消费点
 
 违反任一规则即命中反模式 #32（签名链断裂），拒绝放行。
