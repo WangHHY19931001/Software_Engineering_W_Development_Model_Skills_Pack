@@ -14,6 +14,7 @@
 |---|---|---|
 | [rounds-09-39.md](./rounds-09-39.md) | SSoT §3.4.7-39 轮次记录 + §10A 对应轮次行 + §10B 参考实现调测史 | [9.0.0] ~ [40.2.0]（CHANGELOG-archive.md） |
 | [rounds-40-47.md](./rounds-40-47.md) | SSoT §3.4.40-47 轮次记录 + §10A 对应轮次行 | [41.0.0] ~ [41.6.0]（CHANGELOG.md） |
+| [rounds-48-trust-chain.md](./rounds-48-trust-chain.md) | 第 48 批（批次 6，43.0.0）信任链修复：五项裁定（targetKind 入哈希 / legacy 全清除 / R6 默认化 / maturity 审批链 / estimated 违规化） | [43.0.0]（CHANGELOG.md，随批次 6 发布回填） |
 | [absorptions.md](./absorptions.md) | 外部方法论吸收决策记录（四源 / 三源 / 人月神话 / 外部技能，原 references/*-absorption.md） | [40.0.0] ~ [41.2.0] |
 | [legacy-sections.md](./legacy-sections.md) | 历史段落归档（anti-patterns 实现层经验教训 / hard-constraints 编号迁移表 / SSoT §14-15 tombstone 原文 / 迁移指令等） | 各轮 |
 
@@ -49,3 +50,4 @@
 | §3.4.46 第 45 轮（外部评审核实修正批次） | [41.4.0] | CHANGELOG.md |
 | §3.4.47 第 46 轮（五项落地批次） | [41.5.0] | CHANGELOG.md |
 | §3.4.48 第 47 轮（SSoT 权威性审查修复） | [41.6.0] | CHANGELOG.md |
+| 第 48 批（批次 6 信任链修复，[rounds-48-trust-chain.md](./rounds-48-trust-chain.md)） | [43.0.0] | CHANGELOG.md（随批次 6 发布回填） |

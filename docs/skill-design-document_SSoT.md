@@ -2465,6 +2465,30 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 
 ---
 
+## 10R. 批次 6：信任链关键修复 + legacy 全清除（43.0.0）
+
+**目标**：堵死三类实测穿透面（签名链 targetKind 洗白 / 伪造 VerifierOutput / 伪造 run-log），收紧 maturity/budget 门禁钥匙，修复 TLA+/BDD 已确证 bug 与脱敏变体漏网，注入三条款与 L0 契约入包；全量清除 legacy 兼容机制（用户裁定：毁弃存量数据，不兼容）。
+
+**落点表**（完整清单见 [specs/2026-10-06-w-model-remediation-design.md](./superpowers/specs/2026-10-06-w-model-remediation-design.md) §5）：
+
+| 裁定 | 落点 |
+| --- | --- |
+| sigHash 单一 v3 公式，targetKind/gateExitCode/gateLogPath 入哈希，删 v1/v2 分流 | signature-chain-logic / signature-chain.schema |
+| VerifierOutput 必填 reviewedArtifacts；R19 evidence 归属 + CLI 哈希/行号读盘验证 | verifier-output.schema / verifier-logic / check-verifier-output |
+| R6 交叉校验默认化（gate-logs 目录约定）；legacy 吸收谓词/字段/D-6 窗口删除（R0 自举保留） | run-log-logic / checkpoint-logic / check-run-log |
+| action enum 32→18（删 15 死词与 opsx_*，增 event-route） | run-log.schema / data-models / conventions |
+| maturity level 变更须 role=human 审批链；history 链校验；删三预留死字段 | maturity-logic / maturity.schema / check-artifact-gate |
+| budget 删三零消费死字段；estimated=true 违规化（约束 #4）；R1 顺序化 | budget-logic / budget.schema / run-log-logic |
+| cfg 解析补 PROPERTIES 终止符；SANY 失败输出 notRun 单一事实 | tla-logic |
+| BDD feature 缺失 violation 化（消 fail-open） | check-bdd-model |
+| 脱敏 key 后缀匹配 | evidence-export-logic |
+| 注入三条款（§8.1/§6.2.1/V 派单禁令）；L0 契约入包 | verifier-spec / subagent-delegation / SKILL.md / quickstart |
+
+- **能力分工（不夸大）**：R6 默认化与 R19 将伪造成本从「自洽 JSON」提升到「须持有产物文件并重算哈希」，不提供密码学认证（无密钥哈希）；maturity 审批链复用签名链 v3 公式，同上。注入三条款为提示词层防御，不构建自动化守卫（维持批次 5 三不承诺）。
+- **判据披露**：验收含红队实验 1/2/3 复跑（见计划任务 17）；穿透面关闭以复跑 exit 1 为准。
+
+---
+
 ## 10.10 系统层级树与多层图谱
 
 > 本节确立系统层级树 + 7 层图谱模型。
