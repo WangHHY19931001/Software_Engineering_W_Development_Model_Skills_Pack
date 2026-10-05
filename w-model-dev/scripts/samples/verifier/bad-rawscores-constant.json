@@ -54,5 +54,11 @@
   "compositeScore": 0.8735,
   "qualityLevel": "A",
   "summary": "TC-001 测试用例覆盖完整（5 子标准），含正常边界与异常路径，独立可重复执行，遗留风险：无，待集成验证。",
-  "passed": true
+  "passed": true,
+  "reviewedArtifacts": [
+    {
+      "path": "README.md",
+      "sha256": "a35fac32af8cbc699ce688520a61c41730517bab894f5d21d3ec91207e6d258d"
+    }
+  ]
 }

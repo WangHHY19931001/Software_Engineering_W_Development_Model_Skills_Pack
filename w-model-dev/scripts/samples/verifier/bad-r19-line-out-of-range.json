@@ -16,7 +16,7 @@
       "score": 0.9,
       "rawScores": [0.89, 0.9, 0.91],
       "variance": 0.0000667,
-      "evidence": "覆盖完整"
+      "evidence": "README.md:L99999=越界行号引用（R19 唯一违规点）"
     },
     {
       "name": "clarity",
@@ -24,7 +24,7 @@
       "score": 0.85,
       "rawScores": [0.84, 0.85, 0.86],
       "variance": 0.0000667,
-      "evidence": "REQ-001 §3.2"
+      "evidence": "requirements.md:§3.2=REQ-001 需求覆盖"
     },
     {
       "name": "consistency",
@@ -32,7 +32,7 @@
       "score": 0.88,
       "rawScores": [0.87, 0.88, 0.89],
       "variance": 0.0000667,
-      "evidence": "REQ-001 §3.2"
+      "evidence": "requirements.md:§3.2=REQ-001 需求覆盖"
     },
     {
       "name": "testability",
@@ -40,7 +40,7 @@
       "score": 0.8,
       "rawScores": [0.79, 0.8, 0.81],
       "variance": 0.0000667,
-      "evidence": "REQ-001 §3.4"
+      "evidence": "requirements.md:§3.4=REQ-001 需求覆盖"
     },
     {
       "name": "traceability",
@@ -48,12 +48,12 @@
       "score": 0.95,
       "rawScores": [0.94, 0.95, 0.96],
       "variance": 0.0000667,
-      "evidence": "RTM REQ-001"
+      "evidence": "rtm.json:§REQ-001=coverage full"
     }
   ],
   "compositeScore": 0.8735,
   "qualityLevel": "A",
-  "summary": "REQ-001 需求覆盖完整（5 子标准），采用 RBAC 权限模型，可测试可追溯，遗留风险：无，待运行时验证。",
+  "summary": "A2 反伪造负样本：evidence 引用已登记产物 README.md 但行号 99999 越界（实际行数远小于此），CLI 注入行数表后应被 R19 唯一拦截。",
   "passed": true,
   "reviewedArtifacts": [
     {

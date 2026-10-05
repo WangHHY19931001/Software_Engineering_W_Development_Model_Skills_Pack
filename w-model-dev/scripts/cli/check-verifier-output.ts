@@ -17,7 +17,7 @@
  *
  * 退出码：
  *   0  校验通过（输出符合 §6 Schema 与各数值约束）
- *   1  校验失败（reasons 列出具体原因，Agent 必须按原因重评）
+ *   1  校验失败（reasons 列出具体原因，Agent 必须按原因重评；含 R19 reviewedArtifacts 读盘复核违规——文件不存在 / 哈希不符 / evidence 未登记或行号越界）
  *   2  输入错误（文件不存在 / 非法 JSON）
  *
  * 输出：
@@ -43,6 +43,7 @@ import * as path from 'node:path';
 
 import { checkVerifierOutput, type VerifierOutputShape } from '../logic/verifier-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
+import { verifyReviewedArtifacts } from '../lib/reviewed-artifacts.js';
 import { exitWithError, HandledCliError } from '../lib/cli-error.js';
 import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
@@ -90,7 +91,11 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   // posix 形态（照任务 7 先例，跨平台稳定）。仅 --json 报告承载该键（恒在场）；
   // 人类可读路径 printGateReport（VERIFIER_JSON）不动（偏差 4）。--s-output 仅做路径比较、
   // 不读取内容，不登记。
-  const verifiedArtifacts: Array<{ path: string; sha256: string; bytes: number }> = [];
+  const verifiedArtifacts: Array<{
+    path: string;
+    sha256: string;
+    bytes: number;
+  }> = [];
   try {
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs 由 <output.json> 参数 path.resolve 而来，仅只读
     const buf = readFileSync(abs);
@@ -103,7 +108,16 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     /* 读不到不入表 */
   }
 
-  const result = checkVerifierOutput(parsed);
+  // ==================== reviewedArtifacts 读盘复核（R19，A2：评审对象三重验证） ====================
+  // logic 层纯函数零 fs：存在性 / SHA-256 / 行数由 lib/reviewed-artifacts.ts 读盘完成后，
+  // 以 lineCountsByPath deps 注入 checkVerifierOutput（行号越界校验）；复核违规（文件不存在 /
+  // 哈希不符 / 不可读）并入最终 reasons 汇入 exit 1。口径详见 lib/reviewed-artifacts.ts 模块注释。
+  const reviewedRaw = (parsed as { reviewedArtifacts?: unknown })?.reviewedArtifacts;
+  const artifactCheck = verifyReviewedArtifacts(reviewedRaw, path.dirname(abs));
+
+  const result = checkVerifierOutput(parsed, {
+    lineCountsByPath: artifactCheck.lineCountsByPath,
+  });
   const meta = (parsed as VerifierOutputShape)?.meta;
 
   // self-as-verifier 模式：校验 VerifierOutput JSON 路径与 S 产出路径不同（反模式 #35）
@@ -132,8 +146,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     }
   }
 
-  const allReasons = [...result.reasons, ...selfAsVerifierViolations];
-  const passed = result.passed && selfAsVerifierViolations.length === 0;
+  const allReasons = [...result.reasons, ...artifactCheck.reasons, ...selfAsVerifierViolations];
+  const passed = result.passed && artifactCheck.reasons.length === 0 && selfAsVerifierViolations.length === 0;
   const exitCode = passed ? 0 : 1;
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置

@@ -821,6 +821,7 @@ O 分派时声明的**任务开始前必须成立的可核验命题**清单。�
   - R3 三份报告路径已落盘（V 须读取，反模式 #33）
 上下文：
   - 待评审批产物路径：<列出 S 子代理产出的文件路径>
+  - artifacts 清单（含 sha256，来自 produce 记录）——必附：<逐项列出 path + sha256；V 据此构造 VerifierOutput.reviewedArtifacts，不得自造（R19，A2）>
   - 上游产物路径（用于追溯）：<列出>
 必读：
   - references/agent-personas.md（按 targetKind 选用 Persona）
@@ -829,11 +830,12 @@ O 分派时声明的**任务开始前必须成立的可核验命题**清单。�
   - references/quick-self-check.md（完成定义（DoD）节；如评审阶段门）
 产出契约：
   1. VerifierOutput JSON 文件路径：<约定路径>
-  2. 必须满足 verifier-spec.md §6 Schema（subCriteria / compositeScore / qualityLevel / passed / reworkHints）
-  3. Severity 标签作为 reworkHints 前缀（[Critical] / [Required] / [Optional] / [Nit] / [FYI]）
-  4. 返回编排者：{VerifierOutput JSON 路径, summary 摘要}
+  2. 必须满足 verifier-spec.md §6 Schema（subCriteria / compositeScore / qualityLevel / passed / reworkHints / reviewedArtifacts）
+  3. reviewedArtifacts 按派单上下文的 artifacts 清单逐项回填（path + sha256 原样，不得增删或自造；evidence 的 path:Lnn= 引用只能指向清单内文件——R19）
+  4. Severity 标签作为 reworkHints 前缀（[Critical] / [Required] / [Optional] / [Nit] / [FYI]）
+  5. 返回编排者：{VerifierOutput JSON 路径, summary 摘要}
 可验证终态（selfCheck.terminalState 逐条核验）：
-  - 产物判据：VerifierOutput JSON 落盘且含 verifier-spec §6 Schema 必需键（subCriteria / compositeScore / qualityLevel / passed / reworkHints）
+  - 产物判据：VerifierOutput JSON 落盘且含 verifier-spec §6 Schema 必需键（subCriteria / compositeScore / qualityLevel / passed / reworkHints / reviewedArtifacts）
   - 回填判据：status.json state=DONE 且 run-log action=review outcome=success（角色禁令优先：gate 验证由下游 G 承担）
 
 V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返工重评）：
@@ -1345,6 +1347,7 @@ superpowers 编码链（S-plan → S-coding → S-finalize）每段须额外产�
 上下文：
   - 待复审 R 报告 JSON 路径：<路径>
   - 待复审 R 报告 .md 路径：<路径>
+  - artifacts 清单（含 sha256，来自 produce 记录）——必附：<至少含待复审 R 报告本体 path + sha256；V 据此构造 VerifierOutput.reviewedArtifacts，不得自造（R19，A2）>
   - 失败产物路径（用于核验根因证据）：<路径>
   - 上游产物路径（用于核验 upstreamDefect）：<列出>
   - 原始 V/G reworkHints：<数组>

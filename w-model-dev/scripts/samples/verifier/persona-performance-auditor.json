@@ -54,5 +54,11 @@
   "compositeScore": 0.8975,
   "qualityLevel": "A",
   "summary": "决定：性能审计样例可放行；核心结构：Quick/Deep 模式与指标诚实边界明确；遗留风险：没有工具工件时仅报告潜在影响，真实指标必须由性能测试采集。",
-  "passed": true
+  "passed": true,
+  "reviewedArtifacts": [
+    {
+      "path": "w-model-dev/references/agent-personas.md",
+      "sha256": "fb0f59072dadb491ab8d791e26bce9ad7b2b5b4f519e24c15916e72d2a76df7c"
+    }
+  ]
 }

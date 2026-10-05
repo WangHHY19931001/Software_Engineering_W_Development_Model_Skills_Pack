@@ -15,7 +15,7 @@
       "weight": 0.3,
       "score": 0.9,
       "rawScores": [0.9001, 0.9002, 0.9],
-      "variance": 0.0000000067,
+      "variance": 6.7e-9,
       "evidence": "docs/phase1-requirements/requirement-spec.md:§3.2=REQ-001 需求覆盖"
     },
     {
@@ -54,5 +54,11 @@
   "compositeScore": 0.8735,
   "qualityLevel": "A",
   "summary": "REQ-001 需求覆盖完整（5 子标准），采用 RBAC 权限模型，可测试可追溯，遗留风险：无，待运行时验证。",
-  "passed": true
+  "passed": true,
+  "reviewedArtifacts": [
+    {
+      "path": "README.md",
+      "sha256": "a35fac32af8cbc699ce688520a61c41730517bab894f5d21d3ec91207e6d258d"
+    }
+  ]
 }

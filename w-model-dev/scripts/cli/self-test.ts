@@ -37,6 +37,7 @@ import { createRequire } from 'node:module';
 import type * as TsType from 'typescript';
 
 import { checkVerifierOutput } from '../logic/verifier-logic.js';
+import { verifyReviewedArtifacts } from '../lib/reviewed-artifacts.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { checkArtifactGate, checkPhaseSpecStructure, type GateGraph } from '../logic/gate-logic.js';
 import {
@@ -344,6 +345,28 @@ const VERIFIER_CASES: VerifierCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/subCriteria.*name 应为/],
     description: 'targetKind=rootcause 但误用 test 集合子标准，应被 §7.5 子标准集合校验拦截',
+  },
+  // -------------------- A2 R19：reviewedArtifacts 评审对象绑定（批次 6 任务 4） --------------------
+  {
+    file: 'bad-r19-evidence-not-registered.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R19 evidence 引用未在 reviewedArtifacts 登记/],
+    description:
+      'A2 R19：分数自洽 + evidence 格式合法的 VerifierOutput 引用未登记产物路径（伪造 V 产物与 S 产物零绑定穿透面），应被 R19 唯一拦截',
+  },
+  {
+    file: 'bad-r19-artifact-hash-mismatch.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R19 评审对象哈希不符/],
+    description:
+      'A2 R19：登记项 sha256 首字符被篡改（仍 64 位十六进制，logic 格式过），CLI 读盘哈希复核应唯一拦截（产物已变，旧评审不成立）',
+  },
+  {
+    file: 'bad-r19-line-out-of-range.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R19 evidence 行号越界/],
+    description:
+      'A2 R19：evidence 引用已登记产物但行号 99999 越界（行数表由 lib/reviewed-artifacts 读盘注入 VerifierDeps），应被 R19 唯一拦截',
   },
 ];
 
@@ -3416,14 +3439,21 @@ async function runVerifierCases(samplesDir: string): Promise<CaseResult[]> {
     const abs = path.join(samplesDir, 'verifier', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
     const parsed: unknown = parseJsonSafe(raw);
-    const r = checkVerifierOutput(parsed);
+    // R19（A2，批次 6 任务 4）：样本口径与 CLI 接线单点一致——reviewedArtifacts 读盘复核
+    // （存在 / 哈希 / 行数）经 lib/reviewed-artifacts.ts 完成后，行数表注入 logic（行号越界校验），
+    // 复核违规并入 reasons 与 passed 判定（照 check-budget / check-maturity 复用导出函数先例）。
+    const reviewedRaw = (parsed as { reviewedArtifacts?: unknown } | null)?.reviewedArtifacts;
+    const artifactCheck = verifyReviewedArtifacts(reviewedRaw, path.dirname(abs));
+    const r = checkVerifierOutput(parsed, { lineCountsByPath: artifactCheck.lineCountsByPath });
+    const reasons = [...r.reasons, ...artifactCheck.reasons];
+    const passed = r.passed && artifactCheck.reasons.length === 0;
 
     const details: string[] = [];
-    if (r.passed !== c.expectedPassed) {
-      details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+    if (passed !== c.expectedPassed) {
+      details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${passed}`);
     }
     if (!c.expectedPassed) {
-      details.push(...matchReasonPatterns(r.reasons, c.expectedReasonPatterns));
+      details.push(...matchReasonPatterns(reasons, c.expectedReasonPatterns));
     }
 
     results.push({
