@@ -108,24 +108,31 @@
       "reason": "There should be at least one empty line between import groups"
     },
     {
-      "hash": "2e19d936e6a1f601b17c64195ec777d0987d7a19896ee3d2594b5ac97b446562",
+      "hash": "82878aeee67e38075e50190d00ced485628f2ea0e4dd017219993fa8a333c9b3",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/cli-entry-guard.test.ts",
-      "line": 9,
+      "line": 12,
+      "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
+    },
+    {
+      "hash": "70203b192e89cacc1664b4023c0a7f3e1a3af054214e881e08b592c27061cfc3",
+      "rule_id": "security/detect-non-literal-fs-filename",
+      "file": "w-model-dev/scripts/__tests__/cli-entry-guard.test.ts",
+      "line": 14,
       "reason": "Found readFileSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "3840559d30aae7e7d2c65dd6b735a865774b303171a6d87358716f968e50cf8a",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/cli-entry-guard.test.ts",
-      "line": 19,
+      "line": 25,
       "reason": "Found readdirSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
       "hash": "26c737f03deb27145cc2519fd7d1196807bf45f213e19eac62ba5ebcb55fb090",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/cli-entry-guard.test.ts",
-      "line": 21,
+      "line": 27,
       "reason": "Found readFileSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
