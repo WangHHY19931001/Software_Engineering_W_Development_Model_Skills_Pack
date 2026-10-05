@@ -125,6 +125,10 @@ import { countSuspectedDuplicateGroups } from './check-budget.js';
 // 使 self-test 的样本口径与 CLI 接线单点一致（该文件尾部有 isDirectInvocation 入口守卫，import 不触发 main）
 import { buildR5Diagnostics, collectLexicalMentions, countOperationalFailures } from './check-maturity.js';
 import { checkUatPathMappingContent } from './check-artifact-gate.js';
+// checkpoint-log loader 样本（C14/D3）：复用 check-checkpoint.ts 导出的目录加载器，
+// 使 canonical 形态 / 歧义 fail-closed 的样本口径与 CLI 接线单点一致
+// （该文件尾部有 isDirectInvocation 入口守卫，import 不触发 main）
+import { loadCheckpointLog } from './check-checkpoint.js';
 
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
@@ -328,6 +332,12 @@ const VERIFIER_CASES: VerifierCase[] = [
     file: 'valid-rootcause.json',
     expectedPassed: true,
     description: 'targetKind=rootcause 合法 VerifierOutput（§7.5 子标准集合 + 权重），应通过全部校验',
+  },
+  {
+    file: 'valid-windows-evidence.json',
+    expectedPassed: true,
+    description:
+      'C11 Windows 路径 evidence 正例（反斜杠 src\\mod\\a.ts:L3= + 盘符前缀 D:\\proj\\rootcause.json:L1-5=，子标准集合同 valid-rootcause），应通过 evidence 格式与 R12 校验',
   },
   {
     file: 'bad-rootcause-subcriteria.json',
@@ -1644,6 +1654,38 @@ const CHECKPOINT_CASES: CheckpointCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/R1.*acknowledgedDecisions 为空/],
     description: 'cp1 acknowledgedDecisions=[] 空决策放行，应被 R1 校验拦截',
+  },
+];
+
+// -------------------- Checkpoint-log loader（C14/D3 canonical 形态） --------------------
+
+interface CheckpointLogLoaderCase {
+  /** 样本目录（相对 samples/，目录内为 checkpoint-log 用户确认文件） */
+  sampleDir: string;
+  /** 期望 loader 结果 kind（loaded / no-phase-match / dir-unreadable / ambiguous） */
+  expectedKind: 'loaded' | 'no-phase-match' | 'dir-unreadable' | 'ambiguous';
+  /** expectedKind=loaded：期望这些 phase key 的确认原文非空 */
+  expectedPhases?: string[];
+  /** expectedKind=ambiguous：期望冲突文件名（basename）全部出现在歧义列表 */
+  expectedConflictFiles?: string[];
+  /** 用例说明 */
+  description: string;
+}
+
+const CHECKPOINT_LOG_LOADER_CASES: CheckpointLogLoaderCase[] = [
+  {
+    sampleDir: 'checkpoint-log/valid-phase-1',
+    expectedKind: 'loaded',
+    expectedPhases: ['1'],
+    description:
+      'canonical 形态 phase-1.md（含具体技术决策确认原文 + 时间与放行对象要素）加载为 Map["1"]（D3，42.13.0 起）',
+  },
+  {
+    sampleDir: 'checkpoint-log/bad-ambiguous-phase-1',
+    expectedKind: 'ambiguous',
+    expectedConflictFiles: ['phase-1.md', 'phase-1.txt'],
+    description:
+      '同 phase 双候选（phase-1.md 与 phase-1.txt 并存）→ ambiguous fail-closed 列出两冲突路径，不再由 readdir 顺序择一胜出（C14）',
   },
 ];
 
@@ -4226,6 +4268,50 @@ async function runCheckpointCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+/** checkpoint-log loader 样本（C14/D3）：直接驱动 cli/check-checkpoint.ts 的 loadCheckpointLog。 */
+async function runCheckpointLogLoaderCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  for (const c of CHECKPOINT_LOG_LOADER_CASES) {
+    const dir = path.join(samplesDir, c.sampleDir);
+    const name = `${c.sampleDir}`;
+    const details: string[] = [];
+    try {
+      const outcome = await loadCheckpointLog(dir);
+      if (outcome.kind !== c.expectedKind) {
+        details.push(`  - 期望 kind=${c.expectedKind}，实际 kind=${outcome.kind}`);
+      } else if (outcome.kind === 'loaded') {
+        for (const p of c.expectedPhases ?? []) {
+          const content = outcome.map.get(p);
+          if (content === undefined || content.trim() === '') {
+            details.push(`  - 期望 phase ${p} 的用户确认原文非空`);
+          }
+        }
+      } else if (outcome.kind === 'ambiguous') {
+        const basenames = outcome.files.map((f) => path.basename(f));
+        for (const conflict of c.expectedConflictFiles ?? []) {
+          if (!basenames.includes(conflict)) {
+            details.push(`  - 期望冲突文件 ${conflict} 出现在歧义列表（实际: ${basenames.join(', ')}）`);
+          }
+        }
+      }
+      results.push({
+        name,
+        passed: details.length === 0,
+        description: c.description,
+        details: details.length > 0 ? details : undefined,
+      });
+    } catch (err) {
+      results.push({
+        name,
+        passed: false,
+        description: c.description,
+        details: [`  - 异常: ${err instanceof Error ? err.message : String(err)}`],
+      });
+    }
+  }
+  return results;
+}
+
 async function runCodeTlaCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of CODE_TLA_CASES) {
@@ -5481,6 +5567,7 @@ async function main(): Promise<void> {
   console.log(`Maturity 用例 : ${MATURITY_CASES.length}`);
   console.log(`MaturityRunLog 用例 : ${MATURITY_RUN_LOG_CASES.length}`);
   console.log(`Checkpoint 用例: ${CHECKPOINT_CASES.length}`);
+  console.log(`CheckpointLog loader 用例: ${CHECKPOINT_LOG_LOADER_CASES.length}`);
   console.log(`Code-TLA 用例 : ${CODE_TLA_CASES.length}`);
   console.log(`RootCause 用例 : ${ROOTCAUSE_CASES.length}`);
   console.log(`Schema 用例    : ${SCHEMA_CASES.length}`);
@@ -5522,6 +5609,7 @@ async function main(): Promise<void> {
     maturityResults,
     maturityRunLogResults,
     checkpointResults,
+    checkpointLogLoaderResults,
     codeTlaResults,
     rootcauseResults,
     schemaResults,
@@ -5574,6 +5662,7 @@ async function main(): Promise<void> {
     runMaturityCases(samplesDir),
     runMaturityRunLogCases(samplesDir),
     runCheckpointCases(samplesDir),
+    runCheckpointLogLoaderCases(samplesDir),
     runCodeTlaCases(samplesDir),
     runRootCauseCases(samplesDir),
     runSchemaCases(samplesDir),
@@ -5616,6 +5705,7 @@ async function main(): Promise<void> {
     ...maturityResults,
     ...maturityRunLogResults,
     ...checkpointResults,
+    ...checkpointLogLoaderResults,
     ...codeTlaResults,
     ...rootcauseResults,
     ...schemaResults,

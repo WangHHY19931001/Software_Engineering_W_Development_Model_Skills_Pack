@@ -13,7 +13,12 @@
  *      且 R0 文案保留（fail-closed 回归）；
  *   5. 零记录态 + checkpoint-log 仅含 phase-2 确认 → check-checkpoint.ts exit 1 且
  *      R0 文案保留（修复轮 1 相位缝隙负例：自举条件收紧为 get('1') 非空白，加载器
- *      既有宽松使任意 `*-<数字>.txt` 计入 Map，由 get('1') 兜住）。
+ *      历史宽松形态使任意 phase-<数字> 文件计入 Map，由 get('1') 兜住）；
+ *      同组第三态：仅 legacy 命名 phase-1.txt → no-phase-match exit 1（canonical 收窄
+ *      反例，锁死 CANONICAL_PHASE_FILE 被回宽为旧宽松正则）。
+ *   6. 同 phase 双候选（phase-1.md 与 phase-1.txt 并存）→ check-checkpoint.ts exit 1
+ *      且 stderr 列出两冲突路径（C14/D3 canonical 形态 phase-<N>.md + 歧义 fail-closed，
+ *      42.13.0 起；不再由 readdir 顺序静默择一胜出）。
  *
  * 夹具文法参照 run-log-logic.test.ts「R11 阶段 1 自举豁免（D-6）」组的 phase-1 形态
  * （phaseLead → 四门 gate → checkpoint / check-checkpoint gate 位置两态）。
@@ -21,6 +26,7 @@
  * （vitest-project-split 双向守护）。**不 spawn 全量 vitest**。
  */
 
+import { spawnSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import { createRequire } from 'node:module';
 import * as os from 'node:os';
@@ -38,6 +44,7 @@ const REPO_ROOT = path.resolve(TEST_DIR, '..', '..', '..');
 const CLI_DIR = path.join(REPO_ROOT, 'w-model-dev', 'scripts', 'cli');
 const RUN_LOG_CLI = path.join(CLI_DIR, 'check-run-log.ts');
 const CHECKPOINT_CLI = path.join(CLI_DIR, 'check-checkpoint.ts');
+const WM_STATUS_CLI = path.join(CLI_DIR, 'wm-status.ts');
 
 let tmpDir: string;
 
@@ -140,9 +147,13 @@ async function writeRunLog(name: string, lines: string[]): Promise<string> {
   return abs;
 }
 
-/** checkpoint-log 目录（非空 = 一条 phase-1 用户确认；可传空目录模拟 no-phase-match）。 */
-async function writeCheckpointLog(fileNames: string[]): Promise<string> {
-  const dir = path.join(tmpDir, 'clog');
+/**
+ * checkpoint-log 目录（非空 = 一条 phase-1 用户确认；可传空目录模拟 no-phase-match）。
+ * `subdir`：同一 it 内多行用例（负例组）须各传互异子目录，避免行间文件叠加污染
+ * （如「仅 legacy 命名」行被前一行的 phase-2.md 修正为「混合目录」态）。
+ */
+async function writeCheckpointLog(fileNames: string[], subdir = 'clog'): Promise<string> {
+  const dir = path.join(tmpDir, subdir);
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir 由本测试创建于 os.tmpdir() 下的固定临时目录拼装，仅建 fixture 目录
   await fs.mkdir(dir, { recursive: true });
   for (const [i, name] of fileNames.entries()) {
@@ -197,7 +208,7 @@ describe('E-2 方案 B：phase-1 自举时序端到端（真实子进程）', ()
         entry({ runId: 'x1', timestamp: '2026-09-22T00:01:00Z', action: 'cross', role: 'S' }),
       ].map((e) => JSON.stringify(e)),
     );
-    const clog = await writeCheckpointLog(['phase-1.txt']);
+    const clog = await writeCheckpointLog(['phase-1.md']);
     const run = runCli(CHECKPOINT_CLI, [preLog, `--checkpoint-log=${clog}`, '--json']);
     expect(run.code, `stderr=${run.stderr}\nstdout=${run.stdout}`).toBe(0);
     const report = parseJsonReport(run.stdout);
@@ -206,20 +217,29 @@ describe('E-2 方案 B：phase-1 自举时序端到端（真实子进程）', ()
     expect((report.diagnostics ?? []).some((d) => d.startsWith('BOOTSTRAP_VALIDATION:'))).toBe(true);
   });
 
-  it('零记录态负例对（2 态：checkpoint-log 无 phase-N 匹配 / 仅含 phase-2 确认无 phase-1）→ exit 1 且 R0 文案保留（fail-closed 回归）', async () => {
-    // 第二态为审查复现态（修复轮 1）：加载器既有宽松（任意 `*-<数字>.txt` 计入 Map）使仅含
-    // phase-2.txt 的目录加载为非空 Map——初版「Map 非空」在此 exit 0，穿透「零证据不等于合规」。
+  it('零记录态负例组（3 态：无 phase-N 匹配 / 仅 phase-2 确认无 phase-1 / 仅 legacy 命名）→ exit 1 且 R0 文案保留（fail-closed 回归）', async () => {
+    // 第二态为审查复现态（修复轮 1）：加载器按 canonical 形态 phase-<N>.md 加载，仅含
+    // phase-2.md 的目录加载为非空 Map——初版「Map 非空」在此 exit 0，穿透「零证据不等于合规」。
     // 收紧为 `get('1')` 非空白后，此态维持违规（零放行记录 ⇒ 下一次放行必为首放行，仅首放行
     // 确认可支撑自举）。
-    const rows = [
-      { name: 'checkpoint-log 无 phase-N 匹配', clogFiles: [] as string[] },
-      { name: 'checkpoint-log 仅含 phase-2 确认（无 phase-1）', clogFiles: ['phase-2.txt'] },
-    ] as const;
-    for (const row of rows) {
+    // 第三态为 canonical 收窄反例（C14/D3 审查修复）：目录仅含 legacy 命名 phase-1.txt——若
+    // CANONICAL_PHASE_FILE 被回宽为旧宽松正则（(?:phase-|checkpoint-)?(\d+)\.(?:txt|md|log)$），
+    // 此态会加载出 phase-1 确认 → BOOTSTRAP_VALIDATION → exit 0，本用例即刻转红锁死回宽。
+    const rows: ReadonlyArray<{ name: string; clogFiles: string[]; expectedStderrPattern?: RegExp }> = [
+      { name: 'checkpoint-log 无 phase-N 匹配', clogFiles: [] },
+      { name: 'checkpoint-log 仅含 phase-2 确认（无 phase-1）', clogFiles: ['phase-2.md'] },
+      {
+        name: 'checkpoint-log 仅 legacy 命名 phase-1.txt（canonical 收窄反例，no-phase-match）',
+        clogFiles: ['phase-1.txt'],
+        expectedStderrPattern: /未匹配到 canonical 形态 phase-<N>\.md 文件/,
+      },
+    ];
+    for (const [rowIdx, row] of rows.entries()) {
       const preLog = await writeRunLog('pre-negative.jsonl', [
         JSON.stringify(entry({ runId: 'a1', action: 'chunk', role: 'A' })),
       ]);
-      const clog = await writeCheckpointLog([...row.clogFiles]);
+      // 每行独立子目录：防止前一行文件叠加污染本行目录语义（见 writeCheckpointLog 注释）
+      const clog = await writeCheckpointLog([...row.clogFiles], `clog-neg-${rowIdx}`);
       const run = runCli(CHECKPOINT_CLI, [preLog, `--checkpoint-log=${clog}`, '--json']);
       expect(run.code, `${row.name}：应 exit 1（stderr=${run.stderr}\nstdout=${run.stdout}）`).toBe(1);
       const report = parseJsonReport(run.stdout);
@@ -232,6 +252,57 @@ describe('E-2 方案 B：phase-1 自举时序端到端（真实子进程）', ()
         (report.diagnostics ?? []).some((d) => d.startsWith('BOOTSTRAP_VALIDATION:')),
         `${row.name}：不得出现 BOOTSTRAP_VALIDATION 诊断`,
       ).toBe(false);
+      if (row.expectedStderrPattern) {
+        expect(run.stderr, `${row.name}：stderr 须含 canonical 收窄 no-phase-match 警告`).toMatch(
+          row.expectedStderrPattern,
+        );
+      }
     }
+  });
+
+  it('同 phase 双候选（phase-1.md 与 phase-1.txt 并存）→ exit 1 且 stderr 列出两冲突路径（C14/D3 歧义 fail-closed）', async () => {
+    // canonical 形态为 phase-<N>.md；phase-1.txt 与其并存构成同 phase 命名歧义 →
+    // 既有 violation 失败路径 exit 1（非 exit 2 ARG_INVALID 域），消息列出两冲突路径，
+    // 不再由 readdir 顺序静默择一胜出。
+    const preLog = await writeRunLog('pre-ambiguous.jsonl', [
+      JSON.stringify(entry({ runId: 'a1', action: 'chunk', role: 'A' })),
+    ]);
+    const clog = await writeCheckpointLog(['phase-1.md', 'phase-1.txt']);
+    const run = runCli(CHECKPOINT_CLI, [preLog, `--checkpoint-log=${clog}`, '--json']);
+    expect(run.code, `应 exit 1（stderr=${run.stderr}\nstdout=${run.stdout}）`).toBe(1);
+    expect(run.stderr, 'stderr 须列出两冲突路径（phase-1.md）').toContain('phase-1.md');
+    expect(run.stderr, 'stderr 须列出两冲突路径（phase-1.txt）').toContain('phase-1.txt');
+    const report = parseJsonReport(run.stdout);
+    expect(report.passed).toBe(false);
+    expect(
+      report.reasons.some(
+        (v) => v.includes('同 phase 双候选文件歧义') && v.includes('phase-1.md') && v.includes('phase-1.txt'),
+      ),
+      'violations 须承载含两冲突路径的歧义消息',
+    ).toBe(true);
+    expect(
+      (report.diagnostics ?? []).some((d) => d.startsWith('BOOTSTRAP_VALIDATION:')),
+      '歧义态不得出现 BOOTSTRAP_VALIDATION 诊断',
+    ).toBe(false);
+  });
+});
+
+describe('CLI 入口无 VITEST 环境旁路（C1 反证，真实子进程）', () => {
+  it('VITEST=1 环境下 CLI 必须正常执行而非静默 exit 0（C1 反证）', () => {
+    // 直接 spawnSync 而非 runSync：runSync 的 childProcessEnv 会剥离 VITEST，
+    // 无法构造「子进程带 VITEST」的旁路形态；台账登记见 lib/run-sync.ts
+    // SYNC_PROCESS_EXCEPTIONS（本文件唯一直接同步调用）。
+    const result = spawnSync(process.execPath, [tsxCli, WM_STATUS_CLI], {
+      cwd: REPO_ROOT,
+      timeout: 60_000,
+      encoding: 'utf-8',
+      env: { ...process.env, VITEST: '1' },
+    });
+    // 断言「有输出/有行为」，杜绝静默通过：旧旁路（run-main.ts 的
+    // `if (process.env.VITEST) return;`）下本用例形态 = exit 0 且零输出。
+    expect(
+      (result.stdout ?? '') !== '' || (result.stderr ?? '') !== '' || result.status !== 0,
+      `VITEST=1 下 CLI 被静默跳过（status=${String(result.status)}，stdout=${JSON.stringify(result.stdout)}，stderr=${JSON.stringify(result.stderr)}）`,
+    ).toBe(true);
   });
 });

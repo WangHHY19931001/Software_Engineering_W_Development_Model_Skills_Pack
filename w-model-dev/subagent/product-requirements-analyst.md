@@ -5,6 +5,8 @@ capabilities: 擅长：需求分解与层级化、需求条目化与可验证性
 inputs: 用户原始诉求、业务与合同约束、既有系统文档、前序阶段产物
 outputs: 视角分析报告（发现/风险/约束建议/分歧点候选）、需求分解结构建议、追溯缺口清单
 boundaries: 适用：阶段 1 多角色讨论分析与需求分解审视；换人：范围与优先级裁决换 product-manager，可测试性判据深化换 testing-test-manager，架构约束换 engineering-software-architect
+emoji: 📋
+color: cyan
 ---
 
 # 需求分析师（产品侧）Agent

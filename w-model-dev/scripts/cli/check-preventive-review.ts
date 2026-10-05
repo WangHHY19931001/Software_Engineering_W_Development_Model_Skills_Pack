@@ -20,7 +20,9 @@
  *
  * 退出码：
  *   0  校验通过（各维度审查报告齐全且格式合规——存在性 + schema + phase/dimension 一致，且无任何维度 passed=false）
- *   1  校验失败（reasons 列出具体原因——含任一维度 passed=false；S 子代理须按原因返工后重跑）
+ *   1  校验失败（reasons 列出具体原因——含任一维度 passed=false；S 子代理须按原因返工后重跑。
+ *      读文件异常按 C18 分类：ENOENT → `R3_MISSING: <dim> 维度报告未找到`（报告未产出）；
+ *      解析失败/其他读错 → `R3_UNREADABLE: <dim> 维度报告已产出但不可读（<err.message>）`）
  *   2  输入错误（参数非法 / 文件不存在 / JSON 解析失败，stderr 打印人类可读错误，stdout 输出 ERROR_JSON）
  *
  * 输出：
@@ -46,6 +48,7 @@ import {
 } from '../logic/preventive-review-logic.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { writeGateLog } from '../lib/gate-log-writer.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
@@ -230,17 +233,40 @@ async function main(): Promise<void> {
   const reviews: Record<string, PreventiveReview | null> = {};
   const prefix = reportFilePrefix(phase, variant ?? 'standard');
 
+  // C18：读文件异常分类（logic 层判据不动，CLI 读文件层做前缀区分）：
+  //   ENOENT            → R3_MISSING    （报告未产出）
+  //   解析失败/其他读错 → R3_UNREADABLE （报告已产出但不可读，附 err.message）
+  type DimensionReadError = { kind: 'missing' } | { kind: 'unreadable'; message: string };
+  const readErrors: Partial<Record<(typeof dimensions)[number], DimensionReadError>> = {};
+
   for (const dim of dimensions) {
     const filePath = path.resolve(reviewsDir, `${prefix}${dim}.json`);
     try {
       const content = await fs.readFile(filePath, 'utf-8');
       reviews[dim] = parseJsonSafe(content) as PreventiveReview;
-    } catch {
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      readErrors[dim] =
+        e.code === 'ENOENT' ? { kind: 'missing' } : { kind: 'unreadable', message: e.message ?? String(err) };
       reviews[dim] = null;
     }
   }
 
   const result = checkPreventiveReview(reviews, phase, { variant });
+
+  // C18：logic 层对 null 统一产出「R3 报告缺失：<dim> 维度报告未找到」；
+  // 此处按读文件实测结果原位替换为分类前缀（R3_MISSING / R3_UNREADABLE）。
+  // 字面量与 logic 层逐字相等才替换：logic 文案日后变化时静默回退为原文，不误改其他 reasons。
+  for (const dim of dimensions) {
+    const readErr = readErrors[dim];
+    if (!readErr) continue;
+    const idx = result.reasons.indexOf(`R3 报告缺失：${dim} 维度报告未找到`);
+    if (idx === -1) continue;
+    result.reasons[idx] =
+      readErr.kind === 'missing'
+        ? `R3_MISSING: ${dim} 维度报告未找到`
+        : `R3_UNREADABLE: ${dim} 维度报告已产出但不可读（${readErr.message}）`;
+  }
   const output = {
     ...PREVENTIVE_REVIEW_JSON,
     exitCode: result.passed ? 0 : 1,
@@ -306,4 +332,7 @@ async function main(): Promise<void> {
   return;
 }
 
-runMain(main);
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main
+if (isDirectInvocation(import.meta.url)) {
+  runMain(main);
+}

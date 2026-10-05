@@ -81,6 +81,8 @@ O: 若通过 → 🔴 CHECKPOINT · 阶段门放行（展示 G 证据 + RTM cove
 O: 用户放行 → 更新 project.status → 进入下一阶段
 ```
 
+> 本图为精简时序，省略两个强制环节：阶段 1-4 的「A-lead 多角色讨论分析」（persona 矩阵见 agent-personas.md「阶段角色集矩阵」节）与阶段门放行前的「ICEBERG-B 冰山扫掠」（见 iceberg-sweep-guide.md）。全量时序（含 V/G 失败链与 ICEBERG-A/B 回路）以本文正文「每阶段分派时序」节的全版图为准。
+
 > 阶段 1-4 ingestion 子流程（A→G 路径）：O 跑 plan-chunks.ts → A-chunk ×N → A-cross/A-evolve → G 跑 check-requirement-graph.ts → 收敛循环（MAX_ROUNDS=5）→ CHECKPOINT 收敛确认 → S 产出。
 
 > 阶段 8 终检额外分派 G 跑 check-artifact-gate.ts（无 --phase 参数，终检）。
@@ -354,16 +356,18 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 
 ### 6.3 阶段专属脚本
 
-| 阶段门     | 必跑脚本（约束 #11 通用）                                                    | 阶段专属脚本                                                                                                                                                                                                                                    |
-| ---------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 需求     | 5 闭环 + check-verifier-output + check-role-dispatch + check-signature-chain | check-requirement-graph(--phase=1) / check-requirement-coverage / check-tla-model(--phase=1) / check-bdd-model(--phase=1, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） / check-exemption(豁免时)                  |
-| 2 系统设计 | 同上                                                                         | check-requirement-graph(--phase=2) / check-tla-model(--phase=2, --graph 强制) / check-bdd-model(--phase=2, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） / check-design-fog(--phase=2)               |
-| 3 概要设计 | 同上                                                                         | check-requirement-graph(--phase=3) / check-tla-model(--phase=3, --graph 强制) / check-bdd-model(--phase=3, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） / check-design-fog(--phase=3)               |
-| 4 详细设计 | 同上                                                                         | check-requirement-graph(--phase=4，零违反硬约束) / check-tla-model(--phase=4, --graph 强制) / check-bdd-model(--phase=4, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） / check-design-fog(--phase=4) |
-| 5 编码     | 同上                                                                         | check-code-tla-consistency / check-design-contract-consistency / check-state-machine-consistency / check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=5 cucumber) / check-artifact-gate(--phase=5)                           |
-| 6 集成测试 | 同上                                                                         | check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=6 cucumber) / check-artifact-gate(--phase=6)                                                                                                                              |
-| 7 系统测试 | 同上                                                                         | check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=7 cucumber) / check-artifact-gate(--phase=7)                                                                                                                              |
-| 8 验收测试 | 同上                                                                         | check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-archive-integrity（codingPlanSnapshot 条件项） / check-design-contract-consistency                                        |
+> **唯一权威（D5，2026-10-04）**：各阶段门禁电池以本表为唯一权威清单，他处只指向不复述。阶段必跑项的新增 / 调整先改本表；其余文档（SKILL.md / phase-N-*.md / command-reference.md / workflow.md / hard-constraints.md）只保留局部语境必需的一句提及并指向本表，不得维护独立的阶段电池清单；某处清单若承载本表没有的信息，合并进本表而不是两处都留。
+
+| 阶段门     | 必跑脚本（约束 #11 通用）                                                    | 阶段专属脚本                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 需求     | 5 闭环 + check-verifier-output + check-role-dispatch + check-signature-chain | check-requirement-graph(--phase=1) / check-requirement-coverage / check-tla-model(--phase=1) / check-bdd-model(--phase=1, required D4) / check-artifact-gate(<project-dir> --phase=1 --spec-dir=<dir>，设计级结构六桶 + NFR/CON designDoc；判据见 command-reference.md「Artifact Gate 项目阶段证据门」节) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） / check-exemption(豁免时) |
+| 2 系统设计 | 同上                                                                         | check-requirement-graph(--phase=2) / check-tla-model(--phase=2, --graph 强制) / check-bdd-model(--phase=2, --graph 强制, required D4) / check-artifact-gate(<project-dir> --phase=2 --spec-dir=<dir>，adr 桶强制) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） / check-design-fog(--phase=2)                                                                                     |
+| 3 概要设计 | 同上                                                                         | check-requirement-graph(--phase=3) / check-tla-model(--phase=3, --graph 强制) / check-bdd-model(--phase=3, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） / check-design-fog(--phase=3)                                                                                                                                                                 |
+| 4 详细设计 | 同上                                                                         | check-requirement-graph(--phase=4，零违反硬约束) / check-tla-model(--phase=4, --graph 强制) / check-bdd-model(--phase=4, --graph 强制, required D4) / Artifact Gate pair sync（两份 manifest 真实有效且双向覆盖） / check-design-fog(--phase=4)                                                                                                                                                   |
+| 5 编码     | 同上                                                                         | check-code-tla-consistency / check-design-contract-consistency / check-state-machine-consistency / check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=5 cucumber) / check-artifact-gate(--phase=5)                                                                                                                                                                             |
+| 6 集成测试 | 同上                                                                         | check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=6 cucumber) / check-artifact-gate(--phase=6)                                                                                                                                                                                                                                                                                |
+| 7 系统测试 | 同上                                                                         | check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=7 cucumber) / check-artifact-gate(--phase=7)                                                                                                                                                                                                                                                                                |
+| 8 验收测试 | 同上                                                                         | check-codegraph-queries / check-coding-plan / check-bdd-model(--phase=8 cucumber) / check-artifact-gate(终检) / check-archive-integrity（codingPlanSnapshot 条件项） / check-design-contract-consistency                                                                                                                                                                                          |
 
 > 旧 opsx 制品门 `check-opsx-artifacts.ts` 已于 2026-09-21 退役（不再在 pre-push 执行路径上；由本表新链路的 `check-coding-plan.ts` 承担）。
 
@@ -373,10 +377,10 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 
 ### 6.4 工具与元门禁脚本（门禁脚本权威登记表收尾）
 
-> 本小节补全非阶段门触发的工具类 CLI、code-health 门禁 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录 48 个 .ts
+> 本小节补全非阶段门触发的工具类 CLI、code-health 门禁 CLI 与元门禁脚本，与 `w-model-dev/scripts/cli/` 目录门禁脚本 48 个 .ts（47 个 exit-2 门禁 + self-test）
 > 一一对应（28 个 check-* + 7 个 code-health 门禁 CLI + 12 个工具 CLI + self-test.ts：ensure-codegraph 见 §5 / 其余见下表；其中 47 个为 exit-2 脚本，self-test.ts 为 exit 0/1 回归基线不计入，与 conventions.md「= 47（28 个 check-* + 19 个工具 CLI，不含 self-test；19 = 7 个 code-health 门禁 CLI + 12 个工具 CLI）」口径互补）。
 > **新增 / 改名门禁脚本时登记点为本表 + SKILL.md/AGENTS.md 计数句（由 checkScriptRegistry 与计数检查双向兜底）**——`check-docs-consistency.ts` 的 checkScriptRegistry
-> 核对全部 47 个 cli 脚本名均出现于本文件，SKILL.md「N 个 .ts」/ AGENTS.md「N 个脚本」/ conventions.md 计数句由计数检查同步核对（漏登记即门禁失败，pre-push 第 15 项拦截）。
+> 核对全部 48 个 cli 脚本名（47 个 exit-2 门禁 + self-test）均出现于本文件，SKILL.md「N 个 .ts」/ AGENTS.md「N 个脚本」/ conventions.md 计数句由计数检查同步核对（漏登记即门禁失败，pre-push 第 15 项拦截）。
 
 | 脚本                          | 类别                     | 用途                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | 触发时机                                                                                                                                     |
 | ----------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -680,8 +684,14 @@ V-01: Read handoff/phase1-S-01/output.md → 产出 → Write output.md + status
 ```
 O: 路由 + 读状态 + 检查前置产物 + 加载最小引用集（SKILL.md + 当前阶段 phase-N）
 O: 🔴 CHECKPOINT · 项目初始化（首次）或阶段进入确认
+  ↓ 阶段 1-4：分派 A-lead 多角色讨论分析（并行多轮交叉至收敛，persona 按 agent-personas.md「阶段角色集矩阵」选用；阶段 5-8 跳过本步）
+A-lead: 多视角分析 → 共识纪要（S 唯一落笔）
   ↓ 分派 S
 S: 产出开发文档 + 同步测试设计 + 更新 RTM 实体 → 返回 {产物路径, RTM diff}
+  ↓ 分派 R3 ×3（completeness / reliability / security，可并行）
+R3: 三份 PreventiveReview JSON
+  ↓ 分派 G 跑 check-preventive-review.ts（V 评审前必须 exitCode=0）
+G: check-preventive-review.ts 证据
   ↓ 分派 V
 V: 按 targetKind 路由 Persona → 产出 VerifierOutput JSON
   ↓ 分派 G
@@ -1979,12 +1989,14 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 
 ### 豁免条件
 
+#### self-as-verifier 模式（demo/教学例外）
+
 **self-as-verifier 模式豁免**（仅 demo 项目 / 非生产项目）：
 
 - S/V/G/R 任两角色由同一 Agent 兼任时，run-log 中可同一 `runId` 条目标记多角色（如 `role="S/V"`），但须满足：
   1. 产出各角色独立产物文件（VerifierOutput JSON / RootCauseReport / gate-logs JSON / PreventiveReview JSON 三份路径不同）
   2. run-log 条目的 `artifacts` 字段列出各角色独立产物路径
-- 详见 SKILL.md「self-as-verifier 模式」节与反模式 #35。
+- 详见 [verifier-spec.md](verifier-spec.md)「self-as-verifier 模式」节（§13）与反模式 #35；权威定义见 SSoT §7.6A（本节为编排面细则承载）。
 
 ### 校验命令
 

@@ -73,31 +73,9 @@
 
 ## UAT 路径映射表
 
-> 阶段1设计 UAT 时须同时产出 `docs/uat-path-mapping.md`；阶段5编码后回填实际路径列。
+> `docs/uat-path-mapping.md` 的**格式权威定义**见 [phase-1-requirements.md](phase-1-requirements.md)『uat-path-mapping 格式（权威定义）』节——阶段 1 为该文件**生产者**与格式定义方（产出初始表），阶段 5 编码后回填实际路径列，本阶段为**消费者**。
 
-| UAT ID | 设计路径（阶段1） | 实际路径（阶段5回填） | 映射类型 | 说明 |
-|---|---|---|---|---|
-| UAT-001 | POST /api/site/config | _待阶段5回填_ | _待填_ | |
-
-**映射类型**：
-- `直接`：路径完全一致
-- `等价`：路径不同但语义等价（如路由分组调整）
-- `替代`：因技术约束替代（须说明原因）
-
-**流程**：
-1. 阶段1设计 UAT 时产出初始表（设计路径列）
-2. 阶段5编码后回填实际路径列 + 映射类型
-3. 阶段8验收测试编写时按此表映射，禁止凭主观判断
-
-### 强制校验说明
-
-`docs/uat-path-mapping.md` 为阶段1强制产出，阶段5回填实际路径，阶段8验收时校验完整性。
-
-**校验规则**（由 `check-artifact-gate.ts` 执行）：
-- phase=1：校验 `docs/uat-path-mapping.md` 文件存在性
-- phase=5：校验每条 UAT-NNN 的「实际路径」列非 `_待阶段5回填_`，且 `mappingType` ∈ `["直接","等价","替代"]`
-- phase=8：终检校验所有 UAT-NNN 的映射行格式完整（≥4 列），缺失或格式不符 → 退出码 1，reasons 列出违规行详情
-- 缺失文件或未回填项 → 退出码 1，reasons 列出具体 UAT ID
+**执行期语义（阶段 8）**：阶段8验收测试编写时须按 `docs/uat-path-mapping.md` 映射表逐条对应，禁止凭主观判断；完整性由 `check-artifact-gate.ts` 终检校验（phase=5 回填校验与 phase=8 格式完整性校验规则同见 phase-1-requirements.md 该节「强制校验说明」）。
 
 ### demo 范围 N/A 标记要求
 

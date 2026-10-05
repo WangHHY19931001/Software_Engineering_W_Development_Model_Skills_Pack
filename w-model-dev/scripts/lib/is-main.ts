@@ -12,8 +12,9 @@
  * （fail-open）、或误拦截（直接执行不触发 main）。任一侧 realpath 解析失败
  * （symlink 断链、路径不存在等）→ false 保守不执行 main。
  *
- * 各 `cli/*.ts` 尾部守卫统一写法：
- *   `if (isDirectInvocation(import.meta.url)) { runMain(main); }`
+ * 全部调用 `runMain(main)` 的 cli/*.ts 尾部守卫统一为
+ * `if (isDirectInvocation(import.meta.url)) runMain(main)`（由
+ * `__tests__/cli-entry-guard.test.ts` 强制）；无环境变量旁路。
  */
 
 import { realpathSync } from 'node:fs';

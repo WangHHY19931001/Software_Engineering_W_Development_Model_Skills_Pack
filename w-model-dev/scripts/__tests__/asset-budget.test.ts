@@ -207,10 +207,13 @@ describe('L0 载体定量预算（S30，真实包上限断言）', () => {
       }
     }
 
-    // 守卫断言：阈值判定必须真的罩住当前 5 个大文件，防止阈值/口径漂移使本测试空转。
+    // 守卫断言：阈值判定必须真的罩住当前 6 个大文件，防止阈值/口径漂移使本测试空转。
+    // hard-constraints.md 于 42.13.0 批次因约束 #11 拆节（D13）增至 1009 行越限，按
+    // tla-plus/bdd 先例补「## 目录」节后入册（来历记录见 asset-authoring.md §5）。
     expect(oversized.sort()).toEqual([
       'bdd.md',
       'data-models.md',
+      'hard-constraints.md',
       'subagent-delegation.md',
       'tla-plus.md',
       'verifier-spec.md',

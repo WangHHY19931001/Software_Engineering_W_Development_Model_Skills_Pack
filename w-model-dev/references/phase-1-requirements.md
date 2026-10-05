@@ -17,7 +17,7 @@
 - 《需求规格说明书》（套用 [templates/requirement-spec.md](../templates/requirement-spec.md)）
 - 验收测试用例设计文档（套用 [templates/test-case.md](../templates/test-case.md)，类型=验收测试）
 - 需求风险评估报告（含风险等级与缓解措施）
-- `docs/uat-path-mapping.md`：UAT 路径映射表（**强制产出**）。阶段1产出初始模板，阶段5回填实际路径，阶段8验收时校验完整性。格式见 [phase-8-acceptance-test.md](phase-8-acceptance-test.md) §UAT 路径映射表。
+- `docs/uat-path-mapping.md`：UAT 路径映射表（**强制产出**）。阶段1产出初始模板，阶段5回填实际路径，阶段8验收时校验完整性。格式权威定义见本文件下方『uat-path-mapping 格式（权威定义）』节。
 - 独立产物文件：
   - `system-context.md`：系统上下文（外部实体清单 + 边界原则）
   - `glossary.md`：术语表（需求域子集）
@@ -25,6 +25,36 @@
   - `behavior-spec.md`：行为规格模型（引用 .feature 文件关系，不内联 feature 块）
   - `discipline-dod.md`：工程纪律与 DoD 可勾选清单
   - `uml-modeling.md`：UML 需求建模（用例图 + 领域类图 + 活动图）
+
+## uat-path-mapping 格式（权威定义）
+
+> 本节是 `docs/uat-path-mapping.md` 的**格式唯一权威定义**（阶段 1 为该文件生产者与格式定义方）。阶段 8 为消费者，按此格式执行 UAT 追溯，见 [phase-8-acceptance-test.md](phase-8-acceptance-test.md)「UAT 路径映射表」节。
+
+> 阶段1设计 UAT 时须同时产出 `docs/uat-path-mapping.md`；阶段5编码后回填实际路径列。
+
+| UAT ID | 设计路径（阶段1） | 实际路径（阶段5回填） | 映射类型 | 说明 |
+|---|---|---|---|---|
+| UAT-001 | POST /api/site/config | _待阶段5回填_ | _待填_ | |
+
+**映射类型**：
+- `直接`：路径完全一致
+- `等价`：路径不同但语义等价（如路由分组调整）
+- `替代`：因技术约束替代（须说明原因）
+
+**流程**：
+1. 阶段1设计 UAT 时产出初始表（设计路径列）
+2. 阶段5编码后回填实际路径列 + 映射类型
+3. 阶段8验收测试编写时按此表映射，禁止凭主观判断
+
+### 强制校验说明
+
+`docs/uat-path-mapping.md` 为阶段1强制产出，阶段5回填实际路径，阶段8验收时校验完整性。
+
+**校验规则**（由 `check-artifact-gate.ts` 执行）：
+- phase=1：校验 `docs/uat-path-mapping.md` 文件存在性
+- phase=5：校验每条 UAT-NNN 的「实际路径」列非 `_待阶段5回填_`，且 `mappingType` ∈ `["直接","等价","替代"]`
+- phase=8：终检校验所有 UAT-NNN 的映射行格式完整（≥4 列），缺失或格式不符 → 退出码 1，reasons 列出违规行详情
+- 缺失文件或未回填项 → 退出码 1，reasons 列出具体 UAT ID
 
 ## AI 能力应用
 
@@ -229,9 +259,9 @@
 
 | 产出物 | 落地方式 | 文件命名 |
 |---|---|---|
-| 需求规格说明书 | 套用 `templates/requirement-spec.md` 模板，按"功能 / 非功能 / 约束"三类填充 | `<模块>-requirement-spec.md` |
-| 验收测试用例 | 套用 `templates/test-case.md` 模板，`type=验收测试`，每个功能点 ≥ 1 条用例 | `<模块>-acceptance-test.md` |
-| 风险评估报告 | 产出风险等级（高 / 中 / 低）+ 缓解措施表格；冲突对与缺失项单独列出 | `<模块>-risk-assessment.md` |
+| 需求规格说明书 | 套用 `templates/requirement-spec.md` 模板，按"功能 / 非功能 / 约束"三类填充 | `docs/phase1-requirements/requirement-spec.md` |
+| 验收测试用例 | 套用 `templates/test-case.md` 模板，`type=验收测试`，每个功能点 ≥ 1 条用例 | `docs/phase1-requirements/acceptance-test.md` |
+| 风险评估报告 | 产出风险等级（高 / 中 / 低）+ 缓解措施表格；冲突对与缺失项单独列出 | `docs/phase1-requirements/risk-assessment.md` |
 | graph.json | A 子代理产出，记录 REQ 节点与 parent/depends-on 边 | `.w-model/ingestion/graph.json`（跨阶段演进） |
 | 系统上下文 | 套用 `templates/requirement-spec/system-context.md` | `docs/phase1-requirements/system-context.md` |
 | 术语表 | 套用 `templates/requirement-spec/glossary.md` | `docs/phase1-requirements/glossary.md` |
@@ -240,6 +270,8 @@
 | 行为规格模型 | 套用 `templates/requirement-spec/behavior-spec.md`（引用 .feature 文件，不内联） | `docs/phase1-requirements/behavior-spec.md` |
 | 工程纪律与 DoD | 套用 `templates/requirement-spec/discipline-dod.md` | `docs/phase1-requirements/discipline-dod.md` |
 | 主规格 | 套用 `templates/requirement-spec.md`（骨架 + §0 SSOT 头 + 引用块指向上述 6 文件） | `docs/phase1-requirements/requirement-spec.md` |
+
+> **固定文件名契约**：阶段 1 产物统一为固定文件名——`--spec-dir` 契约要求固定文件名，模块区分由目录承载（阶段 1 主文档与 7 个独立子文件均为无前缀固定名，由 `check-artifact-gate.ts --spec-dir` 的布局校验强制；阶段 2-4 主文档按 `{module}-` 前缀 glob 定位，前缀仅适用于阶段 2-4）。
 
 **执行顺序**：需求解析算法（步骤 1-4）→ 套用模板产出需求规格 → 同步产出验收测试用例（覆盖正常 + 异常 + 边界）→ 产出风险评估报告 → RTM 登记。
 
@@ -327,7 +359,7 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 - `codeModule`：阶段 1 留空，由阶段 5 回填（详见 [phase-5-coding.md](phase-5-coding.md)「NFR/CON codeModule 回填」节）。
 - `unitTest` / `integrationTest` / `systemTest` / `acceptanceTest`：NFR/CON 行可填对应测试用例 ID 或 `null`（横切测试在阶段 5–8 补充）。
 
-**阶段 1 门禁校验**：`check-artifact-gate.ts --phase=1` 校验 NFR/CON 行的 `designDoc` 字段非空（非 `null`、非空字符串）。缺失即门禁退出码 1，作为 R 定位线索并执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；只有用户 CHECKPOINT 确认后，才可按 R 结论回阶段 1 补登记。
+**阶段 1 门禁校验**：`check-artifact-gate.ts --phase=1` 校验 NFR/CON 行的 `designDoc` 字段非空（非 `null`、非空字符串）。缺失即门禁退出码 1，作为 R 定位线索并执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；只有用户 CHECKPOINT 确认后，才可按 R 结论回阶段 1 补登记。阶段 1 门禁电池完整清单以 [subagent-delegation.md](subagent-delegation.md) §6.3 为唯一权威，本节仅保留与本字段判据直接相关的提及。
 
 > 与 REQ 行的差别：REQ 行在阶段 1 登记时 `designDoc` 可暂留空（待阶段 2 系统设计后映射到 SD-xxx）；NFR/CON 行**必须在阶段 1 完成横切登记**，因为 NFR/CON 是横切治理类需求，不挂在具体 SD 上会丢失治理关系。
 
@@ -359,6 +391,8 @@ S-doc 产出需求规格时，须在 `Out of Scope` 节显式声明 demo 范围�
 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）
 
 阶段 1 ingestion 图谱失败是唯一例外：仅允许 `A-chunk/A-cross → G(check-requirement-graph)` 的专用收敛循环（最多 `MAX_ROUNDS=5`），收敛后仍须用户 CHECKPOINT，再分派 S；不得将该例外套用于普通 V/G 失败。
+
+第 `MAX_ROUNDS=5` 轮仍不收敛 → 🔴 CHECKPOINT 由用户三选一裁定：**回退重分块**（调整 chunk 粒度重跑 `plan-chunks`）/ **显式加轮**（记录加轮理由，上限再 5 轮）/ **终止阶段 1 并登记迷雾项**（未决项按「迷雾登记册」节显式登记、不隐式消失，阶段重启后毕业处置仍按该节三选一——毕业成 REQ / 判 Out of Scope / 豁免审批——承接）；与多角色讨论 5 轮安全阀同构。
 
 ## 失败模式矩阵（FM）
 
@@ -452,7 +486,7 @@ V 校验 reviewDecision / rootCauseAnalysis / falsifiabilityCheck / conditions �
 | 13 | 追踪矩阵字段与主规格 §4/§7/§12 不一致 | 步骤 9 须对齐 traceability-matrix.md 与主规格层级树/覆盖矩阵/RTM 登记（FM-3D-08） |
 | 14 | UML 图表与层级树/User Stories 脱节 | uml-modeling.md 三图须对应主规格 §4 REQ/§3 stakeholder/§3 正常场景（FM-3D-09） |
 
-> **门禁强制（第 3 条）**：`check-artifact-gate.ts --phase=1 --spec-dir=<dir>` 的 `acceptance` 桶逐行校验主规格 §4.2 表的「验收标准」列——`类型=acceptance` 行不得为空，任一行不得含不可测量表述（词表见 `w-model-dev/scripts/logic/gate-logic.ts` 的 `SUBJECTIVE_ACCEPTANCE_WORDS`，来源即本表第 3 条与 `templates/requirement-spec.md` §4.2 的 NFR 提示）。**判据边界**：脚本只判字面命中，「标准是否真的可测」仍由 V 评审 `testability` 轴承担。
+> **门禁强制（第 3 条）**：`check-artifact-gate.ts --phase=1 --spec-dir=<dir>` 的 `acceptance` 桶逐行校验主规格 §4.2 表的「验收标准」列——`类型=acceptance` 行不得为空，任一行不得含不可测量表述（词表见 `w-model-dev/scripts/logic/gate-logic.ts` 的 `SUBJECTIVE_ACCEPTANCE_WORDS`，来源即本表第 3 条与 `templates/requirement-spec.md` §4.2 的 NFR 提示）。**判据边界**：脚本只判字面命中，「标准是否真的可测」仍由 V 评审 `testability` 轴承担。本条为该门在阶段 1 电池中的局部语境提及；完整阶段门禁电池以 [subagent-delegation.md](subagent-delegation.md) §6.3 为唯一权威。
 
 ## 返工路径
 

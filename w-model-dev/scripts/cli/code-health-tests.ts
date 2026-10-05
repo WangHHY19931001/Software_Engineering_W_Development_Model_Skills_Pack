@@ -52,6 +52,7 @@ import { createCodeHealthEvidenceStore } from '../lib/code-health-evidence-store
 import { resolveControlledRelativePath } from '../lib/code-health-file-verifier.js';
 import { createCodeHealthGitRevisionProvider } from '../lib/code-health-revision-provider.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { runSync } from '../lib/run-sync.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
@@ -640,6 +641,9 @@ async function main(): Promise<void> {
   await runValidate(parsed);
 }
 
-runMain(main);
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main
+if (isDirectInvocation(import.meta.url)) {
+  runMain(main);
+}
 
 export type { ExpectedGovernanceFacts };

@@ -74,6 +74,8 @@
 
 引用只能一层深的原则（源自 S03）：嵌套引用会让 agent 用 `head -100` 之类命令**预读**而非完整读文件，得到不完整的信息；> 100 行的参考文件加 TOC，正是让 agent 局部预读时也能看到全文范围。
 
+阈值来历（`asset-budget.test.ts` 按本节断言）：2026-09-15 P2-B Task 3 立上限时超 1000 行文件 5 个（tla-plus / bdd / subagent-delegation / data-models / verifier-spec），由该测试的 oversized 守卫断言钉住；2026-10-04 42.13.0 批次 `hard-constraints.md` 因约束 #11 拆主条 + 四细则子节（D13）增至 1009 行越限，按 tla-plus/bdd 先例补「## 目录」节（条目仅列 `##` 级），在册 6 个。
+
 **本仓库的例外与偏离理由**：既有 `references/` 中有 **11 个"2 跳"文件**（`command-reference` / `concurrency-guide` / `conventions` / `data-models` / `event-ingress-guide` / `hill-climbing-guide` / `iceberg-sweep-guide` / `root-cause-locator` / `signature-chain-guide` / `skillopt-adoption` / `workflow`），需经其上游文件（如 `hard-constraints` / `phase-N` / `subagent-delegation`）间接引用才可达；其权威清单与定级见 `subagent-delegation.md` §3.1「全 references 触发条件表」。这些文件按**既定例外**处理：经上游文件间接可达，且由**编排者按触发表显式加载**（不做嵌套预读）。故「只允许一层深」**只对新增参考文件生效**；本仓库偏离该一层深原则的理由是：按需加载由编排者按触发表触发，加载是**显式动作**而非"读到引用才去够"，`head -100` 式部分读取的风险因此不适用。
 
 ## 6. 跨文件 / 跨角色引用约定

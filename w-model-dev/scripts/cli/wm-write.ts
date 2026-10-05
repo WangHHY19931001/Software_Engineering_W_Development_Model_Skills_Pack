@@ -4,6 +4,7 @@
  *
  * 状态写协议：`<target>.lock` 持久目录与可转移 owner 对象在跨进程锁内保护
  * mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复；本脚本是唯一 CLI 写入口。
+ * 锁为**单主机**语义：跨进程（本机）安全；`.w-model` 置于网络盘/共享卷时 PID 判定失效，禁止此部署形态。
  *
  * 用法：
  *   echo '{"k":1}' | npx tsx w-model-dev/scripts/cli/wm-write.ts <target.json> --stdin
@@ -36,6 +37,7 @@ import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 
 import { exitWithError, HandledCliError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { DuplicateFlagError } from '../lib/parse-args.js';
 import { writeStateJson } from '../logic/state-write-logic.js';
@@ -98,6 +100,8 @@ async function main(): Promise<void> {
         break;
       case '--expect-mtime': {
         countFlag('expect-mtime');
+        // 有意宽于 --lock-timeout：调用方常直接字符串化 `stat.mtimeMs`（浮点毫秒），
+        // 有限非负 + floor 语义正确；--lock-timeout 为纯整数语义故严格 `/^\d+$/`。
         const raw = args[++index];
         const parsed = raw === undefined ? NaN : Number(raw);
         if (!Number.isFinite(parsed) || parsed < 0) {
@@ -199,4 +203,7 @@ async function main(): Promise<void> {
   }
 }
 
-runMain(main);
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main
+if (isDirectInvocation(import.meta.url)) {
+  runMain(main);
+}

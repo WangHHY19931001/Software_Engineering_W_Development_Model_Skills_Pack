@@ -148,4 +148,24 @@ describe('exitWithError', () => {
     expect(() => exitWithError(NOT_FOUND)).not.toThrow();
     expect(process.exitCode).toBe(2);
   });
+
+  it('exitCode=1 仍是合法值（C19：wm-verify-evidence-source 无 .git 场景实测 ERROR_JSON 含 "exitCode":1）', () => {
+    const evidenceFailure: CliError = {
+      category: 'STRUCTURE_INVALID',
+      message: 'source provenance 验证失败',
+      exitCode: 1,
+      rule: 'UNSAFE_SOURCE_EVIDENCE',
+    };
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(() => exitWithError(evidenceFailure)).not.toThrow();
+    expect(process.exitCode, '失败透传路径退出码为 1').toBe(1);
+    expect(errorSpy).toHaveBeenCalledWith(
+      '✗ [STRUCTURE_INVALID] source provenance 验证失败 [rule=UNSAFE_SOURCE_EVIDENCE]',
+    );
+    const out = logSpy.mock.calls[0]![0] as string;
+    expect(out.startsWith('ERROR_JSON ')).toBe(true);
+    const parsed = JSON.parse(out.slice('ERROR_JSON '.length)) as { exitCode: number };
+    expect(parsed.exitCode, 'ERROR_JSON 应含 "exitCode":1').toBe(1);
+  });
 });

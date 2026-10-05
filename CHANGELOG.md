@@ -7,6 +7,22 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [42.13.0] - 2026-10-04
+
+### 深度审计 41 项问题全量修复（独立立项；规格 [`docs/superpowers/specs/2026-10-04-audit-deep-dive-fixes-design.md`](./docs/superpowers/specs/2026-10-04-audit-deep-dive-fixes-design.md)）
+
+> 来源：2026-10-04 两轮深度分析（全量盘点 + 四层下钻：实现质量 / 信任模型 / 可执行性 / 证据与演化）登记 41 项——代码 C1-C21 / 文档 D1-D16 / 叙事对齐 N1-N4。实现 32 提交 477fdcc5..cd9d6839（分支 fix/audit-deep-dive-findings，自 main 74279933 开启），84 文件 +2392/−1033。41/41 全部处置、零「不修」；逐项处置（修 / 澄清 / 消解 / 不修+理由）、修复轮次与连带发现按账本 `.superpowers/sdd/2026-10-04-audit-deep-dive-fixes/progress.md` 分类汇总（gitignored 账本，与 42.9.0 惯例一致）。
+
+- **高危修码**：① **C1 VITEST 全局旁路消除**（fail-closed 链唯一全局旁路）——48 个 CLI 入口统一 `isDirectInvocation` 守卫（迁移 N=30 以 grep 实录，含内联形 runMain），`run-main.ts` 删除 `process.env.VITEST` 判断（C7 消解：is-main.ts 头注改为与事实一致）；② **C3 wm-write 并发误判消除**——锁 metadata 改 tmp+rename 原子落位 + `staleOwnerState` 三态化（busy=目录龄宽限重试 / recoverable=孤儿回收 / stale=PID 死+TTL 超限），消除竞争窗口并发写者被误判 `STALE_LOCK`；③ **C2 R11 口径对齐**（DEC-3 修文）——「同秒不算早于」全量改为「严格毫秒早于；同毫秒（含秒级时间戳）不算早于」，7 文件 13 处（含代码注释/SKILL/AGENTS/operational-recovery/hard-constraints #11/SSoT §10C）。
+- **其余代码项分类**：修码 15 项（C1、C3、C4 run-log-logic R6/R7/R8/R10/R11 原位拆分、C5 GATE_ACTIONS 双重定义去 shadow、C6 D-5 共享谓词去重、C9 timestamp 宽容解析统一、C10 `RUN_LOG_ACTION_VALUES` 与 schema 枚举同源、C11 路径正则补 Windows 反斜杠与盘符、C14 check-checkpoint 死代码清理+同名 phase 多文件歧义 fail-closed、C15 O 越权检测补 4 类形态、C16 Ajv 文案正则降为回退、C17 subCriteria 长度不符单条 violation、C18 报告缺失/不可读两类前缀、C19 exitCode 收窄、C21 契约测试锁定值吞噬语义）；澄清 2 项（C12 数值 flag 宽严差异说明、C20 核实 R8 跳过为冗余保护非漏检后补注释）；消解 1 项（C7，随 C1）。
+- **文档批次（D1-D16，全部修文）**：D1 run-log 坏行法定重建程序（消除「跳过继续」vs「exit 1 blocking」互斥死路）、D2 阶段门放行统一「始终用户确认（HOTL 固定）」（硬约束 #2 胜出）、D3 checkpoint-log canonical 落盘形态（`.w-model/checkpoint-log/phase-<N>.md`）、D4 self-as-verifier 唯一承载节收敛、D5 门禁电池 §6.3 唯一权威化（补 phase-1 artifact-gate）、D6 追加片段改官方工具入口、D7 步骤编号对齐、D8 产物命名统一 `--spec-dir` 固定名、D9 五门传参补位置参数、D10 计数统一「48=47 exit-2+1 self-test」、D11 ingestion 收敛 5 轮耗尽三选一出口、D12 uat-path-mapping 格式权威移位阶段 1、D13 hard-constraints #11 拆主条+四细则子节、D14 三 persona 补 emoji/color、D15 DoD 外部来源显式标注、D16 §2 时序图补齐两环节。
+- **叙事对齐批次（N1-N4，改文档与机器现实一致，不加新机制）**：N1 链根不承载于 run-log（signature-chain.jsonl 自包含闭环）、N2 gateLogPath 定位为「供人工/外部审计的定位线索，无脚本消费者」、N3 verifiedArtifacts 定位为「取证留存字段，无仓内自动消费者」、N4 T2/T3 覆盖强度评级「阻断→检测（工具内阻断 / 绕过不可检测）」并注明限定（三不承诺不变）。
+- **既定决策记录**：DEC-1 全量修复（代码+文档+叙事对齐，不含信任加固）；DEC-2 逐问题细粒度 commit+定向验证、全部完成后一次全量 prepush 收口；DEC-3 R11 文档对齐实现（毫秒精度比较，理由：官方追加器写毫秒精度且强制递增，毫秒序是真实信息）；DEC-4 六节设计全部批准。
+- **规格偏差 2 处（均已裁定）**：① C21 已批准偏差——`if (arg === undefined)` 在 noUncheckedIndexedAccess 下类型承重，处置由「删死代码」调整为「保留守卫+注释+契约测试」；② C19 实现口径——核实发现 exitCode 调用点实为 1|2（规格「均为 2」前提被证伪），按方案 A 完整版收窄为字面量 `1 | 2` 并修正注释。
+- **lint:security 遗留处置**：分支实现期新增 12 条 eslint-plugin-security 命中（任务 4 收口时 9 条 + 后续任务新增 3 条：cli-entry-guard.test.ts 5 条 import/order×2+非字面量 fs 文件名×3、state-write-logic.ts 4 条非字面量 fs 文件名、check-preventive-review.ts 3 条 object-injection），逐条判定为 by-design（测试夹具经 `join(__dirname,..)` 读仓内文件 / object 键取自内部 `dimensions` 常量数组 / 锁路径为脚本既定工作面），非漏洞；`security-scan --regenerate` 重生成 baseline 271→281 指纹，`npm run lint:security` 恢复 exit 0。
+- **计数影响**：零新增 CLI（48 不变）/ schema（34 不变）/ references（45 不变）/ persona（36 不变）；门禁脚本 48 不变；测试文件 110→112（+2 新增：`cli-entry-guard.test.ts`（C1/C7 守卫）、`preventive-review-cli.test.ts`（C18），其余 11 个既有测试文件扩展）；eval 语料 65 条不变（65/65 通过）；security baseline +10 指纹（见上条）。
+- prepush 19 项全绿（实测 2328s；vitest 全量 112 文件 1994 用例、self-test 398、eval 65/65、coverage-scope 达阈值、docs-consistency 0 违规）。
+
 ## [42.12.0] - 2026-10-04
 
 ### 测试系统工程批次（用户规范模型吸收；独立立项）

@@ -33,14 +33,14 @@
 - [ ] 反模式 #21（阶段级门禁跳过）：确认阶段 6/7/8 都跑了 `--phase=N` 门禁，未跳过阶段级校验
 - [ ] **JSON 文件写入工具**（反模式 #25）：所有 JSON 文件写入用 Node.js `fs.writeFileSync(path, content, 'utf-8')`，禁止 PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content`（BOM + 深度 + 中文乱码）。详见 [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节
 - [ ] **acknowledgedDecisions 关键词**：每条 `acknowledgedDecisions` 决策条目须命中 ID 模式（`REQ-\d+` / `SD-[\d.]+` / `INTF-[\d.]+` / `DD-[\d.]+` / `TC-\w+-\d+`）或 TECH_KEYWORDS（`REST` / `JWT` / `HTTP` / `状态机` / `不变式` / `接口` / `存储` 等 37 个中英关键词）；「同意」/「确认」/「OK」/「好的」视为空，触发 `check-checkpoint.ts` R2 名词违规。完整集合见 [phase-8-acceptance-test.md](phase-8-acceptance-test.md)「acknowledgedDecisions 决策条目须含关键词」节
-- [ ] **调测者简化行为自检**（反模式 #27）：self-as-verifier 模式下每阶段须按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（硬约束复述 / reworkHints 非空 / 10 脚本全 exitCode=0 / §9 确认 / 长会话重读硬约束）。命中任一简化倾向（S1 上下文压缩丢细节 / S2 追求效率省步骤 / S3 未对照硬约束核验）回阶段起点
+- [ ] **调测者简化行为自检**（反模式 #27）：self-as-verifier 模式下每阶段须按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（硬约束复述 / reworkHints 非空 / 本阶段门禁电池全部 exitCode=0（清单以 subagent-delegation.md §6.3 为准） / §9 确认 / 长会话重读硬约束）。命中任一简化倾向（S1 上下文压缩丢细节 / S2 追求效率省步骤 / S3 未对照硬约束核验）回阶段起点
 - [ ] **Bundled Resources 按需加载**：会话内已加载的文件清单与「Bundled Resources」表对照，未加载无关文件（约束 #6 可执行化）
 
 
 ## 完成定义（DoD）
 
 
-> 吸收自 [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) `references/definition-of-done.md`。
+> 来源：[addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) 的 definition-of-done（外部仓库路径 `references/definition-of-done.md`，非本仓文件；DoD 内容内嵌于本文件「完成定义（DoD）」节）。
 > SSoT §10.6（`docs/skill-design-document_SSoT.md`） 为权威定义，本节为可执行细则。
 >
 > **与工件质量门的关系**：§10.5 工件质量门（`docs/skill-design-document_SSoT.md`） / [`check-artifact-gate.ts`](../scripts/cli/check-artifact-gate.ts) 是「验收阶段的硬门禁」（退出码 0 才放行）；DoD 是「每次变更的日常标准」（每个 `/wm code` / `/wm test` 后自检）。二者不互替。

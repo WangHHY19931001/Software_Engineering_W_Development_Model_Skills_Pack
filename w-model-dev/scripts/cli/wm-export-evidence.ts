@@ -9,6 +9,7 @@
 import * as path from 'node:path';
 
 import { exitWithError, HandledCliError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { exportEvidence, verifyEvidence } from '../logic/evidence-export-logic.js';
 
@@ -58,13 +59,18 @@ async function main(): Promise<void> {
   };
   console.log('EVIDENCE_EXPORT_JSON ' + JSON.stringify({ script: 'wm-export-evidence.ts', ...safeResult }));
   if (!result.ok) {
+    // 失败路径 exitCode ∈ {1,2}：0 仅由成功态（ok:true）产生；失败态只出自 EvidenceFailure(1|2)
+    // 与 catch-all 兜底 1（evidence-export-logic.ts toResult），故断言收窄为 1|2（C19，零运行时变化）。
     exitWithError({
       category: result.exitCode === 2 ? 'FILE_NOT_FOUND' : 'STRUCTURE_INVALID',
       rule: result.reason,
       message: '证据导出或验证失败',
-      exitCode: result.exitCode,
+      exitCode: result.exitCode as 1 | 2,
     });
   }
 }
 
-runMain(main);
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main
+if (isDirectInvocation(import.meta.url)) {
+  runMain(main);
+}

@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/checkpoint-log.schema.json",
   "title": "CheckpointLogEntry",
-  "description": "checkpoint-log.jsonl 单行记录形状（checkpoint-logic.ts RunLogEntry 子集：无 rootcause/fix/escalate 动作、无 R 角色）",
+  "description": "checkpoint-log.jsonl 单行记录形状（checkpoint-logic.ts RunLogEntry 子集：无 rootcause/fix/escalate 动作、无 R 角色）。落盘形态（D3，42.13.0 起）：checkpoint-log 目录内容为 phase-<N>.md 纯文本（UTF-8，用户确认原文 + 时间与放行对象要素）——本 schema 为结构参考，机器校验走 check-checkpoint R1-R5 文本判据（canonical 形态 phase-<N>.md；同 phase 双候选文件歧义 fail-closed）",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -78,7 +78,7 @@
       "type": ["integer", "null"]
     },
     "gateLogPath": {
-      "description": "门禁脚本 stdout 存档路径（gate/tla-gate/graph-gate 类动作必填；G 子代理将脚本 stdout 归档到 gate-logs/，本字段记录路径供交叉校验退出码防伪造，见 SSoT §10E）",
+      "description": "门禁脚本 stdout 存档路径（gate/tla-gate/graph-gate 类动作填写；G 子代理将脚本 stdout 归档到 gate-logs/，本字段记录路径为定位线索（供人工/外部审计复核）；当前无脚本消费者）",
       "type": "string"
     },
     "outcome": {

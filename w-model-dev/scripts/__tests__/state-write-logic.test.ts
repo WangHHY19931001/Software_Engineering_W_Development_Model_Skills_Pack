@@ -863,3 +863,78 @@ describe('review round 1 ownership races', () => {
     await expect(fs.readFile(path.join(transitionDir, 'metadata.json'), 'utf-8')).resolves.toContain('active');
   });
 });
+
+describe('C3 锁竞争窗口（mkdir→metadata）', () => {
+  it('并发双写者：零误判 STALE_LOCK，串行成功', async () => {
+    const p = target('c3-concurrent-writers.json');
+    const [first, second] = await Promise.all([
+      writeStateJson(p, '{"writer":"a"}', { lockTimeoutMs: 30_000 }),
+      writeStateJson(p, '{"writer":"b"}', { lockTimeoutMs: 30_000 }),
+    ]);
+    expect(first).toMatchObject({ ok: true });
+    expect(second).toMatchObject({ ok: true });
+    expect([first.reason, second.reason]).not.toContain('STALE_LOCK');
+    const final = await fs.readFile(p, 'utf-8');
+    expect(['{"writer":"a"}', '{"writer":"b"}']).toContain(final);
+  });
+
+  it('owner 目录在但 metadata 缺失且新鲜（<10s）：走 busy 重试而非 stale', async () => {
+    const p = target('c3-busy-owner.json');
+    const lockDir = `${p}.lock`;
+    const ownerDir = path.join(lockDir, 'owner');
+    await fs.mkdir(ownerDir, { recursive: true });
+
+    const result = await writeStateJson(p, '{"v":1}', { lockTimeoutMs: 200 });
+
+    expect(result).toMatchObject({ ok: false, reason: 'LOCK_TIMEOUT' });
+    await expect(fs.access(path.join(ownerDir, 'metadata.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect((await fs.readdir(lockDir)).some((entry) => entry.startsWith('.stale-'))).toBe(false);
+  });
+
+  it('owner 目录在、metadata 缺失且目录 mtime 超 10s：走孤儿回收（recoverable）', async () => {
+    const p = target('c3-aged-owner.json');
+    const lockDir = `${p}.lock`;
+    const ownerDir = path.join(lockDir, 'owner');
+    await fs.mkdir(ownerDir, { recursive: true });
+    const elevenSecondsAgo = new Date(Date.now() - 11_000);
+    await fs.utimes(ownerDir, elevenSecondsAgo, elevenSecondsAgo);
+
+    const result = await writeStateJson(p, '{"v":"recovered"}', { recoverStaleLock: true });
+
+    expect(result).toMatchObject({ ok: true });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":"recovered"}');
+    expect((await fs.readdir(lockDir)).some((entry) => entry.startsWith('.stale-'))).toBe(true);
+  });
+
+  it('read→stat 跨界缝隙：metadata 恰在两次探测之间落位 → 未决重试而非误判 stale', async () => {
+    const p = target('c3-read-stat-gap.json');
+    const lockDir = `${p}.lock`;
+    const ownerDir = path.join(lockDir, 'owner');
+    await fs.mkdir(ownerDir, { recursive: true });
+    let landed = false;
+    const result = await writeStateJson(p, '{"v":1}', {
+      lockTimeoutMs: 300,
+      afterOwnerReadMiss: async () => {
+        if (landed) return;
+        landed = true;
+        // 模拟竞争方 A 的 rename 恰在本进程 readMetadata（未命中）与 metadataFileAbsent（stat）之间落位
+        await fs.writeFile(
+          path.join(ownerDir, 'metadata.json'),
+          JSON.stringify({
+            targetPath: p,
+            pid: process.pid,
+            token: 'landed-owner',
+            createdAt: new Date().toISOString(),
+            operation: 'wm-write',
+          }),
+          'utf-8',
+        );
+      },
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: 'LOCK_TIMEOUT' });
+    expect(landed).toBe(true);
+    await expect(fs.readFile(path.join(ownerDir, 'metadata.json'), 'utf-8')).resolves.toContain('landed-owner');
+    expect((await fs.readdir(lockDir)).some((entry) => entry.startsWith('.stale-'))).toBe(false);
+  });
+});

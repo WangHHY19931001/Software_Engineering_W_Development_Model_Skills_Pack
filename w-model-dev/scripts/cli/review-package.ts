@@ -27,9 +27,9 @@
 import { randomUUID } from 'node:crypto';
 import { lstatSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { exitWithError, HandledCliError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { runSync } from '../lib/run-sync.js';
 
@@ -404,13 +404,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   }
 }
 
-// 统一入口（lib/run-main.ts）：main().catch 统一为 UNEXPECTED + exit 2；导入模块时不启动 CLI，便于测试写入层。
-const modulePath = path.resolve(fileURLToPath(import.meta.url));
-const invokedAsScript = process.argv.slice(1, 3).some((argument) => {
-  try {
-    return path.resolve(argument) === modulePath;
-  } catch {
-    return false;
-  }
-});
-if (invokedAsScript) runMain(main);
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main，导入模块时不启动 CLI，便于测试写入层
+// （取代原 argv.slice(1, 3) 局部比对——统一走双侧 realpath 判定，防 symlink/盘符大小写/8.3 短名误判）
+if (isDirectInvocation(import.meta.url)) {
+  runMain(main);
+}

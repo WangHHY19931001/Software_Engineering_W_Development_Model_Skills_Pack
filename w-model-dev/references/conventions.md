@@ -118,7 +118,7 @@
 
 ### verifiedArtifacts
 
-- **规范定义**：GATE_JSON（`--json`）顶层可选字段（批次 3），本次门禁判定承重输入文件字节清单 `Array<{path, sha256, bytes}>`（四热点门禁恒存在、空数组允许）；下游 v2 签名的 `sourceArtifacts[].sha256` 从此清单按 path 抄录，消费前可复验「门禁验的与消费的是同一字节」。
+- **规范定义**：GATE_JSON（`--json`）顶层可选字段（批次 3），本次门禁判定承重输入文件字节清单 `Array<{path, sha256, bytes}>`（四热点门禁恒存在、空数组允许）；下游 v2 签名的 `sourceArtifacts[].sha256` 从此清单按 path 抄录，消费前可复验「门禁验的与消费的是同一字节」。**取证留存定位**：sha256 供人工/外部审计复验，当前无仓内自动消费者重验（gate-log↔签名链跨文件「声明 vs 真实字节」自动核查未建，见 [agent-threat-model.md](agent-threat-model.md) T4 已知缺口）。
 - **_Avoid_**：artifacts/inputs/字节清单混写（字段名固定「verifiedArtifacts」；「artifacts」是签名链条目的路径清单字段，不含哈希）。
 
 ### sigHashAlgo
@@ -266,11 +266,11 @@ path:§3.2,L42       （章节+行号混合）
 
 ### 3. evidence 正则
 
-`verifier-logic.ts` 的 EVIDENCE_PATTERN 须匹配以下两种格式：
+`verifier-logic.ts` 的 EVIDENCE_PATTERN 须匹配以下两种格式（C11：路径段字符集含反斜杠，路径首允许 Windows 盘符前缀 `(?:[A-Za-z]:)?`，`src\mod\a.ts:L3=…` / `D:\proj\x.ts:L1-5=…` 均合法）：
 
 ```
-/^[\w/.-]+:§[\w.-]+=.+$/       （章节定位）
-/^[\w/.-]+:L\d+(?:-\d+)?=.+$/  （行号定位）
+/^(?:[A-Za-z]:)?[\w/.\-\\]+:§[\w.-]+=.+$/       （章节定位）
+/^(?:[A-Za-z]:)?[\w/.\-\\]+:L\d+(?:-\d+)?=.+$/  （行号定位）
 ```
 
 ### 4. 引用关系

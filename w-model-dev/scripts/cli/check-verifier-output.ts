@@ -44,6 +44,7 @@ import * as path from 'node:path';
 import { checkVerifierOutput, type VerifierOutputShape } from '../logic/verifier-logic.js';
 import { readJsonOrExit } from '../lib/read-json-or-exit.js';
 import { exitWithError, HandledCliError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
@@ -205,4 +206,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   return;
 }
 
-runMain(main);
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main
+if (isDirectInvocation(import.meta.url)) {
+  runMain(main);
+}

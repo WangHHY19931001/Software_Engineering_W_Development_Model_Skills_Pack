@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 42.12.0
+version: 42.13.0
 description: >-
   Use when the user invokes /wm, mentions W-model, W 模型 or W 开发模型, requests
   requirements traceability (RTM), stage gates, quality gates, or development and
@@ -66,7 +66,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 8   | 编排者最小化          | O 只编排；实施动作由子代理执行；每阶段 S/V/G 各 ≥1，R3 三维度（role=R 的 r3-* success 记录）各 ≥1                                                           |
 | 9   | 门禁退出码不可伪      | exitCode 与 process.exit 强一致；G 存档 stdout；run-log 交叉校验                                                                                            |
 | 10  | 系统层级树 + REQ 层级 | 7 层图谱；REQ level 1-4 必填、level≥2 须 reqGroup                                                                                                           |
-| 11  | 闭环机制 + R3 审查    | 5 脚本每阶段门 exitCode=0（check-run-log R11 校验）；S 产出后 R3 三报告强制；放行三步顺序：确认落盘 → 闭环五门串行 → 放行记录末条（严格晚于五门，同秒不算） |
+| 11  | 闭环机制 + R3 审查    | 5 脚本每阶段门 exitCode=0（check-run-log R11 校验）；S 产出后 R3 三报告强制；放行三步顺序：确认落盘 → 闭环五门串行 → 放行记录末条（严格晚于五门，同毫秒不算晚） |
 | 12  | 返工必经根因定位      | V/G 不通过先 R 报告 → V 复审 → G 门禁 → S-fix                                                                                                               |
 | 13  | 行为门禁按成熟度分级  | 阶段 1-4 TLA+ + BDD 按成熟度强制                                                                                                                            |
 | 14  | 代码改动前后门禁      | 修改前 codegraph 影响分析落盘 + 改动后回归测试                                                                                                              |
@@ -85,7 +85,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | A 分析 | 阶段 1–4 分块分析、合并建图                                 | 只产出 ingestion 中间产物                                                       |
 | R 根因 | 定位根因产出 RootCauseReport；R3 预防性审查                 | 只产出报告，不实施修复                                                          |
 
-每阶段时序：O 路由 → 🔴 CHECKPOINT 进入确认 → 多角色讨论分析（阶段 1-4，A-lead 并行多轮交叉，见 references/agent-personas.md 阶段角色集矩阵）→ S 产出 → R3 预防性审查 → G 运行 `check-preventive-review.ts`（exitCode=0）→ V 评审 → G 常规门禁 → **阶段门放行三步（D-4，顺序不可换、不可并行）** → O 展示证据 → 🔴 CHECKPOINT 阶段门放行 → O 更新状态。**阶段门放行三步**：① 用户确认**先落盘**为 `checkpoint-log/phase-N`（阶段 1 由 R0 自举形态消费该确认作初级证据）→ ② **闭环五门串行**执行且 `exitCode=0`（第 ② 步串行调度序列 = `check-budget.ts` → `check-run-log.ts` → `check-maturity.ts` → `check-checkpoint.ts`；第五门 `check-preventive-review.ts` 在第 ② 步串行调度序列之外、V 评审前执行（见本段开头时序），闭环五门齐备表述以 [references/operational-recovery.md](references/operational-recovery.md)「调用时机」节为准；五门均须提供 run-log——`check-run-log.ts` / `check-checkpoint.ts` 为位置参数 `<run-log.jsonl>`，`check-budget.ts` / `check-maturity.ts` 为 `--run-log=<path>`，`check-preventive-review.ts` 用 `--auto-trigger --run-log=<path>`，`check-checkpoint.ts` 另加 `--checkpoint-log=<dir>`）→ ③ 由 O 追加**放行记录**（`action=checkpoint`、`outcome=success`）作为**阶段末条**，且**严格晚于**五条 gate 记录（同秒不算早于；`check-run-log.ts` R11 机器核验，反伪造）。细则（S 拆分、self-as-verifier 模式、只读脚本例外、dispatch-matrix 总览）见 [references/subagent-delegation.md](references/subagent-delegation.md)。跨阶段/跨角色交接与调用分类的书写规则见同文件「调用分类」与「跨阶段与跨角色交接的书写规则」两节；交接必须写成显式动作句，人类入口不得由子代理代达。
+每阶段时序：O 路由 → 🔴 CHECKPOINT 进入确认 → 多角色讨论分析（阶段 1-4，A-lead 并行多轮交叉，见 references/agent-personas.md 阶段角色集矩阵）→ S 产出 → R3 预防性审查 → G 运行 `check-preventive-review.ts`（exitCode=0）→ V 评审 → G 常规门禁 → **阶段门放行三步（D-4，顺序不可换、不可并行）** → O 展示证据 → 🔴 CHECKPOINT 阶段门放行 → O 更新状态。**阶段门放行三步**：① 用户确认**先落盘**为 `checkpoint-log/phase-N`（阶段 1 由 R0 自举形态消费该确认作初级证据）→ ② **闭环五门串行**执行且 `exitCode=0`（第 ② 步串行调度序列 = `check-budget.ts` → `check-run-log.ts` → `check-maturity.ts` → `check-checkpoint.ts`；第五门 `check-preventive-review.ts` 在第 ② 步串行调度序列之外、V 评审前执行（见本段开头时序），闭环五门齐备表述以 [references/operational-recovery.md](references/operational-recovery.md)「调用时机」节为准；五门均须提供 run-log——`check-run-log.ts` / `check-checkpoint.ts` 为位置参数 `<run-log.jsonl>`，`check-budget.ts` / `check-maturity.ts` 为 `--run-log=<path>`，`check-preventive-review.ts` 用 `<project-dir> --auto-trigger --run-log=<path>`，`check-checkpoint.ts` 另加 `--checkpoint-log=<dir>`）→ ③ 由 O 追加**放行记录**（`action=checkpoint`、`outcome=success`）作为**阶段末条**，且**严格晚于**五条 gate 记录（毫秒精度：同毫秒（含无毫秒部分的秒级时间戳）不算早于；`check-run-log.ts` R11 机器核验，反伪造）。细则（S 拆分、self-as-verifier 模式、只读脚本例外、dispatch-matrix 总览）见 [references/subagent-delegation.md](references/subagent-delegation.md)。跨阶段/跨角色交接与调用分类的书写规则见同文件「调用分类」与「跨阶段与跨角色交接的书写规则」两节；交接必须写成显式动作句，人类入口不得由子代理代达。
 
 ## 执行工作流
 
@@ -96,7 +96,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 5. **产出**（O→S）：生成产物 + 同步测试设计 + 更新 RTM；阶段 1–4 额外产出 TLA+ 规格与 BDD features（按成熟度）；ingestion 子流程（plan-chunks → A-chunk/A-cross → check-requirement-graph，收敛循环 MAX_ROUNDS=5）见 ingestion-chunk.md。
 6. **R3 预防性审查**（O→R→G）：S 产出后分派 R 完成 completeness/reliability/security 三份报告，再由 G 运行 check-preventive-review.ts；exitCode=0 后才可进入 V。
 7. **评审**（O→V）：按 targetKind 路由 Persona 产出 VerifierOutput。**编排者不得自评**。
-8. **门禁**（O→G）：跑 check-verifier-output.ts；阶段 1–4 额外 check-tla-model.ts + check-bdd-model.ts；阶段 5 额外 check-code-tla-consistency.ts。**阶段门放行前顺序（D-4，三步不可换序、不可并行）**：① `checkpoint-log/phase-N` 用户确认**先落盘**（阶段 1 由 R0 首阶段自举形态消费该确认作初级证据）→ ② **闭环五门串行**（串行调度序列 `check-budget.ts` → `check-run-log.ts` → `check-maturity.ts` → `check-checkpoint.ts`；第五门 `check-preventive-review.ts` 在第 ② 步串行调度序列之外、V 评审前执行（见第 6 步），五门均须提供 run-log，全部 `exitCode=0`）→ ③ **放行记录**（`action=checkpoint`、`outcome=success`）为**阶段末条**且**严格晚于**五条 gate 记录（同秒不算早于；违反即 `check-run-log.ts` R11 blocking，约束 #11）。
+8. **门禁**（O→G）：跑 check-verifier-output.ts；阶段 1–4 额外 check-tla-model.ts + check-bdd-model.ts；阶段 5 额外 check-code-tla-consistency.ts。**阶段门放行前顺序（D-4，三步不可换序、不可并行）**：① `checkpoint-log/phase-N` 用户确认**先落盘**（阶段 1 由 R0 首阶段自举形态消费该确认作初级证据）→ ② **闭环五门串行**（串行调度序列 `check-budget.ts` → `check-run-log.ts` → `check-maturity.ts` → `check-checkpoint.ts`；第五门 `check-preventive-review.ts` 在第 ② 步串行调度序列之外、V 评审前执行（见第 6 步），五门均须提供 run-log，全部 `exitCode=0`）→ ③ **放行记录**（`action=checkpoint`、`outcome=success`）为**阶段末条**且**严格晚于**五条 gate 记录（毫秒精度：同毫秒（含无毫秒部分的秒级时间戳）不算早于；违反即 `check-run-log.ts` R11 blocking，约束 #11）。各阶段门禁电池完整清单（阶段专属脚本 + 参数形态）以 [references/subagent-delegation.md](references/subagent-delegation.md) §6.3「阶段专属脚本」为唯一权威，本步只列高频项、不复述完整电池。
 9. **验证与暂停**（O）：普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；跳过 R 或 R 报告复审/门禁分别命中反模式 #18/#19。S-fix 后与放行前分派冰山扫掠（iceberg-sweep-guide.md）；阶段 1 ingestion 图谱失败仍走 A→G 专用收敛循环。
 10. **持久化**（O）：用户放行后才更新 `project.status`；状态写入统一经 wm-write.ts（锁 + 备份 + 原子写）。
 
@@ -118,7 +118,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | `/wm reset` / `/wm import <文件>`                            | 状态操作（🔴 CHECKPOINT 后执行）                                                                                                | O 执行                |
 | `/wm export [目录]` / `/wm hill-climbing`                    | 导出 / 改进信号                                                                                                                 | O 只读 / O 分析       |
 
-每命令的输入、输出、失败动作见 [references/command-reference.md](references/command-reference.md)。门禁脚本 48 个 .ts，登记总览见 subagent-delegation.md「dispatch-matrix」节。
+每命令的输入、输出、失败动作见 [references/command-reference.md](references/command-reference.md)。门禁脚本 48 个 .ts（47 个 exit-2 门禁 + self-test），登记总览见 subagent-delegation.md「dispatch-matrix」节。
 
 > **`/wm code-health` 权限与 CHECKPOINT**：O 只路由 / 只读 / 持久化；A 只解读 O/G 执行的 Phase 1–2 CLI 输出并登记发现（发现不是结论）；S 仅在人类批准 scope 内经 `code-health-apply.ts` 执行最小可逆改动；V 独立复核分类 / 等价证明 / scope / 回滚；G 跑 code-health CLI 并回填真实退出码；R 定位 `blocked` 候选根因；**只有 human 能批准**（精确 candidate ID / action / files / symbols / scopeHash）。实现前与放行前均须 🔴 CHECKPOINT 等待人类决定；失败链 `gate-failure → blocked → R → V → G → S(rework) → evidenced` 顺序不可跳过。详见 [references/code-health-governance.md](references/code-health-governance.md)。
 
@@ -143,7 +143,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 - **核心操作行为**：完整的八条操作行为与失败模式 F1-F10 见 [references/operation-behaviors.md](references/operation-behaviors.md)，按需加载。
 - **技能资产编写**：写或评审 `SKILL.md`/`references/`/`templates/` 前必读 [references/asset-authoring.md](references/asset-authoring.md)（no-op test、渐进披露阈值、授权不写）。
-- **资源计数**：`references/`（45 个 .md）、`schemas/`（34 份 JSON Schema draft-07，含 change-scope / codegraph-query 与 evidence-manifest / evidence-provenance）、门禁脚本 48 个 .ts。
+- **资源计数**：`references/`（45 个 .md）、`schemas/`（34 份 JSON Schema draft-07，含 change-scope / codegraph-query 与 evidence-manifest / evidence-provenance）、门禁脚本 48 个 .ts（47 个 exit-2 门禁 + self-test）。
 - **状态写锁协议**：状态写入统一经 `wm-write.ts` 使用 `<target>.lock` 持久目录与可转移 `owner` 对象实施跨进程锁，锁内校验 mtime 并毫秒+UUID 备份、tmp+rename 原子替换与回读恢复；CLI 用 `--lock-timeout` 控制等待，陈旧锁必须显式 `--recover-stale-lock`，否则以退出码 1 拒绝写入。
 - **行为门禁**：阶段 1-4 传 `--require-tla-equivalence --tla-manifest=<path>`，阶段 5-8 传 `--require-cucumber-report --cucumber-report=<path>`。
 - **证据与审计**：`coverage/`、`.zcode/` 与 `.w-model/` 是 Git 忽略的本地生成物，默认不随 Git 交付；需要交付审计证据时先运行 `npm run wm:verify-evidence-source -- <project-dir>`（`wm-verify-evidence-source.ts` producer+verify 命令，写入 source-bound provenance，登记 `evidence-provenance.schema.json`），再运行 `npm run wm:export-evidence -- <project-dir> <output-dir>` 生成脱敏、带 SHA-256 manifest 的证据包；`wm-export-evidence --verify` 默认仅做 package-only 校验，传 `--source-project` 才做 source-bound 重验；受控本机 provenance 提供流程完整性，不是密码学签名，也不是第三方不可抵赖证明；导出后仍须按项目安全策略审阅，且不会自动提交或发布。受控且被跟踪的历史归档是 `docs/changes/archive/`，与本地 `.w-model/` 不同。

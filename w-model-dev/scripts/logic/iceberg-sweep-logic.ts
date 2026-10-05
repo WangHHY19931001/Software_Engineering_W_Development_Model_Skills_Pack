@@ -365,6 +365,14 @@ export function checkIcebergSweep(
       // R8 分母未覆盖 / 零发现但覆盖不足
       // 收敛集只用**设计 ID 视角**的并集（graph/rtm/tla）：path 命名空间（scope 的文件路径）
       // 不参与，否则收敛集混入文件项后 sweptArtifacts 永远无法覆盖（N-1）。
+      //
+      // `disagreements.length === 0` 门（C20 核实记录）：R6 未对账差异已 blocking，此处跳过
+      // 收敛集检查避免二次误报叠加；R6 清零后本检查生效。依据：disagreements 仅由上方 R6
+      // 的三处累加点写入（宽池两两比对、窄池「超出」与「漏 SD」两方向），非空即在 R7 之前
+      // 被无条件并入 reasons，且自此到本门之间无早退、无清空——故「disagreements>0 ⇒ R6
+      // 已 blocking ⇒ passed=false」对一切输入形态成立（schema 短路与 viewSets 未注入形态
+      // 本就不进入本块；phase 不可解析形态 R6 同样 blocking 且 R8 整块不执行）。差异未对账
+      // 时各视角集合尚未收敛，其并集不构成有效分母，此时计算 R8 只会给已失败结果叠加噪声。
       if (designViews.length > 0 && disagreements.length === 0) {
         // eslint-disable-next-line security/detect-object-injection -- 键 v 取自 designViews（ICEBERG_VIEW_PRESENCE 常量表枚举，IcebergView 四值闭集），非外部可控输入
         const converged = new Set(designViews.flatMap((v) => viewSets[v]!));

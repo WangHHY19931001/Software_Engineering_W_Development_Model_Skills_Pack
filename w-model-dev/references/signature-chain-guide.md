@@ -11,7 +11,7 @@
 - `prevSigId` 指向同阶段前一环签名（形成链）
 - `sigHash = sha256(sigId + phase + role + action + runId + artifacts + prevSigHash + signedAt + signer + inputProvenance)`
 - 首环 `prevSigId = "genesis"`，`prevSigHash = "0"`（阶段起点）
-- 末环（G 签名）的 `sigHash` 作为该阶段签名链根 hash，写入 run-log checkpoint 条目
+- 签名链在 `signature-chain.jsonl` 内自包含闭环（genesis/首条锚定）；run-log **不**承载链根字段（run-log.schema.json `additionalProperties: false`），亦无任何「链根 hash」消费点
 - 可选字段 `targetKind`（返工链语义分类，D-1）是**不入哈希**的元数据：带与不带 `targetKind` 的同一环 sigHash 相同（否则 R6 重算会让全部既有签名链失效）；缺省语义为 `standard`
 
 ## 2. 阶段角色签名顺序（强制链）

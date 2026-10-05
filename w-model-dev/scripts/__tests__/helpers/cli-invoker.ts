@@ -1,7 +1,8 @@
 /**
  * CLI 进程内调用层（Wave 2 试点起用）
  *
- * 前提：lib/run-main.ts 的 VITEST 守卫阻止 import 时自执行；CLI 均以
+ * 前提：各 cli/*.ts 尾部 isDirectInvocation 守卫（lib/is-main.ts）阻止 import 时
+ * 自执行（C1 后取代原 run-main.ts VITEST 守卫——环境旁路已删除）；CLI 均以
  * process.exitCode 赋值收尾（lib/cli-error.ts exitWithError 同款），不调
  * process.exit——本 helper 仅保存/恢复 exitCode 并捕获 console 输出
  * （log→stdout；error/warn→stderr 同池——Node 中 warn 与 error 均写 stderr，语义一致）。

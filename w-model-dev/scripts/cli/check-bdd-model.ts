@@ -60,6 +60,7 @@ import {
 import { loadAndValidate, LOAD_AND_VALIDATE_SENTINEL_PREFIX } from '../lib/load-and-validate.js';
 import { writeGateLog } from '../lib/gate-log-writer.js';
 import { exitWithError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { buildViolationDistribution } from '../lib/gate-report.js';
@@ -535,10 +536,13 @@ async function main(): Promise<number> {
   return result.exitCode;
 }
 
-runMain(async () => {
-  const exitCode = await main();
-  // 错误路径已由 exitWithError 设置 process.exitCode（非 undefined），否则由 Node 自然退出
-  if (process.exitCode === undefined) {
-    process.exitCode = exitCode;
-  }
-});
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main（内联形 runMain 统一迁移，C1/C7）
+if (isDirectInvocation(import.meta.url)) {
+  runMain(async () => {
+    const exitCode = await main();
+    // 错误路径已由 exitWithError 设置 process.exitCode（非 undefined），否则由 Node 自然退出
+    if (process.exitCode === undefined) {
+      process.exitCode = exitCode;
+    }
+  });
+}

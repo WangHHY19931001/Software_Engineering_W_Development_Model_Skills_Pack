@@ -26,6 +26,7 @@ import { promises as fs, type Stats } from 'node:fs';
 import * as path from 'node:path';
 
 import { exitWithError } from '../lib/cli-error.js';
+import { isDirectInvocation } from '../lib/is-main.js';
 import { runMain } from '../lib/run-main.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 import { parseFlagValue } from '../lib/parse-args.js';
@@ -172,5 +173,7 @@ async function main(): Promise<void> {
   process.exitCode = 0;
 }
 
-// 统一入口（lib/run-main.ts）：main().catch 统一为 UNEXPECTED + exit 2；exitWithError 已完成输出则静默退出
-runMain(main);
+// 入口守卫（lib/is-main.ts，双侧 realpath 加固）：仅直接执行时运行 main
+if (isDirectInvocation(import.meta.url)) {
+  runMain(main);
+}
