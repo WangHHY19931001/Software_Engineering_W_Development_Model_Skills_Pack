@@ -2661,26 +2661,26 @@ const SIGNATURE_CHAIN_CASES: SignatureChainCase[] = [
     phase: 2,
     description: '签名链：跨阶段断链（prevSigId 不存在于全链），R2 失败',
   },
-  // 批次3 sigHash v2（公式分流 + R11）
+  // 43.0.0 sigHash v3（A1 单公式；valid-v2/bad-v2-* 经 codemod 后为 v3 原生数据）
   {
     file: 'valid-v2.jsonl',
     expectedPassed: true,
     phase: 1,
-    description: '签名链：v2 公式全链（sigHashAlgo=v2 + 来源 sha256 齐全），R6 按 v2 分流重算 + R11 通过',
+    description: '签名链：v3 单公式全链（sigHashAlgo=v3 + 来源 sha256 齐全），R6 按 v3 重算 + R11 通过',
   },
   {
     file: 'bad-v2-missing-sha256.jsonl',
     expectedPassed: false,
     expectedRulesFailed: ['R11'],
     phase: 1,
-    description: '签名链：v2 条目来源 sha256 缺失，R11 失败',
+    description: '签名链：来源 sha256 缺失，R11 失败（v3 起全量适用，不再按条目分流）',
   },
   {
     file: 'bad-v2-tampered-sha256.jsonl',
     expectedPassed: false,
     expectedRulesFailed: ['R6'],
     phase: 1,
-    description: '签名链：v2 条目来源 sha256 被篡改但 sigHash 未重算，R6 失败（v2 公式纳入 sha256）',
+    description: '签名链：来源 sha256 被篡改但 sigHash 未重算，R6 失败（v3 公式纳入 sha256）',
   },
 ];
 

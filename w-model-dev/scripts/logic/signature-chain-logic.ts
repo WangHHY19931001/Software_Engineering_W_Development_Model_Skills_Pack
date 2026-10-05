@@ -5,7 +5,11 @@
  * 供 check-signature-chain.ts（CLI）调用，校验 signature-chain.jsonl 的：
  *   R1 角色齐全 + R2 链连续 + R3 时序单调 + R4 角色匹配 + R5 代签检测
  *   + R6 防篡改 + R7 悬空来源 + R8 缺失产物 + R9 越权消费 + R10 绕过门禁
- *   + R11 v2 条目来源 sha256 必填 + 跨阶段消费者校验。
+ *   + R11 来源 sha256 必填 + 跨阶段消费者校验。
+ *
+ * sigHash 自 43.0.0 起为 v3 单一公式（targetKind/gateExitCode/gateLogPath 入哈希，
+ * 销毁红队实验 2 证实的「targetKind 单字段洗白 R9 违规」穿透面）；v1/v2 分流已删除，
+ * 旧算法条目（sigHashAlgo !== 'v3'）一律 R6 违规（fail-closed，不迁移）。
  *
  * 单点事实源，不依赖任何 I/O 与 LLM。
  */
@@ -18,14 +22,14 @@ import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 export type Role = 'O' | 'S' | 'A' | 'V' | 'G' | 'R';
 
-/** sigHash 公式版本；缺省 v1（批次3 v2：公式版本化，artifacts 与 sourceArtifacts 整体纳入内容哈希） */
-export type SigHashAlgo = 'v1' | 'v2';
+/** sigHash 公式版本；43.0.0 起唯一合法值 v3（v1/v2 分流已删除，旧值 R6 fail-closed） */
+export type SigHashAlgo = 'v3';
 
 export interface SourceArtifact {
   path: string;
   sourceSigId: string;
   sourceRole: Role;
-  /** 来源产物内容哈希（v2 链必填，R11 校验格式 ^[a-fA-F0-9]{64}$） */
+  /** 来源产物内容哈希（v3 起必填，R11 校验格式 ^[a-fA-F0-9]{64}$） */
   sha256?: string;
 }
 
@@ -41,15 +45,15 @@ export interface SignatureChainEntry {
   phaseName?: string;
   role: Role;
   action: string;
-  /** 返工链语义分类（D-1）：rootcause=复审 R 报告 / preventive=预防性审查（R3） / iceberg=冰山扫掠 / standard=默认。可选元数据，不入 sigHash */
-  targetKind?: 'rootcause' | 'preventive' | 'iceberg' | 'standard';
+  /** 返工链语义分类（D-1）：rootcause=复审 R 报告 / preventive=预防性审查（R3） / iceberg=冰山扫掠 / maturity=成熟度评定（任务 8 预留）/ standard=默认。v3 起入 sigHash */
+  targetKind?: 'rootcause' | 'preventive' | 'iceberg' | 'maturity' | 'standard';
   runId: string;
   artifacts: string[];
   prevSigId: string;
   prevSigHash: string;
   sigHash: string;
-  /** sigHash 公式版本；缺省 v1。v2 条目适用 R11（来源 sha256 必填）且 R6 按 v2 公式分流重算 */
-  sigHashAlgo?: SigHashAlgo;
+  /** sigHash 公式版本（v3 起必填）；非 'v3' 条目 R6 直接违规（旧数据 fail-closed，不迁移） */
+  sigHashAlgo: SigHashAlgo;
   signedAt: string;
   signer: string;
   gateExitCode?: number | null;
@@ -117,41 +121,44 @@ function isAllowedSource(role: Role, entry: SignatureChainEntry, srcRole: Role):
   return false;
 }
 
-// ==================== sigHash 重算 ====================
+// ==================== sigHash 重算（v3 单一公式） ====================
 
 /**
- * 重算 sigHash（R6 防篡改校验，v1 公式——逐字节兼容既有链，不得改动）
- * sigHash = sha256(sigId + phase + role + action + runId + artifacts + prevSigHash + signedAt + signer + inputProvenance)
+ * v3 单一公式（43.0.0，breaking）：14 字段全量入哈希。
+ * 相对 v1/v2 新纳入 targetKind / gateExitCode / gateLogPath——销毁红队实验 2 证实的
+ * 「targetKind 单字段洗白 R9 违规」穿透面（targetKind 不入哈希时，无痕改写即可把
+ * R9 越权消费洗白为 D-1 合法例外）。v1/v2 分流重算已删除（用户裁定：毁弃存量，不兼容）。
+ */
+const SIG_HASH_FIELDS_V3 = [
+  'sigId',
+  'phase',
+  'role',
+  'action',
+  'runId',
+  'artifacts',
+  'sourceArtifacts',
+  'prevSigHash',
+  'signedAt',
+  'signer',
+  'inputProvenance',
+  'targetKind',
+  'gateExitCode',
+  'gateLogPath',
+] as const;
+
+/** 结构化字段：以 JSON 序列化进 canonical 串（undefined/null 归一为 null）；其余字段 String() 归一为 '' */
+const JSON_FIELDS: ReadonlySet<string> = new Set(['artifacts', 'sourceArtifacts', 'inputProvenance']);
+
+/**
+ * 重算 sigHash（R6 防篡改唯一入口，v3 公式）。
+ * sigHash = 'sha256:' + sha256(SIG_HASH_FIELDS_V3 逐字段归一后以 '|' 连接)
  */
 export function computeSigHash(entry: Omit<SignatureChainEntry, 'sigHash'>): string {
-  const artifactsStr = JSON.stringify(entry.artifacts);
-  const provenanceStr = JSON.stringify(entry.inputProvenance);
-  const input = `${entry.sigId}|${entry.phase}|${entry.role}|${entry.action}|${entry.runId}|${artifactsStr}|${entry.prevSigHash}|${entry.signedAt}|${entry.signer}|${provenanceStr}`;
-  return 'sha256:' + createHash('sha256').update(input, 'utf8').digest('hex');
-}
-
-/**
- * v2 公式的 artifacts 清单：artifacts 与 sourceArtifacts 两清单整体（含 sha256）结构化纳入内容哈希。
- */
-function artifactsV2(entry: SignatureChainEntry): string {
-  return JSON.stringify({ artifacts: entry.artifacts, sourceArtifacts: entry.inputProvenance?.sourceArtifacts ?? [] });
-}
-
-/**
- * 重算 sigHash（v2 公式）：与 v1 的差别仅在槽位 6 换为 artifactsV2（两清单整体含 sha256）。
- * v2 条目（sigHashAlgo==='v2'）适用；来源 sha256 必填由 R11 单独校验。
- */
-export function computeSigHashV2(entry: Omit<SignatureChainEntry, 'sigHash'>): string {
-  const input = `${entry.sigId}|${entry.phase}|${entry.role}|${entry.action}|${entry.runId}|${artifactsV2(entry as SignatureChainEntry)}|${entry.prevSigHash}|${entry.signedAt}|${entry.signer}|${JSON.stringify(entry.inputProvenance)}`;
-  return 'sha256:' + createHash('sha256').update(input, 'utf8').digest('hex');
-}
-
-/**
- * 按条目 sigHashAlgo 分流重算：'v2' → computeSigHashV2，缺省/v1 → computeSigHash（v1 路径逐字节不变）。
- * R6 防篡改统一入口。
- */
-export function computeSigHashFor(entry: Omit<SignatureChainEntry, 'sigHash'>): string {
-  return (entry as SignatureChainEntry).sigHashAlgo === 'v2' ? computeSigHashV2(entry) : computeSigHash(entry);
+  const canonical = SIG_HASH_FIELDS_V3.map((field) => {
+    const value = (entry as Record<string, unknown>)[field];
+    return JSON_FIELDS.has(field) ? JSON.stringify(value ?? null) : String(value ?? '');
+  }).join('|');
+  return 'sha256:' + createHash('sha256').update(canonical, 'utf8').digest('hex');
 }
 
 // ==================== 主校验函数 ====================
@@ -333,9 +340,14 @@ export function checkSignatureChain(
     rulesPassed.push('R5');
   }
 
-  // ==================== R6: 防篡改（按条目 sigHashAlgo 分流重算） ====================
+  // ==================== R6: 防篡改（v3 单公式重算；sigHashAlgo 非 v3 一律违规，fail-closed 不迁移） ====================
   for (const entry of phaseEntries) {
-    const recomputed = computeSigHashFor(entry);
+    if (entry.sigHashAlgo !== 'v3') {
+      violations.push(`R6: ${entry.sigId} sigHashAlgo 非 v3（43.0.0 起唯一公式，旧算法条目一律违规）`);
+      rulesFailed.push('R6');
+      continue;
+    }
+    const recomputed = computeSigHash(entry);
     if (recomputed !== entry.sigHash) {
       violations.push(`R6: sigHash 篡改检测：${entry.sigId} 重算 sigHash 与记录不一致`);
       rulesFailed.push('R6');
@@ -417,14 +429,12 @@ export function checkSignatureChain(
     rulesPassed.push('R10');
   }
 
-  // ==================== R11: v2 条目来源 sha256 必填 ====================
-  // 仅 sigHashAlgo==='v2' 条目适用：v2 公式将来源 sha256 纳入内容哈希，缺 sha256 即失去内容绑定意义。
-  // v1 条目（含缺省）不触发——既有 14 个 v1 样本零破坏。
+  // ==================== R11: 来源 sha256 必填（v3 起全量条目适用，不再按 sigHashAlgo 分流） ====================
+  // v3 公式将 sourceArtifacts（含每条 sha256）纳入内容哈希，缺 sha256 即失去内容绑定意义。
   for (const entry of phaseEntries) {
-    if (entry.sigHashAlgo !== 'v2') continue;
     for (const srcArtifact of entry.inputProvenance?.sourceArtifacts ?? []) {
       if (!srcArtifact.sha256 || !/^[a-fA-F0-9]{64}$/.test(srcArtifact.sha256)) {
-        violations.push(`R11: ${entry.sigId} v2 条目来源 sha256 缺失或非法`);
+        violations.push(`R11: ${entry.sigId} 来源 sha256 缺失或非法`);
         rulesFailed.push('R11');
       }
     }
