@@ -3125,12 +3125,15 @@ describe('C9 R7 时间戳不可解析 fail-closed', () => {
 // ==================== C15：R5 越权检测形态补全 ====================
 
 describe('C15 R5 越权检测形态补全', () => {
+  // 42.13.1 收紧后仍须命中的形态（检测面不缩小的回归钉）。
+  // 注：fs.promises/fsPromises 两例在 fs.promises 冗余形态去除后改由 writeFile 模式命中；
+  // --eval= / python -c 两例走「形态 + .w-model/ 路径」复合判定（含路径 → 命中）。
   it.each([
     "node -e \"require('fs').appendFileSync('.w-model/rtm.json','x')\"",
     "require('fs').appendFileSync('.w-model/rtm.json','x')",
     "fs.promises.writeFile('.w-model/rtm.json', 'x')",
     "fsPromises.writeFile('.w-model/rtm.json', 'x')",
-    'node --eval=console.log(1)',
+    "node --eval=\"fs.readFileSync('.w-model/rtm.json','utf8')\"",
     "python -c \"open('.w-model/rtm.json','w').write('x')\"",
   ])('检测 %s 形态', (cmd) => {
     // 单条 produce（无 checkpoint → 不触发 R1/R4/R11），gateLogs 携带含越权命令的
@@ -3140,5 +3143,15 @@ describe('C15 R5 越权检测形态补全', () => {
     const result = checkRunLog(entries, { gateLogs });
     expect(result.passed).toBe(false);
     expect(result.violations.some((v) => v.startsWith('R5:'))).toBe(true);
+  });
+
+  // 42.13.1 收紧：--eval= / python -c 两形态改为复合锚定——gate-log 中仅提及形态、
+  // 命令文本不含 .w-model/ 路径引用的良性命令不再误报（检测面其余部分不变）。
+  it.each(['node --eval=console.log(1)', 'python -c "print(1)"'])('良性引用不误报：%s', (cmd) => {
+    const entries: RunLogEntry[] = [makeEntry({ runId: 'c15-2' })];
+    const gateLogs = new Map([['gate-logs/benign.log', { exitCode: 0, content: cmd }]]);
+    const result = checkRunLog(entries, { gateLogs });
+    expect(result.violations.some((v) => v.startsWith('R5:'))).toBe(false);
+    expect(result.passed).toBe(true);
   });
 });

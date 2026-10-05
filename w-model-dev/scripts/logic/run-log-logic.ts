@@ -1561,22 +1561,26 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   //       对同一文件存多 key，此处按 content 去重，避免对同一日志重复报告。
   if (options?.gateLogs) {
     // 以下模式为启发式检测信号，非安全边界（C15：形态补全不改变该定性）。
-    const suspiciousPatterns = [
-      /node\s+-e\s+/i, // node -e 直接执行
-      /node\s+--eval\s+/i, // node --eval
-      /writeFileSync\s*\(\s*['"].*\.w-model\//i, // writeFileSync('.w-model/...')
-      /writeFile\s*\(\s*['"].*\.w-model\//i, // writeFile('.w-model/...')
-      // C15 追加四类形态：appendFileSync / fs.promises|fsPromises.writeFile / --eval= / python -c
-      /appendFileSync\s*\(\s*['"].*\.w-model\//i, // appendFileSync('.w-model/...')
-      /(fs\.promises|fsPromises)\.writeFile\s*\(\s*['"].*\.w-model\//i, // fs.promises.writeFile('.w-model/...')
-      /node\s+--eval=/i, // node --eval=...（等号形态）
-      /python\s+-c\s+/i, // python -c 直接执行
+    // 42.13.1 收紧说明：fs.promises/fsPromises.writeFile 形态由 writeFile 模式覆盖（任何匹配
+    // 该形态的串必含 writeFile('….w-model/，无增量检测力，已去除）；node --eval= 与 python -c
+    // 两形态为「形态 + .w-model/ 路径」复合判定（requiresWModelPath）——命令文本同时含该形态
+    // 与 .w-model/ 才命中，gate-log 中良性提及（如 python -c "print(1)"）不构成越权信号。
+    const suspiciousPatterns: Array<{ pattern: RegExp; requiresWModelPath?: boolean }> = [
+      { pattern: /node\s+-e\s+/i }, // node -e 直接执行
+      { pattern: /node\s+--eval\s+/i }, // node --eval
+      { pattern: /writeFileSync\s*\(\s*['"].*\.w-model\//i }, // writeFileSync('.w-model/...')
+      { pattern: /writeFile\s*\(\s*['"].*\.w-model\//i }, // writeFile('.w-model/...')
+      // C15 追加形态：appendFileSync（自带 .w-model/ 锚定）/ --eval= / python -c（后两者 42.13.1 复合锚定）
+      { pattern: /appendFileSync\s*\(\s*['"].*\.w-model\//i }, // appendFileSync('.w-model/...')
+      { pattern: /node\s+--eval=/i, requiresWModelPath: true }, // node --eval=...（等号形态；复合锚定 .w-model/）
+      { pattern: /python\s+-c\s+/i, requiresWModelPath: true }, // python -c 直接执行（复合锚定 .w-model/）
     ];
     const scannedContents = new Set<string>();
     for (const [logPath, logData] of options.gateLogs) {
       if (scannedContents.has(logData.content)) continue;
       scannedContents.add(logData.content);
-      for (const pattern of suspiciousPatterns) {
+      for (const { pattern, requiresWModelPath } of suspiciousPatterns) {
+        if (requiresWModelPath && !logData.content.includes('.w-model/')) continue;
         if (pattern.test(logData.content)) {
           violations.push(`R5: gate-log ${logPath} 检测到 O 直接操作 .w-model/ 模式: ${pattern.source}`);
         }
