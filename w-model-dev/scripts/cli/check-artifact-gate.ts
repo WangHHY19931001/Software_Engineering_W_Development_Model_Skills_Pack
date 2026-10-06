@@ -71,9 +71,11 @@ import { checkUatPathMappingContent, collectUatMappingViolations } from '../appl
 import {
   checkArtifactGate,
   checkTemplatesStructure,
+  evaluateTlaBddWaiver,
   type PhaseOption,
   type RTMMatrixShape,
 } from '../logic/gate-logic.js';
+import type { MaturityApprovalInput, SignatureChainEntry } from '../logic/signature-chain-logic.js';
 import { checkCodingPlan } from '../logic/coding-plan-logic.js';
 import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
 import { exitWithError, HandledCliError, type CliError } from '../lib/cli-error.js';
@@ -315,18 +317,54 @@ export function aggregateExternalChecks(
 }
 
 /**
- * 读取 `.w-model/maturity.json` 的 level（成熟度分级，operational-recovery.md）。
+ * 读取 `.w-model/maturity.json` 的 level + history（成熟度分级，operational-recovery.md；A4 豁免判定输入）。
  * 文件缺失 / 解析失败 / level 非法 → undefined（**不豁免**，保持严格；豁免必须有显式声明）。
  */
-async function readMaturityLevel(projectDir: string): Promise<string | undefined> {
+async function readMaturity(projectDir: string): Promise<MaturityApprovalInput | undefined> {
   try {
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 由 CLI 参数解析并经既有 containment 校验
     const raw = await nodeFs.promises.readFile(path.resolve(projectDir, '.w-model', 'maturity.json'), 'utf-8');
-    const parsed = JSON.parse(raw) as { level?: unknown };
-    return typeof parsed.level === 'string' ? parsed.level : undefined;
+    const parsed = JSON.parse(raw) as { level?: unknown; history?: unknown };
+    if (typeof parsed.level !== 'string') return undefined;
+    const history: MaturityApprovalInput['history'] = Array.isArray(parsed.history)
+      ? parsed.history
+          .filter((h): h is { to?: unknown; at?: unknown } => h !== null && typeof h === 'object')
+          .map((h) => ({
+            to: typeof h.to === 'string' ? h.to : '',
+            at: typeof h.at === 'string' ? h.at : undefined,
+          }))
+      : [];
+    return { level: parsed.level, history };
   } catch {
     return undefined;
   }
+}
+
+/**
+ * 装载 `.w-model/signature-chain.jsonl`（A4 成熟度豁免审批链；容错读取）：
+ * 文件不存在 → 空数组；逐行 JSON 解析失败的坏行跳过（坏行无法通过 v3 重算，天然不构成合法审批）；
+ * 整文件读取失败 → 空数组。三形态（无链 / 坏链 / 缺文件）最终都收敛为「不豁免」（fail-closed）。
+ */
+async function loadSignatureChainIfExists(projectDir: string): Promise<SignatureChainEntry[]> {
+  const chainFile = path.resolve(projectDir, '.w-model', 'signature-chain.jsonl');
+  let raw: string;
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 由 CLI 参数解析并经既有 containment 校验
+    raw = await nodeFs.promises.readFile(chainFile, 'utf-8');
+  } catch {
+    return [];
+  }
+  const entries: SignatureChainEntry[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed === '') continue;
+    try {
+      entries.push(JSON.parse(trimmed) as SignatureChainEntry);
+    } catch {
+      /* 坏行不构成审批（fail-closed）：JSON 不完整即无法通过 verifyMaturityApproval 的 v3 重算 */
+    }
+  }
+  return entries;
 }
 
 async function runArtifactGate(argv: string[]): Promise<void> {
@@ -520,12 +558,20 @@ async function runArtifactGate(argv: string[]): Promise<void> {
   // rtm/graph/tickets 读取完成后构建：对本次判定实际承重的输入文件登记 path/sha256/bytes
   //（消费前可复验同一字节）；读不到的文件不入表（不冒充登记）。path 一律项目相对 posix 形态
   //（与 ARTIFACT_PATHS.rtm 及 check-archive-integrity.ts 相对路径先例同口径，跨平台稳定）。
-  const verifiedArtifacts: Array<{ path: string; sha256: string; bytes: number }> = [];
+  const verifiedArtifacts: Array<{
+    path: string;
+    sha256: string;
+    bytes: number;
+  }> = [];
   const addVerified = (abs: string, rel: string): void => {
     try {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- abs 由本 CLI 前序步骤解析（rtm 常量键 / discoverGraphAsset 产物 / resolveProjectRelativeRegularFile 验证），仅只读
       const buf = nodeFs.readFileSync(abs);
-      verifiedArtifacts.push({ path: rel, sha256: createHash('sha256').update(buf).digest('hex'), bytes: buf.length });
+      verifiedArtifacts.push({
+        path: rel,
+        sha256: createHash('sha256').update(buf).digest('hex'),
+        bytes: buf.length,
+      });
     } catch {
       /* 不存在不入表 */
     }
@@ -550,13 +596,17 @@ async function runArtifactGate(argv: string[]): Promise<void> {
     ? await readCucumberReport(cucumberReportFile, true)
     : { cucumberViolations: [] as string[] };
 
-  // 成熟度豁免（operational-recovery.md「成熟度分级」+ hard-constraints #13）：
+  // 成熟度豁免（operational-recovery.md「成熟度与行为门禁」+ hard-constraints #13 + A4 43.0.0）：
   // L0/L1（教学 / demo / 小工具）允许阶段 1-4 不产出 .tla/.cfg/tla-manifest.json 与
-  // .feature/bdd-manifest.json。此前文档有承诺但门禁无 maturity 输入，合法 L1 项目按文档走
-  // 会被 `[artifact:tla] tla-manifest.json missing` 阻断（2026-09-17 审查发现的规则-实现冲突）。
-  const maturityLevel = await readMaturityLevel(projectDir);
-  const tlaBddWaived =
-    (maturityLevel === 'L0' || maturityLevel === 'L1') && isProjectTlaBddEvidencePhase(effectivePhase);
+  // .feature/bdd-manifest.json——但 level 变更须有 role=human / targetKind=maturity 的 v3 签名链
+  // 审批条目（绑定 maturity.json）：无链 / 坏链 / 缺文件三形态一律不豁免（fail-closed），
+  // 拒绝 reason 由 checkArtifactGate（evaluateTlaBddWaiver 单点）并入 reasons/exitCode。
+  // 缺 maturity.json → 不豁免、无新增 reason（既有严格路径零回归）。
+  const maturity = await readMaturity(projectDir);
+  const signatureChain = await loadSignatureChainIfExists(projectDir);
+  const tlaBddWaiver = evaluateTlaBddWaiver(maturity, effectivePhase, signatureChain);
+  const maturityLevel = maturity?.level;
+  const tlaBddWaived = tlaBddWaiver.waived;
 
   const syncPairs: TlaBddSyncPair[] = [];
   const syncPairViolations: string[] = [];
@@ -601,6 +651,10 @@ async function runArtifactGate(argv: string[]): Promise<void> {
     ticketsText,
     // 批次1 SDMAP-3/4 注入面：上面读盘构建的行数表（纯函数不读盘；self-test 纯函数路径不传 → skipped）
     srcLineCounts,
+    // A4：maturity + 签名链条目传入纯函数 → evaluateTlaBddWaiver 单点复判，
+    // 拒绝 reason 由纯函数并入 reasons（与 CLI 早判定同一实现，不重复计数）
+    maturity,
+    signatureChain,
   });
 
   // ==================== 终检调用 TLA+/BDD model 校验（设计文档 §3.3.8） ====================
@@ -772,7 +826,7 @@ async function runArtifactGate(argv: string[]): Promise<void> {
   }
   if (tlaBddWaived) {
     console.log(
-      `TLA+/BDD 资产 : ⏭ 豁免（maturity ${maturityLevel}，阶段 1-4 允许不产出 .tla/.cfg/tla-manifest.json 与 .feature/bdd-manifest.json；其余门禁照跑）`,
+      `TLA+/BDD 资产 : ⏭ 豁免（maturity ${maturityLevel}，human 审批链校验通过；阶段 1-4 允许不产出 .tla/.cfg/tla-manifest.json 与 .feature/bdd-manifest.json；其余门禁照跑）`,
     );
   }
   const specStructureState =
@@ -846,7 +900,11 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   } catch (err) {
     if (err instanceof HandledCliError) return;
     if (err instanceof DuplicateFlagError) {
-      exitWithError({ category: 'ARG_INVALID', message: err.message, exitCode: 2 });
+      exitWithError({
+        category: 'ARG_INVALID',
+        message: err.message,
+        exitCode: 2,
+      });
       return;
     }
     // 其余异常按 runMain 同款语义转 UNEXPECTED / exit 2（子进程形态由 runMain 输出，

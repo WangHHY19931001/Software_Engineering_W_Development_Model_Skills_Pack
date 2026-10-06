@@ -1741,6 +1741,8 @@ R10 维护契约（docs-consistency source×clause 语义门）：
 ### 10C.5 maturity.json Schema
 
 > 编排者 O 在项目初始化（`/wm analyze` 首次）时创建，类比 `project.json`/`rtm.json`/`budget.json`。schema 权威定义见 [`data-models.md`](../w-model-dev/references/data-models.md)。
+>
+> **43.0.0 A4**：`unlockConditions`（无计算器指标）与 `downgradeTriggers` 两个预留死字段已自 schema 删除（毁弃存量）；解锁条件降级为 operational-recovery.md 文档层语义，**无机器校验**。level 的机器消费点（TLA+/BDD 豁免）须 `role=human / targetKind=maturity` 签名链审批（`verifyMaturityApproval`，fail-closed，见 §10C.6）。
 
 ```typescript
 interface MaturityConfig {
@@ -1748,13 +1750,6 @@ interface MaturityConfig {
   projectId: string;
   level: 'L0' | 'L1' | 'L2' | 'L3';
   leveledUpAt: string;
-  unlockConditions: {
-    stableDays: number;
-    completedCycles: number;
-    attemptCapRate: number;
-    misjudgeRate: number;
-    operationalFailures: number;
-  };
   history: Array<{ from: string; to: string; at: string; reason: string }>;
   downgradeTriggers: {
     operationalFailureStreak: number;
@@ -1771,7 +1766,7 @@ interface MaturityConfig {
 2. 识别当前 CHECKPOINT 类型（决策型 / 操作型 / 阶段门放行）
 3. 查 L0~L3 放行矩阵：✅ 等用户 → 执行 CHECKPOINT 暂停；⚡ 自动放行 → 跳过暂停，run-log append 记录（仅操作型适用；阶段门放行在任何级别都等用户，硬约束 #2）
 4. 检查高风险路径（仅 L3）：命中高风险路径表 → 即使 L3 也强制决策型 CHECKPOINT
-5. 升级判定（每次阶段 8 完成后）：汇总 unlockConditions，若全部达标 → 询问用户是否升级（决策型 CHECKPOINT，不可自动升级）
+5. 升级判定（每次阶段 8 完成后）：按解锁条件文档语义（operational-recovery.md「升级与降级」，43.0.0 A4 起 unlockConditions 字段已自 schema 移除、无机器校验）询问用户是否升级（决策型 CHECKPOINT，不可自动升级）；用户确认后 O 须以 `role=human / targetKind=maturity` 条目落签名链（绑定 maturity.json），gate 消费 level 前经 `verifyMaturityApproval` 校验（无链即不豁免，fail-closed）
 6. 降级判定（每次 O 系列失败模式命中后）：若 operationalFailures ≥ downgradeTriggers.operationalFailureStreak → 自动降级到 L0（R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）
 
 **关键约束**：
@@ -1782,14 +1777,18 @@ interface MaturityConfig {
 - **升级不可自动**：升级是决策型 CHECKPOINT，须用户显式确认。
 - **降级可自动**：O 系列失败模式连续命中触发自动降级回 L0（R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）。
 
-### 10C.7 阶段完成计数与强制校验（check-maturity.ts）
+### 10C.7 阶段完成计数与强制校验（check-maturity.ts）【43.0.0 已退役】
 
-> 本节确立阶段完成计数的强制校验。
-> 实现位置：[`w-model-dev/scripts/cli/check-maturity.ts`](../w-model-dev/scripts/cli/check-maturity.ts)（CLI 校验，确定性无 LLM）。
-
-- **阶段完成计数强制递增**：项目每完成一阶段（run-log.jsonl 追加 `action=checkpoint` 且 `outcome=success` 记录后），编排者 O 须将 `maturity.json.unlockConditions.completedCycles` +1；漏更 → 计数滞后。
-- **check-maturity.ts 强制校验**：`check-maturity.ts` 须交叉校验 `maturity.json.unlockConditions.completedCycles` 与 run-log.jsonl 中 `action=checkpoint ∧ outcome=success` 记录数——`completedCycles < 实际 checkpoint success 数` 即滞后 → 退出码 1。
-- **滞后即不放行**：校验发现计数滞后时，编排者 O 不得放行当前阶段门（反模式 #9 谎报状态守护）；须先补更 `completedCycles` 再重跑校验至退出码 0。
+> 本节确立的阶段完成计数强制校验**已随 43.0.0 A4（批次 6 信任链修复）退役**：unlockConditions
+> （含 completedCycles）被审计证实为无计算器/零消费死字段，已自 schema 与 check-maturity.ts 删除
+> （原 R3 周期换算校验随之退役，规则号不回收；决策日志 `docs/changes/decision-log/rounds-48-trust-chain.md`）。
+> 阶段完成计数的事实源仍为 run-log 的 `action=checkpoint ∧ outcome=success` 记录（check-run-log R1/R11 承担）；
+> 成熟度侧的机器防线改为 **R6 history 链一致性**（from==上一条 to / to 严格高于 from / 末条 to==level）
+> 与 **level 变更 human 签名链审批**（`verifyMaturityApproval`，fail-closed）。历史条目存档如下，不再生效：
+>
+> - ~~阶段完成计数强制递增：编排者 O 须将 `maturity.json.unlockConditions.completedCycles` +1~~
+> - ~~check-maturity.ts 交叉校验 completedCycles 与 checkpoint success 计数，滞后即退出码 1~~
+> - ~~滞后即不放行：校验发现计数滞后时，编排者 O 不得放行当前阶段门（反模式 #9 谎报状态守护）~~
 
 ---
 

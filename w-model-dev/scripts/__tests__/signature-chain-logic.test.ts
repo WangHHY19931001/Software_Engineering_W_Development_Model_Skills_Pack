@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { describe, it, expect } from 'vitest';
 
 import { checkSignatureChain, computeSigHash, type SignatureChainEntry } from '../logic/signature-chain-logic.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 const SAMPLES_DIR = path.join(__dirname, '..', 'samples', 'signature-chain');
 
@@ -157,12 +158,22 @@ describe('signature-chain-logic D-1 返工来源例外', () => {
       ],
       [
         'V + review + targetKind=rootcause + 消费 R → 放行（V 复审 RootCauseReport）',
-        { role: 'V', action: 'review', sourceRoles: ['R'], targetKind: 'rootcause' },
+        {
+          role: 'V',
+          action: 'review',
+          sourceRoles: ['R'],
+          targetKind: 'rootcause',
+        },
         true,
       ],
       [
         'R + locate + targetKind=preventive + 消费 S → 放行（R3 预防性审查）',
-        { role: 'R', action: 'locate', sourceRoles: ['S'], targetKind: 'preventive' },
+        {
+          role: 'R',
+          action: 'locate',
+          sourceRoles: ['S'],
+          targetKind: 'preventive',
+        },
         true,
       ],
     ] as const) {
@@ -190,12 +201,22 @@ describe('signature-chain-logic D-1 返工来源例外', () => {
       ],
       [
         'V + review + targetKind=standard + 消费 R → 仍拒',
-        { role: 'V', action: 'review', sourceRoles: ['R'], targetKind: 'standard' },
+        {
+          role: 'V',
+          action: 'review',
+          sourceRoles: ['R'],
+          targetKind: 'standard',
+        },
         '角色 V 不得消费 R',
       ],
       [
         'R + locate + targetKind=rootcause + 消费 S → 仍拒',
-        { role: 'R', action: 'locate', sourceRoles: ['S'], targetKind: 'rootcause' },
+        {
+          role: 'R',
+          action: 'locate',
+          sourceRoles: ['S'],
+          targetKind: 'rootcause',
+        },
         '角色 R 不得消费 S',
       ],
     ] as const) {
@@ -211,13 +232,25 @@ describe('signature-chain-logic D-1 返工来源例外', () => {
   // 43.0.0 A1（推翻「targetKind 不入哈希」旧裁定）：targetKind 入 sigHash——
   // 红队实验 2 证实旧形态下无痕改 targetKind 即可洗白 R9 越权消费为 D-1 合法例外
   it('D-1: targetKind 入 sigHash（v3；无痕改 targetKind → R6 抓获）', () => {
-    const withoutTk = entry({ role: 'V', action: 'review', sourceRoles: ['R'] });
-    const withTk = entry({ role: 'V', action: 'review', sourceRoles: ['R'], targetKind: 'rootcause' });
+    const withoutTk = entry({
+      role: 'V',
+      action: 'review',
+      sourceRoles: ['R'],
+    });
+    const withTk = entry({
+      role: 'V',
+      action: 'review',
+      sourceRoles: ['R'],
+      targetKind: 'rootcause',
+    });
     // 除 targetKind 外字段全同（同一 helper），v3 公式下两环 sigHash 必不同 → targetKind 参与哈希输入
     expect(withTk.sigHash).not.toBe(withoutTk.sigHash);
     expect(computeSigHash(withTk)).toBe(withTk.sigHash);
     // 无痕改写：保留原 sigHash、只改 targetKind → R6 重算不一致（旧公式下此改动不可检测）
-    const tampered: SignatureChainEntry = { ...withoutTk, targetKind: 'rootcause' };
+    const tampered: SignatureChainEntry = {
+      ...withoutTk,
+      targetKind: 'rootcause',
+    };
     const r = checkSignatureChain([tampered]);
     expect(r.violations.filter((v) => v.startsWith('[schema]'))).toEqual([]); // schema 接受 targetKind
     expect(r.rulesFailed).toContain('R6'); // R6 重算不一致
@@ -243,7 +276,12 @@ describe('43.0.0 sigHash v3 单公式', () => {
     inputProvenance: {
       sourceSigIds: [],
       sourceArtifacts: [
-        { path: 'out/gate.json', sourceSigId: 'genesis', sourceRole: 'G' as const, sha256: 'a'.repeat(64) },
+        {
+          path: 'out/gate.json',
+          sourceSigId: 'genesis',
+          sourceRole: 'G' as const,
+          sha256: 'a'.repeat(64),
+        },
       ],
       transformDescription: 't',
     },
@@ -286,14 +324,23 @@ describe('43.0.0 sigHash v3 单公式', () => {
       ...base,
       inputProvenance: {
         ...base.inputProvenance,
-        sourceArtifacts: [{ ...base.inputProvenance.sourceArtifacts[0]!, sha256: 'b'.repeat(64) }],
+        sourceArtifacts: [
+          {
+            ...base.inputProvenance.sourceArtifacts[0]!,
+            sha256: 'b'.repeat(64),
+          },
+        ],
       },
     };
     expect(computeSigHash(tamperedSha)).not.toBe(computeSigHash(base));
   });
 
   it('旧算法条目 fail-closed：sigHashAlgo 非 v3/缺失 → schema 前置拒绝（R6 兜底分支不迁移旧数据）', () => {
-    const legacyV2 = { ...base, sigHash: computeSigHash(base), sigHashAlgo: 'v2' };
+    const legacyV2 = {
+      ...base,
+      sigHash: computeSigHash(base),
+      sigHashAlgo: 'v2',
+    };
     const rV2 = checkSignatureChain([legacyV2 as unknown as SignatureChainEntry]);
     expect(rV2.passed).toBe(false);
     expect(rV2.violations.some((v: string) => v.startsWith('[schema]'))).toBe(true);
@@ -322,7 +369,14 @@ describe('43.0.0 sigHash v3 单公式', () => {
       ...signedMissing,
       inputProvenance: {
         ...missing.inputProvenance,
-        sourceArtifacts: [{ path: 'x', sourceSigId: 'genesis', sourceRole: 'G' as const, sha256: 'not-hex' }],
+        sourceArtifacts: [
+          {
+            path: 'x',
+            sourceSigId: 'genesis',
+            sourceRole: 'G' as const,
+            sha256: 'not-hex',
+          },
+        ],
       },
     };
     const badFormatResult = checkSignatureChain([badFormat]);
@@ -338,7 +392,12 @@ describe('A1 v3 单公式：targetKind/gateExitCode/gateLogPath 入哈希', () =
   const makeValidEntry = () => entry({ role: 'V', action: 'review' });
   /** role=G、带 gateExitCode/gateLogPath 的门禁条目（A1：门禁字段入哈希） */
   const makeValidGateEntry = () =>
-    entry({ role: 'G', action: 'gate', gateExitCode: 0, gateLogPath: '.w-model/gate-logs/gate.json' });
+    entry({
+      role: 'G',
+      action: 'gate',
+      gateExitCode: 0,
+      gateLogPath: '.w-model/gate-logs/gate.json',
+    });
 
   it('R6：已签条目无痕改 targetKind 必须失败（红队实验 2 回归）', () => {
     const e = makeValidEntry();
@@ -391,5 +450,47 @@ describe('sigHash v3 fixtures（samples/signature-chain；43.0.0 codemod 后 val
     const result = checkSignatureChain(entries, { phase: 1 });
     expect(result.rulesFailed).toContain('R6');
     expect(result.rulesFailed).not.toContain('R11'); // 篡改后仍为合法 64-hex，R11 不误报
+  });
+});
+
+// ==================== A4 human 审批条目（maturity 豁免链，批次 6 任务 8） ====================
+
+describe('A4 human 审批条目（task 3 预置枚举的逻辑收尾）', () => {
+  /** role=human / targetKind=maturity 的审批条目（v3 sigHash 真实重算） */
+  const humanApprovalEntry = (): SignatureChainEntry => {
+    const base: Omit<SignatureChainEntry, 'sigHash'> = {
+      sigId: 'wm1-r001-human',
+      phase: 1,
+      role: 'human',
+      action: 'approve',
+      targetKind: 'maturity',
+      runId: 'wm1-r001',
+      artifacts: ['.w-model/maturity.json'],
+      prevSigId: 'genesis',
+      prevSigHash: '0',
+      signedAt: '2026-08-01T12:00:00.000Z',
+      signer: 'user-wangh',
+      inputProvenance: {
+        sourceSigIds: [],
+        sourceArtifacts: [],
+        transformDescription: '用户确认 L0→L1 成熟度升级（human 审批链）',
+      },
+      sigHashAlgo: 'v3',
+    };
+    return { ...base, sigHash: computeSigHash(base) };
+  };
+
+  it('sigId human 后缀形态通过 schema（pattern 扩展；role enum 含 human）', () => {
+    const schemaResult = validateBySchema('signature-chain', humanApprovalEntry());
+    expect(schemaResult.errorMessages).toEqual([]);
+    expect(schemaResult.valid).toBe(true);
+  });
+
+  it('R4 侧不参与阶段角色链：human 条目不触发「不允许角色」（schema description 承诺收尾）', () => {
+    const result = checkSignatureChain([humanApprovalEntry()], { phase: 1 });
+    // 单条 human 链缺整环角色 → R1 失败属预期；但 R4 不得因 human 角色本身违规
+    expect(result.rulesFailed).toContain('R1');
+    expect(result.rulesFailed).not.toContain('R4');
+    expect(result.violations.some((v) => v.startsWith('R4:'))).toBe(false);
   });
 });

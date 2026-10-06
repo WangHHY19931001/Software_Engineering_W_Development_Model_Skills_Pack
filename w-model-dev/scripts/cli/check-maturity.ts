@@ -5,14 +5,15 @@
  * 对应 w-model-dev/references/data-models.md MaturityConfig schema
  * 与 docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md §5.3。
  * 供 O 子代理在阶段推进前调用，校验成熟度模型 schema 完整性、level 合法性、
- * 成功阶段更新一致性、history 时序、降级触发状态。
+ * history 时序、降级触发状态、history 链一致性（R6，A4 43.0.0）。
+ * （原 R3 completedCycles 周期换算随 unlockConditions 死字段删除而退役，43.0.0 A4。）
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>]
  *
  * 参数：
  *   maturity.json        maturity.json 文件路径
- *   --project=<path>     project.json 路径（可选，R3/R4 交叉校验；读取侧经 project.schema.json 校验，缺失/非法/不符 schema → exit 2）
+ *   --project=<path>     project.json 路径（可选，R4 交叉校验；读取侧经 project.schema.json 校验，缺失/非法/不符 schema → exit 2）
  *   --run-log=<path>     run-log.jsonl 路径（可选，R5 真值通道：只统计每条记录的 operationalFailureModes 字段；
  *                        读取路径过滤非 O1~O6 取值（计数为 0 并出非阻断诊断——schema 应拒绝，此处为读取路径防御）；
  *                        note 中的 O1..O6 字样视为引用，仅作非阻断诊断。未提供时输出「R5 未生效」非阻断诊断）
@@ -63,21 +64,6 @@ function parseArgs(argv: string[]): ParsedArgs {
   const runLogFile = parseFlagValue(args, 'run-log');
   return { maturityFile, projectFile, runLogFile };
 }
-
-// ==================== project.status → completedPhases 映射 ====================
-
-// status 枚举对应「已推进到的阶段序号」；项目完成视作 8 阶段全部完成
-const STATUS_TO_PHASES: Record<string, number> = {
-  需求分析: 1,
-  系统设计: 2,
-  概要设计: 3,
-  详细设计: 4,
-  编码: 5,
-  集成测试: 6,
-  系统测试: 7,
-  验收测试: 8,
-  项目完成: 8,
-};
 
 // ==================== run-log O 系列失败模式统计（R5，D-7） ====================
 
@@ -214,15 +200,16 @@ async function main(): Promise<void> {
 
   // 可选输入：--project（F-G4-14：读取侧经 project.schema.json 校验，fail-closed）——
   // 文件缺失/非法 JSON/schema 不符（含缺 status/createdAt 等必填字段）→ STRUCTURE_INVALID exit 2，
-  // 不再 warn-and-skip；schema 校验后 status 必为 9 态枚举（均在 STATUS_TO_PHASES 内）、createdAt 必为
-  // date-time 字符串，「status 非法/缺失」与「未含 createdAt」warn 分支不可达
-  let completedPhases: number | undefined;
+  // 不再 warn-and-skip；schema 校验后 status 必为 9 态枚举、createdAt 必为 date-time 字符串。
+  // （原 completedPhases 推导随 R3 退役删除，43.0.0 A4：--project 现仅服务 R4 时序交叉校验。）
   let projectCreatedAt: string | undefined;
   if (projectFile) {
     const projectAbs = path.resolve(projectFile);
     try {
-      const project = await loadAndValidate<{ status: string; createdAt: string }>(projectAbs, 'project');
-      completedPhases = STATUS_TO_PHASES[project.status];
+      const project = await loadAndValidate<{
+        status: string;
+        createdAt: string;
+      }>(projectAbs, 'project');
       projectCreatedAt = project.createdAt;
     } catch (err) {
       if (err instanceof Error && err.message.startsWith(LOAD_AND_VALIDATE_SENTINEL_PREFIX)) return;
@@ -260,7 +247,6 @@ async function main(): Promise<void> {
 
   // 构建 options 并调用纯逻辑校验
   const result = checkMaturity(parsed, {
-    completedPhases,
     projectCreatedAt,
     operationalFailureCount,
     diagnostics: r5Diagnostics,
@@ -294,9 +280,7 @@ async function main(): Promise<void> {
   console.log(`projectId     : ${maturity.projectId ?? '未设置'}`);
   console.log(`schemaVersion : ${maturity.schemaVersion ?? '未设置'}`);
   console.log(`level         : ${maturity.level ?? '未设置'}`);
-  console.log(
-    `--project     : ${projectFile ? (completedPhases !== undefined ? `已读取（status→completedPhases=${completedPhases}, createdAt=${projectCreatedAt ?? 'N/A'}）` : '已读取（status 无对应阶段映射）') : '未提供'}`,
-  );
+  console.log(`--project     : ${projectFile ? `已读取（createdAt=${projectCreatedAt ?? 'N/A'}）` : '未提供'}`);
   console.log(
     `--run-log     : ${runLogFile ? `${runLogFile}（O 系列标注=${operationalFailureCount ?? 'N/A'}）` : '未提供'}`,
   );
@@ -305,7 +289,7 @@ async function main(): Promise<void> {
 
   if (result.passed) {
     console.log(
-      '成熟度模型符合 data-models.md MaturityConfig schema：完整 + level 合法 + 阶段更新一致 + history 时序 + 降级未触发。',
+      '成熟度模型符合 data-models.md MaturityConfig schema：完整 + level 合法 + history 时序 + history 链一致 + 降级未触发。',
     );
   } else {
     console.log('未通过原因：');
@@ -314,7 +298,7 @@ async function main(): Promise<void> {
     }
     console.log('');
     console.log(
-      'O 子代理须按上述原因处置（补全 schema / 修正 level / 更新 completedCycles / 修正 history 时序 / 响应降级触发），详见：',
+      'O 子代理须按上述原因处置（补全 schema / 修正 level / 修正 history 时序与升级链 / 响应降级触发），详见：',
     );
     console.log('  w-model-dev/references/data-models.md §自主成熟度模型');
   }
@@ -328,7 +312,7 @@ async function main(): Promise<void> {
     }
   }
 
-  // 非阻断警告（如 R3 未校验：未提供 --project）：不影响 exit code，但须可见
+  // 非阻断警告（F-G2-04 通道；43.0.0 A4 后暂无登记项）：不影响 exit code，但须可见
   for (const w of result.warnings) {
     console.error(`⚠ ${w}`);
   }

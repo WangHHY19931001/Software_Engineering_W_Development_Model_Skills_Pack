@@ -6,6 +6,8 @@
  *   R1 角色齐全 + R2 链连续 + R3 时序单调 + R4 角色匹配 + R5 代签检测
  *   + R6 防篡改 + R7 悬空来源 + R8 缺失产物 + R9 越权消费 + R10 绕过门禁
  *   + R11 来源 sha256 必填 + 跨阶段消费者校验。
+ * 另导出 verifyMaturityApproval（A4，批次 6 任务 8）：maturity 豁免须 role=human /
+ * targetKind=maturity 的 v3 审批条目；human 条目 R4 侧不参与阶段角色链（43.0.0）。
  *
  * sigHash 自 43.0.0 起为 v3 单一公式（targetKind/gateExitCode/gateLogPath 入哈希，
  * 销毁红队实验 2 证实的「targetKind 单字段洗白 R9 违规」穿透面）；v1/v2 分流已删除，
@@ -20,7 +22,7 @@ import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 // ==================== 类型定义 ====================
 
-export type Role = 'O' | 'S' | 'A' | 'V' | 'G' | 'R';
+export type Role = 'O' | 'S' | 'A' | 'V' | 'G' | 'R' | 'human';
 
 /** sigHash 公式版本；43.0.0 起唯一合法值 v3（v1/v2 分流已删除，旧值 R6 fail-closed） */
 export type SigHashAlgo = 'v3';
@@ -45,7 +47,7 @@ export interface SignatureChainEntry {
   phaseName?: string;
   role: Role;
   action: string;
-  /** 返工链语义分类（D-1）：rootcause=复审 R 报告 / preventive=预防性审查（R3） / iceberg=冰山扫掠 / maturity=成熟度评定（任务 8 预留）/ standard=默认。v3 起入 sigHash */
+  /** 返工链语义分类（D-1）：rootcause=复审 R 报告 / preventive=预防性审查（R3） / iceberg=冰山扫掠 / maturity=成熟度评定（A4 human 审批条目）/ standard=默认。v3 起入 sigHash */
   targetKind?: 'rootcause' | 'preventive' | 'iceberg' | 'maturity' | 'standard';
   runId: string;
   artifacts: string[];
@@ -93,7 +95,7 @@ const PHASE_ROLE_CHAINS: Record<number, Role[]> = {
 
 // ==================== 来源正确性矩阵 ====================
 
-/** 各角色禁止来源角色（sourceArtifacts 中 sourceRole 不得属于此集合） */
+/** 各角色禁止来源角色（sourceArtifacts 中 sourceRole 不得属于此集合）；human=人类审批，无禁止来源（A4） */
 const FORBIDDEN_SOURCE_ROLES: Record<Role, Role[]> = {
   O: ['S', 'A'], // O checkpoint 不得直接基于 S/A 产物（须通过 G）
   A: ['S', 'V', 'G', 'R'],
@@ -101,6 +103,7 @@ const FORBIDDEN_SOURCE_ROLES: Record<Role, Role[]> = {
   R: ['S'], // R 须独立定位，不得消费 S 产物
   V: ['G', 'R'],
   G: ['S'],
+  human: [],
 };
 
 /**
@@ -159,6 +162,56 @@ export function computeSigHash(entry: Omit<SignatureChainEntry, 'sigHash'>): str
     return JSON_FIELDS.has(field) ? JSON.stringify(value ?? null) : String(value ?? '');
   }).join('|');
   return 'sha256:' + createHash('sha256').update(canonical, 'utf8').digest('hex');
+}
+
+// ==================== A4 成熟度豁免审批链校验（批次 6 任务 8） ====================
+
+/** maturity.json 的豁免判定输入形态（level + history；history 时间字段为 schema 的 `at`） */
+export interface MaturityApprovalInput {
+  readonly level: string;
+  readonly history: ReadonlyArray<{
+    readonly to: string;
+    readonly at?: string;
+  }>;
+}
+
+export type MaturityApprovalVerdict = { readonly ok: true } | { readonly ok: false; readonly reason: string };
+
+/**
+ * 成熟度豁免审批链校验（A4，43.0.0 breaking；决策日志 rounds-48「A4」裁定）：
+ * maturity.level 的机器消费点（check-artifact-gate 的 TLA+/BDD 豁免分支）此前由被门禁者自写
+ * maturity.json 即可关闭——本函数要求 level 变更须有 **role=human / targetKind=maturity** 的
+ * v3 签名链审批条目（绑定 maturity.json），无链 / 坏链 / 早签一律拒绝（fail-closed）。
+ *
+ * 判定序列：
+ *   1. 链中存在 `role=human ∧ targetKind=maturity ∧ sigHash 通过 v3 重算` 的审批条目（否则拒绝——
+ *      「缺少条目」与「签名不符」合并为同一拒绝形态，避免向伪造者泄露判定进度）；
+ *   2. 最新审批条目须绑定 maturity.json（artifacts 含该路径）；
+ *   3. 审批时间不得早于最近一次 level 变更（maturity.history 末条 `at`；字段缺失则跳过该子判定，
+ *      schema 的 required 前置在正常路径保证字段在场）。
+ */
+export function verifyMaturityApproval(
+  chain: readonly SignatureChainEntry[],
+  maturity: MaturityApprovalInput,
+): MaturityApprovalVerdict {
+  const approvals = chain.filter(
+    (e) => e.role === 'human' && e.targetKind === 'maturity' && e.sigHash === computeSigHash(e),
+  );
+  if (approvals.length === 0) {
+    return {
+      ok: false,
+      reason: '缺少 role=human / targetKind=maturity 的审批条目，或签名未通过 v3 重算',
+    };
+  }
+  const latest = approvals[approvals.length - 1]!;
+  if (!latest.artifacts?.some((a) => String(a).includes('maturity.json'))) {
+    return { ok: false, reason: 'maturity 审批条目未绑定 maturity.json' };
+  }
+  const lastChange = maturity.history[maturity.history.length - 1];
+  if (lastChange?.at && latest.signedAt && latest.signedAt < lastChange.at) {
+    return { ok: false, reason: 'maturity 审批早于最近一次 level 变更' };
+  }
+  return { ok: true };
 }
 
 // ==================== 主校验函数 ====================
@@ -314,6 +367,9 @@ export function checkSignatureChain(
   // ==================== R4: 角色匹配 ====================
   const allowedRoles = new Set([...expectedRoles, 'O', 'R']); // O/R 可在任意位置出现
   for (const entry of phaseEntries) {
+    // A4（批次 6 任务 8）：role=human 审批条目不参与阶段角色链（schema role description 契约
+    // 「R4 侧不参与阶段角色链」）——成熟度豁免审批由 verifyMaturityApproval 单独消费，不在此拦
+    if (entry.role === 'human') continue;
     if (!allowedRoles.has(entry.role)) {
       violations.push(`R4: 阶段 ${phase} 不允许角色 ${entry.role}（sigId=${entry.sigId}）`);
       rulesFailed.push('R4');

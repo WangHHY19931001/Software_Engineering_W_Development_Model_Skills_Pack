@@ -1,11 +1,10 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- 构造 mkdtemp 临时项目树（join(tmpDir, ...) 路径由测试自生成，非用户输入） */
 /**
- * maturity-logic.test.ts —— 成熟度校验（R1-R5）单元测试
+ * maturity-logic.test.ts —— 成熟度校验（R1-R6）单元测试
  *
  * 覆盖 maturity-logic.ts 中 checkMaturity 函数：
  *   - 合法 MaturityConfig 通过
  *   - schema 前置校验（缺 required 字段 → [schema] 违规，防反模式 #28）
- *   - R3 completedCycles 与 completedPhases 周期换算
  *   - R4 history / leveledUpAt 早于 project.createdAt
  *   - R5 O 系列失败模式命中达 streak 阈值 → 降级评估提醒
  *   - R5 真值通道（D-7）：只统计 run-log 的 `operationalFailureModes` 字段，note 中的 O1..O6
@@ -15,6 +14,8 @@
  *     `uniqueItems` 与「存在即累加数组长度」口径不变（`['O3','O3']` 仍计 2）
  *   - CLI 三态（真实 tsx 子进程 + 真实临时 run-log）：仅引用 → exit 0 + 诊断 /
  *     字段标注 3 次 → exit 1 + R5 违规 / 未提供 --run-log → exit 0 + 诊断
+ *   - A4（43.0.0）R6 history 链一致性：from == 上一条 to / to > from（严格）/ 末条 to == 当前 level
+ *     （原 R3 completedCycles 周期校验随 unlockConditions 死字段删除而退役，规则号不回收）
  */
 
 import { promises as fs } from 'node:fs';
@@ -41,14 +42,14 @@ function validMaturity(): MaturityConfig {
     projectId: 'test-project',
     level: 'L1',
     leveledUpAt: '2026-08-01T00:00:00Z',
-    unlockConditions: {
-      stableDays: 30,
-      completedCycles: 3,
-      attemptCapRate: 0.85,
-      misjudgeRate: 0.05,
-      operationalFailures: 0,
-    },
-    history: [{ from: 'L0', to: 'L1', at: '2026-08-01T00:00:00Z', reason: '稳定运行 1 完整周期' }],
+    history: [
+      {
+        from: 'L0',
+        to: 'L1',
+        at: '2026-08-01T00:00:00Z',
+        reason: '稳定运行 1 完整周期',
+      },
+    ],
     downgradeTriggers: { operationalFailureStreak: 3, userRequested: false },
   };
 }
@@ -68,16 +69,10 @@ describe('checkMaturity', () => {
     expect(r.violations.some((v) => v.startsWith('[schema]'))).toBe(true);
   });
 
-  it('R3：completedPhases=16（2 完整周期）但 completedCycles=1 → 未更新违规', () => {
-    const m = validMaturity();
-    m.unlockConditions.completedCycles = 1;
-    const r = checkMaturity(m, { completedPhases: 16 });
-    expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('R3') && v.includes('completedCycles'))).toBe(true);
-  });
-
   it('R4：history 条目早于 project.createdAt → 时序违规', () => {
-    const r = checkMaturity(validMaturity(), { projectCreatedAt: '2026-08-15T00:00:00Z' });
+    const r = checkMaturity(validMaturity(), {
+      projectCreatedAt: '2026-08-15T00:00:00Z',
+    });
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.includes('R4') && v.includes('project.createdAt'))).toBe(true);
   });
@@ -89,22 +84,112 @@ describe('checkMaturity', () => {
   });
 });
 
+// ==================== A4（43.0.0）R6 history 链一致性 ====================
+
 /**
- * 可见性与死分支清理（F-G2-04/05，audit-fixes task 5）：
- *   - R3 依赖可选 --project context（completedPhases），缺失时降级为非阻断 warning，不再静默
+ * A4 销账（批次 6 任务 8）：maturity.level 此前由被门禁者自写即可关闭 TLA+/BDD 门禁，
+ * history 无链校验。R6 三判定（审计裁定，决策日志 rounds-48）：
+ *   1. from == 上一条 to（首条无前驱，不约束起点——存量 e2e 资产有 L1→L2 起头形态）；
+ *   2. to > from（LEVEL_ORDER 严格比较；降级走审批链，history 只承载升级链）；
+ *   3. 末条 to == 当前 level（空历史 + level≠L0 亦违规；level=L0 为初始态合法）。
+ */
+describe('A4 maturity 钥匙收紧（R6 history 链）', () => {
+  const mkHistory = (
+    rows: Array<[from: 'L0' | 'L1' | 'L2' | 'L3', to: 'L0' | 'L1' | 'L2' | 'L3']>,
+  ): MaturityConfig['history'] =>
+    rows.map(([from, to], i) => ({
+      from,
+      to,
+      at: `2026-08-0${i + 1}T00:00:00Z`,
+      reason: `升级 ${from}→${to}`,
+    }));
+
+  it('R6：history 链断裂（from ≠ 上一条 to）→ 违规', () => {
+    const m = {
+      ...validMaturity(),
+      level: 'L2',
+      history: mkHistory([
+        ['L0', 'L1'],
+        ['L0', 'L2'],
+      ]),
+    };
+    const r = checkMaturity(m);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.startsWith('R6:'))).toBe(true);
+    expect(r.violations.join()).toContain('上一条');
+  });
+
+  it('R6：末条 to ≠ 当前 level → 违规', () => {
+    const m = {
+      ...validMaturity(),
+      level: 'L2',
+      history: mkHistory([['L0', 'L1']]),
+    };
+    const r = checkMaturity(m);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.startsWith('R6:'))).toBe(true);
+    expect(r.violations.join()).toContain('当前 level');
+  });
+
+  it('R6：from == to（L0→L0 非升级占位条目）→ 违规（history 只承载升级链）', () => {
+    const m = {
+      ...validMaturity(),
+      level: 'L0',
+      history: mkHistory([['L0', 'L0']]),
+    };
+    const r = checkMaturity(m);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.startsWith('R6:') && v.includes('须严格高于 from'))).toBe(true);
+  });
+
+  it('R6：降级形态（to < from）→ 违规（降级走 human 审批链，不记 history）', () => {
+    const m = {
+      ...validMaturity(),
+      level: 'L1',
+      history: mkHistory([
+        ['L0', 'L1'],
+        ['L1', 'L0'],
+      ]),
+    };
+    const r = checkMaturity(m);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.startsWith('R6:') && v.includes('须严格高于 from'))).toBe(true);
+  });
+
+  it('R6：空历史 + level≠L0 → 违规；空历史 + level=L0（初始态）→ 合法', () => {
+    const l1 = checkMaturity({ ...validMaturity(), level: 'L1', history: [] });
+    expect(l1.passed).toBe(false);
+    expect(l1.violations.some((v) => v.startsWith('R6:'))).toBe(true);
+    const l0 = checkMaturity({ ...validMaturity(), level: 'L0', history: [] });
+    expect(l0.passed).toBe(true);
+  });
+
+  it('R6：合法升级链（L0→L1→L2 且 level=L2）→ 零违规', () => {
+    const m = {
+      ...validMaturity(),
+      level: 'L2',
+      history: mkHistory([
+        ['L0', 'L1'],
+        ['L1', 'L2'],
+      ]),
+    };
+    const r = checkMaturity(m);
+    expect(r.passed).toBe(true);
+    expect(r.violations).toHaveLength(0);
+  });
+});
+
+/**
+ * 可见性与死分支清理（F-G2-04/05，audit-fixes task 5；43.0.0 A4 随动）：
+ *   - 原 R3（completedCycles 周期换算）随 unlockConditions 死字段删除而退役（R3 规则号不回收）；
+ *     「R3 未校验」warning 通道一并移除，warnings 保持零值语义
  *   - R1 死分支删除：schema required 前置拦截缺失字段，逻辑层不再重复报「schema 不完整」
  */
 describe('checkMaturity 可见性与死分支清理', () => {
-  it('R3 context 缺失（未提供 completedPhases）→ 非阻断 warning（F-G2-04）', () => {
+  it('A4：unlockConditions/R3 退役后，未提供 --project 不再出 warning（warnings 为空）', () => {
     const r = checkMaturity(validMaturity());
     expect(r.passed).toBe(true);
-    expect(r.warnings).toEqual(['R3 未校验：未提供 --project']);
-  });
-
-  it('R3 context 提供时无 warning', () => {
-    const r = checkMaturity(validMaturity(), { completedPhases: 8 });
-    expect(r.warnings).toHaveLength(0);
-    expect(r.passed).toBe(true);
+    expect(r.warnings).toEqual([]);
   });
 
   it('R1 死分支已删除：缺 level 由 schema required 前置拦截 → [schema]（F-G2-05）', () => {
@@ -131,18 +216,40 @@ const mkEntry = (patch: Record<string, unknown>): Record<string, unknown> => ({
 /**
  * R5 用例的成熟度模型：以 validMaturity() 为底（schema 前置校验要求全 required 字段在场），
  * 覆写 level 与降级阈值 streak——故 mkMaturity(3) 的 R5 判据为「命中 ≥ 3」。
+ * history 同步覆写为 L0→L1→L2 升级链（A4 R6：level 须与末条 history.to 一致，43.0.0）。
  */
 const mkMaturity = (streak: number): MaturityConfig => ({
   ...validMaturity(),
   level: 'L2',
-  downgradeTriggers: { ...validMaturity().downgradeTriggers, operationalFailureStreak: streak },
+  history: [
+    {
+      from: 'L0',
+      to: 'L1',
+      at: '2026-08-01T00:00:00Z',
+      reason: '稳定运行 1 完整周期',
+    },
+    {
+      from: 'L1',
+      to: 'L2',
+      at: '2026-08-02T00:00:00Z',
+      reason: '第二个完整周期完成',
+    },
+  ],
+  downgradeTriggers: {
+    ...validMaturity().downgradeTriggers,
+    operationalFailureStreak: streak,
+  },
 });
 
 describe('R5 真值通道：只统计 operationalFailureModes 字段（D-7）', () => {
   it('R5 只统计 operationalFailureModes 字段，词法命中不改判', () => {
     const rows = [mkEntry({ note: '拦截 #9：R5 O_PATTERN 与 VerifierOutput O3 命名冲突' })];
     expect(countOperationalFailures(rows)).toBe(0);
-    expect(checkMaturity(mkMaturity(3), { operationalFailureCount: countOperationalFailures(rows) }).passed).toBe(true);
+    expect(
+      checkMaturity(mkMaturity(3), {
+        operationalFailureCount: countOperationalFailures(rows),
+      }).passed,
+    ).toBe(true);
   });
 
   it('R5 计数口径·计次行（3 态：标注 3 次违规 / 多枚举数组累加 / 重复值长度口径）', () => {
@@ -190,7 +297,9 @@ describe('R5 真值通道：只统计 operationalFailureModes 字段（D-7）', 
       }
       expect(countOperationalFailures(countedRows), `${caseName}: 计数口径`).toBe(expectedCount);
       if (expectViolation) {
-        const r = checkMaturity(mkMaturity(3), { operationalFailureCount: expectedCount });
+        const r = checkMaturity(mkMaturity(3), {
+          operationalFailureCount: expectedCount,
+        });
         expect(r.passed, `${caseName}: 应触发 R5 违规`).toBe(false);
         expect(r.violations.join(), `${caseName}: 违规文案`).toMatch(/R5: O 系列失败模式命中 3 次/);
       }
@@ -204,7 +313,10 @@ describe('R5 真值通道：只统计 operationalFailureModes 字段（D-7）', 
 
   it('collectLexicalMentions：按命中次数返回 runId（引用位置可追溯），缺 runId 用占位符', () => {
     const rows = [
-      mkEntry({ runId: 'p1-G-verifier-10', note: 'O3 既是运维失败模式也是评审规则编号' }),
+      mkEntry({
+        runId: 'p1-G-verifier-10',
+        note: 'O3 既是运维失败模式也是评审规则编号',
+      }),
       mkEntry({ runId: 'p2-V-rootcause-02c', note: 'O3 与 O4 引用' }),
       mkEntry({ runId: 'p3-G-ok', note: '无失败模式字样' }),
       mkEntry({ note: 'O1 引用但记录缺 runId' }),
@@ -222,7 +334,10 @@ describe('R5 诊断通道：未接线可见化与词法降级（D-7）', () => {
   it('未提供 --run-log → 诊断「R5 未生效」；非阻断（退出码语义不变）', () => {
     const diagnostics = buildR5Diagnostics(false, []);
     expect(diagnostics).toEqual(['R5 未生效：未提供 --run-log（O 系列失败模式未校验）']);
-    const r = checkMaturity(mkMaturity(3), { operationalFailureCount: 0, diagnostics });
+    const r = checkMaturity(mkMaturity(3), {
+      operationalFailureCount: 0,
+      diagnostics,
+    });
     expect(r.passed).toBe(true);
     expect(r.diagnostics).toEqual(diagnostics);
   });
@@ -248,7 +363,7 @@ describe('R5 诊断通道：未接线可见化与词法降级（D-7）', () => {
     const r = checkMaturity(mkMaturity(3), {
       diagnostics: ['R5 未生效：未提供 --run-log（O 系列失败模式未校验）'],
     });
-    expect(r.warnings).toEqual(['R3 未校验：未提供 --project']);
+    expect(r.warnings).toEqual([]);
     expect(r.diagnostics).toHaveLength(1);
     expect(r.passed).toBe(true);
   });
@@ -264,9 +379,9 @@ const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
 const cliDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli');
 
-/** 合法 maturity.json（形状照抄 samples/maturity/valid.json） */
+/** 合法 maturity.json（形状照抄 samples/maturity/valid.json；43.0.0 A4：unlockConditions 死字段已删除） */
 const VALID_MATURITY =
-  '{"schemaVersion":"1.0","projectId":"smoke","level":"L1","leveledUpAt":"2026-07-23T18:00:00Z","unlockConditions":{"stableDays":30,"completedCycles":3,"attemptCapRate":0.85,"misjudgeRate":0.05,"operationalFailures":0},"history":[{"at":"2026-07-23T18:00:00Z","from":"L0","to":"L1","reason":"3 阶段稳定完成"}],"downgradeTriggers":{"operationalFailureStreak":3,"budgetBurnRateExceeded":3,"checkpointRejectionStreak":2,"userRequested":false}}';
+  '{"schemaVersion":"1.0","projectId":"smoke","level":"L1","leveledUpAt":"2026-07-23T18:00:00Z","history":[{"at":"2026-07-23T18:00:00Z","from":"L0","to":"L1","reason":"3 阶段稳定完成"}],"downgradeTriggers":{"operationalFailureStreak":3,"userRequested":false}}';
 
 const runLogEntry = (runId: string, patch: Record<string, unknown>): string =>
   JSON.stringify({
@@ -323,7 +438,11 @@ describe('check-maturity CLI：--run-log 三态（D-7 端到端，真实子进�
       {
         caseName: '仅引用（note 含 O3 字样，共 17 处）→ 不再误判 R5',
         runLogContent: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
-          .map((i) => runLogEntry(`p${i}-G-verifier-${i}`, { note: 'O3 既是运维失败模式也是评审规则编号' }))
+          .map((i) =>
+            runLogEntry(`p${i}-G-verifier-${i}`, {
+              note: 'O3 既是运维失败模式也是评审规则编号',
+            }),
+          )
           .join('\n'),
         expectedExit: 0,
         stdoutIncludes: ['疑似引用 17 处（含规则编号引用，非运维失败）', 'operationalFailureModes 标注：'],
@@ -396,7 +515,10 @@ describe('R5 三态补强（G2-1）', () => {
     const maturity = await write('maturity.json', VALID_MATURITY);
     const r = runSync(process.execPath, [tsxCli, path.join(cliDir, 'check-maturity.ts'), maturity, '--json']);
     expect(r.status).toBe(0);
-    const parsed = JSON.parse((r.stdout ?? '').trim()) as { passed: boolean; diagnostics?: string[] };
+    const parsed = JSON.parse((r.stdout ?? '').trim()) as {
+      passed: boolean;
+      diagnostics?: string[];
+    };
     expect(parsed.passed).toBe(true);
     expect(parsed.diagnostics).toContain('R5 未生效：未提供 --run-log（O 系列失败模式未校验）');
   });
@@ -436,13 +558,19 @@ describe('R5 读路径枚举守卫（G3-18）', () => {
       mkEntry({ operationalFailureModes: [7] }),
       mkEntry({ operationalFailureModes: [null, 'O6'] }),
     ];
-    expect(summarizeOperationalFailures(rows)).toEqual({ count: 2, ignoredCount: 4 });
+    expect(summarizeOperationalFailures(rows)).toEqual({
+      count: 2,
+      ignoredCount: 4,
+    });
   });
 
   it("锁定 schema 语义未被本守卫改变：['O3','O3'] → 计数 2（长度口径，不去重）+ 零诊断", () => {
     const rows = [mkEntry({ operationalFailureModes: ['O3', 'O3'] })];
     expect(countOperationalFailures(rows)).toBe(2); // 与 G2-1 已绿用例同口径（不得改为去重计数）
-    expect(summarizeOperationalFailures(rows)).toEqual({ count: 2, ignoredCount: 0 });
+    expect(summarizeOperationalFailures(rows)).toEqual({
+      count: 2,
+      ignoredCount: 0,
+    });
     expect(buildR5Diagnostics(true, [], 0)).toEqual([]); // 无越界取值 → 零输出
   });
 

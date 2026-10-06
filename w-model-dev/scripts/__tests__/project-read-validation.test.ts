@@ -36,9 +36,9 @@ const VALID_PROJECT =
 const VALID_BUDGET =
   '{"schemaVersion":"1.0","projectId":"smoke","createdAt":"2026-07-01T00:00:00Z","updatedAt":"2026-07-23T18:00:00Z","perPhase":{"maxTokens":200000,"maxSubagentSpawns":10,"maxReworkRounds":3},"project":{"maxTokensTotal":2000000,"maxTokensPerSession":500000},"onExceed":"pause","killSwitch":{"consecutiveReworks":3,"budgetBurnRate":0.9,"tlaReworks":3}}';
 
-/** 合法 maturity.json（形状照抄 samples/maturity/valid.json） */
+/** 合法 maturity.json（形状照抄 samples/maturity/valid.json；43.0.0 A4：unlockConditions 死字段已删除） */
 const VALID_MATURITY =
-  '{"schemaVersion":"1.0","projectId":"smoke","level":"L1","leveledUpAt":"2026-07-23T18:00:00Z","unlockConditions":{"stableDays":30,"completedCycles":3,"attemptCapRate":0.85,"misjudgeRate":0.05,"operationalFailures":0},"history":[{"at":"2026-07-23T18:00:00Z","from":"L0","to":"L1","reason":"3 阶段稳定完成"}],"downgradeTriggers":{"operationalFailureStreak":3,"budgetBurnRateExceeded":3,"checkpointRejectionStreak":2,"userRequested":false}}';
+  '{"schemaVersion":"1.0","projectId":"smoke","level":"L1","leveledUpAt":"2026-07-23T18:00:00Z","history":[{"at":"2026-07-23T18:00:00Z","from":"L0","to":"L1","reason":"3 阶段稳定完成"}],"downgradeTriggers":{"operationalFailureStreak":3,"userRequested":false}}';
 
 let tmpDir: string;
 
@@ -64,7 +64,10 @@ function runCli(script: string, args: string[]): { code: number | null; stdout: 
 
 describe('project.json 读取侧 schema 校验（F-G4-14：三入口统一 fail-closed）', () => {
   it('STRUCTURE_INVALID 三入口对照（3 态逐 CLI 具名：check-budget / check-maturity / wm-status）→ exit 2（原 warn-and-skip 场景反转）', async () => {
-    const rows: Array<{ name: string; prepare: () => Promise<ReturnType<typeof runCli>> }> = [
+    const rows: Array<{
+      name: string;
+      prepare: () => Promise<ReturnType<typeof runCli>>;
+    }> = [
       {
         name: 'check-budget：--project 缺必填字段（无 updatedAt）',
         prepare: async () => {

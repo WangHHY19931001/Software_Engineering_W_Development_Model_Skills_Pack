@@ -8,6 +8,11 @@ import { SafeProjectPathError, resolveProjectRelativeRegularFile } from '../lib/
 import type { StructuredViolation } from '../lib/types.js';
 
 import { parseMarkdownTable } from './graph-logic.js';
+import {
+  verifyMaturityApproval,
+  type MaturityApprovalInput,
+  type SignatureChainEntry,
+} from './signature-chain-logic.js';
 
 export interface RTMRowShape {
   requirementId: string;
@@ -82,6 +87,8 @@ export interface ArtifactGateResult {
   coveragePercent: number;
   missingItems: Array<{ requirementId: string; fields: string[] }>;
   unitCoveragePercent: number;
+  /** A4（43.0.0）：TLA+/BDD 成熟度豁免判定结果（GATE_JSON `tlaBddWaived` 同源）；未请求豁免时 false */
+  tlaBddWaived: boolean;
   /** M07 兼容输出字段；严格模式固定为空数组，不提供时间戳豁免诊断。 */
   legacy?: string[];
   /** M07 测试证据维度计数；Schema 失败时也产出可观察的严格计数。 */
@@ -201,6 +208,49 @@ export interface CheckArtifactGateOptions {
   ticketsText?: string;
   /** 批次1 SDMAP-3/4 注入面：src 路径 → 文件总行数；未注入则该两子项 skipped（CLI 生产路径恒注入）。校验面覆盖全部行类型（REQ+NFR/CON）条目 */
   srcLineCounts?: ReadonlyMap<string, number>;
+  /**
+   * A4（43.0.0）：maturity.json 的 level + history（CLI 读取；缺省不触发豁免判定——
+   * 缺 maturity.json 的项目行为不变，不豁免也不新增违规）。
+   */
+  maturity?: MaturityApprovalInput;
+  /**
+   * A4（43.0.0）：签名链条目（CLI 装载 `.w-model/signature-chain.jsonl`，缺文件 → 空数组；
+   * 纯函数不读盘）。L0/L1 豁免须 role=human / targetKind=maturity 审批条目，无链 / 坏链一律不豁免
+   * （fail-closed；判定经 verifyMaturityApproval 单点）。
+   */
+  signatureChain?: readonly SignatureChainEntry[];
+}
+
+// ==================== A4 maturity 豁免判定（fail-closed 单点） ====================
+
+/** A4 豁免判定结果：waived + 拒绝原因（拒绝原因由 checkArtifactGate 并入 reasons，CLI 早判定复用同一份） */
+export interface TlaBddWaiverVerdict {
+  waived: boolean;
+  reasons: string[];
+}
+
+/**
+ * TLA+/BDD 成熟度豁免判定（A4，批次 6 任务 8；CLI 早判定与 checkArtifactGate 纯函数共用同一实现）：
+ * 仅当 `maturity.level ∈ {L0, L1}` 且 `phase ∈ 1-4` 时请求豁免；请求即须通过 verifyMaturityApproval
+ * （role=human / targetKind=maturity / v3 重算 / 绑定 maturity.json / 不早于最近 level 变更）。
+ * 无链（chain 缺省或空）、坏链（签名不符）、缺 maturity.json（maturity 缺省）三种形态均**不豁免**：
+ * 前两者额外产出「maturity 豁免被拒绝」reason（进 reasons/exitCode），缺 maturity.json 保持既有
+ * 严格行为（不豁免、无新增 reason——与 43.0.0 前的 maturity 缺失路径零回归）。
+ */
+export function evaluateTlaBddWaiver(
+  maturity: MaturityApprovalInput | undefined,
+  phase: number,
+  signatureChain: readonly SignatureChainEntry[] | undefined,
+): TlaBddWaiverVerdict {
+  if (!maturity) return { waived: false, reasons: [] };
+  if (maturity.level !== 'L0' && maturity.level !== 'L1') return { waived: false, reasons: [] };
+  if (phase < 1 || phase > 4) return { waived: false, reasons: [] };
+  const verdict = verifyMaturityApproval(signatureChain ?? [], maturity);
+  if (verdict.ok) return { waived: true, reasons: [] };
+  return {
+    waived: false,
+    reasons: [`maturity 豁免被拒绝：${verdict.reason}（L0/L1 豁免须 human 审批链）`],
+  };
 }
 
 // ==================== SDMAP 锚点条目解析（批次1，规格 §4.1/§4.2）====================
@@ -1449,6 +1499,7 @@ function failureResult(reasons: string[], coveragePercent = 0): ArtifactGateResu
     coveragePercent,
     missingItems: [],
     unitCoveragePercent: 0,
+    tlaBddWaived: false,
   };
 }
 
@@ -1605,12 +1656,20 @@ export function checkArtifactGate(
       coveragePercent: 0,
       missingItems: [],
       unitCoveragePercent: 0,
+      tlaBddWaived: false,
       legacy: [],
       testEvidence: m07.testEvidence,
     };
   }
 
   const reasons: string[] = [];
+
+  // ==================== A4 maturity 豁免判定（fail-closed，L0/L1 须 human 审批链） ====================
+  // 与 CLI 早判定共用 evaluateTlaBddWaiver 单点（拒绝 reason 在此并入 reasons/exitCode，
+  // CLI 不重复push——早判定结果只用于 manifestExists/modelChecks 的豁免分派）。
+  const tlaBddWaiver = evaluateTlaBddWaiver(options?.maturity, phase, options?.signatureChain);
+  reasons.push(...tlaBddWaiver.reasons);
+  const tlaBddWaived = tlaBddWaiver.waived;
 
   if (!Array.isArray(matrix.rows)) reasons.push('RTM 结构错误：rows 字段缺失或非数组');
   if (!matrix.executionSummary || typeof matrix.executionSummary !== 'object') {
@@ -1885,6 +1944,7 @@ export function checkArtifactGate(
     coveragePercent,
     missingItems,
     unitCoveragePercent,
+    tlaBddWaived,
     legacy: [],
     testEvidence: testEvidenceCounts,
     ...(tickets !== undefined ? { tickets } : {}),
@@ -1893,7 +1953,11 @@ export function checkArtifactGate(
     // sdAnchorCheck 语义不变：仅 graph 提供时产出（CLI 将缺省归一为 null）
     ...(sdResult || formatResult
       ? {
-          ...(sdResult ? { sdAnchorCheck: sdResult.skipped ? ('skipped' as const) : ('checked' as const) } : {}),
+          ...(sdResult
+            ? {
+                sdAnchorCheck: sdResult.skipped ? ('skipped' as const) : ('checked' as const),
+              }
+            : {}),
           sdmapViolations: [...(sdResult?.structured ?? []), ...(formatResult?.structured ?? [])],
         }
       : {}),

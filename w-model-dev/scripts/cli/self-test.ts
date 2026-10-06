@@ -168,6 +168,14 @@ interface GateCase {
   ticketsFile?: string;
   /** 批次1 SDMAP-3/4：手写注入表（path→总行数）；缺省不注入 → sdAnchorCheck=skipped */
   srcLineCounts?: Record<string, number>;
+  /**
+   * A4（43.0.0）：配套 maturity.json（相对 samples/gate/，目录组合 fixture）。
+   * 声明时 runGateCases 读取并与 signatureChainFile 一起传入 checkArtifactGate（豁免判定输入）；
+   * 同时被 check-samples-coverage 登记为已引用。
+   */
+  maturityFile?: string;
+  /** A4（43.0.0）：配套 signature-chain.jsonl（相对 samples/gate/）；缺省 → 空链（不豁免形态） */
+  signatureChainFile?: string;
 }
 
 const VERIFIER_CASES: VerifierCase[] = [
@@ -466,6 +474,34 @@ const GATE_CASES: GateCase[] = [
     phaseOption: 1,
     expectedReasonPatterns: [/REQ-001.*acceptanceTest/],
     description: '§10J phase=1 REQ 行 acceptanceTest 为空，应被增量校验拦截',
+  },
+  // -------------------- A4 maturity 豁免收紧（43.0.0，批次 6 任务 8） --------------------
+  {
+    file: 'valid-maturity-waiver-with-approval/rtm.json',
+    expectedPassed: true,
+    phaseOption: 1,
+    maturityFile: 'valid-maturity-waiver-with-approval/maturity.json',
+    signatureChainFile: 'valid-maturity-waiver-with-approval/signature-chain.jsonl',
+    auxFiles: [
+      'valid-maturity-waiver-with-approval/maturity.json',
+      'valid-maturity-waiver-with-approval/signature-chain.jsonl',
+    ],
+    description:
+      'A4 L1 + 合法 human 审批链（role=human / targetKind=maturity / v3 重算一致 / 绑定 maturity.json / 不早于末次变更）→ TLA+/BDD 豁免生效（tlaBddWaived=true），其余门禁照跑全绿',
+  },
+  {
+    file: 'bad-maturity-waiver-missing-approval/rtm.json',
+    expectedPassed: false,
+    phaseOption: 1,
+    maturityFile: 'bad-maturity-waiver-missing-approval/maturity.json',
+    signatureChainFile: 'bad-maturity-waiver-missing-approval/signature-chain.jsonl',
+    auxFiles: [
+      'bad-maturity-waiver-missing-approval/maturity.json',
+      'bad-maturity-waiver-missing-approval/signature-chain.jsonl',
+    ],
+    expectedReasonPatterns: [/maturity 豁免被拒绝：缺少 role=human \/ targetKind=maturity 的审批条目/],
+    description:
+      'A4 L1 审批条目缺 human role（role=S 伪装、v3 签名合法）→ 豁免被拒绝（fail-closed）， maturity.level 自写不再关门禁',
   },
   // -------------------- P0 RTM coverageStatus 校验 --------------------
   {
@@ -879,7 +915,11 @@ interface SpecEnhanceCase {
 }
 
 const SPEC_ENHANCE_CASES: SpecEnhanceCase[] = [
-  { file: 'valid-spec-enhance.json', expectedPassed: true, description: 'R7/R8 通过：追踪矩阵字段合法 + mermaid 配平' },
+  {
+    file: 'valid-spec-enhance.json',
+    expectedPassed: true,
+    description: 'R7/R8 通过：追踪矩阵字段合法 + mermaid 配平',
+  },
   {
     file: 'bad-spec-r7.json',
     expectedPassed: false,
@@ -962,7 +1002,12 @@ interface SpecStructureOutOfScopeCase {
   name: string;
   /** 只提供 §8 段正文；`undefined` = 故意整节缺失（判定 (a)）。 */
   section?: string;
-  expectedBucketCounts: { refs: number; ssot: number; dod: number; outOfScope: number };
+  expectedBucketCounts: {
+    refs: number;
+    ssot: number;
+    dod: number;
+    outOfScope: number;
+  };
   expectedReasonPatterns?: RegExp[];
   description: string;
 }
@@ -1042,7 +1087,11 @@ interface DesignEnhanceCase {
 }
 
 const DESIGN_ENHANCE_CASES: DesignEnhanceCase[] = [
-  { file: 'valid-design-enhance.json', expectedPassed: true, description: 'R9/R10 通过：SD 字段合法 + mermaid 配平' },
+  {
+    file: 'valid-design-enhance.json',
+    expectedPassed: true,
+    description: 'R9/R10 通过：SD 字段合法 + mermaid 配平',
+  },
   {
     file: 'bad-design-r9.json',
     expectedPassed: false,
@@ -1581,8 +1630,8 @@ interface MaturityCase {
   expectedPassed: boolean;
   /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
   expectedReasonPatterns?: RegExp[];
-  /** 传给 checkMaturity 的 options（可选，默认不传） */
-  options?: { completedPhases?: number };
+  /** 传给 checkMaturity 的 options（可选，默认不传；43.0.0 A4：completedPhases 已随 R3 退役删除） */
+  options?: { projectCreatedAt?: string; operationalFailureCount?: number };
   /** 用例说明 */
   description: string;
 }
@@ -1600,11 +1649,11 @@ const MATURITY_CASES: MaturityCase[] = [
     description: 'level=L5 超出 L0/L1/L2/L3，应被 schema enum 前置校验拦截',
   },
   {
-    file: 'bad-r3-cycle-mismatch.json',
+    file: 'bad-r6-history-chain.json',
     expectedPassed: false,
-    expectedReasonPatterns: [/R3.*8 阶段.*1 完整周期.*completedCycles=0/],
-    options: { completedPhases: 8 },
-    description: 'P2.1 R3 单位修正：completedPhases=8（1 完整周期）但 completedCycles=0，应触发 R3 违规',
+    expectedReasonPatterns: [/R6: history\[1\] from=L0 与上一条 to=L1 断链/],
+    description:
+      'A4 R6 history 链一致性：第 2 条 from=L0 与上一条 to=L1 断链（虚高路径：L0 直接跳 L2），应触发 R6 违规（原 bad-r3-cycle-mismatch.json 的 R3 周期用例随 unlockConditions 死字段退役，43.0.0 A4）',
   },
 ];
 
@@ -1769,7 +1818,11 @@ interface RootCauseCase {
 }
 
 const ROOTCAUSE_CASES: RootCauseCase[] = [
-  { file: 'valid.json', expectedPassed: true, description: '完整、合规的 RootCauseReport，应通过所有校验' },
+  {
+    file: 'valid.json',
+    expectedPassed: true,
+    description: '完整、合规的 RootCauseReport，应通过所有校验',
+  },
   {
     file: 'valid-no-root-cause.json',
     expectedPassed: true,
@@ -1959,7 +2012,11 @@ const ICEBERG_CASES: IcebergCase[] = [
     file: 'bad-view-disagreement.json',
     expectedPassed: false,
     expectedReasonPatterns: [/R6/, /视角间存在未对账差异/, /视角间存在未对账差异[\s\S]*SD-002/],
-    injectViewSets: { graph: ['SD-001', 'SD-002'], tla: ['SD-001'], rtm: ['SD-001', 'SD-002'] },
+    injectViewSets: {
+      graph: ['SD-001', 'SD-002'],
+      tla: ['SD-001'],
+      rtm: ['SD-001', 'SD-002'],
+    },
     description: 'graph/rtm 含 SD-002 而 tla 不含，窄池漏 SD 即刻失败（R6[design-sd]，SD 命名空间内差异不豁免）',
   },
   {
@@ -1980,14 +2037,23 @@ const ICEBERG_CASES: IcebergCase[] = [
     file: 'bad-r6-wide-dd-drift.json',
     expectedPassed: false,
     expectedReasonPatterns: [/R6/, /design-wide/, /graph↔rtm[\s\S]*DD-003/],
-    injectViewSets: { graph: ['SD-001', 'DD-003'], tla: ['SD-001'], rtm: ['SD-001'] },
+    injectViewSets: {
+      graph: ['SD-001', 'DD-003'],
+      tla: ['SD-001'],
+      rtm: ['SD-001'],
+    },
     description:
       '宽池 graph↔rtm 的 DD 漂移（DD-003 仅 graph 有）仍被检出（R6[design-wide]：分池只豁免跨命名空间宽度差）',
   },
   {
     file: 'valid-phase5-scope-present.json',
     expectedPassed: true,
-    injectViewSets: { graph: ['SD-001'], tla: ['SD-001'], rtm: ['SD-001'], scope: ['src/counter.ts'] },
+    injectViewSets: {
+      graph: ['SD-001'],
+      tla: ['SD-001'],
+      rtm: ['SD-001'],
+      scope: ['src/counter.ts'],
+    },
     description:
       '阶段 5 scope 视角在盘且为文件路径命名空间：不参与 R6 集合比对与 R8 收敛集，零发现报告可放行（D-1/N-1 分池）',
   },
@@ -2265,7 +2331,11 @@ interface BddCase {
     unitTest: string | null;
   }>;
   /** 注入的 cucumber 报告（用于 D5 step 绑定校验，phase >= 5） */
-  cucumberReport?: { undefinedCount: number; pendingCount: number; failedCount: number };
+  cucumberReport?: {
+    undefinedCount: number;
+    pendingCount: number;
+    failedCount: number;
+  };
 }
 
 const BDD_CASES: BddCase[] = [
@@ -2360,7 +2430,15 @@ const BDD_CASES: BddCase[] = [
     expectedReasonPatterns: [/feature id not in RTM row/],
     phase: 1,
     description: 'feature id 未登记在 RTM test 字段中（由 rtmRows 参数注入），应被 D7 RTM 映射校验拦截',
-    rtmRows: [{ reqId: 'REQ-001', acceptanceTest: null, systemTest: null, integrationTest: null, unitTest: null }],
+    rtmRows: [
+      {
+        reqId: 'REQ-001',
+        acceptanceTest: null,
+        systemTest: null,
+        integrationTest: null,
+        unitTest: null,
+      },
+    ],
   },
   {
     manifestFile: 'valid-manifest.json',
@@ -2727,7 +2805,11 @@ interface ArchiveIntegrityCase {
 }
 
 const ARCHIVE_INTEGRITY_CASES: ArchiveIntegrityCase[] = [
-  { file: 'valid-full.json', expectedPassed: true, description: '归档完整性：全阶段强制文件齐全' },
+  {
+    file: 'valid-full.json',
+    expectedPassed: true,
+    description: '归档完整性：全阶段强制文件齐全',
+  },
   {
     file: 'bad-missing-phase1-docs.json',
     expectedPassed: false,
@@ -2947,7 +3029,12 @@ const CODE_HEALTH_CASES: CodeHealthCase[] = [
     expectedValid: true,
     description: '合法 redacted archive record',
   },
-  { file: 'valid-gap.json', schema: 'code-health-gap', expectedValid: true, description: '合法 test-gap row' },
+  {
+    file: 'valid-gap.json',
+    schema: 'code-health-gap',
+    expectedValid: true,
+    description: '合法 test-gap row',
+  },
   {
     file: 'valid-test-inventory.json',
     schema: 'code-health-test-inventory',
@@ -3444,7 +3531,9 @@ async function runVerifierCases(samplesDir: string): Promise<CaseResult[]> {
     // 复核违规并入 reasons 与 passed 判定（照 check-budget / check-maturity 复用导出函数先例）。
     const reviewedRaw = (parsed as { reviewedArtifacts?: unknown } | null)?.reviewedArtifacts;
     const artifactCheck = verifyReviewedArtifacts(reviewedRaw, path.dirname(abs));
-    const r = checkVerifierOutput(parsed, { lineCountsByPath: artifactCheck.lineCountsByPath });
+    const r = checkVerifierOutput(parsed, {
+      lineCountsByPath: artifactCheck.lineCountsByPath,
+    });
     const reasons = [...r.reasons, ...artifactCheck.reasons];
     const passed = r.passed && artifactCheck.reasons.length === 0;
 
@@ -3485,6 +3574,21 @@ async function runGateCases(samplesDir: string): Promise<CaseResult[]> {
     }
     // 批次1 SDMAP-3/4：用例声明的注入表转 ReadonlyMap 传给纯函数（缺省 undefined → sdAnchorCheck=skipped，与 CLI 生产路径注入态区分）
     options.srcLineCounts = c.srcLineCounts ? new Map(Object.entries(c.srcLineCounts)) : undefined;
+    // A4：目录组合 fixture 的 maturity.json + signature-chain.jsonl 作为豁免判定输入
+    // （链文件逐行 JSON 解析，坏行跳过——与 CLI loadSignatureChainIfExists 同口径）
+    if (c.maturityFile) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控仓库固定路径（samples/gate/ 下的用例声明 fixture），仅只读
+      options.maturity = JSON.parse(await fs.readFile(path.join(samplesDir, 'gate', c.maturityFile), 'utf-8')) as never;
+    }
+    if (c.signatureChainFile) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控仓库固定路径（samples/gate/ 下的用例声明 fixture），仅只读
+      const chainRaw = await fs.readFile(path.join(samplesDir, 'gate', c.signatureChainFile), 'utf-8');
+      options.signatureChain = chainRaw
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0)
+        .map((l) => JSON.parse(l) as never);
+    }
     const r = checkArtifactGate(parsed as never, Object.keys(options).length > 0 ? (options as never) : undefined);
 
     const details: string[] = [];
@@ -3567,7 +3671,11 @@ async function runSpecEnhanceCases(samplesDir: string): Promise<CaseResult[]> {
   for (const c of SPEC_ENHANCE_CASES) {
     const abs = path.join(samplesDir, 'graph', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { traceabilityMatrix: string; umlModeling: string; specContent: string };
+    const parsed = JSON.parse(raw) as {
+      traceabilityMatrix: string;
+      umlModeling: string;
+      specContent: string;
+    };
     const v = checkRequirementSpecEnhance(parsed.traceabilityMatrix, parsed.specContent, parsed.umlModeling);
     const violations = [...v.r7, ...v.r8];
     const actualPassed = violations.length === 0;
@@ -3594,7 +3702,11 @@ async function runSpecStructureCases(samplesDir: string): Promise<CaseResult[]> 
   for (const c of SPEC_STRUCTURE_CASES) {
     const abs = path.join(samplesDir, 'gate', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { specContent: string; refFiles: string[]; dodContent: string };
+    const parsed = JSON.parse(raw) as {
+      specContent: string;
+      refFiles: string[];
+      dodContent: string;
+    };
     const files: Record<string, string> = {};
     const dir = 'docs/phase1-requirements';
     files[path.join(dir, 'requirement-spec.md')] = parsed.specContent;
@@ -3697,7 +3809,11 @@ async function runDesignEnhanceCases(samplesDir: string): Promise<CaseResult[]> 
   for (const c of DESIGN_ENHANCE_CASES) {
     const abs = path.join(samplesDir, 'graph', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { traceabilityMatrix: string; umlModeling: string; designDocContent: string };
+    const parsed = JSON.parse(raw) as {
+      traceabilityMatrix: string;
+      umlModeling: string;
+      designDocContent: string;
+    };
     const v = checkDesignSpecEnhance(parsed.traceabilityMatrix, parsed.designDocContent, parsed.umlModeling);
     const violations = [...v.r9, ...v.r10];
     const actualPassed = violations.length === 0;
@@ -3721,7 +3837,12 @@ async function runPhase2SpecStructureCases(samplesDir: string): Promise<CaseResu
   for (const c of PHASE2_SPEC_STRUCTURE_CASES) {
     const abs = path.join(samplesDir, 'gate', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { mainDoc: string; specContent: string; refFiles: string[]; dodContent: string };
+    const parsed = JSON.parse(raw) as {
+      mainDoc: string;
+      specContent: string;
+      refFiles: string[];
+      dodContent: string;
+    };
     const files: Record<string, string> = {};
     const dir = path.join('docs', 'phase2-design');
     files[path.join(dir, parsed.mainDoc)] = parsed.specContent;
@@ -3764,7 +3885,11 @@ async function runOutlineEnhanceCases(samplesDir: string): Promise<CaseResult[]>
   for (const c of OUTLINE_ENHANCE_CASES) {
     const abs = path.join(samplesDir, 'graph', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { traceabilityMatrix: string; umlModeling: string; designDocContent: string };
+    const parsed = JSON.parse(raw) as {
+      traceabilityMatrix: string;
+      umlModeling: string;
+      designDocContent: string;
+    };
     const v = checkOutlineSpecEnhance(parsed.traceabilityMatrix, parsed.designDocContent, parsed.umlModeling);
     const violations = [...v.r11, ...v.r12];
     const actualPassed = violations.length === 0;
@@ -3787,7 +3912,12 @@ async function runPhase3SpecStructureCases(samplesDir: string): Promise<CaseResu
   for (const c of PHASE3_SPEC_STRUCTURE_CASES) {
     const abs = path.join(samplesDir, 'gate', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { mainDoc: string; specContent: string; refFiles: string[]; dodContent: string };
+    const parsed = JSON.parse(raw) as {
+      mainDoc: string;
+      specContent: string;
+      refFiles: string[];
+      dodContent: string;
+    };
     const files: Record<string, string> = {};
     const dir = path.join('docs', 'phase3-outline');
     files[path.join(dir, parsed.mainDoc)] = parsed.specContent;
@@ -3830,7 +3960,11 @@ async function runDetailedEnhanceCases(samplesDir: string): Promise<CaseResult[]
   for (const c of DETAILED_ENHANCE_CASES) {
     const abs = path.join(samplesDir, 'graph', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { traceabilityMatrix: string; umlModeling: string; designDocContent: string };
+    const parsed = JSON.parse(raw) as {
+      traceabilityMatrix: string;
+      umlModeling: string;
+      designDocContent: string;
+    };
     const v = checkDetailedSpecEnhance(parsed.traceabilityMatrix, parsed.designDocContent, parsed.umlModeling);
     const violations = [...v.r13, ...v.r14];
     const actualPassed = violations.length === 0;
@@ -3853,7 +3987,12 @@ async function runPhase4SpecStructureCases(samplesDir: string): Promise<CaseResu
   for (const c of PHASE4_SPEC_STRUCTURE_CASES) {
     const abs = path.join(samplesDir, 'gate', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { mainDoc: string; specContent: string; refFiles: string[]; dodContent: string };
+    const parsed = JSON.parse(raw) as {
+      mainDoc: string;
+      specContent: string;
+      refFiles: string[];
+      dodContent: string;
+    };
     const files: Record<string, string> = {};
     const dir = path.join('docs', 'phase4-detailed');
     files[path.join(dir, parsed.mainDoc)] = parsed.specContent;
@@ -4118,7 +4257,13 @@ const RUN_LOG_APPEND_CASES: RunLogAppendCase[] = [
   },
   {
     description: '--correct 只新增更正记录（note 含 correction-of:<runId>），历史行逐字段不变',
-    existing: [appendCaseRecord({ runId: 'h1', timestamp: APPEND_CASE_NOW, note: '错值 4' })],
+    existing: [
+      appendCaseRecord({
+        runId: 'h1',
+        timestamp: APPEND_CASE_NOW,
+        note: '错值 4',
+      }),
+    ],
     incoming: [],
     options: { now: '2026-01-05T00:01:00.000Z' },
     correctRunId: 'h1',
@@ -4278,7 +4423,9 @@ async function runCheckpointCases(samplesDir: string): Promise<CaseResult[]> {
     const abs = path.join(samplesDir, 'checkpoint', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
     const parsed: unknown = parseJsonl(raw);
-    const r = checkCheckpoint(parsed, { checkpointLog: c.expectedPassed ? validCheckpointLog : undefined });
+    const r = checkCheckpoint(parsed, {
+      checkpointLog: c.expectedPassed ? validCheckpointLog : undefined,
+    });
 
     const details: string[] = [];
     if (r.passed !== c.expectedPassed) {
@@ -4493,7 +4640,10 @@ async function runTlaBddSyncCases(samplesDir: string): Promise<CaseResult[]> {
     const abs = path.join(samplesDir, 'tla-bdd-sync', c.file);
     try {
       const raw = await fs.readFile(abs, 'utf-8');
-      const data = parseJsonSafe(raw) as { tlaContent: string; featureContent: string };
+      const data = parseJsonSafe(raw) as {
+        tlaContent: string;
+        featureContent: string;
+      };
       const r = checkTlaBddSync(data.tlaContent, data.featureContent);
       const details: string[] = [];
       if (r.passed !== c.expectedPassed) {
@@ -4904,8 +5054,18 @@ interface DesignFogCase {
 }
 
 const DESIGN_FOG_CASES: DesignFogCase[] = [
-  { file: 'valid-all-terminal.md', phase: 2, expectedPassed: true, description: '全终结迷雾册：exit 0' },
-  { file: 'valid-no-fog-marker.md', phase: 2, expectedPassed: true, description: '合法无雾标记：exit 0' },
+  {
+    file: 'valid-all-terminal.md',
+    phase: 2,
+    expectedPassed: true,
+    description: '全终结迷雾册：exit 0',
+  },
+  {
+    file: 'valid-no-fog-marker.md',
+    phase: 2,
+    expectedPassed: true,
+    description: '合法无雾标记：exit 0',
+  },
   {
     file: 'bad-unresolved-fog.md',
     phase: 2,
@@ -5118,7 +5278,11 @@ async function runArchiveIntegrityCases(samplesDir: string): Promise<CaseResult[
           // 树内账本缺失 → 留空，由清单校验 fail-closed 报违规
         }
       }
-      manifest = { codingPlanSnapshot: m.codingPlanSnapshot, changeId: m.changeId, progressMdContent };
+      manifest = {
+        codingPlanSnapshot: m.codingPlanSnapshot,
+        changeId: m.changeId,
+        progressMdContent,
+      };
     }
     const r = checkArchiveIntegrity(contents, undefined, manifest);
 
@@ -5210,7 +5374,14 @@ async function loadPhase1Fixture(abs: string): Promise<CodeHealthPhase1Fixture> 
 function phase1UnexercisedTrace(revision: RevisionIdentity) {
   return {
     revision,
-    scenarios: [{ id: 'unexercised', environment: 'ci', reached: null, observation: 'unavailable' as const }],
+    scenarios: [
+      {
+        id: 'unexercised',
+        environment: 'ci',
+        reached: null,
+        observation: 'unavailable' as const,
+      },
+    ],
     rawTraceSha256: 'd'.repeat(64),
   };
 }

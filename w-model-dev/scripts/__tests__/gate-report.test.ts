@@ -20,6 +20,7 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { runSync } from '../lib/run-sync.js';
 import { writeGateLog } from '../lib/gate-log-writer.js';
+import { computeSigHash, type SignatureChainEntry } from '../logic/signature-chain-logic.js';
 
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
@@ -1096,13 +1097,49 @@ describe('check-artifact-gate.ts phase 1 evidence boundary', () => {
     }
   });
 
+  /** A4 human 审批条目构造器（v3 sigHash 经 computeSigHash 真实重算；形态同 samples/gate/valid-maturity-waiver-with-approval/ 与 gate-logic.test.ts 同名 helper） */
+  function humanMaturityApprovalEntry(): SignatureChainEntry {
+    const base: Omit<SignatureChainEntry, 'sigHash'> = {
+      sigId: 'wm1-r001-human',
+      phase: 1,
+      role: 'human',
+      action: 'approve',
+      targetKind: 'maturity',
+      runId: 'wm1-r001',
+      artifacts: ['.w-model/maturity.json'],
+      prevSigId: 'genesis',
+      prevSigHash: '0',
+      signedAt: '2026-09-18T00:00:00.000Z',
+      signer: 'user-wangh',
+      inputProvenance: {
+        sourceSigIds: [],
+        sourceArtifacts: [],
+        transformDescription: '用户确认 L0→L1 成熟度升级（A4 human 审批链）',
+      },
+      sigHashAlgo: 'v3',
+    };
+    return { ...base, sigHash: computeSigHash(base) };
+  }
+
   // 成熟度豁免（2026-09-17 审查修复）：文档承诺 L0/L1 阶段 1-4 可不产出 TLA+/BDD 资产，
-  // 而门禁此前无 maturity 输入 → 合法 L1 项目必被阻断。三臂：豁免命中 / L2 不命中 / 阶段 5 不命中。
-  it('maturity 豁免矩阵（3 态：L1+阶段1 豁免 / L2+阶段1 不豁免 / L1+阶段5 不豁免）', async () => {
-    for (const [场景, level, phase, 期望Waived, assertMaturityLevel, assertNoTlaReasons, assertTlaReason] of [
-      ['L1 + 阶段 1 → 豁免', 'L1', 1, true, true, true, false],
-      ['L2 + 阶段 1 → 不豁免', 'L2', 1, null, false, false, true],
-      ['L1 + 阶段 5 → 不豁免（豁免只覆盖阶段 1-4）', 'L1', 5, null, false, false, false],
+  // 而门禁此前无 maturity 输入 → 合法 L1 项目必被阻断。四臂（A4 后）：豁免命中（L1 + 合法
+  // human 审批链）/ L2 不命中 / 阶段 5 不命中 / 无链拒绝（A4 fail-closed 新契约的拒绝路径）。
+  it('maturity 豁免矩阵（4 态：L1+链+阶段1 豁免 / L2+阶段1 不豁免 / L1+阶段5 不豁免 / L1+阶段1+无链 拒绝）', async () => {
+    for (const [
+      场景,
+      level,
+      phase,
+      期望Waived,
+      assertMaturityLevel,
+      assertNoTlaReasons,
+      assertTlaReason,
+      带审批链,
+      assertRejectReason,
+    ] of [
+      ['L1 + 阶段 1 + 合法 human 审批链 → 豁免', 'L1', 1, true, true, true, false, true, false],
+      ['L2 + 阶段 1 → 不豁免', 'L2', 1, null, false, false, true, false, false],
+      ['L1 + 阶段 5 → 不豁免（豁免只覆盖阶段 1-4）', 'L1', 5, null, false, false, false, false, false],
+      ['L1 + 阶段 1 + 无链 → 拒绝（A4 fail-closed）', 'L1', 1, null, false, false, true, false, true],
     ] as const) {
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), `wm-artifact-maturity-${level.toLowerCase()}-`));
       try {
@@ -1124,6 +1161,14 @@ describe('check-artifact-gate.ts phase 1 evidence boundary', () => {
           }),
           'utf-8',
         );
+        if (带审批链) {
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
+          await fs.writeFile(
+            path.join(tmpDir, '.w-model/signature-chain.jsonl'),
+            `${JSON.stringify(humanMaturityApprovalEntry())}\n`,
+            'utf-8',
+          );
+        }
         const r = runSync(
           process.execPath,
           [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, tmpDir, `--phase=${phase}`, '--json'],
@@ -1152,6 +1197,12 @@ describe('check-artifact-gate.ts phase 1 evidence boundary', () => {
           expect(
             report.reasons.some((x) => x.includes('[artifact:tla]')),
             `${场景}: 应报 [artifact:tla]`,
+          ).toBe(true);
+        }
+        if (assertRejectReason) {
+          expect(
+            report.reasons.some((x) => x.includes('maturity 豁免被拒绝')),
+            `${场景}: reasons 应含 maturity 豁免被拒绝（A4 fail-closed 拒绝路径）`,
           ).toBe(true);
         }
       } finally {

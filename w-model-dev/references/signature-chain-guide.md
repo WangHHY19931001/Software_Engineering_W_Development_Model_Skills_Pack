@@ -96,14 +96,17 @@ R 签名插入在 V/G 失败之后、S-fix 之前；S-fix 须包含 R 报告作�
 | V 复审 R 报告      | `role=V` ∧ `srcRole=R` ∧ `targetKind=rootcause`          | V 复审 RootCauseReport（返工链 V→G 必经环节，反模式 #19 守护）   |
 | R 预防性审查消费 S | `role=R` ∧ `srcRole=S` ∧ `targetKind=preventive`         | R3 预防性审查须以 S 产物为输入（独立定位与预防性审查是两类动作） |
 
-`targetKind` 四值语义（schema `enum`，缺省即 `standard`）：
+`targetKind` 五值语义（schema `enum`，缺省即 `standard`）：
 
 - `rootcause` — 该环复审 R 报告（RootCauseReport）
 - `preventive` — 该环为预防性审查（R3 报告）
 - `iceberg` — 该环为冰山扫掠报告（ICEBERG-A/B）
+- `maturity` — 该环为成熟度评定审批（43.0.0 A4：`role=human` 条目专用；`check-artifact-gate.ts` 消费 `maturity.json.level` 的 TLA+/BDD 豁免前经 `verifyMaturityApproval` 校验——条目须绑定 `maturity.json`、v3 重算一致、不早于最近一次 level 变更，无链/坏链一律不豁免 fail-closed）
 - `standard` — 默认/非返工语境（既有链无该字段时即此值，行为不变）
 
 > 注意：签名链 schema 的 `targetKind` 与 run-log schema 的同名 `targetKind`（requirement/design/code/test 等词表）是**不同 schema 中的不同词表**，重叠值仅 `rootcause` 且语义一致。`targetKind` 参与 sigHash 计算（43.0.0 v3，见 §1/§6）。
+>
+> **human 条目（43.0.0 A4）**：`role` enum 含 `human`（sigId 用 `human` 后缀形态，如 `wm1-r001-human`）。human 条目**不参与阶段角色链**（R1/R4 侧不计数、不缺席），链连续性（R2/R3）与防篡改（R6/R11）照常适用；当前唯一消费方为成熟度豁免审批（`verifyMaturityApproval`），由 O 在用户确认升级后代为落盘（signer 为用户 ID，落盘动作见 operational-recovery.md「成熟度与行为门禁」节第 5 条）。
 
 ## 4. G 角色校验职责（R1-R11）
 
