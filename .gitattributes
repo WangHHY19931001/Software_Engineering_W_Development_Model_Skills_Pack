@@ -1,3 +1,11 @@
+# 全仓强制 LF 落盘：消除 Windows（core.autocrlf=true）下新 clone 将 LF 内容写成 CRLF、
+# 导致门禁 verifier 登记哈希假红的形态漂移；二进制格式豁免文本归一。
+* text=auto eol=lf
+*.jar binary
+*.png binary
+*.jpg binary
+*.ico binary
+
 # Shell 脚本统一 LF 行尾（Windows autocrlf 环境下 bash 无法解析 CRLF）
 .githooks/* text eol=lf
 *.sh text eol=lf
