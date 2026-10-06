@@ -1883,8 +1883,7 @@ interface RunLogEntry {
   target?: string;
   round?: number;
   implementationTarget?: string;
-  variant?: 'fix' | 'emergency-fix'; // fix=S-fix 返工变体；emergency-fix=紧急修复通道（2026-09-04 起 schema 强制约束见下）
-  blocker?: string; // emergency-fix 的阻塞原因（"为何走紧急通道"审计说明，不意味跳过 R3+V+G 审查）
+  blocker?: string; // 可选审计说明：fix 条目的返工阻断原因（「为何不走常规返工节奏」，不意味跳过 R3+V+G 审查；批次 6 A15 起 emergency-fix 已从词表删除，历史 variant 字段亦已删除，携带即被 additionalProperties 拒绝）
   fixedLocation?: string; // fix 修复位置（文件/区域），审计用
   fixBasedOn?: string; // fix 修复依据（S-self-assessment 或 R 报告 ID），审计用
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
@@ -2426,7 +2425,7 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 | 阶段角色集矩阵 | 三行角色集（阶段 1 六角色 / 阶段 2-3 七角色 / 阶段 4 七角色，顺序=分派顺序）+ 八类视角关注面 + 与 R/V 矩阵划界（三者互不替代）+ 协议摘要 + lite 降级规则——**权威 = 本矩阵节，SSoT 本行只摘要不复制角色集** | `w-model-dev/references/agent-personas.md`「阶段角色集矩阵（A-lead 多视角分析）」节 |
 | persona 资产 ×3 | 3 份新 persona 文件（需求分析师 / 测试经理 / 算法专家），frontmatter 四字段契约（capabilities / inputs / outputs / boundaries）；另复用 5 份既有 persona（D4） | `w-model-dev/subagent/product-requirements-analyst.md` + `w-model-dev/subagent/testing-test-manager.md` + `w-model-dev/subagent/engineering-algorithm-expert.md` |
 | A-lead 协议 | A-lead = A 类 lead 变体（D5）：角色定义（只做分析协调，不产出交付物）+ 派单契约两段（终态 = 共识纪要落盘 + perspective/consensus 留痕）+ 升级路径（5 轮安全阀 → 🔴 CHECKPOINT）+ 分派模板（dispatch-matrix 登记，动作 perspective/consensus 调度） | `w-model-dev/references/subagent-delegation.md`「A-lead（多视角分析协调者，A 类 lead 变体）」节 +「A-lead 多视角分析分派模板」节 |
-| 门禁三维度 | run-log `action=perspective`（persona 非空互异）/ `action=consensus`（A-lead 逐轮）留痕；`check-role-dispatch` 阶段 1-4 三新维度 fail-closed：覆盖（`phaseRoleCoverage`：perspective persona 集 ⊇ 矩阵集）/ 时序（本阶段 produce 严格晚于全部 perspective）/ 互异（一 persona 一报告） | `w-model-dev/scripts/logic/role-dispatch-logic.ts` + `w-model-dev/scripts/cli/check-role-dispatch.ts` + `w-model-dev/schemas/run-log.schema.json`（`persona` 可选字段）+ `w-model-dev/references/conventions.md`「run-log 动作类型枚举」节（32 值） |
+| 门禁三维度 | run-log `action=perspective`（persona 非空互异）/ `action=consensus`（A-lead 逐轮）留痕；`check-role-dispatch` 阶段 1-4 三新维度 fail-closed：覆盖（`phaseRoleCoverage`：perspective persona 集 ⊇ 矩阵集）/ 时序（本阶段 produce 严格晚于全部 perspective）/ 互异（一 persona 一报告） | `w-model-dev/scripts/logic/role-dispatch-logic.ts` + `w-model-dev/scripts/cli/check-role-dispatch.ts` + `w-model-dev/schemas/run-log.schema.json`（`persona` 可选字段）+ `w-model-dev/references/conventions.md`「run-log 动作类型枚举」节（18 值） |
 | 研制要求子模板 | 阶段 1 新子模板：研制要求 DEVREQ 条目化（类别六类枚举 / 量化指标可验证 / 验证层级与判据）+ 逐条追溯 ≥1 REQ；跨阶段子模板 10 种→11 种（D3，`PHASE_SPEC_LAYOUT` 单一事实源同步） | `w-model-dev/templates/requirement-spec/development-requirements.md` + `w-model-dev/scripts/logic/gate-logic.ts` `PHASE_SPEC_LAYOUT` |
 | V 参考项 | 阶段 1-4 评审额外参考矩阵——核验共识纪要 N 视角关注面在产出中的承接（缺任一关注面承接 → 对应子标准降分依据；非独立门禁，不新增子标准名与权重） | `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 |
 

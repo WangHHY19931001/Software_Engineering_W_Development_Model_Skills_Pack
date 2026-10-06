@@ -259,7 +259,8 @@ async function verifyGateLogEvidence(
 /**
  * 读取 tla-manifest.json，提取 checkRounds 数组长度（TLA+ 返工轮数）。
  * tla-manifest.checkRounds 是数组（见 tla-logic.ts TlaManifest.checkRounds），
- * 其长度应与 run-log 中 action=rework 记录数一致。
+ * 其长度应与 run-log 中 TLA 返工 fix 记录数一致（批次 6 A15：rework 死词已删除，返工事件载体为 fix；
+ * 按 phase 过滤且仅统计 target/note 含 TLA 的条目，比对逻辑见 run-log-logic.ts R3）。
  */
 async function loadTlaCheckRounds(tlaManifestFile: string): Promise<number | undefined> {
   const abs = path.resolve(tlaManifestFile);
