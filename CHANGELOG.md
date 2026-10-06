@@ -28,6 +28,7 @@
 - **SANY 失败输出单一事实（A7）**：语法失败路径不再复述 manifest 预置标志——报告输出「TLC 未执行（SANY 失败）」单一事实，deadlockFree/invariantsPassed 等置 `notRun` 形态（tlcStatus 三态），消除「死锁/不变式违反」假信号。
 - **BDD fail-open 修复（A8）**：`check-bdd-model` feature 文件缺失（四路径全空）由放行改为 violation（blocking）；修复 `samples/bdd/valid-manifest.json` basePath 使其走通自家 CLI。
 - **证据导出脱敏加固（A9）**：敏感 key 名单由精确匹配改为「规范化后缀 + 分隔词段拼接」匹配，覆盖 `db_password_hash`/`api_key_v2` 类变体（`SENSITIVE_METADATA_PATTERN` 行内模式同步复核）。
+- **依赖安全（npm audit）**：`npm audit fix` 修复 source-map-js 高危通告 GHSA-68fv-2mgg-jv7q（事件循环 DoS，仅 lockfile 位移），复测 0 漏洞。
 
 ### Docs（C1/C2/C4）
 
@@ -38,7 +39,7 @@
 
 **计数影响**：零新增 CLI（48 = 47 exit-2 + 1 self-test，不变）/ references（45 不变）/ persona（36 不变）；schema 34 份不变（字段级修改：signature-chain / verifier-output / run-log / maturity / budget）；eval 语料 65→68（68/68 通过）；run-log/signature-chain/verifier fixtures 按新公式与枚举机械重写。
 
-**验证记录**：全量 vitest 2060/2060 单次全绿、self-test 403/403、eval 68/68、typecheck 0、docs-consistency 0、audit:l0-links 0、lint:security 0；prepush 19 项全绿（实测耗时待任务 17 回填）。
+**验证记录**：全量 vitest 2060/2060 单次全绿、self-test 403/403、eval 68/68、typecheck 0、docs-consistency 0、audit:l0-links 0、lint:security 0；prepush 19 项单次全绿（实测 1414s；首跑被 npm audit 拦截→`npm audit fix` 后复跑全绿）。
 
 ## [42.13.1] - 2026-10-05
 
