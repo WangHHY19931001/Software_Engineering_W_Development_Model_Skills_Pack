@@ -1266,14 +1266,16 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
       await fs.mkdir(bddModelDir, { recursive: true });
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture and destination are test-controlled
       await fs.copyFile(path.join(fixturesDir, 'bdd', 'valid-manifest.json'), path.join(bddModelDir, 'manifest.json'));
+      // A8（批次 6）：valid-manifest.json 的 filePath 改为相对 projectDir 的 bdd/valid-l1.feature，
+      // 本测试的项目布局须同步（manifest 在 <project>/.w-model/，feature 在 <project>/bdd/）。
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test directory
-      await fs.mkdir(path.join(bddProject, 'samples', 'bdd'), {
+      await fs.mkdir(path.join(bddProject, 'bdd'), {
         recursive: true,
       });
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture and destination are test-controlled
       await fs.copyFile(
         path.join(fixturesDir, 'bdd', 'valid-l1.feature'),
-        path.join(bddProject, 'samples', 'bdd', 'valid-l1.feature'),
+        path.join(bddProject, 'bdd', 'valid-l1.feature'),
       );
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test directory
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture

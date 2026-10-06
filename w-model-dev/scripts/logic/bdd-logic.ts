@@ -811,6 +811,12 @@ export interface BddCheckInput {
     stateMachine: Partial<BddStateMachine>;
     scenarios: ScenarioPathCheck[];
   }>;
+  /**
+   * 由 CLI 注入：feature 文件多路径查找全部未命中（A8，批次 6）。
+   * 每条产生一条 [D1] blocking violation——缺失不得只 console.error 后 continue（fail-open 会让
+   * D1/D3/D6 对空 parsedFeatures 空转通过）。attemptedPaths 供报告定位（4 个候选解析路径）。
+   */
+  unresolvedFeatures?: Array<{ featureId: string; filePath: string; attemptedPaths: string[] }>;
   /** 由 CLI 读取 tla-manifest.json + 调 tla-logic 解析后注入（用于 D4 等价性校验） */
   tlaSnapshots?: TlaSpecSnapshot[];
   /** 由 CLI 读取 rtm.json 后注入（用于 D7 RTM 映射校验） */
@@ -908,6 +914,12 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
   };
 
   // D1: features 头标注完整性 + D3: 状态机七要素
+  // A8（批次 6）：CLI 侧 feature 文件多路径查找全 miss → [D1] blocking violation（防 fail-open 空转通过）
+  for (const uf of input.unresolvedFeatures ?? []) {
+    dims.headerCompleteness.push(
+      `[D1] feature 文件不存在（4 路径均未命中）：${uf.filePath}（featureId=${uf.featureId}；已尝试：${uf.attemptedPaths.join(' | ')}）`,
+    );
+  }
   for (const pf of input.parsedFeatures ?? []) {
     // 头标注字段必填校验已在 parseFeatureHeader 完成；这里补充跨 manifest 一致性校验
     const manifestFeature = input.manifest.features.find((f) => f.id === pf.featureId);

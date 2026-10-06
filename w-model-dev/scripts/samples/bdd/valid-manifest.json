@@ -7,7 +7,7 @@
     {
       "id": "L1_blog_system-001",
       "level": 1,
-      "filePath": "samples/bdd/valid-l1.feature",
+      "filePath": "bdd/valid-l1.feature",
       "scenarioCount": 1,
       "stateMachineId": "SM-L1-blog_system",
       "tlaSpecId": "L1_blog_system",

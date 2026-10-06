@@ -7,7 +7,7 @@
     {
       "id": "L2_blog_system_auth-001",
       "level": 2,
-      "filePath": "samples/bdd/valid-l2.feature",
+      "filePath": "bdd/valid-l2.feature",
       "scenarioCount": 1,
       "stateMachineId": "SM-L2-blog_system_auth",
       "tlaSpecId": "L2_blog_system_auth",

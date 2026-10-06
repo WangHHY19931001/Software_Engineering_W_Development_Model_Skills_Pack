@@ -28,6 +28,10 @@
  *   1  校验失败（违反列出具体原因，S 子代理按原因修正 features / 状态机 / 回退需求设计）
  *   2  输入错误（文件不存在 / 非法 JSON / 参数非法 / schema 不合规）
  *
+ * A8（批次 6）：feature 文件多路径查找（basePath / .w-model/ / .w-model/bdd/ / projectDir）全部未命中时
+ * 产生 [D1] blocking violation 并 exit 1，不再只 console.error 后静默跳过（fail-open 会让
+ * D1/D3/D6 对空 parsedFeatures 空转通过）；violation 消息携带 4 个候选解析路径便于定位。
+ *
  * 输出：
  *   stdout 打印结构化校验报告（人类可读 + 收尾 BDD_JSON 摘要，便于 Agent 正则截取）；默认与 --json 均先尝试写入 .w-model/gate-logs/<timestamp>-bdd.json
  *   gate log 写入失败仅在摘要中增加 gateLogWriteError（并写 stderr 诊断），不改变主 gate result
@@ -159,18 +163,24 @@ function isCucumberReport(value: unknown): value is { elements: unknown[] } {
 }
 
 /**
- * 多路径查找 feature 文件（P2-6 修正）。
+ * feature 文件候选解析路径（P2-6 修正；A8 提取供全 miss 报告定位）。
  * 依次尝试：basePath + filePath → .w-model/ + filePath → .w-model/bdd/ + filePath → projectDir + filePath
- * 返回第一个存在的路径，都不存在返回 null
  */
-function resolveFeatureFile(basePath: string, filePath: string, projectDir: string): string | null {
-  const candidates = [
+function featureFileCandidates(basePath: string, filePath: string, projectDir: string): string[] {
+  return [
     path.resolve(basePath, filePath),
     path.resolve(projectDir, '.w-model', filePath),
     path.resolve(projectDir, '.w-model', 'bdd', filePath),
     path.resolve(projectDir, filePath),
   ];
-  for (const candidate of candidates) {
+}
+
+/**
+ * 多路径查找 feature 文件（P2-6 修正）。
+ * 按 featureFileCandidates 顺序返回第一个存在的路径，都不存在返回 null。
+ */
+function resolveFeatureFile(basePath: string, filePath: string, projectDir: string): string | null {
+  for (const candidate of featureFileCandidates(basePath, filePath, projectDir)) {
     if (existsSync(candidate)) {
       return candidate;
     }
@@ -294,12 +304,16 @@ async function main(): Promise<number> {
   const projectDir = path.resolve(manifestDir, '..');
   const basePath = manifest.basePath ? path.resolve(projectDir, manifest.basePath) : manifestDir; // basePath 缺失时回退到 manifest 所在目录
 
-  // 解析所有 features 文件
+  // 解析所有 features 文件；4 路径全 miss 时登记 unresolvedFeatures（A8：缺失产生 [D1] violation，
+  // 不再只 console.error 后 continue——那会让 D1/D3/D6 对空 parsedFeatures 空转通过，exit 0 假绿）
   const parsedFeatures: BddCheckInput['parsedFeatures'] = [];
+  const unresolvedFeatures: NonNullable<BddCheckInput['unresolvedFeatures']> = [];
   for (const f of manifest.features) {
     const resolved = resolveFeatureFile(basePath, f.filePath, projectDir);
     if (!resolved) {
+      const attemptedPaths = featureFileCandidates(basePath, f.filePath, projectDir);
       console.error(`feature 文件不存在：${f.filePath}（已尝试 basePath / .w-model/ / .w-model/bdd/ / projectDir）`);
+      unresolvedFeatures.push({ featureId: f.id, filePath: f.filePath, attemptedPaths });
       continue;
     }
     try {
@@ -446,6 +460,7 @@ async function main(): Promise<number> {
     manifest,
     phase,
     parsedFeatures,
+    unresolvedFeatures,
     tlaSnapshots,
     rtmRows,
     cucumberReport,
