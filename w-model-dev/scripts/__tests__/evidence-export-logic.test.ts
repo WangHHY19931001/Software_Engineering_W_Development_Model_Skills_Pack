@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { evidenceFs } from '../infrastructure/evidence-fs.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
-import { exportEvidence, verifyEvidence } from '../logic/evidence-export-logic.js';
+import { exportEvidence, redact, verifyEvidence } from '../logic/evidence-export-logic.js';
 import { produceSourceProvenance } from '../logic/evidence-provenance-logic.js';
 import { childProcessEnv } from '../lib/run-sync.js';
 
@@ -1451,5 +1451,44 @@ describe('wm-export-evidence CLI', () => {
     const nonemptyResult = runCli([binaryProject, nonempty]);
     expect(nonemptyResult.code).toBe(1);
     expect(nonemptyResult.stdout).toContain('ERROR_JSON ');
+  });
+});
+
+describe('A9 脱敏敏感 key 规范化变体匹配（批次 6 销账）', () => {
+  it('A9：db_password_hash / api_key_v2 等变体键值被脱敏', () => {
+    const redacted = redact({
+      db_password_hash: 'secret',
+      api_key_v2: 'tok',
+      notes: 'path D:\\x',
+      nested: { db_password_hash: 'nested-secret' },
+    }) as Record<string, unknown>;
+    expect(redacted['db_password_hash']).toBe('[REDACTED]');
+    expect(redacted['api_key_v2']).toBe('[REDACTED]');
+    expect(redacted['notes']).toBe('path <redacted-absolute-path>');
+    expect(redacted['nested']).toEqual({ db_password_hash: '[REDACTED]' });
+  });
+  it('A9：普通键不被误脱敏（passwordPolicy / path / durationMs / tokens）', () => {
+    const redacted = redact({
+      passwordPolicy: 'ok',
+      path: 'D:\\x\\y',
+      durationMs: 5,
+      tokens: 1000,
+    }) as Record<string, unknown>;
+    expect(redacted['passwordPolicy']).toBe('ok');
+    expect(redacted['durationMs']).toBe(5);
+    // run-log 既有键 tokens 不得因短词干 token 被误伤（词干长度 >=6 守卫）。
+    expect(redacted['tokens']).toBe(1000);
+    // path 键名不触发脱敏；值内绝对路径仍按既有路径规则替换。
+    expect(redacted['path']).toBe('<redacted-absolute-path>');
+  });
+  it('A9：恰为名单词干全串的键仍被脱敏（精确匹配是变体匹配的子集）', () => {
+    const redacted = redact({
+      apikey: 'a',
+      credential: 'b',
+      token: 'c',
+    }) as Record<string, unknown>;
+    expect(redacted['apikey']).toBe('[REDACTED]');
+    expect(redacted['credential']).toBe('[REDACTED]');
+    expect(redacted['token']).toBe('[REDACTED]');
   });
 });
