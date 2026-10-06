@@ -779,10 +779,11 @@ describe('P5 schema-loader 分层修复（去 IO / 去 exit）', () => {
 });
 
 /**
- * 审计修复（audit-gate-closure task 3）：run-log fix variant/blocker conditional
- * + preventive-review passed=false 时 findings 须 ≥1。
+ * 批次 6 A3/C14：run-log schema emergency-fix blocker conditional（历史 variant
+ * 字段已删除——携带 variant 的记录由 additionalProperties 拒绝）+ preventive-review
+ * passed=false 时 findings 须 ≥1。
  */
-describe('run-log schema fix/emergency-fix variant conditional', () => {
+describe('run-log schema emergency-fix blocker conditional（variant 字段已删除）', () => {
   const fixBase = {
     runId: 'variant-contract',
     timestamp: '2026-09-03T00:00:00.000Z',
@@ -799,17 +800,16 @@ describe('run-log schema fix/emergency-fix variant conditional', () => {
     artifacts: ['src/app.ts'],
   };
 
-  it('action×variant×blocker 组合矩阵（8 态）', () => {
+  it('action×variant×blocker 组合矩阵（8 态：variant 携带即拒、emergency-fix 强制 blocker）', () => {
     for (const [组合描述, patch, expectValid] of [
-      ['fix 无 variant（向后兼容旧样本）', { action: 'fix' }, true],
-      ['fix + variant=fix', { action: 'fix', variant: 'fix' }, true],
-      ['fix + variant=emergency-fix（variant 与 action 不符）', { action: 'fix', variant: 'emergency-fix' }, false],
-      ['emergency-fix 无 variant（schema 强制 variant+blocker）', { action: 'emergency-fix' }, false],
+      ['fix（正常形态，无 variant 字段）', { action: 'fix' }, true],
+      ['fix + 携带 variant 字段（字段已删除）', { action: 'fix', variant: 'fix' }, false],
+      ['fix + variant 非法枚举值 hotfix（additionalProperties 拒绝）', { action: 'fix', variant: 'hotfix' }, false],
+      ['emergency-fix 缺 blocker', { action: 'emergency-fix' }, false],
       [
-        'emergency-fix + variant=emergency-fix + blocker',
+        'emergency-fix + blocker（合法紧急通道）',
         {
           action: 'emergency-fix',
-          variant: 'emergency-fix',
           blocker: '构建失败阻塞推进',
           fixedLocation: 'w-model-dev/scripts/cli/check-run-log.ts',
           fixBasedOn: 'S-self-assessment',
@@ -817,12 +817,16 @@ describe('run-log schema fix/emergency-fix variant conditional', () => {
         true,
       ],
       [
-        'emergency-fix + variant=emergency-fix 但缺 blocker',
-        { action: 'emergency-fix', variant: 'emergency-fix' },
+        'emergency-fix + variant=emergency-fix + blocker（携带 variant 即拒）',
+        { action: 'emergency-fix', variant: 'emergency-fix', blocker: '构建失败阻塞推进' },
         false,
       ],
-      ['emergency-fix + variant=fix（const 不符）', { action: 'emergency-fix', variant: 'fix' }, false],
-      ['variant 非法枚举值 hotfix', { action: 'fix', variant: 'hotfix' }, false],
+      [
+        'emergency-fix + variant=fix（携带 variant 即拒）',
+        { action: 'emergency-fix', variant: 'fix', blocker: '构建失败阻塞推进' },
+        false,
+      ],
+      ['emergency-fix + blocker 为空串（minLength 拒绝）', { action: 'emergency-fix', blocker: '' }, false],
     ] as Array<[string, Record<string, unknown>, boolean]>) {
       expect(
         validateBySchema('run-log', { ...fixBase, ...patch }).valid,

@@ -7,17 +7,15 @@
  *       + R3 用户确认存在 + R4 决策与阶段匹配 + R5 跨阶段证据一致。
  *
  * 设计原则（与 budget-logic.ts / run-log-logic.ts / maturity-logic.ts 一致）：
- *   1. 自包含：仅依赖本文件内定义的最小类型形状与同目录工具
- *      （schema-loader.ts 为基础设施内部工具、run-log-logic.ts 的 legacy 吸收谓词
- *      为 D-5 共享单点事实，两者均不计为外部依赖）
+ *   1. 自包含：仅依赖本文件内定义的最小类型形状与基础设施内部工具
+ *      （schema-loader.ts；run-log-logic.ts 的 legacy 吸收谓词已随批次 6 A3/C14 删除，
+ *      两门对 schema 失败一律 fail-closed，不再有共享吸收谓词）
  *   2. 纯函数：无 I/O、无副作用，便于测试与复用
- *   3. 单点事实：所有「checkpoint 是否符合规范」的判定均委托至此；schema 失败的
- *      legacy 吸收判定委托至 run-log-logic.isLegacyAbsorbableEntry（与 check-run-log 同谓词）
+ *   3. 单点事实：所有「checkpoint 是否符合规范」的判定均委托至此；schema 失败
+ *      一律 [schema] blocking（与 check-run-log 同口径，无吸收/容忍）
  */
 
 import { validateBySchema } from '../infrastructure/schema-loader.js';
-
-import { isLegacyAbsorbableEntry } from './run-log-logic.js';
 
 // ==================== 自包含类型形状 ====================
 
@@ -231,13 +229,11 @@ export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptio
     // === Schema 前置校验 ===
     // 结构性约束（additionalProperties / required / type）由 schema 拦截，
     // 拒绝时记录 [schema] 前缀违规并跳过该条（与 run-log-logic.ts 一致）。
-    // D-5：variant / reworkHints 规则引入前写入的旧记录按 legacy 吸收为非阻断——
-    // 吸收判定复用 run-log-logic 的共享谓词（单一事实来源），消除「同一条记录
-    // check-run-log 吸收、check-checkpoint 却报 [schema] blocking」的两门口径分裂；
-    // 真实 schema 错误（类型/枚举等不可容忍形态）仍走 [schema] blocking（fail-closed 不变）。
+    // 历史 D-5 legacy 吸收（variant / reworkHints 规则引入前旧记录按非阻断绕行）
+    // 已随批次 6 A3/C14 删除：任何 schema 失败一律 blocking，无两门口径分裂可言
+    // （旧形态数据毁弃，不兼容；fail-closed）。
     const schemaResult = validateBySchema('run-log', raw);
     if (!schemaResult.valid) {
-      if (isLegacyAbsorbableEntry(raw, schemaResult.errorMessages)) continue;
       for (const m of schemaResult.errorMessages) {
         violations.push(`条目 ${i + 1} [schema] ${m}`);
       }

@@ -7,7 +7,7 @@
  * 供 O 子代理在阶段推进前调用，校验运行日志完整性、tokens 合规、返工一致、
  * O 越权检测、exitCode 防伪交叉校验、append-only 时序、轨迹模板、跨轮次评审一致、
  * revertEvidence 回滚证伪、闭环五脚本齐备（R1-R11）。
- * 摘要 JSON 的 r10 字段 = R10 revertEvidence 维度计数（checked/missing/legacy，严格模式 legacy=0）；
+ * 摘要 JSON 的 r10 字段 = R10 revertEvidence 维度计数（checked/missing）；
  * r11 字段 = R11 闭环五脚本核验计数（checkedGates/missing，仅在该 run-log 存在 checkpoint 放行时出现）。
  *
  * 用法：
@@ -267,7 +267,7 @@ async function main(): Promise<void> {
   ];
   const passed = allViolations.length === 0;
   // parseErrors 已作为 blocking violations 列出（展示于 reasons / 人类可读原因）；
-  // diagnostics 仅保留纯逻辑层的非阻断诊断（LEGACY_UNSCOPED / pending-pre-approval 等）
+  // diagnostics 仅保留纯逻辑层的非阻断诊断（pending-pre-approval 等；历史 legacy 吸收诊断已随批次 6 A3/C14 删除）
   const diagnostics = [...(result.diagnostics ?? [])];
   const exitCode = passed ? 0 : 1;
   const lifecycleStatus: RunLogLifecycleStatus =

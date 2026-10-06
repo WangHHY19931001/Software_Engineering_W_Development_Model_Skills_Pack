@@ -1516,7 +1516,7 @@ const RUN_LOG_CASES: RunLogCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/\[rework-hints\].*passed=false.*reworkHints/],
     description:
-      'cutoff 后 review passed=false 无 reworkHints，应被 [rework-hints] 规则拦截（LEGACY_VARIANT_CUTOFF 起强制，cutoff 前旧行按 LEGACY_REWORK_HINTS 诊断吸收）',
+      'review passed=false 无 reworkHints，应被 [rework-hints] 规则拦截（历史 cutoff 吸收路径已删除：任意时间戳一律 blocking）',
   },
   // ---- P2-B（S27 / AC-8）: R10 revertEvidence 回滚证伪协议 ----
   {

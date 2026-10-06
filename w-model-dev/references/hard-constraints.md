@@ -14,7 +14,7 @@
 - [#8 编排者最小化 + 角色分派完整性](#8-编排者最小化--角色分派完整性)
 - [#9 门禁退出码不可伪](#9-门禁退出码不可伪)
 - [#10 系统层级树 + REQ 层级标注](#10-系统层级树--req-层级标注)
-- [#11 闭环机制强制校验 + R3 预防性审查](#11-闭环机制强制校验--r3-预防性审查)（细则子节：#11-a R11 时序细则 / #11-b 自举语义（R0/E-2） / #11-c 历史兼容窗口（D-6） / #11-d 闭环五门调用参数）
+- [#11 闭环机制强制校验 + R3 预防性审查](#11-闭环机制强制校验--r3-预防性审查)（细则子节：#11-a R11 时序细则 / #11-b 自举语义（R0/E-2） / #11-c 历史兼容窗口（D-6，已删除） / #11-d 闭环五门调用参数）
 - [#12 返工必经根因定位](#12-返工必经根因定位)
 - [#13 行为门禁按成熟度分级（TLA+ + BDD）](#13-行为门禁按成熟度分级tla--bdd)
 - [#14 代码改动前后门禁（codegraph + 回归）](#14-代码改动前后门禁codegraph--回归)
@@ -76,7 +76,7 @@
 
 **R3 预防性审查强制**（原约束 #17 并入，无条件，覆盖所有 S 变体）：所有阶段 S 产出后须触发三阶段 R 预防性审查（completeness/reliability/security），产出 `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json` 三份报告。**无条件强制**，覆盖所有 S 变体（S-doc / S-tla / S-bdd / S-ingest-tla / S-ingest-bdd / S-plan / S-coding / S-finalize / **S-fix** / **S-emergency-fix**），无 flag，无「启用时」措辞。S-fix 走 `<phase>-fix-{dim}.json` 路径，S-emergency-fix 走 `<phase>-emergency-{dim}.json` 路径，S-ingest-tla / S-ingest-bdd 走 `<phase>-ingest-{dim}.json` 路径。`preventive-review.schema.json` 强制 `passed=false ⇒ findings ≥1`——无发现的失败审查不得以空 findings 通过 schema。跳过 R3 直接进入 V 评审命中反模式 #33；S-fix / emergency-fix 后跳过 R3+V 命中反模式 #42。详见 [subagent-delegation.md](subagent-delegation.md)「R3 预防性审查分派模板」。
 
-**细则子节**（正文逐字迁移，判据不变）：R11 时序细则与 run-log 时间戳真值纪律见「约束 #11-a R11 时序细则」；首阶段自举语义（R0/E-2）见「约束 #11-b 自举语义（R0/E-2）」；phase-1 历史兼容窗口（D-6）见「约束 #11-c 历史兼容窗口（D-6）」；闭环五门调用参数（含 R3 门 `--variant` / `--auto-trigger`、编码链 stage 级 R3 与双轨契约）见「约束 #11-d 闭环五门调用参数」。
+**细则子节**（正文逐字迁移，判据不变）：R11 时序细则与 run-log 时间戳真值纪律见「约束 #11-a R11 时序细则」；首阶段自举语义（R0/E-2）见「约束 #11-b 自举语义（R0/E-2）」；phase-1 历史兼容窗口的删除裁定（原 D-6）见「约束 #11-c 历史兼容窗口（D-6，已删除）」；闭环五门调用参数（含 R3 门 `--variant` / `--auto-trigger`、编码链 stage 级 R3 与双轨契约）见「约束 #11-d 闭环五门调用参数」。
 
 ### 约束 #11-a R11 时序细则
 
@@ -88,9 +88,9 @@
 
 **首阶段自举语义（E-2 方案 B，2026-09-22；修复轮 1 收紧）**：阶段 1 首次放行前 run-log 尚无 checkpoint 记录，`check-checkpoint.ts` 以 R0 首阶段自举形态达成 exit 0——`--checkpoint-log` 已提供且含 **phase-1 用户确认**（`get('1')` 非空白；零放行记录 ⇒ 下一次放行必为首放行，仅首放行确认可支撑自举）时不视为零证据，改推非阻断 `BOOTSTRAP_VALIDATION` 诊断（checkpoint-log 用户确认为初级证据，SSoT §10.6 6.0）；未提供/空/无 phase-1 条目/不可读仍违规；五脚本无条件每阶段执行的要求不变。
 
-### 约束 #11-c 历史兼容窗口（D-6）
+### 约束 #11-c 历史兼容窗口（D-6，已删除）
 
-**phase-1 后置窗口的历史兼容例外（D-6）**：`phase===1` × `check-checkpoint.ts` 的 R11 后置窗口是**唯一**放宽「严格早于放行」的例外——**窗口判据与定性见 [`operational-recovery.md`](operational-recovery.md)「阶段 1 自举豁免」节（R11 后置窗口，D-6）**；它仅为**历史日志兼容**而保留，只兼容以旧时序（先写放行记录、后补 `check-checkpoint.ts` gate 记录）写入的历史 run-log，删除会使这些历史日志变红；E-2 方案 B 落地后的新建项目走自然时序（**阶段门放行三步顺序**，枚举见 [`SKILL.md`](../SKILL.md)「阶段门放行三步」）**不应产生该形态**（后置形态仍被 R8 轨迹模板拦截，反伪造语义不得据此回退、改写记录或伪造时间戳）。`phase>=2` 无任何后置窗口。
+**phase-1 后置窗口（原 D-6）已删除（批次 6 A3/C14，2026-10-06）**：D-6（2026-09-21）曾是 `phase===1` × `check-checkpoint.ts` 的 R11 后置窗口、唯一放宽「严格早于放行」的例外，仅用于兼容以旧时序（先写放行记录、后补 `check-checkpoint.ts` gate 记录）写入的历史 run-log；E-2 方案 B 使自然时序合法后它退化为纯历史兼容形态。批次 6 裁定「毁弃存量数据，不兼容」：**窗口删除，五门对全部阶段（含阶段 1）一律「严格早于放行」，无任何例外**——以旧时序写入的历史 run-log 直接 R11 blocking；自然时序（**阶段门放行三步顺序**，枚举见 [`SKILL.md`](../SKILL.md)「阶段门放行三步」，R0 首阶段自举形态支撑）下新建项目常态满足严格判据。删除裁定与现行判据见 [`operational-recovery.md`](operational-recovery.md)「R11 阶段 1 后置窗口删除」节。
 
 ### 约束 #11-d 闭环五门调用参数
 

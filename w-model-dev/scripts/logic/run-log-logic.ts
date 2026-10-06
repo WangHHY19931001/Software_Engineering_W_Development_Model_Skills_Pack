@@ -21,9 +21,6 @@ import { parseJsonSafe } from '../lib/safe-json.js';
 
 // ==================== 常量 ====================
 
-/** variant 规则引入时刻（42.2.1 发布日）：此后写入的 emergency-fix 缺 variant 不再按 legacy 吸收 */
-export const LEGACY_VARIANT_CUTOFF = '2026-09-01T00:00:00Z';
-
 /**
  * R9 跨轮次评审不一致的档差阈值（A-3d 标准偏移）。
  *
@@ -52,10 +49,9 @@ export const REVIEW_LEVEL_ORDER: Record<string, number> = {
  * gateExitCode=0 的 gate 记录；缺失或未严格早于放行均 blocking（无时间戳豁免）。
  * 比较为毫秒精度：gate 时间戳须严格毫秒早于放行记录才充数；同毫秒（含无毫秒部分
  * 的秒级时间戳）不算早于。官方追加器强制毫秒递增，毫秒序为真实信息（DEC-3）。
- * 唯一例外是阶段 1 的 `check-checkpoint.ts`（D-6 自举豁免）：
- * 该脚本自身要求 run-log 中已存在 checkpoint 记录才可能 exit 0，故 `phase===1`
- * 时允许其记录晚于放行，但须早于下一放行（无下一放行时无上界）；其余四脚本与
- * `phase>=2` 的放行判据不变。
+ * 五门（含 check-checkpoint.ts）对全部阶段（含阶段 1）一律「严格早于放行」，
+ * 无任何例外——历史 D-6 阶段 1 后置窗口已删除（批次 6 legacy 清除：自然时序由
+ * R0 首阶段自举形态支撑，见 checkpoint-logic.ts；旧时序历史 run-log 直接 blocking）。
  */
 export const RUN_LOG_CLOSURE_SCRIPTS: readonly string[] = [
   'check-budget.ts',
@@ -138,10 +134,8 @@ export interface RunLogEntry {
   rtmDiff?: Record<string, unknown>;
   /** implementation fix/review/gate/R3 所针对的实现产物身份 */
   implementationTarget?: string;
-  // ---- fix/emergency-fix 变体标注（subagent-delegation.md「S 子代理修改既有产物的边界」）----
-  /** fix 变体标注：S-fix 用 "fix"，紧急修复通道用 "emergency-fix"（role=S 时建议必填，schema 仅对 emergency-fix 强制） */
-  variant?: 'fix' | 'emergency-fix';
-  /** emergency-fix 的阻塞原因描述（"为何走紧急通道"的审计说明，variant=emergency-fix 时必填） */
+  // ---- fix/emergency-fix 审计字段（subagent-delegation.md「S 子代理修改既有产物的边界」）----
+  /** emergency-fix 的阻塞原因描述（"为何走紧急通道"的审计说明，action=emergency-fix 时必填） */
   blocker?: string;
   /** fix/emergency-fix 修复位置（文件/区域），审计用 */
   fixedLocation?: string;
@@ -181,12 +175,12 @@ export type RunLogLifecycleStatus = 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_N
 export interface RunLogCheckResult {
   passed: boolean;
   violations: string[];
-  /** 生命周期 reducer 的非阻断诊断（legacy/pending 等状态，不改写 raw log）。 */
+  /** 生命周期 reducer 的非阻断诊断（pending 等状态，不改写 raw log）。 */
   diagnostics?: string[];
   /** 当前输入是否在无 blocking violation 且无 deferred diagnostic 的意义下闭合。 */
   lifecycleStatus: RunLogLifecycleStatus;
-  /** R10 revertEvidence 维度计数；legacy 保留兼容且严格模式固定为 0。 */
-  revertEvidence?: { checked: number; missing: number; legacy: number };
+  /** R10 revertEvidence 维度计数。 */
+  revertEvidence?: { checked: number; missing: number };
   /** R11 闭环五脚本核验计数（checkedGates=已核验的 checkpoint 放行数，missing=缺失/晚到记录数）；无 checkpoint 放行时不出现。 */
   closure?: { checkedGates: number; missing: number };
 }
@@ -381,11 +375,6 @@ function identityFieldValue(identity: LifecycleIdentity, field: string): unknown
   }
 }
 
-function identityMissingFields(identity: LifecycleIdentity): string[] {
-  const fields = ['phase', 'round', 'reportId', 'targetKind', 'basedOnReport', 'implementationTarget'];
-  return fields.filter((field) => identityFieldValue(identity, field) === null);
-}
-
 function entryIdentityMissingFields(entry: RunLogEntry): string[] {
   const identity = lifecycleIdentity(entry);
   const isRootcauseSegment =
@@ -411,71 +400,14 @@ function hasPassedGate(entry: RunLogEntry): boolean {
   );
 }
 
-const LIFECYCLE_IDENTITY_FIELDS = new Set([
-  'round',
-  'reportId',
-  'targetKind',
-  'basedOnReport',
-  'implementationTarget',
-  'target',
-]);
-
-/**
- * 统一 legacy schema 吸收谓词（审计修复 task 3 + review Important-1 修正）：
- *
- * variant 规则引入前的旧记录（未声明 variant 字段）按 LEGACY 吸收——缺失的
- * required 字段若 ⊆ LIFECYCLE_IDENTITY_FIELDS ∪ {variant, blocker}，则吸收为
- * diagnostic（LEGACY_VARIANT / LEGACY_UNSCOPED）而非 blocking。该并集使
- * 「双 legacy」行（phase-8 旧 emergency-fix 同时缺 identity 与 variant/blocker）
- * 也落入吸收，不再因两条谓词互斥而翻转为 blocking。
- *
- * 一旦 variant 已声明（'variant' in record）则仅容忍 identity 字段缺失
- * （与引入 variant 前的 isLegacySchemaFailure 行为一致）；已声明
- * emergency-fix 却缺 blocker、或 variant 值不符 const，属真实不一致，
- * 一律走 blocking [schema]（吸收不覆盖，fail-closed 方向不变）。
- */
-function isLegacySchemaFailure(raw: unknown, errorMessages: string[]): boolean {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
-  const action = (raw as { action?: unknown }).action;
-  if (typeof action !== 'string') return false;
-  const requiredFields = errorMessages
-    .map((message) => message.match(/required property '([^']+)'/)?.[1])
-    .filter((field): field is string => field !== undefined);
-  if (requiredFields.length === 0) return false;
-  const record = raw as Record<string, unknown>;
-  const tolerated =
-    'variant' in record ? LIFECYCLE_IDENTITY_FIELDS : new Set([...LIFECYCLE_IDENTITY_FIELDS, 'variant', 'blocker']);
-  if (requiredFields.some((field) => !tolerated.has(field))) return false;
-  return errorMessages.every(
-    (message) =>
-      /required property '[^']+'/.test(message) ||
-      message.includes('must match "then" schema') ||
-      message.includes('must match "if" schema'),
-  );
-}
-
-/** 记录是否为未声明 variant 的 emergency-fix（variant 规则引入前形态） */
-function isUndeclaredVariantEmergencyFix(raw: unknown): boolean {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
-  return (raw as { action?: unknown }).action === 'emergency-fix' && !('variant' in (raw as Record<string, unknown>));
-}
-
-/**
- * cutoff 分界（review2-fixes task 3 / A5）：未声明 variant 的 emergency-fix 且
- * timestamp 不早于 LEGACY_VARIANT_CUTOFF（variant 规则随 42.2.1 引入之后写入）
- * → 不再按 legacy 吸收，落入 blocking [schema]。timestamp 缺失/非法时视为
- * 非 post-cutoff（保守：维持既有吸收，不因分界引入新的误阻断）。
- */
-function isPostCutoffUndeclaredVariantEmergencyFix(raw: unknown): boolean {
-  if (!isUndeclaredVariantEmergencyFix(raw)) return false;
-  const ts = (raw as { timestamp?: unknown }).timestamp;
-  return typeof ts === 'string' && !Number.isNaN(Date.parse(ts)) && Date.parse(ts) >= Date.parse(LEGACY_VARIANT_CUTOFF);
-}
-
 /**
  * reworkHints 规则（audit-fixes task 4 / I-6）：review 族（review/iceberg-review）
  * passed=false 须带非空 reworkHints（schema allOf 同步强制）。判定含缺失与
  * present-but-empty 两种形态，与 schema `required` + `minItems: 1` 对齐。
+ *
+ * 该谓词仅用于 blocking 违规的分类命名（`[rework-hints]` 前缀）；历史 cutoff
+ * 吸收路径（非阻断 diagnostic 绕行）已删除——任何时刻缺非空 hints
+ * 均为真实不一致，blocking（fail-closed，无时间戳豁免）。
  */
 function isFailedReviewMissingReworkHints(raw: unknown): boolean {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
@@ -487,57 +419,15 @@ function isFailedReviewMissingReworkHints(raw: unknown): boolean {
 }
 
 /**
- * cutoff 分界（与 isPostCutoffUndeclaredVariantEmergencyFix 同型，复用
- * LEGACY_VARIANT_CUTOFF）：reworkHints 规则与 variant 规则同窗引入——cutoff
- * 前写入的失败 review 旧行按 LEGACY_REWORK_HINTS 非阻断 diagnostic 吸收；
- * cutoff 后属真实不一致，blocking。timestamp 缺失/非法时视为非 legacy
- * （保守：不吸收，宁可 blocking；passed=false 却无时间戳的行不构成可信旧证据）。
+ * [rework-hints] 分类命名与其他 schema 错误的区分：仅当该条目的全部 schema
+ * 错误都由 reworkHints 缺失（或 if/then 组合判定）引起时，才以 `[rework-hints]`
+ * 前缀报告；存在其他字段的真实类型/形态错误时回退通用 `[schema]` blocking。
  */
-function isLegacyMissingReworkHints(raw: RunLogEntry): boolean {
-  if (!isFailedReviewMissingReworkHints(raw)) return false;
-  const ts = Date.parse(raw.timestamp ?? '');
-  return Number.isFinite(ts) && ts < Date.parse(LEGACY_VARIANT_CUTOFF);
-}
-
-/**
- * C6（D-5 拷贝合一）：legacy 吸收判定中，从「其他 schema 错误」里排除的消息子串。
- * `isLegacyAbsorbableEntry` 与 `checkRunLog` 的 reworkHints 族承接分派共用同一份——
- * 两处被排除的消息集合必须逐字一致（否则同一记录在两门得到不同裁定）。
- */
-const LEGACY_ABSORB_EXCLUSIONS: readonly string[] = [
+const REWORK_HINTS_MESSAGE_EXCLUSIONS: readonly string[] = [
   'reworkHints',
   'must match "then" schema',
   'must match "if" schema',
 ];
-
-/**
- * 共享谓词（D-5）：该条目的 schema 失败是否属可吸收的 legacy 形态。
- * 与 checkRunLog 的两条吸收分支等价（reworkHints 族 + identity/variant 族），
- * 供 check-checkpoint 复用，消除「同一记录两门裁定不一致」。
- *
- * 净语义（规格 §5「同一条记录，两门对 blocking vs 非阻断的裁定必须相同」）：
- *   真 ⇔ checkRunLog 会吸收该条（不产生 [schema] blocking）。
- * 谓词为真只表示「不按 [schema] 阻断」——吸收方**承接动作不同**：
- *   - reworkHints 族（isFailedReviewMissingReworkHints 且其他 schema 错误为空/同为
- *     legacy 可容忍，且 cutoff 前写入）→ 以 LEGACY_REWORK_HINTS 诊断吸收；
- *   - 其余 → 以身份/variant 族（LEGACY_VARIANT 等）诊断吸收。
- * 消费方按 `isFailedReviewMissingReworkHints(raw)` 分派承接动作即可：谓词为真且该族
- * 成立时，必是上表第一行（此时谓词取值即 isLegacyMissingReworkHints）。
- *
- * errorMessages 须为该条目经 run-log schema 校验得到的原始消息（validateBySchema
- * 的 errorMessages）；schema 通过（无消息）时谓词恒为假（无 schema 失败可吸收）。
- */
-export function isLegacyAbsorbableEntry(raw: unknown, errorMessages: string[]): boolean {
-  if (isFailedReviewMissingReworkHints(raw)) {
-    const otherMessages = errorMessages.filter(
-      (message) => !LEGACY_ABSORB_EXCLUSIONS.some((exclusion) => message.includes(exclusion)),
-    );
-    if (otherMessages.length === 0 || isLegacySchemaFailure(raw, otherMessages)) {
-      return isLegacyMissingReworkHints(raw as RunLogEntry);
-    }
-  }
-  return isLegacySchemaFailure(raw, errorMessages) && !isPostCutoffUndeclaredVariantEmergencyFix(raw);
-}
 
 /**
  * R10 判定：fix/emergency-fix 记录是否携带合法 revertEvidence.command（非空字符串）。
@@ -735,19 +625,7 @@ function checkTimestampOrdering(
               !candidate.artifacts.includes(candidateIdentity.implementationTarget ?? ''))
           );
         });
-        const hasDeferredFix = valid.slice(rootReviewIndex + 1).some((candidate) => {
-          if (!['fix', 'emergency-fix'].includes(candidate.action)) return false;
-          const candidateIdentity = lifecycleIdentity(candidate);
-          return (
-            candidateIdentity.phase === rootIdentity.phase &&
-            candidateIdentity.round === rootIdentity.round &&
-            candidateIdentity.basedOnReport === rootIdentity.reportId &&
-            !completeImplementationIdentity(candidate)
-          );
-        });
-        if (hasDeferredFix) {
-          diagnostics.push(`LEGACY_UNSCOPED: rootcause ${curEntry.reportId} exact fix identity incomplete; deferred`);
-        } else if (hasNonExactFix) {
+        if (hasNonExactFix) {
           violations.push(`R7: rootcause ${curEntry.reportId} exact fix target/artifacts/reportId relation mismatch`);
         } else {
           violations.push(`R7: rootcause ${curEntry.reportId} 同身份缺 exact basedOnReport fix`);
@@ -973,7 +851,7 @@ function checkTrajectoryTemplate(
  */
 function checkRevertEvidence(valid: RunLogEntry[]): {
   violations: string[];
-  counts: { checked: number; missing: number; legacy: number };
+  counts: { checked: number; missing: number };
 } {
   const violations: string[] = [];
 
@@ -985,7 +863,7 @@ function checkRevertEvidence(valid: RunLogEntry[]): {
   // 载体存在与形态）。
   //
   // timestamp 仅为日志元数据，不参与证据信任判定；缺失/非法声明始终 blocking。
-  const r10Counts = { checked: 0, missing: 0, legacy: 0 };
+  const r10Counts = { checked: 0, missing: 0 };
   for (const e of valid) {
     if (!['fix', 'emergency-fix'].includes(e.action)) continue;
     r10Counts.checked++;
@@ -1023,23 +901,11 @@ function checkClosureReleases(valid: RunLogEntry[]): {
   // 不算早于——官方追加器强制毫秒递增，毫秒序为真实信息（DEC-3）。缺失即
   // blocking 并指明阶段与脚本名。同一阶段多次放行逐个核验（不合并）。
   //
-  // D-6 阶段 1 后置窗口（**历史日志兼容形态**——E-2 方案 B 落地后的重定性，判据零变化）：
-  // `phase===1` 的 `check-checkpoint.ts` 允许落在后置窗口 (releaseAt, nextReleaseAt)：
-  // nextReleaseAt 取全部阶段中时间戳严格晚于本放行的最早一条放行记录，不存在下一放行时
-  // 无上界（只要求晚于本放行）。后置窗口是**增补**而非替换——早于放行的同脚本记录照旧
-  // 充数（既有 run-log 不受影响）；窗口只放宽时间轴，记录仍须属本阶段（phase 相同）。
-  // 其余四脚本与 phase>=2 的放行判据完全不变。
-  // 定性沿革：本窗口合入时（D-6，2026-09-21）用于绕开「check-checkpoint 自身要求 run-log
-  // 已有放行记录才可能 exit 0」与 R11 严格早于判据的首阶段自举死锁（先跑门则门红，先放行
-  // 则 R11 红）。E-2 方案 B（2026-09-22 规格修正案，R0 首阶段自举形态：run-log 零放行记录
-  // 时以 checkpoint-log 用户确认为初级证据，见 checkpoint-logic.ts）使自然时序「确认落盘 →
-  // 闭环五门 → 最后写放行记录」合法——新建项目常态满足上方严格判据，不再产生后置形态；
-  // 本窗口仅保留用于兼容以旧时序写入的历史 run-log（删除会使其变红）。注意：后置形态仍
-  // 违反 R8 轨迹模板（R8 零改动，后置记录照常报 R8 三条），新建项目不应产生该形态。
-  const releaseTimes = valid
-    .filter((e) => e.action === 'checkpoint' && e.outcome === 'success')
-    .map((e) => Date.parse(e.timestamp))
-    .sort((a, b) => a - b);
+  // 五门（含 check-checkpoint.ts）一律「严格早于放行」，无任何阶段/脚本例外——
+  // 历史 D-6「phase===1 的 check-checkpoint.ts 后置窗口」（2026-09-21 引入的
+  // 历史日志兼容形态）已随批次 6 legacy 清除删除：自然时序「确认落盘 → 闭环五门 →
+  // 最后写放行记录」（R0 首阶段自举形态，checkpoint-logic.ts）下新建项目常态满足
+  // 严格判据；以旧时序写入的历史 run-log 直接 R11 blocking（毁弃存量数据，不兼容）。
   const closureReleases: Array<{ phase: number; proven: Set<string> }> = [];
   let closureMissingCount = 0;
   for (const e of valid) {
@@ -1051,13 +917,6 @@ function checkClosureReleases(valid: RunLogEntry[]): {
       if (g.gateExitCode !== 0) continue;
       if (typeof g.script !== 'string' || !RUN_LOG_CLOSURE_SCRIPTS.includes(g.script)) continue;
       const gateAt = Date.parse(g.timestamp);
-      if (g.script === 'check-checkpoint.ts' && e.phase === 1) {
-        const nextReleaseAt = releaseTimes.find((t) => t > releaseAt);
-        if (gateAt < releaseAt || (gateAt > releaseAt && (nextReleaseAt === undefined || gateAt < nextReleaseAt))) {
-          proven.add(g.script);
-        }
-        continue;
-      }
       if (gateAt < releaseAt) proven.add(g.script);
     }
     closureReleases.push({ phase: e.phase, proven });
@@ -1110,58 +969,22 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     const schemaResult = validateBySchema('run-log', raw);
     if (!schemaResult.valid) {
       // reworkHints 规则（audit-fixes task 4 / I-6）：review 族 passed=false 缺非空
-      // reworkHints 按 LEGACY_VARIANT_CUTOFF 分界——cutoff 前旧行 LEGACY_REWORK_HINTS
-      // 诊断吸收，cutoff 后 [rework-hints] blocking。仅当其余 schema 错误为空或全部
-      // 为 identity/variant legacy 可容忍时才分派；存在真实类型错误则回退通用
-      // [schema] blocking（不吞错，fail-closed 方向不变）。
-      // D-5：吸收判定统一走共享谓词 isLegacyAbsorbableEntry（与 check-checkpoint 同谓词，
-      // 消除两门对同一条记录的裁定差异）；本块只负责 reworkHints 族的承接动作分派
-      // （absorb → LEGACY_REWORK_HINTS 诊断 / 不 absorb → [rework-hints] blocking）。
+      // reworkHints → blocking `[rework-hints]`（分类命名；仅当全部 schema 错误都由
+      // reworkHints 缺失引起时使用该前缀，存在其他字段的真实错误则回退通用 [schema]）。
+      // 历史 cutoff 吸收路径（非阻断 diagnostic 绕行）与 identity/variant 族
+      // legacy 吸收均已删除（批次 6 A3/C14）：旧形态一律 fail-closed。
       if (isFailedReviewMissingReworkHints(raw)) {
         const otherMessages = schemaResult.errorMessages.filter(
-          (message) => !LEGACY_ABSORB_EXCLUSIONS.some((exclusion) => message.includes(exclusion)),
+          (message) => !REWORK_HINTS_MESSAGE_EXCLUSIONS.some((exclusion) => message.includes(exclusion)),
         );
-        if (otherMessages.length === 0 || isLegacySchemaFailure(raw, otherMessages)) {
-          if (isLegacyAbsorbableEntry(raw, schemaResult.errorMessages)) {
-            const withoutHints = Object.fromEntries(
-              Object.entries(raw as Record<string, unknown>).filter(([field]) => field !== 'reworkHints'),
-            );
-            valid.push(withoutHints as unknown as RunLogEntry);
-            diagnostics.push(
-              `LEGACY_REWORK_HINTS: ${(raw as { action?: string }).action} 条目 ${i + 1} passed=false 缺非空 reworkHints（variant 规则同窗前的旧记录）; deferred`,
-            );
-            continue;
-          }
+        if (otherMessages.length === 0) {
           violations.push(
             `[rework-hints] 条目 ${i + 1} ${(raw as { action?: string }).action} passed=false 须带非空 reworkHints`,
           );
           continue;
         }
       }
-      // D-5：身份/variant 族吸收判定同样走共享谓词（承接动作不变：
-      // LEGACY_VARIANT 诊断 + 裁剪缺失 required 字段后按 legacy 行继续消费）。
-      if (isLegacyAbsorbableEntry(raw, schemaResult.errorMessages)) {
-        const missingFields = schemaResult.errorMessages
-          .map((message) => message.match(/required property '([^']+)'/)?.[1])
-          .filter((field): field is string => field !== undefined);
-        const withoutIdentity = Object.fromEntries(
-          Object.entries(raw as Record<string, unknown>).filter(([field]) => !missingFields.includes(field)),
-        );
-        valid.push(withoutIdentity as unknown as RunLogEntry);
-        // variant 规则引入前形态（未声明 variant）的 emergency-fix：缺失的
-        // variant/blocker（可能连同 identity 字段）以 LEGACY_VARIANT 明示；
-        // identity 缺失部分随后由 LEGACY_UNSCOPED 循环补充说明。
-        if (
-          isUndeclaredVariantEmergencyFix(raw) &&
-          (missingFields.includes('variant') || missingFields.includes('blocker'))
-        ) {
-          diagnostics.push(
-            `LEGACY_VARIANT: emergency-fix 条目 ${i + 1} 缺 required ${missingFields.join(', ')}（variant 规则引入前的旧记录）; deferred`,
-          );
-        }
-        continue;
-      }
-      // schema 拒绝：记录 [schema] 前缀违规并跳过该条
+      // schema 拒绝：记录 [schema] 前缀违规并跳过该条（无任何吸收/容忍）。
       for (const m of schemaResult.errorMessages) {
         violations.push(`条目 ${i + 1} [schema] ${m}`);
       }
@@ -1183,19 +1006,6 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       continue;
     }
     valid.push(e as RunLogEntry);
-  }
-
-  // Missing lifecycle identity is observable and deferred, never inferred from
-  // neighboring rows. This preserves legacy raw records while making their
-  // scope limitation explicit to both logic and CLI consumers.
-  for (const entry of valid) {
-    if (!['rootcause', 'review', 'gate', 'fix', 'emergency-fix', ...R3_ACTIONS].includes(entry.action)) continue;
-    const missing = entryIdentityMissingFields(entry);
-    if (missing.length > 0) {
-      diagnostics.push(
-        `LEGACY_UNSCOPED: ${entry.action} ${entry.runId} identity missing ${missing.join(', ')}; deferred`,
-      );
-    }
   }
 
   // action-role 配对强制（审计修复 task 3）：对每条 schema-valid 记录，
@@ -1295,12 +1105,9 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
 
   for (const rootcause of rootcauseActions) {
     const identity = lifecycleIdentity(rootcause);
-    if (!completeRootcauseIdentity(identity)) {
-      diagnostics.push(
-        `LEGACY_UNSCOPED: rootcause ${rootcause.runId} identity missing ${entryIdentityMissingFields(rootcause).join(', ') || 'unknown'}; deferred`,
-      );
-      continue;
-    }
+    // 不完整身份的 rootcause 不参与 lifecycle 配对（无身份即无 scope；
+    // 历史 deferred 诊断绕行已删除——phase 8 的此类行已被 schema 拦截）。
+    if (!completeRootcauseIdentity(identity)) continue;
     const key = lifecycleKey(identity);
     if (!rootcauseReports.has(key)) rootcauseReports.set(key, rootcause);
   }
@@ -1455,13 +1262,6 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
         );
         continue;
       }
-      const legacyPhase8 = phase === 8 && !strictForFix;
-      if (legacyPhase8) {
-        diagnostics.push(
-          `LEGACY_UNSCOPED: ${fixSegment.entry.action} ${fixSegment.entry.runId} R3/implementation credit deferred`,
-        );
-        continue;
-      }
       let vIndex = -1;
       for (let j = i + 1; j < entryList.length; j++) {
         const candidate = entryList.at(j)!.entry;
@@ -1480,13 +1280,11 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
         }
       }
       if (vIndex < 0) {
-        if (strictForFix && completeImplementationIdentity(fixSegment.entry)) {
+        // strictForFix（isStrictLifecycleEntry）对 fix 条目已蕴含 completeImplementationIdentity，
+        // 故无第三分支：非严格条目（历史轮次形态）走通用 R3 窗口违规（fail-closed）。
+        if (strictForFix) {
           violations.push(
             `R3 记录校验失败：阶段 ${phase} fix ${fixSegment.entry.runId} (${fixIdentity.basedOnReport}) 缺同身份 implementation V，R3 窗口未闭合`,
-          );
-        } else if (strictForFix) {
-          diagnostics.push(
-            `LEGACY_UNSCOPED: fix ${fixSegment.entry.runId} R3/implementation V identity missing ${identityMissingFields(fixIdentity).join(', ') || 'unknown'}; deferred`,
           );
         } else {
           violations.push(

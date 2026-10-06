@@ -52,21 +52,21 @@ describe('run-log R1 扩展：rootcause/fix 动作字段', () => {
         mutate: (l) => (l.action === 'rootcause' ? { ...l, reportId: undefined } : l),
         checkPassed: true,
         scope: 'violations',
-        marker: /R1.*rootcause.*reportId/,
+        marker: /\[schema\].*reportId/,
       },
       {
         label: 'rootcause 动作缺 rootCauseCategory',
         mutate: (l) => (l.action === 'rootcause' ? { ...l, rootCauseCategory: undefined } : l),
         checkPassed: true,
         scope: 'violations',
-        marker: /R1.*rootcause.*rootCauseCategory|\[schema\].*rootCauseCategory/,
+        marker: /\[schema\].*rootCauseCategory/,
       },
       {
         label: 'fix 动作缺 basedOnReport',
         mutate: (l) => (l.action === 'fix' ? { ...l, basedOnReport: undefined } : l),
-        checkPassed: false,
-        scope: 'diagnostics',
-        marker: /LEGACY_UNSCOPED.*basedOnReport/,
+        checkPassed: true,
+        scope: 'violations',
+        marker: /\[schema\].*basedOnReport/,
       },
     ];
     for (const c of cases) {
@@ -240,7 +240,6 @@ describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3', () => {
         outcome: 'success',
         basedOnReport: 'RC-R8',
         artifacts: ['test-artifact'],
-        variant: 'emergency-fix',
         blocker: '构建失败阻塞当前阶段推进',
       },
       {
@@ -359,7 +358,6 @@ describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3', () => {
         outcome: 'success',
         basedOnReport: 'RC-R8',
         artifacts: ['test-artifact'],
-        variant: 'emergency-fix',
         blocker: '构建失败阻塞当前阶段推进',
       },
       {
@@ -1334,7 +1332,7 @@ describe('D8 lifecycle identity reducer', () => {
     expect(result.violations.some((reason) => /fix f-a.*缺同身份 implementation G/.test(reason))).toBe(true);
   });
 
-  it('emits LEGACY_UNSCOPED diagnostics when lifecycle identity fields are missing', () => {
+  it('phase-8 行缺 lifecycle identity → [schema] blocking（不再诊断绕行）', () => {
     const entries = [
       makeEntry({
         action: 'fix',
@@ -1356,31 +1354,28 @@ describe('D8 lifecycle identity reducer', () => {
       }),
     ];
     const result = checkRunLog(entries);
-    expect(
-      (result as unknown as { diagnostics?: string[] }).diagnostics?.some((d) => /LEGACY_UNSCOPED|deferred/i.test(d)),
-    ).toBe(true);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => v.includes('[schema]'))).toBe(true);
+    expect(result.diagnostics, '诊断绕行不复存在').toBeUndefined();
   });
 
-  it('defers the raw legacy fix without exact identity blocking or lifecycle credit', async () => {
+  it('raw 旧形态 fixture（phase-8 缺 identity）→ 一律 [schema] blocking（毁弃存量数据）', async () => {
     const entries = (await fs.readFile(identity2FixturePath, 'utf8'))
       .trim()
       .split(/\r?\n/)
       .filter(Boolean)
       .map((line) => JSON.parse(line)) as RunLogEntry[];
     const result = checkRunLog(entries);
-    const diagnostics = result.diagnostics ?? [];
 
-    expect(result.passed).toBe(true);
-    expect(result.violations.some((reason) => /exact fix identity incomplete/.test(reason))).toBe(false);
-    expect(result.violations.some((reason) => /RC-phase8-10-01.*implementation V|同身份 R3/.test(reason))).toBe(false);
+    expect(result.passed, '旧形态 raw 记录不再吸收放行').toBe(false);
+    expect(result.violations.some((v) => v.includes('[schema]'))).toBe(true);
+    // 曾以 LEGACY 诊断吸收的 RC-phase8-10-01-sfix 行（缺 targetKind/implementationTarget）
+    // 现按 schema additionalProperties/required 拦截
     expect(
-      diagnostics.some((diagnostic) =>
-        /LEGACY_UNSCOPED: fix RC-phase8-10-01-sfix-20260822033128000 identity missing targetKind, implementationTarget; deferred/.test(
-          diagnostic,
-        ),
-      ),
+      result.violations.some((v) => v.includes('[schema]') && (v.includes('targetKind') || v.includes('round'))),
+      '缺 identity 的 phase-8 行被 schema 拦截',
     ).toBe(true);
-    expect(diagnostics.some((diagnostic) => /pending-pre-approval: RC-phase8-2-02/.test(diagnostic))).toBe(true);
+    expect(result.diagnostics, 'LEGACY 吸收诊断不复存在').toBeUndefined();
   });
 
   it('keeps the committed fixture byte/hash contract independent of raw state', async () => {
@@ -1498,9 +1493,7 @@ describe('D8 lifecycle identity reducer', () => {
       implementationGate('g-impl', 'RC-A'),
     ]);
     expect(result.passed).toBe(false);
-    expect(result.diagnostics?.some((diagnostic) => /LEGACY_UNSCOPED.*implementationTarget/.test(diagnostic))).toBe(
-      true,
-    );
+    expect(result.violations.some((v) => v.includes('[schema]') && v.includes('implementationTarget'))).toBe(true);
   });
 
   it('rejects failed R3 evidence even when all three dimensions are present', () => {
@@ -1540,7 +1533,7 @@ describe('D8 lifecycle identity reducer', () => {
     expect(result.violations.some((reason) => /R3 记录校验失败|duplicate|恰好一条/i.test(reason))).toBe(true);
   });
 
-  it('does not let a missing-identity legacy fix satisfy a strict phase 8 lifecycle', () => {
+  it('phase-8 fix 缺 identity → [schema] blocking，不得满足严格 lifecycle（不再 diagnostic-only）', () => {
     const legacyFix = makeEntry({
       runId: 'f-legacy',
       phase: 8,
@@ -1558,10 +1551,9 @@ describe('D8 lifecycle identity reducer', () => {
       rootCauseGate('g-a', 'RC-A'),
       legacyFix,
     ]);
-    expect(result.passed).toBe(true);
-    expect(result.violations.some((reason) => /open-approved-lifecycle|exact.*fix|identity/i.test(reason))).toBe(false);
-    expect(result.diagnostics?.some((diagnostic) => /LEGACY_UNSCOPED/.test(diagnostic))).toBe(true);
-    expect(result.diagnostics?.some((diagnostic) => /deferred/.test(diagnostic))).toBe(true);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => v.includes('[schema]') && v.includes('targetKind'))).toBe(true);
+    expect(result.diagnostics, '诊断绕行不复存在').toBeUndefined();
   });
 
   it('rejects an implementationTarget with the wrong schema type', () => {
@@ -1783,7 +1775,7 @@ describe('D8 lifecycle identity reducer', () => {
     expect(result.violations.some((reason) => /R8.*阶段 7.*轨迹顺序倒置/.test(reason))).toBe(true);
   });
 
-  it('keeps an incomplete legacy fix diagnostic-only instead of granting lifecycle credit', () => {
+  it('phase-8 缺 identity 的 fix 与 r3 行 → [schema] blocking（不再 diagnostic-only 绕行）', () => {
     const legacyFix = makeEntry({
       runId: 'legacy-fix-only',
       phase: 8,
@@ -1825,11 +1817,9 @@ describe('D8 lifecycle identity reducer', () => {
         passed: true,
       }),
     ]);
+    expect(result.passed, '旧形态 phase-8 行不再诊断放行').toBe(false);
+    expect(result.violations.some((v) => v.includes('[schema]'))).toBe(true);
     expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
-    expect(result.diagnostics?.some((diagnostic) => /LEGACY_UNSCOPED.*legacy-fix-only/.test(diagnostic))).toBe(true);
-    expect(
-      result.diagnostics?.some((diagnostic) => /LEGACY_UNSCOPED.*legacy-fix-only.*credit deferred/.test(diagnostic)),
-    ).toBe(true);
   });
 
   it('does not skip a complete phase-8 legacy segment when an unrelated strict segment shares phase 8', () => {
@@ -1940,7 +1930,7 @@ describe('D8 lifecycle identity reducer', () => {
     expect(result.violations.some((reason) => /R8.*V\(review\) 失败.*直接 S/.test(reason))).toBe(true);
   });
 
-  it('does not let phase-8 identity-incomplete evidence cover a legacy rootcause report', () => {
+  it('phase-8 identity-incomplete 证据不再覆盖 legacy rootcause 报告（整体 [schema] blocking）', () => {
     const legacyRoot = rootCause('legacy-root', 'RC-LEGACY');
     delete legacyRoot.round;
     const legacyRootReview = rootCauseReview('legacy-root-v', 'RC-LEGACY');
@@ -1990,8 +1980,12 @@ describe('D8 lifecycle identity reducer', () => {
         passed: true,
       }),
     ]);
+    // 缺 round 的 phase-8 行全部被 schema 拦截：不进入 lifecycle 聚合，
+    // 既无「RC-LEGACY 无对应 fix」误报，也无 LEGACY 诊断绕行。
     expect(result.violations.some((reason) => /RC-LEGACY.*无对应 fix/.test(reason))).toBe(false);
-    expect(result.diagnostics?.some((diagnostic) => /LEGACY_UNSCOPED.*deferred/.test(diagnostic))).toBe(true);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => v.includes('[schema]'))).toBe(true);
+    expect(result.diagnostics, 'LEGACY 吸收诊断不复存在').toBeUndefined();
   });
 });
 
@@ -2031,6 +2025,7 @@ describe('run-log action-role 配对（blocking，logic 层强制）', () => {
       role,
       outcome: 'success',
       gateExitCode: null,
+      ...(action === 'emergency-fix' ? { blocker: '测试用阻塞说明' } : {}),
     });
 
   const pairingViolation = (result: { violations: string[] }, action: string): string | undefined =>
@@ -2129,11 +2124,12 @@ describe('run-log action-role 配对（blocking，logic 层强制）', () => {
 });
 
 /**
- * 审计修复（audit-gate-closure task 3）：schema 对 emergency-fix 强制
- * variant=emergency-fix + blocker；旧记录（无 variant）经 LEGACY 吸收为 diagnostic。
+ * 批次 6 A3/C14：variant 字段已从 run-log schema/类型/fixtures 删除——emergency-fix
+ * 的紧急通道由 `blocker` 非空（schema allOf 强制）单独承载；旧记录携带 variant 字段
+ * 或缺 blocker 一律 [schema] blocking（毁弃存量数据，无 LEGACY 吸收绕行）。
  */
-describe('run-log emergency-fix variant 语义', () => {
-  it('带 variant=emergency-fix + blocker 的 emergency-fix 记录 schema-valid 且无 [schema] violation', () => {
+describe('run-log emergency-fix blocker 语义（variant 字段已删除）', () => {
+  it('emergency-fix + blocker → schema-valid 且无 [schema] violation', () => {
     const entry: RunLogEntry = makeEntry({
       runId: 'em-valid',
       phase: 5,
@@ -2143,7 +2139,6 @@ describe('run-log emergency-fix variant 语义', () => {
       basedOnReport: 'RC-TEST',
       artifacts: ['test-artifact'],
       revertEvidence: { command: 'npm run reproduce-failure' },
-      variant: 'emergency-fix',
       blocker: '构建阻塞当前阶段推进',
       fixedLocation: 'w-model-dev/scripts/cli/check-run-log.ts',
       fixBasedOn: 'S-self-assessment',
@@ -2152,7 +2147,7 @@ describe('run-log emergency-fix variant 语义', () => {
     expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(false);
   });
 
-  it('无 variant 的旧 emergency-fix 记录 → LEGACY diagnostic 而非 blocking [schema]', () => {
+  it('emergency-fix 缺 blocker → [schema] blocking（旧「无 variant 旧行 LEGACY 吸收」已删除）', () => {
     const entry: RunLogEntry = makeEntry({
       runId: 'em-legacy',
       phase: 5,
@@ -2163,14 +2158,14 @@ describe('run-log emergency-fix variant 语义', () => {
       artifacts: ['test-artifact'],
     });
     const result = checkRunLog([entry]);
-    expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(false);
-    expect(result.diagnostics?.some((d) => /LEGACY_VARIANT/.test(d))).toBe(true);
-    expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => /\[schema\].*blocker/.test(v))).toBe(true);
+    expect(result.diagnostics, 'LEGACY 吸收诊断不复存在').toBeUndefined();
   });
 
-  it('已声明 variant 却缺 blocker → blocking（2 态：phase5 / phase8 带完整 identity）', () => {
+  it('emergency-fix 缺 blocker → blocking（2 态：phase5 / phase8 带完整 identity）', () => {
     const cases: [string, Partial<RunLogEntry>][] = [
-      ['phase5 缺 blocker（声明了紧急通道却无阻塞原因）', { runId: 'em-no-blocker', phase: 5 }],
+      ['phase5 缺 blocker（走紧急通道却无阻塞原因）', { runId: 'em-no-blocker', phase: 5 }],
       [
         'phase8 带 identity 缺 blocker（fail-closed 方向不变）',
         {
@@ -2191,7 +2186,6 @@ describe('run-log emergency-fix variant 语义', () => {
         outcome: 'success',
         basedOnReport: 'RC-TEST',
         artifacts: ['test-artifact'],
-        variant: 'emergency-fix',
         ...overrides,
       });
       const result = checkRunLog([entry]);
@@ -2203,10 +2197,7 @@ describe('run-log emergency-fix variant 语义', () => {
     }
   });
 
-  it('双 legacy（phase-8 缺 identity + 缺 variant/blocker）→ LEGACY 吸收：非 blocking + NOT_CLOSED + LEGACY_VARIANT/LEGACY_UNSCOPED', () => {
-    // review Important-1 修正：两条 legacy 谓词并集吸收——此类行在任务前是
-    // identity-legacy 吸收（LEGACY_UNSCOPED、exit 0 + NOT_CLOSED），
-    // 不得因 variant 规则引入而翻转为 [schema] blocking。
+  it('双旧形态（phase-8 缺 identity + 缺 blocker）→ [schema] blocking（不再是 LEGACY 吸收）', () => {
     const entry: RunLogEntry = makeEntry({
       runId: 'em-double-legacy',
       phase: 8,
@@ -2216,49 +2207,39 @@ describe('run-log emergency-fix variant 语义', () => {
       basedOnReport: 'RC-TEST',
       artifacts: ['test-artifact'],
       revertEvidence: { command: 'npm run reproduce-failure' },
-      // 故意缺 round/reportId/targetKind（identity）+ variant/blocker
+      // 故意缺 round/reportId/targetKind（identity）+ blocker
     });
     const result = checkRunLog([entry]);
-    expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(false);
-    expect(result.passed).toBe(true); // logic 无 blocking → CLI exit 0
-    expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
-    // LEGACY_VARIANT 明示缺 variant/blocker（含 identity 缺失字段清单）
-    const variantDiag = result.diagnostics?.find((d) => /LEGACY_VARIANT/.test(d));
-    expect(variantDiag).toBeDefined();
-    expect(variantDiag).toMatch(/variant/);
-    // identity 缺失部分由 LEGACY_UNSCOPED 循环补充说明
-    expect(result.diagnostics?.some((d) => /LEGACY_UNSCOPED/.test(d) && d.includes('identity missing'))).toBe(true);
+    expect(result.passed, '旧形态一律 fail-closed').toBe(false);
+    expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(true);
+    expect(result.diagnostics, 'LEGACY 吸收诊断不复存在').toBeUndefined();
   });
 
-  it('已声明 variant=emergency-fix + blocker 但缺 identity（phase-8）→ 仍按 identity-legacy 吸收，不翻转 blocking', () => {
-    const entry: RunLogEntry = makeEntry({
-      runId: 'em-declared-no-identity',
-      phase: 8,
-      action: 'emergency-fix',
-      role: 'S',
-      outcome: 'success',
-      basedOnReport: 'RC-TEST',
-      artifacts: ['test-artifact'],
+  it('emergency-fix 携带 variant 字段 → schema additionalProperties 拒绝（字段已删除）', () => {
+    const entry = {
+      ...makeEntry({
+        runId: 'em-with-variant',
+        phase: 5,
+        action: 'emergency-fix',
+        role: 'S',
+        outcome: 'success',
+        basedOnReport: 'RC-TEST',
+        artifacts: ['test-artifact'],
+        blocker: '构建失败阻塞当前阶段推进',
+      }),
       variant: 'emergency-fix',
-      blocker: '构建失败阻塞当前阶段推进',
-      revertEvidence: { command: 'npm run reproduce-failure' },
-      // 故意缺 round/reportId/targetKind
-    });
+    } as unknown as RunLogEntry;
     const result = checkRunLog([entry]);
-    expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(false);
-    expect(result.passed).toBe(true);
-    expect(result.lifecycleStatus).toBe('NOT_CLOSED_NOT_PROVEN');
-    expect(result.diagnostics?.some((d) => /LEGACY_UNSCOPED/.test(d) && d.includes('identity missing'))).toBe(true);
-    expect(result.diagnostics?.some((d) => /LEGACY_VARIANT/.test(d))).toBe(false);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => v.includes('[schema]') && v.includes('variant'))).toBe(true);
   });
 });
 
 /**
- * review2-fixes task 3（A5）：LEGACY_VARIANT 吸收以 LEGACY_VARIANT_CUTOFF
- * （2026-09-01T00:00:00Z，variant 规则随 42.2.1 发布）为分界——此后写入的
- * emergency-fix 缺 variant 属真实不一致，blocking [schema]，不再按 legacy 吸收。
+ * 批次 6 A3/C14：cutoff 时间分界已随 legacy 吸收机器删除——旧形态 emergency-fix
+ * 缺 blocker 不再按写入时间区分吸收/阻断，任何时间戳一律 [schema] blocking。
  */
-describe('run-log LEGACY_VARIANT cutoff 分界', () => {
+describe('run-log emergency-fix 无历史时间分界（cutoff 分界已删除）', () => {
   const baseEmergencyFix: Partial<RunLogEntry> = {
     phase: 5,
     action: 'emergency-fix',
@@ -2266,23 +2247,13 @@ describe('run-log LEGACY_VARIANT cutoff 分界', () => {
     outcome: 'success',
     basedOnReport: 'RC-TEST',
     artifacts: ['test-artifact'],
-    // 缺 variant/blocker（两条用例同形，仅 timestamp 跨 cutoff）
+    // 缺 blocker（两条用例同形，仅 timestamp 不同）
   };
 
-  it('LEGACY_VARIANT cutoff 分界（2 态：cutoff 后 blocking / cutoff 前 LEGACY 吸收）', () => {
+  it('emergency-fix 缺 blocker：任意时间戳一律 blocking（2 态：2026-09-02 / 2026-08-31）', () => {
     const cases = [
-      {
-        label: 'cutoff 后（2026-09-02）缺 variant',
-        runId: 'em-post-cutoff',
-        timestamp: '2026-09-02T00:00:00.000Z',
-        blocking: true,
-      },
-      {
-        label: 'cutoff 前（2026-08-31）缺 variant',
-        runId: 'em-pre-cutoff',
-        timestamp: '2026-08-31T00:00:00.000Z',
-        blocking: false,
-      },
+      { label: '2026-09-02 缺 blocker', runId: 'em-post-cutoff', timestamp: '2026-09-02T00:00:00.000Z' },
+      { label: '2026-08-31 缺 blocker', runId: 'em-pre-cutoff', timestamp: '2026-08-31T00:00:00.000Z' },
     ];
     for (const c of cases) {
       const entry: RunLogEntry = makeEntry({
@@ -2293,28 +2264,21 @@ describe('run-log LEGACY_VARIANT cutoff 分界', () => {
       const result = checkRunLog([entry]);
       expect(
         result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]')),
-        `${c.label} [schema] violation 判定`,
-      ).toBe(c.blocking);
-      expect(
-        result.diagnostics?.some((d) => /LEGACY_VARIANT/.test(d)) ?? false,
-        `${c.label} LEGACY_VARIANT 吸收判定`,
-      ).toBe(!c.blocking);
-      if (c.blocking) {
-        expect(result.passed, `${c.label} 应 blocking`).toBe(false);
-      } else {
-        expect(result.lifecycleStatus, `${c.label} lifecycle`).toBe('NOT_CLOSED_NOT_PROVEN');
-      }
+        `${c.label} [schema] blocking`,
+      ).toBe(true);
+      expect(result.passed, `${c.label} 应 blocking`).toBe(false);
+      expect(result.diagnostics, `${c.label} 无吸收诊断`).toBeUndefined();
     }
   });
 });
 
 /**
  * audit-fixes task 4（I-6 / F-G4-01）：review 族（review/iceberg-review）passed=false
- * 强制非空 reworkHints。schema allOf 强制 + logic 按 LEGACY_VARIANT_CUTOFF
- * （2026-09-01T00:00:00Z，与 variant 规则同窗）分界：cutoff 前失败 review 旧行按
- * LEGACY_REWORK_HINTS 非阻断 diagnostic 吸收，cutoff 后属真实不一致 blocking。
+ * 强制非空 reworkHints。schema allOf 强制 + logic `[rework-hints]` blocking（分类命名：
+ * 仅当全部 schema 错误都由 reworkHints 缺失引起时用该前缀）。批次 6 A3/C14：历史
+ * cutoff 吸收路径已删除——任何时间戳写入的失败 review 旧行一律 blocking，无诊断绕行。
  */
-describe('run-log reworkHints 强制（LEGACY_REWORK_HINTS cutoff 分界）', () => {
+describe('run-log reworkHints 强制（无历史吸收）', () => {
   const failedReview = (overrides: Partial<RunLogEntry>): RunLogEntry =>
     makeEntry({
       runId: 'review-fail',
@@ -2325,35 +2289,19 @@ describe('run-log reworkHints 强制（LEGACY_REWORK_HINTS cutoff 分界）', ()
       ...overrides,
     });
 
-  it('reworkHints cutoff 分界（2 态：cutoff 后 blocking / cutoff 前 LEGACY 吸收）', () => {
+  it('passed=false 缺非空 reworkHints：任意时间戳一律 blocking（2 态）', () => {
     const cases = [
-      { label: 'cutoff 后 review passed=false 无 reworkHints', timestamp: '2026-09-02T00:00:00.000Z', blocking: true },
-      { label: 'cutoff 前 review passed=false 无 reworkHints', timestamp: '2026-08-01T00:00:00.000Z', blocking: false },
+      { label: '2026-09-02 review passed=false 无 reworkHints', timestamp: '2026-09-02T00:00:00.000Z' },
+      { label: '2026-08-01 review passed=false 无 reworkHints', timestamp: '2026-08-01T00:00:00.000Z' },
     ];
     for (const c of cases) {
       const result = checkRunLog([failedReview({ timestamp: c.timestamp, passed: false })]);
-      if (c.blocking) {
-        expect(result.passed, `${c.label} 应 blocking`).toBe(false);
-        expect(
-          result.violations.some((v) => /\[rework-hints\].*passed=false.*reworkHints/.test(v)),
-          `${c.label} 应报 [rework-hints]`,
-        ).toBe(true);
-        expect(
-          result.diagnostics?.some((d) => /LEGACY_REWORK_HINTS/.test(d)) ?? false,
-          `${c.label} 不应 legacy 吸收`,
-        ).toBe(false);
-      } else {
-        expect(result.passed, `${c.label} 应 LEGACY_REWORK_HINTS 诊断放行`).toBe(true);
-        expect(
-          result.violations.some((v) => v.includes('[schema]') || v.includes('[rework-hints]')),
-          `${c.label} 不应有 blocking violation`,
-        ).toBe(false);
-        expect(
-          result.diagnostics?.some((d) => /LEGACY_REWORK_HINTS/.test(d)),
-          `${c.label} 应有 LEGACY_REWORK_HINTS 诊断`,
-        ).toBe(true);
-        expect(result.lifecycleStatus, `${c.label} lifecycle`).toBe('NOT_CLOSED_NOT_PROVEN');
-      }
+      expect(result.passed, `${c.label} 应 blocking`).toBe(false);
+      expect(
+        result.violations.some((v) => /\[rework-hints\].*passed=false.*reworkHints/.test(v)),
+        `${c.label} 应报 [rework-hints]`,
+      ).toBe(true);
+      expect(result.diagnostics, `${c.label} 无吸收诊断`).toBeUndefined();
     }
   });
 
@@ -2488,7 +2436,7 @@ describe('run-log R10: revertEvidence 回滚证伪（严格证据模式）', () 
   };
 
   /** 样本整体平移到现代日期（保持 R7 时序单调）。 */
-  async function loadShiftedPastCutoff(): Promise<RunLogEntry[]> {
+  async function loadShiftedModernDate(): Promise<RunLogEntry[]> {
     const lines = await loadJsonl('rootcause-valid.jsonl');
     return lines.map((l) => ({
       ...l,
@@ -2506,15 +2454,15 @@ describe('run-log R10: revertEvidence 回滚证伪（严格证据模式）', () 
     });
   }
 
-  it('R10 revertEvidence 负例（4 态：缺失/空白命令/cutoff 前缺失/旧日期 emergency-fix）', async () => {
+  it('R10 revertEvidence 负例（4 态：缺失/空白命令/旧日期缺失/旧日期 emergency-fix）', async () => {
     const cases: {
       label: string;
       build: () => Promise<RunLogEntry[]> | RunLogEntry[];
       verify: (result: ReturnType<typeof checkRunLog>, label: string) => void;
     }[] = [
       {
-        label: 'fix 缺 revertEvidence（无 LEGACY 吸收）',
-        build: async () => stripRevertEvidence(await loadShiftedPastCutoff()),
+        label: 'fix 缺 revertEvidence（无历史吸收）',
+        build: async () => stripRevertEvidence(await loadShiftedModernDate()),
         verify: (result, label) => {
           expect(result.passed, `${label} 应 blocking`).toBe(false);
           expect(
@@ -2522,20 +2470,19 @@ describe('run-log R10: revertEvidence 回滚证伪（严格证据模式）', () 
             `${label} 应报 R10:revertEvidence`,
           ).toBe(true);
           expect(
-            result.diagnostics?.some((d) => d.startsWith('LEGACY_REVERT_EVIDENCE')) ?? false,
-            `${label} 不应 LEGACY 吸收`,
+            (result.diagnostics ?? []).some((d) => /LEGACY|deferred/.test(d)),
+            `${label} 无 legacy 吸收诊断（pending-pre-approval 等合法诊断不受影响）`,
           ).toBe(false);
           expect(result.revertEvidence, `${label} r10 计数`).toEqual({
             checked: 1,
             missing: 1,
-            legacy: 0,
           });
         },
       },
       {
         label: 'fix command 仅空白（不能以字符串存在替代有效命令）',
         build: async () =>
-          (await loadShiftedPastCutoff()).map((l) =>
+          (await loadShiftedModernDate()).map((l) =>
             l.action === 'fix' ? { ...l, revertEvidence: { command: '   ' } } : l,
           ),
         verify: (result, label) => {
@@ -2547,7 +2494,7 @@ describe('run-log R10: revertEvidence 回滚证伪（严格证据模式）', () 
         },
       },
       {
-        label: 'cutoff 前 fix 缺 revertEvidence（timestamp 不得作为 legacy 放行）',
+        label: '旧日期 fix 缺 revertEvidence（timestamp 不得作为吸收依据）',
         build: async () => stripRevertEvidence(await loadJsonl('rootcause-valid.jsonl')),
         verify: (result, label) => {
           expect(result.passed, `${label} 应 blocking`).toBe(false);
@@ -2556,24 +2503,22 @@ describe('run-log R10: revertEvidence 回滚证伪（严格证据模式）', () 
             `${label} 应报 R10:`,
           ).toBe(true);
           expect(
-            result.diagnostics?.some((d) => d.startsWith('LEGACY_REVERT_EVIDENCE')) ?? false,
-            `${label} 不应 legacy 放行`,
+            (result.diagnostics ?? []).some((d) => /LEGACY|deferred/.test(d)),
+            `${label} 无 legacy 吸收诊断（pending-pre-approval 等合法诊断不受影响）`,
           ).toBe(false);
           expect(result.revertEvidence, `${label} r10 计数`).toEqual({
             checked: 1,
             missing: 1,
-            legacy: 0,
           });
         },
       },
       {
-        label: '旧日期 emergency-fix 缺 revertEvidence（legacy=0）',
+        label: '旧日期 emergency-fix 缺 revertEvidence',
         build: () => [
           makeEntry({
             runId: 'em-r10-old-date',
             action: 'emergency-fix',
             role: 'S',
-            variant: 'emergency-fix',
             blocker: '线上阻断须立即修复',
             timestamp: '2026-07-24T00:00:00.000Z',
           }),
@@ -2586,7 +2531,6 @@ describe('run-log R10: revertEvidence 回滚证伪（严格证据模式）', () 
           expect(result.revertEvidence, `${label} r10 计数`).toEqual({
             checked: 1,
             missing: 1,
-            legacy: 0,
           });
         },
       },
@@ -2596,18 +2540,16 @@ describe('run-log R10: revertEvidence 回滚证伪（严格证据模式）', () 
     }
   });
 
-  it('合法携带 revertEvidence → 通过且 r10 计数 checked=1/missing=0/legacy=0', async () => {
-    const entries = (await loadShiftedPastCutoff()).map((l) =>
+  it('合法携带 revertEvidence → 通过且 r10 计数 checked=1/missing=0', async () => {
+    const entries = (await loadShiftedModernDate()).map((l) =>
       l.action === 'fix' ? { ...l, revertEvidence: VALID_EVIDENCE } : l,
     );
     const result = checkRunLog(entries);
     expect(result.passed).toBe(true);
     expect(result.violations.some((v) => v.startsWith('R10:'))).toBe(false);
-    expect(result.diagnostics?.some((d) => d.startsWith('LEGACY_REVERT_EVIDENCE')) ?? false).toBe(false);
     expect(result.revertEvidence).toEqual({
       checked: 1,
       missing: 0,
-      legacy: 0,
     });
   });
 });
@@ -2844,21 +2786,16 @@ describe('run-log R11: 闭环五脚本机器核验（约束 #11）', () => {
   });
 });
 
-// ==================== R11 阶段 1 自举豁免（D-6） ====================
+// ==================== R11 阶段 1 统一严格时序（D-6 后置窗口已删除） ====================
 //
-// 阶段 1 的 `check-checkpoint.ts` 自身要求 run-log 中已存在 checkpoint 记录才可能 exit 0，
-// 故其成功记录必然晚于本阶段放行——严格「早于放行」判据在首阶段构成自举死锁（先跑门则
-// 门红，先放行则 R11 红）。D-6 给 `phase===1` 的 `check-checkpoint.ts` 开后置窗口：
-// 该记录**允许**晚于放行，但须早于「下一放行」（全部阶段中时间戳严格晚于本放行的最早一条
-// `action=checkpoint` + `outcome=success` 记录）；无下一放行时只要求晚于放行（无上界）。
-// 窗口只放宽时间轴：记录仍须属本阶段（`g.phase === e.phase`）。其余四脚本与 `phase>=2`
-// 的放行判据一字不变（回归用例锁定）。
-//
-// 与 R8 的已知张力：后置 gate 记录天然违反 R8 轨迹模板（gate 须在 checkpoint 之前、
-// checkpoint 为阶段终点）。D-6 的契约面只有 R11（裁定 C：其余规则不动），故本组用例的主
-// 断言是「R11 违规为空」，并在首例精确锁定残留的非 R11 违规仅为那三条 R8——不再放大。
+// 历史 D-6（2026-09-21）曾给 `phase===1` × `check-checkpoint.ts` 开「允许晚于放行」的
+// 后置窗口（历史日志兼容形态：先写放行、后补 check-checkpoint gate 记录）。批次 6
+// A3/C14 裁定「毁弃存量数据，不兼容」：窗口删除，五门（含 check-checkpoint.ts）对
+// 全部阶段一律「严格早于放行」。自然时序「确认落盘 → 闭环五门 → 最后写放行记录」
+// （R0 首阶段自举形态，见 checkpoint-logic.ts）下新建项目常态满足判据；旧时序历史
+// run-log 直接 R11 blocking。
 
-describe('run-log R11 阶段 1 自举豁免（D-6）', () => {
+describe('run-log R11 阶段 1 统一严格时序（D-6 后置窗口删除）', () => {
   /** 单条闭环 gate 记录（shape 与 R11 充数条件一致：role=G / success / exitCode=0） */
   const closureGateRecords = (phase: number, script: string, timestamp: string): RunLogEntry[] => [
     makeEntry({
@@ -2898,27 +2835,37 @@ describe('run-log R11 阶段 1 自举豁免（D-6）', () => {
   };
 
   /**
-   * 阶段 1 夹具：前置 → 四条闭环记录（00:00:01~04）→ 放行（00:00:05）→ check-checkpoint。
-   * `post` 指定后置记录时点（`null` = 完全缺失）；`omit` 剔除指定的前置闭环脚本。
+   * 阶段 1 夹具（新语义正常形态）：前置 → 四门（00:00:01~03）→ check-checkpoint（默认
+   * 00:00:04）→ 预防审查门（00:00:04.500）→ 放行（00:00:05），毫秒递增。
+   * `checkpointAt` 覆盖 check-checkpoint 记录时点（`null` = 完全缺失；后置时点用于锁定
+   * blocking）；`omit` 剔除指定的前置闭环脚本；`moveBudgetTo` 把 check-budget 记录挪到
+   * 指定时点（后置违规用，缺省前置 00:00:01）。
    */
-  const phase1 = (opts: { post?: string | null; omit?: string[] } = {}): RunLogEntry[] => {
-    const post = opts.post === undefined ? '2026-01-01T00:00:06Z' : opts.post;
+  const phase1 = (
+    opts: { checkpointAt?: string | null; omit?: string[]; moveBudgetTo?: string } = {},
+  ): RunLogEntry[] => {
+    const checkpointAt = opts.checkpointAt === undefined ? '2026-01-01T00:00:04Z' : opts.checkpointAt;
     const omit = new Set(opts.omit ?? []);
-    const preAt: Array<[string, string]> = [
-      ['check-budget.ts', '2026-01-01T00:00:01Z'],
-      ['check-run-log.ts', '2026-01-01T00:00:02Z'],
-      ['check-maturity.ts', '2026-01-01T00:00:03Z'],
-      ['check-preventive-review.ts', '2026-01-01T00:00:04Z'],
-    ];
+    const gate = checkpointAt === null ? [] : closureGateRecords(1, 'check-checkpoint.ts', checkpointAt);
+    // 后置（≥ 放行 00:00:05）的 check-checkpoint 记录按日志顺序排在放行之后
+    //（与旧时序写入形态一致，R8 轨迹模板照常对其报违规）。
+    const gateIsPost = checkpointAt !== null && Date.parse(checkpointAt) >= Date.parse('2026-01-01T00:00:05Z');
     return [
       ...phaseLead(1, '2025-12-31T23:50:00Z'),
-      ...preAt.filter(([script]) => !omit.has(script)).flatMap(([script, ts]) => closureGateRecords(1, script, ts)),
+      ...(opts.moveBudgetTo === undefined && !omit.has('check-budget.ts')
+        ? closureGateRecords(1, 'check-budget.ts', '2026-01-01T00:00:01Z')
+        : []),
+      ...closureGateRecords(1, 'check-run-log.ts', '2026-01-01T00:00:02Z'),
+      ...closureGateRecords(1, 'check-maturity.ts', '2026-01-01T00:00:03Z'),
+      ...(gateIsPost ? [] : gate),
+      ...closureGateRecords(1, 'check-preventive-review.ts', '2026-01-01T00:00:04.500Z'),
       cpRecord(1, '2026-01-01T00:00:05Z'),
-      ...(post === null ? [] : closureGateRecords(1, 'check-checkpoint.ts', post)),
+      ...(gateIsPost ? gate : []),
+      ...(opts.moveBudgetTo !== undefined ? closureGateRecords(1, 'check-budget.ts', opts.moveBudgetTo) : []),
     ];
   };
 
-  /** 阶段 2：五条闭环记录齐备且均早于本阶段放行（00:10:00）——供「下一放行」上界使用 */
+  /** 阶段 2：五条闭环记录齐备且均早于本阶段放行（00:10:00）——供跨阶段隔离对照 */
   const phase2 = (): RunLogEntry[] => [
     ...phaseLead(2, '2026-01-01T00:00:07Z'),
     ...closureGateRecords(2, 'check-budget.ts', '2026-01-01T00:09:01Z'),
@@ -2931,25 +2878,15 @@ describe('run-log R11 阶段 1 自举豁免（D-6）', () => {
 
   const r11 = (result: { violations: string[] }): string[] => result.violations.filter((v) => v.startsWith('R11:'));
 
-  it('阶段 1：check-checkpoint 成功记录晚于放行、早于下一放行 → 通过（D-6）', () => {
-    // 下一放行取阶段 2 的 00:10:00 放行（阶段 2 自身闭环齐备，隔离阶段 1 的后置窗口判定）
-    const result = checkRunLog([...phase1(), ...phase2()]);
+  it('阶段 1：五门齐备且全部严格早于放行 → 通过（毫秒递增正常形态）', () => {
+    const result = checkRunLog(phase1());
     expect(r11(result)).toEqual([]);
-    expect(result.closure).toEqual({ checkedGates: 2, missing: 0 });
-    // 完整 violations 断言（裁定 E）：后置 gate 记录与 R8 轨迹模板天然冲突（R8-1 checkpoint
-    // 须为阶段终点 / R8-2 gate 须先于 checkpoint / 理想链顺序），D-6 的契约面只有 R11
-    // （裁定 C：其余规则不动），故残留的非 R11 违规须**恰为**阶段 1 的这三条 R8，
-    // 不得再有其他规则告警（R1 动作完整性 / R7 append-only 均已由夹具满足）。
-    const nonR11 = result.violations.filter((v) => !v.startsWith('R11:'));
-    expect(nonR11).toHaveLength(3);
-    expect(nonR11.every((v) => v.startsWith('R8: 阶段 1 '))).toBe(true);
-    expect(nonR11.some((v) => v.includes('checkpoint 非阶段最后记录'))).toBe(true);
-    expect(nonR11.some((v) => v.includes('gate 动作(gate)出现在 checkpoint 之后'))).toBe(true);
-    expect(nonR11.some((v) => v.includes('轨迹顺序倒置'))).toBe(true);
+    expect(result.closure).toEqual({ checkedGates: 1, missing: 0 });
+    expect(result.violations, '正常形态无任何违规').toEqual([]);
   });
 
   it('阶段 1：完全缺失 check-checkpoint 成功记录 → 阻断', () => {
-    const result = checkRunLog([...phase1({ post: null }), ...phase2()]);
+    const result = checkRunLog([...phase1({ checkpointAt: null }), ...phase2()]);
     const hits = r11(result);
     expect(hits).toHaveLength(1);
     expect(hits[0]).toContain('阶段 1');
@@ -2957,14 +2894,25 @@ describe('run-log R11 阶段 1 自举豁免（D-6）', () => {
     expect(result.closure).toEqual({ checkedGates: 2, missing: 1 });
   });
 
-  it('阶段 2 回归：后置 check-checkpoint 记录 → 仍阻断（phase>=2 行为不变）', () => {
+  it('阶段 1：check-checkpoint 成功记录晚于放行 → R11 blocking（D-6 窗口删除；阶段 2 正常隔离）', () => {
+    const result = checkRunLog([...phase1({ checkpointAt: '2026-01-01T00:00:06Z' }), ...phase2()]);
+    const hits = r11(result);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toContain('阶段 1');
+    expect(hits[0]).toMatch(/R11.*check-checkpoint/);
+    expect(result.closure).toEqual({ checkedGates: 2, missing: 1 });
+    // 后置记录仍照常触发 R8 轨迹模板违规（R8 零改动）
+    expect(result.violations.some((v) => v.startsWith('R8: 阶段 1 '))).toBe(true);
+  });
+
+  it('阶段 2 回归：后置 check-checkpoint 记录 → 仍阻断（全部阶段同一判据）', () => {
     const entries = [
       ...closureGateRecords(2, 'check-budget.ts', '2026-01-01T00:00:01Z'),
       ...closureGateRecords(2, 'check-run-log.ts', '2026-01-01T00:00:02Z'),
       ...closureGateRecords(2, 'check-maturity.ts', '2026-01-01T00:00:03Z'),
       ...closureGateRecords(2, 'check-preventive-review.ts', '2026-01-01T00:00:04Z'),
       cpRecord(2, '2026-01-01T00:00:05Z'),
-      ...closureGateRecords(2, 'check-checkpoint.ts', '2026-01-01T00:00:06Z'), // 后置（阶段 2 不豁免）
+      ...closureGateRecords(2, 'check-checkpoint.ts', '2026-01-01T00:00:06Z'), // 后置 → blocking
     ];
     const result = checkRunLog([...phaseLead(2, '2025-12-31T22:00:00Z'), ...entries]);
     const hits = r11(result);
@@ -2974,9 +2922,9 @@ describe('run-log R11 阶段 1 自举豁免（D-6）', () => {
     expect(result.closure).toEqual({ checkedGates: 1, missing: 1 });
   });
 
-  it('阶段 1：后置记录晚于下一放行 → 阻断（窗口上界）', () => {
+  it('阶段 1：后置记录晚于下一放行 → 阻断（不再有窗口上界概念）', () => {
     const result = checkRunLog([
-      ...phase1({ post: null }),
+      ...phase1({ checkpointAt: null }),
       ...phase2(),
       ...closureGateRecords(1, 'check-checkpoint.ts', '2026-01-01T00:20:00Z'), // 晚于阶段 2 的 00:10:00 放行
     ]);
@@ -2987,23 +2935,24 @@ describe('run-log R11 阶段 1 自举豁免（D-6）', () => {
     expect(result.closure).toEqual({ checkedGates: 2, missing: 1 });
   });
 
-  it('阶段 1：同秒不算晚于放行 → 阻断（窗口下界取严格大于）', () => {
-    const result = checkRunLog([...phase1({ post: '2026-01-01T00:00:05Z' }), ...phase2()]);
+  it('阶段 1：同毫秒不算早于放行 → 阻断（严格早于判据不变）', () => {
+    const result = checkRunLog([...phase1({ checkpointAt: '2026-01-01T00:00:05Z' }), ...phase2()]);
     const hits = r11(result);
     expect(hits).toHaveLength(1);
     expect(hits[0]).toMatch(/R11.*check-checkpoint/);
   });
 
-  it('阶段 1：无下一放行时后置记录仅要求晚于放行 → 通过（无上界）', () => {
-    const result = checkRunLog(phase1());
-    expect(r11(result)).toEqual([]);
-    expect(result.closure).toEqual({ checkedGates: 1, missing: 0 });
+  it('阶段 1：无下一放行时后置记录 → 阻断（旧「无上界」豁免删除）', () => {
+    const result = checkRunLog(phase1({ checkpointAt: '2026-01-01T00:00:06Z' }));
+    const hits = r11(result);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toMatch(/R11.*check-checkpoint/);
+    expect(result.closure).toEqual({ checkedGates: 1, missing: 1 });
   });
 
-  it('阶段 1：后置窗口只给 check-checkpoint.ts，其余四脚本仍须早于放行', () => {
+  it('阶段 1：check-budget 后置 → 只报 check-budget（check-checkpoint 前置照常充数）', () => {
     const result = checkRunLog([
-      ...phase1({ omit: ['check-budget.ts'] }),
-      ...closureGateRecords(1, 'check-budget.ts', '2026-01-01T00:00:07Z'), // 后置但不豁免
+      ...phase1({ moveBudgetTo: '2026-01-01T00:00:07Z' }), // 后置 → blocking
     ]);
     const hits = r11(result);
     expect(hits).toHaveLength(1);
@@ -3153,5 +3102,118 @@ describe('C15 R5 越权检测形态补全', () => {
     const result = checkRunLog(entries, { gateLogs });
     expect(result.violations.some((v) => v.startsWith('R5:'))).toBe(false);
     expect(result.passed).toBe(true);
+  });
+});
+
+// ==================== A3/C14：legacy 吸收机器删除（旧形态一律 fail-closed） ====================
+//
+// 批次 6 任务 5：三种 legacy 诊断性吸收（variant 族 / unscoped 族 / reworkHints 族）、
+// 共享吸收谓词与 R11 D-6「阶段 1 check-checkpoint 后置窗口」全部删除——
+// 用户裁定「毁弃存量数据，不兼容」：旧形态数据直接 fail-closed（[schema] / R11 blocking），
+// 不再有非阻断绕行。R0 首阶段自举（BOOTSTRAP_VALIDATION）是首次运行语义，不在本组。
+
+describe('A3/C14 legacy 清除：旧形态一律 fail-closed', () => {
+  it('variant 非标准字段 → schema additionalProperties 拒绝（不再是 legacy 吸收诊断）', () => {
+    const entry: RunLogEntry = makeEntry({
+      runId: 'legacy-variant-field',
+      phase: 5,
+      action: 'fix',
+      role: 'S',
+      outcome: 'success',
+      revertEvidence: { command: 'npm run reproduce-failure' },
+    });
+    const legacy = { ...entry, variant: 'fix' } as unknown as RunLogEntry;
+    const result = checkRunLog([legacy]);
+    expect(result.violations.some((v) => v.includes('[schema]') && v.includes('variant'))).toBe(true);
+    expect(result.passed).toBe(false);
+    expect(result.diagnostics, 'legacy 吸收诊断不复存在').toBeUndefined();
+  });
+
+  it('unscoped/variant 双旧字段 → schema 拒绝（字段容忍列表移除）', () => {
+    const entry: RunLogEntry = makeEntry({
+      runId: 'legacy-unscoped-field',
+      phase: 5,
+      action: 'fix',
+      role: 'S',
+      outcome: 'success',
+      revertEvidence: { command: 'npm run reproduce-failure' },
+    });
+    const legacy = { ...entry, variant: 'fix', unscoped: true } as unknown as RunLogEntry;
+    const result = checkRunLog([legacy]);
+    expect(result.passed).toBe(false);
+    expect(result.violations.some((v) => v.includes('[schema]'))).toBe(true);
+  });
+
+  it('R11：phase-1 check-checkpoint 记录后置于放行 → blocking（D-6 后置窗口删除）', () => {
+    // 五门在放行前齐备（00:00:01~04），放行 05，check-checkpoint 后置 06——
+    // 旧 D-6 窗口下此形态 R11 通过（无下一放行时无上界）；删除后一律「严格早于放行」。
+    const at = (): RunLogEntry[] =>
+      RUN_LOG_CLOSURE_SCRIPTS.filter((s) => s !== 'check-checkpoint.ts').map((script, index) =>
+        makeEntry({
+          runId: `g1-${script}`,
+          phase: 1,
+          timestamp: `2026-01-01T00:00:0${index + 1}Z`,
+          action: 'gate',
+          role: 'G',
+          outcome: 'success',
+          gateExitCode: 0,
+          script,
+        }),
+      );
+    const lead = [
+      makeEntry({
+        runId: 'a1',
+        phase: 1,
+        timestamp: '2025-12-31T23:50:00Z',
+        action: 'chunk',
+        role: 'A',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'x1',
+        phase: 1,
+        timestamp: '2025-12-31T23:51:00Z',
+        action: 'cross',
+        role: 'S',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'p1',
+        phase: 1,
+        timestamp: '2025-12-31T23:52:00Z',
+        action: 'produce',
+        role: 'S',
+        outcome: 'success',
+      }),
+      makeEntry({
+        runId: 'v1',
+        phase: 1,
+        timestamp: '2025-12-31T23:53:00Z',
+        action: 'review',
+        role: 'V',
+        outcome: 'success',
+      }),
+    ];
+    const release = makeEntry({
+      runId: 'c1',
+      phase: 1,
+      timestamp: '2026-01-01T00:00:05Z',
+      action: 'checkpoint',
+      role: 'O',
+      outcome: 'success',
+      acknowledgedDecisions: ['阶段 1 放行：REQ 全量锐利'],
+    });
+    const postCheckpointGate = makeEntry({
+      runId: 'g1-check-checkpoint.ts',
+      phase: 1,
+      timestamp: '2026-01-01T00:00:06Z',
+      action: 'gate',
+      role: 'G',
+      outcome: 'success',
+      gateExitCode: 0,
+      script: 'check-checkpoint.ts',
+    });
+    const result = checkRunLog([...lead, ...at(), release, postCheckpointGate]);
+    expect(result.violations.some((v) => v.startsWith('R11:') && v.includes('check-checkpoint.ts'))).toBe(true);
   });
 });

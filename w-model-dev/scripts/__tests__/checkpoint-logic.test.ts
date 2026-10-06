@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { checkCheckpoint, RUN_LOG_ACTION_VALUES } from '../logic/checkpoint-logic.js';
-import { checkRunLog, isLegacyAbsorbableEntry } from '../logic/run-log-logic.js';
+import { checkRunLog } from '../logic/run-log-logic.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)); // w-model-dev/scripts/__tests__
@@ -207,25 +207,13 @@ describe('R0 首阶段自举形态（E-2 方案 B）', () => {
 });
 
 /**
- * D-5（2026-09-20 门禁契约修复 · 任务 2）：legacy 吸收谓词两消费者口径统一。
- *
- * 背景：`check-run-log` 对「variant / reworkHints 规则引入前写入的旧记录」（缺
- * reworkHints / variant / blocker 等 required 字段）按 legacy 吸收为非阻断 diagnostic，
- * 而 `check-checkpoint` 对**同一条记录**直接报 `[schema]` blocking——两门对同一事实的
- * 裁定不一致，调测期只能逐条手工补字段绕过。修复：`run-log-logic.ts` 导出
- * `isLegacyAbsorbableEntry`，两门复用同一谓词。
- *
- * 判据不变量（规格 §5）：同一条记录，两门对「blocking vs 非阻断」的裁定必须相同。
- *
- * 形态说明：可被 legacy 吸收的记录必然是**触发 schema required 失败**的旧行
- * （`isLegacySchemaFailure` 只容忍身份/variant/blocker 族字段）。完整合法的
- * checkpoint 对象本身就是 schema-valid（无 schema 失败可吸收），故本组用例以
- * 「LEGACY_VARIANT_CUTOFF 前写入的 failed review 旧行 / 未声明 variant 的
- * emergency-fix 旧行」承载 legacy 形态——这正是 run-log 门报 LEGACY_REWORK_HINTS /
- * LEGACY_VARIANT 诊断而非阻断、而修复前 checkpoint 门报 `[schema]` 的那两类记录。
+ * 批次 6 A3/C14：run-log 的 legacy 吸收谓词（D-5 引入的两门共享谓词，批次 6 已删除）
+ * 已删除——旧形态数据毁弃，两门对 schema 失败一律 fail-closed，无「吸收 vs blocking」
+ * 口径分裂可言。本组锁定：同一旧形态记录在 check-run-log 与 check-checkpoint 两门
+ * 均为 blocking（run-log 门报 [rework-hints]/[schema]，checkpoint 门报 [schema]）。
  */
-describe('D-5 legacy 吸收谓词（两门同判）', () => {
-  /** legacy 形态①：cutoff 前写入的 failed review 旧行，缺非空 reworkHints（reworkHints 族）。 */
+describe('A3/C14 旧形态 fail-closed（两门同判：一律 blocking）', () => {
+  /** 旧形态①：failed review 缺非空 reworkHints（reworkHints 族）。 */
   const legacyFailedReview = {
     runId: 'p1-v-legacy',
     timestamp: '2026-01-05T00:00:00Z',
@@ -242,7 +230,7 @@ describe('D-5 legacy 吸收谓词（两门同判）', () => {
     passed: false,
   };
 
-  /** legacy 形态②：cutoff 前写入、未声明 variant 的 emergency-fix 旧行（identity/variant 族）。 */
+  /** 旧形态②：emergency-fix 缺 blocker（原 identity/variant 族吸收形态）。 */
   const legacyEmergencyFix = {
     runId: 'p2-s-efix',
     timestamp: '2026-01-05T00:00:00Z',
@@ -279,47 +267,43 @@ describe('D-5 legacy 吸收谓词（两门同判）', () => {
   };
   const confirmed = { checkpointLog: new Map([['1', '用户确认：放行进入阶段 2（user-id: alice）']]) };
 
-  it('legacy 旧行（reworkHints 族）：谓词为真，run-log 门吸收为 LEGACY_REWORK_HINTS 诊断', () => {
+  it('旧形态（reworkHints 族）：run-log 门报 [rework-hints] blocking，checkpoint 门报 [schema] blocking', () => {
     const schemaResult = validateBySchema('run-log', legacyFailedReview);
-    expect(schemaResult.valid).toBe(false);
-    expect(isLegacyAbsorbableEntry(legacyFailedReview, schemaResult.errorMessages)).toBe(true);
-    const result = checkRunLog([legacyFailedReview]);
-    expect(result.violations.filter((v) => v.includes('[schema]'))).toEqual([]);
-    expect((result.diagnostics ?? []).some((d) => d.startsWith('LEGACY_REWORK_HINTS'))).toBe(true);
+    expect(schemaResult.valid, '旧形态触发 schema 失败（fail-closed 前提）').toBe(false);
+    const runLogResult = checkRunLog([legacyFailedReview]);
+    expect(runLogResult.passed, 'run-log 门 blocking').toBe(false);
+    expect(runLogResult.violations.some((v) => v.includes('[rework-hints]'))).toBe(true);
+    const checkpointResult = checkCheckpoint([legacyFailedReview], confirmed);
+    expect(checkpointResult.passed, 'checkpoint 门 blocking').toBe(false);
+    expect(checkpointResult.violations.some((v) => v.includes('[schema]'))).toBe(true);
   });
 
-  it('checkpoint 门对两类 legacy 旧行（2 态：reworkHints 族 / identity·variant 族）均不再报 [schema] 且整体通过（D-5 核心）', () => {
-    // 判据不变量（规格 §5）：同一谓词两门同判——checkpoint 门对两类 legacy 旧行均按
-    // 非 blocking 吸收（修复前报 `[schema]` blocking）。
+  it('旧形态（2 态：reworkHints 族 / emergency-fix 缺 blocker）→ 两门均 blocking（无吸收绕行）', () => {
     const rows = [
-      { name: 'legacy 旧行（reworkHints 族：cutoff 前 failed review 缺非空 reworkHints）', entry: legacyFailedReview },
-      {
-        name: 'legacy 旧行（identity/variant 族：cutoff 前 emergency-fix 未声明 variant）',
-        entry: legacyEmergencyFix,
-      },
+      { name: 'reworkHints 族：failed review 缺非空 reworkHints', entry: legacyFailedReview },
+      { name: 'identity/blocker 族：emergency-fix 缺 blocker', entry: legacyEmergencyFix },
     ] as const;
     for (const row of rows) {
       const schemaResult = validateBySchema('run-log', row.entry);
-      expect(schemaResult.valid, `${row.name}：触发 schema required 失败（legacy 形态前提）`).toBe(false);
-      expect(isLegacyAbsorbableEntry(row.entry, schemaResult.errorMessages), `${row.name}：谓词为真`).toBe(true);
-      const result = checkCheckpoint([validCheckpoint, row.entry], confirmed);
+      expect(schemaResult.valid, `${row.name}：schema 失败`).toBe(false);
+      const checkpointResult = checkCheckpoint([validCheckpoint, row.entry], confirmed);
       expect(
-        result.violations.filter((v) => v.includes('[schema]')),
-        `${row.name}：不报 [schema]`,
-      ).toEqual([]);
-      expect(result.passed, `${row.name}：整体通过`).toBe(true);
+        checkpointResult.violations.some((v) => v.includes('[schema]')),
+        `${row.name}：checkpoint 门报 [schema]`,
+      ).toBe(true);
+      expect(checkpointResult.passed, `${row.name}：整体 blocking`).toBe(false);
     }
   });
 
-  it('真实类型错误仍 blocking，且两门同判（回归）', () => {
+  it('真实类型错误仍两门 blocking（回归）', () => {
     const broken = { runId: 1, timestamp: 'x', phase: '一', action: 'checkpoint', role: 'O', outcome: 'success' };
     const schemaResult = validateBySchema('run-log', broken);
     expect(schemaResult.valid).toBe(false);
-    expect(isLegacyAbsorbableEntry(broken, schemaResult.errorMessages)).toBe(false);
     const checkpointResult = checkCheckpoint([broken], confirmed);
     expect(checkpointResult.passed).toBe(false);
     expect(checkpointResult.violations.some((v) => v.includes('[schema]'))).toBe(true);
     const runLogResult = checkRunLog([broken]);
+    expect(runLogResult.passed).toBe(false);
     expect(runLogResult.violations.some((v) => v.includes('[schema]'))).toBe(true);
   });
 });

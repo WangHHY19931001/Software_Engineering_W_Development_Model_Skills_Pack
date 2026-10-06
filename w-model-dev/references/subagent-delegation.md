@@ -1810,10 +1810,10 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 **违规检测**：
 
 - `run-log.jsonl` 中 S 子代理（`role=S`）的 `action=fix` / `action=emergency-fix` 条目需特别审查：
-  - `variant="emergency-fix"` + `blocker` 非空 → 合法紧急修复通道
-  - `variant` 若出现须为 `fix` 或 `emergency-fix` 且与 action 一致（`action=fix` 声明 `variant=emergency-fix`、或 `action=emergency-fix` 声明 `variant=fix` 均属 variant 与 action 不符 → schema blocking）；**未声明 variant 的旧 fix 记录按向后兼容处理，不视为越权**——精确语义见本节紧急修复通道规则：仅 `emergency-fix` 强制 `variant=emergency-fix` + `blocker`（缺失即 blocking `[schema]`），`fix` 的 variant 可选（不强制出现）
+  - `action=emergency-fix` + `blocker` 非空 → 合法紧急修复通道（批次 6 A3/C14：历史 `variant` 字段已删除，携带 `variant` 的记录被 schema additionalProperties 拒绝）
+  - `action=emergency-fix` 缺 `blocker` → schema blocking `[schema]`（无历史吸收绕行）
 - 未按返工流程（未经 R 根因定位报告与 V/G 门禁授权，见本文件「S-fix 子代理（返工变体）」返工循环）擅自修复既有产物的 `fix` 条目视为越权（反模式 #10/#18 变体），需回滚并由 R + S-fix 重做
-- 检测脚本（精确语义，2026-09-04 与 run-log.schema.json / run-log-logic.ts 对齐）：`check-run-log.ts` 对 `action=fix` / `action=emergency-fix` 条目按以下规则判定——`action=emergency-fix` 强制 `variant=emergency-fix` 且 `blocker` 非空（schema 强制）；`action=fix` 的 `variant` **可选**，出现则必须为 `"fix"`（不强制出现，向后兼容 variant 规则引入前的 fix 记录）；已声明 `variant=emergency-fix` 却缺 `blocker`、或 variant 值不符 const 属真实不一致 → blocking `[schema]`；variant 规则引入前的旧记录（未声明 variant，含同时缺 identity 字段的双 legacy 行）经合并 legacy 谓词吸收为 **LEGACY_VARIANT / LEGACY_UNSCOPED 非阻断 diagnostic**，不进 blocking。动作-角色配对（`fix`/`emergency-fix`/`produce`→role=S 等）由 logic 层 blocking 强制。`preventive-review.schema.json` 另强制 `passed=false ⇒ findings ≥1`。
+- 检测脚本（精确语义，批次 6 A3/C14 起与 run-log.schema.json / run-log-logic.ts 对齐）：`check-run-log.ts` 对 `action=fix` / `action=emergency-fix` 条目按以下规则判定——`action=emergency-fix` 强制 `blocker` 非空（schema 强制），缺 `blocker` 或携带 `variant` 字段一律 blocking `[schema]`；历史 legacy 吸收谓词（D-5 两门共享，曾输出非阻断 diagnostic）**已删除**——旧形态记录不再有任何诊断绕行，两门一律 fail-closed。动作-角色配对（`fix`/`emergency-fix`/`produce`→role=S 等）由 logic 层 blocking 强制。`preventive-review.schema.json` 另强制 `passed=false ⇒ findings ≥1`。
 
 > 与反模式 #18（跳过 R 直接 S 返工）的关系：本边界条款是 #18 的细化——S 子代理发现既有 bug 时不得自行修复（即便 S 自评根因准确），必须走「记录 rootcause → 转 R → V 复审 → G 门禁 → S-fix」流程。紧急修复通道是「与其他 S 变体一视同仁的前置 R3+V+G 通道」——emergency-fix 产出后仍须 R3×3 + V + G，命中反模式 #42 一律回退。
 

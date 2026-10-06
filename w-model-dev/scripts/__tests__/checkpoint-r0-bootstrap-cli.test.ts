@@ -5,8 +5,8 @@
  * `check-run-log.ts` → exit 0 且无 R8/R11 违规（E-2 的原始判据）。同时以 CLI 级反放
  * 锁定反伪造边界（根因报告 §7.7 验收口径：复现 1 红转绿 / 复现 3 维持红）：
  *   1. 自然时序 run-log → check-run-log.ts exit 0，R8/R11 零违规，closure missing=0；
- *   2. D-6 时序（check-checkpoint 记录后置于放行）→ check-run-log.ts exit 1，
- *      恰 3 条 R8（后置窗口不合法化 R8 冲突；新建项目不应产生该形态）；
+ *   2. 旧 D-6 后置时序（check-checkpoint 记录后置于放行；批次 6 A3/C14 起窗口已删除）
+ *      → check-run-log.ts exit 1，恰 3 条 R8 + R11 blocking（五门一律严格早于放行）；
  *   3. 零记录态 + checkpoint-log 用户确认在场 → check-checkpoint.ts exit 0 且
  *      --json 携带 BOOTSTRAP_VALIDATION 非阻断诊断（旧 R0 一律违规的唯一阻塞点转绿）；
  *   4. 零记录态 + checkpoint-log 目录无 phase-N 匹配 → check-checkpoint.ts exit 1
@@ -20,8 +20,8 @@
  *      且 stderr 列出两冲突路径（C14/D3 canonical 形态 phase-<N>.md + 歧义 fail-closed，
  *      42.13.0 起；不再由 readdir 顺序静默择一胜出）。
  *
- * 夹具文法参照 run-log-logic.test.ts「R11 阶段 1 自举豁免（D-6）」组的 phase-1 形态
- * （phaseLead → 四门 gate → checkpoint / check-checkpoint gate 位置两态）。
+ * 夹具文法参照 run-log-logic.test.ts「R11 阶段 1 统一严格时序（D-6 后置窗口删除）」组的
+ * phase-1 形态（phaseLead → 四门 gate → checkpoint / check-checkpoint gate 位置两态）。
  * 本文件启动真实 tsx 子进程 → 已登记 config/vitest.config.ts 的 SUBPROCESS_TEST_FILES
  * （vitest-project-split 双向守护）。**不 spawn 全量 vitest**。
  */
@@ -123,7 +123,8 @@ function release(timestamp: string): Record<string, unknown> {
  * 最小 phase-1 自举时序 run-log 行集。
  * `mode: 'natural'`：五条闭环 gate 全部在放行记录之前（check-checkpoint 00:04:04 < 放行 00:05），
  * 放行为阶段末条。`mode: 'd6'`：check-checkpoint 的 gate 记录（00:06）**移到放行记录之后**
- * （数组位置与时间戳一致后移）——即 D-6 后置窗口形态，R8 轨迹模板对其报恰 3 条违规。
+ * （数组位置与时间戳一致后移）——即旧 D-6 后置窗口形态；批次 6 A3/C14 起窗口已删除，
+ * 该形态 R8 轨迹模板报恰 3 条违规 **且** R11 blocking（五门一律严格早于放行）。
  */
 function bootstrapRunLogLines(mode: 'natural' | 'd6'): string[] {
   const checkpointGateAt = mode === 'natural' ? '2026-09-22T00:04:04Z' : '2026-09-22T00:06:00Z';
@@ -187,7 +188,7 @@ describe('E-2 方案 B：phase-1 自举时序端到端（真实子进程）', ()
     expect(report.r11).toEqual({ checkedGates: 1, missing: 0 });
   });
 
-  it('D-6 时序（check-checkpoint 记录后置于放行）→ exit 1 恰 3 条 R8（后置窗口不合法化 R8，反放回归）', async () => {
+  it('旧 D-6 后置时序（check-checkpoint 记录后置于放行）→ exit 1：R8 恰 3 条 + R11 blocking（后置窗口已删除）', async () => {
     const runLog = await writeRunLog('d6order.jsonl', bootstrapRunLogLines('d6'));
     const run = runCli(RUN_LOG_CLI, [runLog, '--json']);
     expect(run.code, `stderr=${run.stderr}\nstdout=${run.stdout}`).toBe(1);
@@ -196,7 +197,11 @@ describe('E-2 方案 B：phase-1 自举时序端到端（真实子进程）', ()
     const r8 = report.reasons.filter((v) => v.startsWith('R8:'));
     expect(r8).toHaveLength(3);
     expect(r8.every((v) => v.includes('阶段 1'))).toBe(true);
-    expect(report.reasons.some((v) => v.startsWith('R11:'))).toBe(false);
+    // 批次 6 A3/C14：D-6 后置窗口删除——后置 check-checkpoint 记录同时构成 R11 缺失
+    const r11Reasons = report.reasons.filter((v) => v.startsWith('R11:'));
+    expect(r11Reasons).toHaveLength(1);
+    expect(r11Reasons[0]).toContain('check-checkpoint');
+    expect(report.r11).toEqual({ checkedGates: 1, missing: 1 });
   });
 
   it('零记录态 + checkpoint-log 确认在场 → check-checkpoint exit 0 且含 BOOTSTRAP_VALIDATION 诊断', async () => {

@@ -621,8 +621,9 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
       type: 'run-log',
       passed: true,
       exitCode: 0,
-      lifecycleStatus: 'NOT_CLOSED_NOT_PROVEN',
-      r10: { checked: 0, missing: 0, legacy: 0 },
+      // 批次 6 A3/C14：legacy 吸收诊断循环删除后，valid.jsonl 无非阻断诊断 → 真闭合
+      lifecycleStatus: 'CLOSED_UNDER_CURRENT_RULES',
+      r10: { checked: 0, missing: 0 },
     });
     // r11 的 checkedGates 数值由 **任务 4/J1 在途改动**（logic/run-log-logic.ts 的 closure 维度）
     // 与本次已改的 samples/run-log/valid.jsonl（放行条数）共同决定——此处只钉 D3 关心的
@@ -633,7 +634,9 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     expect(typeof r11?.checkedGates).toBe('number');
     expect(Array.isArray(parsed.reasons)).toBe(true);
     expect(Array.isArray(parsed.violations)).toBe(true);
-    expect(Array.isArray(parsed.diagnostics)).toBe(true);
+    // 批次 6 A3/C14：legacy 吸收诊断删除后 valid.jsonl 无任何非阻断诊断 →
+    // diagnostics 键按「空则不产出」契约整体缺席（非空数组）。
+    expect(parsed.diagnostics).toBeUndefined();
     expect(Object.keys(parsed)).not.toContain('durationMs');
   });
 
