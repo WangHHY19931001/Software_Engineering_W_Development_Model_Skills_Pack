@@ -180,7 +180,7 @@
       "minimum": 0
     },
     "estimated": {
-      "description": "tokens 是否为估算值：true=LLM 估算（违反约束 4，应避免）；false=实际报告",
+      "description": "tokens 是否为估算值：true=LLM 估算（违反约束 4；check-run-log R2 对 estimated=true 记录报 blocking 违规，须回填真实运行结果）；false=实际报告",
       "type": "boolean"
     },
     "subagentSpawns": {

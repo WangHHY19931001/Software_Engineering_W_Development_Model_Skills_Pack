@@ -236,7 +236,7 @@ S-fix 之后的复审是**受范围约束的复审**（scoped re-review），不
 - **不复审 fix 未触及的代码**：若发现的问题完全落在 fix diff 之外，写入「范围外观察」（Out-of-Scope Observations）——它**不阻塞本任务，也不延长 loop**；整分支的宽范围复审在所有任务完成后单独进行。
 - **一轮 = 一次 fix 分派 + 一次 scoped re-review**；**每任务最多 5 轮**。
 
-> 轮次口径：该 5 轮上限**不放松**既有 `budget.json.perPhase.maxReworkRounds` 预算门禁——两者取更严者；达 `maxReworkRounds` 仍须按既有机制强制 🔴 CHECKPOINT 升级（见「失败模式与回退」节 + operational-recovery.md 场景 5）。
+> 轮次口径：该 5 轮上限**不放松**既有 `budget.json.killSwitch.consecutiveReworks` 预算门禁（perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载）——两者取更严者；达 `maxReworkRounds` 仍须按既有机制强制 🔴 CHECKPOINT 升级（见「失败模式与回退」节 + operational-recovery.md 场景 5）。
 
 #### 3.4.3 逐 finding 结论：ADDRESSED / NOT ADDRESSED
 
@@ -1936,8 +1936,8 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 | 层  | 作用域       | 反馈信号源（既有机制）                                                                          | 本级出口                                                | 达限升级                                                                                                      |
 | --- | ------------ | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | L0  | 单条 finding | scoped re-review 逐条裁决（ADDRESSED / NOT ADDRESSED / FALSE-POSITIVE-CHALLENGE，见 §3.4.3 与 §3.4.5）    | 全部 ADDRESSED 或挑战成立                               | NOT ADDRESSED → 进入 L1 下一轮                                                                                |
-| L1  | 单次派单任务 | fix 循环轮次（一轮 = 一次 fix 分派 + 一次 scoped re-review，见 §3.4.2）                         | loop 关闭                                               | 每任务最多 5 轮；达限 → L4 🔴 CHECKPOINT（强制，不放松 `budget.json.perPhase.maxReworkRounds`，两者取更严者） |
-| L2  | 当前阶段     | `budget.json.perPhase.maxReworkRounds` 预算门禁 + R3×3 + 冰山 ICEBERG-A/B（maxIcebergRounds=5） | 阶段门放行（G 全绿 + 🔴 CHECKPOINT 用户确认）           | 达 `maxReworkRounds` → L4；达 maxIcebergRounds=5 → L4 用户三选一（继续深挖 / 接受剩余项并放行 / 阶段回退）    |
+| L1  | 单次派单任务 | fix 循环轮次（一轮 = 一次 fix 分派 + 一次 scoped re-review，见 §3.4.2）                         | loop 关闭                                               | 每任务最多 5 轮；达限 → L4 🔴 CHECKPOINT（强制，不放松 `budget.json.killSwitch.consecutiveReworks`，两者取更严者） |
+| L2  | 当前阶段     | `budget.json.killSwitch.consecutiveReworks` 预算门禁（perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载）+ R3×3 + 冰山 ICEBERG-A/B（maxIcebergRounds=5） | 阶段门放行（G 全绿 + 🔴 CHECKPOINT 用户确认）           | 达 `maxReworkRounds` → L4；达 maxIcebergRounds=5 → L4 用户三选一（继续深挖 / 接受剩余项并放行 / 阶段回退）    |
 | L3  | 跨阶段       | R 报告 `upstreamDefect` 判定（唯一合法回退建议源，phase-5-coding.md「返工路径」节）             | 用户 🔴 CHECKPOINT 裁定回退                             | 回退执行走对应阶段变更流程；O 不得自行切换阶段                                                                |
 | L4  | 项目级       | 🔴 CHECKPOINT                                                                                   | 用户裁定：继续修复 / 接受剩余项并放行 / 阶段回退 / 终止 | —                                                                                                             |
 

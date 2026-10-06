@@ -209,8 +209,9 @@ npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --std
 |---|---|
 | 单阶段 token 超过 `budget.json.perPhase.maxTokens` | 按 `onExceed` 处置；默认 `pause` → 🔴 CHECKPOINT · 预算告警 |
 | 项目级 token 超过 `budget.json.project.maxTokensTotal` | 立即 `halt`；回退到当前阶段起点；告知用户累计消耗 |
-| 单会话 token 超过 `maxTokensPerSession` | 暂停后续子代理分派，建议用户开新会话续接 |
 | `onExceed=notify` 但连续 3 次告警 | 自动升级为 `pause`，强制 🔴 CHECKPOINT |
+
+> 43.0.0 A5：`maxTokensPerSession` 死字段已删除（零消费退役），「单会话 token 上限」不再是预算字段——单次交互爆量由 `perPhase.maxTokens` 用量实效校验（R6）与 killSwitch burnRate 告警（R5-b）承接。
 
 ### kill switch 触发
 
@@ -219,6 +220,8 @@ npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --std
 | 连续阶段返工次数 ≥ `killSwitch.consecutiveReworks` | 全流程暂停；展示返工历史；询问是否降级范围/取消 |
 | 单阶段 token 占 `maxTokens` ≥ `killSwitch.budgetBurnRate` | 暂停后续子代理；展示消耗明细；询问增预算/降范围 |
 | TLA+ 规格返工 ≥ `killSwitch.tlaReworks` | 暂停 TLA+ 建模；询问是否简化建模范围或回退修正需求/设计 |
+
+> **无复位通道**：reworkCount 为 append-only 累计，唯一出口=用户上调 killSwitch 阈值或阶段归档换日志（43.0.0 挑明）。
 
 ### 运行日志维护
 
@@ -335,7 +338,7 @@ run-log 出现坏行（非法 JSON）时的法定重建程序（唯一合法出�
 |---|---|---|
 | A) 确认回退到 `<upstreamPhase>` | O 更新 `project.status` 回退到上游阶段 → 上游阶段重走 S→V→G→（若再次失败）R 循环 | 在回退后的上游阶段 append `rootcause` 动作（`upstreamDefect:true`、`rollbackRecommended:true`、`reportId:"<RC-...>"`；批次 6 A15：原 `escalate`/`rollback` 死词已删除，升级语义由 rootcause 两布尔字段承载） |
 | B) 不回退，继续当前阶段返工 | `round++`，但须用户说明理由 | append `fix` 动作（`round++`），`note` 记用户理由（批次 6 A15：原 `rework` 死词已删除，返工事件载体为 `fix`） |
-| C) 调整 `maxReworkRounds` 继续尝试 | 更新 `budget.json.perPhase.maxReworkRounds`，继续返工 | append `checkpoint` 动作，`acknowledgedDecisions` 记调整决策 |
+| C) 上调 killSwitch 阈值继续尝试 | 用户上调 `budget.json.killSwitch.consecutiveReworks`（43.0.0 A5：`perPhase.maxReworkRounds` 死字段已删除，上调是返工计数的唯一复位出口，见「kill switch 触发」挑明句），继续返工 | append `checkpoint` 动作，`acknowledgedDecisions` 记调整决策 |
 
 **回退后处理**：
 
@@ -343,7 +346,7 @@ run-log 出现坏行（非法 JSON）时的法定重建程序（唯一合法出�
 - 上游阶段通过后，重新进入当前阶段，S 重新产出（不沿用回退前的产物）
 - 回退前的 R 报告归档为「历史根因分析」，可供新一轮 R 参考（避免重复定位）
 
-> 场景 5 与 O6（Escalation Failure）运维失败模式一致：返工达 `maxReworkRounds` 或 R 触发场景 5 均强制 🔴 CHECKPOINT，避免循环卡死。
+> 场景 5 与 O6（Escalation Failure）运维失败模式一致：返工达阶段轮次上限（用户裁定的上限，历史上由已退役的 `maxReworkRounds` 字段承载）或 R 触发场景 5 均强制 🔴 CHECKPOINT，避免循环卡死。
 
 ### 升级与降级
 
@@ -477,8 +480,8 @@ G 子代理在每个阶段门按以下顺序调用，任一退出码 ≠ 0 → O
 
 | 脚本 | 关键校验项（对应修正设计规则表） |
 |---|---|
-| `check-budget.ts`（§5.1） | R1 时效性（`updatedAt` 滞后）· R2 schema 完整 · R3 onExceed 合法 · R4 killSwitch 合法 · R5 触发检测（返工次数 ≥ killSwitch 阈值但 run-log 无告警） |
-| `check-run-log.ts`（§5.2） | R1 阶段动作完整性（chunk/cross/gate/checkpoint 4 类）· R2 tokens 非负 · R3 返工记录一致 · R4 acknowledgedDecisions 非空 · R5 O 越权检测（交叉 `gate-logs/`）· R6 exitCode 一致（SSoT §10E）· R7 append-only（时间戳真值 + **禁止回溯改写历史行或重排时间戳**；记录修正只经 `wm-append-runlog --correct` 追加更正记录，见下「调用约定」） · R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint；V 失败后须先 rootcause 再 S-fix（反模式 #18 轨迹检测），违例走返工循环；处置：补齐缺失动作 / 对齐理想轨迹后重跑）· R9 跨轮次评审一致性（同一产物的 `qualityLevel` 跨轮次差 ≥2 档 → 评审者自身标准漂移，走高成熟度 CHECKPOINT 交人裁定，不走 R；见 [verifier-spec.md](verifier-spec.md) §14.1）· R10 revertEvidence 回滚证伪（fix/emergency-fix 须携带非空 `revertEvidence.command`，**无时间戳豁免**：缺失或非法始终 blocking；处置：由 S-fix 重跑真实回滚命令并补记后重跑）· R11 闭环五脚本齐备（凡有 `action=checkpoint` 且 `outcome=success` 放行的阶段，放行前须已有闭环五门各一条 `role=G` + `outcome=success` + `gateExitCode=0` 的 gate 记录，且时间戳**严格毫秒早于**放行（同毫秒（含无毫秒部分的秒级时间戳）不算早于，无时间戳豁免）；五门对全部阶段（含阶段 1）一律同一判据，无任何例外——处置：补齐缺失的闭环脚本 gate 记录后重跑） |
+| `check-budget.ts`（§5.1） | R1 时效性（43.0.0 A5 顺序化：`budget.updatedAt` 早于 `project.updatedAt` 即违规「预算未随项目演进复核」，相等合法）· R2 schema 完整 · R3 onExceed 合法 · R4 killSwitch 合法 · R5 触发检测（返工次数 ≥ killSwitch 阈值但 run-log 无告警） |
+| `check-run-log.ts`（§5.2） | R1 阶段动作完整性（chunk/cross/gate/checkpoint 4 类）· R2 tokens 非负 + `estimated=true` 违规（约束 #4：tokens 为 LLM 估算值即 blocking，须回填真实运行结果；43.0.0 A5）· R3 返工记录一致 · R4 acknowledgedDecisions 非空 · R5 O 越权检测（交叉 `gate-logs/`）· R6 exitCode 一致（SSoT §10E）· R7 append-only（时间戳真值 + **禁止回溯改写历史行或重排时间戳**；记录修正只经 `wm-append-runlog --correct` 追加更正记录，见下「调用约定」） · R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint；V 失败后须先 rootcause 再 S-fix（反模式 #18 轨迹检测），违例走返工循环；处置：补齐缺失动作 / 对齐理想轨迹后重跑）· R9 跨轮次评审一致性（同一产物的 `qualityLevel` 跨轮次差 ≥2 档 → 评审者自身标准漂移，走高成熟度 CHECKPOINT 交人裁定，不走 R；见 [verifier-spec.md](verifier-spec.md) §14.1）· R10 revertEvidence 回滚证伪（fix/emergency-fix 须携带非空 `revertEvidence.command`，**无时间戳豁免**：缺失或非法始终 blocking；处置：由 S-fix 重跑真实回滚命令并补记后重跑）· R11 闭环五脚本齐备（凡有 `action=checkpoint` 且 `outcome=success` 放行的阶段，放行前须已有闭环五门各一条 `role=G` + `outcome=success` + `gateExitCode=0` 的 gate 记录，且时间戳**严格毫秒早于**放行（同毫秒（含无毫秒部分的秒级时间戳）不算早于，无时间戳豁免）；五门对全部阶段（含阶段 1）一律同一判据，无任何例外——处置：补齐缺失的闭环脚本 gate 记录后重跑） |
 | `check-maturity.ts`（§5.3） | R1 schema 完整 · R2 level 合法 · R4 history 一致 · R5 降级触发 · R6 history 链一致（43.0.0 A4：from==上一条 to / to 严格高于 from / 末条 to 不低于 level——降级后 level 低于末条合法，只锁伪造升级（批次 6 修复轮 1）；原 R3 周期校验随 unlockConditions 死字段退役，规则号不回收） |
 | `check-checkpoint.ts`（§5.4） | R1 acknowledgedDecisions 非空 · R2 决策内容具体（泛化词黑名单）· R3 用户确认存在 · R4 决策与阶段匹配 · R5 跨阶段证据一致（SSoT §10.6 6.3） |
 

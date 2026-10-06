@@ -539,8 +539,8 @@ write_json('.w-model/maturity.json', {
 write_json('.w-model/budget.json', {
   'schemaVersion': '1.0', 'projectId': 'counter-api',
   'createdAt': '2026-09-19T03:00:00+08:00', 'updatedAt': '2026-09-19T03:00:00+08:00',
-  'perPhase': {'maxTokens': 200000, 'maxSubagentSpawns': 10, 'maxReworkRounds': 3},
-  'project': {'maxTokensTotal': 2000000, 'maxTokensPerSession': 500000},
+  'perPhase': {'maxTokens': 200000},
+  'project': {'maxTokensTotal': 2000000},
   'onExceed': 'pause',
   'killSwitch': {'consecutiveReworks': 3, 'budgetBurnRate': 0.9, 'tlaReworks': 3},
 })

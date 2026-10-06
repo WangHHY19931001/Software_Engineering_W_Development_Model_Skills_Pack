@@ -3,7 +3,8 @@
  *
  * 对应 w-model-dev/references/data-models.md BudgetConfig schema（§成本预算与运行日志）
  * 与 w-model-dev/references/operational-recovery.md §成本预算与运行日志。
- * 校验：时效性（R1）+ onExceed 合法（R3）+ killSwitch 触发检测（R5）+ 多角度 R token 预算（R4-A）
+ * 校验：时效性（R1，43.0.0 A5 顺序化：budget.updatedAt < project.updatedAt 违规，相等合法）
+ *      + onExceed 合法（R3）+ killSwitch 触发检测（R5）+ 多角度 R token 预算（R4-A）
  *      + 用量实效（R6，D-4b：Σtokens(阶段/总量) 超上限 → blocking；≥ budgetBurnRate × maxTokens
  *        → killSwitch 用量告警，文案以 `R5-b：` 开头以区别于 R5 的返工/TLA 触发文案）。
  * schema 完整（R2）与 killSwitch.budgetBurnRate 范围（R4）由 budget.schema.json 前置拦截
@@ -51,12 +52,12 @@ export interface BudgetConfig {
   updatedAt: string;
   perPhase: {
     maxTokens: number;
-    maxSubagentSpawns: number;
-    maxReworkRounds: number;
+    // 43.0.0 A5：maxSubagentSpawns / maxReworkRounds 零消费死字段已删除（审计证实无任何门禁消费）；
+    // 旧数据携带这些字段由 budget.schema.json additionalProperties:false 拒绝（毁弃存量，不兼容）。
   };
   project: {
     maxTokensTotal: number;
-    maxTokensPerSession: number;
+    // 43.0.0 A5：maxTokensPerSession 零消费死字段已删除（同上，additionalProperties 拒绝残留字段）。
   };
   onExceed: 'pause' | 'notify' | 'halt';
   killSwitch: {
@@ -91,7 +92,8 @@ export interface BudgetCheckResult {
  *
  * @param budget  budget.json 的解析结果（先经 budget.schema.json 校验，schema 不符即返回 [schema] violations）
  * @param options 交叉校验的运行时上下文，全部可选；缺失的规则会以 warnings 显式声明「未校验」（不静默通过）：
- *   - `projectUpdatedAt` / `budgetCreatedAt`：R1 时效性
+ *   - `projectUpdatedAt` / `budgetCreatedAt`：R1 时效性（43.0.0 A5 顺序化：budget.updatedAt 早于
+ *     projectUpdatedAt 即违规，相等合法；budgetCreatedAt 不再参与判定，仅为既有 options 形状保留）
  *   - `reworkCount` / `tlaReworkCount`：R5 killSwitch 触发检测。口径见文件头「返工计数口径」——
  *     `reworkCount` 是「返工事件 + 未过门事件」的累计条数，故 `consecutiveReworks` 实际约束的是
  *     本阶段返工/未过门事件累计阈值
@@ -135,17 +137,22 @@ export function checkBudget(
   const b = budget as Partial<BudgetConfig>;
   const ks = b.killSwitch;
 
-  // R1 时效性：项目已推进（projectUpdatedAt > budgetCreatedAt）但预算未更新（updatedAt == createdAt）
-  // 注意：updatedAt/createdAt 可能 undefined，须先确认两者均为 string 再比较，避免 undefined == undefined 误报
-  if (
-    options?.projectUpdatedAt &&
-    options?.budgetCreatedAt &&
-    typeof b.updatedAt === 'string' &&
-    typeof b.createdAt === 'string' &&
-    new Date(options.projectUpdatedAt) > new Date(options.budgetCreatedAt) &&
-    b.updatedAt === b.createdAt
-  ) {
-    violations.push('budget.updatedAt == createdAt，项目已推进但预算未更新');
+  // R1 时效性（43.0.0 A5 顺序化）：预算未随项目演进复核——budget.updatedAt **早于** project.updatedAt
+  // 即违规（相等合法）。旧判定「updatedAt == createdAt 且项目已推进」已删除。
+  // 时间戳经 Date 解析为毫秒比较（同库 R4/maturity 先例，禁字符串比较——字符串比较对毫秒精度与
+  // 时区偏移形态会误判）；任一端不可解析 → 跳过该子判定（保持既有宽容形态）并出非阻断诊断（跳过不等于通过）。
+  if (options?.projectUpdatedAt && options?.budgetCreatedAt && typeof b.updatedAt === 'string') {
+    const budgetMs = new Date(b.updatedAt).getTime();
+    const projectMs = new Date(options.projectUpdatedAt).getTime();
+    if (Number.isFinite(budgetMs) && Number.isFinite(projectMs)) {
+      if (budgetMs < projectMs) {
+        violations.push(
+          `R1：budget.updatedAt（${b.updatedAt}）早于 project.updatedAt（${options.projectUpdatedAt}），预算未随项目演进复核`,
+        );
+      }
+    } else {
+      warnings.push('R1 未校验：updatedAt / project.updatedAt 存在不可解析时间戳（跳过不等于通过）');
+    }
   }
 
   // R3 onExceed 合法（schema enum 为前置拦截，此处为纵深防御；存在性检查避免 includes(undefined) 误报）

@@ -615,6 +615,24 @@ function makeEntry(overrides: Partial<RunLogEntry>): RunLogEntry {
   return merged as unknown as RunLogEntry;
 }
 
+describe('run-log R2 扩展：estimated=true tokens 违规化（约束 #4，43.0.0 A5）', () => {
+  it('A5：estimated=true 的 tokens 记录 → R2 blocking（消息含 estimated 与约束 #4 指引）', () => {
+    const log = [makeEntry({ runId: 'est-1', tokens: 1200, estimated: true })];
+    const result = checkRunLog(log);
+    expect(result.passed).toBe(false);
+    const hit = result.violations.find((v) => v.includes('estimated'));
+    expect(hit, '应产出含 estimated 的违规').toBeDefined();
+    expect(hit).toContain('R2');
+    expect(hit).toContain('约束 #4');
+  });
+
+  it('estimated=false 不受影响（只加违规判定，不改 Σtokens 求和口径）', () => {
+    const result = checkRunLog([makeEntry({ runId: 'est-0', tokens: 1200, estimated: false })]);
+    expect(result.passed).toBe(true);
+    expect(result.violations.some((v) => v.includes('estimated'))).toBe(false);
+  });
+});
+
 describe('run-log R8 轨迹模板校验（agentic Ch19 轨迹符合性）', () => {
   it('已完成阶段 gate 在 checkpoint 之后 → 违规', () => {
     const lines = [

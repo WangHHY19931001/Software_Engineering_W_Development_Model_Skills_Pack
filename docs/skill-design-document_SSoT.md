@@ -669,7 +669,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 | O3  | Verifier Theater（V 子代理"looks good"但 CI 挂）     | V 评审 passed=true qualityLevel=A 但下游测试失败                  | 与 #1（跳过评审）对立面：评审走了形式                               | 强化 verifier-spec §1 设计原则：V 默认拒绝姿态（"find reasons to reject"）；V 须引用具体 evidence 非空泛；G 校验 evidence 非空 |
 | O4  | Comprehension Debt Spiral（用户橡皮图章 CHECKPOINT） | 用户对所有 CHECKPOINT 输入"确认"无修改意见；阶段产物无人理解      | 与 F5（sycophantic）互补：F5 是 Agent 奉承用户，O4 是用户奉承 Agent | 理解证据机制（§10.6 第六维度）：放行前须填 acknowledgedDecisions ≥1 关键决策；空确认视为 O4 命中                               |
 | O5  | Cognitive Surrender（"循环处理了"无设计意见）        | 用户放弃对设计/架构的意见；全权委托 Agent                         | 与 §4A.1 第 3 条（Push Back）对立面                                 | 阶段 2/4 设计 CHECKPOINT 强制用户提出 ≥1 修改意见或替代方案；无意见视为 O5 命中                                                |
-| O6  | Escalation Failure（attempt cap 触发但无人被通知）   | 返工达 maxReworkRounds 但用户未被告知；循环卡死                   | 与 #8（越过 CHECKPOINT）互补：#8 是显式越过，O6 是隐式卡死          | attempt cap 触发 → run-log append escalate 记录 + 强制 🔴 CHECKPOINT 展示返工历史                                              |
+| O6  | Escalation Failure（attempt cap 触发但无人被通知）   | 返工达 maxReworkRounds（perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载）但用户未被告知；循环卡死                   | 与 #8（越过 CHECKPOINT）互补：#8 是显式越过，O6 是隐式卡死          | attempt cap 触发 → run-log append escalate 记录 + 强制 🔴 CHECKPOINT 展示返工历史                                              |
 
 > O 系列命中不回退，但应在 run-log 的 `operationalFailureModes` 字段标注（如 `"operationalFailureModes": ["O1"]`；`note` 中的 O1~O6 字样按引用处理——如 O3 同时是评审规则编号，不计入 R5），并在阶段产物「备注」节或评审报告 reworkHints 中记录。O4/O5 直接关联 CHECKPOINT 有效性，命中时拒绝放行。
 
@@ -1818,12 +1818,9 @@ interface BudgetConfig {
   updatedAt: string;
   perPhase: {
     maxTokens: number;
-    maxSubagentSpawns: number;
-    maxReworkRounds: number;
   };
   project: {
     maxTokensTotal: number;
-    maxTokensPerSession: number;
   };
   onExceed: 'pause' | 'notify' | 'halt';
   killSwitch: {
@@ -1833,6 +1830,8 @@ interface BudgetConfig {
   };
 }
 ```
+
+> 43.0.0 A5：`perPhase.maxSubagentSpawns` / `perPhase.maxReworkRounds` / `project.maxTokensPerSession` 三个零消费死字段已删除（审计证实无任何门禁脚本消费）；旧数据携带这些字段被 `additionalProperties:false` 拒绝（毁弃存量，不兼容）。阶段返工轮次上限由 `killSwitch.consecutiveReworks`（D-4a 口径）与分层反馈回路（L0-L4）承载。
 
 - `onExceed=pause`：暂停后续子代理分派，🔴 CHECKPOINT · 预算告警，等用户决定（增预算/降范围/取消）
 - `onExceed=notify`：仅在 run-log 记录告警，继续执行（适合 L2+ 自主度）
@@ -1923,14 +1922,15 @@ interface RunLogEntry {
 
 1. 读取 budget.json
 2. 汇总 run-log.jsonl 中本阶段（phase=N）所有记录的 tokens 总和 = phaseTokensUsed
-3. 汇总 run-log.jsonl 中本阶段 subagentSpawns 总和 = phaseSpawns
-4. 汇总 run-log.jsonl 中全项目 tokens 总和 = projectTokensUsed
-5. 判定：超 maxTokens / maxSubagentSpawns / maxTokensTotal → 触发告警；killSwitch 任一条件满足 → 触发 kill switch
-6. 按 onExceed 处置：pause（🔴 CHECKPOINT）/ notify（run-log 记录）/ halt（回退阶段起点）
+3. 汇总 run-log.jsonl 中全项目 tokens 总和 = projectTokensUsed
+4. 判定：超 maxTokens / maxTokensTotal → 触发告警（用量实效 R6/R5-b，D-4b）；killSwitch 任一条件满足 → 触发 kill switch
+5. 按 onExceed 处置：pause（🔴 CHECKPOINT）/ notify（run-log 记录）/ halt（回退阶段起点）
+
+> 43.0.0 A5：原步骤 3「汇总 subagentSpawns = phaseSpawns」及步骤 5 判定枚举中的 `maxSubagentSpawns` 已随该死字段退役删除——子代理分派次数从未有任何门禁消费（审计证实零消费）。
 
 ### 10D.6 关键约束
 
-- **不引入 LLM 估算**（约束 4）：tokensEstimate 由宿主 Agent 报告实际消耗（estimated=false）；estimated=true 违反约束4，应避免。
+- **不引入 LLM 估算**（约束 4）：tokensEstimate 由宿主 Agent 报告实际消耗（estimated=false）；estimated=true 违反约束4，`check-run-log.ts` R2 对其报 blocking 违规（43.0.0 A5 违规化），须回填真实运行结果。
 - **预算检查不替代门禁脚本**（反模式 #3/#6）：预算超限触发的是暂停/告警，不是放行/否决；放行仍由 G 子代理退出码决定。
 - **kill switch 是暂停不是终止**：触发 kill switch 后须 🔴 CHECKPOINT 展示消耗明细，由用户决定增预算/降范围/取消。
 - **run-log 是 append-only**：不得修改历史记录；运行时读取不得以「跳过坏行继续」处置——坏行的唯一合法出口是法定重建程序（CHECKPOINT 批准 → 快照 → 仅剔坏行重写 → `rebuild-of:` 追加记录 → 复跑门禁；见 `w-model-dev/references/operational-recovery.md`「run-log 坏行法定重建程序」节），且门禁对空/坏行 **fail-closed**（见 §10D.8），不得把坏行静默当作证据缺失放行。
@@ -1941,7 +1941,7 @@ interface RunLogEntry {
 > 本节确立强制校验项。
 > 实现位置：[`w-model-dev/scripts/cli/check-budget.ts`](../w-model-dev/scripts/cli/check-budget.ts) + [`w-model-dev/scripts/cli/check-run-log.ts`](../w-model-dev/scripts/cli/check-run-log.ts)（CLI 校验，确定性无 LLM）。
 
-- **预算更新时戳**：每个阶段门放行前，`budget.json.updatedAt` 须更新为当前时间戳（证明预算检查已执行，非沿用历史值）；未更新 → `check-budget.ts` 退出码 1。
+- **预算更新时戳**：每个阶段门放行前，`budget.json.updatedAt` 须更新为当前时间戳（证明预算检查已执行，非沿用历史值）；`budget.updatedAt` **早于** `project.updatedAt`（预算未随项目演进复核）→ `check-budget.ts` 退出码 1（43.0.0 A5 顺序化：相等合法，毫秒比较，任一端不可解析跳过该子判定并出非阻断诊断）。
 - **killSwitch 告警**：killSwitch 任一触发条件满足（`consecutiveReworks` / `budgetBurnRate` / `tlaReworks`）时须产出告警（run-log 记录 + 🔴 CHECKPOINT 展示消耗明细），不得静默；`check-budget.ts` 校验 killSwitch 触发但 run-log 无对应告警记录 → 退出码 1。
 - **killSwitch 返工计数口径（D-4a，对齐真实事件）**：`check-budget.ts` 的 `reworkCount` 按**真实事件**累计——`action=fix`（批次 6 A15：rework/emergency-fix 死词已删除，返工事件载体为 fix）**或** `outcome ∈ {fail, rework}` 的记录各计 1 条（`countReworks` 已导出以供测试）；它是「返工事件 + 未过门事件」的**累计**条数而非「连续 N 轮返工」的滑动窗口，`consecutiveReworks` 实际约束的是本阶段累计阈值（字段名沿用 schema，语义以本口径为准）；若提供 `--phase=N` 则只统计 `phase===N` 的记录。`tlaReworkCount` 为其中 note/target 含 TLA 的子集（未扩大 tla 判据：非返工记录即使提及 TLA 也不计入）。背景：真实 8 阶段调测的 run-log 中 `action=rework` 一条都没有（返工以 fix/fail 记录），旧口径只数 `action=rework` 会让护栏静默失灵。
 - **用量实效校验 R6 + burnRate 告警 R5-b（D-4b）**：预算配置合法 ≠ 用量在预算内。`check-budget.ts --run-log=<path>` 从 run-log 累计 tokens（只计有限非负数的 `tokens` 字段，坏值剔除否则 Σ 变 NaN 而判定静默永不触发），Σtokens(阶段) 严格大于 `perPhase.maxTokens` 或 Σtokens(全量) 严格大于 `project.maxTokensTotal` → **blocking（退出码 1）**（消息以 `R6：` 开头并附超限占比；恰等于上限不算超限）；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` → killSwitch 用量告警（消息以 `R5-b：` 开头，与 R5 既有返工/TLA 文案区分）。**未接线不静默（D-5②/N-6）**：未提供 `--run-log` 时 R5 触发检测与 R6/R5-b 一并跳过（退出码行为与新增前一字不变），但**不再静默**——CLI 输出非阻断诊断（跳过不等于通过）；故**权威调用表必带** `--run-log=.w-model/run-log.jsonl --phase=N`，不带接线属未接线运行。**Σtokens 为上界口径（宁严不松）**：同一分派的多条归账重复累计、判超限不去重——分组键与键守卫、疑似重复归账诊断、R3 三条目归账约定以及 Σtokens=0 / 读取失败两条边界的完整口径，见 `w-model-dev/references/data-models.md`「用量实效校验」段（R6）与其「Σtokens 为上界口径」条。

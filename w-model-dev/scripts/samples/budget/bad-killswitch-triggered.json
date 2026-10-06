@@ -4,13 +4,10 @@
   "createdAt": "2026-07-01T00:00:00Z",
   "updatedAt": "2026-07-23T18:00:00Z",
   "perPhase": {
-    "maxTokens": 200000,
-    "maxSubagentSpawns": 10,
-    "maxReworkRounds": 3
+    "maxTokens": 200000
   },
   "project": {
-    "maxTokensTotal": 2000000,
-    "maxTokensPerSession": 500000
+    "maxTokensTotal": 2000000
   },
   "onExceed": "pause",
   "killSwitch": {

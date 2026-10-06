@@ -1147,7 +1147,7 @@ S-fix 之后的复审是**受范围约束的复审**（scoped re-review），不
 - **范围 = findings 清单 + fix diff 两项**：对 findings 清单**逐条**出结论，并检查 fix diff 本身是否引入新问题；fix 未触及的代码不在本次复审范围内。
 - **逐 finding 结论**（按 findings 原顺序）：`<finding 一行摘要> — ADDRESSED | NOT ADDRESSED`，附 `file:line` 证据；**「Attempted」不算 addressed**——那条具体缺陷必须已经不存在。
 - **Minor 不进 loop**：Minor 记入进度台账并指向最终整分支复审，不触发 fix 分派、不计入轮次上限。
-- **一轮 = 一次 fix 分派 + 一次 scoped re-review**，**每任务最多 5 轮**；该上限不放松 `budget.json.perPhase.maxReworkRounds`，两者取更严者。
+- **一轮 = 一次 fix 分派 + 一次 scoped re-review**，**每任务最多 5 轮**；该上限不放松 `budget.json.killSwitch.consecutiveReworks`（perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载），两者取更严者。
 - **范围外观察不阻塞**：完全落在 fix diff 之外的问题记为范围外观察，不阻塞本任务、不延长 loop。
 - **R 前置不变（`普通 V/G 失败链`）**：V/G 不通过须先分派 R 定位根因，R 报告经 V 复审 + G 门禁（`check-rootcause-report.ts` exitCode=0）通过后才分派 S-fix；scoped re-review 不是跳过 R 的旁路（反模式 #18 / #19）。
 

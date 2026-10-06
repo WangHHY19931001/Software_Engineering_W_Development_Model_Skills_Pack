@@ -1428,12 +1428,12 @@ const BUDGET_CASES: BudgetCase[] = [
   {
     file: 'bad-stale.json',
     expectedPassed: false,
-    expectedReasonPatterns: [/updatedAt == createdAt/],
+    expectedReasonPatterns: [/预算未随项目演进复核/],
     options: {
       projectUpdatedAt: '2026-07-23T18:00:00Z',
       budgetCreatedAt: '2026-07-01T00:00:00Z',
     },
-    description: 'updatedAt==createdAt 且项目已推进，应被 R1 时效性校验拦截',
+    description: 'updatedAt 早于 project.updatedAt（预算未随项目演进复核），应被 R1 时效性（43.0.0 A5 顺序化）校验拦截',
   },
   {
     file: 'bad-killswitch-triggered.json',

@@ -3,7 +3,7 @@
  *
  * 对应 w-model-dev/references/data-models.md RunLogEntry schema（§运行日志模型）
  * 与 w-model-dev/references/operational-recovery.md §5.2。
- * 校验：R1 阶段动作完整性 + R2 tokens 非负 + R3 返工记录一致
+ * 校验：R1 阶段动作完整性 + R2 tokens 非负 + estimated=true 违规（约束 #4，43.0.0 A5）+ R3 返工记录一致
  *       + R4 acknowledgedDecisions 非空 + R5 O 越权检测 + R6 exitCode 一致
  *       + R7 append-only 时序（相邻时间戳非递减，允许相等）。
  *       + R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint）
@@ -1054,10 +1054,17 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
-  // R2 tokens 非负
+  // R2 tokens 非负 + estimated 违规（43.0.0 A5：estimated=true → tokens 为 LLM 估算值，
+  // 违反约束 #4 真实执行 → blocking；只加违规判定，不改 Σtokens 求和口径——check-budget
+  // sumTokens 不筛 estimated，上界口径与新增前一字不变）
   for (const e of valid) {
     if (typeof e.tokens === 'number' && e.tokens < 0) {
       violations.push(`R2: 条目 ${e.runId ?? '?'} tokens 为负: ${e.tokens}`);
+    }
+    if (e.estimated === true) {
+      violations.push(
+        `R2: 条目 ${e.runId ?? '?'} tokens 为估算值（estimated=true），违反约束 #4 真实执行——必须回填真实运行结果`,
+      );
     }
     // checkpoint success 须 tokens > 0（除非 note 标注首次/L0）
     // L0 首次或 note 含 "首次" 可豁免——简化：仅当 note 不含 "首次" 时报

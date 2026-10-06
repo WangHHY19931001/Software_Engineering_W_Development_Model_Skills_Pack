@@ -317,18 +317,12 @@ interface BudgetConfig {
   perPhase: {
     /** 单阶段累计 token 上限；超过触发 onExceed */
     maxTokens: number;
-    /** 单阶段子代理分派次数上限（S+V+G+A 合计）；超过触发 onExceed */
-    maxSubagentSpawns: number;
-    /** 单阶段返工循环上限（默认 3，与 operational-recovery.md「同一阶段返工超过 2 次」一致+1） */
-    maxReworkRounds: number;
   };
 
   /** 项目级全局预算 */
   project: {
     /** 全阶段累计 token 上限；超过触发 onExceed */
     maxTokensTotal: number;
-    /** 单次会话 token 上限（防止单次交互爆量） */
-    maxTokensPerSession: number;
   };
 
   /** 预算超限时的处置策略 */
@@ -359,6 +353,8 @@ interface BudgetConfig {
 }
 ```
 
+> **43.0.0 A5 死字段退役**：`perPhase.maxSubagentSpawns` / `perPhase.maxReworkRounds` / `project.maxTokensPerSession` 三个零消费死字段已删除（审计证实无任何门禁脚本消费）；旧数据携带这些字段将被 `additionalProperties:false` 拒绝（毁弃存量，不兼容）。阶段返工轮次上限由 `killSwitch`（`consecutiveReworks`，D-4a 口径）与分层反馈回路（L0-L4）承载，不再以预算字段登记。
+
 **默认值**（`/wm analyze` 首次初始化时写入，用户可改）：
 
 ```json
@@ -368,13 +364,10 @@ interface BudgetConfig {
   "createdAt": "<now>",
   "updatedAt": "<now>",
   "perPhase": {
-    "maxTokens": 500000,
-    "maxSubagentSpawns": 30,
-    "maxReworkRounds": 3
+    "maxTokens": 500000
   },
   "project": {
-    "maxTokensTotal": 4000000,
-    "maxTokensPerSession": 1000000
+    "maxTokensTotal": 4000000
   },
   "onExceed": "pause",
   "killSwitch": {
@@ -394,8 +387,8 @@ interface BudgetConfig {
 
 - `budget.json` 由编排者 O 维护，属"状态读写+持久化"允许动作（非实施，不触发反模式 #10）。
 - 编排者在每个阶段门放行前执行预算检查（汇总 `run-log.jsonl` 中本阶段/全项目 tokens），超限按 `onExceed` 处置。
-- `tokensEstimate` 由宿主 Agent 报告实际消耗（`estimated=false`）；不得用 LLM 估算（`estimated=true` 违反约束 4）。
-- `budget.updatedAt` 须在每个阶段门放行前更新（编排者 O 在 CHECKPOINT 放行时同步刷新为当前时间戳）。与 `check-budget.ts` R1 时效性校验对齐：当 `project.updatedAt > budget.createdAt` 时须满足 `budget.updatedAt > budget.createdAt`，否则报「阶段推进但 budget 未更新」。
+- `tokensEstimate` 由宿主 Agent 报告实际消耗（`estimated=false`）；不得用 LLM 估算（`estimated=true` 违反约束 4；43.0.0 A5 起 `check-run-log.ts` R2 对 `estimated=true` 记录报 blocking 违规，须回填真实运行结果）。
+- `budget.updatedAt` 须在每个阶段门放行前更新（编排者 O 在 CHECKPOINT 放行时同步刷新为当前时间戳）。与 `check-budget.ts` R1 时效性校验对齐（43.0.0 A5 顺序化）：`budget.updatedAt` **不得早于** `project.updatedAt`——早于即报「预算未随项目演进复核」（相等合法）；时间戳按毫秒比较，任一端不可解析则跳过该子判定并出非阻断诊断（跳过不等于通过）。
 - 预算检查不替代门禁脚本（反模式 #3/#6）：预算超限触发暂停/告警，放行仍由 G 子代理退出码决定。
 - `rootcauseParallelBudget` 为多角度 R 的 token 预算配置（字段名保留向后兼容，实际含义为「每轮多角度 R 的 token 预算」，不论并行/串行均累计）。由 [`check-budget.ts`](../scripts/cli/check-budget.ts) R4-A 规则校验：每轮 persona 数 ≤ `maxPersonasPerRound`、每个 persona tokens ≤ `maxTokensPerPersona`、每轮总 tokens ≤ `maxTotalTokensPerRound`（串行分派时累计校验，超限触发 killSwitch）。未配置该字段时不校验（向后兼容）。
 - **用量实效校验（R6，D-4b）**：预算配置合法 ≠ 用量在预算内。`check-budget.ts --run-log=` 从 `run-log.jsonl` 累计 `tokens`（Σtokens(阶段) 与 Σtokens(全量)；只累计有限非负数的 `tokens` 字段，坏值不计入），再与上限比对：Σtokens(阶段) > `perPhase.maxTokens` **或** Σtokens(全量) > `project.maxTokensTotal` → **blocking（退出码 1）**，违规消息以 `R6：` 开头并附超限占比；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` 时另报 killSwitch 用量告警（**R5-b**，消息以 `R5-b：` 开头，与 R5 的返工/TLA 触发文案区分——R5 既有文案「killSwitch 应触发（返工 N >= M）但未告警」逐字不变）。未提供 `--run-log`（即无用量输入）时 R6/R5-b 整体跳过（**判据与退出码不变**），但输出非阻断诊断「R6/R5-b 未生效（未提供 run-log）」——省略该参数不再等于静默跳过（D-5② 未接线可见化；live run 实测 9/9 次调用均未传该参数，R6/R5-b 全程静默，故权威调用表把 `--run-log` 定为必带，见 `operational-recovery.md`「调用时机」表）；`--run-log` 文件存在且 Σtokens=0（无 `tokens` 记录）时输出「R6 未生效」非阻断警告（跳过不等于通过；读取失败时该警告不追加，避免把「没读到」说成「没用量」）；提供了 `--run-log` 但**读取失败**时同样**不出**「未接线」诊断（此时走该门自身的失败路径：stderr 读取失败警告已说明跳过原因，R5/R6/R5-b 同样跳过）。背景：真实 8 阶段调测实耗 580M tokens 而门禁全程未红，`perPhase.maxTokens`/`project.maxTokensTotal` 形同虚设。
