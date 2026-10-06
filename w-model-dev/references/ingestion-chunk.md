@@ -144,11 +144,11 @@ A-chunk 独立产出时只能初判跨块关系，最终跨块边由 A-cross 在
 
 A-chunk 提取每个实体时，同步识别信息流（与结构边正交）：
 
-- **consumes**：该实体消费了哪些上游信息 → 写 `{from:上游, to:本实体, type:"consumes"}`
-- **produces**：该实体产出了哪些下游信息 → 写 `{from:本实体, to:下游, type:"produces"}`
+- **produces（唯一信息流边类型，单向）**：该实体产出了哪些下游信息 → 写 `{from:本实体, to:下游, type:"produces"}`；实体消费上游信息同样用 produces 表达（`{from:上游, to:本实体, type:"produces"}`），方向由 `{from,to}` 表达（D21）
+- **consumes 已移除（D21）**：不存在 consumes 边类型；若按旧习惯写 `{..., type:"consumes"}` 将被 schema 拒绝
 - **边界节点**：识别外部信息源写 `EXT-IN` 节点、外部信息汇写 `EXT-OUT` 节点（DFD terminator）
 
-方向约定：produces/consumes 的 `{from,to}` 一律表信息流方向。目标：让 G 跑 check-requirement-graph.ts 时每个业务节点入流出流均 ≥1、边界各 ≥1（无黑洞/奇迹/死模块）。
+方向约定：信息流边统一 produces 单向，`{from,to}` 一律表信息流方向（consumes 边类型已移除，写入将被 schema 拒绝）。目标：让 G 跑 check-requirement-graph.ts 时每个业务节点入流出流均 ≥1、边界各 ≥1（无黑洞/奇迹/死模块）。
 
 ## blocked 返回条件
 

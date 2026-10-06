@@ -19,6 +19,8 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 **交付层**：L0「纯 skill」= `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/`，拷贝即激活；L1「带门禁」= L0 + `scripts/` + `samples/` + `tools/`（需项目根 `npm install`）。L0 文档中指向 `scripts/`、`samples/`、`tools/` 的链接统一为 **L1-only 导航**（权威定义：SSoT §3.5）：L0 副本预期不含目标，链接检查须将其分类为分层边界且不得报告“L0 全链接通过”；取得 L1 后才校验这些目标。5 分钟上手见 [references/quickstart.md](references/quickstart.md)；安装细节见 `docs/INSTALL.md` §2。
 
+**L0 运行时行为**：纯 L0 副本下全部脚本门禁不可用——编排者跳过 G 子代理脚本门禁，改由 V 评审 + 用户确认把关，并在 `project.status` 标记 `gateLevel: "l0"`；该标记本身无脚本可验，属自我声明（L1 用户不受影响）。
+
 ## 触发决策
 
 | 用户信号                                                                              | 行为                                                                                                                                                                                                                                                                                                            |

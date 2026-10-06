@@ -336,7 +336,7 @@ npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json or conso
 - 阶段4：+ `DD_without_realizes=0`（追溯项 3 个）—— **硬约束零违反才放行进阶段5**
 
 信息流层（与结构层同节奏，详见 [`information-flow-validation-design.md`](./information-flow-validation-design.md) §2.2）：
-- 阶段1：REQ 信息流闭合（**严格**，与结构连通同级）—— REQ 子图 `produces`/`consumes` 连通 + `EXT-IN`/`EXT-OUT` 边界完整 + 无 REQ 黑洞/奇迹/死模块
+- 阶段1：REQ 信息流闭合（**严格**，与结构连通同级）—— REQ 子图 `produces` 单向连通 + `EXT-IN`/`EXT-OUT` 边界完整 + 无 REQ 黑洞/奇迹/死模块
 - 阶段2：+ SD 节点无黑洞/奇迹/死模块（硬约束）
 - 阶段3：+ INTF 节点无黑洞/奇迹/死模块（硬约束）
 - 阶段4：+ DD 节点无黑洞/奇迹/死模块；`--phase=4` **信息流零违反 ∧ 结构零违反**才放行进编码（硬约束）

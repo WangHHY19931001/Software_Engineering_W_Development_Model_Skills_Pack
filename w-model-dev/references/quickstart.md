@@ -12,7 +12,7 @@ git clone <本仓库> && cd <仓库目录>
 npm install          # 同时装配 git hooks（core.hooksPath .githooks）
 ```
 
-只要纯提示词/模板（L0）？把 `w-model-dev/` 下 `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/` 拷贝到宿主技能目录即可，无需 npm。L0 直接由 Agent 读取 `SKILL.md` 并按需加载 references/templates/examples；其中指向 `scripts/`、`samples/`、`tools/` 的链接是 L1-only 导航（权威定义见仓库 SSoT §3.5），在 L0 副本中目标预期不存在，不能据此宣称 L0 全链接通过。
+只要纯提示词/模板（L0）？把 `w-model-dev/` 下 `SKILL.md` + `references/` + `templates/` + `examples/` + `subagent/` + `schemas/` 拷贝到宿主技能目录即可，无需 npm。L0 直接由 Agent 读取 `SKILL.md` 并按需加载 references/templates/examples；其中指向 `scripts/`、`samples/`、`tools/` 的链接是 L1-only 导航（权威定义见仓库 SSoT §3.5），在 L0 副本中目标预期不存在，不能据此宣称 L0 全链接通过。**L0 运行时行为**：纯 L0 副本下全部脚本门禁不可用——编排者跳过 G 子代理脚本门禁，改由 V 评审 + 用户确认把关，并在 `project.status` 标记 `gateLevel: "l0"`；该标记本身无脚本可验，属自我声明（L1 用户不受影响）。细则见 `SKILL.md`「交付层」节。
 
 ## 3. 验证安装（仅 L1）
 
