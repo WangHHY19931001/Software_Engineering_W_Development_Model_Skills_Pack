@@ -289,28 +289,28 @@ describe('43.0.0 sigHash v3 单公式', () => {
   };
 
   it('v3 公式逐字段手工拼串独立重算一致（14 字段全量入哈希，含 sourceArtifacts 槽位）', () => {
-    // 独立实现 v3 公式（与 logic 层同构），防实现漂移
-    const FIELDS = [
-      'sigId',
-      'phase',
-      'role',
-      'action',
-      'runId',
-      'artifacts',
-      'sourceArtifacts',
-      'prevSigHash',
-      'signedAt',
-      'signer',
-      'inputProvenance',
-      'targetKind',
-      'gateExitCode',
-      'gateLogPath',
-    ];
-    const JSONF = new Set(['artifacts', 'sourceArtifacts', 'inputProvenance']);
-    const record = base as unknown as Record<string, unknown>;
-    const canonical = FIELDS.map((f) =>
-      JSONF.has(f) ? JSON.stringify(record[f] ?? null) : String(record[f] ?? ''),
-    ).join('|');
+    // 独立实现 v3 公式（与 logic 层同构）：按 SIG_HASH_FIELDS_V3 顺序逐字段 dot 取值
+    // （JSON_FIELDS 三字段 JSON.stringify ?? null，其余 String ?? ''），防实现漂移；
+    // 显式 dot 访问无动态键，object-injection 安全。
+    const canonical = [
+      String(base.sigId ?? ''),
+      String(base.phase ?? ''),
+      String(base.role ?? ''),
+      String(base.action ?? ''),
+      String(base.runId ?? ''),
+      JSON.stringify(base.artifacts ?? null),
+      // 'sourceArtifacts' 槽位恒为 'null'：运行时 SignatureChainEntry 无顶层该属性
+      // （真实来源经 inputProvenance 槽位入哈希），与 logic 层原 cast 读取（undefined）行为一致
+      JSON.stringify(null),
+      String(base.prevSigHash ?? ''),
+      String(base.signedAt ?? ''),
+      String(base.signer ?? ''),
+      JSON.stringify(base.inputProvenance ?? null),
+      // base 未设可选字段 targetKind → 该槽位恒为 ''
+      String(''),
+      String(base.gateExitCode ?? ''),
+      String(base.gateLogPath ?? ''),
+    ].join('|');
     const expected = 'sha256:' + createHash('sha256').update(canonical, 'utf8').digest('hex');
     expect(computeSigHash(base)).toBe(expected);
   });

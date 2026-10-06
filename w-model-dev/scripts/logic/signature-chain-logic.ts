@@ -158,7 +158,61 @@ const JSON_FIELDS: ReadonlySet<string> = new Set(['artifacts', 'sourceArtifacts'
  */
 export function computeSigHash(entry: Omit<SignatureChainEntry, 'sigHash'>): string {
   const canonical = SIG_HASH_FIELDS_V3.map((field) => {
-    const value = (entry as Record<string, unknown>)[field];
+    // 显式字段白名单取值（switch 穷举 SIG_HASH_FIELDS_V3 字面量联合，dot 访问无动态键注入面；
+    // 新增字段漏分支由下方 never 守卫在编译期报错），行为与逐字段读取完全等价（v3 哈希公式不变）。
+    let value: unknown;
+    switch (field) {
+      case 'sigId':
+        value = entry.sigId;
+        break;
+      case 'phase':
+        value = entry.phase;
+        break;
+      case 'role':
+        value = entry.role;
+        break;
+      case 'action':
+        value = entry.action;
+        break;
+      case 'runId':
+        value = entry.runId;
+        break;
+      case 'artifacts':
+        value = entry.artifacts;
+        break;
+      // 'sourceArtifacts' 槽位：schema 顶层 additionalProperties=false 且无该属性（真实来源
+      // 经 inputProvenance 槽位入哈希），原 cast 读取恒为 undefined → canonical 恒为 'null'。
+      // 保留该槽位维持 v3 canonical 串逐字节稳定（既有签名可重算），不改变哈希公式。
+      case 'sourceArtifacts':
+        value = undefined;
+        break;
+      case 'prevSigHash':
+        value = entry.prevSigHash;
+        break;
+      case 'signedAt':
+        value = entry.signedAt;
+        break;
+      case 'signer':
+        value = entry.signer;
+        break;
+      case 'inputProvenance':
+        value = entry.inputProvenance;
+        break;
+      case 'targetKind':
+        value = entry.targetKind;
+        break;
+      case 'gateExitCode':
+        value = entry.gateExitCode;
+        break;
+      case 'gateLogPath':
+        value = entry.gateLogPath;
+        break;
+      default: {
+        const exhaustive: never = field;
+        void exhaustive;
+        value = undefined;
+      }
+    }
     return JSON_FIELDS.has(field) ? JSON.stringify(value ?? null) : String(value ?? '');
   }).join('|');
   return 'sha256:' + createHash('sha256').update(canonical, 'utf8').digest('hex');

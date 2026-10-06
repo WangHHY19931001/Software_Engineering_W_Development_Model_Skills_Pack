@@ -187,8 +187,9 @@ function isSensitiveKey(key: string): boolean {
   const segments = key.split(SENSITIVE_KEY_SEGMENT_SPLIT).filter((segment) => segment.length > 0);
   for (let start = 0; start < segments.length; start += 1) {
     let joined = '';
-    for (let end = start; end < segments.length; end += 1) {
-      joined += normalizeSensitiveKey(segments[end]!);
+    // slice + for-of 取代 segments[end] 动态下标取值（受控遍历，object-injection 安全，行为等价）
+    for (const segment of segments.slice(start)) {
+      joined += normalizeSensitiveKey(segment);
       if (joined.length >= 6 && SENSITIVE_KEYS.has(joined)) return true;
     }
   }
@@ -382,12 +383,20 @@ async function buildExportFiles(state: string, sourceReal: string): Promise<Expo
     if (measurementKey)
       sourceMeasurements.get(measurementKey)!.push({ path: source.sourceRelative, sha256: sha256(sourceContent) });
     entries.push({
-      file: { path: source.sourceRelative, sha256: sha256(sanitized), kind: source.kind },
+      file: {
+        path: source.sourceRelative,
+        sha256: sha256(sanitized),
+        kind: source.kind,
+      },
       content: sanitized,
     });
   }
   entries.sort((left, right) => comparePaths(left.file.path, right.file.path));
-  return { entries, files: entries.map(({ file }) => file), sourceMeasurements };
+  return {
+    entries,
+    files: entries.map(({ file }) => file),
+    sourceMeasurements,
+  };
 }
 function sanitizeSensitiveAssignment(line: string): string {
   const prefix = line.match(/^\s*(?:[-*>+]\s+|\[[A-Z]+\]\s+|`+\s*)/i)?.[0] ?? '';
@@ -705,7 +714,10 @@ export async function exportEvidence(projectDir: string, outputDir: string): Pro
       provenance: toExportProvenance(sourceProvenance, sortedFiles),
       files: sortedFiles,
     };
-    const manifest: EvidenceManifest = { ...manifestBase, manifestSha256: hashManifest(manifestBase) };
+    const manifest: EvidenceManifest = {
+      ...manifestBase,
+      manifestSha256: hashManifest(manifestBase),
+    };
     if (!validateBySchema('evidence-manifest', manifest).valid) throw new EvidenceFailure(1, 'INVALID_MANIFEST');
     await atomicWrite(path.join(staging, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + '\n');
     await assertSafeOutputPath(output, sourceReal);
