@@ -63,7 +63,7 @@ R 签名插入在 V/G 失败之后、S-fix 之前；S-fix 须包含 R 报告作�
 
 返工环上的 `targetKind` 填写约定（D-1）：
 
-- **S(fix)/S(emergency-fix)**：消费 R 报告是义务而非越权（action 即为例外判据，`targetKind` 可不填或填 `standard`）
+- **S(fix)**：消费 R 报告是义务而非越权（action 即为例外判据，`targetKind` 可不填或填 `standard`；A15 注记：emergency-fix 已随 43.0.0 A15 从 action 词表删除）
 - **V(review-fix)**：复审 RootCauseReport 的环填 `targetKind: "rootcause"`
 - **R(locate) 做预防性审查（R3）**：消费 S 产物的环填 `targetKind: "preventive"`
 - 冰山扫掠（ICEBERG-A/B）环填 `targetKind: "iceberg"`；其余所有环不填（缺省即 `standard`）。尾注：该值当前**不解锁 R9 例外**（R-iceberg 环消费 S 产物仍须按 §3 矩阵裁定；`isAllowedSource` 三例外不含 `iceberg`）
@@ -92,9 +92,11 @@ R 签名插入在 V/G 失败之后、S-fix 之前；S-fix 须包含 R 报告作�
 
 | 例外               | 条件（三者须同时成立）                                   | 设计依据                                                         |
 | ------------------ | -------------------------------------------------------- | ---------------------------------------------------------------- |
-| S-fix 消费 R       | `role=S` ∧ `srcRole=R` ∧ `action ∈ {fix, emergency-fix}` | S-fix 必须携带 R 报告执行返工修复（反模式 #18 守护）             |
+| S-fix 消费 R       | `role=S` ∧ `srcRole=R` ∧ `action=fix`                     | S-fix 必须携带 R 报告执行返工修复（反模式 #18 守护）             |
 | V 复审 R 报告      | `role=V` ∧ `srcRole=R` ∧ `targetKind=rootcause`          | V 复审 RootCauseReport（返工链 V→G 必经环节，反模式 #19 守护）   |
 | R 预防性审查消费 S | `role=R` ∧ `srcRole=S` ∧ `targetKind=preventive`         | R3 预防性审查须以 S 产物为输入（独立定位与预防性审查是两类动作） |
+
+> A15 注记：emergency-fix 已随 43.0.0 A15 从 action 词表删除，本例外判据相应收窄为 `action=fix`（`isAllowedSource` 实现：`entry.action === 'fix'`）。
 
 `targetKind` 五值语义（schema `enum`，缺省即 `standard`）：
 

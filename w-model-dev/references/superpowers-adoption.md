@@ -123,7 +123,7 @@ L1 的关键技能集（源码常量 `SUPERPOWERS_KEY_SKILLS`，最低 3 个）�
 
 - `check-coding-plan.ts`：plan 结构 + 账本覆盖 + 三件套存在性 + R3×9 / V×3 齐全性；阶段 5-8 由 check-artifact-gate 以 `--scope` 聚合。
 - 归档快照校验并入 check-archive-integrity（原 check-openspec-archive 已退役，不新增第二归档门）。
-- run-log：`opsx_explore / opsx_propose / opsx_apply / opsx_archive` 转为 **LEGACY**（历史记录仍可解析，不再由新流程产生）；新动作 `plan_propose / plan_task / plan_review` 与 S-plan / S-coding / V 任务评审配对。
+- run-log action 词表（43.0.0 A15：32→18，权威 enum 见 `w-model-dev/schemas/run-log.schema.json`）：`chunk / cross / produce / review / gate / tla-gate / graph-gate / checkpoint / rootcause / fix / r3-completeness / r3-reliability / r3-security / perspective / consensus / iceberg-sweep / plan_propose / event-route`；`opsx_*` 与 `plan_task / plan_review` 已删除、写入即 schema 拒绝，LEGACY 吸收机制已移除。`plan_propose` 与 S-plan 配对（S-coding 走 `produce`、V 任务评审走 `review`）。
 - 归档快照而非改 gitignore：`.superpowers/sdd/` 仍是 gitignored 瞬态工作区，账本与三件套通过归档复制变成可查证据，避免把瞬态工作区变成被跟踪面。
 - 双账本注：`.superpowers/sdd/` 同时承载方法论账本（plan 指向 `docs/superpowers/plans/**`）与新契约账本（plan 指向 `docs/plans/**`），以 plan 路径区分，勿混用。
 
