@@ -184,7 +184,7 @@ describe('run-log E9: 1 fix 可覆盖多份 R 报告（去重映射）', () => {
   });
 });
 
-describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3', () => {
+describe('run-log R8 扩展：S-fix 后须 R3（批次 6 A15：emergency-fix 死词已删除，紧急通道以 fix 留痕）', () => {
   it('S-fix 后无 R3 直接 V 应失败', () => {
     const entries: RunLogEntry[] = [
       {
@@ -223,25 +223,26 @@ describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3', () => {
     expect(result.violations.some((v) => /R3 记录校验失败.*S\(fix\)/.test(v))).toBe(true);
   });
 
-  it('S-emergency-fix 后无 R3 直接 V 应失败', () => {
+  it('携带已删除 action 死词 emergency-fix → schema enum 拒绝（批次 6 A15，R8 不再单独可达）', () => {
+    const deadWordEntry = {
+      runId: '1',
+      timestamp: '2026-07-31T00:00:00Z',
+      phase: 5,
+      phaseName: 'Coding',
+      action: 'emergency-fix',
+      role: 'S',
+      duration_s: 10,
+      tokens: 100,
+      estimated: false,
+      subagentSpawns: 0,
+      gateExitCode: null,
+      outcome: 'success',
+      basedOnReport: 'RC-R8',
+      artifacts: ['test-artifact'],
+      blocker: '构建失败阻塞当前阶段推进',
+    } as unknown as RunLogEntry;
     const entries: RunLogEntry[] = [
-      {
-        runId: '1',
-        timestamp: '2026-07-31T00:00:00Z',
-        phase: 5,
-        phaseName: 'Coding',
-        action: 'emergency-fix',
-        role: 'S',
-        duration_s: 10,
-        tokens: 100,
-        estimated: false,
-        subagentSpawns: 0,
-        gateExitCode: null,
-        outcome: 'success',
-        basedOnReport: 'RC-R8',
-        artifacts: ['test-artifact'],
-        blocker: '构建失败阻塞当前阶段推进',
-      },
+      deadWordEntry,
       {
         runId: '2',
         timestamp: '2026-07-31T00:01:00Z',
@@ -259,7 +260,11 @@ describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3', () => {
     ];
     const result = checkRunLog(entries, { gateLogs: new Map() });
     expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => /R3 记录校验失败.*S\(emergency-fix\)/.test(v))).toBe(true);
+    expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(true);
+    expect(
+      result.violations.some((v) => /R3 记录校验失败/.test(v)),
+      '死词记录在 schema 层即被拒，R8 不再单独可达',
+    ).toBe(false);
   });
 
   it('S-fix 后有 3 条 R3 再 V 应通过 R8（不因 fix 段报违规）', () => {
@@ -341,14 +346,14 @@ describe('run-log R8 扩展：S-fix/emergency-fix 后须 R3', () => {
     expect(result.violations.some((v) => /R3 记录校验失败/.test(v))).toBe(false);
   });
 
-  it('S-emergency-fix 后有 3 条 R3 再 V 应通过 R8', () => {
+  it('S-fix（+ blocker 紧急通道审计说明）后有 3 条 R3 再 V 应通过 R8（批次 6 A15：emergency-fix 动作已删除，紧急通道以 fix+blocker 留痕）', () => {
     const entries: RunLogEntry[] = [
       {
         runId: '1',
         timestamp: '2026-07-31T00:00:00Z',
         phase: 5,
         phaseName: 'Coding',
-        action: 'emergency-fix',
+        action: 'fix',
         role: 'S',
         duration_s: 10,
         tokens: 100,
@@ -597,7 +602,7 @@ function makeEntry(overrides: Partial<RunLogEntry>): RunLogEntry {
   for (const [k, v] of Object.entries(overrides)) {
     if (v !== undefined) merged[k] = v;
   }
-  if (['fix', 'emergency-fix'].includes(String(merged.action))) {
+  if (String(merged.action) === 'fix') {
     if (merged.basedOnReport === undefined) merged.basedOnReport = 'RC-TEST';
     if (merged.artifacts === undefined) merged.artifacts = ['test-artifact'];
   }
@@ -2025,7 +2030,6 @@ describe('run-log action-role 配对（blocking，logic 层强制）', () => {
       role,
       outcome: 'success',
       gateExitCode: null,
-      ...(action === 'emergency-fix' ? { blocker: '测试用阻塞说明' } : {}),
     });
 
   const pairingViolation = (result: { violations: string[] }, action: string): string | undefined =>
@@ -2033,7 +2037,7 @@ describe('run-log action-role 配对（blocking，logic 层强制）', () => {
       (v) => v.startsWith('action-role 配对') && v.includes(`action=${action}`) && v.includes(`runId=`),
     );
 
-  it('非法 action-role 配对 → blocking violation（5 态：r3/produce/fix/emergency-fix/review/gate 族）', () => {
+  it('非法 action-role 配对 → blocking violation（r3/produce/fix/review/gate 族；批次 6 A15：emergency-fix 死词已删除，原第 4 态移除）', () => {
     const cases: {
       label: string;
       action: RunLogEntry['action'];
@@ -2050,7 +2054,6 @@ describe('run-log action-role 配对（blocking，logic 层强制）', () => {
       },
       { label: 'produce 由 A 执行', action: 'produce', role: 'A', runId: 'run-produce' },
       { label: 'fix 由 R 执行', action: 'fix', role: 'R', runId: 'run-fix' },
-      { label: 'emergency-fix 由 O 执行', action: 'emergency-fix', role: 'O', runId: 'run-emergency' },
       { label: 'review 由 G 执行', action: 'review', role: 'G', runId: 'run-review' },
       { label: 'gate 由 S 执行', action: 'gate', role: 'S', runId: 'run-gate' },
       { label: 'tla-gate 由 S 执行', action: 'tla-gate', role: 'S', runId: 'run-tla-gate' },
@@ -2092,16 +2095,26 @@ describe('run-log action-role 配对（blocking，logic 层强制）', () => {
     expect(result.violations.some((v) => v.startsWith('action-role 配对'))).toBe(false);
   });
 
-  it('plan_propose（S）/plan_task（S）/plan_review（V）通过 schema 校验且不触发新违规（superpowers 替换 opsx 批次 1）', () => {
-    const entries = [
-      baseEntry('plan_propose', 'S', 'plan-p1'),
-      baseEntry('plan_task', 'S', 'plan-t1'),
-      baseEntry('plan_review', 'V', 'plan-v1'),
-    ];
+  it('plan_propose（S）与新增 event-route（O）通过 schema 校验且不触发新违规（批次 6 A15：plan_task/plan_review 死词已删除）', () => {
+    const entries = [baseEntry('plan_propose', 'S', 'plan-p1'), baseEntry('event-route', 'O', 'event-r1')];
     const result = checkRunLog(entries);
     expect(result.violations.some((v) => v.includes('[schema]'))).toBe(false);
     expect(result.violations.some((v) => v.startsWith('action-role 配对'))).toBe(false);
-    expect(result.violations.some((v) => v.includes('plan_'))).toBe(false);
+  });
+
+  it('携带已删除 action 死词（plan_task/plan_review）→ schema enum 拒绝（批次 6 A15 负例）', () => {
+    for (const dead of ['plan_task', 'plan_review'] as const) {
+      const bad = {
+        ...baseEntry('produce', 'S', `dead-${dead}`),
+        action: dead,
+      } as unknown as RunLogEntry;
+      const result = checkRunLog([bad]);
+      expect(result.passed, `${dead} 应 schema 拒绝`).toBe(false);
+      expect(
+        result.violations.some((v) => v.includes('[schema]')),
+        `${dead} 应报 [schema]`,
+      ).toBe(true);
+    }
   });
 
   it('perspective/consensus 由 A 执行 + persona 字段通过 schema 校验且无配对违规（阶段 1-4 多角色机制，task 3）', () => {
@@ -2124,16 +2137,16 @@ describe('run-log action-role 配对（blocking，logic 层强制）', () => {
 });
 
 /**
- * 批次 6 A3/C14：variant 字段已从 run-log schema/类型/fixtures 删除——emergency-fix
- * 的紧急通道由 `blocker` 非空（schema allOf 强制）单独承载；旧记录携带 variant 字段
- * 或缺 blocker 一律 [schema] blocking（毁弃存量数据，无 LEGACY 吸收绕行）。
+ * 批次 6 A15：emergency-fix 动作已从 18 值词表删除——紧急通道以 `fix` + `blocker`
+ * （可选审计说明）留痕；携带已删除 action 死词（emergency-fix / rework 等 15 死词）
+ * 或已删除 `variant` 字段的记录一律 [schema] blocking（毁弃存量数据，无吸收绕行）。
  */
-describe('run-log emergency-fix blocker 语义（variant 字段已删除）', () => {
-  it('emergency-fix + blocker → schema-valid 且无 [schema] violation', () => {
+describe('run-log fix 紧急通道审计字段与已删除 action 死词（批次 6 A15）', () => {
+  it('fix + blocker/fixedLocation/fixBasedOn 审计说明 → schema-valid 且无 [schema] violation', () => {
     const entry: RunLogEntry = makeEntry({
       runId: 'em-valid',
       phase: 5,
-      action: 'emergency-fix',
+      action: 'fix',
       role: 'S',
       outcome: 'success',
       basedOnReport: 'RC-TEST',
@@ -2147,80 +2160,36 @@ describe('run-log emergency-fix blocker 语义（variant 字段已删除）', ()
     expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(false);
   });
 
-  it('emergency-fix 缺 blocker → [schema] blocking（旧「无 variant 旧行 LEGACY 吸收」已删除）', () => {
-    const entry: RunLogEntry = makeEntry({
-      runId: 'em-legacy',
-      phase: 5,
-      action: 'emergency-fix',
-      role: 'S',
-      outcome: 'success',
-      basedOnReport: 'RC-TEST',
-      artifacts: ['test-artifact'],
-    });
-    const result = checkRunLog([entry]);
-    expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => /\[schema\].*blocker/.test(v))).toBe(true);
-    expect(result.diagnostics, 'LEGACY 吸收诊断不复存在').toBeUndefined();
-  });
-
-  it('emergency-fix 缺 blocker → blocking（2 态：phase5 / phase8 带完整 identity）', () => {
-    const cases: [string, Partial<RunLogEntry>][] = [
-      ['phase5 缺 blocker（走紧急通道却无阻塞原因）', { runId: 'em-no-blocker', phase: 5 }],
-      [
-        'phase8 带 identity 缺 blocker（fail-closed 方向不变）',
-        {
-          runId: 'em-declared-no-blocker2',
-          phase: 8,
-          round: 1,
-          reportId: 'RC-TEST',
-          targetKind: 'code',
-          implementationTarget: 'test-artifact',
-          target: 'test-artifact',
-        },
-      ],
-    ];
-    for (const [label, overrides] of cases) {
-      const entry: RunLogEntry = makeEntry({
-        action: 'emergency-fix',
-        role: 'S',
-        outcome: 'success',
-        basedOnReport: 'RC-TEST',
-        artifacts: ['test-artifact'],
-        ...overrides,
-      });
+  it('携带已删除 action 死词（emergency-fix / rework）→ schema enum 拒绝 [schema] blocking', () => {
+    const deadWordCases = ['emergency-fix', 'rework'];
+    for (const dead of deadWordCases) {
+      const entry = {
+        ...makeEntry({
+          runId: `dead-${dead}`,
+          phase: 5,
+          role: 'S',
+          outcome: 'success',
+          basedOnReport: 'RC-TEST',
+          artifacts: ['test-artifact'],
+        }),
+        action: dead,
+      } as unknown as RunLogEntry;
       const result = checkRunLog([entry]);
-      expect(result.passed, `${label} 应 blocking`).toBe(false);
+      expect(result.passed, `${dead} 应 schema 拒绝`).toBe(false);
       expect(
-        result.violations.some((v) => /\[schema\].*blocker/.test(v)),
-        `${label} 应报 [schema] blocker`,
+        result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]')),
+        `${dead} 应报 [schema]`,
       ).toBe(true);
+      expect(result.diagnostics, `${dead} 无吸收诊断`).toBeUndefined();
     }
   });
 
-  it('双旧形态（phase-8 缺 identity + 缺 blocker）→ [schema] blocking（不再是 LEGACY 吸收）', () => {
-    const entry: RunLogEntry = makeEntry({
-      runId: 'em-double-legacy',
-      phase: 8,
-      action: 'emergency-fix',
-      role: 'S',
-      outcome: 'success',
-      basedOnReport: 'RC-TEST',
-      artifacts: ['test-artifact'],
-      revertEvidence: { command: 'npm run reproduce-failure' },
-      // 故意缺 round/reportId/targetKind（identity）+ blocker
-    });
-    const result = checkRunLog([entry]);
-    expect(result.passed, '旧形态一律 fail-closed').toBe(false);
-    expect(result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]'))).toBe(true);
-    expect(result.diagnostics, 'LEGACY 吸收诊断不复存在').toBeUndefined();
-  });
-
-  it('emergency-fix 携带 variant 字段 → schema additionalProperties 拒绝（字段已删除）', () => {
+  it('fix 携带 variant 字段 → schema additionalProperties 拒绝（字段已删除）', () => {
     const entry = {
       ...makeEntry({
         runId: 'em-with-variant',
         phase: 5,
-        action: 'emergency-fix',
+        action: 'fix',
         role: 'S',
         outcome: 'success',
         basedOnReport: 'RC-TEST',
@@ -2236,31 +2205,28 @@ describe('run-log emergency-fix blocker 语义（variant 字段已删除）', ()
 });
 
 /**
- * 批次 6 A3/C14：cutoff 时间分界已随 legacy 吸收机器删除——旧形态 emergency-fix
- * 缺 blocker 不再按写入时间区分吸收/阻断，任何时间戳一律 [schema] blocking。
+ * 批次 6 A15：已删除 action 死词无历史时间分界——任何时间戳写入的死词记录
+ * 一律 [schema] blocking（enum 拒绝，无吸收绕行）。
  */
-describe('run-log emergency-fix 无历史时间分界（cutoff 分界已删除）', () => {
-  const baseEmergencyFix: Partial<RunLogEntry> = {
-    phase: 5,
-    action: 'emergency-fix',
-    role: 'S',
-    outcome: 'success',
-    basedOnReport: 'RC-TEST',
-    artifacts: ['test-artifact'],
-    // 缺 blocker（两条用例同形，仅 timestamp 不同）
-  };
-
-  it('emergency-fix 缺 blocker：任意时间戳一律 blocking（2 态：2026-09-02 / 2026-08-31）', () => {
+describe('run-log 已删除 action 死词无历史时间分界（批次 6 A15）', () => {
+  it('emergency-fix 死词：任意时间戳一律 [schema] blocking（2 态：2026-09-02 / 2026-08-31）', () => {
     const cases = [
-      { label: '2026-09-02 缺 blocker', runId: 'em-post-cutoff', timestamp: '2026-09-02T00:00:00.000Z' },
-      { label: '2026-08-31 缺 blocker', runId: 'em-pre-cutoff', timestamp: '2026-08-31T00:00:00.000Z' },
+      { label: '2026-09-02 死词记录', runId: 'em-post-cutoff', timestamp: '2026-09-02T00:00:00.000Z' },
+      { label: '2026-08-31 死词记录', runId: 'em-pre-cutoff', timestamp: '2026-08-31T00:00:00.000Z' },
     ];
     for (const c of cases) {
-      const entry: RunLogEntry = makeEntry({
-        ...baseEmergencyFix,
-        runId: c.runId,
-        timestamp: c.timestamp,
-      });
+      const entry = {
+        ...makeEntry({
+          runId: c.runId,
+          timestamp: c.timestamp,
+          phase: 5,
+          role: 'S',
+          outcome: 'success',
+          basedOnReport: 'RC-TEST',
+          artifacts: ['test-artifact'],
+        }),
+        action: 'emergency-fix',
+      } as unknown as RunLogEntry;
       const result = checkRunLog([entry]);
       expect(
         result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]')),
@@ -2273,8 +2239,8 @@ describe('run-log emergency-fix 无历史时间分界（cutoff 分界已删除�
 });
 
 /**
- * audit-fixes task 4（I-6 / F-G4-01）：review 族（review/iceberg-review）passed=false
- * 强制非空 reworkHints。schema allOf 强制 + logic `[rework-hints]` blocking（分类命名：
+ * audit-fixes task 4（I-6 / F-G4-01）：review 动作 passed=false
+ * 强制非空 reworkHints（批次 6 A15：原 review/iceberg-review 两值族中 iceberg-review 死词已删除）。schema allOf 强制 + logic `[rework-hints]` blocking（分类命名：
  * 仅当全部 schema 错误都由 reworkHints 缺失引起时用该前缀）。批次 6 A3/C14：历史
  * cutoff 吸收路径已删除——任何时间戳写入的失败 review 旧行一律 blocking，无诊断绕行。
  */
@@ -2423,10 +2389,10 @@ describe('A-3d 跨轮次评审一致性（R9 标准偏移）', () => {
 
 // ==================== R10: revertEvidence 回滚证伪协议（P2-B / S27 / AC-8） ====================
 //
-// fix/emergency-fix 记录必须携带合法 revertEvidence.command（非空字符串）：执行该命令使
+// fix 记录必须携带合法 revertEvidence.command（非空字符串）：执行该命令使
 // S-fix 的复现测试回到失败态，证明测试确实锚定被修缺陷（反模式 #45「改断言让测试通过」
 // 的确定性挂点）。timestamp 仅为日志元数据，不参与证据信任判定；缺失/非法声明始终
-// blocking。
+// blocking。（批次 6 A15：emergency-fix 死词已删除，R10 只覆盖 fix。）
 // 注：规则编号为 R10——R9 已被 A-3d 跨轮次评审一致性占用（计划文本写作 R9 属编号漂移）。
 
 describe('run-log R10: revertEvidence 回滚证伪（严格证据模式）', () => {
@@ -2444,17 +2410,17 @@ describe('run-log R10: revertEvidence 回滚证伪（严格证据模式）', () 
     }));
   }
 
-  /** 去掉 fix/emergency-fix 条目的 revertEvidence（无论夹具是否已登记该字段） */
+  /** 去掉 fix 条目的 revertEvidence（无论夹具是否已登记该字段） */
   function stripRevertEvidence(entries: RunLogEntry[]): RunLogEntry[] {
     return entries.map((l) => {
-      if (!['fix', 'emergency-fix'].includes(l.action)) return l;
+      if (l.action !== 'fix') return l;
       const clone = { ...l } as RunLogEntry & { revertEvidence?: unknown };
       delete clone.revertEvidence;
       return clone;
     });
   }
 
-  it('R10 revertEvidence 负例（4 态：缺失/空白命令/旧日期缺失/旧日期 emergency-fix）', async () => {
+  it('R10 revertEvidence 负例（4 态：缺失/空白命令/旧日期缺失/emergency-fix 死词不入 R10）', async () => {
     const cases: {
       label: string;
       build: () => Promise<RunLogEntry[]> | RunLogEntry[];
@@ -2513,24 +2479,27 @@ describe('run-log R10: revertEvidence 回滚证伪（严格证据模式）', () 
         },
       },
       {
-        label: '旧日期 emergency-fix 缺 revertEvidence',
+        label: 'emergency-fix 死词 → schema enum 拒绝，R10 不再计入（批次 6 A15）',
         build: () => [
-          makeEntry({
-            runId: 'em-r10-old-date',
+          {
+            ...makeEntry({
+              runId: 'em-r10-old-date',
+              action: 'fix',
+              role: 'S',
+              blocker: '线上阻断须立即修复',
+              timestamp: '2026-07-24T00:00:00.000Z',
+            }),
             action: 'emergency-fix',
-            role: 'S',
-            blocker: '线上阻断须立即修复',
-            timestamp: '2026-07-24T00:00:00.000Z',
-          }),
+          } as unknown as RunLogEntry,
         ],
         verify: (result, label) => {
           expect(
-            result.violations.some((v) => v.startsWith('R10:') && v.includes('emergency-fix')),
-            `${label} 应报 R10:emergency-fix`,
+            result.violations.some((v) => v.startsWith('条目') && v.includes('[schema]')),
+            `${label} 应报 [schema] 死词拒绝`,
           ).toBe(true);
-          expect(result.revertEvidence, `${label} r10 计数`).toEqual({
-            checked: 1,
-            missing: 1,
+          expect(result.revertEvidence, `${label} r10 计数（死词不入 R10）`).toEqual({
+            checked: 0,
+            missing: 0,
           });
         },
       },

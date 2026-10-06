@@ -249,7 +249,6 @@ run-log 出现坏行（非法 JSON）时的法定重建程序（唯一合法出�
 | `rootcause`（R 子代理） | R 子代理（含 R-lead + N 个 R-persona）的 tokens 累计。每条 `rootcause` 动作各记 tokens 字段 | R-lead + N 个 R-persona 的 tokens 之和受 `budget.json.rootcauseParallelBudget` 约束（R4-A 规则） |
 | `rootcause`（串行分派） | 串行分派时，每条 `rootcause` 动作各记 tokens，最终汇总校验 R4-A 预算（`maxTotalTokensPerRound`） | 不论并行/串行均累计校验；超限触发 killSwitch |
 | `fix`（S 兼 F 修复） | S-fix 子代理的 tokens，记入 `fix` 动作的 tokens 字段 | 纳入单阶段 `perPhase.maxTokens` 与项目级 `project.maxTokensTotal` 统计 |
-| `escalate`（upstreamDefect 触发） | 记录 `reportId` 与升级原因；tokens 由触发升级的 CHECKPOINT 会话承担 | 升级本身不消耗额外子代理 tokens（CHECKPOINT 由编排者处理） |
 
 **多角度 R 的 token 预算校验（R4-A）**：
 
@@ -333,8 +332,8 @@ run-log 出现坏行（非法 JSON）时的法定重建程序（唯一合法出�
 
 | 选项 | 动作 | run-log 记录 |
 |---|---|---|
-| A) 确认回退到 `<upstreamPhase>` | O 更新 `project.status` 回退到上游阶段 → 上游阶段重走 S→V→G→（若再次失败）R 循环 | append `escalate` 动作（`reason:"upstreamDefect"`, `reportId:"<RC-...>"`）+ `rollback` 动作 |
-| B) 不回退，继续当前阶段返工 | `round++`，但须用户说明理由 | append `rework` 动作，`note` 记用户理由 |
+| A) 确认回退到 `<upstreamPhase>` | O 更新 `project.status` 回退到上游阶段 → 上游阶段重走 S→V→G→（若再次失败）R 循环 | 在回退后的上游阶段 append `rootcause` 动作（`upstreamDefect:true`、`rollbackRecommended:true`、`reportId:"<RC-...>"`；批次 6 A15：原 `escalate`/`rollback` 死词已删除，升级语义由 rootcause 两布尔字段承载） |
+| B) 不回退，继续当前阶段返工 | `round++`，但须用户说明理由 | append `fix` 动作（`round++`），`note` 记用户理由（批次 6 A15：原 `rework` 死词已删除，返工事件载体为 `fix`） |
 | C) 调整 `maxReworkRounds` 继续尝试 | 更新 `budget.json.perPhase.maxReworkRounds`，继续返工 | append `checkpoint` 动作，`acknowledgedDecisions` 记调整决策 |
 
 **回退后处理**：

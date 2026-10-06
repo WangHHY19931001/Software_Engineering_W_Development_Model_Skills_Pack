@@ -30,36 +30,22 @@ import { validateBySchema } from '../infrastructure/schema-loader.js';
 export const RUN_LOG_ACTION_VALUES = [
   'chunk',
   'cross',
-  'evolve',
   'produce',
   'review',
   'gate',
   'tla-gate',
   'graph-gate',
-  'test',
   'checkpoint',
-  'rework',
-  'rollback',
   'rootcause',
   'fix',
-  'emergency-fix',
-  'escalate',
   'r3-completeness',
   'r3-reliability',
   'r3-security',
-  'codegraph_query',
-  'opsx_explore',
-  'opsx_propose',
-  'opsx_apply',
-  'opsx_archive',
-  'ensure_deps',
-  'iceberg-sweep',
-  'iceberg-review',
-  'plan_propose',
-  'plan_task',
-  'plan_review',
   'perspective',
   'consensus',
+  'iceberg-sweep',
+  'plan_propose',
+  'event-route',
 ] as const;
 
 export interface RunLogEntry {
@@ -371,13 +357,14 @@ export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptio
   }
 
   // R5 跨阶段证据一致（检测"静默推翻"）
-  // 目标：检测后阶段决策否定前阶段已放行决策，且无对应 rework/rollback 记录。
-  // 算法：收集 rework/rollback 的 phase 集合 → 对每条 checkpoint 决策检测否定关键词
-  //       → 含否定关键词 且 该阶段无 rework/rollback → 疑似静默推翻（D19）
+  // 目标：检测后阶段决策否定前阶段已放行决策，且无对应返工记录。
+  // 算法：收集返工链动作（rootcause/fix——批次 6 A15 词表收敛后 run-log 返工事件的载体，
+  //       原 rework/rollback 动作已删除）的 phase 集合 → 对每条 checkpoint 决策检测否定关键词
+  //       → 含否定关键词 且 该阶段无 rootcause/fix → 疑似静默推翻（D19）
   // 注意：R5 是启发式检测，宁可漏报不可误报。仅当同时满足两条件才报。
   const reworkedPhases = new Set<number>();
   for (const e of valid) {
-    if (e.action === 'rework' || e.action === 'rollback') {
+    if (e.action === 'rootcause' || e.action === 'fix') {
       reworkedPhases.add(e.phase);
     }
   }
@@ -388,7 +375,7 @@ export function checkCheckpoint(entries: unknown, options?: CheckpointCheckOptio
       const hasNegation = NEGATION_KEYWORDS.some((k) => decision.includes(k));
       if (hasNegation && !reworkedPhases.has(e.phase)) {
         violations.push(
-          `R5: 阶段 ${e.phase} 决策 "${decision}" 含否定语义，但该阶段无 rework/rollback 记录，疑似静默推翻前阶段决策（D19）`,
+          `R5: 阶段 ${e.phase} 决策 "${decision}" 含否定语义，但该阶段无 rootcause/fix 返工记录，疑似静默推翻前阶段决策（D19）`,
         );
       }
     }

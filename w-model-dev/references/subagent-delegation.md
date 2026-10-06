@@ -1127,7 +1127,7 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 - **输入**：S-plan 产物（`docs/plans/<changeId>.plan.md` 任务节）+ R3/V 审查通过
 - **调用**：按 plan 任务节逐任务执行（`subagent-driven-development`）+ TDD 红-绿-重构；每任务 `Edit`/`Write` 前先 `codegraph query <目标符号>` → 落盘 `.w-model/codegraph-queries/` → 代码 + 单元测试 → 该任务 code-TLA+ 一致性校验；任务完成写账本 `Task N: complete`（`.superpowers/sdd/<plan-基名>/progress.md`）
 - **产出**：代码 + 测试 + `.w-model/codegraph-queries/` + TLA 校验报告 + 账本 + 任务三件套（`task-<N>-{brief,report}.md`）+ `review-*.diff`
-- **可验证终态**（selfCheck.terminalState 逐条核验）：测试判据——本任务单元测试全绿（N passed / 0 failed）；产物判据——账本 `Task N: complete` + 任务三件套 + `review-*.diff` + `.w-model/codegraph-queries/` 落盘；回填判据——status.json state=DONE 且 run-log action=plan_task outcome=success（角色禁令优先：gate 验证由下游 G 承担）
+- **可验证终态**（selfCheck.terminalState 逐条核验）：测试判据——本任务单元测试全绿（N passed / 0 failed）；产物判据——账本 `Task N: complete` + 任务三件套 + `review-*.diff` + `.w-model/codegraph-queries/` 落盘；回填判据——status.json state=DONE 且 run-log action=produce outcome=success（批次 6 A15：plan_task 死词已删除，计划任务推进并入 produce；角色禁令优先：gate 验证由下游 G 承担）
 - **审查**：R3×3 → V 评审 → 不合格打回（指定返工任务）
 - **约束 #14**：任何 Edit/Write 前须经 codegraph CLI 查询（`codegraph query <符号>`；宿主 MCP 工具为可选加速），否则命中反模式 #38
 
@@ -1209,7 +1209,7 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 | 标准 S / S-doc / S-tla / S-bdd  | `produce`       | `<phase>-{dim}.json`           |
 | S-ingest-tla / S-ingest-bdd     | `produce`       | `<phase>-ingest-{dim}.json`    |
 | S-fix（返工变体）               | `fix`           | `<phase>-fix-{dim}.json`       |
-| S-emergency-fix（紧急修复变体） | `emergency-fix` | `<phase>-emergency-{dim}.json` |
+| S-emergency-fix（紧急修复变体） | `fix`（+ `blocker` 审计说明；批次 6 A15：emergency-fix 动作已删除，紧急通道以 fix 动作留痕） | `<phase>-emergency-{dim}.json` |
 
 `check-preventive-review.ts` 支持 `--variant=standard|fix|emergency|ingest` 参数校验对应路径（ingest 须显式传参）；`--auto-trigger` 模式从 run-log 推断 S 变体。
 
@@ -1802,20 +1802,20 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 2. **转交 R 子代理**：非紧急修复一律转 R 子代理正式定位，S 子代理不得越权修改既有产物。R 子代理产出 `RootCauseReport` → V 复审 → G 门禁 → S-fix 修复（标准返工流程）
 3. **紧急修复通道**（仅当 bug 阻塞当前阶段推进时启用，前置 R3+V+G）：
    - S 子代理可执行**最小修复**（仅修复阻塞点，不扩展功能、不重构）
-   - 必须在 `.w-model/run-log.jsonl` 追加 `action=emergency-fix` 条目（见下格式）并填写阻塞原因
-   - 紧急修复条目格式：`{role:"S", action:"emergency-fix", variant:"emergency-fix", blocker:<阻塞描述>, fixedLocation, fixBasedOn:"S-self-assessment"}`
-   - emergency-fix 与其他 S 变体一视同仁，产出后须前置 **R3×3（completeness/reliability/security）→ V → G**，不得跳过。R3 报告路径走 `<phase>-emergency-{completeness,reliability,security}.json`（与 `check-preventive-review.ts --variant=emergency` 一致）。跳过 R3+V 命中反模式 #42。`variant=emergency-fix` + `blocker` 字段保留用于 run-log 审计，仅作为「为何走紧急通道」的说明，不再意味跳过审查。
+   - 必须在 `.w-model/run-log.jsonl` 追加 `action=fix` 条目（见下格式）并填写阻塞原因（批次 6 A15：emergency-fix 动作已从 18 值词表删除，紧急通道以 fix 动作留痕）
+   - 紧急修复条目格式：`{role:"S", action:"fix", blocker:<阻塞描述>, fixedLocation, fixBasedOn:"S-self-assessment"}`（历史 `variant` 字段已删除，携带即被 schema additionalProperties 拒绝）
+   - 紧急修复与其他 S 变体一视同仁，产出后须前置 **R3×3（completeness/reliability/security）→ V → G**，不得跳过。R3 报告路径走 `<phase>-emergency-{completeness,reliability,security}.json`（与 `check-preventive-review.ts --variant=emergency` 一致）。跳过 R3+V 命中反模式 #42。`blocker` 字段保留用于 run-log 审计，仅作为「为何走紧急通道」的说明，不再意味跳过审查。
    - **移除机制**：原「阶段完成后由 R 子代理复核紧急修复的完整性（R 复核产出追加到 `RootCauseReport` 的 `emergencyFixReview` 字段）」事后复核机制已移除。紧急修复的完整性由前置 R3×3 + V 兜底。
 
 **违规检测**：
 
-- `run-log.jsonl` 中 S 子代理（`role=S`）的 `action=fix` / `action=emergency-fix` 条目需特别审查：
-  - `action=emergency-fix` + `blocker` 非空 → 合法紧急修复通道（批次 6 A3/C14：历史 `variant` 字段已删除，携带 `variant` 的记录被 schema additionalProperties 拒绝）
-  - `action=emergency-fix` 缺 `blocker` → schema blocking `[schema]`（无历史吸收绕行）
+- `run-log.jsonl` 中 S 子代理（`role=S`）的 `action=fix` 条目需特别审查（批次 6 A15：`emergency-fix` 动作已从词表删除，携带该值的记录一律 schema 违规）：
+  - `action=fix` + `blocker` 非空 → 合法紧急修复通道（`blocker` 为可选审计说明）
+  - 携带已删除 action 值（`emergency-fix`/`rework` 等 15 死词）或已删除 `variant` 字段 → schema blocking `[schema]`（无历史吸收绕行）
 - 未按返工流程（未经 R 根因定位报告与 V/G 门禁授权，见本文件「S-fix 子代理（返工变体）」返工循环）擅自修复既有产物的 `fix` 条目视为越权（反模式 #10/#18 变体），需回滚并由 R + S-fix 重做
-- 检测脚本（精确语义，批次 6 A3/C14 起与 run-log.schema.json / run-log-logic.ts 对齐）：`check-run-log.ts` 对 `action=fix` / `action=emergency-fix` 条目按以下规则判定——`action=emergency-fix` 强制 `blocker` 非空（schema 强制），缺 `blocker` 或携带 `variant` 字段一律 blocking `[schema]`；历史 legacy 吸收谓词（D-5 两门共享，曾输出非阻断 diagnostic）**已删除**——旧形态记录不再有任何诊断绕行，两门一律 fail-closed。动作-角色配对（`fix`/`emergency-fix`/`produce`→role=S 等）由 logic 层 blocking 强制。`preventive-review.schema.json` 另强制 `passed=false ⇒ findings ≥1`。
+- 检测脚本（精确语义，批次 6 A3/C14 起与 run-log.schema.json / run-log-logic.ts 对齐）：`check-run-log.ts` 对 `action=fix` 条目按以下规则判定——`basedOnReport` 非空 + 非空 `artifacts`（schema 强制）+ 合法 `revertEvidence.command`（R10 强制），携带 `variant` 字段或已删除 action 死词一律 blocking `[schema]`；历史 legacy 吸收谓词（D-5 两门共享，曾输出非阻断 diagnostic）**已删除**——旧形态记录不再有任何诊断绕行，两门一律 fail-closed。动作-角色配对（`fix`/`produce`→role=S 等）由 logic 层 blocking 强制。`preventive-review.schema.json` 另强制 `passed=false ⇒ findings ≥1`。
 
-> 与反模式 #18（跳过 R 直接 S 返工）的关系：本边界条款是 #18 的细化——S 子代理发现既有 bug 时不得自行修复（即便 S 自评根因准确），必须走「记录 rootcause → 转 R → V 复审 → G 门禁 → S-fix」流程。紧急修复通道是「与其他 S 变体一视同仁的前置 R3+V+G 通道」——emergency-fix 产出后仍须 R3×3 + V + G，命中反模式 #42 一律回退。
+> 与反模式 #18（跳过 R 直接 S 返工）的关系：本边界条款是 #18 的细化——S 子代理发现既有 bug 时不得自行修复（即便 S 自评根因准确），必须走「记录 rootcause → 转 R → V 复审 → G 门禁 → S-fix」流程。紧急修复通道是「与其他 S 变体一视同仁的前置 R3+V+G 通道」——紧急修复（以 `fix` 动作 + `blocker` 审计说明留痕）产出后仍须 R3×3 + V + G，命中反模式 #42 一律回退。
 
 ## 豁免审批角色边界
 

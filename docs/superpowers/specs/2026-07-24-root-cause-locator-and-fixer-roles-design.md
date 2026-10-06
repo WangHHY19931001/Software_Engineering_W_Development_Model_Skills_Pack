@@ -713,7 +713,7 @@ O 检测到回退条件满足 → 强制 🔴 CHECKPOINT · 阶段回退决策
 扩展后：R 触发场景 5（阶段回退）+ maxReworkRounds 触达均强制 🔴 CHECKPOINT，与 O6 缓解措施一致。`run-log.jsonl` 新增 `escalate` 记录：
 
 ```json
-{"action":"escalate","phase":"<阶段N>","round":<int>,"reason":"maxReworkRounds | upstreamDefect","reportId":"<RC-...，仅 upstreamDefect>","timestamp":"<ISO>","note":"<可选>"}
+{"action":"rootcause","phase":"<阶段N>","round":<int>,"upstreamDefect":true,"rollbackRecommended":true,"reportId":"<RC-...，仅 upstreamDefect>","timestamp":"<ISO>","note":"<可选>"}
 ```
 
 ---

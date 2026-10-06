@@ -230,7 +230,7 @@ describe('A3/C14 旧形态 fail-closed（两门同判：一律 blocking）', () 
     passed: false,
   };
 
-  /** 旧形态②：emergency-fix 缺 blocker（原 identity/variant 族吸收形态）。 */
+  /** 旧形态②：携带已删除 action 死词 emergency-fix（批次 6 A15 词表收敛，enum 拒绝）。 */
   const legacyEmergencyFix = {
     runId: 'p2-s-efix',
     timestamp: '2026-01-05T00:00:00Z',
@@ -281,7 +281,7 @@ describe('A3/C14 旧形态 fail-closed（两门同判：一律 blocking）', () 
   it('旧形态（2 态：reworkHints 族 / emergency-fix 缺 blocker）→ 两门均 blocking（无吸收绕行）', () => {
     const rows = [
       { name: 'reworkHints 族：failed review 缺非空 reworkHints', entry: legacyFailedReview },
-      { name: 'identity/blocker 族：emergency-fix 缺 blocker', entry: legacyEmergencyFix },
+      { name: '死词族：emergency-fix 已从 18 值词表删除', entry: legacyEmergencyFix },
     ] as const;
     for (const row of rows) {
       const schemaResult = validateBySchema('run-log', row.entry);
@@ -310,8 +310,8 @@ describe('A3/C14 旧形态 fail-closed（两门同判：一律 blocking）', () 
 
 /**
  * C10（2026-10-04 audit-deep-dive）：checkpoint-logic 的 RunLogEntry.action 曾内联
- * 12 值子集联合——schema 枚举已扩至 32 值，类型对 schema 撒谎（合法 action 被 TS 判非法）。
- * 修复：导出 RUN_LOG_ACTION_VALUES 常量（as const，32 值）并派生类型；本组以
+ * 12 值子集联合——schema 枚举扩容后类型对 schema 撒谎（合法 action 被 TS 判非法）。
+ * 修复：导出 RUN_LOG_ACTION_VALUES 常量（as const；批次 6 A15 起为 18 值）并派生类型；本组以
  * set 相等测试锁定「常量 ↔ schema 枚举」同源（schema 为单一事实来源）。
  */
 describe('C10 action 枚举同源', () => {

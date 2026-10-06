@@ -394,10 +394,10 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #39（跳过编码计划审查） | [`check-coding-plan.ts`](../scripts/cli/check-coding-plan.ts)（plan 结构 / 账本覆盖 / 三件套 / R3×3 + V 审查齐全 R1-R6，exitCode=1 命中） |
 | #40（plan 任务与执行账本/切片职责混淆） | [`check-coding-plan.ts`](../scripts/cli/check-coding-plan.ts)（plan 任务节 ↔ 账本 `Task N: complete` ↔ 任务三件套绑定校验 R2/R3/R4，exitCode=1 命中） |
 | #41（加权平均掩盖单轴失败） | [`check-verifier-output.ts`](../scripts/cli/check-verifier-output.ts) R13 单轴下限（subCriterion.score < 0.70 → exitCode=1） |
-| #42（S-fix 后跳过 R3+V） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R8（S(fix/emergency-fix)→V 间 R3 记录数）+ [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) `--variant=fix\|emergency` |
+| #42（S-fix 后跳过 R3+V） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R8（S(fix)→V 间 R3 记录数；A15：emergency-fix 死词已删除）+ [`check-role-dispatch.ts`](../scripts/cli/check-role-dispatch.ts) + [`check-preventive-review.ts`](../scripts/cli/check-preventive-review.ts) `--variant=fix\|emergency` |
 | #43（敏感信息写入状态文件） | 无专用脚本（V 评审人工核验 + [`security-scan.ts`](../scripts/cli/security-scan.ts) 源码级扫描；G 不做人工核验，见 #36 行说明） |
-| #44（跳过冰山扫掠直接放行） | [`check-iceberg-sweep.ts`](../scripts/cli/check-iceberg-sweep.ts)（IcebergSweepReport R1-R8 校验，含 R6/R7/R8 三视角对账（见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md) §8.4），exitCode=1 命中）；run-log `iceberg-sweep` / `iceberg-review` 动作缺失检测为软检测（编排者自查 + V/G 人工核验，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节） |
-| #45（为通过测试而修改断言/测试期望） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R10 revertEvidence 回滚证伪（fix/emergency-fix 记录须携带合法 `revertEvidence.command`，**无时间戳豁免**：缺失或非法始终 blocking；`LEGACY_REVERT_EVIDENCE_CUTOFF` / `LEGACY_REVERT_EVIDENCE` 吸收路径已删除，exitCode=1 命中）；断言与需求的语义对应仍由 V 评审人工核验 |
+| #44（跳过冰山扫掠直接放行） | [`check-iceberg-sweep.ts`](../scripts/cli/check-iceberg-sweep.ts)（IcebergSweepReport R1-R8 校验，含 R6/R7/R8 三视角对账（见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md) §8.4），exitCode=1 命中）；run-log `iceberg-sweep` 动作缺失检测为软检测（A15：原 `iceberg-review` 死词已删除，V 复审冰山报告以 `review` 动作记录）（编排者自查 + V/G 人工核验，见 [iceberg-sweep-guide.md](iceberg-sweep-guide.md)「触发时机」节） |
+| #45（为通过测试而修改断言/测试期望） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R10 revertEvidence 回滚证伪（fix 记录须携带合法 `revertEvidence.command`（A15：emergency-fix 死词已删除），**无时间戳豁免**：缺失或非法始终 blocking；`LEGACY_REVERT_EVIDENCE_CUTOFF` / `LEGACY_REVERT_EVIDENCE` 吸收路径已删除，exitCode=1 命中）；断言与需求的语义对应仍由 V 评审人工核验 |
 | #46（只给审计权不给修正权） | 无专用脚本（CHECKPOINT 介入路径标注） |
 | #47（大规模重构式改动） | 无专用脚本（diff 可审性由评审人工核验 + 增量集成纪律约束） |
 
@@ -558,7 +558,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 **检测信号**（sig-008）：子代理响应中**无 `tool_use` 块且未附产物路径**（见 [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节的四条行为要求）；规划产物（spec/plan）存在但无对应执行产物。
 >
-> 2026-09-17 审查更正：原文写作「run-log 中存在 `action=plan` 但无后续 `action=implement`/`action=verify`」——该三值**不在 run-log 32 值 action 枚举内**（写入即 schema 违规），属伪字段信号。
+> 2026-09-17 审查更正：原文写作「run-log 中存在 `action=plan` 但无后续 `action=implement`/`action=verify`」——该三值**不在 run-log action 枚举内**（历史为 32 值、批次 6 A15 起为 18 值；写入即 schema 违规），属伪字段信号。
 
 ### #21 阶段级门禁跳过（self-as-verifier 模式下跳过中间阶段门禁直接跑终检）
 
@@ -595,7 +595,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 **违反原则**：真实执行（约束 #4）+ 阶段门放行（约束 #2）——轮次上限被架空，🔴 CHECKPOINT 不可绕过被实质绕过。
 
-**检测信号**：run-log 中同 target 连续 `action=rework` 记录数超过轮次上限；同轮次号重复出现（计数被重置）；同 id finding 在循环轮次间定义发生语义改写。
+**检测信号**：run-log 中同 target 连续 `action=fix` 记录数超过轮次上限（A15：返工事件载体由原 `rework` 死词改为 `fix`）；同轮次号重复出现（计数被重置）；同 id finding 在循环轮次间定义发生语义改写。
 
 **修正**：达限强制 🔴 CHECKPOINT 升级（L1→L4，用户裁定：继续修复 / 接受剩余项并放行 / 阶段回退 / 终止）；禁止升级单调性列出的绕过手段——分层出口与升级路径见 [subagent-delegation.md](subagent-delegation.md)「分层反馈回路（L0-L4）」节。
 
@@ -830,7 +830,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 **检测信号**：
 - `.w-model/codegraph-queries/` 目录不存在或为空（阶段 5-8 有代码修改但无查询记录）
 - 代码修改的 ticket 在 codegraph-queries/ 下无对应 `phase<N>-<ticket>-<symbol>.json` 落盘文件
-- run-log 中阶段 5-8 有 action=produce（代码产出）但无 action=codegraph_query 记录
+- run-log 中阶段 5-8 有 action=produce（代码产出）但无 codegraph 查询留痕（A15：原 `codegraph_query` 死词已从 run-log 词表删除，查询证据以 `.w-model/codegraph-queries/` 落盘文件为唯一载体）
 
 **回退动作**：撤销未查询的修改，补跑 codegraph CLI 查询（`codegraph query <符号>`）并落盘，重新评估影响半径后重做修改。
 
@@ -893,9 +893,9 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 **为何是反模式**：R3 预防性审查对所有 S 变体无条件强制。「修复就是小改不用审」「紧急救援优先跳过审查」属合理化借口——修复恰好是引入回归风险最高的环节，紧急修复往往跳过完整设计审查，更需要 R3 三维度（完整性/可靠性/安全性）兜底。跳过 R3+V 的修复等于未经验证直接合入。
 
 **检测信号**：
-- run-log 中 `action=fix` 或 `action=emergency-fix` 后无 3 条 R3 记录直接出现 `action=review` role=V
-- run-log 中 `action=fix` 或 `action=emergency-fix` 后无 R3 记录直接进入 `action=gate` role=G
-- `check-run-log.ts` R8 报「S(fix)→V 之间 R3 记录不足」或「S(emergency-fix)→V 之间 R3 记录不足」
+- run-log 中 `action=fix` 后无 3 条 R3 记录直接出现 `action=review` role=V（A15：原 `emergency-fix` 死词已删除）
+- run-log 中 `action=fix` 后无 R3 记录直接进入 `action=gate` role=G
+- `check-run-log.ts` R8 报「S(fix)→V 之间 R3 记录不足」
 - `check-role-dispatch.ts` 报「阶段 N 缺失 role=R」
 - `check-preventive-review.ts --variant=fix/emergency` 报告路径缺失（`<phase>-fix-{dim}.json` 或 `<phase>-emergency-{dim}.json` 三份不齐）
 - `.w-model/preventive-reviews/` 下无对应 fix/emergency 前缀的三份 PreventiveReview JSON
@@ -956,7 +956,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 **例外**：经用户/主刀明确批准的需求变更（走豁免或 S→R→V→人类四阶段），不视为违反。
 
-**门禁脚本**：[`check-run-log.ts`](../scripts/cli/check-run-log.ts) R10 revertEvidence 回滚证伪——fix/emergency-fix 记录须携带合法 `revertEvidence.command`（S-fix 复现测试的回滚证伪声明：执行 command 使复现测试回到失败态，AC-8；**无时间戳豁免**：缺失或非法始终 blocking，`LEGACY_REVERT_EVIDENCE_CUTOFF` / `LEGACY_REVERT_EVIDENCE` 吸收路径已删除）；断言与需求的语义对应仍由 V 评审人工核验（软检测兜底）
+**门禁脚本**：[`check-run-log.ts`](../scripts/cli/check-run-log.ts) R10 revertEvidence 回滚证伪——fix 记录须携带合法 `revertEvidence.command`（A15：emergency-fix 死词已删除）（S-fix 复现测试的回滚证伪声明：执行 command 使复现测试回到失败态，AC-8；**无时间戳豁免**：缺失或非法始终 blocking，`LEGACY_REVERT_EVIDENCE_CUTOFF` / `LEGACY_REVERT_EVIDENCE` 吸收路径已删除）；断言与需求的语义对应仍由 V 评审人工核验（软检测兜底）
 
 **关联**：「改断言让测试通过」条目；"记叙性优先"（测试断言不是金标准，失败先归因，见 [bdd.md](bdd.md)「记叙性优先」节）
 
@@ -1000,7 +1000,7 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 
 ### #18 跳过根因定位直接返工（V/G 不通过 → 未经 R 直接分派 S 返工）
 
-**检测信号**：run-log 中 V/G `outcome=fail/rework` 之后紧接 `action=rework` 且无 `action=rootcause` 记录；reworkHints 未出现在任何 RootCauseReport 的输入引用中。
+**检测信号**：run-log 中 V/G `outcome=fail/rework` 之后未先出现 `action=rootcause` 记录即出现 S 返工（`action=fix`）；reworkHints 未出现在任何 RootCauseReport 的输入引用中。
 
 **回退动作**：撤销该轮 S 返工产物，将问题交给 R 定位；完成普通 V/G 失败链（见「普通 V/G 失败链」节）后再由 S-fix 修复。
 

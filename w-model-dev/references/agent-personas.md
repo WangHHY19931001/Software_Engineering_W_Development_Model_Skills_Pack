@@ -785,7 +785,7 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 
 | persona | 强化职责 | 加载时机 |
 |---|---|---|
-| `engineering-incident-response-commander` | 紧急修复分派场景主导（5-Why 主导，判断紧急修复是否触及根因） | run-log 含 `emergency-fix` 条目时必含 |
+| `engineering-incident-response-commander` | 紧急修复分派场景主导（5-Why 主导，判断紧急修复是否触及根因） | run-log 含带 `blocker` 审计说明的 `fix` 条目时必含（批次 6 A15：emergency-fix 动作已删除，紧急通道以 fix + blocker 留痕） |
 | `testing-evidence-collector` | 收集 S-fix 修复后的测试证据，验证修复有效 | S-fix 修复后 V 复审时必含 |
 | `testing-reality-checker` | 防幻想根因（R 自评根因准确但 S-fix 修复后 bug 仍存在 → 重新定位） | R 重派（round ≥ 2）时必含 |
 

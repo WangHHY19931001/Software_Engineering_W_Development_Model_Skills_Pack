@@ -1169,7 +1169,7 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 
   | 例外               | 条件（三者须同时成立）                                   | 设计依据                                                         |
   | ------------------ | -------------------------------------------------------- | ---------------------------------------------------------------- |
-  | S-fix 消费 R       | `role=S` ∧ `srcRole=R` ∧ `action ∈ {fix, emergency-fix}` | S-fix 必须携带 R 报告执行返工修复（反模式 #18 守护）             |
+  | S-fix 消费 R       | `role=S` ∧ `srcRole=R` ∧ `action=fix` | S-fix 必须携带 R 报告执行返工修复（反模式 #18 守护；批次 6 A15：emergency-fix 死词已删除）             |
   | V 复审 R 报告      | `role=V` ∧ `srcRole=R` ∧ `targetKind=rootcause`          | V 复审 RootCauseReport（返工链 V→G 必经环节，反模式 #19 守护）   |
   | R 预防性审查消费 S | `role=R` ∧ `srcRole=S` ∧ `targetKind=preventive`         | R3 预防性审查须以 S 产物为输入（独立定位与预防性审查是两类动作） |
 
@@ -1851,34 +1851,22 @@ interface RunLogEntry {
   action:
     | 'chunk'
     | 'cross'
-    | 'evolve'
     | 'produce'
     | 'review'
     | 'gate'
     | 'tla-gate'
     | 'graph-gate'
-    | 'test'
     | 'checkpoint'
-    | 'rework'
-    | 'rollback'
     | 'rootcause'
     | 'fix'
-    | 'emergency-fix'
-    | 'escalate'
     | 'r3-completeness'
     | 'r3-reliability'
     | 'r3-security'
-    | 'codegraph_query'
-    | 'opsx_explore'
-    | 'opsx_propose'
-    | 'opsx_apply'
-    | 'opsx_archive'
-    | 'ensure_deps'
+    | 'perspective'
+    | 'consensus'
     | 'iceberg-sweep'
-    | 'iceberg-review'
     | 'plan_propose'
-    | 'plan_task'
-    | 'plan_review';
+    | 'event-route';
   role: 'O' | 'A' | 'S' | 'V' | 'G' | 'R';
   duration_s: number;
   tokens: number; // 由宿主 Agent 报告实际消耗；无值时填 0 并标注 estimated:false
@@ -1897,17 +1885,17 @@ interface RunLogEntry {
   implementationTarget?: string;
   variant?: 'fix' | 'emergency-fix'; // fix=S-fix 返工变体；emergency-fix=紧急修复通道（2026-09-04 起 schema 强制约束见下）
   blocker?: string; // emergency-fix 的阻塞原因（"为何走紧急通道"审计说明，不意味跳过 R3+V+G 审查）
-  fixedLocation?: string; // fix/emergency-fix 修复位置（文件/区域），审计用
-  fixBasedOn?: string; // fix/emergency-fix 修复依据（S-self-assessment 或 R 报告 ID），审计用
+  fixedLocation?: string; // fix 修复位置（文件/区域），审计用
+  fixBasedOn?: string; // fix 修复依据（S-self-assessment 或 R 报告 ID），审计用
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
 }
 ```
 
-**action 词表口径（32 值）**：`plan_propose` / `plan_task` / `plan_review` 为 superpowers 编码链新增（S-plan 计划提案 / 计划任务推进 / V 任务评审，2026-09-21 起）；`perspective` / `consensus` 为阶段 1-4 多角色讨论分析新增（A persona 视角分析 / A-lead 共识纪要逐轮留痕，2026-10-03 起，见 §10P）；`opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive` 同批转为 **LEGACY**（位置不变，历史记录仍可解析，新流程不再产生）。词表口径与 `data-models.md` / `conventions.md` 一致，`check-run-log.ts` 的 action-role 配对同步生效。
+**action 词表口径（18 值，批次 6 A15 收敛）**：词表为 `chunk` / `cross` / `produce` / `review` / `gate` / `tla-gate` / `graph-gate` / `checkpoint` / `rootcause` / `fix` / `r3-completeness` / `r3-reliability` / `r3-security` / `perspective`（阶段 1-4 多角色讨论分析新增，2026-10-03 起，见 §10P）/ `consensus`（同前）/ `iceberg-sweep` / `plan_propose`（superpowers 编码链新增，2026-09-21 起）/ `event-route`（Loop 3 事件接驳路由）。2026-10-06 批次 6 A15：32 值旧词表删除 15 个零真实用法死词（evolve / test / rework / rollback / emergency-fix / escalate / codegraph_query / opsx_explore / opsx_propose / opsx_apply / opsx_archive / ensure_deps / iceberg-review / plan_task / plan_review），新增 `event-route`；写入已删除值即 schema 违规。逐值职责表见 `data-models.md`「动作类型字段约束」节；词表口径与 `data-models.md` / `conventions.md` 一致，`check-run-log.ts` 的 action-role 配对同步生效。
 
-**D8 lifecycle identity contract（phase 8）：** `check-run-log.ts` 按完整 `(phase, round, reportId, targetKind, basedOnReport, implementationTarget)` 关联 lifecycle segment。rootcause R/V/G 仅相互关联同一 reportId/round/targetKind；fix、emergency-fix、implementation V/G/R3 必须显式声明并 exact 对齐 `target===implementationTarget`，且 fix/R3/V/G artifacts 包含 exact target；rootcause review 不计入 implementation V，也不满足 R3。R3 仅在同身份 `S-fix → R3 completeness/reliability/security → implementation V` 窗口计数，R8 在 segment 内校验，禁止 phase/round bucket 或 phase-wide 首索引。缺字段输出 `LEGACY_UNSCOPED`/deferred diagnostics，legacy 证据不进入 credit；生命周期机器状态统一为 `CLOSED_UNDER_CURRENT_RULES` 或 `NOT_CLOSED_NOT_PROVEN`，exit 0 仍不单独证明 closed。诊断不会修改 append-only raw JSONL。
+**D8 lifecycle identity contract（phase 8）：** `check-run-log.ts` 按完整 `(phase, round, reportId, targetKind, basedOnReport, implementationTarget)` 关联 lifecycle segment。rootcause R/V/G 仅相互关联同一 reportId/round/targetKind；fix、implementation V/G/R3 必须显式声明并 exact 对齐 `target===implementationTarget`，且 fix/R3/V/G artifacts 包含 exact target；rootcause review 不计入 implementation V，也不满足 R3。R3 仅在同身份 `S-fix → R3 completeness/reliability/security → implementation V` 窗口计数，R8 在 segment 内校验，禁止 phase/round bucket 或 phase-wide 首索引。缺字段输出 `LEGACY_UNSCOPED`/deferred diagnostics，legacy 证据不进入 credit；生命周期机器状态统一为 `CLOSED_UNDER_CURRENT_RULES` 或 `NOT_CLOSED_NOT_PROVEN`，exit 0 仍不单独证明 closed。诊断不会修改 append-only raw JSONL。
 
-**variant / blocker 与坏行语义（2026-09-04 audit-gate-closure，schema 强制）**：`action=emergency-fix` 强制 `variant=emergency-fix` 且 `blocker` 非空（`variant=emergency-fix` 同样强制 `blocker`）；`action=fix` 的 `variant` **可选**——出现则必须为 `"fix"`（向后兼容 variant 规则引入前的 fix 记录）。缺 identity 字段的历史行（含双 legacy：同时缺 identity 与 variant/blocker 的旧 emergency-fix 行，经合并 legacy 谓词吸收）走 `LEGACY_VARIANT` / `LEGACY_UNSCOPED` **非阻断** diagnostic；已声明 `variant` 却缺 `blocker`、或 variant 值不符 const，属真实不一致 → blocking `[schema]`（吸收不覆盖）。`check-run-log.ts` 的 parseErrors 从纯 diagnostics **并入 blocking violations**：run-log 为空、空白、malformed-only 或 valid+malformed 一律 exit 1（坏行使输入不完整、可能丢失证据，fail-closed），消息保留 `PARSE_INCOMPLETE` 前缀；`checkRunLog([])` 返回 `passed=false` + `NOT_CLOSED_NOT_PROVEN`。action-role 配对由 logic 层 blocking 强制：`r3-*`→R、`fix`/`emergency-fix`/`produce`→S、`review`→V、`gate`/`tla-gate`/`graph-gate`→G。`preventive-review.schema.json` 同步新增条件约束：`passed=false ⇒ findings ≥1`（schema 强制 `findings.minItems=1`，防止无发现的失败审查被空 findings 掩盖）。
+**variant / blocker 与坏行语义（2026-09-04 audit-gate-closure 引入；批次 6 A3/C14 + A15 后的现状）**：schema 已无 `variant` 字段（批次 6 A3/C14 删除，携带即被 additionalProperties 拒绝）；`emergency-fix` 动作已随批次 6 A15 从 18 值词表删除（携带即 schema 违规），其 `blocker` 条件强制随之删除——`blocker` 降级为 `fix` 记录的可选审计说明（「为何走紧急通道」，不意味跳过 R3+V+G 审查）。携带已删除 action 死词或 `variant` 字段的记录属真实不一致 → blocking `[schema]`（无吸收绕行）。`check-run-log.ts` 的 parseErrors 从纯 diagnostics **并入 blocking violations**：run-log 为空、空白、malformed-only 或 valid+malformed 一律 exit 1（坏行使输入不完整、可能丢失证据，fail-closed），消息保留 `PARSE_INCOMPLETE` 前缀；`checkRunLog([])` 返回 `passed=false` + `NOT_CLOSED_NOT_PROVEN`。action-role 配对由 logic 层 blocking 强制：`r3-*`→R、`fix`/`produce`→S、`review`→V、`gate`/`tla-gate`/`graph-gate`→G。`preventive-review.schema.json` 同步新增条件约束：`passed=false ⇒ findings ≥1`（schema 强制 `findings.minItems=1`，防止无发现的失败审查被空 findings 掩盖）。
 
 **R3/R7 配对接受 V 重发记录（D-2，2026-09-21）**：VerifierOutput / 预防性报告等 V 自有产物类缺陷由 V 重发其自有产物修复，此时不存在 S-fix 记录。`checkRunLog` 的 R3 rootcause↔fix 一一对应与 R7 返工时序（legacy phase<8 路径）将满足以下全部门的记录**等价视为一次成功修复证据**：`action=review` ∧ `role=V` ∧ `outcome=success` ∧ `basedOnReport` 非空（引用被修 R 报告的 `reportId`）∧ `artifacts` 非空且**每一项**均以 V 自有目录前缀（`.w-model/verifier-outputs/` / `.w-model/v-reviews/` / `.w-model/preventive-reviews/`）之一开头。缺 `basedOnReport`、artifacts 非 V 前缀或 `outcome≠success` 不充数（配对违规照常报出）；phase 8 严格分支不受影响，仍只接受 S-fix 精确身份证据。详见 [`subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)「V 重发 = 修复证据」节。
 
@@ -1925,7 +1913,7 @@ interface RunLogEntry {
 | 每次子代理分派返回后             | append 一条 RunLogEntry（action 对应角色动作）                                                  |
 | 每个门禁脚本执行后               | append 一条 RunLogEntry（gateExitCode 填实际退出码）                                            |
 | 每个 🔴 CHECKPOINT 放行后        | append 一条 RunLogEntry（action=checkpoint，acknowledgedDecisions 填用户输入）                  |
-| 每次返工/回退后                  | append 一条 RunLogEntry（action=rework/rollback，note 填原因）                                  |
+| 每次返工/回退后                  | append 一条 RunLogEntry（action=fix，note 填原因；批次 6 A15：rework/rollback 死词已删除，返工事件载体为 fix）          |
 | 预算检查点（每阶段门后）         | 读 budget.json + 累计本阶段 run-log tokens，若超 maxTokens 或触发 killSwitch → 按 onExceed 处置 |
 
 > **顺序纪律交叉引用（D-4/D-8，2026-09-27 清收批补）**：本表「每个 🔴 CHECKPOINT 放行后」动作须遵循**阶段门放行三步顺序**（三步枚举与放行判据见 [`SKILL.md`](../w-model-dev/SKILL.md)「阶段门放行三步」）；机器核验见 `check-run-log` R11（§10D.7），唯一例外登记见 §10.6。
@@ -1956,10 +1944,10 @@ interface RunLogEntry {
 
 - **预算更新时戳**：每个阶段门放行前，`budget.json.updatedAt` 须更新为当前时间戳（证明预算检查已执行，非沿用历史值）；未更新 → `check-budget.ts` 退出码 1。
 - **killSwitch 告警**：killSwitch 任一触发条件满足（`consecutiveReworks` / `budgetBurnRate` / `tlaReworks`）时须产出告警（run-log 记录 + 🔴 CHECKPOINT 展示消耗明细），不得静默；`check-budget.ts` 校验 killSwitch 触发但 run-log 无对应告警记录 → 退出码 1。
-- **killSwitch 返工计数口径（D-4a，对齐真实事件）**：`check-budget.ts` 的 `reworkCount` 按**真实事件**累计——`action ∈ {rework, fix, emergency-fix}` **或** `outcome ∈ {fail, rework}` 的记录各计 1 条（`countReworks` 已导出以供测试）；它是「返工事件 + 未过门事件」的**累计**条数而非「连续 N 轮返工」的滑动窗口，`consecutiveReworks` 实际约束的是本阶段累计阈值（字段名沿用 schema，语义以本口径为准）；若提供 `--phase=N` 则只统计 `phase===N` 的记录。`tlaReworkCount` 为其中 note/target 含 TLA 的子集（未扩大 tla 判据：非返工记录即使提及 TLA 也不计入）。背景：真实 8 阶段调测的 run-log 中 `action=rework` 一条都没有（返工以 fix/fail 记录），旧口径只数 `action=rework` 会让护栏静默失灵。
+- **killSwitch 返工计数口径（D-4a，对齐真实事件）**：`check-budget.ts` 的 `reworkCount` 按**真实事件**累计——`action=fix`（批次 6 A15：rework/emergency-fix 死词已删除，返工事件载体为 fix）**或** `outcome ∈ {fail, rework}` 的记录各计 1 条（`countReworks` 已导出以供测试）；它是「返工事件 + 未过门事件」的**累计**条数而非「连续 N 轮返工」的滑动窗口，`consecutiveReworks` 实际约束的是本阶段累计阈值（字段名沿用 schema，语义以本口径为准）；若提供 `--phase=N` 则只统计 `phase===N` 的记录。`tlaReworkCount` 为其中 note/target 含 TLA 的子集（未扩大 tla 判据：非返工记录即使提及 TLA 也不计入）。背景：真实 8 阶段调测的 run-log 中 `action=rework` 一条都没有（返工以 fix/fail 记录），旧口径只数 `action=rework` 会让护栏静默失灵。
 - **用量实效校验 R6 + burnRate 告警 R5-b（D-4b）**：预算配置合法 ≠ 用量在预算内。`check-budget.ts --run-log=<path>` 从 run-log 累计 tokens（只计有限非负数的 `tokens` 字段，坏值剔除否则 Σ 变 NaN 而判定静默永不触发），Σtokens(阶段) 严格大于 `perPhase.maxTokens` 或 Σtokens(全量) 严格大于 `project.maxTokensTotal` → **blocking（退出码 1）**（消息以 `R6：` 开头并附超限占比；恰等于上限不算超限）；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` → killSwitch 用量告警（消息以 `R5-b：` 开头，与 R5 既有返工/TLA 文案区分）。**未接线不静默（D-5②/N-6）**：未提供 `--run-log` 时 R5 触发检测与 R6/R5-b 一并跳过（退出码行为与新增前一字不变），但**不再静默**——CLI 输出非阻断诊断（跳过不等于通过）；故**权威调用表必带** `--run-log=.w-model/run-log.jsonl --phase=N`，不带接线属未接线运行。**Σtokens 为上界口径（宁严不松）**：同一分派的多条归账重复累计、判超限不去重——分组键与键守卫、疑似重复归账诊断、R3 三条目归账约定以及 Σtokens=0 / 读取失败两条边界的完整口径，见 `w-model-dev/references/data-models.md`「用量实效校验」段（R6）与其「Σtokens 为上界口径」条。
 - **运行日志 4 类动作完备**：每个阶段 run-log.jsonl 须含 `chunk` / `cross` / `gate` / `checkpoint` 4 类动作记录（阶段 1–4 ingestion 含 `chunk`/`cross`；所有阶段含 `gate`/`checkpoint`）；缺类 → `check-run-log.ts` 退出码 1。
-- **返工须有 rework 记录**：任一返工发生后，run-log 须追加 `action=rework` 记录（`note` 填原因）；返工发生但无 `rework` 记录 → `check-run-log.ts` 退出码 1。
+- **返工须有 fix 记录**：任一返工发生后，run-log 须追加 `action=fix` 记录（`note` 填原因；批次 6 A15：原 `rework` 死词已删除，返工事件载体为 fix）；返工发生但无 fix 记录 → R3/R7 配对校验报出。
 - **R8 相对顺序约束（同生命周期段内动作链序）**：`check-run-log.ts` 对 phase 8 按 identity segment 校验 **S-fix → R3×3 → implementation V → implementation G → checkpoint**，rootcause R/V/G 不混入实现链；legacy 缺身份记录输出 `LEGACY_UNSCOPED`/deferred，不用 phase-wide 首索引、最近记录或集合数量补齐。其他阶段保留兼容的阶段级轨迹校验。真实顺序缺失仍返回退出码 1。
 - **编排质量指标（orchestrationQuality，只读统计，不加门禁）**：`metrics-report.ts` 在 7 区度量基础上新增 `orchestration` 子区，统计编排质量信号——`r3`（R3 预防性审查套数 / 维度分布 / findings 严重度分布，数据源 `.w-model/preventive-reviews/`）、`iceberg`（冰山扫掠轮次分布 / 新发现计数 / 严重度分布，数据源 `.w-model/iceberg/`）、`reworkHints`（V 审查返工提示密度，数据源 run-log 本身）。`r3`/`iceberg` 数据源缺失时对应子区为 `null`（不告警、不阻断）；该指标仅供汇报与诊断，不参与任何门禁放行判定。
 - **强制校验脚本**：`check-budget.ts`（预算更新时戳 + killSwitch 告警）与 `check-run-log.ts`（4 类动作 + rework 记录 + §10E 交叉校验）须在每个阶段门由 G 子代理执行；任一退出码 ≠ 0 → O 不得放行（反模式 #3/#6/#9 守护）。闭环五门（清单与调用顺序见 [`SKILL.md`](../w-model-dev/SKILL.md)「阶段门放行三步」与 [`operational-recovery.md`](../w-model-dev/references/operational-recovery.md)「调用时机」节）是否真的在每个阶段门跑过，由 `check-run-log` R11 机器核验（2026-09-18）：凡有 `action=checkpoint` 且 `outcome=success` 放行的阶段，放行前须已有五条 `role=G` / `outcome=success` / `gateExitCode=0` 的闭环脚本 gate 记录且时间戳**严格毫秒早于**放行（毫秒精度口径，DEC-3：gate 时间戳须严格毫秒早于放行记录才充数，同毫秒（含无毫秒部分的秒级时间戳，Date.parse 后相等）不算早于；官方追加器强制毫秒递增（同毫秒 +1ms 步进），毫秒序为真实信息；无时间戳豁免；无放行的 run 不触发）。**唯一例外**：`phase===1` × `check-checkpoint.ts` 的后置窗口（历史日志兼容，D-6）——判据与定性见 [`operational-recovery.md`](../w-model-dev/references/operational-recovery.md)「阶段 1 自举豁免」节（R11 后置窗口，D-6）；该例外只兼容以旧时序（先写放行记录、后补 `check-checkpoint.ts` gate 记录）写入的历史 run-log（后置形态仍被 R8 轨迹模板拦截），`phase>=2` 无此例外。

@@ -149,7 +149,7 @@ describe('checkBudget 逐规则单测', () => {
  * countReworks（CLI 侧 run-log 返工统计口径，D-4a）
  *
  * 背景：真实 8 阶段调测的 run-log 中 action='rework' 一条都没有——返工以
- * fix/emergency-fix 与 outcome='fail'/'rework' 落盘，旧口径（只认 action==='rework'）
+ * fix 与 outcome='fail'/'rework' 落盘（批次 6 A15：rework/emergency-fix 死词已删除），旧口径（只认 action==='rework'）
  * 使 reworkCount 恒为 0，R5 连续返工护栏（killSwitch）一次都没触发（护栏失灵）。
  */
 describe('countReworks 返工计数口径（D-4a）', () => {
@@ -164,16 +164,16 @@ describe('countReworks 返工计数口径（D-4a）', () => {
     expect(s.reworkCount).toBe(3); // a+b+c（phase=3）
   });
 
-  it('legacy action=rework 与 emergency-fix 均计入，且同一记录不重复计数', () => {
+  it('批次 6 A15：action=rework/emergency-fix 死词不经 action 判据计入，outcome 判据不变', () => {
     const entries = [
-      // 兼容项：旧记录的 action='rework' 仍计入（即使 outcome 也命中，只计一次）
+      // 'a' 经 outcome='fail' 计入（outcome 判据）；'b' outcome='success' 且 action 为死词 → 不计入
       { runId: 'a', phase: 5, action: 'rework', role: 'S', outcome: 'fail' },
       { runId: 'b', phase: 5, action: 'emergency-fix', role: 'S', outcome: 'success' },
       { runId: 'c', phase: 5, action: 'gate', role: 'G', outcome: 'success' },
       { runId: 'd', phase: 5, action: 'review', role: 'V', outcome: 'success' },
     ];
     const s = countReworks(entries, 5);
-    expect(s.reworkCount).toBe(2); // a+b；c/d 无返工语义
+    expect(s.reworkCount).toBe(1); // 仅 a（outcome 判据）；b 的 action 死词不再计入
   });
 
   it('tlaReworkCount 只在计入返工的记录里按 note/target 的 TLA 判据统计', () => {

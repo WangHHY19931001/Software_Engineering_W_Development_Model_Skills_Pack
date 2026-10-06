@@ -106,7 +106,7 @@ const FORBIDDEN_SOURCE_ROLES: Record<Role, Role[]> = {
 /**
  * D-1 返工来源例外：role×action×targetKind 三元判定。
  * 在 FORBIDDEN_SOURCE_ROLES 基础上开三个具名例外（其余一律仍拒）：
- *   1. S 消费 R：仅 action ∈ {fix, emergency-fix}（S-fix 必须消费 R 报告，反模式 #18 守护）
+ *   1. S 消费 R：仅 action=fix（S-fix 必须消费 R 报告，反模式 #18 守护；批次 6 A15：emergency-fix 死词已删除）
  *   2. V 消费 R：仅 targetKind === 'rootcause'（V 复审 RootCauseReport）
  *   3. R 消费 S：仅 targetKind === 'preventive'（R3 预防性审查消费 S 产物）
  * targetKind 缺省视为 'standard'——既有签名链（无该字段）走 standard 路径，行为不变。
@@ -115,7 +115,7 @@ function isAllowedSource(role: Role, entry: SignatureChainEntry, srcRole: Role):
   const forbidden = FORBIDDEN_SOURCE_ROLES[role] ?? [];
   if (!forbidden.includes(srcRole)) return true;
   const tk = entry.targetKind ?? 'standard';
-  if (role === 'S' && srcRole === 'R') return entry.action === 'fix' || entry.action === 'emergency-fix';
+  if (role === 'S' && srcRole === 'R') return entry.action === 'fix';
   if (role === 'V' && srcRole === 'R') return tk === 'rootcause';
   if (role === 'R' && srcRole === 'S') return tk === 'preventive';
   return false;

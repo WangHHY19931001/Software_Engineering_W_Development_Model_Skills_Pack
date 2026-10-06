@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/checkpoint-log.schema.json",
   "title": "CheckpointLogEntry",
-  "description": "checkpoint-log.jsonl 单行记录形状（checkpoint-logic.ts RunLogEntry 子集：无 rootcause/fix/escalate 动作、无 R 角色）。落盘形态（D3，42.13.0 起）：checkpoint-log 目录内容为 phase-<N>.md 纯文本（UTF-8，用户确认原文 + 时间与放行对象要素）——本 schema 为结构参考，机器校验走 check-checkpoint R1-R5 文本判据（canonical 形态 phase-<N>.md；同 phase 双候选文件歧义 fail-closed）",
+  "description": "checkpoint-log.jsonl 单行记录形状（checkpoint-logic.ts RunLogEntry 子集：仅阶段门放行链动作、无 R 角色）。落盘形态（D3，42.13.0 起）：checkpoint-log 目录内容为 phase-<N>.md 纯文本（UTF-8，用户确认原文 + 时间与放行对象要素）——本 schema 为结构参考，机器校验走 check-checkpoint R1-R5 文本判据（canonical 形态 phase-<N>.md；同 phase 双候选文件歧义 fail-closed）",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -42,24 +42,11 @@
       "minLength": 1
     },
     "action": {
-      "description": "动作类型枚举（12 值，checkpoint-log 为 run-log 子集，无 rootcause/fix/escalate 动作）：chunk=A 子代理 ingestion 分块（阶段1-4必需）；cross=A 子代理跨块交叉合并（阶段1-4必需）；evolve=A 子代理图谱演进增量更新（阶段2-4 在现有 graph.json 上追加节点/边）；produce=S 产出阶段产物（阶段5-8必需）；review=V 评审（阶段5-8必需）；gate=G 工件质量门（check-artifact-gate.ts）；tla-gate=G TLA+ 行为门禁（check-tla-model.ts）；graph-gate=G 图谱门禁（check-requirement-graph.ts）；test=S 测试执行；checkpoint=O 阶段门 CHECKPOINT 放行；rework=返工；rollback=阶段回退。R5 检测后阶段决策否定前阶段决策且该阶段无 rework/rollback 记录 → 疑似静默推翻",
-      "enum": [
-        "chunk",
-        "cross",
-        "evolve",
-        "produce",
-        "review",
-        "gate",
-        "tla-gate",
-        "graph-gate",
-        "test",
-        "checkpoint",
-        "rework",
-        "rollback"
-      ]
+      "description": "动作类型枚举（8 值，checkpoint-log 为 run-log 子集——阶段门放行链动作，无 rootcause/fix/r3-*/perspective/consensus/iceberg-sweep/plan_propose/event-route 等返工链与实施类动作）：chunk=A 子代理 ingestion 分块（阶段1-4必需）；cross=A 子代理跨块交叉合并（阶段1-4必需）；produce=S 产出阶段产物（阶段5-8必需）；review=V 评审；gate=G 工件质量门（check-artifact-gate.ts）；tla-gate=G TLA+ 行为门禁（check-tla-model.ts）；graph-gate=G 图谱门禁（check-requirement-graph.ts）；checkpoint=O 阶段门 CHECKPOINT 放行。（批次 6 A15：run-log 词表 32→18，旧 12 值子集中的 evolve/test/rework/rollback 随死词清理一并删除。）",
+      "enum": ["chunk", "cross", "produce", "review", "gate", "tla-gate", "graph-gate", "checkpoint"]
     },
     "role": {
-      "description": "执行角色枚举（5 值，无 R）：O=编排者（执行 checkpoint/阶段门放行）A=分析（chunk/cross/evolve）S=产出（produce/test）V=评审（review）G=门禁（gate/tla-gate/graph-gate）；checkpoint-log 为 run-log 子集，排除 R=根因定位/R3 预防性审查角色",
+      "description": "执行角色枚举（5 值，无 R）：O=编排者（执行 checkpoint/阶段门放行）A=分析（chunk/cross）S=产出（produce）V=评审（review）G=门禁（gate/tla-gate/graph-gate）；checkpoint-log 为 run-log 子集，排除 R=根因定位/R3 预防性审查角色",
       "enum": ["O", "A", "S", "V", "G"]
     },
     "duration_s": { "description": "本次动作持续时间，单位秒，非负数值", "type": "number", "minimum": 0 },

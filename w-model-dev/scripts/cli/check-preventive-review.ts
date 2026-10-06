@@ -174,7 +174,7 @@ async function main(): Promise<void> {
     }
     // 取最后一条 checkpoint success 记录的 phase 作为当前阶段
     let lastPhase = 0;
-    // 扫描 run-log 推断 S 变体（最近一条 fix/emergency-fix 决定 variant）
+    // 扫描 run-log 推断 S 变体（最近一条 fix 决定 variant；批次 6 A15：emergency-fix 动作已删除，emergency 变体仅可显式 --variant=emergency 指定）
     let inferredVariant: PreventiveReviewOptions['variant'] = 'standard';
     let lastSAction: string | null = null;
     for (const entryRaw of entries) {
@@ -188,8 +188,6 @@ async function main(): Promise<void> {
       if (entry.role === 'S' && typeof entry.action === 'string') {
         if (entry.action === 'fix') {
           lastSAction = 'fix';
-        } else if (entry.action === 'emergency-fix') {
-          lastSAction = 'emergency-fix';
         } else if (entry.action === 'produce') {
           lastSAction = 'produce';
         }
@@ -198,7 +196,6 @@ async function main(): Promise<void> {
     // 推断 variant：若未显式传 --variant，则按最后一条 S action 推断
     if (!variantArg) {
       if (lastSAction === 'fix') inferredVariant = 'fix';
-      else if (lastSAction === 'emergency-fix') inferredVariant = 'emergency';
       else inferredVariant = 'standard';
       variant = inferredVariant;
     }

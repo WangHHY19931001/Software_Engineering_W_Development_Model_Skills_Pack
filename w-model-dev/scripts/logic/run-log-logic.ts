@@ -74,36 +74,22 @@ export interface RunLogEntry {
   action:
     | 'chunk'
     | 'cross'
-    | 'evolve'
     | 'produce'
     | 'review'
     | 'gate'
     | 'tla-gate'
     | 'graph-gate'
-    | 'test'
     | 'checkpoint'
-    | 'rework'
-    | 'rollback'
     | 'rootcause'
     | 'fix'
-    | 'emergency-fix'
-    | 'escalate'
     | 'r3-completeness'
     | 'r3-reliability'
     | 'r3-security'
-    | 'codegraph_query'
-    | 'opsx_explore'
-    | 'opsx_propose'
-    | 'opsx_apply'
-    | 'opsx_archive'
-    | 'ensure_deps'
-    | 'iceberg-sweep'
-    | 'iceberg-review'
-    | 'plan_propose'
-    | 'plan_task'
-    | 'plan_review'
     | 'perspective'
-    | 'consensus';
+    | 'consensus'
+    | 'iceberg-sweep'
+    | 'plan_propose'
+    | 'event-route';
   role: 'O' | 'A' | 'S' | 'V' | 'G' | 'R';
   duration_s: number;
   tokens: number;
@@ -134,12 +120,12 @@ export interface RunLogEntry {
   rtmDiff?: Record<string, unknown>;
   /** implementation fix/review/gate/R3 所针对的实现产物身份 */
   implementationTarget?: string;
-  // ---- fix/emergency-fix 审计字段（subagent-delegation.md「S 子代理修改既有产物的边界」）----
-  /** emergency-fix 的阻塞原因描述（"为何走紧急通道"的审计说明，action=emergency-fix 时必填） */
+  // ---- fix 审计字段（subagent-delegation.md「S 子代理修改既有产物的边界」；批次 6 A15：emergency-fix 动作已删除，紧急通道说明降级为 fix 可选审计字段）----
+  /** 紧急通道的阻塞原因描述（"为何不走常规返工节奏"的审计说明；emergency-fix 动作已删除，本字段为 fix 可选审计说明） */
   blocker?: string;
-  /** fix/emergency-fix 修复位置（文件/区域），审计用 */
+  /** fix 修复位置（文件/区域），审计用 */
   fixedLocation?: string;
-  /** fix/emergency-fix 依据（如 S-self-assessment 或 R 报告 ID），审计用 */
+  /** fix 修复依据（如 S-self-assessment 或 R 报告 ID），审计用 */
   fixBasedOn?: string;
   /** effective lifecycle status is emitted by the checker summary, never written back to raw JSONL. */
   lifecycleStatus?: RunLogLifecycleStatus;
@@ -153,7 +139,7 @@ export interface RunLogEntry {
   passed?: boolean;
   /** review: 返工提示 */
   reworkHints?: string[];
-  /** fix/emergency-fix: S-fix 复现测试的回滚证伪声明（R10 强制携带；schema 层 optional）。 */
+  /** fix: S-fix 复现测试的回滚证伪声明（R10 强制携带；schema 层 optional）。 */
   revertEvidence?: { command: string; description?: string };
   /** rootcause/fix: 返工轮次 */
   round?: number;
@@ -248,9 +234,10 @@ function lifecycleScopeKey(identity: LifecycleIdentity): string {
 
 function entryScopeKey(entry: RunLogEntry): string {
   const identity = lifecycleIdentity(entry);
-  const reportRef = ['fix', 'emergency-fix'].includes(entry.action)
-    ? (identity.basedOnReport ?? identity.reportId)
-    : (identity.reportId ?? identity.basedOnReport);
+  const reportRef =
+    entry.action === 'fix'
+      ? (identity.basedOnReport ?? identity.reportId)
+      : (identity.reportId ?? identity.basedOnReport);
   return [identity.phase, identity.round, reportRef].map((value) => value ?? 'unknown').join('|');
 }
 
@@ -288,7 +275,7 @@ function sameIdentity(a: LifecycleIdentity, b: LifecycleIdentity): boolean {
 }
 
 function isSuccessfulFix(entry: RunLogEntry): boolean {
-  return entry.role === 'S' && ['fix', 'emergency-fix'].includes(entry.action) && entry.outcome === 'success';
+  return entry.role === 'S' && entry.action === 'fix' && entry.outcome === 'success';
 }
 
 /**
@@ -401,9 +388,11 @@ function hasPassedGate(entry: RunLogEntry): boolean {
 }
 
 /**
- * reworkHints 规则（audit-fixes task 4 / I-6）：review 族（review/iceberg-review）
+ * reworkHints 规则（audit-fixes task 4 / I-6）：review 动作
  * passed=false 须带非空 reworkHints（schema allOf 同步强制）。判定含缺失与
  * present-but-empty 两种形态，与 schema `required` + `minItems: 1` 对齐。
+ * （批次 6 A15：原 review/iceberg-review 两值族中 iceberg-review 已删除，V 复审
+ * 冰山报告以 review 动作记录。）
  *
  * 该谓词仅用于 blocking 违规的分类命名（`[rework-hints]` 前缀）；历史 cutoff
  * 吸收路径（非阻断 diagnostic 绕行）已删除——任何时刻缺非空 hints
@@ -412,7 +401,7 @@ function hasPassedGate(entry: RunLogEntry): boolean {
 function isFailedReviewMissingReworkHints(raw: unknown): boolean {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
   const record = raw as Record<string, unknown>;
-  const isReviewFamily = record.action === 'review' || record.action === 'iceberg-review';
+  const isReviewFamily = record.action === 'review';
   const hints = record.reworkHints;
   const missingHints = !Array.isArray(hints) || hints.length === 0;
   return isReviewFamily && record.passed === false && missingHints;
@@ -430,7 +419,7 @@ const REWORK_HINTS_MESSAGE_EXCLUSIONS: readonly string[] = [
 ];
 
 /**
- * R10 判定：fix/emergency-fix 记录是否携带合法 revertEvidence.command（非空字符串）。
+ * R10 判定：fix 记录是否携带合法 revertEvidence.command（非空字符串）。
  * schema 层已保证出现时为 object 且 command 为 minLength 1 字符串；此处对仅空白
  * command（schema 可通过）按非法处理，与非空字符串判据（isNonEmptyString）对齐。
  */
@@ -441,7 +430,7 @@ function hasValidRevertEvidence(entry: RunLogEntry): boolean {
 
 const GATE_ACTIONS = new Set(['gate', 'tla-gate', 'graph-gate']);
 const R3_ACTIONS = ['r3-completeness', 'r3-reliability', 'r3-security'];
-const S_VARIANTS = ['produce', 'fix', 'emergency-fix'];
+const S_VARIANTS = ['produce', 'fix'];
 const R3_DIMENSIONS = ['completeness', 'reliability', 'security'];
 
 /**
@@ -452,7 +441,6 @@ const R3_DIMENSIONS = ['completeness', 'reliability', 'security'];
 const ACTION_ROLE_PAIRING: Record<string, 'A' | 'S' | 'V' | 'G' | 'R'> = {
   produce: 'S',
   fix: 'S',
-  'emergency-fix': 'S',
   review: 'V',
   gate: 'G',
   'tla-gate': 'G',
@@ -601,7 +589,7 @@ function checkTimestampOrdering(
         continue;
       }
       const fixIndex = valid.findIndex((candidate, index) => {
-        if (index <= rootReviewIndex || !['fix', 'emergency-fix'].includes(candidate.action)) return false;
+        if (index <= rootReviewIndex || candidate.action !== 'fix') return false;
         const fixIdentity = lifecycleIdentity(candidate);
         return (
           hasExactFixEvidence(candidate) &&
@@ -613,7 +601,7 @@ function checkTimestampOrdering(
       });
       if (fixIndex < 0) {
         const hasNonExactFix = valid.slice(rootReviewIndex + 1).some((candidate) => {
-          if (!['fix', 'emergency-fix'].includes(candidate.action)) return false;
+          if (candidate.action !== 'fix') return false;
           const candidateIdentity = lifecycleIdentity(candidate);
           return (
             candidateIdentity.phase === rootIdentity.phase &&
@@ -665,7 +653,7 @@ function checkTrajectoryTemplate(
   const violations: string[] = [];
 
   // R8 轨迹模板校验（agentic Ch19 轨迹符合性）
-  // 理想阶段轨迹：S 变体(produce/fix/emergency-fix) → R3×3 → V(review) → G(gate 类) → checkpoint(阶段最后)。
+  // 理想阶段轨迹：S 变体(produce/fix) → R3×3 → V(review) → G(gate 类) → checkpoint(阶段最后)。
   // R8 校验「轨迹正确」（R7 仅「时序正确」）：偏离理想动作序列即违规。
   for (const phase of completedPhases) {
     const phaseEntries = valid.filter((e) => e.phase === phase);
@@ -741,12 +729,12 @@ function checkTrajectoryTemplate(
     for (const [phase, phaseEntryList] of phaseEntries) {
       for (let start = 0; start < phaseEntryList.length; start++) {
         const startEntry = phaseEntryList.at(start)!.entry;
-        if (startEntry.role !== 'S' || !['fix', 'emergency-fix'].includes(startEntry.action)) continue;
+        if (startEntry.role !== 'S' || startEntry.action !== 'fix') continue;
         if (!isStrictLifecycleEntry(startEntry) || !isSuccessfulFix(startEntry)) continue;
         if (!completeImplementationIdentity(startEntry)) continue;
         const identity = lifecycleIdentity(startEntry);
         const nextFix = phaseEntryList.findIndex(
-          ({ entry }, index) => index > start && entry.role === 'S' && ['fix', 'emergency-fix'].includes(entry.action),
+          ({ entry }, index) => index > start && entry.role === 'S' && entry.action === 'fix',
         );
         const terminal = phaseEntryList.findIndex(
           ({ entry }, index) => index > start && entry.action === 'checkpoint' && entry.outcome === 'success',
@@ -759,7 +747,7 @@ function checkTrajectoryTemplate(
         const exactEntry = (entry: RunLogEntry): boolean => sameIdentity(lifecycleIdentity(entry), identity);
         const firstIndex = (pred: (e: RunLogEntry) => boolean): number => window.findIndex(({ entry }) => pred(entry));
         const chain: Array<[string, number]> = [
-          ['S(fix|emergency-fix)', 0],
+          ['S(fix)', 0],
           [
             'R3(r3-completeness|r3-reliability|r3-security)',
             firstIndex((entry) => exactEntry(entry) && hasExactR3Evidence(entry)),
@@ -822,7 +810,7 @@ function checkTrajectoryTemplate(
       };
       const phaseNo = phaseEntries[0]?.phase;
       const chain: Array<[string, number]> = [
-        ['S(produce|fix|emergency-fix)', firstIndex((e) => e.action === 'produce' || isSuccessfulFix(e))],
+        ['S(produce|fix)', firstIndex((e) => e.action === 'produce' || isSuccessfulFix(e))],
         ['R3(r3-completeness|r3-reliability|r3-security)', firstIndex((e) => legacyR3Actions.includes(e.action))],
         ['V(review)', firstIndex((e) => e.action === 'review')],
         ['G(gate 类)', lastIndex((e) => GATE_ACTIONS.has(e.action))],
@@ -857,7 +845,7 @@ function checkRevertEvidence(valid: RunLogEntry[]): {
 
   // R10: revertEvidence 回滚证伪协议（P2-B / S27 / AC-8）。
   //
-  // fix/emergency-fix 记录必须携带合法 revertEvidence.command（非空字符串）：执行该
+  // fix 记录必须携带合法 revertEvidence.command（非空字符串）：执行该
   // 命令使 S-fix 的复现测试回到失败态，证明测试确实锚定被修缺陷——反模式 #45
   // 「改断言让测试通过」的确定性挂点（命令本身由 S 在真实执行中出示，此处只验
   // 载体存在与形态）。
@@ -865,7 +853,7 @@ function checkRevertEvidence(valid: RunLogEntry[]): {
   // timestamp 仅为日志元数据，不参与证据信任判定；缺失/非法声明始终 blocking。
   const r10Counts = { checked: 0, missing: 0 };
   for (const e of valid) {
-    if (!['fix', 'emergency-fix'].includes(e.action)) continue;
+    if (e.action !== 'fix') continue;
     r10Counts.checked++;
     if (hasValidRevertEvidence(e)) continue;
     r10Counts.missing++;
@@ -1009,7 +997,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   }
 
   // action-role 配对强制（审计修复 task 3）：对每条 schema-valid 记录，
-  // action∈{r3-*} 须 role=R；{fix,emergency-fix,produce} 须 role=S；{review} 须
+  // action∈{r3-*} 须 role=R；{fix,produce} 须 role=S；{review} 须
   // role=V；{gate,tla-gate,graph-gate} 须 role=G；{perspective,consensus} 须 role=A
   // （阶段 1-4 多角色机制）。违反即 blocking（含 runId/action/role）。
   for (const e of valid) {
@@ -1059,7 +1047,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       if (typeof e.rollbackRecommended !== 'boolean')
         violations.push(`R1: rootcause 动作 ${e.runId} 须含 rollbackRecommended(boolean)`);
     }
-    if (['fix', 'emergency-fix'].includes(e.action)) {
+    if (e.action === 'fix') {
       if (!isNonEmptyString(e.basedOnReport)) violations.push(`R1: ${e.action} 动作 ${e.runId} 须含 basedOnReport`);
       if (!Array.isArray(e.artifacts) || e.artifacts.length === 0)
         violations.push(`R1: ${e.action} 动作 ${e.runId} 须含 artifacts(非空数组)`);
@@ -1081,9 +1069,10 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   }
 
   // R3 返工记录一致性（可选校验：仅当 tlaCheckRounds 提供时执行）
-  // 按 phase 过滤 + 仅统计 target/note 含 TLA 的返工，与 tla-manifest checkRounds 语义对齐
+  // 返工事件载体为 fix 动作（批次 6 A15：原 action=rework 死词已删除，无真实用法）；
+  // 按 phase 过滤 + 仅统计 target/note 含 TLA 的 fix，与 tla-manifest checkRounds 语义对齐
   if (options?.tlaCheckRounds !== undefined) {
-    let reworkEntries = valid.filter((e) => e.action === 'rework');
+    let reworkEntries = valid.filter((e) => e.action === 'fix');
     if (options.phase !== undefined) {
       reworkEntries = reworkEntries.filter((e) => e.phase === options.phase);
     }
@@ -1142,7 +1131,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   };
   const isPhase8IdentityIncomplete = (entry: RunLogEntry): boolean =>
     entry.phase === 8 &&
-    ['rootcause', 'review', 'gate', 'fix', 'emergency-fix', ...R3_ACTIONS].includes(entry.action) &&
+    ['rootcause', 'review', 'gate', 'fix', ...R3_ACTIONS].includes(entry.action) &&
     entryIdentityMissingFields(entry).length > 0;
 
   for (const [key, rootcause] of rootcauseReports) {
@@ -1252,8 +1241,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
   for (const [phase, entryList] of phaseEntries) {
     for (let i = 0; i < entryList.length; i++) {
       const fixSegment = entryList.at(i);
-      if (!fixSegment || fixSegment.entry.role !== 'S' || !['fix', 'emergency-fix'].includes(fixSegment.entry.action))
-        continue;
+      if (!fixSegment || fixSegment.entry.role !== 'S' || fixSegment.entry.action !== 'fix') continue;
       const fixIdentity = lifecycleIdentity(fixSegment.entry);
       const strictForFix = isStrictLifecycleEntry(fixSegment.entry);
       if (!isSuccessfulFix(fixSegment.entry)) {
@@ -1275,7 +1263,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
           vIndex = j;
           break;
         }
-        if (candidate.action === 'fix' || candidate.action === 'emergency-fix') {
+        if (candidate.action === 'fix') {
           if (!strictForFix || sameIdentity(candidateIdentity, fixIdentity)) break;
         }
       }
@@ -1319,7 +1307,7 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       }
       if (strictForFix) {
         const nextFixIndex = entryList.findIndex(({ entry }, index) => {
-          if (index <= i || entry.role !== 'S' || !['fix', 'emergency-fix'].includes(entry.action)) return false;
+          if (index <= i || entry.role !== 'S' || entry.action !== 'fix') return false;
           return sameIdentity(lifecycleIdentity(entry), fixIdentity);
         });
         const terminalIndex = entryList.findIndex(
