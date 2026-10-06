@@ -536,15 +536,22 @@ async function main(): Promise<void> {
     `拆解违反      : ${result.decompositionViolations.length === 0 ? '无' : `${result.decompositionViolations.length} 条`}`,
   );
   console.log(`语法错误      : ${result.syntaxErrors.length === 0 ? '无' : `${result.syntaxErrors.length} 条`}`);
-  console.log(
-    `死锁违反      : ${result.deadlockViolations.length === 0 ? '无' : `${result.deadlockViolations.length} 条`}`,
-  );
-  console.log(
-    `不变式违反    : ${result.invariantViolations.length === 0 ? '无' : `${result.invariantViolations.length} 条`}`,
-  );
-  console.log(
-    `状态爆炸规格  : ${result.stateExplosionSpecs.length === 0 ? '无' : result.stateExplosionSpecs.join(', ')}`,
-  );
+  // A7：全部受检规格均 notRun（TLC 未执行）时，TLC 结果类判据（死锁/不变式/状态爆炸）不适用，
+  // 不打印类目行——报告零相关字样、单一事实=「TLC 未执行」；只要有任一真跑结果即逐类照常打印。
+  const allSpecsNotRun = result.specs.length > 0 && result.specs.every((st) => st.tlcStatus === 'notRun');
+  if (allSpecsNotRun) {
+    console.log('TLC 结果检查  : 未执行（判据不适用，逐规格状态见下）');
+  } else {
+    console.log(
+      `死锁违反      : ${result.deadlockViolations.length === 0 ? '无' : `${result.deadlockViolations.length} 条`}`,
+    );
+    console.log(
+      `不变式违反    : ${result.invariantViolations.length === 0 ? '无' : `${result.invariantViolations.length} 条`}`,
+    );
+    console.log(
+      `状态爆炸规格  : ${result.stateExplosionSpecs.length === 0 ? '无' : result.stateExplosionSpecs.join(', ')}`,
+    );
+  }
   console.log(
     `覆盖率违反    : ${result.coverageViolations.length === 0 ? '无' : `${result.coverageViolations.length} 条`}`,
   );
@@ -557,6 +564,11 @@ async function main(): Promise<void> {
   console.log(
     `checkRounds   : ${result.checkRoundsViolations.length === 0 ? '无' : `${result.checkRoundsViolations.length} 条`}`,
   );
+  // A7：per-spec TLC 执行状态（passed/failed/notRun 单一事实；notRun 不复述预置死锁/违反标志）
+  for (const st of result.specs) {
+    const reasonText = st.reasons.length > 0 ? `：${st.reasons.join('；')}` : '';
+    console.log(`规格 TLC 状态  : ${st.specId} [${st.tlcStatus}]${reasonText}`);
+  }
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
@@ -584,6 +596,7 @@ async function main(): Promise<void> {
       phase: result.phase,
       totalSpecs: result.totalSpecs,
       checkedSpecs: result.checkedSpecs,
+      specs: result.specs,
       headerViolations: result.headerViolations,
       hierarchyViolations: result.hierarchyViolations,
       decompositionViolations: result.decompositionViolations,

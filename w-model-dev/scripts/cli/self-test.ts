@@ -1344,13 +1344,9 @@ const TLA_CASES: TlaCase[] = [
     file: 'bad-declared-flags.json',
     phase: 1,
     expectedPassed: false,
-    expectedReasonPatterns: [
-      /syntaxChecked=false/,
-      /存在死锁.*deadlockFree=false/,
-      /不变式违反.*invariantsHold=false/,
-      /L1-system 状态爆炸.*stateExplosion=true/,
-    ],
-    description: '声明标志全反（syntax/deadlock/invariant/explosion），应同时触发四类违反',
+    expectedReasonPatterns: [/syntaxChecked=false/, /TLC 未执行（SANY 语法检查失败）/],
+    description:
+      '声明标志全反且 SANY 未过（A7）：只报 SANY 单一事实 + 「TLC 未执行」，不复述 TLC 未跑时的预置死锁/不变式/状态爆炸标志',
   },
   {
     file: 'bad-coverage-missing-sd.json',
