@@ -14,7 +14,7 @@
  *     `uniqueItems` 与「存在即累加数组长度」口径不变（`['O3','O3']` 仍计 2）
  *   - CLI 三态（真实 tsx 子进程 + 真实临时 run-log）：仅引用 → exit 0 + 诊断 /
  *     字段标注 3 次 → exit 1 + R5 违规 / 未提供 --run-log → exit 0 + 诊断
- *   - A4（43.0.0）R6 history 链一致性：from == 上一条 to / to > from（严格）/ 末条 to == 当前 level
+ *   - A4（43.0.0）R6 history 链一致性：from == 上一条 to / to > from（严格）/ 末条 to 不低于当前 level（降级合法）
  *     （原 R3 completedCycles 周期校验随 unlockConditions 死字段删除而退役，规则号不回收）
  */
 
@@ -88,10 +88,11 @@ describe('checkMaturity', () => {
 
 /**
  * A4 销账（批次 6 任务 8）：maturity.level 此前由被门禁者自写即可关闭 TLA+/BDD 门禁，
- * history 无链校验。R6 三判定（审计裁定，决策日志 rounds-48）：
+ * history 无链校验。R6 三判定（审计裁定，决策日志 rounds-48；第三判定经批次 6 修复轮 1 放宽）：
  *   1. from == 上一条 to（首条无前驱，不约束起点——存量 e2e 资产有 L1→L2 起头形态）；
  *   2. to > from（LEVEL_ORDER 严格比较；降级走审批链，history 只承载升级链）；
- *   3. 末条 to == 当前 level（空历史 + level≠L0 亦违规；level=L0 为初始态合法）。
+ *   3. 末条 to 不低于当前 level（降级后 level 低于末条合法——A4 起豁免须 human 审批链，
+ *      降级不再构成绕过面，R6 只锁「level 高于链末条」的伪造升级；空历史 + level≠L0 亦违规）。
  */
 describe('A4 maturity 钥匙收紧（R6 history 链）', () => {
   const mkHistory = (
@@ -119,7 +120,7 @@ describe('A4 maturity 钥匙收紧（R6 history 链）', () => {
     expect(r.violations.join()).toContain('上一条');
   });
 
-  it('R6：末条 to ≠ 当前 level → 违规', () => {
+  it('R6：末条 to 低于当前 level（level 虚高，伪造升级）→ 违规', () => {
     const m = {
       ...validMaturity(),
       level: 'L2',
@@ -129,6 +130,20 @@ describe('A4 maturity 钥匙收紧（R6 history 链）', () => {
     expect(r.passed).toBe(false);
     expect(r.violations.some((v) => v.startsWith('R6:'))).toBe(true);
     expect(r.violations.join()).toContain('当前 level');
+  });
+
+  it('R6：降级合法（升级链至 L2 后 level=L0，末条高于 level）→ 零违规（修复轮 1：R6 只锁伪造升级，不锁降级）', () => {
+    const m = {
+      ...validMaturity(),
+      level: 'L0',
+      history: mkHistory([
+        ['L0', 'L1'],
+        ['L1', 'L2'],
+      ]),
+    };
+    const r = checkMaturity(m);
+    expect(r.passed).toBe(true);
+    expect(r.violations).toHaveLength(0);
   });
 
   it('R6：from == to（L0→L0 非升级占位条目）→ 违规（history 只承载升级链）', () => {
@@ -216,7 +231,7 @@ const mkEntry = (patch: Record<string, unknown>): Record<string, unknown> => ({
 /**
  * R5 用例的成熟度模型：以 validMaturity() 为底（schema 前置校验要求全 required 字段在场），
  * 覆写 level 与降级阈值 streak——故 mkMaturity(3) 的 R5 判据为「命中 ≥ 3」。
- * history 同步覆写为 L0→L1→L2 升级链（A4 R6：level 须与末条 history.to 一致，43.0.0）。
+ * history 同步覆写为 L0→L1→L2 升级链（A4 R6：level 不得高于末条 history.to，降级后低于末条合法，43.0.0）。
  */
 const mkMaturity = (streak: number): MaturityConfig => ({
   ...validMaturity(),

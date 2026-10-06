@@ -531,7 +531,8 @@ write_json('.w-model/project.json', {
 write_json('.w-model/maturity.json', {
   'schemaVersion': '1.0', 'projectId': 'counter-api', 'level': 'L2',
   'leveledUpAt': '2026-09-19T03:00:00+08:00',
-  # 43.0.0 A4：unlockConditions 与 downgradeTriggers 两个预留死字段已自 schema 删除（毁弃存量）
+  # 43.0.0 A4：unlockConditions 与 downgradeTriggers.budgetBurnRateExceeded / .checkpointRejectionStreak
+  # 预留死字段已自 schema 删除（毁弃存量；downgradeTriggers 本身保留 operationalFailureStreak + userRequested）
   'history': [{'at': '2026-09-19T03:00:00+08:00', 'from': 'L1', 'to': 'L2', 'reason': 'e2e 调测项目按生产小项目定级'}],
   'downgradeTriggers': {'operationalFailureStreak': 3, 'userRequested': False},
 })

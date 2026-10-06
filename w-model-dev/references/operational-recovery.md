@@ -350,7 +350,7 @@ run-log 出现坏行（非法 JSON）时的法定重建程序（唯一合法出�
 | 场景 | 动作 |
 |---|---|
 | 阶段 8 完成后解锁条件全部达标 | 询问用户是否升级（决策型 CHECKPOINT，不可自动升级）；用户确认 → 更新 maturity.json.level + history，**并以 `role=human / targetKind=maturity` 条目落签名链（绑定 maturity.json；43.0.0 A4，无链则 gate 拒绝豁免）**。解锁条件（稳定时长 / 周期数 / 达标率 / 误判率 / 运维失败数）为本文档描述层语义，**无机器校验（字段已自 schema 移除，仅本文档描述）** |
-| O 系列失败模式连续命中 ≥ `downgradeTriggers.operationalFailureStreak` | 自动降级到 L0；run-log append 降级记录（降级不记 history 升级链，R6 只承载升级） |
+| O 系列失败模式连续命中 ≥ `downgradeTriggers.operationalFailureStreak` | 自动降级到 L0；run-log append 降级记录（降级不记 history 升级链，R6 只承载升级；降级后 level 低于 history 末条 to 属合法形态——R6 只锁伪造升级不锁降级，豁免已由 human 审批链锁死） |
 | 用户显式请求降级 | 更新 maturity.json.level=L0 + userRequested=true |
 | L1+ 自动放行时 acknowledgedDecisions 为空 | 拒绝放行（O4 命中）；自动放行 ≠ 理解豁免，仍须填理解证据 |
 
@@ -479,7 +479,7 @@ G 子代理在每个阶段门按以下顺序调用，任一退出码 ≠ 0 → O
 |---|---|
 | `check-budget.ts`（§5.1） | R1 时效性（`updatedAt` 滞后）· R2 schema 完整 · R3 onExceed 合法 · R4 killSwitch 合法 · R5 触发检测（返工次数 ≥ killSwitch 阈值但 run-log 无告警） |
 | `check-run-log.ts`（§5.2） | R1 阶段动作完整性（chunk/cross/gate/checkpoint 4 类）· R2 tokens 非负 · R3 返工记录一致 · R4 acknowledgedDecisions 非空 · R5 O 越权检测（交叉 `gate-logs/`）· R6 exitCode 一致（SSoT §10E）· R7 append-only（时间戳真值 + **禁止回溯改写历史行或重排时间戳**；记录修正只经 `wm-append-runlog --correct` 追加更正记录，见下「调用约定」） · R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint；V 失败后须先 rootcause 再 S-fix（反模式 #18 轨迹检测），违例走返工循环；处置：补齐缺失动作 / 对齐理想轨迹后重跑）· R9 跨轮次评审一致性（同一产物的 `qualityLevel` 跨轮次差 ≥2 档 → 评审者自身标准漂移，走高成熟度 CHECKPOINT 交人裁定，不走 R；见 [verifier-spec.md](verifier-spec.md) §14.1）· R10 revertEvidence 回滚证伪（fix/emergency-fix 须携带非空 `revertEvidence.command`，**无时间戳豁免**：缺失或非法始终 blocking；处置：由 S-fix 重跑真实回滚命令并补记后重跑）· R11 闭环五脚本齐备（凡有 `action=checkpoint` 且 `outcome=success` 放行的阶段，放行前须已有闭环五门各一条 `role=G` + `outcome=success` + `gateExitCode=0` 的 gate 记录，且时间戳**严格毫秒早于**放行（同毫秒（含无毫秒部分的秒级时间戳）不算早于，无时间戳豁免）；五门对全部阶段（含阶段 1）一律同一判据，无任何例外——处置：补齐缺失的闭环脚本 gate 记录后重跑） |
-| `check-maturity.ts`（§5.3） | R1 schema 完整 · R2 level 合法 · R4 history 一致 · R5 降级触发 · R6 history 链一致（43.0.0 A4：from==上一条 to / to 严格高于 from / 末条 to==level；原 R3 周期校验随 unlockConditions 死字段退役，规则号不回收） |
+| `check-maturity.ts`（§5.3） | R1 schema 完整 · R2 level 合法 · R4 history 一致 · R5 降级触发 · R6 history 链一致（43.0.0 A4：from==上一条 to / to 严格高于 from / 末条 to 不低于 level——降级后 level 低于末条合法，只锁伪造升级（批次 6 修复轮 1）；原 R3 周期校验随 unlockConditions 死字段退役，规则号不回收） |
 | `check-checkpoint.ts`（§5.4） | R1 acknowledgedDecisions 非空 · R2 决策内容具体（泛化词黑名单）· R3 用户确认存在 · R4 决策与阶段匹配 · R5 跨阶段证据一致（SSoT §10.6 6.3） |
 
 ### 脚本间依赖

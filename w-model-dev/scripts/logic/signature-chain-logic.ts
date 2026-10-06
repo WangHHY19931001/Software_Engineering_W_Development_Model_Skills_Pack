@@ -187,8 +187,8 @@ export type MaturityApprovalVerdict = { readonly ok: true } | { readonly ok: fal
  *   1. 链中存在 `role=human ∧ targetKind=maturity ∧ sigHash 通过 v3 重算` 的审批条目（否则拒绝——
  *      「缺少条目」与「签名不符」合并为同一拒绝形态，避免向伪造者泄露判定进度）；
  *   2. 最新审批条目须绑定 maturity.json（artifacts 含该路径）；
- *   3. 审批时间不得早于最近一次 level 变更（maturity.history 末条 `at`；字段缺失则跳过该子判定，
- *      schema 的 required 前置在正常路径保证字段在场）。
+ *   3. 审批时间不得早于最近一次 level 变更（maturity.history 末条 `at`；Date 解析比较，任一端
+ *      缺失或不可解析则跳过该子判定，schema 的 required 前置在正常路径保证字段在场）。
  */
 export function verifyMaturityApproval(
   chain: readonly SignatureChainEntry[],
@@ -208,7 +208,11 @@ export function verifyMaturityApproval(
     return { ok: false, reason: 'maturity 审批条目未绑定 maturity.json' };
   }
   const lastChange = maturity.history[maturity.history.length - 1];
-  if (lastChange?.at && latest.signedAt && latest.signedAt < lastChange.at) {
+  // 时序比较用 Date 解析（与 maturity-logic R4 先例一致；批次 6 修复轮 1 审查裁定）：
+  // 字符串比较在混合时区格式（…Z vs …+08:00）下会误判先后。任一端缺失或不可解析（NaN）→ 跳过该子判定。
+  const changeMs = lastChange?.at ? new Date(lastChange.at).getTime() : Number.NaN;
+  const approveMs = latest.signedAt ? new Date(latest.signedAt).getTime() : Number.NaN;
+  if (!Number.isNaN(changeMs) && !Number.isNaN(approveMs) && approveMs < changeMs) {
     return { ok: false, reason: 'maturity 审批早于最近一次 level 变更' };
   }
   return { ok: true };

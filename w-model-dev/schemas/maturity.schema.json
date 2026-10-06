@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/maturity.schema.json",
-  "description": "成熟度等级（maturity.json）结构 schema，对应 maturity-logic.ts R1-R6 schema/level/history/降级/链一致性校验（43.0.0 A4：unlockConditions 及 downgradeTriggers 两个预留死字段已删除；level 变更须 role=human 签名链审批，见 signature-chain-logic verifyMaturityApproval）",
+  "description": "成熟度等级（maturity.json）结构 schema，对应 maturity-logic.ts R1-R6 schema/level/history/降级/链一致性校验（43.0.0 A4：unlockConditions 及 downgradeTriggers.budgetBurnRateExceeded / .checkpointRejectionStreak 预留死字段已删除，downgradeTriggers 本身保留 operationalFailureStreak + userRequested；level 变更须 role=human 签名链审批，见 signature-chain-logic verifyMaturityApproval）",
   "title": "MaturityConfig",
   "type": "object",
   "additionalProperties": false,
@@ -10,7 +10,7 @@
     "schemaVersion": { "description": "Schema 版本，当前固定为 1.0", "type": "string", "pattern": "^1\\.0$" },
     "projectId": { "description": "项目 ID（与 project.json 一致）", "type": "string", "minLength": 1 },
     "level": {
-      "description": "当前成熟度级别：L0=初始级，决策型/操作型 CHECKPOINT 均需用户参与 / L1=操作型 CHECKPOINT 自动放行 / L2=事件驱动循环激活 / L3=低介入自主（高风险路径仍强制决策型 CHECKPOINT）；R2 校验须为 L0/L1/L2/L3 之一；R6 校验末条 history.to == level；L0/L1 的 TLA+/BDD 豁免须 role=human / targetKind=maturity 签名链审批（check-artifact-gate 消费前校验，无链即不豁免）",
+      "description": "当前成熟度级别：L0=初始级，决策型/操作型 CHECKPOINT 均需用户参与 / L1=操作型 CHECKPOINT 自动放行 / L2=事件驱动循环激活 / L3=低介入自主（高风险路径仍强制决策型 CHECKPOINT）；R2 校验须为 L0/L1/L2/L3 之一；R6 校验末条 history.to 不低于 level（降级后低于末条合法，只锁伪造升级）；L0/L1 的 TLA+/BDD 豁免须 role=human / targetKind=maturity 签名链审批（check-artifact-gate 消费前校验，无链即不豁免）",
       "enum": ["L0", "L1", "L2", "L3"]
     },
     "leveledUpAt": {
@@ -19,7 +19,7 @@
       "format": "date-time"
     },
     "history": {
-      "description": "升级历史数组（每次升级 append 一条；只承载升级链，降级走 human 审批链不记 history；R4 校验每条 at 不得早于 project.createdAt；R6 校验 from==上一条 to / to 严格高于 from / 末条 to==level）",
+      "description": "升级历史数组（每次升级 append 一条；只承载升级链，降级走 human 审批链不记 history；R4 校验每条 at 不得早于 project.createdAt；R6 校验 from==上一条 to / to 严格高于 from / 末条 to 不低于 level——降级后 level 低于末条合法，只锁伪造升级）",
       "type": "array",
       "items": {
         "description": "单条成熟度升级历史（LevelHistory：from + to + at + reason）",

@@ -1742,7 +1742,7 @@ R10 维护契约（docs-consistency source×clause 语义门）：
 
 > 编排者 O 在项目初始化（`/wm analyze` 首次）时创建，类比 `project.json`/`rtm.json`/`budget.json`。schema 权威定义见 [`data-models.md`](../w-model-dev/references/data-models.md)。
 >
-> **43.0.0 A4**：`unlockConditions`（无计算器指标）与 `downgradeTriggers` 两个预留死字段已自 schema 删除（毁弃存量）；解锁条件降级为 operational-recovery.md 文档层语义，**无机器校验**。level 的机器消费点（TLA+/BDD 豁免）须 `role=human / targetKind=maturity` 签名链审批（`verifyMaturityApproval`，fail-closed，见 §10C.6）。
+> **43.0.0 A4**：`unlockConditions`（无计算器指标）与 `downgradeTriggers.budgetBurnRateExceeded` / `downgradeTriggers.checkpointRejectionStreak` 预留死字段已自 schema 删除（毁弃存量；`downgradeTriggers` 本身保留：`operationalFailureStreak` + `userRequested`）；解锁条件降级为 operational-recovery.md 文档层语义，**无机器校验**。level 的机器消费点（TLA+/BDD 豁免）须 `role=human / targetKind=maturity` 签名链审批（`verifyMaturityApproval`，fail-closed，见 §10C.6）。
 
 ```typescript
 interface MaturityConfig {
@@ -1783,7 +1783,8 @@ interface MaturityConfig {
 > （含 completedCycles）被审计证实为无计算器/零消费死字段，已自 schema 与 check-maturity.ts 删除
 > （原 R3 周期换算校验随之退役，规则号不回收；决策日志 `docs/changes/decision-log/rounds-48-trust-chain.md`）。
 > 阶段完成计数的事实源仍为 run-log 的 `action=checkpoint ∧ outcome=success` 记录（check-run-log R1/R11 承担）；
-> 成熟度侧的机器防线改为 **R6 history 链一致性**（from==上一条 to / to 严格高于 from / 末条 to==level）
+> 成熟度侧的机器防线改为 **R6 history 链一致性**（from==上一条 to / to 严格高于 from / 末条 to 不低于
+> level——修复轮 1 放宽：降级后 level 低于末条合法，只锁伪造升级，见 §10R）
 > 与 **level 变更 human 签名链审批**（`verifyMaturityApproval`，fail-closed）。历史条目存档如下，不再生效：
 >
 > - ~~阶段完成计数强制递增：编排者 O 须将 `maturity.json.unlockConditions.completedCycles` +1~~
@@ -2472,6 +2473,7 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 
 - **能力分工（不夸大）**：R6 默认化与 R19 将伪造成本从「自洽 JSON」提升到「须持有产物文件并重算哈希」，不提供密码学认证（无密钥哈希）；maturity 审批链复用签名链 v3 公式，同上。注入三条款为提示词层防御，不构建自动化守卫（维持批次 5 三不承诺）。
 - **判据披露**：验收含红队实验 1/2/3 复跑（见计划任务 17）；穿透面关闭以复跑 exit 1 为准。
+- **修复轮 1（2026-10-06 审查修复，控制者裁定记账）**：R6 第三判定由「末条 to == 当前 level」放宽为「末条 to **不低于** 当前 level」（`LEVEL_ORDER` 序比较）——降级后 level 低于 history 末条属**合法形态**。安全性依据：A4 起 TLA+/BDD 豁免须 human 审批链（`verifyMaturityApproval`），降级不再构成绕过面，R6 只锁「level 高于升级链末条」的伪造升级（to>from 链判定不变）；`verifyMaturityApproval` 审批时序由字符串比较改 **Date 解析比较**（混合时区格式 …Z vs …+08:00 下字符串比较会误判先后；任一端缺失或不可解析则跳过该子判定，与 maturity-logic R4 先例一致）。
 
 ---
 

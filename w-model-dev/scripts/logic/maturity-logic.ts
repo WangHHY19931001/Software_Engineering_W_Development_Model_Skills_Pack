@@ -143,11 +143,12 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
     );
   }
 
-  // R6 history 链一致性（A4，43.0.0；决策日志 rounds-48 三判定）：
+  // R6 history 链一致性（A4，43.0.0；决策日志 rounds-48 三判定；批次 6 修复轮 1 审查裁定第三判定放宽）：
   //   1. from == 上一条 to（首条无前驱，不约束起点——存量形态允许 L1→L2 起头的升级链切片）；
   //   2. to > from（LEVEL_ORDER 严格比较；history 只承载升级链，降级走 human 审批链）；
-  //   3. 末条 to == 当前 level（空历史仅 level=L0 初始态合法）。
-  // 破链/跳级/平级/降级 history 即虚高路径——machine 层 fail-closed。
+  //   3. 末条 to 不低于当前 level（降级后 level 低于末条属合法形态——A4 起 TLA+/BDD 豁免须 human
+  //      审批链，降级不再构成绕过面，R6 只锁「level 高于升级链末条」的伪造升级虚高路径）。
+  // 破链/跳级/平级/level 虚高（高于链末条）即伪造路径——machine 层 fail-closed。
   if (Array.isArray(m.history)) {
     let prevTo: string | undefined;
     for (const [i, h] of m.history.entries()) {
@@ -170,9 +171,9 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
         if (m.level !== 'L0') {
           violations.push(`R6: history 为空但 level=${m.level}（初始态须为 L0；升级须以 history 升级链记录）`);
         }
-      } else if (last.to !== m.level) {
+      } else if (levelRank(last.to) < levelRank(m.level)) {
         violations.push(
-          `R6: history 末条 to=${String(last.to)} ≠ 当前 level=${String(m.level)}（level 变更须与升级链一致）`,
+          `R6: history 末条 to=${String(last.to)} 低于当前 level=${String(m.level)}（level 不得高于升级链末条；降级后 level 低于末条属合法形态）`,
         );
       }
     }

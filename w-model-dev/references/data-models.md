@@ -632,9 +632,11 @@ interface MaturityConfig {
 
 > **43.0.0 A4 死字段删除**：`unlockConditions`（无计算器的四个指标 + 仅 R3 消费的 completedCycles）与
 > `downgradeTriggers.budgetBurnRateExceeded` / `downgradeTriggers.checkpointRejectionStreak`（零消费预留）
-> 已自 schema 与校验逻辑删除（毁弃存量，不兼容）；「解锁条件」现为 operational-recovery.md 文档层语义，
+> 已自 schema 与校验逻辑删除（毁弃存量，不兼容；`downgradeTriggers` 本身保留：`operationalFailureStreak`
+> + `userRequested` 两字段）；「解锁条件」现为 operational-recovery.md 文档层语义，
 > **无机器校验**。原 R3（completedCycles 周期换算）随之退役，R4/R5 编号保持稳定，新增 R6（history 链一致性：
-> from == 上一条 to / to 严格高于 from / 末条 to == 当前 level）。level 的机器消费点（check-artifact-gate
+> from == 上一条 to / to 严格高于 from / 末条 to 不低于当前 level——降级后 level 低于末条属合法形态，
+> R6 只锁伪造升级）。level 的机器消费点（check-artifact-gate
 > TLA+/BDD 豁免分支）须 `role=human / targetKind=maturity` 签名链审批（`verifyMaturityApproval`，fail-closed）。
 
 **默认值**（`/wm analyze` 首次初始化）：
@@ -659,7 +661,7 @@ interface MaturityConfig {
 - 编排者 O 在每个 🔴 CHECKPOINT 处读取 `level`，按 L0~L3 放行矩阵决定 CHECKPOINT 类型（决策型 / 操作型 / 阶段门放行；阶段门放行始终等用户，HOTL 固定，硬约束 #2）。
 - L1+ 操作型 CHECKPOINT 自动放行时，仍在 run-log 记录 action=checkpoint outcome=success，保留可追溯性。
 - 升级不可自动：升级是决策型 CHECKPOINT，须用户显式确认（阶段 8 完成后按 operational-recovery.md「升级与降级」的解锁条件文档语义询问；43.0.0 A4 起升级链须 role=human 签名链条目留痕）。
-- 降级可自动：O 系列失败模式连续命中 ≥ `downgradeTriggers.operationalFailureStreak` → 自动降级到 L0（降级不记 history 升级链，R6 只承载升级）。
+- 降级可自动：O 系列失败模式连续命中 ≥ `downgradeTriggers.operationalFailureStreak` → 自动降级到 L0（降级不记 history 升级链，R6 只承载升级）。降级后 `level` 低于 history 末条 to 属**合法形态**（批次 6 修复轮 1：R6 第三判定为「末条 to 不低于 level」，只锁伪造升级不锁降级——A4 起 TLA+/BDD 豁免须 human 审批链，降级不再构成绕过面）。
 - `maturity.json` 与 `budget.json` 协同：L2+ 自主度可设 `onExceed=notify`（仅在 run-log 记录告警）；L0 默认 `onExceed=pause`（最保守）。
 
 ### RunLogEntry vs EventIngress Schema 边界对照表

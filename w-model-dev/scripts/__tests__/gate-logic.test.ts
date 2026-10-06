@@ -183,6 +183,18 @@ describe('A4 maturity 豁免收紧：verifyMaturityApproval（signature-chain-lo
   it('合法 human 审批条目 → ok:true', () => {
     expect(verifyMaturityApproval([humanMaturityApprovalEntry()], maturity)).toEqual({ ok: true });
   });
+
+  it('混合时区格式同时刻（审批 …T12:00:00.000Z vs 变更 …T20:00:00+08:00，同一时刻）→ ok:true（修复轮 1：Date 解析比较，字符串比较会误判）', () => {
+    const m = { level: 'L1', history: [{ to: 'L1', at: '2026-08-01T20:00:00+08:00' }] };
+    expect(verifyMaturityApproval([humanMaturityApprovalEntry()], m)).toEqual({ ok: true });
+  });
+
+  it('混合时区格式：审批早于变更 1 小时（…T11:00:00.000Z vs …T20:00:00+08:00）→ ok:false', () => {
+    const m = { level: 'L1', history: [{ to: 'L1', at: '2026-08-01T20:00:00+08:00' }] };
+    const v = verifyMaturityApproval([humanMaturityApprovalEntry({ signedAt: '2026-08-01T11:00:00.000Z' })], m);
+    expect(v.ok).toBe(false);
+    if (!v.ok) expect(v.reason).toContain('早于最近一次 level 变更');
+  });
 });
 
 describe('A4 maturity 豁免收紧：checkArtifactGate 豁免分支（fail-closed）', () => {
