@@ -94,10 +94,10 @@ interface ReworkStats {
  * 统计 run-log.jsonl 中的返工记录数（D-4a：口径对齐真实事件）。
  *
  * 判据（命中任一即计入返工，同一记录只计一次）：
- *   - action ∈ {'rework', 'fix', 'emergency-fix'}（'rework' 为旧记录兼容项，非新增语义）
+ *   - action ∈ {'fix'}（返工事件载体；批次 6 A15 词表收敛：'rework'/'emergency-fix' 死词已删除）
  *   - outcome ∈ {'fail', 'rework'}
  * 对齐事实：真实 8 阶段调测的 run-log 中 action='rework' 一条都没有，返工以
- * fix/emergency-fix 与 outcome='fail'/'rework' 落盘；旧口径使 reworkCount 恒为 0，
+ * fix 与 outcome='fail'/'rework' 落盘；旧口径使 reworkCount 恒为 0，
  * R5 连续返工护栏（killSwitch）失灵。
  *
  * - reworkCount     = 命中上述判据且（若提供 phase）phase === N 的记录数
@@ -123,9 +123,7 @@ export function countReworks(entries: unknown[], phase: number | undefined): Rew
     };
     if (phase !== undefined && e.phase !== phase) continue;
     const isRework =
-      e.action === 'rework' || // 兼容旧记录（保留原口径，非新增语义）
-      e.action === 'fix' ||
-      e.action === 'emergency-fix' ||
+      e.action === 'fix' || // 批次 6 A15：原 'rework' 兼容项与 'emergency-fix' 死分支随词表收敛删除
       e.outcome === 'fail' ||
       e.outcome === 'rework';
     if (!isRework) continue;

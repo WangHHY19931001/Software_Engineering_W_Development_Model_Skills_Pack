@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "demo-blog-system-a4",
+  "level": "L2",
+  "leveledUpAt": "2026-07-21T00:00:00Z",
+  "history": [
+    {
+      "at": "2026-07-20T00:00:00Z",
+      "from": "L0",
+      "to": "L1",
+      "reason": "首个完整周期完成"
+    },
+    {
+      "at": "2026-07-21T00:00:00Z",
+      "from": "L0",
+      "to": "L2",
+      "reason": "虚高路径：from 未衔接上一条 to（L0 直接跳 L2）"
+    }
+  ],
+  "downgradeTriggers": {
+    "operationalFailureStreak": 3,
+    "userRequested": false
+  }
+}

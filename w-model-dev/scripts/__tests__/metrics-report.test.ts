@@ -19,7 +19,7 @@ import { invokeCli } from './helpers/cli-invoker.js';
 
 const RUN_LOG_JSONL =
   '{"phase":1,"action":"produce","role":"S","outcome":"success","tokens":100,"duration_s":10,"subagentSpawns":1,"gateExitCode":null,"timestamp":"2026-08-05T01:00:00Z"}\n' +
-  '{"phase":1,"action":"rework","role":"S","outcome":"rework","tokens":50,"duration_s":5,"subagentSpawns":1,"gateExitCode":null,"timestamp":"2026-08-05T02:00:00Z"}\n' +
+  '{"phase":1,"action":"fix","role":"S","outcome":"rework","tokens":50,"duration_s":5,"subagentSpawns":1,"gateExitCode":null,"timestamp":"2026-08-05T02:00:00Z"}\n' +
   '{"phase":2,"action":"gate","role":"G","outcome":"success","tokens":30,"duration_s":3,"subagentSpawns":1,"gateExitCode":0,"timestamp":"2026-08-06T01:00:00Z"}\n';
 const BUDGET_JSON =
   '{"projectId":"smoke","project":{"maxTokensTotal":10000},"perPhase":{"maxTokens":1000},"killSwitch":{"consecutiveReworks":3,"budgetBurnRate":0.9},"onExceed":"pause"}';
@@ -93,7 +93,7 @@ describe('metrics-report CLI（正常路径）', () => {
     expect(parsed.overall.totalTokens).toBe(180);
     expect(parsed.overall.reworkRecords).toBe(1);
     expect(parsed.byPhase).toHaveLength(2);
-    expect(parsed.byAction).toMatchObject({ produce: 1, rework: 1, gate: 1 });
+    expect(parsed.byAction).toMatchObject({ produce: 1, fix: 1, gate: 1 });
     expect(parsed.gate).toMatchObject({ total: 1, passed: 1 });
     expect(parsed.budget).toMatchObject({
       totalTokens: 180,

@@ -99,11 +99,29 @@ export interface HeaderField {
   value: string | null;
 }
 
+/**
+ * per-spec TLC 执行状态（A7，2026-10-06）：报告「TLC 到底跑没跑、跑赢没跑」的单一事实。
+ *   - notRun：TLC 未执行（SANY 语法检查失败 ⇒ 反模式 #14 顺序硬约束；或 tlcChecked=false），
+ *     reasons 只陈述这一事实 + 首因，**不复述** manifest 预置的死锁/不变式/状态爆炸布尔。
+ *   - failed：TLC 已执行且存在违反（死锁 / 不变式违反 / 状态爆炸）。
+ *   - passed：TLC 已执行且零违反。
+ */
+export type TlcRunStatus = 'passed' | 'failed' | 'notRun';
+
+export interface TlaSpecRunStatus {
+  specId: string;
+  tlaPath: string;
+  tlcStatus: TlcRunStatus;
+  reasons: string[];
+}
+
 export interface TlaCheckResult {
   passed: boolean;
   phase: number;
   totalSpecs: number;
   checkedSpecs: number;
+  /** per-spec TLC 执行状态（A7 单一事实报告，见 TlaSpecRunStatus） */
+  specs: TlaSpecRunStatus[];
   headerViolations: string[];
   hierarchyViolations: string[];
   decompositionViolations: string[];
@@ -175,12 +193,56 @@ function stripComments(s: string): string {
 }
 
 /**
+ * cfg 段落关键字全集（INVARIANTS 列表块的合法终止符，A6 修复 2026-10-06）。
+ *
+ * 名单来源（两处对照后取并集）：
+ *   1. 本仓 tla2tools.jar（w-model-dev/tools/tla2tools.jar，
+ *      tlc2/tool/impl/ModelConfig.class 字符串常量，2024-08-08 构建）：
+ *      SPECIFICATION / INIT / NEXT / CONSTANT(S) / INVARIANT(S) / PROPERTY(IES) /
+ *      CONSTRAINT(S) / ACTION_CONSTRAINT(S) / TYPE_CONSTRAINT / SYMMETRY / VIEW / CHECK_DEADLOCK
+ *   2. TLC 官方文档「The Config File」（docs.tlapl.us using:tlc:config_file）及更新版 TLC：
+ *      另有 CHECK_FINAL / POSTCONDITION / ALIAS（本仓 jar 未含，保留以兼容新版 TLC 输出的 cfg）。
+ * 说明：INVARIANT(S) 另由上方「形式1/形式2」分支优先消费，列入本表为兜底——
+ *   裸 `INVARIANT` 行出现在列表块内时正确终止列表，防止关键字被误当不变式名。
+ * 段名与后续内容间以词边界分隔（`\\b`），不变式名含同名前缀（如 `Initializer`）不受影响。
+ */
+const CFG_SECTION_KEYWORDS = [
+  'SPECIFICATION',
+  'INIT',
+  'NEXT',
+  'CONSTANT',
+  'CONSTANTS',
+  'INVARIANT',
+  'INVARIANTS',
+  'PROPERTY',
+  'PROPERTIES',
+  'CONSTRAINT',
+  'CONSTRAINTS',
+  'ACTION_CONSTRAINT',
+  'ACTION_CONSTRAINTS',
+  'TYPE_CONSTRAINT',
+  'SYMMETRY',
+  'VIEW',
+  'POSTCONDITION',
+  'CHECK_DEADLOCK',
+  'CHECK_FINAL',
+  'ALIAS',
+] as const;
+
+/** cfg 段落关键字终止符（大小写不敏感，词边界锚定行首）。 */
+const CFG_SECTION_TERMINATOR_RE = new RegExp(`^(${CFG_SECTION_KEYWORDS.join('|')})\\b`, 'i');
+
+/**
  * 解析 .cfg 中的不变式名集合（§11 两种合法形式）：
  *   - 形式1：`INVARIANTS` 关键字后跟列表（同行或后续缩进行）
  *   - 形式2：逐行 `INVARIANT <Name>`（单行单不变式）
- * 列表块在遇到已知 cfg 段落关键字（SPECIFICATION/INIT/NEXT/...）或空行时结束。
+ * 列表块在遇到已知 cfg 段落关键字（见 CFG_SECTION_KEYWORDS）或空行时结束。
+ *
+ * A6（2026-10-06）：终止关键字表原先缺 `PROPERTIES` 等段名，官方 cfg 写法
+ * （INVARIANTS 列表后紧跟 PROPERTIES 时序属性段）会把 `PROPERTIES` 与属性名
+ * 误当不变式名 → 假 cfgTlaMismatch。已对照完整段名全集一次补齐。
  */
-function parseCfgInvariantNames(cfgContent: string): string[] {
+export function parseCfgInvariantNames(cfgContent: string): string[] {
   const names: string[] = [];
   const lines = (cfgContent ?? '').split('\n');
   let inList = false;
@@ -211,11 +273,7 @@ function parseCfgInvariantNames(cfgContent: string): string[] {
     }
     // 列表块内的后续行：已知 cfg 关键字结束列表，否则视为不变式名
     if (inList) {
-      if (
-        /^(SPECIFICATION|INIT|NEXT|CONSTRAINT|CONSTRAINTS|ACTION_CONSTRAINT|SYMMETRY|VIEW|POSTCONDITION|CHECK_DEADLOCK|CHECK_FINAL|ALIAS)\b/i.test(
-          line,
-        )
-      ) {
+      if (CFG_SECTION_TERMINATOR_RE.test(line)) {
         inList = false;
         continue;
       }
@@ -791,6 +849,9 @@ function validateSpec(raw: unknown, index: number): string[] {
  *   6. SD 覆盖率（checkCoverage，§10）：manifest.graphSdNodes 非空时执行，未覆盖 SD → coverageViolations
  *   7. cfg-tla 一致性 + cfg 结构（§11/§12）：spec 含 tlaContent/cfgContent 时执行，
  *      不变式集合不一致 → cfgConsistencyViolations；MODULE 声明/格式错误 → cfgStructureViolations
+ *   8. per-spec TLC 执行状态（result.specs，A7）：tlcStatus ∈ passed/failed/notRun，
+ *      SANY 失败 ⇒ notRun 且 reasons 只含「TLC 未执行（SANY 语法检查失败）：<首因>」，
+ *      不复述 manifest 预置的死锁/不变式/状态爆炸布尔（TLC 未跑时它们不构成事实）
  *
  * 注意：headerViolations / environmentOk / environmentErrors 在纯逻辑中分别留空 / 置真 / 置空，
  *   由 CLI 在执行文件头解析与环境检查后回填，并重算 passed。
@@ -888,6 +949,7 @@ export function checkTlaModel(manifest: unknown, phase: number): TlaCheckResult 
     phase,
     totalSpecs: 0,
     checkedSpecs: 0,
+    specs: [],
     headerViolations: [],
     hierarchyViolations: [],
     decompositionViolations: [],
@@ -968,23 +1030,44 @@ export function checkTlaModel(manifest: unknown, phase: number): TlaCheckResult 
   }
   result.checkedSpecs = checkedSpecs.length;
 
-  // 3. 声明的 SANY/TLC 结果标志
+  // 3. 声明的 SANY/TLC 结果标志 + per-spec TLC 执行状态（A7）
   for (const s of checkedSpecs) {
     if (!s.syntaxChecked) {
-      result.syntaxErrors.push(`规格 ${s.id} syntaxChecked=false（SANY 语法检查未通过或未执行）`);
+      // A7（2026-10-06）：SANY 语法检查失败 ⇒ TLC 必然未执行（反模式 #14 顺序硬约束：先 SANY 后 TLC）。
+      // 单一事实：只报 SANY 未通过，**不读取/不复述** manifest 预置的 TLC 结果布尔
+      //（tlcChecked/deadlockFree/invariantsHold/stateExplosion——TLC 没跑，它们不构成事实）。
+      // notRun 一律不放行：syntaxErrors 非空已使 passed=false（见步骤 9）。
+      const sanyDetail = `规格 ${s.id} syntaxChecked=false（SANY 语法检查未通过或未执行）`;
+      const notRunReason = `TLC 未执行（SANY 语法检查失败）：${sanyDetail}`;
+      result.syntaxErrors.push(sanyDetail);
+      result.violations.push(notRunReason);
+      result.specs.push({ specId: s.id, tlaPath: s.tlaPath, tlcStatus: 'notRun', reasons: [notRunReason] });
+      continue;
     }
+    const flagReasons: string[] = [];
     if (!s.tlcChecked) {
-      result.violations.push(`规格 ${s.id} tlcChecked=false（TLC 模型检查未完成）`);
+      const msg = `规格 ${s.id} tlcChecked=false（TLC 模型检查未完成）`;
+      result.violations.push(msg);
+      flagReasons.push(msg);
     }
     if (!s.deadlockFree) {
-      result.deadlockViolations.push(`规格 ${s.id} 存在死锁（deadlockFree=false）`);
+      const msg = `规格 ${s.id} 存在死锁（deadlockFree=false）`;
+      result.deadlockViolations.push(msg);
+      flagReasons.push(msg);
     }
     if (!s.invariantsHold) {
-      result.invariantViolations.push(`规格 ${s.id} 不变式违反（invariantsHold=false）`);
+      const msg = `规格 ${s.id} 不变式违反（invariantsHold=false）`;
+      result.invariantViolations.push(msg);
+      flagReasons.push(msg);
     }
     if (s.stateExplosion) {
       result.stateExplosionSpecs.push(s.id);
+      flagReasons.push(`规格 ${s.id} 状态爆炸（stateExplosion=true）`);
     }
+    // SANY 已过：tlcChecked=false 仍属「TLC 未执行」；已执行且有违反 → failed；否则 passed。
+    const tlcStatus: TlcRunStatus = !s.tlcChecked ? 'notRun' : flagReasons.length > 0 ? 'failed' : 'passed';
+    const reasons = !s.tlcChecked ? [`TLC 未执行（tlcChecked=false）：TLC 模型检查未完成`] : flagReasons;
+    result.specs.push({ specId: s.id, tlaPath: s.tlaPath, tlcStatus, reasons });
   }
 
   // 4. 层次一致性

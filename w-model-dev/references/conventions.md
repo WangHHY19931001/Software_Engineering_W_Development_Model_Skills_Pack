@@ -56,7 +56,7 @@
 
 ### action（RunLogEntry）
 
-- **规范定义**：run-log 动作类型枚举（共 32 值，以 `run-log.schema.json` 为准）：`chunk` / `cross` / `evolve` / `produce` / `review`（V 评审）/ `gate` / `tla-gate` / `graph-gate` / `test` / `checkpoint` / `rework` / `rollback` / `rootcause` / `fix` / `emergency-fix` / `escalate` / `r3-completeness` / `r3-reliability` / `r3-security` / `codegraph_query` / `opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive`（以上四值为 LEGACY——历史 run-log 合法，新日志须改用 plan_* 三动作）/ `ensure_deps` / `iceberg-sweep` / `iceberg-review` / `plan_propose`（S 产编码计划 docs/plans/<changeId>.plan.md）/ `plan_task`（S 按计划执行一个任务）/ `plan_review`（V 对计划任务产出做评审）/ `perspective`（A persona 子代理按阶段角色集矩阵单 persona 视角分析，须含 persona 字段且非空）/ `consensus`（A-lead 汇总分歧/交叉轮调度/共识纪要，多轮逐轮记录；persona 可为 A-lead 或空——以 role=A 判定）。
+- **规范定义**：run-log 动作类型枚举（共 18 值，以 `run-log.schema.json` 为准）：`chunk` / `cross` / `produce` / `review` / `gate` / `tla-gate` / `graph-gate` / `checkpoint` / `rootcause` / `fix` / `r3-completeness` / `r3-reliability` / `r3-security` / `perspective` / `consensus` / `iceberg-sweep` / `plan_propose` / `event-route`。（批次 6 A15：32 值旧词表删除 15 个零真实用法死词 evolve/test/rework/rollback/emergency-fix/escalate/codegraph_query/opsx_* 四值/ensure_deps/iceberg-review/plan_task/plan_review，新增 event-route；逐值职责见 data-models.md「动作类型字段约束」节 18 值表，写入已删除值即 schema 违规。）
 - **_Avoid_**：operation/op/行为/事件（「action」字段名固定；EventIngress 的同类字段是 `eventType`）。
 
 ### checkRounds
@@ -118,12 +118,12 @@
 
 ### verifiedArtifacts
 
-- **规范定义**：GATE_JSON（`--json`）顶层可选字段（批次 3），本次门禁判定承重输入文件字节清单 `Array<{path, sha256, bytes}>`（四热点门禁恒存在、空数组允许）；下游 v2 签名的 `sourceArtifacts[].sha256` 从此清单按 path 抄录，消费前可复验「门禁验的与消费的是同一字节」。**取证留存定位**：sha256 供人工/外部审计复验，当前无仓内自动消费者重验（gate-log↔签名链跨文件「声明 vs 真实字节」自动核查未建，见 [agent-threat-model.md](agent-threat-model.md) T4 已知缺口）。
+- **规范定义**：GATE_JSON（`--json`）顶层可选字段（批次 3），本次门禁判定承重输入文件字节清单 `Array<{path, sha256, bytes}>`（四热点门禁恒存在、空数组允许）；下游签名链（43.0.0 v3 起全量条目）的 `sourceArtifacts[].sha256` 从此清单按 path 抄录，消费前可复验「门禁验的与消费的是同一字节」。**取证留存定位**：sha256 供人工/外部审计复验，当前无仓内自动消费者重验（gate-log↔签名链跨文件「声明 vs 真实字节」自动核查未建，见 [agent-threat-model.md](agent-threat-model.md) T4 已知缺口）。
 - **_Avoid_**：artifacts/inputs/字节清单混写（字段名固定「verifiedArtifacts」；「artifacts」是签名链条目的路径清单字段，不含哈希）。
 
 ### sigHashAlgo
 
-- **规范定义**：签名链条目可选字段（批次 3），sigHash 公式版本枚举 `v1` | `v2`，缺省即 `v1`；v2 将 artifacts 与 sourceArtifacts 两清单整体（含 sha256）纳入内容哈希，v2 条目另受 R11（来源 sha256 必填且 64-hex）约束，R6 按条目分流重算（`computeSigHashFor`），v1 路径逐字节不变。
+- **规范定义**：签名链条目必填字段（43.0.0 v3 起），sigHash 公式版本枚举唯一值 `v3`；v3 单公式将 14 字段（含 `targetKind`/`gateExitCode`/`gateLogPath` 与 sourceArtifacts 清单）全量纳入内容哈希，全量条目另受 R11（来源 sha256 必填且 64-hex）约束，R6 以 `computeSigHash` 单公式重算；非 `v3` 条目一律违规（旧数据 fail-closed，毁弃存量不迁移，v1/v2 分流已删除）。
 - **_Avoid_**：algo/hashVersion/version（字段名固定「sigHashAlgo」；「signatureHash」指哈希值本身，不同概念）。
 
 ### plan 任务 vs 执行账本 vs tickets.md

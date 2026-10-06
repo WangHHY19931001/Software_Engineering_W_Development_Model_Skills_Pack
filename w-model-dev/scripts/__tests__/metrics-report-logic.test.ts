@@ -28,7 +28,7 @@ function e(p: Partial<RunLogEntryLike> = {}): RunLogEntryLike {
 
 describe('computeMetrics', () => {
   it('总体汇总（records/tokens/duration/spawns/返工）', () => {
-    const r = computeMetrics([e(), e({ tokens: 200, duration_s: 20 }), e({ action: 'rework', outcome: 'fail' })]);
+    const r = computeMetrics([e(), e({ tokens: 200, duration_s: 20 }), e({ action: 'fix', outcome: 'fail' })]);
     expect(r.overall.totalRecords).toBe(3);
     expect(r.overall.totalTokens).toBe(400);
     expect(r.overall.totalDurationS).toBe(40);
@@ -72,7 +72,7 @@ describe('computeMetrics', () => {
   it('返工率与连续段（跨 action 连续返工）', () => {
     const r = computeMetrics([
       e({ action: 'produce' }),
-      e({ action: 'rework' }),
+      e({ action: 'rootcause' }),
       e({ action: 'fix' }),
       e({ action: 'rootcause' }),
       e({ action: 'produce' }),
@@ -103,7 +103,7 @@ describe('computeMetrics', () => {
       killSwitch: { consecutiveReworks: 2, budgetBurnRate: 0.9 },
       onExceed: 'pause',
     };
-    const r = computeMetrics([e({ tokens: 400 }), e({ action: 'rework' }), e({ action: 'fix' })], budget);
+    const r = computeMetrics([e({ tokens: 400 }), e({ action: 'rootcause' }), e({ action: 'fix' })], budget);
     expect(r.budget?.totalBurnRate).toBeCloseTo(0.6);
     expect(r.budget?.byPhase[0]).toMatchObject({
       phase: 1,

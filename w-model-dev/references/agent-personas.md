@@ -737,7 +737,7 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 | Optional/Nit/FYI 缺陷的 R 定位 | 可选多角度（默认单 R-lead） | 轻微缺陷可单 R-lead 产出 |
 | 阶段门 V 评审（首次） | 可选多角度（默认单 V） | 首次评审可单 persona |
 | 根因报告 V 复审 | **强制多角度** | 根因准确性须多角度保证 |
-| maxReworkRounds 达上限前一轮 | **强制多角度** | 最后一轮须多角度穷尽 |
+| maxReworkRounds（perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载（D-4a 累计口径））达上限前一轮 | **强制多角度** | 最后一轮须多角度穷尽 |
 
 ---
 
@@ -785,7 +785,7 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 
 | persona | 强化职责 | 加载时机 |
 |---|---|---|
-| `engineering-incident-response-commander` | 紧急修复分派场景主导（5-Why 主导，判断紧急修复是否触及根因） | run-log 含 `emergency-fix` 条目时必含 |
+| `engineering-incident-response-commander` | 紧急修复分派场景主导（5-Why 主导，判断紧急修复是否触及根因） | run-log 含带 `blocker` 审计说明的 `fix` 条目时必含（批次 6 A15：emergency-fix 动作已删除，紧急通道以 fix + blocker 留痕） |
 | `testing-evidence-collector` | 收集 S-fix 修复后的测试证据，验证修复有效 | S-fix 修复后 V 复审时必含 |
 | `testing-reality-checker` | 防幻想根因（R 自评根因准确但 S-fix 修复后 bug 仍存在 → 重新定位） | R 重派（round ≥ 2）时必含 |
 

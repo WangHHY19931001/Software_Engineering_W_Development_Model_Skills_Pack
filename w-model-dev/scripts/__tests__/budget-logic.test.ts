@@ -64,18 +64,19 @@ describe('R4-A 多角度 R token 预算', () => {
  * fixture 形状照抄 samples/budget/ 既有文件（不新增样本，避免 samples 覆盖矩阵联动）。
  */
 describe('checkBudget 逐规则单测', () => {
-  it('R1 正例：提供 --project context 且 updatedAt 已刷新 → passed', async () => {
+  it('R1 正例（A5 顺序化）：budget.updatedAt 不早于 project.updatedAt（已复核）→ passed', async () => {
     const b = await loadBudgetSample('valid.json');
-    const r = checkBudget(b, { projectUpdatedAt: '2026-07-24T00:00:00Z', budgetCreatedAt: '2026-07-01T00:00:00Z' });
+    // valid.json updatedAt=2026-07-23T18:00:00Z ≥ projectUpdatedAt → 顺序化判据合法（相等/晚于均合法）
+    const r = checkBudget(b, { projectUpdatedAt: '2026-07-10T00:00:00Z', budgetCreatedAt: '2026-07-01T00:00:00Z' });
     expect(r.passed).toBe(true);
     expect(r.violations).toHaveLength(0);
   });
 
-  it('R1 反例：updatedAt 停滞（== createdAt）且项目已推进 → 违规', async () => {
+  it('R1 反例（A5 顺序化）：updatedAt 停滞（== createdAt）且早于 project.updatedAt → 违规（预算未随项目演进复核）', async () => {
     const b = await loadBudgetSample('bad-stale.json');
     const r = checkBudget(b, { projectUpdatedAt: '2026-07-23T18:00:00Z', budgetCreatedAt: '2026-07-01T00:00:00Z' });
     expect(r.passed).toBe(false);
-    expect(r.violations.some((v) => v.includes('updatedAt == createdAt'))).toBe(true);
+    expect(r.violations.some((v) => v.startsWith('R1') && v.includes('预算未随项目演进复核'))).toBe(true);
   });
 
   it('R1 context 缺失（未提供 --project）→ 非阻断 warning，不再静默跳过（F-G2-04）', async () => {
@@ -149,7 +150,7 @@ describe('checkBudget 逐规则单测', () => {
  * countReworks（CLI 侧 run-log 返工统计口径，D-4a）
  *
  * 背景：真实 8 阶段调测的 run-log 中 action='rework' 一条都没有——返工以
- * fix/emergency-fix 与 outcome='fail'/'rework' 落盘，旧口径（只认 action==='rework'）
+ * fix 与 outcome='fail'/'rework' 落盘（批次 6 A15：rework/emergency-fix 死词已删除），旧口径（只认 action==='rework'）
  * 使 reworkCount 恒为 0，R5 连续返工护栏（killSwitch）一次都没触发（护栏失灵）。
  */
 describe('countReworks 返工计数口径（D-4a）', () => {
@@ -164,16 +165,16 @@ describe('countReworks 返工计数口径（D-4a）', () => {
     expect(s.reworkCount).toBe(3); // a+b+c（phase=3）
   });
 
-  it('legacy action=rework 与 emergency-fix 均计入，且同一记录不重复计数', () => {
+  it('批次 6 A15：action=rework/emergency-fix 死词不经 action 判据计入，outcome 判据不变', () => {
     const entries = [
-      // 兼容项：旧记录的 action='rework' 仍计入（即使 outcome 也命中，只计一次）
+      // 'a' 经 outcome='fail' 计入（outcome 判据）；'b' outcome='success' 且 action 为死词 → 不计入
       { runId: 'a', phase: 5, action: 'rework', role: 'S', outcome: 'fail' },
       { runId: 'b', phase: 5, action: 'emergency-fix', role: 'S', outcome: 'success' },
       { runId: 'c', phase: 5, action: 'gate', role: 'G', outcome: 'success' },
       { runId: 'd', phase: 5, action: 'review', role: 'V', outcome: 'success' },
     ];
     const s = countReworks(entries, 5);
-    expect(s.reworkCount).toBe(2); // a+b；c/d 无返工语义
+    expect(s.reworkCount).toBe(1); // 仅 a（outcome 判据）；b 的 action 死词不再计入
   });
 
   it('tlaReworkCount 只在计入返工的记录里按 note/target 的 TLA 判据统计', () => {
@@ -216,8 +217,8 @@ describe('R6 用量实效 + R5-b burnRate 预警（D-4b）', () => {
       projectId: 'x',
       createdAt: T,
       updatedAt: T,
-      perPhase: { maxTokens: 100, maxSubagentSpawns: 10, maxReworkRounds: 3 },
-      project: { maxTokensTotal: 1000, maxTokensPerSession: 1000 },
+      perPhase: { maxTokens: 100 },
+      project: { maxTokensTotal: 1000 },
       onExceed: 'pause',
       killSwitch: { consecutiveReworks: 3, budgetBurnRate: 0.9, tlaReworks: 3 },
     };
@@ -423,6 +424,113 @@ describe('R6 用量实效 + R5-b burnRate 预警（D-4b）', () => {
       r6.some((v) => v.includes('%')),
       'R6 文案应省略百分比段（除零守卫）',
     ).toBe(false);
+  });
+});
+
+/**
+ * R1 顺序化（43.0.0 A5）+ 三死字段退役
+ *
+ * - R1 时效性改为顺序比较：budget.updatedAt 早于 project.updatedAt → 违规（预算未随项目演进复核），
+ *   相等合法；时间戳经 Date 解析为毫秒比较（禁字符串比较），任一端不可解析 → 跳过子判定 + 非阻断诊断。
+ * - perPhase.maxSubagentSpawns / perPhase.maxReworkRounds / project.maxTokensPerSession 三个
+ *   零消费死字段删除（毁弃存量）：旧数据携带这些字段 → additionalProperties:false 拒绝。
+ */
+function makeBudget(
+  overrides: {
+    createdAt?: string;
+    updatedAt?: string;
+    perPhase?: Record<string, unknown>;
+    project?: Record<string, unknown>;
+  } = {},
+): BudgetConfig {
+  return {
+    schemaVersion: '1.0',
+    projectId: 'a5-budget',
+    createdAt: overrides.createdAt ?? '2026-10-01T00:00:00Z',
+    updatedAt: overrides.updatedAt ?? '2026-10-05T00:00:00Z',
+    perPhase: { maxTokens: 100, ...(overrides.perPhase ?? {}) } as BudgetConfig['perPhase'],
+    project: { maxTokensTotal: 1000, ...(overrides.project ?? {}) } as BudgetConfig['project'],
+    onExceed: 'pause',
+    killSwitch: { consecutiveReworks: 3, budgetBurnRate: 0.9, tlaReworks: 3 },
+  };
+}
+
+describe('R1 顺序化（43.0.0 A5）：budget.updatedAt vs project.updatedAt', () => {
+  const opts = (projectUpdatedAt: string) => ({ projectUpdatedAt, budgetCreatedAt: '2026-10-01T00:00:00Z' });
+
+  it('R1 四态（早于→违规 / 相等→合法 / 晚于→合法）', () => {
+    const rows: readonly [string, string, string, boolean][] = [
+      [
+        'budget.updatedAt 早于 project.updatedAt → R1 违规（预算未随项目演进复核）',
+        '2026-10-01T00:00:00Z',
+        '2026-10-05T00:00:00Z',
+        true,
+      ],
+      [
+        'budget.updatedAt 相等 project.updatedAt → 合法（相等不再违规）',
+        '2026-10-05T00:00:00Z',
+        '2026-10-05T00:00:00Z',
+        false,
+      ],
+      ['budget.updatedAt 晚于 project.updatedAt → 合法', '2026-10-06T00:00:00Z', '2026-10-05T00:00:00Z', false],
+    ];
+    for (const [name, updatedAt, projectUpdatedAt, expectViolation] of rows) {
+      const r = checkBudget(makeBudget({ updatedAt }), opts(projectUpdatedAt));
+      expect(
+        r.violations.some((v) => v.startsWith('R1')),
+        `${name}：R1 判定不符`,
+      ).toBe(expectViolation);
+      if (expectViolation) {
+        expect(r.passed, `${name} 应 blocking`).toBe(false);
+        expect(
+          r.violations.some((v) => v.includes('预算未随项目演进复核')),
+          `${name} 应含挑明文案`,
+        ).toBe(true);
+      } else {
+        expect(r.passed, `${name} 应通过`).toBe(true);
+      }
+    }
+  });
+
+  it('R1 不可解析守卫：任一端不可解析 → 跳过子判定（无 R1 违规）+ 非阻断诊断（跳过不等于通过）', () => {
+    const r = checkBudget(makeBudget({ updatedAt: '2026-10-01T00:00:00Z' }), {
+      projectUpdatedAt: 'not-a-date',
+      budgetCreatedAt: '2026-10-01T00:00:00Z',
+    });
+    expect(r.violations.some((v) => v.startsWith('R1'))).toBe(false);
+    expect(r.passed).toBe(true);
+    expect(r.warnings.some((w) => w.includes('R1') && w.includes('不可解析'))).toBe(true);
+  });
+
+  it('A5 简报原例：updatedAt==createdAt 停滞且 project.updatedAt 已推进 → R1 违规', () => {
+    const r = checkBudget(
+      makeBudget({ createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z' }),
+      opts('2026-10-05T00:00:00Z'),
+    );
+    expect(r.violations.some((v) => v.startsWith('R1'))).toBe(true);
+  });
+});
+
+describe('A5：三死字段退役（43.0.0，毁弃存量）', () => {
+  it('三死字段出现于 budget.json → [schema] 违规（additionalProperties 拒绝，3 态）', () => {
+    const rows: readonly [string, Record<string, unknown>, string][] = [
+      ['perPhase.maxSubagentSpawns', { perPhase: { maxTokens: 100, maxSubagentSpawns: 30 } }, 'maxSubagentSpawns'],
+      ['perPhase.maxReworkRounds', { perPhase: { maxTokens: 100, maxReworkRounds: 3 } }, 'maxReworkRounds'],
+      [
+        'project.maxTokensPerSession',
+        { project: { maxTokensTotal: 1000, maxTokensPerSession: 1000 } },
+        'maxTokensPerSession',
+      ],
+    ];
+    for (const [name, patch, field] of rows) {
+      const b = { ...(makeBudget() as unknown as Record<string, unknown>), ...patch };
+      const r = checkBudget(b);
+      expect(r.passed, `${name} 应 fail`).toBe(false);
+      expect(
+        r.violations.some((v) => v.startsWith('[schema]') && v.includes(field)),
+        `${name} 应报 [schema] ${field}`,
+      ).toBe(true);
+    }
   });
 });
 

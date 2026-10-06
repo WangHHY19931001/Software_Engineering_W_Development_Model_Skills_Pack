@@ -37,6 +37,7 @@ import { createRequire } from 'node:module';
 import type * as TsType from 'typescript';
 
 import { checkVerifierOutput } from '../logic/verifier-logic.js';
+import { verifyReviewedArtifacts } from '../lib/reviewed-artifacts.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { checkArtifactGate, checkPhaseSpecStructure, type GateGraph } from '../logic/gate-logic.js';
 import {
@@ -167,6 +168,14 @@ interface GateCase {
   ticketsFile?: string;
   /** 批次1 SDMAP-3/4：手写注入表（path→总行数）；缺省不注入 → sdAnchorCheck=skipped */
   srcLineCounts?: Record<string, number>;
+  /**
+   * A4（43.0.0）：配套 maturity.json（相对 samples/gate/，目录组合 fixture）。
+   * 声明时 runGateCases 读取并与 signatureChainFile 一起传入 checkArtifactGate（豁免判定输入）；
+   * 同时被 check-samples-coverage 登记为已引用。
+   */
+  maturityFile?: string;
+  /** A4（43.0.0）：配套 signature-chain.jsonl（相对 samples/gate/）；缺省 → 空链（不豁免形态） */
+  signatureChainFile?: string;
 }
 
 const VERIFIER_CASES: VerifierCase[] = [
@@ -345,6 +354,28 @@ const VERIFIER_CASES: VerifierCase[] = [
     expectedReasonPatterns: [/subCriteria.*name 应为/],
     description: 'targetKind=rootcause 但误用 test 集合子标准，应被 §7.5 子标准集合校验拦截',
   },
+  // -------------------- A2 R19：reviewedArtifacts 评审对象绑定（批次 6 任务 4） --------------------
+  {
+    file: 'bad-r19-evidence-not-registered.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R19 evidence 引用未在 reviewedArtifacts 登记/],
+    description:
+      'A2 R19：分数自洽 + evidence 格式合法的 VerifierOutput 引用未登记产物路径（伪造 V 产物与 S 产物零绑定穿透面），应被 R19 唯一拦截',
+  },
+  {
+    file: 'bad-r19-artifact-hash-mismatch.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R19 评审对象哈希不符/],
+    description:
+      'A2 R19：登记项 sha256 首字符被篡改（仍 64 位十六进制，logic 格式过），CLI 读盘哈希复核应唯一拦截（产物已变，旧评审不成立）',
+  },
+  {
+    file: 'bad-r19-line-out-of-range.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R19 evidence 行号越界/],
+    description:
+      'A2 R19：evidence 引用已登记产物但行号 99999 越界（行数表由 lib/reviewed-artifacts 读盘注入 VerifierDeps），应被 R19 唯一拦截',
+  },
 ];
 
 const GATE_CASES: GateCase[] = [
@@ -443,6 +474,34 @@ const GATE_CASES: GateCase[] = [
     phaseOption: 1,
     expectedReasonPatterns: [/REQ-001.*acceptanceTest/],
     description: '§10J phase=1 REQ 行 acceptanceTest 为空，应被增量校验拦截',
+  },
+  // -------------------- A4 maturity 豁免收紧（43.0.0，批次 6 任务 8） --------------------
+  {
+    file: 'valid-maturity-waiver-with-approval/rtm.json',
+    expectedPassed: true,
+    phaseOption: 1,
+    maturityFile: 'valid-maturity-waiver-with-approval/maturity.json',
+    signatureChainFile: 'valid-maturity-waiver-with-approval/signature-chain.jsonl',
+    auxFiles: [
+      'valid-maturity-waiver-with-approval/maturity.json',
+      'valid-maturity-waiver-with-approval/signature-chain.jsonl',
+    ],
+    description:
+      'A4 L1 + 合法 human 审批链（role=human / targetKind=maturity / v3 重算一致 / 绑定 maturity.json / 不早于末次变更）→ TLA+/BDD 豁免生效（tlaBddWaived=true），其余门禁照跑全绿',
+  },
+  {
+    file: 'bad-maturity-waiver-missing-approval/rtm.json',
+    expectedPassed: false,
+    phaseOption: 1,
+    maturityFile: 'bad-maturity-waiver-missing-approval/maturity.json',
+    signatureChainFile: 'bad-maturity-waiver-missing-approval/signature-chain.jsonl',
+    auxFiles: [
+      'bad-maturity-waiver-missing-approval/maturity.json',
+      'bad-maturity-waiver-missing-approval/signature-chain.jsonl',
+    ],
+    expectedReasonPatterns: [/maturity 豁免被拒绝：缺少 role=human \/ targetKind=maturity 的审批条目/],
+    description:
+      'A4 L1 审批条目缺 human role（role=S 伪装、v3 签名合法）→ 豁免被拒绝（fail-closed）， maturity.level 自写不再关门禁',
   },
   // -------------------- P0 RTM coverageStatus 校验 --------------------
   {
@@ -856,7 +915,11 @@ interface SpecEnhanceCase {
 }
 
 const SPEC_ENHANCE_CASES: SpecEnhanceCase[] = [
-  { file: 'valid-spec-enhance.json', expectedPassed: true, description: 'R7/R8 通过：追踪矩阵字段合法 + mermaid 配平' },
+  {
+    file: 'valid-spec-enhance.json',
+    expectedPassed: true,
+    description: 'R7/R8 通过：追踪矩阵字段合法 + mermaid 配平',
+  },
   {
     file: 'bad-spec-r7.json',
     expectedPassed: false,
@@ -939,7 +1002,12 @@ interface SpecStructureOutOfScopeCase {
   name: string;
   /** 只提供 §8 段正文；`undefined` = 故意整节缺失（判定 (a)）。 */
   section?: string;
-  expectedBucketCounts: { refs: number; ssot: number; dod: number; outOfScope: number };
+  expectedBucketCounts: {
+    refs: number;
+    ssot: number;
+    dod: number;
+    outOfScope: number;
+  };
   expectedReasonPatterns?: RegExp[];
   description: string;
 }
@@ -1019,7 +1087,11 @@ interface DesignEnhanceCase {
 }
 
 const DESIGN_ENHANCE_CASES: DesignEnhanceCase[] = [
-  { file: 'valid-design-enhance.json', expectedPassed: true, description: 'R9/R10 通过：SD 字段合法 + mermaid 配平' },
+  {
+    file: 'valid-design-enhance.json',
+    expectedPassed: true,
+    description: 'R9/R10 通过：SD 字段合法 + mermaid 配平',
+  },
   {
     file: 'bad-design-r9.json',
     expectedPassed: false,
@@ -1272,13 +1344,9 @@ const TLA_CASES: TlaCase[] = [
     file: 'bad-declared-flags.json',
     phase: 1,
     expectedPassed: false,
-    expectedReasonPatterns: [
-      /syntaxChecked=false/,
-      /存在死锁.*deadlockFree=false/,
-      /不变式违反.*invariantsHold=false/,
-      /L1-system 状态爆炸.*stateExplosion=true/,
-    ],
-    description: '声明标志全反（syntax/deadlock/invariant/explosion），应同时触发四类违反',
+    expectedReasonPatterns: [/syntaxChecked=false/, /TLC 未执行（SANY 语法检查失败）/],
+    description:
+      '声明标志全反且 SANY 未过（A7）：只报 SANY 单一事实 + 「TLC 未执行」，不复述 TLC 未跑时的预置死锁/不变式/状态爆炸标志',
   },
   {
     file: 'bad-coverage-missing-sd.json',
@@ -1356,12 +1424,12 @@ const BUDGET_CASES: BudgetCase[] = [
   {
     file: 'bad-stale.json',
     expectedPassed: false,
-    expectedReasonPatterns: [/updatedAt == createdAt/],
+    expectedReasonPatterns: [/预算未随项目演进复核/],
     options: {
       projectUpdatedAt: '2026-07-23T18:00:00Z',
       budgetCreatedAt: '2026-07-01T00:00:00Z',
     },
-    description: 'updatedAt==createdAt 且项目已推进，应被 R1 时效性校验拦截',
+    description: 'updatedAt 早于 project.updatedAt（预算未随项目演进复核），应被 R1 时效性（43.0.0 A5 顺序化）校验拦截',
   },
   {
     file: 'bad-killswitch-triggered.json',
@@ -1493,7 +1561,7 @@ const RUN_LOG_CASES: RunLogCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/\[rework-hints\].*passed=false.*reworkHints/],
     description:
-      'cutoff 后 review passed=false 无 reworkHints，应被 [rework-hints] 规则拦截（LEGACY_VARIANT_CUTOFF 起强制，cutoff 前旧行按 LEGACY_REWORK_HINTS 诊断吸收）',
+      'review passed=false 无 reworkHints，应被 [rework-hints] 规则拦截（历史 cutoff 吸收路径已删除：任意时间戳一律 blocking）',
   },
   // ---- P2-B（S27 / AC-8）: R10 revertEvidence 回滚证伪协议 ----
   {
@@ -1558,8 +1626,8 @@ interface MaturityCase {
   expectedPassed: boolean;
   /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
   expectedReasonPatterns?: RegExp[];
-  /** 传给 checkMaturity 的 options（可选，默认不传） */
-  options?: { completedPhases?: number };
+  /** 传给 checkMaturity 的 options（可选，默认不传；43.0.0 A4：completedPhases 已随 R3 退役删除） */
+  options?: { projectCreatedAt?: string; operationalFailureCount?: number };
   /** 用例说明 */
   description: string;
 }
@@ -1577,11 +1645,11 @@ const MATURITY_CASES: MaturityCase[] = [
     description: 'level=L5 超出 L0/L1/L2/L3，应被 schema enum 前置校验拦截',
   },
   {
-    file: 'bad-r3-cycle-mismatch.json',
+    file: 'bad-r6-history-chain.json',
     expectedPassed: false,
-    expectedReasonPatterns: [/R3.*8 阶段.*1 完整周期.*completedCycles=0/],
-    options: { completedPhases: 8 },
-    description: 'P2.1 R3 单位修正：completedPhases=8（1 完整周期）但 completedCycles=0，应触发 R3 违规',
+    expectedReasonPatterns: [/R6: history\[1\] from=L0 与上一条 to=L1 断链/],
+    description:
+      'A4 R6 history 链一致性：第 2 条 from=L0 与上一条 to=L1 断链（虚高路径：L0 直接跳 L2），应触发 R6 违规（原 bad-r3-cycle-mismatch.json 的 R3 周期用例随 unlockConditions 死字段退役，43.0.0 A4）',
   },
 ];
 
@@ -1746,7 +1814,11 @@ interface RootCauseCase {
 }
 
 const ROOTCAUSE_CASES: RootCauseCase[] = [
-  { file: 'valid.json', expectedPassed: true, description: '完整、合规的 RootCauseReport，应通过所有校验' },
+  {
+    file: 'valid.json',
+    expectedPassed: true,
+    description: '完整、合规的 RootCauseReport，应通过所有校验',
+  },
   {
     file: 'valid-no-root-cause.json',
     expectedPassed: true,
@@ -1936,7 +2008,11 @@ const ICEBERG_CASES: IcebergCase[] = [
     file: 'bad-view-disagreement.json',
     expectedPassed: false,
     expectedReasonPatterns: [/R6/, /视角间存在未对账差异/, /视角间存在未对账差异[\s\S]*SD-002/],
-    injectViewSets: { graph: ['SD-001', 'SD-002'], tla: ['SD-001'], rtm: ['SD-001', 'SD-002'] },
+    injectViewSets: {
+      graph: ['SD-001', 'SD-002'],
+      tla: ['SD-001'],
+      rtm: ['SD-001', 'SD-002'],
+    },
     description: 'graph/rtm 含 SD-002 而 tla 不含，窄池漏 SD 即刻失败（R6[design-sd]，SD 命名空间内差异不豁免）',
   },
   {
@@ -1957,14 +2033,23 @@ const ICEBERG_CASES: IcebergCase[] = [
     file: 'bad-r6-wide-dd-drift.json',
     expectedPassed: false,
     expectedReasonPatterns: [/R6/, /design-wide/, /graph↔rtm[\s\S]*DD-003/],
-    injectViewSets: { graph: ['SD-001', 'DD-003'], tla: ['SD-001'], rtm: ['SD-001'] },
+    injectViewSets: {
+      graph: ['SD-001', 'DD-003'],
+      tla: ['SD-001'],
+      rtm: ['SD-001'],
+    },
     description:
       '宽池 graph↔rtm 的 DD 漂移（DD-003 仅 graph 有）仍被检出（R6[design-wide]：分池只豁免跨命名空间宽度差）',
   },
   {
     file: 'valid-phase5-scope-present.json',
     expectedPassed: true,
-    injectViewSets: { graph: ['SD-001'], tla: ['SD-001'], rtm: ['SD-001'], scope: ['src/counter.ts'] },
+    injectViewSets: {
+      graph: ['SD-001'],
+      tla: ['SD-001'],
+      rtm: ['SD-001'],
+      scope: ['src/counter.ts'],
+    },
     description:
       '阶段 5 scope 视角在盘且为文件路径命名空间：不参与 R6 集合比对与 R8 收敛集，零发现报告可放行（D-1/N-1 分池）',
   },
@@ -2242,7 +2327,11 @@ interface BddCase {
     unitTest: string | null;
   }>;
   /** 注入的 cucumber 报告（用于 D5 step 绑定校验，phase >= 5） */
-  cucumberReport?: { undefinedCount: number; pendingCount: number; failedCount: number };
+  cucumberReport?: {
+    undefinedCount: number;
+    pendingCount: number;
+    failedCount: number;
+  };
 }
 
 const BDD_CASES: BddCase[] = [
@@ -2337,7 +2426,15 @@ const BDD_CASES: BddCase[] = [
     expectedReasonPatterns: [/feature id not in RTM row/],
     phase: 1,
     description: 'feature id 未登记在 RTM test 字段中（由 rtmRows 参数注入），应被 D7 RTM 映射校验拦截',
-    rtmRows: [{ reqId: 'REQ-001', acceptanceTest: null, systemTest: null, integrationTest: null, unitTest: null }],
+    rtmRows: [
+      {
+        reqId: 'REQ-001',
+        acceptanceTest: null,
+        systemTest: null,
+        integrationTest: null,
+        unitTest: null,
+      },
+    ],
   },
   {
     manifestFile: 'valid-manifest.json',
@@ -2661,26 +2758,26 @@ const SIGNATURE_CHAIN_CASES: SignatureChainCase[] = [
     phase: 2,
     description: '签名链：跨阶段断链（prevSigId 不存在于全链），R2 失败',
   },
-  // 批次3 sigHash v2（公式分流 + R11）
+  // 43.0.0 sigHash v3（A1 单公式；valid-v2/bad-v2-* 经 codemod 后为 v3 原生数据）
   {
     file: 'valid-v2.jsonl',
     expectedPassed: true,
     phase: 1,
-    description: '签名链：v2 公式全链（sigHashAlgo=v2 + 来源 sha256 齐全），R6 按 v2 分流重算 + R11 通过',
+    description: '签名链：v3 单公式全链（sigHashAlgo=v3 + 来源 sha256 齐全），R6 按 v3 重算 + R11 通过',
   },
   {
     file: 'bad-v2-missing-sha256.jsonl',
     expectedPassed: false,
     expectedRulesFailed: ['R11'],
     phase: 1,
-    description: '签名链：v2 条目来源 sha256 缺失，R11 失败',
+    description: '签名链：来源 sha256 缺失，R11 失败（v3 起全量适用，不再按条目分流）',
   },
   {
     file: 'bad-v2-tampered-sha256.jsonl',
     expectedPassed: false,
     expectedRulesFailed: ['R6'],
     phase: 1,
-    description: '签名链：v2 条目来源 sha256 被篡改但 sigHash 未重算，R6 失败（v2 公式纳入 sha256）',
+    description: '签名链：来源 sha256 被篡改但 sigHash 未重算，R6 失败（v3 公式纳入 sha256）',
   },
 ];
 
@@ -2704,7 +2801,11 @@ interface ArchiveIntegrityCase {
 }
 
 const ARCHIVE_INTEGRITY_CASES: ArchiveIntegrityCase[] = [
-  { file: 'valid-full.json', expectedPassed: true, description: '归档完整性：全阶段强制文件齐全' },
+  {
+    file: 'valid-full.json',
+    expectedPassed: true,
+    description: '归档完整性：全阶段强制文件齐全',
+  },
   {
     file: 'bad-missing-phase1-docs.json',
     expectedPassed: false,
@@ -2924,7 +3025,12 @@ const CODE_HEALTH_CASES: CodeHealthCase[] = [
     expectedValid: true,
     description: '合法 redacted archive record',
   },
-  { file: 'valid-gap.json', schema: 'code-health-gap', expectedValid: true, description: '合法 test-gap row' },
+  {
+    file: 'valid-gap.json',
+    schema: 'code-health-gap',
+    expectedValid: true,
+    description: '合法 test-gap row',
+  },
   {
     file: 'valid-test-inventory.json',
     schema: 'code-health-test-inventory',
@@ -3416,14 +3522,23 @@ async function runVerifierCases(samplesDir: string): Promise<CaseResult[]> {
     const abs = path.join(samplesDir, 'verifier', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
     const parsed: unknown = parseJsonSafe(raw);
-    const r = checkVerifierOutput(parsed);
+    // R19（A2，批次 6 任务 4）：样本口径与 CLI 接线单点一致——reviewedArtifacts 读盘复核
+    // （存在 / 哈希 / 行数）经 lib/reviewed-artifacts.ts 完成后，行数表注入 logic（行号越界校验），
+    // 复核违规并入 reasons 与 passed 判定（照 check-budget / check-maturity 复用导出函数先例）。
+    const reviewedRaw = (parsed as { reviewedArtifacts?: unknown } | null)?.reviewedArtifacts;
+    const artifactCheck = verifyReviewedArtifacts(reviewedRaw, path.dirname(abs));
+    const r = checkVerifierOutput(parsed, {
+      lineCountsByPath: artifactCheck.lineCountsByPath,
+    });
+    const reasons = [...r.reasons, ...artifactCheck.reasons];
+    const passed = r.passed && artifactCheck.reasons.length === 0;
 
     const details: string[] = [];
-    if (r.passed !== c.expectedPassed) {
-      details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${r.passed}`);
+    if (passed !== c.expectedPassed) {
+      details.push(`  - 期望 passed=${c.expectedPassed}，实际 passed=${passed}`);
     }
     if (!c.expectedPassed) {
-      details.push(...matchReasonPatterns(r.reasons, c.expectedReasonPatterns));
+      details.push(...matchReasonPatterns(reasons, c.expectedReasonPatterns));
     }
 
     results.push({
@@ -3455,6 +3570,21 @@ async function runGateCases(samplesDir: string): Promise<CaseResult[]> {
     }
     // 批次1 SDMAP-3/4：用例声明的注入表转 ReadonlyMap 传给纯函数（缺省 undefined → sdAnchorCheck=skipped，与 CLI 生产路径注入态区分）
     options.srcLineCounts = c.srcLineCounts ? new Map(Object.entries(c.srcLineCounts)) : undefined;
+    // A4：目录组合 fixture 的 maturity.json + signature-chain.jsonl 作为豁免判定输入
+    // （链文件逐行 JSON 解析，坏行跳过——与 CLI loadSignatureChainIfExists 同口径）
+    if (c.maturityFile) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控仓库固定路径（samples/gate/ 下的用例声明 fixture），仅只读
+      options.maturity = JSON.parse(await fs.readFile(path.join(samplesDir, 'gate', c.maturityFile), 'utf-8')) as never;
+    }
+    if (c.signatureChainFile) {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控仓库固定路径（samples/gate/ 下的用例声明 fixture），仅只读
+      const chainRaw = await fs.readFile(path.join(samplesDir, 'gate', c.signatureChainFile), 'utf-8');
+      options.signatureChain = chainRaw
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0)
+        .map((l) => JSON.parse(l) as never);
+    }
     const r = checkArtifactGate(parsed as never, Object.keys(options).length > 0 ? (options as never) : undefined);
 
     const details: string[] = [];
@@ -3537,7 +3667,11 @@ async function runSpecEnhanceCases(samplesDir: string): Promise<CaseResult[]> {
   for (const c of SPEC_ENHANCE_CASES) {
     const abs = path.join(samplesDir, 'graph', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { traceabilityMatrix: string; umlModeling: string; specContent: string };
+    const parsed = JSON.parse(raw) as {
+      traceabilityMatrix: string;
+      umlModeling: string;
+      specContent: string;
+    };
     const v = checkRequirementSpecEnhance(parsed.traceabilityMatrix, parsed.specContent, parsed.umlModeling);
     const violations = [...v.r7, ...v.r8];
     const actualPassed = violations.length === 0;
@@ -3564,7 +3698,11 @@ async function runSpecStructureCases(samplesDir: string): Promise<CaseResult[]> 
   for (const c of SPEC_STRUCTURE_CASES) {
     const abs = path.join(samplesDir, 'gate', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { specContent: string; refFiles: string[]; dodContent: string };
+    const parsed = JSON.parse(raw) as {
+      specContent: string;
+      refFiles: string[];
+      dodContent: string;
+    };
     const files: Record<string, string> = {};
     const dir = 'docs/phase1-requirements';
     files[path.join(dir, 'requirement-spec.md')] = parsed.specContent;
@@ -3667,7 +3805,11 @@ async function runDesignEnhanceCases(samplesDir: string): Promise<CaseResult[]> 
   for (const c of DESIGN_ENHANCE_CASES) {
     const abs = path.join(samplesDir, 'graph', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { traceabilityMatrix: string; umlModeling: string; designDocContent: string };
+    const parsed = JSON.parse(raw) as {
+      traceabilityMatrix: string;
+      umlModeling: string;
+      designDocContent: string;
+    };
     const v = checkDesignSpecEnhance(parsed.traceabilityMatrix, parsed.designDocContent, parsed.umlModeling);
     const violations = [...v.r9, ...v.r10];
     const actualPassed = violations.length === 0;
@@ -3691,7 +3833,12 @@ async function runPhase2SpecStructureCases(samplesDir: string): Promise<CaseResu
   for (const c of PHASE2_SPEC_STRUCTURE_CASES) {
     const abs = path.join(samplesDir, 'gate', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { mainDoc: string; specContent: string; refFiles: string[]; dodContent: string };
+    const parsed = JSON.parse(raw) as {
+      mainDoc: string;
+      specContent: string;
+      refFiles: string[];
+      dodContent: string;
+    };
     const files: Record<string, string> = {};
     const dir = path.join('docs', 'phase2-design');
     files[path.join(dir, parsed.mainDoc)] = parsed.specContent;
@@ -3734,7 +3881,11 @@ async function runOutlineEnhanceCases(samplesDir: string): Promise<CaseResult[]>
   for (const c of OUTLINE_ENHANCE_CASES) {
     const abs = path.join(samplesDir, 'graph', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { traceabilityMatrix: string; umlModeling: string; designDocContent: string };
+    const parsed = JSON.parse(raw) as {
+      traceabilityMatrix: string;
+      umlModeling: string;
+      designDocContent: string;
+    };
     const v = checkOutlineSpecEnhance(parsed.traceabilityMatrix, parsed.designDocContent, parsed.umlModeling);
     const violations = [...v.r11, ...v.r12];
     const actualPassed = violations.length === 0;
@@ -3757,7 +3908,12 @@ async function runPhase3SpecStructureCases(samplesDir: string): Promise<CaseResu
   for (const c of PHASE3_SPEC_STRUCTURE_CASES) {
     const abs = path.join(samplesDir, 'gate', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { mainDoc: string; specContent: string; refFiles: string[]; dodContent: string };
+    const parsed = JSON.parse(raw) as {
+      mainDoc: string;
+      specContent: string;
+      refFiles: string[];
+      dodContent: string;
+    };
     const files: Record<string, string> = {};
     const dir = path.join('docs', 'phase3-outline');
     files[path.join(dir, parsed.mainDoc)] = parsed.specContent;
@@ -3800,7 +3956,11 @@ async function runDetailedEnhanceCases(samplesDir: string): Promise<CaseResult[]
   for (const c of DETAILED_ENHANCE_CASES) {
     const abs = path.join(samplesDir, 'graph', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { traceabilityMatrix: string; umlModeling: string; designDocContent: string };
+    const parsed = JSON.parse(raw) as {
+      traceabilityMatrix: string;
+      umlModeling: string;
+      designDocContent: string;
+    };
     const v = checkDetailedSpecEnhance(parsed.traceabilityMatrix, parsed.designDocContent, parsed.umlModeling);
     const violations = [...v.r13, ...v.r14];
     const actualPassed = violations.length === 0;
@@ -3823,7 +3983,12 @@ async function runPhase4SpecStructureCases(samplesDir: string): Promise<CaseResu
   for (const c of PHASE4_SPEC_STRUCTURE_CASES) {
     const abs = path.join(samplesDir, 'gate', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
-    const parsed = JSON.parse(raw) as { mainDoc: string; specContent: string; refFiles: string[]; dodContent: string };
+    const parsed = JSON.parse(raw) as {
+      mainDoc: string;
+      specContent: string;
+      refFiles: string[];
+      dodContent: string;
+    };
     const files: Record<string, string> = {};
     const dir = path.join('docs', 'phase4-detailed');
     files[path.join(dir, parsed.mainDoc)] = parsed.specContent;
@@ -4088,7 +4253,13 @@ const RUN_LOG_APPEND_CASES: RunLogAppendCase[] = [
   },
   {
     description: '--correct 只新增更正记录（note 含 correction-of:<runId>），历史行逐字段不变',
-    existing: [appendCaseRecord({ runId: 'h1', timestamp: APPEND_CASE_NOW, note: '错值 4' })],
+    existing: [
+      appendCaseRecord({
+        runId: 'h1',
+        timestamp: APPEND_CASE_NOW,
+        note: '错值 4',
+      }),
+    ],
     incoming: [],
     options: { now: '2026-01-05T00:01:00.000Z' },
     correctRunId: 'h1',
@@ -4248,7 +4419,9 @@ async function runCheckpointCases(samplesDir: string): Promise<CaseResult[]> {
     const abs = path.join(samplesDir, 'checkpoint', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
     const parsed: unknown = parseJsonl(raw);
-    const r = checkCheckpoint(parsed, { checkpointLog: c.expectedPassed ? validCheckpointLog : undefined });
+    const r = checkCheckpoint(parsed, {
+      checkpointLog: c.expectedPassed ? validCheckpointLog : undefined,
+    });
 
     const details: string[] = [];
     if (r.passed !== c.expectedPassed) {
@@ -4463,7 +4636,10 @@ async function runTlaBddSyncCases(samplesDir: string): Promise<CaseResult[]> {
     const abs = path.join(samplesDir, 'tla-bdd-sync', c.file);
     try {
       const raw = await fs.readFile(abs, 'utf-8');
-      const data = parseJsonSafe(raw) as { tlaContent: string; featureContent: string };
+      const data = parseJsonSafe(raw) as {
+        tlaContent: string;
+        featureContent: string;
+      };
       const r = checkTlaBddSync(data.tlaContent, data.featureContent);
       const details: string[] = [];
       if (r.passed !== c.expectedPassed) {
@@ -4874,8 +5050,18 @@ interface DesignFogCase {
 }
 
 const DESIGN_FOG_CASES: DesignFogCase[] = [
-  { file: 'valid-all-terminal.md', phase: 2, expectedPassed: true, description: '全终结迷雾册：exit 0' },
-  { file: 'valid-no-fog-marker.md', phase: 2, expectedPassed: true, description: '合法无雾标记：exit 0' },
+  {
+    file: 'valid-all-terminal.md',
+    phase: 2,
+    expectedPassed: true,
+    description: '全终结迷雾册：exit 0',
+  },
+  {
+    file: 'valid-no-fog-marker.md',
+    phase: 2,
+    expectedPassed: true,
+    description: '合法无雾标记：exit 0',
+  },
   {
     file: 'bad-unresolved-fog.md',
     phase: 2,
@@ -5088,7 +5274,11 @@ async function runArchiveIntegrityCases(samplesDir: string): Promise<CaseResult[
           // 树内账本缺失 → 留空，由清单校验 fail-closed 报违规
         }
       }
-      manifest = { codingPlanSnapshot: m.codingPlanSnapshot, changeId: m.changeId, progressMdContent };
+      manifest = {
+        codingPlanSnapshot: m.codingPlanSnapshot,
+        changeId: m.changeId,
+        progressMdContent,
+      };
     }
     const r = checkArchiveIntegrity(contents, undefined, manifest);
 
@@ -5180,7 +5370,14 @@ async function loadPhase1Fixture(abs: string): Promise<CodeHealthPhase1Fixture> 
 function phase1UnexercisedTrace(revision: RevisionIdentity) {
   return {
     revision,
-    scenarios: [{ id: 'unexercised', environment: 'ci', reached: null, observation: 'unavailable' as const }],
+    scenarios: [
+      {
+        id: 'unexercised',
+        environment: 'ci',
+        reached: null,
+        observation: 'unavailable' as const,
+      },
+    ],
     rawTraceSha256: 'd'.repeat(64),
   };
 }

@@ -1095,7 +1095,7 @@ main().catch((err) => {
 构造夹具（复用 Task 3 的 `$tmp`，追加 budget.json + 多条 run-log）：
 ```powershell
 $tmp = Join-Path $env:TEMP "wm31-smoke"; New-Item -ItemType Directory -Force -Path (Join-Path $tmp ".w-model") | Out-Null
-Set-Content -Encoding utf8 (Join-Path $tmp ".w-model\run-log.jsonl") '{"phase":1,"action":"produce","role":"S","outcome":"success","tokens":100,"duration_s":10,"subagentSpawns":1,"gateExitCode":null,"timestamp":"2026-08-05T01:00:00Z"}{"phase":1,"action":"rework","role":"S","outcome":"rework","tokens":50,"duration_s":5,"subagentSpawns":1,"gateExitCode":null,"timestamp":"2026-08-05T02:00:00Z"}{"phase":2,"action":"gate","role":"G","outcome":"success","tokens":30,"duration_s":3,"subagentSpawns":1,"gateExitCode":0,"timestamp":"2026-08-06T01:00:00Z"}'
+Set-Content -Encoding utf8 (Join-Path $tmp ".w-model\run-log.jsonl") '{"phase":1,"action":"produce","role":"S","outcome":"success","tokens":100,"duration_s":10,"subagentSpawns":1,"gateExitCode":null,"timestamp":"2026-08-05T01:00:00Z"}{"phase":1,"action":"fix","role":"S","outcome":"rework","tokens":50,"duration_s":5,"subagentSpawns":1,"gateExitCode":null,"timestamp":"2026-08-05T02:00:00Z"}{"phase":2,"action":"gate","role":"G","outcome":"success","tokens":30,"duration_s":3,"subagentSpawns":1,"gateExitCode":0,"timestamp":"2026-08-06T01:00:00Z"}'
 Set-Content -Encoding utf8 (Join-Path $tmp ".w-model\budget.json") '{"projectId":"smoke","project":{"maxTokensTotal":10000},"perPhase":{"maxTokens":1000},"killSwitch":{"consecutiveReworks":3,"budgetBurnRate":0.9},"onExceed":"pause"}'
 npx tsx w-model-dev/scripts/metrics-report.ts $tmp
 npx tsx w-model-dev/scripts/metrics-report.ts $tmp --json --out (Join-Path $tmp "report.json")

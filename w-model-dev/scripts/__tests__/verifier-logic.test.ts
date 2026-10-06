@@ -33,6 +33,8 @@ import {
   checkR18ResolutionFloor,
   checkVerifierOutput,
   ajvErrorSubject,
+  parseEvidencePath,
+  validateReviewedArtifacts,
   RESOLUTION_FLOOR,
 } from '../logic/verifier-logic.js';
 
@@ -46,6 +48,13 @@ const PERSONA_FIXTURES = [
   'persona-security-auditor.json',
   'persona-performance-auditor.json',
 ] as const;
+
+/**
+ * R19（A2，批次 6 任务 4）测试共用登记项：满足 schema 与 logic 形态的 reviewedArtifacts 条目。
+ * 仅喂 logic 纯函数（不触盘），故 path 无须真实存在；行号越界 / 哈希复核由 CLI 层
+ * （lib/reviewed-artifacts.ts 读盘后经 VerifierDeps 注入）另行覆盖。
+ */
+const R19_REVIEWED = [{ path: 'requirements.md', sha256: 'a'.repeat(64) }];
 
 /** 进程内调用 check-verifier-output CLI（模块路径相对 helpers/cli-invoker.ts 解析） */
 async function runVerifierCli(
@@ -212,7 +221,11 @@ describe('Persona Verifier CLI regressions', () => {
     const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier/persona-code-reviewer.json');
     const result = await runVerifierCli(fixturePath);
     const report = JSON.parse(result.stdout) as {
-      verifiedArtifacts?: Array<{ path: string; sha256: string; bytes: number }>;
+      verifiedArtifacts?: Array<{
+        path: string;
+        sha256: string;
+        bytes: number;
+      }>;
     };
 
     expect(result.code).toBe(0);
@@ -227,7 +240,10 @@ describe('Persona Verifier CLI regressions', () => {
   it('--json 校验失败报告同样恒带 verifiedArtifacts（读不到不入表，读得到必登记）', async () => {
     const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier/bad-variance-drift.json');
     const result = await runVerifierCli(fixturePath);
-    const report = JSON.parse(result.stdout) as { verifiedArtifacts?: unknown[]; passed?: boolean };
+    const report = JSON.parse(result.stdout) as {
+      verifiedArtifacts?: unknown[];
+      passed?: boolean;
+    };
 
     expect(result.code).toBe(1);
     expect(report.passed).toBe(false);
@@ -428,6 +444,7 @@ describe('evidence 扣分后 passed 重算', () => {
       ],
       compositeScore: 0.72,
       qualityLevel: 'B',
+      reviewedArtifacts: R19_REVIEWED,
       summary: 'REQ-001 需求覆盖基本完整，采用 RBAC 权限模型，可测试，遗留风险：无，待运行时验证确认。',
       passed: true,
     };
@@ -495,6 +512,7 @@ describe('evidence 扣分后 passed 重算', () => {
       ],
       compositeScore: 0.72,
       qualityLevel: 'B',
+      reviewedArtifacts: R19_REVIEWED,
       summary: 'REQ-001 需求覆盖基本完整，采用 RBAC 权限模型，可测试，遗留风险：无，待运行时验证确认。',
       passed: true,
     };
@@ -578,6 +596,7 @@ describe('targetKind=rootcause（§7.5 V 复审根因报告）', () => {
     ],
     compositeScore: 0.876,
     qualityLevel: 'A' as const,
+    reviewedArtifacts: R19_REVIEWED,
     summary: 'RC-phase5-1-01 根因链逻辑自洽，可证伪假设成立，修复建议与预防措施可执行，V 复审结论：通过。',
     passed: true,
   };
@@ -707,6 +726,7 @@ describe('R18 端到端接线（checkVerifierOutput.reasons 消费，非仅 help
       compositeScore: 0.9,
       qualityLevel: 'A',
       passed: true,
+      reviewedArtifacts: R19_REVIEWED,
       summary: '本次评审覆盖五个子标准，全部达标，结论为 A 级可放行，无阻断性返工提示，评审方法为 logits 连续评分。',
       reworkHints: [],
     };
@@ -737,6 +757,7 @@ describe('R18 端到端接线（checkVerifierOutput.reasons 消费，非仅 help
       compositeScore: 0.9,
       qualityLevel: 'A',
       passed: true,
+      reviewedArtifacts: R19_REVIEWED,
       summary: '本次评审覆盖五个子标准，全部达标，结论为 A 级可放行，无阻断性返工提示，评审方法为 logits 连续评分。',
       reworkHints: [],
     };
@@ -786,6 +807,7 @@ describe('批次3 双轨：structuredViolations（rule/subject/fixHints）', () 
     compositeScore: 0.9,
     qualityLevel: 'A',
     passed: true,
+    reviewedArtifacts: R19_REVIEWED,
     summary: '本次评审覆盖五个子标准，全部达标，结论为 A 级可放行，无阻断性返工提示，评审方法为 logits 连续评分。',
     reworkHints: [],
   });
@@ -898,6 +920,7 @@ describe('C11 Windows 路径 evidence', () => {
     })),
     compositeScore: 0.9,
     qualityLevel: 'A',
+    reviewedArtifacts: R19_REVIEWED,
     summary: '本次评审覆盖五个子标准，全部达标，结论为 A 级可放行，无阻断性返工提示，评审方法为 logits 连续评分。',
     passed: true,
   });
@@ -929,13 +952,21 @@ describe('C16 Ajv 结构化字段优先', () => {
   it('instancePath/params.missingProperty 可用时不再依赖文案正则', () => {
     // 合成 ajv 错误对象驱动：required 错误的字段名在 params.missingProperty、父路径在 instancePath，
     // 结构化提取 = 父路径 + 缺失字段（旧文案正则只能取到 '/meta:' 前的父路径）
-    expect(ajvErrorSubject({ instancePath: '/gateExitCode', params: { missingProperty: 'runId' } })).toBe(
-      'gateExitCode.runId',
-    );
+    expect(
+      ajvErrorSubject({
+        instancePath: '/gateExitCode',
+        params: { missingProperty: 'runId' },
+      }),
+    ).toBe('gateExitCode.runId');
     // 非 required 错误：instancePath 即完整字段路径（JSON pointer → 点号形态）
     expect(ajvErrorSubject({ instancePath: '/meta/reviewedAt' })).toBe('meta.reviewedAt');
     // 根级（instancePath 空/根）无字段路径 → undefined（由调用方回退文案正则 → 'schema'，既有钉死语义不变）
-    expect(ajvErrorSubject({ instancePath: '', params: { missingProperty: 'subCriteria' } })).toBeUndefined();
+    expect(
+      ajvErrorSubject({
+        instancePath: '',
+        params: { missingProperty: 'subCriteria' },
+      }),
+    ).toBeUndefined();
     expect(ajvErrorSubject({ instancePath: '/' })).toBeUndefined();
     expect(ajvErrorSubject(undefined)).toBeUndefined();
   });
@@ -1006,6 +1037,7 @@ describe('C17 长度不符降噪', () => {
       // 其余字段全部自洽（Σ = 0.9 × 0.7 = 0.63 → C 级 → expectedPassed=false），隔离长度单因子
       compositeScore: 0.63,
       qualityLevel: 'C',
+      reviewedArtifacts: R19_REVIEWED,
       summary: '子标准数量不足的 VerifierOutput，应只报一条数量不符 violation，不叠加按下标错位比对误报。',
       passed: false,
       reworkHints: ['补齐缺失的 completeness 子标准后重新提交'],
@@ -1020,5 +1052,195 @@ describe('C17 长度不符降噪', () => {
     // 双轨同源：structuredViolations 恰 1 条
     expect(r.structuredViolations).toHaveLength(1);
     expect(r.structuredViolations?.[0]?.subject).toBe('subCriteria');
+  });
+});
+
+// ==================== A2 R19：reviewedArtifacts 评审对象绑定（批次 6 任务 4） ====================
+//
+// 红队实测穿透面：手写分数自洽（过 R18/R13）、evidence 格式合法（过 R12）的 VerifierOutput
+// 可一次通过 check-verifier-output——evidence 是纯字符串，与被评审的 S 产物零绑定。
+// R19 强制 VerifierOutput 必填 reviewedArtifacts: [{path, sha256}]，CLI 读盘复核存在性 + 哈希 +
+// 行数（deps 注入），logic 校验 evidence 归属与行号越界。
+//
+// 简报示意 helper（makeValidOutput / withReviewed）按本文件既有构造方式落地：
+// makeValidOutput = 除 reviewedArtifacts 外全部合规的最小合法形态（照「R18 端到端接线」构造），
+// withReviewed = 浅拷贝注入 reviewedArtifacts。断言语义与简报一致（R19 违规在场 + 消息含关键标识）。
+
+describe('A2 R19：reviewedArtifacts 归属校验', () => {
+  const makeValidOutput = () => ({
+    schemaVersion: '1.0',
+    meta: {
+      targetKind: 'requirement',
+      target: 'REQ-001',
+      reviewedAt: '2026-07-31T00:00:00Z',
+      agent: 'test-agent',
+      scoringMethod: 'logits',
+      repeatTimes: 3,
+      varianceThreshold: 0.1,
+    },
+    subCriteria: (
+      [
+        ['completeness', 0.3],
+        ['clarity', 0.25],
+        ['consistency', 0.2],
+        ['testability', 0.15],
+        ['traceability', 0.1],
+      ] as const
+    ).map(([name, weight]) => ({
+      name,
+      weight,
+      score: 0.9,
+      rawScores: [0.89, 0.9, 0.91],
+      variance: 0.0000667,
+      evidence: 'src/a.ts:L1-2=合规行号区间引用',
+    })),
+    compositeScore: 0.9,
+    qualityLevel: 'A',
+    passed: true,
+    summary: '本次评审覆盖五个子标准，全部达标，结论为 A 级可放行，无阻断性返工提示，评审方法为 logits 连续评分。',
+    reworkHints: [],
+  });
+  const withReviewed = (
+    out: ReturnType<typeof makeValidOutput>,
+    reviewed: Array<{ path: string; sha256: string }>,
+  ) => ({ ...out, reviewedArtifacts: reviewed });
+
+  it('无 reviewedArtifacts → 拒绝（schema required 前置拦截 + logic 双拦）', () => {
+    // schema 侧：checkVerifierOutput 前置校验（[schema] 前缀、点名 reviewedArtifacts）
+    const base = makeValidOutput();
+    const viaGate = checkVerifierOutput(base);
+    expect(viaGate.passed).toBe(false);
+    expect(viaGate.reasons.some((m) => m.includes('reviewedArtifacts'))).toBe(true);
+    // logic 侧（防仅靠 schema 单拦的直连调用方）：validateReviewedArtifacts 对空/缺登记独立报 R19
+    for (const reviewed of [undefined, []]) {
+      const out = withReviewed(base, reviewed ?? []);
+      const r19 = validateReviewedArtifacts(out as Record<string, unknown>);
+      expect(
+        r19.reasons.some((m) => m.includes('R19') && m.includes('reviewedArtifacts')),
+        `reviewedArtifacts=${JSON.stringify(reviewed)}: logic 层应独立报 R19`,
+      ).toBe(true);
+    }
+  });
+
+  it('evidence 引用未登记的路径 → R19', () => {
+    const out = withReviewed(makeValidOutput(), [{ path: 'src/a.ts', sha256: 'a'.repeat(64) }]);
+    const subCriteria = out.subCriteria as Array<{ evidence: string }>;
+    subCriteria[0]!.evidence = 'src/b.ts:L1-2=引用了未登记产物';
+    const report = checkVerifierOutput(out);
+    expect(report.passed).toBe(false);
+    expect(
+      report.reasons.some(
+        (m) => m.includes('R19') && m.includes('src/b.ts') && m.includes('未在 reviewedArtifacts 登记'),
+      ),
+    ).toBe(true);
+  });
+
+  it('evidence 行号越界（deps 注入行数表）→ R19', () => {
+    const out = withReviewed(makeValidOutput(), [{ path: 'src/a.ts', sha256: 'a'.repeat(64) }]);
+    const subCriteria = out.subCriteria as Array<{ evidence: string }>;
+    subCriteria[0]!.evidence = 'src/a.ts:L999=越界行号引用';
+    const report = checkVerifierOutput(out, {
+      lineCountsByPath: new Map([['src/a.ts', 40]]),
+    });
+    expect(report.passed).toBe(false);
+    expect(report.reasons.some((m) => m.includes('R19') && m.includes('越界'))).toBe(true);
+  });
+
+  it('行数表未注入时跳过越界检查（CLI 直连 logic 的降级语义，不误报）', () => {
+    const out = withReviewed(makeValidOutput(), [{ path: 'src/a.ts', sha256: 'a'.repeat(64) }]);
+    const report = checkVerifierOutput(out);
+    expect(report.reasons.some((m) => m.includes('越界'))).toBe(false);
+    expect(report.passed).toBe(true);
+  });
+
+  it('sha256 非 64 位十六进制 → R19（schema pattern 前置 + logic 双拦）', () => {
+    const out = withReviewed(makeValidOutput(), [{ path: 'src/a.ts', sha256: 'zz' }]);
+    // schema 侧：pattern 前置拦截，点名 sha256
+    const viaGate = checkVerifierOutput(out);
+    expect(viaGate.passed).toBe(false);
+    expect(viaGate.reasons.some((m) => m.includes('sha256'))).toBe(true);
+    // logic 侧（直连调用双拦）：validateReviewedArtifacts 独立报 R19 64 位十六进制
+    const r19 = validateReviewedArtifacts(out as Record<string, unknown>);
+    expect(r19.reasons.some((m) => m.includes('R19') && m.includes('64 位十六进制'))).toBe(true);
+  });
+
+  it('R19 其余形态（3 态：path 含 ..、path 含反斜杠、登记齐全但 evidence 双份路径其一未登记）', () => {
+    // path 含 ..（目录穿越形态）
+    const traversal = withReviewed(makeValidOutput(), [{ path: '../secrets/a.ts', sha256: 'a'.repeat(64) }]);
+    expect(
+      validateReviewedArtifacts(traversal as Record<string, unknown>).reasons.some(
+        (m) => m.includes('R19') && m.includes('POSIX'),
+      ),
+    ).toBe(true);
+    // path 含反斜杠（Windows 形态不得登记——与 valid-windows-evidence.json 的 C11 正例语义互斥）
+    const backslash = withReviewed(makeValidOutput(), [{ path: 'src\\a.ts', sha256: 'a'.repeat(64) }]);
+    expect(validateReviewedArtifacts(backslash as Record<string, unknown>).reasons.some((m) => m.includes('R19'))).toBe(
+      true,
+    );
+    // 同一输出内 §-形态 evidence 不参与绑定（跳过），登记齐全 → 零 R19
+    const sectionForm = withReviewed(makeValidOutput(), R19_REVIEWED);
+    (sectionForm.subCriteria as Array<{ evidence: string }>).forEach((sc) => {
+      sc.evidence = 'requirements.md:§3.2=章节引用不参与绑定';
+    });
+    expect(validateReviewedArtifacts(sectionForm as Record<string, unknown>).reasons).toEqual([]);
+  });
+});
+
+describe('parseEvidencePath（R19 与 evidence 归属共用提取器；R12 判定零变化）', () => {
+  it('POSIX path:Lnn / path:Lnn-nn 提取（2 态）', () => {
+    expect(parseEvidencePath('src/a.ts:L42=陈述')).toEqual({
+      path: 'src/a.ts',
+      startLine: 42,
+      endLine: 42,
+    });
+    expect(parseEvidencePath('src/a.ts:L42-58=陈述')).toEqual({
+      path: 'src/a.ts',
+      startLine: 42,
+      endLine: 58,
+    });
+  });
+
+  it('非绑定形态返回 null（5 态：§章节 / 双 L 区间 / Windows 反斜杠 / 盘符前缀 / 裸行号）', () => {
+    for (const ev of [
+      'docs/x.md:§1.1=章节引用',
+      'docs/x.md:L51-L53=双 L 区间',
+      'src\\mod\\a.ts:L3=反斜杠路径',
+      'D:\\proj\\x.ts:L1-5=盘符前缀',
+      'L5',
+      'REQ-001 §3.2',
+      undefined,
+    ]) {
+      expect(parseEvidencePath(ev), `${String(ev)}: 应返回 null`).toBeNull();
+    }
+  });
+});
+
+describe('A2 R19 CLI 负样本（samples/verifier/bad-r19-*.json，读盘三重复核）', () => {
+  it.each([
+    ['bad-r19-evidence-not-registered.json', /R19 evidence 引用未在 reviewedArtifacts 登记/],
+    ['bad-r19-artifact-hash-mismatch.json', /R19 评审对象哈希不符/],
+    ['bad-r19-line-out-of-range.json', /R19 evidence 行号越界/],
+  ] as const)('%s 经 CLI 应 exit 1 且唯一违规为 R19', async (file, pattern) => {
+    const result = await runVerifierCli(resolve(ROOT, 'w-model-dev/scripts/samples/verifier', file));
+    expect(result.code).toBe(1);
+    const report = JSON.parse(result.stdout) as { reasons: string[] };
+    expect(
+      report.reasons.some((r) => pattern.test(r)),
+      `reasons 应含 ${pattern}`,
+    ).toBe(true);
+    expect(report.reasons, '唯一违规：不得叠加其他规则违规').toHaveLength(1);
+  });
+
+  it('lib/reviewed-artifacts：登记文件不存在 → R19 文件不存在（not-exists 分支，隔离根）', async () => {
+    const { verifyReviewedArtifacts } = await import('../lib/reviewed-artifacts.js');
+    const tempDir = await mkdtemp(resolve(tmpdir(), 'verifier-r19-'));
+    try {
+      const check = verifyReviewedArtifacts([{ path: 'phantom.ts', sha256: 'a'.repeat(64) }], tempDir);
+      expect(check.reasons).toEqual([expect.stringContaining('R19 评审对象文件不存在：phantom.ts')]);
+      expect(check.lineCountsByPath.has('phantom.ts')).toBe(false);
+    } finally {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned temporary directory
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 });

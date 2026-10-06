@@ -471,6 +471,144 @@ export function validateEvidenceFormat(evidence: string[]): {
   return { valid: vagueItems.length === 0, vagueItems, formatMismatchItems };
 }
 
+// ==================== R19：reviewedArtifacts 评审对象绑定（A2，批次 6 任务 4） ====================
+
+/**
+ * logic 层依赖注入接缝（asset-authoring「注入接缝」形）：logic 保持纯函数、零 node:fs，
+ * 由 CLI（check-verifier-output.ts）读盘后注入。
+ */
+export interface VerifierDeps {
+  /** path -> 文件行数，由 CLI 读盘后注入（R19 行号越界校验用）；未注入则跳过越界检查 */
+  readonly lineCountsByPath?: ReadonlyMap<string, number>;
+}
+
+/** evidence 中 `path:Lnn[[-]nn]=` 形态的定位引用（R19 绑定校验用） */
+export interface EvidencePathRef {
+  /** POSIX 相对路径（原样截取，未做归一化） */
+  path: string;
+  /** 起始行号（`:L42` → 42） */
+  startLine: number;
+  /** 结束行号（`:L42-58` → 58；单行形态与 startLine 相同） */
+  endLine: number;
+}
+
+/**
+ * 从 evidence 字符串提取 `POSIX path:Lnn=` / `path:Lnn-nn=` 定位引用；非绑定形态返回 null。
+ *
+ * 只识别 **POSIX 相对路径**（`[\w][\w./-]*`：不含反斜杠、不含盘符前缀、不以 `..` 开头）——
+ * Windows 反斜杠 / 盘符前缀形态（C11 正例，见 samples/verifier/valid-windows-evidence.json）
+ * 与 `§章节` / 双 L 区间 / 裸行号形态一样**不参与 R19 绑定**（登记项 path 同样禁反斜杠与 `..`，
+ * 两端口径一致；已知残差：全部证据改写为 Windows 绝对路径可绕过绑定，仍受 R12/格式校验约束，
+ * 属登记的接受残差）。双 L 区间 `path:L51-L53=` 被 `=` 锚点拒绝（与 EVIDENCE_PATTERN 同口径）。
+ *
+ * 本函数为**新提取器**：R12 既有判定（R12_SPECIFIC_REF_PATTERN 具体引用判据）不经过本函数，
+ * 行为零变化（既有 R12 测试为回归证据）。
+ */
+// eslint-disable-next-line security/detect-unsafe-regex -- star height 2（(?:-\d+)? 内含 \d+）为 safe-regex 保守计数：行首 ^ 锚定 + 有界字符类 + `=` 字面锚点，回溯线性（双 L 形态被 `=` 拒绝即失败），与既有 EVIDENCE_PATTERN 同口径
+const EVIDENCE_LREF_PATTERN = /^([\w][\w./-]*):L(\d+)(?:-(\d+))?=/;
+
+export function parseEvidencePath(evidence: unknown): EvidencePathRef | null {
+  if (typeof evidence !== 'string') return null;
+  const m = EVIDENCE_LREF_PATTERN.exec(evidence.trim());
+  if (!m) return null;
+  const startLine = Number.parseInt(m[2] ?? '', 10);
+  const endRaw = m[3];
+  const endLine = endRaw === undefined ? startLine : Number.parseInt(endRaw, 10);
+  if (!Number.isFinite(startLine) || !Number.isFinite(endLine)) return null;
+  return { path: m[1] ?? '', startLine, endLine };
+}
+
+/** R19 双轨收集结果（reasons 与 structured 恒一一对应，照批次3 任务8 双轨形态） */
+export interface ReviewedArtifactsViolations {
+  reasons: string[];
+  structured: StructuredViolation[];
+}
+
+/**
+ * R19（43.0.0，A2）：评审对象绑定。堵「伪造 VerifierOutput 与 S 产物零绑定」穿透面
+ * （红队实测：分数自洽 + evidence 格式合法即可一次通过）。
+ *
+ * 判定四路：
+ *   1. 登记项 sha256 非 64 位小写十六进制 → VERIFIER-SCHEMA；
+ *   2. 登记项 path 缺失 / 含 `..` / 含反斜杠（非 POSIX 相对路径）→ VERIFIER-SCHEMA（不进 registered 集）；
+ *   3. registered 为空（缺 reviewedArtifacts / 全部条目非法）→ VERIFIER-STRUCTURE
+ *     （经 checkVerifierOutput 入口时通常已被 schema required/minItems 前置拦截，此处为直连调用方双拦）；
+ *   4. evidence 的 `path:Lnn=` 引用未登记 → VERIFIER-EVIDENCE（报告不是证据，产物才是）；
+ *      已登记且 deps 注入行数表时 endLine 越界 → VERIFIER-EVIDENCE（未注入则跳过，不误报）。
+ *
+ * 纯函数、无 I/O；导出供单元测试与直连调用方（不经 CLI 的 logic 消费者）使用。
+ */
+export function validateReviewedArtifacts(
+  out: Record<string, unknown>,
+  deps?: VerifierDeps,
+): ReviewedArtifactsViolations {
+  const reasons: string[] = [];
+  const structured: StructuredViolation[] = [];
+  const push = (reason: string, rule: VerifierRuleId, subject: string): void => {
+    reasons.push(reason);
+    structured.push(makeStructured(rule, subject, reason));
+  };
+
+  const registered = new Set<string>();
+  const rawList = out.reviewedArtifacts;
+  if (Array.isArray(rawList)) {
+    for (const [i, item] of rawList.entries()) {
+      // eslint-disable-next-line security/detect-object-injection -- item 为 Array.prototype.entries 迭代出的受控元素（非外部键索引），仅做形状收窄
+      const entry = item as Record<string, unknown> | null;
+      const entryPath = entry && typeof entry.path === 'string' ? entry.path : '';
+      const sha = entry && typeof entry.sha256 === 'string' ? entry.sha256 : '';
+      const label = entryPath === '' ? `#${i + 1}` : entryPath;
+      if (!/^[0-9a-f]{64}$/.test(sha)) {
+        push(
+          `R19 reviewedArtifacts.sha256 必须为 64 位十六进制：${label}`,
+          'VERIFIER-SCHEMA',
+          `reviewedArtifacts[${i + 1}].sha256`,
+        );
+      }
+      if (entryPath === '' || entryPath.includes('..') || entryPath.includes('\\')) {
+        push(
+          `R19 reviewedArtifacts.path 必须为不含 .. 的 POSIX 相对路径：${label}`,
+          'VERIFIER-SCHEMA',
+          `reviewedArtifacts[${i + 1}].path`,
+        );
+      } else {
+        registered.add(entryPath);
+      }
+    }
+  }
+  if (registered.size === 0) {
+    push(
+      'R19 reviewedArtifacts 至少登记 1 个评审对象（报告不是证据，产物才是）',
+      'VERIFIER-STRUCTURE',
+      'reviewedArtifacts',
+    );
+  }
+
+  const subCriteria = Array.isArray(out.subCriteria) ? (out.subCriteria as Array<Record<string, unknown>>) : [];
+  for (const [i, item] of subCriteria.entries()) {
+    // eslint-disable-next-line security/detect-object-injection -- item 为 entries() 迭代出的受控元素（非外部键索引），仅做 evidence 读取
+    const ref = parseEvidencePath(item?.evidence);
+    if (!ref) continue;
+    if (!registered.has(ref.path)) {
+      push(
+        `R19 evidence 引用未在 reviewedArtifacts 登记：${ref.path}（报告不是证据，产物才是）`,
+        'VERIFIER-EVIDENCE',
+        `subCriteria[${i + 1}].evidence`,
+      );
+      continue;
+    }
+    const lines = deps?.lineCountsByPath?.get(ref.path);
+    if (lines !== undefined && ref.endLine > lines) {
+      push(
+        `R19 evidence 行号越界：${ref.path}:${ref.endLine} > 实际 ${lines} 行`,
+        'VERIFIER-EVIDENCE',
+        `subCriteria[${i + 1}].evidence`,
+      );
+    }
+  }
+  return { reasons, structured };
+}
+
 // ==================== 主校验函数 ====================
 
 /**
@@ -493,8 +631,10 @@ export function validateEvidenceFormat(evidence: string[]): {
  *   9. passed = (qualityLevel === A || B) 且所有子标准得分 ≥ 0.70（R13 单轴下限）
  *  10. passed=false 时 reworkHints 必须非空数组
  *  11. ranking（可选）字段类型合法
+ *  12. R19（A2）：reviewedArtifacts 必填且 evidence 的 path:Lnn= 引用只能指向登记的 POSIX 路径；
+ *      行号越界校验仅在 deps 注入行数表时执行（CLI 读盘后注入，见 validateReviewedArtifacts）
  */
-export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
+export function checkVerifierOutput(raw: unknown, deps?: VerifierDeps): VerifierCheckResult {
   // === Schema 前置校验 ===
   // 结构性约束（additionalProperties / required / type）由 schema 拦截，
   // 通过后才进入下方业务规则校验（数值合理性 / 防漂移 / 权重匹配等）。
@@ -946,6 +1086,11 @@ export function checkVerifierOutput(raw: unknown): VerifierCheckResult {
   structuredViolations.push(...singleAxis.structured);
   reasons.push(...resolution.reasons);
   structuredViolations.push(...resolution.structured);
+  // R19（A2）：评审对象绑定（schema required 前置拦截缺字段形态，此处为业务层双拦 + 归属/越界判定；
+  // deps 由 CLI 读盘后注入，纯 logic 直连调用未注入时跳过越界检查）
+  const reviewed = validateReviewedArtifacts(o, deps);
+  reasons.push(...reviewed.reasons);
+  structuredViolations.push(...reviewed.structured);
 
   // 8. summary（R1 非空）
   if (typeof o.summary !== 'string' || o.summary.trim() === '') {

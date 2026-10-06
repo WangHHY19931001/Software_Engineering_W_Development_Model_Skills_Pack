@@ -669,7 +669,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 | O3  | Verifier Theater（V 子代理"looks good"但 CI 挂）     | V 评审 passed=true qualityLevel=A 但下游测试失败                  | 与 #1（跳过评审）对立面：评审走了形式                               | 强化 verifier-spec §1 设计原则：V 默认拒绝姿态（"find reasons to reject"）；V 须引用具体 evidence 非空泛；G 校验 evidence 非空 |
 | O4  | Comprehension Debt Spiral（用户橡皮图章 CHECKPOINT） | 用户对所有 CHECKPOINT 输入"确认"无修改意见；阶段产物无人理解      | 与 F5（sycophantic）互补：F5 是 Agent 奉承用户，O4 是用户奉承 Agent | 理解证据机制（§10.6 第六维度）：放行前须填 acknowledgedDecisions ≥1 关键决策；空确认视为 O4 命中                               |
 | O5  | Cognitive Surrender（"循环处理了"无设计意见）        | 用户放弃对设计/架构的意见；全权委托 Agent                         | 与 §4A.1 第 3 条（Push Back）对立面                                 | 阶段 2/4 设计 CHECKPOINT 强制用户提出 ≥1 修改意见或替代方案；无意见视为 O5 命中                                                |
-| O6  | Escalation Failure（attempt cap 触发但无人被通知）   | 返工达 maxReworkRounds 但用户未被告知；循环卡死                   | 与 #8（越过 CHECKPOINT）互补：#8 是显式越过，O6 是隐式卡死          | attempt cap 触发 → run-log append escalate 记录 + 强制 🔴 CHECKPOINT 展示返工历史                                              |
+| O6  | Escalation Failure（attempt cap 触发但无人被通知）   | 返工达 maxReworkRounds（perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载（D-4a 累计口径））但用户未被告知；循环卡死                   | 与 #8（越过 CHECKPOINT）互补：#8 是显式越过，O6 是隐式卡死          | attempt cap 触发 → run-log append escalate 记录 + 强制 🔴 CHECKPOINT 展示返工历史                                              |
 
 > O 系列命中不回退，但应在 run-log 的 `operationalFailureModes` 字段标注（如 `"operationalFailureModes": ["O1"]`；`note` 中的 O1~O6 字样按引用处理——如 O3 同时是评审规则编号，不计入 R5），并在阶段产物「备注」节或评审报告 reworkHints 中记录。O4/O5 直接关联 CHECKPOINT 有效性，命中时拒绝放行。
 
@@ -1160,16 +1160,16 @@ LLM-as-a-Verifier 评审由外部 Agent 按提示词执行，**本节不再定�
 
 要点：
 
-- **链式约束**：`prevSigId` 指向同阶段前一环签名；`sigHash = sha256(sigId + phase + role + action + runId + artifacts + prevSigHash + signedAt + signer + inputProvenance)`；首环 `prevSigId = "genesis"`，`prevSigHash = "0"`。
-- **sigHash 公式版本化 `sigHashAlgo`（可选字段，批次 3/D6）**：`SignatureChainEntry` 增 `sigHashAlgo?: 'v1' | 'v2'`，**字段缺失按 v1**——历史链按 v1 公式（上式）重算，零破坏。v2 公式：`sha256(sigId|phase|role|action|runId|artifactsV2|prevSigHash|signedAt|signer|inputProvenance)`，其中 `artifactsV2 = JSON.stringify({ artifacts, sourceArtifacts })`（两产物清单整体、含 sha256，纳入公式）；`computeSigHash` 按 `entry.sigHashAlgo ?? 'v1'` 分流。`SourceArtifact` 增 `sha256?: string`（64-hex；v2 链必填，v1 链忽略）。校验器（check-signature-chain / signature-chain-logic）：R6 按 algo 分流重算（v1 条目行为与现状逐字节一致）；新规则 **R11**：`sigHashAlgo === 'v2'` 的条目，`inputProvenance.sourceArtifacts[]` 每条 `sha256` 必填且匹配 `^[a-fA-F0-9]{64}$`，v1 条目不触发 R11。**增益边界（知情声明，D6 已裁定接受）**：v2 使「字节声明」不可抵赖（篡改声明字段→R6 重算失败）并为未来自动核查铺路；「声明 vs 真实字节」的自动核查需 gate-log 索引基建，本批不建、登记后续。
+- **链式约束**：`prevSigId` 指向同阶段前一环签名；`sigHash = sha256(sigId|phase|role|action|runId|artifacts|sourceArtifacts|prevSigHash|signedAt|signer|inputProvenance|targetKind|gateExitCode|gateLogPath)`（43.0.0 v3 单公式，14 字段全量入哈希；首环 `prevSigId = "genesis"`，`prevSigHash = "0"`）。
+- **sigHash 公式版本 `sigHashAlgo`（v3 起必填）**：唯一合法值 `'v3'`——43.0.0 单公式（breaking）：14 字段全量入哈希（相对旧公式新纳入 targetKind / gateExitCode / gateLogPath，关闭「targetKind 单字段洗白 R9 违规」穿透面）。**v1/v2 分流重算已删除**（用户裁定：毁弃存量，不迁移）——`sigHashAlgo` 非 `'v3'`（含缺省）条目由 schema 前置拒绝 + R6 兜底一律违规。`SourceArtifact.sha256`（64-hex）由 **R11** 对全量条目校验（不再按 `sigHashAlgo` 分流豁免）。历史（v1/v2 公式与按 algo 分流语义，批次 3/D6 引入、43.0.0 删除）见 CHANGELOG 与决策日志 `rounds-48-trust-chain`。
 - **角色签名顺序**（强制链）：`genesis → O(chunk) → A(cross) → S(produce) → V(review) → G(gate) → O(checkpoint-用户确认)`；阶段 5 无 A，阶段 6-8 视具体阶段调整。
 - **产出来源正确性**（`inputProvenance`）：各角色产出须声明上游签名 + 上游产物 + 变换描述；强制来源/禁止来源矩阵见 [`signature-chain-guide.md`](../w-model-dev/references/signature-chain-guide.md) §3。
-- **返工链语义分类 `targetKind`（可选字段，D-1）**：`rootcause`（该环复审 R 报告）/ `preventive`（该环为 R3 预防性审查）/ `iceberg`（该环为冰山扫掠报告）/ `standard`（缺省即此值——既有链无该字段时走 standard 路径，行为不变）。**不入 sigHash**：上式哈希输入不含该字段，带与不带 `targetKind` 的同一环 sigHash 相同。注意其与 run-log schema 的同名 `targetKind`（requirement/design/code/test 等词表）是**不同 schema 中的不同词表**，重叠值仅 `rootcause` 且语义一致。
+- **返工链语义分类 `targetKind`（可选字段，D-1）**：`rootcause`（该环复审 R 报告）/ `preventive`（该环为 R3 预防性审查）/ `iceberg`（该环为冰山扫掠报告）/ `standard`（缺省即此值——既有链无该字段时走 standard 路径，行为不变）。**43.0.0 v3 起入 sigHash**：哈希输入含该字段，无痕改写 `targetKind` 即被 R6 抓获（红队实验 2 证实的「单字段洗白」穿透面已封堵；旧「不入 sigHash」表述随 v1/v2 分流删除一并作废）。注意其与 run-log schema 的同名 `targetKind`（requirement/design/code/test 等词表）是**不同 schema 中的不同词表**，重叠值仅 `rootcause` 且语义一致。
 - **R9 返工来源三例外（D-1，role×action×targetKind 三元判定）**：`FORBIDDEN_SOURCE_ROLES` 禁止矩阵在以下三种**具名例外**下放行（权威实现 `signature-chain-logic.ts` `isAllowedSource`；其余组合一律仍拒，违规文案不变）：
 
   | 例外               | 条件（三者须同时成立）                                   | 设计依据                                                         |
   | ------------------ | -------------------------------------------------------- | ---------------------------------------------------------------- |
-  | S-fix 消费 R       | `role=S` ∧ `srcRole=R` ∧ `action ∈ {fix, emergency-fix}` | S-fix 必须携带 R 报告执行返工修复（反模式 #18 守护）             |
+  | S-fix 消费 R       | `role=S` ∧ `srcRole=R` ∧ `action=fix` | S-fix 必须携带 R 报告执行返工修复（反模式 #18 守护；批次 6 A15：emergency-fix 死词已删除）             |
   | V 复审 R 报告      | `role=V` ∧ `srcRole=R` ∧ `targetKind=rootcause`          | V 复审 RootCauseReport（返工链 V→G 必经环节，反模式 #19 守护）   |
   | R 预防性审查消费 S | `role=R` ∧ `srcRole=S` ∧ `targetKind=preventive`         | R3 预防性审查须以 S 产物为输入（独立定位与预防性审查是两类动作） |
 
@@ -1741,6 +1741,8 @@ R10 维护契约（docs-consistency source×clause 语义门）：
 ### 10C.5 maturity.json Schema
 
 > 编排者 O 在项目初始化（`/wm analyze` 首次）时创建，类比 `project.json`/`rtm.json`/`budget.json`。schema 权威定义见 [`data-models.md`](../w-model-dev/references/data-models.md)。
+>
+> **43.0.0 A4**：`unlockConditions`（无计算器指标）与 `downgradeTriggers.budgetBurnRateExceeded` / `downgradeTriggers.checkpointRejectionStreak` 预留死字段已自 schema 删除（毁弃存量；`downgradeTriggers` 本身保留：`operationalFailureStreak` + `userRequested`）；解锁条件降级为 operational-recovery.md 文档层语义，**无机器校验**。level 的机器消费点（TLA+/BDD 豁免）须 `role=human / targetKind=maturity` 签名链审批（`verifyMaturityApproval`，fail-closed，见 §10C.6）。
 
 ```typescript
 interface MaturityConfig {
@@ -1748,13 +1750,6 @@ interface MaturityConfig {
   projectId: string;
   level: 'L0' | 'L1' | 'L2' | 'L3';
   leveledUpAt: string;
-  unlockConditions: {
-    stableDays: number;
-    completedCycles: number;
-    attemptCapRate: number;
-    misjudgeRate: number;
-    operationalFailures: number;
-  };
   history: Array<{ from: string; to: string; at: string; reason: string }>;
   downgradeTriggers: {
     operationalFailureStreak: number;
@@ -1771,7 +1766,7 @@ interface MaturityConfig {
 2. 识别当前 CHECKPOINT 类型（决策型 / 操作型 / 阶段门放行）
 3. 查 L0~L3 放行矩阵：✅ 等用户 → 执行 CHECKPOINT 暂停；⚡ 自动放行 → 跳过暂停，run-log append 记录（仅操作型适用；阶段门放行在任何级别都等用户，硬约束 #2）
 4. 检查高风险路径（仅 L3）：命中高风险路径表 → 即使 L3 也强制决策型 CHECKPOINT
-5. 升级判定（每次阶段 8 完成后）：汇总 unlockConditions，若全部达标 → 询问用户是否升级（决策型 CHECKPOINT，不可自动升级）
+5. 升级判定（每次阶段 8 完成后）：按解锁条件文档语义（operational-recovery.md「升级与降级」，43.0.0 A4 起 unlockConditions 字段已自 schema 移除、无机器校验）询问用户是否升级（决策型 CHECKPOINT，不可自动升级）；用户确认后 O 须以 `role=human / targetKind=maturity` 条目落签名链（绑定 maturity.json），gate 消费 level 前经 `verifyMaturityApproval` 校验（无链即不豁免，fail-closed）
 6. 降级判定（每次 O 系列失败模式命中后）：若 operationalFailures ≥ downgradeTriggers.operationalFailureStreak → 自动降级到 L0（R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）
 
 **关键约束**：
@@ -1782,14 +1777,19 @@ interface MaturityConfig {
 - **升级不可自动**：升级是决策型 CHECKPOINT，须用户显式确认。
 - **降级可自动**：O 系列失败模式连续命中触发自动降级回 L0（R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）。
 
-### 10C.7 阶段完成计数与强制校验（check-maturity.ts）
+### 10C.7 阶段完成计数与强制校验（check-maturity.ts）【43.0.0 已退役】
 
-> 本节确立阶段完成计数的强制校验。
-> 实现位置：[`w-model-dev/scripts/cli/check-maturity.ts`](../w-model-dev/scripts/cli/check-maturity.ts)（CLI 校验，确定性无 LLM）。
-
-- **阶段完成计数强制递增**：项目每完成一阶段（run-log.jsonl 追加 `action=checkpoint` 且 `outcome=success` 记录后），编排者 O 须将 `maturity.json.unlockConditions.completedCycles` +1；漏更 → 计数滞后。
-- **check-maturity.ts 强制校验**：`check-maturity.ts` 须交叉校验 `maturity.json.unlockConditions.completedCycles` 与 run-log.jsonl 中 `action=checkpoint ∧ outcome=success` 记录数——`completedCycles < 实际 checkpoint success 数` 即滞后 → 退出码 1。
-- **滞后即不放行**：校验发现计数滞后时，编排者 O 不得放行当前阶段门（反模式 #9 谎报状态守护）；须先补更 `completedCycles` 再重跑校验至退出码 0。
+> 本节确立的阶段完成计数强制校验**已随 43.0.0 A4（批次 6 信任链修复）退役**：unlockConditions
+> （含 completedCycles）被审计证实为无计算器/零消费死字段，已自 schema 与 check-maturity.ts 删除
+> （原 R3 周期换算校验随之退役，规则号不回收；决策日志 `docs/changes/decision-log/rounds-48-trust-chain.md`）。
+> 阶段完成计数的事实源仍为 run-log 的 `action=checkpoint ∧ outcome=success` 记录（check-run-log R1/R11 承担）；
+> 成熟度侧的机器防线改为 **R6 history 链一致性**（from==上一条 to / to 严格高于 from / 末条 to 不低于
+> level——修复轮 1 放宽：降级后 level 低于末条合法，只锁伪造升级，见 §10R）
+> 与 **level 变更 human 签名链审批**（`verifyMaturityApproval`，fail-closed）。历史条目存档如下，不再生效：
+>
+> - ~~阶段完成计数强制递增：编排者 O 须将 `maturity.json.unlockConditions.completedCycles` +1~~
+> - ~~check-maturity.ts 交叉校验 completedCycles 与 checkpoint success 计数，滞后即退出码 1~~
+> - ~~滞后即不放行：校验发现计数滞后时，编排者 O 不得放行当前阶段门（反模式 #9 谎报状态守护）~~
 
 ---
 
@@ -1818,12 +1818,9 @@ interface BudgetConfig {
   updatedAt: string;
   perPhase: {
     maxTokens: number;
-    maxSubagentSpawns: number;
-    maxReworkRounds: number;
   };
   project: {
     maxTokensTotal: number;
-    maxTokensPerSession: number;
   };
   onExceed: 'pause' | 'notify' | 'halt';
   killSwitch: {
@@ -1833,6 +1830,8 @@ interface BudgetConfig {
   };
 }
 ```
+
+> 43.0.0 A5：`perPhase.maxSubagentSpawns` / `perPhase.maxReworkRounds` / `project.maxTokensPerSession` 三个零消费死字段已删除（审计证实无任何门禁脚本消费）；旧数据携带这些字段被 `additionalProperties:false` 拒绝（毁弃存量，不兼容）。阶段返工轮次上限由 `killSwitch.consecutiveReworks`（D-4a 口径）与分层反馈回路（L0-L4）承载。
 
 - `onExceed=pause`：暂停后续子代理分派，🔴 CHECKPOINT · 预算告警，等用户决定（增预算/降范围/取消）
 - `onExceed=notify`：仅在 run-log 记录告警，继续执行（适合 L2+ 自主度）
@@ -1851,34 +1850,22 @@ interface RunLogEntry {
   action:
     | 'chunk'
     | 'cross'
-    | 'evolve'
     | 'produce'
     | 'review'
     | 'gate'
     | 'tla-gate'
     | 'graph-gate'
-    | 'test'
     | 'checkpoint'
-    | 'rework'
-    | 'rollback'
     | 'rootcause'
     | 'fix'
-    | 'emergency-fix'
-    | 'escalate'
     | 'r3-completeness'
     | 'r3-reliability'
     | 'r3-security'
-    | 'codegraph_query'
-    | 'opsx_explore'
-    | 'opsx_propose'
-    | 'opsx_apply'
-    | 'opsx_archive'
-    | 'ensure_deps'
+    | 'perspective'
+    | 'consensus'
     | 'iceberg-sweep'
-    | 'iceberg-review'
     | 'plan_propose'
-    | 'plan_task'
-    | 'plan_review';
+    | 'event-route';
   role: 'O' | 'A' | 'S' | 'V' | 'G' | 'R';
   duration_s: number;
   tokens: number; // 由宿主 Agent 报告实际消耗；无值时填 0 并标注 estimated:false
@@ -1895,23 +1882,22 @@ interface RunLogEntry {
   target?: string;
   round?: number;
   implementationTarget?: string;
-  variant?: 'fix' | 'emergency-fix'; // fix=S-fix 返工变体；emergency-fix=紧急修复通道（2026-09-04 起 schema 强制约束见下）
-  blocker?: string; // emergency-fix 的阻塞原因（"为何走紧急通道"审计说明，不意味跳过 R3+V+G 审查）
-  fixedLocation?: string; // fix/emergency-fix 修复位置（文件/区域），审计用
-  fixBasedOn?: string; // fix/emergency-fix 修复依据（S-self-assessment 或 R 报告 ID），审计用
+  blocker?: string; // 可选审计说明：fix 条目的返工阻断原因（「为何不走常规返工节奏」，不意味跳过 R3+V+G 审查；批次 6 A15 起 emergency-fix 已从词表删除，历史 variant 字段亦已删除，携带即被 additionalProperties 拒绝）
+  fixedLocation?: string; // fix 修复位置（文件/区域），审计用
+  fixBasedOn?: string; // fix 修复依据（S-self-assessment 或 R 报告 ID），审计用
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
 }
 ```
 
-**action 词表口径（32 值）**：`plan_propose` / `plan_task` / `plan_review` 为 superpowers 编码链新增（S-plan 计划提案 / 计划任务推进 / V 任务评审，2026-09-21 起）；`perspective` / `consensus` 为阶段 1-4 多角色讨论分析新增（A persona 视角分析 / A-lead 共识纪要逐轮留痕，2026-10-03 起，见 §10P）；`opsx_explore` / `opsx_propose` / `opsx_apply` / `opsx_archive` 同批转为 **LEGACY**（位置不变，历史记录仍可解析，新流程不再产生）。词表口径与 `data-models.md` / `conventions.md` 一致，`check-run-log.ts` 的 action-role 配对同步生效。
+**action 词表口径（18 值，批次 6 A15 收敛）**：词表为 `chunk` / `cross` / `produce` / `review` / `gate` / `tla-gate` / `graph-gate` / `checkpoint` / `rootcause` / `fix` / `r3-completeness` / `r3-reliability` / `r3-security` / `perspective`（阶段 1-4 多角色讨论分析新增，2026-10-03 起，见 §10P）/ `consensus`（同前）/ `iceberg-sweep` / `plan_propose`（superpowers 编码链新增，2026-09-21 起）/ `event-route`（Loop 3 事件接驳路由）。2026-10-06 批次 6 A15：32 值旧词表删除 15 个零真实用法死词（evolve / test / rework / rollback / emergency-fix / escalate / codegraph_query / opsx_explore / opsx_propose / opsx_apply / opsx_archive / ensure_deps / iceberg-review / plan_task / plan_review），新增 `event-route`；写入已删除值即 schema 违规。逐值职责表见 `data-models.md`「动作类型字段约束」节；词表口径与 `data-models.md` / `conventions.md` 一致，`check-run-log.ts` 的 action-role 配对同步生效。
 
-**D8 lifecycle identity contract（phase 8）：** `check-run-log.ts` 按完整 `(phase, round, reportId, targetKind, basedOnReport, implementationTarget)` 关联 lifecycle segment。rootcause R/V/G 仅相互关联同一 reportId/round/targetKind；fix、emergency-fix、implementation V/G/R3 必须显式声明并 exact 对齐 `target===implementationTarget`，且 fix/R3/V/G artifacts 包含 exact target；rootcause review 不计入 implementation V，也不满足 R3。R3 仅在同身份 `S-fix → R3 completeness/reliability/security → implementation V` 窗口计数，R8 在 segment 内校验，禁止 phase/round bucket 或 phase-wide 首索引。缺字段输出 `LEGACY_UNSCOPED`/deferred diagnostics，legacy 证据不进入 credit；生命周期机器状态统一为 `CLOSED_UNDER_CURRENT_RULES` 或 `NOT_CLOSED_NOT_PROVEN`，exit 0 仍不单独证明 closed。诊断不会修改 append-only raw JSONL。
+**D8 lifecycle identity contract（phase 8）：** `check-run-log.ts` 按完整 `(phase, round, reportId, targetKind, basedOnReport, implementationTarget)` 关联 lifecycle segment。rootcause R/V/G 仅相互关联同一 reportId/round/targetKind；fix、implementation V/G/R3 必须显式声明并 exact 对齐 `target===implementationTarget`，且 fix/R3/V/G artifacts 包含 exact target；rootcause review 不计入 implementation V，也不满足 R3。R3 仅在同身份 `S-fix → R3 completeness/reliability/security → implementation V` 窗口计数，R8 在 segment 内校验，禁止 phase/round bucket 或 phase-wide 首索引。缺字段记录不再有 legacy 吸收（批次 6 C14：`LEGACY_UNSCOPED`/deferred 诊断已删除，旧形态一律 blocking `[schema]`，无吸收绕行）；生命周期机器状态统一为 `CLOSED_UNDER_CURRENT_RULES` 或 `NOT_CLOSED_NOT_PROVEN`，exit 0 仍不单独证明 closed。诊断不会修改 append-only raw JSONL。
 
-**variant / blocker 与坏行语义（2026-09-04 audit-gate-closure，schema 强制）**：`action=emergency-fix` 强制 `variant=emergency-fix` 且 `blocker` 非空（`variant=emergency-fix` 同样强制 `blocker`）；`action=fix` 的 `variant` **可选**——出现则必须为 `"fix"`（向后兼容 variant 规则引入前的 fix 记录）。缺 identity 字段的历史行（含双 legacy：同时缺 identity 与 variant/blocker 的旧 emergency-fix 行，经合并 legacy 谓词吸收）走 `LEGACY_VARIANT` / `LEGACY_UNSCOPED` **非阻断** diagnostic；已声明 `variant` 却缺 `blocker`、或 variant 值不符 const，属真实不一致 → blocking `[schema]`（吸收不覆盖）。`check-run-log.ts` 的 parseErrors 从纯 diagnostics **并入 blocking violations**：run-log 为空、空白、malformed-only 或 valid+malformed 一律 exit 1（坏行使输入不完整、可能丢失证据，fail-closed），消息保留 `PARSE_INCOMPLETE` 前缀；`checkRunLog([])` 返回 `passed=false` + `NOT_CLOSED_NOT_PROVEN`。action-role 配对由 logic 层 blocking 强制：`r3-*`→R、`fix`/`emergency-fix`/`produce`→S、`review`→V、`gate`/`tla-gate`/`graph-gate`→G。`preventive-review.schema.json` 同步新增条件约束：`passed=false ⇒ findings ≥1`（schema 强制 `findings.minItems=1`，防止无发现的失败审查被空 findings 掩盖）。
+**variant / blocker 与坏行语义（2026-09-04 audit-gate-closure 引入；批次 6 A3/C14 + A15 后的现状）**：schema 已无 `variant` 字段（批次 6 A3/C14 删除，携带即被 additionalProperties 拒绝）；`emergency-fix` 动作已随批次 6 A15 从 18 值词表删除（携带即 schema 违规），其 `blocker` 条件强制随之删除——`blocker` 降级为 `fix` 记录的可选审计说明（「为何走紧急通道」，不意味跳过 R3+V+G 审查）。携带已删除 action 死词或 `variant` 字段的记录属真实不一致 → blocking `[schema]`（无吸收绕行）。`check-run-log.ts` 的 parseErrors 从纯 diagnostics **并入 blocking violations**：run-log 为空、空白、malformed-only 或 valid+malformed 一律 exit 1（坏行使输入不完整、可能丢失证据，fail-closed），消息保留 `PARSE_INCOMPLETE` 前缀；`checkRunLog([])` 返回 `passed=false` + `NOT_CLOSED_NOT_PROVEN`。action-role 配对由 logic 层 blocking 强制：`r3-*`→R、`fix`/`produce`→S、`review`→V、`gate`/`tla-gate`/`graph-gate`→G。`preventive-review.schema.json` 同步新增条件约束：`passed=false ⇒ findings ≥1`（schema 强制 `findings.minItems=1`，防止无发现的失败审查被空 findings 掩盖）。
 
 **R3/R7 配对接受 V 重发记录（D-2，2026-09-21）**：VerifierOutput / 预防性报告等 V 自有产物类缺陷由 V 重发其自有产物修复，此时不存在 S-fix 记录。`checkRunLog` 的 R3 rootcause↔fix 一一对应与 R7 返工时序（legacy phase<8 路径）将满足以下全部门的记录**等价视为一次成功修复证据**：`action=review` ∧ `role=V` ∧ `outcome=success` ∧ `basedOnReport` 非空（引用被修 R 报告的 `reportId`）∧ `artifacts` 非空且**每一项**均以 V 自有目录前缀（`.w-model/verifier-outputs/` / `.w-model/v-reviews/` / `.w-model/preventive-reviews/`）之一开头。缺 `basedOnReport`、artifacts 非 V 前缀或 `outcome≠success` 不充数（配对违规照常报出）；phase 8 严格分支不受影响，仍只接受 S-fix 精确身份证据。详见 [`subagent-delegation.md`](../w-model-dev/references/subagent-delegation.md)「V 重发 = 修复证据」节。
 
-**legacy 吸收共享谓词（D-5，2026-09-21）**：`run-log-logic.ts` 导出 `isLegacyAbsorbableEntry`，`check-run-log` 与 `check-checkpoint` 两门对同一条 legacy 记录复用**同一**吸收判定（此前 checkpoint 门持有一份漂移副本，可能对同一行一台 absorbing、另一台 blocking）；真实 schema 错误仍 blocking，吸收只覆盖可容忍缺失。
+**legacy 吸收共享谓词（D-5，2026-09-21）【已随批次 6 43.0.0 移除】**：`run-log-logic.ts` 的 `isLegacyAbsorbableEntry` 共享吸收谓词与 `check-run-log` / `check-checkpoint` 两门的 legacy 吸收判定**已删除**（C14：legacy 吸收诊断取消，`variant` 字段一并删除——旧形态记录一律 blocking `[schema]`，真实不一致无吸收绕行；决策日志 `rounds-48-trust-chain`）。本段仅存历史，不再生效。
 
 **R11 阶段 1 自举豁免（D-6，2026-09-21）**：`check-checkpoint.ts` 自身要求 run-log 中已存在 checkpoint 记录才可能 exit 0，故其成功 gate 记录必然晚于本阶段放行——严格「早于放行」在首阶段构成自举死锁（先跑门则门红，先放行则 R11 红）。`phase===1` 时该脚本**新增**后置窗口 `(releaseAt, nextReleaseAt)`——**判据（窗口边界、同毫秒与无上界形态）见 [`operational-recovery.md`](../w-model-dev/references/operational-recovery.md)「阶段 1 自举豁免」节（R11 后置窗口，D-6），本文件不重复枚举**；后置窗口是**增补**而非替换——早于放行的同脚本记录照旧充数（既有 run-log 不受影响）；窗口只放宽时间轴，记录仍须属本阶段（phase 相同、`role=G`、`gateExitCode=0`）。其余四脚本与 phase≥2 的放行判据完全不变（例外只此一处）。**E-2 修正案后的定性（2026-09-22，历史日志兼容）**：E-2 方案 B（R0 首阶段自举形态，§10.6 6.0）使自然时序（**阶段门放行三步顺序**，枚举见 [`SKILL.md`](../w-model-dev/SKILL.md)「阶段门放行三步」）合法，新建项目常态满足五门严格早于放行、不再产生后置形态——本窗口降级为**历史日志兼容形态**（删除会使以旧时序写入的历史 run-log 变红，故保留判据）。原「已知张力（契约边界）」（后置 gate 记录与 R8 轨迹模板冲突，R11 豁免不放宽 R8，`check-run-log.ts` 会同时报 R8 三条）就此消解为预期反伪造语义：后置形态仍被 R8 拦截，不得据此回退、改写记录或伪造时间戳（详见 [`operational-recovery.md`](../w-model-dev/references/operational-recovery.md)「阶段 1 自举豁免」节（R11 后置窗口，D-6））。
 
@@ -1925,7 +1911,7 @@ interface RunLogEntry {
 | 每次子代理分派返回后             | append 一条 RunLogEntry（action 对应角色动作）                                                  |
 | 每个门禁脚本执行后               | append 一条 RunLogEntry（gateExitCode 填实际退出码）                                            |
 | 每个 🔴 CHECKPOINT 放行后        | append 一条 RunLogEntry（action=checkpoint，acknowledgedDecisions 填用户输入）                  |
-| 每次返工/回退后                  | append 一条 RunLogEntry（action=rework/rollback，note 填原因）                                  |
+| 每次返工/回退后                  | append 一条 RunLogEntry（action=fix，note 填原因；批次 6 A15：rework/rollback 死词已删除，返工事件载体为 fix）          |
 | 预算检查点（每阶段门后）         | 读 budget.json + 累计本阶段 run-log tokens，若超 maxTokens 或触发 killSwitch → 按 onExceed 处置 |
 
 > **顺序纪律交叉引用（D-4/D-8，2026-09-27 清收批补）**：本表「每个 🔴 CHECKPOINT 放行后」动作须遵循**阶段门放行三步顺序**（三步枚举与放行判据见 [`SKILL.md`](../w-model-dev/SKILL.md)「阶段门放行三步」）；机器核验见 `check-run-log` R11（§10D.7），唯一例外登记见 §10.6。
@@ -1936,14 +1922,15 @@ interface RunLogEntry {
 
 1. 读取 budget.json
 2. 汇总 run-log.jsonl 中本阶段（phase=N）所有记录的 tokens 总和 = phaseTokensUsed
-3. 汇总 run-log.jsonl 中本阶段 subagentSpawns 总和 = phaseSpawns
-4. 汇总 run-log.jsonl 中全项目 tokens 总和 = projectTokensUsed
-5. 判定：超 maxTokens / maxSubagentSpawns / maxTokensTotal → 触发告警；killSwitch 任一条件满足 → 触发 kill switch
-6. 按 onExceed 处置：pause（🔴 CHECKPOINT）/ notify（run-log 记录）/ halt（回退阶段起点）
+3. 汇总 run-log.jsonl 中全项目 tokens 总和 = projectTokensUsed
+4. 判定：超 maxTokens / maxTokensTotal → 触发告警（用量实效 R6/R5-b，D-4b）；killSwitch 任一条件满足 → 触发 kill switch
+5. 按 onExceed 处置：pause（🔴 CHECKPOINT）/ notify（run-log 记录）/ halt（回退阶段起点）
+
+> 43.0.0 A5：原步骤 3「汇总 subagentSpawns = phaseSpawns」及步骤 5 判定枚举中的 `maxSubagentSpawns` 已随该死字段退役删除——子代理分派次数从未有任何门禁消费（审计证实零消费）。
 
 ### 10D.6 关键约束
 
-- **不引入 LLM 估算**（约束 4）：tokensEstimate 由宿主 Agent 报告实际消耗（estimated=false）；estimated=true 违反约束4，应避免。
+- **不引入 LLM 估算**（约束 4）：tokensEstimate 由宿主 Agent 报告实际消耗（estimated=false）；estimated=true 违反约束4，`check-run-log.ts` R2 对其报 blocking 违规（43.0.0 A5 违规化），须回填真实运行结果。
 - **预算检查不替代门禁脚本**（反模式 #3/#6）：预算超限触发的是暂停/告警，不是放行/否决；放行仍由 G 子代理退出码决定。
 - **kill switch 是暂停不是终止**：触发 kill switch 后须 🔴 CHECKPOINT 展示消耗明细，由用户决定增预算/降范围/取消。
 - **run-log 是 append-only**：不得修改历史记录；运行时读取不得以「跳过坏行继续」处置——坏行的唯一合法出口是法定重建程序（CHECKPOINT 批准 → 快照 → 仅剔坏行重写 → `rebuild-of:` 追加记录 → 复跑门禁；见 `w-model-dev/references/operational-recovery.md`「run-log 坏行法定重建程序」节），且门禁对空/坏行 **fail-closed**（见 §10D.8），不得把坏行静默当作证据缺失放行。
@@ -1954,13 +1941,13 @@ interface RunLogEntry {
 > 本节确立强制校验项。
 > 实现位置：[`w-model-dev/scripts/cli/check-budget.ts`](../w-model-dev/scripts/cli/check-budget.ts) + [`w-model-dev/scripts/cli/check-run-log.ts`](../w-model-dev/scripts/cli/check-run-log.ts)（CLI 校验，确定性无 LLM）。
 
-- **预算更新时戳**：每个阶段门放行前，`budget.json.updatedAt` 须更新为当前时间戳（证明预算检查已执行，非沿用历史值）；未更新 → `check-budget.ts` 退出码 1。
+- **预算更新时戳**：每个阶段门放行前，`budget.json.updatedAt` 须更新为当前时间戳（证明预算检查已执行，非沿用历史值）；`budget.updatedAt` **早于** `project.updatedAt`（预算未随项目演进复核）→ `check-budget.ts` 退出码 1（43.0.0 A5 顺序化：相等合法，毫秒比较，任一端不可解析跳过该子判定并出非阻断诊断）。
 - **killSwitch 告警**：killSwitch 任一触发条件满足（`consecutiveReworks` / `budgetBurnRate` / `tlaReworks`）时须产出告警（run-log 记录 + 🔴 CHECKPOINT 展示消耗明细），不得静默；`check-budget.ts` 校验 killSwitch 触发但 run-log 无对应告警记录 → 退出码 1。
-- **killSwitch 返工计数口径（D-4a，对齐真实事件）**：`check-budget.ts` 的 `reworkCount` 按**真实事件**累计——`action ∈ {rework, fix, emergency-fix}` **或** `outcome ∈ {fail, rework}` 的记录各计 1 条（`countReworks` 已导出以供测试）；它是「返工事件 + 未过门事件」的**累计**条数而非「连续 N 轮返工」的滑动窗口，`consecutiveReworks` 实际约束的是本阶段累计阈值（字段名沿用 schema，语义以本口径为准）；若提供 `--phase=N` 则只统计 `phase===N` 的记录。`tlaReworkCount` 为其中 note/target 含 TLA 的子集（未扩大 tla 判据：非返工记录即使提及 TLA 也不计入）。背景：真实 8 阶段调测的 run-log 中 `action=rework` 一条都没有（返工以 fix/fail 记录），旧口径只数 `action=rework` 会让护栏静默失灵。
+- **killSwitch 返工计数口径（D-4a，对齐真实事件）**：`check-budget.ts` 的 `reworkCount` 按**真实事件**累计——`action=fix`（批次 6 A15：rework/emergency-fix 死词已删除，返工事件载体为 fix）**或** `outcome ∈ {fail, rework}` 的记录各计 1 条（`countReworks` 已导出以供测试）；它是「返工事件 + 未过门事件」的**累计**条数而非「连续 N 轮返工」的滑动窗口，`consecutiveReworks` 实际约束的是本阶段累计阈值（字段名沿用 schema，语义以本口径为准）；若提供 `--phase=N` 则只统计 `phase===N` 的记录。`tlaReworkCount` 为其中 note/target 含 TLA 的子集（未扩大 tla 判据：非返工记录即使提及 TLA 也不计入）。背景：真实 8 阶段调测的 run-log 中 `action=rework` 一条都没有（返工以 fix/fail 记录），旧口径只数 `action=rework` 会让护栏静默失灵。
 - **用量实效校验 R6 + burnRate 告警 R5-b（D-4b）**：预算配置合法 ≠ 用量在预算内。`check-budget.ts --run-log=<path>` 从 run-log 累计 tokens（只计有限非负数的 `tokens` 字段，坏值剔除否则 Σ 变 NaN 而判定静默永不触发），Σtokens(阶段) 严格大于 `perPhase.maxTokens` 或 Σtokens(全量) 严格大于 `project.maxTokensTotal` → **blocking（退出码 1）**（消息以 `R6：` 开头并附超限占比；恰等于上限不算超限）；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` → killSwitch 用量告警（消息以 `R5-b：` 开头，与 R5 既有返工/TLA 文案区分）。**未接线不静默（D-5②/N-6）**：未提供 `--run-log` 时 R5 触发检测与 R6/R5-b 一并跳过（退出码行为与新增前一字不变），但**不再静默**——CLI 输出非阻断诊断（跳过不等于通过）；故**权威调用表必带** `--run-log=.w-model/run-log.jsonl --phase=N`，不带接线属未接线运行。**Σtokens 为上界口径（宁严不松）**：同一分派的多条归账重复累计、判超限不去重——分组键与键守卫、疑似重复归账诊断、R3 三条目归账约定以及 Σtokens=0 / 读取失败两条边界的完整口径，见 `w-model-dev/references/data-models.md`「用量实效校验」段（R6）与其「Σtokens 为上界口径」条。
 - **运行日志 4 类动作完备**：每个阶段 run-log.jsonl 须含 `chunk` / `cross` / `gate` / `checkpoint` 4 类动作记录（阶段 1–4 ingestion 含 `chunk`/`cross`；所有阶段含 `gate`/`checkpoint`）；缺类 → `check-run-log.ts` 退出码 1。
-- **返工须有 rework 记录**：任一返工发生后，run-log 须追加 `action=rework` 记录（`note` 填原因）；返工发生但无 `rework` 记录 → `check-run-log.ts` 退出码 1。
-- **R8 相对顺序约束（同生命周期段内动作链序）**：`check-run-log.ts` 对 phase 8 按 identity segment 校验 **S-fix → R3×3 → implementation V → implementation G → checkpoint**，rootcause R/V/G 不混入实现链；legacy 缺身份记录输出 `LEGACY_UNSCOPED`/deferred，不用 phase-wide 首索引、最近记录或集合数量补齐。其他阶段保留兼容的阶段级轨迹校验。真实顺序缺失仍返回退出码 1。
+- **返工须有 fix 记录**：任一返工发生后，run-log 须追加 `action=fix` 记录（`note` 填原因；批次 6 A15：原 `rework` 死词已删除，返工事件载体为 fix）；返工发生但无 fix 记录 → R3/R7 配对校验报出。
+- **R8 相对顺序约束（同生命周期段内动作链序）**：`check-run-log.ts` 对 phase 8 按 identity segment 校验 **S-fix → R3×3 → implementation V → implementation G → checkpoint**，rootcause R/V/G 不混入实现链；legacy 缺身份记录不再吸收（批次 6 C14：`LEGACY_UNSCOPED`/deferred 已删除，旧形态 blocking `[schema]`），不用 phase-wide 首索引、最近记录或集合数量补齐。其他阶段保留兼容的阶段级轨迹校验。真实顺序缺失仍返回退出码 1。
 - **编排质量指标（orchestrationQuality，只读统计，不加门禁）**：`metrics-report.ts` 在 7 区度量基础上新增 `orchestration` 子区，统计编排质量信号——`r3`（R3 预防性审查套数 / 维度分布 / findings 严重度分布，数据源 `.w-model/preventive-reviews/`）、`iceberg`（冰山扫掠轮次分布 / 新发现计数 / 严重度分布，数据源 `.w-model/iceberg/`）、`reworkHints`（V 审查返工提示密度，数据源 run-log 本身）。`r3`/`iceberg` 数据源缺失时对应子区为 `null`（不告警、不阻断）；该指标仅供汇报与诊断，不参与任何门禁放行判定。
 - **强制校验脚本**：`check-budget.ts`（预算更新时戳 + killSwitch 告警）与 `check-run-log.ts`（4 类动作 + rework 记录 + §10E 交叉校验）须在每个阶段门由 G 子代理执行；任一退出码 ≠ 0 → O 不得放行（反模式 #3/#6/#9 守护）。闭环五门（清单与调用顺序见 [`SKILL.md`](../w-model-dev/SKILL.md)「阶段门放行三步」与 [`operational-recovery.md`](../w-model-dev/references/operational-recovery.md)「调用时机」节）是否真的在每个阶段门跑过，由 `check-run-log` R11 机器核验（2026-09-18）：凡有 `action=checkpoint` 且 `outcome=success` 放行的阶段，放行前须已有五条 `role=G` / `outcome=success` / `gateExitCode=0` 的闭环脚本 gate 记录且时间戳**严格毫秒早于**放行（毫秒精度口径，DEC-3：gate 时间戳须严格毫秒早于放行记录才充数，同毫秒（含无毫秒部分的秒级时间戳，Date.parse 后相等）不算早于；官方追加器强制毫秒递增（同毫秒 +1ms 步进），毫秒序为真实信息；无时间戳豁免；无放行的 run 不触发）。**唯一例外**：`phase===1` × `check-checkpoint.ts` 的后置窗口（历史日志兼容，D-6）——判据与定性见 [`operational-recovery.md`](../w-model-dev/references/operational-recovery.md)「阶段 1 自举豁免」节（R11 后置窗口，D-6）；该例外只兼容以旧时序（先写放行记录、后补 `check-checkpoint.ts` gate 记录）写入的历史 run-log（后置形态仍被 R8 轨迹模板拦截），`phase>=2` 无此例外。
 
@@ -2438,7 +2425,7 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 | 阶段角色集矩阵 | 三行角色集（阶段 1 六角色 / 阶段 2-3 七角色 / 阶段 4 七角色，顺序=分派顺序）+ 八类视角关注面 + 与 R/V 矩阵划界（三者互不替代）+ 协议摘要 + lite 降级规则——**权威 = 本矩阵节，SSoT 本行只摘要不复制角色集** | `w-model-dev/references/agent-personas.md`「阶段角色集矩阵（A-lead 多视角分析）」节 |
 | persona 资产 ×3 | 3 份新 persona 文件（需求分析师 / 测试经理 / 算法专家），frontmatter 四字段契约（capabilities / inputs / outputs / boundaries）；另复用 5 份既有 persona（D4） | `w-model-dev/subagent/product-requirements-analyst.md` + `w-model-dev/subagent/testing-test-manager.md` + `w-model-dev/subagent/engineering-algorithm-expert.md` |
 | A-lead 协议 | A-lead = A 类 lead 变体（D5）：角色定义（只做分析协调，不产出交付物）+ 派单契约两段（终态 = 共识纪要落盘 + perspective/consensus 留痕）+ 升级路径（5 轮安全阀 → 🔴 CHECKPOINT）+ 分派模板（dispatch-matrix 登记，动作 perspective/consensus 调度） | `w-model-dev/references/subagent-delegation.md`「A-lead（多视角分析协调者，A 类 lead 变体）」节 +「A-lead 多视角分析分派模板」节 |
-| 门禁三维度 | run-log `action=perspective`（persona 非空互异）/ `action=consensus`（A-lead 逐轮）留痕；`check-role-dispatch` 阶段 1-4 三新维度 fail-closed：覆盖（`phaseRoleCoverage`：perspective persona 集 ⊇ 矩阵集）/ 时序（本阶段 produce 严格晚于全部 perspective）/ 互异（一 persona 一报告） | `w-model-dev/scripts/logic/role-dispatch-logic.ts` + `w-model-dev/scripts/cli/check-role-dispatch.ts` + `w-model-dev/schemas/run-log.schema.json`（`persona` 可选字段）+ `w-model-dev/references/conventions.md`「run-log 动作类型枚举」节（32 值） |
+| 门禁三维度 | run-log `action=perspective`（persona 非空互异）/ `action=consensus`（A-lead 逐轮）留痕；`check-role-dispatch` 阶段 1-4 三新维度 fail-closed：覆盖（`phaseRoleCoverage`：perspective persona 集 ⊇ 矩阵集）/ 时序（本阶段 produce 严格晚于全部 perspective）/ 互异（一 persona 一报告） | `w-model-dev/scripts/logic/role-dispatch-logic.ts` + `w-model-dev/scripts/cli/check-role-dispatch.ts` + `w-model-dev/schemas/run-log.schema.json`（`persona` 可选字段）+ `w-model-dev/references/conventions.md`「run-log 动作类型枚举」节（18 值） |
 | 研制要求子模板 | 阶段 1 新子模板：研制要求 DEVREQ 条目化（类别六类枚举 / 量化指标可验证 / 验证层级与判据）+ 逐条追溯 ≥1 REQ；跨阶段子模板 10 种→11 种（D3，`PHASE_SPEC_LAYOUT` 单一事实源同步） | `w-model-dev/templates/requirement-spec/development-requirements.md` + `w-model-dev/scripts/logic/gate-logic.ts` `PHASE_SPEC_LAYOUT` |
 | V 参考项 | 阶段 1-4 评审额外参考矩阵——核验共识纪要 N 视角关注面在产出中的承接（缺任一关注面承接 → 对应子标准降分依据；非独立门禁，不新增子标准名与权重） | `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 |
 
@@ -2462,6 +2449,31 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 
 - **能力分工（不得夸大）**：类型学是**登记**不是新门禁——不改变任何既有门禁判定（四级测试门禁 / BDD 门禁 / 覆盖率门禁判定口径零改动）；冒烟准入是**文档时序机制**不是机器门禁——零新脚本，执行纪律靠 O 与测试团队遵循（与派单契约同款文档机制形态，D3 知情声明），冒烟不改变四级 passed 判定；模块测试是**集成的子层**——四级门禁不变，不做四级→五级升级（D2）；协同绑定是**复用 42.11.0 多角色讨论机制**——零新角色集、零新 CHECKPOINT（D5），V 承接核验为降分参考项非独立门禁。
 - **判据披露**：D1 全量批次（四缺口一次收口）/ D2 模块测试=集成的子层 / D3 冒烟=准入机制（零新脚本）——**D1-D3 为推荐采定，用户审查设计规格可推翻**（见 [设计规格](./superpowers/specs/2026-10-04-test-systems-engineering-design.md) §1）；D4-D6 按推荐采定（类型学落点 quality-standards / 协同绑定形态 / 版本 42.12.0）；**用户指令来源：2026-10-04 用户测试系统工程规范模型指令**（单元/模块/集成/系统/验收/黑盒/白盒/冒烟/行为/边界/覆盖多目的测试，测试经理组织测试/设计/开发/需求团队在合适阶段设计；独立立项，不属五批次吸收计划）。
+
+---
+
+## 10R. 批次 6：信任链关键修复 + legacy 全清除（43.0.0）
+
+**目标**：堵死三类实测穿透面（签名链 targetKind 洗白 / 伪造 VerifierOutput / 伪造 run-log），收紧 maturity/budget 门禁钥匙，修复 TLA+/BDD 已确证 bug 与脱敏变体漏网，注入三条款与 L0 契约入包；全量清除 legacy 兼容机制（用户裁定：毁弃存量数据，不兼容）。
+
+**落点表**（完整清单见 [specs/2026-10-06-w-model-remediation-design.md](./superpowers/specs/2026-10-06-w-model-remediation-design.md) §5）：
+
+| 裁定 | 落点 |
+| --- | --- |
+| sigHash 单一 v3 公式，targetKind/gateExitCode/gateLogPath 入哈希，删 v1/v2 分流 | signature-chain-logic / signature-chain.schema |
+| VerifierOutput 必填 reviewedArtifacts；R19 evidence 归属 + CLI 哈希/行号读盘验证 | verifier-output.schema / verifier-logic / check-verifier-output |
+| R6 交叉校验默认化（gate-logs 目录约定）；legacy 吸收谓词/字段/D-6 窗口删除（R0 自举保留） | run-log-logic / checkpoint-logic / check-run-log |
+| action enum 32→18（删 15 死词（含 opsx_* 四值），增 event-route） | run-log.schema / data-models / conventions |
+| maturity level 变更须 role=human 审批链；history 链校验；删三预留死字段 | maturity-logic / maturity.schema / check-artifact-gate |
+| budget 删三零消费死字段；estimated=true 违规化（约束 #4）；R1 顺序化 | budget-logic / budget.schema / run-log-logic |
+| cfg 解析补 PROPERTIES 终止符；SANY 失败输出 notRun 单一事实 | tla-logic |
+| BDD feature 缺失 violation 化（消 fail-open） | check-bdd-model |
+| 脱敏 key 后缀匹配 | evidence-export-logic |
+| 注入三条款（§8.1/§6.2.1/V 派单禁令）；L0 契约入包 | verifier-spec / subagent-delegation / SKILL.md / quickstart |
+
+- **能力分工（不夸大）**：R6 默认化与 R19 将伪造成本从「自洽 JSON」提升到「须持有产物文件并重算哈希」，不提供密码学认证（无密钥哈希）；maturity 审批链复用签名链 v3 公式，同上。注入三条款为提示词层防御，不构建自动化守卫（维持批次 5 三不承诺）。
+- **判据披露**：验收含红队实验 1/2/3 复跑（见计划任务 17）；穿透面关闭以复跑 exit 1 为准。
+- **修复轮 1（2026-10-06 审查修复，控制者裁定记账）**：R6 第三判定由「末条 to == 当前 level」放宽为「末条 to **不低于** 当前 level」（`LEVEL_ORDER` 序比较）——降级后 level 低于 history 末条属**合法形态**。安全性依据：A4 起 TLA+/BDD 豁免须 human 审批链（`verifyMaturityApproval`），降级不再构成绕过面，R6 只锁「level 高于升级链末条」的伪造升级（to>from 链判定不变）；`verifyMaturityApproval` 审批时序由字符串比较改 **Date 解析比较**（混合时区格式 …Z vs …+08:00 下字符串比较会误判先后；任一端缺失或不可解析则跳过该子判定，与 maturity-logic R4 先例一致）。
 
 ---
 
@@ -2526,12 +2538,12 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | R3   | 时间戳单调递增                                                                                                                             | exitCode=1，标注时序异常         |
 | R4   | 签名角色与阶段角色清单匹配                                                                                                                 | exitCode=1，标注越权角色         |
 | R5   | O checkpoint 签名 signer 为用户 ID（非 O 角色）                                                                                            | exitCode=1，标注代签（O4 命中）  |
-| R6   | sigHash 重算一致（防篡改；按 `sigHashAlgo` 分流 v1/v2 公式，v1 条目行为与现状逐字节一致）                                                  | exitCode=1，标注篡改签名         |
+| R6   | sigHash 重算一致（防篡改；v3 单公式——`sigHashAlgo` 非 `v3` 一律违规，毁弃存量不迁移，43.0.0）                                              | exitCode=1，标注篡改签名         |
 | R7   | 各角色 sourceSigIds 均存在于签名链中                                                                                                       | exitCode=1，标注悬空来源         |
 | R8   | 各角色 sourceArtifacts 路径存在于磁盘（仅当解析到含 .w-model/project.json 的真实项目根时启用；独立链文件/夹具自动跳过）                    | exitCode=1，标注缺失产物         |
 | R9   | 各角色来源符合"强制来源/禁止来源"矩阵                                                                                                      | exitCode=1，标注越权消费         |
 | R10  | O checkpoint 的 sourceArtifacts 含 G gate 产物 + 用户确认记录                                                                              | exitCode=1，标注绕过门禁         |
-| R11  | `sigHashAlgo === 'v2'` 条目的 `inputProvenance.sourceArtifacts[]` 每条 `sha256` 必填且匹配 `^[a-fA-F0-9]{64}$`（v1 条目不触发；批次 3/D6） | exitCode=1，标注缺失/非法 sha256 |
+| R11  | 全量条目（43.0.0 v3 起）的 `inputProvenance.sourceArtifacts[]` 每条 `sha256` 必填且匹配 `^[a-fA-F0-9]{64}$`（不再按 `sigHashAlgo` 分流豁免） | exitCode=1，标注缺失/非法 sha256 |
 
 **跨阶段消费者校验**（`--stage=archive` 时）：
 
@@ -2576,7 +2588,7 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | 10.9 根因报告门禁                            | 返工循环 R 子代理 `RootCauseReport` 校验门禁（R1-R11：Schema 完整性 / 根因链 / 可证伪假设 / fixRecommendation / prevention / upstreamDefect / qualityLevel / reportId / 多角度 PartialReport / canonical `testing-reality-checker` confidence，legacy `reality-checker` fallback / 多角度 persona 选择矩阵合法性与第一键交集）                                 | `w-model-dev/scripts/cli/check-rootcause-report.ts`（CLI，与 `check-verifier-output.ts` 平级）+ 校验纯逻辑（单点事实源）                                                                                                                                                                                                           | 完整（G 子代理在 V 复审根因报告后跑，exitCode=0 才可分派 S-fix；守护反模式 #18/#19；详见 [根因定位者设计 spec](./superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) §4）    |
 | 10C 自主成熟度阶梯                           | L0~L3 成熟度 + CHECKPOINT 放行矩阵（决策型与阶段门放行始终 attended——阶段门放行 HOTL 固定、硬约束 #2，其余操作型按级别自动放行）+ 高风险路径强制人工 gate + maturity.json schema + 升级/降级逻辑                                                                                                                                                                                                                                | `docs/loop-engineering-adoption-design.md` §2（权威定义）+ `w-model-dev/references/operational-recovery.md`「成熟度与 CHECKPOINT 放行」节 + `w-model-dev/references/data-models.md`（maturity schema）                                                                                                                             | 完整（吸收自 cobusgreyling/loop-engineering `docs/loop-design-checklist.md` L0~L3 阶梯；不违反约束2：L1+ 自动放行是操作型 CHECKPOINT 选择性激活，非绕过，阶段门放行始终用户确认；L3 高风险路径强制人工 gate）               |
 | 10D 成本预算与运行日志                       | budget.json（perPhase/project 预算 + killSwitch + onExceed）+ run-log.jsonl（append-only 运行历史 + acknowledgedDecisions）+ 编排者预算检查逻辑                                                                                                                                                                                                                | `docs/loop-engineering-adoption-design.md` §1（权威定义）+ `w-model-dev/references/operational-recovery.md`「成本预算与运行日志」节 + `w-model-dev/references/data-models.md`（budget / run-log schema）                                                                                                                           | 完整（吸收自 cobusgreyling/loop-engineering `docs/operating-loops.md` loop-budget + loop-run-log + kill switch；不引入 LLM 估算 token，由宿主 Agent 报告实际消耗，遵守约束4）                       |
-| 10D.8 角色分派与 run-log fail-closed         | R3 三种证明路径矩阵（standard / fix-emergency identity window / 编码链 stage plan/execute/finalize 9+3）+ role-dispatch 精确语义（空/全无效 fail-closed、R3 只计 role=R 的 r3-* success、r3Missing 明细）+ run-log 空/坏行 blocking、action-role 配对、variant/blocker 与 LEGACY_VARIANT/LEGACY_UNSCOPED 吸收 + preventive-review `passed=false ⇒ findings ≥1` | `w-model-dev/references/subagent-delegation.md`（R3 矩阵 + dispatch 表）+ `w-model-dev/references/data-models.md`（run-log / preventive-review schema）+ `w-model-dev/scripts/logic/role-dispatch-logic.ts` + `w-model-dev/scripts/logic/run-log-logic.ts` + `w-model-dev/scripts/cli/check-role-dispatch.ts` / `check-run-log.ts` | 完整（R3 无条件强制与维度语义由 logic 层守护；`--r3-enabled` no-op；坏行并入 blocking 不静默）                                                                                                      |
+| 10D.8 角色分派与 run-log fail-closed         | R3 三种证明路径矩阵（standard / fix-emergency identity window / 编码链 stage plan/execute/finalize 9+3）+ role-dispatch 精确语义（空/全无效 fail-closed、R3 只计 role=R 的 r3-* success、r3Missing 明细）+ run-log 空/坏行 blocking、action-role 配对、variant/blocker 与 LEGACY_VARIANT/LEGACY_UNSCOPED 吸收——已随 43.0.0 A3/C14 移除（现 fail-closed）+ preventive-review `passed=false ⇒ findings ≥1` | `w-model-dev/references/subagent-delegation.md`（R3 矩阵 + dispatch 表）+ `w-model-dev/references/data-models.md`（run-log / preventive-review schema）+ `w-model-dev/scripts/logic/role-dispatch-logic.ts` + `w-model-dev/scripts/logic/run-log-logic.ts` + `w-model-dev/scripts/cli/check-role-dispatch.ts` / `check-run-log.ts` | 完整（R3 无条件强制与维度语义由 logic 层守护；`--r3-enabled` no-op；坏行并入 blocking 不静默）                                                                                                      |
 | 10.5.2 阶段 5-8 外部校验聚合                 | ChangeScope 绑定 + codegraph/coding-plan strict 校验聚合进 artifact gate（violations 并入 reasons/exitCode、GATE_JSON external summary、scopeProvidedButFailed 抑制误导文案）+ 归档快照为 phase 8 后置门（codingPlanSnapshot 条件项）                                                                                                                          | `w-model-dev/references/command-reference.md`（Artifact Gate 节）+ `w-model-dev/scripts/lib/change-scope.ts` + `check-codegraph-queries.ts` / `check-coding-plan.ts` / `check-archive-integrity.ts` / `check-artifact-gate.ts`（CLI，strict 一律经 resolveCliScope）                                                               | 完整（`gate-logic.ts` externalChecks 透传已删除；`check-opsx-artifacts.ts` 旧链路与其 legacy 纯逻辑已于 2026-09-21 一并退役，语义并入 `check-coding-plan.ts` R5 的 R3×9 + V×3）                     |
 | 10F 事件驱动循环（Loop 3）                   | EventIngress schema + 棕地条件性路由（L2+ 激活，事件→单阶段）+ 高风险路径强制 CHECKPOINT + 编排者路由逻辑                                                                                                                                                                                                                                                      | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §2（权威定义）+ `w-model-dev/references/event-ingress-guide.md` + `w-model-dev/references/data-models.md`（EventIngress schema）+ `w-model-dev/references/operational-recovery.md`「事件驱动与棕地维护」节                                     | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 3 Event-driven；不引入调度基础设施，消费方自行实现触发器；L2+ 激活，L0/L1 不支持；高风险路径强制 CHECKPOINT 不违反约束2）                 |
 | 10G 爬坡循环（Loop 4）                       | HarnessImprovementReport（确定性分析 run-log，无 LLM）+ 信号检测逻辑 + 触发时机 + 与外部工具边界 + 报告消费流程                                                                                                                                                                                                                                                | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §3（权威定义）+ `w-model-dev/references/hill-climbing-guide.md` + `w-model-dev/references/data-models.md`（HarnessImprovementReport schema）+ `w-model-dev/references/hard-constraints.md`「C1（候选，pending V 复审）」节                     | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 4 Hill Climbing；只产出改进信号不自动改 harness，保持"技能自演化不在本仓库"原则；外部 SkillOpt/darwin-skill 消费信号；人审后手动应用）    |
@@ -2585,6 +2597,7 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | §10O agent 威胁模型、整批否决权与迁移素材 | 威胁目录 T1-T7→既有机制映射（叙事层三不承诺）+ §7.4A 边界细化 + campaign 整批否决权/回收路径（编组语义，零新机制）+ Phase 5–8 迁移设计锚点素材（待需求输入） | `w-model-dev/references/agent-threat-model.md` + `w-model-dev/references/verifier-spec.md` §7.4A + `w-model-dev/references/quality-standards.md`「整批否决权与回收路径」节 + `w-model-dev/references/code-health-governance.md` §6 与头部指针 + 本文档 §10K.7 | 完整（纯文档批次，零新脚本零 schema；D1-D5 已裁定，见 [批次 5 设计规格](./superpowers/specs/2026-10-03-batch5-governance-narrative-design.md)） |
 | §10P 阶段 1-4 多角色讨论分析 | A-lead 按「阶段角色集矩阵」并行分派 N persona 视角分析 + 并行多轮交叉至收敛（收敛判据为主、5 轮安全阀为辅）+ 共识纪要承载（S 唯一落笔）+ run-log perspective/consensus 留痕 + `check-role-dispatch` 三新维度（覆盖 phaseRoleCoverage / 时序 / 互异）+ 研制要求子模板（子模板 10 种→11 种）+ V 覆盖核验参考项 | `w-model-dev/references/agent-personas.md`「阶段角色集矩阵」节 + `w-model-dev/subagent/` 3 新 persona + `w-model-dev/references/subagent-delegation.md`「A-lead」节 + `w-model-dev/scripts/logic/role-dispatch-logic.ts` + `w-model-dev/templates/requirement-spec/development-requirements.md` + `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 + 本文档 §10P | 完整（讨论=分析动作，语义质量归 V；D1-D9 已裁定，见 [设计规格](./superpowers/specs/2026-10-03-phase-multi-role-analysis-design.md)） |
 | §10Q 测试系统工程类型学与冒烟准入 | 类型学总登记（层级×方法×策略三维，逐维度映射左右 V 阶段与四级门禁；登记不改变任何既有门禁判定）+ 模块测试显式化（集成的子层，阶段 3 模块维度→阶段 6 前置，D2）+ 冒烟准入（阶段 6/7/8 文档时序机制，零新脚本，D3）+ 测试设计协同绑定（复用 42.11.0 多角色机制，零新角色集，D5） | `w-model-dev/references/quality-standards.md`「测试系统工程类型学」节 + `w-model-dev/references/phase-6-integration-test.md` / `phase-7-system-test.md` / `phase-8-acceptance-test.md`「冒烟准入」节 + `w-model-dev/templates/test-case.md` 冒烟列 + `w-model-dev/references/phase-1-requirements.md` / `phase-2-system-design.md` / `phase-3-outline-design.md` / `phase-4-detailed-design.md`「测试用例设计」承接句 + `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 + `w-model-dev/references/bdd.md` + 本文档 §10Q | 完整（纯文档批次，零新脚本零 schema；D1-D3 推荐采定用户可推翻，见 [设计规格](./superpowers/specs/2026-10-04-test-systems-engineering-design.md)） |
+| §10R 批次 6（43.0.0）信任链关键修复 + legacy 全清除 | sigHash 单一 v3 公式（targetKind/gateExitCode/gateLogPath 入哈希，删 v1/v2 分流）+ VerifierOutput 必填 reviewedArtifacts 与 R19 evidence 归属 + R6 交叉校验默认化（gate-logs 目录约定）+ action enum 32→18 与 legacy 吸收机制全清除 + maturity level 变更 human 审批链与 history 链校验 + budget 死字段删除/estimated 违规化/R1 顺序化 + TLA+ cfg 终止符与 notRun 单一事实 + BDD fail-open 修复 + 脱敏后缀匹配 + 注入三条款与 L0 契约入包 | `w-model-dev/scripts/logic/signature-chain-logic.ts` / `verifier-logic.ts` / `run-log-logic.ts` / `maturity-logic.ts` / `budget-logic.ts` / `tla-logic.ts` + `w-model-dev/schemas/`（signature-chain / verifier-output / run-log / maturity / budget 五份字段级修改）+ `w-model-dev/scripts/cli/check-verifier-output.ts` / `check-run-log.ts` / `check-artifact-gate.ts` / `check-bdd-model.ts` + `w-model-dev/references/verifier-spec.md` / `subagent-delegation.md` / `signature-chain-guide.md` / `operational-recovery.md` / `data-models.md` + 本文档 §10R | 完整（毁弃存量数据不兼容为用户裁定，fixtures 机械重写；伪造成本提升到「须持有产物文件并重算哈希」，不提供密码学认证；见 [修复规格](./superpowers/specs/2026-10-06-w-model-remediation-design.md) §5 与 [裁定登记](./changes/decision-log/rounds-48-trust-chain.md)） |
 | 11A 采用路径                                 | greenfield vs brownfield 引入 W 模型                                                                                                                                                                                                                                                                                                                           | `docs/adoption-guide.md`                                                                                                                                                                                                                                                                                                           | 完整（吸收自 addyosmani/agent-skills `docs/adoption-guide.md`）                                                                                                                                     |
 
 ---

@@ -71,7 +71,7 @@
 | A3 | 未决项显式登记机制 | 设计期迷雾登记册（锐利性测试判「能否精确陈述问题」+ 毕业三选一 + CHECKPOINT 强制清空） |
 | A4 | 可选能力与承诺区分 | 图内无可选语义：进入图=承诺为运行时事实，全部不变量无一豁免；P2（可以）≠可选能力 |
 | B1 | 结构化违规诊断（subject/fixHints） | 面向修复者 LLM 的符号级定位 + ≤3 条祈使句修复话术，四热点门禁先行 |
-| B2 | 内容哈希绑定实践 | sigHash 公式版本化（v1\|v2 分流、历史链零破坏）+ GATE_JSON verifiedArtifacts 字节清单——「门禁验的与消费的是同一字节」 |
+| B2 | 内容哈希绑定实践 | sigHash v3 单公式（43.0.0 起唯一，14 字段全量入哈希；v1/v2 分流已删除）+ GATE_JSON verifiedArtifacts 字节清单——「门禁验的与消费的是同一字节」 |
 | B3 | 修复范围声明实践 | fixRecommendation.scope 双数组（allowed/forbidden）强制，V scoped re-review 对照消费 |
 | B4 | 派单契约化实践 | 前置条件（O 派单前逐条自证）+ 可验证终态（第三方可复核、禁自评词）两段进 22 个分派模板 |
 | B5 | 返工轮次治理 | L0-L4 分层反馈回路收敛视图（零新增轮次数值，信号源全为既有机制与既有数值） |
@@ -111,7 +111,7 @@
 | A3 | 脚本门禁 | check-design-fog.ts R1-R6（存在未终结项 exit 1 阻断放行；phase-2/3/4 验收清单接线） |
 | A4 | 无脚本门禁（知情声明） | 靠 V 评审 + phase-2/3/4 图谱禁止行为条目承载；图模型无可选语义使可选能力天然不产生对账义务 |
 | B1 | 门禁输出扩展 | 四热点 structuredViolations（`--json` 机器可读当前仅 check-artifact-gate 的 `sdmapViolations` 键；三热点透传登记总纲 §5.1 后续批次——SSoT §10L.8 勘误如实转述） |
-| B2 | 脚本门禁 | check-signature-chain.ts R6 按 sigHashAlgo 分流重算（signature-chain-logic.ts）+ R11（v2 链 sha256 必填） |
+| B2 | 脚本门禁 | check-signature-chain.ts R6 v3 单公式全量重算（signature-chain-logic.ts；按 sigHashAlgo 分流已删除）+ R11（来源 sha256 必填对全量条目生效） |
 | B3 | 脚本门禁 | check-rootcause-report.ts R4（每条 fixRecommendation 必带合规 scope：{allowed,forbidden} 至少一侧非空） |
 | B4 | 无脚本门禁（知情声明，批次 4 D12 形态） | 执行靠 O/V 遵循 + 既有闭环门禁（check-run-log / check-budget / check-role-dispatch）间接承载 |
 | B5 | 无脚本（收敛视图） | 轮次上限义务由既有 check-budget / check-run-log R11 / ICEBERG maxIcebergRounds=5（hard-constraints.md 反模式 #44）承载；候选反模式 C2 pending V 复审不作为强制反模式执行 |
@@ -134,7 +134,7 @@
 | B2 | sigHash v2 vs evidence provenance | sigHash=签名链条目完整性（篡改声明→R6 重算失败）；provenance=受控本机 source-bound 流程完整性（非密码学签名，command-reference.md「Source-bound provenance 边界」节）——两机制强度如实标注 |
 | B3 | scope 强制 vs 角色禁令 | scope 管「修复能碰什么」；角色禁令管「谁能跑什么」——互不替代 |
 | B4 | 派单契约 vs 角色边界 | 契约管「派什么/怎么验」；同文件角色边界管「谁能做什么」——两节互补不重复 |
-| B5 | L0-L4 视图 vs 既有轮次数值 | 收敛视图零新增数值：每任务 5 轮 / maxReworkRounds / maxIcebergRounds=5 均既有值引用（subagent-delegation.md L1/L2 行） |
+| B5 | L0-L4 视图 vs 既有轮次数值 | 收敛视图零新增数值：每任务 5 轮 / maxReworkRounds（perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载（D-4a 累计口径））/ maxIcebergRounds=5 均既有值引用（subagent-delegation.md L1/L2 行） |
 | C2 | 威胁叙事 vs 守卫体系 | 叙事层不建自动化守卫（批次 5 D1）；守卫唯一执行体仍是门禁脚本+硬约束 |
 | C4 | campaign 整批 vs 阶段回退 | 阶段 5-8 的「整批」形态已存在=阶段回退（references/workflow.md「回退路径阶段编号映射」节）；本机制补 campaign 级 |
 | C1 | 迁移素材 vs 正常阶段流程 | 待输入字段表将定义「哪些变更不算迁移」；当前一切照常走阶段 5-8 流程 |

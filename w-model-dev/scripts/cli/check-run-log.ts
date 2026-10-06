@@ -7,7 +7,7 @@
  * 供 O 子代理在阶段推进前调用，校验运行日志完整性、tokens 合规、返工一致、
  * O 越权检测、exitCode 防伪交叉校验、append-only 时序、轨迹模板、跨轮次评审一致、
  * revertEvidence 回滚证伪、闭环五脚本齐备（R1-R11）。
- * 摘要 JSON 的 r10 字段 = R10 revertEvidence 维度计数（checked/missing/legacy，严格模式 legacy=0）；
+ * 摘要 JSON 的 r10 字段 = R10 revertEvidence 维度计数（checked/missing）；
  * r11 字段 = R11 闭环五脚本核验计数（checkedGates/missing，仅在该 run-log 存在 checkpoint 放行时出现）。
  *
  * 用法：
@@ -15,7 +15,8 @@
  *
  * 参数：
  *   run-log.jsonl        run-log.jsonl 文件路径
- *   --gate-logs=<dir>    gate-logs 目录路径（可选，R5/R6 交叉校验）
+ *   --gate-logs=<dir>    gate-logs 目录路径（覆盖参数；缺省自动解析 run-log 同目录约定路径 gate-logs/，
+ *                        R6 交叉校验无条件执行——批次 6 A3 后半）
  *   --tla-manifest=<path> tla-manifest.json 路径（可选，R3 返工一致性校验）
  *   --json               机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
@@ -31,8 +32,15 @@
  * 错误字段（ERROR_JSON）：
  *   file=相关文件路径；rule=违规规则链（如 'P0-1'）；field=具体字段位置；detail=补充详情（如收到的参数值）
  *
- * 命令行参数：支持 --json（机器可读输出）、--gate-logs=、--tla-manifest=
+ * 命令行参数：支持 --json（机器可读输出）、--gate-logs=（覆盖参数，缺省 run-log 同目录 gate-logs/）、--tla-manifest=
  * 退出码：0=通过 / 1=校验失败（violations）/ 2=输入错误（ERROR_JSON）
+ *
+ * R6 交叉校验默认化（批次 6 A3 后半）：不传 --gate-logs 时默认解析 run-log 同目录 `gate-logs/`，
+ * 对每条「gateLogPath 已设且 gateExitCode 为 number」的记录（与 logic 层 R6 交叉校验前置一致）逐条核验：
+ *   - gate-logs 目录整体缺失 → 一条汇总 blocking（无此类记录时不触发）；
+ *   - 记录引用文件缺失/不可读 → blocking `gate-log 文件缺失：X`（gateLogPath 相对 run-log 所在目录解析，绝对路径原样）；
+ *   - gate-log JSON 顶层 exitCode !== 记录 gateExitCode → blocking `gate-log exitCode 与记录不符：X`。
+ * 显式传 --gate-logs 时保留旧整目录装载语义（schema 校验 + R5 扫描 + logic 层交叉校验），作为覆盖参数。
  *
  * @module
  */
@@ -171,12 +179,88 @@ async function loadGateLogs(gateLogsDir: string): Promise<GateLogsResult> {
   return { map, fileCount, violations };
 }
 
+// ==================== R6 默认交叉校验（批次 6 A3 后半） ====================
+
+/**
+ * R6 交叉校验默认化的逐条核验（默认模式：未显式传 --gate-logs 时执行）。
+ *
+ * 与 logic 层 R6 交叉校验前置一致：仅核验「gateLogPath 已设（非空白）且 gateExitCode 为 number」
+ * 的记录——gateExitCode 未回填的记录由 R6 回填规则另行拦截，不在此重复报告（保持既有失败点不漂移）。
+ *
+ * 判定口径（控制者裁定）：
+ *   - gateLogPath 相对路径以 run-log 文件所在目录为基准解析；绝对路径原样；
+ *   - 「缺失」= 文件不存在或不可读；
+ *   - 「不符」= gate-log JSON 顶层 exitCode !== 记录.gateExitCode（含无法提取合法顶层 exitCode 的 fail-closed 归入）。
+ * 目录整体缺失（或不可读）时不逐条展开，产出一条汇总 blocking；不存在相关记录时整体不触发。
+ */
+async function verifyGateLogEvidence(
+  runLogAbs: string,
+  gateLogsDirAbs: string,
+  entries: readonly unknown[],
+): Promise<string[]> {
+  const relevant = entries.filter(
+    (e): e is { gateLogPath: string; gateExitCode: number } =>
+      typeof e === 'object' &&
+      e !== null &&
+      typeof (e as { gateLogPath?: unknown }).gateLogPath === 'string' &&
+      ((e as { gateLogPath?: unknown }).gateLogPath as string).trim() !== '' &&
+      typeof (e as { gateExitCode?: unknown }).gateExitCode === 'number',
+  );
+  if (relevant.length === 0) return [];
+
+  // 目录整体缺失/不可读 → 一条汇总 blocking（不逐条展开；无相关记录时上面已提前返回，不触发）
+  try {
+    await fs.readdir(gateLogsDirAbs);
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    const code = e.code ?? e.message;
+    const suffix = code === 'ENOENT' ? '' : `（读取失败 ${code}）`;
+    return [
+      `R6: gate-logs 目录缺失：${gateLogsDirAbs}（${relevant.length} 条带 gateLogPath 的 gate 记录无法交叉验证）${suffix}`,
+    ];
+  }
+
+  const violations: string[] = [];
+  const runLogDir = path.dirname(runLogAbs);
+  for (const e of relevant) {
+    const gateLogPath = e.gateLogPath.trim();
+    const fileAbs = path.isAbsolute(gateLogPath) ? gateLogPath : path.resolve(runLogDir, gateLogPath);
+    let content: string;
+    try {
+      content = await fs.readFile(fileAbs, 'utf-8');
+    } catch (err) {
+      const fe = err as NodeJS.ErrnoException;
+      violations.push(`R6: gate-log 文件缺失：${gateLogPath}（${fileAbs}；${fe.code ?? fe.message}）`);
+      continue;
+    }
+    // 顶层 exitCode 提取：仅认「JSON object 顶层 exitCode 为 number」；无法提取按不符 fail-closed
+    let fileExitCode: number | undefined;
+    try {
+      const parsed = parseJsonSafe(content) as { exitCode?: unknown } | undefined;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && typeof parsed.exitCode === 'number') {
+        fileExitCode = parsed.exitCode;
+      }
+    } catch {
+      /* 非 JSON gate-log → 保持 undefined，按不符处置 */
+    }
+    if (fileExitCode === undefined) {
+      violations.push(`R6: gate-log exitCode 与记录不符：${gateLogPath}（gate-log 未提取到合法顶层 exitCode）`);
+    } else if (fileExitCode !== e.gateExitCode) {
+      violations.push(
+        `R6: gate-log exitCode 与记录不符：${gateLogPath}（记录 gateExitCode=${e.gateExitCode}，gate-log exitCode=${fileExitCode}）`,
+      );
+    }
+  }
+  return violations;
+}
+
 // ==================== tla-manifest 加载 ====================
 
 /**
  * 读取 tla-manifest.json，提取 checkRounds 数组长度（TLA+ 返工轮数）。
  * tla-manifest.checkRounds 是数组（见 tla-logic.ts TlaManifest.checkRounds），
- * 其长度应与 run-log 中 action=rework 记录数一致。
+ * 其长度应与 run-log 中 TLA 返工 fix 记录数一致（批次 6 A15：rework 死词已删除，返工事件载体为 fix；
+ * 按 phase 过滤且仅统计 target/note 含 TLA 的条目，比对逻辑见 run-log-logic.ts R3）。
  */
 async function loadTlaCheckRounds(tlaManifestFile: string): Promise<number | undefined> {
   const abs = path.resolve(tlaManifestFile);
@@ -227,20 +311,27 @@ async function main(): Promise<void> {
   }
 
   const runLogAbs = path.resolve(runLogFile);
+  // 批次 6 A3 后半：--gate-logs 降级为覆盖参数；缺省自动解析 run-log 同目录约定路径 gate-logs/，
+  // R6 交叉校验无条件执行（默认模式走 verifyGateLogEvidence 逐条核验）。
+  const gateLogsDirResolved = gateLogsDir ? path.resolve(gateLogsDir) : path.join(path.dirname(runLogAbs), 'gate-logs');
 
   // 读 run-log.jsonl（ENOENT → exit(2)；坏行保留 parseErrors，避免部分历史被当成完整输入）
   const parsedRunLog = await readJsonlOrExitDetailed(runLogAbs, 'run-log');
   const entries = parsedRunLog.entries;
 
-  // 可选输入：--gate-logs；一旦显式传入，读取/schema/协议错误均为 blocking violation。
+  // 显式覆盖输入：--gate-logs=<dir>；一旦显式传入，保留旧整目录装载语义——
+  // 读取/schema/协议错误均为 blocking violation，并激活 R5 扫描与 logic 层 R6 交叉校验。
   let gateLogs: Map<string, { exitCode?: number; content: string }> | undefined;
   let gateLogFileCount = 0;
   let gateLogViolations: string[] = [];
-  if (gateLogsDir) {
-    const loaded = await loadGateLogs(gateLogsDir);
+  if (gateLogsExplicit) {
+    const loaded = await loadGateLogs(gateLogsDirResolved);
     gateLogs = loaded.map;
     gateLogFileCount = loaded.fileCount;
     gateLogViolations = loaded.violations;
+  } else {
+    // 默认模式：不整目录装载（无 schema/R5 语义放大），仅对带 gateLogPath 的 gate 记录逐条核验证据文件
+    gateLogViolations = await verifyGateLogEvidence(runLogAbs, gateLogsDirResolved, entries);
   }
 
   // 可选输入：--tla-manifest（读失败只警告不 exit）
@@ -267,7 +358,7 @@ async function main(): Promise<void> {
   ];
   const passed = allViolations.length === 0;
   // parseErrors 已作为 blocking violations 列出（展示于 reasons / 人类可读原因）；
-  // diagnostics 仅保留纯逻辑层的非阻断诊断（LEGACY_UNSCOPED / pending-pre-approval 等）
+  // diagnostics 仅保留纯逻辑层的非阻断诊断（pending-pre-approval 等；历史 legacy 吸收诊断已随批次 6 A3/C14 删除）
   const diagnostics = [...(result.diagnostics ?? [])];
   const exitCode = passed ? 0 : 1;
   const lifecycleStatus: RunLogLifecycleStatus =
@@ -307,7 +398,9 @@ async function main(): Promise<void> {
   console.log('═'.repeat(60));
   console.log(`输入文件        : ${runLogAbs}`);
   console.log(`条目数          : ${entries.length}`);
-  console.log(`--gate-logs     : ${gateLogsDir ?? '未提供'}${gateLogs ? `（已加载 ${gateLogFileCount} 个文件）` : ''}`);
+  console.log(
+    `gate-logs 目录  : ${gateLogsDirResolved}${gateLogsExplicit ? '（--gate-logs 显式覆盖' : '（默认：run-log 同目录 gate-logs/'}${gateLogs ? `，已加载 ${gateLogFileCount} 个文件）` : '）'}`,
+  );
   console.log(
     `--tla-manifest  : ${tlaManifestFile ?? '未提供'}${tlaCheckRounds !== undefined ? `（checkRounds=${tlaCheckRounds}）` : ''}`,
   );

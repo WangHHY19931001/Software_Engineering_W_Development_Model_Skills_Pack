@@ -5,7 +5,16 @@
   "title": "VerifierOutput",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "meta", "subCriteria", "compositeScore", "qualityLevel", "summary", "passed"],
+  "required": [
+    "schemaVersion",
+    "meta",
+    "subCriteria",
+    "compositeScore",
+    "qualityLevel",
+    "summary",
+    "passed",
+    "reviewedArtifacts"
+  ],
   "properties": {
     "schemaVersion": {
       "description": "Verifier 输出 schema 版本，固定为 \"1.0\"（不符即校验失败）",
@@ -112,6 +121,29 @@
       "description": "返工提示数组（passed=false 时必须为非空数组）",
       "type": "array",
       "items": { "type": "string" }
+    },
+    "reviewedArtifacts": {
+      "description": "评审对象绑定清单（R19，A2 反伪造）：V 实际评审过的产物文件清单；O 分派 V 时按 produce 记录的 artifacts 清单构造，V 不得自造。evidence 中的 path:Lnn= 引用只能指向本清单内登记的 POSIX 相对路径；check-verifier-output.ts 读盘复核文件存在性与 SHA-256 一致并注入行数表供行号越界校验。登记项路径解析口径（双解析）：优先相对本 VerifierOutput 文件所在目录，未命中回退 cwd（仓内样例以仓库根为基准的项目根相对惯例，§6.2.1 evidence 同口径）",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "description": "单个被评审产物登记项（路径 + 内容 SHA-256）",
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {
+            "description": "被评审产物的 POSIX 相对路径（解析口径：优先相对本 VerifierOutput 文件所在目录，未命中回退 cwd；不得含反斜杠，任一路径段不得为 ..——含路径中部，如 a/../b.md）",
+            "type": "string",
+            "pattern": "^(?!.*/\\.\\.($|/))[\\w][\\w./-]*$"
+          },
+          "sha256": {
+            "description": "产物内容 SHA-256（64 位小写十六进制）；由 check-verifier-output 读盘复核",
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
     },
     "ranking": {
       "description": "PPT（Probabilistic Pivot Tournament）优先级排序结果（可选；多候选目标时存在，单候选可省略）",

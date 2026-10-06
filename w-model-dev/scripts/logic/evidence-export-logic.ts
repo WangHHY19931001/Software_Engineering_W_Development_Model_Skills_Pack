@@ -172,6 +172,31 @@ function hashManifest(manifest: Omit<EvidenceManifest, 'manifestSha256'>): strin
 function normalizeSensitiveKey(key: string): string {
   return key.replace(/[^a-z0-9]/gi, '').toLowerCase();
 }
+const SENSITIVE_KEY_SEGMENT_SPLIT = /[^a-zA-Z0-9]+/;
+/**
+ * A9 敏感 key 判定：精确匹配（既有行为，变体匹配的子集）之外，追加两类规范化变体
+ * 匹配——①规范化全串的后缀（词干长度 ≥6）：`tokens` 由精确 Set 语义保住（`tokens`
+ * 不在 Set 内，而候选词干 `token` 长度 5 < 6 不满足长度守卫、后缀分支不触发）；同一
+ * 守卫保护 `token_count` 类计数键并阻断 `mytoken` 式后缀命中（词干不足 6 一律不算）；
+ * ②分隔符词段的连续拼接（词干必须整段跨越分隔符边界，不得切断无分隔符的字母串）：
+ * `api_key_v2` 的 `api+key` 段、`db_password_hash` 的 `password` 段命中；
+ * `passwordPolicy`（无分隔符边界）、`path`/`durationMs` 不误伤。
+ */
+function isSensitiveKey(key: string): boolean {
+  const normalizedKey = normalizeSensitiveKey(key);
+  if (SENSITIVE_KEYS.has(normalizedKey)) return true;
+  if ([...SENSITIVE_KEYS].some((stem) => stem.length >= 6 && normalizedKey.endsWith(stem))) return true;
+  const segments = key.split(SENSITIVE_KEY_SEGMENT_SPLIT).filter((segment) => segment.length > 0);
+  for (let start = 0; start < segments.length; start += 1) {
+    let joined = '';
+    // slice + for-of 取代 segments[end] 动态下标取值（受控遍历，object-injection 安全，行为等价）
+    for (const segment of segments.slice(start)) {
+      joined += normalizeSensitiveKey(segment);
+      if (joined.length >= 6 && SENSITIVE_KEYS.has(joined)) return true;
+    }
+  }
+  return false;
+}
 function isPathInside(candidate: string, parent: string): boolean {
   const relative = path.relative(parent, candidate);
   return relative === '' || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative));
@@ -360,12 +385,20 @@ async function buildExportFiles(state: string, sourceReal: string): Promise<Expo
     if (measurementKey)
       sourceMeasurements.get(measurementKey)!.push({ path: source.sourceRelative, sha256: sha256(sourceContent) });
     entries.push({
-      file: { path: source.sourceRelative, sha256: sha256(sanitized), kind: source.kind },
+      file: {
+        path: source.sourceRelative,
+        sha256: sha256(sanitized),
+        kind: source.kind,
+      },
       content: sanitized,
     });
   }
   entries.sort((left, right) => comparePaths(left.file.path, right.file.path));
-  return { entries, files: entries.map(({ file }) => file), sourceMeasurements };
+  return {
+    entries,
+    files: entries.map(({ file }) => file),
+    sourceMeasurements,
+  };
 }
 function sanitizeSensitiveAssignment(line: string): string {
   const prefix = line.match(/^\s*(?:[-*>+]\s+|\[[A-Z]+\]\s+|`+\s*)/i)?.[0] ?? '';
@@ -477,14 +510,15 @@ function sanitizeMarkdown(text: string): string {
   });
   return sanitizedLines.join('');
 }
-function redact(value: unknown): unknown {
+/** A9：导出仅供单元测试直接断言脱敏行为（与既有 logic 层测试导入惯例一致）。 */
+export function redact(value: unknown): unknown {
   if (typeof value === 'string') return sanitizeString(value);
   if (Array.isArray(value)) return value.map(redact);
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>).map(([key, nested]) => [
         key,
-        SENSITIVE_KEYS.has(normalizeSensitiveKey(key)) ? REDACTED : redact(nested),
+        isSensitiveKey(key) ? REDACTED : redact(nested),
       ]),
     );
   }
@@ -682,7 +716,10 @@ export async function exportEvidence(projectDir: string, outputDir: string): Pro
       provenance: toExportProvenance(sourceProvenance, sortedFiles),
       files: sortedFiles,
     };
-    const manifest: EvidenceManifest = { ...manifestBase, manifestSha256: hashManifest(manifestBase) };
+    const manifest: EvidenceManifest = {
+      ...manifestBase,
+      manifestSha256: hashManifest(manifestBase),
+    };
     if (!validateBySchema('evidence-manifest', manifest).valid) throw new EvidenceFailure(1, 'INVALID_MANIFEST');
     await atomicWrite(path.join(staging, MANIFEST_NAME), JSON.stringify(manifest, null, 2) + '\n');
     await assertSafeOutputPath(output, sourceReal);

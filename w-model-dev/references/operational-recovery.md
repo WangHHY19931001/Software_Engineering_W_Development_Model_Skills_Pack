@@ -209,8 +209,9 @@ npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --std
 |---|---|
 | 单阶段 token 超过 `budget.json.perPhase.maxTokens` | 按 `onExceed` 处置；默认 `pause` → 🔴 CHECKPOINT · 预算告警 |
 | 项目级 token 超过 `budget.json.project.maxTokensTotal` | 立即 `halt`；回退到当前阶段起点；告知用户累计消耗 |
-| 单会话 token 超过 `maxTokensPerSession` | 暂停后续子代理分派，建议用户开新会话续接 |
 | `onExceed=notify` 但连续 3 次告警 | 自动升级为 `pause`，强制 🔴 CHECKPOINT |
+
+> 43.0.0 A5：`maxTokensPerSession` 死字段已删除（零消费退役），「单会话 token 上限」不再是预算字段——单次交互爆量由 `perPhase.maxTokens` 用量实效校验（R6）与 killSwitch burnRate 告警（R5-b）承接。
 
 ### kill switch 触发
 
@@ -219,6 +220,8 @@ npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --std
 | 连续阶段返工次数 ≥ `killSwitch.consecutiveReworks` | 全流程暂停；展示返工历史；询问是否降级范围/取消 |
 | 单阶段 token 占 `maxTokens` ≥ `killSwitch.budgetBurnRate` | 暂停后续子代理；展示消耗明细；询问增预算/降范围 |
 | TLA+ 规格返工 ≥ `killSwitch.tlaReworks` | 暂停 TLA+ 建模；询问是否简化建模范围或回退修正需求/设计 |
+
+> **无复位通道**：reworkCount 为 append-only 累计，唯一出口=用户上调 killSwitch 阈值或阶段归档换日志（43.0.0 挑明）。
 
 ### 运行日志维护
 
@@ -249,7 +252,6 @@ run-log 出现坏行（非法 JSON）时的法定重建程序（唯一合法出�
 | `rootcause`（R 子代理） | R 子代理（含 R-lead + N 个 R-persona）的 tokens 累计。每条 `rootcause` 动作各记 tokens 字段 | R-lead + N 个 R-persona 的 tokens 之和受 `budget.json.rootcauseParallelBudget` 约束（R4-A 规则） |
 | `rootcause`（串行分派） | 串行分派时，每条 `rootcause` 动作各记 tokens，最终汇总校验 R4-A 预算（`maxTotalTokensPerRound`） | 不论并行/串行均累计校验；超限触发 killSwitch |
 | `fix`（S 兼 F 修复） | S-fix 子代理的 tokens，记入 `fix` 动作的 tokens 字段 | 纳入单阶段 `perPhase.maxTokens` 与项目级 `project.maxTokensTotal` 统计 |
-| `escalate`（upstreamDefect 触发） | 记录 `reportId` 与升级原因；tokens 由触发升级的 CHECKPOINT 会话承担 | 升级本身不消耗额外子代理 tokens（CHECKPOINT 由编排者处理） |
 
 **多角度 R 的 token 预算校验（R4-A）**：
 
@@ -288,7 +290,7 @@ run-log 出现坏行（非法 JSON）时的法定重建程序（唯一合法出�
 
 | 成熟度（`maturity.json.level`） | 适用场景 | TLA+ / BDD 强制级别 |
 |---|---|---|
-| L0 / L1 | 教学 / demo / 小工具 | **可选**——阶段 1-4 可不产出 `.tla`/`.cfg`/`tla-manifest.json` 与 `.feature`/`bdd-manifest.json`；其余门禁照跑（图谱 / verifier / 闭环 5 脚本 / 工件质量门）。**由门禁强制**：`check-artifact-gate.ts` 读取 `.w-model/maturity.json` 的 `level`，L0/L1 且阶段 1-4 时豁免该组资产要求（GATE_JSON 输出 `maturityLevel` / `tlaBddWaived` 供审计区分「通过」与「豁免」；缺 `maturity.json` 或 level 非法 → 不豁免，保持严格） |
+| L0 / L1 | 教学 / demo / 小工具 | **可选**——阶段 1-4 可不产出 `.tla`/`.cfg`/`tla-manifest.json` 与 `.feature`/`bdd-manifest.json`；其余门禁照跑（图谱 / verifier / 闭环 5 脚本 / 工件质量门）。**由门禁强制**：`check-artifact-gate.ts` 读取 `.w-model/maturity.json` 的 `level`，L0/L1 且阶段 1-4 时豁免该组资产要求（GATE_JSON 输出 `maturityLevel` / `tlaBddWaived` 供审计区分「通过」与「豁免」；缺 `maturity.json` 或 level 非法 → 不豁免，保持严格）。**43.0.0 A4 收紧**：豁免还须签名链审批——`.w-model/signature-chain.jsonl` 中存在 `role=human / targetKind=maturity`、v3 签名重算一致、绑定 `maturity.json` 且不早于最近一次 level 变更的审批条目（`verifyMaturityApproval` 校验）；**无链 / 坏链 / 缺链文件三形态一律不豁免（fail-closed），拒绝原因进 reasons 与 exitCode** |
 | L2 | 生产小项目 | **部分必跑**——TLA+ L1 + BDD L1 必跑（阶段 1 产出、G 跑行为门禁），L2-L4 层级可选 |
 | L3 | 生产中大型 | **全必跑**——阶段 1-4 产出全部对应层级 TLA+ 与 BDD 资产，G 每阶段门跑行为门禁 |
 
@@ -298,6 +300,7 @@ run-log 出现坏行（非法 JSON）时的法定重建程序（唯一合法出�
 2. **降级路径**：成熟度 L2 降至 L1（预算/时间受限）时，已产出的 TLA+/BDD 资产仍须过门禁；未产出的层级不再补产，在 run-log 决策记录中登记"按 L1 成熟度豁免 L2-L4 行为门禁"。
 3. **升优路径**：L1 项目选择产出 TLA+/BDD 时，按对应层级完整执行（无"产出但免检"）。
 4. **记录**：O 在 run-log 的决策条目中登记实际采用的行为门禁级别（如 `maturity=L2 → TLA+ L1 + BDD L1 必跑`），供 `check-run-log.ts` 审计。
+5. **level 变更审批链（43.0.0 A4）**：level 变更（升级）走固定流程——**S 提议 → 用户确认（决策型 CHECKPOINT）→ O 以 `role=human / targetKind=maturity` 条目落签名链**（`.w-model/signature-chain.jsonl`，sigId 用 `human` 后缀形态、artifacts 绑定 `maturity.json`、sigHash 按 v3 公式重算）→ **gate 消费时校验**（`check-artifact-gate.ts` 经 `verifyMaturityApproval`：无链 / 坏链 / 早签一律不豁免）。maturity.json 与签名链条目须成对落盘——只改 `level` 不落链，下一次 gate 即被拒绝（fail-closed，反「被门禁者自写即关门禁」缺口）。
 
 ### 场景 5：阶段回退
 
@@ -333,9 +336,9 @@ run-log 出现坏行（非法 JSON）时的法定重建程序（唯一合法出�
 
 | 选项 | 动作 | run-log 记录 |
 |---|---|---|
-| A) 确认回退到 `<upstreamPhase>` | O 更新 `project.status` 回退到上游阶段 → 上游阶段重走 S→V→G→（若再次失败）R 循环 | append `escalate` 动作（`reason:"upstreamDefect"`, `reportId:"<RC-...>"`）+ `rollback` 动作 |
-| B) 不回退，继续当前阶段返工 | `round++`，但须用户说明理由 | append `rework` 动作，`note` 记用户理由 |
-| C) 调整 `maxReworkRounds` 继续尝试 | 更新 `budget.json.perPhase.maxReworkRounds`，继续返工 | append `checkpoint` 动作，`acknowledgedDecisions` 记调整决策 |
+| A) 确认回退到 `<upstreamPhase>` | O 更新 `project.status` 回退到上游阶段 → 上游阶段重走 S→V→G→（若再次失败）R 循环 | 在回退后的上游阶段 append `rootcause` 动作（`upstreamDefect:true`、`rollbackRecommended:true`、`reportId:"<RC-...>"`；批次 6 A15：原 `escalate`/`rollback` 死词已删除，升级语义由 rootcause 两布尔字段承载） |
+| B) 不回退，继续当前阶段返工 | `round++`，但须用户说明理由 | append `fix` 动作（`round++`），`note` 记用户理由（批次 6 A15：原 `rework` 死词已删除，返工事件载体为 `fix`） |
+| C) 上调 killSwitch 阈值继续尝试 | 用户上调 `budget.json.killSwitch.consecutiveReworks`（43.0.0 A5：`perPhase.maxReworkRounds` 死字段已删除，上调是返工计数的唯一复位出口，见「kill switch 触发」挑明句），继续返工 | append `checkpoint` 动作，`acknowledgedDecisions` 记调整决策 |
 
 **回退后处理**：
 
@@ -343,14 +346,14 @@ run-log 出现坏行（非法 JSON）时的法定重建程序（唯一合法出�
 - 上游阶段通过后，重新进入当前阶段，S 重新产出（不沿用回退前的产物）
 - 回退前的 R 报告归档为「历史根因分析」，可供新一轮 R 参考（避免重复定位）
 
-> 场景 5 与 O6（Escalation Failure）运维失败模式一致：返工达 `maxReworkRounds` 或 R 触发场景 5 均强制 🔴 CHECKPOINT，避免循环卡死。
+> 场景 5 与 O6（Escalation Failure）运维失败模式一致：返工达阶段轮次上限（用户裁定的上限，历史上由已退役的 `maxReworkRounds` 字段承载）或 R 触发场景 5 均强制 🔴 CHECKPOINT，避免循环卡死。
 
 ### 升级与降级
 
 | 场景 | 动作 |
 |---|---|
-| 阶段 8 完成后 unlockConditions 全部达标 | 询问用户是否升级（决策型 CHECKPOINT，不可自动升级）；用户确认 → 更新 maturity.json.level + history |
-| O 系列失败模式连续命中 ≥ `downgradeTriggers.operationalFailureStreak` | 自动降级到 L0；run-log append 降级记录 |
+| 阶段 8 完成后解锁条件全部达标 | 询问用户是否升级（决策型 CHECKPOINT，不可自动升级）；用户确认 → 更新 maturity.json.level + history，**并以 `role=human / targetKind=maturity` 条目落签名链（绑定 maturity.json；43.0.0 A4，无链则 gate 拒绝豁免）**。解锁条件（稳定时长 / 周期数 / 达标率 / 误判率 / 运维失败数）为本文档描述层语义，**无机器校验（字段已自 schema 移除，仅本文档描述）** |
+| O 系列失败模式连续命中 ≥ `downgradeTriggers.operationalFailureStreak` | 自动降级到 L0；run-log append 降级记录（降级不记 history 升级链，R6 只承载升级；降级后 level 低于 history 末条 to 属合法形态——R6 只锁伪造升级不锁降级，豁免已由 human 审批链锁死） |
 | 用户显式请求降级 | 更新 maturity.json.level=L0 + userRequested=true |
 | L1+ 自动放行时 acknowledgedDecisions 为空 | 拒绝放行（O4 命中）；自动放行 ≠ 理解豁免，仍须填理解证据 |
 
@@ -477,29 +480,26 @@ G 子代理在每个阶段门按以下顺序调用，任一退出码 ≠ 0 → O
 
 | 脚本 | 关键校验项（对应修正设计规则表） |
 |---|---|
-| `check-budget.ts`（§5.1） | R1 时效性（`updatedAt` 滞后）· R2 schema 完整 · R3 onExceed 合法 · R4 killSwitch 合法 · R5 触发检测（返工次数 ≥ killSwitch 阈值但 run-log 无告警） |
-| `check-run-log.ts`（§5.2） | R1 阶段动作完整性（chunk/cross/gate/checkpoint 4 类）· R2 tokens 非负 · R3 返工记录一致 · R4 acknowledgedDecisions 非空 · R5 O 越权检测（交叉 `gate-logs/`）· R6 exitCode 一致（SSoT §10E）· R7 append-only（时间戳真值 + **禁止回溯改写历史行或重排时间戳**；记录修正只经 `wm-append-runlog --correct` 追加更正记录，见下「调用约定」） · R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint；V 失败后须先 rootcause 再 S-fix（反模式 #18 轨迹检测），违例走返工循环；处置：补齐缺失动作 / 对齐理想轨迹后重跑）· R9 跨轮次评审一致性（同一产物的 `qualityLevel` 跨轮次差 ≥2 档 → 评审者自身标准漂移，走高成熟度 CHECKPOINT 交人裁定，不走 R；见 [verifier-spec.md](verifier-spec.md) §14.1）· R10 revertEvidence 回滚证伪（fix/emergency-fix 须携带非空 `revertEvidence.command`，**无时间戳豁免**：缺失或非法始终 blocking；处置：由 S-fix 重跑真实回滚命令并补记后重跑）· R11 闭环五脚本齐备（凡有 `action=checkpoint` 且 `outcome=success` 放行的阶段，放行前须已有闭环五门各一条 `role=G` + `outcome=success` + `gateExitCode=0` 的 gate 记录，且时间戳**严格毫秒早于**放行（同毫秒（含无毫秒部分的秒级时间戳）不算早于，无时间戳豁免）；处置：补齐缺失的闭环脚本 gate 记录后重跑。**唯一例外**：阶段 1 的 `check-checkpoint.ts` 后置窗口（历史日志兼容，D-6）——判据与定性见下「阶段 1 自举豁免」节（R11 后置窗口，D-6）） |
-| `check-maturity.ts`（§5.3） | R1 schema 完整 · R2 level 合法 · R3 成功阶段计数更新（`completedCycles` 滞后）· R4 history 一致 · R5 降级触发 |
+| `check-budget.ts`（§5.1） | R1 时效性（43.0.0 A5 顺序化：`budget.updatedAt` 早于 `project.updatedAt` 即违规「预算未随项目演进复核」，相等合法）· R2 schema 完整 · R3 onExceed 合法 · R4 killSwitch 合法 · R5 触发检测（返工次数 ≥ killSwitch 阈值但 run-log 无告警） |
+| `check-run-log.ts`（§5.2） | R1 阶段动作完整性（chunk/cross/gate/checkpoint 4 类）· R2 tokens 非负 + `estimated=true` 违规（约束 #4：tokens 为 LLM 估算值即 blocking，须回填真实运行结果；43.0.0 A5）· R3 返工记录一致 · R4 acknowledgedDecisions 非空 · R5 O 越权检测（交叉 `gate-logs/`）· R6 exitCode 一致（SSoT §10E）· R7 append-only（时间戳真值 + **禁止回溯改写历史行或重排时间戳**；记录修正只经 `wm-append-runlog --correct` 追加更正记录，见下「调用约定」） · R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint；V 失败后须先 rootcause 再 S-fix（反模式 #18 轨迹检测），违例走返工循环；处置：补齐缺失动作 / 对齐理想轨迹后重跑）· R9 跨轮次评审一致性（同一产物的 `qualityLevel` 跨轮次差 ≥2 档 → 评审者自身标准漂移，走高成熟度 CHECKPOINT 交人裁定，不走 R；见 [verifier-spec.md](verifier-spec.md) §14.1）· R10 revertEvidence 回滚证伪（fix/emergency-fix 须携带非空 `revertEvidence.command`，**无时间戳豁免**：缺失或非法始终 blocking；处置：由 S-fix 重跑真实回滚命令并补记后重跑）· R11 闭环五脚本齐备（凡有 `action=checkpoint` 且 `outcome=success` 放行的阶段，放行前须已有闭环五门各一条 `role=G` + `outcome=success` + `gateExitCode=0` 的 gate 记录，且时间戳**严格毫秒早于**放行（同毫秒（含无毫秒部分的秒级时间戳）不算早于，无时间戳豁免）；五门对全部阶段（含阶段 1）一律同一判据，无任何例外——处置：补齐缺失的闭环脚本 gate 记录后重跑） |
+| `check-maturity.ts`（§5.3） | R1 schema 完整 · R2 level 合法 · R4 history 一致 · R5 降级触发 · R6 history 链一致（43.0.0 A4：from==上一条 to / to 严格高于 from / 末条 to 不低于 level——降级后 level 低于末条合法，只锁伪造升级（批次 6 修复轮 1）；原 R3 周期校验随 unlockConditions 死字段退役，规则号不回收） |
 | `check-checkpoint.ts`（§5.4） | R1 acknowledgedDecisions 非空 · R2 决策内容具体（泛化词黑名单）· R3 用户确认存在 · R4 决策与阶段匹配 · R5 跨阶段证据一致（SSoT §10.6 6.3） |
 
 ### 脚本间依赖
 
 `check-run-log.ts` 交叉校验 `gate-logs/` 存档与 run-log `gateExitCode` 一致（SSoT §10E.3）；`check-checkpoint.ts` 依赖 run-log 中 checkpoint 记录；`check-budget.ts` / `check-maturity.ts` 交叉 run-log 统计返工/成功阶段数。四脚本须在阶段门一并跑完，不得跳过；CLI 用法与退出码语义（0 通过 / 1 校验失败 / 2 输入错误）见修正设计 §5.1-5.4。（依赖关系与执行顺序见修正设计 §5.5）
 
-### 阶段 1 自举豁免（R11 后置窗口，D-6；E-2 方案 B 后为历史日志兼容形态）
+### R11 阶段 1 后置窗口删除（原 D-6 自举豁免，批次 6 A3/C14）
 
-> R11 的严格判据是「五条闭环记录须**严格早于**放行」。本节描述的 `phase===1` × `check-checkpoint.ts` 后置窗口（D-6，2026-09-21）是其唯一例外。**定性沿革（E-2 方案 B，2026-09-22）**：该窗口合入时用于绕开首阶段自举死锁（旧 R0 要求 run-log 已有放行记录 check-checkpoint 才可能 exit 0——先跑门则门红，先放行则 R11 红）；E-2 方案 B（R0 首阶段自举形态：零放行记录时以 checkpoint-log 用户确认为初级证据，SSoT §10.6 6.0）使自然时序（**阶段门放行三步顺序**，枚举见 [`SKILL.md`](../SKILL.md)「阶段门放行三步」）合法，新建项目常态满足严格判据、**不应产生后置形态**。窗口判据保留，仅用于兼容以旧时序写入的历史 run-log（删除会使其变红）。
+> R11 的严格判据是「五条闭环记录须**严格早于**放行」，且五门（含 `check-checkpoint.ts`）对**全部阶段（含阶段 1）**一律同一判据、无任何例外。历史沿革：D-6（2026-09-21）曾给 `phase===1` × `check-checkpoint.ts` 开「允许晚于放行」的后置窗口，用于绕开首阶段自举死锁（旧 R0 要求 run-log 已有放行记录 check-checkpoint 才可能 exit 0——先跑门则门红，先放行则 R11 红）；E-2 方案 B（2026-09-22，R0 首阶段自举形态：零放行记录时以 checkpoint-log 用户确认为初级证据，SSoT §10.6 6.0）使自然时序（**阶段门放行三步顺序**，枚举见 [`SKILL.md`](../SKILL.md)「阶段门放行三步」）合法后，该窗口退化为纯历史日志兼容形态。批次 6 A3/C14（2026-10-06）裁定「毁弃存量数据，不兼容」：**窗口删除**——以旧时序（先写放行记录、后补 `check-checkpoint.ts` gate 记录）写入的历史 run-log 直接 R11 blocking；自然时序下新建项目常态满足严格判据，不受影响。
 
-| 项 | 判据（保留不变，历史日志兼容） |
+| 项 | 现行判据（五门统一，无例外） |
 |---|---|
-| 适用域 | 仅 `phase === 1` 的放行 × `check-checkpoint.ts`（记录仍须属本阶段，即 `phase` 相同） |
-| 后置窗口 | 时间戳 **> 放行时刻** 且 **< 下一放行时刻**；下一放行 = 全部阶段中时间戳**严格晚于**本放行的最早一条 `action=checkpoint` + `outcome=success` 记录 |
-| 无下一放行 | 只要求晚于本放行（窗口无上界） |
-| 同毫秒 | 不算合格（前置与后置窗口均为毫秒精度严格比较，`timestamp` 同毫秒（含无毫秒部分的秒级时间戳，Date.parse 后相等）先后不可判定；DEC-3） |
-| 早于放行的记录 | 照旧充数——后置窗口是**增补**而非替换（既有 run-log 不受影响） |
-| 其余四脚本 | `check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-preventive-review.ts` 一律仍须严格早于放行 |
-| `phase >= 2` | 行为**完全不变**：后置的 `check-checkpoint.ts` 记录仍 R11 blocking |
+| 适用域 | 全部阶段 × 闭环五门（`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`） |
+| 充数判据 | `action=gate` + `role=G` + `outcome=success` + `gateExitCode=0` 且时间戳**严格毫秒早于**放行（`Date.parse(g.timestamp) < releaseAt`；同毫秒（含无毫秒部分的秒级时间戳）不算早于，无时间戳豁免；DEC-3） |
+| 后置记录 | 一律**不充数**并使该门缺失 → R11 blocking（含 `phase===1` × `check-checkpoint.ts`；批次 6 前的后置窗口已删除） |
+| 多次放行 | 同一阶段多次放行逐个核验（不合并） |
 
-**历史日志兼容例外（D-6 后置窗口的定性）**：上表判据是 `phase===1` × `check-checkpoint.ts` 的**历史日志兼容例外**——保留仅为兼容以**旧时序**（先写放行记录、后补 `check-checkpoint.ts` 成功 gate 记录）写入的历史 run-log（删除该窗口会使这些历史日志变红）；新建项目走下方自然时序、**不应产生后置形态**（后置形态仍被 R8 拦截，见下）。`phase >= 2` 无此例外。
+**自然时序下的首阶段形态（E-2 方案 B，现行语义）**：确认落盘 → 闭环五门 → 最后写放行记录——`check-checkpoint.ts` 运行时放行记录尚未写入，以 R0 首阶段自举形态通过并输出非阻断 `BOOTSTRAP_VALIDATION:` 诊断（见 `checkpoint-logic.ts` 的 R0 零证据守卫与 phase-1 自举分支）；因此五门记录天然全部严格早于放行，R11 通过。后置 gate 记录同时仍违反 R8 轨迹模板（checkpoint 须为阶段终点）——旧时序历史日志修复路径为补齐缺失门记录或重建 run-log，不得回退、改写记录或伪造时间戳（反伪造纪律见下方「调用约定」）。
 
-**调用约定（E-2 方案 B 后的自然时序，适用所有阶段）**：每个阶段门都按同一条自然时序执行——**阶段门放行三步顺序**与放行判据见 [`SKILL.md`](../SKILL.md)「阶段门放行三步」，本文件不重复枚举。本文件只补两处阶段差异与时间序判据：**（a）阶段 1**：第 ① 步的 checkpoint-log `phase-N` 用户确认由 R0 首阶段自举形态消费 **phase-1** 确认作初级证据——未提供/空 Map/无 phase-1 条目（含仅 phase-2+ 确认）/phase-1 空白/不可读仍违规，零证据不等于合规；第 ② 步内此时 run-log 尚无放行记录，`check-checkpoint.ts` 以 R0 自举形态通过并输出非阻断 `BOOTSTRAP_VALIDATION:` 诊断。**（b）时间序判据（D-4）**：五条 gate 记录须**严格早于**放行记录（`Date.parse(gate.timestamp) < Date.parse(release.timestamp)` 毫秒精度严格比较；**同毫秒（含无毫秒部分的秒级时间戳）不算早于**、无时间戳豁免），由 `check-run-log.ts` R11 机器核验。**阶段 ≥2**：与阶段 1 完全同一条自然时序，唯一差别是 `check-checkpoint.ts` **没有**后置窗口——它与其他四门一样须严格早于放行，后置即 R11 blocking。放行记录的内容校验（R1/R2/R4）由下一阶段 `check-checkpoint.ts` 的全局回溯完成（与阶段 ≥2 既有语义一致）。**原「已知张力（R8 同源）」销项（2026-09-22）**：旧时序（写放行记录 → 后补 check-checkpoint 成功记录）依赖 D-6 窗口、且与 R8 轨迹模板冲突（`check-run-log.ts` 同时报 R8 三条）——该张力随自然时序合法化而消解：R8 零改动，后置形态仍被 R8 拦截（这正是反伪造语义：新建项目不应产生该形态），不得据此回退、改写记录或伪造时间戳。**run-log 时间戳真值纪律（D-5①，反伪造）**：记录时间戳必须为**写入时刻真值**；**禁止回溯改写历史行或重排时间戳**（改时间戳 / 改 note / 删行 / 插行后重排时间轴同样禁止）；记录修正**只允许**经 O 侧统一追加器**追加更正记录**——`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin --correct=<runId>`（更正记录 `note` 含 `correction-of:<runId>`，历史行逐字节不变），不得手改历史行；追加器对新增记录强制时间戳严格递增（**时间戳三态**，②与③不得合并叙述；完整口径与逃生口语义见 `command-reference.md` 的 `wm-append-runlog.ts` 条目「时间戳三态」）——① 显式 ≤ 末条拒绝；② 无显式且时钟真倒退拒绝；③ 无显式且同毫秒/批内冲突良性步进；`--timestamp=<iso>` 注入成功**须晚于末条**，且与载荷自带 `timestamp` **互斥**（同给 exit 2 `TIMESTAMP_CONFLICT`））。
+**调用约定（E-2 方案 B 后的自然时序，适用所有阶段）**：每个阶段门都按同一条自然时序执行——**阶段门放行三步顺序**与放行判据见 [`SKILL.md`](../SKILL.md)「阶段门放行三步」，本文件不重复枚举。本文件只补两处阶段差异与时间序判据：**（a）阶段 1**：第 ① 步的 checkpoint-log `phase-N` 用户确认由 R0 首阶段自举形态消费 **phase-1** 确认作初级证据——未提供/空 Map/无 phase-1 条目（含仅 phase-2+ 确认）/phase-1 空白/不可读仍违规，零证据不等于合规；第 ② 步内此时 run-log 尚无放行记录，`check-checkpoint.ts` 以 R0 自举形态通过并输出非阻断 `BOOTSTRAP_VALIDATION:` 诊断。**（b）时间序判据（D-4）**：五条 gate 记录须**严格早于**放行记录（`Date.parse(gate.timestamp) < Date.parse(release.timestamp)` 毫秒精度严格比较；**同毫秒（含无毫秒部分的秒级时间戳）不算早于**、无时间戳豁免），由 `check-run-log.ts` R11 机器核验，全部阶段无例外。放行记录的内容校验（R1/R2/R4）由下一阶段 `check-checkpoint.ts` 的全局回溯完成（与阶段 ≥2 既有语义一致）。**run-log 时间戳真值纪律（D-5①，反伪造）**：记录时间戳必须为**写入时刻真值**；**禁止回溯改写历史行或重排时间戳**（改时间戳 / 改 note / 删行 / 插行后重排时间轴同样禁止）；记录修正**只允许**经 O 侧统一追加器**追加更正记录**——`npx tsx w-model-dev/scripts/cli/wm-append-runlog.ts .w-model/run-log.jsonl --stdin --correct=<runId>`（更正记录 `note` 含 `correction-of:<runId>`，历史行逐字节不变），不得手改历史行；追加器对新增记录强制时间戳严格递增（**时间戳三态**，②与③不得合并叙述；完整口径与逃生口语义见 `command-reference.md` 的 `wm-append-runlog.ts` 条目「时间戳三态」）——① 显式 ≤ 末条拒绝；② 无显式且时钟真倒退拒绝；③ 无显式且同毫秒/批内冲突良性步进；`--timestamp=<iso>` 注入成功**须晚于末条**，且与载荷自带 `timestamp` **互斥**（同给 exit 2 `TIMESTAMP_CONFLICT`））。

@@ -54,5 +54,11 @@
   "compositeScore": 0.8735,
   "qualityLevel": "A",
   "summary": "V 复审使用 test 集合子标准评审 rootcause 报告（误用 §7.3 标准），应被 rootcause 子标准集合校验拦截。",
-  "passed": true
+  "passed": true,
+  "reviewedArtifacts": [
+    {
+      "path": "README.md",
+      "sha256": "2dfe8de7b528a1673567de769e2c231817ba9fe765c87cda195cd3c92f316d14"
+    }
+  ]
 }

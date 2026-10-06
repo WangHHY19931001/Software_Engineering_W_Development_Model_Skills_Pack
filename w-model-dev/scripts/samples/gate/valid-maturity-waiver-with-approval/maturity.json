@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "demo-maturity-waiver",
+  "level": "L1",
+  "leveledUpAt": "2026-08-01T11:00:00.000Z",
+  "history": [
+    {
+      "at": "2026-08-01T11:00:00.000Z",
+      "from": "L0",
+      "to": "L1",
+      "reason": "首个完整周期完成（A4：用户已确认升级）"
+    }
+  ],
+  "downgradeTriggers": {
+    "operationalFailureStreak": 3,
+    "userRequested": false
+  }
+}

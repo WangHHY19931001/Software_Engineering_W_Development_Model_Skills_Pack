@@ -36,9 +36,9 @@
       }
     },
     {
-      "description": "action=fix/emergency-fix 时强制 basedOnReport 非空 + artifacts 非空数组。revertEvidence（回滚证伪声明，AC-8）形态在此登记但 schema 不强制出现——由 check-run-log R10 逻辑始终强制 fix/emergency-fix 携带合法非空 command。",
+      "description": "action=fix 时强制 basedOnReport 非空 + artifacts 非空数组。revertEvidence（回滚证伪声明，AC-8）形态在此登记但 schema 不强制出现——由 check-run-log R10 逻辑始终强制 fix 携带合法非空 command。",
       "if": {
-        "properties": { "action": { "enum": ["fix", "emergency-fix"] } },
+        "properties": { "action": { "const": "fix" } },
         "required": ["action"]
       },
       "then": {
@@ -51,53 +51,11 @@
       }
     },
     {
-      "description": "action=emergency-fix 时强制 variant=emergency-fix 且 blocker 非空。历史兼容：未声明 variant 的历史 emergency-fix 记录由 check-run-log 以 LEGACY_VARIANT 非阻断 diagnostic 吸收（exit 0 + NOT_CLOSED_NOT_PROVEN），以 LEGACY_VARIANT_CUTOFF='2026-09-01T00:00:00Z'（run-log-logic.ts）为吸收/阻断分界，cutoff 后写入的此类记录不再吸收、落入 blocking [schema]；新记录必须声明 variant 且 emergency-fix 须附 blocker。",
-      "if": {
-        "properties": { "action": { "const": "emergency-fix" } },
-        "required": ["action"]
-      },
-      "then": {
-        "properties": {
-          "variant": { "const": "emergency-fix" },
-          "blocker": { "type": "string", "minLength": 1 }
-        },
-        "required": ["variant", "blocker"]
-      }
-    },
-    {
-      "if": {
-        "properties": { "action": { "const": "fix" } },
-        "required": ["action"]
-      },
-      "then": {
-        "properties": { "variant": { "const": "fix" } }
-      }
-    },
-    {
-      "if": {
-        "properties": { "variant": { "const": "emergency-fix" } },
-        "required": ["variant"]
-      },
-      "then": {
-        "properties": { "blocker": { "type": "string", "minLength": 1 } },
-        "required": ["blocker"]
-      }
-    },
-    {
       "if": {
         "properties": {
           "phase": { "const": 8 },
           "action": {
-            "enum": [
-              "rootcause",
-              "review",
-              "gate",
-              "r3-completeness",
-              "r3-reliability",
-              "r3-security",
-              "fix",
-              "emergency-fix"
-            ]
+            "enum": ["rootcause", "review", "gate", "r3-completeness", "r3-reliability", "r3-security", "fix"]
           }
         },
         "required": ["phase", "action"]
@@ -118,7 +76,7 @@
         "properties": {
           "phase": { "const": 8 },
           "action": {
-            "enum": ["review", "gate", "r3-completeness", "r3-reliability", "r3-security", "fix", "emergency-fix"]
+            "enum": ["review", "gate", "r3-completeness", "r3-reliability", "r3-security", "fix"]
           },
           "targetKind": { "enum": ["requirement", "design", "code", "test"] }
         },
@@ -148,10 +106,10 @@
       }
     },
     {
-      "description": "action=review/iceberg-review 且 passed=false 时强制 reworkHints 非空（≥1 条返工提示）。历史兼容：reworkHints 规则与 variant 规则同窗引入，以 LEGACY_VARIANT_CUTOFF='2026-09-01T00:00:00Z'（run-log-logic.ts）为吸收/阻断分界——cutoff 前写入的失败 review 旧行由 check-run-log 以 LEGACY_REWORK_HINTS 非阻断 diagnostic 吸收；cutoff 后 passed=false 无非空 reworkHints 属真实不一致，blocking。注意：plan_review 不在 reworkHints 强制族（配对非强制，约束 #8 审计面）。",
+      "description": "action=review 且 passed=false 时强制 reworkHints 非空（≥1 条返工提示）。历史 cutoff 吸收已删除：任何时刻 passed=false 缺非空 reworkHints 均属真实不一致，由本 schema 拒绝 + check-run-log 报 [rework-hints] blocking（无时间戳豁免）。（批次 6 A15：原 review/iceberg-review 两值族中 iceberg-review 动作已删除，V 复审冰山报告以 action=review 记录。）",
       "if": {
         "properties": {
-          "action": { "enum": ["review", "iceberg-review"] },
+          "action": { "enum": ["review"] },
           "passed": { "const": false }
         },
         "required": ["action", "passed"]
@@ -185,40 +143,26 @@
       "minLength": 1
     },
     "action": {
-      "description": "动作类型枚举（共 32 值）：chunk=A 子代理 ingestion 分块（阶段1-4必需）；cross=A 子代理跨块交叉合并（阶段1-4必需）；evolve=A 子代理图谱演进增量更新（A-evolve，阶段2-4 在现有 graph.json 上追加节点/边）；produce=S 产出阶段产物（阶段5-8必需）；review=V 评审（阶段5-8必需）；gate=G 工件质量门（check-artifact-gate.ts）；tla-gate=G TLA+ 行为门禁（check-tla-model.ts）；graph-gate=G 图谱门禁（check-requirement-graph.ts）；test=S 测试执行；checkpoint=O 阶段门 CHECKPOINT 放行；rework=返工；rollback=阶段回退；rootcause=R 根因定位（须含 reportId/rootCauseCategory/upstreamDefect/rollbackRecommended）；fix=S 兼 F 修复（须含 basedOnReport/artifacts）；emergency-fix=S 紧急修复变体；escalate=升级（upstreamDefect 触发阶段回退升级时记录 reportId）；r3-completeness/r3-reliability/r3-security=R 预防性审查三报告（约束 #11 无条件强制）；codegraph_query=S-coding 修改前符号级影响分析查询（约束 #14）；opsx_explore/opsx_propose/opsx_apply/opsx_archive=（LEGACY——历史 run-log 合法，新日志须改用 plan_* 三动作）OpenSpec 规格驱动变更四动作；ensure_deps=O 编排者依赖检测（`ensure-codegraph.ts`：codegraph CLI + superpowers 三层检测；缺失时自动安装 codegraph，superpowers 只检测不安装；OpenSpec 项已退役）；iceberg-sweep=R-iceberg 冰山扫掠分派（须含 triggerType/icebergRound/reportPath/newFindingsCount/passed）；iceberg-review=V 复审冰山报告（须含 reportId/passed/validFindings/reworkHints）；plan_propose=S 产编码计划 docs/plans/<changeId>.plan.md（writing-plans）；plan_task=S 按计划执行一个任务（SDD 逐任务）；plan_review=V 对计划任务产出做评审（不在 reworkHints 强制族：配对非强制，约束 #8 审计面）；perspective=A persona 子代理按 agent-personas 阶段角色集矩阵单 persona 视角分析（阶段1-4 多角色机制；须含 persona 字段且非空、与 persona id 一致）；consensus=A-lead 汇总分歧/交叉轮调度/共识纪要（多轮逐轮记录；persona 可为 A-lead 或空——以 role=A 判定）。动作与角色配对：配对强制子集由 check-run-log.ts logic 层 blocking 执行（r3-completeness/r3-reliability/r3-security→R、fix/emergency-fix/produce→S、review→V、gate/tla-gate/graph-gate→G、perspective/consensus→A）；其余动作（test/rootcause/iceberg-sweep/checkpoint/ensure_deps/chunk/cross/evolve/codegraph_query/iceberg-review/opsx_*/plan_* 等）与角色的配对语义见本 description 上文逐动作罗列，非强制子集违反时按 R5/role-action 审计处理（约束 #8 角色分派完整性）",
+      "description": "动作类型枚举（共 18 值，批次 6 A15 词表收敛：32 值旧词表删除 15 个零真实用法死词 evolve/test/rework/rollback/emergency-fix/escalate/codegraph_query/opsx_explore/opsx_propose/opsx_apply/opsx_archive/ensure_deps/iceberg-review/plan_task/plan_review，新增 event-route；写入已删除值即 schema 违规）：chunk=A 子代理 ingestion 分块（阶段1-4必需）；cross=A 子代理跨块交叉合并（阶段1-4必需）；produce=S 产出阶段产物（阶段5-8必需）；review=V 评审（阶段5-8必需；passed=false 须带非空 reworkHints）；gate=G 工件质量门（check-artifact-gate.ts）；tla-gate=G TLA+ 行为门禁（check-tla-model.ts）；graph-gate=G 图谱门禁（check-requirement-graph.ts）；checkpoint=O 阶段门 CHECKPOINT 放行；rootcause=R 根因定位（须含 reportId/rootCauseCategory/upstreamDefect/rollbackRecommended）；fix=S 兼 F 修复（须含 basedOnReport/artifacts；R10 须携带合法 revertEvidence.command）；r3-completeness/r3-reliability/r3-security=R 预防性审查三报告（约束 #11 无条件强制）；perspective=A persona 子代理按 agent-personas 阶段角色集矩阵单 persona 视角分析（阶段1-4 多角色机制；须含 persona 字段且非空、与 persona id 一致）；consensus=A-lead 汇总分歧/交叉轮调度/共识纪要（多轮逐轮记录；persona 可为 A-lead 或空——以 role=A 判定）；iceberg-sweep=R-iceberg 冰山扫掠分派（须含 triggerType/icebergRound/reportPath/newFindingsCount/passed；V 复审以 action=review 记录）；plan_propose=S 产编码计划 docs/plans/<changeId>.plan.md（writing-plans）；event-route=O Loop 3 事件接驳路由（读 event-ingress.jsonl、查路由表、写 routedTo 后留痕，见 event-ingress-guide.md）。动作与角色配对：配对强制子集由 check-run-log.ts logic 层 blocking 执行（r3-completeness/r3-reliability/r3-security→R、fix/produce→S、review→V、gate/tla-gate/graph-gate→G、perspective/consensus→A）；其余动作（chunk/cross/rootcause/iceberg-sweep/checkpoint/plan_propose/event-route 等）与角色的配对语义见本 description 上文逐动作罗列，非强制子集违反时按 R5/role-action 审计处理（约束 #8 角色分派完整性）",
       "enum": [
         "chunk",
         "cross",
-        "evolve",
         "produce",
         "review",
         "gate",
         "tla-gate",
         "graph-gate",
-        "test",
         "checkpoint",
-        "rework",
-        "rollback",
         "rootcause",
         "fix",
-        "emergency-fix",
-        "escalate",
         "r3-completeness",
         "r3-reliability",
         "r3-security",
-        "codegraph_query",
-        "opsx_explore",
-        "opsx_propose",
-        "opsx_apply",
-        "opsx_archive",
-        "ensure_deps",
-        "iceberg-sweep",
-        "iceberg-review",
-        "plan_propose",
-        "plan_task",
-        "plan_review",
         "perspective",
-        "consensus"
+        "consensus",
+        "iceberg-sweep",
+        "plan_propose",
+        "event-route"
       ]
     },
     "role": {
@@ -236,7 +180,7 @@
       "minimum": 0
     },
     "estimated": {
-      "description": "tokens 是否为估算值：true=LLM 估算（违反约束 4，应避免）；false=实际报告",
+      "description": "tokens 是否为估算值：true=LLM 估算（违反约束 4；check-run-log R2 对 estimated=true 记录报 blocking 违规，须回填真实运行结果）；false=实际报告",
       "type": "boolean"
     },
     "subagentSpawns": {
@@ -286,7 +230,7 @@
       "items": { "type": "string" }
     },
     "reportId": {
-      "description": "rootcause 动作的 R 报告 ID（格式 RC-<phase>-<round>-<seq>）；escalate（upstreamDefect 触发）时关联根因报告",
+      "description": "rootcause 动作的 R 报告 ID（格式 RC-<phase>-<round>-<seq>）；review（targetKind=rootcause）与 fix 以 basedOnReport/target 关联同一 ID",
       "type": "string"
     },
     "rootCauseCategory": {
@@ -305,25 +249,21 @@
       "description": "fix 动作所基于的 R 报告 ID（与 reportId 一一对应，由 run-log R3 扩展校验）；implementation V/G 与对应 fix 使用同一 exact 值",
       "type": "string"
     },
-    "variant": {
-      "description": "fix/emergency-fix 动作的变体标注（subagent-delegation.md「S 子代理修改既有产物的边界」）：fix=S-fix 返工变体；emergency-fix=紧急修复通道（blocker 说明阻塞原因）。action=emergency-fix 时必填且 const=emergency-fix、blocker 必填；action=fix 时若出现必须为 fix（不强制出现，向后兼容 variant 规则引入前的 fix 记录）；动作-角色配对（r3-*/produce/fix/emergency-fix/review/gate 类）由 check-run-log.ts logic 层强制。历史兼容：未声明 variant 的历史 emergency-fix 记录由 check-run-log 以 LEGACY_VARIANT 非阻断 diagnostic 吸收（exit 0 + NOT_CLOSED_NOT_PROVEN）；新记录必须声明 variant 且 emergency-fix 须附 blocker。",
-      "enum": ["fix", "emergency-fix"]
-    },
     "blocker": {
-      "description": "emergency-fix 的阻塞原因描述（非空字符串，仅作为「为何走紧急通道」的审计说明，不意味跳过 R3+V+G 审查）；variant=emergency-fix 或 action=emergency-fix 时必填。历史兼容：未声明 variant 的历史 emergency-fix 记录由 check-run-log 以 LEGACY_VARIANT 非阻断 diagnostic 吸收（exit 0 + NOT_CLOSED_NOT_PROVEN）；新记录必须声明 variant 且 emergency-fix 须附 blocker。",
+      "description": "可选审计字段：紧急通道的阻塞原因描述（「为何不走常规返工节奏」的说明，不意味跳过 R3+V+G 审查）。批次 6 A15：action=emergency-fix 已从词表删除（本 schema 的条件强制随之删除），本字段降级为 fix 记录的可选审计说明；历史 variant 字段亦已删除，携带即被 additionalProperties 拒绝。",
       "type": "string",
       "minLength": 1
     },
     "fixedLocation": {
-      "description": "fix/emergency-fix 修复位置（文件路径/区域），紧急修复条目审计用（subagent-delegation.md 紧急修复条目格式字段）",
+      "description": "fix 修复位置（文件路径/区域），紧急修复条目审计用（subagent-delegation.md 紧急修复条目格式字段）",
       "type": "string"
     },
     "fixBasedOn": {
-      "description": "fix/emergency-fix 修复依据（如 S-self-assessment 或 R 报告 ID），紧急修复条目审计用（subagent-delegation.md 紧急修复条目格式字段）",
+      "description": "fix 修复依据（如 S-self-assessment 或 R 报告 ID），紧急修复条目审计用（subagent-delegation.md 紧急修复条目格式字段）",
       "type": "string"
     },
     "implementationTarget": {
-      "description": "implementation review/gate 所针对的实现产物身份；缺失时 reducer 输出 LEGACY_UNSCOPED，不从邻近记录推断",
+      "description": "implementation review/gate 所针对的实现产物身份；缺失时该记录不参与严格生命周期配对（不提供信用，也不从邻近记录推断）。phase 8 记录缺该字段由本 schema allOf 直接拒绝（fail-closed）。",
       "type": "string"
     },
     "lifecycleStatus": {
@@ -347,7 +287,7 @@
       "enum": ["A", "B", "C", "D"]
     },
     "passed": {
-      "description": "review 是否通过（boolean；passed=false 时 reworkHints 须非空——schema 强制 + logic 按 cutoff 分界）",
+      "description": "review 是否通过（boolean；passed=false 时 reworkHints 须非空——schema 强制 + logic [rework-hints] blocking，无历史吸收）",
       "type": "boolean"
     },
     "reworkHints": {
@@ -356,7 +296,7 @@
       "items": { "type": "string" }
     },
     "revertEvidence": {
-      "description": "S-fix 复现测试的回滚证伪声明：执行 command 使复现测试回到失败态（AC-8）。fix/emergency-fix 记录由 check-run-log R10 逻辑强制携带（schema 层 optional）",
+      "description": "S-fix 复现测试的回滚证伪声明：执行 command 使复现测试回到失败态（AC-8）。fix 记录由 check-run-log R10 逻辑强制携带（schema 层 optional）",
       "type": "object",
       "required": ["command"],
       "properties": {
@@ -402,7 +342,7 @@
       "minimum": 0
     },
     "validFindings": {
-      "description": "iceberg-review 动作经 V 复审确认的有效发现数（非负整数）",
+      "description": "V 复审冰山扫掠报告（action=review，targetKind/reportPath 关联报告）经确认的有效发现数（非负整数；批次 6 A15：原 iceberg-review 动作已删除，复审以 review 动作记录）",
       "type": "integer",
       "minimum": 0
     },

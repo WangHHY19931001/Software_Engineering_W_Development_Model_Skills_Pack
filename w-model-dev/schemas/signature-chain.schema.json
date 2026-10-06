@@ -15,15 +15,16 @@
     "prevSigId",
     "prevSigHash",
     "sigHash",
+    "sigHashAlgo",
     "signedAt",
     "signer",
     "inputProvenance"
   ],
   "properties": {
     "sigId": {
-      "description": "签名 ID，格式 wm<阶段>-r<轮次>-<角色>[序号]（如 wm1-r002-S、wm1-r001-O1，可选 P2- 前缀表示分片；后缀与 role 对应）；R4 校验角色须在阶段角色清单内；阶段起点为 \"genesis\"",
+      "description": "签名 ID，格式 wm<阶段>-r<轮次>-<角色>[序号]（如 wm1-r002-S、wm1-r001-O1，可选 P2- 前缀表示分片；后缀与 role 对应；43.0.0 A4 起后缀可为 human[序号]——role=human 成熟度审批条目）；R4 校验角色须在阶段角色清单内（human 除外，R4 侧不参与阶段角色链）；阶段起点为 \"genesis\"",
       "type": "string",
-      "pattern": "^wm\\d+-r\\d+-(P2-)?[OSAVGR]\\d*$|^genesis$"
+      "pattern": "^wm\\d+-r\\d+-(P2-)?(?:human|[OSAVGR])\\d*$|^genesis$"
     },
     "phase": {
       "description": "签名所处阶段编号，取值 1-8（R1 各阶段强制角色链齐全）",
@@ -33,17 +34,17 @@
     },
     "phaseName": { "description": "阶段名称（如 需求分析 / 系统设计），与 phase 对应", "type": "string" },
     "role": {
-      "description": "签名角色：O=编排者 / A=分析 / S=产出 / V=评审 / G=门禁 / R=根因（R4 校验须在阶段角色清单内）",
+      "description": "签名角色：O=编排者 / A=分析 / S=产出 / V=评审 / G=门禁 / R=根因（R4 校验须在阶段角色清单内）；human=人类用户签名（豁免/审批链预留，任务 8 依赖，R4 侧不参与阶段角色链）",
       "type": "string",
-      "enum": ["O", "S", "A", "V", "G", "R"]
+      "enum": ["O", "S", "A", "V", "G", "R", "human"]
     },
     "action": {
       "description": "动作类型（如 chunk/cross/produce/review/gate/checkpoint/locate/fix），与 run-log action 对应",
       "type": "string"
     },
     "targetKind": {
-      "description": "返工链语义分类（D-1，可选元数据，不入 sigHash）：rootcause=复审 R 报告（RootCauseReport）；preventive=预防性审查（R3 报告）；iceberg=冰山扫掠报告；standard=默认/非返工语境。用于 R9 来源矩阵例外判定：V 消费 R 产物须 targetKind=rootcause、R 消费 S 产物须 targetKind=preventive、S 消费 R 产物须 action=fix/emergency-fix（详见 signature-chain-guide.md §3）。注意：与 run-log schema 的同名 targetKind（requirement/design/code/test 等词表）是不同 schema 中的不同词表，重叠值仅 rootcause 且语义一致",
-      "enum": ["rootcause", "preventive", "iceberg", "standard"]
+      "description": "返工链语义分类（D-1；43.0.0 v3 起入 sigHash，无痕改写即被 R6 抓获）：rootcause=复审 R 报告（RootCauseReport）；preventive=预防性审查（R3 报告）；iceberg=冰山扫掠报告；maturity=成熟度评定（A4：maturity 豁免 human 审批条目，check-artifact-gate 消费 level 前经 verifyMaturityApproval 校验）；standard=默认/非返工语境。用于 R9 来源矩阵例外判定：V 消费 R 产物须 targetKind=rootcause、R 消费 S 产物须 targetKind=preventive、S 消费 R 产物须 action=fix（详见 signature-chain-guide.md §3）。注意：与 run-log schema 的同名 targetKind（requirement/design/code/test 等词表）是不同 schema 中的不同词表，重叠值仅 rootcause 且语义一致",
+      "enum": ["rootcause", "preventive", "iceberg", "maturity", "standard"]
     },
     "runId": { "description": "关联的 run-log 运行 ID（与 run-log.jsonl 中 runId 对应）", "type": "string" },
     "artifacts": { "description": "本条签名产出的产物路径数组", "type": "array", "items": { "type": "string" } },
@@ -57,14 +58,14 @@
       "pattern": "^sha256:[0-9a-f]{64}$|^0$"
     },
     "sigHash": {
-      "description": "本条签名哈希（格式 sha256:<64 位 hex>；R6 防篡改：重算 sigHash=sha256(sigId|phase|role|action|runId|artifacts|prevSigHash|signedAt|signer|inputProvenance)，不一致即报篡改；该式为 v1 公式，v2 条目按 sigHashAlgo 分流）",
+      "description": "本条签名哈希（格式 sha256:<64 位 hex>；R6 防篡改：按 v3 单公式重算 sigHash=sha256(sigId|phase|role|action|runId|artifacts|sourceArtifacts|prevSigHash|signedAt|signer|inputProvenance|targetKind|gateExitCode|gateLogPath)，不一致即报篡改；43.0.0 起唯一公式，无 v1/v2 分流）",
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
     },
     "sigHashAlgo": {
-      "description": "sigHash 公式版本；缺省 v1。v2 将 artifacts 与 sourceArtifacts 两清单整体（含 sha256）纳入公式；v2 条目适用 R11",
+      "description": "sigHash 公式版本（43.0.0 起必填）：唯一合法值 v3（targetKind/gateExitCode/gateLogPath 与 sourceArtifacts 全量入哈希）；非 v3 条目 R6 一律违规（旧数据 fail-closed，毁弃存量不迁移）",
       "type": "string",
-      "enum": ["v1", "v2"]
+      "enum": ["v3"]
     },
     "signedAt": {
       "description": "签名时间（ISO 8601；R3 校验按链序时间戳单调递增）",
@@ -107,7 +108,7 @@
               "sha256": {
                 "type": "string",
                 "pattern": "^[a-fA-F0-9]{64}$",
-                "description": "来源产物内容哈希（v2 链必填，R11）"
+                "description": "来源产物内容哈希（43.0.0 v3 起全量必填，R11）"
               }
             }
           }

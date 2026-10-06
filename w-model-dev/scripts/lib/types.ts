@@ -47,7 +47,7 @@ export interface JsonReport {
    * 动态 facts 通道整体跳过——键保持在场以稳定形状，供审计区分「已校验」与「本次跳过」。
    */
   dynamicMeasurements?: Record<string, unknown> | null;
-  /** 非阻断生命周期诊断（例如 LEGACY_UNSCOPED/pending-pre-approval）。 */
+  /** 非阻断生命周期诊断（例如 pending-pre-approval；历史 legacy 吸收诊断已删除）。 */
   diagnostics?: string[];
   /** 非阻断警告（如 check-requirement-coverage 未提供 --graph 时 C7 降级）。 */
   warnings?: string[];

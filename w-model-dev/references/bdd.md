@@ -1180,7 +1180,7 @@ Scenario: 已登录用户登出
 }
 ```
 
-> **`basePath` 解析基准（2026-09-19）**：本 manifest 内相对路径的解析基准：相对项目根目录（projectDir；约定本文件位于 .w-model/ 下）。两处消费方对 basePath 本身的锚点相同（均为 `resolve(projectDir, basePath)`），差异在兜底候选集：check-bdd-model.ts **在首个候选 `<basePath>/<filePath>` 不存在时**还会依次尝试 `.w-model/<filePath>`、`.w-model/bdd/<filePath>`、`<projectDir>/<filePath>`；check-artifact-gate.ts 无兜底（直接报 [artifact:bdd] feature file missing）。跨工具复用时以两处门禁实测为准。
+> **`basePath` 解析基准（2026-09-19；2026-10-06 A8 更新）**：本 manifest 内相对路径的解析基准：相对项目根目录（projectDir；约定本文件位于 .w-model/ 下）。两处消费方对 basePath 本身的锚点相同（均为 `resolve(projectDir, basePath)`），差异在兜底候选集：check-bdd-model.ts **在首个候选 `<basePath>/<filePath>` 不存在时**还会依次尝试 `.w-model/<filePath>`、`.w-model/bdd/<filePath>`、`<projectDir>/<filePath>`；check-artifact-gate.ts 无兜底（直接报 [artifact:bdd] feature file missing）。**4 路径全部未命中时 check-bdd-model.ts 产生 `[D1] feature 文件不存在（4 路径均未命中）` blocking violation 并 exit 1（A8，批次 6：不再只 console.error 后静默跳过——那会让 D1/D3/D6 对空 parsedFeatures 空转通过、exit 0 假绿），violation 消息携带 4 个候选解析路径便于定位。**跨工具复用时以两处门禁实测为准。
 
 ### 状态机说明
 

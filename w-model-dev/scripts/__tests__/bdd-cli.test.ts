@@ -31,6 +31,12 @@ function run(args: string[]): { code: number | null; stdout: string; stderr: str
   return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 
+/** 同 run，但允许指定子进程 cwd（真机 fixture 回归需要以仓库根为 cwd）。 */
+function runAt(cwd: string, args: string[]): { code: number | null; stdout: string; stderr: string } {
+  const result = runSync(process.execPath, [tsxCli, SCRIPT, ...args, '--json'], { cwd });
+  return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+}
+
 async function writeJson(relativePath: string, value: unknown): Promise<string> {
   const target = path.join(tmpDir, relativePath);
   await fs.mkdir(path.dirname(target), { recursive: true });
@@ -357,5 +363,70 @@ describe('check-bdd-model --phase 形态契约（D3/I-4：仅等号形态）', (
     expect(result.code).toBe(2);
     expect(result.stderr).toContain('ARG_INVALID');
     expect(result.stderr).toContain('--phase 仅支持等号形态 --phase=N');
+  });
+});
+
+describe('check-bdd-model feature 文件缺失不再 fail-open（A8，批次 6）', () => {
+  it('feature 文件 4 路径全缺失 → exit 1 且产生携带 4 个尝试路径的 [D1] violation（不再 console.error 后 continue 空转通过）', async () => {
+    const manifest = await writeJson('.w-model/bdd-manifest.json', {
+      ...baseManifest(1),
+      features: [
+        {
+          id: 'BDD-L1-missing',
+          level: 1,
+          filePath: 'missing.feature',
+          scenarioCount: 1,
+          stateMachineId: 'SM-L1-missing',
+          tlaSpecId: 'L1-missing',
+          reqIds: [],
+          designIds: [],
+          parentFeatureIds: [],
+          siblingFeatureIds: [],
+          childFeatureIds: [],
+        },
+      ],
+    });
+
+    const result = run([manifest, '--phase=1']);
+
+    expect(result.code).toBe(1);
+    const parsed = JSON.parse(result.stdout) as { passed: boolean; exitCode: number; reasons: string[] };
+    expect(parsed.passed).toBe(false);
+    expect(parsed.exitCode).toBe(1);
+    const missing = parsed.reasons.find((x) => x.startsWith('[D1]') && x.includes('feature 文件不存在'));
+    expect(missing, `reasons 应含 [D1] missing-feature violation：${JSON.stringify(parsed.reasons)}`).toBeDefined();
+    expect(missing).toContain('4 路径均未命中');
+    expect(missing).toContain('missing.feature');
+    // 消息携带 4 个候选解析路径（basePath / .w-model/ / .w-model/bdd/ / projectDir），便于定位
+    expect(missing).toContain(path.resolve(tmpDir, 'missing.feature'));
+    expect(missing).toContain(path.resolve(tmpDir, '.w-model', 'missing.feature'));
+    expect(missing).toContain(path.resolve(tmpDir, '.w-model', 'bdd', 'missing.feature'));
+  });
+
+  it('4 路径部分命中（首个候选 <projectDir>/<filePath> 存在）→ 行为不变：exit 0 且无 missing violation', async () => {
+    // 约定布局：manifest 在 <project>/.w-model/，basePath="." 锚定 projectDir，feature 落在 <projectDir>/bdd/
+    await fs.mkdir(path.join(tmpDir, 'bdd'), { recursive: true });
+    await fs.copyFile(
+      path.join(ROOT, 'w-model-dev/scripts/samples/bdd/valid-l1.feature'),
+      path.join(tmpDir, 'bdd', 'valid-l1.feature'),
+    );
+    const fixtureManifest = JSON.parse(
+      await fs.readFile(path.join(ROOT, 'w-model-dev/scripts/samples/bdd/valid-manifest.json'), 'utf-8'),
+    ) as Record<string, unknown>;
+    const manifest = await writeJson('.w-model/bdd-manifest.json', fixtureManifest);
+
+    const result = run([manifest, '--phase=1']);
+
+    expect(result.code).toBe(0);
+    const parsed = JSON.parse(result.stdout) as { passed: boolean; exitCode: number; reasons: string[] };
+    expect(parsed).toMatchObject({ passed: true, exitCode: 0 });
+    expect(parsed.reasons.some((x) => x.includes('feature 文件不存在'))).toBe(false);
+  });
+
+  it('samples/bdd/valid-manifest.json 走通自家 CLI → exit 0（真机 fixture 回归，仓库根 cwd）', async () => {
+    const result = runAt(ROOT, [path.join(ROOT, 'w-model-dev/scripts/samples/bdd/valid-manifest.json'), '--phase=1']);
+
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ exitCode: 0, passed: true });
   });
 });

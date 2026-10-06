@@ -58,8 +58,14 @@
   "ranking": {
     "algorithm": "PPT",
     "k": 2.5,
-    "temperature": 4.0,
+    "temperature": 4,
     "rounds": 25,
     "ordered": ["REQ-001", "REQ-002"]
-  }
+  },
+  "reviewedArtifacts": [
+    {
+      "path": "README.md",
+      "sha256": "2dfe8de7b528a1673567de769e2c231817ba9fe765c87cda195cd3c92f316d14"
+    }
+  ]
 }

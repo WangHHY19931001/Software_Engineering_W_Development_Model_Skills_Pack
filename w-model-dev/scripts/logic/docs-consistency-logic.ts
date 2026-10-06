@@ -250,8 +250,8 @@ export interface DocConsistencyInput {
  * 一律从活体文档解析，不在此硬编码；Vitest 文件数/用例数属于受控动态 facts，不由文档声明。
  */
 export const EXPECTED = {
-  // 2026-10-03 task 3（阶段多角色讨论分析机制）：perspective/consensus 两动作入枚举，30→32
-  runLogActionCount: 32,
+  // 2026-10-06 批次 6 A15（run-log action 词表收敛）：32→18——删 15 死词（含 opsx_*）+ 增 event-route
+  runLogActionCount: 18,
   maxAntiPattern: 48,
   prePushCount: 19,
   /** 硬约束条数（14 条） */

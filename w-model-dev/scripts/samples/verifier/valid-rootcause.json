@@ -54,5 +54,11 @@
   "compositeScore": 0.876,
   "qualityLevel": "A",
   "summary": "RC-phase5-1-01 根因链逻辑自洽（3 步追溯至根本原因），可证伪假设成立，修复建议与预防措施可执行，V 复审结论：通过。",
-  "passed": true
+  "passed": true,
+  "reviewedArtifacts": [
+    {
+      "path": "README.md",
+      "sha256": "2dfe8de7b528a1673567de769e2c231817ba9fe765c87cda195cd3c92f316d14"
+    }
+  ]
 }

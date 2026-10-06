@@ -49,6 +49,7 @@ export const SUBPROCESS_TEST_FILES: readonly string[] = [
   'check-coding-plan.test.ts',
   'check-coverage-scope.test.ts',
   'check-pollution-cli.test.ts',
+  'check-run-log-cli.test.ts',
   'check-samples-coverage.test.ts',
   'checkpoint-r0-bootstrap-cli.test.ts',
   'cli-arg-unification.test.ts',

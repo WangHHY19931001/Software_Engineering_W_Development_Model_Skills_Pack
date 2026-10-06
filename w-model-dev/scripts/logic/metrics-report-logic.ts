@@ -6,8 +6,8 @@
  * 设计：docs/superpowers/specs/2026-08-05-round31-wm-status-metrics-design.md §3.2
  */
 
-/** 返工相关 action（rework/fix/rootcause） */
-export const REWORK_ACTIONS: ReadonlySet<string> = new Set(['rework', 'fix', 'rootcause']);
+/** 返工相关 action（fix/rootcause；批次 6 A15 词表收敛：rework 死词已删除） */
+export const REWORK_ACTIONS: ReadonlySet<string> = new Set(['fix', 'rootcause']);
 /** 门禁类 action */
 export const GATE_ACTIONS: ReadonlySet<string> = new Set(['gate', 'tla-gate', 'graph-gate']);
 

@@ -317,18 +317,12 @@ interface BudgetConfig {
   perPhase: {
     /** 单阶段累计 token 上限；超过触发 onExceed */
     maxTokens: number;
-    /** 单阶段子代理分派次数上限（S+V+G+A 合计）；超过触发 onExceed */
-    maxSubagentSpawns: number;
-    /** 单阶段返工循环上限（默认 3，与 operational-recovery.md「同一阶段返工超过 2 次」一致+1） */
-    maxReworkRounds: number;
   };
 
   /** 项目级全局预算 */
   project: {
     /** 全阶段累计 token 上限；超过触发 onExceed */
     maxTokensTotal: number;
-    /** 单次会话 token 上限（防止单次交互爆量） */
-    maxTokensPerSession: number;
   };
 
   /** 预算超限时的处置策略 */
@@ -359,6 +353,8 @@ interface BudgetConfig {
 }
 ```
 
+> **43.0.0 A5 死字段退役**：`perPhase.maxSubagentSpawns` / `perPhase.maxReworkRounds` / `project.maxTokensPerSession` 三个零消费死字段已删除（审计证实无任何门禁脚本消费）；旧数据携带这些字段将被 `additionalProperties:false` 拒绝（毁弃存量，不兼容）。阶段返工轮次上限由 `killSwitch`（`consecutiveReworks`，D-4a 口径）与分层反馈回路（L0-L4）承载，不再以预算字段登记。
+
 **默认值**（`/wm analyze` 首次初始化时写入，用户可改）：
 
 ```json
@@ -368,13 +364,10 @@ interface BudgetConfig {
   "createdAt": "<now>",
   "updatedAt": "<now>",
   "perPhase": {
-    "maxTokens": 500000,
-    "maxSubagentSpawns": 30,
-    "maxReworkRounds": 3
+    "maxTokens": 500000
   },
   "project": {
-    "maxTokensTotal": 4000000,
-    "maxTokensPerSession": 1000000
+    "maxTokensTotal": 4000000
   },
   "onExceed": "pause",
   "killSwitch": {
@@ -394,13 +387,13 @@ interface BudgetConfig {
 
 - `budget.json` 由编排者 O 维护，属"状态读写+持久化"允许动作（非实施，不触发反模式 #10）。
 - 编排者在每个阶段门放行前执行预算检查（汇总 `run-log.jsonl` 中本阶段/全项目 tokens），超限按 `onExceed` 处置。
-- `tokensEstimate` 由宿主 Agent 报告实际消耗（`estimated=false`）；不得用 LLM 估算（`estimated=true` 违反约束 4）。
-- `budget.updatedAt` 须在每个阶段门放行前更新（编排者 O 在 CHECKPOINT 放行时同步刷新为当前时间戳）。与 `check-budget.ts` R1 时效性校验对齐：当 `project.updatedAt > budget.createdAt` 时须满足 `budget.updatedAt > budget.createdAt`，否则报「阶段推进但 budget 未更新」。
+- `tokensEstimate` 由宿主 Agent 报告实际消耗（`estimated=false`）；不得用 LLM 估算（`estimated=true` 违反约束 4；43.0.0 A5 起 `check-run-log.ts` R2 对 `estimated=true` 记录报 blocking 违规，须回填真实运行结果）。
+- `budget.updatedAt` 须在每个阶段门放行前更新（编排者 O 在 CHECKPOINT 放行时同步刷新为当前时间戳）。与 `check-budget.ts` R1 时效性校验对齐（43.0.0 A5 顺序化）：`budget.updatedAt` **不得早于** `project.updatedAt`——早于即报「预算未随项目演进复核」（相等合法）；时间戳按毫秒比较，任一端不可解析则跳过该子判定并出非阻断诊断（跳过不等于通过）。
 - 预算检查不替代门禁脚本（反模式 #3/#6）：预算超限触发暂停/告警，放行仍由 G 子代理退出码决定。
 - `rootcauseParallelBudget` 为多角度 R 的 token 预算配置（字段名保留向后兼容，实际含义为「每轮多角度 R 的 token 预算」，不论并行/串行均累计）。由 [`check-budget.ts`](../scripts/cli/check-budget.ts) R4-A 规则校验：每轮 persona 数 ≤ `maxPersonasPerRound`、每个 persona tokens ≤ `maxTokensPerPersona`、每轮总 tokens ≤ `maxTotalTokensPerRound`（串行分派时累计校验，超限触发 killSwitch）。未配置该字段时不校验（向后兼容）。
 - **用量实效校验（R6，D-4b）**：预算配置合法 ≠ 用量在预算内。`check-budget.ts --run-log=` 从 `run-log.jsonl` 累计 `tokens`（Σtokens(阶段) 与 Σtokens(全量)；只累计有限非负数的 `tokens` 字段，坏值不计入），再与上限比对：Σtokens(阶段) > `perPhase.maxTokens` **或** Σtokens(全量) > `project.maxTokensTotal` → **blocking（退出码 1）**，违规消息以 `R6：` 开头并附超限占比；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` 时另报 killSwitch 用量告警（**R5-b**，消息以 `R5-b：` 开头，与 R5 的返工/TLA 触发文案区分——R5 既有文案「killSwitch 应触发（返工 N >= M）但未告警」逐字不变）。未提供 `--run-log`（即无用量输入）时 R6/R5-b 整体跳过（**判据与退出码不变**），但输出非阻断诊断「R6/R5-b 未生效（未提供 run-log）」——省略该参数不再等于静默跳过（D-5② 未接线可见化；live run 实测 9/9 次调用均未传该参数，R6/R5-b 全程静默，故权威调用表把 `--run-log` 定为必带，见 `operational-recovery.md`「调用时机」表）；`--run-log` 文件存在且 Σtokens=0（无 `tokens` 记录）时输出「R6 未生效」非阻断警告（跳过不等于通过；读取失败时该警告不追加，避免把「没读到」说成「没用量」）；提供了 `--run-log` 但**读取失败**时同样**不出**「未接线」诊断（此时走该门自身的失败路径：stderr 读取失败警告已说明跳过原因，R5/R6/R5-b 同样跳过）。背景：真实 8 阶段调测实耗 580M tokens 而门禁全程未红，`perPhase.maxTokens`/`project.maxTokensTotal` 形同虚设。
 - **Σtokens 为上界口径（N-6）**：Σtokens 是「按 run-log 记录值累计」的口径，**同一分派动作的多条归账会重复累计**（实测 live run 记录值 522M 中约 72.8M 来自重复归账），故它是**真实唯一消耗的上界**；R6/R5-b 的预算判定**按上界执行**（宁严不松），**不做去重**——去重键在 legacy 记录上不可靠（阶段 1-4 的 `reportId` 为空、`timestamp` 等值会误并真实并发分派）。脚本在同 `(parentDispatchId, timestamp, tokens, duration_s)` **键**出现 >1 次时输出「疑似重复归账 N 组」非阻断诊断（键守卫：`tokens` 非有限正数或 `duration_s` 非数字的条目不入组；同 `parentDispatchId` 且键全同仍计组；只统计并可见化、不改变 Σtokens 与退出码）。**R3 三条目归账约定**：同一分派若按 `r3-completeness` / `r3-reliability` / `r3-security` 分别记账，**能拆分到维度的则各自填实际 `tokens`，不能拆分时只填一条、其余两条填 `0`**——避免把同一消耗写三遍而人为放大上界。
-- **`killSwitch.consecutiveReworks` 的计数口径（D-4a）**：`check-budget.ts` 的 `reworkCount` 是「返工事件 ∪ 未过门事件」的**累计**条数（`action ∈ {rework, fix, emergency-fix}` 或 `outcome ∈ {fail, rework}`），不是「连续 N 轮返工」的滑动窗口——该阈值实际约束的是本阶段返工/未过门事件累计条数（字段名沿用 schema，语义以此口径为准）。
+- **`killSwitch.consecutiveReworks` 的计数口径（D-4a）**：`check-budget.ts` 的 `reworkCount` 是「返工事件 ∪ 未过门事件」的**累计**条数（返工事件载体 `action=fix`——批次 6 A15 词表收敛后 `rework`/`emergency-fix` 死词已删除——或 `outcome ∈ {fail, rework}`），不是「连续 N 轮返工」的滑动窗口——该阈值实际约束的是本阶段返工/未过门事件累计条数（字段名沿用 schema，语义以此口径为准）。
 
 ## 运行日志模型（run-log.jsonl）
 
@@ -420,36 +413,22 @@ interface RunLogEntry {
   action:
     | 'chunk'
     | 'cross'
-    | 'evolve'
     | 'produce'
     | 'review'
     | 'gate'
     | 'tla-gate'
     | 'graph-gate'
-    | 'test'
     | 'checkpoint'
-    | 'rework'
-    | 'rollback'
     | 'rootcause'
     | 'fix'
-    | 'emergency-fix'
-    | 'escalate'
     | 'r3-completeness'
     | 'r3-reliability'
     | 'r3-security'
-    | 'codegraph_query'
-    | 'opsx_explore'
-    | 'opsx_propose'
-    | 'opsx_apply'
-    | 'opsx_archive'
-    | 'ensure_deps'
-    | 'iceberg-sweep'
-    | 'iceberg-review'
-    | 'plan_propose'
-    | 'plan_task'
-    | 'plan_review'
     | 'perspective'
-    | 'consensus';
+    | 'consensus'
+    | 'iceberg-sweep'
+    | 'plan_propose'
+    | 'event-route';
   /** 子代理角色 */
   role: 'O' | 'A' | 'S' | 'V' | 'G' | 'R';
   /** 多视角分析的 persona 标识（action=perspective/consensus 时须非空；取值=agent-personas 阶段角色集矩阵 persona id；其他 action 不得出现——role-dispatch logic 校验） */
@@ -478,21 +457,19 @@ interface RunLogEntry {
   artifacts?: string[];
   /** 决策置信度（可选，0.0-1.0；agentic Ch18 结构化思维链日志，供 Loop 4 劣化分析） */
   decisionConfidence?: number;
-  /** implementation review/gate 所针对的实现目标；缺失时 reducer 输出 LEGACY_UNSCOPED */
+  /** implementation review/gate 所针对的实现目标；缺失时该记录不参与严格生命周期配对（phase 8 行缺该字段由 schema 拒绝） */
   implementationTarget?: string;
-  /** fix/emergency-fix 变体标注：fix=S-fix 返工变体；emergency-fix=紧急修复通道（action=emergency-fix 时必填且 const=emergency-fix、blocker 必填；action=fix 时可选，出现则必须为 "fix"）。2026-09-01（LEGACY_VARIANT_CUTOFF）起写入的 emergency-fix 缺 variant 属 blocking，不再按 LEGACY_VARIANT 吸收 */
-  variant?: 'fix' | 'emergency-fix';
-  /** emergency-fix 的阻塞原因（非空字符串；仅作「为何走紧急通道」的审计说明，不意味跳过 R3+V+G 审查） */
+  /** 紧急通道的阻塞原因（可选审计说明，「为何不走常规返工节奏」，不意味跳过 R3+V+G 审查）。批次 6 A15：action=emergency-fix 已从词表删除，本字段降级为 fix 记录的可选审计说明；历史 variant 字段已删除（批次 6 A3/C14），携带即被 schema additionalProperties 拒绝 */
   blocker?: string;
-  /** fix/emergency-fix 修复位置（文件/区域），紧急修复条目审计用 */
+  /** fix 修复位置（文件/区域），紧急修复条目审计用 */
   fixedLocation?: string;
-  /** fix/emergency-fix 修复依据（S-self-assessment 或 R 报告 ID），紧急修复条目审计用 */
+  /** fix 修复依据（S-self-assessment 或 R 报告 ID），紧急修复条目审计用 */
   fixBasedOn?: string;
-  /** review: 是否通过（passed=false 时 reworkHints 须非空——schema 强制 + logic 按 cutoff 分界） */
+  /** review: 是否通过（passed=false 时 reworkHints 须非空——schema 强制 + logic `[rework-hints]` blocking，无历史吸收） */
   passed?: boolean;
-  /** review: 返工提示数组（passed=false 时必须为非空数组；reworkHints 规则与 variant 规则同窗引入，LEGACY_VARIANT_CUTOFF 前旧行经 LEGACY_REWORK_HINTS 非阻断 diagnostic 吸收，此后 blocking） */
+  /** review: 返工提示数组（passed=false 时必须为非空数组；历史 cutoff 吸收路径已删除（批次 6 A3/C14）：任何时间戳一律 blocking） */
   reworkHints?: string[];
-  /** fix/emergency-fix: S-fix 复现测试的回滚证伪声明（R10 强制携带，schema 层 optional；缺失或仅空白 command 一律 blocking，无时间戳豁免） */
+  /** fix: S-fix 复现测试的回滚证伪声明（R10 强制携带，schema 层 optional；缺失或仅空白 command 一律 blocking，无时间戳豁免） */
   revertEvidence?: { command: string; description?: string };
   /** effective consumer 的机器状态，不改写 raw JSONL；exit 0 仍可能是 NOT_CLOSED_NOT_PROVEN */
   lifecycleStatus?: 'CLOSED_UNDER_CURRENT_RULES' | 'NOT_CLOSED_NOT_PROVEN';
@@ -555,18 +532,37 @@ interface RunLogEntry {
 - 阶段 1-4 不要求 `produce`/`review`；阶段 5-8 不要求 `chunk`/`cross`。
 - 所有阶段均要求 gate 类动作和 checkpoint。missing 任一必需动作 → R1 违规。
 
-### 动作类型字段约束（rootcause / fix / escalate 扩展）
+### 动作类型字段约束（rootcause / fix 扩展）与 action 词表（18 值）
 
 > 对应 spec §5.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） run-log 新增动作 + §7.5（`docs/superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md`） schema 扩展。由 [`scripts/logic/run-log-logic.ts`](../scripts/logic/run-log-logic.ts) R1 校验。
 
-`action` 枚举新增 `rootcause` / `fix` 两个动作。返工链固定为 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；各动作的额外必填字段约束：
+`action` 词表自批次 6 A15 起收敛为 **18 值**（与 `run-log.schema.json` enum 逐值一致，32 值旧词表中 15 个零真实用法死词——`evolve`/`test`/`rework`/`rollback`/`emergency-fix`/`escalate`/`codegraph_query`/`opsx_*` 四值/`ensure_deps`/`iceberg-review`/`plan_task`/`plan_review`——已删除，新增 `event-route`；写入已删除值即 schema 违规）。每值一句职责：
+
+| action | 职责 |
+| --- | --- |
+| `chunk` | A 子代理 ingestion 分块（阶段 1-4 必需） |
+| `cross` | A 子代理跨块交叉合并（阶段 1-4 必需） |
+| `produce` | S 产出阶段产物（阶段 5-8 必需） |
+| `review` | V 评审（passed=false 须带非空 reworkHints） |
+| `gate` | G 工件质量门（check-artifact-gate.ts） |
+| `tla-gate` | G TLA+ 行为门禁（check-tla-model.ts） |
+| `graph-gate` | G 图谱门禁（check-requirement-graph.ts） |
+| `checkpoint` | O 阶段门 CHECKPOINT 放行 |
+| `rootcause` | R 根因定位（须含 reportId/rootCauseCategory/upstreamDefect/rollbackRecommended） |
+| `fix` | S 兼 F 修复（须含 basedOnReport/artifacts；R10 须携带合法 revertEvidence.command） |
+| `r3-completeness` / `r3-reliability` / `r3-security` | R 预防性审查三报告（约束 #11 无条件强制） |
+| `perspective` | A persona 单视角分析（阶段 1-4 多角色机制，须含非空 persona 字段） |
+| `consensus` | A-lead 汇总分歧/共识纪要（多轮逐轮记录） |
+| `iceberg-sweep` | R-iceberg 冰山扫掠分派（V 复审以 `review` 动作记录） |
+| `plan_propose` | S 产编码计划 docs/plans/<changeId>.plan.md |
+| `event-route` | O Loop 3 事件接驳路由留痕（见 event-ingress-guide.md） |
+
+返工链固定为 普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；各动作的额外必填字段约束：
 
 | action          | 额外必填字段                                                                            | 说明                                                                                                                                                                                                                                |
 | --------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `rootcause`     | `reportId` / `rootCauseCategory` / `upstreamDefect` / `rollbackRecommended`             | R 子代理产出根因报告时记录；`reportId` 格式 `RC-<phase>-<round>-<seq>`；`rootCauseCategory` 见 RootCauseReport Schema；`upstreamDefect`(boolean) 标记是否检测到上游缺陷；`rollbackRecommended`(boolean) 标记是否建议阶段回退        |
-| `fix`           | `basedOnReport` / `artifacts`（`variant` 可选，出现则必须为 `"fix"`）                   | S 兼 F 修复时记录；`basedOnReport` 引用 R 报告 `reportId`（一一对应，由 run-log R3 扩展校验）；`artifacts` 为修复涉及的非空产物路径数组，implementation segment 还须 `target===implementationTarget` 且 artifacts 包含 exact target |
-| `emergency-fix` | `basedOnReport` / `artifacts` + schema 强制 `variant=emergency-fix` / `blocker`（非空） | S 紧急修复变体，与 `fix` 使用相同的 identity、非空 artifacts 和 R3/V/G credit 约束；`variant`/`blocker` 仅作「为何走紧急通道」审计说明                                                                                              |
-| `escalate`      | 新增可选字段 `reportId`（仅 `upstreamDefect` 触发的升级）                               | 当 R 标记 `upstreamDefect.present=true` 且 `rollbackRecommended=true` 触发场景 5 阶段回退升级时，`escalate` 动作记录 `reportId` 关联根因报告                                                                                        |
+| `fix`           | `basedOnReport` / `artifacts`                                                           | S 兼 F 修复时记录；`basedOnReport` 引用 R 报告 `reportId`（一一对应，由 run-log R3 扩展校验）；`artifacts` 为修复涉及的非空产物路径数组，implementation segment 还须 `target===implementationTarget` 且 artifacts 包含 exact target |
 
 **rootcause 动作示例**（spec §5.5）：
 
@@ -584,17 +580,17 @@ interface RunLogEntry {
 
 **V 重发 = 修复证据（D-2，2026-09-21）**：VerifierOutput / 预防性报告等 V 自有产物类缺陷由 V 重发其自有产物修复，无 S-fix 记录。run-log 以 `action=review` + `role=V` + `outcome=success` + `basedOnReport`（非空，引用被修 R 报告 `reportId`）+ `artifacts`（非空数组且每项均以 `.w-model/verifier-outputs/` / `.w-model/v-reviews/` / `.w-model/preventive-reviews/` 之一开头）识别该形态；R3 的 rootcause↔fix 一一对应与 R7 返工时序（legacy phase<8 路径）将其等价视为一次成功修复证据。缺 `basedOnReport`、artifacts 非 V 前缀或 `outcome≠success` 不充数；phase 8 严格分支仍只接受 S-fix 精确身份证据。
 
-> **D8 lifecycle identity 约束（phase 8）：** reducer 使用完整 `(phase, round, reportId, targetKind, basedOnReport, implementationTarget)` 作为生命周期键；rootcause R/V/G 使用 `targetKind=rootcause` 与同一 `reportId`，rootcause 的 `basedOnReport` 明确为 `null/unknown`；fix/emergency-fix 只接受 `basedOnReport` 精确匹配的 reportId、`target===implementationTarget` 且非空 artifacts 包含 exact target。implementation V/G/R3 必须与对应 fix 保持同一 phase/round/reportId/targetKind/basedOnReport/implementationTarget，并满足 exact target/artifacts 关系。R3 completeness/reliability/security 只在同身份 `S-fix → R3×3 → implementation V` 窗口内计数，rootcause review 不计入。缺字段不得由首索引、最近记录或集合数量补齐，输出 `LEGACY_UNSCOPED`/deferred diagnostic；legacy evidence 不进入 R3/V/R8 credit；机器状态为 `CLOSED_UNDER_CURRENT_RULES` 或 `NOT_CLOSED_NOT_PROVEN`，exit 0 不单独证明 closed。raw JSONL 始终 append-only，不由 checker 改写。
+> **D8 lifecycle identity 约束（phase 8）：** reducer 使用完整 `(phase, round, reportId, targetKind, basedOnReport, implementationTarget)` 作为生命周期键；rootcause R/V/G 使用 `targetKind=rootcause` 与同一 `reportId`，rootcause 的 `basedOnReport` 明确为 `null/unknown`；fix 只接受 `basedOnReport` 精确匹配的 reportId、`target===implementationTarget` 且非空 artifacts 包含 exact target。implementation V/G/R3 必须与对应 fix 保持同一 phase/round/reportId/targetKind/basedOnReport/implementationTarget，并满足 exact target/artifacts 关系。R3 completeness/reliability/security 只在同身份 `S-fix → R3×3 → implementation V` 窗口内计数，rootcause review 不计入。缺字段不得由首索引、最近记录或集合数量补齐——phase 8 行缺 identity 字段由 schema 直接拒绝（批次 6 A3/C14：历史 deferred 诊断绕行已删除），其余不进入严格配对的记录不提供 R3/V/R8 credit；机器状态为 `CLOSED_UNDER_CURRENT_RULES` 或 `NOT_CLOSED_NOT_PROVEN`，exit 0 不单独证明 closed。raw JSONL 始终 append-only，不由 checker 改写。
 
-**variant / blocker 与 legacy 吸收（2026-09-04 audit-gate-closure）**：schema（`run-log.schema.json`）新增 `variant`（enum `fix`/`emergency-fix`）/ `blocker` / `fixedLocation` / `fixBasedOn` 字段与条件约束——`action=emergency-fix` ⇒ `variant=emergency-fix` 且 `blocker` 非空；`variant=emergency-fix` ⇒ `blocker` 非空；`action=fix` 的 `variant` 若出现必须为 `"fix"`（不强制出现）。variant 规则引入前的旧记录（未声明 variant，含同时缺 identity 字段的「双 legacy」旧 emergency-fix 行）经合并 legacy 谓词（`isLegacySchemaFailure`：可容忍缺失 ⊆ LIFECYCLE_IDENTITY_FIELDS ∪ {variant, blocker}）吸收为 **LEGACY_VARIANT / LEGACY_UNSCOPED 非阻断 diagnostic**；已声明 variant 却缺 blocker 或 variant 值不符 const 属真实不一致 → blocking `[schema]`（吸收不覆盖）。**共享谓词（D-5，2026-09-21）**：`isLegacyAbsorbableEntry` 由 `run-log-logic.ts` 导出，为 run-log 门（`check-run-log.ts`）与 checkpoint 门（`check-checkpoint.ts`）**共享**的 legacy 吸收判定——两门对同一条记录裁定一致，真实 schema 错误仍 blocking。
+**blocker 与 legacy 吸收删除（批次 6 A3/C14；A15 再收敛）**：schema（`run-log.schema.json`）保留 `blocker` / `fixedLocation` / `fixBasedOn` 字段。批次 6 A15：`emergency-fix` 动作已从 18 值词表删除（零真实用法），其 schema 条件强制（`action=emergency-fix` ⇒ `blocker` 非空）随之删除——`blocker` 降级为 `fix` 记录的可选审计说明。历史 `variant` 字段与 legacy 吸收机器（含共享吸收谓词，D-5 曾由 `run-log-logic.ts` 导出供 run-log 门与 checkpoint 门复用）**全部删除**：旧形态记录（携带 `variant`、`emergency-fix`/`rework` 等已删除 action 值、phase 8 缺 identity 字段、failed review 缺非空 reworkHints）不再有任何非阻断诊断绕行，两门一律 fail-closed blocking（`[schema]` / `[rework-hints]`）——毁弃存量数据，不兼容。
 
-**reworkHints 强制与 cutoff 分界（2026-09-06 audit-fixes）**：schema allOf 新增条件约束——`action ∈ {review, iceberg-review}` 且 `passed=false` ⇒ `reworkHints` 非空（`minItems: 1`，缺失或空数组均拦截）。reworkHints 规则与 variant 规则同窗引入，复用同一分界 `LEGACY_VARIANT_CUTOFF='2026-09-01T00:00:00Z'`（常量定义于 `run-log-logic.ts`）：cutoff 前写入的失败 review 旧行（缺 hints 或 hints 为空数组）经 `LEGACY_REWORK_HINTS` 非阻断 diagnostic 吸收（含与缺 identity 字段叠加的双 legacy 行，identity 缺失部分由 LEGACY_UNSCOPED 循环补充说明）；cutoff 后属真实不一致 → blocking `[rework-hints] 条目 N <action> passed=false 须带非空 reworkHints`。timestamp 缺失/非法时视为非 legacy（保守不吸收）。其余 schema 错误（如字段类型错误）非 legacy 可容忍时不经此吸收，回退通用 `[schema]` blocking。
+**reworkHints 强制（2026-09-06 audit-fixes；批次 6 A3/C14 收紧）**：schema allOf 条件约束——`action=review` 且 `passed=false` ⇒ `reworkHints` 非空（批次 6 A15：原 review/iceberg-review 两值族中 iceberg-review 死词已删除，V 复审冰山报告以 `review` 动作记录）（`minItems: 1`，缺失或空数组均拦截）。逻辑层以 `[rework-hints]` 前缀 blocking（分类命名：仅当该条目全部 schema 错误都由 reworkHints 缺失引起时用该前缀，存在其他字段真实错误则回退通用 `[schema]`）。历史 cutoff 吸收路径已删除：任何时间戳写入的失败 review 旧行一律 blocking。
 
-**revertEvidence 回滚证伪强制（2026-09-15 P2-B / S27 / AC-8）**：schema 根 properties 登记 `revertEvidence`（object，`required:["command"]`，command 非空字符串）但 optional——由 `checkRunLog` 逻辑层 R10 强制：`action ∈ {fix, emergency-fix}` ⇒ 须携带合法 `revertEvidence.command`（S-fix 复现测试的回滚证伪声明：执行 command 使复现测试回到失败态；命令本身由 S 在真实执行中出示，门禁只验载体存在与形态，反模式 #45 的确定性挂点）。**严格语义（无时间戳豁免）**：缺失或非法（含仅空白 command）**始终** blocking `R10: <action> 动作 <runId> 须携带合法 revertEvidence.command…`，与 `timestamp` 早晚无关——`timestamp` 只是日志元数据，不参与信任判定；历史上曾存在的 `LEGACY_REVERT_EVIDENCE_CUTOFF` / `LEGACY_REVERT_EVIDENCE` 吸收路径**已删除**（旧记录须重跑真实回滚命令并保存原始输出，经 producer 记录当前 HEAD 与运行身份后迁移）。CLI 摘要 `r10` 计数字段：`{checked, missing, legacy}`，严格模式下 `legacy` **恒为 0**（含义是「没有时间戳豁免」，不是「历史记录已被证明有效」）。注意 `LEGACY_VARIANT` / `LEGACY_UNSCOPED` / `LEGACY_REWORK_HINTS`（`LEGACY_VARIANT_CUTOFF` 分界）是**另一条独立规则**，仍在生效，与 R10 的严格化互不影响。
+**revertEvidence 回滚证伪强制（2026-09-15 P2-B / S27 / AC-8）**：schema 根 properties 登记 `revertEvidence`（object，`required:["command"]`，command 非空字符串）但 optional——由 `checkRunLog` 逻辑层 R10 强制：`action=fix` ⇒ 须携带合法 `revertEvidence.command`（批次 6 A15：emergency-fix 死词已删除）（S-fix 复现测试的回滚证伪声明：执行 command 使复现测试回到失败态；命令本身由 S 在真实执行中出示，门禁只验载体存在与形态，反模式 #45 的确定性挂点）。**严格语义（无时间戳豁免）**：缺失或非法（含仅空白 command）**始终** blocking `R10: <action> 动作 <runId> 须携带合法 revertEvidence.command…`，与 `timestamp` 早晚无关——`timestamp` 只是日志元数据，不参与信任判定；历史上曾存在的 `LEGACY_REVERT_EVIDENCE_CUTOFF` / `LEGACY_REVERT_EVIDENCE` 吸收路径**已删除**（旧记录须重跑真实回滚命令并保存原始输出，经 producer 记录当前 HEAD 与运行身份后迁移）。CLI 摘要 `r10` 计数字段：`{checked, missing}`（批次 6 A3/C14 起无 `legacy` 维度）。
 
-**R11 闭环五脚本机器核验（2026-09-18 J1）**：`checkRunLog` 的 R11 把约束 #11（闭环五脚本每阶段门 `exitCode=0`）做成机器可核验判定——凡 run-log 中出现 **checkpoint 放行**（`action=checkpoint` 且 `outcome=success`）的阶段，放行前须已有各一条 `action=gate` + `role=G` + `outcome=success` + `gateExitCode=0` 记录，`script` ∈ 闭环五门（清单与调用顺序见 [`operational-recovery.md`](operational-recovery.md)「调用时机」节；约束 #11），且 `timestamp` **严格毫秒早于**放行时间（`Date.parse(g.timestamp) < releaseAt`，毫秒精度严格比较；同毫秒（含无毫秒部分的秒级时间戳，Date.parse 后相等）不算「早于放行」，无时间戳豁免）；缺失任一或**未严格早于放行（含同毫秒）** → blocking（消息列出阶段与缺失脚本名）；同一阶段多次放行逐个核验（不合并）。无 checkpoint 放行的 run（如 fix/emergency-fix 变体、或 checkpoint `outcome≠success`）不触发 R11。**唯一例外（D-6，历史日志兼容）**：`phase===1` × `check-checkpoint.ts` 的后置窗口——判据与定性见 [`operational-recovery.md`](operational-recovery.md)「阶段 1 自举豁免」节（R11 后置窗口，D-6；本文件不重复枚举）；该例外只兼容以旧时序（先写放行记录、后补 `check-checkpoint.ts` gate 记录）写入的历史 run-log；E-2 方案 B 后的新建项目走自然时序（见 [`SKILL.md`](../SKILL.md)「阶段门放行三步」）**不应产生该形态**（后置形态仍被 R8 拦截）；`phase>=2` 无此例外。`RunLogCheckResult.closure` 字段为 `{checkedGates, missing}`（checkedGates=核验的 checkpoint 放行数，missing=缺失/晚到的「放行 × 脚本」计数）且仅在存在放行时出现；CLI 摘要以 `r11` 键条件展开——无 `closure` 时 `RUN_LOG_JSON` 与 `--json` 输出**不出现 `r11` 键**，无放行时 exit 0 通过语为「闭环五脚本：不适用（无 checkpoint 放行）」。
+**R11 闭环五脚本机器核验（2026-09-18 J1）**：`checkRunLog` 的 R11 把约束 #11（闭环五脚本每阶段门 `exitCode=0`）做成机器可核验判定——凡 run-log 中出现 **checkpoint 放行**（`action=checkpoint` 且 `outcome=success`）的阶段，放行前须已有各一条 `action=gate` + `role=G` + `outcome=success` + `gateExitCode=0` 记录，`script` ∈ 闭环五门（清单与调用顺序见 [`operational-recovery.md`](operational-recovery.md)「调用时机」节；约束 #11），且 `timestamp` **严格毫秒早于**放行时间（`Date.parse(g.timestamp) < releaseAt`，毫秒精度严格比较；同毫秒（含无毫秒部分的秒级时间戳，Date.parse 后相等）不算「早于放行」，无时间戳豁免）；缺失任一或**未严格早于放行（含同毫秒）** → blocking（消息列出阶段与缺失脚本名）；同一阶段多次放行逐个核验（不合并）。五门对**全部阶段（含阶段 1）**一律同一判据——历史 D-6「`phase===1` × `check-checkpoint.ts` 后置窗口」已随批次 6 A3/C14 删除（毁弃存量数据，不兼容）；E-2 方案 B 的自然时序「确认落盘 → 闭环五门 → 最后写放行记录」（R0 首阶段自举形态，见 [`SKILL.md`](../SKILL.md)「阶段门放行三步」与 `checkpoint-logic.ts`）下新建项目常态满足严格判据。无 checkpoint 放行的 run（如 fix 变体、或 checkpoint `outcome≠success`）不触发 R11。`RunLogCheckResult.closure` 字段为 `{checkedGates, missing}`（checkedGates=核验的 checkpoint 放行数，missing=缺失/晚到的「放行 × 脚本」计数）且仅在存在放行时出现；CLI 摘要以 `r11` 键条件展开——无 `closure` 时 `RUN_LOG_JSON` 与 `--json` 输出**不出现 `r11` 键**，无放行时 exit 0 通过语为「闭环五脚本：不适用（无 checkpoint 放行）」。
 
-动作-角色配对（`r3-*`→R、`fix`/`emergency-fix`/`produce`→S、`review`→V、`gate`/`tla-gate`/`graph-gate`→G）由 `checkRunLog` logic 层 blocking 强制（schema 的 description 注明，不在 schema 强制以兼容历史样本）。`check-run-log.ts` CLI 的 parseErrors 并入 blocking violations（坏行使输入不完整，fail-closed）；`checkRunLog([])` → `passed=false` + `NOT_CLOSED_NOT_PROVEN`。
+动作-角色配对（`r3-*`→R、`fix`/`produce`→S、`review`→V、`gate`/`tla-gate`/`graph-gate`→G）由 `checkRunLog` logic 层 blocking 强制（schema 的 description 注明，不在 schema 强制以兼容历史样本）。`check-run-log.ts` CLI 的 parseErrors 并入 blocking violations（坏行使输入不完整，fail-closed）；`checkRunLog([])` → `passed=false` + `NOT_CLOSED_NOT_PROVEN`。
 
 ## 自主成熟度模型（maturity.json）
 
@@ -610,20 +606,7 @@ interface MaturityConfig {
   level: 'L0' | 'L1' | 'L2' | 'L3';
   /** 升级到此级别的时间 ISO 8601 */
   leveledUpAt: string;
-  /** 解锁条件达成状态 */
-  unlockConditions: {
-    /** 稳定运行时长（天） */
-    stableDays: number;
-    /** 完整 8 阶段周期数（L0→L1 需要 ≥1） */
-    completedCycles: number;
-    /** attempt cap 达标率（L1→L2 需要 ≥0.8） */
-    attemptCapRate: number;
-    /** 误判率（L2→L3 需要 ≤0.1） */
-    misjudgeRate: number;
-    /** O 系列失败模式命中次数（升级需 0） */
-    operationalFailures: number;
-  };
-  /** 升级历史 */
+  /** 升级历史（只承载升级链；降级走 human 审批链，不记 history——43.0.0 A4） */
   history: Array<{
     from: 'L0' | 'L1' | 'L2' | 'L3';
     to: 'L0' | 'L1' | 'L2' | 'L3';
@@ -640,6 +623,15 @@ interface MaturityConfig {
 }
 ```
 
+> **43.0.0 A4 死字段删除**：`unlockConditions`（无计算器的四个指标 + 仅 R3 消费的 completedCycles）与
+> `downgradeTriggers.budgetBurnRateExceeded` / `downgradeTriggers.checkpointRejectionStreak`（零消费预留）
+> 已自 schema 与校验逻辑删除（毁弃存量，不兼容；`downgradeTriggers` 本身保留：`operationalFailureStreak`
+> + `userRequested` 两字段）；「解锁条件」现为 operational-recovery.md 文档层语义，
+> **无机器校验**。原 R3（completedCycles 周期换算）随之退役，R4/R5 编号保持稳定，新增 R6（history 链一致性：
+> from == 上一条 to / to 严格高于 from / 末条 to 不低于当前 level——降级后 level 低于末条属合法形态，
+> R6 只锁伪造升级）。level 的机器消费点（check-artifact-gate
+> TLA+/BDD 豁免分支）须 `role=human / targetKind=maturity` 签名链审批（`verifyMaturityApproval`，fail-closed）。
+
 **默认值**（`/wm analyze` 首次初始化）：
 
 ```json
@@ -648,13 +640,6 @@ interface MaturityConfig {
   "projectId": "<auto>",
   "level": "L0",
   "leveledUpAt": "<now>",
-  "unlockConditions": {
-    "stableDays": 0,
-    "completedCycles": 0,
-    "attemptCapRate": 0,
-    "misjudgeRate": 0,
-    "operationalFailures": 0
-  },
   "history": [],
   "downgradeTriggers": {
     "operationalFailureStreak": 2,
@@ -668,8 +653,8 @@ interface MaturityConfig {
 - `maturity.json` 由编排者 O 维护，属"状态读写+持久化"允许动作（非实施，不触发反模式 #10）。
 - 编排者 O 在每个 🔴 CHECKPOINT 处读取 `level`，按 L0~L3 放行矩阵决定 CHECKPOINT 类型（决策型 / 操作型 / 阶段门放行；阶段门放行始终等用户，HOTL 固定，硬约束 #2）。
 - L1+ 操作型 CHECKPOINT 自动放行时，仍在 run-log 记录 action=checkpoint outcome=success，保留可追溯性。
-- 升级不可自动：升级是决策型 CHECKPOINT，须用户显式确认（阶段 8 完成后 unlockConditions 全部达标时询问）。
-- 降级可自动：O 系列失败模式连续命中 ≥ `downgradeTriggers.operationalFailureStreak` → 自动降级到 L0。
+- 升级不可自动：升级是决策型 CHECKPOINT，须用户显式确认（阶段 8 完成后按 operational-recovery.md「升级与降级」的解锁条件文档语义询问；43.0.0 A4 起升级链须 role=human 签名链条目留痕）。
+- 降级可自动：O 系列失败模式连续命中 ≥ `downgradeTriggers.operationalFailureStreak` → 自动降级到 L0（降级不记 history 升级链，R6 只承载升级）。降级后 `level` 低于 history 末条 to 属**合法形态**（批次 6 修复轮 1：R6 第三判定为「末条 to 不低于 level」，只锁伪造升级不锁降级——A4 起 TLA+/BDD 豁免须 human 审批链，降级不再构成绕过面）。
 - `maturity.json` 与 `budget.json` 协同：L2+ 自主度可设 `onExceed=notify`（仅在 run-log 记录告警）；L0 默认 `onExceed=pause`（最保守）。
 
 ### RunLogEntry vs EventIngress Schema 边界对照表
@@ -681,7 +666,7 @@ interface MaturityConfig {
 | 标识     | `runId`（UUID 或时间戳）                                                                                                                                                                                                                                                                                                                                                                                                                              | `eventId`（UUID 或时间戳）                                | 不同 ID 命名空间，不可混用                  |
 | 时间戳   | `timestamp`                                                                                                                                                                                                                                                                                                                                                                                                                                           | `timestamp`                                               | 相同（ISO 8601）                            |
 | 阶段     | `phase` + `phaseName`                                                                                                                                                                                                                                                                                                                                                                                                                                 | 无（路由后才有阶段）                                      | RunLogEntry 强制阶段，EventIngress 路由前无 |
-| 动作     | `action`（32 值枚举，与 run-log.schema.json 完全一致：chunk/cross/evolve/produce/review/gate/tla-gate/graph-gate/test/checkpoint/rework/rollback/rootcause/fix/emergency-fix/escalate/r3-completeness/r3-reliability/r3-security/codegraph_query/opsx_explore/opsx_propose/opsx_apply/opsx_archive/ensure_deps/iceberg-sweep/iceberg-review/plan_propose/plan_task/plan_review/perspective/consensus；opsx_* 四值为 LEGACY——历史 run-log 合法，新日志须改用 plan_* 三动作） | `eventType`（bug-report/requirement-change/...）          | 不同枚举集，不可混用                        |
+| 动作     | `action`（18 值枚举，与 run-log.schema.json 完全一致：chunk/cross/produce/review/gate/tla-gate/graph-gate/checkpoint/rootcause/fix/r3-completeness/r3-reliability/r3-security/perspective/consensus/iceberg-sweep/plan_propose/event-route；逐值职责见「动作类型字段约束」节 18 值表） | `eventType`（bug-report/requirement-change/...）          | 不同枚举集，不可混用                        |
 | 角色     | `role`（O/A/S/V/G/R）                                                                                                                                                                                                                                                                                                                                                                                                                                 | `source`（webhook/cron/manual/external-ci/user-report）   | 不同维度，不可混用                          |
 | 结果     | `outcome`（success/fail/rework/escalate/blocked/cancelled）                                                                                                                                                                                                                                                                                                                                                                                           | `routedTo`（路由决策对象）                                | 不同语义，不可混用                          |
 | 决策     | `acknowledgedDecisions`（数组）                                                                                                                                                                                                                                                                                                                                                                                                                       | 无                                                        | 仅 RunLogEntry                              |
@@ -1007,17 +992,17 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 | ------------------------------- | ------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `verifier-output`               | `verifier-output.schema.json`               | VerifierOutput             | additionalProperties:false；meta/subCriteria 嵌套严格；summary minLength:50                                                                                                                                                                                                                                                                                                                           | verifier-logic.ts                                                                             |
 | `rtm`                           | `rtm.schema.json`                           | RTMMatrixShape             | additionalProperties:false；executionSummary 嵌套严格；coverage [0,100]                                                                                                                                                                                                                                                                                                                               | gate-logic.ts                                                                                 |
-| `graph`                         | `graph.schema.json`                         | GraphShape                 | additionalProperties:false；node.type enum（REQ/SD/INTF/DD/EXT-IN/EXT-OUT）；edge.type enum（9 类）                                                                                                                                                                                                                                                                                                   | graph-logic.ts                                                                                |
+| `graph`                         | `graph.schema.json`                         | GraphShape                 | additionalProperties:false；node.type enum（REQ/SD/INTF/DD/EXT-IN/EXT-OUT）；edge.type enum（12 类）                                                                                                                                                                                                                                                                                                  | graph-logic.ts                                                                                |
 | `tla-manifest`                  | `tla-manifest.schema.json`                  | TlaManifest                | additionalProperties:false；spec.level enum（L1-L6）；decompositionDecision enum（4 类）                                                                                                                                                                                                                                                                                                              | tla-logic.ts                                                                                  |
 | `code-tla-manifest`             | `code-tla-manifest.schema.json`             | CodeTlaConsistencyInput    | 顶层 additionalProperties:false（manifest/graph/rtm/codeSources）；兼容 codeFiles 运行时形态（见 schema description）；manifest/graph/rtm 兼容层允许扩展字段（开集例外，见设计原则 2）                                                                                                                                                                                                                | code-tla-logic.ts                                                                             |
 | `budget`                        | `budget.schema.json`                        | BudgetConfig               | additionalProperties:false；onExceed enum；killSwitch.budgetBurnRate [0,1]                                                                                                                                                                                                                                                                                                                            | budget-logic.ts                                                                               |
 | `gate-log`                      | `gate-log.schema.json`                      | GateLogEntry               | gate-logs append-only 审计记录；gate/tla-gate/graph-gate 输出与退出码可追溯                                                                                                                                                                                                                                                                                                                           | gate-log.ts                                                                                   |
-| `run-log`                       | `run-log.schema.json`                       | RunLogEntry                | additionalProperties:false；action enum（32 类）；role enum（O/A/S/V/G/R）                                                                                                                                                                                                                                                                                                                            | run-log-logic.ts                                                                              |
-| `checkpoint-log`                | `checkpoint-log.schema.json`                | CheckpointLogEntry         | run-log 子集：action 排除 rootcause/fix/escalate；role 排除 R                                                                                                                                                                                                                                                                        | checkpoint-log 为 `.w-model/checkpoint-log/phase-<N>.md` 纯文本（UTF-8，用户确认原文 + 时间与放行对象要素）；schema 为结构参考，机器校验走 check-checkpoint R1-R5 文本判据（canonical 形态与歧义 fail-closed 自 42.13.0 起） |
+| `run-log`                       | `run-log.schema.json`                       | RunLogEntry                | additionalProperties:false；action enum（18 类）；role enum（O/A/S/V/G/R）                                                                                                                                                                                                                                                                                                                            | run-log-logic.ts                                                                              |
+| `checkpoint-log`                | `checkpoint-log.schema.json`                | CheckpointLogEntry         | run-log 子集：action 仅阶段门放行链 8 值（chunk/cross/produce/review/gate/tla-gate/graph-gate/checkpoint）；role 排除 R                                                                                                                                                                                                                                                                        | checkpoint-log 为 `.w-model/checkpoint-log/phase-<N>.md` 纯文本（UTF-8，用户确认原文 + 时间与放行对象要素）；schema 为结构参考，机器校验走 check-checkpoint R1-R5 文本判据（canonical 形态与歧义 fail-closed 自 42.13.0 起） |
 | `event-ingress`                 | `event-ingress.schema.json`                 | `EventIngressEntry`        | additionalProperties:false；source enum（6 类）；eventType enum（9 类）                                                                                                                                                                                                                                                                                                                               | （暂未集成到 logic.ts，仅 self-test 覆盖）                                                    |
 | `change-scope`                  | `change-scope.schema.json`                  | ChangeScope                | additionalProperties:false；phase 1-8；changedFiles 相对路径 pattern（绝对/`..`/反斜杠拒绝）；headRef 须等于当前 HEAD                                                                                                                                                                                                                                                                                 | lib/change-scope.ts（resolveCliScope / verifyScopeGitBinding）                                |
 | `codegraph-query`               | `codegraph-query.schema.json`               | CodegraphQueryRecord       | additionalProperties:false；blastRadius minimum 0；queryTimestamp format date-time；changeId/targetFiles strict 模式必填（ChangeScope 绑定）；证据声明族 `evidenceKind`（enum cli/artifact）/`degradationReason`/`alternativeEvidence[{command,evidencePath}]` 为**可选结构字段**（语义判据由 checker 索引探测强制，枚举见 [command-reference.md](command-reference.md)「阶段 5-8 codegraph/coding-plan 门禁 CLI」节的 codegraph checker 条目） | cli/check-codegraph-queries.ts（checkCodegraphQueriesStrict / evidenceDeclarationViolations） |
-| `maturity`                      | `maturity.schema.json`                      | MaturityConfig             | additionalProperties:false；level enum（L0-L3）；unlockConditions 嵌套严格                                                                                                                                                                                                                                                                                                                            | maturity-logic.ts                                                                             |
+| `maturity`                      | `maturity.schema.json`                      | MaturityConfig             | additionalProperties:false；level enum（L0-L3）；history 升级链严格（43.0.0 A4：unlockConditions 与两个降级预留死字段已删除，level 消费须 human 签名链审批）                                                                                                                                                                                                                                                                                                                            | maturity-logic.ts                                                                             |
 | `project`                       | `project.schema.json`                       | `Project`                  | additionalProperties:false；status enum（9 阶段）；techStack 嵌套严格                                                                                                                                                                                                                                                                                                                                 | （暂未集成到 logic.ts，仅 self-test 覆盖）                                                    |
 | `hill-climbing-report`          | `hill-climbing-report.schema.json`          | `HarnessImprovementReport` | additionalProperties:false；signal.priority [1,5]；recommendations 5 字段全 required                                                                                                                                                                                                                                                                                                                  | （暂未集成到 logic.ts，仅 self-test 覆盖）                                                    |
 | `rootcause-report`              | `rootcause-report.schema.json`              | RootCauseReport            | additionalProperties:false；meta.targetKind const=rootcause；rootCauseChain minItems:2/maxItems:5                                                                                                                                                                                                                                                                                                     | root-cause-logic.ts                                                                           |

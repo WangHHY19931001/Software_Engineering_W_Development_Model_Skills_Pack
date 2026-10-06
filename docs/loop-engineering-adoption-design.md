@@ -335,6 +335,8 @@ interface MaturityConfig {
 }
 ```
 
+> 注记（退役）：unlockConditions 已随 43.0.0 A4 自 schema 移除（无机器校验），本文档保留历史接口描述（SSoT §10C.5）。
+
 **默认值**（`/wm analyze` 首次初始化）：
 
 ```json
@@ -358,6 +360,8 @@ interface MaturityConfig {
 }
 ```
 
+> 注记（退役）：unlockConditions 已随 43.0.0 A4 自 schema 移除（无机器校验），本文档保留历史接口描述（SSoT §10C.5）。
+
 ### 2.5 编排者成熟度判定逻辑（确定性，无 LLM）
 
 > 编排者 O 在每个 🔴 CHECKPOINT 处读取 maturity.json，按当前 level 决定 CHECKPOINT 类型。
@@ -378,6 +382,8 @@ interface MaturityConfig {
    - 若 operationalFailures ≥ downgradeTriggers.operationalFailureStreak → 自动降级到 L0
    - run-log append 降级记录
 ```
+
+> 注记（退役）：unlockConditions 已随 43.0.0 A4 自 schema 移除（无机器校验），本文档保留历史接口描述（SSoT §10C.5）。
 
 ### 2.6 SSoT 同步点
 
@@ -637,6 +643,8 @@ interface MaturityConfig {
 | Comprehension Debt + digest | acknowledgedDecisions + VerifierOutput.summary 强化 | 优化4 |
 | Maker/Checker Split | **w-model-dev 已更强**（O/A/S/V/G 五角色 + 反模式 #10 强制） | 不采纳（已有） |
 | Verifier default REJECT | O3 Verifier Theater 缓解：强化 verifier-spec §1 设计原则 | 优化3 |
+
+> 注记（退役）：表中 `maturity.json unlockConditions` 行为历史接口描述——unlockConditions 已随 43.0.0 A4 自 schema 移除（无机器校验）（SSoT §10C.5）。
 
 ### 6.2 不采纳的 loop-engineering 概念（架构冲突）
 

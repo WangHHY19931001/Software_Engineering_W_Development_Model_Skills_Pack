@@ -531,15 +531,16 @@ write_json('.w-model/project.json', {
 write_json('.w-model/maturity.json', {
   'schemaVersion': '1.0', 'projectId': 'counter-api', 'level': 'L2',
   'leveledUpAt': '2026-09-19T03:00:00+08:00',
-  'unlockConditions': {'stableDays': 30, 'completedCycles': 3, 'attemptCapRate': 0.85, 'misjudgeRate': 0.05, 'operationalFailures': 0},
+  # 43.0.0 A4：unlockConditions 与 downgradeTriggers.budgetBurnRateExceeded / .checkpointRejectionStreak
+  # 预留死字段已自 schema 删除（毁弃存量；downgradeTriggers 本身保留 operationalFailureStreak + userRequested）
   'history': [{'at': '2026-09-19T03:00:00+08:00', 'from': 'L1', 'to': 'L2', 'reason': 'e2e 调测项目按生产小项目定级'}],
-  'downgradeTriggers': {'operationalFailureStreak': 3, 'budgetBurnRateExceeded': 3, 'checkpointRejectionStreak': 2, 'userRequested': False},
+  'downgradeTriggers': {'operationalFailureStreak': 3, 'userRequested': False},
 })
 write_json('.w-model/budget.json', {
   'schemaVersion': '1.0', 'projectId': 'counter-api',
   'createdAt': '2026-09-19T03:00:00+08:00', 'updatedAt': '2026-09-19T03:00:00+08:00',
-  'perPhase': {'maxTokens': 200000, 'maxSubagentSpawns': 10, 'maxReworkRounds': 3},
-  'project': {'maxTokensTotal': 2000000, 'maxTokensPerSession': 500000},
+  'perPhase': {'maxTokens': 200000},
+  'project': {'maxTokensTotal': 2000000},
   'onExceed': 'pause',
   'killSwitch': {'consecutiveReworks': 3, 'budgetBurnRate': 0.9, 'tlaReworks': 3},
 })

@@ -20,6 +20,7 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { runSync } from '../lib/run-sync.js';
 import { writeGateLog } from '../lib/gate-log-writer.js';
+import { computeSigHash, type SignatureChainEntry } from '../logic/signature-chain-logic.js';
 
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
@@ -69,7 +70,13 @@ describe('printGateReport', () => {
     expect(logSpy).toHaveBeenNthCalledWith(1, '─'.repeat(60));
     expect(logSpy).toHaveBeenNthCalledWith(
       2,
-      'MATURITY_JSON ' + JSON.stringify({ type: 'maturity', passed: true, violations: [], exitCode: 0 }),
+      'MATURITY_JSON ' +
+        JSON.stringify({
+          type: 'maturity',
+          passed: true,
+          violations: [],
+          exitCode: 0,
+        }),
     );
     expect(exitSpy).not.toHaveBeenCalled();
   });
@@ -185,9 +192,13 @@ describe('check-samples-coverage.ts --json（子进程冒烟：shell exit 与 JS
   async function createSamplesCoverageFixture(withViolation: boolean): Promise<string> {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-samples-coverage-json-'));
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test fixture path
-    await fs.mkdir(path.join(tmpDir, 'w-model-dev', 'scripts', 'samples'), { recursive: true });
+    await fs.mkdir(path.join(tmpDir, 'w-model-dev', 'scripts', 'samples'), {
+      recursive: true,
+    });
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test fixture path
-    await fs.mkdir(path.join(tmpDir, 'w-model-dev', 'scripts', 'cli'), { recursive: true });
+    await fs.mkdir(path.join(tmpDir, 'w-model-dev', 'scripts', 'cli'), {
+      recursive: true,
+    });
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test fixture path
     await fs.writeFile(path.join(tmpDir, 'w-model-dev', 'scripts', 'samples', 'README.md'), '', 'utf-8');
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test fixture path
@@ -218,7 +229,10 @@ describe('check-samples-coverage.ts --json（子进程冒烟：shell exit 与 JS
     try {
       const result = runSync(process.execPath, [tsxCli, CHECK_SAMPLES_COVERAGE_SCRIPT, tmpDir, '--json'], {});
       expect(result.status).toBe(1);
-      const report = JSON.parse(result.stdout ?? '') as { passed: boolean; exitCode: number };
+      const report = JSON.parse(result.stdout ?? '') as {
+        passed: boolean;
+        exitCode: number;
+      };
       expect(report.passed).toBe(false);
       expect(report.exitCode).toBe(1);
     } finally {
@@ -231,7 +245,10 @@ describe('check-samples-coverage.ts --json（子进程冒烟：shell exit 与 JS
     try {
       const result = runSync(process.execPath, [tsxCli, CHECK_SAMPLES_COVERAGE_SCRIPT, tmpDir, '--json'], {});
       expect(result.status).toBe(0);
-      const report = JSON.parse(result.stdout ?? '') as { passed: boolean; exitCode: number };
+      const report = JSON.parse(result.stdout ?? '') as {
+        passed: boolean;
+        exitCode: number;
+      };
       expect(report.passed).toBe(true);
       expect(report.exitCode).toBe(0);
     } finally {
@@ -296,7 +313,10 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
         },
       );
       expect(result.status).toBe(0);
-      expect(JSON.parse(result.stdout ?? '')).toMatchObject({ passed: true, exitCode: 0 });
+      expect(JSON.parse(result.stdout ?? '')).toMatchObject({
+        passed: true,
+        exitCode: 0,
+      });
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
@@ -329,7 +349,10 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
         { cwd: tmpDir },
       );
       expect(result.status).toBe(0);
-      expect(JSON.parse(result.stdout ?? '')).toMatchObject({ passed: true, exitCode: 0 });
+      expect(JSON.parse(result.stdout ?? '')).toMatchObject({
+        passed: true,
+        exitCode: 0,
+      });
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
@@ -436,7 +459,9 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
         async (tmpDir: string) => {
           const gateLogsDir = path.join(tmpDir, 'gate-logs');
           // eslint-disable-next-line security/detect-non-literal-fs-filename -- gateLogsDir is beneath the test-owned mkdtemp fixture
-          await fs.mkdir(path.join(gateLogsDir, 'not-a-file'), { recursive: true });
+          await fs.mkdir(path.join(gateLogsDir, 'not-a-file'), {
+            recursive: true,
+          });
           return { gateLogsDir, entry: 'not-a-file' };
         },
         (gateLogsDir: string) => gateLogsDir,
@@ -529,15 +554,44 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     }
   }, 150_000);
 
-  it('未传 --gate-logs 时不强制要求 gate-log', async () => {
+  it('批次 6 A3 后半：未传 --gate-logs 时 R6 默认核验——gate 记录带 gateLogPath 且同目录 gate-logs/ 整体缺失 → exit 1（旧「不强制」契约已废除）', async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
     try {
       const runLog = path.join(tmpDir, 'run-log.jsonl');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
       await fs.writeFile(runLog, makeRunLogEntry('missing.json', 0) + '\n', 'utf8');
       const result = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog], { cwd: tmpDir });
+      expect(result.status).toBe(1);
+      const report = JSON.parse(result.stdout ?? '') as {
+        passed: boolean;
+        exitCode: number;
+        reasons: string[];
+      };
+      expect(report).toMatchObject({ passed: false, exitCode: 1 });
+      // 目录整体缺失 → 一条汇总 blocking R6 违规（不逐条展开）
+      expect(report.reasons.filter((v) => v.startsWith('R6:'))).toHaveLength(1);
+      expect(report.reasons.some((v) => v.includes('gate-logs 目录缺失'))).toBe(true);
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('批次 6 A3 后半：未传 --gate-logs 且无任何带 gateLogPath 的 gate 记录 → 不触发默认核验（同目录无 gate-logs/ 仍 exit 0）', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-gate-log-b1-'));
+    try {
+      const runLog = path.join(tmpDir, 'run-log.jsonl');
+      // gateExitCode=null 且无 gateLogPath：R6 默认核验无对象，不因 gate-logs/ 缺失而触发
+      const bareGate = makeRunLogEntry('missing.json', 0)
+        .replace('"gateExitCode":0', '"gateExitCode":null')
+        .replace(',"gateLogPath":"missing.json"', '');
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
+      await fs.writeFile(runLog, bareGate + '\n', 'utf8');
+      const result = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', runLog], { cwd: tmpDir });
       expect(result.status).toBe(0);
-      expect(JSON.parse(result.stdout ?? '')).toMatchObject({ passed: true, exitCode: 0 });
+      expect(JSON.parse(result.stdout ?? '')).toMatchObject({
+        passed: true,
+        exitCode: 0,
+      });
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
@@ -621,8 +675,9 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
       type: 'run-log',
       passed: true,
       exitCode: 0,
-      lifecycleStatus: 'NOT_CLOSED_NOT_PROVEN',
-      r10: { checked: 0, missing: 0, legacy: 0 },
+      // 批次 6 A3/C14：legacy 吸收诊断循环删除后，valid.jsonl 无非阻断诊断 → 真闭合
+      lifecycleStatus: 'CLOSED_UNDER_CURRENT_RULES',
+      r10: { checked: 0, missing: 0 },
     });
     // r11 的 checkedGates 数值由 **任务 4/J1 在途改动**（logic/run-log-logic.ts 的 closure 维度）
     // 与本次已改的 samples/run-log/valid.jsonl（放行条数）共同决定——此处只钉 D3 关心的
@@ -633,7 +688,9 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
     expect(typeof r11?.checkedGates).toBe('number');
     expect(Array.isArray(parsed.reasons)).toBe(true);
     expect(Array.isArray(parsed.violations)).toBe(true);
-    expect(Array.isArray(parsed.diagnostics)).toBe(true);
+    // 批次 6 A3/C14：legacy 吸收诊断删除后 valid.jsonl 无任何非阻断诊断 →
+    // diagnostics 键按「空则不产出」契约整体缺席（非空数组）。
+    expect(parsed.diagnostics).toBeUndefined();
     expect(Object.keys(parsed)).not.toContain('durationMs');
   });
 
@@ -652,7 +709,10 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
       expect(jsonResult.status).toBe(1); // malformed 行是 blocking → exit 1
       expect(defaultResult.status).toBe(1);
       const jsonSummary = JSON.parse(jsonResult.stdout ?? '') as Record<string, unknown>;
-      expect(jsonSummary).toMatchObject({ passed: false, lifecycleStatus: 'NOT_CLOSED_NOT_PROVEN' });
+      expect(jsonSummary).toMatchObject({
+        passed: false,
+        lifecycleStatus: 'NOT_CLOSED_NOT_PROVEN',
+      });
       const reasons = jsonSummary.reasons as string[];
       expect(reasons.some((r) => r.startsWith('PARSE_INCOMPLETE: line 2') && r.includes('run-log'))).toBe(true);
       const defaultLine = (defaultResult.stdout ?? '').split(/\r?\n/).find((line) => line.startsWith('RUN_LOG_JSON '));
@@ -679,7 +739,11 @@ describe('check-run-log.ts --json（子进程冒烟：--json 输出纯 JSON、�
         await fs.writeFile(logFile, content, 'utf-8');
         const r = runSync(process.execPath, [tsxCli, CHECK_RUN_LOG_SCRIPT, '--json', logFile], {});
         expect(r.status, `${文件形态}: 应 exit 1`).toBe(1);
-        const parsed = JSON.parse(r.stdout ?? '') as { passed: boolean; reasons: string[]; lifecycleStatus: string };
+        const parsed = JSON.parse(r.stdout ?? '') as {
+          passed: boolean;
+          reasons: string[];
+          lifecycleStatus: string;
+        };
         expect(parsed.passed, `${文件形态}: 应 fail-closed`).toBe(false);
         if (parseIncomplete) {
           expect(
@@ -755,7 +819,11 @@ describe('check-role-dispatch.ts --json（子进程冒烟：空输入 fail-close
       );
       const r = runSync(process.execPath, [tsxCli, CHECK_ROLE_DISPATCH_SCRIPT, '--json', logFile], {});
       expect(r.status).toBe(1);
-      const parsed = JSON.parse(r.stdout ?? '') as { passed: boolean; reasons: string[]; exitCode: number };
+      const parsed = JSON.parse(r.stdout ?? '') as {
+        passed: boolean;
+        reasons: string[];
+        exitCode: number;
+      };
       expect(parsed.passed).toBe(false);
       expect(parsed.exitCode).toBe(1);
       expect(parsed.reasons.join(' ')).toMatch(/有效 R3 维度记录不足/);
@@ -802,7 +870,10 @@ describe('check-role-dispatch.ts --json（子进程冒烟：空输入 fail-close
       );
       const r = runSync(process.execPath, [tsxCli, CHECK_ROLE_DISPATCH_SCRIPT, '--json', logFile], {});
       expect(r.status).toBe(0);
-      const parsed = JSON.parse(r.stdout ?? '') as { passed: boolean; exitCode: number };
+      const parsed = JSON.parse(r.stdout ?? '') as {
+        passed: boolean;
+        exitCode: number;
+      };
       expect(parsed.passed).toBe(true);
       expect(parsed.exitCode).toBe(0);
     } finally {
@@ -824,7 +895,11 @@ describe('check-role-dispatch.ts --json（子进程冒烟：空输入 fail-close
       // 实跑对照：同 fixture 同 exit 1（坏行 blocking，非 exit 2 输入错误）
       expect(roleDispatch.status).toBe(1);
       expect(runLog.status).toBe(1);
-      const parsed = JSON.parse(roleDispatch.stdout ?? '') as { passed: boolean; reasons: string[]; exitCode: number };
+      const parsed = JSON.parse(roleDispatch.stdout ?? '') as {
+        passed: boolean;
+        reasons: string[];
+        exitCode: number;
+      };
       expect(parsed.passed).toBe(false);
       expect(parsed.exitCode).toBe(1);
       const parseReasons = parsed.reasons.filter((r) => r.startsWith('PARSE_INCOMPLETE: line 2'));
@@ -1022,13 +1097,49 @@ describe('check-artifact-gate.ts phase 1 evidence boundary', () => {
     }
   });
 
+  /** A4 human 审批条目构造器（v3 sigHash 经 computeSigHash 真实重算；形态同 samples/gate/valid-maturity-waiver-with-approval/ 与 gate-logic.test.ts 同名 helper） */
+  function humanMaturityApprovalEntry(): SignatureChainEntry {
+    const base: Omit<SignatureChainEntry, 'sigHash'> = {
+      sigId: 'wm1-r001-human',
+      phase: 1,
+      role: 'human',
+      action: 'approve',
+      targetKind: 'maturity',
+      runId: 'wm1-r001',
+      artifacts: ['.w-model/maturity.json'],
+      prevSigId: 'genesis',
+      prevSigHash: '0',
+      signedAt: '2026-09-18T00:00:00.000Z',
+      signer: 'user-wangh',
+      inputProvenance: {
+        sourceSigIds: [],
+        sourceArtifacts: [],
+        transformDescription: '用户确认 L0→L1 成熟度升级（A4 human 审批链）',
+      },
+      sigHashAlgo: 'v3',
+    };
+    return { ...base, sigHash: computeSigHash(base) };
+  }
+
   // 成熟度豁免（2026-09-17 审查修复）：文档承诺 L0/L1 阶段 1-4 可不产出 TLA+/BDD 资产，
-  // 而门禁此前无 maturity 输入 → 合法 L1 项目必被阻断。三臂：豁免命中 / L2 不命中 / 阶段 5 不命中。
-  it('maturity 豁免矩阵（3 态：L1+阶段1 豁免 / L2+阶段1 不豁免 / L1+阶段5 不豁免）', async () => {
-    for (const [场景, level, phase, 期望Waived, assertMaturityLevel, assertNoTlaReasons, assertTlaReason] of [
-      ['L1 + 阶段 1 → 豁免', 'L1', 1, true, true, true, false],
-      ['L2 + 阶段 1 → 不豁免', 'L2', 1, null, false, false, true],
-      ['L1 + 阶段 5 → 不豁免（豁免只覆盖阶段 1-4）', 'L1', 5, null, false, false, false],
+  // 而门禁此前无 maturity 输入 → 合法 L1 项目必被阻断。四臂（A4 后）：豁免命中（L1 + 合法
+  // human 审批链）/ L2 不命中 / 阶段 5 不命中 / 无链拒绝（A4 fail-closed 新契约的拒绝路径）。
+  it('maturity 豁免矩阵（4 态：L1+链+阶段1 豁免 / L2+阶段1 不豁免 / L1+阶段5 不豁免 / L1+阶段1+无链 拒绝）', async () => {
+    for (const [
+      场景,
+      level,
+      phase,
+      期望Waived,
+      assertMaturityLevel,
+      assertNoTlaReasons,
+      assertTlaReason,
+      带审批链,
+      assertRejectReason,
+    ] of [
+      ['L1 + 阶段 1 + 合法 human 审批链 → 豁免', 'L1', 1, true, true, true, false, true, false],
+      ['L2 + 阶段 1 → 不豁免', 'L2', 1, null, false, false, true, false, false],
+      ['L1 + 阶段 5 → 不豁免（豁免只覆盖阶段 1-4）', 'L1', 5, null, false, false, false, false, false],
+      ['L1 + 阶段 1 + 无链 → 拒绝（A4 fail-closed）', 'L1', 1, null, false, false, true, false, true],
     ] as const) {
       const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), `wm-artifact-maturity-${level.toLowerCase()}-`));
       try {
@@ -1043,9 +1154,21 @@ describe('check-artifact-gate.ts phase 1 evidence boundary', () => {
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
         await fs.writeFile(
           path.join(tmpDir, '.w-model/maturity.json'),
-          JSON.stringify({ level, history: [], lastUpdated: '2026-09-17T00:00:00.000Z' }),
+          JSON.stringify({
+            level,
+            history: [],
+            lastUpdated: '2026-09-17T00:00:00.000Z',
+          }),
           'utf-8',
         );
+        if (带审批链) {
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- test-owned mkdtemp fixture
+          await fs.writeFile(
+            path.join(tmpDir, '.w-model/signature-chain.jsonl'),
+            `${JSON.stringify(humanMaturityApprovalEntry())}\n`,
+            'utf-8',
+          );
+        }
         const r = runSync(
           process.execPath,
           [tsxCli, CHECK_ARTIFACT_GATE_SCRIPT, tmpDir, `--phase=${phase}`, '--json'],
@@ -1074,6 +1197,12 @@ describe('check-artifact-gate.ts phase 1 evidence boundary', () => {
           expect(
             report.reasons.some((x) => x.includes('[artifact:tla]')),
             `${场景}: 应报 [artifact:tla]`,
+          ).toBe(true);
+        }
+        if (assertRejectReason) {
+          expect(
+            report.reasons.some((x) => x.includes('maturity 豁免被拒绝')),
+            `${场景}: reasons 应含 maturity 豁免被拒绝（A4 fail-closed 拒绝路径）`,
           ).toBe(true);
         }
       } finally {
@@ -1137,12 +1266,16 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
       await fs.mkdir(bddModelDir, { recursive: true });
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture and destination are test-controlled
       await fs.copyFile(path.join(fixturesDir, 'bdd', 'valid-manifest.json'), path.join(bddModelDir, 'manifest.json'));
+      // A8（批次 6）：valid-manifest.json 的 filePath 改为相对 projectDir 的 bdd/valid-l1.feature，
+      // 本测试的项目布局须同步（manifest 在 <project>/.w-model/，feature 在 <project>/bdd/）。
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test directory
-      await fs.mkdir(path.join(bddProject, 'samples', 'bdd'), { recursive: true });
+      await fs.mkdir(path.join(bddProject, 'bdd'), {
+        recursive: true,
+      });
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture and destination are test-controlled
       await fs.copyFile(
         path.join(fixturesDir, 'bdd', 'valid-l1.feature'),
-        path.join(bddProject, 'samples', 'bdd', 'valid-l1.feature'),
+        path.join(bddProject, 'bdd', 'valid-l1.feature'),
       );
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled test directory
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is confined to this test's mkdtemp-owned gate-log fixture
@@ -1156,7 +1289,10 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
       expect(icebergSummary).toMatchObject({
         passed: true,
         exitCode: 0,
-        gateLogWriteError: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' },
+        gateLogWriteError: {
+          code: 'GATE_LOG_WRITE_FAILED',
+          message: 'Unable to persist gate log',
+        },
       });
       expect(iceberg.stdout ?? '').not.toContain(blockedLogRoot);
       expect(iceberg.stderr ?? '').not.toContain(blockedLogRoot);
@@ -1172,7 +1308,10 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
       expect(JSON.parse(icebergJson.stdout ?? '')).toMatchObject({
         passed: true,
         exitCode: 0,
-        gateLogWriteError: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' },
+        gateLogWriteError: {
+          code: 'GATE_LOG_WRITE_FAILED',
+          message: 'Unable to persist gate log',
+        },
       });
 
       const preventive = runSync(process.execPath, [tsxCli, CHECK_PREVENTIVE_REVIEW_SCRIPT, tmpDir, '--phase=1'], {});
@@ -1184,7 +1323,10 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
       expect(preventiveSummary).toMatchObject({
         passed: false,
         exitCode: 1,
-        gateLogWriteError: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' },
+        gateLogWriteError: {
+          code: 'GATE_LOG_WRITE_FAILED',
+          message: 'Unable to persist gate log',
+        },
       });
       const preventiveJson = runSync(
         process.execPath,
@@ -1195,7 +1337,10 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
       expect(JSON.parse(preventiveJson.stdout ?? '')).toMatchObject({
         passed: false,
         exitCode: 1,
-        gateLogWriteError: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' },
+        gateLogWriteError: {
+          code: 'GATE_LOG_WRITE_FAILED',
+          message: 'Unable to persist gate log',
+        },
       });
 
       const bdd = runSync(
@@ -1208,7 +1353,10 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
       expect(bddSummary).toMatchObject({
         passed: true,
         exitCode: 0,
-        gateLogWriteError: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' },
+        gateLogWriteError: {
+          code: 'GATE_LOG_WRITE_FAILED',
+          message: 'Unable to persist gate log',
+        },
       });
       const bddJson = runSync(
         process.execPath,
@@ -1219,7 +1367,10 @@ describe('check-iceberg-sweep.ts --json（子进程冒烟：纯 JSON、默认路
       expect(JSON.parse(bddJson.stdout ?? '')).toMatchObject({
         passed: true,
         exitCode: 0,
-        gateLogWriteError: { code: 'GATE_LOG_WRITE_FAILED', message: 'Unable to persist gate log' },
+        gateLogWriteError: {
+          code: 'GATE_LOG_WRITE_FAILED',
+          message: 'Unable to persist gate log',
+        },
       });
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });

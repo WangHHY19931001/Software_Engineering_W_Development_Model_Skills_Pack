@@ -54,5 +54,11 @@
   "compositeScore": 0.876,
   "qualityLevel": "A",
   "summary": "C11 Windows 路径 evidence 正例（反斜杠 src\\mod\\a.ts:L3= 与盘符前缀 D:\\proj\\rootcause.json:L1-5=），rootcause 子标准集合与权重同 valid-rootcause.json，应通过全部校验。",
-  "passed": true
+  "passed": true,
+  "reviewedArtifacts": [
+    {
+      "path": "README.md",
+      "sha256": "2dfe8de7b528a1673567de769e2c231817ba9fe765c87cda195cd3c92f316d14"
+    }
+  ]
 }

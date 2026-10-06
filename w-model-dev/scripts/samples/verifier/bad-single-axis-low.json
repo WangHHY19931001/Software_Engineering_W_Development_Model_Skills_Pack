@@ -55,5 +55,11 @@
   "qualityLevel": "A",
   "summary": "REQ-002 四维度完整但 completeness 偏低（0.65 低于单轴下限 0.70），加权平均达 A 级但存在单轴失败，须判定 passed=false 触发返工。",
   "passed": false,
-  "reworkHints": ["completeness 维度得分 0.65 < 0.70 单轴下限，须补全需求覆盖后重评"]
+  "reworkHints": ["completeness 维度得分 0.65 < 0.70 单轴下限，须补全需求覆盖后重评"],
+  "reviewedArtifacts": [
+    {
+      "path": "README.md",
+      "sha256": "2dfe8de7b528a1673567de769e2c231817ba9fe765c87cda195cd3c92f316d14"
+    }
+  ]
 }

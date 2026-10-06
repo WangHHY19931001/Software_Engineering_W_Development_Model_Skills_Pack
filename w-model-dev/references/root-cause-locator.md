@@ -100,7 +100,7 @@
 - 我们是否只是在「靠惯性硬撑」（sticking with it through sheer inertia）？
 - 应当重构架构，还是继续修症状（refactor architecture vs. continue fixing symptoms）？
 
-**与 `maxReworkRounds` 的关系**：本节只给出「提前停手」的技术判据，**不改变**既有的 `maxReworkRounds` 轮次上限机制（见 §4.1 的多角度强制）——判据命中时应在轮次用尽**之前**就转入架构讨论，而不是把轮次耗完。
+**与 `maxReworkRounds` 的关系**（perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载（D-4a 累计口径））：本节只给出「提前停手」的技术判据，**不改变**既有的 `maxReworkRounds` 轮次上限机制（见 §4.1 的多角度强制）——判据命中时应在轮次用尽**之前**就转入架构讨论，而不是把轮次耗完。
 
 **与 R 既有入口的分工**（不冲突、不替代）：
 

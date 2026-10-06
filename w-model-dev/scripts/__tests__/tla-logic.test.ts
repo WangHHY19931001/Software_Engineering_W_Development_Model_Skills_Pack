@@ -22,6 +22,7 @@ import {
   checkCfgInvariantsConsistency,
   checkCfgStructure,
   checkHierarchy,
+  parseCfgInvariantNames,
   validateHeader,
   type TlaSpec,
 } from '../logic/tla-logic.js';
@@ -395,6 +396,147 @@ describe('checkCoverage sdCoverage 回填', () => {
     } as any;
     const result = checkTlaModel(manifest, 2);
     expect(result.coverageViolations).toEqual([]);
+  });
+});
+
+// ==================== A6：cfg 段落关键字终止 INVARIANTS 列表 ====================
+
+describe('A6 cfg 段落关键字终止 INVARIANTS 列表（PROPERTIES 等）', () => {
+  it('官方 cfg 写法：INVARIANTS 列表后跟 PROPERTIES 段，属性名不入不变式集合', () => {
+    const cfg = ['INVARIANTS', 'TypeOK', 'Inv', '', 'PROPERTIES', 'Termination'].join('\n');
+    expect(parseCfgInvariantNames(cfg)).toEqual(['TypeOK', 'Inv']);
+  });
+
+  it('多段 cfg：官方段名全集逐个终止前导 INVARIANTS 列表，列表外的行不混入', () => {
+    // 每个段落关键字各配一个 [INVARIANTS → 不变式名 → 关键字行] 块：
+    // 关键字若缺席终止符表，其后内容会被误当不变式名混入（A6 回归素材）。
+    const sectionLines = [
+      'SPECIFICATION Spec',
+      'INIT Init',
+      'NEXT Next',
+      'CONSTANT N = 3',
+      'CONSTANTS A = 1, B = 2',
+      'CONSTRAINT TimeBound',
+      'CONSTRAINTS C1, C2',
+      'ACTION_CONSTRAINT ActC',
+      'ACTION_CONSTRAINTS ActC1, ActC2',
+      'TYPE_CONSTRAINT TypeC',
+      'SYMMETRY Sym',
+      'VIEW View1',
+      'PROPERTY Liveness',
+      'PROPERTIES Termination',
+      'CHECK_DEADLOCK FALSE',
+      'CHECK_FINAL FinalCond',
+      'POSTCONDITION Post',
+      'ALIAS Alias1',
+    ];
+    const cfg = sectionLines.map((line) => `INVARIANTS\nInv_${line.split(/[\s=]/)[0]}\n${line}`).join('\n');
+    const expected = sectionLines.map((line) => `Inv_${line.split(/[\s=]/)[0]}`);
+    expect(parseCfgInvariantNames(cfg)).toEqual(expected);
+  });
+
+  it('端到端：INVARIANTS 后紧跟 PROPERTIES 段（无空行）不再假报 cfgTlaMismatch', () => {
+    const tla = 'BusinessInvariant == /\\ TypeOK /\\ Inv';
+    const cfg = 'SPECIFICATION Spec\nINVARIANTS\nTypeOK\nInv\nPROPERTIES\nTermination';
+    const result = checkCfgInvariantsConsistency(tla, cfg);
+    expect(result.passed).toBe(true);
+    expect(result.violations).toEqual([]);
+  });
+});
+
+// ==================== A7：SANY 失败 → tlcStatus=notRun 单一事实 ====================
+
+/** A7 用 manifest：单 L1 根、schema 合法、声明标志可逐项覆盖（缺省 = 全通过标志）。 */
+function makeSingleSpecManifest(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+  return {
+    version: 1,
+    currentPhase: 1,
+    basePath: '.',
+    tools: { jarPath: 'tools/tla2tools.jar', javaMinVersion: 11 },
+    specs: [
+      {
+        id: 'L1-system',
+        level: 'L1',
+        phase: 1,
+        system: 'sample-system',
+        requirementIds: ['REQ-001'],
+        designRef: 'docs/requirement-spec.md',
+        tlaPath: 'tla/L1-system.tla',
+        cfgPath: 'tla/L1-system.cfg',
+        parent: null,
+        siblings: [],
+        children: [],
+        variableCombination: 240,
+        decompositionDecision: 'kept-below-threshold',
+        syntaxChecked: true,
+        tlcChecked: true,
+        deadlockFree: true,
+        invariantsHold: true,
+        stateExplosion: false,
+        ...overrides,
+      },
+    ],
+    checkRounds: [],
+  };
+}
+
+describe('A7 SANY 失败 → 报告输出 notRun 单一事实，不复述预置标志', () => {
+  it('syntaxChecked=false：tlcStatus=notRun，reasons 仅含「TLC 未执行」，全局分类零死锁/不变式违反/状态爆炸', () => {
+    // bad-declared-flags 形态：SANY 未过 + TLC 结果布尔全预置为「违反」
+    const result = checkTlaModel(
+      makeSingleSpecManifest({
+        syntaxChecked: false,
+        tlcChecked: false,
+        deadlockFree: false,
+        invariantsHold: false,
+        stateExplosion: true,
+      }),
+      1,
+    );
+    // 门禁不放行（notRun 一律 exit 1）
+    expect(result.passed).toBe(false);
+    // per-spec 单一事实
+    expect(result.specs).toHaveLength(1);
+    expect(result.specs[0]?.specId).toBe('L1-system');
+    expect(result.specs[0]?.tlcStatus).toBe('notRun');
+    const reasons = result.specs[0]?.reasons.join() ?? '';
+    expect(reasons).toContain('TLC 未执行（SANY 语法检查失败）');
+    expect(reasons).not.toContain('死锁');
+    expect(reasons).not.toContain('不变式违反');
+    expect(reasons).not.toContain('状态爆炸');
+    // 全局分类数组不复述预置布尔
+    expect(result.deadlockViolations).toEqual([]);
+    expect(result.invariantViolations).toEqual([]);
+    expect(result.stateExplosionSpecs).toEqual([]);
+    // violations（CLI/--json/self-test 消费面）同样单一事实：含「TLC 未执行」不含「死锁」
+    const violations = result.violations.join();
+    expect(violations).toContain('TLC 未执行');
+    expect(violations).not.toContain('死锁');
+    expect(violations).not.toContain('状态爆炸');
+  });
+
+  it('真跑通过（标志全 true）→ tlcStatus=passed 且 reasons 为空', () => {
+    const result = checkTlaModel(makeSingleSpecManifest(), 1);
+    expect(result.specs[0]?.tlcStatus).toBe('passed');
+    expect(result.specs[0]?.reasons).toEqual([]);
+  });
+
+  it('真跑失败（deadlockFree=false / invariantsHold=false / stateExplosion=true）→ tlcStatus=failed 且 reasons 与逐类违反同文案', () => {
+    const result = checkTlaModel(
+      makeSingleSpecManifest({ deadlockFree: false, invariantsHold: false, stateExplosion: true }),
+      1,
+    );
+    expect(result.specs[0]?.tlcStatus).toBe('failed');
+    expect(result.specs[0]?.reasons.join()).toContain('存在死锁（deadlockFree=false）');
+    expect(result.specs[0]?.reasons.join()).toContain('不变式违反（invariantsHold=false）');
+    expect(result.specs[0]?.reasons.join()).toContain('状态爆炸（stateExplosion=true）');
+  });
+
+  it('SANY 过但 tlcChecked=false → tlcStatus=notRun 且保留既有 tlcChecked violation', () => {
+    const result = checkTlaModel(makeSingleSpecManifest({ tlcChecked: false }), 1);
+    expect(result.specs[0]?.tlcStatus).toBe('notRun');
+    expect(result.specs[0]?.reasons.join()).toContain('TLC 未执行');
+    expect(result.violations.join()).toContain('tlcChecked=false（TLC 模型检查未完成）');
   });
 });
 
