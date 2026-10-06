@@ -134,7 +134,7 @@
 | B2 | sigHash v2 vs evidence provenance | sigHash=签名链条目完整性（篡改声明→R6 重算失败）；provenance=受控本机 source-bound 流程完整性（非密码学签名，command-reference.md「Source-bound provenance 边界」节）——两机制强度如实标注 |
 | B3 | scope 强制 vs 角色禁令 | scope 管「修复能碰什么」；角色禁令管「谁能跑什么」——互不替代 |
 | B4 | 派单契约 vs 角色边界 | 契约管「派什么/怎么验」；同文件角色边界管「谁能做什么」——两节互补不重复 |
-| B5 | L0-L4 视图 vs 既有轮次数值 | 收敛视图零新增数值：每任务 5 轮 / maxReworkRounds（perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载）/ maxIcebergRounds=5 均既有值引用（subagent-delegation.md L1/L2 行） |
+| B5 | L0-L4 视图 vs 既有轮次数值 | 收敛视图零新增数值：每任务 5 轮 / maxReworkRounds（perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载（D-4a 累计口径））/ maxIcebergRounds=5 均既有值引用（subagent-delegation.md L1/L2 行） |
 | C2 | 威胁叙事 vs 守卫体系 | 叙事层不建自动化守卫（批次 5 D1）；守卫唯一执行体仍是门禁脚本+硬约束 |
 | C4 | campaign 整批 vs 阶段回退 | 阶段 5-8 的「整批」形态已存在=阶段回退（references/workflow.md「回退路径阶段编号映射」节）；本机制补 campaign 级 |
 | C1 | 迁移素材 vs 正常阶段流程 | 待输入字段表将定义「哪些变更不算迁移」；当前一切照常走阶段 5-8 流程 |

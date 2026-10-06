@@ -599,7 +599,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 **修正**：达限强制 🔴 CHECKPOINT 升级（L1→L4，用户裁定：继续修复 / 接受剩余项并放行 / 阶段回退 / 终止）；禁止升级单调性列出的绕过手段——分层出口与升级路径见 [subagent-delegation.md](subagent-delegation.md)「分层反馈回路（L0-L4）」节。
 
-**状态**：候选（pending V 复审）。复审前不作为强制反模式执行——达上限 CHECKPOINT 义务本身是既有强制约束（subagent-delegation.md scoped re-review 每任务 5 轮上限与 `budget.json.killSwitch.consecutiveReworks` 预算门禁；perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载），不受候选状态影响；V 子代理复审转正后正式编号 #49 并同步活体计数。
+**状态**：候选（pending V 复审）。复审前不作为强制反模式执行——达上限 CHECKPOINT 义务本身是既有强制约束（subagent-delegation.md scoped re-review 每任务 5 轮上限与 `budget.json.killSwitch.consecutiveReworks` 预算门禁；perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载（D-4a 累计口径）），不受候选状态影响；V 子代理复审转正后正式编号 #49 并同步活体计数。
 
 ### #28 schema 前置校验缺失（借鉴点 2 — Task 3）
 

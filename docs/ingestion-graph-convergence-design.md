@@ -168,12 +168,11 @@
 | `implements` | SD→REQ | 设计实现需求（追溯边） | 每 SD ≥1 |
 | `defines` | SD→INTF | 系统设计定义接口 | 每 INTF ≥1（阶段3起校验） |
 | `realizes` | DD→INTF | 详细设计实现接口 | 每 DD ≥1（阶段4起校验） |
-| `produces` | 生产者 → 消费者 \| 生产者 → `EXT-OUT` | 信息流边（强调「产出」视角）：`from` 节点把信息推给 `to` | 业务节点 ≥ 0；方向=信息流方向 |
-| `consumes` | `EXT-IN` → 消费者 \| 生产者 → 消费者 | 信息流边（强调「消费」视角）：`to` 节点从 `from` 拉取信息 | 业务节点 ≥ 0；方向=信息流方向 |
+| `produces` | 生产者 → 消费者 / `EXT-IN` → 消费者 \| 生产者 → `EXT-OUT`（双向语义由 `from`/`to` 表达） | 信息流方向：`from` 产出信息给 `to`（consumes 边类型已移除，D21：信息流层统一用 `produces`） | 业务节点 ≥ 0；方向=信息流方向 |
 
 **单根树**由 `parent` 边构成：`REQ-ROOT → REQ-module → SD → INTF → DD`，多级汇聚为一个根。`implements/defines/realizes` 是追溯边，不参与树的父唯一性约束但参与连通性。
 
-**信息流边**（`produces`/`consumes`）方向语义统一：`{from, to}` 一律表示信息流方向，`from`=来源 `to`=去向；对任意节点 `n`，`to=n` 即"流入 n"，`from=n` 即"流出 n"。两类边方向语义相同，区别仅在语义强调与 A 子代理提取来源（`produces` 由生产方文档提取，`consumes` 由消费方文档提取，合并后可能表征同一条流）。信息流边不参与 `parent` 单根树约束（与结构边正交），但参与整体连通性 BFS；用于黑洞/奇迹/死模块校验，详见 [`information-flow-validation-design.md`](./information-flow-validation-design.md) §1.1。
+**信息流边**（`produces` 单向）：`{from, to}` 一律表示信息流方向，`from`=来源 `to`=去向；对任意节点 `n`，`to=n` 即"流入 n"，`from=n` 即"流出 n"。consumes 边类型已移除（D21）——信息流层统一用 `produces`，双向语义由 `from`/`to` 表达（A 子代理提取时消费方文档同样登记为 `produces` 边，方向按信息流向写）。信息流边不参与 `parent` 单根树约束（与结构边正交），但参与整体连通性 BFS；用于黑洞/奇迹/死模块校验，详见 [`information-flow-validation-design.md`](./information-flow-validation-design.md) §1.1。
 
 ### 2.4 graph.json schema
 
@@ -264,11 +263,11 @@ npx tsx w-model-dev/scripts/cli/check-requirement-graph.ts "<graph.json or conso
    - phase ≥ 3: 每个 INTF 节点入边 defines ≥ 1 → 否则 INTF_without_defines++
    - phase ≥ 4: 每个 DD 节点出边 realizes ≥ 1 → 否则 DD_without_realizes++
 6. 信息流校验（与结构校验正交，详见 information-flow-validation-design.md §2.1）:
-   构建 produces/consumes 有向子图（方向=信息流方向，to=n 即流入 n，from=n 即流出 n）
+   构建 produces 有向子图（consumes 已移除，D21；方向=信息流方向，to=n 即流入 n，from=n 即流出 n）
    businessNodes = nodes 中 type ∈ {REQ|SD|INTF|DD} 且 phase ≤ currentPhase 的节点
    for n in businessNodes:
-     inFlow  = count(edges where (type=produces ∨ type=consumes) ∧ to=n)
-     outFlow = count(edges where (type=produces ∨ type=consumes) ∧ from=n)
+     inFlow  = count(edges where type=produces ∧ to=n)
+     outFlow = count(edges where type=produces ∧ from=n)
      - inFlow=0 ∧ outFlow=0 → deadModules.push(n)（死模块：无信息流经）
      - inFlow=0 ∧ outFlow>0 → miracles.push(n)（奇迹：只出不进，信息凭空产生）
      - inFlow>0 ∧ outFlow=0 → blackHoles.push(n)（黑洞：只进不出，信息消失）

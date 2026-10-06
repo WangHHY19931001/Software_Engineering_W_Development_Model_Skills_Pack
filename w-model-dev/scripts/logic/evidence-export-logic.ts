@@ -175,10 +175,12 @@ function normalizeSensitiveKey(key: string): string {
 const SENSITIVE_KEY_SEGMENT_SPLIT = /[^a-zA-Z0-9]+/;
 /**
  * A9 敏感 key 判定：精确匹配（既有行为，变体匹配的子集）之外，追加两类规范化变体
- * 匹配——①规范化全串的后缀（词干长度 ≥6，防短词干误伤如 run-log 既有键 `tokens`
- * 不得因词干 `token` 命中）；②分隔符词段的连续拼接（词干必须整段跨越分隔符边界，
- * 不得切断无分隔符的字母串）：`api_key_v2` 的 `api+key` 段、`db_password_hash` 的
- * `password` 段命中；`passwordPolicy`（无分隔符边界）、`path`/`durationMs` 不误伤。
+ * 匹配——①规范化全串的后缀（词干长度 ≥6）：`tokens` 由精确 Set 语义保住（`tokens`
+ * 不在 Set 内，而候选词干 `token` 长度 5 < 6 不满足长度守卫、后缀分支不触发）；同一
+ * 守卫保护 `token_count` 类计数键并阻断 `mytoken` 式后缀命中（词干不足 6 一律不算）；
+ * ②分隔符词段的连续拼接（词干必须整段跨越分隔符边界，不得切断无分隔符的字母串）：
+ * `api_key_v2` 的 `api+key` 段、`db_password_hash` 的 `password` 段命中；
+ * `passwordPolicy`（无分隔符边界）、`path`/`durationMs` 不误伤。
  */
 function isSensitiveKey(key: string): boolean {
   const normalizedKey = normalizeSensitiveKey(key);

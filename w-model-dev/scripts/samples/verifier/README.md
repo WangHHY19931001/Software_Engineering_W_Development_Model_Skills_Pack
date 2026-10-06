@@ -14,6 +14,9 @@ R19 评审对象绑定）。登记口径：
   存在自引用悖论；也不登记同目录其他 fixture（相互哈希耦合会扩散改动面）。
 - **`persona-*.json`**：登记其 `path:Lnn=` evidence 指向的仓内真实文件（仓库根相对路径，
   `check-verifier-output.ts` 按「VerifierOutput 所在目录优先、cwd 回退」解析）。
+  **运行目录说明**：self-test / persona fixture 的哈希校验假定 cwd=仓库根（cwd 回退分支按
+  仓库根相对路径解析 `w-model-dev/...` 登记项；从其他目录运行会因解析不到登记文件而报
+  `R19 评审对象文件不存在`）。
   **维护注意**：这些登记项哈希绑定被引文件的当前字节——修改
   `w-model-dev/scripts/logic/verifier-logic.ts`、`w-model-dev/scripts/__tests__/verifier-logic.test.ts`、
   `w-model-dev/references/agent-personas.md` 后，须同步刷新对应 persona fixture 的

@@ -384,7 +384,7 @@
         { "type": "contains", "target": "w-model-dev/references/verifier-spec.md", "substring": "INJECTION-SUSPECTED" }
       ],
       "evidence": { "type": "assertion" } },
-    { "id": 67, "scenario": "新机制：产物自我合格声明当证据", "layer": "L2",
+    { "id": 67, "scenario": "新机制：产物自我合格声明被当证据采信", "layer": "L2",
       "assertions": [
         { "type": "contains", "target": "w-model-dev/references/verifier-spec.md", "substring": "不构成 evidence" }
       ],

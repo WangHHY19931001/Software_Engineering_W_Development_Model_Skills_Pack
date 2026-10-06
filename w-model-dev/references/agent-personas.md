@@ -737,7 +737,7 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 | Optional/Nit/FYI 缺陷的 R 定位 | 可选多角度（默认单 R-lead） | 轻微缺陷可单 R-lead 产出 |
 | 阶段门 V 评审（首次） | 可选多角度（默认单 V） | 首次评审可单 persona |
 | 根因报告 V 复审 | **强制多角度** | 根因准确性须多角度保证 |
-| maxReworkRounds（perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载）达上限前一轮 | **强制多角度** | 最后一轮须多角度穷尽 |
+| maxReworkRounds（perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载（D-4a 累计口径））达上限前一轮 | **强制多角度** | 最后一轮须多角度穷尽 |
 
 ---
 

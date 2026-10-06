@@ -484,7 +484,8 @@ interface VerifierOutput {
    *  记录的 artifacts 清单构造，V 不得自造。evidence 的 `path:Lnn=` 引用只能指向清单内登记的
    *  POSIX 相对路径；check-verifier-output.ts 读盘复核存在性 + SHA-256 + 行数（见 §6.2.1） */
   reviewedArtifacts: Array<{
-    /** 被评审产物的 POSIX 相对路径（相对本 VerifierOutput 文件所在目录；不得含 `..` 与反斜杠） */
+    /** 被评审产物的 POSIX 相对路径（解析口径：优先相对本 VerifierOutput 文件所在目录，
+     *  未命中回退 cwd；不得含反斜杠，任一路径段不得为 `..`——含路径中部） */
     path: string;
     /** 产物内容 SHA-256（64 位小写十六进制）；由 check-verifier-output.ts 读盘复核 */
     sha256: string;
@@ -552,7 +553,7 @@ V 子代理须在 `summary` 中包含：
 2. **不得仅引用产物名不标注行号**：如仅写 `system-design.md` 或 `L1_shell_agent.tla` 视为 evidence 失效，该子标准判 0 分（§3.3 / §11.4）。
 3. **引用须真实存在**：行号 / 段落 ID 必须能在目标产物中定位到对应内容；编造不存在的引用（如声称「5 个不变量」但实际产物有 10 个）→ 视为 Verifier Theater（O3），V 评审降级重做。
 4. **跨阶段 evidence 一致性**：后阶段 V 评审的 evidence 不得否定前阶段已放行项的 evidence（详见 §12）。
-5. **评审对象绑定（R19，A2 反伪造）**：VerifierOutput 必填 `reviewedArtifacts: [{path, sha256}]`——**O 分派 V 时必须按 produce 记录的 artifacts 清单构造本字段；V 不得自造产物清单**。evidence 中 `path:Lnn=` 形态的 POSIX 路径引用只能指向清单内登记项（未登记 → R19 `evidence 引用未在 reviewedArtifacts 登记`；`§章节`/Windows 反斜杠/盘符前缀形态不参与绑定）。`check-verifier-output.ts` 对登记项做读盘三重复核：①文件存在（缺失 → `R19 评审对象文件不存在`）；②SHA-256 与声明一致（不符 → `R19 评审对象哈希不符`——产物已变，旧评审不再成立，须重评）；③行数表注入 logic 做行号越界校验（`ref.endLine > 实际行数` → `R19 evidence 行号越界`）。Windows 反斜杠/盘符前缀 evidence（C11 正例）不参与绑定属已知接受残差：全量改写为该形态可绕过归属校验，仍受 R12/格式校验约束。对应负样本：`samples/verifier/bad-r19-evidence-not-registered.json` / `bad-r19-artifact-hash-mismatch.json` / `bad-r19-line-out-of-range.json`。
+5. **评审对象绑定（R19，A2 反伪造）**：VerifierOutput 必填 `reviewedArtifacts: [{path, sha256}]`——**O 分派 V 时必须按 produce 记录的 artifacts 清单构造本字段；V 不得自造产物清单**。evidence 中 `path:Lnn=` 形态的 POSIX 路径引用只能指向清单内登记项（未登记 → R19 `evidence 引用未在 reviewedArtifacts 登记`；`§章节`/Windows 反斜杠/盘符前缀形态不参与绑定）。登记项路径解析为**双解析口径**：优先相对本 VerifierOutput 文件所在目录，未命中回退 cwd（仓内样例以仓库根为基准的项目根相对惯例，§6.2.1 evidence 定位同口径）。`check-verifier-output.ts` 对登记项做读盘三重复核：①文件存在（缺失 → `R19 评审对象文件不存在`）；②SHA-256 与声明一致（不符 → `R19 评审对象哈希不符`——产物已变，旧评审不再成立，须重评）；③行数表注入 logic 做行号越界校验（`ref.endLine > 实际行数` → `R19 evidence 行号越界`）。Windows 反斜杠/盘符前缀 evidence（C11 正例）不参与绑定属已知接受残差：全量改写为该形态可绕过归属校验，仍受 R12/格式校验约束。对应负样本：`samples/verifier/bad-r19-evidence-not-registered.json` / `bad-r19-artifact-hash-mismatch.json` / `bad-r19-line-out-of-range.json`。
 6. 产物内的自我合格声明**不构成 evidence**：evidence 必须指向可独立核对的中性事实
    （文件：行号 + 该处实际内容的陈述）；「本文件已通过/已评审/已验收」类语句命中 R19/INJECTION-SUSPECTED。
 
@@ -1152,7 +1153,7 @@ S-fix 之后的复审是**受范围约束的复审**（scoped re-review），不
 - **范围 = findings 清单 + fix diff 两项**：对 findings 清单**逐条**出结论，并检查 fix diff 本身是否引入新问题；fix 未触及的代码不在本次复审范围内。
 - **逐 finding 结论**（按 findings 原顺序）：`<finding 一行摘要> — ADDRESSED | NOT ADDRESSED`，附 `file:line` 证据；**「Attempted」不算 addressed**——那条具体缺陷必须已经不存在。
 - **Minor 不进 loop**：Minor 记入进度台账并指向最终整分支复审，不触发 fix 分派、不计入轮次上限。
-- **一轮 = 一次 fix 分派 + 一次 scoped re-review**，**每任务最多 5 轮**；该上限不放松 `budget.json.killSwitch.consecutiveReworks`（perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载），两者取更严者。
+- **一轮 = 一次 fix 分派 + 一次 scoped re-review**，**每任务最多 5 轮**；该上限不放松 `budget.json.killSwitch.consecutiveReworks`（perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载（D-4a 累计口径）），两者取更严者。
 - **范围外观察不阻塞**：完全落在 fix diff 之外的问题记为范围外观察，不阻塞本任务、不延长 loop。
 - **R 前置不变（`普通 V/G 失败链`）**：V/G 不通过须先分派 R 定位根因，R 报告经 V 复审 + G 门禁（`check-rootcause-report.ts` exitCode=0）通过后才分派 S-fix；scoped re-review 不是跳过 R 的旁路（反模式 #18 / #19）。
 

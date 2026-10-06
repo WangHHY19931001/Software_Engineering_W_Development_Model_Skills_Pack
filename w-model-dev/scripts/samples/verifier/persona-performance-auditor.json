@@ -16,7 +16,7 @@
       "score": 0.9,
       "rawScores": [0.89, 0.9, 0.91],
       "variance": 0.0000667,
-      "evidence": "w-model-dev/references/agent-personas.md:L356-381=Quick 与 Deep 模式边界"
+      "evidence": "w-model-dev/references/agent-personas.md:§quick-deep-boundary=Quick 与 Deep 模式边界"
     },
     {
       "name": "requirement-coverage",
@@ -24,7 +24,7 @@
       "score": 0.91,
       "rawScores": [0.9, 0.91, 0.92],
       "variance": 0.0000667,
-      "evidence": "w-model-dev/references/agent-personas.md:L373-383=未测量不得伪造指标"
+      "evidence": "w-model-dev/references/agent-personas.md:§metric-honesty=未测量不得伪造指标"
     },
     {
       "name": "interface-consistency",
@@ -32,7 +32,7 @@
       "score": 0.89,
       "rawScores": [0.88, 0.89, 0.9],
       "variance": 0.0000667,
-      "evidence": "w-model-dev/references/agent-personas.md:L500-538=性能 Persona 输出格式与样例位置"
+      "evidence": "w-model-dev/references/agent-personas.md:§performance-persona-output=性能 Persona 输出格式与样例位置"
     },
     {
       "name": "feasibility",
@@ -40,7 +40,7 @@
       "score": 0.88,
       "rawScores": [0.87, 0.88, 0.89],
       "variance": 0.0000667,
-      "evidence": "w-model-dev/references/agent-personas.md:L362-371=工具工件存在时才采用 Deep 模式"
+      "evidence": "w-model-dev/references/agent-personas.md:§deep-mode-gating=工具工件存在时才采用 Deep 模式"
     },
     {
       "name": "testability",
@@ -57,8 +57,8 @@
   "passed": true,
   "reviewedArtifacts": [
     {
-      "path": "w-model-dev/references/agent-personas.md",
-      "sha256": "ae144f08f616821ba1da689c14255107e95f7b77bad04e92a0050fbed5fc2b05"
+      "path": "README.md",
+      "sha256": "2dfe8de7b528a1673567de769e2c231817ba9fe765c87cda195cd3c92f316d14"
     }
   ]
 }
