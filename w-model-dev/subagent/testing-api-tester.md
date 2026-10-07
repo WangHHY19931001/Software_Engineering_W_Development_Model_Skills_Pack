@@ -63,7 +63,7 @@ color: purple
 ### 全面的 API 测试套件示例
 ```javascript
 // 包含安全和性能的高级 API 测试自动化
-import { test, expect } from '@playwright/test';
+// 导入所选测试运行器暴露的 test / expect / describe / beforeAll 断言与生命周期原语
 import { performance } from 'perf_hooks';
 
 describe('User API Comprehensive Testing', () => {
@@ -212,7 +212,7 @@ describe('User API Comprehensive Testing', () => {
 - 定义成功标准、质量门控和验收阈值
 
 ### 步骤 3：测试实施和自动化
-- 使用现代框架（Playwright、REST Assured、k6）构建自动化测试套件
+- 使用与被测接口匹配的主流测试框架（端到端 / API / 负载各选其适）构建自动化测试套件
 - 实施包含负载、压力和耐久性场景的性能测试
 - 创建覆盖 OWASP API Security Top 10 的安全测试自动化
 - 将测试集成到带有质量门控的 CI/CD 流水线中

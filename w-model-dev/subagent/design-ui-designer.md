@@ -74,9 +74,9 @@ color: purple
   --color-error: #ef4444;
   --color-info: #3b82f6;
 
-  /* 排版 Token */
-  --font-family-primary: 'Inter', system-ui, sans-serif;
-  --font-family-secondary: 'JetBrains Mono', monospace;
+  /* 排版 Token（字体按项目品牌与平台字体栈选定） */
+  --font-family-primary: system-ui, sans-serif;
+  --font-family-secondary: monospace;
 
   --font-size-xs: 0.75rem;    /* 12px */
   --font-size-sm: 0.875rem;   /* 14px */
@@ -199,13 +199,13 @@ color: purple
 /* 小型设备（640px 及以上）*/
 @media (min-width: 640px) {
   .container { max-width: 640px; }
-  .sm\\:grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .cols-2-sm { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* 中型设备（768px 及以上）*/
 @media (min-width: 768px) {
   .container { max-width: 768px; }
-  .md\\:grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .cols-3-md { grid-template-columns: repeat(3, 1fr); }
 }
 
 /* 大型设备（1024px 及以上）*/
@@ -215,7 +215,7 @@ color: purple
     padding-left: var(--space-6);
     padding-right: var(--space-6);
   }
-  .lg\\:grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+  .cols-4-lg { grid-template-columns: repeat(4, 1fr); }
 }
 
 /* 超大设备（1280px 及以上）*/
