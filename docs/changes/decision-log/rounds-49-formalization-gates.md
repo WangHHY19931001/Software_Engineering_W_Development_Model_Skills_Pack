@@ -43,4 +43,4 @@
 |---|---|
 | self-test | 403 → **412**（TLA 15→20 / GRAPH 37→39 / MATURITY 3→5，其余不变） |
 | 版本号 | 43.1.0（批次 7 目标版本，breaking；判据收紧不留兼容） |
-| prepush | 19 项占位待 T15 回填（实测耗时）；T14 记录：self-test 412/412、docs-consistency 0、eval 68/68、typecheck 0 |
+| prepush | **19/19 全绿（实测 1793s，2026-10-07 单次；T15 实测）**；T14 记录：self-test 412/412、docs-consistency 0、eval 68/68、typecheck 0；规则层覆盖口径 75 文件——语句 87.41 / 分支 81.23 / 函数 95.68 / 行 89.97（阈值 80/75/90/85） |

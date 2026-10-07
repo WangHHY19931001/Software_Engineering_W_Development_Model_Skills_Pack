@@ -9,7 +9,7 @@
 
 ## [43.1.0] - 2026-10-07
 
-### 批次 7：形式化与图谱门禁收严（15 实现任务 + 1 专项收口 + 2 审查修复轮，增量规格 §5 批次 7 的 21 项全部销账；规格 [`docs/superpowers/specs/2026-10-07-remediation-leftovers-design.md`](./docs/superpowers/specs/2026-10-07-remediation-leftovers-design.md) §0 决策 2/3/4 与 §2，裁定登记 [`decision-log/rounds-49-formalization-gates.md`](./docs/changes/decision-log/rounds-49-formalization-gates.md)，SSoT 权威摘要 §10S）
+### 批次 7：形式化与图谱门禁收严（12 实现任务 + 1 专项收口 + 3 审查修复轮，增量规格 §5 批次 7 的 21 项全部销账；规格 [`docs/superpowers/specs/2026-10-07-remediation-leftovers-design.md`](./docs/superpowers/specs/2026-10-07-remediation-leftovers-design.md) §0 决策 2/3/4 与 §2，裁定登记 [`decision-log/rounds-49-formalization-gates.md`](./docs/changes/decision-log/rounds-49-formalization-gates.md)，SSoT 权威摘要 §10S）
 
 > **Breaking（门禁判据收紧，不留兼容）**：本批为真实门禁行为收严——恒真不变式防御、图谱 depends-on 环检全 phase、`evidenceStatus=pending` 与 RTM `coverageStatus` 缺字段/非法值违规化、`project.status` 转移校验、降级须 human 授权、R6 首条 `from==L0`、`*_token` 词段命中脱敏，均在既有输入上可能新增 red。存量项目须按下方「迁移」段处置 `maturity.json` history 与 `rtm.json` coverageStatus。判据直接收紧、不写兼容分流（延续批次 6「毁弃存量数据」裁定，R-B7-2）。
 
@@ -49,11 +49,11 @@
   ]
   ```
 - **RTM coverageStatus（存量 `rtm.json`）**：各行补 `coverageStatus`（`"100%"` / `"部分"` / `"待覆盖"`，按行级完整性判定），缺失或非法值 `check-artifact-gate` exit 1（本批样本 4 处按行级完整性枚举对齐）。
-- **图谱 evidenceStatus=pending（存量 `graph.json`）**：放行前 pending 节点须转 `confirmed`，或经 `check-exemption` 登记 evidence-anchor 豁免（CLI `--exemptions` 按 `R15b ` 前缀匹配）。
+- **图谱 evidenceStatus=pending（存量 `graph.json`）**：放行前 pending 节点须转 `confirmed`，或经 `check-exemption` 登记 evidence-anchor 豁免（`ruleId` 填 `R15b`、不带尾空格——CLI `--exemptions` 按「`R15b ` / `[R15b]` / `R15b-`」三种前缀形式过滤违规文本，写 `R15` 命不中 `R15b ` 开头的违规）。
 
-**计数影响**：零新增 CLI（48 = 47 exit-2 + 1 self-test，不变）/ references（45 不变）/ persona（36 不变）/ schema 34 份不变（字段级修改：verifier-output / tla-manifest / rtm / project / graph / maturity）；门禁脚本 48 不变；测试文件 113→114（新增 `reviewed-artifacts-normalization.test.ts`，其余为既有文件扩展）；`vitest list` 收集计数 **114 文件 / 2117 用例**（执行计数与耗时待 T15 prepush 回填）；self-test 403→**412**（TLA 15→20、GRAPH 37→39、MATURITY 3→5，其余不变）；samples 新增 10 文件（4 TLA 负例 + depends-on 环 phase3 + pending + idle-next + 无授权降级 + `with-approval/` 2 文件）；eval 语料 68 条不变。
+**计数影响**：零新增 CLI（48 = 47 exit-2 + 1 self-test，不变）/ references（45 不变）/ persona（36 不变）/ schema 34 份不变（字段级修改 7 份：verifier-output / tla-manifest / rtm / project / graph / maturity / signature-chain）；门禁脚本 48 不变；测试文件 113→114（新增 `reviewed-artifacts-normalization.test.ts`，其余为既有文件扩展）；`vitest list` 收集计数 **114 文件 / 2117 用例**（执行侧：prepush 第 12 项全量 vitest exit 0，耗时 1777s；prepush 车道临时 JSON 随车道清理，执行计数不单独留档）；self-test 403→**412**（TLA 15→20、GRAPH 37→39、MATURITY 3→5，其余不变）；samples 新增 10 文件（4 TLA 负例 + depends-on 环 phase3 + pending + idle-next + 无授权降级 + `with-approval/` 2 文件）；eval 语料 68 条不变。
 
-**验证记录**：prepush 19 项全绿（实测耗时见 T15 回填）；self-test 412/412、docs-consistency exit 0、eval 68/68、typecheck exit 0、demo 三门（artifact-gate / maturity / wm-status）exit 0、`lint:security` exit 0（T13b 专项收口 10 项新发现）——全量 vitest 与规则层覆盖口径终值待 T15 回填。
+**验证记录**：prepush **19/19 全绿（实测 1793s，2026-10-07 单次；T15 实测）**；self-test 412/412、docs-consistency exit 0、eval 68/68、typecheck exit 0、demo 三门（artifact-gate / maturity / wm-status）exit 0、`lint:security` exit 0（T13b 专项收口 10 项新发现）；全量 vitest（prepush 第 12 项）exit 0（耗时 1777s），规则层覆盖口径（第 13 项，logic+lib 分母重算 75 文件）exit 0——语句 87.41% / 分支 81.23% / 函数 95.68% / 行 89.97%（阈值 80/75/90/85）。专项复跑（T15）：红队实验 1/2/3 全部复现拦截（伪造 VerifierOutput 三变体 exit 1；R9 违规链加 `targetKind:"preventive"` 无痕改写→R6、只重算该条→下游 R2，均 exit 1，阴性对照 exit 0；伪造 run-log 无配套 gate-logs / exitCode 不符 exit 1，一致对照 exit 0）、五类退化解探针 exit 1、B7 `SKIPPED(level=1)` 证据可见、fresh-clone（`core.autocrlf=true`）self-test 412/412。**已知未达标（T15 登记）**：主规格 §6 验收句的 demo 三门口径中 `check-tla-model` exit 1——1 条为**先于本批存在**的 `.tla` 头/manifest 漂移（BASE `12c9d748` 复跑同为 exit 1），2 条为本批 B1a 对 demo cfg 的新增 red（`build_workspace.py` 生成的 cfg 仅声明 `TypeInvariant`，未随 B1a 迁移）；demo 为 gitignored 可再生 eval 夹具，不影响包内门禁与交付，处置待终审裁定（T15 报告 §C4）。
 
 ## [43.0.1] - 2026-10-07
 
@@ -61,7 +61,7 @@
 
 - **环境（autocrlf×R19）**：增补 `.gitattributes` 全仓 LF 规则（`* text=auto eol=lf` + 二进制豁免），强制 LF 落盘并 renormalize——修复全局 `core.autocrlf=true` 下新 clone 首次 self-test 的 R19 哈希假红（合并期实测发现）。机制侧归一化哈希随 43.1.0 落地。
 
-**验证记录**：self-test 403/403（renormalize 后回配）；fresh-clone 实证 LF 落盘成立；prepush 19 项全绿（实测 1403s，SDD 账本）。
+**验证记录**：self-test 403/403（renormalize 后回配）；fresh-clone 实证 LF 落盘成立；prepush 19 项全绿（热修会话实测；耗时账本未随仓交付）。
 
 ## [43.0.0] - 2026-10-06
 
