@@ -19,6 +19,11 @@
  * evidence-anchor-pending（第 6 类：graph.json 中 evidenceStatus=pending 的节点
  * 在阶段门放行前的合法出口——不给出口会逼人把未验证锚点直接标 confirmed）。
  * 六类**共用同一套 E1-E9**，不因类型分叉，无类型专属逻辑。
+ *
+ * ruleId 允许子规则小写后缀（schema pattern `^[RC]\d+[a-z]?$`，如 `R15b`）：
+ * 第 6 类 evidence-anchor-pending 的消费方是 `check-requirement-graph.ts` 的
+ * `R15b pending 未核验` violation，登记 `ruleId='R15b'` 才能被 `--exemptions` 前缀过滤命中
+ * （写 `R15` 命不中 `R15b ` 开头的违规文本；C1 修复前 R15b 过不了本 schema 的 pattern，出口死锁）。
  */
 import { validateBySchema, type SchemaValidationResult } from '../infrastructure/schema-loader.js';
 

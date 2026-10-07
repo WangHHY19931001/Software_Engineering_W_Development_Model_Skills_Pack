@@ -1961,3 +1961,99 @@ describe('A11/A12 图谱收严（批次 7 任务 8）', () => {
     expect(out.passed, 'confirmed + 合法锚点应通过').toBe(true);
   });
 });
+
+// ==================== C1（终审修复波）：evidence-anchor-pending 豁免出口端到端可达 ====================
+describe('C1：check-requirement-graph --exemptions 的 R15b 豁免出口（端到端）', () => {
+  const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/check-requirement-graph.ts');
+  const PENDING_SAMPLE = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '../samples/graph/bad-evidence-status-pending.json',
+  );
+
+  /**
+   * 按 samples/graph/bad-evidence-status-pending.json 的既有形态构造「全节点 pending」phase-1 图，
+   * 差异仅在锚点：样本首节点的 `docs/phase1-requirements/requirement-spec.md` 在盘不存在
+   * （样本自带 R15c 违规），本用例把全部锚点改指向树内真实存在的 `anchors/evidence.md`，
+   * 使 R15b 成为**唯一**违规源——出口是否可达才由单一变量锁定（C1 审查者复现形态）。
+   */
+  async function buildTree(): Promise<{ root: string; graph: string }> {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-c1-exemption-'));
+    const graph = path.join(root, 'graph.json');
+    // .git/ 使 resolveAnchorBaseDir 以树根为基准（锚点按项目根相对路径解析）
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp 自有临时目录内的受控目录树
+    await fs.mkdir(path.join(root, '.git'), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，受控锚点目录
+    await fs.mkdir(path.join(root, 'anchors'), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，受控锚点目标文件
+    await fs.writeFile(path.join(root, 'anchors', 'evidence.md'), '# C1 锚点目标（内容无关，存在即可）\n', 'utf-8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 仓内受控 fixture 读取
+    const sample = JSON.parse(await fs.readFile(PENDING_SAMPLE, 'utf-8')) as GraphShape;
+    for (const n of sample.nodes) {
+      n.evidenceAnchor = `anchors/evidence.md:§3=${n.id} pending 待验证`;
+      n.evidenceStatus = 'pending';
+    }
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp 自有临时目录内的受控图文件
+    await fs.writeFile(graph, JSON.stringify(sample, null, 2), 'utf-8');
+    return { root, graph };
+  }
+
+  /** granted.json（check-exemption approve 的落盘形态：grantedExemptions[].ruleId） */
+  async function writeGranted(root: string, ruleId: string): Promise<string> {
+    const file = path.join(root, 'granted.json');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp 自有临时目录内的受控豁免文件
+    await fs.writeFile(file, JSON.stringify({ grantedExemptions: [{ ruleId }] }), 'utf-8');
+    return file;
+  }
+
+  function runCli(graph: string, extraArgs: string[]): { exitCode: number | null; stdout: string; stderr: string } {
+    const r = runSync(process.execPath, [tsxCli, CLI, graph, '--phase=1', '--json', ...extraArgs], {
+      cwd: path.dirname(graph),
+    });
+    return { exitCode: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
+  }
+
+  it('未豁免：R15b pending 阻断且为唯一违规源（exit 1）', async () => {
+    const tree = await buildTree();
+    try {
+      const r = runCli(tree.graph, []);
+      expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(1);
+      const report = JSON.parse(r.stdout) as { passed: boolean; reasons: string[] };
+      expect(report.passed).toBe(false);
+      expect(report.reasons, 'R15b 应为唯一违规源（锚点全部落在树内真实文件，无 R15c）').toHaveLength(1);
+      expect(report.reasons[0]).toContain('R15b pending 未核验');
+    } finally {
+      await fs.rm(tree.root, { recursive: true, force: true });
+    }
+  });
+
+  it('granted ruleId=R15b：pending 豁免生效 → exit 0（C1 修复后出口可达）', async () => {
+    const tree = await buildTree();
+    try {
+      const granted = await writeGranted(tree.root, 'R15b');
+      const r = runCli(tree.graph, [`--exemptions=${granted}`]);
+      expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+      const report = JSON.parse(r.stdout) as { passed: boolean; reasons: string[] };
+      expect(report.passed, 'R15b 豁免生效后应放行（pending 节点已登记豁免出口）').toBe(true);
+      expect(report.reasons).toEqual([]);
+    } finally {
+      await fs.rm(tree.root, { recursive: true, force: true });
+    }
+  });
+
+  it('granted ruleId=R15（审查者复现的写法）：前缀命不中 R15b 违规 → 仍 exit 1（负例锁）', async () => {
+    const tree = await buildTree();
+    try {
+      const granted = await writeGranted(tree.root, 'R15');
+      const r = runCli(tree.graph, [`--exemptions=${granted}`]);
+      expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(1);
+      const report = JSON.parse(r.stdout) as { passed: boolean; reasons: string[] };
+      expect(report.passed).toBe(false);
+      expect(
+        report.reasons.some((v) => v.startsWith('R15b pending 未核验')),
+        'R15 不得命中 R15b（前缀过滤仅认 `R15b ` / `[R15b]` / `R15b-`——迁移指引必须写 R15b）',
+      ).toBe(true);
+    } finally {
+      await fs.rm(tree.root, { recursive: true, force: true });
+    }
+  });
+});

@@ -117,7 +117,7 @@ implements/defines/realizes 追溯边与 governs/collaborates-with/derives 横�
 2. 横切边不替代追溯：被治理子系统的 parent 仍是系统根（治理是横切叠加，不改变结构依附）；追溯层与横切层并存，互不替代。
 3. 信息流可跨层流动，但两端须在层级树中。
 
-**证据锚点状态（R15b，43.1.0 A12 起 violation 化）**：全部节点须携带 `evidenceStatus`（`confirmed` | `pending`，schema enum）。阶段门放行前 `pending` 节点数为 0——pending 节点须转 `confirmed`（R15e：confirmed 须有签名链证据）或走 `check-exemption.ts` 第 6 类 `evidence-anchor-pending` 豁免；带 pending 直接放行由 `check-requirement-graph.ts` R15b 判 violation（43.1.0 A12 前 pending 为合法放行态）。
+**证据锚点状态（R15b，43.1.0 A12 起 violation 化）**：全部节点须携带 `evidenceStatus`（`confirmed` | `pending`，schema enum）。阶段门放行前 `pending` 节点数为 0——pending 节点须转 `confirmed`（R15e：confirmed 须有签名链证据）或走 `check-exemption.ts` 第 6 类 `evidence-anchor-pending` 豁免（`ruleId` 填 `R15b`——豁免 CLI 按 `R15b ` / `[R15b]` / `R15b-` 前缀过滤违规文本，写 `R15` 命不中）；带 pending 直接放行由 `check-requirement-graph.ts` R15b 判 violation（43.1.0 A12 前 pending 为合法放行态）。
 
 ## 可选能力边界（批次 2 A4）
 
