@@ -753,6 +753,131 @@ export function checkCfgStructure(cfgContent: string): {
   return { passed: violations.length === 0, violations, invariantCount };
 }
 
+// ==================== B1 恒真/空洞不变式防御 + B10c CONSTRAINT 禁用（批次 7 任务 3） ====================
+
+/** 转义正则元字符（由定义名构造字面匹配用）。 */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** 定义体归一化（trim + 折叠空白），用于 B1b/B1c 的语法等价比对。 */
+function normalizeDefBody(body: string): string {
+  return body.trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * 从 .tla 文本提取顶层定义 `Name ==` 的定义体（到下一顶层定义 / 模块终止符 ==== / EOF）。
+ * 提取前剥离 `(* *)` 块注释与 `\*` 行注释；找不到该定义返回 null
+ * （cfg 声明了 .tla 不存在的名字时由 §11 cfg-tla 集合一致性另行拦截，此处静默跳过）。
+ */
+export function extractTlaDefBody(tlaContent: string, name: string): string | null {
+  if (typeof tlaContent !== 'string' || tlaContent === '' || name === '') return null;
+  const tla = stripComments(tlaContent);
+  const lines = tla.split('\n');
+  const defLineRe = new RegExp(`^[ \\t]*${escapeRegExp(name)}\\s*==(.*)$`);
+  const nextDefRe = /^[ \t]*[A-Za-z][A-Za-z0-9_]*\s*==/;
+  // 循环变量用 defIdx/bodyIdx（而非 checkCfgStructure 的 i 命名）：上方「cfg 结构：裸 INVARIANT」
+  // 规则块在 tla-logic-rule-loadbearing.test.ts 的剥离锚点是唯一的 i 循环头文本，本函数任何行
+  //（含注释）都不得复现该字面量。
+  for (let defIdx = 0; defIdx < lines.length; defIdx++) {
+    const m = (lines[defIdx] ?? '').match(defLineRe);
+    if (!m) continue;
+    const bodyLines: string[] = [m[1] ?? ''];
+    for (let bodyIdx = defIdx + 1; bodyIdx < lines.length; bodyIdx++) {
+      const line = lines[bodyIdx] ?? '';
+      if (/^[ \t]*====/.test(line)) break; // 模块终止符 ====
+      if (nextDefRe.test(line)) break; // 下一顶层定义
+      bodyLines.push(line);
+    }
+    return bodyLines.join('\n');
+  }
+  return null;
+}
+
+/**
+ * B1 恒真/空洞不变式防御 + B10c CONSTRAINT 禁用（批次 7 任务 3，cfg 一致性检查区）。
+ *
+ * B1：恒真/空洞不变式防御。业务不变式 = cfg INVARIANTS 中名字不以 'Type' 开头者。
+ * ①须 ≥1 条；②定义体归一化后（trim + 折叠空白）不得为 'TRUE'，
+ * ③不得与任一 Type 类不变式定义体相同（同规格内比对）。
+ * B10c：cfg 出现 CONSTRAINT/CONSTRAINTS 段名 → 违规（状态空间砍削掩盖死锁/爆炸，
+ * 正道是规格拆解——反模式 #16 家族）。
+ *
+ * 判定细节：
+ *   - B1a 仅在 cfg 声明了不变式（INVARIANTS/INVARIANT 解析非空）时评估——cfg 未声明任何
+ *     不变式（如纯死锁冒烟规格）不属「全 Type 类」空洞形态，不在此拦截。
+ *   - B1b/B1c 的定义体经 extractTlaDefBody 从 .tla 提取后归一化比较；提取不到定义体的
+ *     名字跳过（§11 集合一致性已另行拦截「.tla 缺失/多余」）。
+ *   - B10c 词边界锚定行首（`^(CONSTRAINT|CONSTRAINTS)\b`，大小写不敏感），
+ *     ACTION_CONSTRAINT / TYPE_CONSTRAINT 等其余段名不命中。
+ *
+ * @param tlaContent .tla 文件文本内容（定义体提取来源）
+ * @param cfgContent .cfg 文件文本内容（INVARIANTS 名单与 CONSTRAINT 段检测来源）
+ * @returns { passed, violations }
+ */
+export function checkBusinessInvariants(
+  tlaContent: string,
+  cfgContent: string,
+): { passed: boolean; violations: string[] } {
+  const violations: string[] = [];
+  const tla = typeof tlaContent === 'string' ? tlaContent : '';
+  const cfg = stripComments(cfgContent ?? '');
+
+  // B10c：cfg 出现 CONSTRAINT/CONSTRAINTS 段名 → 违规
+  const cfgLines = cfg.split('\n');
+  for (let i = 0; i < cfgLines.length; i++) {
+    const line = (cfgLines[i] ?? '').trim();
+    const m = line.match(/^(CONSTRAINT|CONSTRAINTS)\b/i);
+    if (m && m[1]) {
+      violations.push(
+        `.cfg 第 ${i + 1} 行含 ${m[1].toUpperCase()} 段（CONSTRAINT/CONSTRAINTS 禁用）：不得用约束砍状态空间掩盖死锁/爆炸，正道是规格拆解（反模式 #16 家族）`,
+      );
+    }
+  }
+
+  // B1：业务不变式 = cfg INVARIANTS 中名字不以 'Type' 开头者
+  const names = [...new Set(parseCfgInvariantNames(cfg))];
+  if (names.length === 0) {
+    // cfg 未声明任何不变式：B1a 针对的是「声明了不变式但全部为 Type 类」的空洞形态
+    return { passed: violations.length === 0, violations };
+  }
+  const business = names.filter((n) => !n.startsWith('Type'));
+  const typeInvariants = names.filter((n) => n.startsWith('Type'));
+
+  // ①须 ≥1 条业务不变式
+  if (business.length === 0) {
+    violations.push(
+      `缺非 Type 业务不变式：cfg INVARIANTS 全为 Type 类不变式（${names.join(', ')}），至少须 1 条名字不以 Type 开头的业务不变式`,
+    );
+    return { passed: false, violations };
+  }
+
+  // ②③定义体归一化比对（同规格内）
+  const normalizedBodies = new Map<string, string>();
+  for (const n of names) {
+    const body = extractTlaDefBody(tla, n);
+    if (body != null) normalizedBodies.set(n, normalizeDefBody(body));
+  }
+  for (const n of business) {
+    const body = normalizedBodies.get(n);
+    if (body === undefined) continue; // 定义体提取不到 → 由 §11 集合一致性拦截
+    // ②不得为恒真
+    if (body === 'TRUE') {
+      violations.push(`业务不变式 ${n} 定义体恒真（归一化后为 TRUE）：恒真不变式不构成验证`);
+    }
+    // ③不得与任一 Type 类不变式定义体相同
+    for (const t of typeInvariants) {
+      const tBody = normalizedBodies.get(t);
+      if (tBody !== undefined && tBody === body) {
+        violations.push(
+          `业务不变式 ${n} 定义体与 Type 类不变式 ${t} 定义体相同（同规格内比对）：Type 类校验不能替代业务不变式`,
+        );
+      }
+    }
+  }
+  return { passed: violations.length === 0, violations };
+}
+
 // ==================== 规格字段结构校验 ====================
 
 /** 校验单个 spec 的字段类型与取值合法性，返回违反消息数组。 */
@@ -1130,6 +1255,11 @@ export function checkTlaModel(manifest: unknown, phase: number): TlaCheckResult 
     if (typeof s.tlaContent === 'string' && typeof s.cfgContent === 'string') {
       const cons = checkCfgInvariantsConsistency(s.tlaContent, s.cfgContent);
       for (const v of cons.violations) {
+        result.cfgConsistencyViolations.push(`规格 ${s.id}: ${v}`);
+      }
+      // B1 恒真/空洞不变式防御 + B10c CONSTRAINT 禁用（批次 7 任务 3）：违规并入 cfg 一致性桶
+      const biz = checkBusinessInvariants(s.tlaContent, s.cfgContent);
+      for (const v of biz.violations) {
         result.cfgConsistencyViolations.push(`规格 ${s.id}: ${v}`);
       }
       const struct = checkCfgStructure(s.cfgContent);

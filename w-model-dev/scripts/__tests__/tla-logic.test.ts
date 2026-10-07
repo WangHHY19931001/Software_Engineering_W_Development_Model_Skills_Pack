@@ -21,6 +21,7 @@ import {
   checkCoverage,
   checkCfgInvariantsConsistency,
   checkCfgStructure,
+  checkBusinessInvariants,
   checkHierarchy,
   parseCfgInvariantNames,
   validateHeader,
@@ -670,5 +671,80 @@ describe('S2 checkHierarchy 区分 phase 过滤掉的 child/parent/sibling', () 
     expect(result.hierarchyViolations[0]).not.toContain('不在 manifest 中');
     // 判定结果不变：仍拦截（passed=false）
     expect(result.passed).toBe(false);
+  });
+});
+
+// ==================== B1 恒真不变式防御 + B10c CONSTRAINT 禁用（批次 7 任务 3） ====================
+
+describe('B1 恒真不变式防御 + B10c CONSTRAINT 禁用', () => {
+  /** 最小 .tla 文本：TypeOK 为 Type 类不变式，Spec/Init/Next 仅作结构占位。 */
+  const tlaWithTypeOk = [
+    '---- MODULE M ----',
+    'EXTENDS Naturals',
+    'VARIABLES x',
+    'Init == x = 0',
+    "Next == x' = x + 1",
+    'Spec == Init /\\ [][Next]_x',
+    'TypeOK == x \\in Nat',
+    '====',
+  ].join('\n');
+
+  it('B1a：INVARIANTS 全部为 Type 类（名字以 Type 开头）→ 违规「缺非 Type 业务不变式」', () => {
+    // cfg INVARIANTS 仅 TypeOK
+    const cfg = 'SPECIFICATION Spec\nINVARIANTS TypeOK';
+    const result = checkBusinessInvariants(tlaWithTypeOk, cfg);
+    expect(result.passed, '全 Type 类不变式应判失败').toBe(false);
+    expect(
+      result.violations.some((v) => v.includes('缺非 Type 业务不变式')),
+      '应含「缺非 Type 业务不变式」违规',
+    ).toBe(true);
+  });
+
+  it('B1b：业务不变式定义体语法等价于 TRUE → 违规', () => {
+    const tla = `${tlaWithTypeOk.split('====')[0]}Inv == TRUE\n====`;
+    const cfg = 'SPECIFICATION Spec\nINVARIANTS Inv TypeOK';
+    const result = checkBusinessInvariants(tla, cfg);
+    expect(result.passed, '恒真业务不变式应判失败').toBe(false);
+    expect(
+      result.violations.some((v) => v.includes('恒真') && v.includes('Inv')),
+      '应含「恒真」违规且点名 Inv',
+    ).toBe(true);
+    // 归一化口径：多空白 / 前后空白的 TRUE 同样命中
+    const tlaSpaced = `${tlaWithTypeOk.split('====')[0]}Inv ==   TRUE  \n====`;
+    expect(checkBusinessInvariants(tlaSpaced, cfg).violations.some((v) => v.includes('恒真'))).toBe(true);
+  });
+
+  it('B1c：业务不变式定义体与某 TypeInvariant 定义体相同 → 违规', () => {
+    // Inv 与 TypeOK 同体
+    const tla = `${tlaWithTypeOk.split('====')[0]}Inv == x \\in Nat\n====`;
+    const cfg = 'SPECIFICATION Spec\nINVARIANTS TypeOK Inv';
+    const result = checkBusinessInvariants(tla, cfg);
+    expect(result.passed, '与 Type 类不变式同体应判失败').toBe(false);
+    expect(
+      result.violations.some((v) => v.includes('定义体相同') && v.includes('TypeOK') && v.includes('Inv')),
+      '应含「定义体相同」违规且点名 TypeOK 与 Inv',
+    ).toBe(true);
+  });
+
+  it('B10c：cfg 含 CONSTRAINT/CONSTRAINTS 段 → 违规「不得用约束砍状态空间」', () => {
+    const tla = `${tlaWithTypeOk.split('====')[0]}Inv == x >= 0\n====`;
+    const cfgBase = 'SPECIFICATION Spec\nINVARIANTS Inv TypeOK';
+    for (const [场景, cfg] of [
+      ['CONSTRAINT 单数段', `${cfgBase}\nCONSTRAINT TimeBound`],
+      ['CONSTRAINTS 复数段', `${cfgBase}\nCONSTRAINTS C1, C2`],
+    ] as const) {
+      const result = checkBusinessInvariants(tla, cfg);
+      expect(result.passed, `${场景}: 应判失败`).toBe(false);
+      expect(
+        result.violations.some((v) => v.includes('不得用约束砍状态空间')),
+        `${场景}: 应含「不得用约束砍状态空间」违规`,
+      ).toBe(true);
+    }
+    // 词边界：ACTION_CONSTRAINT / TYPE_CONSTRAINT 是别的段名，不命中 CONSTRAINT 禁用
+    const otherSections = `${cfgBase}\nACTION_CONSTRAINT ActC\nTYPE_CONSTRAINT TypeC`;
+    expect(
+      checkBusinessInvariants(tla, otherSections).violations.some((v) => v.includes('不得用约束砍状态空间')),
+      'ACTION_CONSTRAINT / TYPE_CONSTRAINT 不应命中 CONSTRAINT 禁用',
+    ).toBe(false);
   });
 });

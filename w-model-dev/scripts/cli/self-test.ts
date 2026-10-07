@@ -1390,6 +1390,36 @@ const TLA_CASES: TlaCase[] = [
     description:
       'checkRounds 元素含 phaseSummary 字段（phase 级摘要），应被 schema additionalProperties:false 前置拦截（F-G4-13 收紧；此前由 R13 拦截）',
   },
+  {
+    file: 'bad-only-type-invariants.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/缺非 Type 业务不变式/],
+    description:
+      'B1a：cfg INVARIANTS 全为 Type 类不变式（仅 TypeOK），应被「缺非 Type 业务不变式」校验拦截（批次 7 任务 3）',
+  },
+  {
+    file: 'bad-tautology-invariant.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/恒真/],
+    description: 'B1b：业务不变式 Inv 定义体恒真（== TRUE），应被恒真不变式校验拦截（批次 7 任务 3）',
+  },
+  {
+    file: 'bad-duplicate-of-type.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/定义体相同/],
+    description: 'B1c：业务不变式 Inv 定义体与 Type 类不变式 TypeOK 定义体相同，应被同体校验拦截（批次 7 任务 3）',
+  },
+  {
+    file: 'bad-constraint-shrink.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/不得用约束砍状态空间/],
+    description:
+      'B10c：cfg 含 CONSTRAINT 段（状态空间砍削掩盖死锁/爆炸），应被 CONSTRAINT 禁用校验拦截（批次 7 任务 3）',
+  },
   // -------------------- 孤儿样本（check-samples-coverage 引用登记） --------------------
   {
     file: 'bad-coverage-uncovered-sd.json',
