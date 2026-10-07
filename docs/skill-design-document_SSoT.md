@@ -2502,11 +2502,12 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 | 降级须 human 授权（T11，决策 2；规则号 R8） | maturity-logic.ts（R8 + verifyMaturityApproval requireAction）/ check-maturity.ts（`downgrade-approve` 专属绑定，R-B7-7）/ maturity.schema / samples/maturity/with-approval |
 | R6 第四判定首条 from==L0（T12，决策 3） | maturity-logic.ts / maturity.schema / data-models / operational-recovery / eval/e2e/demo-assets/build_workspace.py 迁移 |
 | gate-log 损坏两用例 + D-1 收窄负例（T13） | __tests__/check-run-log-cli.test.ts / signature-chain-logic.test.ts（零实现改动） |
+| demo 资产迁移（T15b，B1a 落地） | eval/e2e/demo-assets/build_workspace.py（L1/L2 cfg 双 `INVARIANT` 补 `NoOverflowState` 非 Type 业务不变式 + `.tla` 头 `@requirement`/`@child` 与 `tla_manifest_variant()` 变体降级同源对齐；demo 三门 3/3 exit 0） |
 | lint:security 10 项新发现收口（T13b） | security-scan baseline / tla-logic.ts / wm-status-logic.ts |
 
-- **能力分工（不夸大）**：归一化哈希消除「checkout 行尾配置（`core.autocrlf`）→ 登记哈希假红」的形态漂移，不提供密码学认证（同 §10R 口径）；恒真不变式与空转 Next 为**启发式防御**（保守方向、可能漏报，口径披露在 logic 注释与负例 fixture）；降级授权复用签名链审批记录（既有人类确认，无密钥）；`evidenceStatus=pending` 违规化保留 `check-exemption` 豁免出口——豁免是显式登记而非自动放行。
-- **判据披露**：三处 breaking 的存量处置见 CHANGELOG 43.1.0「迁移」段——R6 存量 history 首条非 L0 时前插 `{"from":"L0","to":"L1"}`（既有条目逐字不动）；RTM 各行补 `coverageStatus`；图谱放行前 pending 转 `confirmed` 或登记豁免。迁移面已机器扫描（1323 tracked 文件 0 处需迁移，装配器源资产 1 处 + 生成物重建）。
-- **修复轮与实施裁定**：T4 死锁指引主形态改终态自环（R-B7-5）、T7 空转 Next 合取聚合（修复轮 1）、T11 降级专属绑定（R-B7-7，审查者复现的绕过面关闭）、R7/R8 规则号让号（R-B7-6，编号不回收）；其余裁定与转办项（T5 D6 find-first 已知限制、T9 SKILL.md 接线缺口）登记 decision-log 并转批次 8 候选。
+- **能力分工（不夸大）**：归一化哈希消除「checkout 行尾配置（`core.autocrlf`）→ 登记哈希假红」的形态漂移，不提供密码学认证（同 §10R 口径）；恒真不变式与空转 Next 为**启发式防御**（保守方向、可能漏报，口径披露在 logic 注释与负例 fixture）；降级授权复用签名链审批记录（既有人类确认，无密钥）；`evidenceStatus=pending` 违规化保留 `check-exemption` 豁免出口——豁免是显式登记而非自动放行（豁免出口的 ruleId 允许子规则后缀 `R15b`，端到端封闭见终审 C1 修复）。
+- **判据披露**：breaking 的存量处置见 CHANGELOG 43.1.0「迁移」段——R6 存量 history 首条非 L0 时前插 `{"from":"L0","to":"L1"}`（既有条目逐字不动）；RTM 各行补 `coverageStatus`；图谱放行前 pending 转 `confirmed` 或登记豁免（`ruleId=R15b`）；B1a 存量 cfg 补 ≥1 条非 Type 业务不变式；B10c 删 cfg `CONSTRAINT(S)` 段；R8 存量降级须落 `action='downgrade-approve'` 的 human 条目。迁移面已机器扫描（1323 tracked 文件 0 处需迁移，装配器源资产 1 处 + 生成物重建）。
+- **修复轮与实施裁定**：T4 死锁指引主形态改终态自环（R-B7-5）、T7 空转 Next 合取聚合（修复轮 1）、T11 降级专属绑定（R-B7-7，审查者复现的绕过面关闭）、R7/R8 规则号让号（R-B7-6，编号不回收）；T15b demo 资产迁移（B1a 落地 + 头漂移，三门 3/3 exit 0；`NoOverflowState` 为单变量 2 态抽象的非 Type 下限占位，严格更强转批次 8）；其余裁定与转办项（T5 D6 find-first 已知限制、T9 SKILL.md 接线缺口）登记 decision-log 并转批次 8 候选。
 
 ---
 
