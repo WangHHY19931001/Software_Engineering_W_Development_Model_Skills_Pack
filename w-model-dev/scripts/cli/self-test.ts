@@ -1682,8 +1682,12 @@ interface MaturityCase {
   expectedPassed: boolean;
   /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
   expectedReasonPatterns?: RegExp[];
-  /** 传给 checkMaturity 的 options（可选，默认不传；43.0.0 A4：completedPhases 已随 R3 退役删除） */
-  options?: { projectCreatedAt?: string; operationalFailureCount?: number };
+  /**
+   * 传给 checkMaturity 的 options（可选，默认不传；43.0.0 A4：completedPhases 已随 R3 退役删除）。
+   * `maturityApprovalOk`（43.1.0 决策 #2）为 R8 的 human 审批链接缝注入——logic 不读盘，
+   * 真值由 CLI 装载 signature-chain.jsonl 后给出（CLI 装载端到端见 `__tests__/maturity-logic.test.ts`）。
+   */
+  options?: { projectCreatedAt?: string; operationalFailureCount?: number; maturityApprovalOk?: boolean };
   /** 用例说明 */
   description: string;
 }
@@ -1706,6 +1710,20 @@ const MATURITY_CASES: MaturityCase[] = [
     expectedReasonPatterns: [/R6: history\[1\] from=L0 与上一条 to=L1 断链/],
     description:
       'A4 R6 history 链一致性：第 2 条 from=L0 与上一条 to=L1 断链（虚高路径：L0 直接跳 L2），应触发 R6 违规（原 bad-r3-cycle-mismatch.json 的 R3 周期用例随 unlockConditions 死字段退役，43.0.0 A4）',
+  },
+  {
+    file: 'bad-downgrade-without-approval.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R8: 降级形态（level=L0 低于 history 末条 to=L2）/],
+    description:
+      '决策2（43.1.0）R8：降级形态（升级链 L0→L1→L2 后 level 回落 L0，R6 第三判定允许）无 role=human / targetKind=maturity 审批链 → R8 blocking（降级无法过闭环五门 = 「不允许降级」的机器化；CLI 装载缺链/坏链一律注入 false）',
+  },
+  {
+    file: 'valid-downgrade-with-approval.json',
+    expectedPassed: true,
+    options: { maturityApprovalOk: true },
+    description:
+      '决策2（43.1.0）R8：同形态降级 + 有效 human 审批链（logic 接缝注入 maturityApprovalOk=true，等价 CLI 装载 signature-chain.jsonl 后 verifyMaturityApproval 通过）→ 零违规；CLI 装载端到端见 __tests__/maturity-logic.test.ts',
   },
 ];
 

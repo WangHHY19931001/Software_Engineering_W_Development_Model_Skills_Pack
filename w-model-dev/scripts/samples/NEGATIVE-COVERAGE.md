@@ -51,7 +51,7 @@
 | check-bdd-model                   | `samples/bdd/bad-schema.manifest.json`                    | fixture | 放宽 BDD 校验将漏掉 manifest 缺必填字段仍通过 D1/D2；feature 文件 4 路径全 miss 的 fail-open（只 console.error 后 continue、D1/D3/D6 对空 parsedFeatures 空转 exit 0 假绿）由同门禁 A8 用例承担（`w-model-dev/scripts/__tests__/bdd-cli.test.ts`：全 miss → `[D1] feature 文件不存在（4 路径均未命中）` exit 1；`samples/bdd/valid-manifest.json` 真机走通 CLI exit 0，批次 6） |
 | check-budget                      | `samples/budget/bad-stale.json`                           | fixture | 放宽 R1 时效性将漏掉过期 budget 不再被拦截，预算约束形同虚设                                                                                                                                                                                                |
 | check-run-log                     | `samples/run-log/bad-incomplete.jsonl`                    | fixture | 放宽 R1 完整性将漏掉缺字段的 run-log 记录被静默接受                                                                                                                                                                                                         |
-| check-maturity                    | `samples/maturity/bad-stale.json`                         | fixture | 放宽周期校验将漏掉 maturity 过期未降级导致的成熟度虚高                                                                                                                                                                                                      |
+| check-maturity                    | `samples/maturity/bad-downgrade-without-approval.json`    | fixture | 放宽 R8 降级授权将漏掉降级形态（升级链至 L2 后 level 回落 L0，R6 第三判定允许）无 role=human / targetKind=maturity 审批链仍被放行的缺口——降级无法过闭环五门 = 「不允许降级」的机器化（决策 #2，43.1.0）                                                     |
 | check-checkpoint                  | `samples/checkpoint/bad-empty-decisions.jsonl`            | fixture | 放宽 R1 决策非空将漏掉空决策的 CHECKPOINT 被判通过（人类确认被绕过）                                                                                                                                                                                        |
 | check-code-tla-consistency        | `samples/code-tla/bad-sd-no-code-module.json`             | fixture | 放宽 SD→codeModule 将漏掉设计组件无对应实现仍通过一致性回归                                                                                                                                                                                                 |
 | check-rootcause-report            | `samples/rootcause/bad-r1-missing-fields.json`            | fixture | 放宽 R1 将漏掉缺必填字段的 RootCauseReport 被 V/G 接受进入返工                                                                                                                                                                                              |
@@ -110,3 +110,10 @@
 >   `check-codegraph-queries`（G4-2 空查询目录 / 无索引两样本）、`check-coding-plan`（bad-missing-ledger /
 >   bad-task-missing-verify）等行原列的同门禁**其余**样本，同样因「一行一 fixture」不再列出——它们仍由
 >   `self-test.ts` 的对应用例数组逐条执行，所防回归未失守。
+>
+> **2026-10-07 批次 7 任务 11（决策 #2）换件**：`check-maturity` 行原指向 `samples/maturity/bad-stale.json`
+> （level=L5 越界 → schema enum 拦截；其「周期校验」表述随 43.0.0 A4 原 R3 退役已过期）——换件为唯一覆盖
+> 且期望失败的 `samples/maturity/bad-downgrade-without-approval.json`（R8：降级形态无授权 → blocking）。
+> `bad-stale.json` 仍由 `MATURITY_CASES` 逐条执行（不占行）；同组的
+> `samples/maturity/valid-downgrade-with-approval.json` 为期望通过样本（logic 接缝注入审批通过），
+> 亦不占行。

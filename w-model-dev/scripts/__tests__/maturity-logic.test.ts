@@ -16,6 +16,9 @@
  *     字段标注 3 次 → exit 1 + R5 违规 / 未提供 --run-log → exit 0 + 诊断
  *   - A4（43.0.0）R6 history 链一致性：from == 上一条 to / to > from（严格）/ 末条 to 不低于当前 level（降级合法）
  *     （原 R3 completedCycles 周期校验随 unlockConditions 死字段删除而退役，规则号不回收）
+ *   - A14（43.1.0）R7 project.status 转移合法性（judge 单点复用）
+ *   - 决策2（43.1.0）R8 降级须 human 授权：降级形态（level < history 末条 to）经 CLI 装载签名链
+ *     注入 maturityApprovalOk 后判定（无授权 → blocking；logic 保持纯函数接缝）
  */
 
 import { promises as fs } from 'node:fs';
@@ -36,6 +39,7 @@ import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { runSync } from '../lib/run-sync.js';
 import { judgeProjectStatusTransition } from '../logic/gate-logic.js';
 import { checkMaturity, type MaturityConfig } from '../logic/maturity-logic.js';
+import { computeSigHash, verifyMaturityApproval, type SignatureChainEntry } from '../logic/signature-chain-logic.js';
 
 function validMaturity(): MaturityConfig {
   return {
@@ -133,7 +137,7 @@ describe('A4 maturity 钥匙收紧（R6 history 链）', () => {
     expect(r.violations.join()).toContain('当前 level');
   });
 
-  it('R6：降级合法（升级链至 L2 后 level=L0，末条高于 level）→ 零违规（修复轮 1：R6 只锁伪造升级，不锁降级）', () => {
+  it('R6：降级形态（升级链至 L2 后 level=L0，末条高于 level）→ R6 零违规（只锁伪造升级；降级授权由 R8 独立承担）', () => {
     const m = {
       ...validMaturity(),
       level: 'L0',
@@ -142,7 +146,9 @@ describe('A4 maturity 钥匙收紧（R6 history 链）', () => {
         ['L1', 'L2'],
       ]),
     };
-    const r = checkMaturity(m);
+    // 决策 #2（43.1.0）：R6 第三判定仍不锁降级形态，但降级须 human 授权（R8）——
+    // 注入授权通过结果后 R6 侧零违规；未注入的 R8 blocking 由「决策2a」用例锁定。
+    const r = checkMaturity(m, { maturityApprovalOk: true });
     expect(r.passed).toBe(true);
     expect(r.violations).toHaveLength(0);
   });
@@ -636,5 +642,133 @@ describe('A14：project.status 转移合法性校验（judge 单点 + checkMatur
     const rNoPrev = checkMaturity(validMaturity(), { projectStatus: '编码' });
     expect(rNoPrev.passed).toBe(true);
     expect(rNoPrev.violations.some((v) => v.includes('R7'))).toBe(false);
+  });
+});
+
+// ==================== 决策 #2（43.1.0）：降级须 human 授权（R8，批次 7 任务 11） ====================
+
+/**
+ * 决策 2（2026-10-07 用户定案）：「除非 human 明确授权否则不允许降级」——降级与升级对称走签名链审批。
+ * 让号说明（裁定 R-B7-6）：T9 已占用 R7（project.status 转移校验），本规则编号 **R8**（规则号不回收）。
+ *
+ * R6 第三判定允许「level 低于 history 末条 to」的降级形态（只锁伪造升级）；R8 把该形态收紧为
+ * **须 role=human / targetKind=maturity 审批链**：CLI 装载 `.w-model/signature-chain.jsonl`（与
+ * maturity.json 同目录）后经 verifyMaturityApproval 判定，把 ok 注入 `options.maturityApprovalOk`
+ * （logic 保持纯函数、不读盘——与 gate-logic.evaluateTlaBddWaiver 同款接缝）。
+ */
+
+/** R8 降级形态 fixture：升级链 L0→L1→L2（链一致）+ level 回落 L0/L1（R6 第三判定允许的合法形态） */
+function downgradeMaturity(level: 'L0' | 'L1' = 'L0'): MaturityConfig {
+  return {
+    ...validMaturity(),
+    level,
+    leveledUpAt: '2026-08-02T00:00:00Z',
+    history: [
+      { from: 'L0', to: 'L1', at: '2026-08-01T00:00:00Z', reason: '稳定运行 1 完整周期' },
+      { from: 'L1', to: 'L2', at: '2026-08-02T00:00:00Z', reason: '稳定运行 2 完整周期' },
+    ],
+  };
+}
+
+/** R8 human 审批条目构造器（v3 sigHash 真值重算；形态与 gate-logic.test.ts 的 A4 构造器同源） */
+function humanMaturityApprovalEntry(over?: { artifacts?: string[]; signedAt?: string }): SignatureChainEntry {
+  const base: Omit<SignatureChainEntry, 'sigHash'> = {
+    sigId: 'wm1-r001-human',
+    phase: 1,
+    role: 'human',
+    action: 'approve',
+    targetKind: 'maturity',
+    runId: 'wm1-r001',
+    artifacts: over?.artifacts ?? ['.w-model/maturity.json'],
+    prevSigId: 'genesis',
+    prevSigHash: '0',
+    // 默认晚于链末条 at（2026-08-02T00:00:00Z）——满足「审批不早于最近一次 level 变更」子判定
+    signedAt: over?.signedAt ?? '2026-08-03T00:00:00.000Z',
+    signer: 'user-wangh',
+    inputProvenance: {
+      sourceSigIds: [],
+      sourceArtifacts: [],
+      transformDescription: '用户确认降级（human 审批链）',
+    },
+    sigHashAlgo: 'v3',
+  };
+  return { ...base, sigHash: computeSigHash(base) };
+}
+
+describe('决策2（43.1.0）：降级须 human 授权（R8）', () => {
+  it('决策2a：level < 末条 to（降级形态）且无有效 human 审批链 → R8 blocking', () => {
+    const m = downgradeMaturity();
+    // 零审批链 → verifyMaturityApproval 判定 ok:false（CLI 缺链 / 空链 / 坏链一律注入 false）
+    expect(verifyMaturityApproval([], m).ok, '零审批链判定须为 ok:false').toBe(false);
+    // 未注入（logic 纯函数默认无授权）→ R8 blocking
+    const r = checkMaturity(m);
+    expect(r.passed).toBe(false);
+    expect(
+      r.violations.some((v) => v.startsWith('R8:') && v.includes('role=human') && v.includes('L2')),
+      '违规须点名 R8、human 授权与降级链末条 to',
+    ).toBe(true);
+    // R6 不报（降级后 level 低于末条属 R6 第三判定合法形态）——R8 是降级的唯一拦截面
+    expect(r.violations.some((v) => v.startsWith('R6:'))).toBe(false);
+    // 显式注入 false（CLI 装载到坏链 / 签名不符的等价形态）同样 blocking
+    const rExplicit = checkMaturity(m, { maturityApprovalOk: false });
+    expect(rExplicit.passed).toBe(false);
+    expect(rExplicit.violations.some((v) => v.startsWith('R8:'))).toBe(true);
+  });
+
+  it('决策2b：降级形态 + 有效审批链（verifyMaturityApproval 通过）→ 零违规', () => {
+    const m = downgradeMaturity();
+    const verdict = verifyMaturityApproval([humanMaturityApprovalEntry()], m);
+    expect(verdict.ok, 'human 审批条（v3 重算 + 绑定 maturity.json + 不早于末条变更）须通过').toBe(true);
+    const r = checkMaturity(m, { maturityApprovalOk: verdict.ok });
+    expect(r.passed).toBe(true);
+    expect(r.violations).toHaveLength(0);
+  });
+
+  it('决策2c：升级形态不受 R8 影响（既有 R6 用例零漂移）', () => {
+    // 升级形态（末条 to == 当前 level）：未注入审批结果 → 零违规
+    const upgraded: MaturityConfig = {
+      ...validMaturity(),
+      level: 'L2',
+      history: [
+        { from: 'L0', to: 'L1', at: '2026-08-01T00:00:00Z', reason: '升级 L0→L1' },
+        { from: 'L1', to: 'L2', at: '2026-08-02T00:00:00Z', reason: '升级 L1→L2' },
+      ],
+    };
+    expect(checkMaturity(upgraded).passed).toBe(true);
+    // 即便显式注入「无审批」（false），升级形态也不触发 R8（R8 只锁降级形态）
+    const injected = checkMaturity(upgraded, { maturityApprovalOk: false });
+    expect(injected.passed).toBe(true);
+    expect(injected.violations.some((v) => v.startsWith('R8:'))).toBe(false);
+  });
+});
+
+// ==================== check-maturity CLI：R8 装载签名链 ====================
+
+describe('check-maturity CLI：R8 装载签名链（真实子进程 + maturity.json 同目录 signature-chain.jsonl）', () => {
+  const samplesDir = path.resolve(cliDir, '../samples');
+  const checkMaturityCli = path.join(cliDir, 'check-maturity.ts');
+
+  it('CLI 端到端：降级形态无链 → exit 1 + R8；同目录落 human 审批条目 → exit 0', async () => {
+    // (1) 无链（samples/maturity/ 无 signature-chain.jsonl）：装载 → 空链 → R8 blocking
+    const noChain = runSync(process.execPath, [
+      tsxCli,
+      checkMaturityCli,
+      path.join(samplesDir, 'maturity', 'bad-downgrade-without-approval.json'),
+    ]);
+    expect(noChain.status, `无链降级须 exit 1；stdout=${noChain.stdout}`).toBe(1);
+    expect(noChain.stdout).toContain('R8:');
+    expect(maturitySummary(noChain.stdout ?? '')['passed']).toBe(false);
+
+    // (2) 配链：valid fixture 复制到临时 .w-model/ + 同目录落 human 审批条目（绑定 maturity.json）→ exit 0
+    const validRaw = await fs.readFile(
+      path.join(samplesDir, 'maturity', 'valid-downgrade-with-approval.json'),
+      'utf-8',
+    );
+    const maturityFile = await write('.w-model/maturity.json', validRaw);
+    await write('.w-model/signature-chain.jsonl', JSON.stringify(humanMaturityApprovalEntry()) + '\n');
+    const withChain = runSync(process.execPath, [tsxCli, checkMaturityCli, maturityFile]);
+    expect(withChain.status, `配链降级须 exit 0；stdout=${withChain.stdout}`).toBe(0);
+    expect(maturitySummary(withChain.stdout ?? '')['passed']).toBe(true);
+    expect(withChain.stdout).not.toContain('R8:');
   });
 });

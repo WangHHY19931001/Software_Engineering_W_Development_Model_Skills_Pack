@@ -262,6 +262,8 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 
 > **project.json 读取口径（F-G4-14）**：全部读取侧（本命令 + 阶段门 `check-budget.ts --project=` / `check-maturity.ts --project=`）统一经 `project.schema.json` 校验（`loadAndValidate(file, 'project')`）——文件缺失（wm-status 的 ENOENT 视为「未初始化」exit 0 除外）、非法 JSON 或缺必填字段 / 枚举越界 / 多未知字段（`additionalProperties:false`）一律 `STRUCTURE_INVALID` / exit 2，不再 warn-and-skip；「合法 project 缺 updatedAt」场景已被 schema required 前置排除。
 
+> **降级须 human 授权（决策 #2 · R8，43.1.0）**：`check-maturity.ts` 自动装载 `<maturity.json 同目录>/signature-chain.jsonl`（容错读取：缺文件 → 空链、坏行跳过；无新增参数，调用形态 `<maturity.json> [--project=] [--run-log=]` 不变），经 `verifyMaturityApproval`（`signature-chain-logic.ts`）判定后把 `ok` 注入纯逻辑 `options.maturityApprovalOk`（logic 不读盘）。降级形态（`level` 低于 history 末条 `to`；R6 第三判定允许的合法形态）下无 `role=human / targetKind=maturity` 有效审批条目（缺链 / 空链 / 坏链 / 早签）→ **R8 blocking（exit 1）**——降级无法过闭环五门 = 「不允许降级」的机器化；应急处置路径 = 用户在 🔴 CHECKPOINT 确认即授权（O 据此落链条目）。非降级形态零行为变化；人类可读报告增「签名链(R8)」行（路径 + 条目数 / 未找到）供审计。
+
 > **project.status 转移合法性（A14 R7，43.1.0）**：`check-maturity.ts` 增可选 `--prev-status=<9态>`（须与 `--project` 同时提供；取值须为 `PROJECT_STATUSES` 9 态之一，否则 ARG_INVALID exit 2）与 `--rollback-approved`（场景 5 🔴 CHECKPOINT 用户裁定回退后由 O 置位）。prev + current 同时提供时执行转移校验：合法 = 前向链下一步 ∪ 场景 5 用户批准回退 ∪ 终态「项目完成」；非法 → R7 违规 exit 1。仅提供 current（无 prev）不判定（project.json 无 status 历史，不发明历史机制）。9 态序与 8/9 双口径（机器 phase=9 / 展示收敛 8）单点承载于 `scripts/lib/constants.ts`（`PROJECT_STATUSES` / `PROJECT_STATUS_TO_PHASE`），wm-status 展示口径同源。
 
 ## `/wm metrics`

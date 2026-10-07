@@ -5,8 +5,12 @@
  * 对应 w-model-dev/references/data-models.md MaturityConfig schema
  * 与 docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md §5.3。
  * 供 O 子代理在阶段推进前调用，校验成熟度模型 schema 完整性、level 合法性、
- * history 时序、降级触发状态、history 链一致性（R6，A4 43.0.0）。
+ * history 时序、降级触发状态、history 链一致性（R6，A4 43.0.0）、project.status 转移合法性
+ * （R7，A14 43.1.0）、降级须 human 授权（R8，批次 7 决策 #2 43.1.0）。
  * （原 R3 completedCycles 周期换算随 unlockConditions 死字段删除而退役，43.0.0 A4。）
+ * R8 的签名链装载：读取 `<maturity.json 同目录>/signature-chain.jsonl`（容错读取——缺文件 → 空链、
+ * 坏行跳过；三形态最终都收敛为「不授权」fail-closed），经 `verifyMaturityApproval` 判定后把
+ * `ok` 注入纯逻辑 `options.maturityApprovalOk`——logic 层不读盘（接缝形态与 check-artifact-gate 一致）。
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--prev-status=<9态>] [--rollback-approved]
@@ -46,6 +50,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
 import { checkMaturity, type MaturityConfig } from '../logic/maturity-logic.js';
+import { verifyMaturityApproval, type SignatureChainEntry } from '../logic/signature-chain-logic.js';
 import { PROJECT_STATUSES } from '../lib/constants.js';
 import { readJsonOrExit, readJsonlOptional } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
@@ -181,6 +186,38 @@ export function buildR5Diagnostics(
   return diagnostics;
 }
 
+// ==================== R8 签名链装载（批次 7 决策 #2，43.1.0） ====================
+
+/**
+ * 装载 maturity.json 同目录的 `signature-chain.jsonl`（R8 降级审批链；容错读取，与
+ * `check-artifact-gate.loadSignatureChainIfExists` 同口径）：文件不存在 / 整文件读取失败 → 空链，
+ * 逐行 JSON 解析失败的坏行跳过（坏行无法通过 v3 重算，天然不构成合法审批）。
+ * 三形态（缺链 / 空链 / 坏链）最终都收敛为「无有效授权」——fail-closed，降级一律 R8 blocking。
+ * `found` 仅用于人类可读报告（审计可见性），不参与判定。
+ */
+async function loadSignatureChainIfExists(
+  chainFile: string,
+): Promise<{ entries: SignatureChainEntry[]; found: boolean }> {
+  let raw: string;
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- chainFile 由 <maturity.json> 同目录派生（受控路径），只读
+    raw = await fs.readFile(chainFile, 'utf-8');
+  } catch {
+    return { entries: [], found: false };
+  }
+  const entries: SignatureChainEntry[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed === '') continue;
+    try {
+      entries.push(JSON.parse(trimmed) as SignatureChainEntry);
+    } catch {
+      /* 坏行不构成审批（fail-closed）：JSON 不完整即无法通过 verifyMaturityApproval 的 v3 重算 */
+    }
+  }
+  return { entries, found: true };
+}
+
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
@@ -280,11 +317,27 @@ async function main(): Promise<void> {
     r5Diagnostics.push(...buildR5Diagnostics(false, []));
   }
 
+  // R8（批次 7 决策 #2，43.1.0）：降级须 human 授权——装载 maturity.json 同目录的
+  // signature-chain.jsonl（容错读取），经 verifyMaturityApproval 判定后把 ok 注入纯逻辑
+  // （logic 不读盘）。非降级形态下该结果不被消费（既有行为零回归）；降级形态无授权 → R8 blocking。
+  const chainFile = path.resolve(path.dirname(maturityAbs), 'signature-chain.jsonl');
+  const { entries: signatureChain, found: chainFound } = await loadSignatureChainIfExists(chainFile);
+  const maturityApprovalOk = verifyMaturityApproval(signatureChain, {
+    level: typeof maturity?.level === 'string' ? maturity.level : '',
+    history: Array.isArray(maturity?.history)
+      ? maturity.history.map((h) => ({
+          to: typeof h?.to === 'string' ? h.to : '',
+          at: typeof h?.at === 'string' ? h.at : undefined,
+        }))
+      : [],
+  }).ok;
+
   // 构建 options 并调用纯逻辑校验
   const result = checkMaturity(parsed, {
     projectCreatedAt,
     operationalFailureCount,
     diagnostics: r5Diagnostics,
+    maturityApprovalOk,
     // A14 R7：prev + current 同时提供才触发转移合法性校验（maturity-logic 内判定）
     ...(prevStatus !== undefined && projectStatus !== undefined
       ? {
@@ -327,12 +380,15 @@ async function main(): Promise<void> {
   console.log(
     `--run-log     : ${runLogFile ? `${runLogFile}（O 系列标注=${operationalFailureCount ?? 'N/A'}）` : '未提供'}`,
   );
+  console.log(
+    `签名链(R8)    : ${chainFound ? `${chainFile}（条目 ${signatureChain.length}）` : `未找到（${chainFile}）`}`,
+  );
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
   if (result.passed) {
     console.log(
-      '成熟度模型符合 data-models.md MaturityConfig schema：完整 + level 合法 + history 时序 + history 链一致 + 降级未触发。',
+      '成熟度模型符合 data-models.md MaturityConfig schema：完整 + level 合法 + history 时序 + history 链一致 + 降级未触发 +（降级形态时）human 授权链通过。',
     );
   } else {
     console.log('未通过原因：');

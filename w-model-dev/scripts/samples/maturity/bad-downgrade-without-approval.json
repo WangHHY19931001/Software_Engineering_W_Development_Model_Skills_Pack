@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "demo-downgrade-no-approval",
+  "level": "L0",
+  "leveledUpAt": "2026-08-02T00:00:00Z",
+  "history": [
+    {
+      "at": "2026-08-01T00:00:00Z",
+      "from": "L0",
+      "to": "L1",
+      "reason": "稳定运行 1 完整周期"
+    },
+    {
+      "at": "2026-08-02T00:00:00Z",
+      "from": "L1",
+      "to": "L2",
+      "reason": "稳定运行 2 完整周期"
+    }
+  ],
+  "downgradeTriggers": {
+    "operationalFailureStreak": 3,
+    "userRequested": false
+  }
+}

@@ -606,14 +606,15 @@ interface MaturityConfig {
   level: 'L0' | 'L1' | 'L2' | 'L3';
   /** 升级到此级别的时间 ISO 8601 */
   leveledUpAt: string;
-  /** 升级历史（只承载升级链；降级走 human 审批链，不记 history——43.0.0 A4） */
+  /** 升级历史（只承载升级链；降级走 human 审批链，不记 history——43.0.0 A4。
+      降级形态 = level 低于末条 to，须 role=human / targetKind=maturity 审批（check-maturity R8，43.1.0 决策 #2） */
   history: Array<{
     from: 'L0' | 'L1' | 'L2' | 'L3';
     to: 'L0' | 'L1' | 'L2' | 'L3';
     at: string;
     reason: string;
   }>;
-  /** 降级触发条件（自动降级回 L0） */
+  /** 降级触发条件（命中即触发降级评估；降级须 human 授权——43.1.0 决策 #2，原「自动降级回 L0」作废） */
   downgradeTriggers: {
     /** 连续 O 系列失败模式命中 ≥ 此值 */
     operationalFailureStreak: number;
@@ -628,9 +629,12 @@ interface MaturityConfig {
 > 已自 schema 与校验逻辑删除（毁弃存量，不兼容；`downgradeTriggers` 本身保留：`operationalFailureStreak`
 > + `userRequested` 两字段）；「解锁条件」现为 operational-recovery.md 文档层语义，
 > **无机器校验**。原 R3（completedCycles 周期换算）随之退役，R4/R5 编号保持稳定，新增 R6（history 链一致性：
-> from == 上一条 to / to 严格高于 from / 末条 to 不低于当前 level——降级后 level 低于末条属合法形态，
-> R6 只锁伪造升级）。level 的机器消费点（check-artifact-gate
+> from == 上一条 to / to 严格高于 from / 末条 to 不低于当前 level——R6 只锁伪造升级）。level 的机器消费点（check-artifact-gate
 > TLA+/BDD 豁免分支）须 `role=human / targetKind=maturity` 签名链审批（`verifyMaturityApproval`，fail-closed）。
+> **43.1.0（批次 7 决策 #2）**：新增 **R8 降级须 human 授权**——降级形态（level 低于 history 末条 to，R6 允许的合法形态）
+> 一律要求同一 `role=human / targetKind=maturity` 审批链：`check-maturity.ts` 装载 maturity.json 同目录
+> `signature-chain.jsonl` 后经 `verifyMaturityApproval` 判定并注入纯逻辑；无链条目（缺链 / 坏链 / 早签）→ R8 blocking
+> （降级无法过闭环五门 = 「不允许降级」的机器化；应急处置路径 = 用户确认即授权）。
 
 **默认值**（`/wm analyze` 首次初始化）：
 
@@ -654,7 +658,7 @@ interface MaturityConfig {
 - 编排者 O 在每个 🔴 CHECKPOINT 处读取 `level`，按 L0~L3 放行矩阵决定 CHECKPOINT 类型（决策型 / 操作型 / 阶段门放行；阶段门放行始终等用户，HOTL 固定，硬约束 #2）。
 - L1+ 操作型 CHECKPOINT 自动放行时，仍在 run-log 记录 action=checkpoint outcome=success，保留可追溯性。
 - 升级不可自动：升级是决策型 CHECKPOINT，须用户显式确认（阶段 8 完成后按 operational-recovery.md「升级与降级」的解锁条件文档语义询问；43.0.0 A4 起升级链须 role=human 签名链条目留痕）。
-- 降级可自动：O 系列失败模式连续命中 ≥ `downgradeTriggers.operationalFailureStreak` → 自动降级到 L0（降级不记 history 升级链，R6 只承载升级）。降级后 `level` 低于 history 末条 to 属**合法形态**（批次 6 修复轮 1：R6 第三判定为「末条 to 不低于 level」，只锁伪造升级不锁降级——A4 起 TLA+/BDD 豁免须 human 审批链，降级不再构成绕过面）。
+- **降级须 human 授权（决策 #2，43.1.0；原「降级可自动」语义作废）**：O 系列失败模式连续命中 ≥ `downgradeTriggers.operationalFailureStreak` → **触发降级评估并暂停**；用户在 🔴 CHECKPOINT 明确确认 + O 落 `role=human / targetKind=maturity` 审批条目后方可降级（降级不记 history 升级链，R6 只承载升级）。降级后 `level` 低于 history 末条 to 属**合法形态**（批次 6 修复轮 1：R6 第三判定为「末条 to 不低于 level」，只锁伪造升级——R8 是降级的唯一拦截面：无审批链条目 → blocking；应急处置路径 = 用户确认即授权）。
 - `maturity.json` 与 `budget.json` 协同：L2+ 自主度可设 `onExceed=notify`（仅在 run-log 记录告警）；L0 默认 `onExceed=pause`（最保守）。
 
 ### RunLogEntry vs EventIngress Schema 边界对照表
@@ -1002,7 +1006,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 | `event-ingress`                 | `event-ingress.schema.json`                 | `EventIngressEntry`        | additionalProperties:false；source enum（6 类）；eventType enum（9 类）                                                                                                                                                                                                                                                                                                                               | （暂未集成到 logic.ts，仅 self-test 覆盖）                                                    |
 | `change-scope`                  | `change-scope.schema.json`                  | ChangeScope                | additionalProperties:false；phase 1-8；changedFiles 相对路径 pattern（绝对/`..`/反斜杠拒绝）；headRef 须等于当前 HEAD                                                                                                                                                                                                                                                                                 | lib/change-scope.ts（resolveCliScope / verifyScopeGitBinding）                                |
 | `codegraph-query`               | `codegraph-query.schema.json`               | CodegraphQueryRecord       | additionalProperties:false；blastRadius minimum 0；queryTimestamp format date-time；changeId/targetFiles strict 模式必填（ChangeScope 绑定）；证据声明族 `evidenceKind`（enum cli/artifact）/`degradationReason`/`alternativeEvidence[{command,evidencePath}]` 为**可选结构字段**（语义判据由 checker 索引探测强制，枚举见 [command-reference.md](command-reference.md)「阶段 5-8 codegraph/coding-plan 门禁 CLI」节的 codegraph checker 条目） | cli/check-codegraph-queries.ts（checkCodegraphQueriesStrict / evidenceDeclarationViolations） |
-| `maturity`                      | `maturity.schema.json`                      | MaturityConfig             | additionalProperties:false；level enum（L0-L3）；history 升级链严格（43.0.0 A4：unlockConditions 与两个降级预留死字段已删除，level 消费须 human 签名链审批）                                                                                                                                                                                                                                                                                                                            | maturity-logic.ts                                                                             |
+| `maturity`                      | `maturity.schema.json`                      | MaturityConfig             | additionalProperties:false；level enum（L0-L3）；history 升级链严格（43.0.0 A4：unlockConditions 与两个降级预留死字段已删除，level 消费须 human 签名链审批；43.1.0 决策 #2：降级形态 R8 须同一审批链，无授权 blocking）                                                                                                                                                                                                                                                                  | maturity-logic.ts                                                                             |
 | `project`                       | `project.schema.json`                       | `Project`                  | additionalProperties:false；status enum（9 阶段）；techStack 嵌套严格                                                                                                                                                                                                                                                                                                                                 | （暂未集成到 logic.ts，仅 self-test 覆盖）                                                    |
 | `hill-climbing-report`          | `hill-climbing-report.schema.json`          | `HarnessImprovementReport` | additionalProperties:false；signal.priority [1,5]；recommendations 5 字段全 required                                                                                                                                                                                                                                                                                                                  | （暂未集成到 logic.ts，仅 self-test 覆盖）                                                    |
 | `rootcause-report`              | `rootcause-report.schema.json`              | RootCauseReport            | additionalProperties:false；meta.targetKind const=rootcause；rootCauseChain minItems:2/maxItems:5                                                                                                                                                                                                                                                                                                     | root-cause-logic.ts                                                                           |

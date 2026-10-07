@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/maturity.schema.json",
-  "description": "成熟度等级（maturity.json）结构 schema，对应 maturity-logic.ts R1-R6 schema/level/history/降级/链一致性校验（43.0.0 A4：unlockConditions 及 downgradeTriggers.budgetBurnRateExceeded / .checkpointRejectionStreak 预留死字段已删除，downgradeTriggers 本身保留 operationalFailureStreak + userRequested；level 变更须 role=human 签名链审批，见 signature-chain-logic verifyMaturityApproval）",
+  "description": "成熟度等级（maturity.json）结构 schema，对应 maturity-logic.ts R1-R8 schema/level/history/降级/链一致性（R7 status 转移、R8 降级须 human 授权）校验（43.0.0 A4：unlockConditions 及 downgradeTriggers.budgetBurnRateExceeded / .checkpointRejectionStreak 预留死字段已删除，downgradeTriggers 本身保留 operationalFailureStreak + userRequested；level 变更须 role=human 签名链审批，见 signature-chain-logic verifyMaturityApproval）",
   "title": "MaturityConfig",
   "type": "object",
   "additionalProperties": false,
@@ -49,13 +49,13 @@
       }
     },
     "downgradeTriggers": {
-      "description": "降级触发条件（满足即自动降级回 L0，run-log append 降级记录；43.0.0 A4 起仅 operationalFailureStreak + userRequested，两个预留死字段已删除）",
+      "description": "降级触发条件（满足即触发降级评估，run-log append 降级记录；降级须 human 授权——43.1.0 决策 #2，原「自动降级回 L0」语义作废，check-maturity R8 无审批链条目即 blocking；43.0.0 A4 起仅 operationalFailureStreak + userRequested，两个预留死字段已删除）",
       "type": "object",
       "additionalProperties": false,
       "required": ["operationalFailureStreak", "userRequested"],
       "properties": {
         "operationalFailureStreak": {
-          "description": "连续 O 系列失败模式命中阈值（命中 ≥ 此值自动降级到 L0；R5 校验比对 run-log O1-O6 命中计数）",
+          "description": "连续 O 系列失败模式命中阈值（命中 ≥ 此值触发降级评估并暂停，须 human 授权方可降级；R5 校验比对 run-log O1-O6 命中计数）",
           "type": "integer",
           "minimum": 0
         },
