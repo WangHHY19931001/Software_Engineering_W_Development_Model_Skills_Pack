@@ -97,6 +97,23 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\w-model-dev"
 
 上述目标路径是 Agent-specific placeholder，不是通用路径，也不能直接复制执行。目标 skills 路径、激活机制和官方链接以具体 Agent 文档为准；路径包含空格时始终使用引号。
 
+> **拷贝时须排除 `node_modules`**：`w-model-dev/` 是仓库单根包的子目录，在仓库根或目录内跑过依赖安装的检出可能含 **Git 忽略**的 `w-model-dev/node_modules`（本机生成物，非 Skill 资产；仓库不跟踪它）。拷贝示例因此需排除该目录——Bash：`cp -r` 后删除，或改用带排除的 `rsync`：
+>
+> ```bash
+> cp -r "w-model-dev" "/path/to/<agent-specific-skills>/w-model-dev" && rm -rf "/path/to/<agent-specific-skills>/w-model-dev/node_modules"
+> # 或（rsync 可用时）：
+> rsync -a --exclude 'node_modules' "w-model-dev/" "/path/to/<agent-specific-skills>/w-model-dev/"
+> ```
+>
+> PowerShell：`Copy-Item` 无排除参数，先整目录复制再删除：
+>
+> ```powershell
+> Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\w-model-dev"
+> Remove-Item -Recurse -Force "<agent-specific-skills>\w-model-dev\node_modules" -ErrorAction SilentlyContinue
+> ```
+>
+> Skill 副本本身不需要 `node_modules`（依赖树属仓库检出，不随 Skill 交付）；门禁脚本一律在仓库检出内运行——副本不是依赖树的一部分，在其上跑门禁会因解析不到 tsx / ajv 等依赖而失败（见 §4「校验脚本可用性」）。
+
 安装后的目录结构应为：
 
 ```
@@ -197,6 +214,8 @@ npm install                    # 完整重装/修复仍可由开发者显式执�
 ### 校验脚本可用性
 
 确认 Agent 能运行门禁脚本：先在仓库根目录完成依赖安装（`npm install`，命令见 [README.md](../README.md#验证仓库) 的「验证仓库」快速开始块），再跑下面的探针命令。仓库验证入口（`npm install` / `npm run self-test` / `npm run doctor`）同样以上述 README 权威块为准，本节不重复。
+
+**门禁脚本必须在仓库检出内运行**：脚本依赖检出根的 `node_modules`（tsx + ajv / ajv-formats 等 devDeps，见 §2）与 `w-model-dev/tools/tla2tools.jar`（TLA+ 门禁另需 Java 运行时），并按检出相对路径解析 `w-model-dev/scripts/**` 与 `.w-model/` 状态文件。把 Skill 拷贝到 Agent skills 目录（§3）只是**提示词侧安装**——副本用于让 Agent 读取 `SKILL.md` 与 `references/`，**不能在其上跑门禁脚本**；所有门禁命令（`npx tsx w-model-dev/scripts/cli/check-*.ts`）都在仓库检出内执行。
 
 ```bash
 # 验证脚本可执行 + schema 校验链路通：

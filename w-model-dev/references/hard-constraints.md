@@ -355,6 +355,12 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 ### 与门禁脚本的对应关系
 
+> **强制接线率（C7 披露）**：`scripts/cli/` 共 48 个 `.ts`（47 个 exit-2 脚本 + self-test），其中**阶段必跑链强制接线 20 个（≈43%）**= **放行链 8** + **阶段专属 12**。其余 27 个不构成阶段必跑链（元门禁 / 工具 / 事件或条件触发），「47 个门禁」的数量感不适用于回答「每阶段到底强制跑哪些」——后者以本节口径与 [subagent-delegation.md](subagent-delegation.md) §6.1/§6.3 权威清单为准。
+>
+> - **放行链 8**（每个阶段门必跑，与 §6.3 表「必跑脚本（约束 #11 通用）」列逐名一致）= 五门 5（§6.1：`check-budget.ts` / `check-run-log.ts` / `check-maturity.ts` / `check-checkpoint.ts` / `check-preventive-review.ts`）+ 常驻三门 3（§6.2：`check-verifier-output.ts` / `check-role-dispatch.ts` / `check-signature-chain.ts`；触发时机「V 产出后」「每阶段门放行前」无条件）。
+> - **阶段专属 12**（§6.3「阶段专属脚本」列去重，不含条件项 `check-exemption.ts`「豁免时」）：`check-requirement-graph.ts` / `check-requirement-coverage.ts` / `check-tla-model.ts` / `check-bdd-model.ts` / `check-artifact-gate.ts` / `check-design-fog.ts` / `check-code-tla-consistency.ts` / `check-design-contract-consistency.ts` / `check-state-machine-consistency.ts` / `check-codegraph-queries.ts` / `check-coding-plan.ts` / `check-archive-integrity.ts`。
+> - **其余 27 个** = 上述 20 以外的 8 个 `check-*`（`check-docs-consistency` / `check-samples-coverage` / `check-coverage-scope` / `check-pollution` / `check-exemption` / `check-iceberg-sweep` / `check-rootcause-report` / `check-tla-bdd-sync`，均不在阶段必跑列）+ 19 个工具 CLI（7 个 code-health 门禁 CLI + 12 个工具 CLI，见 §6.4），登记总览见 subagent-delegation.md「dispatch-matrix」节。
+
 | 反模式 | 由哪个脚本 / 机制守护 |
 |---|---|
 | #1（跳过评审） | workflow.md「阶段门评审（每个阶段统一）」节 + 🔴 CHECKPOINT · 阶段门放行 |
