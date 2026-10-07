@@ -747,22 +747,63 @@ function normalizeR10Prose(value: string): string {
     .toLowerCase();
 }
 
+/** R10 contract XML 权威全文所在来源（verifier-spec §7.5）；其余来源只允许「消费语境 + 指针」。 */
+const R10_AUTHORITY_SOURCE = 'verifier-spec';
+/** 消费方指针规范句：四个消费来源须逐字包含（43.2.0 C9 单一事实源收敛）。 */
+export const R10_CONTRACT_POINTER_TEXT = 'R10 contract XML 权威定义见 `verifier-spec.md` §7.5';
+const R10_POINTER_PATTERN = /R10 contract XML 权威定义见.*verifier-spec\.md.*§7\.5/;
+
+function checkR10PointerSource(sourceName: string, content: string): DocCheckViolation[] {
+  if (typeof content !== 'string' || content.trim() === '') {
+    return [{ check: R10_CONTRACT_CHECK, message: `${sourceName} 未被独立读取（R10 source 缺失，fail-closed）` }];
+  }
+  const violations: DocCheckViolation[] = [];
+  const lines = content.split(/\r?\n/);
+  const copiedXmlLines = lines.filter((line) => line.includes('<r10-contract')).length;
+  if (copiedXmlLines > 0) {
+    violations.push({
+      check: R10_CONTRACT_CHECK,
+      message: `${sourceName} 复制了 R10 contract XML（${copiedXmlLines} 行）——权威全文仅 ${R10_AUTHORITY_SOURCE} §7.5，消费方须改为指针（单一事实源 fail-closed）`,
+    });
+  }
+  if (lines.some((line) => R10_LEGACY_TOKEN_PATTERN.test(line))) {
+    violations.push({
+      check: R10_CONTRACT_CHECK,
+      message: `${sourceName} 含遗留 R10 契约标记（R10-CONTRACT-MARKER / R10-C1..C7），fail-closed`,
+    });
+  }
+  if (!R10_POINTER_PATTERN.test(content)) {
+    violations.push({
+      check: R10_CONTRACT_CHECK,
+      message: `${sourceName} 缺 R10 contract XML 指针（须含「${R10_CONTRACT_POINTER_TEXT}」）`,
+    });
+  }
+  return violations;
+}
+
 /**
- * R10 维护契约的唯一 checker。每个权威来源必须独立包含七个结构化关系 clause；
- * 节点必须由对应宿主语法解析，quoted/comment/fenced/example/未知上下文均 fail-closed。
+ * R10 维护契约的唯一 checker（43.2.0 C9 收敛后形态）。
+ *
+ * 单一权威全文 = verifier-spec §7.5（逐 clause 结构化校验，保留 43.0.0 的 source×clause 强度）；
+ * 结构化宿主 = rootcause-schema（JSON `x-r10-contract`）与 rootcause-checker（TS `R10_CONTRACT_NODES`），
+ * 各自以宿主语法独立承载七个 clause（防伪造：quoted/comment/fenced/example/未知上下文一律 fail-closed）；
+ * 消费方 = authority-spec（agent-personas）/ SSoT / root-cause-locator / command-reference，
+ * 只允许「消费语境 + 指针」——复制 XML 或缺失指针均 fail-closed，防止再次分叉为多份事实源。
  */
 export function checkRootCauseR10Contract(sources: RootCauseR10ContractSources): DocCheckViolation[] {
-  const namedSources: Array<[string, string]> = [
-    ['authority-spec', sources.authoritySpec],
+  const structuredSources: Array<[string, string]> = [
     ['rootcause-schema', sources.schema],
     ['rootcause-checker', sources.checkerSource],
+    [R10_AUTHORITY_SOURCE, sources.verifierSpec],
+  ];
+  const pointerSources: Array<[string, string]> = [
+    ['authority-spec', sources.authoritySpec],
     ['SSoT', sources.ssot],
     ['root-cause-locator', sources.locator],
-    ['verifier-spec', sources.verifierSpec],
     ['command-reference', sources.commandReference],
   ];
   const violations: DocCheckViolation[] = [];
-  for (const [sourceName, content] of namedSources) {
+  for (const [sourceName, content] of structuredSources) {
     if (typeof content !== 'string' || content.trim() === '') {
       violations.push({
         check: R10_CONTRACT_CHECK,
@@ -778,6 +819,9 @@ export function checkRootCauseR10Contract(sources: RootCauseR10ContractSources):
         });
       }
     }
+  }
+  for (const [sourceName, content] of pointerSources) {
+    violations.push(...checkR10PointerSource(sourceName, content));
   }
   return violations;
 }

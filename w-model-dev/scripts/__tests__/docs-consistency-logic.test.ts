@@ -13,6 +13,7 @@ import {
   A4_FORBIDDEN_AUTOMATIC_INSTALL_PATTERNS,
   A4_FORBIDDEN_MTIME_SAFETY_CLAIM_PATTERNS,
   checkRootCauseR10Contract,
+  R10_CONTRACT_POINTER_TEXT,
   checkRootCausePersonaMatrix,
   checkPersonaCapabilityDeclarations,
   canonicalizeExit2ProbeIdentity,
@@ -79,6 +80,12 @@ const R10_CONTRACT_FIXTURE = [
   '<r10-contract id="cross-artifact-conflict" relation=\'{"artifactRelation":"different","conflict":"fail-closed"}\'>different artifact conflict is fail-closed</r10-contract>',
   '<r10-contract id="canonical-duplicate" relation=\'{"persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}\'>canonical > 1 duplicate is fail-closed</r10-contract>',
   '<r10-contract id="legacy-duplicate" relation=\'{"persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}\'>legacy > 1 duplicate is fail-closed</r10-contract>',
+].join('\n');
+
+/** R10 消费方来源 fixture（43.2.0 C9 起：消费方只允许「消费语境 + 指针」，复制 XML 即违规）。 */
+const R10_POINTER_FIXTURE = [
+  '## R10 维护契约（消费语境）',
+  `${R10_CONTRACT_POINTER_TEXT}（本文件只保留消费语境与指针，不复制 XML）。`,
 ].join('\n');
 
 /**
@@ -149,13 +156,13 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     personaCount: 28,
     exit2ScriptCount: 45,
     referencesCount: 53,
-    rootCauseAuthoritySpec: R10_CONTRACT_FIXTURE,
+    rootCauseAuthoritySpec: R10_POINTER_FIXTURE,
     rootCauseSchema: R10_CONTRACT_FIXTURE,
     rootCauseCheckerSource: R10_CONTRACT_FIXTURE,
-    rootCauseSsot: R10_CONTRACT_FIXTURE,
-    rootCauseLocator: R10_CONTRACT_FIXTURE,
+    rootCauseSsot: R10_POINTER_FIXTURE,
+    rootCauseLocator: R10_POINTER_FIXTURE,
     rootCauseVerifierSpec: R10_CONTRACT_FIXTURE,
-    rootCauseCommandReference: R10_CONTRACT_FIXTURE,
+    rootCauseCommandReference: R10_POINTER_FIXTURE,
     dataModels: [
       '### Schema 清单（5 份）',
       '| `verifier-output` | `verifier-output.schema.json` | ... |',
@@ -242,7 +249,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
   };
 }
 
-describe('R10 七来源 source×clause 维护契约', () => {
+describe('R10 七来源维护契约（权威全文单点 + 消费方指针）', () => {
   const sourceNames = [
     'authoritySpec',
     'schema',
@@ -252,6 +259,8 @@ describe('R10 七来源 source×clause 维护契约', () => {
     'verifierSpec',
     'commandReference',
   ] as const;
+  const structuredSourceNames = ['schema', 'checkerSource', 'verifierSpec'] as const;
+  const pointerSourceNames = ['authoritySpec', 'ssot', 'locator', 'commandReference'] as const;
   const sourceLabels: Array<[(typeof sourceNames)[number], string]> = [
     ['authoritySpec', 'authority-spec'],
     ['schema', 'rootcause-schema'],
@@ -285,11 +294,18 @@ describe('R10 七来源 source×clause 维护契约', () => {
         return { ...sources, commandReference: value };
     }
   };
-  it('完整七来源七条 clause 通过，缺失任一 source fail-closed', () => {
-    const sources = Object.fromEntries(sourceNames.map((name) => [name, R10_CONTRACT_FIXTURE])) as Record<
-      (typeof sourceNames)[number],
-      string
-    >;
+  const buildSources = (): Record<(typeof sourceNames)[number], string> => ({
+    authoritySpec: R10_POINTER_FIXTURE,
+    schema: R10_CONTRACT_FIXTURE,
+    checkerSource: R10_CONTRACT_FIXTURE,
+    ssot: R10_POINTER_FIXTURE,
+    locator: R10_POINTER_FIXTURE,
+    verifierSpec: R10_CONTRACT_FIXTURE,
+    commandReference: R10_POINTER_FIXTURE,
+  });
+
+  it('结构化来源七条 clause 与消费方指针齐备时通过，缺失任一 source fail-closed', () => {
+    const sources = buildSources();
     expect(checkRootCauseR10Contract(sources)).toEqual([]);
     for (const sourceName of sourceNames) {
       const missing = replaceSource(sources, sourceName, '');
@@ -300,7 +316,7 @@ describe('R10 七来源 source×clause 维护契约', () => {
     }
   });
 
-  it('每条 R10 clause mutation 均产生明确 violation（7 source 全源变异）', () => {
+  it('每条 R10 clause mutation 均产生明确 violation（结构化来源全源变异）', () => {
     const clauseMutations: Array<[string, RegExp]> = [
       ['canonical-name', /^<r10-contract id="canonical-name"[^\n]*\n?/m],
       ['threshold', /^<r10-contract id="threshold"[^\n]*\n?/m],
@@ -310,13 +326,10 @@ describe('R10 七来源 source×clause 维护契约', () => {
       ['canonical-duplicate', /^<r10-contract id="canonical-duplicate"[^\n]*\n?/m],
       ['legacy-duplicate', /^<r10-contract id="legacy-duplicate"[^\n]*\n?/m],
     ];
-    for (const sourceName of sourceNames) {
+    for (const sourceName of structuredSourceNames) {
       for (const [clauseName, mutation] of clauseMutations) {
         const mutated = R10_CONTRACT_FIXTURE.replace(mutation, '');
-        const sources = Object.fromEntries(sourceNames.map((name) => [name, R10_CONTRACT_FIXTURE])) as Record<
-          (typeof sourceNames)[number],
-          string
-        >;
+        const sources = buildSources();
         const mutatedSources = replaceSource(sources, sourceName, mutated);
         const violations = checkRootCauseR10Contract(mutatedSources);
         expect(
@@ -343,10 +356,7 @@ describe('R10 七来源 source×clause 维护契约', () => {
       ['legacy-duplicate', 'legacy > 1 duplicate is allowed'],
     ] as const;
     for (const [clauseName, mutation] of cases) {
-      const sources = Object.fromEntries(sourceNames.map((name) => [name, R10_CONTRACT_FIXTURE])) as Record<
-        (typeof sourceNames)[number],
-        string
-      >;
+      const sources = buildSources();
       const mutatedFixture = R10_CONTRACT_FIXTURE.split('\n')
         .map((line) =>
           line.includes(`<r10-contract id="${clauseName}"`)
@@ -354,11 +364,11 @@ describe('R10 七来源 source×clause 维护契约', () => {
             : line,
         )
         .join('\n');
-      const mutatedSources = replaceSource(sources, 'authoritySpec', mutatedFixture);
+      const mutatedSources = replaceSource(sources, 'verifierSpec', mutatedFixture);
       const violations = checkRootCauseR10Contract(mutatedSources);
       expect(
         violations.some(
-          (violation) => violation.message.includes('authority-spec') && violation.message.includes(clauseName),
+          (violation) => violation.message.includes('verifier-spec') && violation.message.includes(clauseName),
         ),
         `${clauseName} 反向语义应 fail-closed`,
       ).toBe(true);
@@ -379,15 +389,10 @@ describe('R10 七来源 source×clause 维护契约', () => {
     ];
     for (const content of bypasses) {
       const violations = checkRootCauseR10Contract({
-        authoritySpec: content,
-        schema: valid,
-        checkerSource: valid,
-        ssot: valid,
-        locator: valid,
-        verifierSpec: valid,
-        commandReference: valid,
+        ...buildSources(),
+        verifierSpec: content,
       });
-      expect(violations.filter((violation) => violation.message.startsWith('authority-spec'))).toHaveLength(7);
+      expect(violations.filter((violation) => violation.message.startsWith('verifier-spec'))).toHaveLength(7);
     }
   });
 
@@ -398,19 +403,47 @@ describe('R10 七来源 source×clause 维护契约', () => {
       'canonical persona is testing-reality-checker\n' +
       rows.slice(1).join('\n');
     const violations = checkRootCauseR10Contract({
-      authoritySpec: splitNode,
-      schema: R10_CONTRACT_FIXTURE,
-      checkerSource: R10_CONTRACT_FIXTURE,
-      ssot: R10_CONTRACT_FIXTURE,
-      locator: R10_CONTRACT_FIXTURE,
-      verifierSpec: R10_CONTRACT_FIXTURE,
-      commandReference: R10_CONTRACT_FIXTURE,
+      ...buildSources(),
+      verifierSpec: splitNode,
     });
     expect(
       violations.some(
-        (violation) => violation.message.includes('authority-spec') && violation.message.includes('canonical-name'),
+        (violation) => violation.message.includes('verifier-spec') && violation.message.includes('canonical-name'),
       ),
     ).toBe(true);
+  });
+
+  it('消费方来源复制 XML / 缺指针 / 含遗留标记一律 fail-closed（单一事实源双向守门）', () => {
+    for (const sourceName of pointerSourceNames) {
+      const label = sourceLabel(sourceName);
+      const withXml = checkRootCauseR10Contract(
+        replaceSource(buildSources(), sourceName, `${R10_POINTER_FIXTURE}\n${R10_CONTRACT_FIXTURE}`),
+      );
+      expect(
+        withXml.some(
+          (violation) => violation.message.includes(label) && violation.message.includes('复制了 R10 contract XML'),
+        ),
+        `${label} 复制 XML 应 fail-closed`,
+      ).toBe(true);
+      const withoutPointer = checkRootCauseR10Contract(
+        replaceSource(buildSources(), sourceName, '## 只有消费语境，没有指针'),
+      );
+      expect(
+        withoutPointer.some(
+          (violation) => violation.message.includes(label) && violation.message.includes('缺 R10 contract XML 指针'),
+        ),
+        `${label} 缺指针应 fail-closed`,
+      ).toBe(true);
+      const withLegacyMarker = checkRootCauseR10Contract(
+        replaceSource(buildSources(), sourceName, `${R10_POINTER_FIXTURE}\n<!-- R10-C1 legacy -->`),
+      );
+      expect(
+        withLegacyMarker.some(
+          (violation) => violation.message.includes(label) && violation.message.includes('遗留 R10 契约标记'),
+        ),
+        `${label} 含遗留标记应 fail-closed`,
+      ).toBe(true);
+    }
   });
 
   it('原始 ERROR_JSON 缺失、null 或逐字段 drift 不计入 exit2ScriptCount', () => {
@@ -439,7 +472,7 @@ describe('R10 七来源 source×clause 维护契约', () => {
     }
   });
 
-  it('七个真实 source 各自否定一条 R10 clause 时定位对应 source×clause violation', async () => {
+  it('真实结构化来源逐 clause 变异 fail-closed + 真实消费方来源禁抄 XML / 指针缺失双向 fail-closed', async () => {
     const sourceKeys = [
       'authoritySpec',
       'schema',
@@ -602,7 +635,9 @@ describe('R10 七来源 source×clause 维护契约', () => {
       return lines.join('\n');
     };
 
-    for (const sourceKey of sourceKeys) {
+    const structuredSourceKeys = ['schema', 'checkerSource', 'verifierSpec'] as const;
+    const pointerSourceKeys = ['authoritySpec', 'ssot', 'locator', 'commandReference'] as const;
+    for (const sourceKey of structuredSourceKeys) {
       const sourceContent = await readRealSource(sourceKey);
       expect(sourceContent).toMatch(
         sourceKey === 'schema'
@@ -642,6 +677,31 @@ describe('R10 七来源 source×clause 维护契约', () => {
           `${sourceKey} ${clauseName} relation reversal must fail closed`,
         ).toBe(true);
       }
+    }
+
+    for (const sourceKey of pointerSourceKeys) {
+      const sourceContent = await readRealSource(sourceKey);
+      const label = sourceLabel(sourceKey);
+      expect(sourceContent, `${label} 只保留消费语境与指针`).toContain(R10_CONTRACT_POINTER_TEXT);
+      expect(sourceContent.includes('<r10-contract'), `${label} 不得再复制 R10 contract XML`).toBe(false);
+      const copied = checkRootCauseR10Contract(
+        replaceSource(sources, sourceKey, `${sourceContent}\n${R10_CONTRACT_FIXTURE}`),
+      );
+      expect(
+        copied.some(
+          (violation) => violation.message.includes(label) && violation.message.includes('复制了 R10 contract XML'),
+        ),
+        `${label} 复制 XML must fail closed`,
+      ).toBe(true);
+      const stripped = checkRootCauseR10Contract(
+        replaceSource(sources, sourceKey, sourceContent.split(R10_CONTRACT_POINTER_TEXT).join('（指针已删除）')),
+      );
+      expect(
+        stripped.some(
+          (violation) => violation.message.includes(label) && violation.message.includes('缺 R10 contract XML 指针'),
+        ),
+        `${label} 指针缺失 must fail closed`,
+      ).toBe(true);
     }
   }, 90_000); // real-execution probe: ~15-19s alone, >30s under full-suite+coverage load (batch 3 wave merged larger real sources); per-test budget instead of raising global testTimeout
 });

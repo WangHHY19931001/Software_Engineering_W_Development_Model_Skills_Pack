@@ -1668,14 +1668,7 @@ npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts "<rootcause-report.jso
 
 > **R11 强制面边界（如实陈述）**：门禁只校验 persona 选择的**合法性**（矩阵内）与**第一键交集**。数量约束（默认 3 / 上限 5）与 `incident-response-commander` 必含**不门禁强制**——它们是分派默认，由编排者按 `agent-personas.md` §4 与 token 预算（`budget-logic.ts` R4-A）执行。第二键（风险域信号）因报告未声明信号字段亦不门禁强制，仅作分派指导。
 
-R10 维护契约（docs-consistency source×clause 语义门）：
-<r10-contract id="canonical-name" relation='{"canonicalPersona":"testing-reality-checker"}'>canonical persona is testing-reality-checker</r10-contract>
-<r10-contract id="threshold" relation='{"canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5}'>testing-reality-checker confidence >= 0.5</r10-contract>
-<r10-contract id="legacy-fallback" relation='{"legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"}'>legacy reality-checker is fallback only when canonical is absent</r10-contract>
-<r10-contract id="same-artifact-dedupe" relation='{"artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"}'>same artifact canonical-first and not counted twice</r10-contract>
-<r10-contract id="cross-artifact-conflict" relation='{"artifactRelation":"different","conflict":"fail-closed"}'>different artifact conflict is fail-closed</r10-contract>
-<r10-contract id="canonical-duplicate" relation='{"persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>canonical > 1 duplicate is fail-closed</r10-contract>
-<r10-contract id="legacy-duplicate" relation='{"persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>legacy > 1 duplicate is fail-closed</r10-contract>
+> **R10 维护契约（设计语境；XML 不复制）**：R10 的结构化维护契约由 docs-consistency 门禁按「**单一权威全文 + 消费方指针**」复核——R10 contract XML 权威定义见 `verifier-spec.md` §7.5（链接：[verifier-spec §7.5](../w-model-dev/references/verifier-spec.md)）；`agent-personas.md` / `root-cause-locator.md` / `command-reference.md` 与本 SSoT 只保留消费语境与指针，复制 XML 或缺失指针均 fail-closed。语义权威为上表 R10 行（canonical `testing-reality-checker` / confidence ≥ 0.5 / legacy fallback / 去重与冲突 fail-closed）。
 
 **退出码**：`0=通过 / 1=校验失败 / 2=输入错误`（与现有脚本约定一致）。
 

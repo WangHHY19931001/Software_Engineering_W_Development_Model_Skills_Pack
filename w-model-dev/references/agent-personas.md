@@ -791,12 +791,5 @@ self-as-verifier 模式下，S/V/G/R 任两角色由同一 Agent 兼任时，须
 
 > 与反模式 #18（跳过 R 直接 S 返工）的关系：紧急修复虽由 S 直接执行（受时间压力），但前置 R3×3 + V 保证修复质量与根因对齐；事后复核机制已移除（见 [subagent-delegation.md](subagent-delegation.md)「dispatch-matrix」§4）。R3/V 不通过 → 仍须走标准 S-fix 流程。
 
-R10 维护契约：
-<r10-contract id="canonical-name" relation='{"canonicalPersona":"testing-reality-checker"}'>canonical persona is testing-reality-checker</r10-contract>
-<r10-contract id="threshold" relation='{"canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5}'>testing-reality-checker confidence >= 0.5</r10-contract>
-<r10-contract id="legacy-fallback" relation='{"legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"}'>legacy reality-checker is fallback only when canonical is absent</r10-contract>
-<r10-contract id="same-artifact-dedupe" relation='{"artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"}'>same artifact canonical-first and not counted twice</r10-contract>
-<r10-contract id="cross-artifact-conflict" relation='{"artifactRelation":"different","conflict":"fail-closed"}'>different artifact conflict is fail-closed</r10-contract>
-<r10-contract id="canonical-duplicate" relation='{"persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>canonical > 1 duplicate is fail-closed</r10-contract>
-<r10-contract id="legacy-duplicate" relation='{"persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>legacy > 1 duplicate is fail-closed</r10-contract>
+**R10 维护契约（persona 侧消费语境）**：`testing-reality-checker` 为 canonical persona（confidence >= 0.5），legacy `reality-checker` 仅在 canonical 缺失时作 fallback；同 artifact 去重、跨 artifact 与异常重复/冲突 fail-closed 语义由 R-persona 强化职责与 R 重派（round ≥ 2）场景消费。R10 contract XML 权威定义见 `verifier-spec.md` §7.5（本文件只保留消费语境与指针，不复制 XML）。
 
