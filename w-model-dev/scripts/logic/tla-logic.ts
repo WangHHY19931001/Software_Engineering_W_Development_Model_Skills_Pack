@@ -42,6 +42,16 @@ export interface TlaSpec {
   children: string[];
   variableCombination: number;
   decompositionDecision: DecompositionDecision;
+  /**
+   * B9（批次 7）+ I5（终审修复）：variableCombination 的推导注记（可选）。
+   * variableCombination > CONSIDER_SPLIT_THRESHOLD(1000) 且保留未拆（kept-below-threshold）时必填：
+   * Πvariables[].cardinality 必须等于声明的 variableCombination 字段值，cardinality 须为 ≥1 的整数，
+   * 且 variables[].name 集合须覆盖 .tla `VARIABLES` 声明的全部状态变量（提取得时）
+   * （缺注记 / 基数非法 / 乘积不符 / 缺变量名 → checkDecomposition violation；≤1000 不要求）。
+   */
+  variableCombinationBasis?: {
+    variables: Array<{ name: string; cardinality: number }>;
+  };
   syntaxChecked: boolean;
   tlcChecked: boolean;
   deadlockFree: boolean;
@@ -583,17 +593,60 @@ export function checkHierarchy(specs: TlaSpec[], options: HierarchyOptions = {})
 
 // ==================== 拆解决策校验 ====================
 
+/** TLA+ 块注释 `(* … *)` 与行注释 `\* …` 剥离（I5：只扫声明面，注释里的示例声明不计入） */
+function stripTlaComments(tlaContent: string): string {
+  return tlaContent.replace(/\(\*[\s\S]*?\*\)/g, ' ').replace(/\\\*[^\n]*/g, ' ');
+}
+
+/**
+ * 从 .tla 文本提取 `VARIABLES` 声明的状态变量名集合（I5 终审修复，B9 schema 承诺落地）。
+ *
+ * - 声明面：`VARIABLES x, y` / `VARIABLE x`（关键字须位于行首，允许前导空白）；
+ *   续行形态（该行以 `,` 结尾）继续收集下一行，直到某行不以 `,` 结尾（声明结束）。
+ * - 剥离块注释与行注释后再扫描（注释中的声明不计入）。
+ * - **提取失败返回 undefined**（无 `VARIABLES` 行 / 未取到任何合法标识符 / 文本为空）——
+ *   调用方据此跳过名集合比对，不把「解析不到」误红成 violation（fail-open 方向保守）。
+ * - 标识符判据 `[A-Za-z_][A-Za-z0-9_]*`；`VARIABLES` 后的其它记号（如换行后的定义体）不收集。
+ *   实现用「收集态」顺序扫描（无动态下标取值，避免 security/detect-object-injection）。
+ */
+export function extractTlaVariableNames(tlaContent: string): Set<string> | undefined {
+  if (typeof tlaContent !== 'string' || tlaContent.trim() === '') return undefined;
+  const names = new Set<string>();
+  let collecting = false;
+  for (const rawLine of stripTlaComments(tlaContent).split('\n')) {
+    const head = /^[ \t]*(?:VARIABLES|VARIABLE)\b/.exec(rawLine);
+    if (head) collecting = true;
+    if (!collecting) continue;
+    const declaration = head ? rawLine.slice(head[0].length) : rawLine;
+    for (const token of declaration.split(/[,\s]+/)) {
+      if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(token)) names.add(token);
+    }
+    // 不以 `,` 结尾 = 声明结束（TLA+ 多行 VARIABLES 列表靠行尾逗号延续）
+    if (!declaration.trimEnd().endsWith(',')) collecting = false;
+  }
+  return names.size > 0 ? names : undefined;
+}
+
 /**
  * 校验拆解决策（设计文档 §3.1 步骤 4 / §1.1）：
  *   - variableCombination > MUST_SPLIT_THRESHOLD(10000) 必须 decompositionDecision='split-done'，
  *     否则为违反（导致失败）
  *   - variableCombination > CONSIDER_SPLIT_THRESHOLD(1000) 且 decompositionDecision='kept-below-threshold'
  *     为警告（不导致失败，仅提示补充理由或拆解）
+ *   - B9（批次 7）：variableCombination > CONSIDER_SPLIT_THRESHOLD(1000) 且保留未拆（kept-below-threshold）
+ *     时必须附推导注记 variableCombinationBasis（各变量 {name, cardinality}），且
+ *     Πcardinality === 声明的 variableCombination 字段值；缺注记 / 基数非法 / 乘积不符均为 violation。
+ *     ≤1000 不要求。
+ *   - I5（终审修复）：basis 名集合须**覆盖** .tla `VARIABLES` 声明的全部状态变量（schema 承诺落地）；
+ *     名集合比对仅在能提取到 VARIABLES 时启用（提取失败/无该行 → 跳过不误红）；基数为整数（schema integer）。
  *
  * @param specs 待校验的规格数组
  * @returns { violations, warnings }
  */
-export function checkDecomposition(specs: TlaSpec[]): { violations: string[]; warnings: string[] } {
+export function checkDecomposition(specs: TlaSpec[]): {
+  violations: string[];
+  warnings: string[];
+} {
   const violations: string[] = [];
   const warnings: string[] = [];
   if (!Array.isArray(specs)) {
@@ -611,6 +664,43 @@ export function checkDecomposition(specs: TlaSpec[]): { violations: string[]; wa
       warnings.push(
         `拆解警告：规格 ${s.id} variableCombination=${combo} > ${CONSIDER_SPLIT_THRESHOLD} 且保留未拆（kept-below-threshold），建议补充理由或拆解`,
       );
+      // B9：>1000 kept 须附推导注记，且 Πcardinality === 声明 variableCombination（乘积可复核）
+      const basis = s.variableCombinationBasis;
+      const variables = basis?.variables;
+      if (!basis || !Array.isArray(variables) || variables.length === 0) {
+        violations.push(
+          `拆解校验失败：规格 ${s.id} variableCombination=${combo} > ${CONSIDER_SPLIT_THRESHOLD} 且保留未拆（kept-below-threshold），缺少推导注记 variableCombinationBasis（须声明各变量 {name, cardinality}，且 Πcardinality === 声明值 ${combo}）`,
+        );
+      } else {
+        const invalid = variables.filter(
+          (v) => typeof v?.cardinality !== 'number' || !Number.isInteger(v.cardinality) || v.cardinality < 1,
+        );
+        if (invalid.length > 0) {
+          violations.push(
+            `拆解校验失败：规格 ${s.id} variableCombinationBasis.variables 含非法 cardinality（须为 ≥1 的整数，实际 ${invalid
+              .map((v) => JSON.stringify(v?.cardinality))
+              .join(', ')}）`,
+          );
+        } else {
+          const product = variables.reduce((acc, v) => acc * v.cardinality, 1);
+          if (product !== combo) {
+            violations.push(
+              `拆解校验失败：规格 ${s.id} variableCombinationBasis 推导不符：Πcardinality=${product} ≠ 声明 variableCombination=${combo}（>1000 保留未拆须附推导注记且乘积与声明值一致）`,
+            );
+          }
+          // I5：名集合覆盖 .tla 声明的全部状态变量（提取失败 → undefined → 跳过，不误红）
+          const declaredNames = typeof s.tlaContent === 'string' ? extractTlaVariableNames(s.tlaContent) : undefined;
+          if (declaredNames !== undefined) {
+            const basisNames = new Set(variables.map((v) => String(v?.name)));
+            const missing = [...declaredNames].filter((name) => !basisNames.has(name));
+            if (missing.length > 0) {
+              violations.push(
+                `拆解校验失败：规格 ${s.id} variableCombinationBasis.variables 未覆盖 .tla 声明的全部状态变量（缺 ${missing.join(', ')}；basis 名集合须 ⊇ VARIABLES 声明集）`,
+              );
+            }
+          }
+        }
+      }
     }
   }
   return { violations, warnings };
@@ -751,6 +841,250 @@ export function checkCfgStructure(cfgContent: string): {
   const invariantCount = parseCfgInvariantNames(content).length;
 
   return { passed: violations.length === 0, violations, invariantCount };
+}
+
+// ==================== B1 恒真/空洞不变式防御 + B10c CONSTRAINT 禁用（批次 7 任务 3） ====================
+
+/** 定义体归一化（trim + 折叠空白），用于 B1b/B1c 的语法等价比对。 */
+function normalizeDefBody(body: string): string {
+  return body.trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * 从 .tla 文本提取顶层定义 `Name ==` 的定义体（到下一顶层定义 / 模块终止符 ==== / EOF）。
+ * 提取前剥离 `(* *)` 块注释与 `\*` 行注释；找不到该定义返回 null
+ * （cfg 声明了 .tla 不存在的名字时由 §11 cfg-tla 集合一致性另行拦截，此处静默跳过）。
+ */
+export function extractTlaDefBody(tlaContent: string, name: string): string | null {
+  if (typeof tlaContent !== 'string' || tlaContent === '' || name === '') return null;
+  const tla = stripComments(tlaContent);
+  const lines = tla.split('\n');
+  // 静态模式 + 前缀字面量比对，取代「按名字转义后 new RegExp」：名字取自 cfg 解析（已 trim 的非空白
+  // token），「剥行首空白 → 字面量前缀相等 → 余部匹配 `\s*==(.*)`」与转义名正则逐字节等价
+  //（差分验证 0 分歧），且名字中的正则元字符不再参与正则解释。
+  const defBodyRe = /^\s*==(.*)$/;
+  const nextDefRe = /^[ \t]*[A-Za-z][A-Za-z0-9_]*\s*==/;
+  // 迭代一律不得复现 checkCfgStructure「cfg 结构：裸 INVARIANT」块的 i 循环头文本：该文本被
+  // tla-logic-rule-loadbearing.test.ts 用作剥离锚点并要求源码内唯一，本函数任何行（含注释）都不得
+  // 复现它。entries()/slice() 既满足该约束，也消除动态下标取值（object-injection 面）。
+  for (const [defIdx, rawLine] of lines.entries()) {
+    const head = rawLine.replace(/^[ \t]*/, '');
+    if (!head.startsWith(name)) continue;
+    const m = head.slice(name.length).match(defBodyRe);
+    if (!m) continue;
+    const bodyLines: string[] = [m[1] ?? ''];
+    for (const line of lines.slice(defIdx + 1)) {
+      if (/^[ \t]*====/.test(line)) break; // 模块终止符 ====
+      if (nextDefRe.test(line)) break; // 下一顶层定义
+      bodyLines.push(line);
+    }
+    return bodyLines.join('\n');
+  }
+  return null;
+}
+
+/**
+ * B1 恒真/空洞不变式防御 + B10c CONSTRAINT 禁用（批次 7 任务 3，cfg 一致性检查区）。
+ *
+ * B1：恒真/空洞不变式防御。业务不变式 = cfg INVARIANTS 中名字不以 'Type' 开头者。
+ * ①须 ≥1 条；②定义体归一化后（trim + 折叠空白）不得为 'TRUE'，
+ * ③不得与任一 Type 类不变式定义体相同（同规格内比对）。
+ * B10c：cfg 出现 CONSTRAINT/CONSTRAINTS 段名 → 违规（状态空间砍削掩盖死锁/爆炸，
+ * 正道是规格拆解——反模式 #16 家族）。
+ *
+ * 判定细节：
+ *   - B1a 仅在 cfg 声明了不变式（INVARIANTS/INVARIANT 解析非空）时评估——cfg 未声明任何
+ *     不变式（如纯死锁冒烟规格）不属「全 Type 类」空洞形态，不在此拦截。
+ *   - B1b/B1c 的定义体经 extractTlaDefBody 从 .tla 提取后归一化比较；提取不到定义体的
+ *     名字跳过（§11 集合一致性已另行拦截「.tla 缺失/多余」）。
+ *   - B10c 词边界锚定行首（`^(CONSTRAINT|CONSTRAINTS)\b`，大小写不敏感），
+ *     ACTION_CONSTRAINT / TYPE_CONSTRAINT 等其余段名不命中。
+ *
+ * @param tlaContent .tla 文件文本内容（定义体提取来源）
+ * @param cfgContent .cfg 文件文本内容（INVARIANTS 名单与 CONSTRAINT 段检测来源）
+ * @returns { passed, violations }
+ */
+export function checkBusinessInvariants(
+  tlaContent: string,
+  cfgContent: string,
+): { passed: boolean; violations: string[] } {
+  const violations: string[] = [];
+  const tla = typeof tlaContent === 'string' ? tlaContent : '';
+  const cfg = stripComments(cfgContent ?? '');
+
+  // B10c：cfg 出现 CONSTRAINT/CONSTRAINTS 段名 → 违规
+  const cfgLines = cfg.split('\n');
+  for (const [lineIdx, rawLine] of cfgLines.entries()) {
+    const line = rawLine.trim();
+    const m = line.match(/^(CONSTRAINT|CONSTRAINTS)\b/i);
+    if (m && m[1]) {
+      violations.push(
+        `.cfg 第 ${lineIdx + 1} 行含 ${m[1].toUpperCase()} 段（CONSTRAINT/CONSTRAINTS 禁用）：不得用约束砍状态空间掩盖死锁/爆炸，正道是规格拆解（反模式 #16 家族）`,
+      );
+    }
+  }
+
+  // B1：业务不变式 = cfg INVARIANTS 中名字不以 'Type' 开头者
+  const names = [...new Set(parseCfgInvariantNames(cfg))];
+  if (names.length === 0) {
+    // cfg 未声明任何不变式：B1a 针对的是「声明了不变式但全部为 Type 类」的空洞形态
+    return { passed: violations.length === 0, violations };
+  }
+  const business = names.filter((n) => !n.startsWith('Type'));
+  const typeInvariants = names.filter((n) => n.startsWith('Type'));
+
+  // ①须 ≥1 条业务不变式
+  if (business.length === 0) {
+    violations.push(
+      `缺非 Type 业务不变式：cfg INVARIANTS 全为 Type 类不变式（${names.join(', ')}），至少须 1 条名字不以 Type 开头的业务不变式`,
+    );
+    return { passed: false, violations };
+  }
+
+  // ②③定义体归一化比对（同规格内）
+  const normalizedBodies = new Map<string, string>();
+  for (const n of names) {
+    const body = extractTlaDefBody(tla, n);
+    if (body != null) normalizedBodies.set(n, normalizeDefBody(body));
+  }
+  for (const n of business) {
+    const body = normalizedBodies.get(n);
+    if (body === undefined) continue; // 定义体提取不到 → 由 §11 集合一致性拦截
+    // ②不得为恒真
+    if (body === 'TRUE') {
+      violations.push(`业务不变式 ${n} 定义体恒真（归一化后为 TRUE）：恒真不变式不构成验证`);
+    }
+    // ③不得与任一 Type 类不变式定义体相同
+    for (const t of typeInvariants) {
+      const tBody = normalizedBodies.get(t);
+      if (tBody !== undefined && tBody === body) {
+        violations.push(
+          `业务不变式 ${n} 定义体与 Type 类不变式 ${t} 定义体相同（同规格内比对）：Type 类校验不能替代业务不变式`,
+        );
+      }
+    }
+  }
+  return { passed: violations.length === 0, violations };
+}
+
+// ==================== B10 空转 Next 检测（批次 7 任务 7） ====================
+
+/**
+ * 解析 .cfg 中 NEXT 段声明的 Next 操作符名（INIT/NEXT 形式，段名大小写不敏感）。
+ * 解析前先剥离 `(* *)` 块注释与 `\*` 行注释——注释中的 NEXT 字样不产生幻影名
+ * （函数自含剥注释，调用方无需预处理；stripComments 幂等，重复剥离无害）。
+ * SPECIFICATION Spec 形式无 NEXT 段 → 返回 []（Next 由 Spec 间接引用，空转检测不适用）。
+ * 每个NEXT 行取段名后首个 token 为操作符名；裸 NEXT 行（无名字）跳过（由 SANY / TLC 报 cfg 错误）。
+ */
+export function parseCfgNextNames(cfgContent: string): string[] {
+  const names: string[] = [];
+  for (const rawLine of stripComments(cfgContent ?? '').split('\n')) {
+    const m = rawLine.trim().match(/^NEXT\s+(\S+)/i);
+    if (m && m[1]) names.push(m[1]);
+  }
+  return names;
+}
+
+/**
+ * B10 空转 Next 检测（批次 7 任务 7；修复轮 1 收敛为跨定义体合取聚合 + 多 NEXT 聚合判定）。
+ *
+ * 退化解形态：`Next == x' = x`（全恒等自赋值）或 `Next == TRUE / UNCHANGED x`
+ * （无任何状态赋值）——状态永不变化，TLC 永不死锁、不变式恒成立，
+ * 「验证通过」不构成任何行为保证（反模式 #16：TLA+ 占位/简化实现）。
+ *
+ * 逐名判定（Next 定义体归一化后，含传递引用闭包；跨定义体按合取聚合——子定义体
+ * 以 `/\` 并入闭包文本，分解式 `Next == A /\ B`（A、B 均恒等）与一级/多级间接
+ * 引用 `Next == A`（A == x' = x）与单体直写形态判定一致）：
+ *   - 闭包无任何 `var' =` 状态赋值 → 该名空转候选；
+ *   - 闭包内全部状态赋值均为恒等自赋值（逐顶层合取/析取子句整句匹配 var' = var）
+ *     → 该名空转候选；
+ *   - 存在任一非恒等赋值 → 该名推进。
+ *
+ * 多 NEXT 聚合（TLC 对 cfg 多 NEXT 行取合取）：全部可判定名均为空转候选才 violation
+ * 「空转规格」；任一名推进 → 合取整体推进，不违规（保守方向，防误报优先）。
+ *
+ * 判定细节：
+ *   - 状态赋值形态计 `var' =`（确定性）与 `var' \in`（非确定性）两种——`Next == x' \in 0..10`
+ *     是真实推进，不属空转。
+ *   - 引用闭包：Next 定义体内引用的标识符若为 .tla 顶层定义（`Name ==`），其定义体递归并入
+ *     （防 `Next == A \/ B` 子动作形态误报）；提取不到定义体的标识符（变量 / 常量 / 内置算子）
+ *     跳过。visited 集防循环引用。
+ *   - cfg 无 NEXT 段（SPECIFICATION Spec 形式）→ 本检测不适用，跳过。
+ *   - cfg 声明的 Next 名在 .tla 无定义 / 闭包为空 → 该名不可判定（§11 集合一致性 / SANY
+ *     另行拦截），聚合时按不违规处理。
+ *   - 子句切分按归一化文本的字面 `/\`（合取）与 `\/`（析取）；括号包裹的复合子句不匹配
+ *     恒等式 → 计为非恒等，同样走保守不误报方向。
+ *
+ * @param tlaContent .tla 文件文本内容（定义体提取来源）
+ * @param cfgContent .cfg 文件文本内容（NEXT 段解析来源）
+ * @returns { passed, violations }
+ */
+export function checkIdleNext(tlaContent: string, cfgContent: string): { passed: boolean; violations: string[] } {
+  const violations: string[] = [];
+  const tla = typeof tlaContent === 'string' ? tlaContent : '';
+  const cfg = stripComments(cfgContent ?? '');
+
+  // 多 NEXT 聚合判定（TLC 对 cfg 多 NEXT 行取合取）：逐名收集空转候选，任一名推进即整体推进
+  const idleCandidates: string[] = [];
+  let anyProgressing = false;
+  let anyUndecidable = false;
+  for (const nextName of parseCfgNextNames(cfg)) {
+    // 传递引用闭包（visited 防循环）
+    const visited = new Set<string>([nextName]);
+    const bodies: string[] = [];
+    const queue: string[] = [nextName];
+    while (queue.length > 0) {
+      const name = queue.shift();
+      if (name === undefined) break;
+      const body = extractTlaDefBody(tla, name);
+      if (body == null) continue; // 定义缺失：由 §11 集合一致性 / SANY 拦截，此处跳过
+      bodies.push(normalizeDefBody(body));
+      for (const ident of body.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? []) {
+        if (!visited.has(ident)) {
+          visited.add(ident);
+          queue.push(ident);
+        }
+      }
+    }
+    // 跨定义体按合取聚合：子定义体以 `/\` 并入闭包文本，与「多 NEXT 行取合取」同向保守
+    // （空格拼接无法恢复子句边界，分解式 `Next == A /\ B` 会整块失配恒等式 → 漏报）
+    const closure = normalizeDefBody(bodies.join(' /\\ '));
+    if (closure === '') {
+      // Next 定义体为空 / 提取不到：该名不可判定，聚合时按不违规处理（SANY / §11 另行拦截）
+      anyUndecidable = true;
+      continue;
+    }
+
+    // 顶层合取/析取子句切分（归一化文本；`/\` 合取与 `\/` 析取字面）
+    const conjuncts = closure
+      .split(/\/\\|\\\//g)
+      .map((s) => s.trim())
+      .filter((s) => s !== '');
+
+    let assignmentCount = 0;
+    let allIdentity = true;
+    for (const c of conjuncts) {
+      // 非赋值子句（UNCHANGED / 纯谓词）不提供推进信息；var' \in 计赋值（非确定性推进）
+      if (!/[A-Za-z_][A-Za-z0-9_]*'\s*(?:=|\\in)/.test(c)) continue;
+      assignmentCount += 1;
+      const m = c.match(/^([A-Za-z_][A-Za-z0-9_]*)'\s*=\s*([A-Za-z_][A-Za-z0-9_]*)$/);
+      if (!(m && m[1] === m[2])) allIdentity = false;
+    }
+    if (assignmentCount === 0) {
+      idleCandidates.push(
+        `空转规格：NEXT ${nextName} 定义体（含引用闭包）归一化后无任何 var' = 状态赋值（如 Next == TRUE / UNCHANGED x）：状态永不变化，验证不构成行为（反模式 #16）`,
+      );
+    } else if (allIdentity) {
+      idleCandidates.push(
+        `空转规格：NEXT ${nextName} 的全部状态赋值均为恒等自赋值 var' = var（如 Next == x' = x）：状态永不变化，验证不构成行为（反模式 #16）`,
+      );
+    } else {
+      anyProgressing = true;
+    }
+  }
+  // 聚合出口：全部可判定名均空转候选才违规；任一名推进 / 存在不可判定名 → 不违规（防误报优先）
+  if (!anyProgressing && !anyUndecidable) violations.push(...idleCandidates);
+  return { passed: violations.length === 0, violations };
 }
 
 // ==================== 规格字段结构校验 ====================
@@ -1041,7 +1375,12 @@ export function checkTlaModel(manifest: unknown, phase: number): TlaCheckResult 
       const notRunReason = `TLC 未执行（SANY 语法检查失败）：${sanyDetail}`;
       result.syntaxErrors.push(sanyDetail);
       result.violations.push(notRunReason);
-      result.specs.push({ specId: s.id, tlaPath: s.tlaPath, tlcStatus: 'notRun', reasons: [notRunReason] });
+      result.specs.push({
+        specId: s.id,
+        tlaPath: s.tlaPath,
+        tlcStatus: 'notRun',
+        reasons: [notRunReason],
+      });
       continue;
     }
     const flagReasons: string[] = [];
@@ -1082,7 +1421,11 @@ export function checkTlaModel(manifest: unknown, phase: number): TlaCheckResult 
       .filter((s) => typeof (s as TlaSpec).tlaPath === 'string' && filteredOutPaths.has((s as TlaSpec).tlaPath))
       .map((s) => [(s as TlaSpec).tlaPath, (s as TlaSpec).phase] as const),
   );
-  result.hierarchyViolations = checkHierarchy(checkedSpecs, { filteredOutPaths, fullPhaseByPath, phase });
+  result.hierarchyViolations = checkHierarchy(checkedSpecs, {
+    filteredOutPaths,
+    fullPhaseByPath,
+    phase,
+  });
 
   // 5. 拆解决策（警告不导致失败，仅取 violations）
   const decomp = checkDecomposition(checkedSpecs);
@@ -1130,6 +1473,16 @@ export function checkTlaModel(manifest: unknown, phase: number): TlaCheckResult 
     if (typeof s.tlaContent === 'string' && typeof s.cfgContent === 'string') {
       const cons = checkCfgInvariantsConsistency(s.tlaContent, s.cfgContent);
       for (const v of cons.violations) {
+        result.cfgConsistencyViolations.push(`规格 ${s.id}: ${v}`);
+      }
+      // B1 恒真/空洞不变式防御 + B10c CONSTRAINT 禁用（批次 7 任务 3）：违规并入 cfg 一致性桶
+      const biz = checkBusinessInvariants(s.tlaContent, s.cfgContent);
+      for (const v of biz.violations) {
+        result.cfgConsistencyViolations.push(`规格 ${s.id}: ${v}`);
+      }
+      // B10 空转 Next 检测（批次 7 任务 7）：违规并入 cfg 一致性桶
+      const idle = checkIdleNext(s.tlaContent, s.cfgContent);
+      for (const v of idle.violations) {
         result.cfgConsistencyViolations.push(`规格 ${s.id}: ${v}`);
       }
       const struct = checkCfgStructure(s.cfgContent);

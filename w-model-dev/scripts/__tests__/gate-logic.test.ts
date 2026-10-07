@@ -2,7 +2,13 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { checkArtifactGate, evaluateTlaBddWaiver, type RTMMatrixShape } from '../logic/gate-logic.js';
+import { validateBySchema } from '../infrastructure/schema-loader.js';
+import {
+  checkArtifactGate,
+  checkRtmCoverageStatusConsistency,
+  evaluateTlaBddWaiver,
+  type RTMMatrixShape,
+} from '../logic/gate-logic.js';
 import { computeSigHash, verifyMaturityApproval, type SignatureChainEntry } from '../logic/signature-chain-logic.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -257,5 +263,46 @@ describe('A4 maturity 豁免收紧：checkArtifactGate 豁免分支（fail-close
     expect(v.waived).toBe(false);
     expect(v.reasons[0]).toContain('maturity 豁免被拒绝');
     expect(evaluateTlaBddWaiver(undefined, 1, []).waived).toBe(false);
+  });
+});
+
+// ==================== A13：rtm coverageStatus 收严（43.1.0 breaking） ====================
+describe('A13：rtm coverageStatus 收严（enum 三值 + rows 必填 + P0 循环不再 continue）', () => {
+  it('A13a：rtm 行缺 coverageStatus → P0 违规（不再 continue 跳过）', () => {
+    // 纵深防御层：直接调 P0 行级一致性校验，缺 coverageStatus 的行必须产出违规（此前 continue 跳过）
+    const base = makeGateInput();
+    const stripped = base.rows.map((r, i) => {
+      const clone = { ...r };
+      if (i === 0) delete clone.coverageStatus;
+      return clone;
+    });
+    const violations = checkRtmCoverageStatusConsistency(stripped, []);
+    expect(
+      violations.some((v) => v.includes('REQ-001') && v.includes('coverageStatus')),
+      '缺 coverageStatus 行须被点名（REQ-001）',
+    ).toBe(true);
+
+    // 端到端：schema rows.items.required 前置拦截，门禁不再静默放行
+    const result = checkArtifactGate({ ...base, rows: stripped }, { phaseOption: 1 });
+    expect(result.passed, '缺 coverageStatus 的 RTM 不得通过阶段门').toBe(false);
+    expect(result.reasons.some((r) => r.includes('coverageStatus'))).toBe(true);
+  });
+
+  it('A13b：coverageStatus 非三值 → schema 拒绝', () => {
+    const base = makeGateInput();
+    for (const bad of ['完整', 'done', '100']) {
+      const rows = base.rows.map((r) => ({ ...r, coverageStatus: bad }));
+      const schemaResult = validateBySchema('rtm', { ...base, rows });
+      expect(schemaResult.valid, `coverageStatus="${bad}" 须被 schema enum 拒绝`).toBe(false);
+      expect(
+        schemaResult.errorMessages?.some((m) => m.includes('coverageStatus')),
+        `coverageStatus="${bad}" 的 schema 错误须点名 coverageStatus`,
+      ).toBe(true);
+    }
+    // 合法三值不拒绝
+    for (const ok of ['100%', '部分', '待覆盖']) {
+      const rows = base.rows.map((r) => ({ ...r, coverageStatus: ok }));
+      expect(validateBySchema('rtm', { ...base, rows }).valid, `coverageStatus="${ok}" 为合法枚举`).toBe(true);
+    }
   });
 });

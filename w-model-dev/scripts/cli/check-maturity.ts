@@ -5,11 +5,17 @@
  * 对应 w-model-dev/references/data-models.md MaturityConfig schema
  * 与 docs/superpowers/specs/2026-07-23-w-model-dev-correction-design.md §5.3。
  * 供 O 子代理在阶段推进前调用，校验成熟度模型 schema 完整性、level 合法性、
- * history 时序、降级触发状态、history 链一致性（R6，A4 43.0.0）。
+ * history 时序、降级触发状态、history 链一致性（R6，A4 43.0.0）、project.status 转移合法性
+ * （R7，A14 43.1.0）、降级须 human 授权（R8，批次 7 决策 #2 43.1.0）。
  * （原 R3 completedCycles 周期换算随 unlockConditions 死字段删除而退役，43.0.0 A4。）
+ * R8 的签名链装载：读取 `<maturity.json 同目录>/signature-chain.jsonl`（容错读取——缺文件 → 空链、
+ * 坏行与非对象行跳过；三形态最终都收敛为「不授权」fail-closed），经 `verifyMaturityApproval`
+ * 以 `requireAction='downgrade-approve'` 判定（**降级专属绑定**：升级流程落的人签条目不计入降级授权——
+ * 否则升级条目天然满足 R8）后把 `ok` 注入纯逻辑 `options.maturityApprovalOk`（logic 层不读盘，
+ * 接缝形态与 check-artifact-gate 一致）。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>]
+ *   npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--prev-status=<9态>] [--rollback-approved]
  *
  * 参数：
  *   maturity.json        maturity.json 文件路径
@@ -17,6 +23,11 @@
  *   --run-log=<path>     run-log.jsonl 路径（可选，R5 真值通道：只统计每条记录的 operationalFailureModes 字段；
  *                        读取路径过滤非 O1~O6 取值（计数为 0 并出非阻断诊断——schema 应拒绝，此处为读取路径防御）；
  *                        note 中的 O1..O6 字样视为引用，仅作非阻断诊断。未提供时输出「R5 未生效」非阻断诊断）
+ *   --prev-status=<9态>  project.status 前值（可选，A14 R7 转移合法性校验；须与 --project 同时提供，
+ *                        取值须为 PROJECT_STATUSES 9 态之一，否则 ARG_INVALID exit 2。
+ *                        合法转移 = 前向链下一步 ∪ 场景 5 用户批准回退 ∪ 终态「项目完成」）
+ *   --rollback-approved  场景 5 用户批准回退标记（可选，仅在 🔴 CHECKPOINT 用户裁定回退后由 O 置位；
+ *                        未置位的回退转移 → R7 违规 exit 1）
  *   --json               机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse，含 warnings 非阻断警告字段与 diagnostics 非阻断诊断字段）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
@@ -41,6 +52,8 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
 import { checkMaturity, type MaturityConfig } from '../logic/maturity-logic.js';
+import { verifyMaturityApproval, type SignatureChainEntry } from '../logic/signature-chain-logic.js';
+import { PROJECT_STATUSES } from '../lib/constants.js';
 import { readJsonOrExit, readJsonlOptional } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { isDirectInvocation } from '../lib/is-main.js';
@@ -55,6 +68,8 @@ interface ParsedArgs {
   maturityFile: string | undefined;
   projectFile: string | undefined;
   runLogFile: string | undefined;
+  prevStatus: string | undefined;
+  rollbackApproved: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -62,7 +77,9 @@ function parseArgs(argv: string[]): ParsedArgs {
   const maturityFile = args.find((a) => !a.startsWith('--'));
   const projectFile = parseFlagValue(args, 'project');
   const runLogFile = parseFlagValue(args, 'run-log');
-  return { maturityFile, projectFile, runLogFile };
+  const prevStatus = parseFlagValue(args, 'prev-status');
+  const rollbackApproved = hasFlag(args, 'rollback-approved');
+  return { maturityFile, projectFile, runLogFile, prevStatus, rollbackApproved };
 }
 
 // ==================== run-log O 系列失败模式统计（R5，D-7） ====================
@@ -171,13 +188,74 @@ export function buildR5Diagnostics(
   return diagnostics;
 }
 
+// ==================== R8 签名链装载（批次 7 决策 #2，43.1.0） ====================
+
+/**
+ * 装载 maturity.json 同目录的 `signature-chain.jsonl`（R8 降级审批链；容错读取，与
+ * `check-artifact-gate.loadSignatureChainIfExists` 同口径）：文件不存在 / 整文件读取失败 → 空链，
+ * 逐行 JSON 解析失败的坏行跳过（坏行无法通过 v3 重算，天然不构成合法审批）。**合法 JSON 但非对象
+ * 的整行**（如整行 `null` / 数组 / 数字）同样跳过——非对象行无法承载 `role/sigHash` 等字段，
+ * 放行会把判定推进到 `[UNEXPECTED]` exit 2（修复轮 1 审查实跑复现的崩溃面），跳过则收敛为本有的
+ * 「无有效授权」fail-closed（降级一律 R8 blocking）。
+ * 三形态（缺链 / 空链 / 坏链）最终都收敛为「无有效授权」——fail-closed，降级一律 R8 blocking。
+ * `found` 仅用于人类可读报告（审计可见性），不参与判定。
+ */
+async function loadSignatureChainIfExists(
+  chainFile: string,
+): Promise<{ entries: SignatureChainEntry[]; found: boolean }> {
+  let raw: string;
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- chainFile 由 <maturity.json> 同目录派生（受控路径），只读
+    raw = await fs.readFile(chainFile, 'utf-8');
+  } catch {
+    return { entries: [], found: false };
+  }
+  const entries: SignatureChainEntry[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed === '') continue;
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      // 非对象行（null / 数组 / 标量）跳过：无法通过 verifyMaturityApproval 的字段判定
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+      entries.push(parsed as SignatureChainEntry);
+    } catch {
+      /* 坏行不构成审批（fail-closed）：JSON 不完整即无法通过 verifyMaturityApproval 的 v3 重算 */
+    }
+  }
+  return { entries, found: true };
+}
+
 // ==================== 主流程 ====================
 
 async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
-  const { maturityFile, projectFile, runLogFile } = parseArgs(process.argv);
+  const { maturityFile, projectFile, runLogFile, prevStatus, rollbackApproved } = parseArgs(process.argv);
+
+  // A14 R7 前置参数校验（ARG_INVALID，exit 2）：--prev-status 须为 9 态枚举之一，且须与
+  // --project 同时提供（转移判定需要 current status）；--rollback-approved 仅在场景 5
+  // 🔴 CHECKPOINT 用户裁定回退后由 O 置位。
+  if (prevStatus !== undefined && !(PROJECT_STATUSES as readonly string[]).includes(prevStatus)) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: `--prev-status 非法：${prevStatus}`,
+      detail: `须为 PROJECT_STATUSES 9 态之一（${PROJECT_STATUSES.join(' / ')}）`,
+      exitCode: 2,
+    });
+    return;
+  }
+  if (prevStatus !== undefined && !projectFile) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: '--prev-status 须与 --project 同时提供（转移判定需要 project.status 当前值）',
+      exitCode: 2,
+    });
+    return;
+  }
 
   if (!maturityFile) {
     exitWithError({
@@ -185,7 +263,7 @@ async function main(): Promise<void> {
       rule: 'P0-1',
       message: '参数缺失 <maturity.json>',
       detail:
-        '用法: npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>]',
+        '用法: npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--prev-status=<9态>] [--rollback-approved]',
       exitCode: 2,
     });
     return;
@@ -203,6 +281,7 @@ async function main(): Promise<void> {
   // 不再 warn-and-skip；schema 校验后 status 必为 9 态枚举、createdAt 必为 date-time 字符串。
   // （原 completedPhases 推导随 R3 退役删除，43.0.0 A4：--project 现仅服务 R4 时序交叉校验。）
   let projectCreatedAt: string | undefined;
+  let projectStatus: string | undefined;
   if (projectFile) {
     const projectAbs = path.resolve(projectFile);
     try {
@@ -211,6 +290,7 @@ async function main(): Promise<void> {
         createdAt: string;
       }>(projectAbs, 'project');
       projectCreatedAt = project.createdAt;
+      projectStatus = project.status;
     } catch (err) {
       if (err instanceof Error && err.message.startsWith(LOAD_AND_VALIDATE_SENTINEL_PREFIX)) return;
       throw err;
@@ -245,11 +325,41 @@ async function main(): Promise<void> {
     r5Diagnostics.push(...buildR5Diagnostics(false, []));
   }
 
+  // R8（批次 7 决策 #2，43.1.0）：降级须 human 授权——装载 maturity.json 同目录的
+  // signature-chain.jsonl（容错读取），经 verifyMaturityApproval 判定后把 ok 注入纯逻辑
+  // （logic 不读盘）。非降级形态下该结果不被消费（既有行为零回归）；降级形态无授权 → R8 blocking。
+  // 修复轮 1（控制者裁定 R-B7-7）：判定须传 `requireAction: 'downgrade-approve'`——否则升级流程
+  // 每次都会落的人签条目（signedAt 必然 ≥ 末条 history.at）天然满足授权，构成「升级审批洗白降级」。
+  const chainFile = path.resolve(path.dirname(maturityAbs), 'signature-chain.jsonl');
+  const { entries: signatureChain, found: chainFound } = await loadSignatureChainIfExists(chainFile);
+  const maturityApprovalOk = verifyMaturityApproval(
+    signatureChain,
+    {
+      level: typeof maturity?.level === 'string' ? maturity.level : '',
+      history: Array.isArray(maturity?.history)
+        ? maturity.history.map((h) => ({
+            to: typeof h?.to === 'string' ? h.to : '',
+            at: typeof h?.at === 'string' ? h.at : undefined,
+          }))
+        : [],
+    },
+    { requireAction: 'downgrade-approve' },
+  ).ok;
+
   // 构建 options 并调用纯逻辑校验
   const result = checkMaturity(parsed, {
     projectCreatedAt,
     operationalFailureCount,
     diagnostics: r5Diagnostics,
+    maturityApprovalOk,
+    // A14 R7：prev + current 同时提供才触发转移合法性校验（maturity-logic 内判定）
+    ...(prevStatus !== undefined && projectStatus !== undefined
+      ? {
+          projectStatus,
+          prevProjectStatus: prevStatus,
+          projectStatusRollbackApproved: rollbackApproved,
+        }
+      : {}),
   });
   const exitCode = result.passed ? 0 : 1;
 
@@ -284,12 +394,15 @@ async function main(): Promise<void> {
   console.log(
     `--run-log     : ${runLogFile ? `${runLogFile}（O 系列标注=${operationalFailureCount ?? 'N/A'}）` : '未提供'}`,
   );
+  console.log(
+    `签名链(R8)    : ${chainFound ? `${chainFile}（条目 ${signatureChain.length}）` : `未找到（${chainFile}）`}`,
+  );
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);
   console.log('─'.repeat(60));
 
   if (result.passed) {
     console.log(
-      '成熟度模型符合 data-models.md MaturityConfig schema：完整 + level 合法 + history 时序 + history 链一致 + 降级未触发。',
+      '成熟度模型符合 data-models.md MaturityConfig schema：完整 + level 合法 + history 时序 + history 链一致 + 降级未触发 +（降级形态时）human 授权链通过。',
     );
   } else {
     console.log('未通过原因：');

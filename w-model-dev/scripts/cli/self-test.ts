@@ -56,7 +56,11 @@ import { checkCheckpoint } from '../logic/checkpoint-logic.js';
 import { checkRequirementCoverage, type CoverageCheckOptions } from '../logic/coverage-logic.js';
 import { computeCoverageScope, type CoverageScopeThresholds } from '../logic/coverage-scope-logic.js';
 import { checkExemption } from '../logic/exemption-logic.js';
-import { checkSignatureChain } from '../logic/signature-chain-logic.js';
+import {
+  checkSignatureChain,
+  verifyMaturityApproval,
+  type SignatureChainEntry,
+} from '../logic/signature-chain-logic.js';
 import { checkArchiveIntegrity, type ArchiveIntegrityManifest } from '../logic/archive-integrity-logic.js';
 import { checkDesignContractConsistency, type DesignContractCheckInput } from '../logic/design-contract-logic.js';
 import {
@@ -116,6 +120,7 @@ import {
 import { checkCodingPlan } from '../logic/coding-plan-logic.js';
 import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
+import { readJsonlOptional } from '../lib/read-json-or-exit.js';
 import { runSync } from '../lib/run-sync.js';
 
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
@@ -821,6 +826,14 @@ const GRAPH_CASES: GraphCase[] = [
     description: '四维·维度3：depends-on 子图有环（REQ-002→REQ-003→REQ-002），应被 R5 依赖无环校验拦截',
   },
   {
+    file: 'bad-depends-on-cycle-phase3.json',
+    phase: 3,
+    expectedPassed: false,
+    expectedReasonPatterns: [/R5.*depends-on.*环/],
+    description:
+      'A11（批次 7 任务 8）：phase=3 图 depends-on 成环（SD-001→SD-002→SD-001），应被 R5 依赖无环校验拦截（环检测已移出 phase=1 限界、全 phase 执行；收严前阶段 2-4 环结构带病放行）',
+  },
+  {
     file: 'bad-precedes-cycle.json',
     phase: 1,
     expectedPassed: false,
@@ -867,6 +880,17 @@ const GRAPH_CASES: GraphCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/R15b evidenceStatus 非法/],
     description: 'R15b：evidenceStatus="maybe" 非 confirmed|pending，应被状态枚举校验拦截',
+  },
+  {
+    file: 'bad-evidence-status-pending.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [
+      /R15b pending 未核验/,
+      /放行前 pending 节点须转 confirmed 或走 evidence-anchor 豁免（check-exemption）/,
+    ],
+    description:
+      'A12a（批次 7 任务 8）：锚点合规但全节点 evidenceStatus=pending，应被 R15b pending 放行前阻断拦截（pending 由放行改 violation；豁免出口走 check-exemption 第 6 类 evidence-anchor-pending；收严前 pending 节点可带病放行）',
   },
   {
     file: 'bad-evidence-path-missing.json',
@@ -1390,6 +1414,43 @@ const TLA_CASES: TlaCase[] = [
     description:
       'checkRounds 元素含 phaseSummary 字段（phase 级摘要），应被 schema additionalProperties:false 前置拦截（F-G4-13 收紧；此前由 R13 拦截）',
   },
+  {
+    file: 'bad-only-type-invariants.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/缺非 Type 业务不变式/],
+    description:
+      'B1a：cfg INVARIANTS 全为 Type 类不变式（仅 TypeOK），应被「缺非 Type 业务不变式」校验拦截（批次 7 任务 3）',
+  },
+  {
+    file: 'bad-tautology-invariant.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/恒真/],
+    description: 'B1b：业务不变式 Inv 定义体恒真（== TRUE），应被恒真不变式校验拦截（批次 7 任务 3）',
+  },
+  {
+    file: 'bad-duplicate-of-type.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/定义体相同/],
+    description: 'B1c：业务不变式 Inv 定义体与 Type 类不变式 TypeOK 定义体相同，应被同体校验拦截（批次 7 任务 3）',
+  },
+  {
+    file: 'bad-constraint-shrink.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/不得用约束砍状态空间/],
+    description:
+      'B10c：cfg 含 CONSTRAINT 段（状态空间砍削掩盖死锁/爆炸），应被 CONSTRAINT 禁用校验拦截（批次 7 任务 3）',
+  },
+  {
+    file: 'bad-idle-next.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/空转规格/],
+    description: "B10：NEXT Next 全恒等自赋值（Next == x' = x，状态永不变化），应被空转规格校验拦截（批次 7 任务 7）",
+  },
   // -------------------- 孤儿样本（check-samples-coverage 引用登记） --------------------
   {
     file: 'bad-coverage-uncovered-sd.json',
@@ -1620,14 +1681,28 @@ const BUDGET_RUN_LOG_CASES: BudgetRunLogCase[] = [
 // -------------------- Maturity --------------------
 
 interface MaturityCase {
-  /** 样本文件名（相对 samples/maturity/） */
+  /** 样本文件名（相对 samples/maturity/；可含子目录，如 `with-approval/maturity.json`） */
   file: string;
   /** 期望校验是否通过 */
   expectedPassed: boolean;
   /** 期望 violations 中至少一条匹配以下每个正则（全部匹配才算通过） */
   expectedReasonPatterns?: RegExp[];
-  /** 传给 checkMaturity 的 options（可选，默认不传；43.0.0 A4：completedPhases 已随 R3 退役删除） */
-  options?: { projectCreatedAt?: string; operationalFailureCount?: number };
+  /**
+   * 传给 checkMaturity 的 options（可选，默认不传；43.0.0 A4：completedPhases 已随 R3 退役删除）。
+   * `maturityApprovalOk`（43.1.0 决策 #2）为 R8 的 human 审批链接缝注入——logic 不读盘，
+   * 真值由调用方装载 signature-chain.jsonl 后给出。声明 `sampleDir` 的用例**不用手写**本字段：
+   * 判定由 `sampleDir` 下的真实链条目派生（见下）。
+   */
+  options?: { projectCreatedAt?: string; operationalFailureCount?: number; maturityApprovalOk?: boolean };
+  /**
+   * 可选：`samples/maturity/` 下的样本子目录（如 `with-approval`）。声明即：
+   *   1. 本用例真实装载 `<sampleDir>/signature-chain.jsonl`（与 CLI 同径：容错行解析 +
+   *      `verifyMaturityApproval(..., { requireAction: 'downgrade-approve' })` 降级专属判定），
+   *      把 `ok` 注入 `options.maturityApprovalOk`——样本自洽（CLI 直接在该目录跑通，见
+   *      `__tests__/maturity-logic.test.ts`），且样本链的 v3 sigHash 真值受本用例守卫；
+   *   2. 该子树经此字段在 check-samples-coverage 规则 1 登记（fixture 引用 ↔ 在盘双向闭环）。
+   */
+  sampleDir?: string;
   /** 用例说明 */
   description: string;
 }
@@ -1650,6 +1725,20 @@ const MATURITY_CASES: MaturityCase[] = [
     expectedReasonPatterns: [/R6: history\[1\] from=L0 与上一条 to=L1 断链/],
     description:
       'A4 R6 history 链一致性：第 2 条 from=L0 与上一条 to=L1 断链（虚高路径：L0 直接跳 L2），应触发 R6 违规（原 bad-r3-cycle-mismatch.json 的 R3 周期用例随 unlockConditions 死字段退役，43.0.0 A4）',
+  },
+  {
+    file: 'bad-downgrade-without-approval.json',
+    expectedPassed: false,
+    expectedReasonPatterns: [/R8: 降级形态（level=L0 低于 history 末条 to=L2）/],
+    description:
+      '决策2（43.1.0）R8：降级形态（升级链 L0→L1→L2 后 level 回落 L0，R6 第三判定允许）无 role=human / targetKind=maturity 审批链 → R8 blocking（降级无法过闭环五门 = 「不允许降级」的机器化；CLI 装载缺链/坏链一律注入 false）',
+  },
+  {
+    file: 'with-approval/maturity.json',
+    sampleDir: 'maturity/with-approval',
+    expectedPassed: true,
+    description:
+      '决策2（43.1.0）R8 正向样本（自洽目录）：同形态降级 + 同目录 signature-chain.jsonl 内的 `action=downgrade-approve` human 条目（真实 v3 sigHash、绑定 maturity.json、不早于末条变更）→ 经 CLI 同径判定（requireAction 降级专属绑定，修复轮 1 R-B7-7）注入后零违规；升级/非降级 action 条目不计入（负例见 __tests__/maturity-logic.test.ts）',
   },
 ];
 
@@ -4333,13 +4422,49 @@ function runRunLogAppendCases(): CaseResult[] {
   return results;
 }
 
+/**
+ * R8 样本链判定（与 `cli/check-maturity.ts` 主流程同径）：装载 `<sampleDir>/signature-chain.jsonl`
+ * （容错：坏行跳过，`readJsonlOptional` 已 warn+skip；非对象行在本函数过滤），经
+ * `verifyMaturityApproval(..., { requireAction: 'downgrade-approve' })` 判定降级专属授权。
+ * 为什么与 CLI 同径而不是硬编码 `maturityApprovalOk: true`：样本链的 v3 sigHash 真值与降级专属
+ * action 由此受 self-test 守卫（链被改坏 / action 改回升级值即红），样本目录名与实相符。
+ */
+async function maturityApprovalFromSample(samplesDir: string, sampleDir: string, maturity: unknown): Promise<boolean> {
+  const chainFile = path.join(samplesDir, sampleDir, 'signature-chain.jsonl');
+  const rows = await readJsonlOptional(chainFile, 'signature-chain');
+  // 非对象行跳过（与 check-maturity / check-artifact-gate 的 loader 同口径；样本链不应含此类行）
+  const chain = rows.filter((e): e is SignatureChainEntry => e !== null && typeof e === 'object' && !Array.isArray(e));
+  const m = maturity as { level?: unknown; history?: unknown };
+  return verifyMaturityApproval(
+    chain,
+    {
+      level: typeof m?.level === 'string' ? m.level : '',
+      history: Array.isArray(m?.history)
+        ? m.history.map((h) => {
+            const row = h as { to?: unknown; at?: unknown };
+            return {
+              to: typeof row?.to === 'string' ? row.to : '',
+              at: typeof row?.at === 'string' ? row.at : undefined,
+            };
+          })
+        : [],
+    },
+    { requireAction: 'downgrade-approve' },
+  ).ok;
+}
+
 async function runMaturityCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of MATURITY_CASES) {
     const abs = path.join(samplesDir, 'maturity', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
     const parsed: unknown = parseJsonSafe(raw);
-    const r = checkMaturity(parsed, c.options);
+    // 声明 sampleDir 的用例（R8 正向样本）：用真实链条目判定结果覆盖注入（样本自洽，见接口注释）
+    const options =
+      c.sampleDir === undefined
+        ? c.options
+        : { ...c.options, maturityApprovalOk: await maturityApprovalFromSample(samplesDir, c.sampleDir, parsed) };
+    const r = checkMaturity(parsed, options);
 
     const details: string[] = [];
     if (r.passed !== c.expectedPassed) {

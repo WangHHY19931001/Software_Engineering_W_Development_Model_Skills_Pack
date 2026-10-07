@@ -3,7 +3,9 @@
  *
  * 对应 w-model-dev/references/data-models.md MaturityConfig schema（§自主成熟度模型）
  * 与 w-model-dev/references/hard-constraints.md（反模式节）§运维失败模式清单 O1~O6。
- * 校验：level 合法（R2）+ history 时序一致（R4）+ 降级触发检测（R5）+ history 链一致性（R6）。
+ * 校验：level 合法（R2）+ history 时序一致（R4）+ 降级触发检测（R5）+ history 链一致性（R6）
+ * + project.status 转移合法性（R7，A14 43.1.0）+ 降级须 human 授权（R8，批次 7 决策 #2 43.1.0；
+ * 修复轮 1 R-B7-7 增降级专属绑定——调用方以 `requireAction='downgrade-approve'` 判定授权条目）。
  * 原 R3（unlockConditions.completedCycles 周期换算）随 unlockConditions 死字段删除而退役
  * （43.0.0 A4，批次 6 任务 8；规则号不回收，R4/R5 编号保持稳定）。
  * R5 为**真值通道**（D-7）：命中次数只统计 run-log 的 `operationalFailureModes` 字段，note 中的
@@ -13,12 +15,19 @@
  * maturity.schema.json 前置拦截，逻辑层不再重复校验（audit-fixes task 5，F-G2-05 死分支清理）。
  *
  * 设计原则（与 budget-logic.ts / graph-logic.ts / verifier-logic.ts 一致）：
- *   1. 自包含：仅依赖本文件内定义的最小类型形状，不 import 外部模块
+ *   1. 依赖面最小化：只依赖本文件定义的最小类型形状 + **单一显式例外**——R7 的转移判定
+ *      复用 `gate-logic.judgeProjectStatusTransition`（判定单点优先于字面自包含，与
+ *      wm-status-logic.ts 同款先例；判定逻辑不在此复制）。R8 的审批链校验结果由调用方注入，
+ *      本文件仍不读盘、不 import 签名链模块。
  *   2. 纯函数：无 I/O、无副作用，便于测试与复用
  *   3. 单点事实：所有「成熟度模型是否符合规范」的判定均委托至此
  */
 
 import { validateBySchema } from '../infrastructure/schema-loader.js';
+
+// R7（A14，43.1.0）：status 转移判定单点在 gate-logic.judgeProjectStatusTransition（与
+// check-artifact-gate / wm-status 共用常数 PROJECT_STATUSES；判定逻辑不在此复制）。
+import { judgeProjectStatusTransition } from './gate-logic.js';
 
 // ==================== 自包含类型形状 ====================
 
@@ -31,14 +40,14 @@ export interface MaturityConfig {
   level: 'L0' | 'L1' | 'L2' | 'L3';
   /** 升级到此级别的时间 ISO 8601 */
   leveledUpAt: string;
-  /** 升级历史（只承载升级链；降级走 human 审批链，不记 history，A4 43.0.0） */
+  /** 升级历史（只承载升级链；降级走 human 审批链，不记 history，A4 43.0.0。降级形态 = level 低于末条 to，须 R8 human 授权，43.1.0。链须自 L0 起步，决策 #3 43.1.0） */
   history: Array<{
     from: 'L0' | 'L1' | 'L2' | 'L3';
     to: 'L0' | 'L1' | 'L2' | 'L3';
     at: string;
     reason: string;
   }>;
-  /** 降级触发条件（自动降级回 L0） */
+  /** 降级触发条件（命中即触发降级评估；降级须 human 授权——43.1.0 决策 #2，原「自动降级回 L0」作废） */
   downgradeTriggers: {
     /** 连续 O 系列失败模式命中 ≥ 此值 */
     operationalFailureStreak: number;
@@ -57,6 +66,26 @@ export interface MaturityCheckOptions {
    * 逐字回传进报告（与 warnings 并存），**不参与 passed 判定**。
    */
   diagnostics?: string[];
+  /** R7（A14，43.1.0）：project.status 当前值（须与 prevProjectStatus 同时提供才触发 R7） */
+  projectStatus?: string;
+  /** R7（A14）：project.status 前值（转移起点；缺省时不做转移判定——不发明历史机制） */
+  prevProjectStatus?: string;
+  /**
+   * R7（A14）：场景 5 用户批准回退标记。仅当 🔴 CHECKPOINT 用户裁定回退
+   * （operational-recovery.md「场景 5：阶段回退」）后由调用方置位；未置位的回退一律 R7 违规。
+   */
+  projectStatusRollbackApproved?: boolean;
+  /**
+   * R8（批次 7 决策 #2，43.1.0）：降级形态（`level` 低于 history 末条 `to`）的 human 审批链
+   * 校验结果——由调用方（CLI 装载 `.w-model/signature-chain.jsonl` 后经
+   * `verifyMaturityApproval` 判定）注入；本纯函数不读盘（接缝形态与
+   * `gate-logic.evaluateTlaBddWaiver` 一致）。**仅当降级形态时被消费**：真值须为 `true`
+   * 才放行，未注入 / `false`（缺链 / 坏链 / 早签）一律 R8 blocking。
+   * **降级专属绑定（修复轮 1 R-B7-7）由调用方传入**：CLI 以
+   * `verifyMaturityApproval(..., { requireAction: 'downgrade-approve' })` 判定——升级审批条目
+   * 不计入（否则升级条目天然满足 R8，可洗白降级）；本字段只见最终布尔结果。
+   */
+  maturityApprovalOk?: boolean;
 }
 
 export interface MaturityCheckResult {
@@ -143,12 +172,16 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
     );
   }
 
-  // R6 history 链一致性（A4，43.0.0；决策日志 rounds-48 三判定；批次 6 修复轮 1 审查裁定第三判定放宽）：
-  //   1. from == 上一条 to（首条无前驱，不约束起点——存量形态允许 L1→L2 起头的升级链切片）；
+  // R6 history 链一致性（A4，43.0.0；决策日志 rounds-48 三判定；批次 6 修复轮 1 审查裁定第三判定放宽；
+  //   批次 7 决策 #3 43.1.0 新增第四判定——首条 from 须为 L0，完整升级链自 L0 起步）：
+  //   1. from == 上一条 to（首条无前驱，不断链——起点由第四判定单独约束）；
   //   2. to > from（LEVEL_ORDER 严格比较；history 只承载升级链，降级走 human 审批链）；
-  //   3. 末条 to 不低于当前 level（降级后 level 低于末条属合法形态——A4 起 TLA+/BDD 豁免须 human
-  //      审批链，降级不再构成绕过面，R6 只锁「level 高于升级链末条」的伪造升级虚高路径）。
-  // 破链/跳级/平级/level 虚高（高于链末条）即伪造路径——machine 层 fail-closed。
+  //   3. 末条 to 不低于当前 level（降级后 level 低于末条属合法形态——R6 只锁「level 高于升级链末条」
+  //      的伪造升级虚高路径；降级形态本身由 R8 单独锁死：须 human 审批链，43.1.0 决策 #2）；
+  //   4. 首条 from == L0（决策 #3，43.1.0）：完整升级链须自 L0 起步——存量 L1→L2 切片链不再合法
+  //      （迁移：e2e 装配器 maturity.json 前插 L0→L1）。与第三判定可并存：降级链（level 低于末条）
+  //      仍须自 L0 起头。
+  // 破链/跳级/平级/起点非 L0/level 虚高（高于链末条）即伪造路径——machine 层 fail-closed。
   if (Array.isArray(m.history)) {
     let prevTo: string | undefined;
     for (const [i, h] of m.history.entries()) {
@@ -165,6 +198,11 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
       }
       prevTo = h.to;
     }
+    // 第四判定（决策 #3，43.1.0）：首条 from 须为 L0——升级链是完整链，不接受 L1/L2 起头的切片
+    const first = m.history.length > 0 ? m.history[0] : undefined;
+    if (first && typeof first === 'object' && first.from !== 'L0') {
+      violations.push(`R6: history[0] from=${String(first.from)} ≠ L0（完整升级链须自 L0 起步）`);
+    }
     if (m.level) {
       const last = m.history.length > 0 ? m.history[m.history.length - 1] : undefined;
       if (!last) {
@@ -176,6 +214,38 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
           `R6: history 末条 to=${String(last.to)} 低于当前 level=${String(m.level)}（level 不得高于升级链末条；降级后 level 低于末条属合法形态）`,
         );
       }
+    }
+  }
+
+  // R8 降级须 human 授权（批次 7 决策 #2，43.1.0）：
+  // R6 第三判定允许「level 低于 history 末条 to」的降级形态（只锁伪造升级）——本规则把该形态
+  // 收紧为**须 role=human / targetKind=maturity 审批链**：CLI 装载 `.w-model/signature-chain.jsonl`
+  // 后经 verifyMaturityApproval 判定并把 ok 注入 options.maturityApprovalOk（本函数不读盘）。
+  // 无授权降级 = blocking——「降级无法过闭环五门」＝「不允许降级」的机器化；应急处置路径 =
+  // 用户在 🔴 CHECKPOINT 明确确认即授权（O 据此落链条目，见 operational-recovery.md「升级与降级」）。
+  if (Array.isArray(m.history) && typeof m.level === 'string') {
+    const last = m.history.length > 0 ? m.history[m.history.length - 1] : undefined;
+    const rankLevel = levelRank(m.level);
+    if (last && rankLevel >= 0 && levelRank(last.to) > rankLevel) {
+      if (options?.maturityApprovalOk !== true) {
+        violations.push(
+          `R8: 降级形态（level=${m.level} 低于 history 末条 to=${String(last.to)}）须 role=human / targetKind=maturity 审批链条目（签名链验证未通过或未提供；降级须用户在 CHECKPOINT 明确授权）`,
+        );
+      }
+    }
+  }
+
+  // R7 project.status 转移合法性（A14，43.1.0）：prev + current 同时提供才触发；
+  // 合法 = 前向链下一步 ∪ 场景 5 用户批准回退 ∪ 终态「项目完成」（判据单点 judgeProjectStatusTransition）。
+  // 仅提供 current（无 prev）→ 不判定（project.json 无 status 历史，不发明历史机制）。
+  if (options?.projectStatus !== undefined && options.prevProjectStatus !== undefined) {
+    const judgement = judgeProjectStatusTransition(options.prevProjectStatus, options.projectStatus, {
+      userApprovedRollback: options.projectStatusRollbackApproved === true,
+    });
+    if (!judgement.legal) {
+      violations.push(
+        `R7: project.status 转移非法：${options.prevProjectStatus} → ${options.projectStatus}（${judgement.reason}；合法 = 前向链下一步 ∪ 场景 5 用户批准回退 ∪ 终态「项目完成」）`,
+      );
     }
   }
 

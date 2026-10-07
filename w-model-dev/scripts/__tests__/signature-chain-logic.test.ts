@@ -195,7 +195,7 @@ describe('signature-chain-logic D-1 返工来源例外', () => {
   it('D-1 拒绝行（3 态：S@produce 消费 R / V@standard 消费 R / R@rootcause 消费 S）', () => {
     for (const [场景, over, 期望片段] of [
       [
-        'S + produce + 消费 R → 仍拒（#18 守护：例外仅限 fix/emergency-fix）',
+        'S + produce + 消费 R → 仍拒（#18 守护：例外仅限 fix；A15：emergency-fix 死词已删除）',
         { role: 'S', action: 'produce', sourceRoles: ['R'] },
         '角色 S 不得消费 R',
       ],
@@ -227,6 +227,29 @@ describe('signature-chain-logic D-1 返工来源例外', () => {
       );
       expect(r.rulesFailed, `${场景}: R9 应失败`).toContain('R9');
     }
+  });
+
+  // 批次 7 任务 13：D-1 收窄锁定。三查结论：既有聚合表「D-1 拒绝行」已含 S+produce 一态，
+  // 故本用例不以「新增拒绝态」自证，改造为可证伪形态 = 同 fixture 差分对 + A15 死词边界探针：
+  //   - 差分对：仅 action 不同（fix / produce）即翻转 R9 归属 → 证明断言对 action 有区分力，
+  //     且同时锁两侧——拓宽（produce 被放行）或过窄（删掉 D-1 例外、S 一律不得消费 R，违反反模式 #18）均失败；
+  //   - 边界探针：批次 6 A15 已从词表删除 emergency-fix（SSoT §10E D-1 行：条件 = role=S ∧ srcRole=R ∧ action=fix），
+  //     S 消费 R 的例外集须恰为 {fix}；重新接纳该死词即属「例外被拓宽」。
+  it('D-1 收窄：S 消费 R 且 action 为 produce（非 fix）→ R9 违规', () => {
+    const r9Of = (v: readonly string[]): string[] => v.filter((s) => s.startsWith('R9:'));
+    const produce = checkSignatureChain([entry({ role: 'S', action: 'produce', sourceRoles: ['R'] })]);
+    const fixTwin = checkSignatureChain([entry({ role: 'S', action: 'fix', sourceRoles: ['R'] })]);
+    const deadWord = checkSignatureChain([entry({ role: 'S', action: 'emergency-fix', sourceRoles: ['R'] })]);
+
+    // 拒绝侧：produce 消费 R → 恰好一条 R9，且为完整原文（消息漂移即失败）
+    expect(r9Of(produce.violations)).toEqual(['R9: wm1-r001-S1 越权消费：角色 S 不得消费 R 产物']);
+    expect(produce.rulesFailed).toContain('R9');
+    // 差分对照：同 fixture 仅 action 换成 fix → R9 侧全静默（证明上一行不是恒真的空转断言）
+    expect(r9Of(fixTwin.violations)).toEqual([]);
+    expect(fixTwin.rulesFailed).not.toContain('R9');
+    // 边界：A15 死词 emergency-fix 不得被例外接纳（例外集 = {fix}，非 {fix, emergency-fix}）
+    expect(r9Of(deadWord.violations)).toEqual(['R9: wm1-r001-S1 越权消费：角色 S 不得消费 R 产物']);
+    expect(deadWord.rulesFailed).toContain('R9');
   });
 
   // 43.0.0 A1（推翻「targetKind 不入哈希」旧裁定）：targetKind 入 sigHash——

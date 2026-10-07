@@ -29,7 +29,7 @@ import { checkCodeTlaConsistency, type CodeTlaConsistencyInput, type TlaManifest
 /** 用例行形状（简报 CASES 行仅含两键；显式键型避免 Record 索引访问的 string | undefined）。 */
 type ParityRow = { requirementId: string; codeModule: string };
 
-/** gate 侧矩阵构造（照 gate-enhancement.test.ts 内联矩阵拷改：补齐 schema 必填八字段）。 */
+/** gate 侧矩阵构造（照 gate-enhancement.test.ts 内联矩阵拷改：补齐 schema 必填九字段，A13 后含 coverageStatus）。 */
 function makeMatrix(rows: ParityRow[]): RTMMatrixShape {
   return {
     rows: rows.map((row) => ({
@@ -41,6 +41,7 @@ function makeMatrix(rows: ParityRow[]): RTMMatrixShape {
       integrationTest: 'IT-001',
       systemTest: 'ST-001',
       acceptanceTest: 'UAT-001',
+      coverageStatus: '100%',
     })),
     executionSummary: {
       unitTest: { total: 1, passed: 1, failed: 0, pending: 0, coverage: 90 },

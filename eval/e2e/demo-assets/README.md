@@ -74,3 +74,4 @@ bash run_negative_probes.sh              # 期望末行：✓ 9/9 探针被拦�
 2. **禁止并发写者**：重放期间不要跑其他 vitest / `npm run prepush`，也不要往 `docs/debug/` 写文件——`exit2-failure-atomicity` 对并发写盘敏感，会产生伪失败并争用 `coverage/`。
 3. **超时预算**：聚合门以子进程调用 TLA 模型检查（真实 TLC），子进程预算为 `EXEC_LIMITS.modelCheckChildTimeoutMs`（360s）；机器负载高时可重跑，不要把它误判为门禁缺陷。
 4. **九项探针的期望命中词**写死在 `run_negative_probes.sh` 的 `EXPECT`；改动门禁消息文案时必须同步更新，否则探针会以「未命中期望原因」失败。
+5. **`NoOverflowState` 是 2 态抽象的结构性下限占位，非强于 `TypeInvariant`**：demo 的 L1/L2 规格只有一个变量 `state`，取值域就是可达集 `{zeroed, counting}`，故任何成立的状态不变式在语义上都被 `TypeInvariant` 蕴含——`NoOverflowState == state # "overflow"` 只是「非 Type 类业务不变式」形式下限的占位（满足 43.1.0 B1a 的 cfg 业务不变式下限判据），**不**提供额外强度。要让业务不变式真正强于类型，须把环值 `count ∈ 0..10` 建模为第二变量（会波及 BDD features 与 `src/counter.ts` 断言锚点），属批次 8 候选（局限登记见 SSoT §10S 修复轮注记）。

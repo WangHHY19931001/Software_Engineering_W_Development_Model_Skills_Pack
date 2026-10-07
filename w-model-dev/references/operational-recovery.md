@@ -297,10 +297,10 @@ run-log 出现坏行（非法 JSON）时的法定重建程序（唯一合法出�
 **执行规则**：
 
 1. **编排层开关，不是脚本参数**：强制级别由 O 按 `maturity.json.level` 决定是否分派 S-tla / S-bdd 与 G 行为门禁；**不得**给 `check-tla-model.ts` / `check-bdd-model.ts` 加跳过参数（`--skip-tlc` 已移除，禁止重新引入削弱门禁的 flag）。L2/L3 项目一旦产出 TLA+/BDD 资产，门禁即无条件强制（语法 + TLC + D1-D8 全维度）。
-2. **降级路径**：成熟度 L2 降至 L1（预算/时间受限）时，已产出的 TLA+/BDD 资产仍须过门禁；未产出的层级不再补产，在 run-log 决策记录中登记"按 L1 成熟度豁免 L2-L4 行为门禁"。
+2. **降级路径**：成熟度 L2 降至 L1（预算/时间受限）时，已产出的 TLA+/BDD 资产仍须过门禁；未产出的层级不再补产，在 run-log 决策记录中登记"按 L1 成熟度豁免 L2-L4 行为门禁"。**降级本身须 human 授权（决策 #2，43.1.0）**：用户在 🔴 CHECKPOINT 明确确认 + O 据此落 `role=human / targetKind=maturity` 审批条目（**action 须为降级专属值 `downgrade-approve`**；见下方第 5 条与「升级与降级」）；无条目降级被 `check-maturity.ts` **R8 blocking**。
 3. **升优路径**：L1 项目选择产出 TLA+/BDD 时，按对应层级完整执行（无"产出但免检"）。
 4. **记录**：O 在 run-log 的决策条目中登记实际采用的行为门禁级别（如 `maturity=L2 → TLA+ L1 + BDD L1 必跑`），供 `check-run-log.ts` 审计。
-5. **level 变更审批链（43.0.0 A4）**：level 变更（升级）走固定流程——**S 提议 → 用户确认（决策型 CHECKPOINT）→ O 以 `role=human / targetKind=maturity` 条目落签名链**（`.w-model/signature-chain.jsonl`，sigId 用 `human` 后缀形态、artifacts 绑定 `maturity.json`、sigHash 按 v3 公式重算）→ **gate 消费时校验**（`check-artifact-gate.ts` 经 `verifyMaturityApproval`：无链 / 坏链 / 早签一律不豁免）。maturity.json 与签名链条目须成对落盘——只改 `level` 不落链，下一次 gate 即被拒绝（fail-closed，反「被门禁者自写即关门禁」缺口）。
+5. **level 变更审批链（升级与降级；43.0.0 A4，降级并入 43.1.0 决策 #2）**：level 变更（**升级与降级**）走同一固定流程——**S 提议 → 用户确认（决策型 CHECKPOINT）→ O 以 `role=human / targetKind=maturity` 条目落签名链**（`.w-model/signature-chain.jsonl`，sigId 用 `human` 后缀形态、artifacts 绑定 `maturity.json`、sigHash 按 v3 公式重算）→ **gate 消费时校验**（`check-artifact-gate.ts` 经 `verifyMaturityApproval`：无链 / 坏链 / 早签一律不豁免；`check-maturity.ts` R8：降级形态无有效条目即 blocking——CLI 装载 `maturity.json` 同目录 `signature-chain.jsonl` 后注入判定）。**降级条目须 `action='downgrade-approve'`**（降级专属绑定，43.1.0 修复轮 1 裁定 R-B7-7）：R8 判定以 `verifyMaturityApproval(..., { requireAction: 'downgrade-approve' })` 做严格 action 相等过滤——否则**每次升级**所落的同类人签条目（其 `signedAt` 必然 ≥ 末条 history `at`）会天然满足 R8，构成「升级审批洗白降级」缺口；升级审批条目的 action **无机器校验**（现状用 `approve`，可写 `upgrade-approve`，仅语义登记，R8 只锁降级）。maturity.json 与签名链条目须成对落盘——只改 `level` 不落链，下一次 gate 即被拒绝（fail-closed，反「被门禁者自写即关门禁」缺口）。
 
 ### 场景 5：阶段回退
 
@@ -352,9 +352,9 @@ run-log 出现坏行（非法 JSON）时的法定重建程序（唯一合法出�
 
 | 场景 | 动作 |
 |---|---|
-| 阶段 8 完成后解锁条件全部达标 | 询问用户是否升级（决策型 CHECKPOINT，不可自动升级）；用户确认 → 更新 maturity.json.level + history，**并以 `role=human / targetKind=maturity` 条目落签名链（绑定 maturity.json；43.0.0 A4，无链则 gate 拒绝豁免）**。解锁条件（稳定时长 / 周期数 / 达标率 / 误判率 / 运维失败数）为本文档描述层语义，**无机器校验（字段已自 schema 移除，仅本文档描述）** |
-| O 系列失败模式连续命中 ≥ `downgradeTriggers.operationalFailureStreak` | 自动降级到 L0；run-log append 降级记录（降级不记 history 升级链，R6 只承载升级；降级后 level 低于 history 末条 to 属合法形态——R6 只锁伪造升级不锁降级，豁免已由 human 审批链锁死） |
-| 用户显式请求降级 | 更新 maturity.json.level=L0 + userRequested=true |
+| 阶段 8 完成后解锁条件全部达标 | 询问用户是否升级（决策型 CHECKPOINT，不可自动升级）；用户确认 → 更新 maturity.json.level + history，**并以 `role=human / targetKind=maturity` 条目落签名链（绑定 maturity.json；43.0.0 A4，无链则 gate 拒绝豁免）**。升级条目的 `action` 无机器校验（现状用 `approve`；R8 只锁降级，升级条目不计入降级授权）。解锁条件（稳定时长 / 周期数 / 达标率 / 误判率 / 运维失败数）为本文档描述层语义，**无机器校验（字段已自 schema 移除，仅本文档描述）** |
+| O 系列失败模式连续命中 ≥ `downgradeTriggers.operationalFailureStreak` | **触发降级评估并暂停**：降级须用户在 🔴 CHECKPOINT 明确确认，O 据此落 `role=human / targetKind=maturity` 审批条目（绑定 maturity.json、**`action='downgrade-approve'`**——R8 降级专属绑定，修复轮 1 R-B7-7）后方可更新 `level` + append run-log 降级记录（决策 #2，43.1.0）；**无条目降级无法过闭环五门**（`check-maturity.ts` R8 blocking = 「不允许降级」的机器化）。**应急处置路径 = 用户确认即授权**（故障时用户在 CHECKPOINT 确认即产生链条目，不额外走审批流程）。降级不记 history 升级链（R6 只承载升级；降级后 level 低于 history 末条 to 仍属合法形态，但须 R8 授权） |
+| 用户显式请求降级 | 同一流程（用户请求本身即授权意向，仍须 O 落链）：用户确认 → 更新 maturity.json.level=L0 + userRequested=true + 落 `role=human / targetKind=maturity`、`action='downgrade-approve'` 审批条目 |
 | L1+ 自动放行时 acknowledgedDecisions 为空 | 拒绝放行（O4 命中）；自动放行 ≠ 理解豁免，仍须填理解证据 |
 
 ### acknowledgedDecisions 真实性约束
@@ -481,8 +481,8 @@ G 子代理在每个阶段门按以下顺序调用，任一退出码 ≠ 0 → O
 | 脚本 | 关键校验项（对应修正设计规则表） |
 |---|---|
 | `check-budget.ts`（§5.1） | R1 时效性（43.0.0 A5 顺序化：`budget.updatedAt` 早于 `project.updatedAt` 即违规「预算未随项目演进复核」，相等合法）· R2 schema 完整 · R3 onExceed 合法 · R4 killSwitch 合法 · R5 触发检测（返工次数 ≥ killSwitch 阈值但 run-log 无告警） |
-| `check-run-log.ts`（§5.2） | R1 阶段动作完整性（chunk/cross/gate/checkpoint 4 类）· R2 tokens 非负 + `estimated=true` 违规（约束 #4：tokens 为 LLM 估算值即 blocking，须回填真实运行结果；43.0.0 A5）· R3 返工记录一致 · R4 acknowledgedDecisions 非空 · R5 O 越权检测（交叉 `gate-logs/`）· R6 exitCode 一致（SSoT §10E）· R7 append-only（时间戳真值 + **禁止回溯改写历史行或重排时间戳**；记录修正只经 `wm-append-runlog --correct` 追加更正记录，见下「调用约定」） · R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint；V 失败后须先 rootcause 再 S-fix（反模式 #18 轨迹检测），违例走返工循环；处置：补齐缺失动作 / 对齐理想轨迹后重跑）· R9 跨轮次评审一致性（同一产物的 `qualityLevel` 跨轮次差 ≥2 档 → 评审者自身标准漂移，走高成熟度 CHECKPOINT 交人裁定，不走 R；见 [verifier-spec.md](verifier-spec.md) §14.1）· R10 revertEvidence 回滚证伪（fix/emergency-fix 须携带非空 `revertEvidence.command`，**无时间戳豁免**：缺失或非法始终 blocking；处置：由 S-fix 重跑真实回滚命令并补记后重跑）· R11 闭环五脚本齐备（凡有 `action=checkpoint` 且 `outcome=success` 放行的阶段，放行前须已有闭环五门各一条 `role=G` + `outcome=success` + `gateExitCode=0` 的 gate 记录，且时间戳**严格毫秒早于**放行（同毫秒（含无毫秒部分的秒级时间戳）不算早于，无时间戳豁免）；五门对全部阶段（含阶段 1）一律同一判据，无任何例外——处置：补齐缺失的闭环脚本 gate 记录后重跑） |
-| `check-maturity.ts`（§5.3） | R1 schema 完整 · R2 level 合法 · R4 history 一致 · R5 降级触发 · R6 history 链一致（43.0.0 A4：from==上一条 to / to 严格高于 from / 末条 to 不低于 level——降级后 level 低于末条合法，只锁伪造升级（批次 6 修复轮 1）；原 R3 周期校验随 unlockConditions 死字段退役，规则号不回收） |
+| `check-run-log.ts`（§5.2） | R1 阶段动作完整性（chunk/cross/gate/checkpoint 4 类）· R2 tokens 非负 + `estimated=true` 违规（约束 #4：tokens 为 LLM 估算值即 blocking，须回填真实运行结果；43.0.0 A5）· R3 返工记录一致 · R4 acknowledgedDecisions 非空 · R5 O 越权检测（交叉 `gate-logs/`）· R6 exitCode 一致（SSoT §10E）· R7 append-only（时间戳真值 + **禁止回溯改写历史行或重排时间戳**；记录修正只经 `wm-append-runlog --correct` 追加更正记录，见下「调用约定」） · R8 轨迹模板校验（理想阶段轨迹：S→R3×3→V→G→checkpoint；V 失败后须先 rootcause 再 S-fix（反模式 #18 轨迹检测），违例走返工循环；处置：补齐缺失动作 / 对齐理想轨迹后重跑）· R9 跨轮次评审一致性（同一产物的 `qualityLevel` 跨轮次差 ≥2 档 → 评审者自身标准漂移，走高成熟度 CHECKPOINT 交人裁定，不走 R；见 [verifier-spec.md](verifier-spec.md) §14.1）· R10 revertEvidence 回滚证伪（fix 须携带非空 `revertEvidence.command`（批次 6 A15：emergency-fix 死词已删除，R10 只覆盖 fix），**无时间戳豁免**：缺失或非法始终 blocking；处置：由 S-fix 重跑真实回滚命令并补记后重跑）· R11 闭环五脚本齐备（凡有 `action=checkpoint` 且 `outcome=success` 放行的阶段，放行前须已有闭环五门各一条 `role=G` + `outcome=success` + `gateExitCode=0` 的 gate 记录，且时间戳**严格毫秒早于**放行（同毫秒（含无毫秒部分的秒级时间戳）不算早于，无时间戳豁免）；五门对全部阶段（含阶段 1）一律同一判据，无任何例外——处置：补齐缺失的闭环脚本 gate 记录后重跑） |
+| `check-maturity.ts`（§5.3） | R1 schema 完整 · R2 level 合法 · R4 history 一致 · R5 降级触发 · R6 history 链一致（43.0.0 A4：from==上一条 to / to 严格高于 from / 末条 to 不低于 level——R6 只锁伪造升级（批次 6 修复轮 1）；**43.1.0 决策 #3**：首条 from==L0——完整升级链须自 L0 起步，存量切片链不再合法；原 R3 周期校验随 unlockConditions 死字段退役，规则号不回收）· R7 project.status 转移合法性（A14 43.1.0：prev + current 同时提供时判定，合法 = 前向链下一步 ∪ 场景 5 用户批准回退 ∪ 终态「项目完成」）· R8 降级须 human 授权（决策 #2，43.1.0：降级形态 = level 低于 history 末条 to；无 `role=human / targetKind=maturity` 审批链 → blocking；**降级专属绑定**：判定以 `requireAction='downgrade-approve'` 严格过滤 action——升级条目不计入，修复轮 1 R-B7-7） |
 | `check-checkpoint.ts`（§5.4） | R1 acknowledgedDecisions 非空 · R2 决策内容具体（泛化词黑名单）· R3 用户确认存在 · R4 决策与阶段匹配 · R5 跨阶段证据一致（SSoT §10.6 6.3） |
 
 ### 脚本间依赖

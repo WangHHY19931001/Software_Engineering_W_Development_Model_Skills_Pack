@@ -330,6 +330,7 @@ export function checkEvidenceAnchors(
   const violations: string[] = [];
   const missingAnchors: string[] = [];
   const badStatus: string[] = [];
+  const pendingStatus: string[] = [];
   const badFormat: string[] = [];
   const missingPaths: string[] = [];
   const badLineRanges: string[] = [];
@@ -350,6 +351,13 @@ export function checkEvidenceAnchors(
     // R15b 状态枚举（缺失 = undefined，同样非法）
     if (typeof n.evidenceStatus !== 'string' || !VALID_EVIDENCE_STATUS.includes(n.evidenceStatus)) {
       badStatus.push(`${n.id}（${String(n.evidenceStatus)}）`);
+    }
+    // R15b（A12a）：pending 由放行改 violation——放行前 pending 节点须转 confirmed 或走
+    // evidence-anchor 豁免（check-exemption，第 6 类 evidence-anchor-pending；枚举仍合法保留
+    // pending，供豁免登记与下游引用，schema enum 不变）。锚点缺失/格式非法的节点已在上方
+    // continue，不重复计 pending（避免二次噪声）。
+    if (n.evidenceStatus === 'pending') {
+      pendingStatus.push(`${n.id}（${anchor}）`);
     }
     const anchorPath = anchor.split(':')[0] ?? '';
     // R15c 路径存在性（仅在 CLI 注入存在集合时校验）
@@ -398,6 +406,11 @@ export function checkEvidenceAnchors(
   }
   if (badStatus.length > 0) {
     violations.push(`R15b evidenceStatus 非法：${badStatus.join(', ')}（须为 confirmed | pending）`);
+  }
+  if (pendingStatus.length > 0) {
+    violations.push(
+      `R15b pending 未核验：${pendingStatus.join(', ')}（放行前 pending 节点须转 confirmed 或走 evidence-anchor 豁免（check-exemption））`,
+    );
   }
   if (missingPaths.length > 0) {
     violations.push(`R15c 证据路径不存在：${missingPaths.join(', ')}（引用的东西必须真实存在）`);
@@ -801,6 +814,47 @@ export function checkRequirementGraph(
     result.boundary.complete = true;
   }
 
+  // ==================== R5: depends-on 无环（A11：全 phase 执行）====================
+  // A11 之前本检测位于下方 `if (phase === 1)` 四维识别块内——阶段 2-4 图谱引入 depends-on
+  // 边后环检测不再执行，环结构可带病放行到编码阶段。故将 depends-on 子图的环检测移出
+  // 限界、全 phase 执行；precedes 时序环仍属阶段 1 REQ 图语义（时序边仅阶段 1 引入），
+  // 维持 phase=1 限定（下方块内复用本 detectCycle）。
+  const detectCycle = (edgeType: 'depends-on' | 'precedes'): string[][] => {
+    const adj: Record<string, string[]> = {};
+    for (const e of g.edges ?? []) {
+      if (e.type === edgeType) {
+        (adj[e.from] ??= []).push(e.to);
+      }
+    }
+    const cycles: string[][] = [];
+    const visited = new Set<string>();
+    const stack = new Set<string>();
+    const path: string[] = [];
+    const dfs = (node: string): void => {
+      if (stack.has(node)) {
+        const cycleStart = path.indexOf(node);
+        cycles.push([...path.slice(cycleStart), node]);
+        return;
+      }
+      if (visited.has(node)) return;
+      visited.add(node);
+      stack.add(node);
+      path.push(node);
+      for (const next of adj[node] ?? []) dfs(next);
+      path.pop();
+      stack.delete(node);
+    };
+    for (const node of Object.keys(adj)) dfs(node);
+    return cycles;
+  };
+
+  const dependsOnCycles = detectCycle('depends-on');
+  if (dependsOnCycles.length > 0) {
+    result.violations.push(
+      `R5 依赖无环校验失败：depends-on 子图有环：${dependsOnCycles.map((c) => c.join('→')).join('；')}`,
+    );
+  }
+
   // ==================== 四维识别校验（phase=1 时启用）====================
   if (phase === 1) {
     // 四维识别：NFR/CON 节点（通过 ID 前缀识别，type 仍为 REQ）不参与 R1-R4 层级树校验
@@ -875,43 +929,9 @@ export function checkRequirementGraph(
       result.violations.push(`R4 REQ-group 非空校验失败：REQ 总数≥5 但无 level=1 REQ（无候选子系统）`);
     }
 
-    // R5: depends-on 与 precedes 无环
-    const detectCycle = (edgeType: 'depends-on' | 'precedes'): string[][] => {
-      const adj: Record<string, string[]> = {};
-      for (const e of g.edges ?? []) {
-        if (e.type === edgeType) {
-          (adj[e.from] ??= []).push(e.to);
-        }
-      }
-      const cycles: string[][] = [];
-      const visited = new Set<string>();
-      const stack = new Set<string>();
-      const path: string[] = [];
-      const dfs = (node: string): void => {
-        if (stack.has(node)) {
-          const cycleStart = path.indexOf(node);
-          cycles.push([...path.slice(cycleStart), node]);
-          return;
-        }
-        if (visited.has(node)) return;
-        visited.add(node);
-        stack.add(node);
-        path.push(node);
-        for (const next of adj[node] ?? []) dfs(next);
-        path.pop();
-        stack.delete(node);
-      };
-      for (const node of Object.keys(adj)) dfs(node);
-      return cycles;
-    };
-
-    const dependsOnCycles = detectCycle('depends-on');
+    // R5 时序无环（depends-on 部分已上移至全 phase 执行，见上方 A11 注记；
+    // precedes 仍为 phase=1 限定——时序边仅阶段 1 REQ 图语义引入）
     const precedesCycles = detectCycle('precedes');
-    if (dependsOnCycles.length > 0) {
-      result.violations.push(
-        `R5 依赖无环校验失败：depends-on 子图有环：${dependsOnCycles.map((c) => c.join('→')).join('；')}`,
-      );
-    }
     if (precedesCycles.length > 0) {
       result.violations.push(
         `R5 时序无环校验失败：precedes 子图有环：${precedesCycles.map((c) => c.join('→')).join('；')}`,

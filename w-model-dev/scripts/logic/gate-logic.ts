@@ -3,7 +3,7 @@ import * as nodeFs from 'node:fs';
 import * as path from 'node:path';
 
 import { validateBySchema } from '../infrastructure/schema-loader.js';
-import { RTM_FIELDS } from '../lib/constants.js';
+import { PROJECT_STATUSES, PROJECT_STATUS_COMPLETED, RTM_FIELDS } from '../lib/constants.js';
 import { SafeProjectPathError, resolveProjectRelativeRegularFile } from '../lib/safe-project-path.js';
 import type { StructuredViolation } from '../lib/types.js';
 
@@ -1634,6 +1634,106 @@ export function computeRtmTraceCoverage(
   return { rowReasons, missingItems, coveragePercent };
 }
 
+/**
+ * RTM coverageStatus 行级一致性校验（P0，纯函数；A13，43.1.0 breaking）。
+ *
+ * 约束 #3：coverageStatus 须与该行自身完整性一致：
+ *   - 缺 coverageStatus（非字符串）→ 违规（不再 continue 跳过；schema rows.items.required 为前置拦截，
+ *     本函数为纵深防御——直接调用 logic 层的调用方同样被覆盖）
+ *   - "待覆盖" → 违反（须回退重做）
+ *   - "100%" 但行追溯不完整 / "部分" 但行追溯完整 → 与行级完整性不一致
+ *
+ * @param rows RTM 行数组（容忍非对象元素，逐行产出违规而非抛错）
+ * @param missingItems computeRtmTraceCoverage 产出的行级缺失清单（行完整性的唯一判据）
+ */
+export function checkRtmCoverageStatusConsistency(
+  rows: ReadonlyArray<unknown>,
+  missingItems: ReadonlyArray<{ requirementId: string; fields: string[] }>,
+): string[] {
+  const violations: string[] = [];
+  const missingReqIds = new Set(missingItems.map((item) => item.requirementId));
+  const missingFieldsByReqId = new Map<string, string[]>(missingItems.map((item) => [item.requirementId, item.fields]));
+  for (const [index, rawRow] of rows.entries()) {
+    const row = rawRow as Record<string, unknown> | null | undefined;
+    if (!row || typeof row !== 'object') continue; // 结构错误由 computeRtmTraceCoverage rowReasons 点名，此处不重复
+    const rowLabel =
+      typeof row.requirementId === 'string' && row.requirementId.trim() !== '' ? row.requirementId : `rows[${index}]`;
+    if (typeof row.coverageStatus !== 'string') {
+      violations.push(`RTM 行 ${rowLabel} 缺 coverageStatus（约束 #3：行级覆盖状态必填，A13 后不再跳过）`);
+      continue;
+    }
+    const status = row.coverageStatus.trim();
+    if (status === '待覆盖') {
+      violations.push(`RTM coverageStatus="待覆盖" 不允许（须回退重做，约束 #3）`);
+      continue;
+    }
+    const rowComplete = typeof row.requirementId === 'string' && !missingReqIds.has(row.requirementId);
+    if (status === '100%' && !rowComplete) {
+      const fields = typeof row.requirementId === 'string' ? (missingFieldsByReqId.get(row.requirementId) ?? []) : [];
+      violations.push(
+        `RTM coverageStatus="100%" 但该行追溯不完整（缺少 ${fields.join('、')}），coverageStatus 与行级完整性不一致`,
+      );
+    } else if (status === '部分' && rowComplete) {
+      violations.push(`RTM coverageStatus="部分" 但该行追溯完整，coverageStatus 与行级完整性不一致`);
+    }
+  }
+  return violations;
+}
+
+/** project.status 转移判定结果（A14；legal=false 时 reason 点名前后状态与非法原因） */
+export interface StatusTransitionJudgement {
+  legal: boolean;
+  reason: string | null;
+}
+
+/**
+ * project.status 转移合法性判定（A14 单点判据，43.1.0）。
+ *
+ * 合法转移 = 前向链下一步 ∪ 场景 5 用户批准回退 ∪ 终态「项目完成」：
+ *   - 前向链下一步：PROJECT_STATUSES 序中 index+1（状态原地不变视为非转移，合法）
+ *   - 场景 5 用户批准回退：operational-recovery.md「场景 5：阶段回退」——R 标记 upstreamDefect
+ *     且 V 复审通过后强制 🔴 CHECKPOINT，由用户裁定回退；机器面落地为
+ *     `options.userApprovedRollback === true`（调用方仅在 CHECKPOINT 用户批准后置位）
+ *   - 终态「项目完成」：经前向链从验收测试自然到达；到达后不可迁出（回退亦须 userApprovedRollback）
+ *   - 其余（跳步前移、未批准回退、未知状态）一律非法
+ */
+export function judgeProjectStatusTransition(
+  prev: string,
+  next: string,
+  options?: { userApprovedRollback?: boolean },
+): StatusTransitionJudgement {
+  const prevIndex = (PROJECT_STATUSES as readonly string[]).indexOf(prev);
+  const nextIndex = (PROJECT_STATUSES as readonly string[]).indexOf(next);
+  if (prevIndex < 0) {
+    return { legal: false, reason: `未知起始状态：${prev}（须为 PROJECT_STATUSES 9 态之一）` };
+  }
+  if (nextIndex < 0) {
+    return { legal: false, reason: `未知目标状态：${next}（须为 PROJECT_STATUSES 9 态之一）` };
+  }
+  if (prevIndex === nextIndex) return { legal: true, reason: null }; // 原地更新非转移
+  // A14b 终态单点消费（终审顺手修）：PROJECT_STATUS_COMPLETED 为链末终态——到达后迁出一律按
+  // 回退处置（须场景 5 用户批准）。此前终态性只是「index+1 越界」的**隐式**事实：PROJECT_STATUSES
+  // 若增补状态，终态会被静默放开；改引常数后终态语义与状态表长度解耦（单一来源精神）。
+  if (prev === PROJECT_STATUS_COMPLETED) {
+    return options?.userApprovedRollback === true
+      ? { legal: true, reason: null }
+      : {
+          legal: false,
+          reason: `终态「${PROJECT_STATUS_COMPLETED}」不可迁出（回退须场景 5 用户批准后置 userApprovedRollback）`,
+        };
+  }
+  if (nextIndex === prevIndex + 1) return { legal: true, reason: null }; // 前向链下一步
+  if (nextIndex < prevIndex) {
+    return options?.userApprovedRollback === true
+      ? { legal: true, reason: null } // 场景 5 用户批准回退
+      : {
+          legal: false,
+          reason: `回退 ${prev} → ${next} 未经用户批准（场景 5 须 🔴 CHECKPOINT 用户裁定后置 userApprovedRollback）`,
+        };
+  }
+  return { legal: false, reason: `跳步前移 ${prev} → ${next} 非法（只允许前向链下一步；回退须场景 5 用户批准）` };
+}
+
 export function checkArtifactGate(
   matrix: RTMMatrixShape | null | undefined,
   options?: CheckArtifactGateOptions,
@@ -1739,26 +1839,9 @@ export function checkArtifactGate(
   // ==================== coverageStatus 字段一致性校验（P0，行级） ====================
   // 约束 #3：coverageStatus 须与该行自身完整性一致，不再与矩阵全局 coveragePercent 比较
   //   "100%" → 该行所需 RTM 字段齐全；"部分" → 该行存在追溯缺失；"待覆盖" → 违反
-  //   （"完整" 等历史兼容值与非标准值不参与一致性判定，由 missingItems 覆盖检查兜底）
-  const missingReqIds = new Set(missingItems.map((item) => item.requirementId));
-  const missingFieldsByReqId = new Map<string, string[]>(missingItems.map((item) => [item.requirementId, item.fields]));
-  for (const row of matrix.rows) {
-    if (!row || typeof row.coverageStatus !== 'string') continue;
-    const status = row.coverageStatus.trim();
-    if (status === '待覆盖') {
-      reasons.push(`RTM coverageStatus="待覆盖" 不允许（须回退重做，约束 #3）`);
-      continue;
-    }
-    const rowComplete = !missingReqIds.has(row.requirementId);
-    if (status === '100%' && !rowComplete) {
-      const fields = missingFieldsByReqId.get(row.requirementId) ?? [];
-      reasons.push(
-        `RTM coverageStatus="100%" 但该行追溯不完整（缺少 ${fields.join('、')}），coverageStatus 与行级完整性不一致`,
-      );
-    } else if (status === '部分' && rowComplete) {
-      reasons.push(`RTM coverageStatus="部分" 但该行追溯完整，coverageStatus 与行级完整性不一致`);
-    }
-  }
+  //   缺 coverageStatus → 违规（A13，43.1.0 breaking：不再 continue 跳过；schema rows.items.required
+  //   为前置拦截，本行级校验为纵深防御——经 checkArtifactGate 入口时缺字段通常已被 [schema] 拦截）
+  reasons.push(...checkRtmCoverageStatusConsistency(matrix.rows, missingItems));
 
   // ==================== NFR 双值字段校验（P2） ====================
   // 问题 4：性能基线须区分生产目标值与测试环境基线

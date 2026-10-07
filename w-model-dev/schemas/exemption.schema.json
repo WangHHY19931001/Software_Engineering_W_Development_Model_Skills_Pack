@@ -29,9 +29,9 @@
       "minLength": 1
     },
     "ruleId": {
-      "description": "被豁免的校验规则 ID（如 R4 / C8 等，pattern ^[RC]\\d+$ 或 ^C\\d+$）",
+      "description": "被豁免的校验规则 ID（如 R4 / C8 / R15b 等；pattern ^[RC]\\d+[a-z]?$——可选小写字母后缀用于子规则，如 R15b 对应 check-requirement-graph 的 pending 未核验 violation）",
       "type": "string",
-      "pattern": "^[RC]\\d+$|^C\\d+$"
+      "pattern": "^[RC]\\d+[a-z]?$"
     },
     "justification": { "description": "豁免理由（E2 校验长度须 ≥20 字符，防敷衍）", "type": "string", "minLength": 20 },
     "evidence": {

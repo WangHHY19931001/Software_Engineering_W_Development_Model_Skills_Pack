@@ -13,7 +13,7 @@
       "integrationTest": "TC-INT-001",
       "systemTest": null,
       "acceptanceTest": "TC-UAT-001",
-      "coverageStatus": "完整"
+      "coverageStatus": "100%"
     },
     {
       "requirementId": "NFR-001",
@@ -24,7 +24,7 @@
       "integrationTest": null,
       "systemTest": null,
       "acceptanceTest": null,
-      "coverageStatus": "完整",
+      "coverageStatus": "100%",
       "targetValue": "P95 ≤ 200ms（生产环境）",
       "testThreshold": "P95 ≤ 250ms（测试环境基线）"
     }

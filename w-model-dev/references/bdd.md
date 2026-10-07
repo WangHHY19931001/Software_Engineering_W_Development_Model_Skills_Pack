@@ -5,6 +5,20 @@
 > 权威设计见 `docs/superpowers/specs/2026-07-27-bdd-modeling-and-acceptance-fixture-design.md`。
 > 本指南的 BDD features 即『行为测试』（测试系统工程类型学的方法维度登记，见 [quality-standards.md](quality-standards.md)『测试系统工程类型学』节）——机制零改动。
 
+> **§0 按需分节加载导引**（约束 #6）：本文件约 1800 行，按「角色 × 任务」只读所需节，禁止整文件载入上下文。
+>
+> | 角色 × 任务                           | 只读章节                                                                                          |
+> | ------------------------------------- | ------------------------------------------------------------------------------------------------- |
+> | S-bdd × 产出 .feature（头标注/命名）  | §2 features 文件结构与头标注契约 + §3.1-§3.2 Background 契约与七要素 + 「模式与示例」按层级选模板 |
+> | S-bdd × 事件/转移命名（ASCII 词判据） | §3.3 转移表格式（ASCII 词判据）+ §3.4.3 D6 事件提取约定                                           |
+> | S-bdd × 验收夹具设计                  | §7 验收夹具四类设计                                                                               |
+> | S-ingest-bdd × 回填覆盖率             | 「S-ingest-bdd 子代理」节                                                                         |
+> | V-bdd × 评审                          | 「评审清单」节 + §3 状态机七要素 + 「记叙性优先」节                                               |
+> | G × 跑门禁（check-bdd-model）         | §5 门禁脚本调用（7 维度 D1/D3-D8；D2 由 V 评审人工核验）                                          |
+> | S/V × BDD↔TLA+ 不一致 / 回退          | §4 BDD↔TLA+ 协作 + §8 不符处理流程 + §9 TLA+/BDD 自动化同步校验                                   |
+> | 任意 × Gherkin 语法 / 模板骨架        | 「语法速查」节 + 「模式与示例」节                                                                 |
+> | 任意 × 阶段产出时序                   | §6 8 阶段产出时序                                                                                 |
+
 ## 目录
 
 - [速查摘要](#速查摘要)
@@ -27,32 +41,32 @@
 
 > 一页速查：BDD 建模与验收夹具细则。行为具象化门禁（第四维度），与结构连通（graph）、信息流（dataflow）、行为正确性（TLA+）正交。S/V/G 子代理必读。
 
-| 维度 | 核心锚点 | 详见 |
-|---|---|---|
-| 公理 | BDD features 是 TLA+ 抽象规格的具象化层，靠 check-bdd-model.ts 等价性校验保证一致 | 「公理」节 |
-| 分层架构 | L1↔L1 ... L4↔L4 与 TLA+ 对称，最细粒度到原子方法 | §1 |
-| 头标注契约 | 10 个 `@` 字段（@req/@design/@designIds/@tla-spec/@state-machine 等） | §2 |
-| 状态机七要素 | @states/@initial-state/@terminal-states/@accepting-states/@rejecting-states/@transitions/@invariants | §3 |
-| BDD↔TLA+ 协作 | 独立门禁回退 + 等价性跨校验（D4）+ 不一致走 R→V | §4 |
-| 记叙性优先 | 测试断言不是金标准，失败先归因（呼应反模式 #45） | 「记叙性优先」节 |
-| 门禁脚本 | check-bdd-model.ts 7 维度（D1/D3-D8）+ 退出码；D2 由 V 评审人工核验 | §5 |
-| 阶段产出时序 | 阶段 1-4 设计 features，5-8 执行 | §6 |
-| 验收夹具 | World / 数据 fixture / setup-teardown / 快照 四类 | §7 |
-| 不符处理流程 | 反模式 #29 + R 子代理流程 + 联网调研约束 | §8 |
-| 同步校验 | check-tla-bdd-sync.ts | §9 |
+| 维度          | 核心锚点                                                                                             | 详见             |
+| ------------- | ---------------------------------------------------------------------------------------------------- | ---------------- |
+| 公理          | BDD features 是 TLA+ 抽象规格的具象化层，靠 check-bdd-model.ts 等价性校验保证一致                    | 「公理」节       |
+| 分层架构      | L1↔L1 ... L4↔L4 与 TLA+ 对称，最细粒度到原子方法                                                     | §1               |
+| 头标注契约    | 10 个 `@` 字段（@req/@design/@designIds/@tla-spec/@state-machine 等）                                | §2               |
+| 状态机七要素  | @states/@initial-state/@terminal-states/@accepting-states/@rejecting-states/@transitions/@invariants | §3               |
+| BDD↔TLA+ 协作 | 独立门禁回退 + 等价性跨校验（D4）+ 不一致走 R→V                                                      | §4               |
+| 记叙性优先    | 测试断言不是金标准，失败先归因（呼应反模式 #45）                                                     | 「记叙性优先」节 |
+| 门禁脚本      | check-bdd-model.ts 7 维度（D1/D3-D8）+ 退出码；D2 由 V 评审人工核验                                  | §5               |
+| 阶段产出时序  | 阶段 1-4 设计 features，5-8 执行                                                                     | §6               |
+| 验收夹具      | World / 数据 fixture / setup-teardown / 快照 四类                                                    | §7               |
+| 不符处理流程  | 反模式 #29 + R 子代理流程 + 联网调研约束                                                             | §8               |
+| 同步校验      | check-tla-bdd-sync.ts                                                                                | §9               |
 
 **按场景只读 §X**：
 
-| 场景 | 应读章节 |
-|---|---|
-| 产出 .feature 前（头标注/命名） | §2 |
-| 声明状态机七要素 | §3 |
-| BDD↔TLA+ 等价性 / 不一致处理 | §4 |
-| G 跑门禁脚本（7 维度；D2 由 V 评审人工核验） | §5 |
-| 各阶段产出时序 | §6 |
-| 设计验收夹具 | §7 |
-| 建模不符回退 | §8 |
-| S-ingest-bdd 回填覆盖率 | 「S-ingest-bdd 子代理」节 |
+| 场景                                         | 应读章节                  |
+| -------------------------------------------- | ------------------------- |
+| 产出 .feature 前（头标注/命名）              | §2                        |
+| 声明状态机七要素                             | §3                        |
+| BDD↔TLA+ 等价性 / 不一致处理                 | §4                        |
+| G 跑门禁脚本（7 维度；D2 由 V 评审人工核验） | §5                        |
+| 各阶段产出时序                               | §6                        |
+| 设计验收夹具                                 | §7                        |
+| 建模不符回退                                 | §8                        |
+| S-ingest-bdd 回填覆盖率                      | 「S-ingest-bdd 子代理」节 |
 
 ## 所属系统
 
@@ -70,18 +84,18 @@
 
 BDD 门禁是 W 模型第四维度门禁——与结构连通门禁（graph）、信息流门禁（dataflow）、行为正确性门禁（TLA+）正交：
 
-| 维度 | 校验什么 | 脚本 |
-|---|---|---|
-| 结构连通 | 节点归属单根树、追溯完整 | `check-requirement-graph.ts` |
-| 信息流闭合 | 节点既是生产者又是消费者 | `check-requirement-graph.ts` |
-| 行为正确性（TLA+） | 状态机无死锁、不变式成立、无状态爆炸 | `check-tla-model.ts` |
-| **行为具象化（BDD）** | **features 状态机七要素、scenario 路径合法、TLA+ 等价** | **`check-bdd-model.ts`** |
+| 维度                  | 校验什么                                                | 脚本                         |
+| --------------------- | ------------------------------------------------------- | ---------------------------- |
+| 结构连通              | 节点归属单根树、追溯完整                                | `check-requirement-graph.ts` |
+| 信息流闭合            | 节点既是生产者又是消费者                                | `check-requirement-graph.ts` |
+| 行为正确性（TLA+）    | 状态机无死锁、不变式成立、无状态爆炸                    | `check-tla-model.ts`         |
+| **行为具象化（BDD）** | **features 状态机七要素、scenario 路径合法、TLA+ 等价** | **`check-bdd-model.ts`**     |
 
 ## 工具链
 
-| 依赖 | 版本 | 位置 |
-|---|---|---|
-| （无 BDD 专属 devDep） | — | features 场景解析为手写正则（`bdd-logic.ts` 的 `parseFeatureFile`），由 `check-bdd-model.ts` 在阶段 1-8 BDD 模型门禁时调用 |
+| 依赖                   | 版本 | 位置                                                                                                                       |
+| ---------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------- |
+| （无 BDD 专属 devDep） | —    | features 场景解析为手写正则（`bdd-logic.ts` 的 `parseFeatureFile`），由 `check-bdd-model.ts` 在阶段 1-8 BDD 模型门禁时调用 |
 
 > 场景解析为手写正则（`bdd-logic.ts` 的 `parseFeatureFile`），不依赖 Cucumber.js/Gherkin 解析器。阶段 5-8 若需实际执行 scenarios（验收测试），Cucumber 运行器由消费方自行安装，仓库不内置；undefined/pending step 视为失败（D5 step 绑定校验），与门禁退出码语义一致。
 
@@ -95,27 +109,27 @@ BDD 分层与 TLA+ 分层对称（L1/L2/L3/L4），最细粒度都到原子方�
 
 ### §1.1 分层对称表
 
-| BDD 层级 | 对应 TLA+ 层级 | BDD 描述对象 | 产出阶段 | 执行阶段 | features 目录 |
-|---|---|---|---|---|---|
-| L1 | L1（系统内外交互） | 系统与外部参与者的端到端交互场景 | 阶段 1 | 阶段 8（验收测试） | `features/L1/` |
-| L2 | L2（子系统行为 + 协作） | 子系统内行为 + 兄弟子系统协作场景 | 阶段 2 | 阶段 7（系统测试） | `features/L2/` |
-| L3 | L3（原子子系统行为） | 模块间集成场景 + 接口契约场景 | 阶段 3 | 阶段 6（集成测试） | `features/L3/` |
-| L4 | TLA+ L4（按需；缺省对齐 L3 最细粒度） | 单个方法/函数的原子行为场景 | 阶段 4 | 阶段 5（TDD 夹具） | `features/L4/` |
+| BDD 层级 | 对应 TLA+ 层级                        | BDD 描述对象                      | 产出阶段 | 执行阶段           | features 目录  |
+| -------- | ------------------------------------- | --------------------------------- | -------- | ------------------ | -------------- |
+| L1       | L1（系统内外交互）                    | 系统与外部参与者的端到端交互场景  | 阶段 1   | 阶段 8（验收测试） | `features/L1/` |
+| L2       | L2（子系统行为 + 协作）               | 子系统内行为 + 兄弟子系统协作场景 | 阶段 2   | 阶段 7（系统测试） | `features/L2/` |
+| L3       | L3（原子子系统行为）                  | 模块间集成场景 + 接口契约场景     | 阶段 3   | 阶段 6（集成测试） | `features/L3/` |
+| L4       | TLA+ L4（按需；缺省对齐 L3 最细粒度） | 单个方法/函数的原子行为场景       | 阶段 4   | 阶段 5（TDD 夹具） | `features/L4/` |
 
 > **TLA+ L4 说明**：TLA+ 分层为 L1-L3 + 按需 L4（递归拆解，阶段 4 按需，见 [tla-plus.md](tla-plus.md)）。BDD L4 与 TLA+ L4 同层对应（都到原子方法）；未产出 TLA+ L4 时，BDD L4 与 TLA+ L3 的最细粒度（原子方法级）对齐。
 
 ### §1.2 与 W 模型 8 阶段对应表
 
-| 阶段 | 开发活动（左 V） | 同步 BDD 设计 | 执行 BDD | 子代理分派 |
-|---|---|---|---|---|
-| 1 需求分析 | REQ 产出 | L1 features 设计（验收测试设计） | — | S-doc 产出 features + S-bdd 维护 manifest |
-| 2 系统设计 | SD 产出 | L2 features 设计（系统测试设计） | — | S-doc + S-bdd |
-| 3 概要设计 | INTF 产出 | L3 features 设计（集成测试设计） | — | S-doc + S-bdd |
-| 4 详细设计 | DD 产出 | L4 features 设计（单元测试设计） | — | S-doc + S-bdd |
-| 5 编码实现 | 代码 + step definitions | L4 features 作为 TDD 夹具驱动编码 | L4 features 执行 | S-code 实现 step + 代码；G 跑 cucumber L4 |
-| 6 集成测试 | — | — | L3 features 执行 | S-test 运行 cucumber L3 |
-| 7 系统测试 | — | — | L2 features 执行 | S-test 运行 cucumber L2 |
-| 8 验收测试 | — | — | L1 features 执行 | S-test 运行 cucumber L1；G 终检 check-bdd-model.ts |
+| 阶段       | 开发活动（左 V）        | 同步 BDD 设计                     | 执行 BDD         | 子代理分派                                         |
+| ---------- | ----------------------- | --------------------------------- | ---------------- | -------------------------------------------------- |
+| 1 需求分析 | REQ 产出                | L1 features 设计（验收测试设计）  | —                | S-doc 产出 features + S-bdd 维护 manifest          |
+| 2 系统设计 | SD 产出                 | L2 features 设计（系统测试设计）  | —                | S-doc + S-bdd                                      |
+| 3 概要设计 | INTF 产出               | L3 features 设计（集成测试设计）  | —                | S-doc + S-bdd                                      |
+| 4 详细设计 | DD 产出                 | L4 features 设计（单元测试设计）  | —                | S-doc + S-bdd                                      |
+| 5 编码实现 | 代码 + step definitions | L4 features 作为 TDD 夹具驱动编码 | L4 features 执行 | S-code 实现 step + 代码；G 跑 cucumber L4          |
+| 6 集成测试 | —                       | —                                 | L3 features 执行 | S-test 运行 cucumber L3                            |
+| 7 系统测试 | —                       | —                                 | L2 features 执行 | S-test 运行 cucumber L2                            |
+| 8 验收测试 | —                       | —                                 | L1 features 执行 | S-test 运行 cucumber L1；G 终检 check-bdd-model.ts |
 
 ### §1.3 协作原则
 
@@ -154,18 +168,18 @@ Feature: 博客系统端到端用户场景
 
 ### §2.2 头标注字段契约
 
-| 字段 | 必填 | 取值 | 校验规则 |
-|---|---|---|---|
-| `@req` | 是 | 逗号分隔的 REQ ID | 每个 ID 须在 RTM 中存在 |
-| `@design` | 是 | 逗号分隔的 SD/INTF/DD ID | 每个 ID 须在图谱中存在 |
-| `@designIds` | 是 | 逗号分隔的 SD 节点 ID | 每个 ID 须在 graph.json 中 type=SD 节点中存在 |
-| `@system` | 是 | `<level>_<system>` 命名 | 与文件名前缀一致；与同层 TLA+ MODULE 名一致 |
-| `@tla-spec` | 是 | 同层 TLA+ spec ID | 须在 tla-manifest.json 中存在 |
-| `@state-machine` | 是 | `SM-L<level>-<system>` | 须在 bdd-manifest.json 中存在 |
-| `@parent-features` | L1 可填 `(none)`；L2-L4 必填 | 上级 features 文件名列表 | L2 的 parent 须在 L1；L3 的 parent 须在 L2；L4 的 parent 须在 L3 |
-| `@sibling-features` | 可填 `(none)` | 同级 features 文件名列表 | 须在 bdd-manifest.json 中存在 |
-| `@child-features` | L4 可填 `(none)`；L1-L3 必填 | 下级 features 文件名列表 | L1 的 child 须在 L2；L2 的 child 须在 L3；L3 的 child 须在 L4 |
-| `@scenario-id-prefix` | 是 | `BDD-L<level>` | 用于 scenario 内 TAG 命名 |
+| 字段                  | 必填                         | 取值                     | 校验规则                                                         |
+| --------------------- | ---------------------------- | ------------------------ | ---------------------------------------------------------------- |
+| `@req`                | 是                           | 逗号分隔的 REQ ID        | 每个 ID 须在 RTM 中存在                                          |
+| `@design`             | 是                           | 逗号分隔的 SD/INTF/DD ID | 每个 ID 须在图谱中存在                                           |
+| `@designIds`          | 是                           | 逗号分隔的 SD 节点 ID    | 每个 ID 须在 graph.json 中 type=SD 节点中存在                    |
+| `@system`             | 是                           | `<level>_<system>` 命名  | 与文件名前缀一致；与同层 TLA+ MODULE 名一致                      |
+| `@tla-spec`           | 是                           | 同层 TLA+ spec ID        | 须在 tla-manifest.json 中存在                                    |
+| `@state-machine`      | 是                           | `SM-L<level>-<system>`   | 须在 bdd-manifest.json 中存在                                    |
+| `@parent-features`    | L1 可填 `(none)`；L2-L4 必填 | 上级 features 文件名列表 | L2 的 parent 须在 L1；L3 的 parent 须在 L2；L4 的 parent 须在 L3 |
+| `@sibling-features`   | 可填 `(none)`                | 同级 features 文件名列表 | 须在 bdd-manifest.json 中存在                                    |
+| `@child-features`     | L4 可填 `(none)`；L1-L3 必填 | 下级 features 文件名列表 | L1 的 child 须在 L2；L2 的 child 须在 L3；L3 的 child 须在 L4    |
+| `@scenario-id-prefix` | 是                           | `BDD-L<level>`           | 用于 scenario 内 TAG 命名                                        |
 
 > **D4 配对命名约定（2026-09-19）**：`@state-machine` 的值与 TLA+ `spec.id` 的配对是隐式约定「`SM-` 前缀之后的字符串 == `spec.id`」——`SM-L2_counter_service` ↔ `L2_counter_service`。前缀不一致（如 `SM_L2_…`）会导致 D4 报「no TLA+ snapshot」。
 
@@ -185,12 +199,12 @@ S-ingest-bdd 子代理据此字段与 graph.json 比对后回填 manifest design
 L<level>_<system>[_<subsystem>][_<atom>]-<feature-num>.feature
 ```
 
-| 层级 | 命名示例 |
-|---|---|
-| L1 | `L1_blog_system-001.feature` |
-| L2 | `L2_blog_system_auth-001.feature` |
-| L3 | `L3_blog_system_article_store-001.feature` |
-| L4 | `L4_blog_system_token_store_issue-001.feature` |
+| 层级 | 命名示例                                       |
+| ---- | ---------------------------------------------- |
+| L1   | `L1_blog_system-001.feature`                   |
+| L2   | `L2_blog_system_auth-001.feature`              |
+| L3   | `L3_blog_system_article_store-001.feature`     |
+| L4   | `L4_blog_system_token_store_issue-001.feature` |
 
 > 命名规则与 TLA+ MODULE 命名（`L1_blog_system` / `L2_auth_subsystem` / `L3_token_store`）对称，下划线分隔、字母开头、仅含字母数字下划线。
 
@@ -229,15 +243,15 @@ Background:
 
 > 「必填」指字段必须在 Background 节中声明；值可为空集 `()` 的字段，声明 `()` 视为该字段已填（值为空集），不视为缺失。
 
-| 要素 | 字段 | 必填 | 约束 |
-|---|---|---|---|
-| 状态集 | `@states` | 是 | ≥1 个状态，逗号分隔（不允许空集） |
-| 初始状态 | `@initial-state` | 是 | 必须在 `@states` 中 |
-| 终态集 | `@terminal-states` | 是（值可空） | 字段必须声明；若声明为 `()` 表示无终态；若声明非空，每个终态必须在 `@states` 中 |
-| 可接受状态 | `@accepting-states` | 是（值不可空） | 每个必须在 `@states` 中；至少 1 个（终态语义） |
-| 可拒绝状态 | `@rejecting-states` | 是（值可空） | 字段必须声明；若声明为 `()` 表示无可拒绝状态；若声明非空，每个必须在 `@states` 中 |
-| 转移表 | `@transitions` | 是 | ≥1 条转移；格式 `From + Event -> To [guard: ...] [action: ...]` |
-| 不变式集 | `@invariants` | 是 | ≥1 条不变式；逻辑表达式 |
+| 要素       | 字段                | 必填           | 约束                                                                              |
+| ---------- | ------------------- | -------------- | --------------------------------------------------------------------------------- |
+| 状态集     | `@states`           | 是             | ≥1 个状态，逗号分隔（不允许空集）                                                 |
+| 初始状态   | `@initial-state`    | 是             | 必须在 `@states` 中                                                               |
+| 终态集     | `@terminal-states`  | 是（值可空）   | 字段必须声明；若声明为 `()` 表示无终态；若声明非空，每个终态必须在 `@states` 中   |
+| 可接受状态 | `@accepting-states` | 是（值不可空） | 每个必须在 `@states` 中；至少 1 个（终态语义）                                    |
+| 可拒绝状态 | `@rejecting-states` | 是（值可空）   | 字段必须声明；若声明为 `()` 表示无可拒绝状态；若声明非空，每个必须在 `@states` 中 |
+| 转移表     | `@transitions`      | 是             | ≥1 条转移；格式 `From + Event -> To [guard: ...] [action: ...]`                   |
+| 不变式集   | `@invariants`       | 是             | ≥1 条不变式；逻辑表达式                                                           |
 
 ### §3.3 转移表格式
 
@@ -252,6 +266,8 @@ Background:
 - `[guard: ...]`：可选触发条件，逻辑表达式
 - `[action: ...]`：可选副作用，动词原形
 
+> **ASCII 词判据（B8，2026-10-07）**：`@transitions` 行的 `From` / `Event` / `To` 三段都必须是 ASCII 词 `[A-Za-z0-9_]+`（与状态名/事件名命名规范一致）。含非 ASCII 词段（如中文事件名）的转移行**整行不被识别**，该条转移静默丢失——下游表现为 D3 转移缺失、D4 BDD↔TLA+ 转移集不一致或 D6「no transition from ...」等间接违规，难以定位。中文叙述请放在 `#` 注释或 scenario 步骤文本中，转移行只留 ASCII 标识符。
+
 ### §3.4 Scenario 与状态机对应关系
 
 ```gherkin
@@ -259,19 +275,19 @@ Background:
 Scenario: 用户使用邮箱密码登录成功
   Given 系统处于 "Unauthenticated" 状态
   And 用户输入有效凭据 "user@example.com" / "password123"
-  When 用户提交登录请求
+  When 用户提交登录请求 (login)
   Then 系统应转移到 "Authenticated" 状态
   And 不变式 "Authenticated => sessionValid" 应成立
 ```
 
 #### §3.4.1 Scenario 步骤与状态机对应
 
-| Gherkin 关键字 | 对应状态机要素 | 校验规则 |
-|---|---|---|
-| `Given` 起始状态声明 | `@initial-state` 或转移表中可达状态 | 必须在 `@states` 中 |
-| `When` 事件 | `@transitions` 中的 Event | 必须在转移表中有匹配的 `From + Event` 记录 |
-| `Then` 终态断言 | 转移表中的 `To` | 转移后的状态必须与 `Then` 声明一致 |
-| `And` 不变式断言 | `@invariants` | 必须引用 `@invariants` 中已声明的不变式 |
+| Gherkin 关键字       | 对应状态机要素                      | 校验规则                                   |
+| -------------------- | ----------------------------------- | ------------------------------------------ |
+| `Given` 起始状态声明 | `@initial-state` 或转移表中可达状态 | 必须在 `@states` 中                        |
+| `When` 事件          | `@transitions` 中的 Event           | 必须在转移表中有匹配的 `From + Event` 记录 |
+| `Then` 终态断言      | 转移表中的 `To`                     | 转移后的状态必须与 `Then` 声明一致         |
+| `And` 不变式断言     | `@invariants`                       | 必须引用 `@invariants` 中已声明的不变式    |
 
 #### §3.4.2 Scenario 路径合法性
 
@@ -288,6 +304,8 @@ Scenario 路径（非法）：
   Given Unauthenticated + When logout + Then LoggedOut    ✗ 非法（转移表中无此 From+Event 组合）
 ```
 
+> **已知限制（D6 转移匹配口径，2026-10-07 真机验证登记）**：D6 路径校验对 `(From, Event)` 取转移表**声明顺序第一条**命中（`find` 首条，不求解 `guard` 表达式），且取**首个 `Then` 声明**为期望终态。因此：(1) 同一 `(From, Event)` 存在多条 guard 分歧转移时，按首条目标态比对——guard 选中的另一分支会报 end-state mismatch（本指南官方模板中即例：Example 1 登录失败、Example 2 reader 被拒、Example 3 场景 1-2、Example 4 未认证被拒、Example 5 凭据无效、语法速查完整示例 Outline 的 reader 行），终态正确性由 V 评审人工核验（D2）兜底；(2) 多事件 scenario 须按 §3.4.3 链式风格书写（事件在前、单个 Then 终态断言收尾），事件间穿插 Then 的写法会按首个 Then 比对而误报。「按 expectedEndState 存在性在候选分支中判定」的算法增强已登记为后续批次候选。
+
 #### §3.4.3 多事件 scenario 链式处理
 
 scenario 可含多个 When 步骤（用 `And` 连接），按顺序构成状态转移链：
@@ -301,8 +319,8 @@ And 事件 e2
 Then 状态 C          # 终态断言
 ```
 
-> **D6 事件提取约定（2026-09-19）**：D6 对 `When` 与 `And` 行同规则——取行末 ASCII 词为事件名（完整式 `^\s*(?:When|And)\s+.+?\b(\w+)\s*\)?\s*$`，容忍行末 `)`）。行末不是 ASCII 词时（如 `When Inc`、`When Inc 计数器自增`）会静默取不到事件，进而报成 end-state mismatch 而非「无事件」。请在行末放事件名，例如 `When 计数器自增 (Inc)` 或 `When 计数器自增 IncCounter`。
-> 本指南部分历史示例（行末为中文）为示意，不参与 D6 校验；实际项目请以「行末 ASCII 事件名」为准。
+> **D6 事件提取约定（2026-09-19；B8 判据显式化 2026-10-07）**：D6 对 `When` 与 `And` 行同规则——取行末 ASCII 词为事件名（完整式 `^\s*(?:When|And)\s+.+?\b(\w+)\s*\)?\s*$`，容忍行末 `)`）。**行末事件名必须为 ASCII 词 `[A-Za-z0-9_]+`（行末裸词或行末 `(Event)` 括号尾注）；非 ASCII 词尾（如中文事件名）提取不到事件。** 自 2026-10-07 起，`When` 行提取不到事件名时 D6 **显式报** `[D6:*] When 步骤行末事件名为空/非 ASCII 词尾 ...` violation（携带原行，先于 startState 缺失短路），不再静默零事件走链后报成难定位的 end-state mismatch；`And` 行不报（常承载输入前置 / 不变式断言等非事件步骤）。请在行末放事件名，例如 `When 计数器自增 (Inc)` 或 `When 计数器自增 IncCounter`。
+> 本指南「语法速查」节的纯 Gherkin 语法示例（`When 动作` 等）为关键字示意、无状态机绑定，不参与 D6 校验；「模式与示例」节官方模板已按本判据改写，实际项目请以「行末 ASCII 事件名」为准。
 
 校验算法按链式查找：S0 + e1 -> S1, S1 + e2 -> S2, ... 最终 Sn 必须与 `Then` 声明的终态一致。
 
@@ -324,11 +342,11 @@ BDD 与 TLA+ 是两个独立的行为规格来源，互不替代：
 
 `check-bdd-model.ts` 在阶段 1-4 门禁时可执行 BDD↔TLA+ 等价性校验；项目阶段门须传 `--require-tla-equivalence --tla-manifest=<path>`，以缺证据时的 D4 violation / exit 1 fail-closed。未传 require flag 的 fixture/兼容调用仍跳过 D4 并输出跳过原因。
 
-| 校验维度 | 算法 |
-|---|---|
-| 状态集等价 | `set(BDD.states) == set(TLA+ State 集合)`（双向包含） |
-| 转移集等价 | `set((From, Event, To) for BDD) == set((From, Event, To) for TLA+ Next 分支)`（双向包含） |
-| 初始状态一致 | `BDD.initialState == TLA+ Init` |
+| 校验维度     | 算法                                                                                                                                      |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 状态集等价   | `set(BDD.states) == set(TLA+ State 集合)`（双向包含）                                                                                     |
+| 转移集等价   | `set((From, Event, To) for BDD) == set((From, Event, To) for TLA+ Next 分支)`（双向包含）                                                 |
+| 初始状态一致 | `BDD.initialState == TLA+ Init`                                                                                                           |
 | 不变式集等价 | **两阶段校验**：第一阶段做归一化字符串匹配（去前后空格 + 小写 + 去除多余空白）；若第一阶段失败，由 R 子代理判定语义等价性（允许措辞不同） |
 
 > TLA+ State 集合与 Next 分支由 `tla-logic.ts` 解析 .tla 文件得出；BDD 状态集与转移表由 `bdd-logic.ts` 解析 Background 节得出。
@@ -383,23 +401,23 @@ R 子代理在判定「实质一致 vs 实质不一致」时允许联网搜索�
 
 ### §5.1 新增脚本
 
-| 脚本 | 路径 | 用途 | 退出码 |
-|---|---|---|---|
-| `check-bdd-model.ts` | `w-model-dev/scripts/cli/check-bdd-model.ts` | BDD features 静态结构门禁 | 0=通过 / 1=校验失败 / 2=输入错误 |
-| `bdd-logic.ts` | `w-model-dev/scripts/logic/bdd-logic.ts` | BDD 业务规则校验逻辑（被 check-bdd-model.ts 调用） | — |
+| 脚本                 | 路径                                         | 用途                                               | 退出码                           |
+| -------------------- | -------------------------------------------- | -------------------------------------------------- | -------------------------------- |
+| `check-bdd-model.ts` | `w-model-dev/scripts/cli/check-bdd-model.ts` | BDD features 静态结构门禁                          | 0=通过 / 1=校验失败 / 2=输入错误 |
+| `bdd-logic.ts`       | `w-model-dev/scripts/logic/bdd-logic.ts`     | BDD 业务规则校验逻辑（被 check-bdd-model.ts 调用） | —                                |
 
 ### §5.2 check-bdd-model.ts 7 个校验维度（D2 由 V 评审人工核验）
 
-| 维度 | 名称 | 校验内容 | 阶段边界 |
-|---|---|---|---|
-| D1 | headerCompleteness | features 文件头标注完整性 | 阶段 1-8 |
-| D2 | gherkinSyntax | Gherkin 语法（**未实装为脚本门禁**，由 V 评审人工核验；场景解析用手写正则，不引入 @cucumber 依赖） | 阶段 1-8 |
-| D3 | stateMachineCompleteness | Background 状态机七要素 | 阶段 1-8 |
-| D4 | tlaEquivalence | BDD↔TLA+ 等价性 | phase 1-4；项目阶段门传 `--require-tla-equivalence` 强制证据 |
-| D5 | stepBinding | step definitions 绑定完整性 | phase 5-8；项目阶段门传 `--require-cucumber-report` 强制证据 |
-| D6 | scenarioPathValidity | scenario Given→When→Then 是合法路径 | 阶段 1-8 |
-| D7 | rtmMapping | 与 RTM 映射 | 阶段 1-8 |
-| D8 | sdCoverage | SD Coverage（phase>=2 强制） | 阶段 2-8 |
+| 维度 | 名称                     | 校验内容                                                                                           | 阶段边界                                                     |
+| ---- | ------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| D1   | headerCompleteness       | features 文件头标注完整性                                                                          | 阶段 1-8                                                     |
+| D2   | gherkinSyntax            | Gherkin 语法（**未实装为脚本门禁**，由 V 评审人工核验；场景解析用手写正则，不引入 @cucumber 依赖） | 阶段 1-8                                                     |
+| D3   | stateMachineCompleteness | Background 状态机七要素                                                                            | 阶段 1-8                                                     |
+| D4   | tlaEquivalence           | BDD↔TLA+ 等价性                                                                                    | phase 1-4；项目阶段门传 `--require-tla-equivalence` 强制证据 |
+| D5   | stepBinding              | step definitions 绑定完整性                                                                        | phase 5-8；项目阶段门传 `--require-cucumber-report` 强制证据 |
+| D6   | scenarioPathValidity     | scenario Given→When→Then 是合法路径                                                                | 阶段 1-8                                                     |
+| D7   | rtmMapping               | 与 RTM 映射                                                                                        | 阶段 1-8                                                     |
+| D8   | sdCoverage               | SD Coverage（phase>=2 强制）                                                                       | 阶段 2-8                                                     |
 
 > **阶段边界说明**：阶段 1-4（设计阶段）D5 跳过（step definitions 尚未实现），由 D6（scenario 路径合法性）+ D7（RTM 映射）+ D8（SD Coverage，phase>=2）替代校验；阶段 5-8（执行阶段）D5 强制校验。
 
@@ -429,13 +447,15 @@ npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json> \
 > `--require-tla-equivalence` 仅适用于 phase 1-4；缺少 `--tla-manifest` 产生 D4 violation / exitCode=1，而不是参数错误。`--graph=<graph.json>` 在 phase>=2 时仍强制必填（D8 数据源，缺失 → exitCode=2 ARG_INVALID）；phase=1 时可选。
 
 # phase 5-8 项目阶段门：必须提供 cucumber 执行证据
+
 npx tsx w-model-dev/scripts/cli/check-bdd-model.ts <bdd-manifest.json> \
-  --phase=5|6|7|8 \
-  --require-cucumber-report \
-  --cucumber-report=<.w-model/bdd/reports/report.json> \
-  --graph=<graph.json> \
-  [--rtm=<rtm.json>]
-```
+--phase=5|6|7|8 \
+--require-cucumber-report \
+--cucumber-report=<.w-model/bdd/reports/report.json> \
+--graph=<graph.json> \
+[--rtm=<rtm.json>]
+
+````
 
 > `--require-cucumber-report` 仅适用于 phase 5-8；缺少 `--cucumber-report`、报告不是 `{ elements: [...] }` 形状、或没有至少一个**具非空 `name` 与 `steps` 的 scenario element** 中的 `result.status="passed"`，均产生 D5 violation / exitCode=1。`failed` 只保留为失败诊断，`skipped` / `pending` / `undefined` / 未知 status 均不能作为执行证据且产生 D5 violation；匿名 element 同样拒绝。若 manifest 声明 features，零已执行 scenario 同样拒绝；门禁只要求最小执行证据，不声称未建模的 feature↔report 完全映射。两个 require flag 用在不对应 phase 均为 exitCode=2 ARG_INVALID。CLI 只接受文档列出的精确裸 require flag；`=true`、重复、拼写近似或任何未知 `--*` 均为 exitCode=2。未使用 require flag 时保留原有兼容行为：缺少输入仅跳过对应 D4/D5 并说明原因，适用于技能包 fixture 回归，不得代替项目阶段门。
 
@@ -531,7 +551,7 @@ setWorldConstructor(class extends World implements CustomWorld {
   lastResponse = null;
   sharedState = {};
 });
-```
+````
 
 ### §7.3 测试数据 fixture
 
@@ -555,7 +575,7 @@ import { createApp } from '../../../src/app';
 
 BeforeAll(async function () {
   const app = await createApp({ storage: 'memory' });
-  const server = app.listen(0);  // 0 = 随机端口
+  const server = app.listen(0); // 0 = 随机端口
   (this as CustomWorld).server = { app, baseUrl: `http://localhost:${server.address().port}` };
 });
 
@@ -566,7 +586,7 @@ Before(async function () {
   (this as CustomWorld).authenticatedUser = null;
   (this as CustomWorld).lastResponse = null;
   (this as CustomWorld).sharedState = {};
-  await resetDatabase();  // 重置内存数据库
+  await resetDatabase(); // 重置内存数据库
 });
 ```
 
@@ -580,16 +600,17 @@ step definition 加载快照 JSON，与 `this.lastResponse` 深度比对（允�
 
 ### §7.6 夹具命名约定
 
-| 夹具类型 | 命名规则 | 示例 |
-|---|---|---|
-| 数据 fixture | `<entity>s.json`（复数） | `users.json` / `articles.json` |
-| 快照 fixture | `<scenario-context>-<num>.json` | `articles-list-001.json` |
-| World 扩展 | `custom-world.ts`（单文件） | — |
-| Hooks | `<purpose>.ts`（语义命名） | `global-setup.ts` / `scenario-reset.ts` |
+| 夹具类型     | 命名规则                        | 示例                                    |
+| ------------ | ------------------------------- | --------------------------------------- |
+| 数据 fixture | `<entity>s.json`（复数）        | `users.json` / `articles.json`          |
+| 快照 fixture | `<scenario-context>-<num>.json` | `articles-list-001.json`                |
+| World 扩展   | `custom-world.ts`（单文件）     | —                                       |
+| Hooks        | `<purpose>.ts`（语义命名）      | `global-setup.ts` / `scenario-reset.ts` |
 
 ### §7.7 夹具完备性校验
 
 check-bdd-model.ts D5（step 绑定）扩展校验：
+
 - scenario 引用的 fixture 文件名（在 step 文本中匹配 `fixtures/<type>/<name>.json`）必须存在于 `features/fixtures/` 对应子目录
 - 引用不存在的 fixture → violation，退出码 1
 
@@ -606,6 +627,7 @@ check-bdd-model.ts D5（step 绑定）扩展校验：
 **危害**：BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段
 
 **正确做法**：
+
 - BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）
 - BDD↔TLA+ 不等价时必须走完整 R 报告复审、根因门禁、S-fix 后 R3×3/预防审查/V/G/CHECKPOINT 链（§4.3），不得直接放行
 - 接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）
@@ -654,11 +676,11 @@ V 子代理复审 R 报告
 
 ### 校验内容
 
-| 维度 | TLA+ 来源 | BDD 来源 | 比对规则 |
-|---|---|---|---|
-| 转移名 | `Next == \/ Act1 \/ Act2` | Background 节 `When` 步骤 | 名称完全一致 |
-| 状态名 | `vars` 声明 | Background 节 `Given` 步骤 | 名称完全一致 |
-| 不变式名 | `Inv == ...` | Background 节 `Then` 步骤 | 名称完全一致 |
+| 维度     | TLA+ 来源                 | BDD 来源                   | 比对规则     |
+| -------- | ------------------------- | -------------------------- | ------------ |
+| 转移名   | `Next == \/ Act1 \/ Act2` | Background 节 `When` 步骤  | 名称完全一致 |
+| 状态名   | `vars` 声明               | Background 节 `Given` 步骤 | 名称完全一致 |
+| 不变式名 | `Inv == ...`              | Background 节 `Then` 步骤  | 名称完全一致 |
 
 ### 脚本调用
 
@@ -691,13 +713,12 @@ npx tsx w-model-dev/scripts/cli/check-tla-bdd-sync.ts <tla-file> <feature-file>
 BDD 覆盖率数据由独立的 S-ingest-bdd 子代理回填，非 S-bdd 自填。
 
 分派时序：
+
 1. S-bdd 产出 .feature/manifest 基础字段 + @designIds 头部
 2. S-ingest-bdd 从 .feature 提取 @designIds + 比对 graph.json SD 节点 → 回填 manifest designCoverage
 3. R3 → V → G(check-bdd-model --graph 校验)
 
-
 ## 语法速查
-
 
 > 本文件为 Gherkin 语法通用参考，覆盖 Cucumber.js 11.x 支持的全部关键字与语法结构。
 > **W 模型约束**：BDD features 文件头标注与 Background 节状态机七要素声明须遵循 [bdd.md](./bdd.md) §2-§3。
@@ -951,7 +972,7 @@ Gherkin 支持 60+ 语言关键字。Cucumber.js 通过 `language` 配置项切�
 // features/cucumber.js
 module.exports = {
   default: {
-    language: 'zh-CN',  // 使用中文关键字
+    language: 'zh-CN', // 使用中文关键字
     // ...
   },
 };
@@ -959,18 +980,18 @@ module.exports = {
 
 中文关键字示例：
 
-| 英文 | 中文 |
-|---|---|
-| Feature | 功能 |
-| Background | 背景 |
-| Scenario | 场景 |
+| 英文             | 中文     |
+| ---------------- | -------- |
+| Feature          | 功能     |
+| Background       | 背景     |
+| Scenario         | 场景     |
 | Scenario Outline | 场景大纲 |
-| Given | 假如 |
-| When | 当 |
-| Then | 那么 |
-| And | 而且 |
-| But | 但是 |
-| Examples | 例子 |
+| Given            | 假如     |
+| When             | 当       |
+| Then             | 那么     |
+| And              | 而且     |
+| But              | 但是     |
+| Examples         | 例子     |
 
 > **W 模型推荐**：默认使用英文关键字（`Feature` / `Scenario` / `Given` / `When` / `Then`），与既有 references/ 文档语言风格一致。中文关键字仅在与中文业务方协作时启用。
 
@@ -1000,6 +1021,7 @@ Background:
   # @transitions:
   #   Unauthenticated + login -> Authenticated [guard: credentialsValid] [action: issueSession]
   #   Authenticated + authorize -> Authorized [guard: roleMatches] [action: grantPermissions]
+  #   Authenticated + authorize -> Authenticated [guard: roleMismatch] [action: recordDenied]
   #   Authorized + logout -> LoggedOut [action: revokeSession]
   # @invariants:
   #   Authenticated => sessionValid
@@ -1010,7 +1032,7 @@ Background:
 Scenario: 用户使用邮箱密码登录成功
   Given 系统处于 "Unauthenticated" 状态
   And 用户输入有效凭据 "alice@example.com" / "valid123"
-  When 用户提交登录请求
+  When 用户提交登录请求 (login)
   Then 系统应转移到 "Authenticated" 状态
   And 不变式 "Authenticated => sessionValid" 应成立
 
@@ -1018,7 +1040,7 @@ Scenario: 用户使用邮箱密码登录成功
 Scenario Outline: 不同角色的授权行为
   Given 系统处于 "Authenticated" 状态
   And 用户角色为 "<role>"
-  When 用户请求授权
+  When 用户请求授权 (authorize)
   Then 系统应转移到 "<expectedState>" 状态
 
   Examples:
@@ -1034,10 +1056,7 @@ Scenario Outline: 不同角色的授权行为
 - [bdd.md](./bdd.md)：BDD 模式示例库（按 L1/L2/L3/L4 分类）
 - [tla-plus.md](./tla-plus.md)：TLA+ 完整语法参考（对称参考）
 
-
-
 ## 模式与示例
-
 
 > 本文件为 BDD features 典型示例库，按 L1/L2/L3/L4 层级分类，提供 S-bdd 子代理在阶段 1-4 按层级选模板用的可复用模式集合。
 > 每个示例包含完整 .feature 文件 + bdd-manifest.json 片段 + 状态机说明。
@@ -1062,13 +1081,13 @@ Scenario Outline: 不同角色的授权行为
 
 ### 示例索引
 
-| # | 示例 | 层级 | 典型场景 | W 模型阶段 | 对应 TLA+ 层级 |
-|---|---|---|---|---|---|
-| 1 | 用户登录端到端 | L1 | 端到端用户场景（认证） | 阶段 1 | L1 |
-| 2 | 文章发布端到端 | L1 | 端到端用户场景（内容创建） | 阶段 1 | L1 |
-| 3 | 认证子系统协作 | L2 | 子系统内行为 + 协作 | 阶段 2 | L2 |
-| 4 | 文章存储 + 用户认证集成 | L3 | 模块间集成 + 接口契约 | 阶段 3 | L3 |
-| 5 | TokenStore.issue() 原子方法 | L4 | 单方法原子行为 | 阶段 4 | TLA+ L3 最细粒度 |
+| #   | 示例                        | 层级 | 典型场景                   | W 模型阶段 | 对应 TLA+ 层级   |
+| --- | --------------------------- | ---- | -------------------------- | ---------- | ---------------- |
+| 1   | 用户登录端到端              | L1   | 端到端用户场景（认证）     | 阶段 1     | L1               |
+| 2   | 文章发布端到端              | L1   | 端到端用户场景（内容创建） | 阶段 1     | L1               |
+| 3   | 认证子系统协作              | L2   | 子系统内行为 + 协作        | 阶段 2     | L2               |
+| 4   | 文章存储 + 用户认证集成     | L3   | 模块间集成 + 接口契约      | 阶段 3     | L3               |
+| 5   | TokenStore.issue() 原子方法 | L4   | 单方法原子行为             | 阶段 4     | TLA+ L3 最细粒度 |
 
 ---
 
@@ -1114,7 +1133,7 @@ Background:
 Scenario: 用户使用有效凭据登录成功
   Given 系统处于 "Unauthenticated" 状态
   And 用户输入有效凭据 "alice@example.com" / "valid123"
-  When 用户提交登录请求
+  When 用户提交登录请求 (login)
   Then 系统应转移到 "Authenticated" 状态
   And 不变式 "Authenticated => sessionValid" 应成立
 
@@ -1122,14 +1141,14 @@ Scenario: 用户使用有效凭据登录成功
 Scenario: 用户使用无效凭据登录失败
   Given 系统处于 "Unauthenticated" 状态
   And 用户输入无效凭据 "alice@example.com" / "wrong-pass"
-  When 用户提交登录请求
+  When 用户提交登录请求 (login)
   Then 系统应保持在 "Unauthenticated" 状态
   And 不变式 "Authenticated => sessionValid" 应成立
 
 @REQ-001 @SD-3.2.1 @UAT-003 @BDD-L1-003 @medium
 Scenario: 已登录用户登出
   Given 系统处于 "Authenticated" 状态
-  When 用户点击 "登出" 按钮
+  When 用户点击 "登出" 按钮 (logout)
   Then 系统应转移到 "LoggedOut" 状态
   And 不变式 "LoggedOut => sessionRevoked" 应成立
 ```
@@ -1167,14 +1186,23 @@ Scenario: 已登录用户登出
       "acceptingStates": ["Authenticated"],
       "rejectingStates": ["Unauthenticated"],
       "transitions": [
-        { "from": "Unauthenticated", "event": "login", "to": "Authenticated", "guard": "credentialsValid", "action": "issueSession" },
-        { "from": "Unauthenticated", "event": "login", "to": "Unauthenticated", "guard": "credentialsInvalid", "action": "recordFailure" },
+        {
+          "from": "Unauthenticated",
+          "event": "login",
+          "to": "Authenticated",
+          "guard": "credentialsValid",
+          "action": "issueSession"
+        },
+        {
+          "from": "Unauthenticated",
+          "event": "login",
+          "to": "Unauthenticated",
+          "guard": "credentialsInvalid",
+          "action": "recordFailure"
+        },
         { "from": "Authenticated", "event": "logout", "to": "LoggedOut", "action": "revokeSession" }
       ],
-      "invariants": [
-        "Authenticated => sessionValid",
-        "LoggedOut => sessionRevoked"
-      ]
+      "invariants": ["Authenticated => sessionValid", "LoggedOut => sessionRevoked"]
     }
   ]
 }
@@ -1236,7 +1264,7 @@ Scenario: blogger 角色用户成功发布文章
   Given 系统处于 "Drafting" 状态
   And 当前用户角色为 "blogger"
   And 文章标题为 "Hello World" 内容为 "first post"
-  When 用户点击 "发布" 按钮
+  When 用户点击 "发布" 按钮 (submit)
   Then 系统应转移到 "Published" 状态
   And 不变式 "Published => articlePersisted" 应成立
 
@@ -1244,7 +1272,7 @@ Scenario: blogger 角色用户成功发布文章
 Scenario: reader 角色用户发布文章被拒绝
   Given 系统处于 "Drafting" 状态
   And 当前用户角色为 "reader"
-  When 用户点击 "发布" 按钮
+  When 用户点击 "发布" 按钮 (submit)
   Then 系统应转移到 "Rejected" 状态
   And 不变式 "Rejected => denialRecorded" 应成立
 ```
@@ -1360,17 +1388,31 @@ Scenario: token 过期后失效
       "acceptingStates": ["Authorized"],
       "rejectingStates": ["Idle"],
       "transitions": [
-        { "from": "Idle", "event": "issueToken", "to": "TokenIssued", "guard": "credentialsValid", "action": "persistToken" },
-        { "from": "TokenIssued", "event": "authorize", "to": "Authorized", "guard": "roleMatches", "action": "grantPermissions" },
-        { "from": "TokenIssued", "event": "authorize", "to": "TokenIssued", "guard": "roleMismatch", "action": "recordDenied" },
+        {
+          "from": "Idle",
+          "event": "issueToken",
+          "to": "TokenIssued",
+          "guard": "credentialsValid",
+          "action": "persistToken"
+        },
+        {
+          "from": "TokenIssued",
+          "event": "authorize",
+          "to": "Authorized",
+          "guard": "roleMatches",
+          "action": "grantPermissions"
+        },
+        {
+          "from": "TokenIssued",
+          "event": "authorize",
+          "to": "TokenIssued",
+          "guard": "roleMismatch",
+          "action": "recordDenied"
+        },
         { "from": "TokenIssued", "event": "expire", "to": "Expired", "action": "revokeToken" },
         { "from": "Authorized", "event": "expire", "to": "Expired", "action": "revokeToken" }
       ],
-      "invariants": [
-        "TokenIssued => tokenValid",
-        "Authorized => permissionsGranted",
-        "Expired => tokenRevoked"
-      ]
+      "invariants": ["TokenIssued => tokenValid", "Authorized => permissionsGranted", "Expired => tokenRevoked"]
     }
   ]
 }
@@ -1434,10 +1476,9 @@ Scenario: 已认证用户成功读取已存在的文章
   Given 文章存储模块处于 "AwaitingAuth" 状态
   And 用户携带有效 token "token-001"
   When 模块调用认证接口 verifyToken
-  Then 模块应转移到 "AuthVerified" 状态
-  And 不变式 "AuthVerified => userIdLoaded" 应成立
-  When 模块请求文章 "art-001"
+  And 模块请求文章 "art-001" (fetchArticle)
   Then 模块应转移到 "ArticleServed" 状态
+  And 不变式 "AuthVerified => userIdLoaded" 应成立
   And 不变式 "ArticleServed => articleReturned" 应成立
 
 @REQ-002 @REQ-001 @INTF-3.1.2 @IT-002 @BDD-L3-002 @high
@@ -1505,7 +1546,7 @@ Background:
 Scenario: 凭据有效时成功颁发 token
   Given TokenStore 处于 "Empty" 状态
   And 输入凭据为 "alice@example.com" / "valid123"
-  When 调用 issue("alice@example.com", "valid123")
+  When 调用 issue("alice@example.com", "valid123") (issue)
   Then TokenStore 应转移到 "TokenPersisted" 状态
   And 返回的 token 应非空
   And 不变式 "TokenPersisted => tokenNotNull" 应成立
@@ -1514,7 +1555,7 @@ Scenario: 凭据有效时成功颁发 token
 Scenario: 凭据无效时返回错误
   Given TokenStore 处于 "Empty" 状态
   And 输入凭据为 "alice@example.com" / "wrong-pass"
-  When 调用 issue("alice@example.com", "wrong-pass")
+  When 调用 issue("alice@example.com", "wrong-pass") (issue)
   Then TokenStore 应转移到 "Error" 状态
   And 应抛出 "InvalidCredentialsError"
   And 不变式 "Error => errorMessageSet" 应成立
@@ -1523,7 +1564,7 @@ Scenario: 凭据无效时返回错误
 Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
   Given TokenStore 处于 "TokenPersisted" 状态
   And 已存在凭据 "alice@example.com" 对应的 token "token-001"
-  When 调用 issue("alice@example.com", "valid123")
+  When 调用 issue("alice@example.com", "valid123") (issue)
   Then TokenStore 应保持在 "TokenPersisted" 状态
   And 返回的 token 应等于 "token-001"
   And 不变式 "TokenPersisted => tokenNotNull" 应成立
@@ -1558,14 +1599,23 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
       "acceptingStates": ["TokenPersisted"],
       "rejectingStates": ["Error"],
       "transitions": [
-        { "from": "Empty", "event": "issue", "to": "TokenPersisted", "guard": "credentialsValid", "action": "generateToken" },
+        {
+          "from": "Empty",
+          "event": "issue",
+          "to": "TokenPersisted",
+          "guard": "credentialsValid",
+          "action": "generateToken"
+        },
         { "from": "Empty", "event": "issue", "to": "Error", "guard": "credentialsInvalid", "action": "returnError" },
-        { "from": "TokenPersisted", "event": "issue", "to": "TokenPersisted", "guard": "sameCredentials", "action": "returnExistingToken" }
+        {
+          "from": "TokenPersisted",
+          "event": "issue",
+          "to": "TokenPersisted",
+          "guard": "sameCredentials",
+          "action": "returnExistingToken"
+        }
       ],
-      "invariants": [
-        "TokenPersisted => tokenNotNull",
-        "Error => errorMessageSet"
-      ]
+      "invariants": ["TokenPersisted => tokenNotNull", "Error => errorMessageSet"]
     }
   ]
 }
@@ -1586,15 +1636,15 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 
 ### 常见场景模式总结
 
-| 模式 | 适用层级 | 典型用法 | 示例 |
-|---|---|---|---|
-| 正常路径（happy path） | L1-L4 | 验证业务期望的成功路径 | 示例 1 Scenario 1 |
-| 异常路径（error path） | L1-L4 | 验证凭据无效/权限不足/资源不存在等失败路径 | 示例 1 Scenario 2 / 示例 5 Scenario 2 |
-| 边界路径（boundary） | L1-L4 | 验证边界条件（如 token 过期、参数边界） | 示例 3 Scenario 3 |
-| 幂等性（idempotency） | L4 | 验证原子方法重复调用返回一致结果 | 示例 5 Scenario 3 |
-| 多事件链式（multi-event） | L1-L3 | 验证多个 When 步骤构成的状态转移链 | 示例 1 Scenario 3 / 示例 3 Scenario 1 / 示例 4 Scenario 1 |
-| 角色分支（role branching） | L1-L2 | 验证不同角色的差异化行为 | 示例 2 / 示例 3 |
-| 参数化场景（scenario outline） | L1-L4 | 用 Examples 表展开多组数据 | 详见 [bdd.md](./bdd.md) |
+| 模式                           | 适用层级 | 典型用法                                   | 示例                                                      |
+| ------------------------------ | -------- | ------------------------------------------ | --------------------------------------------------------- |
+| 正常路径（happy path）         | L1-L4    | 验证业务期望的成功路径                     | 示例 1 Scenario 1                                         |
+| 异常路径（error path）         | L1-L4    | 验证凭据无效/权限不足/资源不存在等失败路径 | 示例 1 Scenario 2 / 示例 5 Scenario 2                     |
+| 边界路径（boundary）           | L1-L4    | 验证边界条件（如 token 过期、参数边界）    | 示例 3 Scenario 3                                         |
+| 幂等性（idempotency）          | L4       | 验证原子方法重复调用返回一致结果           | 示例 5 Scenario 3                                         |
+| 多事件链式（multi-event）      | L1-L3    | 验证多个 When 步骤构成的状态转移链         | 示例 1 Scenario 3 / 示例 3 Scenario 1 / 示例 4 Scenario 1 |
+| 角色分支（role branching）     | L1-L2    | 验证不同角色的差异化行为                   | 示例 2 / 示例 3                                           |
+| 参数化场景（scenario outline） | L1-L4    | 用 Examples 表展开多组数据                 | 详见 [bdd.md](./bdd.md)                                   |
 
 ### W 模型交叉引用
 
@@ -1604,10 +1654,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 - [tla-plus.md](./tla-plus.md)：TLA+ 模式示例库（对称参考）
 - [../templates/feature.template](../templates/feature.template)：features 文件模板（套用起点）
 
-
-
 ## 评审清单
-
 
 > **配套**：[bdd.md](./bdd.md)
 > **W 模型适配**：不新增 `targetKind=bdd`（违反 P2.5 的 4 值枚举约束）。V-bdd 子代理评审 BDD features 时仍用 `targetKind=test`，本清单作为 §7.3「测试用例」的参考资料
@@ -1622,6 +1669,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **检查点**：Background 节是否声明状态集/初始/终态/转移表/不变式/accepting-rejecting/guard-action 七要素。
 
 **通过标准**：
+
 - Background 节含全部 7 个 `@` 字段：`@states` / `@initial-state` / `@terminal-states` / `@accepting-states` / `@rejecting-states` / `@transitions` / `@invariants`
 - `@states` 至少 1 个状态（不允许空集）
 - `@initial-state` 在 `@states` 中
@@ -1632,6 +1680,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 - `@invariants` 至少 1 条不变式；逻辑表达式
 
 **失败处理**：
+
 - 缺失字段或值不合法 → 标注 `Critical:` reworkHint
 - 触发 `check-bdd-model.ts` D3（stateMachineCompleteness）退出码 1
 - 走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节） 循环修正
@@ -1641,6 +1690,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **检查点**：每个 scenario 的 Given→When→Then 是否为状态转移表中的合法路径。
 
 **通过标准**：
+
 - 每个 scenario 的 `Given` 起始状态在 `@states` 中
 - 每个 `When` 事件在 `@transitions` 中有匹配的 `From + Event` 记录
 - 转移后的状态与 `Then` 声明一致
@@ -1648,6 +1698,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 - 每条转移路径完整可在转移表中复现
 
 **失败处理**：
+
 - 路径非法（如 `Given Unauthenticated + When logout + Then LoggedOut`，但转移表中无此 From+Event 组合）→ 标注 `Critical:` reworkHint
 - 触发 `check-bdd-model.ts` D6（scenarioPathValidity）退出码 1
 - 走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节） 循环修正
@@ -1657,12 +1708,14 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **检查点**：BDD 状态集与同层 TLA+ spec 状态集是否等价（双向包含）。
 
 **通过标准**：
+
 - `set(BDD.states) == set(TLA+ State 集合)`（双向包含）
 - `set((From, Event, To) for BDD) == set((From, Event, To) for TLA+ Next 分支)`（双向包含）
 - `BDD.initialState == TLA+ Init`
 - 不变式集等价：归一化字符串匹配通过；或 R 子代理判定实质一致（措辞不同但语义等价）
 
 **失败处理**：
+
 - 状态集/转移集/初始状态不等价 → 标注 `Critical:` reworkHint
 - 不变式集字符串匹配失败 → 触发 R 子代理语义等价判定
   - 实质一致：放行，R 报告记录判定依据
@@ -1675,6 +1728,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **检查点**：所有 step 文本是否有对应 step definition（cucumber 报告无 undefined/pending）。
 
 **通过标准**：
+
 - **阶段 1-4**：D5 跳过（step definitions 尚未实现），由 D6（scenario 路径合法性）+ D7（RTM 映射）替代校验
 - **阶段 5-8**：
   - `features/step_definitions/` 下所有 .steps.ts 文件提取 Given/When/Then 步骤文本模式
@@ -1683,6 +1737,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
   - `cucumber.js` 配置 `strict: true`（undefined/pending 视为失败）
 
 **失败处理**：
+
 - 存在 undefined/pending step → 标注 `Critical:` reworkHint
 - 触发 `check-bdd-model.ts` D5（stepBinding）退出码 1
 - 该失败只形成 R 定位线索；按普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）完成 R 报告、V 复审、G 根因门禁、S-fix、R3×3、预防审查、V/G 与 CHECKPOINT 后，才由 S-fix 补全 step definition 或修正 step/scenario
@@ -1692,6 +1747,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **检查点**：features 文件头标注 + scenario TAG 是否覆盖所有相关 REQ/SD/INTF/DD。
 
 **通过标准**：
+
 - features 文件头 `@req` 列表中的每个 REQ ID 在 RTM 中存在
 - features 文件头 `@design` 列表中的每个 SD/INTF/DD ID 在图谱中存在
 - features 文件头 `@tla-spec` 在 tla-manifest.json 中存在
@@ -1702,6 +1758,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 - `@parent-features` / `@child-features` 与 bdd-manifest.json 一致
 
 **失败处理**：
+
 - 追溯缺失或不一致 → 标注 `Critical:` reworkHint
 - 触发 `check-bdd-model.ts` D1（headerCompleteness）+ D7（rtmMapping）退出码 1
 - 走普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节） 循环修正
@@ -1711,6 +1768,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **检查点**：scenario 引用的 fixture 文件是否存在于 `features/fixtures/`。
 
 **通过标准**：
+
 - scenario step 文本中引用的 fixture 文件（匹配 `fixtures/<type>/<name>.json`）必须存在于 `features/fixtures/` 对应子目录
 - 四类夹具位置合规：
   - Cucumber World 对象在 `features/fixtures/world/custom-world.ts`
@@ -1720,6 +1778,7 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 - 夹具命名遵循约定（数据 `<entity>s.json` / 快照 `<scenario-context>-<num>.json`）
 
 **失败处理**：
+
 - 引用不存在的 fixture → 标注 `Important:` reworkHint
 - 触发 `check-bdd-model.ts` D5（stepBinding）扩展校验退出码 1
 - 该失败只形成 R 定位线索；完成普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）后，才由 S-fix 补全缺失 fixture 或修正引用
@@ -1729,11 +1788,13 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 **检查点**：每个状态机不变式至少有 1 个 scenario 验证（Then 步骤含断言）。
 
 **通过标准**：
+
 - Background 节 `@invariants` 中声明的每条不变式至少有 1 个 scenario 的 `Then` / `And` 步骤引用
 - scenario 中 `And 不变式 "<表达式>" 应成立` 引用的表达式在 `@invariants` 中已声明
 - 不变式断言对应的终态满足该不变式（语义校验由 V 子代理执行，门禁做存在性校验）
 
 **失败处理**：
+
 - 不变式未被任何 scenario 验证 → 标注 `Important:` reworkHint
 - scenario 引用未声明的不变式 → 标注 `Critical:` reworkHint
 - 触发 `check-bdd-model.ts` D3（stateMachineCompleteness）+ D6（scenarioPathValidity）退出码 1
@@ -1745,15 +1806,15 @@ Scenario: 相同凭据重复调用 issue 返回相同 token（幂等）
 
 V-bdd 子代理产出 VerifierOutput JSON 时，本清单 7 项按以下映射归入 5 维度（不修改 5 维度定义，仅作参考）：
 
-| 本清单项 | verifier-spec.md §7.3 维度 | weight |
-|---|---|---|
-| 1 状态机七要素完整性 | correctness | 0.25 |
-| 2 scenario 路径合法性 | correctness | 0.25 |
-| 3 TLA+ 等价性 | coverage | 0.30 |
-| 4 step 绑定完整性 | independence | 0.20 |
-| 5 追溯完整性 | coverage | 0.30 |
-| 6 夹具完备性 | independence | 0.20 |
-| 7 不变式覆盖 | coverage | 0.30 |
+| 本清单项              | verifier-spec.md §7.3 维度 | weight |
+| --------------------- | -------------------------- | ------ |
+| 1 状态机七要素完整性  | correctness                | 0.25   |
+| 2 scenario 路径合法性 | correctness                | 0.25   |
+| 3 TLA+ 等价性         | coverage                   | 0.30   |
+| 4 step 绑定完整性     | independence               | 0.20   |
+| 5 追溯完整性          | coverage                   | 0.30   |
+| 6 夹具完备性          | independence               | 0.20   |
+| 7 不变式覆盖          | coverage                   | 0.30   |
 
 > 完整 5 维度权重：`coverage` 0.30 / `correctness` 0.25 / `independence` 0.20 / `clarity` 0.15 / `priority-reasonableness` 0.10。
 
@@ -1776,6 +1837,7 @@ G 子代理门禁
 ```
 
 **门禁分工原则**（与 TLA+ 对称）：
+
 - `check-verifier-output.ts` 校验 V 评审输出的 schema 合规性（防 LLM 漂移）
 - `check-bdd-model.ts` 校验 BDD features 本身的静态结构合规性（防占位/简化/错误实现）
 - 两者正交：V 评审可能通过但 G 门禁失败（features 结构问题），或 V 评审失败但 G 门禁通过（features 结构合规但内容质量不足）
@@ -1784,13 +1846,13 @@ G 子代理门禁
 
 BDD features 评审的 `subCriteria[*].evidence` 须引用 features 文件内具体位置：
 
-| 引用类型 | 格式 | 示例 |
-|---|---|---|
-| features 文件 + 行号 | `features/L1/blog_system-001.feature:L23-45` | scenario 步骤引用 |
-| 状态机声明 | `features/L1/blog_system-001.feature:Background:L5-15` | 状态集/转移表引用 |
-| scenario TAG | `features/L1/blog_system-001.feature@REQ-001:L17` | 追溯 TAG 引用 |
-| step definition | `features/step_definitions/auth.steps.ts:L42-58` | step 绑定引用 |
-| TLA+ spec 对照 | `tla/L1_blog_system.tla:L30-50` | 等价性 evidence |
+| 引用类型             | 格式                                                   | 示例              |
+| -------------------- | ------------------------------------------------------ | ----------------- |
+| features 文件 + 行号 | `features/L1/blog_system-001.feature:L23-45`           | scenario 步骤引用 |
+| 状态机声明           | `features/L1/blog_system-001.feature:Background:L5-15` | 状态集/转移表引用 |
+| scenario TAG         | `features/L1/blog_system-001.feature@REQ-001:L17`      | 追溯 TAG 引用     |
+| step definition      | `features/step_definitions/auth.steps.ts:L42-58`       | step 绑定引用     |
+| TLA+ spec 对照       | `tla/L1_blog_system.tla:L30-50`                        | 等价性 evidence   |
 
 > 与 §6.2.1 evidence 可追溯约束一致：禁止仅引用文件名不标行号。
 
@@ -1809,4 +1871,3 @@ BDD features 评审的 `subCriteria[*].evidence` 须引用 features 文件内具
 - [bdd.md](./bdd.md)：Gherkin 完整语法
 - [bdd.md](./bdd.md)：BDD 模式示例库（按 L1/L2/L3/L4 分类）
 - [tla-plus.md](./tla-plus.md)：TLA+ 评审 7 项清单（对称参考）
-

@@ -7,7 +7,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { buildStatusReport, STATUS_TO_PHASE } from '../logic/wm-status-logic.js';
+import { PROJECT_STATUS_COMPLETED, PROJECT_STATUSES, PROJECT_STATUS_TO_PHASE } from '../lib/constants.js';
+import { buildStatusReport, NEXT_STEPS, STATUS_TO_PHASE } from '../logic/wm-status-logic.js';
 
 describe('STATUS_TO_PHASE', () => {
   it('9 态映射（需求分析=1 … 验收测试=8，项目完成=9）', () => {
@@ -184,5 +185,40 @@ describe('buildStatusReport', () => {
       const r = buildStatusReport({ status });
       expect(r.nextSteps.length).toBeGreaterThan(0);
     }
+  });
+});
+
+// ==================== A14b：「项目完成」常数单一来源（43.1.0） ====================
+describe('A14b：「项目完成」常数单一来源（lib/constants 导出，两消费点相等）', () => {
+  it('A14b：「项目完成」常数单一来源（lib/constants 导出，两消费点相等）', () => {
+    // 常数单点：终态名与 9 态序全部由 lib/constants 导出
+    expect(PROJECT_STATUS_COMPLETED).toBe('项目完成');
+    expect([...PROJECT_STATUSES]).toEqual([
+      '需求分析',
+      '系统设计',
+      '概要设计',
+      '详细设计',
+      '编码',
+      '集成测试',
+      '系统测试',
+      '验收测试',
+      '项目完成',
+    ]);
+
+    // 消费点 1（STATUS_TO_PHASE）与消费点 2（NEXT_STEPS）键集与 PROJECT_STATUSES 逐一相等
+    expect(Object.keys(STATUS_TO_PHASE)).toEqual([...PROJECT_STATUSES]);
+    expect(Object.keys(NEXT_STEPS)).toEqual([...PROJECT_STATUSES]);
+    expect(STATUS_TO_PHASE[PROJECT_STATUS_COMPLETED]).toBe(PROJECT_STATUS_TO_PHASE[PROJECT_STATUS_COMPLETED].phase);
+
+    // 8/9 双口径统一：机器 phase=9，展示口径收敛 8（displayPhase/completedPhases 单点承载）
+    expect(PROJECT_STATUS_TO_PHASE[PROJECT_STATUS_COMPLETED]).toEqual({
+      phase: 9,
+      displayPhase: 8,
+      completedPhases: 8,
+    });
+    const r = buildStatusReport({ status: PROJECT_STATUS_COMPLETED, updatedAt: '2026-10-07T00:00:00Z' });
+    expect(r.phase).toBe(PROJECT_STATUS_TO_PHASE[PROJECT_STATUS_COMPLETED].displayPhase);
+    expect(r.completedPhases).toBe(PROJECT_STATUS_TO_PHASE[PROJECT_STATUS_COMPLETED].completedPhases);
+    expect(r.progress).toBe('8/8（100%）');
   });
 });

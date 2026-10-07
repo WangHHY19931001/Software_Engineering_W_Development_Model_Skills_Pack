@@ -7,13 +7,65 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [43.1.0] - 2026-10-07
+
+### 批次 7：形式化与图谱门禁收严（12 实现任务 + 1 专项收口 + 3 审查修复轮，增量规格 §5 批次 7 的 21 项全部销账；规格 [`docs/superpowers/specs/2026-10-07-remediation-leftovers-design.md`](./docs/superpowers/specs/2026-10-07-remediation-leftovers-design.md) §0 决策 2/3/4 与 §2，裁定登记 [`decision-log/rounds-49-formalization-gates.md`](./docs/changes/decision-log/rounds-49-formalization-gates.md)，SSoT 权威摘要 §10S）
+
+> **Breaking（门禁判据收紧，不留兼容）**：本批为真实门禁行为收严——恒真不变式防御（cfg 业务不变式下限 B1a / cfg CONSTRAINT 禁用 B10c）、图谱 depends-on 环检全 phase、`evidenceStatus=pending` 与 RTM `coverageStatus` 缺字段/非法值违规化、`project.status` 转移校验、降级须 human 授权（R8，`downgrade-approve` 专属绑定）、R6 首条 `from==L0`、`*_token` 词段命中脱敏，均在既有输入上可能新增 red。存量项目须按下方「迁移」段处置 `maturity.json` history（R6 前插 L0 起步条目 + R8 降级授权）、`rtm.json` coverageStatus、`graph.json` evidenceStatus 与 `.tla`/`.cfg`（B1a 补业务不变式 + B10c 删 CONSTRAINT）。判据直接收紧、不写兼容分流（延续批次 6「毁弃存量数据」裁定，R-B7-2）。
+
+### Changed/Breaking（归一化哈希 / 恒真不变式 / 图谱与 RTM 收严 / 脱敏 / 降级授权 / R6 第四判定）
+
+- **归一化哈希（T2，决策 1 后半）**：`lib/reviewed-artifacts.ts` 读盘后 CRLF→LF 归一化再算 SHA-256（行数统计同消费归一化结果）；verifier fixture 登记哈希按归一化口径核验（codemod 实盘 31 文件 / 33 条 `reviewedArtifacts` 登记，零变更——存量登记本就为 LF 口径；故意错值的负样本 `bad-r19-artifact-hash-mismatch.json` 按判据排除）；`verifier-output.schema.json` 与 `verifier-spec.md` §6.2 措辞改「归一化内容（CRLF→LF）的 SHA-256」——任何 checkout 行尾配置（`core.autocrlf`）下哈希恒稳定，43.0.1 环境侧修复（`.gitattributes`）的机制侧闭环。
+- **恒真不变式防御 + cfg CONSTRAINT 禁用（T3，B1/B10c）**：`tla-logic.ts` 新增业务不变式核验——cfg INVARIANTS 须含 ≥1 条非 Type 类；业务不变式定义体归一化后不得为 `TRUE`、不得与任一 Type 类定义体相同；cfg 出现 `CONSTRAINT`/`CONSTRAINTS` 段即违规（砍状态空间掩盖死锁/爆炸，正道是规格拆解）。四负例 fixture 落 `samples/tla/`（only-type-invariants / tautology / duplicate-of-type / constraint-shrink）。附裁定：cfg 未声明任何 INVARIANTS 时跳过「缺非 Type 业务不变式」判定（否则会改写既有纯死锁冒烟规格 DeadlockDemo 的失败原因）。
+- **图谱收严（T8，A11/A12）**：`graph-logic.ts` 的 depends-on 环检（R5）移出 `phase===1` 四维识别块、**全 phase 执行**（`precedes` 时序环维持 phase=1 限定）；`evidenceStatus=pending` 由放行改为 R15b violation（放行前须转 `confirmed` 或走 `check-exemption` 的 evidence-anchor 豁免；schema 枚举仍含 pending 供豁免登记）；两负例 fixture + graph-guide 承诺项对齐。
+- **RTM/状态机收严（T9，A13/A14/C16）**：`rtm.schema.json` 的 `coverageStatus` 加 `enum: ["100%","部分","待覆盖"]` 并入 `rows.items.required`；`gate-logic.ts` 行级一致性校验提取为具名导出 `checkRtmCoverageStatusConsistency`，缺字段由 `continue` 改 violation；`lib/constants.ts` 新增 `PROJECT_STATUSES`（9 态有序）/ `PROJECT_STATUS_COMPLETED`（终态单点）/ `PROJECT_STATUS_TO_PHASE`（含 phase/displayPhase/completedPhases 双口径），`maturity-logic.ts` 新增 **R7 = `project.status` 转移校验**（合法 = 前向链下一步 ∧ 场景 5 用户批准回退 ∧ 终态不可再迁出；同状态原地更新合法），`wm-status-logic.ts` 派生于同一常数（8/9 双口径收敛）；`project.schema.json` status description 删 `currentPhase` 引用。
+- **`*_token` 盲区消除 + 防复生（T10，决策 4）**：`evidence-export-logic.ts` 的 `isSensitiveKey` 词段分支**取消长度守卫**——任一分隔词段命中敏感词干即脱敏（`refresh_token`/`session_token`/`jwt_token` 全覆盖）；后缀（endsWith）分支维持 ≥6 守卫（`mytoken` 不误伤）；跨分隔符拼接分支语义不变。显式声明保守代价：`token_count` 类计数键会被脱敏。词段分支取**精确相等**（R-B7-1：`endsWith` 会误伤 `mytoken` 且对 `refresh_token` 无增益）；四态用例 + NEGATIVE 登记防复生。**终审修复（I4）**：决策 #4 的「不切驼峰」口径撤销——词段切分前按驼峰边界二次切分（lower/digit→Upper 与大写序列规则），`refreshToken`/`sessionToken`/`jwtToken`/`authToken`/`bearerToken`/`idToken`/`apiToken`/`oAuthToken`/`secretKey`/`apiKey` 十变体全部脱敏（审查者实测此前整键明文）；新增保守代价 `passwordPolicy` 类「敏感词干+非敏感词尾」驼峰键被脱敏（与 `secretKey` 同构不可分离），`mytoken`/`tokens`/`prompt_tokens`/`path`/`durationMs`/中性驼峰键零误伤，决策4a-4g 锁定。
+- **降级须 human 授权（T11，决策 2；规则号 R8）**：`check-maturity.ts` 新增 R8——`level < history 末条 to`（降级形态）时须存在通过 `verifyMaturityApproval` 校验的 human 审批链（复用签名链 v3 + `role=human`/`targetKind=maturity`），无授权降级 blocking（降级无法过闭环五门 = 「不允许降级」的机器化）；**降级专属绑定**（R-B7-7）：`verifyMaturityApproval` 增可选 `requireAction`（不传 = 原行为零漂移），R8 传 `downgrade-approve`，历史 `upgrade-approve` 条目不再天然满足（审查者实跑复现的绕过面已关闭）。规则号让号（R-B7-6）：T9 已占用 R7 = status 转移校验，本规则为 R8、规则号不回收；`check-maturity` 头注释与 AGENTS.md §8 / operational-recovery / SSoT §10C 同步 R1-R8。
+- **R6 第四判定首条 from==L0（T12，决策 3）**：`maturity-logic.ts` history 校验新增第四判定——**首条 `from == 'L0'`**（违者 `R6: history[0] from=<值> ≠ L0（完整升级链须自 L0 起步）`）；空 history 不触发（由既有「空历史 + level≠L0 违规」兜底）；既有三判定（链断裂 / `to > from` / 末条 to ≥ level 允许降级）语义未动。存量迁移动作见下方「迁移」段。
+
+### Fixed（TLA+/BDD 文档与判据、空转 Next）
+
+- **tla-plus.md 修复（T4，B1/B3-B6）**：死锁指引改「终态自环主形态 + 显式豁免兜底」（补 `NoStuckState` 配套不变式模板与理由登记要求，删无理由 `CHECK_DEADLOCK FALSE` 示例）；cfg 内联表达式示例改算子名引用、模板 PROPERTIES 改实际存在算子、悬空 `INVARIANTS TxLifecycle` 修复；§14.3 正例补 `oldestAge'` 重置；示例库去坏（Elevator 补动作去死锁假红、Smokers 集合等式可读化、CallsServiced 补 fairness/删活性断言）；头部字段口径统一 8 字段（`@designIds` 降为可选注记）。
+- **bdd.md 修复（T5，B8）**：D6 `@transitions` 行末事件名 ASCII 判据显式化（非 ASCII 词尾提取不到事件 → D6 end-state mismatch）；`bdd-logic.ts` 补「事件名为空」显式 violation（不再静默 mismatch）。
+- **空转 Next 检测（T7，B10）**：`tla-logic.ts` 新增 `parseCfgNextNames` + `checkIdleNext`——Next 定义体零赋值或全恒等自赋值 → 「空转规格」violation（反模式 #16 家族；引用闭包防子动作误报，`var' =`/`var' \in` 双赋值形态，多 NEXT / 合取聚合判定）；负例 fixture `bad-idle-next.json`（真机 exit 1 实测）；五类退化解负例收口（T3/T7，NEGATIVE-COVERAGE 47 行不新开行、fixture 机制逐行列明）。
+
+### Feat（证据显式化与推导注记）
+
+- **D4 L1 豁免显式 SKIPPED 证据（T6，B7）**：`BddCheckResult` 新增 `tlaEquivalenceSkipped: string[]`（逐条 `[D4:...] SKIPPED(level=1)：…`），`check-bdd-model.ts` 人类报告输出 skipped 段（非空才输出）；证据不进 `dims.tlaEquivalence`/`allViolations`，不影响 `passed`/`exitCode`——「零输出 → 显式证据」与豁免的 pass 语义并行。**终审修复（I3）**：证据补进三个机器面——`--json` 输出全字段 `tlaEquivalenceSkipped`（逐条）、`BDD_JSON` 摘要 `tlaEquivalenceSkippedCount`、gate-log `reportSummary.tlaEquivalenceSkippedCount`（gate-log.schema 的 bddSummary 同步加可选字段；计数不计入 `violationsCount`），三条断言锁在 `bdd-cli.test.ts`。
+- **variableCombination 推导注记（T6，B9）**：`tla-manifest.schema.json` spec 层新增可选 `variableCombinationBasis`（`variables[].name`/`cardinality`，cardinality ≥1，`additionalProperties:false`）；`checkDecomposition` 在 `combo > 1000` 且 kept-below-threshold 分支要求推导注记——缺失 / 基数非法 / 乘积不符 → violation；既有「拆解宣告」与 `MUST_SPLIT`（>2000）语义不变。**终审修复（I5）**：schema 承诺的两处补实现——①`cardinality` 由 `number` 收紧为 **`integer`**（逻辑侧同步 `Number.isInteger`，小数基数 schema/校验双侧拒绝）；②名集合须**覆盖** `.tla` `VARIABLES` 声明的全部状态变量（新增 `extractTlaVariableNames`，剥块注释/行注释、支持多行续行；提取失败/无 `VARIABLES` 行 → 跳过名比对不误红）。
+
+### Docs
+
+- **§0 分节加载导引（T4/T5，B10）**：`tla-plus.md` / `bdd.md` 文件头新增节级加载表（按角色 S/V/G × 任务 建模/门禁/模板/示例/配置 给出「读哪些节」），按需加载替代整文件载入。
+- **终审顺手修（8 项，零判据新增）**：`agent-threat-model.md` T4 机制映射改 sigHash **单一 v3** 口径（删 43.0.0 前的 v1/v2 分流旧描述），T3/T4 已知缺口补「签名链可被全链重算（重签）——链为完整性/审计，非授权」（红队实验 2 边界 b2 随仓登记）；`verifier-spec.md` §6.2.1 与 `command-reference.md` R19 段补归一化哈希**生产侧算法**（LF 落盘下与 raw 等价；CRLF 产物先归一化再算）；`bdd-logic.ts` 的 B8 violation 补 `[scenario:<name>]` 前缀（与同族消息一致）；`samples/graph/bad-depends-on-cycle-phase3.json` 删注入的重复 `depends-on` 边（保留最小成环所需一条，环检出不变）；`check-run-log-cli.test.ts` 临时目录改仓内 `tmpDirs` 约定（修「循环内 makeTmpDir 覆盖变量 → 早轮目录泄漏」）；`gate-logic.ts` 终态判定显式消费 `PROJECT_STATUS_COMPLETED`（终态性与状态表长度解耦）；`eval/e2e/demo-assets/README.md` 登记 `NoOverflowState` 为 2 态抽象的结构性下限占位、非强于 `TypeInvariant`。
+- **裁定登记与权威摘要**：7 项用户决策（规格 §0）与批次 7 七项实施裁定（R-B7-1…R-B7-7）登记 [`decision-log/rounds-49-formalization-gates.md`](./docs/changes/decision-log/rounds-49-formalization-gates.md)；SSoT 新增 §10S 权威摘要与 §10A 追溯行。
+
+### 迁移（R6 / A13 / A12 breaking 的存量项目动作）
+
+- **R6 首条 from==L0（存量 `maturity.json`）**：`history` 首条非 L0 时**前插一条** `{"from":"L0","to":"L1"}`（`at` 取不晚于既有首条时刻——R4 判据为严格早于才违规；`reason` 自述起步基线；既有条目逐字保持——既有末条 `at` 不变则审批时序判据零漂移），否则 `check-maturity` R6 exit 1。参考迁移形态（本批 e2e 装配器同款）：
+  ```json
+  "history": [
+    { "at": "<≤ 既有首条时刻>", "from": "L0", "to": "L1", "reason": "L0 起步基线（43.1.0 决策 #3：完整升级链须自 L0 起步）" },
+    { "at": "<既有首条 at 原值>", "from": "L1", "to": "L2", "reason": "<既有 reason 原值>" }
+  ]
+  ```
+- **RTM coverageStatus（存量 `rtm.json`）**：各行补 `coverageStatus`（`"100%"` / `"部分"` / `"待覆盖"`，按行级完整性判定），缺失或非法值 `check-artifact-gate` exit 1（本批样本 4 处按行级完整性枚举对齐）。
+- **cfg 业务不变式下限（B1a，存量 `.tla`/`.cfg`）**：cfg 的 `INVARIANTS` 须含 **≥1 条非 Type 类**业务不变式（定义体归一化后不得为 `TRUE`、不得与任一 Type 类定义体相同）——只声明 `TypeInvariant` 类不变式的存量 cfg 由放行改 violation（`check-tla-model` exit 1；cfg 未声明任何 `INVARIANTS` 时该判定跳过）。最小动作：在 `.tla` 补一条业务不变式定义（如 `NoOverflowState == state # "overflow"`）并在 cfg 追加 `INVARIANT <名>`；负例形态见 `samples/tla/bad-only-type-invariants.json`、真值同型负例 `bad-tautology-invariant.json` / `bad-duplicate-of-type.json`，正例参考 `eval/e2e/demo-assets/build_workspace.py`（cfg 双 `INVARIANT TypeInvariant` + `INVARIANT NoOverflowState`）。
+- **cfg CONSTRAINT 禁用（B10c，存量 `.cfg`）**：cfg 出现 `CONSTRAINT` / `CONSTRAINTS` 段即 violation（约束砍状态空间会掩盖死锁/状态爆炸，正道是规格拆解）。最小动作：删除该段，改为规格拆解（`decompositionDecision='split-done'`）或修正规格本身；负例形态见 `samples/tla/bad-constraint-shrink.json`。
+- **降级授权条目（R8，存量 `maturity.json`）**：`level < history 末条 to`（降级形态）时须存在 `role=human` / `targetKind=maturity` 且 **`action='downgrade-approve'`** 的签名链条目；旧的 `approve` / `upgrade-approve` 条目不再满足（R-B7-7 降级专属绑定）——无授权降级 `check-maturity` exit 1。可参考形态：`samples/maturity/with-approval/`（`maturity.json` + 同目录 `signature-chain.jsonl`）；负例 `samples/maturity/bad-downgrade-without-approval.json`。
+- **图谱 evidenceStatus=pending（存量 `graph.json`）**：放行前 pending 节点须转 `confirmed`，或经 `check-exemption` 登记 evidence-anchor 豁免（第 6 类 `evidence-anchor-pending`，`ruleId` 填 `R15b`、不带尾空格——CLI `--exemptions` 按「`R15b ` / `[R15b]` / `R15b-`」三种前缀形式过滤违规文本，写 `R15` 命不中 `R15b ` 开头的违规）。`exemption.schema.json` 的 ruleId pattern 为 `^[RC]\d+[a-z]?$`（终审 C1 修复：原 `^[RC]\d+$|^C\d+$` 使 `R15b` 过不了 schema，该迁移写法按字面无法执行；现 `R15b` 经 check-exemption 全流程通过 + `--exemptions` 过滤命中，端到端锁在 `graph-logic.test.ts`）。
+
+**计数影响**：零新增 CLI（48 = 47 exit-2 + 1 self-test，不变）/ references（45 不变）/ persona（36 不变）/ schema 34 份不变（字段级修改 9 份：verifier-output / tla-manifest / rtm / project / graph / maturity / signature-chain / exemption（ruleId 子规则后缀，终审 C1）/ gate-log（bddSummary skipped 计数，终审 I3））；门禁脚本 48 不变；测试文件 113→114（新增 `reviewed-artifacts-normalization.test.ts`，其余为既有文件扩展）；`vitest list` 收集计数 **114 文件 / 2117 用例**（执行侧：prepush 第 12 项全量 vitest exit 0，耗时 1777s；prepush 车道临时 JSON 随车道清理，执行计数不单独留档）；self-test 403→**412**（TLA 15→20、GRAPH 37→39、MATURITY 3→5，其余不变）；samples 新增 10 文件（4 TLA 负例 + depends-on 环 phase3 + pending + idle-next + 无授权降级 + `with-approval/` 2 文件）；eval 语料 68 条不变。
+
+**验证记录**：prepush **19/19 全绿（实测 1793s，2026-10-07 单次；T15 实测）**；self-test 412/412、docs-consistency exit 0、eval 68/68、typecheck exit 0、demo 三门（artifact-gate / maturity / wm-status）exit 0、`lint:security` exit 0（T13b 专项收口 10 项新发现）；全量 vitest（prepush 第 12 项）exit 0（耗时 1777s），规则层覆盖口径（第 13 项，logic+lib 分母重算 75 文件）exit 0——语句 87.41% / 分支 81.23% / 函数 95.68% / 行 89.97%（阈值 80/75/90/85）。专项复跑（T15）：红队实验 1/2/3 全部复现拦截（伪造 VerifierOutput 三变体 exit 1；R9 违规链加 `targetKind:"preventive"` 无痕改写→R6、只重算该条→下游 R2，均 exit 1，阴性对照 exit 0；伪造 run-log 无配套 gate-logs / exitCode 不符 exit 1，一致对照 exit 0）、五类退化解探针 exit 1、B7 `SKIPPED(level=1)` 证据可见、fresh-clone（`core.autocrlf=true`）self-test 412/412。**T15b 处置（demo 三门收口，提交 `6ac5c7bf`）**：T15 登记的三条 `check-tla-model` 红已全部消除——`eval/e2e/demo-assets/build_workspace.py` 的 L1/L2 `.tla` 补 `NoOverflowState` 业务不变式（`BusinessInvariant == /\ TypeInvariant /\ NoOverflowState`）+ 两份 `.cfg` 双 `INVARIANT`（B1a 两条新增红），基准态头取阶段 2+ 形态 `@requirement REQ-001,SD-001`（先行既有头/manifest 漂移），`p1`/`p2plus` 变体改由基准态降级派生、与 `tla_manifest_variant()` 同源；demo 三门（check-requirement-graph / check-bdd-model / check-tla-model）**3/3 exit 0**，主规格 §6 批次验收句达成。重建前按装配器三信号（run-log 行数 104 / `*.bak.*` / 基准外 checkpoint 放行）判为干净基准态、非唯一证据载体，dry-run 预演目录即删；`run_trajectory.sh` / `run_negative_probes.sh` 未整体重跑（覆盖写 `.replay/*.log` 会摧毁 09-27 证据），改以逐形态矩阵复验门禁调用与负向探针前提、`.replay/` 5 文件完整保留。已知局限（诚实登记）：demo 单变量 2 态抽象下 `NoOverflowState` 是「非 Type 下限占位」而非强于 `TypeInvariant`，严格更强须把环值建模为第二变量（波及 BDD/`src` 断言锚点）→ 批次 8 候选。
+
 ## [43.0.1] - 2026-10-07
 
 ### Fixed
 
-- **环境（autocrlf×R19）**：新增 `.gitattributes` 强制全仓 LF 落盘并 renormalize——修复全局 `core.autocrlf=true` 下新 clone 首次 self-test 的 R19 哈希假红（合并期实测发现）。机制侧归一化哈希随 43.1.0 落地。
+- **环境（autocrlf×R19）**：增补 `.gitattributes` 全仓 LF 规则（`* text=auto eol=lf` + 二进制豁免），强制 LF 落盘并 renormalize——修复全局 `core.autocrlf=true` 下新 clone 首次 self-test 的 R19 哈希假红（合并期实测发现）。机制侧归一化哈希随 43.1.0 落地。
 
-**验证记录**：self-test 403/403（renormalize 后回配）；fresh-clone 实证 LF 落盘成立；prepush 19 项全绿（实测耗时见 git log）。
+**验证记录**：self-test 403/403（renormalize 后回配）；fresh-clone 实证 LF 落盘成立；prepush 19 项全绿（热修会话实测；耗时账本未随仓交付）。
 
 ## [43.0.0] - 2026-10-06
 

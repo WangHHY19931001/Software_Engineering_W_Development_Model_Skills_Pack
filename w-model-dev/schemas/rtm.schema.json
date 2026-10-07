@@ -40,7 +40,8 @@
           "unitTest",
           "integrationTest",
           "systemTest",
-          "acceptanceTest"
+          "acceptanceTest",
+          "coverageStatus"
         ],
         "properties": {
           "requirementId": {
@@ -77,7 +78,8 @@
             "type": ["string", "null"]
           },
           "coverageStatus": {
-            "description": "覆盖率状态：\"100%\"=该行追溯完整（全部行完整时矩阵 coveragePercent=100）；\"部分\"=该行存在追溯缺失（coveragePercent 须<100）；\"待覆盖\"=违反约束 #3，不允许（须回退重做）",
+            "description": "覆盖率状态（必填三值枚举，约束 #3）：\"100%\"=该行追溯完整（全部行完整时矩阵 coveragePercent=100）；\"部分\"=该行存在追溯缺失（coveragePercent 须<100）；\"待覆盖\"=违反约束 #3，不允许（须回退重做）。与行级完整性的强一致由 check-artifact-gate P0 行级校验强制（A13）；历史兼容值（如\"完整\"）43.1.0 起不再合法",
+            "enum": ["100%", "部分", "待覆盖"],
             "type": "string"
           },
           "targetValue": {

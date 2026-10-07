@@ -1767,7 +1767,7 @@ interface MaturityConfig {
 3. 查 L0~L3 放行矩阵：✅ 等用户 → 执行 CHECKPOINT 暂停；⚡ 自动放行 → 跳过暂停，run-log append 记录（仅操作型适用；阶段门放行在任何级别都等用户，硬约束 #2）
 4. 检查高风险路径（仅 L3）：命中高风险路径表 → 即使 L3 也强制决策型 CHECKPOINT
 5. 升级判定（每次阶段 8 完成后）：按解锁条件文档语义（operational-recovery.md「升级与降级」，43.0.0 A4 起 unlockConditions 字段已自 schema 移除、无机器校验）询问用户是否升级（决策型 CHECKPOINT，不可自动升级）；用户确认后 O 须以 `role=human / targetKind=maturity` 条目落签名链（绑定 maturity.json），gate 消费 level 前经 `verifyMaturityApproval` 校验（无链即不豁免，fail-closed）
-6. 降级判定（每次 O 系列失败模式命中后）：若 operationalFailures ≥ downgradeTriggers.operationalFailureStreak → 自动降级到 L0（R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）
+6. 降级判定（每次 O 系列失败模式命中后）：若 operationalFailures ≥ downgradeTriggers.operationalFailureStreak → **触发降级评估并暂停**；降级须用户在 🔴 CHECKPOINT 明确确认 + O 落 `role=human / targetKind=maturity`、**`action='downgrade-approve'`** 审批条目后方可更新 level（决策 #2，43.1.0；无条目 → `check-maturity.ts` R8 blocking = 降级无法过闭环五门；**降级专属绑定**——R8 以 `requireAction='downgrade-approve'` 严格过滤 action，升级条目不计入（修复轮 1 R-B7-7 裁定，安全审查实跑复现「升级审批洗白降级」后加固）；R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）
 
 **关键约束**：
 
@@ -1775,7 +1775,7 @@ interface MaturityConfig {
 - **决策型 CHECKPOINT 在所有级别均等用户**：设计方向不可自动决定。
 - **阶段门放行在所有级别均等用户**（HOTL 固定，硬约束 #2）：不随成熟度自动化；L1/L2/L3 差异仅体现在文档仪式与 TLA+/BDD 强度。
 - **升级不可自动**：升级是决策型 CHECKPOINT，须用户显式确认。
-- **降级可自动**：O 系列失败模式连续命中触发自动降级回 L0（R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）。
+- **升级与降级对称走 human 授权（决策 #2，43.1.0；原「降级可自动」语义作废）**：O 系列失败模式连续命中触发降级评估并暂停；降级须用户在 CHECKPOINT 明确确认 + O 落 `role=human / targetKind=maturity`、`action='downgrade-approve'` 审批条目（R8 机器化：无条目 blocking——**判定为降级专属绑定**：仅 `action='downgrade-approve'` 的条目计入，升级条目不计入（修复轮 1 R-B7-7）；应急处置路径 = 用户确认即授权；R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）。
 
 ### 10C.7 阶段完成计数与强制校验（check-maturity.ts）【43.0.0 已退役】
 
@@ -1783,9 +1783,14 @@ interface MaturityConfig {
 > （含 completedCycles）被审计证实为无计算器/零消费死字段，已自 schema 与 check-maturity.ts 删除
 > （原 R3 周期换算校验随之退役，规则号不回收；决策日志 `docs/changes/decision-log/rounds-48-trust-chain.md`）。
 > 阶段完成计数的事实源仍为 run-log 的 `action=checkpoint ∧ outcome=success` 记录（check-run-log R1/R11 承担）；
-> 成熟度侧的机器防线改为 **R6 history 链一致性**（from==上一条 to / to 严格高于 from / 末条 to 不低于
-> level——修复轮 1 放宽：降级后 level 低于末条合法，只锁伪造升级，见 §10R）
-> 与 **level 变更 human 签名链审批**（`verifyMaturityApproval`，fail-closed）。历史条目存档如下，不再生效：
+> 成熟度侧的机器防线改为 **R6 history 链一致性**（首条 from==L0（决策 #3，43.1.0：完整升级链须自 L0 起步）/
+> from==上一条 to / to 严格高于 from / 末条 to 不低于 level——修复轮 1 放宽：降级后 level 低于末条合法，
+> R6 只锁伪造升级，见 §10R）
+> 与 **level 变更 human 签名链审批**（`verifyMaturityApproval`，fail-closed；43.1.0 决策 #2 增
+> **R8 降级须 human 授权**：降级形态同一链条目，无授权 blocking——降级无法过闭环五门；
+> **降级专属绑定**（修复轮 1 R-B7-7）：R8 传 `requireAction='downgrade-approve'` 严格过滤 action，
+> 升级审批条目不计入降级授权）。
+> 历史条目存档如下，不再生效：
 >
 > - ~~阶段完成计数强制递增：编排者 O 须将 `maturity.json.unlockConditions.completedCycles` +1~~
 > - ~~check-maturity.ts 交叉校验 completedCycles 与 checkpoint success 计数，滞后即退出码 1~~
@@ -2477,6 +2482,36 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 
 ---
 
+## 10S. 批次 7：形式化与图谱门禁收严（43.1.0）
+
+**目标**：销账增量规格 §5 批次 7 的 21 项——形式化子系统加固（恒真不变式防御 / 死锁指引 / cfg 指南 / 示例库 / 五类退化解负例 / §0 分节导引）、图谱与 RTM/状态机收严（depends-on 环检全 phase / `evidenceStatus=pending` 违规化 / RTM `coverageStatus` enum+必填 / `project.status` 转移校验 / 8·9 常数统一）、批次 6 跟进五项（归一化哈希机制侧 / 降级 human 授权 / R6 首条 `from==L0` / gate-log 损坏两用例 / D-1 收窄负例）。判据直接收紧、不留兼容（用户 2026-10-07 决策 2/3/4 + 延续「毁弃存量数据」裁定）。
+
+**落点表**（完整清单见增量规格 [specs/2026-10-07-remediation-leftovers-design.md](./superpowers/specs/2026-10-07-remediation-leftovers-design.md) §2 与主规格 §6；实施裁定登记见 [decision-log/rounds-49-formalization-gates.md](./changes/decision-log/rounds-49-formalization-gates.md)）：
+
+| 项 | 落点 |
+| --- | --- |
+| 归一化哈希（T2，决策 1 后半） | lib/reviewed-artifacts.ts（CRLF→LF 后哈希与行数统计）/ verifier-output.schema / verifier-spec §6.2 / samples/verifier 登记哈希按新口径核验（31 文件 / 33 条登记，零变更） |
+| 恒真不变式防御 + cfg CONSTRAINT 禁用（T3，B1/B10c） | tla-logic.ts（checkBusinessInvariants）/ samples/tla 四负例 / NEGATIVE-COVERAGE |
+| tla-plus.md 指南修复（T4，B1/B3-B6） | references/tla-plus.md（死锁指引终态自环主形态 + cfg 算子名引用 + §14.3 + 示例库 + 8 字段口径） |
+| bdd.md D6 判据 + 事件名空 violation（T5，B8/B10） | references/bdd.md / bdd-logic.ts |
+| D4 L1 SKIPPED 证据 + variableCombination 推导注记（T6，B7/B9；终审 I3/I5 补机器面与实现） | bdd-logic.ts（`tlaEquivalenceSkipped`）/ check-bdd-model.ts 报告段 + `--json` 全字段 / `BDD_JSON` 与 gate-log `reportSummary` 计数 / gate-log.schema（bddSummary）/ tla-logic.ts（checkDecomposition + `extractTlaVariableNames` 变量名覆盖 + integer 基数）/ tla-manifest.schema |
+| 五类退化解负例 + 空转 Next 检测（T7，B10） | tla-logic.ts（parseCfgNextNames / checkIdleNext）/ samples/tla/bad-idle-next.json / NEGATIVE-COVERAGE |
+| 图谱收严（T8，A11/A12） | graph-logic.ts（环检全 phase / R15b pending violation）/ graph.schema / samples/graph 两负例 / graph-guide |
+| RTM / 状态机收严（T9，A13/A14/C16） | rtm.schema（coverageStatus enum+必填）/ gate-logic.ts（checkRtmCoverageStatusConsistency）/ lib/constants.ts（PROJECT_STATUSES 等）/ maturity-logic.ts（R7 = project.status 转移校验）/ wm-status-logic.ts / project.schema |
+| 脱敏盲区消除 + 防复生（T10，决策 4；终审 I4 扩面） | evidence-export-logic.ts（词段精确相等，取消长度守卫；I4 起按驼峰边界二次切分——`*Token` 家族与 `secretKey` 全脱敏）/ NEGATIVE-COVERAGE |
+| 降级须 human 授权（T11，决策 2；规则号 R8） | maturity-logic.ts（R8 + verifyMaturityApproval requireAction）/ check-maturity.ts（`downgrade-approve` 专属绑定，R-B7-7）/ maturity.schema / samples/maturity/with-approval |
+| R6 第四判定首条 from==L0（T12，决策 3） | maturity-logic.ts / maturity.schema / data-models / operational-recovery / eval/e2e/demo-assets/build_workspace.py 迁移 |
+| gate-log 损坏两用例 + D-1 收窄负例（T13） | __tests__/check-run-log-cli.test.ts / signature-chain-logic.test.ts（零实现改动） |
+| demo 资产迁移（T15b，B1a 落地） | eval/e2e/demo-assets/build_workspace.py（L1/L2 cfg 双 `INVARIANT` 补 `NoOverflowState` 非 Type 业务不变式 + `.tla` 头 `@requirement`/`@child` 与 `tla_manifest_variant()` 变体降级同源对齐；demo 三门 3/3 exit 0） |
+| lint:security 10 项新发现收口（T13b） | security-scan baseline / tla-logic.ts / wm-status-logic.ts |
+
+- **能力分工（不夸大）**：归一化哈希消除「checkout 行尾配置（`core.autocrlf`）→ 登记哈希假红」的形态漂移，不提供密码学认证（同 §10R 口径）；恒真不变式与空转 Next 为**启发式防御**（保守方向、可能漏报，口径披露在 logic 注释与负例 fixture）；降级授权复用签名链审批记录（既有人类确认，无密钥）；`evidenceStatus=pending` 违规化保留 `check-exemption` 豁免出口——豁免是显式登记而非自动放行（豁免出口的 ruleId 允许子规则后缀 `R15b`，端到端封闭见终审 C1 修复）。
+- **脱敏保守代价登记（I4 终审）**：驼峰边界二次切分使「敏感词干 + 非敏感词尾」驼峰键不可分离——`passwordPolicy` 类键（前段 `password` 命中）与 `token_count` 类计数键（词段恰为 `token`）被保守脱敏，属显式接受代价（决策 #4 / I4，决策 4a-4g 锁定；同款登记见 CHANGELOG 43.1.0 与 `w-model-dev/scripts/samples/NEGATIVE-COVERAGE.md` 的 wm-export-evidence 行）；`mytoken` / `tokens` / `prompt_tokens` / `path` / `durationMs` / 中性驼峰键零误伤。
+- **判据披露**：breaking 的存量处置见 CHANGELOG 43.1.0「迁移」段——R6 存量 history 首条非 L0 时前插 `{"from":"L0","to":"L1"}`（既有条目逐字不动）；RTM 各行补 `coverageStatus`；图谱放行前 pending 转 `confirmed` 或登记豁免（`ruleId=R15b`）；B1a 存量 cfg 补 ≥1 条非 Type 业务不变式；B10c 删 cfg `CONSTRAINT(S)` 段；R8 存量降级须落 `action='downgrade-approve'` 的 human 条目。迁移面已机器扫描（1323 tracked 文件 0 处需迁移，装配器源资产 1 处 + 生成物重建）。
+- **修复轮与实施裁定**：T4 死锁指引主形态改终态自环（R-B7-5）、T7 空转 Next 合取聚合（修复轮 1）、T11 降级专属绑定（R-B7-7，审查者复现的绕过面关闭）、R7/R8 规则号让号（R-B7-6，编号不回收）；T15b demo 资产迁移（B1a 落地 + 头漂移，三门 3/3 exit 0；`NoOverflowState` 为单变量 2 态抽象的非 Type 下限占位，严格更强转批次 8）；其余裁定与转办项（T5 D6 find-first 已知限制、T9 SKILL.md 接线缺口）登记 decision-log 并转批次 8 候选。
+
+---
+
 ## 10.10 系统层级树与多层图谱
 
 > 本节确立系统层级树 + 7 层图谱模型。
@@ -2598,6 +2633,7 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | §10P 阶段 1-4 多角色讨论分析 | A-lead 按「阶段角色集矩阵」并行分派 N persona 视角分析 + 并行多轮交叉至收敛（收敛判据为主、5 轮安全阀为辅）+ 共识纪要承载（S 唯一落笔）+ run-log perspective/consensus 留痕 + `check-role-dispatch` 三新维度（覆盖 phaseRoleCoverage / 时序 / 互异）+ 研制要求子模板（子模板 10 种→11 种）+ V 覆盖核验参考项 | `w-model-dev/references/agent-personas.md`「阶段角色集矩阵」节 + `w-model-dev/subagent/` 3 新 persona + `w-model-dev/references/subagent-delegation.md`「A-lead」节 + `w-model-dev/scripts/logic/role-dispatch-logic.ts` + `w-model-dev/templates/requirement-spec/development-requirements.md` + `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 + 本文档 §10P | 完整（讨论=分析动作，语义质量归 V；D1-D9 已裁定，见 [设计规格](./superpowers/specs/2026-10-03-phase-multi-role-analysis-design.md)） |
 | §10Q 测试系统工程类型学与冒烟准入 | 类型学总登记（层级×方法×策略三维，逐维度映射左右 V 阶段与四级门禁；登记不改变任何既有门禁判定）+ 模块测试显式化（集成的子层，阶段 3 模块维度→阶段 6 前置，D2）+ 冒烟准入（阶段 6/7/8 文档时序机制，零新脚本，D3）+ 测试设计协同绑定（复用 42.11.0 多角色机制，零新角色集，D5） | `w-model-dev/references/quality-standards.md`「测试系统工程类型学」节 + `w-model-dev/references/phase-6-integration-test.md` / `phase-7-system-test.md` / `phase-8-acceptance-test.md`「冒烟准入」节 + `w-model-dev/templates/test-case.md` 冒烟列 + `w-model-dev/references/phase-1-requirements.md` / `phase-2-system-design.md` / `phase-3-outline-design.md` / `phase-4-detailed-design.md`「测试用例设计」承接句 + `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 + `w-model-dev/references/bdd.md` + 本文档 §10Q | 完整（纯文档批次，零新脚本零 schema；D1-D3 推荐采定用户可推翻，见 [设计规格](./superpowers/specs/2026-10-04-test-systems-engineering-design.md)） |
 | §10R 批次 6（43.0.0）信任链关键修复 + legacy 全清除 | sigHash 单一 v3 公式（targetKind/gateExitCode/gateLogPath 入哈希，删 v1/v2 分流）+ VerifierOutput 必填 reviewedArtifacts 与 R19 evidence 归属 + R6 交叉校验默认化（gate-logs 目录约定）+ action enum 32→18 与 legacy 吸收机制全清除 + maturity level 变更 human 审批链与 history 链校验 + budget 死字段删除/estimated 违规化/R1 顺序化 + TLA+ cfg 终止符与 notRun 单一事实 + BDD fail-open 修复 + 脱敏后缀匹配 + 注入三条款与 L0 契约入包 | `w-model-dev/scripts/logic/signature-chain-logic.ts` / `verifier-logic.ts` / `run-log-logic.ts` / `maturity-logic.ts` / `budget-logic.ts` / `tla-logic.ts` + `w-model-dev/schemas/`（signature-chain / verifier-output / run-log / maturity / budget 五份字段级修改）+ `w-model-dev/scripts/cli/check-verifier-output.ts` / `check-run-log.ts` / `check-artifact-gate.ts` / `check-bdd-model.ts` + `w-model-dev/references/verifier-spec.md` / `subagent-delegation.md` / `signature-chain-guide.md` / `operational-recovery.md` / `data-models.md` + 本文档 §10R | 完整（毁弃存量数据不兼容为用户裁定，fixtures 机械重写；伪造成本提升到「须持有产物文件并重算哈希」，不提供密码学认证；见 [修复规格](./superpowers/specs/2026-10-06-w-model-remediation-design.md) §5 与 [裁定登记](./changes/decision-log/rounds-48-trust-chain.md)） |
+| §10S 批次 7（43.1.0）形式化与图谱门禁收严 | 归一化哈希（CRLF→LF 后 SHA-256，对 checkout 行尾配置免疫）+ 恒真不变式防御与 cfg CONSTRAINT 禁用 + tla-plus/bdd 指南修复与 §0 分节导引 + D4 L1 SKIPPED 证据与 variableCombination 推导注记 + 五类退化解负例与空转 Next 检测 + 图谱 depends-on 环检全 phase 与 evidenceStatus=pending violation 化 + RTM coverageStatus enum+必填与 project.status 转移校验（R7）及 8·9 常数统一 + `*_token` 词段命中脱敏 + 降级须 human 授权（R8，downgrade-approve 专属绑定）+ R6 第四判定首条 from==L0 | `w-model-dev/scripts/lib/reviewed-artifacts.ts` / `lib/constants.ts` / `logic/tla-logic.ts` / `bdd-logic.ts` / `graph-logic.ts` / `gate-logic.ts` / `maturity-logic.ts` / `evidence-export-logic.ts` + `w-model-dev/schemas/`（verifier-output / tla-manifest / rtm / project / graph / maturity / signature-chain 七份字段级修改）+ `w-model-dev/scripts/cli/check-bdd-model.ts` / `check-maturity.ts` / `check-run-log.ts` + `w-model-dev/references/tla-plus.md` / `bdd.md` / `graph-guide.md` / `data-models.md` / `operational-recovery.md` + `w-model-dev/scripts/samples/`（TLA/graph/maturity 负例 10 文件）+ `eval/e2e/demo-assets/build_workspace.py`（R6 迁移）+ 本文档 §10S | 完整（判据收紧不留兼容为用户裁定，三处 breaking 的存量迁移见 CHANGELOG 43.1.0「迁移」段；恒真不变式与空转 Next 为启发式防御，pending 违规化保留 check-exemption 豁免出口；见 [增量规格](./superpowers/specs/2026-10-07-remediation-leftovers-design.md) §2 与 [裁定登记](./changes/decision-log/rounds-49-formalization-gates.md)） |
 | 11A 采用路径                                 | greenfield vs brownfield 引入 W 模型                                                                                                                                                                                                                                                                                                                           | `docs/adoption-guide.md`                                                                                                                                                                                                                                                                                                           | 完整（吸收自 addyosmani/agent-skills `docs/adoption-guide.md`）                                                                                                                                     |
 
 ---

@@ -33,13 +33,14 @@
 - **威胁**：不真实运行门禁而谎报退出码；以 LLM 估算替代脚本判定；子代理自评代替独立评审。
 - **攻击面示例**：O 自评「应该能过」直接放行；手写 GATE_JSON 而不跑脚本。
 - **既有机制映射**：既有约束 #9（门禁退出码不可伪）+ 既有约束 #4（真实执行）——Agent 在 🔴 CHECKPOINT 处以脚本退出码为准，不得 LLM 估算（**检测**——退出码与 process.exit 强一致在**官方门禁链内**成立，约束本身属流程约束；绕过官方链谎报退出码 / 手写 gate 记录不可检测，故整体为检测级，[hard-constraints.md](hard-constraints.md)）；gate 记录由 G 角色独占产出（**流程**，[subagent-delegation.md](subagent-delegation.md) 角色边界）；`check-verifier-output` R13 单轴下限防评审漂移（**检测**）。
+- **已知缺口**：签名链可被全链重算（重签）——链为完整性 / 审计，**非授权机制**（无密钥、无外部签名）；持有工具与写权限者可重算整链使 R6/R11 自洽，检测力上限即「无痕改写被抓、整体重签不被抓」。
 
 ### T4 字节篡改与抵赖（产物改后声明不变）
 
 - **威胁**：产物在「声明已验证」之后被篡改，或对验证过的字节内容抵赖。
 - **攻击面示例**：签名链条目声称验证过的文件内容已被改；导出证据包被替换。
-- **既有机制映射**：签名链 sigHash v1/v2 + R11（v2 链 `sourceArtifacts[].sha256` 必填并按 algo 分流重算）（**检测**，[signature-chain-guide.md](signature-chain-guide.md)）；GATE_JSON `verifiedArtifacts` 字节清单（**检测**，批次 3 B2）；evidence provenance source-bound 重验（**检测**，**非密码学签名**——按既有边界如实标注）；code-health RevisionIdentity / EvidenceBinding / canonical 重算（**阻断**，SSoT §10K.3）；archive manifest SHA-256（**检测**，完整性校验和**非签名**）。
-- **已知缺口**：gate-log↔签名链跨文件「声明 vs 真实字节」自动核查未建（批次 3 既有登记：v2 只使字节声明不可抵赖）。
+- **既有机制映射**：签名链 sigHash **单一 v3 公式** + R11 单公式重算（14 字段全量入哈希，`targetKind`/`gateExitCode`/`gateLogPath` 参与；v1/v2 分流与 `sigHashAlgo` 多值枚举已于 43.0.0 A1 删除）（**检测**，[signature-chain-guide.md](signature-chain-guide.md)）；GATE_JSON `verifiedArtifacts` 字节清单（**检测**，批次 3 B2）；evidence provenance source-bound 重验（**检测**，**非密码学签名**——按既有边界如实标注）；code-health RevisionIdentity / EvidenceBinding / canonical 重算（**阻断**，SSoT §10K.3）；archive manifest SHA-256（**检测**，完整性校验和**非签名**）。
+- **已知缺口**：gate-log↔签名链跨文件「声明 vs 真实字节」自动核查未建（批次 3 既有登记：签名只使字节声明不可抵赖）；签名链可被全链重算（重签）——链为完整性 / 审计，**非授权机制**。
 
 ### T5 越权实施（编排者越权 / 绕过受控写入）
 

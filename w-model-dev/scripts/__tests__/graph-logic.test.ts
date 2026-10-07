@@ -1872,3 +1872,188 @@ describe('check-requirement-graph CLI 锚点基准解析（D2 回归：gitignore
     }
   });
 });
+
+// ==================== A11/A12 图谱收严（批次 7 任务 8，43.1.0 breaking） ====================
+describe('A11/A12 图谱收严（批次 7 任务 8）', () => {
+  const GRAPH_SAMPLES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/graph');
+
+  /** 读取 samples/graph fixture（受控目录，路径由本文件常量拼接） */
+  async function readGraphFixture(file: string): Promise<GraphShape> {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 常量目录 + 受控文件名（同 D2 describe 先例）
+    const raw = await fs.readFile(path.join(GRAPH_SAMPLES, file), 'utf-8');
+    return JSON.parse(raw) as GraphShape;
+  }
+
+  /** 两节点 phase=1 纯 REQ 合法图（锚点合规；仅 evidenceStatus 可变） */
+  function makeStatusGraph(evidenceStatus: 'confirmed' | 'pending'): GraphShape {
+    return {
+      version: 1,
+      currentPhase: 1,
+      nodes: [
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: '用户登录',
+          summary: '登录',
+          level: 1,
+          evidenceAnchor: 'docs/req.md:§4=登录需密码',
+          evidenceStatus,
+        },
+        {
+          id: 'REQ-002',
+          type: 'REQ',
+          phase: 1,
+          title: '密码策略',
+          summary: '密码',
+          level: 2,
+          reqGroup: 'REQ-001',
+          evidenceAnchor: 'docs/req.md:§4=登录需密码',
+          evidenceStatus,
+        },
+      ],
+      edges: [
+        { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
+        { from: 'REQ-001', to: 'REQ-002', type: 'produces' },
+      ],
+    };
+  }
+
+  it('A11：phase=3 图 depends-on 成环 → violation（环检测不再限于 phase 1）', async () => {
+    // 正例基线：valid-phase3 fixture 在 phase=3 零违规通过（收严不得误红既有正例）
+    const base = await readGraphFixture('valid-phase3.json');
+    const ok = checkRequirementGraph(base, 3);
+    expect(ok.passed, '正例基线：valid-phase3 在 phase=3 应零违规通过').toBe(true);
+    expect(
+      ok.violations.some((v) => v.includes('R5')),
+      '正例基线不应含 R5 违规',
+    ).toBe(false);
+
+    // 注入 SD-001→SD-002→SD-001 depends-on 环（depends-on 边不参与 parent/produces 语义，环是唯一新增违规源）
+    const cycled = JSON.parse(JSON.stringify(base)) as GraphShape;
+    cycled.edges.push(
+      { from: 'SD-001', to: 'SD-002', type: 'depends-on' },
+      { from: 'SD-002', to: 'SD-001', type: 'depends-on' },
+    );
+    const bad = checkRequirementGraph(cycled, 3);
+    expect(bad.passed, 'phase=3 图 depends-on 成环应 fail').toBe(false);
+    expect(
+      bad.violations.some((v) => v.includes('R5') && v.includes('depends-on')),
+      'phase=3 图 depends-on 成环应报 R5 依赖无环违规（A11 之前环检测仅 phase=1 执行，阶段 2-4 环结构带病放行）',
+    ).toBe(true);
+  });
+
+  it('A12a：evidenceStatus=pending → violation（放行前阻断，豁免走 check-exemption）', () => {
+    const out = checkRequirementGraph(makeStatusGraph('pending'), 1);
+    expect(out.passed, 'pending 节点在放行前应被阻断（A12a 之前 pending 放行）').toBe(false);
+    const violation = out.violations.find((v) => v.startsWith('R15b ') && v.includes('pending'));
+    expect(violation, 'pending 应产生 R15b violation（文案点名放行前阻断与豁免出口）').toBeDefined();
+    expect(violation).toContain('放行前 pending 节点须转 confirmed 或走 evidence-anchor 豁免（check-exemption）');
+    expect(
+      violation?.includes('REQ-001') && violation?.includes('REQ-002'),
+      'violation 应逐一点名 pending 节点 id',
+    ).toBe(true);
+  });
+
+  it('A12b：evidenceStatus=confirmed/锚点合规 → 零违规（既有行为不回归）', () => {
+    const out = checkRequirementGraph(makeStatusGraph('confirmed'), 1);
+    expect(out.violations, 'confirmed + 合法锚点不应产生任何违规（既有放行行为不回归）').toEqual([]);
+    expect(out.passed, 'confirmed + 合法锚点应通过').toBe(true);
+  });
+});
+
+// ==================== C1（终审修复波）：evidence-anchor-pending 豁免出口端到端可达 ====================
+describe('C1：check-requirement-graph --exemptions 的 R15b 豁免出口（端到端）', () => {
+  const CLI = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../cli/check-requirement-graph.ts');
+  const PENDING_SAMPLE = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '../samples/graph/bad-evidence-status-pending.json',
+  );
+
+  /**
+   * 按 samples/graph/bad-evidence-status-pending.json 的既有形态构造「全节点 pending」phase-1 图，
+   * 差异仅在锚点：样本首节点的 `docs/phase1-requirements/requirement-spec.md` 在盘不存在
+   * （样本自带 R15c 违规），本用例把全部锚点改指向树内真实存在的 `anchors/evidence.md`，
+   * 使 R15b 成为**唯一**违规源——出口是否可达才由单一变量锁定（C1 审查者复现形态）。
+   */
+  async function buildTree(): Promise<{ root: string; graph: string }> {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-c1-exemption-'));
+    const graph = path.join(root, 'graph.json');
+    // .git/ 使 resolveAnchorBaseDir 以树根为基准（锚点按项目根相对路径解析）
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp 自有临时目录内的受控目录树
+    await fs.mkdir(path.join(root, '.git'), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，受控锚点目录
+    await fs.mkdir(path.join(root, 'anchors'), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，受控锚点目标文件
+    await fs.writeFile(path.join(root, 'anchors', 'evidence.md'), '# C1 锚点目标（内容无关，存在即可）\n', 'utf-8');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 仓内受控 fixture 读取
+    const sample = JSON.parse(await fs.readFile(PENDING_SAMPLE, 'utf-8')) as GraphShape;
+    for (const n of sample.nodes) {
+      n.evidenceAnchor = `anchors/evidence.md:§3=${n.id} pending 待验证`;
+      n.evidenceStatus = 'pending';
+    }
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp 自有临时目录内的受控图文件
+    await fs.writeFile(graph, JSON.stringify(sample, null, 2), 'utf-8');
+    return { root, graph };
+  }
+
+  /** granted.json（check-exemption approve 的落盘形态：grantedExemptions[].ruleId） */
+  async function writeGranted(root: string, ruleId: string): Promise<string> {
+    const file = path.join(root, 'granted.json');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp 自有临时目录内的受控豁免文件
+    await fs.writeFile(file, JSON.stringify({ grantedExemptions: [{ ruleId }] }), 'utf-8');
+    return file;
+  }
+
+  function runCli(graph: string, extraArgs: string[]): { exitCode: number | null; stdout: string; stderr: string } {
+    const r = runSync(process.execPath, [tsxCli, CLI, graph, '--phase=1', '--json', ...extraArgs], {
+      cwd: path.dirname(graph),
+    });
+    return { exitCode: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
+  }
+
+  it('未豁免：R15b pending 阻断且为唯一违规源（exit 1）', async () => {
+    const tree = await buildTree();
+    try {
+      const r = runCli(tree.graph, []);
+      expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(1);
+      const report = JSON.parse(r.stdout) as { passed: boolean; reasons: string[] };
+      expect(report.passed).toBe(false);
+      expect(report.reasons, 'R15b 应为唯一违规源（锚点全部落在树内真实文件，无 R15c）').toHaveLength(1);
+      expect(report.reasons[0]).toContain('R15b pending 未核验');
+    } finally {
+      await fs.rm(tree.root, { recursive: true, force: true });
+    }
+  });
+
+  it('granted ruleId=R15b：pending 豁免生效 → exit 0（C1 修复后出口可达）', async () => {
+    const tree = await buildTree();
+    try {
+      const granted = await writeGranted(tree.root, 'R15b');
+      const r = runCli(tree.graph, [`--exemptions=${granted}`]);
+      expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+      const report = JSON.parse(r.stdout) as { passed: boolean; reasons: string[] };
+      expect(report.passed, 'R15b 豁免生效后应放行（pending 节点已登记豁免出口）').toBe(true);
+      expect(report.reasons).toEqual([]);
+    } finally {
+      await fs.rm(tree.root, { recursive: true, force: true });
+    }
+  });
+
+  it('granted ruleId=R15（审查者复现的写法）：前缀命不中 R15b 违规 → 仍 exit 1（负例锁）', async () => {
+    const tree = await buildTree();
+    try {
+      const granted = await writeGranted(tree.root, 'R15');
+      const r = runCli(tree.graph, [`--exemptions=${granted}`]);
+      expect(r.exitCode, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(1);
+      const report = JSON.parse(r.stdout) as { passed: boolean; reasons: string[] };
+      expect(report.passed).toBe(false);
+      expect(
+        report.reasons.some((v) => v.startsWith('R15b pending 未核验')),
+        'R15 不得命中 R15b（前缀过滤仅认 `R15b ` / `[R15b]` / `R15b-`——迁移指引必须写 R15b）',
+      ).toBe(true);
+    } finally {
+      await fs.rm(tree.root, { recursive: true, force: true });
+    }
+  });
+});

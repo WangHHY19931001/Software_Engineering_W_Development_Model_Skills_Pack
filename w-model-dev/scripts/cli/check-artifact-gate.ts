@@ -343,6 +343,8 @@ async function readMaturity(projectDir: string): Promise<MaturityApprovalInput |
 /**
  * 装载 `.w-model/signature-chain.jsonl`（A4 成熟度豁免审批链；容错读取）：
  * 文件不存在 → 空数组；逐行 JSON 解析失败的坏行跳过（坏行无法通过 v3 重算，天然不构成合法审批）；
+ * 合法 JSON 但非对象的整行（`null` / 数组 / 标量）同样跳过——放行会推进到 `[UNEXPECTED]` exit 2
+ * （批次 7 任务 11 修复轮 1 审查实跑复现，与 check-maturity 同口径）；
  * 整文件读取失败 → 空数组。三形态（无链 / 坏链 / 缺文件）最终都收敛为「不豁免」（fail-closed）。
  */
 async function loadSignatureChainIfExists(projectDir: string): Promise<SignatureChainEntry[]> {
@@ -359,7 +361,10 @@ async function loadSignatureChainIfExists(projectDir: string): Promise<Signature
     const trimmed = line.trim();
     if (trimmed === '') continue;
     try {
-      entries.push(JSON.parse(trimmed) as SignatureChainEntry);
+      const parsed: unknown = JSON.parse(trimmed);
+      // 非对象行（null / 数组 / 标量）跳过：无法通过 verifyMaturityApproval 的字段判定
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+      entries.push(parsed as SignatureChainEntry);
     } catch {
       /* 坏行不构成审批（fail-closed）：JSON 不完整即无法通过 verifyMaturityApproval 的 v3 重算 */
     }

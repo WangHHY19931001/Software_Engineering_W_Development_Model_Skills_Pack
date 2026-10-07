@@ -325,7 +325,7 @@ interface MaturityConfig {
     at: string;
     reason: string;
   }>;
-  /** 降级触发条件（自动降级回 L0） */
+  /** 降级触发条件（命中即触发降级评估；降级须 human 授权——43.1.0 决策 #2 收紧，原「自动降级回 L0」作废） */
   downgradeTriggers: {
     /** 连续 O 系列失败模式命中 ≥ 此值 */
     operationalFailureStreak: number;
@@ -379,7 +379,7 @@ interface MaturityConfig {
    - 若全部达标 → 询问用户是否升级（决策型 CHECKPOINT，不可自动升级）
    - 用户确认 → 更新 maturity.json.level + history
 6. 降级判定（每次 O 系列失败模式命中后）：
-   - 若 operationalFailures ≥ downgradeTriggers.operationalFailureStreak → 自动降级到 L0
+   - 若 operationalFailures ≥ downgradeTriggers.operationalFailureStreak → 触发降级评估并暂停；降级须用户在 CHECKPOINT 明确确认 + O 落 role=human / targetKind=maturity 审批条目（43.1.0 决策 #2；无条目 check-maturity R8 blocking）
    - run-log append 降级记录
 ```
 

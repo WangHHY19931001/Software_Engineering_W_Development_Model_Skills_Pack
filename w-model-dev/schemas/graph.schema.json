@@ -68,7 +68,7 @@
             "minLength": 1
           },
           "evidenceStatus": {
-            "description": "证据状态（阶段 1-4 全节点必填）：confirmed=已核验（须在签名链中存在引用本节点的 V review 环，R15e 校验）；pending=基于逻辑推理尚未验证（阶段门放行前被扫描阻断，须补验证转 confirmed 或走 exemption 的 evidence-anchor-pending 豁免）。语义区别于 coverageStatus.partial（后者意为覆盖不完整）。",
+            "description": "证据状态（阶段 1-4 全节点必填）：confirmed=已核验（须在签名链中存在引用本节点的 V review 环，R15e 校验）；pending=基于逻辑推理尚未验证（放行前 pending 节点须转 confirmed 或走 evidence-anchor 豁免（check-exemption））。语义区别于 coverageStatus.partial（后者意为覆盖不完整）。",
             "type": "string",
             "enum": ["confirmed", "pending"]
           }

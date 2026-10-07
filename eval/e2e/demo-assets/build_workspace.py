@@ -302,13 +302,16 @@ test('UAT-002 REQ-002 Inc 与 Reset 行为', () => {
 ''')
 
 # ---------- TLA+ L1/L2（真实 SANY/TLC 可执行） ----------
+# 基准态 .tla = 阶段 2+／终态形态：@requirement 含 SD 标识（tla-plus.md §3 要求每个 spec 的
+# requirementIds 至少含 1 个 SD-xxx；阶段 2+ 的 manifest 变体正是 [REQ-xxx, SD-001]），
+# 与 .w-model/tla-manifest.json（= variant(4)）双向一致。阶段 1 变体由基准态降级派生。
 write('tla/L1_counter.tla', '''---- MODULE L1_counter ----
 EXTENDS Naturals
 VARIABLES state
 
 (*
   @system      counter-api
-  @requirement REQ-001
+  @requirement REQ-001,SD-001
   @design      docs/system-design.md#3.1
   @parent      null
   @sibling     null
@@ -323,16 +326,23 @@ Reset == state = "counting" /\\ state' = "zeroed"
 Next == \\/ Inc \\/ Reset
 Spec == Init /\\ [][Next]_state
 TypeInvariant == state \\in {"zeroed", "counting"}
+
+\\* 业务不变式（名字不以 Type 开头，非 Type 类，满足 B1 业务不变式下限）：
+\\* @designRef docs/system-design.md#3.1 环形计数器取值有界（REQ-001 / UAT-001 取值 0..10），
+\\* 规格状态机永不进入溢出态
+NoOverflowState == state # "overflow"
 BusinessInvariant == /\\ TypeInvariant
+                      /\\ NoOverflowState
 ====
 ''')
-# 阶段 1 变体：L1 尚无 L2 子规格（文件头 @child null，与 manifest.p1 双向一致）
+# 阶段 1 变体：L1 尚无 L2 子规格 + requirementIds 不含 SD 标识（文件头 @child / @requirement
+# 与 manifest.p1 双向一致；两个字段的降级与 tla_manifest_variant(1) 同源）
 _p1_tla = open(os.path.join(ROOT, 'tla', 'L1_counter.tla'), encoding='utf-8').read().replace(
-    '@child       tla/L2_counter_service.tla', '@child       null')
+    '@child       tla/L2_counter_service.tla', '@child       null').replace(
+    '@requirement REQ-001,SD-001', '@requirement REQ-001')
 write('tla/L1_counter.p1.tla', _p1_tla)
-_p2_tla = open(os.path.join(ROOT, 'tla', 'L1_counter.tla'), encoding='utf-8').read().replace(
-    '@requirement REQ-001', '@requirement REQ-001,SD-001')
-write('tla/L1_counter.p2plus.tla', _p2_tla)
+# 阶段 2+ 变体与基准态同形（基准态已是阶段 2+ 形态，无需再注入 SD 标识）
+write('tla/L1_counter.p2plus.tla', open(os.path.join(ROOT, 'tla', 'L1_counter.tla'), encoding='utf-8').read())
 write('features/L2/L2_counter_service-001.feature', '''# features/L2/L2_counter_service-001.feature
 # @req: REQ-002
 # @design: SD-001
@@ -379,7 +389,11 @@ Scenario: 服务层复位回到零态
   And 不变式 "BusinessInvariant" 应成立
 ''')
 write('tla/L1_counter.cfg', '''SPECIFICATION Spec
+
+\\* INVARIANTS 须与 .tla BusinessInvariant 展开集合完全相等（tla-plus.md §11）；
+\\* NoOverflowState 属业务不变式（非 Type 类），满足 B1 业务不变式下限
 INVARIANT TypeInvariant
+INVARIANT NoOverflowState
 ''')
 write('tla/L2_counter_service.tla', '''---- MODULE L2_counter_service ----
 EXTENDS Naturals
@@ -402,11 +416,20 @@ Reset == state = "counting" /\\ state' = "zeroed"
 Next == \\/ Inc \\/ Reset
 Spec == Init /\\ [][Next]_state
 TypeInvariant == state \\in {"zeroed", "counting"}
+
+\\* 业务不变式（名字不以 Type 开头，非 Type 类，满足 B1 业务不变式下限）：
+\\* @designRef docs/system-design.md#3.2 计数服务自增/复位不越界（REQ-002），永不进入溢出态
+NoOverflowState == state # "overflow"
 BusinessInvariant == /\\ TypeInvariant
+                      /\\ NoOverflowState
 ====
 ''')
 write('tla/L2_counter_service.cfg', '''SPECIFICATION Spec
+
+\\* INVARIANTS 须与 .tla BusinessInvariant 展开集合完全相等（tla-plus.md §11）；
+\\* NoOverflowState 属业务不变式（非 Type 类），满足 B1 业务不变式下限
 INVARIANT TypeInvariant
+INVARIANT NoOverflowState
 ''')
 
 # ---------- BDD L1 feature ----------
@@ -533,7 +556,12 @@ write_json('.w-model/maturity.json', {
   'leveledUpAt': '2026-09-19T03:00:00+08:00',
   # 43.0.0 A4：unlockConditions 与 downgradeTriggers.budgetBurnRateExceeded / .checkpointRejectionStreak
   # 预留死字段已自 schema 删除（毁弃存量；downgradeTriggers 本身保留 operationalFailureStreak + userRequested）
-  'history': [{'at': '2026-09-19T03:00:00+08:00', 'from': 'L1', 'to': 'L2', 'reason': 'e2e 调测项目按生产小项目定级'}],
+  # 43.1.0 决策 #3：R6 第四判定要求完整升级链须自 L0 起步——首条 L0→L1（at 取 project.createdAt 同刻，
+  # R4 判据为严格早于才违规），既有 L1→L2 定级条目保持原样（末条 at 不变，审批时序判据零漂移）。
+  'history': [
+    {'at': '2026-09-19T03:00:00+08:00', 'from': 'L0', 'to': 'L1', 'reason': 'L0 起步基线（决策 #3 43.1.0：完整升级链须自 L0 起步）'},
+    {'at': '2026-09-19T03:00:00+08:00', 'from': 'L1', 'to': 'L2', 'reason': 'e2e 调测项目按生产小项目定级'},
+  ],
   'downgradeTriggers': {'operationalFailureStreak': 3, 'userRequested': False},
 })
 write_json('.w-model/budget.json', {
@@ -651,16 +679,16 @@ write_json('.w-model/bdd/reports/report.json', {
 rows = [
   {'requirementId': 'REQ-001', 'description': '环形计数器取值 [0,10]', 'designDoc': 'SD-001,INTF-001,DD-001',
    'codeModule': 'SD-001:src/counter.ts:L1', 'unitTest': 'TC-UNIT-001', 'integrationTest': 'TC-INT-001',
-   'systemTest': 'TC-SYS-001', 'acceptanceTest': 'docs/acceptance-test-design.md#UAT-001', 'coverageStatus': '完整'},
+   'systemTest': 'TC-SYS-001', 'acceptanceTest': 'docs/acceptance-test-design.md#UAT-001', 'coverageStatus': '100%'},
   {'requirementId': 'REQ-002', 'description': 'Inc 自增与 Reset 复位', 'designDoc': 'SD-001,INTF-001,DD-001',
    'codeModule': 'SD-001:src/counter.ts:L1', 'unitTest': 'TC-UNIT-002', 'integrationTest': 'TC-INT-002',
-   'systemTest': 'TC-SYS-002', 'acceptanceTest': 'docs/acceptance-test-design.md#UAT-002', 'coverageStatus': '完整'},
+   'systemTest': 'TC-SYS-002', 'acceptanceTest': 'docs/acceptance-test-design.md#UAT-002', 'coverageStatus': '100%'},
   {'requirementId': 'NFR-001', 'description': '响应时间 P95 ≤ 200ms', 'designDoc': 'SD-001',
    'codeModule': '横切', 'unitTest': '', 'integrationTest': '', 'systemTest': '', 'acceptanceTest': '',
-   'coverageStatus': '完整', 'targetValue': 'P95 ≤ 200ms（生产环境）', 'testThreshold': 'P95 ≤ 250ms（测试环境基线）'},
+   'coverageStatus': '100%', 'targetValue': 'P95 ≤ 200ms（生产环境）', 'testThreshold': 'P95 ≤ 250ms（测试环境基线）'},
   {'requirementId': 'CON-001', 'description': '零 npm 运行时依赖', 'designDoc': 'SD-001',
    'codeModule': '横切', 'unitTest': '', 'integrationTest': '', 'systemTest': '', 'acceptanceTest': '',
-   'coverageStatus': '完整'},
+   'coverageStatus': '100%'},
 ]
 write_json('.w-model/rtm.json', {
   'schemaVersion': '1.0', 'projectId': 'counter-api', 'currentPhase': 8,

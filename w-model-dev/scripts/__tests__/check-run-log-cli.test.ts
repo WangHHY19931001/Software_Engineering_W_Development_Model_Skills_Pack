@@ -8,6 +8,8 @@
  *   - gate-logs 目录整体缺失且存在带 gateLogPath + 数字 gateExitCode 的 gate 记录 → 一条汇总 blocking；
  *   - 目录在场但记录引用文件缺失/不可读 → blocking `gate-log 文件缺失`；
  *   - 文件在场但顶层 exitCode 与记录 gateExitCode 不符 → blocking `gate-log exitCode 与记录不符`；
+ *   - 文件在场但非 JSON / 顶层 exitCode 非 number → 同一条 `gate-log exitCode 与记录不符`
+ *     （fail-closed：默认路径不回退旧 `*_JSON {...}` 摘要提取，损坏证据不得被静默吞掉）；
  *   - 文件在场且 exitCode 一致 → exit 0（不再需要 --gate-logs）。
  *
  * 判定口径与 logic 层 R6 交叉校验前置一致（`gateLogPath` 已设且 `gateExitCode` 为 number）；
@@ -29,13 +31,22 @@ const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const RUN_LOG_CLI = path.resolve(TEST_DIR, '../cli/check-run-log.ts');
 
 let tmpDir: string;
+/**
+ * 本文件全部临时目录（仓内 tmpDirs 约定，同 change-scope / check-coding-plan 测试）：
+ * T13 的两处「循环内 makeTmpDir」会把 tmpDir 变量覆盖成最后一个，earlier 目录在 afterEach
+ * 只清最后一处 → 临时目录泄漏；改为入账数组、afterEach 全量清理（每轮仍独立目录，保住用例隔离）。
+ */
+const tmpDirs: string[] = [];
 
 afterEach(async () => {
-  if (tmpDir) await fs.rm(tmpDir, { recursive: true, force: true });
+  for (const dir of tmpDirs.splice(0)) {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 });
 
 async function makeTmpDir(): Promise<string> {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-run-log-r6-default-'));
+  tmpDirs.push(tmpDir);
   return tmpDir;
 }
 
@@ -174,6 +185,15 @@ async function writeCompanionGateLog(name: string, exitCode: number): Promise<vo
   await fs.writeFile(path.join(dir, name), JSON.stringify(gateLogPayload(exitCode)), 'utf8');
 }
 
+/** 在 tmpDir 下写同目录约定 gate-logs/ 伴生**原始内容**（损坏态 fixture，不经过 JSON 序列化）。 */
+async function writeCompanionGateLogRaw(name: string, content: string): Promise<void> {
+  const dir = path.join(tmpDir, 'gate-logs');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- dir 由本测试创建于 os.tmpdir() 下的固定临时目录拼装
+  await fs.mkdir(dir, { recursive: true });
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 同上，fixture 写入
+  await fs.writeFile(path.join(dir, name), content, 'utf8');
+}
+
 interface JsonReportShape {
   passed: boolean;
   reasons: string[];
@@ -230,6 +250,49 @@ describe('check-run-log R6 交叉校验默认化（批次 6 A3 后半，不传 -
     const report = JSON.parse(r.stdout) as JsonReportShape;
     const r6 = report.reasons.filter((v) => v.startsWith('R6:'));
     expect(r6.some((v) => v.includes('gate-log exitCode 与记录不符：gate-logs/gate-evidence.json'))).toBe(true);
+  });
+
+  it('gate-log 非 JSON → 默认路径 R6 fail-closed exit 1', async () => {
+    // 两形态同判：(a) 纯垃圾内容；(b) 含旧 `*_JSON {...}` 摘要标记但整体非 JSON 文档——
+    // (b) 若默认路径回退旧摘要提取即可读出 exitCode=0 与记录一致而放行，故一并锁定
+    // 「损坏证据 fail-closed，不回退旧提取路径」。
+    for (const [label, content] of [
+      ['纯非 JSON 内容', '<not-json truncated'],
+      ['含旧 BUDGET_JSON 摘要标记但非 JSON 文档', 'BUDGET_JSON {"exitCode":0,"passed":true}\n<not-json truncated'],
+    ] as const) {
+      await makeTmpDir();
+      await writeCompanionGateLogRaw('broken.json', content);
+      const runLog = await writeRunLog(validRunLogLines('gate-logs/broken.json'));
+      const r = runCli(runLog);
+      expect(r.code, `${label}: stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(1);
+      const report = JSON.parse(r.stdout) as JsonReportShape;
+      expect(report.passed, label).toBe(false);
+      const r6 = report.reasons.filter((v) => v.startsWith('R6:'));
+      expect(r6, label).toEqual([expect.stringContaining('R6: gate-log exitCode 与记录不符：gate-logs/broken.json')]);
+      expect(r6[0], label).toContain('gate-log 未提取到合法顶层 exitCode');
+    }
+  });
+
+  it('gate-log 顶层 exitCode 非 number → 默认路径 R6 fail-closed exit 1', async () => {
+    // 伪造形态：JSON 合法、passed/摘要字段齐备，仅顶层 exitCode 类型被换掉（字符串 "0" / null / true）。
+    // 默认路径只认「顶层 exitCode 为 number」，类型不符一律按不符 fail-closed，不得按真值比较放行。
+    for (const [label, exitCode] of [
+      ['字符串 "0"', '0'],
+      ['null', null],
+      ['boolean true', true],
+    ] as const) {
+      await makeTmpDir();
+      const payload: Record<string, unknown> = { ...gateLogPayload(0), exitCode };
+      await writeCompanionGateLogRaw('spoofed.json', JSON.stringify(payload));
+      const runLog = await writeRunLog(validRunLogLines('gate-logs/spoofed.json'));
+      const r = runCli(runLog);
+      expect(r.code, `${label}: stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(1);
+      const report = JSON.parse(r.stdout) as JsonReportShape;
+      expect(report.passed, label).toBe(false);
+      const r6 = report.reasons.filter((v) => v.startsWith('R6:'));
+      expect(r6, label).toEqual([expect.stringContaining('R6: gate-log exitCode 与记录不符：gate-logs/spoofed.json')]);
+      expect(r6[0], label).toContain('gate-log 未提取到合法顶层 exitCode');
+    }
   });
 
   it('gate-log 在场且 exitCode 一致 → exit 0（不再需要 --gate-logs）', async () => {

@@ -89,6 +89,11 @@
         "checkedAt": { "type": "string", "format": "date-time", "description": "BDD 校验执行时间。" },
         "summary": { "type": "string", "description": "BDD 校验结论摘要。" },
         "violationsCount": { "type": "integer", "minimum": 0, "description": "BDD 违规数量。" },
+        "tlaEquivalenceSkippedCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "D4 L1 豁免的显式 SKIPPED(level=1) 证据条数（B7/I3；证据不是违规，不计入 violationsCount）。"
+        },
         "exitCode": {
           "type": "integer",
           "enum": [0, 1, 2],

@@ -39,11 +39,11 @@
       "enum": ["O", "S", "A", "V", "G", "R", "human"]
     },
     "action": {
-      "description": "动作类型（如 chunk/cross/produce/review/gate/checkpoint/locate/fix），与 run-log action 对应",
+      "description": "动作类型（如 chunk/cross/produce/review/gate/checkpoint/locate/fix），与 run-log action 对应。成熟度审批条目另用降级专属值 downgrade-approve（43.1.0 决策 #2：check-maturity R8 经 verifyMaturityApproval 的 requireAction 严格绑定该值，且 action 在 v3 sigHash 内、改动即被 R6 防篡改重算抓获）；升级审批条目无机器校验，既有流程与样本用 approve（仅语义登记）",
       "type": "string"
     },
     "targetKind": {
-      "description": "返工链语义分类（D-1；43.0.0 v3 起入 sigHash，无痕改写即被 R6 抓获）：rootcause=复审 R 报告（RootCauseReport）；preventive=预防性审查（R3 报告）；iceberg=冰山扫掠报告；maturity=成熟度评定（A4：maturity 豁免 human 审批条目，check-artifact-gate 消费 level 前经 verifyMaturityApproval 校验）；standard=默认/非返工语境。用于 R9 来源矩阵例外判定：V 消费 R 产物须 targetKind=rootcause、R 消费 S 产物须 targetKind=preventive、S 消费 R 产物须 action=fix（详见 signature-chain-guide.md §3）。注意：与 run-log schema 的同名 targetKind（requirement/design/code/test 等词表）是不同 schema 中的不同词表，重叠值仅 rootcause 且语义一致",
+      "description": "返工链语义分类（D-1；43.0.0 v3 起入 sigHash，无痕改写即被 R6 抓获）：rootcause=复审 R 报告（RootCauseReport）；preventive=预防性审查（R3 报告）；iceberg=冰山扫掠报告；maturity=成熟度评定（A4：maturity 豁免 human 审批条目，check-artifact-gate 消费 level 前经 verifyMaturityApproval 校验；43.1.0 增第二消费点 check-maturity R8 降级授权，同函数以 requireAction=downgrade-approve 判定）；standard=默认/非返工语境。用于 R9 来源矩阵例外判定：V 消费 R 产物须 targetKind=rootcause、R 消费 S 产物须 targetKind=preventive、S 消费 R 产物须 action=fix（详见 signature-chain-guide.md §3）。注意：与 run-log schema 的同名 targetKind（requirement/design/code/test 等词表）是不同 schema 中的不同词表，重叠值仅 rootcause 且语义一致",
       "enum": ["rootcause", "preventive", "iceberg", "maturity", "standard"]
     },
     "runId": { "description": "关联的 run-log 运行 ID（与 run-log.jsonl 中 runId 对应）", "type": "string" },

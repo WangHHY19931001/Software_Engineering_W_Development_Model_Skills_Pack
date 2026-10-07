@@ -205,7 +205,7 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>"
 4. 编排者（O）分派 V 子代理按 Persona 产出 `VerifierOutput` JSON，再分派 G 子代理跑上述命令。
 5. 编排者（O）说明 A/B 且 `passed=true` 才能进入用户放行检查点；C/D 仅作为 R 定位线索，普通失败必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），不得直接分派 S。
 
-**reviewedArtifacts 读盘三重复核（R19，A2 反伪造；43.0.0 起必填）**：`VerifierOutput.reviewedArtifacts: [{path, sha256}]` 为 Schema 必填字段（O 分派 V 时按 produce 记录的 artifacts 清单构造，V 不得自造）。CLI 对登记项读盘复核：①文件存在（缺失 → `R19 评审对象文件不存在`）；②SHA-256 一致（不符 → `R19 评审对象哈希不符`——产物已变，旧评审不再成立）；③行数表注入 logic 校验 evidence 行号越界（→ `R19 evidence 行号越界`）；logic 层另校验 evidence 的 `path:Lnn=` 引用只能指向登记的 POSIX 路径（→ `R19 evidence 引用未在 reviewedArtifacts 登记`；`§`/Windows 形态不参与绑定）。三类 R19 违规均汇入 exit 1。路径解析口径：VerifierOutput 文件所在目录优先、cwd 回退。
+**reviewedArtifacts 读盘三重复核（R19，A2 反伪造；43.0.0 起必填）**：`VerifierOutput.reviewedArtifacts: [{path, sha256}]` 为 Schema 必填字段（O 分派 V 时按 produce 记录的 artifacts 清单构造，V 不得自造）。CLI 对登记项读盘复核：①文件存在（缺失 → `R19 评审对象文件不存在`）；②SHA-256 一致——哈希口径为归一化内容（CRLF→LF）的 SHA-256（43.1.0，对 checkout 行尾配置免疫；生产侧算法：读文本 → `\r\n` 全替换为 `\n` → 对归一化内容按 UTF-8 取 SHA-256 小写 hex，LF 落盘下与 raw 等价、CRLF 产物须先归一化再算，终审顺手补；不符 → `R19 评审对象哈希不符`——产物已变，旧评审不再成立）；③行数表注入 logic 校验 evidence 行号越界（→ `R19 evidence 行号越界`）；logic 层另校验 evidence 的 `path:Lnn=` 引用只能指向登记的 POSIX 路径（→ `R19 evidence 引用未在 reviewedArtifacts 登记`；`§`/Windows 形态不参与绑定）。三类 R19 违规均汇入 exit 1。路径解析口径：VerifierOutput 文件所在目录优先、cwd 回退。
 
 **self-as-verifier 模式**（仅限 demo / 非生产 / 教学演示项目，生产项目禁止；前置：`project.status` 标记 `selfAsVerifier: true`，V 评审须切换 Persona 视角并在 `summary` 注明，详见 [subagent-delegation.md「self-as-verifier 模式（demo/教学例外）」节](subagent-delegation.md#self-as-verifier-模式demo教学例外)与 verifier-spec §13；权威定义见 SSoT §7.6A）：单 Agent 兼任 S/V 时，V 评审后用 `--self-as-verifier --s-output=<S产出路径>` 校验 VerifierOutput 路径与 S 产出路径不同（反模式 #35）：
 
@@ -261,6 +261,10 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 - 退出码：0 = 正常（含未初始化提示「项目未初始化」）；2 = project/rtm JSON 损坏或 project.json 不符 `project.schema.json`（转 `operational-recovery.md`，不得猜测状态）。
 
 > **project.json 读取口径（F-G4-14）**：全部读取侧（本命令 + 阶段门 `check-budget.ts --project=` / `check-maturity.ts --project=`）统一经 `project.schema.json` 校验（`loadAndValidate(file, 'project')`）——文件缺失（wm-status 的 ENOENT 视为「未初始化」exit 0 除外）、非法 JSON 或缺必填字段 / 枚举越界 / 多未知字段（`additionalProperties:false`）一律 `STRUCTURE_INVALID` / exit 2，不再 warn-and-skip；「合法 project 缺 updatedAt」场景已被 schema required 前置排除。
+
+> **降级须 human 授权（决策 #2 · R8，43.1.0）**：`check-maturity.ts` 自动装载 `<maturity.json 同目录>/signature-chain.jsonl`（容错读取：缺文件 → 空链、坏行与**合法 JSON 非对象行**（`null` / 数组 / 标量）跳过；无新增参数，调用形态 `<maturity.json> [--project=] [--run-log=]` 不变），经 `verifyMaturityApproval`（`signature-chain-logic.ts`）以 **`requireAction='downgrade-approve'`（降级专属绑定）** 判定后把 `ok` 注入纯逻辑 `options.maturityApprovalOk`（logic 不读盘）。降级形态（`level` 低于 history 末条 `to`；R6 第三判定允许的合法形态）下无 `role=human / targetKind=maturity` 且 `action='downgrade-approve'` 的有效审批条目（缺链 / 空链 / 坏链 / 早签 / **仅升级条目**）→ **R8 blocking（exit 1）**——降级无法过闭环五门 = 「不允许降级」的机器化；应急处置路径 = 用户在 🔴 CHECKPOINT 确认即授权（O 据此落 `action='downgrade-approve'` 链条目）。**降级专属绑定的由来（43.1.0 修复轮 1，R-B7-7）**：不含 action 过滤时，升级流程每次所落的同类人签条目（`signedAt` 必然 ≥ 末条 history `at`）天然满足 R8，可洗白降级（安全审查实跑复现，已钉为负例测试）；升级审批条目 action 无机器校验（现状 `approve`）。非降级形态零行为变化；人类可读报告增「签名链(R8)」行（路径 + 条目数 / 未找到）供审计。
+
+> **project.status 转移合法性（A14 R7，43.1.0）**：`check-maturity.ts` 增可选 `--prev-status=<9态>`（须与 `--project` 同时提供；取值须为 `PROJECT_STATUSES` 9 态之一，否则 ARG_INVALID exit 2）与 `--rollback-approved`（场景 5 🔴 CHECKPOINT 用户裁定回退后由 O 置位）。prev + current 同时提供时执行转移校验：合法 = 前向链下一步 ∪ 场景 5 用户批准回退 ∪ 终态「项目完成」；非法 → R7 违规 exit 1。仅提供 current（无 prev）不判定（project.json 无 status 历史，不发明历史机制）。9 态序与 8/9 双口径（机器 phase=9 / 展示收敛 8）单点承载于 `scripts/lib/constants.ts`（`PROJECT_STATUSES` / `PROJECT_STATUS_TO_PHASE`），wm-status 展示口径同源。
 
 ## `/wm metrics`
 

@@ -301,6 +301,8 @@ export function parseBackgroundStateMachine(backgroundContent: string): {
  * 语义基线（统一 check-bdd-model.ts 与 self-test.ts 的复制漂移，以 self-test 为准）：
  *   - events：When 与 And 步骤双取（`(?:When|And)`），行末单词为事件名；
  *     保留行末括号 `)` 容错（check-bdd-model.ts 原实现支持 `When 用户提交注册信息 (Register)` 格式）
+ *   - whenEventExtractionFailures：When 行行末非 ASCII 词尾时登记原行（B8 2026-10-07），
+ *     由 D6 显式报「事件名为空/非 ASCII 词尾」；And 行不登记（常为非事件步骤）
  *   - expectedEndState：取第一个 Then 声明的状态（self-test 基线；check-bdd-model 原取最后一个）
  *   - startState（Given）/ invariantAssertions（Then|And 不变式）：两处原实现一致
  */
@@ -328,10 +330,17 @@ export function parseFeatureFile(content: string): {
     const name = m[1]!.trim();
     const body = m[2]!;
     const startState = extractStateFromStep(body, /Given.*?"(\w+)"/);
-    const events = extractEventsFromStep(body);
+    const { events, whenFailures } = extractEventsFromStep(body);
     const expectedEndState = extractStateFromStep(body, /Then.*?"(\w+)"/);
     const invariantAssertions = extractInvariantsFromThen(body);
-    scenarios.push({ scenarioName: name, startState, events, expectedEndState, invariantAssertions });
+    scenarios.push({
+      scenarioName: name,
+      startState,
+      events,
+      expectedEndState,
+      invariantAssertions,
+      whenEventExtractionFailures: whenFailures,
+    });
   }
 
   return {
@@ -350,15 +359,25 @@ function extractStateFromStep(body: string, pattern: RegExp): string | null {
 /**
  * 从 scenario body 中提取事件名（When 与 And 步骤行末英文单词，容忍行末括号）。
  * 事件名是行末括号中的英文单词，如 (CreateComment)，或行末最后一个英文单词。
+ *
+ * B8（2026-10-07）：When 行必然承载事件（D6 路径校验的事件来源），行末非 ASCII 词尾
+ * （如中文事件名）时提取不到事件——此时登记原行到 whenFailures，供 D6 显式报
+ * 「事件名为空/非 ASCII 词尾」而非静默零事件走链后报 end-state mismatch。
+ * And 行不登记：And 常承载非事件步骤（输入前置 / 不变式断言），提取失败属正常形态。
  */
-function extractEventsFromStep(body: string): string[] {
+function extractEventsFromStep(body: string): { events: string[]; whenFailures: string[] } {
   const events: string[] = [];
+  const whenFailures: string[] = [];
   const lines = body.split('\n');
   for (const line of lines) {
     const m = line.match(/^\s*(?:When|And)\s+.+?\b(\w+)\s*\)?\s*$/);
-    if (m) events.push(m[1]!);
+    if (m) {
+      events.push(m[1]!);
+    } else if (/^\s*When\s+\S/.test(line)) {
+      whenFailures.push(line.trim());
+    }
   }
-  return events;
+  return { events, whenFailures };
 }
 
 /**
@@ -449,14 +468,29 @@ export interface ScenarioPathCheck {
   events: string[];
   expectedEndState: string | null;
   invariantAssertions: string[];
+  /**
+   * When 行事件名提取失败的原行（行末非 ASCII 词尾，B8 2026-10-07）。
+   * 由 validateScenarioPath 显式报「事件名为空/非 ASCII 词尾」violation，替代静默 end-state mismatch。
+   */
+  whenEventExtractionFailures?: string[];
 }
 
 /**
  * 校验 scenario 的 Given→When→Then 路径在状态机转移表中是否合法（spec §7.2 D6）。
  * 多事件 scenario 按链式查找：S0 + e1 -> S1, S1 + e2 -> S2, ...
+ * When 行事件名提取失败（非 ASCII 词尾）时显式报 violation（B8），且先于 startState 缺失短路。
  */
 export function validateScenarioPath(check: ScenarioPathCheck, sm: BddStateMachine): string[] {
   const violations: string[] = [];
+
+  // B8（2026-10-07）：When 行提取不到事件名（行末非 ASCII 词尾）时显式报错，
+  // 不再静默走零事件链后把根因报成 end-state mismatch。置于 startState 短路之前，保证判据始终可见。
+  // 消息前缀与同族其余 violation 一致（`[scenario:<name>]`，终审顺手修）。
+  for (const rawLine of check.whenEventExtractionFailures ?? []) {
+    violations.push(
+      `[scenario:${check.scenarioName}] When 步骤行末事件名为空/非 ASCII 词尾（事件名须为 ASCII 词 [A-Za-z0-9_]+，行末裸词或行末 (Event) 括号尾注）："${rawLine}"`,
+    );
+  }
 
   if (!check.startState) {
     violations.push(`[scenario:${check.scenarioName}] no Given state declared`);
@@ -867,6 +901,12 @@ export interface BddCheckResult {
     rtmMapping: string[];
     sdCoverage: string[];
   };
+  /**
+   * B7（批次 7）：D4 L1 豁免的显式 SKIPPED(level=1) 证据行（不再零输出）。
+   * 每条形如 `[D4:SM-xxx] SKIPPED(level=1)：...`；证据不是违规——不进 dimensions.tlaEquivalence、
+   * 不计入 violations、不影响 passed/exitCode；人类报告行由 CLI（check-bdd-model.ts）渲染。
+   */
+  tlaEquivalenceSkipped: string[];
   summary: string;
   violations: string[];
 }
@@ -898,6 +938,7 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
         rtmMapping: schemaResult.errorMessages.map((m) => `[schema] ${m}`),
         sdCoverage: [],
       },
+      tlaEquivalenceSkipped: [],
       summary: `schema validation failed: ${schemaResult.errorMessages.length} errors`,
       violations: schemaResult.errorMessages.map((m) => `[schema] ${m}`),
     };
@@ -912,6 +953,8 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
     rtmMapping: [] as string[],
     sdCoverage: [] as string[],
   };
+  // B7：D4 L1 豁免证据（不进 dims、不进 allViolations——豁免不是违规）
+  const tlaEquivalenceSkipped: string[] = [];
 
   // D1: features 头标注完整性 + D3: 状态机七要素
   // A8（批次 6）：CLI 侧 feature 文件多路径查找全 miss → [D1] blocking violation（防 fail-open 空转通过）
@@ -952,7 +995,14 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
       // L1 系统级规格豁免 D4 自动等价：L1 是请求-响应抽象而非内部状态机，
       // 自动等价比对无意义，由 R3/V 语义评审把关（不产生任何 D4 violation）；
       // L2+ 子系统级规格仍执行完整自动等价校验。
-      if (sm.level === 1) continue;
+      // B7（批次 7）：豁免不再零输出——输出显式 SKIPPED(level=1) 证据行
+      // （进 tlaEquivalenceSkipped 字段 + CLI 人类报告行，不计入 violations）。
+      if (sm.level === 1) {
+        tlaEquivalenceSkipped.push(
+          `[D4:${sm.id}] SKIPPED(level=1)：L1 系统级规格豁免 D4 自动等价（请求-响应抽象，非内部状态机），由 R3/V 语义评审把关`,
+        );
+        continue;
+      }
       const tlaSnap = input.tlaSnapshots.find((t) => t.specId === sm.id.replace(/^SM-/, ''));
       if (!tlaSnap) {
         // TLA+ 未提供对应 spec：由 R 子代理判定是缺失还是层级不对应
@@ -1091,6 +1141,7 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
     checkedAt,
     phase,
     dimensions: dims,
+    tlaEquivalenceSkipped,
     summary: passed
       ? `BDD model check passed (phase ${phase})`
       : `BDD model check failed with ${allViolations.length} violations (phase ${phase})`,

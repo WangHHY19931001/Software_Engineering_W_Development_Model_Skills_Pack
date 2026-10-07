@@ -21,8 +21,12 @@ import {
   checkCoverage,
   checkCfgInvariantsConsistency,
   checkCfgStructure,
+  checkBusinessInvariants,
+  checkIdleNext,
   checkHierarchy,
+  checkDecomposition,
   parseCfgInvariantNames,
+  parseCfgNextNames,
   validateHeader,
   type TlaSpec,
 } from '../logic/tla-logic.js';
@@ -523,7 +527,11 @@ describe('A7 SANY 失败 → 报告输出 notRun 单一事实，不复述预置�
 
   it('真跑失败（deadlockFree=false / invariantsHold=false / stateExplosion=true）→ tlcStatus=failed 且 reasons 与逐类违反同文案', () => {
     const result = checkTlaModel(
-      makeSingleSpecManifest({ deadlockFree: false, invariantsHold: false, stateExplosion: true }),
+      makeSingleSpecManifest({
+        deadlockFree: false,
+        invariantsHold: false,
+        stateExplosion: true,
+      }),
       1,
     );
     expect(result.specs[0]?.tlcStatus).toBe('failed');
@@ -669,6 +677,468 @@ describe('S2 checkHierarchy 区分 phase 过滤掉的 child/parent/sibling', () 
     expect(result.hierarchyViolations[0]).toContain('phase=2');
     expect(result.hierarchyViolations[0]).not.toContain('不在 manifest 中');
     // 判定结果不变：仍拦截（passed=false）
+    expect(result.passed).toBe(false);
+  });
+});
+
+// ==================== B1 恒真不变式防御 + B10c CONSTRAINT 禁用（批次 7 任务 3） ====================
+
+describe('B1 恒真不变式防御 + B10c CONSTRAINT 禁用', () => {
+  /** 最小 .tla 文本：TypeOK 为 Type 类不变式，Spec/Init/Next 仅作结构占位。 */
+  const tlaWithTypeOk = [
+    '---- MODULE M ----',
+    'EXTENDS Naturals',
+    'VARIABLES x',
+    'Init == x = 0',
+    "Next == x' = x + 1",
+    'Spec == Init /\\ [][Next]_x',
+    'TypeOK == x \\in Nat',
+    '====',
+  ].join('\n');
+
+  it('B1a：INVARIANTS 全部为 Type 类（名字以 Type 开头）→ 违规「缺非 Type 业务不变式」', () => {
+    // cfg INVARIANTS 仅 TypeOK
+    const cfg = 'SPECIFICATION Spec\nINVARIANTS TypeOK';
+    const result = checkBusinessInvariants(tlaWithTypeOk, cfg);
+    expect(result.passed, '全 Type 类不变式应判失败').toBe(false);
+    expect(
+      result.violations.some((v) => v.includes('缺非 Type 业务不变式')),
+      '应含「缺非 Type 业务不变式」违规',
+    ).toBe(true);
+  });
+
+  it('B1b：业务不变式定义体语法等价于 TRUE → 违规', () => {
+    const tla = `${tlaWithTypeOk.split('====')[0]}Inv == TRUE\n====`;
+    const cfg = 'SPECIFICATION Spec\nINVARIANTS Inv TypeOK';
+    const result = checkBusinessInvariants(tla, cfg);
+    expect(result.passed, '恒真业务不变式应判失败').toBe(false);
+    expect(
+      result.violations.some((v) => v.includes('恒真') && v.includes('Inv')),
+      '应含「恒真」违规且点名 Inv',
+    ).toBe(true);
+    // 归一化口径：多空白 / 前后空白的 TRUE 同样命中
+    const tlaSpaced = `${tlaWithTypeOk.split('====')[0]}Inv ==   TRUE  \n====`;
+    expect(checkBusinessInvariants(tlaSpaced, cfg).violations.some((v) => v.includes('恒真'))).toBe(true);
+  });
+
+  it('B1c：业务不变式定义体与某 TypeInvariant 定义体相同 → 违规', () => {
+    // Inv 与 TypeOK 同体
+    const tla = `${tlaWithTypeOk.split('====')[0]}Inv == x \\in Nat\n====`;
+    const cfg = 'SPECIFICATION Spec\nINVARIANTS TypeOK Inv';
+    const result = checkBusinessInvariants(tla, cfg);
+    expect(result.passed, '与 Type 类不变式同体应判失败').toBe(false);
+    expect(
+      result.violations.some((v) => v.includes('定义体相同') && v.includes('TypeOK') && v.includes('Inv')),
+      '应含「定义体相同」违规且点名 TypeOK 与 Inv',
+    ).toBe(true);
+  });
+
+  it('B10c：cfg 含 CONSTRAINT/CONSTRAINTS 段 → 违规「不得用约束砍状态空间」', () => {
+    const tla = `${tlaWithTypeOk.split('====')[0]}Inv == x >= 0\n====`;
+    const cfgBase = 'SPECIFICATION Spec\nINVARIANTS Inv TypeOK';
+    for (const [场景, cfg] of [
+      ['CONSTRAINT 单数段', `${cfgBase}\nCONSTRAINT TimeBound`],
+      ['CONSTRAINTS 复数段', `${cfgBase}\nCONSTRAINTS C1, C2`],
+    ] as const) {
+      const result = checkBusinessInvariants(tla, cfg);
+      expect(result.passed, `${场景}: 应判失败`).toBe(false);
+      expect(
+        result.violations.some((v) => v.includes('不得用约束砍状态空间')),
+        `${场景}: 应含「不得用约束砍状态空间」违规`,
+      ).toBe(true);
+    }
+    // 词边界：ACTION_CONSTRAINT / TYPE_CONSTRAINT 是别的段名，不命中 CONSTRAINT 禁用
+    const otherSections = `${cfgBase}\nACTION_CONSTRAINT ActC\nTYPE_CONSTRAINT TypeC`;
+    expect(
+      checkBusinessInvariants(tla, otherSections).violations.some((v) => v.includes('不得用约束砍状态空间')),
+      'ACTION_CONSTRAINT / TYPE_CONSTRAINT 不应命中 CONSTRAINT 禁用',
+    ).toBe(false);
+  });
+});
+
+// ==================== B10 空转 Next 检测（批次 7 任务 7） ====================
+
+describe('B10 空转 Next 检测（无状态赋值 / 全恒等自赋值）', () => {
+  /** 带真实推进 Next 的最小 .tla（非空转对照组）。 */
+  const tlaProgressing = [
+    '---- MODULE M ----',
+    'EXTENDS Naturals',
+    'VARIABLES x',
+    'Init == x = 0',
+    "Next == x' = x + 1",
+    'Spec == Init /\\ [][Next]_x',
+    '====',
+  ].join('\n');
+  const cfgNext = 'INIT Init\nNEXT Next';
+
+  it('parseCfgNextNames：INIT/NEXT 形式提取 Next 名；SPECIFICATION 形式返回空数组', () => {
+    expect(parseCfgNextNames('SPECIFICATION Spec\nINVARIANTS Inv')).toEqual([]);
+    expect(parseCfgNextNames(cfgNext)).toEqual(['Next']);
+    expect(parseCfgNextNames('INIT Init\nnext NextOp')).toEqual(['NextOp']); // 段名大小写不敏感
+    expect(parseCfgNextNames('INIT Init\nNEXT')).toEqual([]); // 裸 NEXT 行（无名字）跳过
+  });
+
+  it("空转形态一：Next == x' = x（全恒等自赋值）→ 违规「空转规格」", () => {
+    const tla = tlaProgressing.replace("Next == x' = x + 1", "Next == x' = x");
+    const result = checkIdleNext(tla, cfgNext);
+    expect(result.passed, '全恒等自赋值 Next 应判失败').toBe(false);
+    expect(
+      result.violations.some((v) => v.includes('空转规格') && v.includes('Next')),
+      '应含「空转规格」违规且点名 Next',
+    ).toBe(true);
+  });
+
+  it("空转形态二：Next == TRUE / UNCHANGED x（闭包无任何 var' = 赋值）→ 违规「空转规格」", () => {
+    const tlaTrue = tlaProgressing.replace("Next == x' = x + 1", 'Next == TRUE');
+    const resultTrue = checkIdleNext(tlaTrue, cfgNext);
+    expect(resultTrue.passed, 'Next == TRUE 应判失败').toBe(false);
+    expect(resultTrue.violations.some((v) => v.includes('空转规格'))).toBe(true);
+
+    const tlaUnchanged = tlaProgressing.replace("Next == x' = x + 1", 'Next == UNCHANGED x');
+    expect(checkIdleNext(tlaUnchanged, cfgNext).violations.some((v) => v.includes('空转规格'))).toBe(true);
+  });
+
+  it("非空转对照组：真实推进 Next（x' = x + 1，算术 RHS）不违规", () => {
+    expect(checkIdleNext(tlaProgressing, cfgNext).passed).toBe(true);
+  });
+
+  it("非确定性推进：Next == x' \\in 0..10（var' \\in 赋值形态）不违规", () => {
+    const tla = tlaProgressing.replace("Next == x' = x + 1", "Next == x' \\in 0..10");
+    expect(checkIdleNext(tla, cfgNext).passed).toBe(true);
+  });
+
+  it('子动作引用闭包：Next == A \\/ B 且子动作含真实赋值 → 不违规（防误报）', () => {
+    const tla = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x',
+      'Init == x = 0',
+      'Next == A \\/ B',
+      "A == x' = x + 1",
+      "B == x' = 0",
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    expect(checkIdleNext(tla, cfgNext).passed).toBe(true);
+  });
+
+  it('混合形态：恒等自赋值与非恒等赋值并存 → 不违规（存在推进分支即非空转）', () => {
+    const tla = tlaProgressing.replace("Next == x' = x + 1", "Next == x' = x /\\ x' = x + 1");
+    expect(checkIdleNext(tla, cfgNext).passed).toBe(true);
+  });
+
+  it("全恒等多变量：Next == x' = x /\\ y' = y → 违规「空转规格」", () => {
+    const tla = tlaProgressing
+      .replace('VARIABLES x', 'VARIABLES x, y')
+      .replace("Next == x' = x + 1", "Next == x' = x /\\ y' = y");
+    const result = checkIdleNext(tla, cfgNext);
+    expect(result.passed, '全变量恒等自赋值应判失败').toBe(false);
+    expect(result.violations.some((v) => v.includes('空转规格'))).toBe(true);
+  });
+
+  it('分解式全恒等（跨定义体合取聚合）：Next == A /\\ B（A、B 均恒等自赋值）→ 违规「空转规格」', () => {
+    const tla = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x, y',
+      'Init == x = 0 /\\ y = 0',
+      'Next == A /\\ B',
+      "A == x' = x",
+      "B == y' = y",
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    const result = checkIdleNext(tla, cfgNext);
+    expect(result.passed, '跨定义体分解式全恒等应判失败（跨定义体合取聚合）').toBe(false);
+    expect(result.violations.some((v) => v.includes('空转规格'))).toBe(true);
+  });
+
+  it("间接引用恒等（一级/二级）：Next == A（A == x' = x）与 Next == A（A == B, B == x' = x）→ 违规「空转规格」", () => {
+    const tlaLevel1 = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x',
+      'Init == x = 0',
+      'Next == A',
+      "A == x' = x",
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    expect(checkIdleNext(tlaLevel1, cfgNext).violations.some((v) => v.includes('空转规格'))).toBe(true);
+
+    const tlaLevel2 = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x',
+      'Init == x = 0',
+      'Next == A',
+      'A == B',
+      "B == x' = x",
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    expect(checkIdleNext(tlaLevel2, cfgNext).violations.some((v) => v.includes('空转规格'))).toBe(true);
+  });
+
+  it('多 NEXT 合取聚合：NEXT A（恒等）+ NEXT B（推进）→ 零违规；两均恒等 → 违规', () => {
+    const cfgMulti = 'INIT Init\nNEXT A\nNEXT B';
+    const tla = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x, y',
+      'Init == x = 0 /\\ y = 0',
+      "A == x' = x",
+      "B == y' = y + 1",
+      'Spec == Init /\\ [][A /\\ B]_x',
+      '====',
+    ].join('\n');
+    expect(checkIdleNext(tla, cfgMulti).passed, 'TLC 多 NEXT 取合取：整体推进不应违规').toBe(true);
+
+    const tlaBothIdle = tla.replace("B == y' = y + 1", "B == y' = y");
+    const result = checkIdleNext(tlaBothIdle, cfgMulti);
+    expect(result.passed, '多 NEXT 全部空转应判失败').toBe(false);
+    expect(result.violations.filter((v) => v.includes('空转规格')).length, '逐名报告两处空转候选').toBe(2);
+  });
+
+  it("跨变量混合形态：Next == x' = x /\\ y' = y + 1（存在推进分支）→ 不违规", () => {
+    const tla = tlaProgressing
+      .replace('VARIABLES x', 'VARIABLES x, y')
+      .replace("Next == x' = x + 1", "Next == x' = x /\\ y' = y + 1");
+    expect(checkIdleNext(tla, cfgNext).passed).toBe(true);
+  });
+
+  it('parseCfgNextNames：剥离注释——行/块注释中的 NEXT 字样不产生幻影名', () => {
+    expect(parseCfgNextNames('NEXT Real \\* NEXT Phantom')).toEqual(['Real']);
+    expect(parseCfgNextNames('(* NEXT Phantom *)\nNEXT Real')).toEqual(['Real']);
+  });
+
+  it('cfg 无 NEXT 段（SPECIFICATION 形式）或 .tla 缺 Next 定义 → 跳过不违规', () => {
+    expect(checkIdleNext(tlaProgressing, 'SPECIFICATION Spec').passed).toBe(true);
+    const tlaNoNext = tlaProgressing.replace("Next == x' = x + 1\n", '');
+    expect(checkIdleNext(tlaNoNext, cfgNext).passed).toBe(true);
+  });
+
+  it('wiring：checkTlaModel 将空转 Next 违规并入 cfgConsistencyViolations（规格 <id>: 前缀）且 passed=false', () => {
+    const m = makeValidManifestWithoutBasePath() as Record<string, unknown>;
+    m.basePath = '.';
+    const spec = (m.specs as Record<string, unknown>[])[0] as Record<string, unknown>;
+    spec.tlaContent = [
+      '---- MODULE L1System ----',
+      'EXTENDS Naturals',
+      'VARIABLES x',
+      'Init == x = 0',
+      "Next == x' = x",
+      'Spec == Init /\\ [][Next]_x',
+      'Inv == x >= 0',
+      'BusinessInvariant == /\\ Inv',
+      '====',
+    ].join('\n');
+    spec.cfgContent = 'INIT Init\nNEXT Next\nINVARIANTS Inv';
+    const result = checkTlaModel(m, 1);
+    expect(
+      result.cfgConsistencyViolations.some((v) => v.startsWith('规格 L1-system:') && v.includes('空转规格')),
+      '空转规格违规应并入 cfg 一致性桶并带规格前缀',
+    ).toBe(true);
+    expect(result.passed).toBe(false);
+  });
+});
+
+// ==================== B9 variableCombination 推导注记 ====================
+
+describe('B9 variableCombination 推导注记', () => {
+  /** 构造一条 kept-below-threshold 规格（variableCombination 可指定）。 */
+  function makeKeptSpec(variableCombination: number, basis?: TlaSpec['variableCombinationBasis']): TlaSpec {
+    return {
+      id: 'L2-big',
+      level: 'L2',
+      phase: 2,
+      system: 'sample-system::auth',
+      requirementIds: ['REQ-001'],
+      designRef: 'docs/system-design.md',
+      tlaPath: 'tla/L2-auth.tla',
+      cfgPath: 'tla/L2-auth.cfg',
+      parent: 'tla/L1-system.tla',
+      siblings: [],
+      children: [],
+      variableCombination,
+      decompositionDecision: 'kept-below-threshold',
+      variableCombinationBasis: basis,
+      syntaxChecked: true,
+      tlcChecked: true,
+      deadlockFree: true,
+      invariantsHold: true,
+      stateExplosion: false,
+    };
+  }
+
+  it('B9：variableCombination >1000 kept 且无推导注记 → 违规', () => {
+    const result = checkDecomposition([makeKeptSpec(2000)]);
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]).toContain('L2-big');
+    expect(result.violations[0]).toContain('variableCombinationBasis');
+    // 既有警告保留（不因违规引入而删除）
+    expect(result.warnings.some((w) => w.includes('kept-below-threshold'))).toBe(true);
+  });
+
+  it('B9 通过行：有 basis 且 Πcardinality === 声明 variableCombination → 零 violation', () => {
+    const basis = {
+      variables: [
+        { name: 'user', cardinality: 40 },
+        { name: 'session', cardinality: 50 },
+      ],
+    };
+    const result = checkDecomposition([makeKeptSpec(2000, basis)]);
+    expect(result.violations).toEqual([]);
+    expect(result.warnings.some((w) => w.includes('kept-below-threshold'))).toBe(true);
+  });
+
+  it('B9 乘积不符：Πcardinality ≠ 声明 variableCombination → 违规（点名乘积与声明值）', () => {
+    const basis = {
+      variables: [
+        { name: 'user', cardinality: 40 },
+        { name: 'session', cardinality: 60 },
+      ],
+    };
+    const result = checkDecomposition([makeKeptSpec(2000, basis)]);
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]).toContain('Πcardinality=2400');
+    expect(result.violations[0]).toContain('2000');
+  });
+
+  it('B9 非法基数：cardinality 非正数/非有限数 → 违规', () => {
+    for (const cardinality of [0, -3, Number.POSITIVE_INFINITY, Number.NaN]) {
+      const basis = {
+        variables: [
+          { name: 'user', cardinality },
+          { name: 'session', cardinality: 50 },
+        ],
+      };
+      const result = checkDecomposition([makeKeptSpec(2000, basis)]);
+      expect(
+        result.violations.some((v) => v.includes('cardinality')),
+        `cardinality=${cardinality}`,
+      ).toBe(true);
+    }
+  });
+
+  it('B9 边界：≤1000 kept 无 basis 不要求（零 violation）；split-done/split 阈值行为不变', () => {
+    // ≤1000 不要求推导注记
+    expect(checkDecomposition([makeKeptSpec(1000)]).violations).toEqual([]);
+    // >10000 非 split-done 仍走原 MUST_SPLIT violation（不受 B9 影响）
+    const mustSplit = {
+      ...makeKeptSpec(20000),
+      id: 'L2-huge',
+      decompositionDecision: 'consider-split' as const,
+    };
+    expect(
+      checkDecomposition([mustSplit]).violations.some((v) => v.includes("须 decompositionDecision='split-done'")),
+    ).toBe(true);
+  });
+
+  // ==================== I5（终审修复波）：basis 名集合覆盖 .tla VARIABLES + cardinality 整数 ====================
+
+  it('I5：basis 缺 .tla VARIABLES 声明变量 → violation（schema 承诺「须覆盖全部状态变量」落地）', () => {
+    const spec = makeKeptSpec(2000, {
+      variables: [
+        { name: 'user', cardinality: 40 },
+        { name: 'session', cardinality: 50 },
+      ],
+    });
+    spec.tlaContent = [
+      '---- MODULE L2_auth ----',
+      'EXTENDS Naturals',
+      'VARIABLES user, session, token_state',
+      '====',
+    ].join('\n');
+    const result = checkDecomposition([spec]);
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]).toContain('未覆盖 .tla 声明的全部状态变量');
+    expect(result.violations[0]).toContain('token_state');
+  });
+
+  it('I5：名集合覆盖齐 → 零违规（块注释/行注释中的声明不计入；多行续行形态正确收集）', () => {
+    const spec = makeKeptSpec(2000, {
+      variables: [
+        { name: 'user', cardinality: 40 },
+        { name: 'session', cardinality: 50 },
+      ],
+    });
+    spec.tlaContent = [
+      '---- MODULE L2_auth ----',
+      '(*',
+      '  VARIABLES phantom_only_in_block_comment',
+      '*)',
+      '\\* VARIABLES ghost_only_in_line_comment',
+      'VARIABLES user,',
+      '        session',
+      '====',
+    ].join('\n');
+    expect(checkDecomposition([spec]).violations).toEqual([]);
+  });
+
+  it('I5：无 VARIABLES 行（提取失败）→ 跳过名比对不误红', () => {
+    const spec = makeKeptSpec(2000, {
+      variables: [
+        { name: 'whatever', cardinality: 40 },
+        { name: 'other', cardinality: 50 },
+      ],
+    });
+    spec.tlaContent = '---- MODULE L2_auth ----\nEXTENDS Naturals\n====\n';
+    expect(checkDecomposition([spec]).violations).toEqual([]);
+  });
+
+  it('I5：cardinality 小数 → violation（须为 ≥1 的整数，与 schema integer 同口径）', () => {
+    const result = checkDecomposition([
+      makeKeptSpec(2000, {
+        variables: [
+          { name: 'user', cardinality: 40.5 },
+          { name: 'session', cardinality: 50 },
+        ],
+      }),
+    ]);
+    expect(result.violations.some((v) => v.includes('非法 cardinality') && v.includes('整数'))).toBe(true);
+  });
+
+  it('I5：schema 侧 cardinality 为 integer —— 小数基数在 manifest schema 层即被拒', () => {
+    const manifest = {
+      version: 1,
+      currentPhase: 1,
+      basePath: '.',
+      tools: { jarPath: 'tla2tools.jar', javaMinVersion: 11 },
+      specs: [
+        {
+          id: 'L1_Test',
+          level: 'L1',
+          phase: 1,
+          system: 'test',
+          requirementIds: ['REQ-001'],
+          designRef: 'docs/requirement-spec.md:§1',
+          tlaPath: 'L1_Test.tla',
+          cfgPath: 'L1_Test.cfg',
+          parent: null,
+          siblings: [],
+          children: [],
+          variableCombination: 2000,
+          decompositionDecision: 'kept-below-threshold',
+          variableCombinationBasis: {
+            variables: [
+              { name: 'user', cardinality: 40.5 },
+              { name: 'session', cardinality: 50 },
+            ],
+          },
+          syntaxChecked: true,
+          tlcChecked: true,
+          deadlockFree: true,
+          invariantsHold: true,
+          stateExplosion: false,
+        },
+      ],
+    } as any;
+    const result = checkTlaModel(manifest, 1);
+    expect(
+      result.violations.some((v) => v.startsWith('[schema]') && v.includes('cardinality')),
+      `应报 [schema] 且点名 cardinality，实际：${result.violations.join('; ')}`,
+    ).toBe(true);
     expect(result.passed).toBe(false);
   });
 });

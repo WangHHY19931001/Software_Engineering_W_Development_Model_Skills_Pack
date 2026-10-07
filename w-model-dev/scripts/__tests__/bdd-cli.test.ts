@@ -430,3 +430,85 @@ describe('check-bdd-model feature 文件缺失不再 fail-open（A8，批次 6�
     expect(JSON.parse(result.stdout)).toMatchObject({ exitCode: 0, passed: true });
   });
 });
+
+// ==================== I3（终审修复波）：L1 SKIPPED 证据在三个机器面可见 ====================
+describe('I3：D4 L1 SKIPPED 证据的机器面（--json / BDD_JSON / gate-log reportSummary）', () => {
+  /** 同 run，但不追加 --json（BDD_JSON 摘要只在人类模式输出）。 */
+  function runRaw(args: string[]): { code: number | null; stdout: string; stderr: string } {
+    const result = runSync(process.execPath, [tsxCli, SCRIPT, ...args], { cwd: tmpDir });
+    return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+  }
+
+  /** L1 state machine（七要素齐备）+ 在场 TLA snapshot → D4 走 SKIPPED(level=1) 豁免路径。 */
+  async function writeL1Fixture(): Promise<{ manifest: string; tlaManifest: string }> {
+    const manifest = await writeJson('.w-model/bdd-manifest.json', {
+      ...baseManifest(1),
+      stateMachines: [
+        {
+          id: 'SM-L1-counter',
+          level: 1,
+          states: ['A', 'B'],
+          initialState: 'A',
+          terminalStates: ['B'],
+          acceptingStates: ['B'],
+          rejectingStates: [],
+          transitions: [{ from: 'A', event: 'advance', to: 'B' }],
+          invariants: ['B => done'],
+        },
+      ],
+    });
+    await fs.writeFile(
+      path.join(tmpDir, '.w-model/spec.tla'),
+      ['---- MODULE Test ----', 'VARIABLES state', '===='].join('\n'),
+      'utf-8',
+    );
+    const tlaManifest = await writeJson('.w-model/tla-manifest.json', {
+      basePath: '.',
+      specs: [{ id: 'L2-test', tlaPath: 'spec.tla' }],
+    });
+    return { manifest, tlaManifest };
+  }
+
+  it('--json 输出含全字段 tlaEquivalenceSkipped（逐条 SKIPPED(level=1) 证据）', async () => {
+    const { manifest, tlaManifest } = await writeL1Fixture();
+
+    const result = run([manifest, '--phase=1', `--tla-manifest=${tlaManifest}`, '--require-tla-equivalence']);
+
+    expect(result.code, `stderr=${result.stderr}`).toBe(0);
+    const parsed = JSON.parse(result.stdout) as { passed: boolean; tlaEquivalenceSkipped: string[] };
+    expect(parsed.passed).toBe(true);
+    expect(parsed.tlaEquivalenceSkipped).toHaveLength(1);
+    expect(parsed.tlaEquivalenceSkipped[0]).toContain('[D4:SM-L1-counter]');
+    expect(parsed.tlaEquivalenceSkipped[0]).toContain('SKIPPED(level=1)');
+  });
+
+  it('BDD_JSON 摘要含 tlaEquivalenceSkippedCount（人类模式；证据不计入 violations）', async () => {
+    const { manifest, tlaManifest } = await writeL1Fixture();
+
+    const result = runRaw([manifest, '--phase=1', `--tla-manifest=${tlaManifest}`]);
+
+    expect(result.code, `stderr=${result.stderr}`).toBe(0);
+    const summaryLine = result.stdout.split('\n').find((line) => line.startsWith('BDD_JSON '));
+    expect(summaryLine, `BDD_JSON 摘要行缺失；stdout:\n${result.stdout}`).toBeDefined();
+    const summary = JSON.parse(summaryLine!.slice('BDD_JSON '.length)) as Record<string, unknown>;
+    expect(summary['tlaEquivalenceSkippedCount']).toBe(1);
+    expect(summary['passed']).toBe(true);
+  });
+
+  it('gate-log reportSummary 含 tlaEquivalenceSkippedCount（B7 证据进审计日志机器面）', async () => {
+    const { manifest, tlaManifest } = await writeL1Fixture();
+
+    const result = runRaw([manifest, '--phase=1', `--tla-manifest=${tlaManifest}`]);
+    expect(result.code, `stderr=${result.stderr}`).toBe(0);
+
+    const gateLogDir = path.join(tmpDir, '.w-model', 'gate-logs');
+    const files = (await fs.readdir(gateLogDir)).filter((f) => f.includes('check-bdd-model.ts')).sort();
+    expect(files.length, 'check-bdd-model 应写出 gate-log').toBeGreaterThan(0);
+    const latest = files[files.length - 1] ?? '';
+    const payload = JSON.parse(await fs.readFile(path.join(gateLogDir, latest), 'utf-8')) as {
+      reportSummary: Record<string, unknown>;
+    };
+    expect(payload.reportSummary['tlaEquivalenceSkippedCount']).toBe(1);
+    expect(payload.reportSummary['violationsCount']).toBe(0);
+  });
+});

@@ -9,6 +9,11 @@
  *   - cli/check-verifier-output.ts（生产入口）
  *   - cli/self-test.ts runVerifierCases（样本口径与 CLI 接线单点一致，照 check-budget/check-maturity 先例）
  *
+ * 哈希与行数口径（批次 7 任务 2，43.1.0）：读盘字节先做 CRLF→LF 归一化（normalizeEol）再
+ * 计算 SHA-256 与行数——登记哈希是「归一化内容（CRLF→LF）的 SHA-256」，对 checkout 行尾
+ * 配置（core.autocrlf 等）免疫；行尾差异不构成内容漂移（不触发 `R19 评审对象哈希不符`），
+ * 真实内容变化仍被捕获。环境侧兜底为 .gitattributes 强制 LF 落盘（43.0.1），两者独立生效。
+ *
  * 路径解析口径（与 fixtures 约定一致，跨平台稳定）：
  *   1. 先按 VerifierOutput 文件所在目录（baseDir）解析——schema 契约「相对本文件所在目录」；
  *   2. 未命中再按 process.cwd() 解析——兼容仓内样例以仓库根为基准的 evidence 路径
@@ -25,9 +30,12 @@ import * as path from 'node:path';
 export interface ReviewedArtifactsCheck {
   /** R19 CLI 侧违规（文件不存在 / 哈希不符 / 不可读），由调用方并入最终 reasons（汇入 exit 1） */
   readonly reasons: string[];
-  /** path -> 文件行数（按 utf8 拆 \n 计），注入 logic VerifierDeps 供行号越界校验 */
+  /** path -> 文件行数（归一化内容按 utf8 拆 \n 计），注入 logic VerifierDeps 供行号越界校验 */
   readonly lineCountsByPath: Map<string, number>;
 }
+
+/** CRLF→LF 行尾归一化：登记哈希与行数统计的唯一消费口径（批次 7 任务 2） */
+const normalizeEol = (bytes: Buffer): Buffer => Buffer.from(bytes.toString('utf8').replace(/\r\n/g, '\n'), 'utf8');
 
 /**
  * 对 VerifierOutput 的 reviewedArtifacts 清单做读盘三重复核（存在 → 哈希 → 行数）。
@@ -58,13 +66,15 @@ export function verifyReviewedArtifacts(reviewed: unknown, baseDir: string): Rev
       continue;
     }
     const declared = record && typeof record.sha256 === 'string' ? record.sha256 : '';
-    const digest = createHash('sha256').update(bytes).digest('hex');
+    // 哈希与行数统计均消费 normalizeEol 结果（行尾差异不构成内容漂移，见模块注释口径节）
+    const normalized = normalizeEol(bytes);
+    const digest = createHash('sha256').update(normalized).digest('hex');
     if (declared !== '' && digest !== declared) {
       reasons.push(
         `R19 评审对象哈希不符：${artifactPath}（声明 ${declared.slice(0, 12)}… 实测 ${digest.slice(0, 12)}…）`,
       );
     }
-    lineCountsByPath.set(artifactPath, bytes.toString('utf8').split('\n').length);
+    lineCountsByPath.set(artifactPath, normalized.toString('utf8').split('\n').length);
   }
   return { reasons, lineCountsByPath };
 }

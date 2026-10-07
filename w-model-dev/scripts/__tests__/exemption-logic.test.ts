@@ -246,4 +246,32 @@ describe('E1-E9 豁免审批校验', () => {
       expect(result.stage).toBe('complete');
     });
   });
+
+  // ==================== ruleId 子规则后缀（C1 终审修复，批次 7） ====================
+  describe('ruleId 子规则后缀（C1：evidence-anchor-pending 豁免出口可达）', () => {
+    it('ruleId=R15b 四阶段全通过（schema pattern ^[RC]\\d+[a-z]?$ 放行子规则）', () => {
+      const e = makeValidExemption();
+      e.type = 'evidence-anchor-pending';
+      e.target = 'REQ-001';
+      e.ruleId = 'R15b';
+      e.evidence = ['graph.json:REQ-001.evidenceStatus=pending'];
+      const result = checkExemption(e);
+      expect(result.passed, `R15b 应通过，实际：${result.violations.join('; ')}`).toBe(true);
+      expect(result.violations).toEqual([]);
+      expect(result.stage).toBe('complete');
+    });
+
+    it('形如 R15B / R15b- / R15b2 / X15b 的 ruleId 仍被 [schema] 拦截（放宽不越界）', () => {
+      for (const ruleId of ['R15B', 'R15b-', 'R15b2', 'X15b'] as const) {
+        const e = makeValidExemption();
+        e.ruleId = ruleId;
+        const result = checkExemption(e);
+        expect(result.passed, `${ruleId} 应 fail`).toBe(false);
+        expect(
+          result.violations.some((v) => v.includes('[schema]') && v.includes('ruleId')),
+          `${ruleId} 应报 [schema] 且点名 ruleId，实际：${result.violations.join('; ')}`,
+        ).toBe(true);
+      }
+    });
+  });
 });
