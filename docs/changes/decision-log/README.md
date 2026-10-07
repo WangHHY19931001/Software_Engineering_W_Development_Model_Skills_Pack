@@ -16,6 +16,7 @@
 | [rounds-40-47.md](./rounds-40-47.md) | SSoT §3.4.40-47 轮次记录 + §10A 对应轮次行 | [41.0.0] ~ [41.6.0]（CHANGELOG.md） |
 | [rounds-48-trust-chain.md](./rounds-48-trust-chain.md) | 第 48 批（批次 6，43.0.0）信任链修复：五项裁定（targetKind 入哈希 / legacy 全清除 / R6 默认化 / maturity 审批链 / estimated 违规化） | [43.0.0]（CHANGELOG.md，随批次 6 发布回填） |
 | [rounds-49-formalization-gates.md](./rounds-49-formalization-gates.md) | 第 49 批（批次 7，43.1.0）形式化与图谱门禁收严：用户七项决策（autocrlf 双修 / 降级授权 / R6 首条 L0 / `*_token` / subagentSpawns / 增量规格 / 连续推进）+ 七项实施裁定（R-B7-1…R-B7-7：词段精确相等 / `!` 标记 / 行号漂移 / riders 并入 / 死锁指引主形态 / R7-R8 让号 / 降级专属绑定） | [43.1.0]（CHANGELOG.md，随批次 7 发布回填） |
+| [rounds-50-docs-consistency.md](./rounds-50-docs-consistency.md) | 第 50 批（批次 8，43.2.0）文档与协议一致性：C6 round23 归档 README「pending」vs checkpoint-summary「exit 0」矛盾登记（归档不改写；以 checkpoint-summary 为终态视图）+ Loop 3/4 成熟度头部标注（文档协议，无运行时执行器）；批次 8 其余实施裁定由任务 17 追加 | [43.2.0]（CHANGELOG.md，随批次 8 发布回填） |
 | [absorptions.md](./absorptions.md) | 外部方法论吸收决策记录（四源 / 三源 / 人月神话 / 外部技能，原 references/*-absorption.md） | [40.0.0] ~ [41.2.0] |
 | [legacy-sections.md](./legacy-sections.md) | 历史段落归档（anti-patterns 实现层经验教训 / hard-constraints 编号迁移表 / SSoT §14-15 tombstone 原文 / 迁移指令等） | 各轮 |
 
@@ -53,3 +54,4 @@
 | §3.4.48 第 47 轮（SSoT 权威性审查修复） | [41.6.0] | CHANGELOG.md |
 | 第 48 批（批次 6 信任链修复，[rounds-48-trust-chain.md](./rounds-48-trust-chain.md)） | [43.0.0] | CHANGELOG.md（随批次 6 发布回填） |
 | 第 49 批（批次 7 形式化与图谱门禁收严，[rounds-49-formalization-gates.md](./rounds-49-formalization-gates.md)） | [43.1.0] | CHANGELOG.md（随批次 7 发布回填） |
+| 第 50 批（批次 8 文档与协议一致性，[rounds-50-docs-consistency.md](./rounds-50-docs-consistency.md)） | [43.2.0] | CHANGELOG.md（随批次 8 发布回填） |

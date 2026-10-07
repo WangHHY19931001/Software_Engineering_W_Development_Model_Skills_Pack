@@ -2,6 +2,8 @@
 
 > 来源：SSoT §10F（`docs/skill-design-document_SSoT.md`）（事件驱动循环 Loop 3）。本文件为可执行细则。
 >
+> **成熟度：文档协议，无运行时执行器**（本指南定义协议与判据；执行由 Agent 按协议进行，仓库不含自动执行器）。
+>
 > **目的**：为棕地持续维护场景提供事件接驳能力——消费方自行实现 webhook/cron 触发器写入 `event-ingress.jsonl`，编排者 O 按事件类型路由到单阶段（非完整 8 阶段重跑）。
 >
 > **激活条件**：maturity.json.level ≥ L2（L0/L1 attended 不激活）；greenfield 首次跑不激活。
