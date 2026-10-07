@@ -105,7 +105,7 @@ Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\w-model-dev"
 > rsync -a --exclude 'node_modules' "w-model-dev/" "/path/to/<agent-specific-skills>/w-model-dev/"
 > ```
 >
-> PowerShell：`Copy-Item` 无排除参数，先整目录复制再删除：
+> PowerShell：`Copy-Item` 的 `-Exclude` 在 5.1 下无法可靠排除递归目录中的嵌套 `node_modules`，先整目录复制再删除：
 >
 > ```powershell
 > Copy-Item -Recurse -Force "w-model-dev" "<agent-specific-skills>\w-model-dev"
