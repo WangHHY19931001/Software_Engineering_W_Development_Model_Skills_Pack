@@ -6,6 +6,7 @@
  *   - parseBackgroundStateMachine：七要素解析（含 transitions block）/ 空集 () 解析
  *   - validateStateMachineCompleteness：完整状态机 / initial state 不在 states / accepting-states 为空
  *   - validateScenarioPath：单事件路径 / 多事件链式路径 / 无效事件 / 未声明不变式
+ *   - parseFeatureFile：When/And 双取事件 + 括号容忍 + 中文词尾 When 行登记提取失败（B8）
  *   - validateTlaEquivalence：匹配 / 状态集不同 / 不变式归一化
  *   - checkBddModel：schema 失败返回 exitCode=2
  */
@@ -188,6 +189,41 @@ describe('validateScenarioPath', () => {
     );
     expect(v.some((s) => s.includes('not declared'))).toBe(true);
   });
+
+  it('reports explicit When-line event extraction failure (B8) instead of silent end-state mismatch', () => {
+    // 中文词尾 When 行提取不到事件（B8）：须显式报「事件名为空/非 ASCII 词尾」并携带原行，
+    // 而非静默走零事件路径后报成 end-state mismatch
+    const v = validateScenarioPath(
+      {
+        scenarioName: 's5',
+        startState: 'A',
+        events: [],
+        expectedEndState: 'B',
+        invariantAssertions: [],
+        whenEventExtractionFailures: ['When 用户提交登录请求'],
+      },
+      sm,
+    );
+    expect(v.some((s) => s.includes('事件名为空/非 ASCII 词尾'))).toBe(true);
+    expect(v.some((s) => s.includes('When 用户提交登录请求'))).toBe(true);
+  });
+
+  it('reports When-line extraction failure even when start state is missing', () => {
+    // 显式 violation 先于 startState 缺失短路：保证 B8 判据在任何路径下都可见
+    const v = validateScenarioPath(
+      {
+        scenarioName: 's6',
+        startState: null,
+        events: [],
+        expectedEndState: null,
+        invariantAssertions: [],
+        whenEventExtractionFailures: ['When 系统执行校验'],
+      },
+      sm,
+    );
+    expect(v.some((s) => s.includes('事件名为空/非 ASCII 词尾'))).toBe(true);
+    expect(v.some((s) => s.includes('no Given state declared'))).toBe(true);
+  });
 });
 
 describe('validateTlaEquivalence', () => {
@@ -308,6 +344,80 @@ describe('checkBddModel', () => {
 
     expect(result.exitCode).toBe(1);
     expect(result.dimensions.stepBinding).toEqual(['[D5] required cucumber report has no executed scenarios or steps']);
+  });
+
+  it('D6: surfaces When-line extraction failure as prefixed scenarioPathValidity violation (B8)', () => {
+    const manifest = {
+      schemaVersion: '1.0',
+      projectId: 'test',
+      basePath: 'features/',
+      currentPhase: 1,
+      features: [
+        {
+          id: 'L1_test-001',
+          level: 1,
+          filePath: 'L1/L1_test-001.feature',
+          scenarioCount: 1,
+          stateMachineId: 'SM-L1-test',
+          tlaSpecId: 'L1_test',
+          reqIds: ['REQ-001'],
+          designIds: [],
+          parentFeatureIds: [],
+          siblingFeatureIds: [],
+          childFeatureIds: [],
+        },
+      ],
+      stateMachines: [
+        {
+          id: 'SM-L1-test',
+          level: 1,
+          states: ['A', 'B'],
+          initialState: 'A',
+          terminalStates: [],
+          acceptingStates: ['B'],
+          rejectingStates: [],
+          transitions: [{ from: 'A', event: 'e1', to: 'B' }],
+          invariants: ['B => true'],
+        },
+      ],
+    } satisfies BddManifest;
+
+    const result = checkBddModel({
+      manifest,
+      phase: 1,
+      parsedFeatures: [
+        {
+          featureId: 'L1_test-001',
+          header: {
+            req: ['REQ-001'],
+            design: [],
+            system: 'L1_test',
+            tlaSpec: 'L1_test',
+            stateMachine: 'SM-L1-test',
+            parentFeatures: [],
+            siblingFeatures: undefined,
+            childFeatures: [],
+            scenarioIdPrefix: 'BDD-L1',
+          },
+          stateMachine: {},
+          scenarios: [
+            {
+              scenarioName: '中文事件名',
+              startState: 'A',
+              events: [],
+              expectedEndState: 'B',
+              invariantAssertions: [],
+              whenEventExtractionFailures: ['When 用户提交登录请求'],
+            },
+          ],
+        },
+      ],
+    });
+
+    const d6 = result.dimensions.scenarioPathValidity.join(' ');
+    expect(d6).toContain('[D6:L1_test-001:中文事件名]');
+    expect(d6).toContain('事件名为空/非 ASCII 词尾');
+    expect(result.exitCode).toBe(1);
   });
 
   it('keeps D4 and D5 optional without explicit requirement flags', () => {
@@ -1030,6 +1140,68 @@ Scenario: 无 Given 无 Then
     expect(sc.startState).toBeNull();
     expect(sc.events).toEqual(['Act']);
     expect(sc.expectedEndState).toBeNull();
+  });
+
+  it('records Chinese-tail When line as event extraction failure (B8), not for non-event And lines', () => {
+    // 中文词尾 When：提取不到事件且登记 whenEventExtractionFailures（B8，2026-10-07）
+    const featZh = `# @req: REQ-001
+# @design: SD-3.2.1
+# @system: L1_blog_system
+# @tla-spec: L1_blog_system
+# @state-machine: SM-L1-blog_system
+# @parent-features: (none)
+# @child-features: (none)
+# @scenario-id-prefix: BDD-L1
+Feature: 中文词尾事件名
+Background:
+  # @states: A, B
+  # @initial-state: A
+  # @terminal-states: ()
+  # @accepting-states: B
+  # @rejecting-states: ()
+  # @transitions:
+  #   A + e -> B
+  # @invariants:
+  #   B => true
+Scenario: 中文事件名
+  Given 系统处于 "A"
+  And 用户输入有效凭据 "alice@example.com" / "valid123"
+  When 用户提交登录请求
+  Then 系统进入 "B"
+  And 不变式 "B => true" 应成立
+`;
+    const result = parseFeatureFile(featZh);
+    const sc = result.scenarios[0]!;
+    expect(sc.events).toEqual([]); // 中文词尾提取不到事件
+    expect(sc.whenEventExtractionFailures).toEqual(['When 用户提交登录请求']);
+    // And 行常承载非事件步骤（输入前置 / 不变式断言），提取失败不登记
+    expect(sc.whenEventExtractionFailures!.some((l) => l.startsWith('And '))).toBe(false);
+  });
+
+  it('records no extraction failures for ASCII-tail When lines (bare word or paren idiom)', () => {
+    const featAscii = `# @req: REQ-001
+# @design: SD-3.2.1
+# @system: L1_blog_system
+# @tla-spec: L1_blog_system
+# @state-machine: SM-L1-blog_system
+# @parent-features: (none)
+# @child-features: (none)
+# @scenario-id-prefix: BDD-L1
+Feature: ASCII 词尾事件名
+Scenario: 裸词尾注
+  Given 系统处于 "A"
+  When 用户执行 login
+  Then 系统进入 "B"
+Scenario: 括号尾注
+  Given 系统处于 "A"
+  When 用户提交登录请求 (login)
+  Then 系统进入 "B"
+`;
+    const result = parseFeatureFile(featAscii);
+    expect(result.scenarios[0]!.events).toEqual(['login']);
+    expect(result.scenarios[0]!.whenEventExtractionFailures).toEqual([]);
+    expect(result.scenarios[1]!.events).toEqual(['login']);
+    expect(result.scenarios[1]!.whenEventExtractionFailures).toEqual([]);
   });
 });
 
