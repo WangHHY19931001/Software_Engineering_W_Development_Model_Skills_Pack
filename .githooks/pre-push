@@ -492,7 +492,7 @@ par_expect 17 "prettier 格式一致性（--check）" 0 \
 par_expect 18 "tsc 类型检查 0 错误" 0 \
   npx tsc -p config/tsconfig.json
 
-# 19. eval 语料断言：68 条触发边界语料 + coverageMatrix 五项校验全绿（触发边界 campaign 快追；
+# 19. eval 语料断言：101 条评估语料 + coverageMatrix 六项校验全绿（触发边界 campaign 快追；
 #     断言引擎 --self-check 由 eval/ 自身维护，此处跑全量断言）
 par_expect 19 "eval 语料断言与覆盖矩阵全绿" 0 npx tsx eval/runner.ts
 

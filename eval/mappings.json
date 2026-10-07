@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "description": "88 条评估提示词 → 技能资产锚点映射。断言分层：L1 触发词断言（正向 enable 与歧义 ask）、L1N 负向触发断言（skip 反例，锚定 activation-guide 类别节 + notContains 守卫 + 「不启用」行锚点）、L2 机制存在性断言。顶层 matrix 为覆盖矩阵声明，由 runner coverageMatrix 六项校验强制（⑥ = references/*.md 全覆盖：映射 assertions/evidence 路径并集须覆盖实况文件集，差集非空 exit 1）。每条映射另以 evidence 字段做行为证据映射。",
+  "description": "101 条评估提示词 → 技能资产锚点映射。断言分层：L1 触发词断言（正向 enable 与歧义 ask）、L1N 负向触发断言（skip 反例，锚定 activation-guide 类别节 + notContains 守卫 + 「不启用」行锚点；campaign 后批次延展的 L1N 另有权威行锚点形态、不带 category——类别化语料仍以 guide 登记册与 coverageMatrix ④ 为准）、L2 机制存在性断言。顶层 matrix 为覆盖矩阵声明，由 runner coverageMatrix 六项校验强制（⑥ = references/*.md 全覆盖：映射 assertions/evidence 路径并集须覆盖实况文件集，差集非空 exit 1）。每条映射另以 evidence 字段做行为证据映射。",
   "matrix": {
-    "routeTotals": { "enable": 29, "ask": 9, "skip": 24 },
+    "routeTotals": { "enable": 42, "ask": 9, "skip": 24 },
     "minPerCategory": 2,
     "guidePath": "w-model-dev/references/activation-guide.md"
   },
@@ -514,6 +514,84 @@
       "assertions": [
         { "type": "contains", "target": "w-model-dev/references/phase-4-detailed-design.md", "substring": "同一设计决策散落多模块 = 信息泄露" },
         { "type": "contains", "target": "w-model-dev/references/phase-4-detailed-design.md", "substring": "后门泄露（多方共享但不在接口）比接口泄露更隐蔽" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 89, "scenario": "威胁模型：agent 流水线威胁覆盖询问", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/agent-threat-model.md", "substring": "威胁目录（T1-T7）" },
+        { "type": "contains", "target": "w-model-dev/references/agent-threat-model.md", "substring": "不构建自动化守卫脚本、不新增检测信号、不改变任何 G 门禁判定" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 90, "scenario": "资产编写：references 文档渐进披露询问", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/asset-authoring.md", "substring": "渐进披露判据（分支判据）" },
+        { "type": "contains", "target": "w-model-dev/references/asset-authoring.md", "substring": "授权不写（no-guidance control，S04）" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 91, "scenario": "代码健康：blocked 候选处置询问", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/code-health-governance.md", "substring": "发现 ≠ 结论" },
+        { "type": "contains", "target": "w-model-dev/references/code-health-governance.md", "substring": "gate-failure → blocked → R(root-cause) → V(root-cause-review) → G(root-cause-gate) → S(rework)", "scopeAnchor": "失败链" }
+      ],
+      "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/cli/code-health-archive.ts" } },
+    { "id": 92, "scenario": "设计哲学：主刀与修正权边界询问", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/design-philosophy.md", "substring": "概念完整性由持有目的的人（主刀）持续持有" },
+        { "type": "contains", "target": "w-model-dev/references/design-philosophy.md", "substring": "不给修正权的流程不合格（反模式 #46）" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 93, "scenario": "事件接驳：webhook 事件触发单阶段询问", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/event-ingress-guide.md", "substring": "编排者路由逻辑（确定性，无 LLM）" },
+        { "type": "contains", "target": "w-model-dev/references/event-ingress-guide.md", "substring": "先核实主张再受理（M13）" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 94, "scenario": "证据支撑树：模糊目标分析询问", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/evidence-anchored-tree.md", "substring": "决策树穷尽 + 事实交叉验证 + 渐进式文档沉淀" },
+        { "type": "contains", "target": "w-model-dev/references/evidence-anchored-tree.md", "substring": "唯一增量：evidenceAnchor" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 95, "scenario": "爬坡循环：harness 改进信号排序询问", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/hill-climbing-guide.md", "substring": "侦察 vs 产出两阶段" },
+        { "type": "contains", "target": "w-model-dev/references/hill-climbing-guide.md", "substring": "HarnessImprovementReport 的改进信号按上述三档标注" }
+      ],
+      "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/cli/metrics-report.ts" } },
+    { "id": 96, "scenario": "图谱分块：A-chunk 提取规则询问", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/ingestion-chunk.md", "substring": "REQ 入学锐利性测试" },
+        { "type": "contains", "target": "w-model-dev/references/ingestion-chunk.md", "substring": "level 识别是确定性规则匹配，不是 LLM 估算" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 97, "scenario": "图谱合并：A-cross 冲突处理询问", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/ingestion-cross.md", "substring": "A-cross（阶段1）合并算法" },
+        { "type": "contains", "target": "w-model-dev/references/ingestion-cross.md", "substring": "合并是幂等的：重跑时全量重读所有 chunk.json" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 98, "scenario": "操作行为：编排行为硬性规矩询问", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/operation-behaviors.md", "substring": "失败模式清单（F1~F10）" },
+        { "type": "contains", "target": "w-model-dev/references/operation-behaviors.md", "substring": "代码健康治理中的操作行为" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 99, "scenario": "阶段 6：agent 自报集成通过判定询问", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/phase-6-integration-test.md", "substring": "集成判断由人持有" },
+        { "type": "contains", "target": "w-model-dev/references/phase-6-integration-test.md", "substring": "集成工作的判据不住在被测代码里" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 100, "scenario": "阶段 7：跳过冒烟直跑全量询问", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/phase-7-system-test.md", "substring": "冒烟子集存在失败 → 不开跑完整套件" },
+        { "type": "contains", "target": "w-model-dev/references/phase-7-system-test.md", "substring": "可观测性验收标准" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 101, "scenario": "技能自演化：SkillOpt 直接优化询问", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/skillopt-adoption.md", "substring": "信号→bounded edit→validation gate 流程" },
+        { "type": "contains", "target": "w-model-dev/references/skillopt-adoption.md", "substring": "与 §11「技能自演化不在本仓库」的协调" }
       ],
       "evidence": { "type": "assertion" } }
   ]

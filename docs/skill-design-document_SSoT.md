@@ -439,9 +439,9 @@ L0 文档（`SKILL.md` / `references/` / `templates/` / `examples/` / `subagent/
 
 **三层资产契约**：
 
-- 数据源 = `eval/w-model-dev-test-prompts.json`（60 条，含 category/route 字段）；
+- 数据源 = `eval/w-model-dev-test-prompts.json`（101 条，其中 75 条带 category/route 字段）；
 - 视图 = `w-model-dev/references/activation-guide.md`（13 个 `## <code> <canonical 名>` 节，示例行 `- id=N: <prompt 原文>`，每节另含判定理由与边界说明——何时升级为 ask/enable）；
-- 一致性 = `eval/mappings.json` 顶层 matrix 声明 + `eval/runner.ts` coverageMatrix 五项校验（route 对齐 / 总数符合声明 / 每类别 ≥ minPerCategory / guide 节示例数 == 语料条数 / 每负向类别 ≥1 组 notContains 守卫）。`npm run eval` 已纳入 pre-push 第 19 项门禁（触发边界快追，2026-09-07 纳入时为第 18 项，2026-09-18 插入第 13 项覆盖口径门后顺延）。
+- 一致性 = `eval/mappings.json` 顶层 matrix 声明 + `eval/runner.ts` coverageMatrix 六项校验（route 对齐 / 总数符合声明 / 每类别 ≥ minPerCategory / guide 节示例数 == 语料条数 / 每负向类别 ≥1 组 notContains 守卫 / `w-model-dev/references/*.md` 实况文件集被映射路径并集全覆盖）。`npm run eval` 已纳入 pre-push 第 19 项门禁（触发边界快追，2026-09-07 纳入时为第 18 项，2026-09-18 插入第 13 项覆盖口径门后顺延）。
 
 **触发面分层**：SKILL.md frontmatter description 保留一句英文反例信号（作用于技能加载器的匹配面）；触发决策表"不启用"行含十类速览并链接 activation-guide.md；完整判定细则只在 activation-guide.md 按需加载——常驻面增量 ≤15 行。
 

@@ -618,5 +618,96 @@
     "route": "enable",
     "prompt": "详细设计评审发现「会话超时阈值」这个知识散落在三个类里各自定义，这算设计问题吗",
     "expected": "skill 指出信息隐藏检查判据：同一设计决策散落多模块 = 信息泄露（最重要的类划分危险信号），后门泄露（多方共享但不在接口）比接口泄露更隐蔽；修复为合并受影响类或提取新类封装该知识；类划分同时遵循 quality-standards 类设计规则（25 词职责测试、SRP/OCP/DIP、类名警报、内聚性）（phase-4-detailed-design「类设计规则引用」「信息隐藏检查」节）"
+  },
+  {
+    "id": 89,
+    "scenario": "威胁模型：agent 流水线威胁覆盖询问",
+    "route": "enable",
+    "prompt": "这套 W 模型技能流水线自己会不会被 prompt 注入或者伪造 run-log？有没有针对 agent 自身的威胁模型",
+    "expected": "skill 指向 agent 威胁模型：威胁目录 T1-T7（提示注入/证据伪造/门禁结果冒充/字节篡改/越权实施/敏感数据泄漏/输出漂移）逐类映射既有缓解机制，覆盖强度分阻断/检测/提示三档；三条不承诺开宗明义——不构建自动化守卫脚本、不新增检测信号、不改变任何 G 门禁判定（agent-threat-model「威胁目录（T1-T7）」节）"
+  },
+  {
+    "id": 90,
+    "scenario": "资产编写：references 文档渐进披露询问",
+    "route": "enable",
+    "prompt": "要给这个技能包新写一篇 references 指南，内容很长，哪些该写进去哪些该留指针",
+    "expected": "skill 按技能资产编写规范执行：区分 context load 与 cognitive load，按信息层级阶梯与渐进披露分支判据决定正文体量（S03 数字阈值 + 显式要求标记），跨文件用指针措辞而非深链，收尾过 no-op test 可观测判据；无授权的指导内容不写（S04 授权不写）（asset-authoring「渐进披露判据（分支判据）」「授权不写（no-guidance control，S04）」节）"
+  },
+  {
+    "id": 91,
+    "scenario": "代码健康：blocked 候选处置询问",
+    "route": "enable",
+    "prompt": "code-health 扫出来的重复簇候选现在 blocked 了，直接删掉这个候选或者绕过去行不行",
+    "expected": "skill 按 code-health 治理语义回答：发现 ≠ 结论，blocked 同样是发现不是结论，不得静默丢弃；blocked 后走固定失败链 gate-failure → blocked → R(root-cause) → V(root-cause-review) → G(root-cause-gate) → S(rework) → evidenced，错序或缺角色被拒绝；删除/抽象必须有人类 ApprovalDecision 且可回滚（code-health-governance「候选生命周期与状态」「CHECKPOINT 与失败链」节）"
+  },
+  {
+    "id": 92,
+    "scenario": "设计哲学：主刀与修正权边界询问",
+    "route": "enable",
+    "prompt": "用这套流程时哪些决定必须我自己拍板，哪些可以放手交给 agent",
+    "expected": "skill 按五条设计哲学回答：概念完整性由持有目的的人（主刀）持续持有——拍板、核心判断、最终负责不可委托给 agent；人机分工线、白箱 vs 黑箱、受控的失控、clockware vs swarmware 逐条给出边界；人在回路最低标准是修正权，只给审计权不给修正权的流程不合格（反模式 #46）（design-philosophy「主刀与修正权」节）"
+  },
+  {
+    "id": 93,
+    "scenario": "事件接驳：webhook 事件触发单阶段询问",
+    "route": "enable",
+    "prompt": "外部监控系统能不能通过 webhook 触发这套流程只重跑设计阶段，不用走完整 8 阶段",
+    "expected": "skill 指向事件接驳细则：消费方自行实现 webhook/cron 触发器写入 .w-model/event-ingress.jsonl（append-only），编排者 O 按事件 → 阶段路由表做确定性路由（无 LLM）到单阶段而非完整重跑；受理前先核实主张再受理（M13），高风险路径强制 CHECKPOINT（event-ingress-guide「事件 → 阶段路由表」「编排者路由逻辑（确定性，无 LLM）」节）"
+  },
+  {
+    "id": 94,
+    "scenario": "证据支撑树：模糊目标分析询问",
+    "route": "enable",
+    "prompt": "接手了一个特别模糊的目标，能不能用证据支撑树联合分析那套方法来做",
+    "expected": "skill 按证据支撑树方法论参照执行：决策树穷尽 + 事实交叉验证 + 渐进式文档沉淀，每个结论挂载证据状态（Confirmed/Pending/Invalid）；W 模型侧唯一增量为 evidenceAnchor 字段，方法论中破坏 W 模型架构的部分明确拒绝照搬（evidence-anchored-tree「方法论摘要」「唯一增量：evidenceAnchor」节）"
+  },
+  {
+    "id": 95,
+    "scenario": "爬坡循环：harness 改进信号排序询问",
+    "route": "enable",
+    "prompt": "retro 收集了一堆 harness 改进想法，按什么顺序落地",
+    "expected": "skill 按 Loop 4 爬坡循环处理：HarnessImprovementReport 的改进信号按 optimizationLevel 1|2|3 三档标注，人审按档位排优先级（先 1 后 2 后 3）；侦察 vs 产出两阶段推进；方法论只用于人审排序——不自动改 harness，改进经人审后手动应用（hill-climbing-guide「侦察 vs 产出两阶段」「信号检测逻辑（确定性，无 LLM）」节）"
+  },
+  {
+    "id": 96,
+    "scenario": "图谱分块：A-chunk 提取规则询问",
+    "route": "enable",
+    "prompt": "大仓库做图谱摄入，单个 chunk 里节点、level 和迷雾项分别怎么提取登记",
+    "expected": "skill 按 A-chunk 任务指引执行：level 字段走确定性规则匹配（不是 LLM 估算，匹配失败即 blocked），阶段 1 REQ 节点过入学锐利性测试，迷雾项按固定表格格式写入本块 .md，跨块关联写 fog 边 hint；A-chunk 不写正式阶段产物（ingestion-chunk「节点提取规则」「迷雾项（Fog of War）」节）"
+  },
+  {
+    "id": 97,
+    "scenario": "图谱合并：A-cross 冲突处理询问",
+    "route": "enable",
+    "prompt": "几十个 chunk 的图谱要合并成一张，节点重复和 evidenceAnchor 冲突怎么处理",
+    "expected": "skill 按 A-cross 合并算法回答：收集全部 chunk.json 节点按 id 去重（同 id 取首个，冲突记录到 report），crossChunkHints 确认跨块边；evidenceAnchor 同节点多来源冲突时取来源最具体的并在 cross-analysis-report.md 记录取舍理由，不因合并歧义删除既有合法锚点；合并幂等，重跑全量重读（ingestion-cross「A-cross（阶段1）合并算法」「关键约束」节）"
+  },
+  {
+    "id": 98,
+    "scenario": "操作行为：编排行为硬性规矩询问",
+    "route": "enable",
+    "prompt": "编排过程中 agent 的操作行为有什么硬性规矩，违反了会怎么定性",
+    "expected": "skill 按操作行为参考回答：八条操作行为逐条给出边界，违反按失败模式清单 F1~F10 定性；代码健康治理等场景另有强制落点（operation-behaviors「八条操作行为」「失败模式清单（F1~F10）」节）"
+  },
+  {
+    "id": 99,
+    "scenario": "阶段 6：agent 自报集成通过判定询问",
+    "route": "enable",
+    "prompt": "阶段 6 集成测试跑完了，agent 报告说集成通过，可以直接过阶段门吗",
+    "expected": "skill 指出集成判断由人持有：集成结论由 V/人评审定，不以 agent 自报为准；集成工作的判据不住在被测代码里、住在大系统处境里（接口对齐/版本兼容/多环境隔离/部署方案），「集成通过」的验收判据须在阶段 3 接口设计预注册；本阶段执行前先过冒烟准入（phase-6-integration-test「集成判断由人持有」「冒烟准入（测试系统工程）」节）"
+  },
+  {
+    "id": 100,
+    "scenario": "阶段 7：跳过冒烟直跑全量询问",
+    "route": "enable",
+    "prompt": "阶段 7 系统测试套件太慢了，跳过冒烟子集直接跑全量行不行",
+    "expected": "skill 指出冒烟准入时序：完整测试套件开跑前先执行冒烟子集（test-case 冒烟列 ✓ 用例）；冒烟子集存在失败 → 不开跑完整套件、走普通 V/G 失败链，冒烟全过才开跑；准入为文档时序机制（零新脚本），结果一律经 /wm test result= 真实回填（phase-7-system-test「冒烟准入（测试系统工程）」节）"
+  },
+  {
+    "id": 101,
+    "scenario": "技能自演化：SkillOpt 直接优化询问",
+    "route": "enable",
+    "prompt": "想用 SkillOpt 自动优化这个技能包的 prompt 和工具链，直接对仓库跑可以吗",
+    "expected": "skill 按 SkillOpt 方法论吸收边界回答：信号→bounded edit→validation gate 流程——bounded edit 有边界规则，validation gate 以回归测试为标准；技能自演化不在本仓库、由外部工具完成，w-model-dev Loop 4 只产出 HarnessImprovementReport 信号、不自动改 harness、不重写 prompt/工具/验证规则（skillopt-adoption「信号→bounded edit→validation gate 流程」「与 §11「技能自演化不在本仓库」的协调」节）"
   }
 ]

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 仓内评估断言 runner：验证「60 条评估提示词要求的技能行为支撑资产」是否完备。
+ * 仓内评估断言 runner：验证「101 条评估提示词要求的技能行为支撑资产」是否完备。
  *
  * 断言分层（设计见 docs/superpowers/specs/2026-08-28-w-model-dev-3dim-optimization-design.md §2.2 与
  * docs/superpowers/specs/2026-09-07-trigger-boundary-campaign-design.md §5）：
@@ -94,10 +94,12 @@ function createRealFs(): FileSystemAdapter {
       return fs.existsSync(path.join(repoRoot, p));
     },
     list(dir: string): string[] {
-      return fs
-        .readdirSync(path.join(repoRoot, dir), { withFileTypes: true })
-        .filter((e) => e.isFile())
-        .map((e) => path.posix.join(dir, e.name));
+      // fail-closed（C19 批三）：⑥ 集合口径 = 直接子文件；若未来出现子目录，静默过滤会让
+      // ⑥ 覆盖集合无声缩小成盲区——此处直接报错，要求改递归枚举或将新文件纳入映射。
+      return fs.readdirSync(path.join(repoRoot, dir), { withFileTypes: true }).map((e) => {
+        if (!e.isFile()) throw new Error(`⑥ 枚举 ${dir} 遇到非文件条目：${path.posix.join(dir, e.name)}`);
+        return path.posix.join(dir, e.name);
+      });
     },
   };
 }
