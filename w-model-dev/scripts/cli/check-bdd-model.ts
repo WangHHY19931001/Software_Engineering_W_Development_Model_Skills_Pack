@@ -489,6 +489,8 @@ async function main(): Promise<number> {
         checkedAt: result.checkedAt,
         summary: result.summary,
         violationsCount: result.violations.length,
+        // B7/I3：L1 豁免的 SKIPPED 证据计数进机器面（证据不是违规，不计入 violationsCount）
+        tlaEquivalenceSkippedCount: result.tlaEquivalenceSkipped.length,
         exitCode: result.exitCode,
         passed: result.passed,
       },
@@ -506,6 +508,8 @@ async function main(): Promise<number> {
         passed: result.passed,
         reasons: allViolations,
         violations: buildViolationDistribution(allViolations.length),
+        // B7/I3：SKIPPED 全字段（逐条证据行）进机器可读报告——原先只在人类 stdout 可见
+        tlaEquivalenceSkipped: result.tlaEquivalenceSkipped,
         durationMs: Date.now() - startTime,
         ...(gateLogWriteError === undefined ? {} : { gateLogWriteError }),
         exitCode,
@@ -548,6 +552,8 @@ async function main(): Promise<number> {
     passed: result.passed,
     exitCode: result.exitCode,
     summary: result.summary,
+    // B7/I3：SKIPPED 证据计数进 BDD_JSON 摘要（与摘要既有标量风格一致；逐条证据在 --json 全字段与人类报告段）
+    tlaEquivalenceSkippedCount: result.tlaEquivalenceSkipped.length,
     ...(gateLogWriteError === undefined ? {} : { gateLogWriteError }),
   };
   console.log('BDD_JSON ' + JSON.stringify(summary));

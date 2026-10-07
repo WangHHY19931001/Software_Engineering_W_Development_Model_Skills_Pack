@@ -2494,7 +2494,7 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 | 恒真不变式防御 + cfg CONSTRAINT 禁用（T3，B1/B10c） | tla-logic.ts（checkBusinessInvariants）/ samples/tla 四负例 / NEGATIVE-COVERAGE |
 | tla-plus.md 指南修复（T4，B1/B3-B6） | references/tla-plus.md（死锁指引终态自环主形态 + cfg 算子名引用 + §14.3 + 示例库 + 8 字段口径） |
 | bdd.md D6 判据 + 事件名空 violation（T5，B8/B10） | references/bdd.md / bdd-logic.ts |
-| D4 L1 SKIPPED 证据 + variableCombination 推导注记（T6，B7/B9；终审 I5 补实现） | bdd-logic.ts（`tlaEquivalenceSkipped`）/ check-bdd-model.ts 报告段 / tla-logic.ts（checkDecomposition + `extractTlaVariableNames` 变量名覆盖 + integer 基数）/ tla-manifest.schema |
+| D4 L1 SKIPPED 证据 + variableCombination 推导注记（T6，B7/B9；终审 I3/I5 补机器面与实现） | bdd-logic.ts（`tlaEquivalenceSkipped`）/ check-bdd-model.ts 报告段 + `--json` 全字段 / `BDD_JSON` 与 gate-log `reportSummary` 计数 / gate-log.schema（bddSummary）/ tla-logic.ts（checkDecomposition + `extractTlaVariableNames` 变量名覆盖 + integer 基数）/ tla-manifest.schema |
 | 五类退化解负例 + 空转 Next 检测（T7，B10） | tla-logic.ts（parseCfgNextNames / checkIdleNext）/ samples/tla/bad-idle-next.json / NEGATIVE-COVERAGE |
 | 图谱收严（T8，A11/A12） | graph-logic.ts（环检全 phase / R15b pending violation）/ graph.schema / samples/graph 两负例 / graph-guide |
 | RTM / 状态机收严（T9，A13/A14/C16） | rtm.schema（coverageStatus enum+必填）/ gate-logic.ts（checkRtmCoverageStatusConsistency）/ lib/constants.ts（PROJECT_STATUSES 等）/ maturity-logic.ts（R7 = project.status 转移校验）/ wm-status-logic.ts / project.schema |
