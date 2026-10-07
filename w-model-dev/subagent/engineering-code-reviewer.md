@@ -116,18 +116,18 @@ ch := make(chan Result)  // 如果没有消费者，发送方会永久阻塞
 ch := make(chan Result, 1)  // 或确保有 context 超时
 ```
 
-### Python
-```python
-# 🔴 安全：pickle 反序列化任意数据
-data = pickle.loads(user_input)  # 可执行任意代码！
-# 应该用 json.loads() 或带白名单的反序列化
+### 动态类型语言
+```text
+# 🔴 安全：用不安全的反序列化格式解析外部输入（可执行任意代码）
+对象 = 反序列化(用户输入)          # 危险
+# 应该用纯数据格式（如 JSON）或带白名单的反序列化器
 
 # 🟡 性能：循环内重复查询数据库（N+1 问题）
 for order in orders:
-    customer = db.query(Customer).get(order.customer_id)  # 每次循环一次查询
-# 应该：
+    customer = 查询(Customer, order.customer_id)   # 每次循环一次查询
+# 应该：先收集 id，一次批量查询后在内存中建映射
 customer_ids = [o.customer_id for o in orders]
-customers = db.query(Customer).filter(Customer.id.in_(customer_ids)).all()
+customers = 批量查询(Customer, customer_ids)
 customers_map = {c.id: c for c in customers}
 ```
 

@@ -186,33 +186,33 @@ alerts:
 
 ## 🧪 混沌工程
 
-```python
-# 混沌实验设计模板
-class ChaosExperiment:
-    def __init__(self):
-        self.hypothesis = "当 Redis 主节点故障时，系统自动切换到从节点，延迟增加 <100ms"
-        self.steady_state = {
-            "p99_latency_ms": 200,
-            "error_rate": 0.001,
-            "availability": 0.9995,
-        }
-        self.blast_radius = "staging 环境，仅影响 5% 测试流量"
-        self.abort_conditions = [
-            "错误率 > 5%",
-            "P99 延迟 > 2000ms",
-            "任何生产环境影响",
-        ]
+```text
+# 混沌实验设计模板（栈中立伪码）
 
-    def run(self):
+混沌实验:
+    假设 = "当主数据节点故障时，系统自动切换到从节点，延迟增加 <100ms"
+    稳态指标 = {
+        "p99_latency_ms": 200,
+        "error_rate": 0.001,
+        "availability": 0.9995,
+    }
+    爆炸半径 = "预发环境，仅影响 5% 测试流量"
+    中止条件 = [
+        "错误率 > 5%",
+        "P99 延迟 > 2000ms",
+        "任何生产环境影响",
+    ]
+
+    执行():
         # 1. 确认稳态
-        assert self.verify_steady_state()
+        assert 验证稳态()
         # 2. 注入故障
-        self.inject_fault("redis-master", "network-partition", duration="5m")
+        注入故障(目标="主数据节点", 类型="网络分区", 时长="5m")
         # 3. 观察系统行为
-        results = self.observe(duration="10m")
+        结果 = 观察(时长="10m")
         # 4. 验证假设
-        assert results["failover_time_ms"] < 5000
-        assert results["p99_latency_ms"] < 300
+        assert 结果["failover_time_ms"] < 5000
+        assert 结果["p99_latency_ms"] < 300
 ```
 
 ## 📊 成功指标
