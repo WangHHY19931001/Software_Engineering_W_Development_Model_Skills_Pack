@@ -506,5 +506,117 @@
     "route": "enable",
     "prompt": "一个阶段里编排者派了 35 个子代理会不会被拒绝，子代理分派数上限在哪里配置",
     "expected": "skill 指出 perPhase.maxSubagentSpawns（S+V+G+A 合计，默认 30，可选字段）为单阶段分派上限：check-budget R7 按阶段聚合 run-log 自报的 subagentSpawns，Σ 严格大于上限即 blocking（退出码 1），estimated=true 记录不计入聚合；未配置时 R7 跳过并出非阻断警告（跳过不等于通过）（data-models.md「子代理分派数实效校验（R7）」条）"
+  },
+  {
+    "id": 73,
+    "scenario": "图谱边界：可选能力是否建图节点询问",
+    "route": "enable",
+    "prompt": "阶段 2 设计里提到未来可能支持 LDAP 登录，这次先不做，图谱里要给它建节点和边吗",
+    "expected": "skill 指出进入图 = 承诺为运行时事实：设计提及但非本次承诺的可选能力不建图节点、不建边，未决的登记设计主文档「迷雾登记册」、明确不做的登记「非目标」（附决策引用）；P2（可以）≠ 可选能力，范围内 P2 需求照常建 REQ/SD 节点并承担全部不变量；可选能力后续转正 = 正式变更（graph-guide「可选能力边界」节）"
+  },
+  {
+    "id": 74,
+    "scenario": "RTM 口径：coverageStatus 手工填写是否被门禁信任",
+    "route": "enable",
+    "prompt": "我把 rtm.json 里每条需求的 coverageStatus 都改成 covered，阶段门的覆盖率就过了吧",
+    "expected": "skill 指出 coverageStatus 仅用于展示，门禁脚本会从原始字段重算，不信任手工填写的状态；覆盖率公式为（7 个追溯字段均非空的需求数 / 总需求数）× 100%，description/designDoc/codeModule/unitTest/integrationTest/systemTest/acceptanceTest 任一字段为空该需求即未覆盖（rtm-guide「覆盖率计算公式」节）"
+  },
+  {
+    "id": 75,
+    "scenario": "完成定义：DoD 满意化与局部指标最优化询问",
+    "route": "enable",
+    "prompt": "阶段收口时能不能再打磨几轮把覆盖率刷得更高，追求每个指标最优后再放行",
+    "expected": "skill 指出 Definition of Done 是满意化而非最优：完成 = 达到硬约束包络内可交付（测试/覆盖率/门禁全过），不是「每个指标都最优」；反对过度优化单个局部指标——Goodhart 风险（反模式 #45 同源），优化局部指标可能伤害整体目标，评审与 DoD 以多重目标（质量/成本/时间/可维护性）平衡为准（quality-standards「满意化完成」节）"
+  },
+  {
+    "id": 76,
+    "scenario": "放行取巧：失败测试暂跳求阶段门通过",
+    "route": "skip",
+    "prompt": "有两个测试一直红，先标记成 skip 让这次阶段门过了，下个阶段再补，行不行",
+    "expected": "skill 拒绝：DoD 测试维度要求全部测试通过、无回归，由测试运行器退出码 0 承载，禁止「先放行后补」——不通过的动作是当场补测试或修复回归；乐观标记与放行后补均违反七维度标准（quick-self-check「七维度标准」表）"
+  },
+  {
+    "id": 77,
+    "scenario": "安装形态：L0 纯副本脚本门禁可用性询问",
+    "route": "enable",
+    "prompt": "我只想把提示词和模板拷走用，不装 npm 依赖，L0 副本里 check-artifact-gate 这些脚本门禁还能跑吗",
+    "expected": "skill 指出 L0 纯副本下全部脚本门禁不可用：编排者跳过 G 子代理脚本门禁，改由 V 评审 + 用户确认把关，并在 project.status 标记 gateLevel: \"l0\"（自我声明，无脚本可验）；指向 scripts/samples/tools 的链接是 L1-only 导航，L0 副本中目标预期不存在（quickstart「安装（L1 带门禁）」节）"
+  },
+  {
+    "id": 78,
+    "scenario": "返工升级：连续 3 次修复失败后要求第 4 次尝试",
+    "route": "enable",
+    "prompt": "同一个 bug 已经修了 3 轮还是红，直接再试第 4 次修复吧，这次肯定行",
+    "expected": "skill 拒绝无架构讨论的第 4 次修复：同一问题连续 ≥3 次修复失败触发架构判据（计数依据 = run-log 既有返工记录），不得在无架构讨论的情况下继续尝试第 4 次修复；且 R 报告修复建议须要求先写复现测试再修复——S-fix 先写复现 bug 的失败测试、确认红、修复、确认绿（root-cause-locator「≥3 次修复失败：架构判据」「复现测试强制」节）"
+  },
+  {
+    "id": 79,
+    "scenario": "评审口径：单轴低分加权达标能否判 passed",
+    "route": "enable",
+    "prompt": "Verifier 输出里某个 subCriterion 得分 0.6，但加权总分 0.85 已达标，passed 可以算 true 吗",
+    "expected": "skill 指出单轴下限 R13：任一子标准得分 < 0.70（B 级分界）即 passed=false，即使加权平均达标也不放行——防止加权平均掩盖单轴失败（反模式 #41）；脚本 violation 消息格式固定为「子标准 <name> 得分 <score> < 0.70（单轴下限）」（conventions「单轴下限（R13）」条）"
+  },
+  {
+    "id": 80,
+    "scenario": "抽象门槛：重复簇直接抽公共基类询问",
+    "route": "enable",
+    "prompt": "两个模块有 80 行相似代码，直接抽个公共基类消除重复吧",
+    "expected": "skill 指出重复簇与抽象门槛（code-health Phase 4）：至少 2 个 HEAD-tracked 稳定生产调用点（源码可定位、非 test-only）否则 deferred；11 维逐项等价每维须 canonical 证据子项；维护收益必须是量化的（重复代码收敛/可执行回归覆盖），「少几行 diff」不是理由；权威只来自 HEAD-tracked ledger + 人类批准 + 可执行 rollback（coding-quality「重复簇与抽象门槛」节）"
+  },
+  {
+    "id": 81,
+    "scenario": "并发设计：互持锁场景死锁预防询问",
+    "route": "enable",
+    "prompt": "订单和库存两个模块互相持锁等对方，设计上怎么防死锁",
+    "expected": "skill 指出死锁成立须同时满足四条件（互斥/持有并等待/不可抢占/循环等待），打破任一即可防死锁：循环等待用全序锁顺序（按固定顺序加锁）、持有并等待用一次性申请全部资源、互斥用不可变数据/副本替代、不可抢占用超时释放/可中断锁（concurrency-guide「死锁四条件」节）"
+  },
+  {
+    "id": 82,
+    "scenario": "估算方式：编码耗时乘系数外推总工期",
+    "route": "skip",
+    "prompt": "agent 写这个模块大概 2 小时，乘个 3 的系数你直接告诉我总工期呗",
+    "expected": "skill 拒绝该估算口径：禁「编码×系数」外推——任何按编码耗时 × 系数外推总工期的估算一律标记不可靠；应估「完全搞清楚这段代码应该做什么并验证做对了要多久」；正式估算前跑 mini-spike（一段真实小片段，产物可弃、结论记入决策记录），「我不知道，我们跑一小段真实工作试试看」是最诚实的估算（estimation-guide「禁编码×系数外推」「mini-spike 前置」节）"
+  },
+  {
+    "id": 83,
+    "scenario": "上下文治理：窗口将满时历史全量保留询问",
+    "route": "enable",
+    "prompt": "会话上下文快满了，但之前的讨论和历史决策都留着吧，以后可能用得上，先别删",
+    "expected": "skill 指出上下文分层判据是「这次任务需要吗」，不是「以后可能用得上吗」：常驻=系统提示/当前任务，历史决策与参考代码按需随用随取，早期讨论与已落地内容剔除；占用率体感 10%-30%，超过即主动沉淀重开或剔除（context-management-guide「上下文分层」「自污染」节）"
+  },
+  {
+    "id": 84,
+    "scenario": "工具路由：check-budget 最小参数询问",
+    "route": "enable",
+    "prompt": "跑 check-budget 查预算超限，只传 budget.json 的路径够了吗",
+    "expected": "skill 按 toolbox 决策表指出 budget 超限检查必带 --run-log：不传时 R6/R5-b 不生效，仅输出非阻断诊断（跳过不等于通过）；完整形态为 check-budget.ts .w-model/budget.json --project=.w-model/project.json --run-log=.w-model/run-log.jsonl --phase=N（toolbox「scripts 决策表」行）"
+  },
+  {
+    "id": 85,
+    "scenario": "迷雾毕业：不愿毕业也不判范围的去向确认",
+    "route": "ask",
+    "prompt": "这条需求现在还说不清楚，但业务上不想直接砍掉，能不能先一直留在迷雾册里往下走",
+    "expected": "skill 先询问用户再行动：CHECKPOINT 前强制清空——阶段门放行前迷雾册每项必须有毕业处置结果，禁止静默遗留；毕业三选一（毕业成 REQ / 判 Out of Scope / 豁免审批暂缓）——既不毕业也不判范围时只能走豁免审批 S→R→V→人类四阶段（写入 exemption.json），是否启动豁免与阶段放行均须用户确认（phase-1-requirements「迷雾登记册（Fog of War）」节）"
+  },
+  {
+    "id": 86,
+    "scenario": "ADR 门槛：全部技术决定一律立档询问",
+    "route": "enable",
+    "prompt": "这次把所有技术决定都写成 ADR 文档留档，包括选哪个 JSON 库这种小决定",
+    "expected": "skill 指出 ADR 入选门槛三问（难逆/无上下文会困惑/真取舍）全为真才立档，三问不齐（易逆/不令人困惑/无真实备选）不写 ADR、把决定记入设计文档即可；技术选型本身按 5 维度评分矩阵（适用性/成熟度/可维护性/引入成本/风险敞口）加权汇总取最高分，无评分依据的选型一律返工（phase-2-system-design「技术选型决策矩阵」节）"
+  },
+  {
+    "id": 87,
+    "scenario": "跨模块数据源：follower 校验 store 选择询问",
+    "route": "enable",
+    "prompt": "follow 接口要校验 follower 是否存在，blogger 服务手头有 blogger store，直接在里面查吧",
+    "expected": "skill 指出跨模块数据源选择约束（P7-002/P7-003 预防）：store 选择须与 schema 中的实体定义一致——follower 是 user 实体的子集应在 user store 校验，不应在 blogger store；token.sub 须与所选 store 的主键一致，且每个跨模块调用须在接口契约显式声明所用 store；违反则集成测试暴露缺陷后按普通 V/G 失败链回 phase-3 返工接口设计（phase-3-outline-design「跨模块数据源选择约束」节）"
+  },
+  {
+    "id": 88,
+    "scenario": "类划分：设计决策散落多类的信息泄露判定",
+    "route": "enable",
+    "prompt": "详细设计评审发现「会话超时阈值」这个知识散落在三个类里各自定义，这算设计问题吗",
+    "expected": "skill 指出信息隐藏检查判据：同一设计决策散落多模块 = 信息泄露（最重要的类划分危险信号），后门泄露（多方共享但不在接口）比接口泄露更隐蔽；修复为合并受影响类或提取新类封装该知识；类划分同时遵循 quality-standards 类设计规则（25 词职责测试、SRP/OCP/DIP、类名警报、内聚性）（phase-4-detailed-design「类设计规则引用」「信息隐藏检查」节）"
   }
 ]
