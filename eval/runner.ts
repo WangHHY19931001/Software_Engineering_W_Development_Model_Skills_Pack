@@ -7,7 +7,9 @@
  *   L1 触发词断言 —— 正向 enable 与歧义 ask 的触发契约在 SKILL.md / activation-guide.md 中可命中；
  *   L1N 负向触发断言 —— skip 反例：activation-guide 类别节锚点 + notContains 守卫（「立即启用」行域 + 文件域）+ 「不启用」行锚点；
  *   L2 机制存在性断言 —— expected 引用的机制在「脚本 + 逻辑常量 + references 锚点」有实体；
- *   行为证据映射 —— 每条映射的 evidence 字段指向已存在的 self-test fixture / 测试文件 / 既有断言。
+ *   行为证据映射 —— 每条映射的 evidence 字段指向已存在的 self-test fixture / 测试文件 / 既有断言；
+ *   ⑥ references 全覆盖 —— coverageMatrix 第六项：w-model-dev/references/*.md 实况文件集必须被映射
+ *   assertions/evidence 路径并集全覆盖（差集非空 → exit 1），封堵「非锚点行的级联残留」语料盲区（C19）。
  *
  * 用法：
  *   npm run eval                          # 全量断言，写 eval/results.json，失败 exit 1
@@ -79,6 +81,8 @@ interface AssertionResult {
 export interface FileSystemAdapter {
   read(p: string): string;
   exists(p: string): boolean;
+  /** 列出 repoRoot 相对目录下的直接子文件（posix 相对路径，不含子目录），供 ⑥ references 全覆盖断言枚举实况文件集 */
+  list(dir: string): string[];
 }
 
 function createRealFs(): FileSystemAdapter {
@@ -88,6 +92,12 @@ function createRealFs(): FileSystemAdapter {
     },
     exists(p: string): boolean {
       return fs.existsSync(path.join(repoRoot, p));
+    },
+    list(dir: string): string[] {
+      return fs
+        .readdirSync(path.join(repoRoot, dir), { withFileTypes: true })
+        .filter((e) => e.isFile())
+        .map((e) => path.posix.join(dir, e.name));
     },
   };
 }
@@ -157,7 +167,7 @@ export function crossCheckIds(mappings: Mapping[], promptIds: number[]): string[
   return problems;
 }
 
-/** 覆盖矩阵五项校验：①语料↔映射 route/category 对齐 ②route 总数符合声明 ③每类别 ≥ minPerCategory ④guide 节示例数==语料条数（双向）⑤每负向类别 ≥1 组「立即启用」行 notContains 守卫 */
+/** 覆盖矩阵六项校验：①语料↔映射 route/category 对齐 ②route 总数符合声明 ③每类别 ≥ minPerCategory ④guide 节示例数==语料条数（双向）⑤每负向类别 ≥1 组「立即启用」行 notContains 守卫 ⑥references 全覆盖（映射 assertions/evidence 路径并集 ⊇ w-model-dev/references/*.md 实况文件集，差集非空 → exit 1） */
 export function coverageMatrix(
   corpus: CorpusEntry[],
   mappings: Mapping[],
@@ -187,6 +197,26 @@ export function coverageMatrix(
     if (isRegistryCat(cat) && n < decl.minPerCategory) {
       problems.push(`类别 ${cat} 条数 ${n} < 下限 ${decl.minPerCategory}`);
     }
+  }
+  // ⑥ references 全覆盖（C19 批一）：批次 6 终审实证「非锚点行的级联残留逃过全部既有门禁」——
+  // 未被任何映射 assertions/evidence 路径引用的 references 文件成为语料盲区，此处 fail-closed。
+  // docs/ 等其他目录的锚点文件不参与本集合（⑥ 集合口径 = w-model-dev/references/*.md 45 文件）。
+  const normalize = (p: string) => p.split(path.sep).join('/');
+  const coveredPaths = new Set<string>();
+  for (const m of mappings) {
+    for (const a of m.assertions) coveredPaths.add(normalize(a.target));
+    if (m.evidence.type === 'fileExists') coveredPaths.add(normalize(m.evidence.target));
+  }
+  const refFiles = io
+    .list('w-model-dev/references')
+    .filter((f) => f.endsWith('.md'))
+    .sort();
+  const uncoveredRefs = refFiles.filter((f) => !coveredPaths.has(f));
+  if (uncoveredRefs.length > 0) {
+    problems.push(
+      `⑥ references 覆盖缺口：实况 ${refFiles.length} 个 .md 中 ${uncoveredRefs.length} 个未被映射路径覆盖`,
+    );
+    for (const f of uncoveredRefs) problems.push(`⑥ 未覆盖：${f}`);
   }
   let guide: string;
   try {
@@ -253,6 +283,7 @@ function selfCheckMatrix(): boolean {
       throw new Error(`意外读取：${p}`);
     },
     exists: (p: string) => p === 'guide.md',
+    list: (dir: string) => (dir === 'w-model-dev/references' ? ['w-model-dev/references/x.md'] : []),
   });
   const guideTwo = ['## N1 测试类别', '- id=1: 示例一', '- id=2: 示例二'].join('\n');
   const guideOne = ['## N1 测试类别', '- id=1: 示例一'].join('\n');
@@ -282,6 +313,13 @@ function selfCheckMatrix(): boolean {
     evidence: { type: 'assertion' },
   };
   const misrouted: Mapping = { ...guarded, route: 'enable' };
+  const refMapped: Mapping = {
+    id: 3,
+    layer: 'L2',
+    scenario: '',
+    assertions: [{ type: 'contains', target: 'w-model-dev/references/x.md', substring: 'x' }],
+    evidence: { type: 'assertion' },
+  };
   const declSkip2: MatrixDeclaration = {
     routeTotals: { enable: 0, ask: 0, skip: 2 },
     minPerCategory: 2,
@@ -294,7 +332,8 @@ function selfCheckMatrix(): boolean {
   };
 
   const results = {
-    ok: coverageMatrix(corpusA, [guarded, unguarded], declSkip2, mkIo(guideTwo)).length === 0,
+    // ok 基线含 refMapped：⑥ 生效后「全过」形态必须覆盖 mock 暴露的 references 文件
+    ok: coverageMatrix(corpusA, [guarded, unguarded, refMapped], declSkip2, mkIo(guideTwo)).length === 0,
     badTotals:
       coverageMatrix(
         corpusA,
@@ -311,6 +350,9 @@ function selfCheckMatrix(): boolean {
     ),
     badMissingGuard: coverageMatrix(corpusA, [unguarded, unguarded], declSkip2, mkIo(guideTwo)).some((p) =>
       p.includes('notContains 守卫'),
+    ),
+    refUncovered: coverageMatrix(corpusA, [guarded, unguarded], declSkip2, mkIo(guideTwo)).some((p) =>
+      p.includes('⑥ references 覆盖缺口'),
     ),
   };
   const ok = Object.values(results).every(Boolean);
