@@ -154,6 +154,8 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 > W 模型执行中真实高发陷阱。命中任一条即视为流程破坏，必须回退到对应阶段起点。
 >
 > 本文件由 [`w-model-dev/SKILL.md`](../SKILL.md) 的“反例与黑名单”节拆出，供 Agent 在阶段门评审前对照核验。
+>
+> **泛化度分级（C18）**：**通用** = 跨项目、跨技术栈成立的流程纪律；**项目教训化石** = 源自特定项目/技术栈的具体教训，作为化石保留（标注后可泛化使用）。下表「反模式（不要做）」列行首以【通用】/【项目教训化石】前缀标注；判据锚定**条目本体**是否只在特定栈下成立，而非例示是否具体。
 
 ### 速查摘要
 
@@ -229,54 +231,54 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 | # | 反模式（不要做） | 危害 | 正确做法 |
 |---|---|---|---|
-| 1 | 跳过阶段门评审"直接进入下一阶段" | 缺陷后移，测试前置失效 | 必须按 workflow.md「阶段门评审（每个阶段统一）」节走完评审 + 🔴 CHECKPOINT 放行 |
-| 2 | 将测试设计后置到编码之后 | 破坏 W 模型并行原则，测试失去前置发现能力 | 进入开发阶段时同步产出对应测试设计（见并行对应表） |
-| 3 | 用 LLM 自行"估算"质量门结果 | 估算不可信，RTM 覆盖率 / 测试通过状态会被编造 | 必须执行 [`check-artifact-gate.ts`](../scripts/cli/check-artifact-gate.ts)，以退出码 + GATE_JSON 为准 |
-| 4 | 评审未通过时悄悄小修后继续 | rework 未闭环，缺陷被掩盖 | 普通 V/G 失败必须执行普通 V/G 失败链（见「普通 V/G 失败链」节）；链条完成后再按 R 结论处理 |
-| 5 | 一次性载入全部 `references/` 或违反 Bundled Resources 表 | 上下文污染，阶段聚焦丢失 | 按 [SKILL.md](../SKILL.md)「Bundled Resources」表按需加载 |
-| 6 | 用 LLM 估算 RTM 覆盖率 | RTM 覆盖率造假，追溯链断裂 | 实际核验 RTM 登记项，RTM 覆盖率必须 100% |
-| 7 | 质量门脚本退出码 1/2 时放行发布 | 缺陷带病上线 | 退出码非 0 先交给 R 形成定位线索，并执行普通 V/G 失败链（见「普通 V/G 失败链」节）；不得直接回到编码实现，附 GATE_JSON 详情 |
-| 8 | 越过 🔴 CHECKPOINT 自动推进 | 用户失去决策权，自主失控 | 到达 CHECKPOINT 必须暂停等用户确认 |
-| 9 | 谎报阶段状态（未完成标为完成） | 阶段门依赖断裂，下游全部失真 | `status` 字段如实反映，未完成不得推进 |
-| 10 | 编排者越权实施（写代码 / 改文档 / 产出评审 JSON / 改 RTM 实体 / 生成测试用例 / 越权做根因分析） | 编排者上下文污染、评审独立性丧失、状态机失真、违反「技能不内置 LLM」架构原则；编排者直接判定根因并分派 S-fix 会绕过 R 独立定位 | 编排者仅分派 S / V / G / R 子代理执行实施动作；自身只做路由 + 状态 + CHECKPOINT + 只读脚本（见 [subagent-delegation.md](subagent-delegation.md)）。检测信号 6：编排者会话出现 rootCauseChain / rootCause 等 RootCauseReport 字段；信号 7：编排者直接判定根因并分派 S-fix（无 R 报告路径作为 S-fix 输入）；信号 8：**V 分派 prompt 含预判 findings 的片语**（`do not flag` / `don't treat X as a defect` / `at most Minor` / `the plan chose`）——预判 findings 即编排者替 V 预支评审判断，同属越权；误报的合法出口是让 V 先报出、再由**新 V** 裁决，O 只转达与记录（规则见 subagent-delegation.md §3.4「禁预判 findings 与 scoped re-review 契约」） |
-| 11 | ingestion 跳过图谱校验 | 阶段 1-4 结构连通性失守，孤立 / 多根 / 追溯断裂带入编码，graph.json 形同虚设 | 阶段 1-4 必须跑 [`check-requirement-graph.ts`](../scripts/cli/check-requirement-graph.ts)，不得跳过 A→G 收敛循环（见 [graph-guide.md](graph-guide.md)） |
-| 12 | A 子代理自评收敛（用 LLM 输出判定收敛） | "LLM 估算质量门"在 ingestion 场景的变体，收敛判定漂移 | 收敛判定由 G 跑 `check-requirement-graph.ts` 退出码决定，A 的 `reworkHints` 仅作指引。A 子流程返工也须走 R 定位（图谱/TLA+ 返工同样适用 R 循环），禁止 A 自评根因 |
-| 13 | ingestion 图谱信息流黑洞/奇迹/死模块放行 | 存在只进不出/只出不进/无流经的模块，信息闭合失守，结构追溯通过却仍有信息断点带入编码 | 阶段 1-4 必须通过 [`check-requirement-graph.ts`](../scripts/cli/check-requirement-graph.ts) 信息流校验（无黑洞/奇迹/死模块 + 边界完整），退出码 0 才放行（见 [graph-guide.md](graph-guide.md)「信息流模型」节） |
-| 14 | TLA+ 语法检查未通过即跑 TLC / 跳过语法检查 | TLC 报错信息混乱，无法定位是语法还是语义问题，调试效率崩溃 | `check-tla-model.ts` 步骤 6→7 顺序强制：SANY 语法通过后才允许跑 TLC（见 [tla-plus.md](tla-plus.md)「编码调试顺序」节） |
-| 15 | TLA+ 死锁/状态爆炸/不变式违反放行 | 行为正确性失守，并发/时序缺陷带入编码，后期修复成本指数级上升 | 阶段 1-4 必须通过 [`check-tla-model.ts`](../scripts/cli/check-tla-model.ts) 行为门禁（无死锁/不变式违反/状态爆炸），退出码 0 才放行 |
-| 16 | TLA+ 占位实现/简化实现/错误实现 | 规格形同虚设，无法作为正确性基准，TLA+ 门禁沦为橡皮图章 | V 评审标注 + G 门禁：不接受 `Next=[]` 空下一步 / 遗漏需求关键状态 / 不变式与设计矛盾（见 [tla-plus.md](tla-plus.md)「合规性约束」节） |
-| 17 | TLA+ 建模与需求/设计不符未回退 | 规格通过但与需求/设计脱节，或需求/设计本身缺陷被掩盖，问题后移到编码 | 规格忠实于需求/设计但 TLC 仍发现违反 → 修正需求/设计并回退重跑；规格偏离 → 修正规格重跑（见 [tla-plus.md](tla-plus.md)「建模与需求/设计一致性」节） |
-| 18 | 跳过 R 直接分派 S 返工（V/G 不通过后直接 S-fix，未经 R 根因定位） | 修复针对症状不针对根因，同问题反复出现；缺陷链未追溯，上游缺陷被掩盖 | 必须执行普通 V/G 失败链（见「普通 V/G 失败链」节；详见 [root-cause-locator.md](root-cause-locator.md)） |
-| 19 | R 报告未经 V 复审直接交 S 修复 | 根因准确性无独立保证，S 基于错误根因修复，浪费一轮返工 | R 产出后必须经 V 复审 + G 门禁（check-rootcause-report.ts exitCode=0）才可分派 S-fix |
-| 20 | 只规划不执行（子代理返回规划性内容而未调用任何执行工具） | 浪费 token + 轮次，任务无实际进展 | 子代理分派须强调"立即执行"；规划产物必须有对应执行产物（见 [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节） |
-| 21 | 阶段级门禁跳过（self-as-verifier 模式下跳过阶段 6/7 的 `--phase=N` 直接跑 `--phase=8` 终检） | 阶段级字段缺失（如 REQ 行 `systemTest`）到终检才发现，违反"早发现早修复"原则 | 阶段 6/7/8 完成时必须跑对应 `--phase=6`/`--phase=7`/`--phase=8`，不得跳过（见 [quality-standards.md](quality-standards.md)「质量门检查清单」节） |
-| 22 | 角色越权（`authRequired` 仅校验 token 存在未校验角色） | 越权缺陷带入运行时，`security-auditor` persona 无 phase-5 检查项可依 | 路由层或控制器入口必须显式校验 `requiredRole`，token 解码后断言 `token.role ∈ requiredRoles`，否则返回 403（见 [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节） |
-| 23 | 跨模块 store 误用（跨模块调用时 store 选择与 schema 不一致） | 跨模块数据流缺陷在系统测试才发现，修复成本高 | 跨模块调用时数据源选择须在 phase-3 接口设计显式声明，与 schema 一致（见 [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节） |
-| 24 | 副作用时序不一致（响应体字段返回副作用自增前的旧值） | 响应体字段与已生效状态不一致，集成测试难发现 | 副作用须在响应体构造前完成，响应体字段反映已生效状态（见 [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节） |
-| 25 | JSON 文件写入用 PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content` | BOM + 深度 + 中文乱码，阶段 5/6/7/8 多次返工 | 必须用 Node.js `fs.writeFileSync(path, content, 'utf-8')` 写 JSON（见 [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节） |
-| 26 | RunLogEntry 与 EventIngress 字段混用（`run-log.jsonl` 含 `eventId`/`eventType`/`source`/`summary` 等 EventIngress 字段，或误将 RunLogEntry 的 `acknowledgedDecisions` 字段归到 EventIngress） | schema 漂移，R1 动作完整性校验失败 | `run-log.jsonl` 须用 `runId`/`action`/`role`/`outcome`/`acknowledgedDecisions`，`event-ingress.jsonl` 须用 `eventId`/`eventType`/`source`/`summary`（见 [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节） |
-| 27 | 调测者简化行为（上下文压缩丢细节 / 追求效率省步骤 / 未对照硬约束核验） | self-as-verifier 模式下无外部评审拦截简化行为，硬约束遗漏带入归档 | 调测者须按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（含 3 类简化倾向 S1/S2/S3 + 5 项自检条目） |
-| 28 | schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 34 份（含 change-scope / codegraph-query 与 evidence-manifest / evidence-provenance）） |
-| 29 | BDD 建模与需求/设计/TLA+ 不符未回退 | BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段 | BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）；BDD↔TLA+ 不等价时必须走完整 R 报告复审、根因门禁、S-fix 后 R3×3/预防审查/V/G/CHECKPOINT 链，不得直接放行；接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）；实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项（见 [bdd.md](bdd.md)「不符处理流程」节） |
-| 30 | 豁免审批跳步 | 覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经 S→R→V→人类四阶段流程即生效，需求遗漏被豁免掩盖，治理失守 | 任何豁免必须按 S 提出 exemption-request.json → R 审查（5-Why/上游回溯/可证伪性）exemption-review.json → V 校验 exemption-verification.json → 人类 CHECKPOINT 确认 → check-exemption E1-E9 全通过 → approve 写入 granted.json。典型违规：S 自行声明豁免生效 / R 直接批准 / V 跳过 / 编排者代签人类确认（见 [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05） |
-| 31 | 归档完整性缺失（归档未含阶段强制快照清单文件） | 事后无法审计 V 评审声明真实性，审计链断裂 | 归档须含全部强制产出文档，由 `check-archive-integrity.ts` 校验归档完整性清单（退出码 0） |
-| 32 | 签名链断裂（跳过角色 / 签名不连续 / 代签 checkpoint / 来源缺失） | 流程完整性失守，审计链断裂 | 补齐缺失角色签名与来源证明，`check-signature-chain.ts` R1-R10 全通过（见 [signature-chain-guide.md](signature-chain-guide.md)） |
-| 33 | 跳过 R3 预防性审查 | S 产出后未触发 R3 三阶段审查，直接进入 V 评审 | 回到 S 产出后起点，补跑 R3×3 + V |
-| 34 | 编排者漏派角色（未按约束 #8 分派 S/V/G/R，含 self-as-verifier 兼任未产出独立产物） | 评审 / 门禁 / 根因定位环节缺失，流程完整性失守 | 每阶段分派 S/V/G 各 ≥1 次，R3 须有 `role=R` + `outcome=success` 的 r3-completeness/r3-reliability/r3-security 各 ≥1 条（rootcause/iceberg/失败记录不充数）；`check-role-dispatch.ts` 校验（见约束 #8/#11；空或全无效输入 fail-closed，`--r3-enabled` no-op） |
-| 35 | self-as-verifier 模式下 V/G/R 产物混合（含 R3 三份报告与 S 产出同路径） | 评审独立性失守，结论可能被 S 产出污染或覆盖 | 各角色独立产物文件且路径互不相同；`check-verifier-output.ts --self-as-verifier` 校验 V 产物与 S 产出路径不同 |
-| 36 | 路由顺序错误（参数路径先于静态路径注册，如 `/users/:id` 拦截 `/users/me`；鉴权路由在公开路由之后） | 路由匹配错误、鉴权失效，越权缺陷带入运行时 | 静态路径先于参数路径注册，鉴权中间件在公开路由前；修正后重跑集成测试（无自动脚本，V/G 人工校验） |
-| 37 | 产物膨胀但核心决策稀疏（文件达标但实体引用密度低、核心决策被扩展点淹没） | 稀释产物语义价值，评审难以聚焦 | 精简扩展点/附录，实体引用密度 ≥ 2/章节（V 评审人工校验信息密度） |
-| 38 | 修改前未查询 codegraph（阶段 5-8 S-coding 直接修改代码/测试文件） | 误改被广泛依赖符号，引入隐蔽回归 | 修改前先经 **codegraph CLI**（`codegraph query <符号>`；宿主 MCP 工具为可选加速）查询影响半径并落盘 `.w-model/codegraph-queries/`（记录须含 changeId/targetFiles 与实际变更绑定，覆盖全部须覆盖 code/test 文件）；`check-codegraph-queries.ts --scope=` 校验实际覆盖（约束 #14） |
-| 39 | 跳过编码计划审查（编码链任一 stage 产物未 R3×3 + V，或 plan / 账本 / 三件套缺项即进入下一步） | 规划缺陷 / 实现偏差未被发现 | 每段产物补跑 R3×3 + V；`check-coding-plan.ts` R1-R6 校验（约束 #11） |
-| 40 | plan 任务与执行账本 / 切片职责混淆（plan 任务节、账本完成行、tickets 切片互相替代或内容错位） | 破坏编码计划执行单元（plan 任务节）与代码级切片（how）职责边界 | plan 任务节（writing-plans）+ 账本 `Task N: complete` 与 tickets.md（S-tickets vertical-slice）职责分离；`check-coding-plan.ts` R2/R3/R4 校验 |
-| 41 | 加权平均掩盖单轴失败（compositeScore 达标但存在 subCriterion.score < 0.70） | 单轴缺陷被平均抹平，需求遗漏/分析缺失放行 | passed 判据收紧为 `(A\|\|B) && 所有 subCriterion.score ≥ 0.70`；`check-verifier-output.ts` R13 单轴下限校验 |
-| 42 | S-fix / emergency-fix 后跳过 R3+V | S-fix / S-emergency-fix 产出后未派 R3×3 + V 直接 G/放行，修复未经验证合入 | 回到 S-fix / emergency-fix 产出后起点，补跑 R3×3 + V |
-| 43 | 敏感信息写入状态文件/日志（`.w-model/*.json` / gate-logs / run-log / 模板示例含真实凭据） | 凭据泄露风险，随仓库分发/归档/CI 扩散 | 敏感配置统一环境变量注入，数据文件与模板只存引用名（如 `${JWT_SECRET}`）；V/G 人工核验 + `security-scan.ts` 源码级扫描 |
-| 44 | 跳过冰山扫掠直接放行（S-fix 后或阶段门放行前未分派 R-iceberg，或冰山新问题未经 V 复审直接放行） | 水面之下的同根因扩散/同缺陷类/修复引入回归/相邻逻辑隐患被掩盖，缺陷后移 | S-fix 完成 R3×3/预防审查/V/G 后必须 ICEBERG-A、阶段门前必须 ICEBERG-B；新问题须经 V 复审后走完整 R 报告复审、根因门禁、S-fix 后 R3×3/预防审查/V/G/CHECKPOINT 链；`newFindings=[]` 且 R6/R7/R8 三视角对账通过才可放行；达 maxIcebergRounds=5 时走 🔴 CHECKPOINT 由用户裁定（继续深挖 / 接受剩余项并放行 / 阶段回退） |
-| 45 | subagent 为通过测试/门禁而修改测试断言、测试期望或验收判据（反指标游戏） | "通过"失去与需求的对应关系，覆盖率与断言语义脱节，Goodhart 击穿判据 | 测试断言修改必须先行报告；断言与需求不符走 R→V→G 归因，禁止擅自改断言凑通过 |
-| 46 | 只给审计权不给修正权（全自动流程把用户锁在"跑完再看"之外） | 你能诊断无法治疗；判据持有主体缺位，产物只是采样 | 人在回路最低标准=修正权：能在过程中间改产物而不用整体重跑；CHECKPOINT 显式标注介入路径 |
-| 47 | 大规模重构式改动（单次 diff 重写整个模块） | 变更量子无穷大，"这次改了什么"在结构上不可问 | 小步重构 + 每步保持可编译可测试（增量集成纪律）；一次性 diff 拆分为多个可审 slice |
-| 48 | 子代理越界实施（S/V/G/A/R 执行角色边界外动作：S 跑门禁或改 status、G 改产物或产出评审 JSON、V 跑门禁或改产物、A 写正式阶段产物或改 status、R 实施修复或跑门禁或跨阶段定位） | 评审/门禁独立性失效，产物来源不可信（signature-chain 断链），CHECKPOINT 证据被污染 | 回到当前阶段起点，越权产物作废重做；`check-run-log.ts` R5 校验 role-action 配对，`check-signature-chain.ts` 校验消费链；与 #10（编排者越权实施）成对；**勿与 #22（目标系统 RBAC 角色越权）混淆** |
+| 1 | 【通用】跳过阶段门评审"直接进入下一阶段" | 缺陷后移，测试前置失效 | 必须按 workflow.md「阶段门评审（每个阶段统一）」节走完评审 + 🔴 CHECKPOINT 放行 |
+| 2 | 【通用】将测试设计后置到编码之后 | 破坏 W 模型并行原则，测试失去前置发现能力 | 进入开发阶段时同步产出对应测试设计（见并行对应表） |
+| 3 | 【通用】用 LLM 自行"估算"质量门结果 | 估算不可信，RTM 覆盖率 / 测试通过状态会被编造 | 必须执行 [`check-artifact-gate.ts`](../scripts/cli/check-artifact-gate.ts)，以退出码 + GATE_JSON 为准 |
+| 4 | 【通用】评审未通过时悄悄小修后继续 | rework 未闭环，缺陷被掩盖 | 普通 V/G 失败必须执行普通 V/G 失败链（见「普通 V/G 失败链」节）；链条完成后再按 R 结论处理 |
+| 5 | 【通用】一次性载入全部 `references/` 或违反 Bundled Resources 表 | 上下文污染，阶段聚焦丢失 | 按 [SKILL.md](../SKILL.md)「Bundled Resources」表按需加载 |
+| 6 | 【通用】用 LLM 估算 RTM 覆盖率 | RTM 覆盖率造假，追溯链断裂 | 实际核验 RTM 登记项，RTM 覆盖率必须 100% |
+| 7 | 【通用】质量门脚本退出码 1/2 时放行发布 | 缺陷带病上线 | 退出码非 0 先交给 R 形成定位线索，并执行普通 V/G 失败链（见「普通 V/G 失败链」节）；不得直接回到编码实现，附 GATE_JSON 详情 |
+| 8 | 【通用】越过 🔴 CHECKPOINT 自动推进 | 用户失去决策权，自主失控 | 到达 CHECKPOINT 必须暂停等用户确认 |
+| 9 | 【通用】谎报阶段状态（未完成标为完成） | 阶段门依赖断裂，下游全部失真 | `status` 字段如实反映，未完成不得推进 |
+| 10 | 【通用】编排者越权实施（写代码 / 改文档 / 产出评审 JSON / 改 RTM 实体 / 生成测试用例 / 越权做根因分析） | 编排者上下文污染、评审独立性丧失、状态机失真、违反「技能不内置 LLM」架构原则；编排者直接判定根因并分派 S-fix 会绕过 R 独立定位 | 编排者仅分派 S / V / G / R 子代理执行实施动作；自身只做路由 + 状态 + CHECKPOINT + 只读脚本（见 [subagent-delegation.md](subagent-delegation.md)）。检测信号 6：编排者会话出现 rootCauseChain / rootCause 等 RootCauseReport 字段；信号 7：编排者直接判定根因并分派 S-fix（无 R 报告路径作为 S-fix 输入）；信号 8：**V 分派 prompt 含预判 findings 的片语**（`do not flag` / `don't treat X as a defect` / `at most Minor` / `the plan chose`）——预判 findings 即编排者替 V 预支评审判断，同属越权；误报的合法出口是让 V 先报出、再由**新 V** 裁决，O 只转达与记录（规则见 subagent-delegation.md §3.4「禁预判 findings 与 scoped re-review 契约」） |
+| 11 | 【通用】ingestion 跳过图谱校验 | 阶段 1-4 结构连通性失守，孤立 / 多根 / 追溯断裂带入编码，graph.json 形同虚设 | 阶段 1-4 必须跑 [`check-requirement-graph.ts`](../scripts/cli/check-requirement-graph.ts)，不得跳过 A→G 收敛循环（见 [graph-guide.md](graph-guide.md)） |
+| 12 | 【通用】A 子代理自评收敛（用 LLM 输出判定收敛） | "LLM 估算质量门"在 ingestion 场景的变体，收敛判定漂移 | 收敛判定由 G 跑 `check-requirement-graph.ts` 退出码决定，A 的 `reworkHints` 仅作指引。A 子流程返工也须走 R 定位（图谱/TLA+ 返工同样适用 R 循环），禁止 A 自评根因 |
+| 13 | 【通用】ingestion 图谱信息流黑洞/奇迹/死模块放行 | 存在只进不出/只出不进/无流经的模块，信息闭合失守，结构追溯通过却仍有信息断点带入编码 | 阶段 1-4 必须通过 [`check-requirement-graph.ts`](../scripts/cli/check-requirement-graph.ts) 信息流校验（无黑洞/奇迹/死模块 + 边界完整），退出码 0 才放行（见 [graph-guide.md](graph-guide.md)「信息流模型」节） |
+| 14 | 【通用】TLA+ 语法检查未通过即跑 TLC / 跳过语法检查 | TLC 报错信息混乱，无法定位是语法还是语义问题，调试效率崩溃 | `check-tla-model.ts` 步骤 6→7 顺序强制：SANY 语法通过后才允许跑 TLC（见 [tla-plus.md](tla-plus.md)「编码调试顺序」节） |
+| 15 | 【通用】TLA+ 死锁/状态爆炸/不变式违反放行 | 行为正确性失守，并发/时序缺陷带入编码，后期修复成本指数级上升 | 阶段 1-4 必须通过 [`check-tla-model.ts`](../scripts/cli/check-tla-model.ts) 行为门禁（无死锁/不变式违反/状态爆炸），退出码 0 才放行 |
+| 16 | 【通用】TLA+ 占位实现/简化实现/错误实现 | 规格形同虚设，无法作为正确性基准，TLA+ 门禁沦为橡皮图章 | V 评审标注 + G 门禁：不接受 `Next=[]` 空下一步 / 遗漏需求关键状态 / 不变式与设计矛盾（见 [tla-plus.md](tla-plus.md)「合规性约束」节） |
+| 17 | 【通用】TLA+ 建模与需求/设计不符未回退 | 规格通过但与需求/设计脱节，或需求/设计本身缺陷被掩盖，问题后移到编码 | 规格忠实于需求/设计但 TLC 仍发现违反 → 修正需求/设计并回退重跑；规格偏离 → 修正规格重跑（见 [tla-plus.md](tla-plus.md)「建模与需求/设计一致性」节） |
+| 18 | 【通用】跳过 R 直接分派 S 返工（V/G 不通过后直接 S-fix，未经 R 根因定位） | 修复针对症状不针对根因，同问题反复出现；缺陷链未追溯，上游缺陷被掩盖 | 必须执行普通 V/G 失败链（见「普通 V/G 失败链」节；详见 [root-cause-locator.md](root-cause-locator.md)） |
+| 19 | 【通用】R 报告未经 V 复审直接交 S 修复 | 根因准确性无独立保证，S 基于错误根因修复，浪费一轮返工 | R 产出后必须经 V 复审 + G 门禁（check-rootcause-report.ts exitCode=0）才可分派 S-fix |
+| 20 | 【通用】只规划不执行（子代理返回规划性内容而未调用任何执行工具） | 浪费 token + 轮次，任务无实际进展 | 子代理分派须强调"立即执行"；规划产物必须有对应执行产物（见 [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节） |
+| 21 | 【通用】阶段级门禁跳过（self-as-verifier 模式下跳过阶段 6/7 的 `--phase=N` 直接跑 `--phase=8` 终检） | 阶段级字段缺失（如 REQ 行 `systemTest`）到终检才发现，违反"早发现早修复"原则 | 阶段 6/7/8 完成时必须跑对应 `--phase=6`/`--phase=7`/`--phase=8`，不得跳过（见 [quality-standards.md](quality-standards.md)「质量门检查清单」节） |
+| 22 | 【通用】角色越权（`authRequired` 仅校验 token 存在未校验角色） | 越权缺陷带入运行时，`security-auditor` persona 无 phase-5 检查项可依 | 路由层或控制器入口必须显式校验 `requiredRole`，token 解码后断言 `token.role ∈ requiredRoles`，否则返回 403（见 [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节） |
+| 23 | 【通用】跨模块 store 误用（跨模块调用时 store 选择与 schema 不一致） | 跨模块数据流缺陷在系统测试才发现，修复成本高 | 跨模块调用时数据源选择须在 phase-3 接口设计显式声明，与 schema 一致（见 [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节） |
+| 24 | 【通用】副作用时序不一致（响应体字段返回副作用自增前的旧值） | 响应体字段与已生效状态不一致，集成测试难发现 | 副作用须在响应体构造前完成，响应体字段反映已生效状态（见 [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节） |
+| 25 | 【项目教训化石】JSON 文件写入用 PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content` | BOM + 深度 + 中文乱码，阶段 5/6/7/8 多次返工 | 必须用 Node.js `fs.writeFileSync(path, content, 'utf-8')` 写 JSON（见 [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节） |
+| 26 | 【通用】RunLogEntry 与 EventIngress 字段混用（`run-log.jsonl` 含 `eventId`/`eventType`/`source`/`summary` 等 EventIngress 字段，或误将 RunLogEntry 的 `acknowledgedDecisions` 字段归到 EventIngress） | schema 漂移，R1 动作完整性校验失败 | `run-log.jsonl` 须用 `runId`/`action`/`role`/`outcome`/`acknowledgedDecisions`，`event-ingress.jsonl` 须用 `eventId`/`eventType`/`source`/`summary`（见 [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节） |
+| 27 | 【通用】调测者简化行为（上下文压缩丢细节 / 追求效率省步骤 / 未对照硬约束核验） | self-as-verifier 模式下无外部评审拦截简化行为，硬约束遗漏带入归档 | 调测者须按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验（含 3 类简化倾向 S1/S2/S3 + 5 项自检条目） |
+| 28 | 【通用】schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验） | 结构性错误（字段缺失 / 类型错误 / 未知字段）抛 TypeError 或返回模糊错误，Agent 无法区分"结构错误"vs"业务规则违反"，修正方向不明 | `*-logic.ts` 校验函数入口必须先调用 `validateBySchema(name, input)`，失败时以 `[schema]` 前缀返回错误；同步在 `schemas/` 目录维护对应 schema 文件（见 [data-models.md](data-models.md)「JSON Schema 强约束」节 schema 清单 34 份（含 change-scope / codegraph-query 与 evidence-manifest / evidence-provenance）） |
+| 29 | 【通用】BDD 建模与需求/设计/TLA+ 不符未回退 | BDD 规格形同虚设，与 TLA+ 行为规格不一致或与需求/设计脱节，问题后移到编码或测试执行阶段 | BDD features 必须忠实于需求/设计，符合后仍有问题须修正需求/设计并回退重跑（仿反模式 #17）；BDD↔TLA+ 不等价时必须走完整 R 报告复审、根因门禁、S-fix 后 R3×3/预防审查/V/G/CHECKPOINT 链，不得直接放行；接受措辞不同但实质一致的等价性（由 R 子代理判定 + V 子代理验证）；实质不一致必须上报人类决策，提供修正 BDD / 修正 TLA+ / 修正需求设计三个可选项（见 [bdd.md](bdd.md)「不符处理流程」节） |
+| 30 | 【通用】豁免审批跳步 | 覆盖缺失 / conflicts-with 冲突 / 覆盖率不达标等豁免项未经 S→R→V→人类四阶段流程即生效，需求遗漏被豁免掩盖，治理失守 | 任何豁免必须按 S 提出 exemption-request.json → R 审查（5-Why/上游回溯/可证伪性）exemption-review.json → V 校验 exemption-verification.json → 人类 CHECKPOINT 确认 → check-exemption E1-E9 全通过 → approve 写入 granted.json。典型违规：S 自行声明豁免生效 / R 直接批准 / V 跳过 / 编排者代签人类确认（见 [phase-1-requirements.md](phase-1-requirements.md)「豁免审批治理」节 + FM-EXEMPT-01~05） |
+| 31 | 【通用】归档完整性缺失（归档未含阶段强制快照清单文件） | 事后无法审计 V 评审声明真实性，审计链断裂 | 归档须含全部强制产出文档，由 `check-archive-integrity.ts` 校验归档完整性清单（退出码 0） |
+| 32 | 【通用】签名链断裂（跳过角色 / 签名不连续 / 代签 checkpoint / 来源缺失） | 流程完整性失守，审计链断裂 | 补齐缺失角色签名与来源证明，`check-signature-chain.ts` R1-R10 全通过（见 [signature-chain-guide.md](signature-chain-guide.md)） |
+| 33 | 【通用】跳过 R3 预防性审查 | S 产出后未触发 R3 三阶段审查，直接进入 V 评审 | 回到 S 产出后起点，补跑 R3×3 + V |
+| 34 | 【通用】编排者漏派角色（未按约束 #8 分派 S/V/G/R，含 self-as-verifier 兼任未产出独立产物） | 评审 / 门禁 / 根因定位环节缺失，流程完整性失守 | 每阶段分派 S/V/G 各 ≥1 次，R3 须有 `role=R` + `outcome=success` 的 r3-completeness/r3-reliability/r3-security 各 ≥1 条（rootcause/iceberg/失败记录不充数）；`check-role-dispatch.ts` 校验（见约束 #8/#11；空或全无效输入 fail-closed，`--r3-enabled` no-op） |
+| 35 | 【通用】self-as-verifier 模式下 V/G/R 产物混合（含 R3 三份报告与 S 产出同路径） | 评审独立性失守，结论可能被 S 产出污染或覆盖 | 各角色独立产物文件且路径互不相同；`check-verifier-output.ts --self-as-verifier` 校验 V 产物与 S 产出路径不同 |
+| 36 | 【通用】路由顺序错误（参数路径先于静态路径注册，如 `/users/:id` 拦截 `/users/me`；鉴权路由在公开路由之后） | 路由匹配错误、鉴权失效，越权缺陷带入运行时 | 静态路径先于参数路径注册，鉴权中间件在公开路由前；修正后重跑集成测试（无自动脚本，V/G 人工校验） |
+| 37 | 【通用】产物膨胀但核心决策稀疏（文件达标但实体引用密度低、核心决策被扩展点淹没） | 稀释产物语义价值，评审难以聚焦 | 精简扩展点/附录，实体引用密度 ≥ 2/章节（V 评审人工校验信息密度） |
+| 38 | 【通用】修改前未查询 codegraph（阶段 5-8 S-coding 直接修改代码/测试文件） | 误改被广泛依赖符号，引入隐蔽回归 | 修改前先经 **codegraph CLI**（`codegraph query <符号>`；宿主 MCP 工具为可选加速）查询影响半径并落盘 `.w-model/codegraph-queries/`（记录须含 changeId/targetFiles 与实际变更绑定，覆盖全部须覆盖 code/test 文件）；`check-codegraph-queries.ts --scope=` 校验实际覆盖（约束 #14） |
+| 39 | 【通用】跳过编码计划审查（编码链任一 stage 产物未 R3×3 + V，或 plan / 账本 / 三件套缺项即进入下一步） | 规划缺陷 / 实现偏差未被发现 | 每段产物补跑 R3×3 + V；`check-coding-plan.ts` R1-R6 校验（约束 #11） |
+| 40 | 【通用】plan 任务与执行账本 / 切片职责混淆（plan 任务节、账本完成行、tickets 切片互相替代或内容错位） | 破坏编码计划执行单元（plan 任务节）与代码级切片（how）职责边界 | plan 任务节（writing-plans）+ 账本 `Task N: complete` 与 tickets.md（S-tickets vertical-slice）职责分离；`check-coding-plan.ts` R2/R3/R4 校验 |
+| 41 | 【通用】加权平均掩盖单轴失败（compositeScore 达标但存在 subCriterion.score < 0.70） | 单轴缺陷被平均抹平，需求遗漏/分析缺失放行 | passed 判据收紧为 `(A\|\|B) && 所有 subCriterion.score ≥ 0.70`；`check-verifier-output.ts` R13 单轴下限校验 |
+| 42 | 【通用】S-fix / emergency-fix 后跳过 R3+V | S-fix / S-emergency-fix 产出后未派 R3×3 + V 直接 G/放行，修复未经验证合入 | 回到 S-fix / emergency-fix 产出后起点，补跑 R3×3 + V |
+| 43 | 【通用】敏感信息写入状态文件/日志（`.w-model/*.json` / gate-logs / run-log / 模板示例含真实凭据） | 凭据泄露风险，随仓库分发/归档/CI 扩散 | 敏感配置统一环境变量注入，数据文件与模板只存引用名（如 `${JWT_SECRET}`）；V/G 人工核验 + `security-scan.ts` 源码级扫描 |
+| 44 | 【通用】跳过冰山扫掠直接放行（S-fix 后或阶段门放行前未分派 R-iceberg，或冰山新问题未经 V 复审直接放行） | 水面之下的同根因扩散/同缺陷类/修复引入回归/相邻逻辑隐患被掩盖，缺陷后移 | S-fix 完成 R3×3/预防审查/V/G 后必须 ICEBERG-A、阶段门前必须 ICEBERG-B；新问题须经 V 复审后走完整 R 报告复审、根因门禁、S-fix 后 R3×3/预防审查/V/G/CHECKPOINT 链；`newFindings=[]` 且 R6/R7/R8 三视角对账通过才可放行；达 maxIcebergRounds=5 时走 🔴 CHECKPOINT 由用户裁定（继续深挖 / 接受剩余项并放行 / 阶段回退） |
+| 45 | 【通用】subagent 为通过测试/门禁而修改测试断言、测试期望或验收判据（反指标游戏） | "通过"失去与需求的对应关系，覆盖率与断言语义脱节，Goodhart 击穿判据 | 测试断言修改必须先行报告；断言与需求不符走 R→V→G 归因，禁止擅自改断言凑通过 |
+| 46 | 【通用】只给审计权不给修正权（全自动流程把用户锁在"跑完再看"之外） | 你能诊断无法治疗；判据持有主体缺位，产物只是采样 | 人在回路最低标准=修正权：能在过程中间改产物而不用整体重跑；CHECKPOINT 显式标注介入路径 |
+| 47 | 【通用】大规模重构式改动（单次 diff 重写整个模块） | 变更量子无穷大，"这次改了什么"在结构上不可问 | 小步重构 + 每步保持可编译可测试（增量集成纪律）；一次性 diff 拆分为多个可审 slice |
+| 48 | 【通用】子代理越界实施（S/V/G/A/R 执行角色边界外动作：S 跑门禁或改 status、G 改产物或产出评审 JSON、V 跑门禁或改产物、A 写正式阶段产物或改 status、R 实施修复或跑门禁或跨阶段定位） | 评审/门禁独立性失效，产物来源不可信（signature-chain 断链），CHECKPOINT 证据被污染 | 回到当前阶段起点，越权产物作废重做；`check-run-log.ts` R5 校验 role-action 配对，`check-signature-chain.ts` 校验消费链；与 #10（编排者越权实施）成对；**勿与 #22（目标系统 RBAC 角色越权）混淆** |
 
 ### 反模式表述形式：按失败类型分流
 
