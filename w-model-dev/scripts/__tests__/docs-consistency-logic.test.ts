@@ -262,7 +262,7 @@ describe('R10 七来源维护契约（权威全文单点 + 消费方指针）', 
   const structuredSourceNames = ['schema', 'checkerSource', 'verifierSpec'] as const;
   const pointerSourceNames = ['authoritySpec', 'ssot', 'locator', 'commandReference'] as const;
   const sourceLabels: Array<[(typeof sourceNames)[number], string]> = [
-    ['authoritySpec', 'authority-spec'],
+    ['authoritySpec', 'agent-personas'],
     ['schema', 'rootcause-schema'],
     ['checkerSource', 'rootcause-checker'],
     ['ssot', 'SSoT'],
@@ -446,6 +446,68 @@ describe('R10 七来源维护契约（权威全文单点 + 消费方指针）', 
     }
   });
 
+  it('指针在场加固（T4 修复轮 1 重要 1）：否定语境 / 围栏内 / 段内无 R10 语境 → violation；跨行折断 → 零违规', () => {
+    const pointerSourceKey = 'locator';
+    const label = sourceLabel(pointerSourceKey);
+    const withSource = (content: string) =>
+      checkRootCauseR10Contract(replaceSource(buildSources(), pointerSourceKey, content));
+
+    // ① 否定/废弃语境（后紧邻 / 前紧邻两形态）：指针句被否定 → 等同缺指针，fail-closed
+    for (const negatedContent of [
+      ['## R10 维护契约（消费语境）', `${R10_CONTRACT_POINTER_TEXT} 已废弃不用（本文件只保留消费语境与指针）。`].join(
+        '\n',
+      ),
+      ['## R10 维护契约（消费语境）', `**已废弃**：${R10_CONTRACT_POINTER_TEXT}`].join('\n'),
+    ]) {
+      const violations = withSource(negatedContent);
+      expect(
+        violations.some(
+          (violation) => violation.message.includes(label) && violation.message.includes('否定/废弃语境'),
+        ),
+        `${label} 指针句否定/废弃语境应 fail-closed`,
+      ).toBe(true);
+    }
+
+    // ② 指针句仅出现在围栏代码块内（示例形态）→ 不算在场，fail-closed
+    const fencedViolations = withSource(
+      ['## R10 维护契约（消费语境）', '```md', R10_CONTRACT_POINTER_TEXT, '```'].join('\n'),
+    );
+    expect(
+      fencedViolations.some(
+        (violation) => violation.message.includes(label) && violation.message.includes('围栏代码块内'),
+      ),
+      `${label} 指针句仅出现在围栏内应 fail-closed`,
+    ).toBe(true);
+
+    // ③ 指针句与 R10 消费语境不同段（该段指针句之外无 R10 语境）→ fail-closed
+    const contextViolations = withSource(['## 其他章节', R10_CONTRACT_POINTER_TEXT].join('\n'));
+    expect(
+      contextViolations.some(
+        (violation) => violation.message.includes(label) && violation.message.includes('缺 R10 消费语境'),
+      ),
+      `${label} 指针句与 R10 语境不同段应 fail-closed`,
+    ).toBe(true);
+
+    // ④ 合法指针句跨行折断（段内换行）→ 零违规（不再误报缺指针）
+    const wrapped = withSource(
+      [
+        '## R10 维护契约（消费语境）',
+        'R10 contract XML 权威定义见',
+        '`verifier-spec.md` §7.5（本文件只保留消费语境与指针，不复制 XML）。',
+      ].join('\n'),
+    );
+    expect(wrapped, `${label} 跨行折断的合法指针句不得误报`).toEqual([]);
+
+    // 门禁消息须如实声明「在场校验」边界（非语义等价校验）
+    const missingBoundary = withSource('## R10 消费语境，但无指针');
+    expect(
+      missingBoundary.some(
+        (violation) => violation.message.includes('缺 R10 contract XML 指针') && violation.message.includes('在场校验'),
+      ),
+      '缺指针消息须声明在场校验边界',
+    ).toBe(true);
+  });
+
   it('原始 ERROR_JSON 缺失、null 或逐字段 drift 不计入 exit2ScriptCount', () => {
     const valid = {
       probeId: 'check-budget.ts#invalid-argument',
@@ -503,7 +565,7 @@ describe('R10 七来源维护契约（权威全文单点 + 消费方指针）', 
     const sourceLabel = (sourceKey: (typeof sourceKeys)[number]): string => {
       switch (sourceKey) {
         case 'authoritySpec':
-          return 'authority-spec';
+          return 'agent-personas';
         case 'schema':
           return 'rootcause-schema';
         case 'checkerSource':

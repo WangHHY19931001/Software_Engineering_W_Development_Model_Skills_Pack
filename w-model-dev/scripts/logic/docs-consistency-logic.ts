@@ -122,7 +122,11 @@ export interface DocConsistencyInput {
   operationBehaviors: string;
   /** w-model-dev/references/hard-constraints.md 原文（14 条硬约束完整版） */
   hardConstraints: string;
-  /** R10 authority spec 原文（独立于其他契约来源注入，禁止仅靠关键词计数） */
+  /**
+   * R10 消费方来源原文（agent-personas.md，独立于其他契约来源注入）。
+   * 该来源只允许「消费语境 + 指针」：指针判定是**在场校验**（规范指针句须在非围栏行、
+   * 与段内 R10 消费语境同段、且不处于否定/废弃语境），不是语义等价校验。
+   */
   rootCauseAuthoritySpec: string;
   /** R10 rootcause-report schema 原文（独立来源） */
   rootCauseSchema: string;
@@ -751,31 +755,175 @@ function normalizeR10Prose(value: string): string {
 const R10_AUTHORITY_SOURCE = 'verifier-spec';
 /** 消费方指针规范句：四个消费来源须逐字包含（43.2.0 C9 单一事实源收敛）。 */
 export const R10_CONTRACT_POINTER_TEXT = 'R10 contract XML 权威定义见 `verifier-spec.md` §7.5';
-const R10_POINTER_PATTERN = /R10 contract XML 权威定义见.*verifier-spec\.md.*§7\.5/;
+
+/**
+ * 规范指针句的**宽松形态**（次要 3，T4 修复轮 1）：行内 code span 标记与空白不参与比对，
+ * 两段之间只允许有界窗口（`[\s\S]{0,40}`）——段内空白归一后，跨行折断的合法指针句仍可命中，
+ * 同时防止「同段但两段相隔很远」被当作规范指针句。
+ */
+const R10_POINTER_PATTERN = /R10 contract XML 权威定义见[\s\S]{0,40}verifier-spec\.md[\s\S]{0,40}§7\.5/;
+
+/**
+ * 「与本文档 R10 语境段落同一段」判据的语境标记（重要 1）：须出现在**指针句之外**的同段文本中
+ * ——若只看整段是否含 `R10`，指针句自身的 `R10 contract XML` 会让判据空转。
+ */
+const R10_POINTER_CONTEXT_PATTERN = /R10/;
+
+/**
+ * 否定/废弃语素（重要 1，S18「否定语素紧邻判据」同款）：只认**紧邻**（语素与指针句之间仅隔
+ * 间隔符）或**句内嵌入**，不做整段语义判断——否则合法消费语境句（如「本文件只保留消费语境
+ * 与指针，不复制 XML」）会被「不复制」误伤。清单是**封闭枚举**；清单外语义（如「已被新方案
+ * 取代」）不在确定性判据覆盖范围，由 V 复核兜底。
+ */
+const R10_POINTER_NEGATION_MORPHEMES = [
+  '已废弃',
+  '已作废',
+  '已弃用',
+  '废弃',
+  '弃用',
+  '作废',
+  '勿用',
+  '不再使用',
+  '不再适用',
+  '不再维护',
+  '禁止使用',
+  '不要使用',
+  '不可使用',
+  '停止使用',
+  '不推荐',
+  '非权威',
+  '无效',
+  '失效',
+  'deprecated',
+  'obsolete',
+  'do not use',
+  'no longer',
+] as const;
+
+/** 紧邻判据的末尾间隔符（空白 / 标点 / 引号 / 括号 / 破折号；剥掉后才允许语素「紧邻」指针句） */
+const R10_POINTER_TRAILING_SEPARATOR_RE = /[\s:：、,，;；。.!！?？*`'"“”‘’「」『』（）()\[\]【】<>《》—\-–]+$/;
+/** 紧邻判据的开头间隔符（同上，对指针句之后的文本生效） */
+const R10_POINTER_LEADING_SEPARATOR_RE = /^[\s:：、,，;；。.!！?？*`'"“”‘’「」『』（）()\[\]【】<>《》—\-–]+/;
+
+/**
+ * 非围栏行的 Markdown 段集合（空行 / 围栏边界 / 围栏内容均切段）。
+ * 每段已做**空白归一**（连续空白折叠为单空格、剥掉引用标记 `>`），使跨行折断的指针句
+ * 在段内可被同一有界窗口命中。
+ */
+function collectNonFencedParagraphs(lines: Array<{ text: string; inFence: boolean }>): string[] {
+  const paragraphs: string[] = [];
+  let current: string[] = [];
+  const flush = (): void => {
+    if (current.length > 0) paragraphs.push(current.join(' '));
+    current = [];
+  };
+  for (const line of lines) {
+    if (line.inFence || line.text.trim() === '') {
+      flush();
+      continue;
+    }
+    current.push(
+      line.text
+        .replace(/^\s*>+\s?/, '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    );
+  }
+  flush();
+  return paragraphs;
+}
+
+/** 指针句的否定判据：返回首个紧邻（或句内嵌入）的否定/废弃语素，无则 null。 */
+function findR10PointerNegationMorpheme(paragraph: string, hit: { index: number; text: string }): string | null {
+  const inside = R10_POINTER_NEGATION_MORPHEMES.find((morpheme) => hit.text.includes(morpheme));
+  if (inside !== undefined) return inside;
+  const before = paragraph.slice(0, hit.index).replace(R10_POINTER_TRAILING_SEPARATOR_RE, '');
+  const beforeHit = R10_POINTER_NEGATION_MORPHEMES.find((morpheme) => before.endsWith(morpheme));
+  if (beforeHit !== undefined) return beforeHit;
+  const after = paragraph.slice(hit.index + hit.text.length).replace(R10_POINTER_LEADING_SEPARATOR_RE, '');
+  return R10_POINTER_NEGATION_MORPHEMES.find((morpheme) => after.startsWith(morpheme)) ?? null;
+}
+
+interface R10PointerVerdict {
+  /** 存在满足「非围栏行 + 段内 R10 语境 + 非否定语境」三条件的规范指针句。 */
+  accepted: boolean;
+  /** 存在非围栏段落带指针句，但该段指针句之外的文本不含 R10 消费语境。 */
+  missingContext: boolean;
+  /** 存在非围栏段落带指针句且紧邻否定/废弃语素（首个命中的语素）。 */
+  negatedBy: string | null;
+  /** 规范指针句出现在围栏代码块内（示例形态；仅用于归因消息，不单独构成违规）。 */
+  fencedHit: boolean;
+}
+
+/** 指针在场判定的三条件求值（非围栏行 → 与 R10 语境同段 → 非否定语境）。 */
+function evaluateR10Pointer(content: string): R10PointerVerdict {
+  const lines = splitFenceAwareLines(content);
+  const verdict: R10PointerVerdict = {
+    accepted: false,
+    missingContext: false,
+    negatedBy: null,
+    fencedHit: false,
+  };
+  for (const paragraph of collectNonFencedParagraphs(lines)) {
+    const hit = paragraph.match(R10_POINTER_PATTERN);
+    if (hit === null || hit.index === undefined) continue;
+    const negation = findR10PointerNegationMorpheme(paragraph, { index: hit.index, text: hit[0] });
+    const outsidePointer = paragraph.slice(0, hit.index) + paragraph.slice(hit.index + hit[0].length);
+    const hasContext = R10_POINTER_CONTEXT_PATTERN.test(outsidePointer);
+    if (negation === null && hasContext) {
+      verdict.accepted = true;
+      continue;
+    }
+    if (negation !== null && verdict.negatedBy === null) verdict.negatedBy = negation;
+    if (!hasContext) verdict.missingContext = true;
+  }
+  verdict.fencedHit = R10_POINTER_PATTERN.test(
+    lines
+      .filter((line) => line.inFence)
+      .map((line) => line.text.replace(/\s+/g, ' '))
+      .join(' '),
+  );
+  return verdict;
+}
 
 function checkR10PointerSource(sourceName: string, content: string): DocCheckViolation[] {
   if (typeof content !== 'string' || content.trim() === '') {
     return [{ check: R10_CONTRACT_CHECK, message: `${sourceName} 未被独立读取（R10 source 缺失，fail-closed）` }];
   }
   const violations: DocCheckViolation[] = [];
-  const lines = content.split(/\r?\n/);
-  const copiedXmlLines = lines.filter((line) => line.includes('<r10-contract')).length;
+  const lines = splitFenceAwareLines(content);
+  const copiedXmlLines = lines.filter((line) => line.text.includes('<r10-contract')).length;
   if (copiedXmlLines > 0) {
     violations.push({
       check: R10_CONTRACT_CHECK,
       message: `${sourceName} 复制了 R10 contract XML（${copiedXmlLines} 行）——权威全文仅 ${R10_AUTHORITY_SOURCE} §7.5，消费方须改为指针（单一事实源 fail-closed）`,
     });
   }
-  if (lines.some((line) => R10_LEGACY_TOKEN_PATTERN.test(line))) {
+  if (lines.some((line) => R10_LEGACY_TOKEN_PATTERN.test(line.text))) {
     violations.push({
       check: R10_CONTRACT_CHECK,
       message: `${sourceName} 含遗留 R10 契约标记（R10-CONTRACT-MARKER / R10-C1..C7），fail-closed`,
     });
   }
-  if (!R10_POINTER_PATTERN.test(content)) {
+  const verdict = evaluateR10Pointer(content);
+  if (verdict.negatedBy !== null) {
     violations.push({
       check: R10_CONTRACT_CHECK,
-      message: `${sourceName} 缺 R10 contract XML 指针（须含「${R10_CONTRACT_POINTER_TEXT}」）`,
+      message: `${sourceName} R10 contract XML 指针句处于否定/废弃语境（紧邻否定语素「${verdict.negatedBy}」）——等同缺 R10 contract XML 指针，fail-closed`,
+    });
+  }
+  if (verdict.missingContext) {
+    violations.push({
+      check: R10_CONTRACT_CHECK,
+      message: `${sourceName} 缺 R10 contract XML 指针：指针句所在段缺 R10 消费语境（须与 R10 消费语境同段，fail-closed）`,
+    });
+  }
+  if (!verdict.accepted && verdict.negatedBy === null && !verdict.missingContext) {
+    violations.push({
+      check: R10_CONTRACT_CHECK,
+      message: verdict.fencedHit
+        ? `${sourceName} 缺 R10 contract XML 指针：规范指针句仅出现在围栏代码块内（示例形态不计数，fail-closed）`
+        : `${sourceName} 缺 R10 contract XML 指针（须含「${R10_CONTRACT_POINTER_TEXT}」；本判据为**在场校验**——非围栏行 + 与段内 R10 消费语境同段 + 非否定语境，语义改写由 V 复核兜底，fail-closed）`,
     });
   }
   return violations;
@@ -787,8 +935,10 @@ function checkR10PointerSource(sourceName: string, content: string): DocCheckVio
  * 单一权威全文 = verifier-spec §7.5（逐 clause 结构化校验，保留 43.0.0 的 source×clause 强度）；
  * 结构化宿主 = rootcause-schema（JSON `x-r10-contract`）与 rootcause-checker（TS `R10_CONTRACT_NODES`），
  * 各自以宿主语法独立承载七个 clause（防伪造：quoted/comment/fenced/example/未知上下文一律 fail-closed）；
- * 消费方 = authority-spec（agent-personas）/ SSoT / root-cause-locator / command-reference，
- * 只允许「消费语境 + 指针」——复制 XML 或缺失指针均 fail-closed，防止再次分叉为多份事实源。
+ * 消费方 = agent-personas（原标签 authority-spec 易被读成「权威」，实为消费方）/ SSoT /
+ * root-cause-locator / command-reference，只允许「消费语境 + 指针」——复制 XML 或缺失指针均
+ * fail-closed，防止再次分叉为多份事实源。指针判定是**在场校验**（非围栏行 + 与段内 R10 语境
+ * 同段 + 非否定语境，见 checkR10PointerSource），语义改写由 V 复核兜底。
  */
 export function checkRootCauseR10Contract(sources: RootCauseR10ContractSources): DocCheckViolation[] {
   const structuredSources: Array<[string, string]> = [
@@ -797,7 +947,7 @@ export function checkRootCauseR10Contract(sources: RootCauseR10ContractSources):
     [R10_AUTHORITY_SOURCE, sources.verifierSpec],
   ];
   const pointerSources: Array<[string, string]> = [
-    ['authority-spec', sources.authoritySpec],
+    ['agent-personas', sources.authoritySpec],
     ['SSoT', sources.ssot],
     ['root-cause-locator', sources.locator],
     ['command-reference', sources.commandReference],
@@ -2139,20 +2289,32 @@ function checkBaselineSync(scriptsChanged: boolean, baselineEntryCount: number):
 // ==================== 内链存在性检查（C3） ====================
 
 /**
+ * 围栏感知行切分（C3 内链检查与 R10 指针判定共用的**单一围栏语义**）：逐行标记是否位于
+ * 围栏代码块（``` / ~~~）内；围栏边界行本身也按围栏内处理（与 stripMarkdownCode 的剔除口径一致）。
+ * 未闭合围栏之后的行一律视为围栏内（fail-closed：代码块里的指针/链接不算在场）。
+ */
+export function splitFenceAwareLines(content: string): Array<{ text: string; inFence: boolean }> {
+  let inFence = false;
+  return content.split(/\r?\n/).map((text) => {
+    if (/^\s*(```|~~~)/.test(text)) {
+      inFence = !inFence;
+      return { text, inFence: true };
+    }
+    return { text, inFence };
+  });
+}
+
+/**
  * 剥离围栏代码块（``` / ~~~）与行内 code span（`...`）后的可渲染文本。
  * 围栏内的 `[x](y)` 是代码示例（命令用法 / 正则演示），不参与链接提取；
  * 行内 code span 同理（渲染器不解析其中的链接语法）。
  */
 export function stripMarkdownCode(content: string): string {
-  let inFence = false;
-  const lines = content.split(/\r?\n/).filter((line) => {
-    if (/^\s*(```|~~~)/.test(line)) {
-      inFence = !inFence;
-      return false; // 围栏边界行本身也剔除
-    }
-    return !inFence;
-  });
-  return lines.join('\n').replace(/`[^`\n]*`/g, '');
+  return splitFenceAwareLines(content)
+    .filter((line) => !line.inFence)
+    .map((line) => line.text)
+    .join('\n')
+    .replace(/`[^`\n]*`/g, '');
 }
 
 /**
