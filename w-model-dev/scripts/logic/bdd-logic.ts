@@ -900,6 +900,12 @@ export interface BddCheckResult {
     rtmMapping: string[];
     sdCoverage: string[];
   };
+  /**
+   * B7（批次 7）：D4 L1 豁免的显式 SKIPPED(level=1) 证据行（不再零输出）。
+   * 每条形如 `[D4:SM-xxx] SKIPPED(level=1)：...`；证据不是违规——不进 dimensions.tlaEquivalence、
+   * 不计入 violations、不影响 passed/exitCode；人类报告行由 CLI（check-bdd-model.ts）渲染。
+   */
+  tlaEquivalenceSkipped: string[];
   summary: string;
   violations: string[];
 }
@@ -931,6 +937,7 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
         rtmMapping: schemaResult.errorMessages.map((m) => `[schema] ${m}`),
         sdCoverage: [],
       },
+      tlaEquivalenceSkipped: [],
       summary: `schema validation failed: ${schemaResult.errorMessages.length} errors`,
       violations: schemaResult.errorMessages.map((m) => `[schema] ${m}`),
     };
@@ -945,6 +952,8 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
     rtmMapping: [] as string[],
     sdCoverage: [] as string[],
   };
+  // B7：D4 L1 豁免证据（不进 dims、不进 allViolations——豁免不是违规）
+  const tlaEquivalenceSkipped: string[] = [];
 
   // D1: features 头标注完整性 + D3: 状态机七要素
   // A8（批次 6）：CLI 侧 feature 文件多路径查找全 miss → [D1] blocking violation（防 fail-open 空转通过）
@@ -985,7 +994,14 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
       // L1 系统级规格豁免 D4 自动等价：L1 是请求-响应抽象而非内部状态机，
       // 自动等价比对无意义，由 R3/V 语义评审把关（不产生任何 D4 violation）；
       // L2+ 子系统级规格仍执行完整自动等价校验。
-      if (sm.level === 1) continue;
+      // B7（批次 7）：豁免不再零输出——输出显式 SKIPPED(level=1) 证据行
+      // （进 tlaEquivalenceSkipped 字段 + CLI 人类报告行，不计入 violations）。
+      if (sm.level === 1) {
+        tlaEquivalenceSkipped.push(
+          `[D4:${sm.id}] SKIPPED(level=1)：L1 系统级规格豁免 D4 自动等价（请求-响应抽象，非内部状态机），由 R3/V 语义评审把关`,
+        );
+        continue;
+      }
       const tlaSnap = input.tlaSnapshots.find((t) => t.specId === sm.id.replace(/^SM-/, ''));
       if (!tlaSnap) {
         // TLA+ 未提供对应 spec：由 R 子代理判定是缺失还是层级不对应
@@ -1124,6 +1140,7 @@ export function checkBddModel(input: BddCheckInput): BddCheckResult {
     checkedAt,
     phase,
     dimensions: dims,
+    tlaEquivalenceSkipped,
     summary: passed
       ? `BDD model check passed (phase ${phase})`
       : `BDD model check failed with ${allViolations.length} violations (phase ${phase})`,

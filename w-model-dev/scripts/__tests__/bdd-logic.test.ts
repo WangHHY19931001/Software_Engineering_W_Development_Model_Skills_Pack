@@ -681,6 +681,47 @@ describe('checkBddModel', () => {
     expect(result.dimensions.tlaEquivalence.some((v) => v.includes('SM-L2-sub'))).toBe(true);
     expect(result.exitCode).toBe(1);
   });
+
+  it('B7：L1 状态机 D4 豁免输出显式 SKIPPED 证据（不再零输出）', () => {
+    // B7（批次 7）：L1 豁免从「零输出」改为显式 SKIPPED(level=1) 证据——
+    // JSON 字段 tlaEquivalenceSkipped 承载证据行，人类报告行由 CLI 渲染；
+    // 证据不进 violations（豁免不是违规），不影响 passed/exitCode。
+    const manifest = {
+      schemaVersion: '1.0',
+      projectId: 'test',
+      basePath: 'features/',
+      currentPhase: 2,
+      features: [],
+      stateMachines: [
+        {
+          id: 'SM-L1-sys',
+          level: 1,
+          states: ['A', 'B'],
+          initialState: 'A',
+          terminalStates: [],
+          acceptingStates: ['B'],
+          rejectingStates: [],
+          transitions: [{ from: 'A', event: 'e', to: 'B' }],
+          invariants: ['B => done'],
+        },
+      ],
+      designCoverage: { totalSdNodes: 0, coveredSdNodes: [], uncoveredSdNodes: [], coverageRate: 1 },
+    } as any;
+    const result = checkBddModel({
+      manifest,
+      phase: 2,
+      parsedFeatures: [],
+      tlaSnapshots: [{ specId: 'L1-sys', states: [], initialState: '', transitions: [], invariants: [] }],
+    });
+    // JSON 字段：tlaEquivalenceSkipped 含 SKIPPED(level=1) 形态证据行（带状态机 ID）
+    expect(result.tlaEquivalenceSkipped).toHaveLength(1);
+    expect(result.tlaEquivalenceSkipped[0]).toContain('[D4:SM-L1-sys]');
+    expect(result.tlaEquivalenceSkipped[0]).toContain('SKIPPED(level=1)');
+    // 证据不进 violations 维度：豁免不是违规，不翻转 passed/exitCode
+    expect(result.dimensions.tlaEquivalence.filter((v) => v.includes('SM-L1-sys'))).toEqual([]);
+    expect(result.passed).toBe(true);
+    expect(result.exitCode).toBe(0);
+  });
 });
 
 // ==================== parseTlaSpecSnapshot ====================

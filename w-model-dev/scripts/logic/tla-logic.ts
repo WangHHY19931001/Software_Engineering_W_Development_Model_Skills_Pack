@@ -42,6 +42,13 @@ export interface TlaSpec {
   children: string[];
   variableCombination: number;
   decompositionDecision: DecompositionDecision;
+  /**
+   * B9（批次 7）：variableCombination 的推导注记（可选）。
+   * variableCombination > CONSIDER_SPLIT_THRESHOLD(1000) 且保留未拆（kept-below-threshold）时必填：
+   * Πvariables[].cardinality 必须等于声明的 variableCombination 字段值
+   * （缺注记或乘积不符 → checkDecomposition violation；≤1000 不要求）。
+   */
+  variableCombinationBasis?: { variables: Array<{ name: string; cardinality: number }> };
   syntaxChecked: boolean;
   tlcChecked: boolean;
   deadlockFree: boolean;
@@ -589,6 +596,10 @@ export function checkHierarchy(specs: TlaSpec[], options: HierarchyOptions = {})
  *     否则为违反（导致失败）
  *   - variableCombination > CONSIDER_SPLIT_THRESHOLD(1000) 且 decompositionDecision='kept-below-threshold'
  *     为警告（不导致失败，仅提示补充理由或拆解）
+ *   - B9（批次 7）：variableCombination > CONSIDER_SPLIT_THRESHOLD(1000) 且保留未拆（kept-below-threshold）
+ *     时必须附推导注记 variableCombinationBasis（各变量 {name, cardinality}），且
+ *     Πcardinality === 声明的 variableCombination 字段值；缺注记 / 基数非法 / 乘积不符均为 violation。
+ *     ≤1000 不要求。
  *
  * @param specs 待校验的规格数组
  * @returns { violations, warnings }
@@ -611,6 +622,32 @@ export function checkDecomposition(specs: TlaSpec[]): { violations: string[]; wa
       warnings.push(
         `拆解警告：规格 ${s.id} variableCombination=${combo} > ${CONSIDER_SPLIT_THRESHOLD} 且保留未拆（kept-below-threshold），建议补充理由或拆解`,
       );
+      // B9：>1000 kept 须附推导注记，且 Πcardinality === 声明 variableCombination（乘积可复核）
+      const basis = s.variableCombinationBasis;
+      const variables = basis?.variables;
+      if (!basis || !Array.isArray(variables) || variables.length === 0) {
+        violations.push(
+          `拆解校验失败：规格 ${s.id} variableCombination=${combo} > ${CONSIDER_SPLIT_THRESHOLD} 且保留未拆（kept-below-threshold），缺少推导注记 variableCombinationBasis（须声明各变量 {name, cardinality}，且 Πcardinality === 声明值 ${combo}）`,
+        );
+      } else {
+        const invalid = variables.filter(
+          (v) => typeof v?.cardinality !== 'number' || !Number.isFinite(v.cardinality) || v.cardinality < 1,
+        );
+        if (invalid.length > 0) {
+          violations.push(
+            `拆解校验失败：规格 ${s.id} variableCombinationBasis.variables 含非法 cardinality（须为 ≥1 的有限数，实际 ${invalid
+              .map((v) => JSON.stringify(v?.cardinality))
+              .join(', ')}）`,
+          );
+        } else {
+          const product = variables.reduce((acc, v) => acc * v.cardinality, 1);
+          if (product !== combo) {
+            violations.push(
+              `拆解校验失败：规格 ${s.id} variableCombinationBasis 推导不符：Πcardinality=${product} ≠ 声明 variableCombination=${combo}（>1000 保留未拆须附推导注记且乘积与声明值一致）`,
+            );
+          }
+        }
+      }
     }
   }
   return { violations, warnings };

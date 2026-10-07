@@ -127,6 +127,37 @@
             "description": "拆解决策：kept-below-threshold=组合数低于阈值不拆 / consider-split=>1000 考虑拆解（保留须声明理由）/ must-split=>10000 必须拆解 / split-done=已拆解完成；variableCombination>10000 时必须 split-done",
             "enum": ["must-split", "consider-split", "kept-below-threshold", "split-done"]
           },
+          "variableCombinationBasis": {
+            "description": "推导注记（B9，可选；variableCombination>1000 且保留未拆 kept-below-threshold 时必填）：各变量 {name, cardinality} 列表，Πcardinality 必须等于声明的 variableCombination 字段值；缺失 / 基数非法 / 乘积不符均被 check-tla-model 判 violation；≤1000 不要求",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["variables"],
+            "properties": {
+              "variables": {
+                "description": "参与组合数计算的变量列表（至少 1 项；须覆盖 .tla 声明的全部状态变量）",
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "description": "单个变量的取值基数声明",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "cardinality"],
+                  "properties": {
+                    "name": {
+                      "description": "变量名（与 .tla 文件 VARIABLES 声明一致）",
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "cardinality": {
+                      "description": "变量取值基数（取值域大小，≥1 的有限数；全部变量基数之积须等于 variableCombination）",
+                      "type": "number",
+                      "minimum": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
           "syntaxChecked": {
             "description": "SANY 语法检查是否通过（须为真实 SANY 运行结果，禁止占位/简化，反模式 #16）",
             "type": "boolean"

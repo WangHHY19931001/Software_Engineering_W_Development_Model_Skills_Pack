@@ -23,6 +23,7 @@ import {
   checkCfgStructure,
   checkBusinessInvariants,
   checkHierarchy,
+  checkDecomposition,
   parseCfgInvariantNames,
   validateHeader,
   type TlaSpec,
@@ -746,5 +747,94 @@ describe('B1 恒真不变式防御 + B10c CONSTRAINT 禁用', () => {
       checkBusinessInvariants(tla, otherSections).violations.some((v) => v.includes('不得用约束砍状态空间')),
       'ACTION_CONSTRAINT / TYPE_CONSTRAINT 不应命中 CONSTRAINT 禁用',
     ).toBe(false);
+  });
+});
+
+// ==================== B9 variableCombination 推导注记 ====================
+
+describe('B9 variableCombination 推导注记', () => {
+  /** 构造一条 kept-below-threshold 规格（variableCombination 可指定）。 */
+  function makeKeptSpec(variableCombination: number, basis?: TlaSpec['variableCombinationBasis']): TlaSpec {
+    return {
+      id: 'L2-big',
+      level: 'L2',
+      phase: 2,
+      system: 'sample-system::auth',
+      requirementIds: ['REQ-001'],
+      designRef: 'docs/system-design.md',
+      tlaPath: 'tla/L2-auth.tla',
+      cfgPath: 'tla/L2-auth.cfg',
+      parent: 'tla/L1-system.tla',
+      siblings: [],
+      children: [],
+      variableCombination,
+      decompositionDecision: 'kept-below-threshold',
+      variableCombinationBasis: basis,
+      syntaxChecked: true,
+      tlcChecked: true,
+      deadlockFree: true,
+      invariantsHold: true,
+      stateExplosion: false,
+    };
+  }
+
+  it('B9：variableCombination >1000 kept 且无推导注记 → 违规', () => {
+    const result = checkDecomposition([makeKeptSpec(2000)]);
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]).toContain('L2-big');
+    expect(result.violations[0]).toContain('variableCombinationBasis');
+    // 既有警告保留（不因违规引入而删除）
+    expect(result.warnings.some((w) => w.includes('kept-below-threshold'))).toBe(true);
+  });
+
+  it('B9 通过行：有 basis 且 Πcardinality === 声明 variableCombination → 零 violation', () => {
+    const basis = {
+      variables: [
+        { name: 'user', cardinality: 40 },
+        { name: 'session', cardinality: 50 },
+      ],
+    };
+    const result = checkDecomposition([makeKeptSpec(2000, basis)]);
+    expect(result.violations).toEqual([]);
+    expect(result.warnings.some((w) => w.includes('kept-below-threshold'))).toBe(true);
+  });
+
+  it('B9 乘积不符：Πcardinality ≠ 声明 variableCombination → 违规（点名乘积与声明值）', () => {
+    const basis = {
+      variables: [
+        { name: 'user', cardinality: 40 },
+        { name: 'session', cardinality: 60 },
+      ],
+    };
+    const result = checkDecomposition([makeKeptSpec(2000, basis)]);
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]).toContain('Πcardinality=2400');
+    expect(result.violations[0]).toContain('2000');
+  });
+
+  it('B9 非法基数：cardinality 非正数/非有限数 → 违规', () => {
+    for (const cardinality of [0, -3, Number.POSITIVE_INFINITY, Number.NaN]) {
+      const basis = {
+        variables: [
+          { name: 'user', cardinality },
+          { name: 'session', cardinality: 50 },
+        ],
+      };
+      const result = checkDecomposition([makeKeptSpec(2000, basis)]);
+      expect(
+        result.violations.some((v) => v.includes('cardinality')),
+        `cardinality=${cardinality}`,
+      ).toBe(true);
+    }
+  });
+
+  it('B9 边界：≤1000 kept 无 basis 不要求（零 violation）；split-done/split 阈值行为不变', () => {
+    // ≤1000 不要求推导注记
+    expect(checkDecomposition([makeKeptSpec(1000)]).violations).toEqual([]);
+    // >10000 非 split-done 仍走原 MUST_SPLIT violation（不受 B9 影响）
+    const mustSplit = { ...makeKeptSpec(20000), id: 'L2-huge', decompositionDecision: 'consider-split' as const };
+    expect(
+      checkDecomposition([mustSplit]).violations.some((v) => v.includes("须 decompositionDecision='split-done'")),
+    ).toBe(true);
   });
 });
