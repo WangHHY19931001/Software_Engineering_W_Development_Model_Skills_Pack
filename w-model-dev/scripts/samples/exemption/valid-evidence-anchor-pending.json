@@ -2,7 +2,7 @@
   "id": "EXEMPT-006",
   "type": "evidence-anchor-pending",
   "target": "SD-007",
-  "ruleId": "R15",
+  "ruleId": "R15b",
   "justification": "SD-007（文章归档子系统）的 evidenceAnchor 已声明但尚未完成验证，本阶段门需放行进入下一阶段，故申请豁免并承诺在阶段 5 编码前完成验证转为 confirmed。",
   "evidence": [
     "graph.json:SD-007.evidenceStatus=pending",
