@@ -98,7 +98,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 5. **产出**（O→S）：生成产物 + 同步测试设计 + 更新 RTM；阶段 1–4 额外产出 TLA+ 规格与 BDD features（按成熟度）；ingestion 子流程（plan-chunks → A-chunk/A-cross → check-requirement-graph，收敛循环 MAX_ROUNDS=5）见 ingestion-chunk.md。
 6. **R3 预防性审查**（O→R→G）：S 产出后分派 R 完成 completeness/reliability/security 三份报告，再由 G 运行 check-preventive-review.ts；exitCode=0 后才可进入 V。
 7. **评审**（O→V）：按 targetKind 路由 Persona 产出 VerifierOutput。**编排者不得自评**。
-8. **门禁**（O→G）：跑 check-verifier-output.ts；阶段 1–4 额外 check-tla-model.ts + check-bdd-model.ts；阶段 5 额外 check-code-tla-consistency.ts。**阶段门放行前顺序（D-4，三步不可换序、不可并行）**：① `checkpoint-log/phase-N` 用户确认**先落盘**（阶段 1 由 R0 首阶段自举形态消费该确认作初级证据）→ ② **闭环五门串行**（串行调度序列 `check-budget.ts` → `check-run-log.ts` → `check-maturity.ts` → `check-checkpoint.ts`；第五门 `check-preventive-review.ts` 在第 ② 步串行调度序列之外、V 评审前执行（见第 6 步），五门均须提供 run-log，全部 `exitCode=0`）→ ③ **放行记录**（`action=checkpoint`、`outcome=success`）为**阶段末条**且**严格晚于**五条 gate 记录（毫秒精度：同毫秒（含无毫秒部分的秒级时间戳）不算早于；违反即 `check-run-log.ts` R11 blocking，约束 #11）。各阶段门禁电池完整清单（阶段专属脚本 + 参数形态）以 [references/subagent-delegation.md](references/subagent-delegation.md) §6.3「阶段专属脚本」为唯一权威，本步只列高频项、不复述完整电池。
+8. **门禁**（O→G）：跑 check-verifier-output.ts；阶段 1–4 额外 check-tla-model.ts + check-bdd-model.ts；阶段 5 额外 check-code-tla-consistency.ts。**阶段门放行三步的权威表述与五门参数形态见本文件「编排者-子代理边界」节（唯一权威，本步不复述）；分派细则见 [references/subagent-delegation.md](references/subagent-delegation.md) §6.3。** 各阶段门禁电池完整清单（阶段专属脚本 + 参数形态）以 subagent-delegation.md §6.3「阶段专属脚本」为唯一权威，本步只列高频项、不复述完整电池。
 9. **验证与暂停**（O）：普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）；跳过 R 或 R 报告复审/门禁分别命中反模式 #18/#19。S-fix 后与放行前分派冰山扫掠（iceberg-sweep-guide.md）；阶段 1 ingestion 图谱失败仍走 A→G 专用收敛循环。
 10. **持久化**（O）：用户放行后才更新 `project.status`；状态写入统一经 wm-write.ts（锁 + 备份 + 原子写）。
 
