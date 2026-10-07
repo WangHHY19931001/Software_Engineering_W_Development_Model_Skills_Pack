@@ -1467,14 +1467,16 @@ describe('A9 脱敏敏感 key 规范化变体匹配（批次 6 销账）', () =>
     expect(redacted['notes']).toBe('path <redacted-absolute-path>');
     expect(redacted['nested']).toEqual({ db_password_hash: '[REDACTED]' });
   });
-  it('A9：普通键不被误脱敏（passwordPolicy / path / durationMs / tokens）', () => {
+  it('A9：普通键不被误脱敏（retentionPolicy / path / durationMs / tokens）', () => {
+    // I4 起 `passwordPolicy` 因驼峰切分被保守脱敏（见决策4g），本行改用同为 camelCase 但与
+    // 敏感词干无关的中性键 `retentionPolicy`，继续锁定「驼峰切分不得误伤中性键」。
     const redacted = redact({
-      passwordPolicy: 'ok',
+      retentionPolicy: 'ok',
       path: 'D:\\x\\y',
       durationMs: 5,
       tokens: 1000,
     }) as Record<string, unknown>;
-    expect(redacted['passwordPolicy']).toBe('ok');
+    expect(redacted['retentionPolicy']).toBe('ok');
     expect(redacted['durationMs']).toBe(5);
     // run-log 既有键 tokens 不得被误伤（词段精确相等 `tokens` ≠ `token`；后缀分支 ≥6 守卫亦不触发——决策 2026-10-07#4 口径）。
     expect(redacted['tokens']).toBe(1000);
@@ -1514,21 +1516,67 @@ describe('决策4：*_token 变体盲区消除 + 防复生（批次 7）', () =>
     expect(redacted['token_count']).toBe('[REDACTED]');
     expect(redacted['prompt_tokens']).toBe(7);
   });
-  it('决策4c：passwordPolicy/path/durationMs 仍零误伤（既有负例保持）', () => {
+  it('决策4c：path/durationMs/tokens/retentionPolicy 仍零误伤（既有负例保持）', () => {
     const redacted = redact({
-      passwordPolicy: 'strict',
       path: 'D:\\x\\y',
       durationMs: 5,
       tokens: 1000,
+      retentionPolicy: 'keep-30d',
     }) as Record<string, unknown>;
-    expect(redacted['passwordPolicy']).toBe('strict');
     expect(redacted['durationMs']).toBe(5);
     expect(redacted['tokens']).toBe(1000);
+    expect(redacted['retentionPolicy']).toBe('keep-30d');
     expect(redacted['path']).toBe('<redacted-absolute-path>');
   });
   it('决策4d：mytoken（无分隔后缀）不脱敏（后缀分支 ≥6 守卫保留）', () => {
     const redacted = redact({ mytoken: 'not-a-secret', mypassword: 'also-kept' }) as Record<string, unknown>;
     expect(redacted['mypassword']).toBe('[REDACTED]');
     expect(redacted['mytoken']).toBe('not-a-secret');
+  });
+
+  // ==================== I4（终审修复波）：camelCase 家族盲区消除（决策 #4 点名变体） ====================
+  it('决策4e：reviewer 实测的 camelCase 家族全脱敏（I4 前整键明文导出）', () => {
+    const keys = [
+      'refreshToken',
+      'sessionToken',
+      'jwtToken',
+      'authToken',
+      'bearerToken',
+      'idToken',
+      'apiToken',
+      'oAuthToken',
+      'secretKey',
+      'apiKey',
+    ] as const;
+    const input: Record<string, unknown> = {};
+    for (const k of keys) input[k] = 'plaintext-secret';
+    input['nested'] = { refreshToken: 'nested-plaintext', oAuthToken: 'nested-oauth' };
+    const redacted = redact(input) as Record<string, unknown>;
+    for (const k of keys) {
+      expect(redacted[k], `${k} 应脱敏（I4 前为明文——决策 #4「不切驼峰」口径撤销）`).toBe('[REDACTED]');
+    }
+    // 递归脱敏对驼峰键同样生效
+    expect(redacted['nested']).toEqual({ refreshToken: '[REDACTED]', oAuthToken: '[REDACTED]' });
+  });
+  it('决策4f：驼峰切分不引入新误伤（mytoken/tokens/prompt_tokens/durationMs/中性驼峰）', () => {
+    const redacted = redact({
+      mytoken: 'a',
+      tokens: 1,
+      prompt_tokens: 2,
+      durationMs: 3,
+      retentionPolicy: 'b',
+    }) as Record<string, unknown>;
+    expect(redacted['mytoken']).toBe('a');
+    expect(redacted['tokens']).toBe(1);
+    expect(redacted['prompt_tokens']).toBe(2);
+    expect(redacted['durationMs']).toBe(3);
+    expect(redacted['retentionPolicy']).toBe('b');
+  });
+  it('决策4g：passwordPolicy 类「敏感词干+非敏感词尾」驼峰键被保守脱敏（I4 显式代价）', () => {
+    // 与决策 4b 的 token_count 同属显式接受的保守代价：任何能命中 secretKey 的驼峰规则
+    // （前段命中）结构上必然命中 passwordPolicy——两者形状同构，不可分离。
+    const redacted = redact({ passwordPolicy: 'strict', passwordTtlDays: 90 }) as Record<string, unknown>;
+    expect(redacted['passwordPolicy']).toBe('[REDACTED]');
+    expect(redacted['passwordTtlDays']).toBe('[REDACTED]');
   });
 });

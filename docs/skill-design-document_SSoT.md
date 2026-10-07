@@ -2498,7 +2498,7 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 | 五类退化解负例 + 空转 Next 检测（T7，B10） | tla-logic.ts（parseCfgNextNames / checkIdleNext）/ samples/tla/bad-idle-next.json / NEGATIVE-COVERAGE |
 | 图谱收严（T8，A11/A12） | graph-logic.ts（环检全 phase / R15b pending violation）/ graph.schema / samples/graph 两负例 / graph-guide |
 | RTM / 状态机收严（T9，A13/A14/C16） | rtm.schema（coverageStatus enum+必填）/ gate-logic.ts（checkRtmCoverageStatusConsistency）/ lib/constants.ts（PROJECT_STATUSES 等）/ maturity-logic.ts（R7 = project.status 转移校验）/ wm-status-logic.ts / project.schema |
-| 脱敏盲区消除 + 防复生（T10，决策 4） | evidence-export-logic.ts（词段精确相等，取消长度守卫）/ NEGATIVE-COVERAGE |
+| 脱敏盲区消除 + 防复生（T10，决策 4；终审 I4 扩面） | evidence-export-logic.ts（词段精确相等，取消长度守卫；I4 起按驼峰边界二次切分——`*Token` 家族与 `secretKey` 全脱敏）/ NEGATIVE-COVERAGE |
 | 降级须 human 授权（T11，决策 2；规则号 R8） | maturity-logic.ts（R8 + verifyMaturityApproval requireAction）/ check-maturity.ts（`downgrade-approve` 专属绑定，R-B7-7）/ maturity.schema / samples/maturity/with-approval |
 | R6 第四判定首条 from==L0（T12，决策 3） | maturity-logic.ts / maturity.schema / data-models / operational-recovery / eval/e2e/demo-assets/build_workspace.py 迁移 |
 | gate-log 损坏两用例 + D-1 收窄负例（T13） | __tests__/check-run-log-cli.test.ts / signature-chain-logic.test.ts（零实现改动） |

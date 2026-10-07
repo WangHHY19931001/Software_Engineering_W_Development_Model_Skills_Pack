@@ -174,26 +174,38 @@ function normalizeSensitiveKey(key: string): string {
 }
 const SENSITIVE_KEY_SEGMENT_SPLIT = /[^a-zA-Z0-9]+/;
 /**
- * 分隔词段切分约定（A9 既有）：以连续非字母数字（下划线/连字符/空白等）为界切分原键，
- * 不切驼峰（`passwordPolicy` 是单段）；段内再经 `normalizeSensitiveKey` 小写化后比对。
+ * 驼峰边界（I4 终审修复）：两处零宽断开——`lower/digit→Upper`（`authToken` → auth|Token）
+ * 与「连续大写后接小写词首」（`oAuthToken` → o|Auth|Token，防大写序列被吞成一整段）。
+ */
+const CAMEL_BOUNDARY = /(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/;
+/**
+ * 分隔词段切分约定（A9 既有 + I4 终审修复）：先以连续非字母数字（下划线/连字符/空白等）
+ * 为界切分原键，再对每个词块按驼峰边界二次切分；段内再经 `normalizeSensitiveKey` 小写化后比对。
+ * 决策 #4 的「不切驼峰」口径已被 I4 撤销——驼峰家族（`refreshToken`/`sessionToken`/`jwtToken`/
+ * `authToken`/`bearerToken`/`idToken`/`apiToken`/`oAuthToken`/`secretKey`/`apiKey`）此前整键
+ * 明文导出（审查者实测复现）。
  */
 const segmentsOf = (key: string): string[] =>
   key
     .split(SENSITIVE_KEY_SEGMENT_SPLIT)
+    .flatMap((chunk) => chunk.split(CAMEL_BOUNDARY))
     .filter((segment) => segment.length > 0)
     .map((segment) => normalizeSensitiveKey(segment));
 /**
- * A9 敏感 key 判定（决策 2026-10-07#4 精化）——三分支：
+ * A9 敏感 key 判定（决策 2026-10-07#4 精化 + I4 终审修复）——三分支：
  * ①精确 Set 命中（既有行为，变体匹配的子集）；
  * ②规范化全串的后缀（词干长度 ≥6 守卫）：`mypassword` 类长词干变体命中；同一守卫阻断
  *   `mytoken` 式后缀命中（`token` 词干 5 < 6 一律不算，决策 4d）；
- * ③分隔词段（切分约定见 `segmentsOf`）：任意单段**精确等于**已知敏感词干即脱敏——词段边界
+ * ③分隔/驼峰词段（切分约定见 `segmentsOf`）：任意单段**精确等于**已知敏感词干即脱敏——词段边界
  *   本身即强信号，取消词段分支的长度守卫（决策 #4 盲区消除：`refresh_token`/`session_token`/
- *   `jwt_token` 的 `token` 段、`db_password_hash` 的 `password` 段命中）。保守代价（决策 #4
- *   显式接受，已登记 samples/NEGATIVE-COVERAGE.md 的 wm-export-evidence 行）：`token_count` 类
- *   计数键（词段恰为 `token`）被脱敏；`prompt_tokens`（词段 `tokens` ≠ `token`）与 `tokens`、
- *   `passwordPolicy`（驼峰无词段边界）仍零误伤。跨分隔符的连续拼接（`api_key_v2` 的 api+key）
- *   维持拼接长度 ≥6 守卫：词干必须整段跨越分隔符边界，不得切断无分隔符的字母串。
+ *   `jwt_token` 的 `token` 段、`db_password_hash` 的 `password` 段命中；I4 起同覆盖驼峰家族
+ *   `refreshToken`…`oAuthToken` 的 `token` 段与 `secretKey` 的 `secret` 段）。保守代价（决策 #4
+ *   与 I4 显式接受，已登记 samples/NEGATIVE-COVERAGE.md 的 wm-export-evidence 行）：`token_count`
+ *   类计数键（词段恰为 `token`）与 `passwordPolicy`/`secretPolicy` 类「敏感词干 + 非敏感词尾」
+ *   驼峰键（前段命中）被脱敏；`prompt_tokens`（词段 `tokens` ≠ `token`）与 `tokens`、`mytoken`、
+ *   中性驼峰键（`durationMs`/`retentionPolicy`）仍零误伤。跨分隔符的连续拼接（`api_key_v2` 的
+ *   api+key、I4 起 `apiKey` 的 api+key）维持拼接长度 ≥6 守卫：词干必须整段跨越分隔符/驼峰边界，
+ *   不得切断无边界的长字母串。
  */
 function isSensitiveKey(key: string): boolean {
   const normalizedKey = normalizeSensitiveKey(key);
