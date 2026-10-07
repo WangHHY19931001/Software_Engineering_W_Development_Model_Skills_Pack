@@ -1669,11 +1669,15 @@ CloseDoors(e) ==
     /\ ElevatorState' = [ElevatorState EXCEPT ![e] =
         [@ EXCEPT !.doorsOpen = FALSE]]
     /\ UNCHANGED <<PersonState, ActiveElevatorCalls>>
-\* 方向反转：运行中当前方向无可服务呼叫时反转（避免端楼层同向卡死）
+\* 方向反转：仅旅行边界（下一楼层越界）且当前方向无可服务呼叫时反转。
+\* 若允许途中反转，则存在「临近呼叫楼层前反复调头」的公平弹跳行为，永不
+\* 对齐 (呼叫楼层, 呼叫方向)，任何 WF/SF 公平性组合下 CallsServiced 都被
+\* TLC 判违反（批次 8 真机实证）——反转收窄到旅行边界是活性成立的前提
 ReverseDirection(e) ==
     LET eState == ElevatorState[e] IN
     /\ eState.direction /= "Stationary"
     /\ ~eState.doorsOpen
+    /\ (IF eState.direction = "Up" THEN eState.floor + 1 ELSE eState.floor - 1) \notin Floor
     /\ ~(\E c \in ActiveElevatorCalls : CanServiceCall[e, c])
     /\ ElevatorState' = [ElevatorState EXCEPT ![e] =
         [@ EXCEPT !.direction =
@@ -1713,8 +1717,24 @@ DoorsOpenAtValidFloor ==
         ElevatorState[e].floor \in Floor
 \* Liveness: every call eventually serviced——时序属性须在公平性规格下以
 \* TLC PROPERTIES + SPECIFICATION FairSpec 检查；无公平性的 Spec 下该属性
-\* 不成立也不检查，不得列入 safety cfg 的 INVARIANTS（cfg 示例 3 只查 safety）
-FairSpec == Spec /\ WF_Vars(Next)
+\* 不成立也不检查，不得列入 safety cfg 的 INVARIANTS（cfg 示例 3 只查 safety）。
+\* 公平性按动作组合而非 WF_Vars(Next) 整体弱公平——整体 WF 下调度方总可执行
+\* 其他动作，CallsServiced 被 TLC 判违反（反例经 ReverseDirection 方向弹跳；
+\* 仅按动作 WF 仍不足，须配合 ReverseDirection 的旅行边界反转，见上）。
+\* 属性成立与否由 TLC 判定：本形态真机检查零违反（TLC 2.19，
+\* Person={p1,p2}/Elevator={e1}/FloorCount=3，6550 states，2026-10-07 批次 8）
+FairSpec ==
+    Spec
+    /\ \A p \in Person :
+        /\ WF_Vars(CallElevator(p))
+        /\ WF_Vars(PassengerArrives(p))
+    /\ \A e \in Elevator :
+        /\ WF_Vars(StartElevator(e, "Up"))
+        /\ WF_Vars(StartElevator(e, "Down"))
+        /\ WF_Vars(OpenDoors(e))
+        /\ WF_Vars(CloseDoors(e))
+        /\ WF_Vars(MoveElevator(e))
+        /\ WF_Vars(ReverseDirection(e))
 CallsServiced == \A c \in ElevatorCall :
     c \in ActiveElevatorCalls ~> \E e \in Elevator : CanServiceCall[e, c]
 =============================================================================
@@ -2047,7 +2067,8 @@ INVARIANTS
 \* Properties to check (including liveness)
 \* names MUST be operators actually defined in the .tla（悬空引用 → TLC 报错）
 \* 时序属性须在公平性规格下以 PROPERTIES 检查——接线真实例：Example 5 Elevator 的
-\* FairSpec == Spec /\ WF_Vars(Next) 配 SPECIFICATION FairSpec + PROPERTIES CallsServiced
+\* 按动作 WF 组合 FairSpec（配合 ReverseDirection 旅行边界反转）配
+\* SPECIFICATION FairSpec + PROPERTIES CallsServiced，真机零违反
 \* （属性成立与否由 TLC 检查判定；cfg 示例 3 只做 safety 检查，不列 PROPERTIES）
 PROPERTIES
     CallsServiced

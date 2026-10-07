@@ -25,6 +25,7 @@ import {
   checkIdleNext,
   checkHierarchy,
   checkDecomposition,
+  extractTlaDefBody,
   parseCfgInvariantNames,
   parseCfgNextNames,
   validateHeader,
@@ -941,6 +942,151 @@ describe('B10 空转 Next 检测（无状态赋值 / 全恒等自赋值）', () 
     ).toBe(true);
     expect(result.passed).toBe(false);
   });
+
+  // ==================== 批次 8 rider：顶层析取 + 纯守卫误报窗口收口 ====================
+
+  it('析取窗口：Next == Idle \\/ Guard（Idle 恒等 + Guard 纯守卫）→ 零违规（不误报）', () => {
+    const tla = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x',
+      'Init == x = 0',
+      'Next == Idle \\/ Guard',
+      "Idle == x' = x",
+      'Guard == x > 0',
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    // 无赋值的析取分支撇号变量不受约束、可真实推进——顶层析取下「全恒等 + 纯守卫」
+    // 不可判定，保守计为推进（批次 7 复审确认的误报窗口）
+    expect(checkIdleNext(tla, cfgNext).passed, '析取分支误报窗口应保守放行').toBe(true);
+  });
+
+  it('整块括号析取窗口：Next == (Idle \\/ Guard) → 零违规（保守 pass）', () => {
+    const tla = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x',
+      'Init == x = 0',
+      'Next == (Idle \\/ Guard)',
+      "Idle == x' = x",
+      'Guard == x > 0',
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    expect(checkIdleNext(tla, cfgNext).passed, '整块括号析取形态同窗口，应保守放行').toBe(true);
+  });
+
+  it("析取全恒等不放掉（括号形态）：Next == (x' = x) \\/ (y' = y) → 违规「空转规格」", () => {
+    const tla = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x, y',
+      'Init == x = 0 /\\ y = 0',
+      "Next == (x' = x) \\/ (y' = y)",
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    // 括号包裹的恒等子句剥外括号后仍整句匹配 var' = var，且闭包无非赋值子句——
+    // 析取全恒等语义上仍空转，不得被析取窗口一并放掉
+    const result = checkIdleNext(tla, cfgNext);
+    expect(result.passed, '括号形态析取全恒等应判失败').toBe(false);
+    expect(result.violations.some((v) => v.includes('空转规格'))).toBe(true);
+  });
+
+  it("析取全恒等不放掉（裸形态零回归）：Next == x' = x \\/ y' = y → 违规「空转规格」", () => {
+    const tla = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x, y',
+      'Init == x = 0 /\\ y = 0',
+      "Next == x' = x \\/ y' = y",
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    const result = checkIdleNext(tla, cfgNext);
+    expect(result.passed, '裸形态析取全恒等应判失败').toBe(false);
+    expect(result.violations.some((v) => v.includes('空转规格'))).toBe(true);
+  });
+
+  it('合取分解零回归：Next == A /\\ B（A、B 全恒等）仍违规', () => {
+    const tlaConj = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x, y',
+      'Init == x = 0 /\\ y = 0',
+      'Next == A /\\ B',
+      "A == x' = x",
+      "B == y' = y",
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    // 顶层无 \/ 析取的合取分解形态：全恒等判定照旧违规（真空转），不被析取窗口放掉
+    expect(checkIdleNext(tlaConj, cfgNext).violations.some((v) => v.includes('空转规格'))).toBe(true);
+  });
+});
+
+// ==================== extractTlaDefBody 定义体提取边界（批次 8 rider） ====================
+
+describe('extractTlaDefBody 定义体提取边界', () => {
+  it('Inv == 2：单行标量体提取', () => {
+    const tla = ['---- MODULE M ----', 'Inv == 2', 'Next == TRUE', '===='].join('\n');
+    expect(extractTlaDefBody(tla, 'Inv')).toBe(' 2');
+  });
+
+  it('元字符名：N$e / A.B 按字面前缀提取，正则元字符不参与正则解释', () => {
+    const tla = ['---- MODULE M ----', 'N$e == 1', 'Next == TRUE', 'A.B == (2)', '===='].join('\n');
+    expect(extractTlaDefBody(tla, 'N$e')).toBe(' 1');
+    expect(extractTlaDefBody(tla, 'A.B')).toBe(' (2)');
+    // 前缀相等要求名字完整：'N' 后随 '$'，余部不匹配 `==` → 视为不存在
+    expect(extractTlaDefBody(tla, 'N')).toBe(null);
+  });
+
+  it('元字符名边界：A.B 非标识符形态（含 .）不构成顶层边界，作为上一定义体续行被并入', () => {
+    const tla = ['---- MODULE M ----', 'N$e == 1', 'A.B == (2)', 'Next == TRUE', '===='].join('\n');
+    // 顶层边界正则只认 [A-Za-z][A-Za-z0-9_]* 形态的 0 起始定义；`A.B` 含元字符
+    // 不构成边界 → 并入 N$e 体（元字符名仅来自 cfg 解析输入，实际 .tla 不合法，
+    // 该行为只影响此类病态输入的体边界，不影响合法模块）
+    expect(extractTlaDefBody(tla, 'N$e')).toBe(' 1\nA.B == (2)');
+  });
+
+  it('缩进 LET 体：内层 H == x > 0 不截断外层定义体（批次 8 边界修复）', () => {
+    const tla = [
+      '---- MODULE M ----',
+      'Foo ==',
+      '    LET',
+      '        H == x > 0',
+      '    IN',
+      '    /\\ H',
+      'Bar == 1',
+      '====',
+    ].join('\n');
+    const body = extractTlaDefBody(tla, 'Foo');
+    expect(body, 'Foo 定义体应提取到').not.toBe(null);
+    expect(body?.includes('H == x > 0'), 'LET 体内层定义行属续行，不截断').toBe(true);
+    expect(body?.includes('/\\ H'), 'IN 之后的体内容不丢').toBe(true);
+    expect(body?.includes('Bar'), '0 起始的 Bar == 1 仍是顶层边界').toBe(false);
+    expect(extractTlaDefBody(tla, 'Bar')).toBe(' 1');
+  });
+
+  it('多行合取体：/\\ 子句逐行收集到下一顶层定义', () => {
+    const tla = ['---- MODULE M ----', 'Inv ==', '    /\\ a = 1', '    /\\ b = 2', 'Next == TRUE', '===='].join('\n');
+    const body = extractTlaDefBody(tla, 'Inv') ?? '';
+    expect(body).toContain('/\\ a = 1');
+    expect(body).toContain('/\\ b = 2');
+    expect(body).not.toContain('Next');
+  });
+
+  it('边界：模块终止符 ==== 结束定义体提取；名字不存在返回 null；空入参返回 null', () => {
+    const tla = ['---- MODULE M ----', 'Inv == 1', '====', 'After == 2'].join('\n');
+    expect(extractTlaDefBody(tla, 'Inv')).toBe(' 1');
+    // ==== 只界定定义体的下边界（体收集终止）；目标查找为全文扫描，==== 之后的
+    // 定义行仍可被查到（提取器是文本工具，合法 .tla 中 ==== 后无定义）
+    expect(extractTlaDefBody(tla, 'After')).toBe(' 2');
+    expect(extractTlaDefBody(tla, 'Missing')).toBe(null);
+    expect(extractTlaDefBody('', 'Inv')).toBe(null);
+    expect(extractTlaDefBody(tla, '')).toBe(null);
+  });
 });
 
 // ==================== B9 variableCombination 推导注记 ====================
@@ -1033,6 +1179,19 @@ describe('B9 variableCombination 推导注记', () => {
     expect(
       checkDecomposition([mustSplit]).violations.some((v) => v.includes("须 decompositionDecision='split-done'")),
     ).toBe(true);
+  });
+
+  it('B9 边界：combo=1001（最小违规值）kept 无注记 → violation', () => {
+    const result = checkDecomposition([makeKeptSpec(1001)]);
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]).toContain('variableCombinationBasis');
+    expect(result.violations[0]).toContain('1001');
+  });
+
+  it('B9 边界：空 variables 数组（variables: []）→ 缺注记 violation（不因数组为空而放行）', () => {
+    const result = checkDecomposition([makeKeptSpec(2000, { variables: [] })]);
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]).toContain('variableCombinationBasis');
   });
 
   // ==================== I5（终审修复波）：basis 名集合覆盖 .tla VARIABLES + cardinality 整数 ====================
