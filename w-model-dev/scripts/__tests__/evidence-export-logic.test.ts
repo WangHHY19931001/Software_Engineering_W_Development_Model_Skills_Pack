@@ -1476,7 +1476,7 @@ describe('A9 脱敏敏感 key 规范化变体匹配（批次 6 销账）', () =>
     }) as Record<string, unknown>;
     expect(redacted['passwordPolicy']).toBe('ok');
     expect(redacted['durationMs']).toBe(5);
-    // run-log 既有键 tokens 不得因短词干 token 被误伤（词干长度 >=6 守卫）。
+    // run-log 既有键 tokens 不得被误伤（词段精确相等 `tokens` ≠ `token`；后缀分支 ≥6 守卫亦不触发——决策 2026-10-07#4 口径）。
     expect(redacted['tokens']).toBe(1000);
     // path 键名不触发脱敏；值内绝对路径仍按既有路径规则替换。
     expect(redacted['path']).toBe('<redacted-absolute-path>');
@@ -1490,5 +1490,45 @@ describe('A9 脱敏敏感 key 规范化变体匹配（批次 6 销账）', () =>
     expect(redacted['apikey']).toBe('[REDACTED]');
     expect(redacted['credential']).toBe('[REDACTED]');
     expect(redacted['token']).toBe('[REDACTED]');
+  });
+});
+
+describe('决策4：*_token 变体盲区消除 + 防复生（批次 7）', () => {
+  it('决策4a：refresh_token/session_token/jwt_token 全部脱敏', () => {
+    const redacted = redact({
+      refresh_token: 'rt-secret',
+      session_token: 'st-secret',
+      jwt_token: 'jwt-secret',
+      nested: { refresh_token: 'nested-rt-secret' },
+    }) as Record<string, unknown>;
+    expect(redacted['refresh_token']).toBe('[REDACTED]');
+    expect(redacted['session_token']).toBe('[REDACTED]');
+    expect(redacted['jwt_token']).toBe('[REDACTED]');
+    expect(redacted['nested']).toEqual({ refresh_token: '[REDACTED]' });
+  });
+  it('决策4b：token_count 被保守脱敏（显式声明代价）', () => {
+    // 决策 #4 显式接受的保守代价：词段 token 精确命中使 token_count 类计数键被脱敏，
+    // 已登记 samples/NEGATIVE-COVERAGE.md 的 wm-export-evidence 行（防复生锚）。
+    // 代价边界：复数词段 `tokens` ≠ 词干 `token`（精确相等），与既有 tokens 负例同判保留。
+    const redacted = redact({ token_count: 42, prompt_tokens: 7 }) as Record<string, unknown>;
+    expect(redacted['token_count']).toBe('[REDACTED]');
+    expect(redacted['prompt_tokens']).toBe(7);
+  });
+  it('决策4c：passwordPolicy/path/durationMs 仍零误伤（既有负例保持）', () => {
+    const redacted = redact({
+      passwordPolicy: 'strict',
+      path: 'D:\\x\\y',
+      durationMs: 5,
+      tokens: 1000,
+    }) as Record<string, unknown>;
+    expect(redacted['passwordPolicy']).toBe('strict');
+    expect(redacted['durationMs']).toBe(5);
+    expect(redacted['tokens']).toBe(1000);
+    expect(redacted['path']).toBe('<redacted-absolute-path>');
+  });
+  it('决策4d：mytoken（无分隔后缀）不脱敏（后缀分支 ≥6 守卫保留）', () => {
+    const redacted = redact({ mytoken: 'not-a-secret', mypassword: 'also-kept' }) as Record<string, unknown>;
+    expect(redacted['mypassword']).toBe('[REDACTED]');
+    expect(redacted['mytoken']).toBe('not-a-secret');
   });
 });

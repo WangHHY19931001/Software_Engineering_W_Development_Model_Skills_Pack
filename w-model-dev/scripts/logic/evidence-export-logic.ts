@@ -174,24 +174,41 @@ function normalizeSensitiveKey(key: string): string {
 }
 const SENSITIVE_KEY_SEGMENT_SPLIT = /[^a-zA-Z0-9]+/;
 /**
- * A9 敏感 key 判定：精确匹配（既有行为，变体匹配的子集）之外，追加两类规范化变体
- * 匹配——①规范化全串的后缀（词干长度 ≥6）：`tokens` 由精确 Set 语义保住（`tokens`
- * 不在 Set 内，而候选词干 `token` 长度 5 < 6 不满足长度守卫、后缀分支不触发）；同一
- * 守卫保护 `token_count` 类计数键并阻断 `mytoken` 式后缀命中（词干不足 6 一律不算）；
- * ②分隔符词段的连续拼接（词干必须整段跨越分隔符边界，不得切断无分隔符的字母串）：
- * `api_key_v2` 的 `api+key` 段、`db_password_hash` 的 `password` 段命中；
- * `passwordPolicy`（无分隔符边界）、`path`/`durationMs` 不误伤。
+ * 分隔词段切分约定（A9 既有）：以连续非字母数字（下划线/连字符/空白等）为界切分原键，
+ * 不切驼峰（`passwordPolicy` 是单段）；段内再经 `normalizeSensitiveKey` 小写化后比对。
+ */
+const segmentsOf = (key: string): string[] =>
+  key
+    .split(SENSITIVE_KEY_SEGMENT_SPLIT)
+    .filter((segment) => segment.length > 0)
+    .map((segment) => normalizeSensitiveKey(segment));
+/**
+ * A9 敏感 key 判定（决策 2026-10-07#4 精化）——三分支：
+ * ①精确 Set 命中（既有行为，变体匹配的子集）；
+ * ②规范化全串的后缀（词干长度 ≥6 守卫）：`mypassword` 类长词干变体命中；同一守卫阻断
+ *   `mytoken` 式后缀命中（`token` 词干 5 < 6 一律不算，决策 4d）；
+ * ③分隔词段（切分约定见 `segmentsOf`）：任意单段**精确等于**已知敏感词干即脱敏——词段边界
+ *   本身即强信号，取消词段分支的长度守卫（决策 #4 盲区消除：`refresh_token`/`session_token`/
+ *   `jwt_token` 的 `token` 段、`db_password_hash` 的 `password` 段命中）。保守代价（决策 #4
+ *   显式接受，已登记 samples/NEGATIVE-COVERAGE.md 的 wm-export-evidence 行）：`token_count` 类
+ *   计数键（词段恰为 `token`）被脱敏；`prompt_tokens`（词段 `tokens` ≠ `token`）与 `tokens`、
+ *   `passwordPolicy`（驼峰无词段边界）仍零误伤。跨分隔符的连续拼接（`api_key_v2` 的 api+key）
+ *   维持拼接长度 ≥6 守卫：词干必须整段跨越分隔符边界，不得切断无分隔符的字母串。
  */
 function isSensitiveKey(key: string): boolean {
   const normalizedKey = normalizeSensitiveKey(key);
   if (SENSITIVE_KEYS.has(normalizedKey)) return true;
   if ([...SENSITIVE_KEYS].some((stem) => stem.length >= 6 && normalizedKey.endsWith(stem))) return true;
-  const segments = key.split(SENSITIVE_KEY_SEGMENT_SPLIT).filter((segment) => segment.length > 0);
+  const segments = segmentsOf(key);
+  // 词段命中：单段精确相等（无长度守卫——决策 2026-10-07#4；保守代价 token_count 类计数键
+  // 被脱敏，已在 NEGATIVE-COVERAGE 与测试四态显式声明）。
+  if (segments.some((segment) => SENSITIVE_KEYS.has(segment))) return true;
   for (let start = 0; start < segments.length; start += 1) {
     let joined = '';
     // slice + for-of 取代 segments[end] 动态下标取值（受控遍历，object-injection 安全，行为等价）
     for (const segment of segments.slice(start)) {
-      joined += normalizeSensitiveKey(segment);
+      joined += segment;
+      // 跨分隔符连续拼接：整段拼接才允许命中（拼接长度 ≥6 守卫，A9 既有口径不变）
       if (joined.length >= 6 && SENSITIVE_KEYS.has(joined)) return true;
     }
   }
