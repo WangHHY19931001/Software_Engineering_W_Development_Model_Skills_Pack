@@ -22,9 +22,11 @@ import {
   checkCfgInvariantsConsistency,
   checkCfgStructure,
   checkBusinessInvariants,
+  checkIdleNext,
   checkHierarchy,
   checkDecomposition,
   parseCfgInvariantNames,
+  parseCfgNextNames,
   validateHeader,
   type TlaSpec,
 } from '../logic/tla-logic.js';
@@ -747,6 +749,117 @@ describe('B1 恒真不变式防御 + B10c CONSTRAINT 禁用', () => {
       checkBusinessInvariants(tla, otherSections).violations.some((v) => v.includes('不得用约束砍状态空间')),
       'ACTION_CONSTRAINT / TYPE_CONSTRAINT 不应命中 CONSTRAINT 禁用',
     ).toBe(false);
+  });
+});
+
+// ==================== B10 空转 Next 检测（批次 7 任务 7） ====================
+
+describe('B10 空转 Next 检测（无状态赋值 / 全恒等自赋值）', () => {
+  /** 带真实推进 Next 的最小 .tla（非空转对照组）。 */
+  const tlaProgressing = [
+    '---- MODULE M ----',
+    'EXTENDS Naturals',
+    'VARIABLES x',
+    'Init == x = 0',
+    "Next == x' = x + 1",
+    'Spec == Init /\\ [][Next]_x',
+    '====',
+  ].join('\n');
+  const cfgNext = 'INIT Init\nNEXT Next';
+
+  it('parseCfgNextNames：INIT/NEXT 形式提取 Next 名；SPECIFICATION 形式返回空数组', () => {
+    expect(parseCfgNextNames('SPECIFICATION Spec\nINVARIANTS Inv')).toEqual([]);
+    expect(parseCfgNextNames(cfgNext)).toEqual(['Next']);
+    expect(parseCfgNextNames('INIT Init\nnext NextOp')).toEqual(['NextOp']); // 段名大小写不敏感
+    expect(parseCfgNextNames('INIT Init\nNEXT')).toEqual([]); // 裸 NEXT 行（无名字）跳过
+  });
+
+  it("空转形态一：Next == x' = x（全恒等自赋值）→ 违规「空转规格」", () => {
+    const tla = tlaProgressing.replace("Next == x' = x + 1", "Next == x' = x");
+    const result = checkIdleNext(tla, cfgNext);
+    expect(result.passed, '全恒等自赋值 Next 应判失败').toBe(false);
+    expect(
+      result.violations.some((v) => v.includes('空转规格') && v.includes('Next')),
+      '应含「空转规格」违规且点名 Next',
+    ).toBe(true);
+  });
+
+  it("空转形态二：Next == TRUE / UNCHANGED x（闭包无任何 var' = 赋值）→ 违规「空转规格」", () => {
+    const tlaTrue = tlaProgressing.replace("Next == x' = x + 1", 'Next == TRUE');
+    const resultTrue = checkIdleNext(tlaTrue, cfgNext);
+    expect(resultTrue.passed, 'Next == TRUE 应判失败').toBe(false);
+    expect(resultTrue.violations.some((v) => v.includes('空转规格'))).toBe(true);
+
+    const tlaUnchanged = tlaProgressing.replace("Next == x' = x + 1", 'Next == UNCHANGED x');
+    expect(checkIdleNext(tlaUnchanged, cfgNext).violations.some((v) => v.includes('空转规格'))).toBe(true);
+  });
+
+  it("非空转对照组：真实推进 Next（x' = x + 1，算术 RHS）不违规", () => {
+    expect(checkIdleNext(tlaProgressing, cfgNext).passed).toBe(true);
+  });
+
+  it("非确定性推进：Next == x' \\in 0..10（var' \\in 赋值形态）不违规", () => {
+    const tla = tlaProgressing.replace("Next == x' = x + 1", "Next == x' \\in 0..10");
+    expect(checkIdleNext(tla, cfgNext).passed).toBe(true);
+  });
+
+  it('子动作引用闭包：Next == A \\/ B 且子动作含真实赋值 → 不违规（防误报）', () => {
+    const tla = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x',
+      'Init == x = 0',
+      'Next == A \\/ B',
+      "A == x' = x + 1",
+      "B == x' = 0",
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    expect(checkIdleNext(tla, cfgNext).passed).toBe(true);
+  });
+
+  it('混合形态：恒等自赋值与非恒等赋值并存 → 不违规（存在推进分支即非空转）', () => {
+    const tla = tlaProgressing.replace("Next == x' = x + 1", "Next == x' = x /\\ x' = x + 1");
+    expect(checkIdleNext(tla, cfgNext).passed).toBe(true);
+  });
+
+  it("全恒等多变量：Next == x' = x /\\ y' = y → 违规「空转规格」", () => {
+    const tla = tlaProgressing
+      .replace('VARIABLES x', 'VARIABLES x, y')
+      .replace("Next == x' = x + 1", "Next == x' = x /\\ y' = y");
+    const result = checkIdleNext(tla, cfgNext);
+    expect(result.passed, '全变量恒等自赋值应判失败').toBe(false);
+    expect(result.violations.some((v) => v.includes('空转规格'))).toBe(true);
+  });
+
+  it('cfg 无 NEXT 段（SPECIFICATION 形式）或 .tla 缺 Next 定义 → 跳过不违规', () => {
+    expect(checkIdleNext(tlaProgressing, 'SPECIFICATION Spec').passed).toBe(true);
+    const tlaNoNext = tlaProgressing.replace("Next == x' = x + 1\n", '');
+    expect(checkIdleNext(tlaNoNext, cfgNext).passed).toBe(true);
+  });
+
+  it('wiring：checkTlaModel 将空转 Next 违规并入 cfgConsistencyViolations（规格 <id>: 前缀）且 passed=false', () => {
+    const m = makeValidManifestWithoutBasePath() as Record<string, unknown>;
+    m.basePath = '.';
+    const spec = (m.specs as Record<string, unknown>[])[0] as Record<string, unknown>;
+    spec.tlaContent = [
+      '---- MODULE L1System ----',
+      'EXTENDS Naturals',
+      'VARIABLES x',
+      'Init == x = 0',
+      "Next == x' = x",
+      'Spec == Init /\\ [][Next]_x',
+      'Inv == x >= 0',
+      'BusinessInvariant == /\\ Inv',
+      '====',
+    ].join('\n');
+    spec.cfgContent = 'INIT Init\nNEXT Next\nINVARIANTS Inv';
+    const result = checkTlaModel(m, 1);
+    expect(
+      result.cfgConsistencyViolations.some((v) => v.startsWith('规格 L1-system:') && v.includes('空转规格')),
+      '空转规格违规应并入 cfg 一致性桶并带规格前缀',
+    ).toBe(true);
+    expect(result.passed).toBe(false);
   });
 });
 

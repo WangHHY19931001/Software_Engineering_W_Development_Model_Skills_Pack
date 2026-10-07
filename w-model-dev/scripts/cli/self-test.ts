@@ -1420,6 +1420,13 @@ const TLA_CASES: TlaCase[] = [
     description:
       'B10c：cfg 含 CONSTRAINT 段（状态空间砍削掩盖死锁/爆炸），应被 CONSTRAINT 禁用校验拦截（批次 7 任务 3）',
   },
+  {
+    file: 'bad-idle-next.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [/空转规格/],
+    description: "B10：NEXT Next 全恒等自赋值（Next == x' = x，状态永不变化），应被空转规格校验拦截（批次 7 任务 7）",
+  },
   // -------------------- 孤儿样本（check-samples-coverage 引用登记） --------------------
   {
     file: 'bad-coverage-uncovered-sd.json',

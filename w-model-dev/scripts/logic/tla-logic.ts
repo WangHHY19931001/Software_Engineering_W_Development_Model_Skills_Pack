@@ -915,6 +915,105 @@ export function checkBusinessInvariants(
   return { passed: violations.length === 0, violations };
 }
 
+// ==================== B10 空转 Next 检测（批次 7 任务 7） ====================
+
+/**
+ * 解析 .cfg 中 NEXT 段声明的 Next 操作符名（INIT/NEXT 形式，段名大小写不敏感）。
+ * SPECIFICATION Spec 形式无 NEXT 段 → 返回 []（Next 由 Spec 间接引用，空转检测不适用）。
+ * 每个NEXT 行取段名后首个 token 为操作符名；裸 NEXT 行（无名字）跳过（由 SANY / TLC 报 cfg 错误）。
+ */
+export function parseCfgNextNames(cfgContent: string): string[] {
+  const names: string[] = [];
+  for (const rawLine of (cfgContent ?? '').split('\n')) {
+    const m = rawLine.trim().match(/^NEXT\s+(\S+)/i);
+    if (m && m[1]) names.push(m[1]);
+  }
+  return names;
+}
+
+/**
+ * B10 空转 Next 检测（批次 7 任务 7，五类退化解之「空转 Next」）。
+ *
+ * 退化解形态：`Next == x' = x`（全恒等自赋值）或 `Next == TRUE / UNCHANGED x`
+ * （无任何状态赋值）——状态永不变化，TLC 永不死锁、不变式恒成立，
+ * 「验证通过」不构成任何行为保证（反模式 #16：TLA+ 占位/简化实现）。
+ *
+ * 判定（Next 定义体归一化后，含传递引用闭包）：
+ *   - 闭包无任何 `var' =` 状态赋值 → violation「空转规格」；
+ *   - 闭包内全部状态赋值均为恒等自赋值（逐顶层合取/析取子句整句匹配 var' = var）
+ *     → violation「空转规格」；
+ *   - 存在任一非恒等赋值 → 通过。保守方向：可疑形态不误报（如 `x' = x + 0` 归一化后
+ *     不等于恒等式，不在此拦截，由 V 评审人工核验）。
+ *
+ * 判定细节：
+ *   - 状态赋值形态计 `var' =`（确定性）与 `var' \in`（非确定性）两种——`Next == x' \in 0..10`
+ *     是真实推进，不属空转。
+ *   - 引用闭包：Next 定义体内引用的标识符若为 .tla 顶层定义（`Name ==`），其定义体递归并入
+ *     （防 `Next == A \/ B` 子动作形态误报）；提取不到定义体的标识符（变量 / 常量 / 内置算子）
+ *     跳过。visited 集防循环引用。
+ *   - cfg 无 NEXT 段（SPECIFICATION Spec 形式）→ 本检测不适用，跳过。
+ *   - cfg 声明的 Next 名在 .tla 无定义 → 跳过（§11 集合一致性 / SANY 另行拦截）。
+ *   - 子句切分按归一化文本的字面 `/\`（合取）与 `\/`（析取）；括号包裹的复合子句不匹配
+ *     恒等式 → 计为非恒等，同样走保守不误报方向。
+ *
+ * @param tlaContent .tla 文件文本内容（定义体提取来源）
+ * @param cfgContent .cfg 文件文本内容（NEXT 段解析来源）
+ * @returns { passed, violations }
+ */
+export function checkIdleNext(tlaContent: string, cfgContent: string): { passed: boolean; violations: string[] } {
+  const violations: string[] = [];
+  const tla = typeof tlaContent === 'string' ? tlaContent : '';
+  const cfg = stripComments(cfgContent ?? '');
+
+  for (const nextName of parseCfgNextNames(cfg)) {
+    // 传递引用闭包（visited 防循环）
+    const visited = new Set<string>([nextName]);
+    const bodies: string[] = [];
+    const queue: string[] = [nextName];
+    while (queue.length > 0) {
+      const name = queue.shift();
+      if (name === undefined) break;
+      const body = extractTlaDefBody(tla, name);
+      if (body == null) continue; // 定义缺失：由 §11 集合一致性 / SANY 拦截，此处跳过
+      bodies.push(normalizeDefBody(body));
+      for (const ident of body.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? []) {
+        if (!visited.has(ident)) {
+          visited.add(ident);
+          queue.push(ident);
+        }
+      }
+    }
+    const closure = normalizeDefBody(bodies.join(' '));
+    if (closure === '') continue; // Next 定义体为空：语法错误由 SANY 拦截
+
+    // 顶层合取/析取子句切分（归一化文本；`/\` 合取与 `\/` 析取字面）
+    const conjuncts = closure
+      .split(/\/\\|\\\//g)
+      .map((s) => s.trim())
+      .filter((s) => s !== '');
+
+    let assignmentCount = 0;
+    let allIdentity = true;
+    for (const c of conjuncts) {
+      // 非赋值子句（UNCHANGED / 纯谓词）不提供推进信息；var' \in 计赋值（非确定性推进）
+      if (!/[A-Za-z_][A-Za-z0-9_]*'\s*(?:=|\\in)/.test(c)) continue;
+      assignmentCount += 1;
+      const m = c.match(/^([A-Za-z_][A-Za-z0-9_]*)'\s*=\s*([A-Za-z_][A-Za-z0-9_]*)$/);
+      if (!(m && m[1] === m[2])) allIdentity = false;
+    }
+    if (assignmentCount === 0) {
+      violations.push(
+        `空转规格：NEXT ${nextName} 定义体（含引用闭包）归一化后无任何 var' = 状态赋值（如 Next == TRUE / UNCHANGED x）：状态永不变化，验证不构成行为（反模式 #16）`,
+      );
+    } else if (allIdentity) {
+      violations.push(
+        `空转规格：NEXT ${nextName} 的全部状态赋值均为恒等自赋值 var' = var（如 Next == x' = x）：状态永不变化，验证不构成行为（反模式 #16）`,
+      );
+    }
+  }
+  return { passed: violations.length === 0, violations };
+}
+
 // ==================== 规格字段结构校验 ====================
 
 /** 校验单个 spec 的字段类型与取值合法性，返回违反消息数组。 */
@@ -1297,6 +1396,11 @@ export function checkTlaModel(manifest: unknown, phase: number): TlaCheckResult 
       // B1 恒真/空洞不变式防御 + B10c CONSTRAINT 禁用（批次 7 任务 3）：违规并入 cfg 一致性桶
       const biz = checkBusinessInvariants(s.tlaContent, s.cfgContent);
       for (const v of biz.violations) {
+        result.cfgConsistencyViolations.push(`规格 ${s.id}: ${v}`);
+      }
+      // B10 空转 Next 检测（批次 7 任务 7）：违规并入 cfg 一致性桶
+      const idle = checkIdleNext(s.tlaContent, s.cfgContent);
+      for (const v of idle.violations) {
         result.cfgConsistencyViolations.push(`规格 ${s.id}: ${v}`);
       }
       const struct = checkCfgStructure(s.cfgContent);
