@@ -570,6 +570,34 @@
       "reason": "Found readFileSync from package \"node:fs\" with non literal argument at index 0"
     },
     {
+      "hash": "f3fe6328651bebdb47a8496b94cc456e197df4a623a6da6e2bb5be17cdff1fe9",
+      "rule_id": "security/detect-object-injection",
+      "file": "w-model-dev/scripts/__tests__/wm-status-logic.test.ts",
+      "line": 211,
+      "reason": "Function Call Object Injection Sink"
+    },
+    {
+      "hash": "5f4c0a1465fb35e52378d0e0df0dbcbf86e93f625bc47d5710865710c953b115",
+      "rule_id": "security/detect-object-injection",
+      "file": "w-model-dev/scripts/__tests__/wm-status-logic.test.ts",
+      "line": 214,
+      "reason": "Function Call Object Injection Sink"
+    },
+    {
+      "hash": "10f3cb08fc1f04b3262a88cc43cc77fb6b4ef37de1af5fe0bb421c949c6db448",
+      "rule_id": "security/detect-object-injection",
+      "file": "w-model-dev/scripts/__tests__/wm-status-logic.test.ts",
+      "line": 220,
+      "reason": "Generic Object Injection Sink"
+    },
+    {
+      "hash": "58800d4b8539024887ee3cab08f6b94539e593684619dc5035cc6343064b4353",
+      "rule_id": "security/detect-object-injection",
+      "file": "w-model-dev/scripts/__tests__/wm-status-logic.test.ts",
+      "line": 221,
+      "reason": "Generic Object Injection Sink"
+    },
+    {
       "hash": "dc57b06db5727eee2182cf7ea2ad50f4963844d63468798fc9eaf29e691205db",
       "rule_id": "security/detect-non-literal-fs-filename",
       "file": "w-model-dev/scripts/__tests__/wm-status.test.ts",

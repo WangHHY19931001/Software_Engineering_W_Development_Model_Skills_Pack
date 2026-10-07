@@ -792,11 +792,6 @@ export function checkCfgStructure(cfgContent: string): {
 
 // ==================== B1 恒真/空洞不变式防御 + B10c CONSTRAINT 禁用（批次 7 任务 3） ====================
 
-/** 转义正则元字符（由定义名构造字面匹配用）。 */
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 /** 定义体归一化（trim + 折叠空白），用于 B1b/B1c 的语法等价比对。 */
 function normalizeDefBody(body: string): string {
   return body.trim().replace(/\s+/g, ' ');
@@ -811,17 +806,21 @@ export function extractTlaDefBody(tlaContent: string, name: string): string | nu
   if (typeof tlaContent !== 'string' || tlaContent === '' || name === '') return null;
   const tla = stripComments(tlaContent);
   const lines = tla.split('\n');
-  const defLineRe = new RegExp(`^[ \\t]*${escapeRegExp(name)}\\s*==(.*)$`);
+  // 静态模式 + 前缀字面量比对，取代「按名字转义后 new RegExp」：名字取自 cfg 解析（已 trim 的非空白
+  // token），「剥行首空白 → 字面量前缀相等 → 余部匹配 `\s*==(.*)`」与转义名正则逐字节等价
+  //（差分验证 0 分歧），且名字中的正则元字符不再参与正则解释。
+  const defBodyRe = /^\s*==(.*)$/;
   const nextDefRe = /^[ \t]*[A-Za-z][A-Za-z0-9_]*\s*==/;
-  // 循环变量用 defIdx/bodyIdx（而非 checkCfgStructure 的 i 命名）：上方「cfg 结构：裸 INVARIANT」
-  // 规则块在 tla-logic-rule-loadbearing.test.ts 的剥离锚点是唯一的 i 循环头文本，本函数任何行
-  //（含注释）都不得复现该字面量。
-  for (let defIdx = 0; defIdx < lines.length; defIdx++) {
-    const m = (lines[defIdx] ?? '').match(defLineRe);
+  // 迭代一律不得复现 checkCfgStructure「cfg 结构：裸 INVARIANT」块的 i 循环头文本：该文本被
+  // tla-logic-rule-loadbearing.test.ts 用作剥离锚点并要求源码内唯一，本函数任何行（含注释）都不得
+  // 复现它。entries()/slice() 既满足该约束，也消除动态下标取值（object-injection 面）。
+  for (const [defIdx, rawLine] of lines.entries()) {
+    const head = rawLine.replace(/^[ \t]*/, '');
+    if (!head.startsWith(name)) continue;
+    const m = head.slice(name.length).match(defBodyRe);
     if (!m) continue;
     const bodyLines: string[] = [m[1] ?? ''];
-    for (let bodyIdx = defIdx + 1; bodyIdx < lines.length; bodyIdx++) {
-      const line = lines[bodyIdx] ?? '';
+    for (const line of lines.slice(defIdx + 1)) {
       if (/^[ \t]*====/.test(line)) break; // 模块终止符 ====
       if (nextDefRe.test(line)) break; // 下一顶层定义
       bodyLines.push(line);
@@ -862,12 +861,12 @@ export function checkBusinessInvariants(
 
   // B10c：cfg 出现 CONSTRAINT/CONSTRAINTS 段名 → 违规
   const cfgLines = cfg.split('\n');
-  for (let i = 0; i < cfgLines.length; i++) {
-    const line = (cfgLines[i] ?? '').trim();
+  for (const [lineIdx, rawLine] of cfgLines.entries()) {
+    const line = rawLine.trim();
     const m = line.match(/^(CONSTRAINT|CONSTRAINTS)\b/i);
     if (m && m[1]) {
       violations.push(
-        `.cfg 第 ${i + 1} 行含 ${m[1].toUpperCase()} 段（CONSTRAINT/CONSTRAINTS 禁用）：不得用约束砍状态空间掩盖死锁/爆炸，正道是规格拆解（反模式 #16 家族）`,
+        `.cfg 第 ${lineIdx + 1} 行含 ${m[1].toUpperCase()} 段（CONSTRAINT/CONSTRAINTS 禁用）：不得用约束砍状态空间掩盖死锁/爆炸，正道是规格拆解（反模式 #16 家族）`,
       );
     }
   }

@@ -6,16 +6,17 @@
  * 设计：docs/superpowers/specs/2026-08-05-round31-wm-status-metrics-design.md §3.1
  */
 
-import { PROJECT_STATUS_TO_PHASE, PROJECT_STATUSES, type ProjectStatus } from '../lib/constants.js';
+import { PROJECT_STATUS_TO_PHASE, type ProjectStatus } from '../lib/constants.js';
 
 import { computeRtmTraceCoverage } from './gate-logic.js';
 
 /**
  * 9 态 → 阶段号（A14 常数统一：派生自 lib/constants PROJECT_STATUS_TO_PHASE 的机器口径 phase；
  * 项目完成=9，展示口径 displayPhase/completedPhases 封顶 8 由 constants 单点承载）。
+ * 键集/键序直接取 SOT 记录自身的 entries（受控迭代，无动态下标取值面；顺序即 record 字面量顺序）。
  */
 export const STATUS_TO_PHASE: Record<string, number> = Object.fromEntries(
-  PROJECT_STATUSES.map((s) => [s, PROJECT_STATUS_TO_PHASE[s].phase]),
+  Object.entries(PROJECT_STATUS_TO_PHASE).map(([status, caliber]) => [status, caliber.phase]),
 );
 
 /** 每状态的确定性下一步建议（含阶段产物要点与门禁提示；键集 = PROJECT_STATUSES 9 态） */
