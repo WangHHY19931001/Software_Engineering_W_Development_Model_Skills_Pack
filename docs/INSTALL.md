@@ -251,7 +251,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 43.0.1
+version: 43.1.0
 # description 不在此处复制：SKILL.md 的 frontmatter 是其唯一权威来源
 # （本节曾逐字镜像该字段，已发生过一次漂移，故改为指向而非复述）
 ```
@@ -382,6 +382,11 @@ Skill 资产本身零依赖（纯 Markdown）；根 `package.json` 仅用于支�
 - [`docs/changes/archive/2026-07-26-round15-end-to-end-test/`](./changes/archive/2026-07-26-round15-end-to-end-test/)
 
 调测明细（各轮指标、缺陷清单 L1~L4 沉淀、门禁验证数据）见各归档目录 README 与 [CHANGELOG.md](../CHANGELOG.md)。
+
+**Q：Windows 上全局 `core.autocrlf=true` 的存量 clone，self-test 出现 R19 / verifier 登记哈希假红怎么办？**
+
+- 43.0.1 起仓库增补 `.gitattributes`（`* text=auto eol=lf`）强制 LF 落盘，但**新属性不会自动重写既有工作区**；存量 clone 需显式归一：在仓库根执行 `git add --renormalize . && git checkout -- .`（前者按新属性重算索引 blob，后者把工作区文件重物化为 LF）。
+- 归一后 `npm run self-test` 应恢复全绿；若仍红，核对 `git config core.autocrlf`（仓库级 `false` 亦可）与 `.gitattributes` 是否被本地配置覆盖。43.1.0 起 verifier 登记哈希改为「归一化内容（CRLF→LF）的 SHA-256」，机制侧对 checkout 行尾配置免疫。
 
 ## codegraph CLI 依赖 + superpowers 方法论检测
 
