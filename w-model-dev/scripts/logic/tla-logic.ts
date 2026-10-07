@@ -43,12 +43,15 @@ export interface TlaSpec {
   variableCombination: number;
   decompositionDecision: DecompositionDecision;
   /**
-   * B9（批次 7）：variableCombination 的推导注记（可选）。
+   * B9（批次 7）+ I5（终审修复）：variableCombination 的推导注记（可选）。
    * variableCombination > CONSIDER_SPLIT_THRESHOLD(1000) 且保留未拆（kept-below-threshold）时必填：
-   * Πvariables[].cardinality 必须等于声明的 variableCombination 字段值
-   * （缺注记或乘积不符 → checkDecomposition violation；≤1000 不要求）。
+   * Πvariables[].cardinality 必须等于声明的 variableCombination 字段值，cardinality 须为 ≥1 的整数，
+   * 且 variables[].name 集合须覆盖 .tla `VARIABLES` 声明的全部状态变量（提取得时）
+   * （缺注记 / 基数非法 / 乘积不符 / 缺变量名 → checkDecomposition violation；≤1000 不要求）。
    */
-  variableCombinationBasis?: { variables: Array<{ name: string; cardinality: number }> };
+  variableCombinationBasis?: {
+    variables: Array<{ name: string; cardinality: number }>;
+  };
   syntaxChecked: boolean;
   tlcChecked: boolean;
   deadlockFree: boolean;
@@ -590,6 +593,48 @@ export function checkHierarchy(specs: TlaSpec[], options: HierarchyOptions = {})
 
 // ==================== 拆解决策校验 ====================
 
+/** TLA+ 块注释 `(* … *)` 与行注释 `\* …` 剥离（I5：只扫声明面，注释里的示例声明不计入） */
+function stripTlaComments(tlaContent: string): string {
+  return tlaContent.replace(/\(\*[\s\S]*?\*\)/g, ' ').replace(/\\\*[^\n]*/g, ' ');
+}
+
+/**
+ * 从 .tla 文本提取 `VARIABLES` 声明的状态变量名集合（I5 终审修复，B9 schema 承诺落地）。
+ *
+ * - 声明面：`VARIABLES x, y` / `VARIABLE x`（关键字须位于行首，允许前导空白）；
+ *   续行形态（上一行以 `,` 结尾）一并收集。
+ * - 剥离块注释与行注释后再扫描（注释中的声明不计入）。
+ * - **提取失败返回 undefined**（无 `VARIABLES` 行 / 未取到任何合法标识符 / 文本为空）——
+ *   调用方据此跳过名集合比对，不把「解析不到」误红成 violation（fail-open 方向保守）。
+ * - 标识符判据 `[A-Za-z_][A-Za-z0-9_]*`；`VARIABLES` 后的其它记号（如换行后的定义体）不收集。
+ */
+export function extractTlaVariableNames(tlaContent: string): Set<string> | undefined {
+  if (typeof tlaContent !== 'string' || tlaContent.trim() === '') return undefined;
+  const stripped = stripTlaComments(tlaContent);
+  const names = new Set<string>();
+  const lines = stripped.split('\n');
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index] ?? '';
+    const head = /^[ \t]*(?:VARIABLES|VARIABLE)\b/.exec(line);
+    if (!head) {
+      index += 1;
+      continue;
+    }
+    let declaration = line.slice(head[0].length);
+    // 续行：上一段以 `,` 结尾时把下一行并进来（TLA+ 允许多行 VARIABLES 列表）
+    while (declaration.trimEnd().endsWith(',') && index + 1 < lines.length) {
+      index += 1;
+      declaration += ` ${lines[index] ?? ''}`;
+    }
+    for (const token of declaration.split(/[,\s]+/)) {
+      if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(token)) names.add(token);
+    }
+    index += 1;
+  }
+  return names.size > 0 ? names : undefined;
+}
+
 /**
  * 校验拆解决策（设计文档 §3.1 步骤 4 / §1.1）：
  *   - variableCombination > MUST_SPLIT_THRESHOLD(10000) 必须 decompositionDecision='split-done'，
@@ -600,11 +645,16 @@ export function checkHierarchy(specs: TlaSpec[], options: HierarchyOptions = {})
  *     时必须附推导注记 variableCombinationBasis（各变量 {name, cardinality}），且
  *     Πcardinality === 声明的 variableCombination 字段值；缺注记 / 基数非法 / 乘积不符均为 violation。
  *     ≤1000 不要求。
+ *   - I5（终审修复）：basis 名集合须**覆盖** .tla `VARIABLES` 声明的全部状态变量（schema 承诺落地）；
+ *     名集合比对仅在能提取到 VARIABLES 时启用（提取失败/无该行 → 跳过不误红）；基数为整数（schema integer）。
  *
  * @param specs 待校验的规格数组
  * @returns { violations, warnings }
  */
-export function checkDecomposition(specs: TlaSpec[]): { violations: string[]; warnings: string[] } {
+export function checkDecomposition(specs: TlaSpec[]): {
+  violations: string[];
+  warnings: string[];
+} {
   const violations: string[] = [];
   const warnings: string[] = [];
   if (!Array.isArray(specs)) {
@@ -631,11 +681,11 @@ export function checkDecomposition(specs: TlaSpec[]): { violations: string[]; wa
         );
       } else {
         const invalid = variables.filter(
-          (v) => typeof v?.cardinality !== 'number' || !Number.isFinite(v.cardinality) || v.cardinality < 1,
+          (v) => typeof v?.cardinality !== 'number' || !Number.isInteger(v.cardinality) || v.cardinality < 1,
         );
         if (invalid.length > 0) {
           violations.push(
-            `拆解校验失败：规格 ${s.id} variableCombinationBasis.variables 含非法 cardinality（须为 ≥1 的有限数，实际 ${invalid
+            `拆解校验失败：规格 ${s.id} variableCombinationBasis.variables 含非法 cardinality（须为 ≥1 的整数，实际 ${invalid
               .map((v) => JSON.stringify(v?.cardinality))
               .join(', ')}）`,
           );
@@ -645,6 +695,17 @@ export function checkDecomposition(specs: TlaSpec[]): { violations: string[]; wa
             violations.push(
               `拆解校验失败：规格 ${s.id} variableCombinationBasis 推导不符：Πcardinality=${product} ≠ 声明 variableCombination=${combo}（>1000 保留未拆须附推导注记且乘积与声明值一致）`,
             );
+          }
+          // I5：名集合覆盖 .tla 声明的全部状态变量（提取失败 → undefined → 跳过，不误红）
+          const declaredNames = typeof s.tlaContent === 'string' ? extractTlaVariableNames(s.tlaContent) : undefined;
+          if (declaredNames !== undefined) {
+            const basisNames = new Set(variables.map((v) => String(v?.name)));
+            const missing = [...declaredNames].filter((name) => !basisNames.has(name));
+            if (missing.length > 0) {
+              violations.push(
+                `拆解校验失败：规格 ${s.id} variableCombinationBasis.variables 未覆盖 .tla 声明的全部状态变量（缺 ${missing.join(', ')}；basis 名集合须 ⊇ VARIABLES 声明集）`,
+              );
+            }
           }
         }
       }
@@ -1322,7 +1383,12 @@ export function checkTlaModel(manifest: unknown, phase: number): TlaCheckResult 
       const notRunReason = `TLC 未执行（SANY 语法检查失败）：${sanyDetail}`;
       result.syntaxErrors.push(sanyDetail);
       result.violations.push(notRunReason);
-      result.specs.push({ specId: s.id, tlaPath: s.tlaPath, tlcStatus: 'notRun', reasons: [notRunReason] });
+      result.specs.push({
+        specId: s.id,
+        tlaPath: s.tlaPath,
+        tlcStatus: 'notRun',
+        reasons: [notRunReason],
+      });
       continue;
     }
     const flagReasons: string[] = [];
@@ -1363,7 +1429,11 @@ export function checkTlaModel(manifest: unknown, phase: number): TlaCheckResult 
       .filter((s) => typeof (s as TlaSpec).tlaPath === 'string' && filteredOutPaths.has((s as TlaSpec).tlaPath))
       .map((s) => [(s as TlaSpec).tlaPath, (s as TlaSpec).phase] as const),
   );
-  result.hierarchyViolations = checkHierarchy(checkedSpecs, { filteredOutPaths, fullPhaseByPath, phase });
+  result.hierarchyViolations = checkHierarchy(checkedSpecs, {
+    filteredOutPaths,
+    fullPhaseByPath,
+    phase,
+  });
 
   // 5. 拆解决策（警告不导致失败，仅取 violations）
   const decomp = checkDecomposition(checkedSpecs);

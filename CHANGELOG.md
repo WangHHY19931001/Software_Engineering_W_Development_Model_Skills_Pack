@@ -32,7 +32,7 @@
 ### Feat（证据显式化与推导注记）
 
 - **D4 L1 豁免显式 SKIPPED 证据（T6，B7）**：`BddCheckResult` 新增 `tlaEquivalenceSkipped: string[]`（逐条 `[D4:...] SKIPPED(level=1)：…`），`check-bdd-model.ts` 人类报告输出 skipped 段（非空才输出）；证据不进 `dims.tlaEquivalence`/`allViolations`，不影响 `passed`/`exitCode`——「零输出 → 显式证据」与豁免的 pass 语义并行。
-- **variableCombination 推导注记（T6，B9）**：`tla-manifest.schema.json` spec 层新增可选 `variableCombinationBasis`（`variables[].name`/`cardinality`，cardinality ≥1，`additionalProperties:false`）；`checkDecomposition` 在 `combo > 1000` 且 kept-below-threshold 分支要求推导注记——缺失 / 基数非法 / 乘积不符 → violation；既有「拆解宣告」与 `MUST_SPLIT`（>2000）语义不变。
+- **variableCombination 推导注记（T6，B9）**：`tla-manifest.schema.json` spec 层新增可选 `variableCombinationBasis`（`variables[].name`/`cardinality`，cardinality ≥1，`additionalProperties:false`）；`checkDecomposition` 在 `combo > 1000` 且 kept-below-threshold 分支要求推导注记——缺失 / 基数非法 / 乘积不符 → violation；既有「拆解宣告」与 `MUST_SPLIT`（>2000）语义不变。**终审修复（I5）**：schema 承诺的两处补实现——①`cardinality` 由 `number` 收紧为 **`integer`**（逻辑侧同步 `Number.isInteger`，小数基数 schema/校验双侧拒绝）；②名集合须**覆盖** `.tla` `VARIABLES` 声明的全部状态变量（新增 `extractTlaVariableNames`，剥块注释/行注释、支持多行续行；提取失败/无 `VARIABLES` 行 → 跳过名比对不误红）。
 
 ### Docs
 

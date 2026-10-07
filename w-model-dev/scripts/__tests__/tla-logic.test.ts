@@ -527,7 +527,11 @@ describe('A7 SANY 失败 → 报告输出 notRun 单一事实，不复述预置�
 
   it('真跑失败（deadlockFree=false / invariantsHold=false / stateExplosion=true）→ tlcStatus=failed 且 reasons 与逐类违反同文案', () => {
     const result = checkTlaModel(
-      makeSingleSpecManifest({ deadlockFree: false, invariantsHold: false, stateExplosion: true }),
+      makeSingleSpecManifest({
+        deadlockFree: false,
+        invariantsHold: false,
+        stateExplosion: true,
+      }),
       1,
     );
     expect(result.specs[0]?.tlcStatus).toBe('failed');
@@ -1021,9 +1025,120 @@ describe('B9 variableCombination 推导注记', () => {
     // ≤1000 不要求推导注记
     expect(checkDecomposition([makeKeptSpec(1000)]).violations).toEqual([]);
     // >10000 非 split-done 仍走原 MUST_SPLIT violation（不受 B9 影响）
-    const mustSplit = { ...makeKeptSpec(20000), id: 'L2-huge', decompositionDecision: 'consider-split' as const };
+    const mustSplit = {
+      ...makeKeptSpec(20000),
+      id: 'L2-huge',
+      decompositionDecision: 'consider-split' as const,
+    };
     expect(
       checkDecomposition([mustSplit]).violations.some((v) => v.includes("须 decompositionDecision='split-done'")),
     ).toBe(true);
+  });
+
+  // ==================== I5（终审修复波）：basis 名集合覆盖 .tla VARIABLES + cardinality 整数 ====================
+
+  it('I5：basis 缺 .tla VARIABLES 声明变量 → violation（schema 承诺「须覆盖全部状态变量」落地）', () => {
+    const spec = makeKeptSpec(2000, {
+      variables: [
+        { name: 'user', cardinality: 40 },
+        { name: 'session', cardinality: 50 },
+      ],
+    });
+    spec.tlaContent = [
+      '---- MODULE L2_auth ----',
+      'EXTENDS Naturals',
+      'VARIABLES user, session, token_state',
+      '====',
+    ].join('\n');
+    const result = checkDecomposition([spec]);
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]).toContain('未覆盖 .tla 声明的全部状态变量');
+    expect(result.violations[0]).toContain('token_state');
+  });
+
+  it('I5：名集合覆盖齐 → 零违规（块注释/行注释中的声明不计入；多行续行形态正确收集）', () => {
+    const spec = makeKeptSpec(2000, {
+      variables: [
+        { name: 'user', cardinality: 40 },
+        { name: 'session', cardinality: 50 },
+      ],
+    });
+    spec.tlaContent = [
+      '---- MODULE L2_auth ----',
+      '(*',
+      '  VARIABLES phantom_only_in_block_comment',
+      '*)',
+      '\\* VARIABLES ghost_only_in_line_comment',
+      'VARIABLES user,',
+      '        session',
+      '====',
+    ].join('\n');
+    expect(checkDecomposition([spec]).violations).toEqual([]);
+  });
+
+  it('I5：无 VARIABLES 行（提取失败）→ 跳过名比对不误红', () => {
+    const spec = makeKeptSpec(2000, {
+      variables: [
+        { name: 'whatever', cardinality: 40 },
+        { name: 'other', cardinality: 50 },
+      ],
+    });
+    spec.tlaContent = '---- MODULE L2_auth ----\nEXTENDS Naturals\n====\n';
+    expect(checkDecomposition([spec]).violations).toEqual([]);
+  });
+
+  it('I5：cardinality 小数 → violation（须为 ≥1 的整数，与 schema integer 同口径）', () => {
+    const result = checkDecomposition([
+      makeKeptSpec(2000, {
+        variables: [
+          { name: 'user', cardinality: 40.5 },
+          { name: 'session', cardinality: 50 },
+        ],
+      }),
+    ]);
+    expect(result.violations.some((v) => v.includes('非法 cardinality') && v.includes('整数'))).toBe(true);
+  });
+
+  it('I5：schema 侧 cardinality 为 integer —— 小数基数在 manifest schema 层即被拒', () => {
+    const manifest = {
+      version: 1,
+      currentPhase: 1,
+      basePath: '.',
+      tools: { jarPath: 'tla2tools.jar', javaMinVersion: 11 },
+      specs: [
+        {
+          id: 'L1_Test',
+          level: 'L1',
+          phase: 1,
+          system: 'test',
+          requirementIds: ['REQ-001'],
+          designRef: 'docs/requirement-spec.md:§1',
+          tlaPath: 'L1_Test.tla',
+          cfgPath: 'L1_Test.cfg',
+          parent: null,
+          siblings: [],
+          children: [],
+          variableCombination: 2000,
+          decompositionDecision: 'kept-below-threshold',
+          variableCombinationBasis: {
+            variables: [
+              { name: 'user', cardinality: 40.5 },
+              { name: 'session', cardinality: 50 },
+            ],
+          },
+          syntaxChecked: true,
+          tlcChecked: true,
+          deadlockFree: true,
+          invariantsHold: true,
+          stateExplosion: false,
+        },
+      ],
+    } as any;
+    const result = checkTlaModel(manifest, 1);
+    expect(
+      result.violations.some((v) => v.startsWith('[schema]') && v.includes('cardinality')),
+      `应报 [schema] 且点名 cardinality，实际：${result.violations.join('; ')}`,
+    ).toBe(true);
+    expect(result.passed).toBe(false);
   });
 });
