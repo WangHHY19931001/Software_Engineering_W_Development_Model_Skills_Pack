@@ -8,24 +8,28 @@
  * onExceed/killSwitch 合法性与触发状态。
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl> --phase=<N>]（阶段门调用必带：R6/R5-b 用量校验的接线判据）
+ *   npx tsx w-model-dev/scripts/cli/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl> --phase=<N>]（阶段门调用必带：R6/R5-b/R7 用量校验的接线判据）
  *
  * 参数：
  *   budget.json           budget.json 文件路径
  *   --project=<path>      project.json 路径（可选，用于读取 projectUpdatedAt 做 R1 时效性校验；读取侧经 project.schema.json 校验，缺失/非法/不符 schema → exit 2）
- *   --run-log=<path>      run-log.jsonl 路径（可选，用于统计返工次数做 R5 触发检测 + 累计 tokens 做 R6 用量实效校验）；
- *                         阶段门调用必带 --run-log 与 --phase=N（R6/R5-b 用量校验的接线判据）
+ *   --run-log=<path>      run-log.jsonl 路径（可选，用于统计返工次数做 R5 触发检测 + 累计 tokens 做 R6 用量实效校验
+ *                         + 按阶段聚合 subagentSpawns 做 R7 子代理分派数实效校验）；
+ *                         阶段门调用必带 --run-log 与 --phase=N（R6/R5-b/R7 用量校验的接线判据）
  *                         返工口径（D-4a）见同文件 countReworks；用量口径（D-4b：Σtokens 累计、
  *                         未接线可见化诊断、上界口径、疑似重复归账分组键与键守卫、parentDispatchId
  *                         归账精确化）见同文件 sumTokens / countSuspectedDuplicateGroups 与
- *                         w-model-dev/references/data-models.md「用量实效校验」段（R6）——对外口径以该段为准
+ *                         w-model-dev/references/data-models.md「用量实效校验」段（R6）——对外口径以该段为准；
+ *                         分派数口径（决策 5：ΣsubagentSpawns 按阶段、estimated=true 记录不计入、
+ *                         未配置字段/未提供 --phase 的跳过可见化）见同文件 sumSubagentSpawns 与
+ *                         w-model-dev/references/data-models.md「子代理分派数实效校验（R7）」段
  *   --phase=N             当前阶段 1-8（可选，用于过滤 run-log 中本阶段的返工/用量记录；支持 --phase=N 与 --phase N 两形态，重复传参即错）
  *   --json                机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse，含 warnings 非阻断警告字段）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 校验规则（详见 w-model-dev/references/data-models.md §成本预算模型）：
  *   R1 时效性 · R3 onExceed 合法 · R4-A 多角度 R token 预算 · R5 killSwitch 触发检测（返工/TLA+）
- *   · R5-b 用量 burnRate 告警（D-4b）· R6 用量实效（D-4b）
- *   （R5-b / R6 的判据细节与上界口径的权威指针见上方 --run-log 参数说明，此处不重复）
+ *   · R5-b 用量 burnRate 告警（D-4b）· R6 用量实效（D-4b）· R7 子代理分派数实效（决策 5，43.2.0）
+ *   （R5-b / R6 / R7 的判据细节、上界与聚合口径的权威指针见上方 --run-log 参数说明，此处不重复）
  *
  * 退出码：
  *   0  校验通过
@@ -51,7 +55,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
-import { checkBudget, type BudgetConfig, type TokenUsage } from '../logic/budget-logic.js';
+import { checkBudget, type BudgetConfig, type SpawnUsage, type TokenUsage } from '../logic/budget-logic.js';
 import { parsePhaseArg } from '../lib/parse-phase.js';
 import { readJsonOrExit, readJsonlOptional } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
@@ -167,6 +171,37 @@ export function sumTokens(entries: unknown[], phase: number | undefined): TokenU
   return { phase: phaseTokens, total: totalTokens };
 }
 
+// ==================== run-log 子代理分派数聚合（R7，决策 5） ====================
+
+/**
+ * 聚合 run-log.jsonl 的子代理分派数（R7 的输入，决策 5，43.2.0）。
+ *
+ * 计入判据：`typeof subagentSpawns === 'number' && Number.isFinite(subagentSpawns) && subagentSpawns >= 0`
+ * （与 sumTokens 同款坏值剔除：坏值若不剔除会让 Σ 变 NaN，而 `NaN > max` 恒为 false
+ * ⇒ R7 静默永不触发，与 D-4a「护栏失灵」同型）。
+ *
+ * **`estimated === true` 的记录不计入**（决策 5 口径）：该形态已被 `check-run-log.ts` R2
+ * 判 blocking（43.0.0 A5 违规化），估算值不得占用分派额度；`estimated` 缺省（legacy）或
+ * `false` 的记录照常计入。口径成文见 data-models.md「子代理分派数实效校验（R7）」段。
+ *
+ * phase 为**必传**（R7 是「按阶段」口径，schema 只有 perPhase.maxSubagentSpawns，无全量对照），
+ * 只累计 `phase === N` 的记录——不存在 sumTokens 那种「未提供 phase 视同全量」的退路，
+ * 未提供 `--phase` 由调用方跳过 R7 并出非阻断诊断（按阶段聚合口径无定义）。
+ *
+ * 容错：文件读取与逐行解析由 readJsonlOrExit / readJsonlOptional 负责（坏行 warn+skip），此处仅累计。
+ */
+export function sumSubagentSpawns(entries: unknown[], phase: number): SpawnUsage {
+  let phaseSpawns = 0;
+  for (const entry of entries) {
+    const e = entry as { phase?: number; subagentSpawns?: unknown; estimated?: unknown };
+    if (typeof e.subagentSpawns !== 'number' || !Number.isFinite(e.subagentSpawns) || e.subagentSpawns < 0) continue;
+    if (e.estimated === true) continue;
+    if (e.phase !== phase) continue;
+    phaseSpawns += e.subagentSpawns;
+  }
+  return { phase: phaseSpawns };
+}
+
 // ==================== 疑似重复归账统计（N-6 上界口径诊断） ====================
 
 /**
@@ -239,7 +274,7 @@ async function main(): Promise<void> {
       rule: 'P0-1',
       message: '参数缺失 <budget.json>',
       detail:
-        '用法: npx tsx w-model-dev/scripts/cli/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl> --phase=<N>]（阶段门调用必带：R6/R5-b 用量校验的接线判据）',
+        '用法: npx tsx w-model-dev/scripts/cli/check-budget.ts <budget.json> [--project=<project.json>] [--run-log=<run-log.jsonl> --phase=<N>]（阶段门调用必带：R6/R5-b/R7 用量校验的接线判据）',
       exitCode: 2,
     });
     return;
@@ -270,9 +305,15 @@ async function main(): Promise<void> {
   let reworkCount: number | undefined;
   let tlaReworkCount: number | undefined;
   let tokensUsed: TokenUsage | undefined;
+  // R7（决策 5）：ΣsubagentSpawns 按阶段聚合；--phase 缺席时保持 undefined（按阶段口径无定义，
+  // 见下方可见化警告），不冒充全量。
+  let spawnsUsed: SpawnUsage | undefined;
   // 只有文件确实存在（fs.access 成功即置位，空文件同样算存在）才把「Σtokens=0」解释为「无用量字段」；读取失败时
   // 已由下方 warning 说明跳过原因，不再追加 R6 未生效警告（避免把「没读到」说成「没用量」）
   let runLogReadable = false;
+  // run-log 逐行解析成功（与上面「文件存在」区分）：R7 的跳过归因必须落在「未提供 --phase」上而非读取失败，
+  // 否则会把「没读到」说成「没给 --phase」（与 R6 的措辞纪律同款）
+  let runLogParsed = false;
   // 疑似重复归账组数（N-6）：只在 run-log 确实读到内容时统计；未提供/读取失败时保持 0
   let duplicateGroupCount = 0;
   if (runLogFile) {
@@ -284,17 +325,20 @@ async function main(): Promise<void> {
         runLogReadable = true;
       } catch (err) {
         if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-        console.error(`⚠ --run-log 文件读取失败，跳过 R5/R6/R5-b 触发检测: ${runLogAbs}（ENOENT）`);
+        console.error(`⚠ --run-log 文件读取失败，跳过 R5/R6/R5-b/R7 触发检测: ${runLogAbs}（ENOENT）`);
       }
       const entries = await readJsonlOptional(runLogAbs, 'run-log');
+      runLogParsed = true;
       const stats = countReworks(entries, phase);
       reworkCount = stats.reworkCount;
       tlaReworkCount = stats.tlaReworkCount;
       tokensUsed = sumTokens(entries, phase);
+      // R7：按 --phase 聚合（estimated=true 记录不计入）；未提供 --phase 时不聚合（见下方警告）
+      if (phase !== undefined) spawnsUsed = sumSubagentSpawns(entries, phase);
       duplicateGroupCount = countSuspectedDuplicateGroups(entries);
     } catch (err) {
       const e = err as NodeJS.ErrnoException;
-      console.error(`⚠ --run-log 文件读取失败，跳过 R5/R6/R5-b 触发检测: ${runLogAbs}（${e.code ?? e.message}）`);
+      console.error(`⚠ --run-log 文件读取失败，跳过 R5/R6/R5-b/R7 触发检测: ${runLogAbs}（${e.code ?? e.message}）`);
     }
   }
 
@@ -305,6 +349,7 @@ async function main(): Promise<void> {
     reworkCount,
     tlaReworkCount,
     tokensUsed,
+    spawnsUsed,
   });
 
   // R6 可见性（D-4b，与 R1/R4-A 的「跳过不等于通过」同口径）：--run-log 文件存在但 Σtokens=0
@@ -313,6 +358,13 @@ async function main(): Promise<void> {
   // --run-log 读取失败时也不追加（上一条 warning 已说明跳过原因，避免把「没读到」说成「没用量」）。
   if (runLogReadable && tokensUsed && tokensUsed.total === 0) {
     result.warnings.push('R6 未生效：--run-log 无有效 tokens 用量（Σtokens=0），用量实效校验无实际约束力');
+  }
+
+  // R7 可见性（决策 5，与 R6 同口径）：--run-log 已解析成功但未提供 --phase → 「按阶段」聚合口径无定义，
+  // R7 整体跳过——显式警告而非静默（跳过不等于通过）。读取失败分支不追加（runLogParsed=false：
+  // 上一条 warning 已说明跳过原因，避免把「没读到」说成「没给 --phase」）。
+  if (runLogParsed && spawnsUsed === undefined) {
+    result.warnings.push('R7 未校验：未提供 --phase（子代理分派数按阶段聚合无法进行，跳过不等于通过）');
   }
 
   // 非阻断诊断（D-5② 未接线可见化 + N-6 上界口径）：不影响 exit code，但须可见。
@@ -325,6 +377,10 @@ async function main(): Promise<void> {
   if (!runLogFile) {
     diagnostics.push(
       'R6/R5-b 未生效（未提供 run-log）：用量实效（Σtokens vs 上限）与 burnRate 告警整体跳过，跳过不等于通过',
+    );
+    // R7 独立一条（不改上一条既有文案：其字符串被测试与文档引用）：子代理分派数校验同样跳过
+    diagnostics.push(
+      'R7 未生效（未提供 run-log）：子代理分派数实效（ΣsubagentSpawns vs perPhase.maxSubagentSpawns）整体跳过，跳过不等于通过',
     );
   }
   if (duplicateGroupCount > 0) {
@@ -364,7 +420,7 @@ async function main(): Promise<void> {
   console.log(`onExceed      : ${budget.onExceed ?? '未设置'}`);
   console.log(`--project     : ${projectFile ? (projectUpdatedAt ?? '已读取但无 updatedAt') : '未提供'}`);
   console.log(
-    `--run-log     : ${runLogFile ? `${runLogFile}（rework=${reworkCount ?? 'N/A'}, tla-rework=${tlaReworkCount ?? 'N/A'}, tokens=阶段/全量 ${tokensUsed ? `${tokensUsed.phase}/${tokensUsed.total}` : 'N/A'}）` : '未提供'}`,
+    `--run-log     : ${runLogFile ? `${runLogFile}（rework=${reworkCount ?? 'N/A'}, tla-rework=${tlaReworkCount ?? 'N/A'}, tokens=阶段/全量 ${tokensUsed ? `${tokensUsed.phase}/${tokensUsed.total}` : 'N/A'}, spawns=阶段 ${spawnsUsed ? spawnsUsed.phase : 'N/A'}）` : '未提供'}`,
   );
   console.log(`--phase       : ${phase ?? '未提供'}`);
   console.log(`校验结果      : ${result.passed ? '✓ 通过' : '✗ 未通过'}`);

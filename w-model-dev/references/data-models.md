@@ -313,10 +313,12 @@ interface BudgetConfig {
   createdAt: string;
   updatedAt: string;
 
-  /** 每阶段 token 预算上限 */
+  /** 每阶段 token 预算上限 + 子代理分派数上限 */
   perPhase: {
     /** 单阶段累计 token 上限；超过触发 onExceed */
     maxTokens: number;
+    /** 单阶段子代理分派次数上限（S+V+G+A 合计，默认 30，43.2.0 回归并可省略）；阶段 ΣsubagentSpawns > 此值 → check-budget R7 blocking（estimated=true 记录不计入，口径见「子代理分派数实效校验（R7）」条） */
+    maxSubagentSpawns?: number;
   };
 
   /** 项目级全局预算 */
@@ -353,7 +355,7 @@ interface BudgetConfig {
 }
 ```
 
-> **43.0.0 A5 死字段退役**：`perPhase.maxSubagentSpawns` / `perPhase.maxReworkRounds` / `project.maxTokensPerSession` 三个零消费死字段已删除（审计证实无任何门禁脚本消费）；旧数据携带这些字段将被 `additionalProperties:false` 拒绝（毁弃存量，不兼容）。阶段返工轮次上限由 `killSwitch`（`consecutiveReworks`，D-4a 口径）与分层反馈回路（L0-L4）承载，不再以预算字段登记。
+> **43.0.0 A5 死字段退役 → 43.2.0 `maxSubagentSpawns` 回归（决策 5）**：`perPhase.maxReworkRounds` / `project.maxTokensPerSession` 两个零消费死字段保持退役（旧数据携带仍被 `additionalProperties:false` 拒绝，毁弃存量，不兼容；阶段返工轮次上限由 `killSwitch.consecutiveReworks`（D-4a 口径）与分层反馈回路（L0-L4）承载）。`perPhase.maxSubagentSpawns` 曾于 A5（`eacc8d6a`）按零消费死字段删除，43.2.0 因 `check-budget.ts` R7 消费之而**回归**——来龙去脉：删除理由是「无任何门禁消费」，本版使该约束成真，故字段回归有据；回归后为**可选字段**（缺字段不非法：R7 跳过并出非阻断诊断，见下条），旧数据携带该字段不再被拒绝。
 
 **默认值**（`/wm analyze` 首次初始化时写入，用户可改）：
 
@@ -364,7 +366,8 @@ interface BudgetConfig {
   "createdAt": "<now>",
   "updatedAt": "<now>",
   "perPhase": {
-    "maxTokens": 500000
+    "maxTokens": 500000,
+    "maxSubagentSpawns": 30
   },
   "project": {
     "maxTokensTotal": 4000000
@@ -393,6 +396,7 @@ interface BudgetConfig {
 - `rootcauseParallelBudget` 为多角度 R 的 token 预算配置（字段名保留向后兼容，实际含义为「每轮多角度 R 的 token 预算」，不论并行/串行均累计）。由 [`check-budget.ts`](../scripts/cli/check-budget.ts) R4-A 规则校验：每轮 persona 数 ≤ `maxPersonasPerRound`、每个 persona tokens ≤ `maxTokensPerPersona`、每轮总 tokens ≤ `maxTotalTokensPerRound`（串行分派时累计校验，超限触发 killSwitch）。未配置该字段时不校验（向后兼容）。
 - **用量实效校验（R6，D-4b）**：预算配置合法 ≠ 用量在预算内。`check-budget.ts --run-log=` 从 `run-log.jsonl` 累计 `tokens`（Σtokens(阶段) 与 Σtokens(全量)；只累计有限非负数的 `tokens` 字段，坏值不计入），再与上限比对：Σtokens(阶段) > `perPhase.maxTokens` **或** Σtokens(全量) > `project.maxTokensTotal` → **blocking（退出码 1）**，违规消息以 `R6：` 开头并附超限占比；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` 时另报 killSwitch 用量告警（**R5-b**，消息以 `R5-b：` 开头，与 R5 的返工/TLA 触发文案区分——R5 既有文案「killSwitch 应触发（返工 N >= M）但未告警」逐字不变）。未提供 `--run-log`（即无用量输入）时 R6/R5-b 整体跳过（**判据与退出码不变**），但输出非阻断诊断「R6/R5-b 未生效（未提供 run-log）」——省略该参数不再等于静默跳过（D-5② 未接线可见化；live run 实测 9/9 次调用均未传该参数，R6/R5-b 全程静默，故权威调用表把 `--run-log` 定为必带，见 `operational-recovery.md`「调用时机」表）；`--run-log` 文件存在且 Σtokens=0（无 `tokens` 记录）时输出「R6 未生效」非阻断警告（跳过不等于通过；读取失败时该警告不追加，避免把「没读到」说成「没用量」）；提供了 `--run-log` 但**读取失败**时同样**不出**「未接线」诊断（此时走该门自身的失败路径：stderr 读取失败警告已说明跳过原因，R5/R6/R5-b 同样跳过）。背景：真实 8 阶段调测实耗 580M tokens 而门禁全程未红，`perPhase.maxTokens`/`project.maxTokensTotal` 形同虚设。
 - **Σtokens 为上界口径（N-6）**：Σtokens 是「按 run-log 记录值累计」的口径，**同一分派动作的多条归账会重复累计**（实测 live run 记录值 522M 中约 72.8M 来自重复归账），故它是**真实唯一消耗的上界**；R6/R5-b 的预算判定**按上界执行**（宁严不松），**不做去重**——去重键在 legacy 记录上不可靠（阶段 1-4 的 `reportId` 为空、`timestamp` 等值会误并真实并发分派）。脚本在同 `(parentDispatchId, timestamp, tokens, duration_s)` **键**出现 >1 次时输出「疑似重复归账 N 组」非阻断诊断（键守卫：`tokens` 非有限正数或 `duration_s` 非数字的条目不入组；同 `parentDispatchId` 且键全同仍计组；只统计并可见化、不改变 Σtokens 与退出码）。**R3 三条目归账约定**：同一分派若按 `r3-completeness` / `r3-reliability` / `r3-security` 分别记账，**能拆分到维度的则各自填实际 `tokens`，不能拆分时只填一条、其余两条填 `0`**——避免把同一消耗写三遍而人为放大上界。
+- **子代理分派数实效校验（R7，决策 5，43.2.0）**：`subagentSpawns` = run-log 记录**自报**的「本记录触发的子代理分派数」（非负整数，run-log schema 必填；`checkpoint-log` 的 `subagentSpawns` 不参与本校验）。`check-budget.ts --run-log= --phase=N` 按阶段聚合：Σ(subagentSpawns，`phase===N`) **严格大于** `perPhase.maxSubagentSpawns` → **blocking（退出码 1）**，违规消息以 `R7：` 开头（恰等于上限不算超限，与 R6 用严格 `>` 同口径）。**`estimated=true` 记录不计入聚合**——口径裁定（A5 关系）：A5 已把 `estimated=true` 违规化（`check-run-log.ts` R2 对 `estimated=true` 记录报 blocking，字段本身保留），故「不计入」仍可实现且按决策 5 执行：估算值不得占用分派额度；`estimated` 缺省（legacy）或 `false` 的记录照常计入。**跳过可见（跳过不等于通过）**：未配置 `perPhase.maxSubagentSpawns`（可选字段，legacy/未启用预算）→ R7 不触发并出非阻断警告「R7 未校验：未配置 perPhase.maxSubagentSpawns」；未提供 `--run-log` 或未提供 `--phase`（按阶段聚合口径无定义）→ R7 整体跳过并出非阻断诊断。字段来龙去脉见上方「A5 死字段退役 → 43.2.0 `maxSubagentSpawns` 回归」条（A5 删除理由 = 零消费；本版使约束成真故回归，可选以兼容存量）。
 - **`killSwitch.consecutiveReworks` 的计数口径（D-4a）**：`check-budget.ts` 的 `reworkCount` 是「返工事件 ∪ 未过门事件」的**累计**条数（返工事件载体 `action=fix`——批次 6 A15 词表收敛后 `rework`/`emergency-fix` 死词已删除——或 `outcome ∈ {fail, rework}`），不是「连续 N 轮返工」的滑动窗口——该阈值实际约束的是本阶段返工/未过门事件累计条数（字段名沿用 schema，语义以此口径为准）。
 
 ## 运行日志模型（run-log.jsonl）
@@ -439,7 +443,7 @@ interface RunLogEntry {
   tokens: number;
   /** tokens 是否为估算值（true=LLM估算，违反约束4，应避免；false=实际报告） */
   estimated: boolean;
-  /** 子代理分派次数（本条记录涉及的子代理调用数） */
+  /** 子代理分派次数（本条记录涉及的子代理调用数）；R7 聚合口径见本文件「子代理分派数实效校验（R7）」条（estimated=true 记录不计入） */
   subagentSpawns: number;
   /** 门禁脚本退出码（仅 gate/tla-gate/graph-gate/checkpoint 类动作填写；其他为 null） */
   gateExitCode: number | null;

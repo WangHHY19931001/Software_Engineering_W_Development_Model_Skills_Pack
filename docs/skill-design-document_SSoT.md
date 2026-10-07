@@ -1823,6 +1823,7 @@ interface BudgetConfig {
   updatedAt: string;
   perPhase: {
     maxTokens: number;
+    maxSubagentSpawns?: number;
   };
   project: {
     maxTokensTotal: number;
@@ -1836,7 +1837,8 @@ interface BudgetConfig {
 }
 ```
 
-> 43.0.0 A5：`perPhase.maxSubagentSpawns` / `perPhase.maxReworkRounds` / `project.maxTokensPerSession` 三个零消费死字段已删除（审计证实无任何门禁脚本消费）；旧数据携带这些字段被 `additionalProperties:false` 拒绝（毁弃存量，不兼容）。阶段返工轮次上限由 `killSwitch.consecutiveReworks`（D-4a 口径）与分层反馈回路（L0-L4）承载。
+> 43.0.0 A5：`perPhase.maxReworkRounds` / `project.maxTokensPerSession` 两个零消费死字段保持退役（审计证实无任何门禁脚本消费）；旧数据携带这两个字段被 `additionalProperties:false` 拒绝（毁弃存量，不兼容）。阶段返工轮次上限由 `killSwitch.consecutiveReworks`（D-4a 口径）与分层反馈回路（L0-L4）承载。
+> 43.2.0（决策 5）：`perPhase.maxSubagentSpawns` **回归**——A5 曾按零消费死字段删除（`eacc8d6a`），本版 `check-budget.ts` R7 消费之（阶段 ΣsubagentSpawns 严格超限 → blocking，`estimated=true` 记录不计入），字段可选（缺字段时 R7 跳过并出非阻断诊断；口径成文见 [`data-models.md`](../w-model-dev/references/data-models.md)「子代理分派数实效校验（R7）」段）。
 
 - `onExceed=pause`：暂停后续子代理分派，🔴 CHECKPOINT · 预算告警，等用户决定（增预算/降范围/取消）
 - `onExceed=notify`：仅在 run-log 记录告警，继续执行（适合 L2+ 自主度）
@@ -1928,10 +1930,11 @@ interface RunLogEntry {
 1. 读取 budget.json
 2. 汇总 run-log.jsonl 中本阶段（phase=N）所有记录的 tokens 总和 = phaseTokensUsed
 3. 汇总 run-log.jsonl 中全项目 tokens 总和 = projectTokensUsed
-4. 判定：超 maxTokens / maxTokensTotal → 触发告警（用量实效 R6/R5-b，D-4b）；killSwitch 任一条件满足 → 触发 kill switch
-5. 按 onExceed 处置：pause（🔴 CHECKPOINT）/ notify（run-log 记录）/ halt（回退阶段起点）
+4. 汇总 run-log.jsonl 中本阶段（phase=N）所有记录的 subagentSpawns 总和 = phaseSpawnsUsed（`estimated=true` 记录不计入，R7，43.2.0 决策 5）
+5. 判定：超 maxTokens / maxTokensTotal → 触发告警（用量实效 R6/R5-b，D-4b）；ΣsubagentSpawns > maxSubagentSpawns → R7 blocking（43.2.0，字段可选：未配置则跳过并出非阻断诊断）；killSwitch 任一条件满足 → 触发 kill switch
+6. 按 onExceed 处置：pause（🔴 CHECKPOINT）/ notify（run-log 记录）/ halt（回退阶段起点）
 
-> 43.0.0 A5：原步骤 3「汇总 subagentSpawns = phaseSpawns」及步骤 5 判定枚举中的 `maxSubagentSpawns` 已随该死字段退役删除——子代理分派次数从未有任何门禁消费（审计证实零消费）。
+> 43.0.0 A5 → 43.2.0（决策 5）：原步骤「汇总 subagentSpawns」曾随 `maxSubagentSpawns` 按零消费死字段退役（A5）；43.2.0 该字段回归（可选）并由 `check-budget.ts` R7 消费，故本表恢复对应步骤（聚合口径 = 按阶段 + `estimated=true` 不计入，成文见 [`data-models.md`](../w-model-dev/references/data-models.md)「子代理分派数实效校验（R7）」段）。
 
 ### 10D.6 关键约束
 
@@ -1950,6 +1953,7 @@ interface RunLogEntry {
 - **killSwitch 告警**：killSwitch 任一触发条件满足（`consecutiveReworks` / `budgetBurnRate` / `tlaReworks`）时须产出告警（run-log 记录 + 🔴 CHECKPOINT 展示消耗明细），不得静默；`check-budget.ts` 校验 killSwitch 触发但 run-log 无对应告警记录 → 退出码 1。
 - **killSwitch 返工计数口径（D-4a，对齐真实事件）**：`check-budget.ts` 的 `reworkCount` 按**真实事件**累计——`action=fix`（批次 6 A15：rework/emergency-fix 死词已删除，返工事件载体为 fix）**或** `outcome ∈ {fail, rework}` 的记录各计 1 条（`countReworks` 已导出以供测试）；它是「返工事件 + 未过门事件」的**累计**条数而非「连续 N 轮返工」的滑动窗口，`consecutiveReworks` 实际约束的是本阶段累计阈值（字段名沿用 schema，语义以本口径为准）；若提供 `--phase=N` 则只统计 `phase===N` 的记录。`tlaReworkCount` 为其中 note/target 含 TLA 的子集（未扩大 tla 判据：非返工记录即使提及 TLA 也不计入）。背景：真实 8 阶段调测的 run-log 中 `action=rework` 一条都没有（返工以 fix/fail 记录），旧口径只数 `action=rework` 会让护栏静默失灵。
 - **用量实效校验 R6 + burnRate 告警 R5-b（D-4b）**：预算配置合法 ≠ 用量在预算内。`check-budget.ts --run-log=<path>` 从 run-log 累计 tokens（只计有限非负数的 `tokens` 字段，坏值剔除否则 Σ 变 NaN 而判定静默永不触发），Σtokens(阶段) 严格大于 `perPhase.maxTokens` 或 Σtokens(全量) 严格大于 `project.maxTokensTotal` → **blocking（退出码 1）**（消息以 `R6：` 开头并附超限占比；恰等于上限不算超限）；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` → killSwitch 用量告警（消息以 `R5-b：` 开头，与 R5 既有返工/TLA 文案区分）。**未接线不静默（D-5②/N-6）**：未提供 `--run-log` 时 R5 触发检测与 R6/R5-b 一并跳过（退出码行为与新增前一字不变），但**不再静默**——CLI 输出非阻断诊断（跳过不等于通过）；故**权威调用表必带** `--run-log=.w-model/run-log.jsonl --phase=N`，不带接线属未接线运行。**Σtokens 为上界口径（宁严不松）**：同一分派的多条归账重复累计、判超限不去重——分组键与键守卫、疑似重复归账诊断、R3 三条目归账约定以及 Σtokens=0 / 读取失败两条边界的完整口径，见 `w-model-dev/references/data-models.md`「用量实效校验」段（R6）与其「Σtokens 为上界口径」条。
+- **子代理分派数实效校验 R7（决策 5，43.2.0）**：预算配置合法 ≠ 分派次数在预算内。`check-budget.ts --run-log=<path> --phase=<N>` 按阶段聚合 run-log 的 `subagentSpawns`（只计有限非负数的字段值，`estimated=true` 的记录不计入——该形态本身已被 check-run-log R2 判 blocking，估算值不得占用分派额度），ΣsubagentSpawns(阶段) **严格大于** `perPhase.maxSubagentSpawns` → **blocking（退出码 1）**（消息以 `R7：` 开头；恰等于上限不算超限，与 R6 同口径）。**字段可选 + 跳过不静默**：未配置该字段（legacy/未启用）→ R7 不触发并出非阻断警告；未提供 `--run-log` 或未提供 `--phase`（按阶段聚合口径无定义）→ R7 跳过并出非阻断诊断（跳过不等于通过）。字段来龙去脉：A5 曾按零消费死字段删除（`eacc8d6a`），本版使约束成真故回归；完整口径见 `w-model-dev/references/data-models.md`「子代理分派数实效校验（R7）」段（R6/R5-b 段同址）。
 - **运行日志 4 类动作完备**：每个阶段 run-log.jsonl 须含 `chunk` / `cross` / `gate` / `checkpoint` 4 类动作记录（阶段 1–4 ingestion 含 `chunk`/`cross`；所有阶段含 `gate`/`checkpoint`）；缺类 → `check-run-log.ts` 退出码 1。
 - **返工须有 fix 记录**：任一返工发生后，run-log 须追加 `action=fix` 记录（`note` 填原因；批次 6 A15：原 `rework` 死词已删除，返工事件载体为 fix）；返工发生但无 fix 记录 → R3/R7 配对校验报出。
 - **R8 相对顺序约束（同生命周期段内动作链序）**：`check-run-log.ts` 对 phase 8 按 identity segment 校验 **S-fix → R3×3 → implementation V → implementation G → checkpoint**，rootcause R/V/G 不混入实现链；legacy 缺身份记录不再吸收（批次 6 C14：`LEGACY_UNSCOPED`/deferred 已删除，旧形态 blocking `[schema]`），不用 phase-wide 首索引、最近记录或集合数量补齐。其他阶段保留兼容的阶段级轨迹校验。真实顺序缺失仍返回退出码 1。
