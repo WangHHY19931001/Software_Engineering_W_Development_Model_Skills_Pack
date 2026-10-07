@@ -56,7 +56,11 @@ import { checkCheckpoint } from '../logic/checkpoint-logic.js';
 import { checkRequirementCoverage, type CoverageCheckOptions } from '../logic/coverage-logic.js';
 import { computeCoverageScope, type CoverageScopeThresholds } from '../logic/coverage-scope-logic.js';
 import { checkExemption } from '../logic/exemption-logic.js';
-import { checkSignatureChain } from '../logic/signature-chain-logic.js';
+import {
+  checkSignatureChain,
+  verifyMaturityApproval,
+  type SignatureChainEntry,
+} from '../logic/signature-chain-logic.js';
 import { checkArchiveIntegrity, type ArchiveIntegrityManifest } from '../logic/archive-integrity-logic.js';
 import { checkDesignContractConsistency, type DesignContractCheckInput } from '../logic/design-contract-logic.js';
 import {
@@ -116,6 +120,7 @@ import {
 import { checkCodingPlan } from '../logic/coding-plan-logic.js';
 import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
+import { readJsonlOptional } from '../lib/read-json-or-exit.js';
 import { runSync } from '../lib/run-sync.js';
 
 import { checkCodegraphQueries } from './check-codegraph-queries.js';
@@ -1676,7 +1681,7 @@ const BUDGET_RUN_LOG_CASES: BudgetRunLogCase[] = [
 // -------------------- Maturity --------------------
 
 interface MaturityCase {
-  /** 样本文件名（相对 samples/maturity/） */
+  /** 样本文件名（相对 samples/maturity/；可含子目录，如 `with-approval/maturity.json`） */
   file: string;
   /** 期望校验是否通过 */
   expectedPassed: boolean;
@@ -1685,9 +1690,19 @@ interface MaturityCase {
   /**
    * 传给 checkMaturity 的 options（可选，默认不传；43.0.0 A4：completedPhases 已随 R3 退役删除）。
    * `maturityApprovalOk`（43.1.0 决策 #2）为 R8 的 human 审批链接缝注入——logic 不读盘，
-   * 真值由 CLI 装载 signature-chain.jsonl 后给出（CLI 装载端到端见 `__tests__/maturity-logic.test.ts`）。
+   * 真值由调用方装载 signature-chain.jsonl 后给出。声明 `sampleDir` 的用例**不用手写**本字段：
+   * 判定由 `sampleDir` 下的真实链条目派生（见下）。
    */
   options?: { projectCreatedAt?: string; operationalFailureCount?: number; maturityApprovalOk?: boolean };
+  /**
+   * 可选：`samples/maturity/` 下的样本子目录（如 `with-approval`）。声明即：
+   *   1. 本用例真实装载 `<sampleDir>/signature-chain.jsonl`（与 CLI 同径：容错行解析 +
+   *      `verifyMaturityApproval(..., { requireAction: 'downgrade-approve' })` 降级专属判定），
+   *      把 `ok` 注入 `options.maturityApprovalOk`——样本自洽（CLI 直接在该目录跑通，见
+   *      `__tests__/maturity-logic.test.ts`），且样本链的 v3 sigHash 真值受本用例守卫；
+   *   2. 该子树经此字段在 check-samples-coverage 规则 1 登记（fixture 引用 ↔ 在盘双向闭环）。
+   */
+  sampleDir?: string;
   /** 用例说明 */
   description: string;
 }
@@ -1719,11 +1734,11 @@ const MATURITY_CASES: MaturityCase[] = [
       '决策2（43.1.0）R8：降级形态（升级链 L0→L1→L2 后 level 回落 L0，R6 第三判定允许）无 role=human / targetKind=maturity 审批链 → R8 blocking（降级无法过闭环五门 = 「不允许降级」的机器化；CLI 装载缺链/坏链一律注入 false）',
   },
   {
-    file: 'valid-downgrade-with-approval.json',
+    file: 'with-approval/maturity.json',
+    sampleDir: 'maturity/with-approval',
     expectedPassed: true,
-    options: { maturityApprovalOk: true },
     description:
-      '决策2（43.1.0）R8：同形态降级 + 有效 human 审批链（logic 接缝注入 maturityApprovalOk=true，等价 CLI 装载 signature-chain.jsonl 后 verifyMaturityApproval 通过）→ 零违规；CLI 装载端到端见 __tests__/maturity-logic.test.ts',
+      '决策2（43.1.0）R8 正向样本（自洽目录）：同形态降级 + 同目录 signature-chain.jsonl 内的 `action=downgrade-approve` human 条目（真实 v3 sigHash、绑定 maturity.json、不早于末条变更）→ 经 CLI 同径判定（requireAction 降级专属绑定，修复轮 1 R-B7-7）注入后零违规；升级/非降级 action 条目不计入（负例见 __tests__/maturity-logic.test.ts）',
   },
 ];
 
@@ -4407,13 +4422,49 @@ function runRunLogAppendCases(): CaseResult[] {
   return results;
 }
 
+/**
+ * R8 样本链判定（与 `cli/check-maturity.ts` 主流程同径）：装载 `<sampleDir>/signature-chain.jsonl`
+ * （容错：坏行跳过，`readJsonlOptional` 已 warn+skip；非对象行在本函数过滤），经
+ * `verifyMaturityApproval(..., { requireAction: 'downgrade-approve' })` 判定降级专属授权。
+ * 为什么与 CLI 同径而不是硬编码 `maturityApprovalOk: true`：样本链的 v3 sigHash 真值与降级专属
+ * action 由此受 self-test 守卫（链被改坏 / action 改回升级值即红），样本目录名与实相符。
+ */
+async function maturityApprovalFromSample(samplesDir: string, sampleDir: string, maturity: unknown): Promise<boolean> {
+  const chainFile = path.join(samplesDir, sampleDir, 'signature-chain.jsonl');
+  const rows = await readJsonlOptional(chainFile, 'signature-chain');
+  // 非对象行跳过（与 check-maturity / check-artifact-gate 的 loader 同口径；样本链不应含此类行）
+  const chain = rows.filter((e): e is SignatureChainEntry => e !== null && typeof e === 'object' && !Array.isArray(e));
+  const m = maturity as { level?: unknown; history?: unknown };
+  return verifyMaturityApproval(
+    chain,
+    {
+      level: typeof m?.level === 'string' ? m.level : '',
+      history: Array.isArray(m?.history)
+        ? m.history.map((h) => {
+            const row = h as { to?: unknown; at?: unknown };
+            return {
+              to: typeof row?.to === 'string' ? row.to : '',
+              at: typeof row?.at === 'string' ? row.at : undefined,
+            };
+          })
+        : [],
+    },
+    { requireAction: 'downgrade-approve' },
+  ).ok;
+}
+
 async function runMaturityCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of MATURITY_CASES) {
     const abs = path.join(samplesDir, 'maturity', c.file);
     const raw = await fs.readFile(abs, 'utf-8');
     const parsed: unknown = parseJsonSafe(raw);
-    const r = checkMaturity(parsed, c.options);
+    // 声明 sampleDir 的用例（R8 正向样本）：用真实链条目判定结果覆盖注入（样本自洽，见接口注释）
+    const options =
+      c.sampleDir === undefined
+        ? c.options
+        : { ...c.options, maturityApprovalOk: await maturityApprovalFromSample(samplesDir, c.sampleDir, parsed) };
+    const r = checkMaturity(parsed, options);
 
     const details: string[] = [];
     if (r.passed !== c.expectedPassed) {

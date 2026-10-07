@@ -9,8 +9,10 @@
  * （R7，A14 43.1.0）、降级须 human 授权（R8，批次 7 决策 #2 43.1.0）。
  * （原 R3 completedCycles 周期换算随 unlockConditions 死字段删除而退役，43.0.0 A4。）
  * R8 的签名链装载：读取 `<maturity.json 同目录>/signature-chain.jsonl`（容错读取——缺文件 → 空链、
- * 坏行跳过；三形态最终都收敛为「不授权」fail-closed），经 `verifyMaturityApproval` 判定后把
- * `ok` 注入纯逻辑 `options.maturityApprovalOk`——logic 层不读盘（接缝形态与 check-artifact-gate 一致）。
+ * 坏行与非对象行跳过；三形态最终都收敛为「不授权」fail-closed），经 `verifyMaturityApproval`
+ * 以 `requireAction='downgrade-approve'` 判定（**降级专属绑定**：升级流程落的人签条目不计入降级授权——
+ * 否则升级条目天然满足 R8）后把 `ok` 注入纯逻辑 `options.maturityApprovalOk`（logic 层不读盘，
+ * 接缝形态与 check-artifact-gate 一致）。
  *
  * 用法：
  *   npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--prev-status=<9态>] [--rollback-approved]
@@ -191,7 +193,10 @@ export function buildR5Diagnostics(
 /**
  * 装载 maturity.json 同目录的 `signature-chain.jsonl`（R8 降级审批链；容错读取，与
  * `check-artifact-gate.loadSignatureChainIfExists` 同口径）：文件不存在 / 整文件读取失败 → 空链，
- * 逐行 JSON 解析失败的坏行跳过（坏行无法通过 v3 重算，天然不构成合法审批）。
+ * 逐行 JSON 解析失败的坏行跳过（坏行无法通过 v3 重算，天然不构成合法审批）。**合法 JSON 但非对象
+ * 的整行**（如整行 `null` / 数组 / 数字）同样跳过——非对象行无法承载 `role/sigHash` 等字段，
+ * 放行会把判定推进到 `[UNEXPECTED]` exit 2（修复轮 1 审查实跑复现的崩溃面），跳过则收敛为本有的
+ * 「无有效授权」fail-closed（降级一律 R8 blocking）。
  * 三形态（缺链 / 空链 / 坏链）最终都收敛为「无有效授权」——fail-closed，降级一律 R8 blocking。
  * `found` 仅用于人类可读报告（审计可见性），不参与判定。
  */
@@ -210,7 +215,10 @@ async function loadSignatureChainIfExists(
     const trimmed = line.trim();
     if (trimmed === '') continue;
     try {
-      entries.push(JSON.parse(trimmed) as SignatureChainEntry);
+      const parsed: unknown = JSON.parse(trimmed);
+      // 非对象行（null / 数组 / 标量）跳过：无法通过 verifyMaturityApproval 的字段判定
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+      entries.push(parsed as SignatureChainEntry);
     } catch {
       /* 坏行不构成审批（fail-closed）：JSON 不完整即无法通过 verifyMaturityApproval 的 v3 重算 */
     }
@@ -320,17 +328,23 @@ async function main(): Promise<void> {
   // R8（批次 7 决策 #2，43.1.0）：降级须 human 授权——装载 maturity.json 同目录的
   // signature-chain.jsonl（容错读取），经 verifyMaturityApproval 判定后把 ok 注入纯逻辑
   // （logic 不读盘）。非降级形态下该结果不被消费（既有行为零回归）；降级形态无授权 → R8 blocking。
+  // 修复轮 1（控制者裁定 R-B7-7）：判定须传 `requireAction: 'downgrade-approve'`——否则升级流程
+  // 每次都会落的人签条目（signedAt 必然 ≥ 末条 history.at）天然满足授权，构成「升级审批洗白降级」。
   const chainFile = path.resolve(path.dirname(maturityAbs), 'signature-chain.jsonl');
   const { entries: signatureChain, found: chainFound } = await loadSignatureChainIfExists(chainFile);
-  const maturityApprovalOk = verifyMaturityApproval(signatureChain, {
-    level: typeof maturity?.level === 'string' ? maturity.level : '',
-    history: Array.isArray(maturity?.history)
-      ? maturity.history.map((h) => ({
-          to: typeof h?.to === 'string' ? h.to : '',
-          at: typeof h?.at === 'string' ? h.at : undefined,
-        }))
-      : [],
-  }).ok;
+  const maturityApprovalOk = verifyMaturityApproval(
+    signatureChain,
+    {
+      level: typeof maturity?.level === 'string' ? maturity.level : '',
+      history: Array.isArray(maturity?.history)
+        ? maturity.history.map((h) => ({
+            to: typeof h?.to === 'string' ? h.to : '',
+            at: typeof h?.at === 'string' ? h.at : undefined,
+          }))
+        : [],
+    },
+    { requireAction: 'downgrade-approve' },
+  ).ok;
 
   // 构建 options 并调用纯逻辑校验
   const result = checkMaturity(parsed, {

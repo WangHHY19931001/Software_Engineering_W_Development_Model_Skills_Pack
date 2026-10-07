@@ -8,6 +8,8 @@
  *   + R11 来源 sha256 必填 + 跨阶段消费者校验。
  * 另导出 verifyMaturityApproval（A4，批次 6 任务 8）：maturity 豁免须 role=human /
  * targetKind=maturity 的 v3 审批条目；human 条目 R4 侧不参与阶段角色链（43.0.0）。
+ * 43.1.0 决策 #2 起该函数新增 `options.requireAction` 降级专属绑定（check-maturity R8 传
+ * `'downgrade-approve'`；不传保持现状，check-artifact-gate 豁免消费零漂移）。
  *
  * sigHash 自 43.0.0 起为 v3 单一公式（targetKind/gateExitCode/gateLogPath 入哈希，
  * 销毁红队实验 2 证实的「targetKind 单字段洗白 R9 违规」穿透面）；v1/v2 分流已删除，
@@ -232,14 +234,34 @@ export interface MaturityApprovalInput {
 export type MaturityApprovalVerdict = { readonly ok: true } | { readonly ok: false; readonly reason: string };
 
 /**
- * 成熟度豁免审批链校验（A4，43.0.0 breaking；决策日志 rounds-48「A4」裁定）：
- * maturity.level 的机器消费点（check-artifact-gate 的 TLA+/BDD 豁免分支）此前由被门禁者自写
- * maturity.json 即可关闭——本函数要求 level 变更须有 **role=human / targetKind=maturity** 的
- * v3 签名链审批条目（绑定 maturity.json），无链 / 坏链 / 早签一律拒绝（fail-closed）。
+ * `verifyMaturityApproval` 的可选收紧项（43.1.0 决策 #2 修复轮 1，控制者裁定 R-B7-7）。
+ */
+export interface MaturityApprovalOptions {
+  /**
+   * 降级专属绑定：提供时，审批条目的 `action` 必须**严格等于**该值才计入（不提供 = 现状口径，
+   * 对 `check-artifact-gate` 的既有豁免消费零漂移）。
+   *
+   * 为什么需要（修复轮 1 安全审查，实跑复现的绕过）：按 operational-recovery.md 的固定流程，
+   * **每次升级**都会落一条 `role=human / targetKind=maturity`（绑定 maturity.json）的人签条目，
+   * 且其 `signedAt` 必然不早于末条 history `at`——于是「升级审批」条目天然满足本函数其余全部判定，
+   * 可被用来洗白一次降级（level < 末条 to）。`check-maturity` R8 传 `'downgrade-approve'`
+   * 把授权绑定到降级专属 action（action 在 v3 sigHash 的 14 字段内，改动即被防篡改重算抓获）。
+   */
+  readonly requireAction?: string;
+}
+
+/**
+ * 成熟度豁免审批链校验（A4，43.0.0 breaking；决策日志 rounds-48「A4」裁定；43.1.0 决策 #2
+ * 增 `options.requireAction` 降级专属绑定）：
+ * maturity.level 的机器消费点（check-artifact-gate 的 TLA+/BDD 豁免分支；43.1.0 起另加
+ * check-maturity R8 降级授权消费）此前由被门禁者自写 maturity.json 即可关闭——本函数要求 level
+ * 变更须有 **role=human / targetKind=maturity** 的 v3 签名链审批条目（绑定 maturity.json），
+ * 无链 / 坏链 / 早签一律拒绝（fail-closed）。
  *
  * 判定序列：
- *   1. 链中存在 `role=human ∧ targetKind=maturity ∧ sigHash 通过 v3 重算` 的审批条目（否则拒绝——
- *      「缺少条目」与「签名不符」合并为同一拒绝形态，避免向伪造者泄露判定进度）；
+ *   1. 链中存在 `role=human ∧ targetKind=maturity ∧ sigHash 通过 v3 重算`（提供了
+ *      `options.requireAction` 时另要求 `action` 严格相等）的审批条目（否则拒绝——「缺少条目」与
+ *      「签名不符」合并为同一拒绝形态，避免向伪造者泄露判定进度）；
  *   2. 最新审批条目须绑定 maturity.json（artifacts 含该路径）；
  *   3. 审批时间不得早于最近一次 level 变更（maturity.history 末条 `at`；Date 解析比较，任一端
  *      缺失或不可解析则跳过该子判定，schema 的 required 前置在正常路径保证字段在场）。
@@ -247,14 +269,23 @@ export type MaturityApprovalVerdict = { readonly ok: true } | { readonly ok: fal
 export function verifyMaturityApproval(
   chain: readonly SignatureChainEntry[],
   maturity: MaturityApprovalInput,
+  options?: MaturityApprovalOptions,
 ): MaturityApprovalVerdict {
+  const requireAction = options?.requireAction;
   const approvals = chain.filter(
-    (e) => e.role === 'human' && e.targetKind === 'maturity' && e.sigHash === computeSigHash(e),
+    (e) =>
+      e.role === 'human' &&
+      e.targetKind === 'maturity' &&
+      e.sigHash === computeSigHash(e) &&
+      (requireAction === undefined || e.action === requireAction),
   );
   if (approvals.length === 0) {
     return {
       ok: false,
-      reason: '缺少 role=human / targetKind=maturity 的审批条目，或签名未通过 v3 重算',
+      reason:
+        requireAction === undefined
+          ? '缺少 role=human / targetKind=maturity 的审批条目，或签名未通过 v3 重算'
+          : `缺少 role=human / targetKind=maturity / action=${requireAction} 的审批条目，或签名未通过 v3 重算`,
     };
   }
   const latest = approvals[approvals.length - 1]!;

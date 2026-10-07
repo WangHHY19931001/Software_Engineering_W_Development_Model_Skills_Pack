@@ -1767,7 +1767,7 @@ interface MaturityConfig {
 3. 查 L0~L3 放行矩阵：✅ 等用户 → 执行 CHECKPOINT 暂停；⚡ 自动放行 → 跳过暂停，run-log append 记录（仅操作型适用；阶段门放行在任何级别都等用户，硬约束 #2）
 4. 检查高风险路径（仅 L3）：命中高风险路径表 → 即使 L3 也强制决策型 CHECKPOINT
 5. 升级判定（每次阶段 8 完成后）：按解锁条件文档语义（operational-recovery.md「升级与降级」，43.0.0 A4 起 unlockConditions 字段已自 schema 移除、无机器校验）询问用户是否升级（决策型 CHECKPOINT，不可自动升级）；用户确认后 O 须以 `role=human / targetKind=maturity` 条目落签名链（绑定 maturity.json），gate 消费 level 前经 `verifyMaturityApproval` 校验（无链即不豁免，fail-closed）
-6. 降级判定（每次 O 系列失败模式命中后）：若 operationalFailures ≥ downgradeTriggers.operationalFailureStreak → **触发降级评估并暂停**；降级须用户在 🔴 CHECKPOINT 明确确认 + O 落 `role=human / targetKind=maturity` 审批条目后方可更新 level（决策 #2，43.1.0；无条目 → `check-maturity.ts` R8 blocking = 降级无法过闭环五门；R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）
+6. 降级判定（每次 O 系列失败模式命中后）：若 operationalFailures ≥ downgradeTriggers.operationalFailureStreak → **触发降级评估并暂停**；降级须用户在 🔴 CHECKPOINT 明确确认 + O 落 `role=human / targetKind=maturity`、**`action='downgrade-approve'`** 审批条目后方可更新 level（决策 #2，43.1.0；无条目 → `check-maturity.ts` R8 blocking = 降级无法过闭环五门；**降级专属绑定**——R8 以 `requireAction='downgrade-approve'` 严格过滤 action，升级条目不计入（修复轮 1 R-B7-7 裁定，安全审查实跑复现「升级审批洗白降级」后加固）；R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）
 
 **关键约束**：
 
@@ -1775,7 +1775,7 @@ interface MaturityConfig {
 - **决策型 CHECKPOINT 在所有级别均等用户**：设计方向不可自动决定。
 - **阶段门放行在所有级别均等用户**（HOTL 固定，硬约束 #2）：不随成熟度自动化；L1/L2/L3 差异仅体现在文档仪式与 TLA+/BDD 强度。
 - **升级不可自动**：升级是决策型 CHECKPOINT，须用户显式确认。
-- **升级与降级对称走 human 授权（决策 #2，43.1.0；原「降级可自动」语义作废）**：O 系列失败模式连续命中触发降级评估并暂停；降级须用户在 CHECKPOINT 明确确认 + O 落 `role=human / targetKind=maturity` 审批条目（R8 机器化：无条目 blocking；应急处置路径 = 用户确认即授权；R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）。
+- **升级与降级对称走 human 授权（决策 #2，43.1.0；原「降级可自动」语义作废）**：O 系列失败模式连续命中触发降级评估并暂停；降级须用户在 CHECKPOINT 明确确认 + O 落 `role=human / targetKind=maturity`、`action='downgrade-approve'` 审批条目（R8 机器化：无条目 blocking——**判定为降级专属绑定**：仅 `action='downgrade-approve'` 的条目计入，升级条目不计入（修复轮 1 R-B7-7）；应急处置路径 = 用户确认即授权；R5 真值通道 = `operationalFailureModes` 字段，§4A.2a）。
 
 ### 10C.7 阶段完成计数与强制校验（check-maturity.ts）【43.0.0 已退役】
 
@@ -1786,7 +1786,9 @@ interface MaturityConfig {
 > 成熟度侧的机器防线改为 **R6 history 链一致性**（from==上一条 to / to 严格高于 from / 末条 to 不低于
 > level——修复轮 1 放宽：降级后 level 低于末条合法，R6 只锁伪造升级，见 §10R）
 > 与 **level 变更 human 签名链审批**（`verifyMaturityApproval`，fail-closed；43.1.0 决策 #2 增
-> **R8 降级须 human 授权**：降级形态同一链条目，无授权 blocking——降级无法过闭环五门）。
+> **R8 降级须 human 授权**：降级形态同一链条目，无授权 blocking——降级无法过闭环五门；
+> **降级专属绑定**（修复轮 1 R-B7-7）：R8 传 `requireAction='downgrade-approve'` 严格过滤 action，
+> 升级审批条目不计入降级授权）。
 > 历史条目存档如下，不再生效：
 >
 > - ~~阶段完成计数强制递增：编排者 O 须将 `maturity.json.unlockConditions.completedCycles` +1~~

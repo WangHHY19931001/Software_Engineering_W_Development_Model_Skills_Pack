@@ -4,7 +4,8 @@
  * 对应 w-model-dev/references/data-models.md MaturityConfig schema（§自主成熟度模型）
  * 与 w-model-dev/references/hard-constraints.md（反模式节）§运维失败模式清单 O1~O6。
  * 校验：level 合法（R2）+ history 时序一致（R4）+ 降级触发检测（R5）+ history 链一致性（R6）
- * + project.status 转移合法性（R7，A14 43.1.0）+ 降级须 human 授权（R8，批次 7 决策 #2 43.1.0）。
+ * + project.status 转移合法性（R7，A14 43.1.0）+ 降级须 human 授权（R8，批次 7 决策 #2 43.1.0；
+ * 修复轮 1 R-B7-7 增降级专属绑定——调用方以 `requireAction='downgrade-approve'` 判定授权条目）。
  * 原 R3（unlockConditions.completedCycles 周期换算）随 unlockConditions 死字段删除而退役
  * （43.0.0 A4，批次 6 任务 8；规则号不回收，R4/R5 编号保持稳定）。
  * R5 为**真值通道**（D-7）：命中次数只统计 run-log 的 `operationalFailureModes` 字段，note 中的
@@ -80,6 +81,9 @@ export interface MaturityCheckOptions {
    * `verifyMaturityApproval` 判定）注入；本纯函数不读盘（接缝形态与
    * `gate-logic.evaluateTlaBddWaiver` 一致）。**仅当降级形态时被消费**：真值须为 `true`
    * 才放行，未注入 / `false`（缺链 / 坏链 / 早签）一律 R8 blocking。
+   * **降级专属绑定（修复轮 1 R-B7-7）由调用方传入**：CLI 以
+   * `verifyMaturityApproval(..., { requireAction: 'downgrade-approve' })` 判定——升级审批条目
+   * 不计入（否则升级条目天然满足 R8，可洗白降级）；本字段只见最终布尔结果。
    */
   maturityApprovalOk?: boolean;
 }

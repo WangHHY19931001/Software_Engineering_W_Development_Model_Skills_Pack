@@ -114,6 +114,12 @@
 > **2026-10-07 批次 7 任务 11（决策 #2）换件**：`check-maturity` 行原指向 `samples/maturity/bad-stale.json`
 > （level=L5 越界 → schema enum 拦截；其「周期校验」表述随 43.0.0 A4 原 R3 退役已过期）——换件为唯一覆盖
 > 且期望失败的 `samples/maturity/bad-downgrade-without-approval.json`（R8：降级形态无授权 → blocking）。
-> `bad-stale.json` 仍由 `MATURITY_CASES` 逐条执行（不占行）；同组的
-> `samples/maturity/valid-downgrade-with-approval.json` 为期望通过样本（logic 接缝注入审批通过），
-> 亦不占行。
+> `bad-stale.json` 仍由 `MATURITY_CASES` 逐条执行（不占行）。
+>
+> **2026-10-07 批次 7 任务 11 修复轮 1（R-B7-7）**：正向样本原为平铺的
+> `samples/maturity/valid-downgrade-with-approval.json`（名与实不符——CLI 按同目录解析签名链，直接跑该文件
+> exit 1；「配链」只在测试临时工作区），已迁入**自洽子目录** `samples/maturity/with-approval/`
+> （`maturity.json` + 同目录 `signature-chain.jsonl`，`action='downgrade-approve'`）——CLI 直接在该目录跑通 exit 0，
+> 期望通过样本仍不占本表行。**本行 fixture 的父目录 `samples/maturity/` 不得出现 `signature-chain.jsonl`**：
+> 一旦有人补放（负向件会被升级条目洗白成静默转绿），`self-test` 的 R8 用例与 CLI 端到端用例（直接跑本行 fixture，
+> 断言 exit 1 + `R8:`）即红——负向语义由「无链」事实 + 两条断言共同守住，不靠目录约定。

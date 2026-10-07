@@ -634,7 +634,10 @@ interface MaturityConfig {
 > **43.1.0（批次 7 决策 #2）**：新增 **R8 降级须 human 授权**——降级形态（level 低于 history 末条 to，R6 允许的合法形态）
 > 一律要求同一 `role=human / targetKind=maturity` 审批链：`check-maturity.ts` 装载 maturity.json 同目录
 > `signature-chain.jsonl` 后经 `verifyMaturityApproval` 判定并注入纯逻辑；无链条目（缺链 / 坏链 / 早签）→ R8 blocking
-> （降级无法过闭环五门 = 「不允许降级」的机器化；应急处置路径 = 用户确认即授权）。
+> （降级无法过闭环五门 = 「不允许降级」的机器化；应急处置路径 = 用户确认即授权）。**降级专属绑定（43.1.0 修复轮 1，
+> R-B7-7）**：R8 判定传 `requireAction='downgrade-approve'` 严格过滤 action——降级条目须用该专属值，
+> 升级流程所落的同类人签条目（`signedAt` 必然 ≥ 末条 history `at`）**不构成降级授权**（否则升级审批可洗白降级）；
+> 不传 `requireAction` 时 `verifyMaturityApproval` 口径不变（check-artifact-gate 豁免消费零漂移）。
 
 **默认值**（`/wm analyze` 首次初始化）：
 
