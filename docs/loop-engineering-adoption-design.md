@@ -9,6 +9,8 @@
 > **参考来源**：[cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering)（MIT，调研于 2026-07-23）—— `docs/primitives.md` / `docs/failure-modes.md` / `docs/anti-patterns.md` / `docs/loop-design-checklist.md` / `docs/concepts.md` / `docs/operating-loops.md`
 >
 > **与 SSoT 的关系**：本文件为设计输入文档，定义 4 项运维层增强（成本预算+运行日志、自主成熟度阶梯、运维失败模式 O1~O6、理解债务显式化）。实现阶段须先把这些设计合并入 SSoT §10C（成熟度）/ §10D（成本与运行日志）/ §4A.2（运维失败模式扩展）/ §10.6（DoD 理解证据维度），再同步 `w-model-dev/` 资产（遵循 AGENTS.md「SSoT 优先」约束）。
+>
+> **实时语义**：预算与分派数校验的实时语义以 SSoT §10D.5 / §10D.7 与 [`data-models.md`](../w-model-dev/references/data-models.md)「用量实效校验（R6）」「子代理分派数实效校验（R7）」段为准（本文 §1 为设计期口径，如 blocking/触发阈值描述与此处不一致时以上述权威为准）。
 
 ## 0. 背景与目标
 
