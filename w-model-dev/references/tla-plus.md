@@ -4,6 +4,22 @@
 > S 子代理（产出 .tla + .cfg + 更新 manifest）、V 子代理（评审合规性）、G 子代理（跑 check-tla-model.ts）必读。
 > 权威设计见 `docs/tla-plus-modeling-design.md`。
 
+> **§0 按需分节加载导引**（约束 #6）：本文件约 2300 行，按「角色 × 任务」只读所需节，禁止整文件载入上下文。
+>
+> | 角色 × 任务                  | 只读章节                                                                                                              |
+> | ---------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+> | S × 建模（产出 .tla）        | §2.0 命名规范 + §2.2 前置清单 + §3 SD 覆盖率 + §4 不变式对齐 + 「层级模型」节 + 「文件头规范」节 + 「语法速查」节       |
+> | S × 建模场景 / 示例参考      | 「建模场景库」节 + 「模式与示例」节（按 SD 子系统类型选模板）                                                          |
+> | S × 产出 .cfg（配置）        | 「TLC 配置」节 + §11 cfg-tla 一致性规则 + §12 cfg 结构规则                                                             |
+> | S × L4 时间推进 / 保留期建模 | §14（AdvanceTime/Purge 正反例与通用规则）                                                                              |
+> | S × BDD 同步 / 代码一致性    | §15 TLA+/BDD 同步 + §16 设计文档↔代码状态机一致性                                                                     |
+> | S-ingest-tla × 回填覆盖率    | 「S-ingest-tla 子代理」节 + 「tla-manifest.json」节                                                                    |
+> | V × 评审                     | 「评审清单」节 + §4 不变式对齐 + §13.2 S-tla/V-tla 加载矩阵                                                            |
+> | G × 跑门禁（check-tla-model）| §2.1 路径解析基准 + §2.2 前置清单 + 「校验脚本」节 + §11 + §12                                                         |
+> | 任意 × 模板 / 文件头         | 「文件头规范」节 + 「tla-manifest.json」节                                                                             |
+>
+> 更细粒度的场景表见下方「速查摘要」节的「按场景只读 §X」，与本表互补。
+
 ## 目录
 
 - [速查摘要](#速查摘要)
@@ -40,7 +56,7 @@
 | 不变式对齐 | 每个不变式须 `@designRef` 标注 + 业务语义解释 | §4 |
 | 层级模型 | L1 系统交互 / L2 子系统 / L3 原子 / L4 递归 | 「层级模型」节 |
 | 拆解决策 | 组合数 ≤1k 保留 / >1w 必须拆（反模式 #16） | 「拆解决策」节 |
-| 文件头规范 | 8 个 `@` 字段 + @designIds 必填 | 「文件头规范」节 |
+| 文件头规范 | 8 个必填 `@` 字段（@designIds 为可选注记，非门禁必填） | 「文件头规范」节 |
 | 校验脚本 | check-tla-model.ts（退出码 0/1/2，先 SANY 后 TLC） | 「校验脚本」节 |
 | 阶段产出契约 | 阶段 1-4 产出对应层级；5-8 冻结只读 | 「阶段产出契约」节 |
 | 合规性约束 | 不允许占位/简化/错误实现；建模须符合需求/设计 | 「合规性约束」节 |
@@ -72,6 +88,8 @@ TLA+ 门禁是 W 模型第三维度门禁——与结构连通门禁（graph）�
 | 结构连通 | 节点归属单根树、追溯完整 | `check-requirement-graph.ts` |
 | 信息流闭合 | 节点既是生产者又是消费者 | `check-requirement-graph.ts` |
 | **行为正确性** | **状态机无死锁、不变式成立、无状态爆炸** | **`check-tla-model.ts`** |
+
+死锁防御的规格内形态：为每个规格配套 `NoStuckState` 不变式（模板见 §12 cfg 结构规则「死锁防御配套不变式模板」），把「无死锁」从门禁退出码升级为规格内可校验命题。`CHECK_DEADLOCK FALSE` 只会掩盖死锁、不构成豁免；确需豁免时走豁免审批门禁（`check-exemption.ts`）并在 run-log 登记理由。
 
 ## 为什么需要模型检查穷举
 
@@ -250,14 +268,14 @@ CategoryTreeNoCycle == \A c \in Categories : categoryParent[c] # c /\
 
 ## 文件头规范（强制）
 
-每个 `.tla` 文件**必须**以结构化注释头开始。缺失任一字段，`check-tla-model.ts` 退出码 1（反模式 #16）。
+每个 `.tla` 文件**必须**以结构化注释头开始。缺失任一必填字段，`check-tla-model.ts` 退出码 1（反模式 #16）。门禁必填字段共 **8 个**（与 `tla-logic.ts` `REQUIRED_HEADER_FIELDS` 一致）：`@system` / `@requirement` / `@design` / `@parent` / `@sibling` / `@child` / `@level` / `@phase`；`@designIds` 为**可选注记**（非门禁必填，见下节）。
 
 ```tla
 (*
   @system        所属系统名称
   @requirement   关联需求 ID（逗号分隔）
   @design        关联设计文档相对路径
-  @designIds     关联 SD 节点 ID（逗号分隔，如 SD-001,SD-002,SD-005）
+  @designIds     关联 SD 节点 ID（逗号分隔，如 SD-001,SD-002,SD-005；可选注记）
   @parent        上级 TLA 文件相对路径（L1 填 null）
   @sibling       同级 TLA 文件相对路径（逗号分隔，无填 null）
   @child         下级 TLA 文件相对路径（逗号分隔，无填 null）
@@ -276,9 +294,9 @@ CategoryTreeNoCycle == \A c \in Categories : categoryParent[c] # c /\
 - **双向一致性**：A 声明 B 为 sibling → B 须声明 A 为 sibling；A 声明 C 为 child → C 须声明 A 为 parent。
 - 层级单调：`child.level = parent.level + 1`。
 
-### @designIds 字段（必填）
+### @designIds 字段（可选注记）
 
-`.tla` 文件头部须含 `@designIds` 字段，列出本规格覆盖的所有 SD 节点 ID（逗号分隔）。
+`.tla` 文件头部的 `@designIds` 字段为**可选注记**——门禁必填字段为上节 8 字段，不含 `@designIds`（与 `tla-logic.ts` `REQUIRED_HEADER_FIELDS` 收敛口径一致）。但阶段 ≥2 的 manifest `sdCoverage` 为强制必填，其来源约定就是本字段，因此**建议始终填写**：列出本规格覆盖的所有 SD 节点 ID（逗号分隔）。
 
 ```
 @designIds     SD-001,SD-002,SD-005
@@ -613,6 +631,18 @@ INVARIANT NoExitTerminal
 INVARIANT ArtifactGateConsistency
 ```
 
+**死锁防御配套不变式模板**（与 `SPECIFICATION Spec` 模板配套；「公理」节「正常软件系统不允许死锁」的规格内落点）：
+
+```tla
+\* 每个可达状态要么已到终态、要么至少有一个 Next 分支使能。
+\* States / Terminal 为占位名，按规格实际命名替换（状态值全集 / 终态值集）。
+NoStuckState == \A s \in States : s \in Terminal \/ ENABLED Next
+```
+
+- `NoStuckState` 属业务不变式（名字不以 `Type` 开头），须纳入 `BusinessInvariant` 聚合并写入 `.cfg` `INVARIANTS`（§11）。
+- 闭合系统到达「全部完成」态后由 `[Next]_vars` stuttering 终止，属正常形态；此时不需要也不应该关死锁检查。
+- 死锁豁免不得用 `CHECK_DEADLOCK FALSE` 掩盖；确需豁免时走豁免审批（`check-exemption.ts`，E1-E9）并登记理由。
+
 > 不变式数量计数是跨产物交叉校验的枢纽：`.cfg` 声明数 = `.tla` `BusinessInvariant` 展开数 = verifier-output 不变式描述数，三者一致才放行（治 D27 三处不一致）。
 
 ## 13. 参考资料（claude-tla-plus-plugin）
@@ -690,8 +720,8 @@ AdvanceTime ==
 
 PurgeExpiredLogs ==
   /\ oldestAge >= RETENTION_DAYS     \* 触发阈值：达到保留期才清理
-  /\ logCount' = logCount - expiredCount
-  /\ oldestAge' = oldestAge
+  /\ logCount' = 0                   \* 保留期已到即全部过期：全量清理，不引入未定义的 expiredCount 引用
+  /\ oldestAge' = 0                  \* 清理后计时归零，重启保留期（残留旧值会使下一次推进直接越界）
   /\ unchanged otherVars
 
 Next == \/ AdvanceTime
@@ -704,7 +734,7 @@ Retention90Days == oldestAge <= RETENTION_DAYS
 **关键设计**：
 1. `AdvanceTime` 前置条件 `logCount > 0`：无日志时不需要推进时间（避免空集合上的无意义动作）
 2. `AdvanceTime` 上限守卫 `oldestAge < RETENTION_DAYS`：确保推进后 `oldestAge' <= RETENTION_DAYS`，不变式保持
-3. `PurgeExpiredLogs` 触发阈值 `oldestAge >= RETENTION_DAYS`：与不变式边界对齐（`>=` 触发清理，`<=` 不变式守卫）
+3. `PurgeExpiredLogs` 触发阈值 `oldestAge >= RETENTION_DAYS`：与不变式边界对齐（`>=` 触发清理，`<=` 不变式守卫）；清理后 `oldestAge' = 0` 重置计时、`logCount' = 0` 全量清理——清理动作须给出全部被引变量的次态，不留未定义引用（如悬空的 `expiredCount`）
 4. `Next` 分支覆盖：`AdvanceTime` 与 `PurgeExpiredLogs` 均可达，清理动作不会被饿死
 
 ### 14.4 通用规则
@@ -1294,6 +1324,13 @@ CloseTx(t) ==
         IF otherTx \in tx' THEN missed[otherTx] \cup written[t] ELSE {}]
     /\ snapshotStore' = [snapshotStore EXCEPT ![t] = [k \in Key |-> NoVal]]
     /\ written' = [written EXCEPT ![t] = {}]
+\* 事务生命周期业务不变式：已关闭/未开启的事务不留残留写集与快照
+\* （cfg 示例 1 引用的 TxLifecycle 即此处定义；名字不以 Type 开头，属业务不变式）
+TxLifecycle ==
+    \A t \in TxId :
+        \/ t \in tx
+        \/ /\ written[t] = {}
+           /\ snapshotStore[t] = [k \in Key |-> NoVal]
 Next ==
     \/ \E t \in TxId : OpenTx(t)
     \/ \E t \in tx : \E k \in Key : \E v \in Val : Add(t, k, v)
@@ -1604,16 +1641,60 @@ MoveElevator(e) ==
     /\ ElevatorState' = [ElevatorState EXCEPT ![e] =
         [@ EXCEPT !.floor = nextFloor]]
     /\ UNCHANGED <<PersonState, ActiveElevatorCalls>>
+\* 启动：静止且有同向呼叫时选定方向（无此动作则方向恒为 Stationary，电梯永不移动）
+StartElevator(e, d) ==
+    LET eState == ElevatorState[e] IN
+    /\ eState.direction = "Stationary"
+    /\ ~eState.doorsOpen
+    /\ \E c \in ActiveElevatorCalls : c.direction = d
+    /\ ElevatorState' = [ElevatorState EXCEPT ![e] =
+        [@ EXCEPT !.direction = d]]
+    /\ UNCHANGED <<PersonState, ActiveElevatorCalls>>
+\* 关门：与 OpenDoors 成对（无此动作则门常开，移动/反转全被卡死）
+CloseDoors(e) ==
+    LET eState == ElevatorState[e] IN
+    /\ eState.doorsOpen
+    /\ ElevatorState' = [ElevatorState EXCEPT ![e] =
+        [@ EXCEPT !.doorsOpen = FALSE]]
+    /\ UNCHANGED <<PersonState, ActiveElevatorCalls>>
+\* 方向反转：运行中当前方向无可服务呼叫时反转（避免端楼层同向卡死）
+ReverseDirection(e) ==
+    LET eState == ElevatorState[e] IN
+    /\ eState.direction /= "Stationary"
+    /\ ~eState.doorsOpen
+    /\ ~(\E c \in ActiveElevatorCalls : CanServiceCall[e, c])
+    /\ ElevatorState' = [ElevatorState EXCEPT ![e] =
+        [@ EXCEPT !.direction =
+            IF eState.direction = "Up" THEN "Down" ELSE "Up"]]
+    /\ UNCHANGED <<PersonState, ActiveElevatorCalls>>
+\* 乘客到达：等待中的乘客在所在楼层遇到开门电梯即到达目的地（乘梯过程折叠为到达一步）
+PassengerArrives(p) ==
+    LET pState == PersonState[p] IN
+    /\ pState.waiting
+    /\ \E e \in Elevator :
+        /\ ElevatorState[e].doorsOpen
+        /\ ElevatorState[e].floor = pState.location
+    /\ PersonState' = [PersonState EXCEPT ![p] =
+        [@ EXCEPT !.location = pState.destination, !.waiting = FALSE]]
+    /\ UNCHANGED <<ElevatorState, ActiveElevatorCalls>>
 Next ==
     \/ \E p \in Person : CallElevator(p)
+    \/ \E e \in Elevator : StartElevator(e, "Up")
+    \/ \E e \in Elevator : StartElevator(e, "Down")
     \/ \E e \in Elevator : OpenDoors(e)
+    \/ \E e \in Elevator : CloseDoors(e)
     \/ \E e \in Elevator : MoveElevator(e)
+    \/ \E e \in Elevator : ReverseDirection(e)
+    \/ \E p \in Person : PassengerArrives(p)
 Spec == Init /\ [][Next]_Vars
 \* Safety: elevator doors only open at valid floors
 DoorsOpenAtValidFloor ==
     \A e \in Elevator : ElevatorState[e].doorsOpen =>
         ElevatorState[e].floor \in Floor
-\* Liveness: every call eventually serviced
+\* Liveness: every call eventually serviced——时序属性须在公平性规格下以
+\* TLC PROPERTIES + SPECIFICATION FairSpec 检查；无公平性的 Spec 下该属性
+\* 不成立也不检查，不得列入 safety cfg 的 INVARIANTS（cfg 示例 3 只查 safety）
+FairSpec == Spec /\ WF_vars(Next)
 CallsServiced == \A c \in ElevatorCall :
     c \in ActiveElevatorCalls ~> \E e \in Elevator : CanServiceCall[e, c]
 =============================================================================
@@ -1647,7 +1728,7 @@ Init ==
 startSmoking ==
     /\ dealer /= {}
     /\ smokers' = [r \in Ingredients |->
-        [smoking |-> {r} \cup dealer = Ingredients]]
+        [smoking |-> ({r} \cup dealer) = Ingredients]]  \* 可读形态：{r} ∪ 桌上供给 = 全集时 r 可开抽（显式括号消除优先级歧义）
     /\ dealer' = {}
 stopSmoking ==
     /\ dealer = {}
@@ -1855,13 +1936,13 @@ Consistency ==
 
 - 常量是否适当有界
 - 是否使用对称性（如适用）
-- 状态约束是否限制爆炸
+- 状态空间控制是否走正道（缩小常量 / 对称性 / 规格拆解；cfg CONSTRAINT 已被门禁禁用，不得砍状态空间）
 
 **W 模型增强**：.cfg 须遵循 [§11 cfg-tla 一致性规则](./tla-plus.md) + [§12 cfg 结构规则](./tla-plus.md)。
 
 ### 6. 常见问题（Common Issues）
 
-- 死锁可能性
+- 死锁可能性（是否配套 NoStuckState 不变式；是否存在 CHECK_DEADLOCK FALSE 掩盖）
 - 缺失 UNCHANGED 子句
 - 过严前置条件
 - 无界状态增长
@@ -1902,7 +1983,7 @@ V-tla 子代理产出 VerifierOutput JSON 时，本清单 7 项按以下映射�
 
 
 > **来源**：吸收自 [`claude-tla-plus-plugin`](https://github.com/andrueandersoncs/claude-tla-plus-plugin) `skills/tla-plus-generator/tlc-configuration.md`
-> **W 模型适配**：.cfg 须遵循 [tla-plus.md §11 cfg-tla 一致性规则](./tla-plus.md) + [§12 cfg 结构规则](./tla-plus.md)；不得含 `MODULE` 声明；`INVARIANTS` 须列出 .tla 中所有不变式（即 `BusinessInvariant == /\ Inv1 /\ Inv2 ...` 展开的全部子不变式）
+> **W 模型适配**：.cfg 须遵循 [tla-plus.md §11 cfg-tla 一致性规则](./tla-plus.md) + [§12 cfg 结构规则](./tla-plus.md)；不得含 `MODULE` 声明；`INVARIANTS` 须列出 .tla 中所有不变式（即 `BusinessInvariant == /\ Inv1 /\ Inv2 ...` 展开的全部子不变式）；**不得含 `CONSTRAINT`/`CONSTRAINTS` 段**（门禁直接违规化，见下方 W 模型约束）；`INVARIANTS`/`PROPERTIES` 引用的算子名须在 .tla 中实际定义（悬空引用 → TLC 报错或 §11 集合不一致拦截）
 > **加载时机**：S-tla 子代理产出 .cfg 时必读
 
 TLC（Temporal Logic Checker）是 TLA+ 规格的模型检查器。本指南覆盖配置文件格式与最佳实践。
@@ -1937,12 +2018,14 @@ CONSTANTS
     Keys = {k1, k2}
 
 \* Invariants to check (safety properties)
+\* names MUST be operators actually defined in the .tla（悬空引用 → TLC 报错）
 INVARIANTS
     TypeInvariant
     Safety
     MutualExclusion
 
 \* Properties to check (including liveness)
+\* names MUST be operators actually defined in the .tla（时序属性算子，如 CallsServiced）
 PROPERTIES
     Liveness
     Termination
@@ -1953,14 +2036,16 @@ SYMMETRY
     Permutations(Procs)
 
 \* State constraint to limit search
-CONSTRAINT
-    StateConstraint
+\* W 模型门禁禁用 CONSTRAINT/CONSTRAINTS（不得用约束砍状态空间，见下方 W 模型约束）
+\* CONSTRAINT
+\*     StateConstraint
 
 \* Action constraint
 ACTION_CONSTRAINT
     ActionConstraint
 
 \* Check deadlock (default: true)
+\* W 模型公理：正常软件系统不允许死锁——保持 TRUE，禁止 FALSE 掩盖死锁
 CHECK_DEADLOCK TRUE
 
 \* Alias for trace exploration
@@ -1973,6 +2058,8 @@ ALIAS
 - `.cfg` **不得**含 `---- MODULE <Name> ----` 声明（这是 `.tla` 头部语法，混入 `.cfg` 触发 TLC 解析错误；见 [tla-plus.md §12 cfg 结构规则](./tla-plus.md)）
 - `INVARIANTS` 须列出 `.tla` 中所有不变式——即 `.tla` 中 `BusinessInvariant == /\ Inv1 /\ Inv2 ...` 展开的全部子不变式，集合须完全相等（见 [tla-plus.md §11 cfg-tla 一致性规则](./tla-plus.md)）
 - 等价的逐行形式 `INVARIANT <Name>` 与 `INVARIANTS` 关键字后跟列表均合法，但不变式数量计数须与 `.tla` `BusinessInvariant` 展开数一致
+- `.cfg` **不得**含 `CONSTRAINT`/`CONSTRAINTS` 段（B10c 禁用：不得用约束砍状态空间掩盖死锁/状态爆炸，正道是缩小 CONSTANTS 规模与规格拆解——反模式 #16 家族；门禁对段名行首词边界匹配、直接违规化）
+- `INVARIANTS`/`PROPERTIES` 引用的算子名须在 `.tla` 中实际定义；悬空引用由 TLC 报错或 §11 集合不一致拦截，不得想当然命名
 
 ### 完整配置示例
 
@@ -2017,7 +2104,7 @@ CHECK_DEADLOCK TRUE
 ### 示例 3：电梯系统配置（Elevator System）
 
 ```cfg
-\* ElevatorSafety.cfg
+\* ElevatorSafety.cfg（与 Example 5 Elevator.tla 配套）
 SPECIFICATION Spec
 
 CONSTANTS
@@ -2025,18 +2112,23 @@ CONSTANTS
     Elevator = {e1}
     FloorCount = 3
 
+\* 与 .tla 实际定义的不变式集合完全相等（§11）；
+\* DoorsOpenAtValidFloor 属业务不变式（非 Type 类），满足 B1 业务不变式下限
 INVARIANTS
     TypeInvariant
-    SafetyInvariant
+    DoorsOpenAtValidFloor
 
-\* Don't check liveness for safety verification
+\* 活性属性 CallsServiced 须在 FairSpec（含公平性）下以 PROPERTIES 检查；
+\* 本 cfg 只做 safety 检查，不列 PROPERTIES
 \* PROPERTIES
-\*     TemporalInvariant
+\*     CallsServiced
 
 SYMMETRY
     Permutations(Person)
 
-CHECK_DEADLOCK FALSE
+\* 不关死锁检查：闭合系统到达「全员到达」终态后由 [Next]_vars stuttering 终止；
+\* 公理「正常软件系统不允许死锁」——CHECK_DEADLOCK FALSE 只会掩盖死锁，不构成豁免
+CHECK_DEADLOCK TRUE
 ```
 
 ### 示例 4：共识协议配置（Consensus Protocol）
@@ -2100,9 +2192,10 @@ PROPERTIES
 SYMMETRY
     Permutations(Data)
 
-\* Limit state space for testing
-CONSTRAINT
-    Len(buffer) <= BufferSize
+\* W 模型禁用 cfg CONSTRAINT（B10c）：不得用 `CONSTRAINT Len(buffer) <= BufferSize`
+\* 之类的约束（更不得内联表达式）砍状态空间。缓冲界以规格内有界算子作为不变式校验
+\* （如 `BoundedBuffer == Len(buffer) <= BufferSize` 并列入 INVARIANTS）；
+\* 状态空间过大的正道是缩小常量规模与规格拆解（反模式 #16 家族）
 ```
 
 ### 配置选项详解（Configuration Options Explained）
@@ -2165,7 +2258,7 @@ SYMMETRY
 
 ### 状态约束（State Constraints）
 
-限制探索至满足约束的状态：
+> **W 模型门禁禁用 `CONSTRAINT`/`CONSTRAINTS`**（B10c，`check-tla-model.ts` 直接违规化）：不得用状态约束砍状态空间来掩盖死锁/状态爆炸——被约束截掉的状态恰是缺陷藏身处。以下为 TLC 原生语法，仅作认知，W 模型门禁下不可用：
 
 ```cfg
 CONSTRAINT
@@ -2175,6 +2268,15 @@ CONSTRAINT
 CONSTRAINT StateConstraint1
 CONSTRAINT StateConstraint2
 ```
+
+需要「有界探索」时的**正道**：在**规格内**定义有界算子并作为不变式校验（越界即作为缺陷暴露，而非作为 cfg 约束静默截断搜索）——
+
+```tla
+\* 规格内定义有界算子（cfg 中以算子名 `CtrBound` 引用，而非内联表达式）
+CtrBound == counter < 100 /\ Len(buffer) <= 10
+```
+
+状态空间确实过大时走**规格拆解**（反模式 #16 家族，见「拆解判定」节）或缩小 CONSTANTS 规模。
 
 ### 动作约束（Action Constraints）
 
@@ -2250,13 +2352,18 @@ SYMMETRY Permutations(Procs)
 CONSTANTS Procs = {1, 2, 3}
 ```
 
-### 3. 为大模型添加状态约束
+### 3. 控制大模型的状态空间（走正道，不用 cfg 约束）
 
 ```cfg
-\* Limit exploration depth
-CONSTRAINT
-    clock < 10 /\
-    \A p \in Procs : counter[p] < 5
+\* 正道：缩小常量规模 + 对称性归约 + 规格拆解（反模式 #16 家族）
+CONSTANTS
+    N = 2
+    MaxValue = 3
+
+\* Gradually increase after verification
+
+\* W 模型禁用 cfg CONSTRAINT 砍状态空间（B10c）：
+\* 状态爆炸时缩小 CONSTANTS / 拆解规格，而不是截断搜索掩盖爆炸
 ```
 
 ### 4. 分离安全性与活性检查
@@ -2293,8 +2400,8 @@ ALIAS
 ### 状态空间爆炸
 
 - 减小常量值
-- 添加状态约束
 - 使用对称性归约
+- 规格拆解（反模式 #16 家族；cfg CONSTRAINT 已被 W 模型门禁禁用，不得砍状态空间）
 - 先尝试模拟模式
 
 ### 活性检查缓慢
