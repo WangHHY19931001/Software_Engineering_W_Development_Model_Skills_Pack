@@ -19,7 +19,7 @@
       "format": "date-time"
     },
     "history": {
-      "description": "升级历史数组（每次升级 append 一条；只承载升级链，降级走 human 审批链不记 history；R4 校验每条 at 不得早于 project.createdAt；R6 校验 from==上一条 to / to 严格高于 from / 末条 to 不低于 level——降级后 level 低于末条合法，只锁伪造升级）",
+      "description": "升级历史数组（每次升级 append 一条；只承载升级链，降级走 human 审批链不记 history；R4 校验每条 at 不得早于 project.createdAt；R6 校验首条 from==L0（决策 #3 43.1.0：完整升级链须自 L0 起步）/ from==上一条 to / to 严格高于 from / 末条 to 不低于 level——降级后 level 低于末条合法，只锁伪造升级）",
       "type": "array",
       "items": {
         "description": "单条成熟度升级历史（LevelHistory：from + to + at + reason）",
@@ -28,7 +28,7 @@
         "required": ["from", "to", "at", "reason"],
         "properties": {
           "from": {
-            "description": "升级前级别（L0/L1/L2/L3；R6 校验首条外须等于上一条 to）",
+            "description": "升级前级别（L0/L1/L2/L3；R6 校验首条须为 L0（决策 #3 43.1.0），其后每条须等于上一条 to）",
             "enum": ["L0", "L1", "L2", "L3"]
           },
           "to": {

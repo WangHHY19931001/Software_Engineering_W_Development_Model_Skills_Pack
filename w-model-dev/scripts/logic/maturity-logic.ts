@@ -40,7 +40,7 @@ export interface MaturityConfig {
   level: 'L0' | 'L1' | 'L2' | 'L3';
   /** 升级到此级别的时间 ISO 8601 */
   leveledUpAt: string;
-  /** 升级历史（只承载升级链；降级走 human 审批链，不记 history，A4 43.0.0。降级形态 = level 低于末条 to，须 R8 human 授权，43.1.0） */
+  /** 升级历史（只承载升级链；降级走 human 审批链，不记 history，A4 43.0.0。降级形态 = level 低于末条 to，须 R8 human 授权，43.1.0。链须自 L0 起步，决策 #3 43.1.0） */
   history: Array<{
     from: 'L0' | 'L1' | 'L2' | 'L3';
     to: 'L0' | 'L1' | 'L2' | 'L3';
@@ -172,12 +172,16 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
     );
   }
 
-  // R6 history 链一致性（A4，43.0.0；决策日志 rounds-48 三判定；批次 6 修复轮 1 审查裁定第三判定放宽）：
-  //   1. from == 上一条 to（首条无前驱，不约束起点——存量形态允许 L1→L2 起头的升级链切片）；
+  // R6 history 链一致性（A4，43.0.0；决策日志 rounds-48 三判定；批次 6 修复轮 1 审查裁定第三判定放宽；
+  //   批次 7 决策 #3 43.1.0 新增第四判定——首条 from 须为 L0，完整升级链自 L0 起步）：
+  //   1. from == 上一条 to（首条无前驱，不断链——起点由第四判定单独约束）；
   //   2. to > from（LEVEL_ORDER 严格比较；history 只承载升级链，降级走 human 审批链）；
   //   3. 末条 to 不低于当前 level（降级后 level 低于末条属合法形态——R6 只锁「level 高于升级链末条」
-  //      的伪造升级虚高路径；降级形态本身由 R8 单独锁死：须 human 审批链，43.1.0 决策 #2）。
-  // 破链/跳级/平级/level 虚高（高于链末条）即伪造路径——machine 层 fail-closed。
+  //      的伪造升级虚高路径；降级形态本身由 R8 单独锁死：须 human 审批链，43.1.0 决策 #2）；
+  //   4. 首条 from == L0（决策 #3，43.1.0）：完整升级链须自 L0 起步——存量 L1→L2 切片链不再合法
+  //      （迁移：e2e 装配器 maturity.json 前插 L0→L1）。与第三判定可并存：降级链（level 低于末条）
+  //      仍须自 L0 起头。
+  // 破链/跳级/平级/起点非 L0/level 虚高（高于链末条）即伪造路径——machine 层 fail-closed。
   if (Array.isArray(m.history)) {
     let prevTo: string | undefined;
     for (const [i, h] of m.history.entries()) {
@@ -193,6 +197,11 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
         violations.push(`R6: history[${i}] from=${String(h.from)} 与上一条 to=${prevTo} 断链（from 须等于上一条 to）`);
       }
       prevTo = h.to;
+    }
+    // 第四判定（决策 #3，43.1.0）：首条 from 须为 L0——升级链是完整链，不接受 L1/L2 起头的切片
+    const first = m.history.length > 0 ? m.history[0] : undefined;
+    if (first && typeof first === 'object' && first.from !== 'L0') {
+      violations.push(`R6: history[0] from=${String(first.from)} ≠ L0（完整升级链须自 L0 起步）`);
     }
     if (m.level) {
       const last = m.history.length > 0 ? m.history[m.history.length - 1] : undefined;

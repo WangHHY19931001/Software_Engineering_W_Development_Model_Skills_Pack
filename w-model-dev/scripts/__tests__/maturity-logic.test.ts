@@ -15,6 +15,7 @@
  *   - CLI 三态（真实 tsx 子进程 + 真实临时 run-log）：仅引用 → exit 0 + 诊断 /
  *     字段标注 3 次 → exit 1 + R5 违规 / 未提供 --run-log → exit 0 + 诊断
  *   - A4（43.0.0）R6 history 链一致性：from == 上一条 to / to > from（严格）/ 末条 to 不低于当前 level（降级合法）
+ *     + 决策3（43.1.0）首条 from == L0（完整升级链须自 L0 起步；存量 L1→L2 切片链不再合法）
  *     （原 R3 completedCycles 周期校验随 unlockConditions 死字段删除而退役，规则号不回收）
  *   - A14（43.1.0）R7 project.status 转移合法性（judge 单点复用）
  *   - 决策2（43.1.0）R8 降级须 human 授权：降级形态（level < history 末条 to）经 CLI 装载签名链
@@ -98,11 +99,14 @@ describe('checkMaturity', () => {
 
 /**
  * A4 销账（批次 6 任务 8）：maturity.level 此前由被门禁者自写即可关闭 TLA+/BDD 门禁，
- * history 无链校验。R6 三判定（审计裁定，决策日志 rounds-48；第三判定经批次 6 修复轮 1 放宽）：
- *   1. from == 上一条 to（首条无前驱，不约束起点——存量 e2e 资产有 L1→L2 起头形态）；
+ * history 无链校验。R6 四判定（审计裁定，决策日志 rounds-48；第三判定经批次 6 修复轮 1 放宽；
+ * 第四判定为批次 7 决策 #3，43.1.0）：
+ *   1. from == 上一条 to（首条无前驱，其起点由第四判定单独约束）；
  *   2. to > from（LEVEL_ORDER 严格比较；降级走审批链，history 只承载升级链）；
  *   3. 末条 to 不低于当前 level（降级后 level 低于末条合法——A4 起豁免须 human 审批链，
- *      降级不再构成绕过面，R6 只锁「level 高于链末条」的伪造升级；空历史 + level≠L0 亦违规）。
+ *      降级不再构成绕过面，R6 只锁「level 高于链末条」的伪造升级；空历史 + level≠L0 亦违规）；
+ *   4. 首条 from == L0（决策 #3，43.1.0）：完整升级链须自 L0 起步——存量 L1→L2 切片链不再合法
+ *      （迁移 = e2e 装配器 maturity.json 前插 L0→L1）。
  */
 describe('A4 maturity 钥匙收紧（R6 history 链）', () => {
   const mkHistory = (
@@ -192,6 +196,31 @@ describe('A4 maturity 钥匙收紧（R6 history 链）', () => {
   });
 
   it('R6：合法升级链（L0→L1→L2 且 level=L2）→ 零违规', () => {
+    const m = {
+      ...validMaturity(),
+      level: 'L2',
+      history: mkHistory([
+        ['L0', 'L1'],
+        ['L1', 'L2'],
+      ]),
+    };
+    const r = checkMaturity(m);
+    expect(r.passed).toBe(true);
+    expect(r.violations).toHaveLength(0);
+  });
+
+  it('决策3：history 首条 from≠L0 → R6 违规「完整升级链须自 L0 起步」', () => {
+    const m = {
+      ...validMaturity(),
+      level: 'L2',
+      history: mkHistory([['L1', 'L2']]),
+    };
+    const r = checkMaturity(m);
+    expect(r.passed).toBe(false);
+    expect(r.violations.some((v) => v.startsWith('R6:') && v.includes('完整升级链须自 L0 起步'))).toBe(true);
+  });
+
+  it('决策3b：首条 from==L0 的切片链（L0→L1→L2）→ 零违规（迁移后形态）', () => {
     const m = {
       ...validMaturity(),
       level: 'L2',

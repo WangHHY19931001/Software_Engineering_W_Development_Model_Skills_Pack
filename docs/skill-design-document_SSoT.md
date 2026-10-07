@@ -1783,8 +1783,9 @@ interface MaturityConfig {
 > （含 completedCycles）被审计证实为无计算器/零消费死字段，已自 schema 与 check-maturity.ts 删除
 > （原 R3 周期换算校验随之退役，规则号不回收；决策日志 `docs/changes/decision-log/rounds-48-trust-chain.md`）。
 > 阶段完成计数的事实源仍为 run-log 的 `action=checkpoint ∧ outcome=success` 记录（check-run-log R1/R11 承担）；
-> 成熟度侧的机器防线改为 **R6 history 链一致性**（from==上一条 to / to 严格高于 from / 末条 to 不低于
-> level——修复轮 1 放宽：降级后 level 低于末条合法，R6 只锁伪造升级，见 §10R）
+> 成熟度侧的机器防线改为 **R6 history 链一致性**（首条 from==L0（决策 #3，43.1.0：完整升级链须自 L0 起步）/
+> from==上一条 to / to 严格高于 from / 末条 to 不低于 level——修复轮 1 放宽：降级后 level 低于末条合法，
+> R6 只锁伪造升级，见 §10R）
 > 与 **level 变更 human 签名链审批**（`verifyMaturityApproval`，fail-closed；43.1.0 决策 #2 增
 > **R8 降级须 human 授权**：降级形态同一链条目，无授权 blocking——降级无法过闭环五门；
 > **降级专属绑定**（修复轮 1 R-B7-7）：R8 传 `requireAction='downgrade-approve'` 严格过滤 action，

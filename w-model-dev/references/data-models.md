@@ -606,7 +606,8 @@ interface MaturityConfig {
   level: 'L0' | 'L1' | 'L2' | 'L3';
   /** 升级到此级别的时间 ISO 8601 */
   leveledUpAt: string;
-  /** 升级历史（只承载升级链；降级走 human 审批链，不记 history——43.0.0 A4。
+  /** 升级历史（只承载升级链；须自 L0 起步——首条 from == L0，决策 #3 43.1.0。
+      降级走 human 审批链，不记 history——43.0.0 A4。
       降级形态 = level 低于末条 to，须 role=human / targetKind=maturity 审批（check-maturity R8，43.1.0 决策 #2） */
   history: Array<{
     from: 'L0' | 'L1' | 'L2' | 'L3';
@@ -629,7 +630,8 @@ interface MaturityConfig {
 > 已自 schema 与校验逻辑删除（毁弃存量，不兼容；`downgradeTriggers` 本身保留：`operationalFailureStreak`
 > + `userRequested` 两字段）；「解锁条件」现为 operational-recovery.md 文档层语义，
 > **无机器校验**。原 R3（completedCycles 周期换算）随之退役，R4/R5 编号保持稳定，新增 R6（history 链一致性：
-> from == 上一条 to / to 严格高于 from / 末条 to 不低于当前 level——R6 只锁伪造升级）。level 的机器消费点（check-artifact-gate
+> 首条 from == L0（决策 #3，43.1.0——完整升级链须自 L0 起步，存量 L1→L2 切片链不再合法）/ from == 上一条 to /
+> to 严格高于 from / 末条 to 不低于当前 level——R6 只锁伪造升级）。level 的机器消费点（check-artifact-gate
 > TLA+/BDD 豁免分支）须 `role=human / targetKind=maturity` 签名链审批（`verifyMaturityApproval`，fail-closed）。
 > **43.1.0（批次 7 决策 #2）**：新增 **R8 降级须 human 授权**——降级形态（level 低于 history 末条 to，R6 允许的合法形态）
 > 一律要求同一 `role=human / targetKind=maturity` 审批链：`check-maturity.ts` 装载 maturity.json 同目录

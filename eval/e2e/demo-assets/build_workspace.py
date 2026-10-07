@@ -533,7 +533,12 @@ write_json('.w-model/maturity.json', {
   'leveledUpAt': '2026-09-19T03:00:00+08:00',
   # 43.0.0 A4：unlockConditions 与 downgradeTriggers.budgetBurnRateExceeded / .checkpointRejectionStreak
   # 预留死字段已自 schema 删除（毁弃存量；downgradeTriggers 本身保留 operationalFailureStreak + userRequested）
-  'history': [{'at': '2026-09-19T03:00:00+08:00', 'from': 'L1', 'to': 'L2', 'reason': 'e2e 调测项目按生产小项目定级'}],
+  # 43.1.0 决策 #3：R6 第四判定要求完整升级链须自 L0 起步——首条 L0→L1（at 取 project.createdAt 同刻，
+  # R4 判据为严格早于才违规），既有 L1→L2 定级条目保持原样（末条 at 不变，审批时序判据零漂移）。
+  'history': [
+    {'at': '2026-09-19T03:00:00+08:00', 'from': 'L0', 'to': 'L1', 'reason': 'L0 起步基线（决策 #3 43.1.0：完整升级链须自 L0 起步）'},
+    {'at': '2026-09-19T03:00:00+08:00', 'from': 'L1', 'to': 'L2', 'reason': 'e2e 调测项目按生产小项目定级'},
+  ],
   'downgradeTriggers': {'operationalFailureStreak': 3, 'userRequested': False},
 })
 write_json('.w-model/budget.json', {
