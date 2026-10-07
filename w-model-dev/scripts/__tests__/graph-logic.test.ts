@@ -1872,3 +1872,92 @@ describe('check-requirement-graph CLI 锚点基准解析（D2 回归：gitignore
     }
   });
 });
+
+// ==================== A11/A12 图谱收严（批次 7 任务 8，43.1.0 breaking） ====================
+describe('A11/A12 图谱收严（批次 7 任务 8）', () => {
+  const GRAPH_SAMPLES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/graph');
+
+  /** 读取 samples/graph fixture（受控目录，路径由本文件常量拼接） */
+  async function readGraphFixture(file: string): Promise<GraphShape> {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 常量目录 + 受控文件名（同 D2 describe 先例）
+    const raw = await fs.readFile(path.join(GRAPH_SAMPLES, file), 'utf-8');
+    return JSON.parse(raw) as GraphShape;
+  }
+
+  /** 两节点 phase=1 纯 REQ 合法图（锚点合规；仅 evidenceStatus 可变） */
+  function makeStatusGraph(evidenceStatus: 'confirmed' | 'pending'): GraphShape {
+    return {
+      version: 1,
+      currentPhase: 1,
+      nodes: [
+        {
+          id: 'REQ-001',
+          type: 'REQ',
+          phase: 1,
+          title: '用户登录',
+          summary: '登录',
+          level: 1,
+          evidenceAnchor: 'docs/req.md:§4=登录需密码',
+          evidenceStatus,
+        },
+        {
+          id: 'REQ-002',
+          type: 'REQ',
+          phase: 1,
+          title: '密码策略',
+          summary: '密码',
+          level: 2,
+          reqGroup: 'REQ-001',
+          evidenceAnchor: 'docs/req.md:§4=登录需密码',
+          evidenceStatus,
+        },
+      ],
+      edges: [
+        { from: 'REQ-001', to: 'REQ-002', type: 'parent' },
+        { from: 'REQ-001', to: 'REQ-002', type: 'produces' },
+      ],
+    };
+  }
+
+  it('A11：phase=3 图 depends-on 成环 → violation（环检测不再限于 phase 1）', async () => {
+    // 正例基线：valid-phase3 fixture 在 phase=3 零违规通过（收严不得误红既有正例）
+    const base = await readGraphFixture('valid-phase3.json');
+    const ok = checkRequirementGraph(base, 3);
+    expect(ok.passed, '正例基线：valid-phase3 在 phase=3 应零违规通过').toBe(true);
+    expect(
+      ok.violations.some((v) => v.includes('R5')),
+      '正例基线不应含 R5 违规',
+    ).toBe(false);
+
+    // 注入 SD-001→SD-002→SD-001 depends-on 环（depends-on 边不参与 parent/produces 语义，环是唯一新增违规源）
+    const cycled = JSON.parse(JSON.stringify(base)) as GraphShape;
+    cycled.edges.push(
+      { from: 'SD-001', to: 'SD-002', type: 'depends-on' },
+      { from: 'SD-002', to: 'SD-001', type: 'depends-on' },
+    );
+    const bad = checkRequirementGraph(cycled, 3);
+    expect(bad.passed, 'phase=3 图 depends-on 成环应 fail').toBe(false);
+    expect(
+      bad.violations.some((v) => v.includes('R5') && v.includes('depends-on')),
+      'phase=3 图 depends-on 成环应报 R5 依赖无环违规（A11 之前环检测仅 phase=1 执行，阶段 2-4 环结构带病放行）',
+    ).toBe(true);
+  });
+
+  it('A12a：evidenceStatus=pending → violation（放行前阻断，豁免走 check-exemption）', () => {
+    const out = checkRequirementGraph(makeStatusGraph('pending'), 1);
+    expect(out.passed, 'pending 节点在放行前应被阻断（A12a 之前 pending 放行）').toBe(false);
+    const violation = out.violations.find((v) => v.startsWith('R15b ') && v.includes('pending'));
+    expect(violation, 'pending 应产生 R15b violation（文案点名放行前阻断与豁免出口）').toBeDefined();
+    expect(violation).toContain('放行前 pending 节点须转 confirmed 或走 evidence-anchor 豁免（check-exemption）');
+    expect(
+      violation?.includes('REQ-001') && violation?.includes('REQ-002'),
+      'violation 应逐一点名 pending 节点 id',
+    ).toBe(true);
+  });
+
+  it('A12b：evidenceStatus=confirmed/锚点合规 → 零违规（既有行为不回归）', () => {
+    const out = checkRequirementGraph(makeStatusGraph('confirmed'), 1);
+    expect(out.violations, 'confirmed + 合法锚点不应产生任何违规（既有放行行为不回归）').toEqual([]);
+    expect(out.passed, 'confirmed + 合法锚点应通过').toBe(true);
+  });
+});

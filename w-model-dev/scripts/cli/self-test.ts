@@ -821,6 +821,14 @@ const GRAPH_CASES: GraphCase[] = [
     description: '四维·维度3：depends-on 子图有环（REQ-002→REQ-003→REQ-002），应被 R5 依赖无环校验拦截',
   },
   {
+    file: 'bad-depends-on-cycle-phase3.json',
+    phase: 3,
+    expectedPassed: false,
+    expectedReasonPatterns: [/R5.*depends-on.*环/],
+    description:
+      'A11（批次 7 任务 8）：phase=3 图 depends-on 成环（SD-001→SD-002→SD-001），应被 R5 依赖无环校验拦截（环检测已移出 phase=1 限界、全 phase 执行；收严前阶段 2-4 环结构带病放行）',
+  },
+  {
     file: 'bad-precedes-cycle.json',
     phase: 1,
     expectedPassed: false,
@@ -867,6 +875,17 @@ const GRAPH_CASES: GraphCase[] = [
     expectedPassed: false,
     expectedReasonPatterns: [/R15b evidenceStatus 非法/],
     description: 'R15b：evidenceStatus="maybe" 非 confirmed|pending，应被状态枚举校验拦截',
+  },
+  {
+    file: 'bad-evidence-status-pending.json',
+    phase: 1,
+    expectedPassed: false,
+    expectedReasonPatterns: [
+      /R15b pending 未核验/,
+      /放行前 pending 节点须转 confirmed 或走 evidence-anchor 豁免（check-exemption）/,
+    ],
+    description:
+      'A12a（批次 7 任务 8）：锚点合规但全节点 evidenceStatus=pending，应被 R15b pending 放行前阻断拦截（pending 由放行改 violation；豁免出口走 check-exemption 第 6 类 evidence-anchor-pending；收严前 pending 节点可带病放行）',
   },
   {
     file: 'bad-evidence-path-missing.json',
