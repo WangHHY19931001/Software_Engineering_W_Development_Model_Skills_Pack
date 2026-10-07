@@ -301,11 +301,6 @@
       "sourceArtifact": "docs/phase2-design/demo-system-design.md"
     },
     {
-      "from": "SD-001",
-      "to": "SD-002",
-      "type": "depends-on"
-    },
-    {
       "from": "SD-002",
       "to": "SD-001",
       "type": "depends-on"

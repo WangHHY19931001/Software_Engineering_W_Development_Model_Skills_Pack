@@ -31,13 +31,22 @@ const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const RUN_LOG_CLI = path.resolve(TEST_DIR, '../cli/check-run-log.ts');
 
 let tmpDir: string;
+/**
+ * 本文件全部临时目录（仓内 tmpDirs 约定，同 change-scope / check-coding-plan 测试）：
+ * T13 的两处「循环内 makeTmpDir」会把 tmpDir 变量覆盖成最后一个，earlier 目录在 afterEach
+ * 只清最后一处 → 临时目录泄漏；改为入账数组、afterEach 全量清理（每轮仍独立目录，保住用例隔离）。
+ */
+const tmpDirs: string[] = [];
 
 afterEach(async () => {
-  if (tmpDir) await fs.rm(tmpDir, { recursive: true, force: true });
+  for (const dir of tmpDirs.splice(0)) {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 });
 
 async function makeTmpDir(): Promise<string> {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-run-log-r6-default-'));
+  tmpDirs.push(tmpDir);
   return tmpDir;
 }
 

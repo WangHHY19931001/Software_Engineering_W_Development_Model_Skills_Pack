@@ -37,6 +37,7 @@
 ### Docs
 
 - **§0 分节加载导引（T4/T5，B10）**：`tla-plus.md` / `bdd.md` 文件头新增节级加载表（按角色 S/V/G × 任务 建模/门禁/模板/示例/配置 给出「读哪些节」），按需加载替代整文件载入。
+- **终审顺手修（8 项，零判据新增）**：`agent-threat-model.md` T4 机制映射改 sigHash **单一 v3** 口径（删 43.0.0 前的 v1/v2 分流旧描述），T3/T4 已知缺口补「签名链可被全链重算（重签）——链为完整性/审计，非授权」（红队实验 2 边界 b2 随仓登记）；`verifier-spec.md` §6.2.1 与 `command-reference.md` R19 段补归一化哈希**生产侧算法**（LF 落盘下与 raw 等价；CRLF 产物先归一化再算）；`bdd-logic.ts` 的 B8 violation 补 `[scenario:<name>]` 前缀（与同族消息一致）；`samples/graph/bad-depends-on-cycle-phase3.json` 删注入的重复 `depends-on` 边（保留最小成环所需一条，环检出不变）；`check-run-log-cli.test.ts` 临时目录改仓内 `tmpDirs` 约定（修「循环内 makeTmpDir 覆盖变量 → 早轮目录泄漏」）；`gate-logic.ts` 终态判定显式消费 `PROJECT_STATUS_COMPLETED`（终态性与状态表长度解耦）；`eval/e2e/demo-assets/README.md` 登记 `NoOverflowState` 为 2 态抽象的结构性下限占位、非强于 `TypeInvariant`。
 - **裁定登记与权威摘要**：7 项用户决策（规格 §0）与批次 7 七项实施裁定（R-B7-1…R-B7-7）登记 [`decision-log/rounds-49-formalization-gates.md`](./docs/changes/decision-log/rounds-49-formalization-gates.md)；SSoT 新增 §10S 权威摘要与 §10A 追溯行。
 
 ### 迁移（R6 / A13 / A12 breaking 的存量项目动作）

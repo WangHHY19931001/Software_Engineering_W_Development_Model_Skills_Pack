@@ -485,9 +485,10 @@ export function validateScenarioPath(check: ScenarioPathCheck, sm: BddStateMachi
 
   // B8（2026-10-07）：When 行提取不到事件名（行末非 ASCII 词尾）时显式报错，
   // 不再静默走零事件链后把根因报成 end-state mismatch。置于 startState 短路之前，保证判据始终可见。
+  // 消息前缀与同族其余 violation 一致（`[scenario:<name>]`，终审顺手修）。
   for (const rawLine of check.whenEventExtractionFailures ?? []) {
     violations.push(
-      `When 步骤行末事件名为空/非 ASCII 词尾（事件名须为 ASCII 词 [A-Za-z0-9_]+，行末裸词或行末 (Event) 括号尾注）："${rawLine}"`,
+      `[scenario:${check.scenarioName}] When 步骤行末事件名为空/非 ASCII 词尾（事件名须为 ASCII 词 [A-Za-z0-9_]+，行末裸词或行末 (Event) 括号尾注）："${rawLine}"`,
     );
   }
 

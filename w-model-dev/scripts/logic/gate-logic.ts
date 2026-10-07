@@ -3,7 +3,7 @@ import * as nodeFs from 'node:fs';
 import * as path from 'node:path';
 
 import { validateBySchema } from '../infrastructure/schema-loader.js';
-import { PROJECT_STATUSES, RTM_FIELDS } from '../lib/constants.js';
+import { PROJECT_STATUSES, PROJECT_STATUS_COMPLETED, RTM_FIELDS } from '../lib/constants.js';
 import { SafeProjectPathError, resolveProjectRelativeRegularFile } from '../lib/safe-project-path.js';
 import type { StructuredViolation } from '../lib/types.js';
 
@@ -1711,6 +1711,17 @@ export function judgeProjectStatusTransition(
     return { legal: false, reason: `未知目标状态：${next}（须为 PROJECT_STATUSES 9 态之一）` };
   }
   if (prevIndex === nextIndex) return { legal: true, reason: null }; // 原地更新非转移
+  // A14b 终态单点消费（终审顺手修）：PROJECT_STATUS_COMPLETED 为链末终态——到达后迁出一律按
+  // 回退处置（须场景 5 用户批准）。此前终态性只是「index+1 越界」的**隐式**事实：PROJECT_STATUSES
+  // 若增补状态，终态会被静默放开；改引常数后终态语义与状态表长度解耦（单一来源精神）。
+  if (prev === PROJECT_STATUS_COMPLETED) {
+    return options?.userApprovedRollback === true
+      ? { legal: true, reason: null }
+      : {
+          legal: false,
+          reason: `终态「${PROJECT_STATUS_COMPLETED}」不可迁出（回退须场景 5 用户批准后置 userApprovedRollback）`,
+        };
+  }
   if (nextIndex === prevIndex + 1) return { legal: true, reason: null }; // 前向链下一步
   if (nextIndex < prevIndex) {
     return options?.userApprovedRollback === true

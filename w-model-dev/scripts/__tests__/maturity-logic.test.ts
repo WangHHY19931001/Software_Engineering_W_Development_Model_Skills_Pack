@@ -671,6 +671,15 @@ describe('A14：project.status 转移合法性校验（judge 单点 + checkMatur
     expect(judgeProjectStatusTransition('系统设计', '需求分析').legal, '无用户批准的回退非法').toBe(false);
     expect(judgeProjectStatusTransition('项目完成', '编码').legal, '终态「项目完成」不可迁出').toBe(false);
     expect(judgeProjectStatusTransition('编码', '项目完成').legal, '跳步到终态仍属跳步，非法').toBe(false);
+    // 终态单点消费（终审顺手修）：PROJECT_STATUS_COMPLETED 走显式终态分支——迁出仅批准回退合法，
+    // 且拒绝理由点名终态（此前依赖「index+1 越界」隐式事实，状态表增补即静默放开）。
+    const terminalExit = judgeProjectStatusTransition('项目完成', '验收测试');
+    expect(terminalExit.legal, '终态迁出无批准非法').toBe(false);
+    expect(terminalExit.reason, '拒绝理由须点名终态（显式终态判据，非回退通用文案）').toContain('不可迁出');
+    expect(
+      judgeProjectStatusTransition('项目完成', '验收测试', { userApprovedRollback: true }).legal,
+      '终态经场景 5 用户批准回退仍合法（既有语义不回归）',
+    ).toBe(true);
 
     // 仅提供 current（无 prev）→ 不做转移判定（无历史可比，不发明历史机制）
     const rNoPrev = checkMaturity(validMaturity(), { projectStatus: '编码' });

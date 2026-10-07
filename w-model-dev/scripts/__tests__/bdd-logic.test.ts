@@ -206,6 +206,8 @@ describe('validateScenarioPath', () => {
     );
     expect(v.some((s) => s.includes('事件名为空/非 ASCII 词尾'))).toBe(true);
     expect(v.some((s) => s.includes('When 用户提交登录请求'))).toBe(true);
+    // 消息前缀与同族其余 violation 一致（终审顺手修：原先缺 [scenario:<name>] 前缀）
+    expect(v.some((s) => s.startsWith('[scenario:s5]') && s.includes('事件名为空/非 ASCII 词尾'))).toBe(true);
   });
 
   it('reports When-line extraction failure even when start state is missing', () => {
