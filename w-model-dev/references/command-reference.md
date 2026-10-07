@@ -205,7 +205,7 @@ npx tsx w-model-dev/scripts/cli/check-verifier-output.ts "<output.json>"
 4. 编排者（O）分派 V 子代理按 Persona 产出 `VerifierOutput` JSON，再分派 G 子代理跑上述命令。
 5. 编排者（O）说明 A/B 且 `passed=true` 才能进入用户放行检查点；C/D 仅作为 R 定位线索，普通失败必须执行普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节），不得直接分派 S。
 
-**reviewedArtifacts 读盘三重复核（R19，A2 反伪造；43.0.0 起必填）**：`VerifierOutput.reviewedArtifacts: [{path, sha256}]` 为 Schema 必填字段（O 分派 V 时按 produce 记录的 artifacts 清单构造，V 不得自造）。CLI 对登记项读盘复核：①文件存在（缺失 → `R19 评审对象文件不存在`）；②SHA-256 一致（不符 → `R19 评审对象哈希不符`——产物已变，旧评审不再成立）；③行数表注入 logic 校验 evidence 行号越界（→ `R19 evidence 行号越界`）；logic 层另校验 evidence 的 `path:Lnn=` 引用只能指向登记的 POSIX 路径（→ `R19 evidence 引用未在 reviewedArtifacts 登记`；`§`/Windows 形态不参与绑定）。三类 R19 违规均汇入 exit 1。路径解析口径：VerifierOutput 文件所在目录优先、cwd 回退。
+**reviewedArtifacts 读盘三重复核（R19，A2 反伪造；43.0.0 起必填）**：`VerifierOutput.reviewedArtifacts: [{path, sha256}]` 为 Schema 必填字段（O 分派 V 时按 produce 记录的 artifacts 清单构造，V 不得自造）。CLI 对登记项读盘复核：①文件存在（缺失 → `R19 评审对象文件不存在`）；②SHA-256 一致——哈希口径为归一化内容（CRLF→LF）的 SHA-256（43.1.0，对 checkout 行尾配置免疫；不符 → `R19 评审对象哈希不符`——产物已变，旧评审不再成立）；③行数表注入 logic 校验 evidence 行号越界（→ `R19 evidence 行号越界`）；logic 层另校验 evidence 的 `path:Lnn=` 引用只能指向登记的 POSIX 路径（→ `R19 evidence 引用未在 reviewedArtifacts 登记`；`§`/Windows 形态不参与绑定）。三类 R19 违规均汇入 exit 1。路径解析口径：VerifierOutput 文件所在目录优先、cwd 回退。
 
 **self-as-verifier 模式**（仅限 demo / 非生产 / 教学演示项目，生产项目禁止；前置：`project.status` 标记 `selfAsVerifier: true`，V 评审须切换 Persona 视角并在 `summary` 注明，详见 [subagent-delegation.md「self-as-verifier 模式（demo/教学例外）」节](subagent-delegation.md#self-as-verifier-模式demo教学例外)与 verifier-spec §13；权威定义见 SSoT §7.6A）：单 Agent 兼任 S/V 时，V 评审后用 `--self-as-verifier --s-output=<S产出路径>` 校验 VerifierOutput 路径与 S 产出路径不同（反模式 #35）：
 

@@ -123,11 +123,11 @@
       "items": { "type": "string" }
     },
     "reviewedArtifacts": {
-      "description": "评审对象绑定清单（R19，A2 反伪造）：V 实际评审过的产物文件清单；O 分派 V 时按 produce 记录的 artifacts 清单构造，V 不得自造。evidence 中的 path:Lnn= 引用只能指向本清单内登记的 POSIX 相对路径；check-verifier-output.ts 读盘复核文件存在性与 SHA-256 一致并注入行数表供行号越界校验。登记项路径解析口径（双解析）：优先相对本 VerifierOutput 文件所在目录，未命中回退 cwd（仓内样例以仓库根为基准的项目根相对惯例，§6.2.1 evidence 同口径）",
+      "description": "评审对象绑定清单（R19，A2 反伪造）：V 实际评审过的产物文件清单；O 分派 V 时按 produce 记录的 artifacts 清单构造，V 不得自造。evidence 中的 path:Lnn= 引用只能指向本清单内登记的 POSIX 相对路径；check-verifier-output.ts 读盘复核文件存在性与归一化内容（CRLF→LF）的 SHA-256 一致并注入行数表供行号越界校验。登记项路径解析口径（双解析）：优先相对本 VerifierOutput 文件所在目录，未命中回退 cwd（仓内样例以仓库根为基准的项目根相对惯例，§6.2.1 evidence 同口径）",
       "type": "array",
       "minItems": 1,
       "items": {
-        "description": "单个被评审产物登记项（路径 + 内容 SHA-256）",
+        "description": "单个被评审产物登记项（路径 + 归一化内容（CRLF→LF）的 SHA-256）",
         "type": "object",
         "additionalProperties": false,
         "required": ["path", "sha256"],
@@ -138,7 +138,7 @@
             "pattern": "^(?!.*/\\.\\.($|/))[\\w][\\w./-]*$"
           },
           "sha256": {
-            "description": "产物内容 SHA-256（64 位小写十六进制）；由 check-verifier-output 读盘复核",
+            "description": "产物归一化内容（CRLF→LF）的 SHA-256（64 位小写十六进制）；由 check-verifier-output 读盘复核，对 checkout 行尾配置免疫（行尾差异不构成内容漂移）",
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
           }
