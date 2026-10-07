@@ -1051,12 +1051,15 @@ function hasTopLevelDisjunct(body: string): boolean {
  *     子句首尾成对平衡外括号先剥再判——`(x' = x) \/ (y' = y)` 析取全恒等仍空转）
  *     → 该名空转候选；
  *   - 存在任一非恒等赋值 → 该名推进。
- *   - 批次 8 误报窗口收口：全恒等赋值**并存非赋值子句**（纯守卫 / 裸引用）且
- *     Next 自身定义体顶层含 `\/` 析取（或整块括号形态）时不可判定——析取分支若
- *     无赋值，该分支撇号变量不受约束、可真实推进（`Next == Idle \/ Guard`，
- *     Idle == x' = x、Guard == x > 0 即误报形态）→ 保守计为推进，不误报优先。
- *     合取分解形态（`Next == A /\ B`）与间接引用（`Next == A`）顶层无 `\/`，
- *     全恒等判定照旧违规（真空转）。
+ *   - 批次 8 误报窗口收口（修复轮 1 收敛为闭包级判定）：全恒等赋值**并存非赋值子句**
+ *     （纯守卫 / 裸引用；「定义体已并入闭包的纯标识符」为拼接伪影，不计入）且**引用
+ *     闭包任一并入定义体**顶层含 `\/` 析取（或整块括号形态）时不可判定——无赋值的
+ *     析取分支撇号变量不受约束、可真实推进（直写 `Next == Idle \/ Guard` 与间接
+ *     `Next == A; A == Idle \/ Guard`，Idle == x' = x、Guard == x > 0 均为误报形态）→
+ *     保守计为推进，不误报优先。子定义体以 `/\` 并入闭包后其顶层 `\/` 仍处深度 0，
+ *     闭包级判定同时覆盖直写与间接形态；析取**全恒等**（闭包无任何非赋值子句，如
+ *     `Next == (x' = x) \/ (y' = y)` 直写或经 `Next == A; A == (x' = x) \/ (y' = y)`
+ *     间接——裸名 A 是拼接伪影而非真实守卫）仍判空转违规（批次 7 既有语义，零回归）。
  *
  * 多 NEXT 聚合（TLC 对 cfg 多 NEXT 行取合取）：全部可判定名均为空转候选才 violation
  * 「空转规格」；任一名推进 → 合取整体推进，不违规（保守方向，防误报优先）。
@@ -1087,8 +1090,10 @@ export function checkIdleNext(tlaContent: string, cfgContent: string): { passed:
   let anyProgressing = false;
   let anyUndecidable = false;
   for (const nextName of parseCfgNextNames(cfg)) {
-    // 传递引用闭包（visited 防循环）
+    // 传递引用闭包（visited 防循环）；inlinedNames 记录定义体成功并入闭包的名字，
+    // 用于识别闭包中的「纯标识符拼接伪影」（见下方子句循环）
     const visited = new Set<string>([nextName]);
+    const inlinedNames = new Set<string>();
     const bodies: string[] = [];
     const queue: string[] = [nextName];
     while (queue.length > 0) {
@@ -1096,6 +1101,7 @@ export function checkIdleNext(tlaContent: string, cfgContent: string): { passed:
       if (name === undefined) break;
       const body = extractTlaDefBody(tla, name);
       if (body == null) continue; // 定义缺失：由 §11 集合一致性 / SANY 拦截，此处跳过
+      inlinedNames.add(name);
       bodies.push(normalizeDefBody(body));
       for (const ident of body.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? []) {
         if (!visited.has(ident)) {
@@ -1112,9 +1118,12 @@ export function checkIdleNext(tlaContent: string, cfgContent: string): { passed:
       anyUndecidable = true;
       continue;
     }
-    // Next 自身定义体（闭包首个并入者，见上 queue 起始）——顶层析取判定只看它，
-    // 不看被并入的子定义体（子动作自身的内部分析取不改变 Next 顶层的合取分解语义）
-    const nextOwnBody = bodies[0] ?? '';
+    // 顶层析取判定看闭包（修复轮 1 收口）：子定义体已以 `/\` 并入闭包，间接形态
+    // （`Next == A; A == Idle \/ Guard`）的析取在 Next 自身体（bodies[0]）中不可见，
+    // 只看 bodies[0] 会漏判该误报窗口。判定逐并入定义体执行（任一体顶层含 `\/` 即真）：
+    // 拼接闭包中各体深度 0 的 `\/` 仍处深度 0，逐体判定与拼接文本口径等价，且整块
+    // 括号形态（bodies[0] == `(Idle \/ Guard)`，体级剥括号后析取在深度 0）不被拼接
+    // 后的前缀括号块掩埋——严格覆盖旧 bodies[0] 判定，方向不漏
 
     // 顶层合取/析取子句切分（归一化文本；`/\` 合取与 `\/` 析取字面）
     const conjuncts = closure
@@ -1128,6 +1137,12 @@ export function checkIdleNext(tlaContent: string, cfgContent: string): { passed:
     for (const c of conjuncts) {
       // 非赋值子句（UNCHANGED / 纯谓词 / 裸引用）不提供推进信息；var' \in 计赋值（非确定性推进）
       if (!/[A-Za-z_][A-Za-z0-9_]*'\s*(?:=|\\in)/.test(c)) {
+        // 「纯标识符且定义体已并入闭包」的子句是拼接伪影而非真实守卫——`Next == A` 的
+        // 闭包既含裸名 A 又含 A 的定义体，A 自身不提供任何约束信息；若计入非赋值子句，
+        // 析取全恒等间接形态（`Next == A; A == (x' = x) \/ (y' = y)`）会被伪影误判入
+        // 析取窗口放掉（与直写形态 violation 不一致）。未成功并入定义体的裸名（状态
+        // 变量守卫等）照旧计入，保守方向不变
+        if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(c) && inlinedNames.has(c)) continue;
         hasNonAssignmentClause = true;
         continue;
       }
@@ -1139,9 +1154,11 @@ export function checkIdleNext(tlaContent: string, cfgContent: string): { passed:
       idleCandidates.push(
         `空转规格：NEXT ${nextName} 定义体（含引用闭包）归一化后无任何 var' = 状态赋值（如 Next == TRUE / UNCHANGED x）：状态永不变化，验证不构成行为（反模式 #16）`,
       );
-    } else if (allIdentity && hasNonAssignmentClause && hasTopLevelDisjunct(nextOwnBody)) {
-      // 批次 8 误报窗口收口：顶层析取下「全恒等 + 非赋值（纯守卫/裸引用）子句」不可判定——
-      // 无赋值的析取分支撇号变量不受约束、可真实推进；保守计为推进（不误报优先）
+    } else if (allIdentity && hasNonAssignmentClause && bodies.some((b) => hasTopLevelDisjunct(b))) {
+      // 批次 8 误报窗口收口（修复轮 1 闭包级判定）：闭包任一并入定义体顶层析取下
+      // 「全恒等 + 真实非赋值（纯守卫/裸引用）子句」不可判定——无赋值的析取分支撇号
+      // 变量不受约束、可真实推进；保守计为推进（不误报优先）。析取全恒等（无非赋值
+      // 子句，拼接伪影已剔除）不受此窗口影响，照旧判空转违规
       anyProgressing = true;
     } else if (allIdentity) {
       idleCandidates.push(

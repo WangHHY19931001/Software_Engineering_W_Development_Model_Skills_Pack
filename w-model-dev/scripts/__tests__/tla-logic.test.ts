@@ -1024,6 +1024,69 @@ describe('B10 空转 Next 检测（无状态赋值 / 全恒等自赋值）', () 
     // 顶层无 \/ 析取的合取分解形态：全恒等判定照旧违规（真空转），不被析取窗口放掉
     expect(checkIdleNext(tlaConj, cfgNext).violations.some((v) => v.includes('空转规格'))).toBe(true);
   });
+
+  // ==================== 批次 8 修复轮 1：间接析取窗口收口（closure 级判定） ====================
+
+  it('间接析取窗口：Next == A; A == Idle \\/ Guard（Idle 恒等 + Guard 纯守卫）→ 零违规（不误报）', () => {
+    const tla = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x',
+      'Init == x = 0',
+      'Next == A',
+      'A == Idle \\/ Guard',
+      "Idle == x' = x",
+      'Guard == x > 0',
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    // 析取在子定义体 A 内、Next 自身体（bodies[0] == "A"）不可见——修复前只看 bodies[0]
+    // 判 violation 属误报：Guard 分支无任何赋值，撇号变量不受约束、规格可真实推进。
+    // 修复后判定看闭包（逐并入定义体，任一体顶层 \/ 即真），窗口照常触发 → 保守计为
+    // 推进（与直写形态 Next == Idle \/ Guard 零违规一致）
+    expect(checkIdleNext(tla, cfgNext).passed, '间接析取分支误报窗口应保守放行').toBe(true);
+  });
+
+  it("间接析取合取分解窗口：Next == A /\\ B; A == (x' = x) \\/ Guard → 零违规（不误报）", () => {
+    const tla = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x, y',
+      'Init == x = 0 /\\ y = 0',
+      'Next == A /\\ B',
+      "A == (x' = x) \\/ Guard",
+      "B == y' = y",
+      'Guard == x > 0',
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    // 析取同样藏于子定义体 A 内（合取分解 + 间接引用复合形态）：Guard 分支撇号变量
+    // （x'、y'）不受约束、可真实推进，判 violation 属误报 → 闭包级判定保守放行
+    expect(checkIdleNext(tla, cfgNext).passed, '复合形态间接析取窗口应保守放行').toBe(true);
+  });
+
+  it("间接析取全恒等不放掉：Next == A; A == (x' = x) \\/ (y' = y) → 违规「空转规格」", () => {
+    const tla = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x, y',
+      'Init == x = 0 /\\ y = 0',
+      'Next == A',
+      "A == (x' = x) \\/ (y' = y)",
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    // 预期：violation，与直写形态 (x' = x) \/ (y' = y)（上方批次 8 rider 锁定用例）一致。
+    // 依据：析取窗口放行条件是「全恒等 + 真实非赋值子句 + 闭包顶层析取」——本形态闭包
+    // （"A /\ (x' = x) \/ (y' = y)"）虽含顶层 \/，但唯一「非赋样子句」是裸名 A，它是
+    // Next == A 引用闭包的拼接伪影（A 的定义体已并入同一闭包，A 自身不提供任何约束
+    // 信息），不计入非赋值子句；剔除伪影后闭包无任何非赋值子句，不满足放行条件 →
+    // 全恒等判定照旧违规（批次 7 既有语义零回归）。若此用例转绿为「零违规」即说明
+    // 伪影剔除缺失，间接与直写两形态判定出现分叉
+    const result = checkIdleNext(tla, cfgNext);
+    expect(result.passed, '间接析取全恒等应判失败（与直写形态一致）').toBe(false);
+    expect(result.violations.some((v) => v.includes('空转规格'))).toBe(true);
+  });
 });
 
 // ==================== extractTlaDefBody 定义体提取边界（批次 8 rider） ====================
