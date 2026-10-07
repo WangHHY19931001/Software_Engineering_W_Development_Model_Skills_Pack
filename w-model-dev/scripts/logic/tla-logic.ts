@@ -602,35 +602,27 @@ function stripTlaComments(tlaContent: string): string {
  * 从 .tla 文本提取 `VARIABLES` 声明的状态变量名集合（I5 终审修复，B9 schema 承诺落地）。
  *
  * - 声明面：`VARIABLES x, y` / `VARIABLE x`（关键字须位于行首，允许前导空白）；
- *   续行形态（上一行以 `,` 结尾）一并收集。
+ *   续行形态（该行以 `,` 结尾）继续收集下一行，直到某行不以 `,` 结尾（声明结束）。
  * - 剥离块注释与行注释后再扫描（注释中的声明不计入）。
  * - **提取失败返回 undefined**（无 `VARIABLES` 行 / 未取到任何合法标识符 / 文本为空）——
  *   调用方据此跳过名集合比对，不把「解析不到」误红成 violation（fail-open 方向保守）。
  * - 标识符判据 `[A-Za-z_][A-Za-z0-9_]*`；`VARIABLES` 后的其它记号（如换行后的定义体）不收集。
+ *   实现用「收集态」顺序扫描（无动态下标取值，避免 security/detect-object-injection）。
  */
 export function extractTlaVariableNames(tlaContent: string): Set<string> | undefined {
   if (typeof tlaContent !== 'string' || tlaContent.trim() === '') return undefined;
-  const stripped = stripTlaComments(tlaContent);
   const names = new Set<string>();
-  const lines = stripped.split('\n');
-  let index = 0;
-  while (index < lines.length) {
-    const line = lines[index] ?? '';
-    const head = /^[ \t]*(?:VARIABLES|VARIABLE)\b/.exec(line);
-    if (!head) {
-      index += 1;
-      continue;
-    }
-    let declaration = line.slice(head[0].length);
-    // 续行：上一段以 `,` 结尾时把下一行并进来（TLA+ 允许多行 VARIABLES 列表）
-    while (declaration.trimEnd().endsWith(',') && index + 1 < lines.length) {
-      index += 1;
-      declaration += ` ${lines[index] ?? ''}`;
-    }
+  let collecting = false;
+  for (const rawLine of stripTlaComments(tlaContent).split('\n')) {
+    const head = /^[ \t]*(?:VARIABLES|VARIABLE)\b/.exec(rawLine);
+    if (head) collecting = true;
+    if (!collecting) continue;
+    const declaration = head ? rawLine.slice(head[0].length) : rawLine;
     for (const token of declaration.split(/[,\s]+/)) {
       if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(token)) names.add(token);
     }
-    index += 1;
+    // 不以 `,` 结尾 = 声明结束（TLA+ 多行 VARIABLES 列表靠行尾逗号延续）
+    if (!declaration.trimEnd().endsWith(',')) collecting = false;
   }
   return names.size > 0 ? names : undefined;
 }

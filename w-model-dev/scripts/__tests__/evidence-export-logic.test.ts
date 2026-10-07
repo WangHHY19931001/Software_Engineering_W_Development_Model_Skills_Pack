@@ -1536,25 +1536,30 @@ describe('决策4：*_token 变体盲区消除 + 防复生（批次 7）', () =>
 
   // ==================== I4（终审修复波）：camelCase 家族盲区消除（决策 #4 点名变体） ====================
   it('决策4e：reviewer 实测的 camelCase 家族全脱敏（I4 前整键明文导出）', () => {
-    const keys = [
-      'refreshToken',
-      'sessionToken',
-      'jwtToken',
-      'authToken',
-      'bearerToken',
-      'idToken',
-      'apiToken',
-      'oAuthToken',
-      'secretKey',
-      'apiKey',
-    ] as const;
-    const input: Record<string, unknown> = {};
-    for (const k of keys) input[k] = 'plaintext-secret';
-    input['nested'] = { refreshToken: 'nested-plaintext', oAuthToken: 'nested-oauth' };
-    const redacted = redact(input) as Record<string, unknown>;
-    for (const k of keys) {
-      expect(redacted[k], `${k} 应脱敏（I4 前为明文——决策 #4「不切驼峰」口径撤销）`).toBe('[REDACTED]');
-    }
+    // 逐键字面量断言（不用动态下标：既避开 security/detect-object-injection，也让每变体自证）
+    const redacted = redact({
+      refreshToken: 'plaintext-secret',
+      sessionToken: 'plaintext-secret',
+      jwtToken: 'plaintext-secret',
+      authToken: 'plaintext-secret',
+      bearerToken: 'plaintext-secret',
+      idToken: 'plaintext-secret',
+      apiToken: 'plaintext-secret',
+      oAuthToken: 'plaintext-secret',
+      secretKey: 'plaintext-secret',
+      apiKey: 'plaintext-secret',
+      nested: { refreshToken: 'nested-plaintext', oAuthToken: 'nested-oauth' },
+    }) as Record<string, unknown>;
+    expect(redacted['refreshToken'], 'refreshToken 应脱敏').toBe('[REDACTED]');
+    expect(redacted['sessionToken'], 'sessionToken 应脱敏').toBe('[REDACTED]');
+    expect(redacted['jwtToken'], 'jwtToken 应脱敏').toBe('[REDACTED]');
+    expect(redacted['authToken'], 'authToken 应脱敏').toBe('[REDACTED]');
+    expect(redacted['bearerToken'], 'bearerToken 应脱敏').toBe('[REDACTED]');
+    expect(redacted['idToken'], 'idToken 应脱敏').toBe('[REDACTED]');
+    expect(redacted['apiToken'], 'apiToken 应脱敏').toBe('[REDACTED]');
+    expect(redacted['oAuthToken'], 'oAuthToken 应脱敏（大写序列切换 o|Auth|Token）').toBe('[REDACTED]');
+    expect(redacted['secretKey'], 'secretKey 应脱敏').toBe('[REDACTED]');
+    expect(redacted['apiKey'], 'apiKey 应脱敏（api+key 跨驼峰拼接）').toBe('[REDACTED]');
     // 递归脱敏对驼峰键同样生效
     expect(redacted['nested']).toEqual({ refreshToken: '[REDACTED]', oAuthToken: '[REDACTED]' });
   });
