@@ -179,10 +179,14 @@ export type EdgeType =
   | 'realizes'
   | 'produces'
   // 已移除：'consumes'（D21：信息流层统一用 produces，双向语义由 from/to 表达）
-  // 新增（多层图谱横切层，见 graph-guide.md §7）
+  // 多层图谱横切层（见 graph-guide.md §7）
   | 'governs' // 治理层：治理类子系统 → 被治理子系统
   | 'collaborates-with' // 协作层：节点 ↔ 节点 对等协作
-  | 'derives'; // 派生层：派生规格节点 → 派生产物
+  | 'derives' // 派生层：派生规格节点 → 派生产物
+  // 四维识别·维度1/3 扩展边（phase=1 时启用校验）
+  | 'precedes' // 时序层：REQ→REQ 时序先于
+  | 'conflicts-with' // 冲突层：REQ→REQ 冲突/互斥（单向写入，语义双向）
+  | 'cross-cuts'; // 横切层：NFR/CON→REQ 横切治理
 ```
 
 **边类型与源节点 marker 对应**：
