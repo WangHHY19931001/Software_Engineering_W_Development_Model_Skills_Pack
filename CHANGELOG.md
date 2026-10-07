@@ -7,6 +7,14 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [43.0.1] - 2026-10-07
+
+### Fixed
+
+- **环境（autocrlf×R19）**：新增 `.gitattributes` 强制全仓 LF 落盘并 renormalize——修复全局 `core.autocrlf=true` 下新 clone 首次 self-test 的 R19 哈希假红（合并期实测发现）。机制侧归一化哈希随 43.1.0 落地。
+
+**验证记录**：self-test 403/403（renormalize 后回配）；fresh-clone 实证 LF 落盘成立；prepush 19 项全绿（实测耗时见 git log）。
+
 ## [43.0.0] - 2026-10-06
 
 ### 批次 6：信任链关键修复 + legacy 全清除（15 实现任务 + 3 审查修复轮，A1-A9 / A15 / C1 / C2 / C4 / C14 全部销账 + 级联清扫；规格 [`docs/superpowers/specs/2026-10-06-w-model-remediation-design.md`](./docs/superpowers/specs/2026-10-06-w-model-remediation-design.md) §5，裁定登记 [`decision-log/rounds-48-trust-chain.md`](./docs/changes/decision-log/rounds-48-trust-chain.md)，SSoT 权威摘要 §10R）
