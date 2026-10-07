@@ -4,7 +4,7 @@
 > S 子代理（产出 .tla + .cfg + 更新 manifest）、V 子代理（评审合规性）、G 子代理（跑 check-tla-model.ts）必读。
 > 权威设计见 `docs/tla-plus-modeling-design.md`。
 
-> **§0 按需分节加载导引**（约束 #6）：本文件约 2300 行，按「角色 × 任务」只读所需节，禁止整文件载入上下文。
+> **§0 按需分节加载导引**（约束 #6）：本文件约 2400 行，按「角色 × 任务」只读所需节，禁止整文件载入上下文。
 >
 > | 角色 × 任务                  | 只读章节                                                                                                              |
 > | ---------------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -89,7 +89,7 @@ TLA+ 门禁是 W 模型第三维度门禁——与结构连通门禁（graph）�
 | 信息流闭合 | 节点既是生产者又是消费者 | `check-requirement-graph.ts` |
 | **行为正确性** | **状态机无死锁、不变式成立、无状态爆炸** | **`check-tla-model.ts`** |
 
-死锁防御的规格内形态：为每个规格配套 `NoStuckState` 不变式（模板见 §12 cfg 结构规则「死锁防御配套不变式模板」），把「无死锁」从门禁退出码升级为规格内可校验命题。`CHECK_DEADLOCK FALSE` 只会掩盖死锁、不构成豁免；确需豁免时走豁免审批门禁（`check-exemption.ts`）并在 run-log 登记理由。
+死锁防御的规格内形态：为每个规格配套 `NoStuckState` 不变式（模板见 §12 cfg 结构规则「死锁防御配套不变式模板」），并以**终态自环动作**让 `ENABLED Next` 在预期终态成立（主形态，死锁检查保持 `CHECK_DEADLOCK TRUE`），把「无死锁」从门禁退出码升级为规格内可校验命题。TLC 死锁检查不计 stuttering 步，`[Next]_vars` 不能让终态免检；`CHECK_DEADLOCK FALSE` 只会掩盖死锁、本身不构成豁免——遗留规格确需豁免时走豁免审批门禁（`check-exemption.ts`）并在 run-log 登记理由。
 
 ## 为什么需要模型检查穷举
 
@@ -434,7 +434,7 @@ npx tsx w-model-dev/scripts/cli/check-tla-model.ts <tla-manifest.json> [--phase=
 9. **states 自动清理**：见下方「TLA+ states 目录自动清理」节。
 
 > **编码调试顺序（硬约束）**：先清轨迹 → SANY 语法通过 → 才允许跑 TLC。违反命中反模式 #14。
-> **.cfg 模式选择**：`SPECIFICATION Spec` 使用 `[Next]_vars` 带 stuttering，可避免终态被误报为死锁；`INIT Init` + `NEXT Next` 不带 stuttering，终态会触发死锁。建模时通常用 `SPECIFICATION Spec`，仅在刻意要检测终态死锁时才用 `INIT/NEXT`。
+> **.cfg 模式选择**：TLC 死锁检查不计 stuttering 步——`SPECIFICATION Spec` 的 `[Next]_vars` 允许 stuttering，并不能让预期终态免检（终态照报 `Error: Deadlock reached.`，TLC 2.19 实测）；`INIT Init` + `NEXT Next` 在死锁检查行为上与之相同。预期终态的免检正道是给 `Next` 配终态自环动作（§12「终态自环主形态」），而非换 cfg 模式或关死锁检查。
 
 ### TLA+ states 目录自动清理
 
@@ -640,8 +640,20 @@ NoStuckState == \A s \in States : s \in Terminal \/ ENABLED Next
 ```
 
 - `NoStuckState` 属业务不变式（名字不以 `Type` 开头），须纳入 `BusinessInvariant` 聚合并写入 `.cfg` `INVARIANTS`（§11）。
-- 闭合系统到达「全部完成」态后由 `[Next]_vars` stuttering 终止，属正常形态；此时不需要也不应该关死锁检查。
-- 死锁豁免不得用 `CHECK_DEADLOCK FALSE` 掩盖；确需豁免时走豁免审批（`check-exemption.ts`，E1-E9）并登记理由。
+
+  > 更精确的写法：状态变量可直接判定终态时，可写 `current \in Terminal \/ ENABLED Next`（`current` 为状态变量），省去对状态值全集的量化。
+
+- **终态自环主形态**：闭合系统到达「全部完成」等预期终态属正常形态，但 TLC 死锁检查**不计 stuttering 步**——`[Next]_vars` 允许 stuttering 并不能让终态免检，无自环的终止规格实测报 `Error: Deadlock reached.`（TLC 2.19，exit 11 → 门禁 exit 1）。正道是给 `Next` 增加终态自环动作（加进析取分支；守卫按规格实际终态条件替换，`vars` 为状态变量组），让 `ENABLED Next` 在终态成立、死锁检查（`CHECK_DEADLOCK TRUE`）保持开启：
+
+```tla
+\* 终态自环动作模板（加进 Next 析取分支）
+AllDone == /\ \A s \in States : s \in Terminal   \* 预期终态判据（占位）
+           /\ UNCHANGED vars
+```
+
+  完整实例见 Example 5 Elevator 的 `AllDone`。
+
+- **显式豁免兜底形态**：遗留规格无法补自环时，才允许 `CHECK_DEADLOCK FALSE`，且必须走豁免审批（`check-exemption.ts`，E1-E9）并登记理由；单独写 `CHECK_DEADLOCK FALSE` 不构成豁免。
 
 > 不变式数量计数是跨产物交叉校验的枢纽：`.cfg` 声明数 = `.tla` `BusinessInvariant` 展开数 = verifier-output 不变式描述数，三者一致才放行（治 D27 三处不一致）。
 
@@ -1677,6 +1689,13 @@ PassengerArrives(p) ==
     /\ PersonState' = [PersonState EXCEPT ![p] =
         [@ EXCEPT !.location = pState.destination, !.waiting = FALSE]]
     /\ UNCHANGED <<ElevatorState, ActiveElevatorCalls>>
+\* 终态自环：全员到达且无待处理呼叫后，规格以显式自环动作停留在终态——
+\* 让 ENABLED Next 在终态成立，死锁检查（CHECK_DEADLOCK TRUE）得以保持开启。
+\* TLC 死锁检查不计 stuttering 步：无此自环时终态报 Error: Deadlock reached.（TLC 2.19 实测）
+AllDone ==
+    /\ ActiveElevatorCalls = {}
+    /\ \A p \in Person : ~PersonState[p].waiting
+    /\ UNCHANGED Vars
 Next ==
     \/ \E p \in Person : CallElevator(p)
     \/ \E e \in Elevator : StartElevator(e, "Up")
@@ -1686,6 +1705,7 @@ Next ==
     \/ \E e \in Elevator : MoveElevator(e)
     \/ \E e \in Elevator : ReverseDirection(e)
     \/ \E p \in Person : PassengerArrives(p)
+    \/ AllDone
 Spec == Init /\ [][Next]_Vars
 \* Safety: elevator doors only open at valid floors
 DoorsOpenAtValidFloor ==
@@ -1694,7 +1714,7 @@ DoorsOpenAtValidFloor ==
 \* Liveness: every call eventually serviced——时序属性须在公平性规格下以
 \* TLC PROPERTIES + SPECIFICATION FairSpec 检查；无公平性的 Spec 下该属性
 \* 不成立也不检查，不得列入 safety cfg 的 INVARIANTS（cfg 示例 3 只查 safety）
-FairSpec == Spec /\ WF_vars(Next)
+FairSpec == Spec /\ WF_Vars(Next)
 CallsServiced == \A c \in ElevatorCall :
     c \in ActiveElevatorCalls ~> \E e \in Elevator : CanServiceCall[e, c]
 =============================================================================
@@ -2025,11 +2045,12 @@ INVARIANTS
     MutualExclusion
 
 \* Properties to check (including liveness)
-\* names MUST be operators actually defined in the .tla（时序属性算子，如 CallsServiced）
+\* names MUST be operators actually defined in the .tla（悬空引用 → TLC 报错）
+\* 时序属性须在公平性规格下以 PROPERTIES 检查——接线真实例：Example 5 Elevator 的
+\* FairSpec == Spec /\ WF_Vars(Next) 配 SPECIFICATION FairSpec + PROPERTIES CallsServiced
+\* （属性成立与否由 TLC 检查判定；cfg 示例 3 只做 safety 检查，不列 PROPERTIES）
 PROPERTIES
-    Liveness
-    Termination
-    Progress
+    CallsServiced
 
 \* Symmetry sets for optimization
 SYMMETRY
@@ -2126,8 +2147,10 @@ INVARIANTS
 SYMMETRY
     Permutations(Person)
 
-\* 不关死锁检查：闭合系统到达「全员到达」终态后由 [Next]_vars stuttering 终止；
-\* 公理「正常软件系统不允许死锁」——CHECK_DEADLOCK FALSE 只会掩盖死锁，不构成豁免
+\* 死锁检查保持开启：Example 5 Elevator 的 Next 已配终态自环动作 AllDone（全员到达
+\* 且无待处理呼叫时 UNCHANGED Vars），使 ENABLED Next 在终态成立、无终态死锁误报。
+\* TLC 死锁检查不计 stuttering 步，勿依赖 [Next]_vars 兜终态；遗留规格确需
+\* CHECK_DEADLOCK FALSE 时须走 check-exemption 理由登记，单独 FALSE 不构成豁免
 CHECK_DEADLOCK TRUE
 ```
 
@@ -2212,7 +2235,7 @@ INIT Init
 NEXT Next
 ```
 
-> **W 模型提示**：`SPECIFICATION Spec` 使用 `[Next]_vars` 带 stuttering，可避免终态被误报为死锁；`INIT Init` + `NEXT Next` 不带 stuttering，终态会触发死锁。建模时通常用 `SPECIFICATION Spec`，仅在刻意要检测终态死锁时才用 `INIT/NEXT`（见 [tla-plus.md §校验步骤](./tla-plus.md)）。
+> **W 模型提示**：TLC 死锁检查不计 stuttering 步——`SPECIFICATION Spec` 的 `[Next]_vars` 允许 stuttering，并不能让预期终态免检；`INIT Init` + `NEXT Next` 在死锁检查行为上与之相同。预期终态的免检正道是给 `Next` 配终态自环动作（§12「终态自环主形态」，见 [tla-plus.md §12 cfg 结构规则](./tla-plus.md)）。
 
 ### 模型值 vs 普通值（Model Values vs Ordinary Values）
 
