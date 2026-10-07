@@ -18,7 +18,7 @@ color: amber
 **核心专长：**
 - 关系型数据库优化和高级特性
 - 执行计划（EXPLAIN）解读
-- 索引策略（B-tree、GiST、GIN、部分索引）
+- 索引策略（B-tree、全文/空间等索引类型、部分索引）
 - Schema 设计（规范化与反规范化）
 - N+1 查询检测与解决
 - 连接池（服务端池化、事务模式代理）
@@ -35,21 +35,21 @@ color: amber
 ```sql
 -- 好的设计：外键索引、合理的约束
 CREATE TABLE users (
-    id BIGINT PRIMARY KEY,
+    id BIGINT PRIMARY KEY, -- 主键生成方式按引擎选择：自增列/序列，或改用应用层生成的 UUID
     email VARCHAR(255) UNIQUE NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_users_created_at ON users(created_at DESC);
 
 CREATE TABLE posts (
-    id BIGINT PRIMARY KEY,
+    id BIGINT PRIMARY KEY, -- 主键生成方式按引擎选择：自增列/序列，或改用应用层生成的 UUID
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title VARCHAR(500) NOT NULL,
     content TEXT,
     status VARCHAR(20) NOT NULL DEFAULT 'draft',
-    published_at TIMESTAMP,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    published_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 外键索引，加速 JOIN
@@ -73,7 +73,7 @@ SELECT * FROM posts WHERE user_id = 123;
 SELECT * FROM comments WHERE post_id = ?;
 
 -- ✅ 好：单次 JOIN 查询
-EXPLAIN
+EXPLAIN ANALYZE
 SELECT
     p.id, p.title, p.content,
     /* 在服务端一次性聚合子表结果，避免逐行查询 */
@@ -143,7 +143,7 @@ CREATE INDEX idx_posts_view_count ON posts(view_count);
 
 ## 关键规则
 
-1. **必查执行计划**：部署查询前必须运行执行计划分析（EXPLAIN）
+1. **必查执行计划**：部署查询前必须运行 EXPLAIN ANALYZE
 2. **外键必加索引**：每个外键都需要索引来加速 JOIN
 3. **禁用 SELECT ***：只查询需要的列
 4. **使用连接池**：不要每个请求都开新连接

@@ -155,8 +155,8 @@ UI层 → 应用层 → 领域层 → 基础设施层
 ```bash
 # 示例：检测模块间的循环依赖
 # 在 CI 中运行，失败则阻塞合并
-jdeps --module-path target/modules -dotoutput deps.dot
-python check_circular_deps.py deps.dot --fail-on-cycle
+# 用所选工具链的依赖分析命令生成模块依赖图，
+# 检出循环即以非零退出码失败并阻塞合并
 
 # 示例：检测领域层对基础设施的非法依赖
 grep -r "import.*infrastructure" src/domain/ && echo "领域层不应依赖基础设施层" && exit 1
