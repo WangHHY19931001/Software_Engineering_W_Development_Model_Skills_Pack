@@ -93,7 +93,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 
 1. **路由任务**（O）：识别命令、阶段和用户意图；歧义触发先确认。
 2. **读取状态与环境自检**（O）：读 `.w-model/project.json` 与 `rtm.json`（损坏先恢复，见 operational-recovery.md）；首次启用或门禁报依赖错误时跑 `npx tsx w-model-dev/scripts/cli/doctor.ts [--with-tla]`。
-3. **前置产物与最小引用集**（O）：缺上游产物拒绝跳阶段并指出应返回的命令；只加载 SKILL.md + 当前阶段 phase-N 摘要 + 状态文件（**最小引用集权威定义**）。
+3. **前置产物与最小引用集**（O）：缺上游产物拒绝跳阶段并指出应返回的命令；只加载 SKILL.md + 当前阶段 phase-N 摘要 + 状态文件（**O 侧最小引用集权威定义**；子代理另按「阶段路由」节按需加载 rtm-guide.md 等参考）。
 4. **初始化确认**（O）：🔴 CHECKPOINT · 项目初始化（复述阶段/同步测试设计/预期产物）。
 5. **产出**（O→S）：生成产物 + 同步测试设计 + 更新 RTM；阶段 1–4 额外产出 TLA+ 规格与 BDD features（按成熟度）；ingestion 子流程（plan-chunks → A-chunk/A-cross → check-requirement-graph，收敛循环 MAX_ROUNDS=5）见 ingestion-chunk.md。
 6. **R3 预防性审查**（O→R→G）：S 产出后分派 R 完成 completeness/reliability/security 三份报告，再由 G 运行 check-preventive-review.ts；exitCode=0 后才可进入 V。

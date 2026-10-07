@@ -624,13 +624,13 @@ phase: <N - 名称>
 - **单一产出类型**：doc / tla / bdd / code / review / gate / rootcause 之一；混合产出 → 用既有变体拆分（S-doc / S-tla / S-bdd、S-plan / S-coding / S-finalize、R-lead / R-persona）。
 - **单一阶段**：越阶段 → 拆分。
 - **输入文件 ≤ 5 个**：超出 → 用 `brief.md` 聚合路径列表，子代理按需 `Read`，禁止全量塞入 brief。
-- **产出文件数由该产出类型的契约定义**（不设通用条数上限）：类型内文件数按既有产出契约判定，O 不另设数字上限——阶段 1 文档档为主文档 + 7 个独立子文件（固定文件名契约，见 [phase-1-requirements.md](phase-1-requirements.md)「执行方法论」）；S-doc / S-tla / S-bdd 的产出清单见本文「S 拆分机制」节。实际产出超出该类型契约 → 按模块 / 层级拆分为多次分派。
+- **产出文件数由该产出类型的契约定义**（不设通用条数上限）：类型内文件数按既有产出契约判定，O 不另设数字上限——阶段 1 文档档为主文档 + 7 个独立子文件（固定文件名契约，见 [phase-1-requirements.md](phase-1-requirements.md)「执行方法论」；各阶段子模板清单见对应 phase-N-*.md「执行方法论」）；S-doc / S-tla / S-bdd 的产出清单见本文「S 拆分机制」节。实际产出超出该类型契约 → 按模块 / 层级拆分为多次分派。
 - **预期单次往返**：复杂任务须先拆；子代理 `BLOCKED` / 轮次膨胀 / 产出质量稀释 → O 拆分后重派（**不计入返工 round**，属编排拆分而非质量返工）。
 
 **过重信号**（命中即拆分重派）：
 
 - 子代理返回 `NEEDS_CONTEXT` ≥ 2 次（上下文过大信号）
-- 单次 `output.md` 超过该角色交接预算（交接件每分派恰 1 份：doc 报告 / review JSON / gate 摘要 / rootcause 报告各 ≤ 1；**指交接件本身，不是产出类型契约定义的真实产物文件数**）
+- 单次 `output.md` 超过该角色交接预算（`output.md` 每分派恰 1 份：doc 报告 / review JSON / gate 摘要 / rootcause 报告各 ≤ 1；**指 `output.md` 本身，不是产出类型契约定义的真实产物文件数**）
 - 子代理主动报告"任务过大 / 需要拆分"
 
 ### 任务合并与审查面（merge & single review surface）
@@ -897,7 +897,7 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 任务：读单个 chunk，提取本阶段节点类型实体，产出 <chunk-id>.{md,json}
 前置条件（派单契约，O 派单前逐条自证）：
   - chunk 路径存在且可 Read
-  - 图谱分析上下文材料已附（全局目录树摘要 + 相邻 chunk 标题列表，见下方上下文）
+  - 图谱分析上下文材料见下方上下文节（全局目录树摘要 + 相邻 chunk 标题列表）
 上下文：
   - chunk 路径：<文件路径>
   - chunk-id：<chunk-001>
@@ -1144,7 +1144,7 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 任务：诊断 V/G 命中的返工问题根因，产出 RootCauseReport
 
 前置条件（派单契约，O 派单前逐条自证）：
-  - V/G 的 reworkHints（原文）与失败产物路径已附
+  - V/G 的 reworkHints（原文）与失败产物路径以指针给到（指针型：只写路径，不附内容，见「交接目录协议」节）
   - 失败产物路径已落盘且可 Read
 
 上下文：
@@ -1272,7 +1272,7 @@ superpowers 编码链（S-plan → S-coding → S-finalize）每段须额外产�
 
 前置条件（派单契约，O 派单前逐条自证）：
   - 线索来源齐备：reworkHints 历史 / fixedPoints / 关联 RootCauseReport 路径（icebergRound>1 另加上一轮 IcebergSweepReport 路径）
-  - 全阶段产物路径已附且可 Read
+  - 全阶段产物路径以指针给到且可 Read（指针型：只写路径，不附内容，见「交接目录协议」节）
 
 上下文：
   - 线索来源：
@@ -1336,7 +1336,7 @@ superpowers 编码链（S-plan → S-coding → S-finalize）每段须额外产�
 
 前置条件（派单契约，O 派单前逐条自证）：
   - R 报告 JSON + .md 路径已落盘且可 Read
-  - 失败产物路径与上游产物路径已附且可 Read
+  - 失败产物路径与上游产物路径以指针给到且可 Read（指针型：只写路径，不附内容，见「交接目录协议」节）
 
 上下文：
   - 待复审 R 报告 JSON 路径：<路径>
@@ -1432,7 +1432,7 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 任务：分派 N 个 R-persona 子代理（并行或串行均可，依宿主能力）→ 聚合产出最终 RootCauseReport
 
 前置条件（派单契约，O 派单前逐条自证）：
-  - 同 R 模板前置：V/G reworkHints（原文）与失败产物路径已附，失败产物可 Read
+  - 同 R 模板前置：V/G reworkHints（原文）与失败产物路径以指针给到（指针型：只写路径，不附内容，见「交接目录协议」节），失败产物可 Read
   - persona 选择矩阵候选（rootCause.category 初判）与宿主分派方式（parallel | serial | single-session-degraded）已在上下文声明
 
 上下文：
@@ -1854,7 +1854,7 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 角色：产出子代理（S）- 豁免请求变体
 任务：识别需豁免项，产出 exemption-request.json
 前置条件（派单契约，O 派单前逐条自证）：
-  - 豁免申请材料已附且可 Read（V 评审 reworkHints 中的覆盖缺失/conflicts-with/覆盖率不达标项 + 需求规格路径）
+  - 豁免申请材料以指针给到且可 Read（V 评审 reworkHints 中的覆盖缺失/conflicts-with/覆盖率不达标项 + 需求规格路径；指针型：只写路径，不附内容，见「交接目录协议」节）
 上下文：
   - 豁免来源：<V 评审 reworkHints 中的覆盖缺失/conflicts-with/覆盖率不达标项>
   - 需求规格路径：<路径>
@@ -1917,7 +1917,7 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 ## 与现有约束的兼容性
 
 - **约束 4「真实执行」**：G 子代理跑脚本 + 回填退出码 = 真实执行，不冲突。
-- **约束 6「按需加载」**：子代理按需加载对应 `phase-N-*.md`，编排者只加载 `SKILL.md` + 状态文件，加载面更窄。
+- **约束 6「按需加载」**：子代理按需加载对应 `phase-N-*.md`，编排者只加载最小引用集（权威定义见 SKILL.md「执行工作流」第 3 步），加载面更窄。
 - **约束 2「阶段门放行」**：G 子代理返回证据 → 编排者展示给用户 → CHECKPOINT 等待，不冲突。
 - **[`verifier-spec.md`](verifier-spec.md) §7.6「外部 Agent 执行」**：V 子代理即「外部 Agent」，边界一致。
 - **[`agent-personas.md`](agent-personas.md) 4 个 Persona**：V 子代理按 `targetKind` 选用，无改动。
