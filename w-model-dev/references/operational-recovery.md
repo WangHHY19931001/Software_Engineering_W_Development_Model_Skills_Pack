@@ -469,7 +469,7 @@ G 子代理在每个阶段门按以下顺序调用，任一退出码 ≠ 0 → O
 |---|---|---|---|
 | 1 | `check-budget.ts .w-model/budget.json --project=.w-model/project.json --run-log=.w-model/run-log.jsonl --phase=N`（**必带** `--run-log`；未接线只出非阻断诊断，口径见 `data-models.md`「用量实效校验」段） | `.w-model/budget.json` | 反模式 #9（谎报状态） |
 | 2 | `check-run-log.ts` | `.w-model/run-log.jsonl` + `gate-logs/` | 反模式 #9 / #10（O 越权） |
-| 3 | `check-maturity.ts .w-model/maturity.json --run-log=.w-model/run-log.jsonl --prev-status=<上一状态>`（**必带** `--run-log`，缺省时仅出非阻断诊断且仍 exit 0，与 check-budget 同式；`--prev-status` 随 `--run-log` 一并传，project.json 无历史可依时省略——R7 转移合法性判定仅在 prev+current 同时提供时生效） | `.w-model/maturity.json` | 反模式 #9 |
+| 3 | `check-maturity.ts .w-model/maturity.json --project=.w-model/project.json --run-log=.w-model/run-log.jsonl --prev-status=<上一状态>`（**必带** `--run-log`，缺省时仅出非阻断诊断且仍 exit 0，与 check-budget 同式；`--project` 与 `--prev-status` 随 `--run-log` 一并传，project.json 无历史可依时省略 prev——`--prev-status` 须与 `--project` 同时提供否则 exit 2，R7 转移合法性判定仅在 prev+current 同时提供时生效） | `.w-model/maturity.json` | 反模式 #9 |
 | 4 | `check-checkpoint.ts` | run-log 中 checkpoint 类记录 | 反模式 #9 / O4 |
 | 5 | 现有三门禁（**非闭环**，常规门禁） | `check-verifier-output.ts` / `check-requirement-graph.ts` / `check-tla-model.ts` | #1/#4/#11-#17 |
 | — | 闭环五门之第五门 `check-preventive-review.ts`（**第 ② 步串行调度序列之外**，V 评审前执行） | `.w-model/preventive-reviews/<phase>-{completeness,reliability,security}.json`，**V 评审前**执行 | 反模式 #33 / #42 |
