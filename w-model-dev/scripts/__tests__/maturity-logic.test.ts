@@ -549,6 +549,31 @@ describe('check-maturity CLI：--run-log 三态（D-7 端到端，真实子进�
   });
 });
 
+// ==================== 批次 8 rider：--rollback-approved 单独给出的非阻断诊断（批次 7 T9 Minor②） ====================
+
+describe('check-maturity CLI：--rollback-approved 单独给出（无 --prev-status）→ 非阻断诊断', () => {
+  const DIAGNOSTIC = '--rollback-approved 已置位但未提供 --prev-status：R7 场景 5 回退转移判定未生效';
+
+  it('单独置位 → exit 0 + 诊断显式登记（堵「置位即以为生效」隐性规避通道）', async () => {
+    const maturity = await write('maturity.json', VALID_MATURITY);
+    const r = runSync(process.execPath, [
+      tsxCli,
+      path.join(cliDir, 'check-maturity.ts'),
+      maturity,
+      '--rollback-approved',
+    ]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain(DIAGNOSTIC);
+  });
+
+  it('未置位 → 不出该诊断（零回归守卫）', async () => {
+    const maturity = await write('maturity.json', VALID_MATURITY);
+    const r = runSync(process.execPath, [tsxCli, path.join(cliDir, 'check-maturity.ts'), maturity]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).not.toContain(DIAGNOSTIC);
+  });
+});
+
 // ==================== R5 三态补强（G2-1） ====================
 
 /**

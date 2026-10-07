@@ -27,7 +27,8 @@
  *                        取值须为 PROJECT_STATUSES 9 态之一，否则 ARG_INVALID exit 2。
  *                        合法转移 = 前向链下一步 ∪ 场景 5 用户批准回退 ∪ 终态「项目完成」）
  *   --rollback-approved  场景 5 用户批准回退标记（可选，仅在 🔴 CHECKPOINT 用户裁定回退后由 O 置位；
- *                        未置位的回退转移 → R7 违规 exit 1）
+ *                        未置位的回退转移 → R7 违规 exit 1。单独给出（无 --prev-status）时 R7 场景 5
+ *                        回退判定不生效，输出非阻断诊断（批次 8 rider，与 D-7 未接线可见化同式））
  *   --json               机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse，含 warnings 非阻断警告字段与 diagnostics 非阻断诊断字段）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
@@ -323,6 +324,15 @@ async function main(): Promise<void> {
   } else {
     // 未接线可见化（D-7）：省略 --run-log 不再静默跳过 R5，以非阻断诊断显式登记（exit 0 语义不变）
     r5Diagnostics.push(...buildR5Diagnostics(false, []));
+  }
+
+  // 批次 8 rider（批次 7 T9 Minor②）：--rollback-approved 单独给出（无 --prev-status）时，
+  // R7 场景 5 回退转移判定不会生效（options 仅在 prev + current 同时提供时才透传 rollbackApproved）——
+  // 以非阻断诊断显式登记，堵「置位即以为生效」的隐性规避通道（exit 0 语义不变，与 D-7 同式）。
+  if (rollbackApproved && prevStatus === undefined) {
+    r5Diagnostics.push(
+      '--rollback-approved 已置位但未提供 --prev-status：R7 场景 5 回退转移判定未生效（--prev-status 须与 --project 同时提供）',
+    );
   }
 
   // R8（批次 7 决策 #2，43.1.0）：降级须 human 授权——装载 maturity.json 同目录的

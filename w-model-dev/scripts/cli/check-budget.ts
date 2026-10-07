@@ -328,7 +328,10 @@ async function main(): Promise<void> {
         console.error(`⚠ --run-log 文件读取失败，跳过 R5/R6/R5-b/R7 触发检测: ${runLogAbs}（ENOENT）`);
       }
       const entries = await readJsonlOptional(runLogAbs, 'run-log');
-      runLogParsed = true;
+      // 批次 8 T2 Minor②：仅文件确实可读（ENOENT 预探测通过）才置 runLogParsed——ENOENT 静默
+      // 返回 [] 时不得置位，否则「文件读取失败」warning 与「未提供 --phase」R7 警告双警告同现
+      //（把「没读到」说成「没给 --phase」，违反本变量注释的归因纪律）。
+      if (runLogReadable) runLogParsed = true;
       const stats = countReworks(entries, phase);
       reworkCount = stats.reworkCount;
       tlaReworkCount = stats.tlaReworkCount;

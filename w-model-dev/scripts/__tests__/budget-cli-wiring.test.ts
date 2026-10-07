@@ -156,6 +156,18 @@ describe('check-budget CLI R7 子代理分派数接线（决策 5，43.2.0）', 
     expect(rNoPhase.stdout + rNoPhase.stderr, '跳过必须可见').toMatch(/R7 未校验：未提供 --phase/);
   });
 
+  it('批次 8 T2 Minor②：--run-log 指向不存在文件（ENOENT）且未提供 --phase → 只出「文件读取失败」单警告，不叠加 R7 未校验警告', () => {
+    // 修复前：readJsonlOptional 对 ENOENT 静默返回 [] 后 runLogParsed 仍被置位，
+    // 「文件读取失败」warning 与「R7 未校验：未提供 --phase」双警告同现（把「没读到」说成「没给 --phase」）。
+    const missing = path.join(tmpDir, 'does-not-exist.jsonl');
+    const r = runCli([BUDGET_SAMPLE, `--run-log=${missing}`]);
+    expect(r.code, 'ENOENT 降级不阻断（exit 0）').toBe(0);
+    expect(r.stderr, '应出「文件读取失败」warning').toContain('文件读取失败');
+    expect(r.stderr.match(/文件读取失败/g) ?? [], '该 warning 恰一次').toHaveLength(1);
+    expect(r.stdout + r.stderr, '不得把「没读到」说成「没给 --phase」').not.toMatch(/R7 未校验：未提供 --phase/);
+    expect(r.stdout + r.stderr, '不得把「没读到」说成「没用量」').not.toMatch(/R6 未生效/);
+  });
+
   it('exit 0：estimated=true 记录不计入聚合（决策 5 裁定）——估算值不得占用分派额度', async () => {
     const est = (n: number, estimated: boolean): string =>
       `{"phase":7,"action":"gate","role":"G","outcome":"success","tokens":0,"duration_s":1,"subagentSpawns":${n},"estimated":${estimated}}`;
