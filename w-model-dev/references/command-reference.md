@@ -15,7 +15,7 @@
 
 1. 编排者（O）先读取 `.w-model/project.json` 与 `.w-model/rtm.json`；首次 `/wm analyze` 可初始化。**编排者只可读取/更新状态文件，不得修改 RTM 实体字段**（实体字段由 S 子代理更新）。
 2. 编排者（O）检查命令所需上游阶段产物；缺失时拒绝执行并给出返回命令。
-3. 编排者（O）只加载 `SKILL.md` + 当前阶段 `phase-N-*.md` 摘要 + `rtm-guide.md`；阶段细则由 S 子代理按需加载。
+3. 编排者（O）加载**最小引用集**（权威定义见 [`SKILL.md`](../SKILL.md)「执行工作流」第 3 步，本表不复述）；阶段细则由 S 子代理按需加载。
 4. 编排者（O）所有状态写操作完成后同步 `updatedAt`；只有阶段放行后才更新 `status`。
 5. 编排者（O）所有 `.w-model/*.json` 写入统一经 `wm-write.ts`：`<target>.lock` 持久目录与可转移 owner 对象在跨进程锁内保护 mtime 校验、毫秒+UUID 备份、tmp+rename、回读与原子恢复；`mtime` 乐观锁只在该锁内做版本冲突检测，**不足以**单独保证并发安全、竞争写处理或并发处理。`--expect-mtime` 接受有限非负数并向下取整；`--lock-timeout <ms>` 必须为安全非负整数。两者的宽严差异系有意为之：`--expect-mtime` 有意宽于 `--lock-timeout`——调用方常直接字符串化 `stat.mtimeMs`（浮点毫秒），有限非负 + floor 语义正确；`--lock-timeout` 为纯整数语义故严格 `/^\d+$/`；CLI 检出陈旧锁时，未显式传 `--recover-stale-lock` 即以 `STALE_LOCK` / exit 1 拒绝写入。直接调用 `writeStateJson` 为兼容既有调用仍允许隐式 stale recovery。锁为**单主机**语义：跨进程（本机）安全；`.w-model` 置于网络盘/共享卷时 PID 判定失效，禁止此部署形态。
 6. **docs-consistency 的明确句式契约边界**：门禁仅拒绝集中维护、逐条测试的禁止句式（限 pre-push / 平台检查的自动安装主张，以及已列明的 mtime 错误安全主张），不声称理解所有自然语言；清单外的复杂语义矛盾由 V review 评审。默认/`platform-deps:check` 始终只读；`platform-deps:install` 仅由用户显式调用，在 Windows x64 / Linux x64 的 caller-owned 私有 staging 内校验并安装缺失包。归档 bytes/路径/PAX/GNU/link metadata 不可信，完整 canonical preflight 必须先于 extraction write；同 UID/同访问令牌进程主动 rename 或篡改 staging/repo/lockfile/tarball/`node_modules` 属于受信运行主体之外的边界，不提供原子 namespace 保证。

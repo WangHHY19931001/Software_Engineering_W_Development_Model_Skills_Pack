@@ -624,13 +624,13 @@ phase: <N - 名称>
 - **单一产出类型**：doc / tla / bdd / code / review / gate / rootcause 之一；混合产出 → 用既有变体拆分（S-doc / S-tla / S-bdd、S-plan / S-coding / S-finalize、R-lead / R-persona）。
 - **单一阶段**：越阶段 → 拆分。
 - **输入文件 ≤ 5 个**：超出 → 用 `brief.md` 聚合路径列表，子代理按需 `Read`，禁止全量塞入 brief。
-- **产出文件 ≤ 3 个**：超出 → 拆分为多次分派。
+- **产出文件数由该产出类型的契约定义**（不设通用条数上限）：类型内文件数按既有产出契约判定，O 不另设数字上限——阶段 1 文档档为主文档 + 7 个独立子文件（固定文件名契约，见 [phase-1-requirements.md](phase-1-requirements.md)「执行方法论」）；S-doc / S-tla / S-bdd 的产出清单见本文「S 拆分机制」节。实际产出超出该类型契约 → 按模块 / 层级拆分为多次分派。
 - **预期单次往返**：复杂任务须先拆；子代理 `BLOCKED` / 轮次膨胀 / 产出质量稀释 → O 拆分后重派（**不计入返工 round**，属编排拆分而非质量返工）。
 
 **过重信号**（命中即拆分重派）：
 
 - 子代理返回 `NEEDS_CONTEXT` ≥ 2 次（上下文过大信号）
-- 单次 `output.md` 超过该角色预算（doc ≤ 1 文件、review ≤ 1 JSON、gate ≤ 1 摘要、rootcause ≤ 1 报告）
+- 单次 `output.md` 超过该角色交接预算（交接件每分派恰 1 份：doc 报告 / review JSON / gate 摘要 / rootcause 报告各 ≤ 1；**指交接件本身，不是产出类型契约定义的真实产物文件数**）
 - 子代理主动报告"任务过大 / 需要拆分"
 
 ### 任务合并与审查面（merge & single review surface）
@@ -674,7 +674,7 @@ V-01: Read handoff/phase1-S-01/output.md → 产出 → Write output.md + status
 ## 每阶段分派时序
 
 ```
-O: 路由 + 读状态 + 检查前置产物 + 加载最小引用集（SKILL.md + 当前阶段 phase-N）
+O: 路由 + 读状态 + 检查前置产物 + 加载最小引用集（内容定义见 SKILL.md「执行工作流」第 3 步，不在此复述）
 O: 🔴 CHECKPOINT · 项目初始化（首次）或阶段进入确认
   ↓ 阶段 1-4：分派 A-lead 多角色讨论分析（并行多轮交叉至收敛，persona 按 agent-personas.md「阶段角色集矩阵」选用；阶段 5-8 跳过本步）
 A-lead: 多视角分析 → 共识纪要（S 唯一落笔）
@@ -775,12 +775,13 @@ O 分派时声明的**任务开始前必须成立的可核验命题**清单。�
 角色：产出子代理（S）
 当前 W 模型阶段：<阶段 N - 名称>
 任务：按 phase-<N>-*.md 产出本阶段开发产物 + 同步测试设计 + 更新 RTM 实体
+模型档位：<显式指定，不得省略（省略即静默继承编排者会话模型）；按阶段产物规模 / 复杂度 / 风险定档 — 判据见 estimation-guide.md「模型档位 × 修复轮次 escalation」>
 前置条件（派单契约，O 派单前逐条自证）：
   - 上游产物路径已落盘且可 Read（O 贴路径清单）
   - 当前 RTM（.w-model/rtm.json）可解析且含上游实体
 上下文：
-  - 项目状态：.w-model/project.json（已附）
-  - 当前 RTM：.w-model/rtm.json（已附）
+  - 项目状态：.w-model/project.json（指针型：只写路径，不附内容，见「交接目录协议」节 brief.md 行）
+  - 当前 RTM：.w-model/rtm.json（同指针型：只写路径，不附内容）
   - 上游产物路径：<列出已放行的上游产物路径>
   - 技术栈：<从 project.json.techStack 读取>
 必读：
