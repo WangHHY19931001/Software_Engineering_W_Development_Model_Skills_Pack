@@ -8,7 +8,8 @@
       "unitTest": "UT-001",
       "integrationTest": "",
       "systemTest": "",
-      "acceptanceTest": "UAT-001"
+      "acceptanceTest": "UAT-001",
+      "coverageStatus": "100%"
     },
     {
       "requirementId": "NFR-001",
@@ -18,7 +19,8 @@
       "unitTest": "",
       "integrationTest": "",
       "systemTest": "",
-      "acceptanceTest": ""
+      "acceptanceTest": "",
+      "coverageStatus": "100%"
     },
     {
       "requirementId": "CON-001",
@@ -28,7 +30,8 @@
       "unitTest": "",
       "integrationTest": "",
       "systemTest": "",
-      "acceptanceTest": ""
+      "acceptanceTest": "",
+      "coverageStatus": "部分"
     }
   ],
   "executionSummary": {

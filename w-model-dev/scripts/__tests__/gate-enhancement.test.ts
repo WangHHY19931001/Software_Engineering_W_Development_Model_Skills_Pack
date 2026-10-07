@@ -805,6 +805,7 @@ describe('P0-2 codeModule 格式校验', () => {
           integrationTest: '',
           systemTest: '',
           acceptanceTest: 'UAT-001',
+          coverageStatus: '100%',
         },
       ],
       executionSummary: {
@@ -843,6 +844,7 @@ describe('P0-2 codeModule 格式校验', () => {
           integrationTest: '',
           systemTest: '',
           acceptanceTest: '',
+          coverageStatus: '100%',
         },
       ],
       executionSummary: {
@@ -1512,6 +1514,7 @@ describe('Phase 3 结构校验经 checkArtifactGate 生效', () => {
         integrationTest: '',
         systemTest: '',
         acceptanceTest: 'UAT-001',
+        coverageStatus: '100%',
       },
     ],
     executionSummary: {

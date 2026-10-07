@@ -9,7 +9,7 @@
  * （原 R3 completedCycles 周期换算随 unlockConditions 死字段删除而退役，43.0.0 A4。）
  *
  * 用法：
- *   npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>]
+ *   npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--prev-status=<9态>] [--rollback-approved]
  *
  * 参数：
  *   maturity.json        maturity.json 文件路径
@@ -17,6 +17,11 @@
  *   --run-log=<path>     run-log.jsonl 路径（可选，R5 真值通道：只统计每条记录的 operationalFailureModes 字段；
  *                        读取路径过滤非 O1~O6 取值（计数为 0 并出非阻断诊断——schema 应拒绝，此处为读取路径防御）；
  *                        note 中的 O1..O6 字样视为引用，仅作非阻断诊断。未提供时输出「R5 未生效」非阻断诊断）
+ *   --prev-status=<9态>  project.status 前值（可选，A14 R7 转移合法性校验；须与 --project 同时提供，
+ *                        取值须为 PROJECT_STATUSES 9 态之一，否则 ARG_INVALID exit 2。
+ *                        合法转移 = 前向链下一步 ∪ 场景 5 用户批准回退 ∪ 终态「项目完成」）
+ *   --rollback-approved  场景 5 用户批准回退标记（可选，仅在 🔴 CHECKPOINT 用户裁定回退后由 O 置位；
+ *                        未置位的回退转移 → R7 违规 exit 1）
  *   --json               机器可读输出模式：stdout 仅输出单行报告——exit 0/1 为纯 JSON（可整体 JSON.parse，含 warnings 非阻断警告字段与 diagnostics 非阻断诊断字段）；exit 2 为 ERROR_JSON {...} 单行（带 ERROR_JSON 前缀，见 command-reference.md「错误码与 ERROR_JSON 约定」节）
  *
  * 退出码：
@@ -41,6 +46,7 @@ import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
 import { checkMaturity, type MaturityConfig } from '../logic/maturity-logic.js';
+import { PROJECT_STATUSES } from '../lib/constants.js';
 import { readJsonOrExit, readJsonlOptional } from '../lib/read-json-or-exit.js';
 import { exitWithError } from '../lib/cli-error.js';
 import { isDirectInvocation } from '../lib/is-main.js';
@@ -55,6 +61,8 @@ interface ParsedArgs {
   maturityFile: string | undefined;
   projectFile: string | undefined;
   runLogFile: string | undefined;
+  prevStatus: string | undefined;
+  rollbackApproved: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -62,7 +70,9 @@ function parseArgs(argv: string[]): ParsedArgs {
   const maturityFile = args.find((a) => !a.startsWith('--'));
   const projectFile = parseFlagValue(args, 'project');
   const runLogFile = parseFlagValue(args, 'run-log');
-  return { maturityFile, projectFile, runLogFile };
+  const prevStatus = parseFlagValue(args, 'prev-status');
+  const rollbackApproved = hasFlag(args, 'rollback-approved');
+  return { maturityFile, projectFile, runLogFile, prevStatus, rollbackApproved };
 }
 
 // ==================== run-log O 系列失败模式统计（R5，D-7） ====================
@@ -177,7 +187,30 @@ async function main(): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
   const jsonMode = hasFlag(process.argv.slice(2), 'json');
   const startTime = Date.now();
-  const { maturityFile, projectFile, runLogFile } = parseArgs(process.argv);
+  const { maturityFile, projectFile, runLogFile, prevStatus, rollbackApproved } = parseArgs(process.argv);
+
+  // A14 R7 前置参数校验（ARG_INVALID，exit 2）：--prev-status 须为 9 态枚举之一，且须与
+  // --project 同时提供（转移判定需要 current status）；--rollback-approved 仅在场景 5
+  // 🔴 CHECKPOINT 用户裁定回退后由 O 置位。
+  if (prevStatus !== undefined && !(PROJECT_STATUSES as readonly string[]).includes(prevStatus)) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: `--prev-status 非法：${prevStatus}`,
+      detail: `须为 PROJECT_STATUSES 9 态之一（${PROJECT_STATUSES.join(' / ')}）`,
+      exitCode: 2,
+    });
+    return;
+  }
+  if (prevStatus !== undefined && !projectFile) {
+    exitWithError({
+      category: 'ARG_INVALID',
+      rule: 'P0-1',
+      message: '--prev-status 须与 --project 同时提供（转移判定需要 project.status 当前值）',
+      exitCode: 2,
+    });
+    return;
+  }
 
   if (!maturityFile) {
     exitWithError({
@@ -185,7 +218,7 @@ async function main(): Promise<void> {
       rule: 'P0-1',
       message: '参数缺失 <maturity.json>',
       detail:
-        '用法: npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>]',
+        '用法: npx tsx w-model-dev/scripts/cli/check-maturity.ts <maturity.json> [--project=<project.json>] [--run-log=<run-log.jsonl>] [--prev-status=<9态>] [--rollback-approved]',
       exitCode: 2,
     });
     return;
@@ -203,6 +236,7 @@ async function main(): Promise<void> {
   // 不再 warn-and-skip；schema 校验后 status 必为 9 态枚举、createdAt 必为 date-time 字符串。
   // （原 completedPhases 推导随 R3 退役删除，43.0.0 A4：--project 现仅服务 R4 时序交叉校验。）
   let projectCreatedAt: string | undefined;
+  let projectStatus: string | undefined;
   if (projectFile) {
     const projectAbs = path.resolve(projectFile);
     try {
@@ -211,6 +245,7 @@ async function main(): Promise<void> {
         createdAt: string;
       }>(projectAbs, 'project');
       projectCreatedAt = project.createdAt;
+      projectStatus = project.status;
     } catch (err) {
       if (err instanceof Error && err.message.startsWith(LOAD_AND_VALIDATE_SENTINEL_PREFIX)) return;
       throw err;
@@ -250,6 +285,14 @@ async function main(): Promise<void> {
     projectCreatedAt,
     operationalFailureCount,
     diagnostics: r5Diagnostics,
+    // A14 R7：prev + current 同时提供才触发转移合法性校验（maturity-logic 内判定）
+    ...(prevStatus !== undefined && projectStatus !== undefined
+      ? {
+          projectStatus,
+          prevProjectStatus: prevStatus,
+          projectStatusRollbackApproved: rollbackApproved,
+        }
+      : {}),
   });
   const exitCode = result.passed ? 0 : 1;
 

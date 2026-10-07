@@ -6,22 +6,19 @@
  * 设计：docs/superpowers/specs/2026-08-05-round31-wm-status-metrics-design.md §3.1
  */
 
+import { PROJECT_STATUS_TO_PHASE, PROJECT_STATUSES, type ProjectStatus } from '../lib/constants.js';
+
 import { computeRtmTraceCoverage } from './gate-logic.js';
 
-/** 9 态 → 阶段号（与 project.schema.json status 枚举一致；项目完成=9，展示时收敛为 8） */
-export const STATUS_TO_PHASE: Record<string, number> = {
-  需求分析: 1,
-  系统设计: 2,
-  概要设计: 3,
-  详细设计: 4,
-  编码: 5,
-  集成测试: 6,
-  系统测试: 7,
-  验收测试: 8,
-  项目完成: 9,
-};
+/**
+ * 9 态 → 阶段号（A14 常数统一：派生自 lib/constants PROJECT_STATUS_TO_PHASE 的机器口径 phase；
+ * 项目完成=9，展示口径 displayPhase/completedPhases 封顶 8 由 constants 单点承载）。
+ */
+export const STATUS_TO_PHASE: Record<string, number> = Object.fromEntries(
+  PROJECT_STATUSES.map((s) => [s, PROJECT_STATUS_TO_PHASE[s].phase]),
+);
 
-/** 每状态的确定性下一步建议（含阶段产物要点与门禁提示） */
+/** 每状态的确定性下一步建议（含阶段产物要点与门禁提示；键集 = PROJECT_STATUSES 9 态） */
 export const NEXT_STEPS: Record<string, string[]> = {
   需求分析: [
     '阶段 1：产出 requirement-spec.md 与 graph（ingestion A 子代理），分派 V 评审 + G 跑 check-requirement-graph / check-artifact-gate --phase=1',
@@ -122,9 +119,15 @@ export function buildStatusReport(
   runLog?: RunLogLike[] | null,
 ): StatusReport {
   const status = project.status;
-  const phaseNum = STATUS_TO_PHASE[status] ?? 1;
-  const phase = Math.min(phaseNum, 8);
-  const completedPhases = phaseNum >= 9 ? 8 : Math.max(0, phaseNum - 1);
+  // A14 常数统一：8/9 双口径（机器 phase=9 / 展示收敛 8）由 PROJECT_STATUS_TO_PHASE 单点承载；
+  // 未知状态（读取侧已过 project.schema enum 前置拦截，此处为纵深防御）沿用旧降级口径 phase=1
+  const caliber = PROJECT_STATUS_TO_PHASE[status as ProjectStatus] ?? {
+    phase: 1,
+    displayPhase: 1,
+    completedPhases: 0,
+  };
+  const phase = caliber.displayPhase;
+  const completedPhases = caliber.completedPhases;
   const progress = `${completedPhases}/8（${formatPercent(completedPhases)}）`;
 
   let rtmCoverage: StatusReport['rtmCoverage'] = null;

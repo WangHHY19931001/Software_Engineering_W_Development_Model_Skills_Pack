@@ -21,7 +21,7 @@
 | 类型 | 方向 | 语义 | 数量约束 |
 |---|---|---|---|
 | parent | 父→子 | 系统层级树主结构边：REQ(L0)→SD(L1)→INTF(L2)→DD(L3) | 非根节点恰好 1 条入边；根 0 条；层级单调（见 §3） |
-| depends-on | 同层→同层 | 同层节点依赖（SD→SD / INTF→INTF） | ≥0；禁止环依赖；目标须存在 |
+| depends-on | 同层→同层 | 同层节点依赖（SD→SD / INTF→INTF） | ≥0；禁止环依赖（**全 phase 机器强制**，43.1.0 A11 起 `check-requirement-graph.ts` R5 环检测不再限阶段 1）；目标须存在。**同层端点约束未实现脚本校验，V 人工核验** |
 | implements | SD→REQ | 设计实现需求（追溯边） | 每 SD ≥1 |
 | defines | SD→INTF | 系统设计定义接口 | 每 INTF ≥1（阶段3起校验） |
 | realizes | DD→INTF | 详细设计实现接口 | 每 DD ≥1（阶段4起校验） |
@@ -85,12 +85,12 @@ implements/defines/realizes 追溯边与 governs/collaborates-with/derives 横�
 
 ## 多层图谱（7 层）
 
-> 在系统层级树（§3）之上叠加 7 层正交图谱，各层边类型独立校验。横切层（5/6/7）不依附层级树，但两端节点须已登记于层级树。本节是 graph-logic.ts 多层校验的单点事实源（对齐 SSoT §10.10.2 / §10.10.3）。
+> 在系统层级树（§3）之上叠加 7 层正交图谱，各层边类型独立校验。横切层（5/6/7）不依附层级树，但两端节点须已登记于层级树（**该登记约束未实现脚本校验，V 人工核验**；见下方「跨层一致性」）。本节是 graph-logic.ts 多层校验的单点事实源（对齐 SSoT §10.10.2 / §10.10.3）。
 
 | # | 层名 | 边类型 | 语义 | 校验规则 |
 |---|---|---|---|---|
 | 1 | 结构层 | `parent` | 系统层级树依附 | 单根、父唯一、层级单调、无环、orphan 检测（见 §3） |
-| 2 | 依赖层 | `depends-on` | 同层节点依赖（SD→SD / INTF→INTF） | 两端须为同层节点；禁止环依赖；依赖目标须存在 |
+| 2 | 依赖层 | `depends-on` | 同层节点依赖（SD→SD / INTF→INTF） | 禁止环依赖（**全 phase 机器强制**，43.1.0 A11 起 R5 环检测不再限阶段 1）；依赖目标须存在。**「两端须为同层节点」未实现脚本校验，V 人工核验** |
 | 3 | 追溯层 | `implements` / `defines` / `realizes` | 跨层追溯（SD→REQ / SD→INTF / DD→INTF） | SD_without_implements=0 / INTF_without_defines=0 / DD_without_realizes=0（阶段递进，见 §4） |
 | 4 | 信息流层 | `produces` | 信息流转（from 产出给 to） | 无黑洞/奇迹/死模块；根节点豁免死模块；EXT-IN/OUT 须依附系统层级树 |
 | 5 | 治理层 | `governs` | 横切治理（治理类子系统→多子系统，如 S08） | 源须为 `governance===true` 的治理类子系统（如 S08）（marker 定义见 data-models.md）；目标须为被治理子系统且存在；不依附层级树 |
@@ -113,9 +113,11 @@ implements/defines/realizes 追溯边与 governs/collaborates-with/derives 横�
 
 **跨层一致性**（对齐 SSoT §10.10.3）：
 
-1. 横切边（governs/collaborates-with/derives，即第 5/6/7 层）不依附系统层级树，但两端节点须已登记于层级树（REQ/SD/INTF/DD 之一），不构成 parent 关系。
+1. 横切边（governs/collaborates-with/derives，即第 5/6/7 层）不依附系统层级树，但两端节点须已登记于层级树（REQ/SD/INTF/DD 之一），不构成 parent 关系。**该登记约束未实现脚本校验（脚本只核源 marker 与目标存在性），V 人工核验**。
 2. 横切边不替代追溯：被治理子系统的 parent 仍是系统根（治理是横切叠加，不改变结构依附）；追溯层与横切层并存，互不替代。
 3. 信息流可跨层流动，但两端须在层级树中。
+
+**证据锚点状态（R15b，43.1.0 A12 起 violation 化）**：全部节点须携带 `evidenceStatus`（`confirmed` | `pending`，schema enum）。阶段门放行前 `pending` 节点数为 0——pending 节点须转 `confirmed`（R15e：confirmed 须有签名链证据）或走 `check-exemption.ts` 第 6 类 `evidence-anchor-pending` 豁免；带 pending 直接放行由 `check-requirement-graph.ts` R15b 判 violation（43.1.0 A12 前 pending 为合法放行态）。
 
 ## 可选能力边界（批次 2 A4）
 

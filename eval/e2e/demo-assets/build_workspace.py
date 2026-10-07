@@ -651,16 +651,16 @@ write_json('.w-model/bdd/reports/report.json', {
 rows = [
   {'requirementId': 'REQ-001', 'description': '环形计数器取值 [0,10]', 'designDoc': 'SD-001,INTF-001,DD-001',
    'codeModule': 'SD-001:src/counter.ts:L1', 'unitTest': 'TC-UNIT-001', 'integrationTest': 'TC-INT-001',
-   'systemTest': 'TC-SYS-001', 'acceptanceTest': 'docs/acceptance-test-design.md#UAT-001', 'coverageStatus': '完整'},
+   'systemTest': 'TC-SYS-001', 'acceptanceTest': 'docs/acceptance-test-design.md#UAT-001', 'coverageStatus': '100%'},
   {'requirementId': 'REQ-002', 'description': 'Inc 自增与 Reset 复位', 'designDoc': 'SD-001,INTF-001,DD-001',
    'codeModule': 'SD-001:src/counter.ts:L1', 'unitTest': 'TC-UNIT-002', 'integrationTest': 'TC-INT-002',
-   'systemTest': 'TC-SYS-002', 'acceptanceTest': 'docs/acceptance-test-design.md#UAT-002', 'coverageStatus': '完整'},
+   'systemTest': 'TC-SYS-002', 'acceptanceTest': 'docs/acceptance-test-design.md#UAT-002', 'coverageStatus': '100%'},
   {'requirementId': 'NFR-001', 'description': '响应时间 P95 ≤ 200ms', 'designDoc': 'SD-001',
    'codeModule': '横切', 'unitTest': '', 'integrationTest': '', 'systemTest': '', 'acceptanceTest': '',
-   'coverageStatus': '完整', 'targetValue': 'P95 ≤ 200ms（生产环境）', 'testThreshold': 'P95 ≤ 250ms（测试环境基线）'},
+   'coverageStatus': '100%', 'targetValue': 'P95 ≤ 200ms（生产环境）', 'testThreshold': 'P95 ≤ 250ms（测试环境基线）'},
   {'requirementId': 'CON-001', 'description': '零 npm 运行时依赖', 'designDoc': 'SD-001',
    'codeModule': '横切', 'unitTest': '', 'integrationTest': '', 'systemTest': '', 'acceptanceTest': '',
-   'coverageStatus': '完整'},
+   'coverageStatus': '100%'},
 ]
 write_json('.w-model/rtm.json', {
   'schemaVersion': '1.0', 'projectId': 'counter-api', 'currentPhase': 8,

@@ -19,6 +19,9 @@
  */
 
 import { validateBySchema } from '../infrastructure/schema-loader.js';
+// R7（A14，43.1.0）：status 转移判定单点在 gate-logic.judgeProjectStatusTransition（与
+// check-artifact-gate / wm-status 共用常数 PROJECT_STATUSES；判定逻辑不在此复制）。
+import { judgeProjectStatusTransition } from './gate-logic.js';
 
 // ==================== 自包含类型形状 ====================
 
@@ -57,6 +60,15 @@ export interface MaturityCheckOptions {
    * 逐字回传进报告（与 warnings 并存），**不参与 passed 判定**。
    */
   diagnostics?: string[];
+  /** R7（A14，43.1.0）：project.status 当前值（须与 prevProjectStatus 同时提供才触发 R7） */
+  projectStatus?: string;
+  /** R7（A14）：project.status 前值（转移起点；缺省时不做转移判定——不发明历史机制） */
+  prevProjectStatus?: string;
+  /**
+   * R7（A14）：场景 5 用户批准回退标记。仅当 🔴 CHECKPOINT 用户裁定回退
+   * （operational-recovery.md「场景 5：阶段回退」）后由调用方置位；未置位的回退一律 R7 违规。
+   */
+  projectStatusRollbackApproved?: boolean;
 }
 
 export interface MaturityCheckResult {
@@ -176,6 +188,20 @@ export function checkMaturity(maturity: unknown, options?: MaturityCheckOptions)
           `R6: history 末条 to=${String(last.to)} 低于当前 level=${String(m.level)}（level 不得高于升级链末条；降级后 level 低于末条属合法形态）`,
         );
       }
+    }
+  }
+
+  // R7 project.status 转移合法性（A14，43.1.0）：prev + current 同时提供才触发；
+  // 合法 = 前向链下一步 ∪ 场景 5 用户批准回退 ∪ 终态「项目完成」（判据单点 judgeProjectStatusTransition）。
+  // 仅提供 current（无 prev）→ 不判定（project.json 无 status 历史，不发明历史机制）。
+  if (options?.projectStatus !== undefined && options.prevProjectStatus !== undefined) {
+    const judgement = judgeProjectStatusTransition(options.prevProjectStatus, options.projectStatus, {
+      userApprovedRollback: options.projectStatusRollbackApproved === true,
+    });
+    if (!judgement.legal) {
+      violations.push(
+        `R7: project.status 转移非法：${options.prevProjectStatus} → ${options.projectStatus}（${judgement.reason}；合法 = 前向链下一步 ∪ 场景 5 用户批准回退 ∪ 终态「项目完成」）`,
+      );
     }
   }
 

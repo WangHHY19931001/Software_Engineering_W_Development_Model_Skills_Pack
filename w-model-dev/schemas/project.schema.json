@@ -15,7 +15,7 @@
     "name": { "description": "项目名称，非空字符串", "type": "string", "minLength": 1 },
     "description": { "description": "项目描述（可为空字符串；用于说明项目背景与范围）", "type": "string" },
     "status": {
-      "description": "项目状态枚举（9 态，与 currentPhase 对应：需求分析=阶段1/系统设计=阶段2/概要设计=阶段3/详细设计=阶段4/编码=阶段5/集成测试=阶段6/系统测试=阶段7/验收测试=阶段8/项目完成=8 阶段全部完成后，currentPhase=9）；随阶段推进更新，阶段切换时同步刷新 updatedAt；状态与产物不一致时以可验证产物为准修正（operational-recovery.md）",
+      "description": "项目状态枚举（9 态有序，阶段前向链：需求分析=阶段1/系统设计=阶段2/概要设计=阶段3/详细设计=阶段4/编码=阶段5/集成测试=阶段6/系统测试=阶段7/验收测试=阶段8/项目完成=8 阶段全部完成后的终态，机器口径 phase=9、展示口径收敛 8——双口径由 scripts/lib/constants.ts PROJECT_STATUS_TO_PHASE 单点承载）；随阶段推进更新，阶段切换时同步刷新 updatedAt；转移合法性由 check-maturity R7 校验（合法 = 前向链下一步 ∪ 场景 5 用户批准回退 ∪ 终态「项目完成」，见 operational-recovery.md「场景 5：阶段回退」）；状态与产物不一致时以可验证产物为准修正（operational-recovery.md）",
       "enum": ["需求分析", "系统设计", "概要设计", "详细设计", "编码", "集成测试", "系统测试", "验收测试", "项目完成"]
     },
     "techStack": {

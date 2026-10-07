@@ -34,6 +34,7 @@ import {
 } from '../cli/check-maturity.js';
 import { validateBySchema } from '../infrastructure/schema-loader.js';
 import { runSync } from '../lib/run-sync.js';
+import { judgeProjectStatusTransition } from '../logic/gate-logic.js';
 import { checkMaturity, type MaturityConfig } from '../logic/maturity-logic.js';
 
 function validMaturity(): MaturityConfig {
@@ -603,5 +604,37 @@ describe('R5 读路径枚举守卫（G3-18）', () => {
     expect(r.status).toBe(0);
     expect(r.stdout).toContain('1 项非 O1~O6 取值已忽略（schema 应拒绝；读取路径防御）');
     expect(maturitySummary(r.stdout ?? '')['passed']).toBe(true);
+  });
+});
+
+// ==================== A14：project.status 转移合法性（R7，43.1.0） ====================
+describe('A14：project.status 转移合法性校验（judge 单点 + checkMaturity R7 接线）', () => {
+  it('A14a：project.status 非法转移（如 需求分析→编码）→ 违规', () => {
+    // R7 接线：prev + current 同时提供时执行转移校验；跳步前移（需求分析→编码）非法
+    const r = checkMaturity(validMaturity(), {
+      projectStatus: '编码',
+      prevProjectStatus: '需求分析',
+    });
+    expect(r.passed, '需求分析→编码（跳 4 级）须违规').toBe(false);
+    expect(
+      r.violations.some((v) => v.includes('R7') && v.includes('需求分析') && v.includes('编码')),
+      '违规须点名 R7 与前后状态',
+    ).toBe(true);
+
+    // judge 判据口径：合法 = 前向链下一步 ∪ 场景 5 用户批准回退 ∪ 终态「项目完成」
+    expect(judgeProjectStatusTransition('需求分析', '系统设计').legal, '前向链下一步合法').toBe(true);
+    expect(judgeProjectStatusTransition('验收测试', '项目完成').legal, '进入终态「项目完成」合法').toBe(true);
+    expect(
+      judgeProjectStatusTransition('系统设计', '需求分析', { userApprovedRollback: true }).legal,
+      '场景 5 用户批准回退合法',
+    ).toBe(true);
+    expect(judgeProjectStatusTransition('系统设计', '需求分析').legal, '无用户批准的回退非法').toBe(false);
+    expect(judgeProjectStatusTransition('项目完成', '编码').legal, '终态「项目完成」不可迁出').toBe(false);
+    expect(judgeProjectStatusTransition('编码', '项目完成').legal, '跳步到终态仍属跳步，非法').toBe(false);
+
+    // 仅提供 current（无 prev）→ 不做转移判定（无历史可比，不发明历史机制）
+    const rNoPrev = checkMaturity(validMaturity(), { projectStatus: '编码' });
+    expect(rNoPrev.passed).toBe(true);
+    expect(rNoPrev.violations.some((v) => v.includes('R7'))).toBe(false);
   });
 });
