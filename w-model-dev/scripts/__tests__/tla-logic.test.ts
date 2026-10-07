@@ -832,6 +832,82 @@ describe('B10 空转 Next 检测（无状态赋值 / 全恒等自赋值）', () 
     expect(result.violations.some((v) => v.includes('空转规格'))).toBe(true);
   });
 
+  it('分解式全恒等（跨定义体合取聚合）：Next == A /\\ B（A、B 均恒等自赋值）→ 违规「空转规格」', () => {
+    const tla = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x, y',
+      'Init == x = 0 /\\ y = 0',
+      'Next == A /\\ B',
+      "A == x' = x",
+      "B == y' = y",
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    const result = checkIdleNext(tla, cfgNext);
+    expect(result.passed, '跨定义体分解式全恒等应判失败（跨定义体合取聚合）').toBe(false);
+    expect(result.violations.some((v) => v.includes('空转规格'))).toBe(true);
+  });
+
+  it("间接引用恒等（一级/二级）：Next == A（A == x' = x）与 Next == A（A == B, B == x' = x）→ 违规「空转规格」", () => {
+    const tlaLevel1 = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x',
+      'Init == x = 0',
+      'Next == A',
+      "A == x' = x",
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    expect(checkIdleNext(tlaLevel1, cfgNext).violations.some((v) => v.includes('空转规格'))).toBe(true);
+
+    const tlaLevel2 = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x',
+      'Init == x = 0',
+      'Next == A',
+      'A == B',
+      "B == x' = x",
+      'Spec == Init /\\ [][Next]_x',
+      '====',
+    ].join('\n');
+    expect(checkIdleNext(tlaLevel2, cfgNext).violations.some((v) => v.includes('空转规格'))).toBe(true);
+  });
+
+  it('多 NEXT 合取聚合：NEXT A（恒等）+ NEXT B（推进）→ 零违规；两均恒等 → 违规', () => {
+    const cfgMulti = 'INIT Init\nNEXT A\nNEXT B';
+    const tla = [
+      '---- MODULE M ----',
+      'EXTENDS Naturals',
+      'VARIABLES x, y',
+      'Init == x = 0 /\\ y = 0',
+      "A == x' = x",
+      "B == y' = y + 1",
+      'Spec == Init /\\ [][A /\\ B]_x',
+      '====',
+    ].join('\n');
+    expect(checkIdleNext(tla, cfgMulti).passed, 'TLC 多 NEXT 取合取：整体推进不应违规').toBe(true);
+
+    const tlaBothIdle = tla.replace("B == y' = y + 1", "B == y' = y");
+    const result = checkIdleNext(tlaBothIdle, cfgMulti);
+    expect(result.passed, '多 NEXT 全部空转应判失败').toBe(false);
+    expect(result.violations.filter((v) => v.includes('空转规格')).length, '逐名报告两处空转候选').toBe(2);
+  });
+
+  it("跨变量混合形态：Next == x' = x /\\ y' = y + 1（存在推进分支）→ 不违规", () => {
+    const tla = tlaProgressing
+      .replace('VARIABLES x', 'VARIABLES x, y')
+      .replace("Next == x' = x + 1", "Next == x' = x /\\ y' = y + 1");
+    expect(checkIdleNext(tla, cfgNext).passed).toBe(true);
+  });
+
+  it('parseCfgNextNames：剥离注释——行/块注释中的 NEXT 字样不产生幻影名', () => {
+    expect(parseCfgNextNames('NEXT Real \\* NEXT Phantom')).toEqual(['Real']);
+    expect(parseCfgNextNames('(* NEXT Phantom *)\nNEXT Real')).toEqual(['Real']);
+  });
+
   it('cfg 无 NEXT 段（SPECIFICATION 形式）或 .tla 缺 Next 定义 → 跳过不违规', () => {
     expect(checkIdleNext(tlaProgressing, 'SPECIFICATION Spec').passed).toBe(true);
     const tlaNoNext = tlaProgressing.replace("Next == x' = x + 1\n", '');

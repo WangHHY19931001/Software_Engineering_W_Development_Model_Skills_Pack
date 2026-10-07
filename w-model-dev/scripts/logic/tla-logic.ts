@@ -919,12 +919,14 @@ export function checkBusinessInvariants(
 
 /**
  * 解析 .cfg 中 NEXT 段声明的 Next 操作符名（INIT/NEXT 形式，段名大小写不敏感）。
+ * 解析前先剥离 `(* *)` 块注释与 `\*` 行注释——注释中的 NEXT 字样不产生幻影名
+ * （函数自含剥注释，调用方无需预处理；stripComments 幂等，重复剥离无害）。
  * SPECIFICATION Spec 形式无 NEXT 段 → 返回 []（Next 由 Spec 间接引用，空转检测不适用）。
  * 每个NEXT 行取段名后首个 token 为操作符名；裸 NEXT 行（无名字）跳过（由 SANY / TLC 报 cfg 错误）。
  */
 export function parseCfgNextNames(cfgContent: string): string[] {
   const names: string[] = [];
-  for (const rawLine of (cfgContent ?? '').split('\n')) {
+  for (const rawLine of stripComments(cfgContent ?? '').split('\n')) {
     const m = rawLine.trim().match(/^NEXT\s+(\S+)/i);
     if (m && m[1]) names.push(m[1]);
   }
@@ -932,18 +934,22 @@ export function parseCfgNextNames(cfgContent: string): string[] {
 }
 
 /**
- * B10 空转 Next 检测（批次 7 任务 7，五类退化解之「空转 Next」）。
+ * B10 空转 Next 检测（批次 7 任务 7；修复轮 1 收敛为跨定义体合取聚合 + 多 NEXT 聚合判定）。
  *
  * 退化解形态：`Next == x' = x`（全恒等自赋值）或 `Next == TRUE / UNCHANGED x`
  * （无任何状态赋值）——状态永不变化，TLC 永不死锁、不变式恒成立，
  * 「验证通过」不构成任何行为保证（反模式 #16：TLA+ 占位/简化实现）。
  *
- * 判定（Next 定义体归一化后，含传递引用闭包）：
- *   - 闭包无任何 `var' =` 状态赋值 → violation「空转规格」；
+ * 逐名判定（Next 定义体归一化后，含传递引用闭包；跨定义体按合取聚合——子定义体
+ * 以 `/\` 并入闭包文本，分解式 `Next == A /\ B`（A、B 均恒等）与一级/多级间接
+ * 引用 `Next == A`（A == x' = x）与单体直写形态判定一致）：
+ *   - 闭包无任何 `var' =` 状态赋值 → 该名空转候选；
  *   - 闭包内全部状态赋值均为恒等自赋值（逐顶层合取/析取子句整句匹配 var' = var）
- *     → violation「空转规格」；
- *   - 存在任一非恒等赋值 → 通过。保守方向：可疑形态不误报（如 `x' = x + 0` 归一化后
- *     不等于恒等式，不在此拦截，由 V 评审人工核验）。
+ *     → 该名空转候选；
+ *   - 存在任一非恒等赋值 → 该名推进。
+ *
+ * 多 NEXT 聚合（TLC 对 cfg 多 NEXT 行取合取）：全部可判定名均为空转候选才 violation
+ * 「空转规格」；任一名推进 → 合取整体推进，不违规（保守方向，防误报优先）。
  *
  * 判定细节：
  *   - 状态赋值形态计 `var' =`（确定性）与 `var' \in`（非确定性）两种——`Next == x' \in 0..10`
@@ -952,7 +958,8 @@ export function parseCfgNextNames(cfgContent: string): string[] {
  *     （防 `Next == A \/ B` 子动作形态误报）；提取不到定义体的标识符（变量 / 常量 / 内置算子）
  *     跳过。visited 集防循环引用。
  *   - cfg 无 NEXT 段（SPECIFICATION Spec 形式）→ 本检测不适用，跳过。
- *   - cfg 声明的 Next 名在 .tla 无定义 → 跳过（§11 集合一致性 / SANY 另行拦截）。
+ *   - cfg 声明的 Next 名在 .tla 无定义 / 闭包为空 → 该名不可判定（§11 集合一致性 / SANY
+ *     另行拦截），聚合时按不违规处理。
  *   - 子句切分按归一化文本的字面 `/\`（合取）与 `\/`（析取）；括号包裹的复合子句不匹配
  *     恒等式 → 计为非恒等，同样走保守不误报方向。
  *
@@ -965,6 +972,10 @@ export function checkIdleNext(tlaContent: string, cfgContent: string): { passed:
   const tla = typeof tlaContent === 'string' ? tlaContent : '';
   const cfg = stripComments(cfgContent ?? '');
 
+  // 多 NEXT 聚合判定（TLC 对 cfg 多 NEXT 行取合取）：逐名收集空转候选，任一名推进即整体推进
+  const idleCandidates: string[] = [];
+  let anyProgressing = false;
+  let anyUndecidable = false;
   for (const nextName of parseCfgNextNames(cfg)) {
     // 传递引用闭包（visited 防循环）
     const visited = new Set<string>([nextName]);
@@ -983,8 +994,14 @@ export function checkIdleNext(tlaContent: string, cfgContent: string): { passed:
         }
       }
     }
-    const closure = normalizeDefBody(bodies.join(' '));
-    if (closure === '') continue; // Next 定义体为空：语法错误由 SANY 拦截
+    // 跨定义体按合取聚合：子定义体以 `/\` 并入闭包文本，与「多 NEXT 行取合取」同向保守
+    // （空格拼接无法恢复子句边界，分解式 `Next == A /\ B` 会整块失配恒等式 → 漏报）
+    const closure = normalizeDefBody(bodies.join(' /\\ '));
+    if (closure === '') {
+      // Next 定义体为空 / 提取不到：该名不可判定，聚合时按不违规处理（SANY / §11 另行拦截）
+      anyUndecidable = true;
+      continue;
+    }
 
     // 顶层合取/析取子句切分（归一化文本；`/\` 合取与 `\/` 析取字面）
     const conjuncts = closure
@@ -1002,15 +1019,19 @@ export function checkIdleNext(tlaContent: string, cfgContent: string): { passed:
       if (!(m && m[1] === m[2])) allIdentity = false;
     }
     if (assignmentCount === 0) {
-      violations.push(
+      idleCandidates.push(
         `空转规格：NEXT ${nextName} 定义体（含引用闭包）归一化后无任何 var' = 状态赋值（如 Next == TRUE / UNCHANGED x）：状态永不变化，验证不构成行为（反模式 #16）`,
       );
     } else if (allIdentity) {
-      violations.push(
+      idleCandidates.push(
         `空转规格：NEXT ${nextName} 的全部状态赋值均为恒等自赋值 var' = var（如 Next == x' = x）：状态永不变化，验证不构成行为（反模式 #16）`,
       );
+    } else {
+      anyProgressing = true;
     }
   }
+  // 聚合出口：全部可判定名均空转候选才违规；任一名推进 / 存在不可判定名 → 不违规（防误报优先）
+  if (!anyProgressing && !anyUndecidable) violations.push(...idleCandidates);
   return { passed: violations.length === 0, violations };
 }
 
