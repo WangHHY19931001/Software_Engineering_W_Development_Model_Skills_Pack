@@ -18,6 +18,10 @@
 #      为故障定位辅助，不强制、不安装。
 #   ④ npm audit（`.githooks/pre-push` 第 14 项）：依赖 npm registry 网络。本地离线
 #      时由 audit_can_skip 枚举短表跳过；CI 有网，audit 正常执行、high 以上仍阻断。
+#   ⑤ 最小权限（T2-review rider）：workflow 顶层 `permissions: contents: read`——本
+#      工作流只读代码（checkout）并跑门禁，不写仓库内容、不发布，读权限即最小集。
+#   ⑥ 探针韧性（T2-review rider）：`java -version` 探针设 `continue-on-error: true`——
+#      若镜像移除预装 Java，探针失败仅留诊断、不阻塞门禁（探针本就「不强制、不安装」）。
 #
 # 冗余兜底说明：`npm run prepush` 已包含 self-test（第 1 项）与 eval（第 19 项），
 # 下方显式重跑 `self-test` / `eval` 为冗余兜底——prepush 失败时便于快速定位
@@ -25,6 +29,10 @@
 name: CI
 
 on: [push, pull_request]
+
+# 最小权限加固（T2-review rider ⑤）：本工作流仅需读仓库内容，不写入、不发布
+permissions:
+  contents: read
 
 jobs:
   prepush:
@@ -42,8 +50,10 @@ jobs:
           cache: npm
 
       # 不可移植项登记 ③：Java/tla2tools 探针（ubuntu-latest 预装 Java；仅故障定位辅助）
+      # 探针韧性（T2-review rider ⑥）：镜像缺 Java 时不阻塞门禁，仅留失败诊断
       - name: Probe Java (TLA+ tla2tools dependency)
         run: java -version
+        continue-on-error: true
 
       - name: Install dependencies (npm ci)
         run: npm ci
