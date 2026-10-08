@@ -70,7 +70,7 @@ color: teal
 
 > 一句话描述这个项目做什么以及为什么重要。
 
-[![版本徽章](版本徽章图片链接)](包主页链接)
+- 版本徽章行：徽章图片嵌入 + 链接到包主页（部署时以真实徽章 URL 填充，形态同下方 License 徽章）
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 为什么需要这个
