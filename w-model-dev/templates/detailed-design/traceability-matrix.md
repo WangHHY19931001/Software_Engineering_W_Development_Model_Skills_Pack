@@ -1,6 +1,6 @@
 # 详细设计追踪矩阵（Traceability Matrix）
 
-> 对应 DESIGN.md §2.1.1 需求条目化追踪矩阵。Phase 4 适配：DD 编号 → 主文档 §1/§2 类与数据设计。
+> 主模板：[detailed-design.md](../detailed-design.md)（引用块子文件：需求条目化追踪矩阵详述）。Phase 4 适配：DD 编号 → 主文档 §1/§2 类与数据设计。
 > **阶段边界**：本文件是详细设计级追踪（DD×INTF），编码级映射（DD→codeModule）由阶段 5 承接。
 > 模板版本：v1.0。主文档引用块：`> 追踪矩阵详见 [{{module}}-traceability-matrix.md](./{{module}}-traceability-matrix.md)`。
 

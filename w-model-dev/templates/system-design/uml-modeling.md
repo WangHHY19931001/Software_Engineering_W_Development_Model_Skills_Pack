@@ -1,6 +1,6 @@
 # UML 系统级建模（UML System-Level Modeling）
 
-> 对应 DESIGN.md 附录 A UML 2.0 系统建模图表集（系统级子集）。系统级建模仅部署图 + 顶层组件图 + 包图 + 用例图；
+> 主模板：[system-design.md](../system-design.md)（引用块子文件：UML 2.0 系统建模图表集详述）。系统级建模仅部署图 + 顶层组件图 + 包图 + 用例图；
 > 接口级图表（序列图/通信图）由阶段 3 承接，类级图表（类图/ER 图/状态机图）由阶段 4 承接，不在此重复。
 > **阶段边界**：本文件只产系统级 UML，越界即返工（FM-SD-06）。
 > 模板版本：v1.0。主文档引用块：`> UML 系统级建模详见 [{{module}}-uml-modeling.md](./{{module}}-uml-modeling.md)`。

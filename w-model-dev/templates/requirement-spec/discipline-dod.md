@@ -1,6 +1,6 @@
 # Phase 1 工程纪律与 Definition of Done（DoD）
 
-> 对应 DESIGN.md §2.4 工程纪律 + §2.4.6 DoD 可勾选清单。Phase 1 收敛子集；完整工程宪法见 `SKILL.md`，项目级 DoD 见 `references/quick-self-check.md`（完成定义（DoD）节）。
+> 主模板：[requirement-spec.md](../requirement-spec.md)（引用块子文件：工程纪律 / DoD 可勾选清单详述）。Phase 1 收敛子集；完整工程宪法见 `SKILL.md`，项目级 DoD 见 `references/quick-self-check.md`（完成定义（DoD）节）。
 > 模板版本：v1.0。主规格引用块：`> Phase 1 工程纪律与 DoD 详见 [discipline-dod.md](./discipline-dod.md)`。
 
 ## 1. 需求阶段纪律

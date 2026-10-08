@@ -1,6 +1,6 @@
 # 术语表（Glossary）
 
-> 对应 DESIGN.md §3 核心概念与术语。系统设计域术语子集；全量术语权威表见 `references/conventions.md`（术语表），
+> 主模板：[system-design.md](../system-design.md)（引用块子文件）。系统设计域术语子集；全量术语权威表见 `references/conventions.md`（术语表），
 > 本文件仅收录本项目系统设计域新引入/易混淆术语，引用权威表编号。
 > **阶段边界**：只收系统设计域术语（架构/子系统/部署/ADT 等），接口/类级术语由阶段 3/4 术语表承接。
 > 模板版本：v1.0。主文档引用块：`> 术语表详见 [{{module}}-glossary.md](./{{module}}-glossary.md)`。

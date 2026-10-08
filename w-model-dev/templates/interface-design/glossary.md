@@ -1,6 +1,6 @@
 # 术语表（Glossary）
 
-> 对应 DESIGN.md §3 核心概念与术语。接口域术语子集；全量术语权威表见 `references/conventions.md`（术语表），
+> 主模板：[interface-design.md](../interface-design.md)（引用块子文件）。接口域术语子集；全量术语权威表见 `references/conventions.md`（术语表），
 > 本文件仅收录本项目接口域新引入/易混淆术语，引用权威表编号。
 > **阶段边界**：只收接口域术语（契约/错误码/调用关系/协议等），类级术语由阶段 4 术语表承接。
 > 模板版本：v1.0。主文档引用块：`> 术语表详见 [{{module}}-glossary.md](./{{module}}-glossary.md)`。

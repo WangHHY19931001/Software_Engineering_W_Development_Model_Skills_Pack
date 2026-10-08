@@ -1,6 +1,6 @@
 # 系统设计追踪矩阵（Traceability Matrix）
 
-> 对应 DESIGN.md §2.1.1 需求条目化追踪矩阵。Phase 2 适配：SD 编号 → 主模板 §3 模块划分模块 ID。
+> 主模板：[system-design.md](../system-design.md)（引用块子文件：需求条目化追踪矩阵详述）。Phase 2 适配：SD 编号 → 主模板 §3 模块划分模块 ID。
 > **阶段边界**：本文件是系统设计级追踪（SD×需求），接口级（INTF×SD）与类级（DD×INTF）追踪由阶段 3/4 承接。
 > 模板版本：v1.0。主文档引用块：`> 追踪矩阵详见 [{{module}}-traceability-matrix.md](./{{module}}-traceability-matrix.md)`。
 
