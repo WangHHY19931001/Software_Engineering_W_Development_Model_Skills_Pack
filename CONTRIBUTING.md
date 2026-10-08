@@ -73,6 +73,8 @@ npm run check:verifier -- <sample.json>
 npm run format
 ```
 
+> **验证面教训（批次 8 T18 / 批次 9 T14 固化）**：修改 `subagent/*.md`、`references/*.md` 等**散文/文档文件**后，**必跑 `npm run audit:l0-links`（0 违规），涉及 persona 哈希时另跑 self-test 的 R19 断言（或直接全量 vitest/self-test）**。散文改动不在「改 `cli/*.ts` 必须跑回归测试」的默认提示面内，但可能漂移：l0 链接（L0/L1 边界）、persona fixture 哈希（R19 self-test 断言，改 `subagent/*.md` 且其被 `samples/verifier/persona-*.json` 登记 `reviewedArtifacts` 时）、docs-consistency 计数登记（D8 `count-claim-live-docs`，新增含计数表述的活体文档须入 REQUIRED_PATHS 或豁免表，漏登记即红）。l0-link 审计为秒级快检、必先跑。典型事故：批次 8 T18 改 persona 后未跑 l0-link/self-test 致哈希漂移；批次 9 T14 改生产代码后未随改 `security-scan --regenerate` 重生成 baseline，`lint:security` 绿声称被推翻（时间线 T8-T13 红）——`lint:security` 绿/新增校验须绑定任务自身终态（随改随 regenerate 或显式确认），pre-push 为强制执行点。
+
 > 本仓库的校验正确性由两层保障：
 >
 > - **vitest 单元测试**（`w-model-dev/scripts/__tests__/`）覆盖纯逻辑边界路径，coverage 矩阵见 [`__tests__/README.md`](./w-model-dev/scripts/__tests__/README.md)

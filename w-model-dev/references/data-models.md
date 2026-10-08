@@ -290,7 +290,7 @@ RTM 的每一列对应一个数据模型的 `id` 字段（见 [rtm-guide.md](rtm
 | 情况             | `wm-write` 行为                                                                                         | 后续处理                                                                                                      |
 | ---------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | 并发 writer 竞争 | `<target>.lock` 持久目录与可转移 owner 对象保证同一时刻仅一个 writer 在锁内执行；竞争 writer 不会双成功 | 被拒绝 writer 重读最新状态、重新合并后再调用 `wm-write`                                                       |
-| mtime 版本不符   | 锁内比较 `--expect-mtime`（有限非负数、向下取整）与当前 mtime，不符即 `MTIME_CONFLICT` / exit 1         | 重读目标，按最新 mtime 重试                                                                                   |
+| mtime 版本不符   | 锁内比较 `--expect-mtime`（有限非负数、向下取整——**须传 `stat.mtimeMs` 原始浮点值，勿 `Math.round`/截断**，两值同 floor 才放行）与当前 mtime，不符即 `MTIME_CONFLICT` / exit 1         | 重读目标，按最新 mtime 重试                                                                                   |
 | 陈旧锁           | CLI 默认 fail-closed：`STALE_LOCK` / exit 1                                                             | 经人工判断后显式使用 `--recover-stale-lock`；直接 `writeStateJson` 调用仅为兼容既有调用允许隐式恢复           |
 | 锁等待超时       | `--lock-timeout <ms>` 必须是安全非负整数；超时即 `LOCK_TIMEOUT` / exit 1                                | 保留原状态，稍后重试或协调 writer                                                                             |
 | 测试状态冲突     | 应由业务合并逻辑判断                                                                                    | 以「失败」为优先（保守原则），先执行普通 V/G 失败链（hard-constraints），再按 R 结论由 S-fix 修复并回到阶段 5 |

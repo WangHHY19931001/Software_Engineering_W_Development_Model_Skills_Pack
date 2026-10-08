@@ -61,11 +61,11 @@ import {
 /**
  * 本门禁所需「活体文档」路径白名单（REQUIRED_PATHS）。
  * 契约：新增 schema / 脚本 / 设计文档等资产时，若其计数或枚举被任一检查消费，须在此登记路径
- * 并在 docs-consistency-logic.ts 增加对应输入字段与检查规则；只登记「被读取的活体文档」，
- * 目录类（schemas/、subagent/、__tests__/、references/）由 readdir 动态发现，不进本表——
- * 目录项（w-model-dev/subagent、w-model-dev/scripts/__tests__、w-model-dev/references）承担
- * 两层职责：① 存在性检查；② D8（count-claim-live-docs）的登记面（目录前缀下全部 .md 视为已登记，
- * 与 logic 层 isCountClaimRegistered 判定一致）。
+ * 并在 docs-consistency-logic.ts 增加对应输入字段与检查规则；只登记「被读取的活体文档」。
+ * 目录类文件夹（subagent/、__tests__/、references/）以**目录项**形式进本表（其下文件由 readdir
+ * 动态发现，不逐份登记；schemas/ 目录无表项，其下 schema 文件逐份登记）——目录项承担两层职责：
+ * ① 存在性检查；② D8（count-claim-live-docs）的登记面（目录前缀下全部 .md 视为已登记，
+ * 与 logic 层 isRegistered 判定一致）。
  */
 const REQUIRED_PATHS = [
   'package.json',

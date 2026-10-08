@@ -121,7 +121,9 @@ export function sha256Hex(value: string): string {
  * Join a member list with `,` after sorting a defensive copy, so the same set always serializes
  * identically regardless of arrival order. Scope identities must be order-independent: a candidate
  * whose file/symbol list arrives in a different order must not produce a different scopeHash
- * (which the evidence store would reject as a false SCOPE_MISMATCH).
+ * (which the evidence store would reject as a false SCOPE_MISMATCH). `Array.prototype.sort` default
+ * ordering (UTF-16 code-unit lexicographic) is deterministic and sufficient here — no locale-aware
+ * collation is used, so sorting is stable across Node versions and platforms.
  */
 export function sortedJoin(values: readonly string[]): string {
   return [...values].sort().join(',');

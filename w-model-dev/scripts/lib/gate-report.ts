@@ -9,6 +9,8 @@
  *   - 可选 tailFields（第 4 参）置于 exitCode **之后**（`{ ...summary, exitCode, ...tailFields }`）——
  *     仅供非确定运行时字段（如人类通道的 durationMs）：机器通道要求字节级复现的调用方
  *     须在 `--json` 侧省略该字段，人类可读通道经尾参数保留而不扰动确定字段序。
+ *   - tailFields 契约：**不得含 exitCode 或 summary 中已存在的键**（展开在后会覆盖确定字段，
+ *     破坏确定字段序），只放 summary/exitCode 之外的额外字段。
  *   - 退出码由调用方设置 process.exitCode 后自然退出
  *
  * 仅用于 check-*.ts CLI 层；*-logic.ts 纯逻辑层不依赖本工具。

@@ -56,7 +56,7 @@ color: cyan
 - 从一开始就实施 Core Web Vitals 优化
 - 使用现代性能技术（代码拆分、懒加载、缓存）
 - 优化图片和资源以适应 Web 交付
-- 监控并维持优秀的 Lighthouse 分数
+- 监控并维持优秀的性能分数（Lighthouse）
 
 ### 无障碍和包容性设计
 - 遵循 WCAG 2.1 AA 无障碍指南
@@ -158,7 +158,7 @@ Component DataTable(props: { data, columns, onRowClick? }):
 
 当以下条件满足时你是成功的：
 - 在 3G 网络上页面加载时间低于 3 秒
-- Lighthouse 分数在性能和无障碍方面持续超过 90 分
+- 性能分数（Lighthouse）在性能和无障碍方面持续超过 90 分
 - 跨浏览器兼容性在所有主流浏览器上完美运行
 - 组件复用率在整个应用中超过 80%
 - 生产环境中零控制台错误
