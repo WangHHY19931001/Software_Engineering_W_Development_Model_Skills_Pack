@@ -75,16 +75,6 @@ export const SYNC_PROCESS_EXCEPTIONS: readonly SyncProcessException[] = [
   },
   {
     api: 'spawnSync',
-    file: 'cli/check-docs-consistency.ts',
-    anchor: 'runSync(`npx vitest ${vitestArgs.map((a) => (/[ "&=]/.test(a) ? `"${a}"` : a)).join(\' \')}`, [], {',
-    symbol: 'collectVitestMeasurements',
-    reason:
-      'B3 migrated the shell Vitest fallback through runSync; retained as audit provenance with its VITEST_SPAWN_TIMEOUT_MS (3600 s) timeout. 2026-09-26 随实测墙钟 1962s 与宿主同源常量一并调至 3600s。',
-    migratedToRunSync: true,
-    timeout: { required: true, status: 'present' },
-  },
-  {
-    api: 'spawnSync',
     file: 'cli/check-tla-model.ts',
     anchor: "const res = runSync('java', ['-version'], {",
     symbol: 'checkEnvironment',

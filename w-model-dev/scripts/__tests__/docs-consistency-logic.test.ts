@@ -27,6 +27,10 @@ import {
   checkTestsMatrixCoverage,
   ORPHAN_REFERENCE_EXEMPTIONS,
   checkSchemaFieldDescriptions,
+  checkCountClaimLiveDocs,
+  COUNT_CLAIM_EXEMPTIONS,
+  COUNT_CLAIM_LINE_RE,
+  isCountClaimScannedPath,
   type DocConsistencyInput,
 } from '../logic/docs-consistency-logic.js';
 import { childProcessEnv } from '../lib/run-sync.js';
@@ -580,15 +584,12 @@ describe('R10 七来源维护契约（权威全文单点 + 消费方指针）', 
           return 'command-reference';
       }
     };
-    const sources = {
-      authoritySpec: await readRealSource('authoritySpec'),
-      schema: await readRealSource('schema'),
-      checkerSource: await readRealSource('checkerSource'),
-      ssot: await readRealSource('ssot'),
-      locator: await readRealSource('locator'),
-      verifierSpec: await readRealSource('verifierSpec'),
-      commandReference: await readRealSource('commandReference'),
-    };
+    // sourceKeys 既作类型脚（readRealSource/sourceLabel），也驱动 sources 逐键加载（R-B9-6：清除「仅作类型使用」的 no-unused-vars 残留）
+    const sources = {} as Record<(typeof sourceKeys)[number], string>;
+    for (const sourceKey of sourceKeys) {
+      // eslint-disable-next-line security/detect-object-injection -- sourceKey 为 (typeof sourceKeys)[number] 字面量联合（文件上方 as const 数组），测试受控键非外部输入
+      sources[sourceKey] = await readRealSource(sourceKey);
+    }
     const clauseMutations: Array<[string, string, string]> = [
       [
         'canonical-name',
@@ -2182,7 +2183,7 @@ describe('runDocConsistencyChecks', () => {
       async (fixtureRoot) => {
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixtureRoot is a mkdtemp-owned isolated repository copy
         expect(existsSync(path.join(fixtureRoot, 'node_modules', 'vitest'))).toBe(false);
-        // 无 vitest 可执行且 PATH 清空：若仍 spawn（回退到 npx）必然采集失败 → exit 1；
+        // 无 vitest 可执行且 PATH 清空：态 3 缺省绝不 spawn（spawn 分支仅显式 --spawn-vitest 时可达）——
         // 故 exit 0 本身即「未 spawn」的判据（同原用例的 vitest 不可用前提，反向断言）。
         const json = runDocsConsistencyCli(fixtureRoot, NO_VITEST_ENV, ['--json'], { timeoutMs: 30_000 });
         expect(json.code, JSON.stringify(json)).toBe(0);
@@ -2216,7 +2217,8 @@ describe('runDocConsistencyChecks', () => {
           timeoutMs: 60_000,
         });
         // 逃生口语义：显式要求自采集即恢复 fail-closed（vitest 不可用 → 采集失败 → vitest-* 违规 exit 1），
-        // 不得退化成「跳过 + exit 0」。本用例断言路由（spawn 被真实发起）；成功路径见下一条 stub vitest 用例。
+        // 不得退化成「跳过 + exit 0」。本用例断言路由——A18 去 shell 后 vitest 缺失直接以 -1 哨兵
+        // fail-closed（不 spawn、无 npx 回退）；成功路径见下一条 stub vitest 用例。
         expect(result.code, JSON.stringify(result)).toBe(1);
         const report = JSON.parse(result.stdout) as {
           reasons: string[];
@@ -2299,6 +2301,79 @@ describe('runDocConsistencyChecks', () => {
       { availablePackages: ['tsx', 'typescript', 'esbuild'] },
     );
   }, 120_000);
+
+  it('CLI --spawn-vitest 参数数组透传：异常临时目录名含空格/&/引号（POSIX）时无 shell 拼接、子进程原样收到（A18）', async () => {
+    await withDocsConsistencyFixture(
+      async (fixtureRoot) => {
+        // stub vitest（与既有成功路径同构）：写 JSON 工件 + 把自身收到的 argv 落到 cwd 侧车，供透传断言。
+        const vitestDir = path.join(fixtureRoot, 'node_modules', 'vitest');
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture path is inside the mkdtemp-owned test root
+        await fs.mkdir(vitestDir, { recursive: true });
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture path is inside the mkdtemp-owned test root
+        await fs.writeFile(
+          path.join(vitestDir, 'package.json'),
+          JSON.stringify({ name: 'vitest', version: '0.0.0', bin: { vitest: 'stub-cli.mjs' } }),
+          'utf-8',
+        );
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture path is inside the mkdtemp-owned test root
+        await fs.writeFile(
+          path.join(vitestDir, 'stub-cli.mjs'),
+          [
+            "import { writeFileSync } from 'node:fs';",
+            "const out = process.argv.find((arg) => arg.startsWith('--outputFile='));",
+            'if (out) {',
+            "  writeFileSync(out.slice('--outputFile='.length), JSON.stringify({ testResults: [{}, {}], numTotalTests: 7, numPassedTests: 7, numFailedTests: 0, success: true }));",
+            '}',
+            // 侧车：把子进程收到的完整 argv 原样落盘（cwd=fixtureRoot），供测试断言「数组透传、无 shell 拼接/转义」
+            "writeFileSync(process.cwd() + '/stub-argv.json', JSON.stringify(process.argv), 'utf-8');",
+            'process.exit(0);',
+          ].join('\n'),
+          'utf-8',
+        );
+        // 异常临时目录名：含空格 + &（两平台）+ 字面双引号（仅 POSIX——Windows 文件名禁 "，而 A18 原缺陷恰为
+        // 内层引号未转义）。os.tmpdir() 在 CLI 子进程内经 TMPDIR/TEMP/TMP 继承，--outputFile=<该目录>/w-model-vitest-count-<pid>.json
+        // 即成为含特殊字符的参数值；改造前的 shell 拼接路径（引号包裹 + 内层 " 未转义）在此输入下必然损坏，
+        // 改造后参数数组原样透传。源码删除的 shell 拼接串见 run-sync.ts 台账移除记录。
+        const delimiterQuote = process.platform === 'win32' ? '' : '"';
+        const weirdTmp = path.join(os.tmpdir(), `a18-staging${delimiterQuote} & audit-${process.pid}`);
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- under os.tmpdir(); cleaned in finally
+        await fs.mkdir(weirdTmp, { recursive: true });
+        try {
+          const result = runDocsConsistencyCli(
+            fixtureRoot,
+            {
+              WM_VITEST_COUNT_FILE: '',
+              WM_VITEST_PROVENANCE_FILE: '',
+              WM_VITEST_PROVENANCE_ROOT: '',
+              TMPDIR: weirdTmp,
+              TEMP: weirdTmp,
+              TMP: weirdTmp,
+            },
+            ['--json', '--spawn-vitest'],
+            { timeoutMs: 60_000 },
+          );
+          // 全链路成功即证明 args 数组经 process.execPath spawn 原样到达 stub（含特殊字符 --outputFile）
+          expect(result.code, JSON.stringify(result)).toBe(0);
+          const report = JSON.parse(result.stdout) as {
+            dynamicMeasurements: { vitestTestCount: number; success: boolean } | null;
+          };
+          expect(report.dynamicMeasurements).toMatchObject({ vitestTestCount: 7, success: true });
+          // 透传等价断言：stub 收到的 argv 中 --outputFile 值指向 weirdTmp（空格/&/引号原样、无 shell 转义痕迹）
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- sidecar written by the stub inside fixtureRoot
+          const argv = JSON.parse(await fs.readFile(path.join(fixtureRoot, 'stub-argv.json'), 'utf-8')) as string[];
+          const outArg = argv.find((a) => a.startsWith('--outputFile='));
+          expect(outArg, JSON.stringify(argv)).toBeDefined();
+          if (outArg !== undefined) {
+            expect(outArg.startsWith(`--outputFile=${weirdTmp}${path.sep}`), outArg).toBe(true);
+          }
+        } finally {
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- under os.tmpdir()
+          await fs.rm(weirdTmp, { recursive: true, force: true });
+        }
+      },
+      { availablePackages: ['tsx', 'typescript', 'esbuild'] },
+    );
+  }, 180_000);
 
   it('CLI --spawn-vitest 与受控工件共存时快路径优先（prepush 语义一字不变）', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
@@ -3909,6 +3984,166 @@ describe('gate-count-docs（活体文档门禁项数引用扫描，F1 反哺）'
     });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs');
     expect(v).toHaveLength(2);
+  });
+});
+
+describe('count-claim-live-docs（D8 计数声明活体文档登记自省）', () => {
+  const rc = (overrides: Partial<DocConsistencyInput>) =>
+    runDocConsistencyChecks(baseInput(overrides)).filter((x) => x.check === 'count-claim-live-docs');
+
+  it('漏登记即红（2 态：未登记文档含计数表述 → 具名违规 / 无计数表述 → 零违规）', () => {
+    const registered = ['README.md', 'w-model-dev/SKILL.md', 'w-model-dev/references'];
+    const cases: { label: string; doc: { name: string; content: string }; expectHit: boolean }[] = [
+      {
+        label: 'hit：未登记文档含「19 项门禁」',
+        doc: { name: 'docs/my-new-guide.md', content: '收口前全量：`npm run prepush`（19 项门禁）' },
+        expectHit: true,
+      },
+      {
+        label: 'clean：未登记文档无计数表述',
+        doc: { name: 'docs/plain.md', content: '本文无任何数量词计数。' },
+        expectHit: false,
+      },
+      {
+        label: 'clean：REQUIRED_PATHS 目录项（references/）下文档已登记',
+        doc: { name: 'w-model-dev/references/new-ref.md', content: '含 19 项门禁与 48 条反模式。' },
+        expectHit: false,
+      },
+    ];
+    for (const c of cases) {
+      const v = rc({
+        countClaimLiveDocs: [c.doc],
+        countClaimRegisteredPaths: registered,
+      });
+      if (c.expectHit) {
+        expect(v, `${c.label} 应恰 1 条违规`).toHaveLength(1);
+        expect(v[0]!.message, `${c.label} 应含文档名与命中行`).toContain('docs/my-new-guide.md:1');
+        expect(v[0]!.message, `${c.label} 应示例命中行`).toContain('19 项');
+      } else {
+        expect(v, `${c.label} 应零违规`).toEqual([]);
+      }
+    }
+  });
+
+  it('豁免表生效（3 态：精确豁免 / 前缀豁免 / 豁免表外仍红）', () => {
+    const registered = ['README.md'];
+    const cases: {
+      label: string;
+      doc: { name: string; content: string };
+      expectHit: boolean;
+    }[] = [
+      {
+        label: 'clean：COUNT_CLAIM_EXEMPTIONS 精确条目（eval/README.md）',
+        doc: { name: 'eval/README.md', content: '`npm run eval` = **101/101**、语料 101 条（共 31 条 dry_run）。' },
+        expectHit: false,
+      },
+      {
+        label: 'clean：COUNT_CLAIM_EXEMPTIONS 前缀条目（decision-log/）',
+        doc: { name: 'docs/changes/decision-log/rounds-51-x.md', content: '批次 9 的 21 项销账。' },
+        expectHit: false,
+      },
+      {
+        label: 'red：豁免表外文档仍红',
+        doc: { name: 'docs/other-record.md', content: '保留 17 项门禁与 8 份快照。' },
+        expectHit: true,
+      },
+    ];
+    for (const c of cases) {
+      const v = rc({ countClaimLiveDocs: [c.doc], countClaimRegisteredPaths: registered });
+      expect(v.length, `${c.label} 判定`).toBe(c.expectHit ? 1 : 0);
+    }
+  });
+
+  it('误报消除（小数/版本/个/类/项目 不命中；量词实体命中）', () => {
+    const hit = (line: string): boolean => COUNT_CLAIM_LINE_RE.test(line);
+    const negative = [
+      '### 1.1 项目背景',
+      '### 1.2 项目目标',
+      '版本 43.3.0 起（全仓七处镜像）',
+      '含 5 个文件与 2 个目录', // 个不收
+      '8 类信号与分析 3 个叶子周期', // 类不收
+      'P7-002/P7-003 类缺陷',
+      '覆盖 3 项目目录', // 项后跟「目」的「项目」不作为计数
+    ];
+    for (const line of negative) {
+      expect(hit(line), `【误报防护】不应命中：${line}`).toBe(false);
+    }
+    const positive = [
+      '收口前全量：`npm run prepush`（19 项）',
+      'DoD 清单 ≥ 8 项',
+      '反模式仍 48 条',
+      '单文件单次 edit 最多 3 处',
+      '吸收 claude-tla-plus-plugin 的 4 份 skill 资料',
+      '每阶段 6 份子模板',
+      '共 11 种独立子模板',
+    ];
+    for (const line of positive) {
+      expect(hit(line), `【应命中】: ${line}`).toBe(true);
+    }
+  });
+
+  it('扫描范围谓词 isCountClaimScannedPath（排除/提升）', () => {
+    const excluded = [
+      'docs/changes/2026-08-30-b3-usability-acceptance.md',
+      'docs/changes/engineering-batches/2026-08-11-p0-p2-batches/README.md',
+      'docs/changes/archive/2026-07-30-round23-w-model-8-phase-validation/README.md',
+      'docs/superpowers/plans/2026-10-08-batch9-engineering-hygiene.md',
+      'docs/debug/2026-09-28-test-gate-optimization/baseline.md',
+      '.superpowers/sdd/2026-10-08-batch9-engineering-hygiene/progress.md',
+      'eval/e2e/2026-08-28-baseline.md',
+      'w-model-dev/scripts/samples/gate/valid/valid-gate-report.json.md',
+      'CHANGELOG-archive.md',
+      'node_modules/foo/README.md',
+    ];
+    for (const p of excluded) {
+      expect(isCountClaimScannedPath(p), `应排除：${p}`).toBe(false);
+    }
+    const scanned = [
+      'README.md',
+      'AGENTS.md',
+      'w-model-dev/references/bdd.md',
+      'w-model-dev/templates/README.md',
+      'eval/README.md',
+      'docs/changes/decision-log/rounds-50-docs-consistency.md', // 提升（决策记录）
+      'w-model-dev/scripts/samples/README.md', // 提升（夹具系统说明）
+    ];
+    for (const p of scanned) {
+      expect(isCountClaimScannedPath(p), `应纳入：${p}`).toBe(true);
+    }
+  });
+
+  it('undefined 注入跳过 + 多文档多违规聚合', () => {
+    expect(
+      rc({ countClaimLiveDocs: undefined, countClaimRegisteredPaths: ['README.md'] }),
+      'countClaimLiveDocs undefined 应跳过',
+    ).toEqual([]);
+    expect(
+      rc({ countClaimLiveDocs: undefined, countClaimRegisteredPaths: undefined }),
+      '两者 undefined 应跳过',
+    ).toEqual([]);
+    const v = rc({
+      countClaimLiveDocs: [
+        { name: 'docs/a.md', content: '门禁 17 项与 8 份快照' },
+        { name: 'docs/b.md', content: '保留 6 条反模式' },
+      ],
+      countClaimRegisteredPaths: ['README.md'],
+    });
+    expect(v).toHaveLength(2);
+  });
+
+  it('checkCountClaimLiveDocs 直测：豁免表内容物化（每条 doc/reason 非空）', () => {
+    expect(COUNT_CLAIM_EXEMPTIONS.length).toBeGreaterThan(0);
+    for (const e of COUNT_CLAIM_EXEMPTIONS) {
+      expect(e.doc.length, '豁免 doc 非空').toBeGreaterThan(0);
+      expect(e.reason.length, '豁免 reason 非空').toBeGreaterThan(0);
+    }
+    // 直测函数独立于 buildDocConsistencyReport 接线（同判据）
+    const v = checkCountClaimLiveDocs(
+      [{ name: 'docs/unreg.md', content: '含 19 项门禁表述' }],
+      ['README.md', ...COUNT_CLAIM_EXEMPTIONS.map((e) => e.doc)],
+    );
+    expect(v).toHaveLength(1);
+    expect(checkCountClaimLiveDocs([{ name: 'eval/README.md', content: '101 条语料' }], ['README.md'])).toEqual([]);
   });
 });
 

@@ -112,6 +112,32 @@ describe('printGateReport', () => {
     expect(logSpy).toHaveBeenNthCalledWith(2, 'GATE_JSON ' + JSON.stringify({ passed: true, exitCode: 0 }));
     expect(exitSpy).not.toHaveBeenCalled();
   });
+
+  it('tailFields（非确定运行时字段）经第 4 参置于 exitCode 之后，原 summary 键序不变', () => {
+    const exitSpy = vi.spyOn(process, 'exit');
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const summary = { type: 'run-log', passed: true, reasons: [] };
+    printGateReport('RUN_LOG', summary, 0, { durationMs: 42 });
+
+    const jsonLine = logSpy.mock.calls[1]![0] as string;
+    expect(jsonLine.startsWith('RUN_LOG_JSON ')).toBe(true);
+    expect(jsonLine).toBe('RUN_LOG_JSON ' + JSON.stringify({ ...summary, exitCode: 0, durationMs: 42 }));
+    // durationMs 在 exitCode **之后**（摘要尾部）：非确定运行时字段不扰动确定字段序
+    const keys = Object.keys(JSON.parse(jsonLine.slice('RUN_LOG_JSON '.length)));
+    expect(keys.indexOf('durationMs')).toBeGreaterThan(keys.indexOf('exitCode'));
+    expect(exitSpy).not.toHaveBeenCalled();
+  });
+
+  it('不传 tailFields 时行为与旧契约一致（exitCode 仍在末尾）', () => {
+    const exitSpy = vi.spyOn(process, 'exit');
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    printGateReport('RUN_LOG', { type: 'run-log', passed: false }, 1);
+    const jsonLine = logSpy.mock.calls[1]![0] as string;
+    expect(jsonLine.endsWith('"exitCode":1}')).toBe(true);
+    expect(exitSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe('printJsonReport（--json 机器可读报告）', () => {

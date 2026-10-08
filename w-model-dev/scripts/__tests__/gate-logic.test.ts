@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 读取本仓 samples/gate fixture（samples(f) 相对 __dirname 固定解析），非用户输入 */
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +11,9 @@ import {
   type RTMMatrixShape,
 } from '../logic/gate-logic.js';
 import { computeSigHash, verifyMaturityApproval, type SignatureChainEntry } from '../logic/signature-chain-logic.js';
+// D3-II（43.3.0）：gate 期望单源化——负例期望（expectedPassed / expectedReasonPatterns）不再在
+// vitest 侧独立重复声明，改由 samples/expectations/gate.ts 共享表同源消费（消除双声明漂移）。
+import { getGateExpectation } from '../samples/expectations/gate.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const samples = (f: string) => path.resolve(__dirname, '../samples/gate', f);
@@ -113,30 +117,24 @@ describe('gate-logic 核心路径单测（审计修复 P16：1400+ 行核心逻�
     expect(out.reasons).toEqual([]);
   });
 
-  it('bad fixtures 负例（3 夹具逐具名：bad-coverage / bad-nfr-missing-dual-fields / bad-phase5-missing-codemodule）', async () => {
+  it('bad fixtures 负例（3 夹具逐具名：bad-coverage / bad-nfr-missing-dual-fields / bad-phase5-missing-codemodule，期望数据同源自 GATE_EXPECTATIONS）', async () => {
     const rows = [
-      {
-        fixture: 'bad-coverage.json',
-        phaseOption: 8,
-        marker: /覆盖率未达 100%/,
-      },
-      {
-        fixture: 'bad-nfr-missing-dual-fields.json',
-        phaseOption: 8,
-        marker: /NFR 行 NFR-001 缺 targetValue 与 testThreshold/,
-      },
-      {
-        fixture: 'bad-phase5-missing-codemodule.json',
-        phaseOption: 5,
-        marker: /REQ-001.*codeModule/,
-      },
+      { fixture: 'bad-coverage.json', phaseOption: 8 },
+      { fixture: 'bad-nfr-missing-dual-fields.json', phaseOption: 8 },
+      { fixture: 'bad-phase5-missing-codemodule.json', phaseOption: 5 },
     ] as const;
     for (const row of rows) {
+      const exp = getGateExpectation(row.fixture, { phaseOption: row.phaseOption });
+      expect(exp, `${row.fixture} 应在共享期望表 GATE_EXPECTATIONS 中登记`).toBeDefined();
+      if (exp === undefined) continue;
       const out = checkArtifactGate(await load(row.fixture), {
         phaseOption: row.phaseOption,
       });
-      expect(out.passed, `${row.fixture} 应不通过`).toBe(false);
-      expect(out.reasons.join('\n'), `${row.fixture} 应报具名违规`).toMatch(row.marker);
+      expect(out.passed, `${row.fixture} 应不通过（表内期望 passed=${exp.expectedPassed}）`).toBe(exp.expectedPassed);
+      const joined = out.reasons.join('\n');
+      for (const pattern of exp.expectedReasonPatterns ?? []) {
+        expect(joined, `${row.fixture} 应报具名违规（表内 pattern ${String(pattern)}）`).toMatch(pattern);
+      }
     }
   });
 

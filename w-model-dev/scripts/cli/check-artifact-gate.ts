@@ -75,8 +75,8 @@ import {
   type PhaseOption,
   type RTMMatrixShape,
 } from '../logic/gate-logic.js';
-import type { MaturityApprovalInput, SignatureChainEntry } from '../logic/signature-chain-logic.js';
 import { checkCodingPlan } from '../logic/coding-plan-logic.js';
+import { loadSignatureChainFile, readMaturityFile, type ArtifactGateReadFs } from '../logic/artifact-gate-logic.js';
 import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
 import { exitWithError, HandledCliError, type CliError } from '../lib/cli-error.js';
 import { isDirectInvocation } from '../lib/is-main.js';
@@ -317,60 +317,13 @@ export function aggregateExternalChecks(
 }
 
 /**
- * 读取 `.w-model/maturity.json` 的 level + history（成熟度分级，operational-recovery.md；A4 豁免判定输入）。
- * 文件缺失 / 解析失败 / level 非法 → undefined（**不豁免**，保持严格；豁免必须有显式声明）。
+ * gate-log 读取注入适配器（D6：CLI gate-log 读取下沉 logic 后，CLI 只承担 I/O 层——
+ * 传路径 + 适配器给 logic 纯函数；真实形态 = node:fs/promises.readFile，语义与历史实现
+ * `await nodeFs.promises.readFile(p, 'utf-8')` 逐字等价，ENOENT / 读取失败经 reject 收敛）。
  */
-async function readMaturity(projectDir: string): Promise<MaturityApprovalInput | undefined> {
-  try {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 由 CLI 参数解析并经既有 containment 校验
-    const raw = await nodeFs.promises.readFile(path.resolve(projectDir, '.w-model', 'maturity.json'), 'utf-8');
-    const parsed = JSON.parse(raw) as { level?: unknown; history?: unknown };
-    if (typeof parsed.level !== 'string') return undefined;
-    const history: MaturityApprovalInput['history'] = Array.isArray(parsed.history)
-      ? parsed.history
-          .filter((h): h is { to?: unknown; at?: unknown } => h !== null && typeof h === 'object')
-          .map((h) => ({
-            to: typeof h.to === 'string' ? h.to : '',
-            at: typeof h.at === 'string' ? h.at : undefined,
-          }))
-      : [];
-    return { level: parsed.level, history };
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * 装载 `.w-model/signature-chain.jsonl`（A4 成熟度豁免审批链；容错读取）：
- * 文件不存在 → 空数组；逐行 JSON 解析失败的坏行跳过（坏行无法通过 v3 重算，天然不构成合法审批）；
- * 合法 JSON 但非对象的整行（`null` / 数组 / 标量）同样跳过——放行会推进到 `[UNEXPECTED]` exit 2
- * （批次 7 任务 11 修复轮 1 审查实跑复现，与 check-maturity 同口径）；
- * 整文件读取失败 → 空数组。三形态（无链 / 坏链 / 缺文件）最终都收敛为「不豁免」（fail-closed）。
- */
-async function loadSignatureChainIfExists(projectDir: string): Promise<SignatureChainEntry[]> {
-  const chainFile = path.resolve(projectDir, '.w-model', 'signature-chain.jsonl');
-  let raw: string;
-  try {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- projectDir 由 CLI 参数解析并经既有 containment 校验
-    raw = await nodeFs.promises.readFile(chainFile, 'utf-8');
-  } catch {
-    return [];
-  }
-  const entries: SignatureChainEntry[] = [];
-  for (const line of raw.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (trimmed === '') continue;
-    try {
-      const parsed: unknown = JSON.parse(trimmed);
-      // 非对象行（null / 数组 / 标量）跳过：无法通过 verifyMaturityApproval 的字段判定
-      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
-      entries.push(parsed as SignatureChainEntry);
-    } catch {
-      /* 坏行不构成审批（fail-closed）：JSON 不完整即无法通过 verifyMaturityApproval 的 v3 重算 */
-    }
-  }
-  return entries;
-}
+const gateLogReadFs: ArtifactGateReadFs = {
+  readFile: (p: string) => nodeFs.promises.readFile(p, 'utf-8'),
+};
 
 async function runArtifactGate(argv: string[]): Promise<void> {
   // --json：机器可读报告模式（不打印人类可读分隔线与统计）
@@ -607,8 +560,12 @@ async function runArtifactGate(argv: string[]): Promise<void> {
   // 审批条目（绑定 maturity.json）：无链 / 坏链 / 缺文件三形态一律不豁免（fail-closed），
   // 拒绝 reason 由 checkArtifactGate（evaluateTlaBddWaiver 单点）并入 reasons/exitCode。
   // 缺 maturity.json → 不豁免、无新增 reason（既有严格路径零回归）。
-  const maturity = await readMaturity(projectDir);
-  const signatureChain = await loadSignatureChainIfExists(projectDir);
+  // D6：gate-log 读取下沉 logic（readMaturityFile / loadSignatureChainFile），CLI 只传路径 + 适配器。
+  const maturity = await readMaturityFile(gateLogReadFs, path.resolve(projectDir, '.w-model', 'maturity.json'));
+  const signatureChain = await loadSignatureChainFile(
+    gateLogReadFs,
+    path.resolve(projectDir, '.w-model', 'signature-chain.jsonl'),
+  );
   const tlaBddWaiver = evaluateTlaBddWaiver(maturity, effectivePhase, signatureChain);
   const maturityLevel = maturity?.level;
   const tlaBddWaived = tlaBddWaiver.waived;

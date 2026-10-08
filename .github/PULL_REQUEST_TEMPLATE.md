@@ -8,7 +8,7 @@ closes #N
 
 ## 校验要点
 
-> 本仓库无云端 CI，以下为本地门禁（`.githooks/pre-push`，Git Bash 下执行）。
+> 本仓库以本地 pre-push 为主门禁，GitHub Actions workflow（D1 / 43.3.0）作云端兜底；以下校验要点须本地通过（Git Bash 下执行）。
 
 - [ ] `npm run prepush` 19 项通过（输出摘要附下方「门禁输出」节）
 - [ ] 未新增 `.test.ts`（如新增，已同步 vitest 计数与 `w-model-dev/scripts/__tests__/README.md`）

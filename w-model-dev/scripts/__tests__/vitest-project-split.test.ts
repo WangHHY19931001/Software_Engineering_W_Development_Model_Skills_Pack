@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 枚举本仓 __tests__/ 目录并读取测试源码做项目切分守卫（TEST_DIR 相对固定），非用户输入 */
 /**
  * vitest 三 project 拆分守护（config/vitest.config.ts 的 SUBPROCESS_TEST_FILES 约定）。
  *

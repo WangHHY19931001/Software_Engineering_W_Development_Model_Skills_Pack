@@ -2057,3 +2057,119 @@ describe('C1：check-requirement-graph --exemptions 的 R15b 豁免出口（端�
     }
   });
 });
+
+// ==================== A19 图谱性能四点位（批次 9，43.3.0）====================
+// 回归断言：四点位改造（① precedes 改 nodeMap.get ② 递归 DFS 改迭代栈 ③ BFS queue.shift 改
+// 头指针 ④ R15e 签名链对账预建 role=V/review 索引）不改变任何判据输出。期望值 = 改造前
+// （fa855ddb 版模块）对同一 fixture 的逐位输出，已由跨版本差分对账（55 个 samples × 4 phase
+// × 5 externalEvidence + 120 随机图，3500 项全等）锁定——本组断言把「等价」固化为持续回归，
+// 防止未来再改动时行为漂移。
+describe('A19 图谱性能四点位（43.3.0）——行为不变回归断言', () => {
+  const A19_SAMPLES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../samples/graph');
+
+  /** 读取 samples/graph fixture（受控目录，路径由本文件常量拼接） */
+  async function readA19Fixture(file: string): Promise<GraphShape> {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 常量目录 + 受控文件名
+    const raw = await fs.readFile(path.join(A19_SAMPLES, file), 'utf-8');
+    return JSON.parse(raw) as GraphShape;
+  }
+
+  it('① precedes 分支 nodeMap.get：valid-cross-logic phase=1 零违规通过（含 precedes 时续边）', async () => {
+    const g = await readA19Fixture('valid-cross-logic.json');
+    const r = checkRequirementGraph(g, 1);
+    // 改造前（g.nodes.find）与改造后（nodeMap.get）对同一 fixture 输出逐位一致
+    expect(r.passed).toBe(true);
+    expect(r.connectedComponents).toBe(1);
+    expect(r.roots).toEqual(['REQ-001']);
+    expect(r.violations).toEqual([]);
+  });
+
+  it('② 迭代 DFS：bad-precedes-cycle phase=1 环记录 order 与文本逐字不变', async () => {
+    const g = await readA19Fixture('bad-precedes-cycle.json');
+    const r = checkRequirementGraph(g, 1);
+    expect(r.passed).toBe(false);
+    // 环记录顺序（DFS 展开顺序）是最大的行为敏感点——迭代栈必须保持递归展开序
+    expect(r.crossLogic?.precedesCycles).toEqual([['REQ-002', 'REQ-003', 'REQ-002']]);
+    expect(r.violations[0]).toBe('R5 时序无环校验失败：precedes 子图有环：REQ-002→REQ-003→REQ-002');
+  });
+
+  it('② 迭代 DFS：bad-parent-cycle 零根 parent 环 branch（phase=1 与 phase=3）违规逐字不变', async () => {
+    const g = await readA19Fixture('bad-parent-cycle.json');
+    const r1 = checkRequirementGraph(g, 1);
+    expect(r1.connectedComponents).toBe(1);
+    expect(r1.violations.filter((v) => v.startsWith('环检测失败'))).toEqual([
+      '环检测失败：parent 边存在环，无法确定系统根',
+    ]);
+    const r3 = checkRequirementGraph(g, 3);
+    expect(r3.violations.filter((v) => v.startsWith('单根校验失败') || v.startsWith('环检测失败'))).toEqual([
+      '单根校验失败：缺少 REQ 系统根，可能存在 parent 边环',
+      '环检测失败：parent 边存在环，无法确定系统根',
+    ]);
+  });
+
+  it('③ BFS 头指针：valid-req-hierarchy / valid-phase3 连通分量、orphan、多 parent 不变', async () => {
+    const h = await readA19Fixture('valid-req-hierarchy.json');
+    const r1 = checkRequirementGraph(h, 1);
+    expect(r1.passed).toBe(true);
+    expect(r1.connectedComponents).toBe(1);
+    expect(r1.orphans).toEqual([]);
+    expect(r1.multiParent).toEqual([]);
+    const p3 = await readA19Fixture('valid-phase3.json');
+    const r3 = checkRequirementGraph(p3, 3);
+    expect(r3.passed).toBe(true);
+    expect(r3.violations).toEqual([]);
+    expect(r3.connectedComponents).toBe(1);
+  });
+
+  it('④ R15e 索引：confirmed 与签名链对账（含噪声条目）行为与改造前一致', async () => {
+    const g = await readA19Fixture('valid-evidence-anchor.json');
+    // 基线：未注入签名链 → 不触发 R15e（阶段 1 早期文件不存在不得误红）
+    const noChain = checkRequirementGraph(g, 1);
+    expect(noChain.violations.some((v) => v.startsWith('R15e '))).toBe(false);
+    // 空链 → 全部 confirmed 节点缺 V review 环 → R15e 触发
+    const emptyChain = checkRequirementGraph(g, 1, { signatureChainEntries: [] });
+    expect(emptyChain.violations.filter((v) => v.startsWith('R15e '))).toHaveLength(1);
+    expect(emptyChain.violations[0]).toContain('REQ-001');
+    // 集齐 role=V/review、artifacts 引用节点、inputProvenance 指向锚点 path 的条目 → 不触发。
+    // 同时注入大量「不起作用」噪声条目（错误 role / 错误 action / 错误路径 / 无关 artifacts /
+    // inputProvenance 缺失 / 重复与非字符串 artifacts）——索引须在噪声中正确命中匹配条目。
+    const matching = g.nodes.map((n) => {
+      const p = (n.evidenceAnchor ?? '').split(':')[0] ?? '';
+      return {
+        role: 'V',
+        action: 'review',
+        artifacts: [n.id],
+        inputProvenance: { sourceArtifacts: [{ path: p }] },
+      };
+    });
+    const noise = [
+      {
+        role: 'S',
+        action: 'review',
+        artifacts: ['REQ-001'],
+        inputProvenance: { sourceArtifacts: [{ path: 'docs/x.md' }] },
+      },
+      {
+        role: 'V',
+        action: 'ingest',
+        artifacts: ['REQ-001'],
+        inputProvenance: { sourceArtifacts: [{ path: 'docs/phase1-requirements/requirement-spec.md' }] },
+      },
+      {
+        role: 'V',
+        action: 'review',
+        artifacts: ['REQ-001'],
+        inputProvenance: { sourceArtifacts: [{ path: 'WRONG/path.md' }] },
+      },
+      {
+        role: 'V',
+        action: 'review',
+        artifacts: ['NOPE-999'],
+        inputProvenance: { sourceArtifacts: [{ path: 'docs/phase1-requirements/requirement-spec.md' }] },
+      },
+      { role: 'V', action: 'review', artifacts: ['REQ-001'], inputProvenance: {} },
+    ];
+    const hasRing = checkRequirementGraph(g, 1, { signatureChainEntries: [...matching, ...noise] });
+    expect(hasRing.violations.some((v) => v.startsWith('R15e '))).toBe(false);
+  });
+});

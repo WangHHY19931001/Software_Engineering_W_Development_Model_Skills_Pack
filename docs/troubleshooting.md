@@ -23,7 +23,7 @@
 
 ### 1.2 `git push --no-verify`（契约声明）
 
-**声明**：本仓库不集成云端 CI，本地 pre-push 门禁是**唯一质量屏障**。`git push --no-verify` 跳过门禁视为**破坏契约**，仅限紧急情况且后果自负——`.githooks/pre-push` 头部有显式警告，README「CI 策略」节有同样声明。
+**声明**：本仓库以本地 pre-push 为**主门禁**、GitHub Actions workflow（D1 / 43.3.0）作云端兜底（口径见 README「CI 策略」节，CI 首跑待首次推库触发验证）。`git push --no-verify` 仅绕过**本地**门禁，**云端 CI 仍会触发**；跳过门禁视为**破坏契约**，仅限紧急情况且后果自负——`.githooks/pre-push` 头部有显式警告，README「CI 策略」节有同样声明。
 
 **正确姿势**：紧急绕过后，事后必须在 Git Bash / WSL 中补跑 `npm run prepush`，确认 19 项门禁全部通过后再合入；不得把 `--no-verify` 作为常规开发手段。
 

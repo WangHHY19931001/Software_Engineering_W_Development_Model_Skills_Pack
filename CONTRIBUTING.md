@@ -73,6 +73,8 @@ npm run check:verifier -- <sample.json>
 npm run format
 ```
 
+> **验证面教训（批次 8 T18 / 批次 9 T14 固化）**：修改 `subagent/*.md`、`references/*.md` 等**散文/文档文件**后，**必跑 `npm run audit:l0-links`（0 违规），涉及 persona 哈希时另跑 self-test 的 R19 断言（或直接全量 vitest/self-test）**。散文改动不在「改 `cli/*.ts` 必须跑回归测试」的默认提示面内，但可能漂移：l0 链接（L0/L1 边界）、persona fixture 哈希（R19 self-test 断言，改 `subagent/*.md` 且其被 `samples/verifier/persona-*.json` 登记 `reviewedArtifacts` 时）、docs-consistency 计数登记（D8 `count-claim-live-docs`，新增含计数表述的活体文档须入 REQUIRED_PATHS 或豁免表，漏登记即红）。l0-link 审计为秒级快检、必先跑。典型事故：批次 8 T18 改 persona 后未跑 l0-link/self-test 致哈希漂移；批次 9 T14 改生产代码后未随改 `security-scan --regenerate` 重生成 baseline，`lint:security` 绿声称被推翻（时间线 T8-T13 红）——`lint:security` 绿/新增校验须绑定任务自身终态（随改随 regenerate 或显式确认），pre-push 为强制执行点。
+
 > 本仓库的校验正确性由两层保障：
 >
 > - **vitest 单元测试**（`w-model-dev/scripts/__tests__/`）覆盖纯逻辑边界路径，coverage 矩阵见 [`__tests__/README.md`](./w-model-dev/scripts/__tests__/README.md)
@@ -210,7 +212,7 @@ git push --no-verify
 **提交流程**：
 
 1. 创建分支（见上文「1. 创建分支」）
-2. 本地验证：`npm run prepush`（19 项本地门禁，替代云端 CI；纯文档改动可仅跑 `npm run check:docs-consistency`）
+2. 本地验证：`npm run prepush`（19 项主门禁，云端 CI 兜底同源执行；纯文档改动可仅跑 `npm run check:docs-consistency`）
 3. 按上述格式提交
 4. 推送分支并创建 PR，使用 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 模板（见下节）
 
@@ -228,7 +230,7 @@ refactor(skill): /wm review 编排指引精简
 - PR 标题遵循 Conventional Commits 格式（同提交信息：`<type>(<scope>): <summary>`）
 - PR 描述使用 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 模板，说明：改了什么、为什么改、如何验证（构造了什么输入、退出码如何）
 - 关联相关 issue（如 `Closes #5`）
-- 本仓库无云端 CI：模板中的校验要点由本地 `npm run prepush`（19 项门禁）验证，合入前请确保本地已通过
+- 本地 `npm run prepush`（19 项门禁）为**主门禁**：模板中的校验要点由它验证，合入前请确保本地已通过；仓库另配置 GitHub Actions workflow（[.github/workflows/ci.yml](./.github/workflows/ci.yml)，D1 / 43.3.0）作云端兜底，CI 首跑待首次推库触发验证（R-B9-11 / R-B9-12，暂未写「已首跑全绿」）
 
 ## 文档维护规则
 

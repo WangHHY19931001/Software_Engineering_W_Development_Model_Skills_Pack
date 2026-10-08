@@ -39,7 +39,6 @@
  */
 
 import { promises as fs } from 'node:fs';
-import { accessSync } from 'node:fs';
 import * as path from 'node:path';
 
 import { checkSignatureChain, type SignatureChainEntry } from '../logic/signature-chain-logic.js';
@@ -50,6 +49,7 @@ import { runMain } from '../lib/run-main.js';
 import { printGateReport, printJsonReport, buildViolationDistribution } from '../lib/gate-report.js';
 import { parsePhaseArg, phaseFlagPresent } from '../lib/parse-phase.js';
 import { hasFlag, parseFlagValue } from '../lib/parse-args.js';
+import { resolveProjectRoot as resolveProjectRootFromLib } from '../lib/project-root.js';
 
 // ==================== 参数解析 ====================
 
@@ -122,20 +122,10 @@ async function main(): Promise<void> {
   // 真实项目必有 project.json（/wm analyze 初始化创建）；仅含 gate-logs 等测试残留的 .w-model/ 不视为项目根。
   // 找不到时返回 null → R8 跳过（与 signature-chain-logic 契约一致：existingPaths 未提供即跳过 R8；
   // 真实项目链文件必位于 <project>/.w-model/ 下，向上必能找到）。
+  // D5：判据统一走 lib/project-root.ts（requireProjectFile + maxDepth=5），行为与原实现逐条等价
+  // （原实现以 accessSync 探测 project.json，existsSync 语义等价：仅存在性、不含类型判据）。
   function findProjectRoot(chainDir: string): string | null {
-    let dir = chainDir;
-    for (let i = 0; i < 5; i++) {
-      try {
-        accessSync(path.join(dir, '.w-model', 'project.json'));
-        return dir;
-      } catch {
-        /* continue */
-      }
-      const parent = path.dirname(dir);
-      if (parent === dir) break;
-      dir = parent;
-    }
-    return null; // 未找到真实项目根（无 .w-model/project.json），跳过 R8
+    return resolveProjectRootFromLib(chainDir, { requireProjectFile: true, maxDepth: 5 });
   }
   const projectRoot = findProjectRoot(path.dirname(chainAbs));
   let existingPaths: Set<string> | undefined;

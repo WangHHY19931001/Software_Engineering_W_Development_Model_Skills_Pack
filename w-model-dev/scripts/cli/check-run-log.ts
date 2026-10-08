@@ -384,8 +384,9 @@ async function main(): Promise<void> {
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置。
   // D3（2026-09-18）：机器通道不携带 durationMs——该值每次运行不同（同输入三次 175/209/221ms），
   // 进入 --json 即破坏「同输入同字节复现」；判定字段（passed/reasons/violations/r10/r11/exitCode）
-  // 保持不变。人类可读路径的 RUN_LOG_JSON 摘要按规格保留该字段
-  // （在 `summary` 之外追加，`printGateReport` 再追加 `exitCode`，故位于 `exitCode` 之前；见文件末尾）。
+  // 保持不变。人类可读路径的 RUN_LOG_JSON 摘要按规格保留该字段；A17（43.3.0）口径：
+  // durationMs 为非确定运行时字段，机器通道 --json 不携带；人类通道经 printGateReport 尾参数
+  // 置于摘要尾部（exitCode 之后、`...summary` 展开后置尾），确定字段序保持稳定（见文件末尾调用）。
   if (jsonMode) {
     printJsonReport(summary, exitCode);
     process.exitCode = exitCode;
@@ -433,8 +434,9 @@ async function main(): Promise<void> {
 
   // 末尾 JSON 摘要（供 Agent 解析；行首标记便于正则截取）
   // exitCode 与 process.exitCode 一致（门禁防伪造三层机制之一）
-  // durationMs 仅在此人类可读通道出现（D3：机器通道 --json 已剔除该非确定性字段）
-  printGateReport('RUN_LOG', { ...summary, durationMs }, exitCode);
+  // durationMs 仅在此人类可读通道出现（D3：机器通道 --json 已剔除该非确定性字段）；
+  // A17：非确定运行时字段经 printGateReport 尾参数置于摘要尾部（exitCode 之后），确定字段序稳定
+  printGateReport('RUN_LOG', summary, exitCode, { durationMs });
   process.exitCode = exitCode;
   return;
 }

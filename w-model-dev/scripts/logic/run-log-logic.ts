@@ -474,12 +474,16 @@ export function recordTimestampMs(value: unknown): number | null {
 
 // ==================== 规则段提取函数（C4：checkRunLog 原位拆分） ====================
 //
-// 以下五个函数是 checkRunLog 对应规则段的原位提取（纯机械搬移）：判定逻辑与
+// 以下函数是 checkRunLog 对应规则段的原位提取（纯机械搬移）：判定逻辑与
 // violation push 顺序与拆分前逐字节一致，checkRunLog 退化为编排器，按原执行
 // 顺序依次调用并展平 violations。段间共享的只读状态（completedPhases 来自 R1 段、
-// strictLifecycleScopes / isStrictLifecycleEntry / isPhase8IdentityIncomplete 来自
-// R3 段、phaseEntries 索引来自 R3 预防审查段、diagnostics 累积器）以参数显式
-// 传递，不改判定语义。
+// strictLifecycleScopes / isStrictLifecycleEntry / isPhase8IdentityIncomplete /
+// phaseEntries 索引来自 R3 段、diagnostics 累积器）以参数显式传递，不改判定语义。
+//
+// R6/R7/R8/R10/R11 五个函数（checkGateLogCrossReference / checkTimestampOrdering /
+// checkTrajectoryTemplate / checkRevertEvidence / checkClosureReleases）为批次 4 先行
+// 拆出；结构校验段（collectValidEntries）与 R1/R2/R3/R4/R5/R9 六段为批次 9（D4，
+// 43.3.0）拆完剩余内联段，见文件下方「批次 9（D4）拆分的剩余内联段」。
 
 /**
  * R6 段整体：gateExitCode 回填检查 + gate-log 交叉一致（R6）+
@@ -922,31 +926,25 @@ function checkClosureReleases(valid: RunLogEntry[]): {
   return { violations, closureReleases, missingCount: closureMissingCount };
 }
 
-// ==================== 校验入口 ====================
+// ==================== 批次 9（D4）拆分的剩余内联段 ====================
+//
+// 以下函数是 checkRunLog 其余内联段（结构校验 + R1/R2/R3/R4/R5/R9）的原位提取
+// （纯机械搬移）：判定逻辑与 violation push 顺序与拆分前逐字节一致，checkRunLog
+// 退化为编排器，按原执行顺序依次调用并展平 violations。段间共享的只读状态
+// （completedPhases 来自 R1 段、strictLifecycleScopes / isStrictLifecycleEntry /
+// isPhase8IdentityIncomplete / phaseEntries 来自 R3 段）以返回值显式传递，
+// diagnostics 累积器以参数就地累积，不改判定语义。
 
-export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): RunLogCheckResult {
+/**
+ * 结构校验段（D4 拆分）：schema 前置校验 + narrow 为 RunLogEntry（缺失必需字段
+ * 跳过并记录，容错不 crash）+ action-role 配对强制（约束 #8 / 审计修复 task 3）。
+ * 返回 valid 列表与 violations（顺序与拆分前一致）。
+ */
+function collectValidEntries(entries: unknown[]): {
+  valid: RunLogEntry[];
+  violations: string[];
+} {
   const violations: string[] = [];
-  const diagnostics: string[] = [];
-
-  // 输入校验（先做）：非法输入返回 violations 而非抛 TypeError
-  if (!Array.isArray(entries)) {
-    return {
-      passed: false,
-      violations: ['run-log entries 必须为数组'],
-      lifecycleStatus: 'NOT_CLOSED_NOT_PROVEN',
-    };
-  }
-
-  // 空输入 fail-closed（审计修复 task 3）：[] 此前会走完全流程并在无任何
-  // checkpoint 时静默 passed=true + CLOSED_UNDER_CURRENT_RULES——空日志无
-  // 阶段/角色/门禁/CHECKPOINT 证据，不得视为「闭合通过」。
-  if (entries.length === 0) {
-    return {
-      passed: false,
-      violations: ['run-log 为空：无任何阶段/角色/门禁/CHECKPOINT 证据（fail-closed）'],
-      lifecycleStatus: 'NOT_CLOSED_NOT_PROVEN',
-    };
-  }
 
   // 结构校验：narrow 每个元素为 Partial<RunLogEntry>，缺失必需字段则跳过并记录（容错，不 crash）
   // 必需字段为 R1-R8 实际访问的核心字段：runId / timestamp / phase / action / outcome
@@ -1009,6 +1007,21 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
+  return { valid, violations };
+}
+
+/**
+ * R1 段整体（D4 拆分）：阶段动作完整性（"已完成阶段"=有 checkpoint success 记录，
+ * 按阶段分档检查 chunk/cross vs produce/review + gate 类 + checkpoint）+
+ * rootcause/fix 动作字段完整性（spec §7.5）。返回 completedPhases（R8 轨迹校验消费）与
+ * violations（顺序与拆分前一致）。
+ */
+function checkPhaseActionCompleteness(valid: RunLogEntry[]): {
+  completedPhases: Set<number>;
+  violations: string[];
+} {
+  const violations: string[] = [];
+
   // R1 阶段动作完整性
   // "已完成阶段"定义：该阶段有 action=checkpoint 且 outcome=success 的记录。
   // 对每个已完成阶段，按阶段分档检查动作完整性：
@@ -1054,6 +1067,17 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
+  return { completedPhases, violations };
+}
+
+/**
+ * R2 段整体（D4 拆分）：tokens 非负 + estimated=true 违规（约束 #4，43.0.0 A5，
+ * 只加违规判定、不改 Σtokens 求和口径——check-budget sumTokens 不筛 estimated）+
+ * checkpoint success tokens=0（note 含"首次"豁免）。
+ */
+function checkTokensAndEstimation(valid: RunLogEntry[]): string[] {
+  const violations: string[] = [];
+
   // R2 tokens 非负 + estimated 违规（43.0.0 A5：estimated=true → tokens 为 LLM 估算值，
   // 违反约束 #4 真实执行 → blocking；只加违规判定，不改 Σtokens 求和口径——check-budget
   // sumTokens 不筛 estimated，上界口径与新增前一字不变）
@@ -1074,6 +1098,36 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
       }
     }
   }
+
+  return violations;
+}
+
+/**
+ * R3 段产出的严格生命周期共享状态（供 R7/R8 消费）：
+ * strictLifecycleScopes / isStrictLifecycleEntry / isPhase8IdentityIncomplete 来自
+ * R3 rootcause 生命周期配对段，phaseEntries 索引来自 R3 预防审查段。
+ */
+interface R3LifecycleState {
+  strictLifecycleScopes: Set<string>;
+  isStrictLifecycleEntry: (entry: RunLogEntry) => boolean;
+  isPhase8IdentityIncomplete: (entry: RunLogEntry) => boolean;
+  phaseEntries: Map<number, Array<{ entry: RunLogEntry; index: number }>>;
+}
+
+/**
+ * R3 段整体（D4 拆分）：返工记录一致性（可选校验：仅当 tlaCheckRounds 提供）+
+ * rootcause/fix 只按 action-specific lifecycle projection 关联（open-approved-lifecycle
+ * + legacy 报告配对）+ 预防审查窗口（严格模式只计 fix → 同身份 implementation V 窗口）。
+ * diagnostics 就地累积（pending-pre-approval / NON_CREDIT_FIX）。
+ * 返回 violations 与 lifecycleState（strictLifecycleScopes / isStrictLifecycleEntry /
+ * isPhase8IdentityIncomplete / phaseEntries 供 R7/R8 消费）。
+ */
+function checkReworkConsistency(
+  valid: RunLogEntry[],
+  options: RunLogCheckOptions | undefined,
+  diagnostics: string[],
+): { violations: string[]; lifecycleState: R3LifecycleState } {
+  const violations: string[] = [];
 
   // R3 返工记录一致性（可选校验：仅当 tlaCheckRounds 提供时执行）
   // 返工事件载体为 fix 动作（批次 6 A15：原 action=rework 死词已删除，无真实用法）；
@@ -1337,6 +1391,23 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
+  return {
+    violations,
+    lifecycleState: {
+      strictLifecycleScopes,
+      isStrictLifecycleEntry,
+      isPhase8IdentityIncomplete,
+      phaseEntries,
+    },
+  };
+}
+
+/**
+ * R4 段整体（D4 拆分）：checkpoint success 须 acknowledgedDecisions 非空（O4 Comprehension Debt）。
+ */
+function checkAcknowledgedDecisions(valid: RunLogEntry[]): string[] {
+  const violations: string[] = [];
+
   // R4 acknowledgedDecisions 非空
   for (const e of valid) {
     if (e.action === 'checkpoint' && e.outcome === 'success') {
@@ -1348,56 +1419,61 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
+  return violations;
+}
+
+/**
+ * R5 段整体（D4 拆分）：O 越权检测（可选校验：仅当 gateLogs 提供时执行）。
+ * 扫描 gate-logs 内容，检测 O 是否绕过 A/S 子代理直接操作 .w-model/*.json；
+ * gateLogs 无提供时返回空 violations（与拆分前「if (options?.gateLogs)」守卫等价）。
+ */
+function checkOrchestratorEscalation(options: RunLogCheckOptions | undefined): string[] {
+  const violations: string[] = [];
+
   // R5 O 越权检测（可选校验：仅当 gateLogs 提供时执行）
   // 扫描 gate-logs 内容，检测 O 是否绕过 A/S 子代理直接操作 .w-model/*.json
   // 注意：gateLogs Map 可能因 gateLogPath 匹配策略（basename + 绝对路径 + 相对路径）
   //       对同一文件存多 key，此处按 content 去重，避免对同一日志重复报告。
-  if (options?.gateLogs) {
-    // 以下模式为启发式检测信号，非安全边界（C15：形态补全不改变该定性）。
-    // 42.13.1 收紧说明：fs.promises/fsPromises.writeFile 形态由 writeFile 模式覆盖（任何匹配
-    // 该形态的串必含 writeFile('….w-model/，无增量检测力，已去除）；node --eval= 与 python -c
-    // 两形态为「形态 + .w-model/ 路径」复合判定（requiresWModelPath）——命令文本同时含该形态
-    // 与 .w-model/ 才命中，gate-log 中良性提及（如 python -c "print(1)"）不构成越权信号。
-    const suspiciousPatterns: Array<{ pattern: RegExp; requiresWModelPath?: boolean }> = [
-      { pattern: /node\s+-e\s+/i }, // node -e 直接执行
-      { pattern: /node\s+--eval\s+/i }, // node --eval
-      { pattern: /writeFileSync\s*\(\s*['"].*\.w-model\//i }, // writeFileSync('.w-model/...')
-      { pattern: /writeFile\s*\(\s*['"].*\.w-model\//i }, // writeFile('.w-model/...')
-      // C15 追加形态：appendFileSync（自带 .w-model/ 锚定）/ --eval= / python -c（后两者 42.13.1 复合锚定）
-      { pattern: /appendFileSync\s*\(\s*['"].*\.w-model\//i }, // appendFileSync('.w-model/...')
-      { pattern: /node\s+--eval=/i, requiresWModelPath: true }, // node --eval=...（等号形态；复合锚定 .w-model/）
-      { pattern: /python\s+-c\s+/i, requiresWModelPath: true }, // python -c 直接执行（复合锚定 .w-model/）
-    ];
-    const scannedContents = new Set<string>();
-    for (const [logPath, logData] of options.gateLogs) {
-      if (scannedContents.has(logData.content)) continue;
-      scannedContents.add(logData.content);
-      for (const { pattern, requiresWModelPath } of suspiciousPatterns) {
-        if (requiresWModelPath && !logData.content.includes('.w-model/')) continue;
-        if (pattern.test(logData.content)) {
-          violations.push(`R5: gate-log ${logPath} 检测到 O 直接操作 .w-model/ 模式: ${pattern.source}`);
-        }
+  if (!options?.gateLogs) return violations;
+  // 以下模式为启发式检测信号，非安全边界（C15：形态补全不改变该定性）。
+  // 42.13.1 收紧说明：fs.promises/fsPromises.writeFile 形态由 writeFile 模式覆盖（任何匹配
+  // 该形态的串必含 writeFile('….w-model/，无增量检测力，已去除）；node --eval= 与 python -c
+  // 两形态为「形态 + .w-model/ 路径」复合判定（requiresWModelPath）——命令文本同时含该形态
+  // 与 .w-model/ 才命中，gate-log 中良性提及（如 python -c "print(1)"）不构成越权信号。
+  const suspiciousPatterns: Array<{
+    pattern: RegExp;
+    requiresWModelPath?: boolean;
+  }> = [
+    { pattern: /node\s+-e\s+/i }, // node -e 直接执行
+    { pattern: /node\s+--eval\s+/i }, // node --eval
+    { pattern: /writeFileSync\s*\(\s*['"].*\.w-model\//i }, // writeFileSync('.w-model/...')
+    { pattern: /writeFile\s*\(\s*['"].*\.w-model\//i }, // writeFile('.w-model/...')
+    // C15 追加形态：appendFileSync（自带 .w-model/ 锚定）/ --eval= / python -c（后两者 42.13.1 复合锚定）
+    { pattern: /appendFileSync\s*\(\s*['"].*\.w-model\//i }, // appendFileSync('.w-model/...')
+    { pattern: /node\s+--eval=/i, requiresWModelPath: true }, // node --eval=...（等号形态；复合锚定 .w-model/）
+    { pattern: /python\s+-c\s+/i, requiresWModelPath: true }, // python -c 直接执行（复合锚定 .w-model/）
+  ];
+  const scannedContents = new Set<string>();
+  for (const [logPath, logData] of options.gateLogs) {
+    if (scannedContents.has(logData.content)) continue;
+    scannedContents.add(logData.content);
+    for (const { pattern, requiresWModelPath } of suspiciousPatterns) {
+      if (requiresWModelPath && !logData.content.includes('.w-model/')) continue;
+      if (pattern.test(logData.content)) {
+        violations.push(`R5: gate-log ${logPath} 检测到 O 直接操作 .w-model/ 模式: ${pattern.source}`);
       }
     }
   }
 
-  // R6 段（C4 提取）：gateExitCode 回填 + gate-log 交叉一致 + rootcause gate exitCode
-  violations.push(...checkGateLogCrossReference(valid, options));
+  return violations;
+}
 
-  // R7 段（C4 提取）：append-only 时序（C9 不可解析 fail-closed）+ 返工路径同身份 segment 检查
-  violations.push(...checkTimestampOrdering(valid, strictLifecycleScopes, diagnostics));
-
-  // R8 段（C4 提取）：轨迹模板校验（R8-1~R8-4 + legacy 链）；段间共享只读状态显式传参
-  violations.push(
-    ...checkTrajectoryTemplate(
-      valid,
-      completedPhases,
-      strictLifecycleScopes,
-      phaseEntries,
-      isStrictLifecycleEntry,
-      isPhase8IdentityIncomplete,
-    ),
-  );
+/**
+ * R9 段整体（D4 拆分）：跨轮次评审一致性（A-3d 标准偏移检测，REVIEW_LEVEL_SPREAD
+ * 阈值 + REVIEW_LEVEL_MIN_POINTS 首次评审豁免）。
+ */
+function checkCrossRoundReviewConsistency(valid: RunLogEntry[]): string[] {
+  const violations: string[] = [];
 
   // R9: 跨轮次评审一致性（A-3d 标准偏移检测）。
   //
@@ -1434,6 +1510,78 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     }
   }
 
+  return violations;
+}
+
+// ==================== 校验入口 ====================
+
+export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): RunLogCheckResult {
+  const violations: string[] = [];
+  const diagnostics: string[] = [];
+
+  // 输入校验（先做）：非法输入返回 violations 而非抛 TypeError
+  if (!Array.isArray(entries)) {
+    return {
+      passed: false,
+      violations: ['run-log entries 必须为数组'],
+      lifecycleStatus: 'NOT_CLOSED_NOT_PROVEN',
+    };
+  }
+
+  // 空输入 fail-closed（审计修复 task 3）：[] 此前会走完全流程并在无任何
+  // checkpoint 时静默 passed=true + CLOSED_UNDER_CURRENT_RULES——空日志无
+  // 阶段/角色/门禁/CHECKPOINT 证据，不得视为「闭合通过」。
+  if (entries.length === 0) {
+    return {
+      passed: false,
+      violations: ['run-log 为空：无任何阶段/角色/门禁/CHECKPOINT 证据（fail-closed）'],
+      lifecycleStatus: 'NOT_CLOSED_NOT_PROVEN',
+    };
+  }
+
+  // 结构校验段（D4 拆分）：schema 前置校验 + narrow + action-role 配对
+  const { valid, violations: structureViolations } = collectValidEntries(entries);
+  violations.push(...structureViolations);
+
+  // R1 段（D4 拆分）：阶段动作完整性 + rootcause/fix 字段完整性；completedPhases 供 R8 消费
+  const { completedPhases, violations: r1Violations } = checkPhaseActionCompleteness(valid);
+  violations.push(...r1Violations);
+
+  // R2 段（D4 拆分）：tokens 非负 + estimated 违规 + checkpoint tokens=0
+  violations.push(...checkTokensAndEstimation(valid));
+
+  // R3 段（D4 拆分）：返工记录一致性 + rootcause/fix lifecycle 配对 + 预防审查窗口
+  // lifecycleState 供 R7/R8 消费，diagnostics 就地累积
+  const { violations: r3Violations, lifecycleState } = checkReworkConsistency(valid, options, diagnostics);
+  violations.push(...r3Violations);
+
+  // R4 段（D4 拆分）：checkpoint success 须 acknowledgedDecisions 非空
+  violations.push(...checkAcknowledgedDecisions(valid));
+
+  // R5 段（D4 拆分）：O 越权检测（仅当 gateLogs 提供时执行）
+  violations.push(...checkOrchestratorEscalation(options));
+
+  // R6 段（C4 提取）：gateExitCode 回填 + gate-log 交叉一致 + rootcause gate exitCode
+  violations.push(...checkGateLogCrossReference(valid, options));
+
+  // R7 段（C4 提取）：append-only 时序（C9 不可解析 fail-closed）+ 返工路径同身份 segment 检查
+  violations.push(...checkTimestampOrdering(valid, lifecycleState.strictLifecycleScopes, diagnostics));
+
+  // R8 段（C4 提取）：轨迹模板校验（R8-1~R8-4 + legacy 链）；段间共享只读状态显式传参
+  violations.push(
+    ...checkTrajectoryTemplate(
+      valid,
+      completedPhases,
+      lifecycleState.strictLifecycleScopes,
+      lifecycleState.phaseEntries,
+      lifecycleState.isStrictLifecycleEntry,
+      lifecycleState.isPhase8IdentityIncomplete,
+    ),
+  );
+
+  // R9 段（D4 拆分）：跨轮次评审一致性（A-3d 标准偏移检测）
+  violations.push(...checkCrossRoundReviewConsistency(valid));
+
   // R10 段（C4 提取）：revertEvidence 回滚证伪（r10Counts 随返回值带出）
   const { violations: r10Violations, counts: r10Counts } = checkRevertEvidence(valid);
   violations.push(...r10Violations);
@@ -1449,7 +1597,12 @@ export function checkRunLog(entries: unknown, options?: RunLogCheckOptions): Run
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
     revertEvidence: r10Counts,
     ...(closureReleases.length > 0
-      ? { closure: { checkedGates: closureReleases.length, missing: closureMissingCount } }
+      ? {
+          closure: {
+            checkedGates: closureReleases.length,
+            missing: closureMissingCount,
+          },
+        }
       : {}),
     lifecycleStatus: passed && diagnostics.length === 0 ? 'CLOSED_UNDER_CURRENT_RULES' : 'NOT_CLOSED_NOT_PROVEN',
   };

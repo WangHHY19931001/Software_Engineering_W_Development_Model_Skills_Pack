@@ -48,7 +48,7 @@
 
 - EPERM/EBUSY：提示关闭编辑器锁、同步软件或占用进程，解除后重试当前写入。
 - 并发修改：不得只靠读取前后的 mtime 判断。所有 writer 统一通过 `wm-write` 的 `<target>.lock` 持久目录和可转移 owner 对象串行化，竞争 writer 不会双成功；锁内才校验 `--expect-mtime`，冲突时返回 `MTIME_CONFLICT` / exit 1，再重读合并。
-- 所有 JSON 状态写入统一经 `scripts/cli/wm-write.ts`（锁内执行 mtime 校验、毫秒+UUID `.bak` 备份、tmp+rename、回读与原子恢复；用法：`echo '<json>' | npx tsx w-model-dev/scripts/cli/wm-write.ts <target.json> --stdin [--expect-mtime <ms>] [--lock-timeout <ms>] [--recover-stale-lock]`。`--lock-timeout` 必须为安全非负整数；CLI 检出陈旧锁时未显式给 `--recover-stale-lock` 即返回 `STALE_LOCK` / exit 1）。
+- 所有 JSON 状态写入统一经 `scripts/cli/wm-write.ts`（锁内执行 mtime 校验、毫秒+UUID `.bak` 备份、tmp+rename、回读与原子恢复；用法：`echo '<json>' | npx tsx w-model-dev/scripts/cli/wm-write.ts <target.json> --stdin [--expect-mtime <ms>] [--lock-timeout <ms>] [--recover-stale-lock]`。`--expect-mtime` 须传 `stat.mtimeMs` 原始浮点值（勿 `Math.round`/截断），内部按 floor 比对、两值同 floor 才放行；`--lock-timeout` 必须为安全非负整数；CLI 检出陈旧锁时未显式给 `--recover-stale-lock` 即返回 `STALE_LOCK` / exit 1）。
 
 ## 外部评审与门禁异常
 

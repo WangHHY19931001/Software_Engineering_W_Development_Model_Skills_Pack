@@ -3,10 +3,11 @@
  * samples 覆盖矩阵门禁（Samples Coverage Checker）
  *
  * 核对 w-model-dev/scripts/samples/ 下每个 fixture（文件 / 嵌套目录）都被 self-test.ts
- * 用例数组引用（file / manifestFile / ticketsFile / auxFiles / sampleDir 字段），且每个子目录在 samples/README.md 覆盖矩阵中有声明——
- * 堵住「新增 fixture 后遗忘在 self-test.ts 登记」的缺口（未登记的 fixture 不参与任何检查，
+ * 用例数组或期望数据模块（samples/expectations/<dir>.ts，D3-I 单源化）引用
+ * （file / manifestFile / ticketsFile / auxFiles / sampleDir 字段），且每个子目录在 samples/README.md 覆盖矩阵中有声明——
+ * 堵住「新增 fixture 后遗忘登记」的缺口（未登记的 fixture 不参与任何检查，
  * self-test 基线依然全绿）。双向闭环（F-G7-06/07，audit-fixes task 6）：
- *   - 引用 → 在盘：self-test.ts 引用的 file / sampleDir 路径必须真实存在（悬空 → reference-dangling / exit 1）；
+ *   - 引用 → 在盘：self-test.ts / expectations 模块引用的 file / sampleDir 路径必须真实存在（悬空 → reference-dangling / exit 1）；
  *   - 声明 → 矩阵行：README 覆盖矩阵按表行首列解析（正文反引号提及不算声明）。
  *
  * 第 4 条规则（M06 / S28，P2-A 任务 2）：负向覆盖不变量——`cli/ 下的 *.ts` 减去 `self-test.ts` 的每个
@@ -84,7 +85,10 @@ import { parseJsonSafe } from '../lib/safe-json.js';
 const EXEMPT_DIRS = ['tla-e2e', 'verifier-calibration'];
 
 /** samples/ 扫描时排除的目录 / 文件（运行时产物与文档；NEGATIVE-COVERAGE.md 为声明式清单，非 fixture） */
-const SKIP_NAMES = new Set(['.w-model', 'states', 'README.md', 'NEGATIVE-COVERAGE.md', '.gitkeep']);
+// D3-I（43.3.0）新增 `expectations`：期望数据单源目录（samples/expectations/<dir>.ts 承装 samples/<dir>/
+// 的期望数据，self-test 与 vitest 同源消费）——本身是**元数据模块**而非受检 fixture；其 `file:` 字面量
+// 由本门禁在 extractReferences / collectCaseEntries 中作为引用来源扫描（与 self-test.ts 同口径登记）。
+const SKIP_NAMES = new Set(['.w-model', 'states', 'README.md', 'NEGATIVE-COVERAGE.md', '.gitkeep', 'expectations']);
 
 /** 负向案例机制（NEGATIVE-COVERAGE.md 第 3 列，只允许这三值） */
 const NEGATIVE_MECHANISMS = new Set(['fixture', 'invocation', 'mutated-copy']);
@@ -163,13 +167,13 @@ interface ReferenceSets {
   dirs: Set<string>;
 }
 
-/** self-test.ts 内的一个用例条目（`_CASES` 数组内的对象字面量）及其登记的 samples/ 引用 */
+/** self-test.ts / samples/expectations/<dir>.ts 内的一个用例条目（`_CASES` / `_EXPECTATIONS` 数组内的对象字面量）及其登记的 samples/ 引用 */
 interface CaseEntry {
-  /** 所属用例数组名（诊断用，如 `BUDGET_CASES`） */
+  /** 所属用例数组名（诊断用，如 `BUDGET_CASES`；期望数据模块条目为 `<DIR>_EXPECTATIONS`） */
   array: string;
-  /** 条目在 self-test.ts 源文本内的字符区间起始（含 `{`） */
+  /** 条目在来源源文本内的字符区间起始（含 `{`；期望数据模块条目为占位 0） */
   start: number;
-  /** 条目在 self-test.ts 源文本内的字符区间结束（`}` 之后，不含） */
+  /** 条目在来源源文本内的字符区间结束（`}` 之后，不含；期望数据模块条目为占位 0） */
   end: number;
   /** 条目登记的 samples/ 相对引用（file / manifestFile / ticketsFile / featureFiles / auxFiles / sampleDir） */
   refs: Set<string>;
@@ -180,6 +184,8 @@ interface CaseEntry {
   declarations: Map<string, string>;
   /** 该条目是否声明了**失败期望**（见 FAILURE_EXPECTATION_PATTERNS；规则 4 收紧的判据） */
   expectedFailure: boolean;
+  /** 条目来源文件标识（派生锚前缀：`self-test.ts` 或 `expectations/<dir>.ts`，D3-I 单源化） */
+  source: string;
 }
 
 /**
@@ -297,9 +303,17 @@ function nextCodeIndex(source: string, from: number): number {
 /**
  * 从条目文本按 extractReferences 的同字段口径抽取 samples/ 引用及其**声明文本**，构造 CaseEntry。
  * 声明文本用于派生锚（`self-test.ts#file: 'x.json'`）——它就是用例条目里登记该 fixture 的那一段字面量，
- * 内容寻址、随 self-test 走，故门禁无需（也不再）要求登记册手写锚。
+ * 内容寻址、随来源走，故门禁无需（也不再）要求登记册手写锚。
+ * `source` 为条目来源文件标识（派生锚前缀）：self-test.ts 默认，期望数据模块条目传 `expectations/<dir>.ts`。
  */
-function makeCaseEntry(array: string, dir: string | undefined, text: string, start: number, end: number): CaseEntry {
+function makeCaseEntry(
+  array: string,
+  dir: string | undefined,
+  text: string,
+  start: number,
+  end: number,
+  source = 'self-test.ts',
+): CaseEntry {
   const refs = new Set<string>();
   const declarations = new Map<string, string>();
   if (dir !== undefined) {
@@ -327,6 +341,7 @@ function makeCaseEntry(array: string, dir: string | undefined, text: string, sta
     refs,
     declarations,
     expectedFailure: FAILURE_EXPECTATION_PATTERNS.some((p) => p.test(text)),
+    source,
   };
 }
 
@@ -340,7 +355,59 @@ function makeCaseEntry(array: string, dir: string | undefined, text: string, sta
  * 「文件内含基名」这类粗判据对它们恒真；只有条目粒度才能判定「这条 fixture 由哪个用例登记、
  * 那个用例期望什么结果」。
  */
-function collectCaseEntries(selfTestContent: string): CaseEntry[] {
+/**
+ * 从数组字面量 `[`（arrayBracket 指向 `[`）起切出每个顶层对象字面量（文本 + 字符区间），
+ * 复用 nextCodeIndex 括号配平（跳过字符串 / 正则字面量，避免
+ * `expectedReasonPatterns: [/\[schema\].*level/]` 内的 `[]`/`{}` 错配）。
+ * 同时被 self-test.ts 的 `_CASES` 数组与 samples/expectations/<dir>.ts 的 `_EXPECTATIONS` 数组消费（D3-I）。
+ */
+function sliceArrayObjectLiterals(
+  content: string,
+  arrayBracket: number,
+): Array<{ text: string; start: number; end: number }> {
+  const out: Array<{ text: string; start: number; end: number }> = [];
+  let depth = 0;
+  let entryStart = -1;
+  for (let i = nextCodeIndex(content, arrayBracket + 3); i !== -1; i = nextCodeIndex(content, i + 1)) {
+    // eslint-disable-next-line security/detect-object-injection -- i 为 nextCodeIndex 返回的受控字符下标（源码文本内位置），非外部键注入
+    const ch = content[i]!;
+    if (ch === '[' || ch === '{' || ch === '(') {
+      depth += 1;
+      if (depth === 1 && ch === '{') entryStart = i;
+      continue;
+    }
+    if (ch !== ']' && ch !== '}' && ch !== ')') continue;
+    // 数组字面量在本层闭合（`depth === 0`）→ 该用例数组扫描结束
+    if (depth === 0) return out;
+    depth -= 1;
+    if (depth === 0 && ch === '}' && entryStart !== -1) {
+      out.push({ text: content.slice(entryStart, i + 1), start: entryStart, end: i + 1 });
+      entryStart = -1;
+    }
+  }
+  return out;
+}
+
+/**
+ * 期望数据模块清单（D3-I，43.3.0）：samples/expectations/<dir>.ts 承装 samples/<dir>/ 的期望数据
+ * （self-test 与 vitest 同源消费）。返回模块基名（= 对应子目录名）与文本；expectations/ 不存在或
+ * 为空时返回 []（历史形态兼容——self-test.ts 的字面量仍是合法引用来源）。
+ */
+function listExpectationModules(samplesRoot: string): Array<{ dir: string; content: string }> {
+  const expRoot = join(samplesRoot, 'expectations');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控固定相对路径（samplesRoot 下 expectations/），仅作存在性探测
+  if (!existsSync(expRoot)) return [];
+  const out: Array<{ dir: string; content: string }> = [];
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控固定目录（samples/expectations/）下的条目枚举，仅只读
+  for (const file of readdirSync(expRoot).sort()) {
+    if (!file.endsWith('.ts')) continue;
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控固定目录（samples/expectations/）下的 .ts 模块枚举，仅只读
+    out.push({ dir: file.slice(0, -'.ts'.length), content: readFileSync(join(expRoot, file), 'utf-8') });
+  }
+  return out;
+}
+
+function collectCaseEntries(selfTestContent: string, samplesRoot: string): CaseEntry[] {
   const lines = selfTestContent.split('\n');
   const lineOffsets: number[] = [0];
   for (let i = 0; i < selfTestContent.length; i++) {
@@ -356,30 +423,20 @@ function collectCaseEntries(selfTestContent: string): CaseEntry[] {
     const arrayBracket = selfTestContent.indexOf('= [', lineOffsets[index]!);
     if (arrayBracket === -1) return; // 声明行无数组字面量（理论上不存在）
     const dir = casesToDir.get(decl[1]!);
-    let depth = 0;
-    let entryStart = -1;
-    for (
-      let i = nextCodeIndex(selfTestContent, arrayBracket + 3);
-      i !== -1;
-      i = nextCodeIndex(selfTestContent, i + 1)
-    ) {
-      // eslint-disable-next-line security/detect-object-injection -- i 为 nextCodeIndex 返回的受控字符下标（源码文本内位置），非外部键注入
-      const ch = selfTestContent[i]!;
-      if (ch === '[' || ch === '{' || ch === '(') {
-        depth += 1;
-        if (depth === 1 && ch === '{') entryStart = i;
-        continue;
-      }
-      if (ch !== ']' && ch !== '}' && ch !== ')') continue;
-      // 数组字面量在本层闭合（`depth === 0`）→ 该用例数组扫描结束
-      if (depth === 0) return;
-      depth -= 1;
-      if (depth === 0 && ch === '}' && entryStart !== -1) {
-        entries.push(makeCaseEntry(decl[1]!, dir, selfTestContent.slice(entryStart, i + 1), entryStart, i + 1));
-        entryStart = -1;
-      }
+    for (const lit of sliceArrayObjectLiterals(selfTestContent, arrayBracket)) {
+      entries.push(makeCaseEntry(decl[1]!, dir, lit.text, lit.start, lit.end));
     }
   });
+  // D3-I（43.3.0）：期望数据模块（samples/expectations/<dir>.ts）的条目纳入同一用例条目集合——
+  // 其 `file:` 引用 / 失败期望标记 / 派生锚与 self-test 条目同口径参与覆盖与负向登记分析
+  //（samples/<dir>/ 的 fixture 由表内 `file:` 字面量登记，dir 由模块基名得出）。
+  for (const mod of listExpectationModules(samplesRoot)) {
+    const arr = mod.content.indexOf('= [');
+    if (arr === -1) continue;
+    for (const lit of sliceArrayObjectLiterals(mod.content, arr)) {
+      entries.push(makeCaseEntry(`${mod.dir}_EXPECTATIONS`, mod.dir, lit.text, 0, 0, `expectations/${mod.dir}.ts`));
+    }
+  }
   return entries;
 }
 
@@ -406,17 +463,20 @@ function entryCoversFixture(entry: CaseEntry, fixtureRel: string): boolean {
  */
 function deriveAnchor(entry: CaseEntry, fixtureRel: string): string | null {
   const exact = entry.declarations.get(fixtureRel);
-  if (exact !== undefined) return `self-test.ts#${exact}`;
+  if (exact !== undefined) return `${entry.source}#${exact}`;
   const prefix = [...entry.declarations.keys()]
     .filter((ref) => fixtureRel.startsWith(`${ref}/`))
     .sort((a, b) => b.length - a.length)
     .at(0);
   if (prefix === undefined) return null;
-  return `self-test.ts#${entry.declarations.get(prefix)!}`;
+  return `${entry.source}#${entry.declarations.get(prefix)!}`;
 }
 
-/** 提取 self-test.ts 中所有用例数组对 samples/ 的引用（按行号区间切块，避免正则前瞻误吞） */
-function extractReferences(selfTestContent: string): ReferenceSets {
+/**
+ * 提取 self-test.ts（+ D3-I：samples/expectations/<dir>.ts 期望数据模块）中所有用例数组对 samples/ 的引用
+ * （按行号区间切块，避免正则前瞻误吞）。
+ */
+function extractReferences(selfTestContent: string, samplesRoot: string): ReferenceSets {
   const files = new Set<string>();
   const dirs = new Set<string>();
   const lines = selfTestContent.split('\n');
@@ -446,6 +506,18 @@ function extractReferences(selfTestContent: string): ReferenceSets {
     for (const m of block.matchAll(/(?:featureFiles|auxFiles): \[([^\]]*)\]/g)) {
       for (const ff of m[1]!.matchAll(/'([^']+)'/g)) {
         files.add(`${dir}/${ff[1]!}`);
+      }
+    }
+  }
+
+  // 2.5) 期望数据模块（D3-I）：samples/expectations/<dir>.ts 内 `file:` 等字面量登记为对 samples/<dir>/ 的引用
+  for (const mod of listExpectationModules(samplesRoot)) {
+    for (const m of mod.content.matchAll(/\b(?:file|manifestFile|ticketsFile): '([^']+)'/g)) {
+      files.add(`${mod.dir}/${m[1]!}`);
+    }
+    for (const m of mod.content.matchAll(/(?:featureFiles|auxFiles): \[([^\]]*)\]/g)) {
+      for (const ff of m[1]!.matchAll(/'([^']+)'/g)) {
+        files.add(`${mod.dir}/${ff[1]!}`);
       }
     }
   }
@@ -952,12 +1024,12 @@ async function main(): Promise<void> {
   }
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- selfTestPath 为 repo-root 拼装的受控固定相对路径（'w-model-dev/scripts/cli/self-test.ts'），上方 existsSync 必需文件校验已通过，只读
   const selfTestContent = readFileSync(selfTestPath, 'utf-8');
-  const refs = extractReferences(selfTestContent);
+  const refs = extractReferences(selfTestContent, samplesRoot);
   const uncovered = findUncovered(samplesRoot, refs);
   const dangling = findDanglingRefs(samplesRoot, refs);
   const undeclared = findUndeclaredDirs(samplesRoot, readFileSync(readmePath, 'utf-8'));
-  // 覆盖判据的事实源：self-test.ts 的用例条目（数组内对象字面量）及其登记的 samples/ 引用
-  const caseEntries = collectCaseEntries(selfTestContent);
+  // 覆盖判据的事实源：self-test.ts 的用例条目 + D3-I samples/expectations/<dir>.ts 期望数据模块条目
+  const caseEntries = collectCaseEntries(selfTestContent, samplesRoot);
 
   // 第 4 / 5 条规则：负向覆盖登记册（严格语法 + 证据可解析 + 真实 exit-2 探针）
   const cliScriptFiles = listCliScriptFiles(root);
@@ -1000,11 +1072,11 @@ async function main(): Promise<void> {
   const violations: Array<{ check: string; message: string }> = [
     ...uncovered.map((rel) => ({
       check: 'fixture-unregistered',
-      message: `fixture 未被 self-test.ts 引用：samples/${rel}（新增样本须在 self-test.ts 用例数组登记）`,
+      message: `fixture 未被 self-test.ts / expectations 模块引用：samples/${rel}（新增样本须在 self-test.ts 用例数组或 expectations 期望表登记）`,
     })),
     ...dangling.map((rel) => ({
       check: 'reference-dangling',
-      message: `self-test.ts 引用指向不存在的 fixture：samples/${rel}（引用与在盘文件必须双向闭环，F-G7-06）`,
+      message: `self-test.ts / expectations 模块引用指向不存在的 fixture：samples/${rel}（引用与在盘文件必须双向闭环，F-G7-06）`,
     })),
     ...undeclared.map((dir) => ({
       check: 'matrix-undeclared',
@@ -1055,7 +1127,7 @@ async function main(): Promise<void> {
   // fixture 不可派生（不在盘 / 无覆盖条目 / 多义覆盖）→ null（人类可读侧打印占位说明，机器侧 derivedAnchors 的对应元素为 null）。
   console.log(
     '[派生锚] 每行 → 覆盖位置：fixture 行 = self-test.ts 用例条目派生的覆盖位置' +
-      "（`self-test.ts#file: 'x.json'` / `self-test.ts#sampleDir: 'dir'`）；" +
+      "（`self-test.ts#file: 'x.json'` / `expectations/verifier.ts#file: 'x.json'` / `self-test.ts#sampleDir: 'dir'`）；" +
       'invocation / mutated-copy 行 = 本行落点（登记的第 2 列路径）；' +
       'fixture 不可派生（不在盘 / 无覆盖条目 / 多义覆盖）→ null' +
       '（人类可读侧打印占位说明，机器可读侧 `SAMPLES_COVERAGE_JSON.derivedAnchors` 的对应元素为 `null`，数组按行序占位）',

@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 读取仓库根固定相对路径的只读元数据（SKILL.md / skill-metadata.json / package.json / README.md / docs/INSTALL.md），join(ROOT,...) 尾部全为字面量，非用户输入 */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

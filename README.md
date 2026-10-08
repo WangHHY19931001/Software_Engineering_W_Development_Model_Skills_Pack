@@ -18,7 +18,7 @@ AI 助手写代码很容易「差不多就行」：跳段、凭感觉、说不�
 - **全程可追溯**：需求跟踪矩阵（RTM）自动维护，需求 ↔ 设计 ↔ 代码 ↔ 四级测试双向可查；
 - **管流程的人不亲自动手**：编排者（O）只负责调度、记录和等待确认，实际产出与把关全部由子代理（S 产出 / V 评审 / G 门禁 / R 根因定位 / A 分析）承担。
 
-**当前版本**：`43.2.0`（变更历史见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
+**当前版本**：`43.3.0`（变更历史见 [CHANGELOG.md](./CHANGELOG.md)；41.0.0 之前见 [CHANGELOG-archive.md](./CHANGELOG-archive.md)）
 
 **健康指标**（全部门禁实测通过，怎么验证见下方「CI 策略」与「快速上手」）：
 
@@ -241,7 +241,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 
 ## CI 策略
 
-本项目**不集成云端 CI（GitHub Actions / GitLab CI）**，本地 git `pre-push` hook 是**唯一门禁**：`git push` 时自动跑 self-test + 各门禁脚本 + vitest 全量 + 安全扫描 + npm audit（high 以上漏洞阻断；网络层信号枚举短表命中时自动跳过（2026-09-28 T2 收敛：DNS 解析失败、连接被重置/拒绝、超时、E429 等 errno 网络错误码、network 词面、socket hang up、registry 不支持 audit endpoint；未识别一律 fail-closed 阻断）；漏洞报告、JSON 解析与权限错误仍然阻断），执行为三车道并行（L1 并行车道 + L2 主车道同时发起、L3 尾车道复用 L2 产物；跑完全部车道再全量汇总），任一不符即 exit 1 中止推送。历史原因见 [CHANGELOG.md](./CHANGELOG.md)。
+本项目以本地 git `pre-push` hook 为**主门禁**：`git push` 时自动跑 self-test + 各门禁脚本 + vitest 全量 + 安全扫描 + npm audit（high 以上漏洞阻断；网络层信号枚举短表命中时自动跳过（2026-09-28 T2 收敛：DNS 解析失败、连接被重置/拒绝、超时、E429 等 errno 网络错误码、network 词面、socket hang up、registry 不支持 audit endpoint；未识别一律 fail-closed 阻断）；漏洞报告、JSON 解析与权限错误仍然阻断），执行为三车道并行（L1 并行车道 + L2 主车道同时发起、L3 尾车道复用 L2 产物；跑完全部车道再全量汇总），任一不符即 exit 1 中止推送。**云端 CI 兜底（D1，43.3.0）**：仓库已含 GitHub Actions workflow（[.github/workflows/ci.yml](./.github/workflows/ci.yml)，`on: [push, pull_request]` 触发）在 ubuntu-latest + node 20 上执行本地 19 项门禁的可移植子集（含不可移植项 ①-⑥ 登记与 self-test / eval 冗余兜底）；**CI 首跑待首次推库触发验证**——按 R-B9-11 / R-B9-12 parked 口径，暂未写「已首跑全绿」。本地 pre-push 仍是主门禁，云端 CI 为兜底。历史原因见 [CHANGELOG.md](./CHANGELOG.md)。
 
 - **触发范围以 git push 写入 stdin 的 ref 行判定**（每行 `<local ref> <local sha> <remote ref> <remote sha>` 四字段，支持多 ref 聚合）：local sha 全零 = 删除远端 ref（跳过该行）；remote sha 全零 = 全新分支（经 `git merge-base --fork-point` / merge-base 建立可证明基线，均不可证明或退化为推送尖本身时降级经 remote-tracking 排除集枚举证明——remote 名经白名单与 `git remote get-url` 验证后执行 `git log -m --name-only --pretty=format: <local_sha> --not --remotes=<remote>`，`-m` 确保合并提交按父逐个列出避免空 diff 漏检；三级全部失败才 → fail-closed 跑全部门禁）；任一 ref 行解析失败 → fail-closed；全部行均为删除（delete-only）→ 放行跳过；stdin 为空（非 git push 触发）→ 回退 `HEAD@{push}` 相对 `HEAD` 的 diff，回退失败同样 fail-closed。变更路径命中（`w-model-dev/**`、根级 README/AGENTS/CONTRIBUTING/`.gitignore`/`.eslintsecurity-baseline.json`/`package.json`/`package-lock.json`、`config/**`、`scripts/**`、`.githooks/**`、`docs/*.md`——bash case 模式 `*` 跨 `/`，实测含 `docs/` 任意层级）才跑门禁。
 - **`git push --no-verify` 视为破坏契约**：跳过门禁仅限紧急情况且后果自负（`.githooks/pre-push` 头部有显式警告）。

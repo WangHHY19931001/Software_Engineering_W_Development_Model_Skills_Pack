@@ -54,14 +54,18 @@ import { parseJsonSafe } from '../lib/safe-json.js';
 import {
   buildDocConsistencyReport,
   countValidExit2Scripts,
+  isCountClaimScannedPath,
   type DocConsistencyInput,
 } from '../logic/docs-consistency-logic.js';
 
 /**
  * 本门禁所需「活体文档」路径白名单（REQUIRED_PATHS）。
  * 契约：新增 schema / 脚本 / 设计文档等资产时，若其计数或枚举被任一检查消费，须在此登记路径
- * 并在 docs-consistency-logic.ts 增加对应输入字段与检查规则；只登记「被读取的活体文档」，
- * 目录类（schemas/、subagent/、__tests__/）由 readdir 动态发现，不进本表。
+ * 并在 docs-consistency-logic.ts 增加对应输入字段与检查规则；只登记「被读取的活体文档」。
+ * 目录类文件夹（subagent/、__tests__/、references/）以**目录项**形式进本表（其下文件由 readdir
+ * 动态发现，不逐份登记；schemas/ 目录无表项，其下 schema 文件逐份登记）——目录项承担两层职责：
+ * ① 存在性检查；② D8（count-claim-live-docs）的登记面（目录前缀下全部 .md 视为已登记，
+ * 与 logic 层 isRegistered 判定一致）。
  */
 const REQUIRED_PATHS = [
   'package.json',
@@ -100,6 +104,7 @@ const REQUIRED_PATHS = [
   'docs/skill-design-document.md',
   'docs/tla-plus-modeling-design.md',
   'w-model-dev/scripts/__tests__', // 目录（vitest 测试文件数）
+  'w-model-dev/references', // 目录（references/*.md 为 readdir 全量读取面 + D8 计数声明登记面）
 ];
 
 /** docs/ 根 6 份设计文档（活体引用，README 导航引用；docs/superpowers/ 与 docs/changes/ 归档不动） */
@@ -328,19 +333,38 @@ function collectSkillPkgDocs(root: string): Array<{ name: string; content: strin
 }
 
 /**
- * 定位根 node_modules 下 vitest 包的可执行入口（package.json `bin.vitest`）。
- * 返回绝对路径；vitest 未安装 / package.json 不可解析时返回 null（触发 npx 回退）。
+ * 定位 vitest 包的可执行 JS 入口（package.json `bin.vitest`），供 process.execPath 直接 spawn。
+ * 解析顺序（A18，43.3.0 去 shell 化）：
+ *   1. root/node_modules/vitest 精确路径（既有主路径）；
+ *   2. 经 createRequire(root) 的 Node 模块解析向上回溯父目录（npm workspace / 父级安装）。
+ * 入口必须是 JS 文件（.js/.mjs/.cjs；vitest 为 ./vitest.mjs）——`node_modules/.bin/vitest` shim
+ * （Windows 为 .cmd / POSIX 为 shell 脚本）不能脱离 shell 被 spawnSync 直接执行，故不走 .bin 形态。
+ * 返回绝对路径；vitest 未安装 / package.json 不可解析 / 入口非 JS 文件时返回 null（fail-closed，
+ * 不再回退 npx shell）。
  */
 function findVitestBin(root: string): string | null {
+  const candidates: string[] = [];
+  const exactPkg = join(root, 'node_modules', 'vitest', 'package.json');
+  if (existsSync(exactPkg)) candidates.push(exactPkg);
   try {
-    const pkgPath = join(root, 'node_modules', 'vitest', 'package.json');
-    if (!existsSync(pkgPath)) return null;
-    const pkg = parseJsonSafe(readFileSync(pkgPath, 'utf-8')) as { bin?: { vitest?: unknown } } | null;
-    const bin = pkg?.bin?.vitest;
-    return typeof bin === 'string' ? join(root, 'node_modules', 'vitest', bin) : null;
+    const resolved = createRequire(join(root, 'package.json')).resolve('vitest/package.json');
+    // 与精确路径去重（文本可能不同但同文件，重复候选无害，仅免一次重读）
+    if (resolved !== exactPkg) candidates.push(resolved);
   } catch {
-    return null;
+    // 上溯解析失败——沿用精确路径候选
   }
+  for (const pkgPath of candidates) {
+    try {
+      const pkg = parseJsonSafe(readFileSync(pkgPath, 'utf-8')) as { bin?: { vitest?: unknown } | string } | null;
+      const bin = typeof pkg?.bin === 'string' ? pkg.bin : pkg?.bin?.vitest;
+      if (typeof bin !== 'string') continue;
+      const entry = join(dirname(pkgPath), bin);
+      if (existsSync(entry) && /\.(mjs|js|cjs)$/.test(entry)) return entry;
+    } catch {
+      // 单候选解析失败——继续下一候选
+    }
+  }
+  return null;
 }
 
 interface VitestProvenance {
@@ -569,8 +593,9 @@ const VITEST_SPAWN_TIMEOUT_MS = 3_600_000;
  *   3. **跳过**：工件不在场且无 flag → **不 spawn**，返回 null；调用方输出非阻断诊断并置
  *      `dynamicMeasurements=null`，静态检查全跑、退出码仅由静态违规决定。终局验收一律经
  *      `npm run prepush` 覆盖（AGENTS §6「迭代可走快速车道，验收必须全量」）。
- * 态 2 主路径用 process.execPath 直接执行 node_modules/vitest 入口（Windows 下 .cmd 无法被
- * runSync 直接执行且 npx.cmd 需 shell，绕开该坑）；vitest 未安装时回退 `npx ...`（shell）；
+ * 态 2 主路径用 process.execPath 直接执行 node_modules/vitest 的 JS 入口（Windows 下 .cmd 无法被
+ * runSync 直接执行且 npx.cmd 需 shell，绕开该坑）；入口不可得时（vitest 未安装）不再回退
+ * `npx ...`（shell，A18 43.3.0 删除）——直接以 -1 哨兵 fail-closed（显式 --spawn-vitest 不静默跳过）；
  * 落盘/解析失败（含 spawn 超时/错误）一律先尝试读取 JSON outputFile（vitest 若已完整跑完必落盘）；
  * 仍读不到则返回 -1，由逻辑层生成动态 facts 违规并 fail-closed（不虚构计数）。
  * 注：timeout 取 VITEST_SPAWN_TIMEOUT_MS（随套件规模调整的基建常量，非门禁放宽；
@@ -590,20 +615,18 @@ function collectVitestMeasurements(root: string, spawnVitest: boolean): VitestMe
   const outFile = join(tmpdir(), `w-model-vitest-count-${process.pid}.json`);
   const vitestArgs = ['run', '--config', 'config/vitest.config.ts', '--reporter=json', `--outputFile=${outFile}`];
   const vitestBin = findVitestBin(root);
-  if (vitestBin !== null) {
-    runSync(process.execPath, [vitestBin, ...vitestArgs], {
-      cwd: root,
-      timeout: VITEST_SPAWN_TIMEOUT_MS,
-      maxBuffer: 64 * 1024 * 1024,
-    });
-  } else {
-    runSync(`npx vitest ${vitestArgs.map((a) => (/[ "&=]/.test(a) ? `"${a}"` : a)).join(' ')}`, [], {
-      cwd: root,
-      timeout: VITEST_SPAWN_TIMEOUT_MS,
-      maxBuffer: 64 * 1024 * 1024,
-      shell: true,
-    });
+  if (vitestBin === null) {
+    // A18（43.3.0）：删除 shell 拼接回退（npx + 引号转义）——参数数组原样透传即无拼接、无注入面。
+    // vitest JS 入口不可得时不再 spawn（npx 需 shell，且依赖全局安装/网络获取均不可靠）；
+    // 显式 --spawn-vitest 的 fail-closed 语义保持不变：以 -1 哨兵返回（vitest-* 违规 exit 1），
+    // 而非态 3 的 null 跳过（与既有测试「vitest 缺失仍 fail-closed」契约一致）。
+    return invalidVitestMeasurements('vitest 可执行 JS 入口不可得（未安装或 bin 非 JS 文件）');
   }
+  runSync(process.execPath, [vitestBin, ...vitestArgs], {
+    cwd: root,
+    timeout: VITEST_SPAWN_TIMEOUT_MS,
+    maxBuffer: 64 * 1024 * 1024,
+  });
   // 无论 spawn 是否报错（含 maxBuffer 超限 / vitest 失败），先尝试读 JSON 落盘文件。
   // 自采集路径在本次读取前生成同目录 provenance，避免外部环境变量伪造 passing artifact。
   const selfProvenance = `${outFile}.provenance.json`;
@@ -636,6 +659,31 @@ function collectVitestMeasurements(root: string, spawnVitest: boolean): VitestMe
       // 临时文件清理失败不影响结果
     }
   }
+}
+
+/**
+ * 收集 D8 计数声明自省的扫描输入：git ls-files 枚举**被跟踪** .md（gitignored 天然排除），
+ * 经 logic 层 isCountClaimScannedPath 过滤记录/规划/夹具区后读取原文。
+ * git 不可用 / 命令失败时返回 undefined（跳过检查，与 detectScriptsChanges 的 git 不可用
+ * 保守放行策略一致——本检查是登记自省而非存在性判据，REQUIRED_PATHS 存在性检查仍 fail-closed 生效）。
+ */
+function collectCountClaimLiveDocs(root: string): Array<{ name: string; content: string }> | undefined {
+  const ls = runSync('git', ['ls-files', '*.md'], { cwd: root, timeout: 15_000 });
+  if (ls.error !== undefined || ls.status !== 0) return undefined;
+  const docs: Array<{ name: string; content: string }> = [];
+  for (const rel of String(ls.stdout)
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0)) {
+    if (!isCountClaimScannedPath(rel)) continue;
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- git ls-files 输出仅含仓库被跟踪文件（受控清单）
+      docs.push({ name: rel, content: readFileSync(join(root, rel), 'utf-8') });
+    } catch {
+      // 单文件读取失败（如编码异常）跳过——不并列 fail-closed，避免误伤；REQUIRED_PATHS 存在性检查兜底
+    }
+  }
+  return docs;
 }
 
 async function main(): Promise<void> {
@@ -728,6 +776,9 @@ async function main(): Promise<void> {
   const testFileCount = vitestFacts.testFileCount;
   const vitestTestCount = vitestFacts.vitestTestCount;
   const scriptsChanged = detectScriptsChanges(root);
+  // D8 计数声明自省：被跟踪活体 markdown（git ls-files + isCountClaimScannedPath 过滤；git 不可用 → undefined 跳过）
+  const countClaimLiveDocs = collectCountClaimLiveDocs(root);
+  const countClaimScanSkipped = countClaimLiveDocs === undefined;
 
   // C3 内链存在性数据源：SKILL.md + references/*.md + README.md + AGENTS.md + SSoT（核心导航文档集）
   const referenceFiles = readdirSync(join(root, 'w-model-dev/references'))
@@ -809,6 +860,9 @@ async function main(): Promise<void> {
       { name: 'CONTRIBUTING.md', content: read('CONTRIBUTING.md') },
       { name: 'docs/troubleshooting.md', content: read('docs/troubleshooting.md') },
     ],
+    // D8 计数声明自省：扫描清单（undefined → logic 层跳过检查）+ 登记面 = REQUIRED_PATHS（含目录项）
+    countClaimLiveDocs,
+    countClaimRegisteredPaths: REQUIRED_PATHS,
     prTemplate: read('.github/PULL_REQUEST_TEMPLATE.md'),
     changelog: read('CHANGELOG.md'),
     pkgJson: read('package.json'),
@@ -885,6 +939,9 @@ async function main(): Promise<void> {
     );
     dynamicMeasurements = null;
   }
+  // D8 count-claim 在 git 不可用（非 git 仓库 / 命令失败，如 fixture 隔离副本）时**静默跳过**——
+  // 与 detectScriptsChanges 的 git 不可用保守放行策略一致，不污染 diagnostics 契约
+  // （count-claim 人类可读头行仍如实显示「跳过（git 不可用）」）；REQUIRED_PATHS 存在性检查不受影响。
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
@@ -926,6 +983,9 @@ async function main(): Promise<void> {
   console.log(`persona 文件   : ${personaCount}`);
   console.log(`test 文件    : ${testFileLabel}`);
   console.log(`vitest 用例  : ${vitestTestLabel}`);
+  console.log(
+    `count-claim   : ${countClaimScanSkipped ? '跳过（git 不可用）' : `${countClaimLiveDocs!.length} 份活体 markdown 扫描`}`,
+  );
   console.log(`静态违规      : ${report.staticViolations.length}`);
   console.log(`动态违规      : ${report.dynamicViolations.length}`);
   console.log(`检查结果      : ${violations.length === 0 ? '✓ 全部一致' : `✗ ${violations.length} 项不一致`}`);

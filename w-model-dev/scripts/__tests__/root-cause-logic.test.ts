@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 读取本仓 samples fixture（samplesDir），file 为测试内字面量，非用户输入 */
 /**
  * root-cause-logic.ts 单元测试 —— R 报告校验 R1-R11 规则
  *

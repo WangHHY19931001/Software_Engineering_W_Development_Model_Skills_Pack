@@ -7,6 +7,39 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [43.3.0] - 2026-10-08
+
+### 批次 9：工程化卫生（15 实现任务 + 1 审查修复轮 + 版本 43.3.0 收编（T16），主规格 §8 全部十三项销账（D1-D8 工程化卫生 + A10/A16/A17/A18/A19 杂项修正）+ 批次 8 终审建议与账本 10 项 riders；规格 [`2026-10-06-w-model-remediation-design.md`](./docs/superpowers/specs/2026-10-06-w-model-remediation-design.md) §8 + [实现计划](./docs/superpowers/plans/2026-10-08-batch9-engineering-hygiene.md)，裁定登记 [`decision-log/rounds-50-docs-consistency.md`](./docs/changes/decision-log/rounds-50-docs-consistency.md)，T17 全量 prepush 收口见本节「验证记录」回填）
+
+### Feat（工程化卫生：CI / 期望单源 / 自省检查）
+
+- **CI 工作流（D1，T2）**：`.github/workflows/ci.yml` 新建——ubuntu-latest + node 20 + `npm ci`，主入口 `npm run prepush`（19 项门禁可移植子集）+ self-test/eval 显式冗余兜底；不可移植项逐项登记（Windows shell guard / cygpath / Java-tla2tools 探针 / npm audit 网络依赖）；`permissions: contents: read` 最小权限 + `java -version` 探针 `continue-on-error: true`（T2-review rider 落地）。**CI 首跑 = 待用户推库触发 GitHub Actions 的 parked 项**（本机不可真跑，rounds-50 R-B9 登记，不写「已首跑全绿」）。
+- **期望单源化（D3，T4/T5）**：verifier 区 `samples/expectations/verifier.ts`（32 条）与 gate 区 `samples/expectations/gate.ts`（32 条）共享期望表新建，self-test 与 vitest 侧同源消费——消除「同一期望双声明」的漂移源；`check-samples-coverage` 收严为 self-test ∪ expectations 双来源覆盖；对账断言 2/2（表↔在盘逐项、表↔抽表前黄金快照）。GOLDEN 双表维护约定登记 rounds-50。
+- **docs-consistency 计数文档自省（D8，T15）**：`count-claim-live-docs` 新检查——扫描被跟踪活体 markdown 165 份中含计数表述的行（保守模式定稿：`(?<![\d.])\d+(?!\.\d)\s*(?:项|条|处|份|款|种)(?!目)` + `共\s*\d+`；`\b` 近死弃用裁定见 rounds-50），命中文档须在 REQUIRED_PATHS 或 `COUNT_CLAIM_EXEMPTIONS`（6 项：3 精确 + 3 前缀），**漏登记即红**（fail-closed）；首跑 66 命中 → 已登记 48 → 未登记 18 → 「REQUIRED_PATHS 补 references 目录项（14 份）+ 豁免表 6 项」处置清零。
+
+### Changed（工程化卫生：行为保持重构）
+
+- **checkRunLog 全拆分（D4，T6）**：`checkRunLog` 剩余内联段按 R1/R2/R3/R4/R5/R9 拆 7 函数（`collectValidEntries` 为第 7 函数，行为中性受控超集，计划「六段」字面偏差登记 rounds-50），判定/文案/push 顺序逐字搬移零判据改动；凭据 = vitest 全量 116 files / 2176 tests passed + 差分扫描 151 例 0 不一致。
+- **项目根解析统一（D5，T7）**：新 `lib/project-root.ts`（判据参数化：默认 graph 最严 8 层 / `looseWModel` / `requireProjectFile`+`maxDepth`，互斥同置抛 TypeError）；graph / iceberg / signature-chain 三调用点等价映射；凭据 = 差分探针 576 对比 0 mismatch + 新单测 18 用例。**裁决**：默认收敛为 graph 最严判据；signature-chain 保留 `requireProjectFile`（判据正交，收敛会变宽松→不收敛）；iceberg 宽判据暂保留（真实项目 `.w-model/` 必有状态文件，后续可安全切换但须先补 icebg e2e 回归后切，登记 rounds-50）。
+- **CLI 分层例外下沉/登记（D6，T8）**：gate-log 读取下沉新 `logic/artifact-gate-logic.ts`（注入 `ArtifactGateReadFs` 异步 fs 适配器，JSON 解析/坏行跳过/ENOENT 判据逐字搬移），`check-artifact-gate.ts` +13/−56；`dependency-boundaries.test.ts` 新增「CLI 分层例外登记」表（3 项，行数 `wc -l` 口径比对防瘦身后失效）+ 强制测试防反向漂移。
+- **graph 性能四点位（A19，T9）**：precedes `nodeMap.get`（O(P×V)→O(P)）/ 递归 DFS 改 enter/exit 双相帧显式栈 / BFS 带头指针索引队列（O(n²)→O(n)）/ R15e 签名链预建 role=V/review 索引；差分探针 3500 项 0 失配 + 5 个持续回归断言（期望=改造前逐位输出）。
+- **scopeHash 构造排序化（A10，T10）**：`sortedJoin` 纯函数（防御性拷贝 + `.sort()` UTF-16 字典序）+ `phase1ScopeHash` 双组排序归一；RED（旧公式乱序 join 异 hash）→ GREEN（同集异序同 hash）；单元素/已排序输入向后兼容，多元素乱序输入为假性失配风险源修复。
+- **wm-write `--expect-mtime` 语义挑明（A16，T11）**：确认双向 floor 比对语义正确、解析层 floor 幂等叠加——A16 **只挑明不改语义**，logic 零改动；CLI 头注参数表 + `USAGE`（`--help`）+ MTIME_CONFLICT 错误信息三处补「须传 `stat.mtimeMs` 原始浮点值（勿 `Math.round`/截断），内部按 floor 比对」；SSoT / command-reference 通用规则 / AGENTS.md §6 三处同口径。
+- **run-log 摘要 durationMs 移至非确定尾部字段（A17，T12）**：`printGateReport` 新增可选第 4 参 `tailFields`（`{ ...summary, exitCode, ...tailFields }`，非确定运行时字段置于 exitCode **之后**；不传时行为逐字节不变，21 个既有调用方零影响）；人类通道 durationMs 经尾参数保留、机器通道 `--json` 仍不携带；D3 注释口径句 + command-reference 摘要 JSON 字段序同步；摘要形态断言 4 个（tailFields 契约 = 不得含 exitCode/summary 键，JSDoc 固化）。
+- **shell:true 拼接去 shell 化（A18，T13）**：`check-docs-consistency.ts` 删除全仓最后一条 `shell: true` 调用——`findVitestBin` 强化为 JS 入口解析器（root/node_modules/vitest/package.json + `createRequire` 上溯解析，不走 `.bin` shim——Windows .cmd / POSIX 脚本均需 shell，`process.execPath` + JS 入口是唯一跨平台免 shell 形态），参数数组原样透传（无拼接即无注入面）；入口不可得时 `-1` 哨兵保持 fail-closed；聚焦测试含引号参数透传等价断言。
+- **security baseline 复审（D7，T14）**：测试侧 60 fs + 14 object-injection 逐条有理由 eslint-disable 清零（非批量无脑 disable，每文件头注释留理由）；生产侧逐点复审登记「复审通过理由」保留（动态项目根受控 `.w-model` 子树 + schema 白名单兜底，无实质风险降低的修复点）；R-B9-6：docs-consistency-logic 2 条 no-useless-escape（node 穷举等价验证）+ 测试 1 条 no-unused-vars 实义清除；baseline 294→**219**（真删 79 / 真增 4 = HEAD 预存新发现 / hash 位移 42 净零，程序化对账）。
+
+### Changed（文档/叙事 riders）
+
+- **R-B9-2 Lighthouse 措辞定案**：`subagent/engineering-frontend-developer.md:59/:161` 两处「Lighthouse 分数」改中性「性能分数（Lighthouse）」——C17 人格去栈化的同族口径（命令名清除、参数级 1:1 改写为跨栈表述）的剩余 2 处收口；改后 `audit:l0-links` 0 违规（819 链接）+ self-test 412/412 验证（该文件未登记 persona fixture 哈希，R19 无扰动）。
+- **R-B9-4 验证面教训固化**：CONTRIBUTING §3 增「改 `subagent/*.md` / `references/*.md` 散文须跑 `audit:l0-links` 或全量 vitest/self-test」条目（引批次 8 T18 教训 + 本批 T14 baseline 教训，并固化「lint:security 绿/新增校验绑定任务自身终态，prepush 为强制执行点」）。
+- **R-B9-9 CHANGELOG 计数口径引用化**：[43.2.0] 节「vitest 收集计数以 prepush 实测为准（T18 回填）」按动态 facts 约定（CONTRIBUTING §4：不入活体文档硬编码）改为引用式——以 `npm run prepush`/`npm test` 当前命令输出为准，T18 prepush 已实测 19/19 全绿。
+- **版本收编（T16）**：`version:bump 43.3.0` 七处版本镜像一致（docs-consistency version-consistency 强制）；rounds-50 追加 R-B9 裁决段 + registered-minor 合并清单（去向列）。
+
+**计数影响**：零新增 CLI（48 不变）/ references（45 不变）/ persona（36 不变）/ schema 34 份不变；测试文件数 +4（`verifier-expectations.test.ts` / `gate-expectations.test.ts` / `project-root.test.ts` / `artifact-gate-logic.test.ts`）+ 新非测试文件 4（`lib/project-root.ts` / `logic/artifact-gate-logic.ts` / `samples/expectations/verifier.ts` / `samples/expectations/gate.ts`）；self-test 412/412（不变）；eval 101/101（不变）；lint:security baseline 294→219（见 D7 项）；docs-consistency 新增 D8 检查（count-claim-live-docs）；vitest 收集计数属动态 facts，以当前命令输出为准（同 [43.2.0] 口径）。
+
+**验证记录（T17 回填）**：prepush 19 项**全绿（实测 1641s，2026-10-08，本机运行）**——19 项全清单：self-test 全样本 / check:verifier×3（无参 2、有效 0、无效 1）/ check:gate 无目录 2 / security-scan / check-bdd-model×2 / check:coverage / check:exemption / check-signature-chain / vitest 全量+coverage / npm audit 0 漏洞 / 规则层覆盖口径阈值 / samples 覆盖矩阵 / prettier / tsc / eval 101/101 / docs-consistency。**先红后绿诚实性**：首轮 prepush 第 14 项 npm audit 因 registry 瞬时 `connect ETIMEDOUT`（sandbox egress 抖动）且未命中 T2 收敛 skip 枚举（`reason: connect ETIMEDOUT` / `audit endpoint returned an error` 均非识别形态）而 fail-closed 红 1 项、其余 18 项全绿；网络恢复后（`npm audit --audit-level=high` 实测 0 漏洞 exit 0）复跑 **19/19 全绿**（1641s）——根因留痕见批次 9 任务 17 报告与 rounds-50。任务 16 提交时点实测：docs-consistency 0 违规、eval 101/101、self-test 412/412、typecheck 0、`audit:l0-links` 0 违规（819 链接）。专项复跑（T17）：l0-links 0 / eval 101/101+覆盖矩阵 / self-test 412/412 / docs-consistency 0 / D3 变异抽测（共享期望表单源承重 RED 证据——翻转 `samples/expectations/gate.ts` 1 条 `expectedPassed` → self-test 对应用例转红 411/1 失败 → 还原 412/0，证明同源未削弱承重）。**CI 首跑 = 待用户推库触发 GitHub Actions 的 parked 项**（D1 工作流已本地 YAML 解析 + prepush 等价子集兜底；本机不可真跑，rounds-50 R-B9-11 登记，**不写「已首跑全绿」**）。
+
 ## [43.2.0] - 2026-10-07
 
 ### 批次 8：文档与协议一致性（15 实现任务 + 6 审查修复轮 + 1 跨任务回归修复，主规格 §7 全部 15 项销账（C15 纳入，裁定 R-B8-1）+ 增量规格 §3 三项 + 批次 7 执行期登记 10 项 riders；规格 [`2026-10-06-w-model-remediation-design.md`](./docs/superpowers/specs/2026-10-06-w-model-remediation-design.md) §7 + [`2026-10-07-remediation-leftovers-design.md`](./docs/superpowers/specs/2026-10-07-remediation-leftovers-design.md) §3，裁定登记 [`decision-log/rounds-50-docs-consistency.md`](./docs/changes/decision-log/rounds-50-docs-consistency.md)，SSoT 权威摘要 §10T）
@@ -48,7 +81,7 @@
 - **lint:security baseline 失效条目清理（T15）**：BASE 即有的 3 条漂移（docs-consistency-logic 2 条 no-useless-escape + 测试 1 条 no-unused-vars）经权威 `--regenerate` 吸收保绿并登记。
 - **R15b 表补 pending 语义 + 划界表中性命名（T14 riders）**：SSoT §10.7 规则表与 evidence-anchored-tree.md 门禁表两处同构补 `evidenceStatus=pending` 语义（pending 合法但未核验——放行前阻断，须转 `confirmed` 或走 evidence-anchor 豁免）；evidence-anchored-tree.md 划界表（B2 行）与 ai-native-sdlc-adoption.md:134 中性命名。
 
-**计数影响**：零新增 CLI（48 = 47 exit-2 + 1 self-test，不变）/ references（45 不变）/ persona（36 不变）/ schema 34 份不变（`budget.schema.json` 字段级修改 1 份：maxSubagentSpawns 回归）；门禁脚本 48 不变；测试文件数不变（既有文件扩展：budget-logic / budget-cli-wiring / tla-logic / maturity-logic / evidence-export-logic / docs-consistency-logic）；self-test 412/412（不变；T11 期曾因 persona fixture 哈希失配瞬时 410/412，`4c451647` 修复）；eval 语料 68→**101** 条（references 覆盖 45/45；routeTotals 42/9/24）；vitest 收集计数以 prepush 实测为准（T18 回填）。
+**计数影响**：零新增 CLI（48 = 47 exit-2 + 1 self-test，不变）/ references（45 不变）/ persona（36 不变）/ schema 34 份不变（`budget.schema.json` 字段级修改 1 份：maxSubagentSpawns 回归）；门禁脚本 48 不变；测试文件数不变（既有文件扩展：budget-logic / budget-cli-wiring / tla-logic / maturity-logic / evidence-export-logic / docs-consistency-logic）；self-test 412/412（不变；T11 期曾因 persona fixture 哈希失配瞬时 410/412，`4c451647` 修复）；eval 语料 68→**101** 条（references 覆盖 45/45；routeTotals 42/9/24）；vitest 收集计数属动态 facts（不入活体文档硬编码，口径见 CONTRIBUTING §4 数字一致性），以 `npm run prepush` / `npm test` 当前命令输出为准——本批 T18 prepush 已实测 19/19 全绿（1464s 单次，见下「验证记录」）。
 
 **验证记录**：prepush 19 项**全绿（实测 1464s，2026-10-08 单次，本机运行）**。任务 17 提交前实测：docs-consistency 0 违规、eval 101/101；T15/T16 提交时点实测：self-test 412/412、lint:security 0、eval 101/101（批次 8 执行账本逐任务留痕）。C6 矛盾消歧裁定（含 round23 归档「间接证据、非逐项直接记录」的如实存疑登记）见 [`decision-log/rounds-50-docs-consistency.md`](./docs/changes/decision-log/rounds-50-docs-consistency.md)。
 

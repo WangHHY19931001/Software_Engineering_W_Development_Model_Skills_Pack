@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection -- ICEBERG_VIEW_PRESENCE 为代码常量表，按 for 循环数字下标 1..8 访问，非外部键 */
 import { describe, it, expect } from 'vitest';
 
 import {

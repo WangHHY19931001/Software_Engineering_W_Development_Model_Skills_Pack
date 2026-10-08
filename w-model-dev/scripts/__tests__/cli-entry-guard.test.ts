@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 枚举本仓 lib/ 与 cli/ 目录（join(__dirname,'..')），readdir 条目仅用于 C1/C7 入口守卫断言，非用户输入 */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
