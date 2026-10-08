@@ -233,6 +233,13 @@
 - **云 CI 断言 sweep 关键词集（防同类复发，纳入一致性自省复查，批 N 候选）**：`不集成云端|无云端 CI|唯一门禁|唯一质量屏障|替代云端 CI|GitHub Actions`；复查面 = 活跃导航文档 README / AGENTS / CONTRIBUTING / INSTALL / adoption-guide / user-guide / troubleshooting / `.github/PULL_REQUEST_TEMPLATE`。命中仅定位待核文档（词面出现 ≠ 违规），须人审断言语义与「主门禁 + 云端兜底」当前口径是否一致后再改 / 引入断言（`GitHub Actions` 词面在正确口径文案中属常规出现，不作禁词）。建议随下一轮一致性自省复查落地为批 N 候选（decision-log 登记或复查清单项）；本登记同时作为 43.3.0 时点全文 sweep 证据——修复后既有 3 处 + 本轮 4 处全口径统一，**当前态**无残留「无云端 CI / 唯一门禁 / 唯一质量屏障」断言；关键词集回扫仅余 user-guide:114 的**过去时**历史表述「此前不集成云端 CI」（既定口径，非当前态断言，按建议保留）。
 - 修后实测：docs-consistency 0 + `audit:l0-links` 0 + self-test 412/412 + eval 101/101 + typecheck 0（4 文件均被跟踪在 docs 面 / 模板面，纯 prose 改动；实测绿项见任务 17-fix-B1a 报告）。
 
+**R-B9-14 云端 CI 撤除裁定（用户裁定 2026-10-09，S-fix 任务 18）——workflow 删除 + 活体文档口径回摆 + 防复发约束**
+
+- **用户裁定全文**：本仓库**未开启 GitHub Actions workflow 权限**，不使用云端 CI——批次 9 D1 引入的 `.github/workflows/ci.yml` 须撤除，全部活体文档口径回摆为「本地 pre-push 唯一门禁」，并在 decision-log 登记裁定与防复发约束。**R-B9-11（CI 首跑 parked 登记）、R-B9-12（云端兜底口径同步）、R-B9-13（四处 sweep 收口）中的「CI 首跑待推库 / 云端兜底」口径全部作废关闭**：workflow 已删除，不存在待触发的首跑；三登记作为历史留痕保留（不篡改原文），当前口径以本条为准。
+- 处置：① `git rm .github/workflows/ci.yml`（`.github/` 其余内容 ISSUE_TEMPLATE / PULL_REQUEST_TEMPLATE 等保留）；② 活体文档 7 处口径回摆为「本地 pre-push 为唯一门禁；仓库未开启 GitHub Actions workflow 权限，不集成云端 CI（用户裁定 2026-10-09，R-B9-14）」——README.md「CI 策略」节 / AGENTS.md pre-push 表行（恢复「仓库无 `.github/workflows/`」）/ CONTRIBUTING.md:215（恢复「19 项本地门禁，替代云端 CI」）与 :233 / `.github/PULL_REQUEST_TEMPLATE.md` / docs/troubleshooting.md §1.2（保留「破坏契约」警告与 `--no-verify` 说明）/ docs/user-guide.md §6（保留 Dependabot 剔除叙述，其「无 CI 时价值有限」理由恢复有效）；③ CHANGELOG 43.3.0 节按未发布版本如实反映最终态（移除 D1 Feat 条目，验证记录 CI parked 表述改为撤除说明；「先红后绿」「1641s」等实测记录保留）。
+- **防复发约束**：后续批次不得引入云 CI workflow（GitHub Actions / GitLab CI 等），除非用户显式开启权限并另行裁定。
+- **sweep 关键词方向更新（替代 R-B9-13 的「主门禁 + 云端兜底」对照口径）**：活体导航文档出现 `GitHub Actions|workflows/` 词面即须人审对照本裁定（裁定 = 不集成云 CI；技能能力边界类陈述——SSoT「不内置 GitHub Actions」、activation-guide 触发反例、模板示例等——不属违规）；R-B9-13 关键词集其余词面（`不集成云端|无云端 CI|唯一门禁|唯一质量屏障|替代云端 CI`）在回摆后均为合法口径，命中仅定位、不判违规。
+
 **R-B9-5 计数口径说明**
 
 - 批次 8 账本以 `42620669..HEAD` 为计数口径（26 提交，含批 8 收口提交重放差异），本批以 `main..HEAD` 为口径（16 提交 + 未合入收口提交）。**两口径在「批次边界是否含收口提交」上有差**，不影响任何门禁（git 提交计数非门禁面）；为防止跨批对账混淆，本清单固定口径：**主线提交数以 `main..HEAD` 计，批次边界以计划书基线 commit 为准**。
