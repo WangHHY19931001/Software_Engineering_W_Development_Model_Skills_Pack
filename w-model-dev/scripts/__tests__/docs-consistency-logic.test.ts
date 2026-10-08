@@ -2182,7 +2182,7 @@ describe('runDocConsistencyChecks', () => {
       async (fixtureRoot) => {
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixtureRoot is a mkdtemp-owned isolated repository copy
         expect(existsSync(path.join(fixtureRoot, 'node_modules', 'vitest'))).toBe(false);
-        // 无 vitest 可执行且 PATH 清空：若仍 spawn（回退到 npx）必然采集失败 → exit 1；
+        // 无 vitest 可执行且 PATH 清空：态 3 缺省绝不 spawn（spawn 分支仅显式 --spawn-vitest 时可达）——
         // 故 exit 0 本身即「未 spawn」的判据（同原用例的 vitest 不可用前提，反向断言）。
         const json = runDocsConsistencyCli(fixtureRoot, NO_VITEST_ENV, ['--json'], { timeoutMs: 30_000 });
         expect(json.code, JSON.stringify(json)).toBe(0);
@@ -2216,7 +2216,8 @@ describe('runDocConsistencyChecks', () => {
           timeoutMs: 60_000,
         });
         // 逃生口语义：显式要求自采集即恢复 fail-closed（vitest 不可用 → 采集失败 → vitest-* 违规 exit 1），
-        // 不得退化成「跳过 + exit 0」。本用例断言路由（spawn 被真实发起）；成功路径见下一条 stub vitest 用例。
+        // 不得退化成「跳过 + exit 0」。本用例断言路由——A18 去 shell 后 vitest 缺失直接以 -1 哨兵
+        // fail-closed（不 spawn、无 npx 回退）；成功路径见下一条 stub vitest 用例。
         expect(result.code, JSON.stringify(result)).toBe(1);
         const report = JSON.parse(result.stdout) as {
           reasons: string[];
@@ -2299,6 +2300,79 @@ describe('runDocConsistencyChecks', () => {
       { availablePackages: ['tsx', 'typescript', 'esbuild'] },
     );
   }, 120_000);
+
+  it('CLI --spawn-vitest 参数数组透传：异常临时目录名含空格/&/引号（POSIX）时无 shell 拼接、子进程原样收到（A18）', async () => {
+    await withDocsConsistencyFixture(
+      async (fixtureRoot) => {
+        // stub vitest（与既有成功路径同构）：写 JSON 工件 + 把自身收到的 argv 落到 cwd 侧车，供透传断言。
+        const vitestDir = path.join(fixtureRoot, 'node_modules', 'vitest');
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture path is inside the mkdtemp-owned test root
+        await fs.mkdir(vitestDir, { recursive: true });
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture path is inside the mkdtemp-owned test root
+        await fs.writeFile(
+          path.join(vitestDir, 'package.json'),
+          JSON.stringify({ name: 'vitest', version: '0.0.0', bin: { vitest: 'stub-cli.mjs' } }),
+          'utf-8',
+        );
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture path is inside the mkdtemp-owned test root
+        await fs.writeFile(
+          path.join(vitestDir, 'stub-cli.mjs'),
+          [
+            "import { writeFileSync } from 'node:fs';",
+            "const out = process.argv.find((arg) => arg.startsWith('--outputFile='));",
+            'if (out) {',
+            "  writeFileSync(out.slice('--outputFile='.length), JSON.stringify({ testResults: [{}, {}], numTotalTests: 7, numPassedTests: 7, numFailedTests: 0, success: true }));",
+            '}',
+            // 侧车：把子进程收到的完整 argv 原样落盘（cwd=fixtureRoot），供测试断言「数组透传、无 shell 拼接/转义」
+            "writeFileSync(process.cwd() + '/stub-argv.json', JSON.stringify(process.argv), 'utf-8');",
+            'process.exit(0);',
+          ].join('\n'),
+          'utf-8',
+        );
+        // 异常临时目录名：含空格 + &（两平台）+ 字面双引号（仅 POSIX——Windows 文件名禁 "，而 A18 原缺陷恰为
+        // 内层引号未转义）。os.tmpdir() 在 CLI 子进程内经 TMPDIR/TEMP/TMP 继承，--outputFile=<该目录>/w-model-vitest-count-<pid>.json
+        // 即成为含特殊字符的参数值；改造前的 shell 拼接路径（引号包裹 + 内层 " 未转义）在此输入下必然损坏，
+        // 改造后参数数组原样透传。源码删除的 shell 拼接串见 run-sync.ts 台账移除记录。
+        const delimiterQuote = process.platform === 'win32' ? '' : '"';
+        const weirdTmp = path.join(os.tmpdir(), `a18-staging${delimiterQuote} & audit-${process.pid}`);
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- under os.tmpdir(); cleaned in finally
+        await fs.mkdir(weirdTmp, { recursive: true });
+        try {
+          const result = runDocsConsistencyCli(
+            fixtureRoot,
+            {
+              WM_VITEST_COUNT_FILE: '',
+              WM_VITEST_PROVENANCE_FILE: '',
+              WM_VITEST_PROVENANCE_ROOT: '',
+              TMPDIR: weirdTmp,
+              TEMP: weirdTmp,
+              TMP: weirdTmp,
+            },
+            ['--json', '--spawn-vitest'],
+            { timeoutMs: 60_000 },
+          );
+          // 全链路成功即证明 args 数组经 process.execPath spawn 原样到达 stub（含特殊字符 --outputFile）
+          expect(result.code, JSON.stringify(result)).toBe(0);
+          const report = JSON.parse(result.stdout) as {
+            dynamicMeasurements: { vitestTestCount: number; success: boolean } | null;
+          };
+          expect(report.dynamicMeasurements).toMatchObject({ vitestTestCount: 7, success: true });
+          // 透传等价断言：stub 收到的 argv 中 --outputFile 值指向 weirdTmp（空格/&/引号原样、无 shell 转义痕迹）
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- sidecar written by the stub inside fixtureRoot
+          const argv = JSON.parse(await fs.readFile(path.join(fixtureRoot, 'stub-argv.json'), 'utf-8')) as string[];
+          const outArg = argv.find((a) => a.startsWith('--outputFile='));
+          expect(outArg, JSON.stringify(argv)).toBeDefined();
+          if (outArg !== undefined) {
+            expect(outArg.startsWith(`--outputFile=${weirdTmp}${path.sep}`), outArg).toBe(true);
+          }
+        } finally {
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- under os.tmpdir()
+          await fs.rm(weirdTmp, { recursive: true, force: true });
+        }
+      },
+      { availablePackages: ['tsx', 'typescript', 'esbuild'] },
+    );
+  }, 180_000);
 
   it('CLI --spawn-vitest 与受控工件共存时快路径优先（prepush 语义一字不变）', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
