@@ -168,7 +168,7 @@
 | 9 | R-B9-10（账本） | 探针矩阵 2 格未提交 | 登记（无 tla 面变更，见上） |
 | 10 | T2 review M②④ | java 探针 continue-on-error / 顶层 permissions | 修（ci.yml 注释⑤⑥ 落地） |
 | 11 | T2 review M①③ | 提交信息反引号剥除 / 双触发全量门禁成本 | 登记（git 卫生提示；CI 成本优化候选） |
-| 12 | T3 review M① | `.tmp-d3gen/` 批次终局清理 | 批 17 清洁项（挂 T17 步骤 2） |
+| 12 | T3 review M① | `.tmp-d3gen/` 批次终局清理 | 修（T17 已清理：2026-10-08 删除 8 个 T4 瞬态生成物，无引用、gitignored） |
 | 13 | T3 review M② | `.tmp-*` 置于 `*.log` 之后 | 登记（功能等价） |
 | 14 | T4 review M①③ | 报告措辞（1 行整体替换）/ RED→GREEN 独立复算吸收 | 登记（gitignored 账本内，已入账） |
 | 15 | T5 review M① | eval/runner.ts 证据面前提留痕（map 全表透传注释） | 批 N 候选（无实险） |
@@ -215,6 +215,10 @@
 - **N2（§1 数字叙事更正口径）**：任务 15 报告 §1 首跑叙事「66 命中 / 48 已登记 / 18 未登记」在终态后重述为「65 / 47 / 31（未登记）× 13（表）= 0 未处置」时数字口径漂移——**处置与终态全正确**，仅叙事表述需按实态更正。权威口径：首跑 66 命中（65 唯一行 + 1 文件级），已登记 48，未登记 18，全部处置（14 references + 6 豁免 = 20 项落位，余 0）。后续引用以 D8 段为准。
 - **N4（references 目录项取舍）**：REQUIRED_PATHS 的 `w-model-dev/references` 目录项 = **登记面**（前缀下全部 .md 视为已登记）而非扫描面（仍逐文件扫描）——取舍已由 COUNT_CLAIM_EXEMPTIONS docstring 的「禁止靠既有前缀条目静默吞掉真实漂移源」约束承载；新增含计数表述的 references 文件仍会被扫描命中（登记面已覆盖故不红），新增**精确豁免**须显式登记理由。
 
+**R-B9-11 D1 CI 首跑登记（T17 收口）——待用户推库触发的 parked 项（不写已首跑全绿）**
+
+- `.github/workflows/ci.yml`（ubuntu-latest + node 20 + `npm ci` + 主入口 `npm run prepush` + self-test/eval 显式冗余兜底 + 不可移植项 ①-⑥ 登记）已本地验证：YAML node yaml 1.2 解析断言通过（T2 review 实证）+ 与 prepush 等价子集由本批 T17 全量 prepush 19/19 全绿兜底（实测 1641s，2026-10-08，本机运行）。**CI 首跑 = 待用户推库触发 GitHub Actions 的 parked 项**：本机不可真跑 GitHub Actions，**不写「已首跑全绿」**；推库后首跑核对登记为批次 N 候选（用户推库时核对 workflow 绿态与不可移植项处置）。
+
 **R-B9-5 计数口径说明**
 
 - 批次 8 账本以 `42620669..HEAD` 为计数口径（26 提交，含批 8 收口提交重放差异），本批以 `main..HEAD` 为口径（16 提交 + 未合入收口提交）。**两口径在「批次边界是否含收口提交」上有差**，不影响任何门禁（git 提交计数非门禁面）；为防止跨批对账混淆，本清单固定口径：**主线提交数以 `main..HEAD` 计，批次边界以计划书基线 commit 为准**。
@@ -223,4 +227,4 @@
 |---|---|
 | 版本号 | 43.3.0（批次 9 目标版本） |
 | 门禁影响 | `check-docs-consistency.ts` 新增 D8（count-claim-live-docs，漏登记即红）+ A18 去 shell（`findVitestBin` JS 入口 + spawn 数组透传，fail-closed 保持）；`lib/project-root.ts` 统一三调用点（等价映射，运行期行为不变）；`logic/artifact-gate-logic.ts` 下沉 gate-log 读取（行为不变）；`gate-report.ts` 新增第 4 参 tailFields（可选，向后兼容）；`.eslintsecurity-baseline.json` 294→219（重新生成，lint:security 绿） |
-| 验证 | 任务 16 提交时点实测：docs-consistency 0 违规 + eval 101/101 + self-test 412/412 + typecheck 0 + `audit:l0-links` 0 违规（819 链接）；全量 prepush 19 项待任务 17 回填（R-B8-3 样式纪律，未测不写全绿） |
+| 验证 | prepush 19/19 全绿（实测 1641s，2026-10-08，本机运行；**先红后绿诚实性**：首轮第 14 项 npm audit 因 registry 瞬时 `connect ETIMEDOUT` 未命中 T2 收敛 skip 枚举而 fail-closed 红 1 项、其余 18 项全绿，网络恢复复跑后 19/19 全绿，留痕见 T17 报告）+ 专项复跑（l0-links 0 / eval 101/101+覆盖矩阵 / self-test 412/412 / docs-consistency 0）+ D3 变异抽测 RED 证据（翻转共享期望表 gate.ts 1 条 expectedPassed → self-test 对应用例转红 411/1 → 还原 412/0）+ 重复度抽区复测（verifier/gate 区无第二份独立声明）；**CI 首跑 = 待用户推库触发 GitHub Actions 的 parked 项（R-B9-11，不写已首跑全绿）**；任务 16 提交时点实测：docs-consistency 0 违规 + eval 101/101 + self-test 412/412 + typecheck 0 + `audit:l0-links` 0 违规（819 链接） |
