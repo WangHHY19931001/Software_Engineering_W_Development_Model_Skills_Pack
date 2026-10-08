@@ -354,6 +354,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #45（为通过测试而修改断言/测试期望） | 阶段门评审 / V 评审 | V 评审人工核验断言与需求对应关系（反指标游戏，Goodhart） |
 | #46（只给审计权不给修正权） | 全流程 | CHECKPOINT 显式标注介入路径（外科手术录像回放） |
 | #47（大规模重构式改动） | 阶段 5 | 单次 diff 重写整个模块 → 拆分为可审 slice 逐片提交，保持每片可编译可测试 |
+| #48（子代理越界实施） | 全阶段 | [subagent-delegation.md](subagent-delegation.md) 角色表允许/禁止动作清单 + [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R5 |
 
 ### 与门禁脚本的对应关系
 
@@ -381,6 +382,9 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #15（TLA+ 死锁/违反放行） | [`check-tla-model.ts`](../scripts/cli/check-tla-model.ts)（`TLA_JSON.passed=true` 才退出码 0） |
 | #16（TLA+ 占位/简化/错误实现） | V 评审（`reworkHints` 标注）+ [`check-tla-model.ts`](../scripts/cli/check-tla-model.ts)（拆解决策校验） |
 | #17（TLA+ 与需求/设计不符未回退） | S 子代理核查 + 回退机制（无脚本；Agent 比对 `@requirement`/`@design` 与规格一致性） |
+| #18（跳过 R 直接 S 返工） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R8 轨迹模板校验（V 失败后须先 rootcause 再 S-fix，#18 轨迹检测）+ [`check-signature-chain.ts`](../scripts/cli/check-signature-chain.ts) R9（S@fix 须携带 R 报告来源签名） |
+| #19（R 报告未 V 复审） | [`check-rootcause-report.ts`](../scripts/cli/check-rootcause-report.ts)（V 复审 + exit 0 前置于 S-fix）+ [`check-signature-chain.ts`](../scripts/cli/check-signature-chain.ts) 消费链（V@rootcause 消费 R） |
+| #20（只规划不执行） | 无专用脚本（检测信号 sig-008：子代理响应无 `tool_use` 块且未附产物路径；编排者/V 人工核验，见 [subagent-delegation.md](subagent-delegation.md)「反模式 #20」节） |
 | #21（阶段级门禁跳过） | [`check-artifact-gate.ts`](../scripts/cli/check-artifact-gate.ts) `--phase=N` 参数 + run-log R5 O 越权检测（编排者自检阶段 N 是否跑 `--phase=N`） |
 | #22（角色越权） | V-code 评审（`reworkHints` 标注）+ 系统测试用例（越权场景应返回 403）+ [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节 |
 | #23（跨模块 store 误用） | V-design 评审（`reworkHints` 标注）+ 集成测试用例（跨模块数据流）+ [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节 |
@@ -408,6 +412,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #45（为通过测试而修改断言/测试期望） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R10 revertEvidence 回滚证伪（fix 记录须携带合法 `revertEvidence.command`（A15：emergency-fix 死词已删除），**无时间戳豁免**：缺失或非法始终 blocking；`LEGACY_REVERT_EVIDENCE_CUTOFF` / `LEGACY_REVERT_EVIDENCE` 吸收路径已删除，exitCode=1 命中）；断言与需求的语义对应仍由 V 评审人工核验 |
 | #46（只给审计权不给修正权） | 无专用脚本（CHECKPOINT 介入路径标注） |
 | #47（大规模重构式改动） | 无专用脚本（diff 可审性由评审人工核验 + 增量集成纪律约束） |
+| #48（子代理越界实施） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R5 role-action 配对 + [`check-signature-chain.ts`](../scripts/cli/check-signature-chain.ts) 消费链闭合（与 #10 成对；勿与 #22 混淆） |
 
 ### 命中后的处理流程
 
@@ -448,7 +453,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #25 | run-log.jsonl `note` 字段含 "PowerShell" / "ConvertTo-Json" / "Add-Content" / "Out-File" / "Set-Content" 关键词；或产物 JSON 文件首字节为 BOM（0xEF 0xBB 0xBF）；或 JSON 深度 > 2 时字段丢失 | 回到当前阶段起点，分派 S 改用 Node.js `fs.writeFileSync(path, content, 'utf-8')` 重写损坏的 JSON 文件；重跑相关门禁 | 无脚本（编排者自检 run-log `note` 字段 + 文件 BOM 检测）；详见 [operational-recovery.md](operational-recovery.md)「JSON 文件写入工具选择」节 |
 | #26 | `run-log.jsonl` 含 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`）；或 `event-ingress.jsonl` 含 RunLogEntry 字段（`runId` / `action` / `role` / `outcome` / `acknowledgedDecisions` / `duration_s` / `tokens` / `estimated` / `subagentSpawns` / `gateExitCode` / `gateLogPath` / `phase` / `phaseName`） | 回到当前阶段起点，分派 S 按正确 schema 重写 run-log.jsonl 或 event-ingress.jsonl；重跑 `check-run-log.ts` R1 动作完整性校验 | `check-run-log.ts` 退出码 0 才算 RunLogEntry schema 闭合；详见 [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节 |
 | #27 | run-log.jsonl 缺 chunk/cross/review/gate 动作（S2 省步骤）；或 checkpoint acknowledgedDecisions 缺硬约束 ID（S1 丢细节）；或 gate JSON exitCode ≠ passed（S3 未核验）；或归档缺 acceptance-test-report §9 用户确认（S3 未核验）；或 V 评审 reworkHints 为空（S2 省步骤）；或门禁脚本未实跑——仅记录 JSON 摘要未真实执行命令（编排者仅引用 JSON 摘要中的 `passed: true`，但未展示 check-*.ts 的 stdout 输出）（S2 省步骤） | 回到当前阶段起点，按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验：重读硬约束 + 补全 S→V→G 全流程 + 逐条核验硬约束清单 | 无脚本（编排者自检 run-log 动作完整性 + checkpoint R2 + gate exitCode 一致性交叉检测）；详见 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节 |
-| 48 | run-log role-action 配对异常（如 role=G 且 action=produce）；signature-chain 产物无对应产出者签名；gate-logs 存档者与 run-log 记录者不一致 | 回退当前阶段起点，越权产物作废重做 | check-run-log.ts R5 配对 + check-signature-chain.ts 退出码 0 才算消费链闭合 |
+| #48 | run-log role-action 配对异常（如 role=G 且 action=produce）；signature-chain 产物无对应产出者签名；gate-logs 存档者与 run-log 记录者不一致 | 回退当前阶段起点，越权产物作废重做 | check-run-log.ts R5 配对 + check-signature-chain.ts 退出码 0 才算消费链闭合 |
 
 ### 门禁脚本退出码精确对应表
 
