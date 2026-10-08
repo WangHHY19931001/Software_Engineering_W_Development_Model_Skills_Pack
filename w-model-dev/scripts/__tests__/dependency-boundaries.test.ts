@@ -115,7 +115,7 @@ const CLI_LAYERING_EXCEPTIONS: readonly CliLayeringException[] = [
   },
   {
     file: 'cli/check-docs-consistency.ts',
-    lines: 987,
+    lines: 985,
     embedded:
       'vitest 动态 facts 采集（collectVitestMeasurements/readVitestArtifact/readVitestCountFile，受控工件快路径 + --spawn-vitest）、' +
       'exit-2 探针结果采集（collectExit2ScriptResults）、security baseline 计数、git 变更探测（detectScriptsChanges）；' +
