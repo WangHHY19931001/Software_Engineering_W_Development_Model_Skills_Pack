@@ -801,9 +801,9 @@ const R10_POINTER_NEGATION_MORPHEMES = [
 ] as const;
 
 /** 紧邻判据的末尾间隔符（空白 / 标点 / 引号 / 括号 / 破折号；剥掉后才允许语素「紧邻」指针句） */
-const R10_POINTER_TRAILING_SEPARATOR_RE = /[\s:：、,，;；。.!！?？*`'"“”‘’「」『』（）()\[\]【】<>《》—\-–]+$/;
+const R10_POINTER_TRAILING_SEPARATOR_RE = /[\s:：、,，;；。.!！?？*`'"“”‘’「」『』（）()[\]【】<>《》—\-–]+$/;
 /** 紧邻判据的开头间隔符（同上，对指针句之后的文本生效） */
-const R10_POINTER_LEADING_SEPARATOR_RE = /^[\s:：、,，;；。.!！?？*`'"“”‘’「」『』（）()\[\]【】<>《》—\-–]+/;
+const R10_POINTER_LEADING_SEPARATOR_RE = /^[\s:：、,，;；。.!！?？*`'"“”‘’「」『』（）()[\]【】<>《》—\-–]+/;
 
 /**
  * 非围栏行的 Markdown 段集合（空行 / 围栏边界 / 围栏内容均切段）。

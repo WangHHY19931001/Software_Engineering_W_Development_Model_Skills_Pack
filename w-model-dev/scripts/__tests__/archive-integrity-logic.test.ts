@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 读取本仓 samples fixture（SAMPLES_DIR/archive-integrity），路径为测试文件相对固定解析，非用户输入 */
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 

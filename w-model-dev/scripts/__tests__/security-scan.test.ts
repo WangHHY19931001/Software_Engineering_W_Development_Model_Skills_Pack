@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection -- 测试内建 map 按行号数字键访问（stubResolve），非外部输入 */
 import * as path from 'node:path';
 
 import { describe, it, expect } from 'vitest';

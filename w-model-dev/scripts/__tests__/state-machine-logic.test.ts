@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 读取本仓 samples/state-machine fixture（SAMPLES_DIR），非用户输入 */
 /**
  * state-machine-logic.ts 单元测试 —— 状态机一致性校验纯逻辑
  *

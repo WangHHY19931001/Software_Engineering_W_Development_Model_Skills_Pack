@@ -1,3 +1,5 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 读取本仓 samples fixture（samplesDir），非用户输入 */
+/* eslint-disable security/detect-object-injection -- merged 为测试内建对象按 Object.entries(overrides) 键写入（overrides 为测试字面量），非外部输入 */
 /**
  * run-log-logic.ts 单元测试 —— R1/R3/R6/R7 扩展规则（rootcause/fix 动作）
  *

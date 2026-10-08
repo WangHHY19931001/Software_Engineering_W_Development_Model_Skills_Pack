@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- mkdtemp 临时目录 fixture 读写（path.join(tmpDir,...)），仓库零写入 */
 /**
  * lib/read-json-or-exit.ts 单元测试
  *

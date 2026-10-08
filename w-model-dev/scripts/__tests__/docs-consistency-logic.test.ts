@@ -580,15 +580,12 @@ describe('R10 七来源维护契约（权威全文单点 + 消费方指针）', 
           return 'command-reference';
       }
     };
-    const sources = {
-      authoritySpec: await readRealSource('authoritySpec'),
-      schema: await readRealSource('schema'),
-      checkerSource: await readRealSource('checkerSource'),
-      ssot: await readRealSource('ssot'),
-      locator: await readRealSource('locator'),
-      verifierSpec: await readRealSource('verifierSpec'),
-      commandReference: await readRealSource('commandReference'),
-    };
+    // sourceKeys 既作类型脚（readRealSource/sourceLabel），也驱动 sources 逐键加载（R-B9-6：清除「仅作类型使用」的 no-unused-vars 残留）
+    const sources = {} as Record<(typeof sourceKeys)[number], string>;
+    for (const sourceKey of sourceKeys) {
+      // eslint-disable-next-line security/detect-object-injection -- sourceKey 为 (typeof sourceKeys)[number] 字面量联合（文件上方 as const 数组），测试受控键非外部输入
+      sources[sourceKey] = await readRealSource(sourceKey);
+    }
     const clauseMutations: Array<[string, string, string]> = [
       [
         'canonical-name',

@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 读取本仓 samples fixture（SAMPLES_DIR），非用户输入 */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';

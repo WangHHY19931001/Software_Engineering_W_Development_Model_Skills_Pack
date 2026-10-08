@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 全部 fs 用法均为 mkdtemp 临时目录夹具（path.join(tmpDir,...)）与本仓 samples 只读资产，非用户输入 */
 /**
  * artifact-gate-assets.test.ts —— application/artifact-gate-assets.ts 资产读取/校验层单元测试
  *

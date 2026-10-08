@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 写 mkdtemp 临时目录 .w-model fixture（path.join(tmpDir,...)），仓库零写入 */
 /**
  * metrics-report.ts CLI 层单元测试（进程内模式）
  *

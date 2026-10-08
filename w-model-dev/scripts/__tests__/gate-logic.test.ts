@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 读取本仓 samples/gate fixture（samples(f) 相对 __dirname 固定解析），非用户输入 */
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';

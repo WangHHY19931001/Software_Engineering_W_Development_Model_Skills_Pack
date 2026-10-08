@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 读取本仓 samples fixture（samplesDir），file 为测试内字面量文件名，非用户输入 */
 /**
  * budget-logic.ts 单元测试 —— R4-A 多角度 R token 预算规则 + R6 用量实效
  *

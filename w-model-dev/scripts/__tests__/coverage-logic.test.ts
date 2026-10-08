@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- C7 CLI 集成夹具写在 mkdtempSync 临时目录（join(dir,'coverage.json')），仓库零写入 */
 /**
  * coverage-logic.test.ts —— C1-C10 覆盖分析校验单元测试
  *

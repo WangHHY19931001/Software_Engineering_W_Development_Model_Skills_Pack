@@ -1,3 +1,5 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 读取本仓 samples/gate 与真实 templates 资产（只读）+ mkdtemp 临时目录构建 phase3 fixture，非用户输入 */
+/* eslint-disable security/detect-object-injection -- 循环数字下标 / 内存 mock-fs 键（readFileSync/existsSync 桩）/ TPL_LAYOUT 常量表按受控 phase 键访问，均非外部输入 */
 /**
  * gate-enhancement.test.ts —— Part A 门禁增强 fixture 化回归测试
  *

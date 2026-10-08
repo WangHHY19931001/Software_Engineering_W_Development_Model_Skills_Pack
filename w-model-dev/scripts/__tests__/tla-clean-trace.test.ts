@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- mkdtemp 临时目录构建 TLA 清理 fixture（path.join(dir,...) 尾部为字面量文件名），仓库零写入 */
 /**
  * lib/tla-clean-trace.ts cleanTraceFiles / isTlcStatesDir 单元测试
  *

@@ -1,4 +1,5 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- 读取本仓 samples 夹具与构造注入 fs 桩，非用户输入 */
+/* eslint-disable security/detect-object-injection -- 注入 fs 桩按测试受控路径键访问内存 map（contents[filePath]），非外部输入 */
 /**
  * artifact-gate-logic.test.ts —— D6（43.3.0）gate-log 读取下沉 logic 单测
  *

@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-object-injection -- STATUS_TO_PHASE / NEXT_STEPS 为代码常量映射，按受控键/常量访问，非外部输入 */
 /**
  * wm-status-logic.ts 单元测试
  *

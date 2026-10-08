@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- mkdtemp 临时目录写 uat-path-mapping fixture（path.join(tmpDir,...)），仓库零写入 */
 /**
  * uat-path-mapping.test.ts —— application/uat-path-mapping.ts 解析与校验单元测试
  *

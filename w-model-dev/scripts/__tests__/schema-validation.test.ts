@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-non-literal-fs-filename -- 读取本仓 samples fixture（schema/verifier/code-health），非用户输入 */
 /**
  * schema-validation.test.ts —— JSON Schema 前置校验单元测试
  *
