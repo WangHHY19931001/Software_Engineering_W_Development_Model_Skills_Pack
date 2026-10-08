@@ -27,6 +27,10 @@ import {
   checkTestsMatrixCoverage,
   ORPHAN_REFERENCE_EXEMPTIONS,
   checkSchemaFieldDescriptions,
+  checkCountClaimLiveDocs,
+  COUNT_CLAIM_EXEMPTIONS,
+  COUNT_CLAIM_LINE_RE,
+  isCountClaimScannedPath,
   type DocConsistencyInput,
 } from '../logic/docs-consistency-logic.js';
 import { childProcessEnv } from '../lib/run-sync.js';
@@ -3980,6 +3984,166 @@ describe('gate-count-docs（活体文档门禁项数引用扫描，F1 反哺）'
     });
     const v = runDocConsistencyChecks(input).filter((x) => x.check === 'gate-count-docs');
     expect(v).toHaveLength(2);
+  });
+});
+
+describe('count-claim-live-docs（D8 计数声明活体文档登记自省）', () => {
+  const rc = (overrides: Partial<DocConsistencyInput>) =>
+    runDocConsistencyChecks(baseInput(overrides)).filter((x) => x.check === 'count-claim-live-docs');
+
+  it('漏登记即红（2 态：未登记文档含计数表述 → 具名违规 / 无计数表述 → 零违规）', () => {
+    const registered = ['README.md', 'w-model-dev/SKILL.md', 'w-model-dev/references'];
+    const cases: { label: string; doc: { name: string; content: string }; expectHit: boolean }[] = [
+      {
+        label: 'hit：未登记文档含「19 项门禁」',
+        doc: { name: 'docs/my-new-guide.md', content: '收口前全量：`npm run prepush`（19 项门禁）' },
+        expectHit: true,
+      },
+      {
+        label: 'clean：未登记文档无计数表述',
+        doc: { name: 'docs/plain.md', content: '本文无任何数量词计数。' },
+        expectHit: false,
+      },
+      {
+        label: 'clean：REQUIRED_PATHS 目录项（references/）下文档已登记',
+        doc: { name: 'w-model-dev/references/new-ref.md', content: '含 19 项门禁与 48 条反模式。' },
+        expectHit: false,
+      },
+    ];
+    for (const c of cases) {
+      const v = rc({
+        countClaimLiveDocs: [c.doc],
+        countClaimRegisteredPaths: registered,
+      });
+      if (c.expectHit) {
+        expect(v, `${c.label} 应恰 1 条违规`).toHaveLength(1);
+        expect(v[0]!.message, `${c.label} 应含文档名与命中行`).toContain('docs/my-new-guide.md:1');
+        expect(v[0]!.message, `${c.label} 应示例命中行`).toContain('19 项');
+      } else {
+        expect(v, `${c.label} 应零违规`).toEqual([]);
+      }
+    }
+  });
+
+  it('豁免表生效（3 态：精确豁免 / 前缀豁免 / 豁免表外仍红）', () => {
+    const registered = ['README.md'];
+    const cases: {
+      label: string;
+      doc: { name: string; content: string };
+      expectHit: boolean;
+    }[] = [
+      {
+        label: 'clean：COUNT_CLAIM_EXEMPTIONS 精确条目（eval/README.md）',
+        doc: { name: 'eval/README.md', content: '`npm run eval` = **101/101**、语料 101 条（共 31 条 dry_run）。' },
+        expectHit: false,
+      },
+      {
+        label: 'clean：COUNT_CLAIM_EXEMPTIONS 前缀条目（decision-log/）',
+        doc: { name: 'docs/changes/decision-log/rounds-51-x.md', content: '批次 9 的 21 项销账。' },
+        expectHit: false,
+      },
+      {
+        label: 'red：豁免表外文档仍红',
+        doc: { name: 'docs/other-record.md', content: '保留 17 项门禁与 8 份快照。' },
+        expectHit: true,
+      },
+    ];
+    for (const c of cases) {
+      const v = rc({ countClaimLiveDocs: [c.doc], countClaimRegisteredPaths: registered });
+      expect(v.length, `${c.label} 判定`).toBe(c.expectHit ? 1 : 0);
+    }
+  });
+
+  it('误报消除（小数/版本/个/类/项目 不命中；量词实体命中）', () => {
+    const hit = (line: string): boolean => COUNT_CLAIM_LINE_RE.test(line);
+    const negative = [
+      '### 1.1 项目背景',
+      '### 1.2 项目目标',
+      '版本 43.3.0 起（全仓七处镜像）',
+      '含 5 个文件与 2 个目录', // 个不收
+      '8 类信号与分析 3 个叶子周期', // 类不收
+      'P7-002/P7-003 类缺陷',
+      '覆盖 3 项目目录', // 项后跟「目」的「项目」不作为计数
+    ];
+    for (const line of negative) {
+      expect(hit(line), `【误报防护】不应命中：${line}`).toBe(false);
+    }
+    const positive = [
+      '收口前全量：`npm run prepush`（19 项）',
+      'DoD 清单 ≥ 8 项',
+      '反模式仍 48 条',
+      '单文件单次 edit 最多 3 处',
+      '吸收 claude-tla-plus-plugin 的 4 份 skill 资料',
+      '每阶段 6 份子模板',
+      '共 11 种独立子模板',
+    ];
+    for (const line of positive) {
+      expect(hit(line), `【应命中】: ${line}`).toBe(true);
+    }
+  });
+
+  it('扫描范围谓词 isCountClaimScannedPath（排除/提升）', () => {
+    const excluded = [
+      'docs/changes/2026-08-30-b3-usability-acceptance.md',
+      'docs/changes/engineering-batches/2026-08-11-p0-p2-batches/README.md',
+      'docs/changes/archive/2026-07-30-round23-w-model-8-phase-validation/README.md',
+      'docs/superpowers/plans/2026-10-08-batch9-engineering-hygiene.md',
+      'docs/debug/2026-09-28-test-gate-optimization/baseline.md',
+      '.superpowers/sdd/2026-10-08-batch9-engineering-hygiene/progress.md',
+      'eval/e2e/2026-08-28-baseline.md',
+      'w-model-dev/scripts/samples/gate/valid/valid-gate-report.json.md',
+      'CHANGELOG-archive.md',
+      'node_modules/foo/README.md',
+    ];
+    for (const p of excluded) {
+      expect(isCountClaimScannedPath(p), `应排除：${p}`).toBe(false);
+    }
+    const scanned = [
+      'README.md',
+      'AGENTS.md',
+      'w-model-dev/references/bdd.md',
+      'w-model-dev/templates/README.md',
+      'eval/README.md',
+      'docs/changes/decision-log/rounds-50-docs-consistency.md', // 提升（决策记录）
+      'w-model-dev/scripts/samples/README.md', // 提升（夹具系统说明）
+    ];
+    for (const p of scanned) {
+      expect(isCountClaimScannedPath(p), `应纳入：${p}`).toBe(true);
+    }
+  });
+
+  it('undefined 注入跳过 + 多文档多违规聚合', () => {
+    expect(
+      rc({ countClaimLiveDocs: undefined, countClaimRegisteredPaths: ['README.md'] }),
+      'countClaimLiveDocs undefined 应跳过',
+    ).toEqual([]);
+    expect(
+      rc({ countClaimLiveDocs: undefined, countClaimRegisteredPaths: undefined }),
+      '两者 undefined 应跳过',
+    ).toEqual([]);
+    const v = rc({
+      countClaimLiveDocs: [
+        { name: 'docs/a.md', content: '门禁 17 项与 8 份快照' },
+        { name: 'docs/b.md', content: '保留 6 条反模式' },
+      ],
+      countClaimRegisteredPaths: ['README.md'],
+    });
+    expect(v).toHaveLength(2);
+  });
+
+  it('checkCountClaimLiveDocs 直测：豁免表内容物化（每条 doc/reason 非空）', () => {
+    expect(COUNT_CLAIM_EXEMPTIONS.length).toBeGreaterThan(0);
+    for (const e of COUNT_CLAIM_EXEMPTIONS) {
+      expect(e.doc.length, '豁免 doc 非空').toBeGreaterThan(0);
+      expect(e.reason.length, '豁免 reason 非空').toBeGreaterThan(0);
+    }
+    // 直测函数独立于 buildDocConsistencyReport 接线（同判据）
+    const v = checkCountClaimLiveDocs(
+      [{ name: 'docs/unreg.md', content: '含 19 项门禁表述' }],
+      ['README.md', ...COUNT_CLAIM_EXEMPTIONS.map((e) => e.doc)],
+    );
+    expect(v).toHaveLength(1);
+    expect(checkCountClaimLiveDocs([{ name: 'eval/README.md', content: '101 条语料' }], ['README.md'])).toEqual([]);
   });
 });
 

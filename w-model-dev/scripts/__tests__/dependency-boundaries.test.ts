@@ -115,15 +115,17 @@ const CLI_LAYERING_EXCEPTIONS: readonly CliLayeringException[] = [
   },
   {
     file: 'cli/check-docs-consistency.ts',
-    lines: 985,
+    lines: 1027,
     embedded:
       'vitest 动态 facts 采集（collectVitestMeasurements/readVitestArtifact/readVitestCountFile，受控工件快路径 + --spawn-vitest）、' +
-      'exit-2 探针结果采集（collectExit2ScriptResults）、security baseline 计数、git 变更探测（detectScriptsChanges）；' +
+      'exit-2 探针结果采集（collectExit2ScriptResults）、security baseline 计数、git 变更探测（detectScriptsChanges）、' +
+      'D8 计数声明扫描收集（collectCountClaimLiveDocs：git ls-files + isCountClaimScannedPath 过滤，逻辑判据在 logic 层）；' +
       '主校验判定已在 logic/docs-consistency-logic.ts（本文件为编排 + I/O + 量测）。',
     reason:
       '剩余内嵌为量测采集 / 探针 I/O / 编排；任务 13 A18（43.3.0）已删除 runSync shell 拼接回退（npx vitest），' +
-      '改为 process.execPath + vitest JS 入口（findVitestBin，createRequire 上溯解析）参数数组透传；D6 不重复下沉。',
-    deadline: '未指派归并批次；A18 去 shell 已收口，下次功能性改动本文件时仍可优先下沉（否则保持登记）。',
+      '改为 process.execPath + vitest JS 入口（findVitestBin，createRequire 上溯解析）参数数组透传；' +
+      '任务 15 D8（43.3.0）新增 collectCountClaimLiveDocs（只读 git ls-files + 受控清单 readFileSync）；D6 不重复下沉。',
+    deadline: '未指派归并批次；A18 去 shell / D8 扫描收集已收口，下次功能性改动本文件时仍可优先下沉（否则保持登记）。',
   },
 ];
 

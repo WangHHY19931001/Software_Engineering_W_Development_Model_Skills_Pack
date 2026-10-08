@@ -118,6 +118,20 @@ export interface DocConsistencyInput {
   prTemplate?: string;
   /** 门禁项数引用的活体文档白名单（name + 原文）；缺省时跳过 gate-count-docs 检查（fixture 兼容）。 */
   gateCountDocs?: Array<{ name: string; content: string }>;
+  /**
+   * D8 计数声明扫描输入：被跟踪**活体** markdown 清单（CLI 已按 isCountClaimScannedPath 过滤
+   * 记录/规划/夹具区，git ls-files 只列被跟踪文件故 gitignored 天然排除）。
+   * name = 相对 repo-root 的 POSIX 路径；content = 原文。
+   * 可选——缺省时跳过 count-claim-live-docs 检查（fixture 兼容）。
+   */
+  countClaimLiveDocs?: Array<{ name: string; content: string }>;
+  /**
+   * D8 登记面：REQUIRED_PATHS 完整列表（CLI 注入）。判定「命中计数表述的文档已登记」=
+   * 精确路径命中或命中其目录前缀（如 `w-model-dev/subagent/`、`w-model-dev/scripts/__tests__/`、
+   * `w-model-dev/references/`）；与 COUNT_CLAIM_EXEMPTIONS 并集构成 D8 许可面。
+   * 与 countClaimLiveDocs 同时缺省时跳过检查（fixture 兼容）。
+   */
+  countClaimRegisteredPaths?: string[];
   /** w-model-dev/references/operation-behaviors.md 原文（八条操作行为 + F1-F10） */
   operationBehaviors: string;
   /** w-model-dev/references/hard-constraints.md 原文（14 条硬约束完整版） */
@@ -1252,6 +1266,9 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
   }
   violations.push(...checkPrTemplatePrePushCount(input.prTemplate));
   violations.push(...checkGateCountLiveDocs(input.gateCountDocs));
+  if (input.countClaimLiveDocs !== undefined && input.countClaimRegisteredPaths !== undefined) {
+    violations.push(...checkCountClaimLiveDocs(input.countClaimLiveDocs, input.countClaimRegisteredPaths));
+  }
   if (input.a4Docs !== undefined) {
     violations.push(...checkA4DocumentationContracts(input.a4Docs));
   }
@@ -2237,6 +2254,147 @@ export function checkGateCountLiveDocs(
         }
       }
     }
+  }
+  return violations;
+}
+
+// ==================== D8 计数声明活体文档登记自省（count-claim-live-docs） ====================
+
+/**
+ * D8 计数声明**行级**保守模式（批次 9 任务 15 实测校准）：
+ *   `COUNT_CLAIM_LINE_RE`：数量词计数——`(?<![\d.])\d+(?!\.\d)\s*(?:项|条|处|份|款|种)(?!目)`。
+ *     前缀负向 `(?<![\d.])` 排除版本号/小数续位（如 `43.3.0`、`1.1` 的尾位由「数字前是 .」挡掉），
+ *     后缀 `(?!\.\d)` 排除「1.1 项…」式十进制小数量词误读（`\d+` 吃到小数最后一位的情形），
+ *     `(?!目)` 排除「N 项目」项目后缀误读（与 gate-count-docs 的 `(?!目)` 口径一致）；
+ *     量词集取 项/条/处/份/款/种——「个」「类」实测噪音最高、漂移价值最低（如「≥1 个 REQ 行」、
+ *     「1.1 类图/8 类信号」），不收入（校准数据见 batch 9 任务 15 报告）。
+ *   `COUNT_CLAIM_LINE_GONG_RE`：「共 N」裸露形态；N 后跟数量词时已被上一条捕获，此处兜底无数量词形态。
+ * 保守模式起步：宁可多报（由 COUNT_CLAIM_EXEMPTIONS 归零），不漏报真实仓库状态计数。
+ */
+export const COUNT_CLAIM_LINE_RE = /(?<![\d.])\d+(?!\.\d)\s*(?:项|条|处|份|款|种)(?!目)/;
+export const COUNT_CLAIM_LINE_GONG_RE = /共\s*\d+/;
+export const COUNT_CLAIM_LINE_RE_LIST: ReadonlyArray<{ description: string; re: RegExp }> = [
+  { description: '数量词', re: COUNT_CLAIM_LINE_RE },
+  { description: '共 N', re: COUNT_CLAIM_LINE_GONG_RE },
+];
+
+/**
+ * D8 扫描范围——被跟踪**活体** markdown 的排除前缀（记录/规划/夹具区，非活体文档面）：
+ *   `docs/changes/`（变更/决策/验收历史记录；decision-log 例外见 REINCLUDE，与 GATE_COUNT_DOC_NAMES
+ *     头注「docs/changes/**（历史不可改）」边界一致）
+ *   `docs/superpowers/`（内部规划）、`docs/debug/`（调试会话快照）、`.superpowers/`（SDD 内部工作记录）
+ *   `eval/e2e/`（按日冻结的 e2e 基线与终值，eval/README §4「不可变约定」）
+ *   `w-model-dev/scripts/samples/`（门禁 fixture 数据；顶层 README 例外见 REINCLUDE，覆盖矩阵由
+ *     check-samples-coverage 强制）
+ *   `CHANGELOG-archive.md`（历史归档）、`node_modules/`
+ * gitignored 文件由 git ls-files（只列被跟踪）天然排除。
+ */
+export const COUNT_CLAIM_SCAN_EXCLUDE_PREFIXES: ReadonlyArray<string> = [
+  'docs/changes/',
+  'docs/superpowers/',
+  'docs/debug/',
+  '.superpowers/',
+  'eval/e2e/',
+  'w-model-dev/scripts/samples/',
+  'CHANGELOG-archive.md',
+  'node_modules/',
+];
+/**
+ * 排除区内的显式提升（纳入扫描）：
+ *   `docs/changes/decision-log/`——决策记录含计数裁决句（rounds-50 正在追加），作为「计数已显式登记/
+ *     豁免」的自省面纳入扫描（经 COUNT_CLAIM_EXEMPTIONS 前缀豁免）。
+ *   `w-model-dev/scripts/samples/README.md`——夹具系统覆盖矩阵活体说明（计数由
+ *     check-samples-coverage 锚定，经 COUNT_CLAIM_EXEMPTIONS 精确豁免）。
+ */
+export const COUNT_CLAIM_SCAN_REINCLUDE_PREFIXES: ReadonlyArray<string> = [
+  'docs/changes/decision-log/',
+  'w-model-dev/scripts/samples/README.md',
+];
+
+/** D8 扫描范围判定（共享单一实现：CLI 收集与单测消费同一谓词）。相对 repo-root POSIX 路径。 */
+export function isCountClaimScannedPath(relPath: string): boolean {
+  if (COUNT_CLAIM_SCAN_REINCLUDE_PREFIXES.some((p) => relPath.startsWith(p))) return true;
+  return !COUNT_CLAIM_SCAN_EXCLUDE_PREFIXES.some((p) => relPath.startsWith(p));
+}
+
+/**
+ * D8 计数声明豁免表（COUNT_CLAIM_EXEMPTIONS）：文档（含目录前缀）命中计数表述但**确认计数不漂移**
+ * 而豁免登记。仅限下列类别：① 计数由专项门禁锚定（禁在其面内新增未锚定仓库状态计数）；
+ * ② 历史/冻结记录；③ 演示/建议性内容。新增仓库状态计数（如新脚本/新清单总数）必须补
+ * REQUIRED_PATHS 或新增精确豁免条目，**禁止靠既有前缀条目静默吞掉真实漂移源**。doc 支持目录前缀
+ * （startsWith 匹配）。
+ */
+export const COUNT_CLAIM_EXEMPTIONS: ReadonlyArray<{ doc: string; reason: string }> = [
+  {
+    doc: 'docs/ai-native-sdlc-adoption.md',
+    reason:
+      '导航收口对账文档：「13 来源/13 项」为批次 5 吸收收口范围固定事实，「≤3 条祈使句」为 A1 固定设计，随仓交付后稳定，不随仓库状态漂移',
+  },
+  {
+    doc: 'docs/changes/decision-log/',
+    reason:
+      '决策记录区（含 rounds-50 追加中）：计数为决策时点范围/裁决描述，记录「原文保留，不篡改」；rounds-50 计数口径裁决由批次 9 任务 16 收编（R-B9）',
+  },
+  {
+    doc: 'eval/README.md',
+    reason:
+      'eval 活体说明：语料 101/101、references 锚点 45/45 由 npm run eval（runner.ts assertions + coverageMatrix）与 mappings.json 自校验锚定；e2e/dry_run/TSV 计数为按日冻结的历史凭证；「共 9 列」等表格形态静态。计数已与本批实际（101）对齐',
+  },
+  {
+    doc: 'w-model-dev/examples/',
+    reason:
+      '示例区：计数为演示情境内容（requirement-analysis.md 已标注「示意数字」），非仓库状态声明；新增仓库状态计数须显式登记',
+  },
+  {
+    doc: 'w-model-dev/scripts/samples/README.md',
+    reason:
+      '夹具系统覆盖矩阵说明：fixture 引用完整性/负面覆盖/路径无悬空由 check-samples-coverage（pre-push 第 16 项）强制；「总用例数以运行输出为准」已显式锚定 self-test 输出',
+  },
+  {
+    doc: 'w-model-dev/templates/',
+    reason:
+      '模板区：主/子模板数表与 gate-logic PHASE_SPEC_LAYOUT 锚定、DoD ≥ 8 项/条与 check-artifact-gate 锚定、stage 级 12 份 MD 与 check-coding-plan 锚定；占位符计数（≥1 条/1 条优点）为规范语义，不随仓库状态漂移',
+  },
+];
+
+/**
+ * D8 计数声明活体文档登记自省（count-claim-live-docs）：扫描被跟踪活体 markdown 的行级计数表述，
+ * 命中文档须已登记——REQUIRED_PATHS（countClaimRegisteredPaths 注入，支持目录前缀）或
+ * COUNT_CLAIM_EXEMPTIONS（支持目录前缀）——否则 fail-closed 红（漏登记即红，防新增计数文档静默漂移）。
+ * 逐行 fresh 正则（数组内无共享 lastIndex）；输入未注入（undefined）时跳过（fixture 兼容）。
+ */
+export function checkCountClaimLiveDocs(
+  docs: Array<{ name: string; content: string }> | undefined,
+  registeredPaths: ReadonlyArray<string> | undefined,
+): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  if (docs === undefined || registeredPaths === undefined) return violations;
+  // 登记/豁免目录前缀判定的统一归一：base 带/不带尾斜杠均可（doc 与 REQUIRED_PATHS 目录项两形态），
+  // 避免 `base + '/'` 对已带尾斜杠条目产生 `//` 双斜杠失配。
+  const underPrefix = (base: string, name: string): boolean =>
+    name === base || name.startsWith(base.endsWith('/') ? base : `${base}/`);
+  const isRegistered = (name: string): boolean =>
+    registeredPaths.some((p) => underPrefix(p, name)) || COUNT_CLAIM_EXEMPTIONS.some((e) => underPrefix(e.doc, name));
+  for (const doc of docs) {
+    if (isRegistered(doc.name)) continue;
+    const lines = doc.content.split(/\r?\n/);
+    const hits: Array<{ lineNo: number; text: string }> = [];
+    for (let i = 0; i < lines.length; i++) {
+      // eslint-disable-next-line security/detect-object-injection -- i 为本地数组的整数下标，两侧均为本地派生数据
+      const line = lines[i]!;
+      if (COUNT_CLAIM_LINE_RE_LIST.some(({ re }) => re.test(line))) {
+        hits.push({ lineNo: i + 1, text: line.trim() });
+      }
+    }
+    if (hits.length === 0) continue;
+    const sample = hits[0]!.text.slice(0, 60);
+    violations.push({
+      check: 'count-claim-live-docs',
+      message:
+        `${doc.name}:${hits[0]!.lineNo} 计数表述未登记（REQUIRED_PATHS / COUNT_CLAIM_EXEMPTIONS 均无）——` +
+        `命中行 ${hits.map((h) => h.lineNo).join('/')}（例：「${sample}」）；` +
+        '须补入 REQUIRED_PATHS 或豁免表（D8，漏登记即红）',
+    });
   }
   return violations;
 }

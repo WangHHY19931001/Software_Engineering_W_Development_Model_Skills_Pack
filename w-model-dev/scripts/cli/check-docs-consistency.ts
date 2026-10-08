@@ -54,6 +54,7 @@ import { parseJsonSafe } from '../lib/safe-json.js';
 import {
   buildDocConsistencyReport,
   countValidExit2Scripts,
+  isCountClaimScannedPath,
   type DocConsistencyInput,
 } from '../logic/docs-consistency-logic.js';
 
@@ -61,7 +62,10 @@ import {
  * 本门禁所需「活体文档」路径白名单（REQUIRED_PATHS）。
  * 契约：新增 schema / 脚本 / 设计文档等资产时，若其计数或枚举被任一检查消费，须在此登记路径
  * 并在 docs-consistency-logic.ts 增加对应输入字段与检查规则；只登记「被读取的活体文档」，
- * 目录类（schemas/、subagent/、__tests__/）由 readdir 动态发现，不进本表。
+ * 目录类（schemas/、subagent/、__tests__/、references/）由 readdir 动态发现，不进本表——
+ * 目录项（w-model-dev/subagent、w-model-dev/scripts/__tests__、w-model-dev/references）承担
+ * 两层职责：① 存在性检查；② D8（count-claim-live-docs）的登记面（目录前缀下全部 .md 视为已登记，
+ * 与 logic 层 isCountClaimRegistered 判定一致）。
  */
 const REQUIRED_PATHS = [
   'package.json',
@@ -100,6 +104,7 @@ const REQUIRED_PATHS = [
   'docs/skill-design-document.md',
   'docs/tla-plus-modeling-design.md',
   'w-model-dev/scripts/__tests__', // 目录（vitest 测试文件数）
+  'w-model-dev/references', // 目录（references/*.md 为 readdir 全量读取面 + D8 计数声明登记面）
 ];
 
 /** docs/ 根 6 份设计文档（活体引用，README 导航引用；docs/superpowers/ 与 docs/changes/ 归档不动） */
@@ -656,6 +661,31 @@ function collectVitestMeasurements(root: string, spawnVitest: boolean): VitestMe
   }
 }
 
+/**
+ * 收集 D8 计数声明自省的扫描输入：git ls-files 枚举**被跟踪** .md（gitignored 天然排除），
+ * 经 logic 层 isCountClaimScannedPath 过滤记录/规划/夹具区后读取原文。
+ * git 不可用 / 命令失败时返回 undefined（跳过检查，与 detectScriptsChanges 的 git 不可用
+ * 保守放行策略一致——本检查是登记自省而非存在性判据，REQUIRED_PATHS 存在性检查仍 fail-closed 生效）。
+ */
+function collectCountClaimLiveDocs(root: string): Array<{ name: string; content: string }> | undefined {
+  const ls = runSync('git', ['ls-files', '*.md'], { cwd: root, timeout: 15_000 });
+  if (ls.error !== undefined || ls.status !== 0) return undefined;
+  const docs: Array<{ name: string; content: string }> = [];
+  for (const rel of String(ls.stdout)
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0)) {
+    if (!isCountClaimScannedPath(rel)) continue;
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- git ls-files 输出仅含仓库被跟踪文件（受控清单）
+      docs.push({ name: rel, content: readFileSync(join(root, rel), 'utf-8') });
+    } catch {
+      // 单文件读取失败（如编码异常）跳过——不并列 fail-closed，避免误伤；REQUIRED_PATHS 存在性检查兜底
+    }
+  }
+  return docs;
+}
+
 async function main(): Promise<void> {
   // S22：未知 `--*` flag 不再静默丢弃（避免被当作位置参数 repo-root 误读）——已知集合校验，
   // 未知即 ARG_INVALID / exit 2（与 l0-link-audit「未知 → ARG_INVALID」口径一致）
@@ -746,6 +776,9 @@ async function main(): Promise<void> {
   const testFileCount = vitestFacts.testFileCount;
   const vitestTestCount = vitestFacts.vitestTestCount;
   const scriptsChanged = detectScriptsChanges(root);
+  // D8 计数声明自省：被跟踪活体 markdown（git ls-files + isCountClaimScannedPath 过滤；git 不可用 → undefined 跳过）
+  const countClaimLiveDocs = collectCountClaimLiveDocs(root);
+  const countClaimScanSkipped = countClaimLiveDocs === undefined;
 
   // C3 内链存在性数据源：SKILL.md + references/*.md + README.md + AGENTS.md + SSoT（核心导航文档集）
   const referenceFiles = readdirSync(join(root, 'w-model-dev/references'))
@@ -827,6 +860,9 @@ async function main(): Promise<void> {
       { name: 'CONTRIBUTING.md', content: read('CONTRIBUTING.md') },
       { name: 'docs/troubleshooting.md', content: read('docs/troubleshooting.md') },
     ],
+    // D8 计数声明自省：扫描清单（undefined → logic 层跳过检查）+ 登记面 = REQUIRED_PATHS（含目录项）
+    countClaimLiveDocs,
+    countClaimRegisteredPaths: REQUIRED_PATHS,
     prTemplate: read('.github/PULL_REQUEST_TEMPLATE.md'),
     changelog: read('CHANGELOG.md'),
     pkgJson: read('package.json'),
@@ -903,6 +939,9 @@ async function main(): Promise<void> {
     );
     dynamicMeasurements = null;
   }
+  // D8 count-claim 在 git 不可用（非 git 仓库 / 命令失败，如 fixture 隔离副本）时**静默跳过**——
+  // 与 detectScriptsChanges 的 git 不可用保守放行策略一致，不污染 diagnostics 契约
+  // （count-claim 人类可读头行仍如实显示「跳过（git 不可用）」）；REQUIRED_PATHS 存在性检查不受影响。
 
   // --json：输出机器可读报告（无分隔线），exitCode 由调用方设置
   if (jsonMode) {
@@ -944,6 +983,9 @@ async function main(): Promise<void> {
   console.log(`persona 文件   : ${personaCount}`);
   console.log(`test 文件    : ${testFileLabel}`);
   console.log(`vitest 用例  : ${vitestTestLabel}`);
+  console.log(
+    `count-claim   : ${countClaimScanSkipped ? '跳过（git 不可用）' : `${countClaimLiveDocs!.length} 份活体 markdown 扫描`}`,
+  );
   console.log(`静态违规      : ${report.staticViolations.length}`);
   console.log(`动态违规      : ${report.dynamicViolations.length}`);
   console.log(`检查结果      : ${violations.length === 0 ? '✓ 全部一致' : `✗ ${violations.length} 项不一致`}`);
