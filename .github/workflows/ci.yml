@@ -1,0 +1,61 @@
+# CI 工作流（D1，43.3.0）——prepush 可移植子集 + 不可移植项登记
+#
+# 目的：作为本地 pre-push 门禁的远程 CI 兜底。本地 19 项门禁由 `.githooks/pre-push`
+# 承载（`npm run prepush` = `bash .githooks/pre-push --force`），本工作流在
+# ubuntu-latest + node 20 上执行其等价子集，并把仓库内不可移植项逐项登记。
+#
+# 不可移植项登记（本工作流在 CI 侧替代/豁免的理由）：
+#   ① 纯 Windows shell guard（`.githooks/pre-push` 行 43-70 is_pure_windows_shell）：
+#      guard 只在「无 bash 解释器的原生 cmd/PowerShell」判定为纯 Windows 并 exit 0 放行；
+#      Linux（OSTYPE=linux）恒判非纯 Windows → guard 自动放行，19 项门禁照常执行。
+#      CI 使用 ubuntu-latest，guard 天然 no-op。
+#   ② cygpath 路径转换（`.githooks/pre-push` 行 541-543）：L3 尾车道把 vitest JSON
+#      的 MSYS 临时路径转 Windows 路径供 Node 消费时用 `cygpath -w ... || printf '%s' ...`；
+#      Linux 上无 cygpath → 回退保留原 POSIX 路径，Node 可正常 resolve，天然 no-op。
+#      CI 无需额外处理。
+#   ③ Java/tla2tools：TLA+ 端到端（check-tla-model 的 SANY/TLC）依赖 Java 运行
+#      tla2tools jar。ubuntu-latest 镜像预装 Java——下方 `java -version` 探针步骤
+#      为故障定位辅助，不强制、不安装。
+#   ④ npm audit（`.githooks/pre-push` 第 14 项）：依赖 npm registry 网络。本地离线
+#      时由 audit_can_skip 枚举短表跳过；CI 有网，audit 正常执行、high 以上仍阻断。
+#
+# 冗余兜底说明：`npm run prepush` 已包含 self-test（第 1 项）与 eval（第 19 项），
+# 下方显式重跑 `self-test` / `eval` 为冗余兜底——prepush 失败时便于快速定位
+# 是「可移植子集主入口」还是「兜底项」出了问题。
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  prepush:
+    name: prepush gate subset
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # 不可移植项登记 ③：Java/tla2tools 探针（ubuntu-latest 预装 Java；仅故障定位辅助）
+      - name: Probe Java (TLA+ tla2tools dependency)
+        run: java -version
+
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+      # 19 项门禁等价子集主入口；prepush 内部在 Linux 上 Windows guard 自动放行、
+      # cygpath 天然 no-op（见文件头不可移植项登记 ①②）
+      - name: Run prepush gates
+        run: npm run prepush
+
+      # 冗余兜底（prepush 已含第 1 项 self-test 与第 19 项 eval）；单独重跑以利故障定位
+      - name: Fallback self-test (redundant)
+        run: npm run --silent self-test
+
+      - name: Fallback eval (redundant)
+        run: npm run --silent eval
