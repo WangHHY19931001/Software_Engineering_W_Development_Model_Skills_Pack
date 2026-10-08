@@ -78,7 +78,7 @@
   "reviewedArtifacts": [
     {
       "path": "w-model-dev/scripts/__tests__/verifier-logic.test.ts",
-      "sha256": "f960ceeb18e28e9e820dca0a21588d53e701558a34d6e5e11c5743d2ce39c7b5"
+      "sha256": "7cb8736dd5d351b359c065e151be4ebfafeb9357c9c97a405ac705388d27f6f8"
     },
     {
       "path": "w-model-dev/references/agent-personas.md",

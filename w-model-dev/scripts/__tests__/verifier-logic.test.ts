@@ -37,17 +37,19 @@ import {
   validateReviewedArtifacts,
   RESOLUTION_FLOOR,
 } from '../logic/verifier-logic.js';
+// D3-I（43.3.0）：期望数据单源——shared table（samples/expectations/verifier.ts），
+// self-test 与 vitest 同源消费，消除「fixture 期望」的双声明漂移
+import { VERIFIER_EXPECTATIONS, getVerifierExpectation } from '../samples/expectations/verifier.js';
 
 import { invokeCli } from './helpers/cli-invoker.js';
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(TEST_DIR, '../../..');
-const PERSONA_FIXTURES = [
-  'persona-code-reviewer.json',
-  'persona-test-engineer.json',
-  'persona-security-auditor.json',
-  'persona-performance-auditor.json',
-] as const;
+/**
+ * D3-I（43.3.0）：persona 夹具清单由共享期望表派生（samples/expectations/verifier.ts），
+ * 不再独立声明——四份 persona 正例由表内 `persona-` 前缀 fixture 收敛，既有登记面不变。
+ */
+const PERSONA_FIXTURES = VERIFIER_EXPECTATIONS.filter((e) => e.file.startsWith('persona-')).map((e) => e.file);
 
 /**
  * R19（A2，批次 6 任务 4）测试共用登记项：满足 schema 与 logic 形态的 reviewedArtifacts 条目。
@@ -238,15 +240,18 @@ describe('Persona Verifier CLI regressions', () => {
   });
 
   it('--json 校验失败报告同样恒带 verifiedArtifacts（读不到不入表，读得到必登记）', async () => {
-    const fixturePath = resolve(ROOT, 'w-model-dev/scripts/samples/verifier/bad-variance-drift.json');
+    // D3-I（43.3.0）：失败样本与期望判定由共享期望表单源（不再内联 expected 判定）
+    const drifting = getVerifierExpectation('bad-variance-drift.json')!;
+    expect(drifting.expectedPassed, 'bad-variance-drift.json 应为失败样本').toBe(false);
+    const fixturePath = resolve(ROOT, `w-model-dev/scripts/samples/verifier/${drifting.file}`);
     const result = await runVerifierCli(fixturePath);
     const report = JSON.parse(result.stdout) as {
       verifiedArtifacts?: unknown[];
       passed?: boolean;
     };
 
-    expect(result.code).toBe(1);
-    expect(report.passed).toBe(false);
+    expect(result.code).toBe(drifting.expectedPassed ? 0 : 1);
+    expect(report.passed).toBe(drifting.expectedPassed);
     expect(Array.isArray(report.verifiedArtifacts)).toBe(true);
     expect(report.verifiedArtifacts).toHaveLength(1);
   });
@@ -325,23 +330,22 @@ describe('V 产物形态负样本（D-10：等差改进指引 / 双 L 文案区�
     expect(result.vagueItems).toEqual(evidence);
   });
 
-  it('完美等差数列 rawScores → 失败且文案含改进指引', async () => {
-    const r = await runVerifier('w-model-dev/scripts/samples/verifier/bad-arithmetic-sequence.json');
+  // D3-I（43.3.0）：D-10 三负样本的文件名与原因模式由共享期望表单源（不内联独立正则应判定）
+  const D10_NEGATIVE = ['bad-arithmetic-sequence.json', 'bad-evidence-double-l.json', 'bad-resolution-floor.json'].map(
+    (file) => getVerifierExpectation(file)!,
+  );
+
+  it.each(D10_NEGATIVE)('D-10 负样本 %s → 出口 1 且输出覆盖表内全部原因模式', async (e) => {
+    const r = await runVerifier(`w-model-dev/scripts/samples/verifier/${e.file}`);
     expect(r.exitCode).toBe(1);
-    expect(r.stdout + r.stderr).toMatch(/真实离散/);
+    for (const p of e.expectedReasonPatterns ?? []) {
+      expect(r.stdout + r.stderr, `${e.file}: ${p.source} 应命中 CLI 输出`).toMatch(p);
+    }
   });
 
-  it('双 L evidence 形态 → 文案点明格式不符（非空泛声明）', async () => {
+  it('双 L evidence 形态 → 不得误报为空泛声明（O3 归因防护，D-10②）', async () => {
     const r = await runVerifier('w-model-dev/scripts/samples/verifier/bad-evidence-double-l.json');
-    expect(r.exitCode).toBe(1);
-    expect(r.stdout + r.stderr).toMatch(/格式不符|须 path:Lnn=stmt/);
     expect(r.stdout + r.stderr).not.toMatch(/空泛声明/);
-  });
-
-  it('非全等但分布坍缩 → 失败且文案点明分辨力下限', async () => {
-    const r = await runVerifier('w-model-dev/scripts/samples/verifier/bad-resolution-floor.json');
-    expect(r.exitCode).toBe(1);
-    expect(r.stdout + r.stderr).toMatch(/分布坍缩/);
   });
 });
 
@@ -1216,11 +1220,11 @@ describe('parseEvidencePath（R19 与 evidence 归属共用提取器；R12 判�
 });
 
 describe('A2 R19 CLI 负样本（samples/verifier/bad-r19-*.json，读盘三重复核）', () => {
-  it.each([
-    ['bad-r19-evidence-not-registered.json', /R19 evidence 引用未在 reviewedArtifacts 登记/],
-    ['bad-r19-artifact-hash-mismatch.json', /R19 评审对象哈希不符/],
-    ['bad-r19-line-out-of-range.json', /R19 evidence 行号越界/],
-  ] as const)('%s 经 CLI 应 exit 1 且唯一违规为 R19', async (file, pattern) => {
+  // D3-I（43.3.0）：R19 负样本清单与唯一原因模式由共享期望表派生（bad-r19-* 前缀收敛），不再独立声明
+  const R19_NEGATIVE = VERIFIER_EXPECTATIONS.filter((e) => e.file.startsWith('bad-r19-')).map(
+    (e) => [e.file, e.expectedReasonPatterns![0]!] as const,
+  );
+  it.each(R19_NEGATIVE)('%s 经 CLI 应 exit 1 且唯一违规为 R19', async (file, pattern) => {
     const result = await runVerifierCli(resolve(ROOT, 'w-model-dev/scripts/samples/verifier', file));
     expect(result.code).toBe(1);
     const report = JSON.parse(result.stdout) as { reasons: string[] };
