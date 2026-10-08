@@ -197,7 +197,7 @@ S-test 子代理执行 `npx cucumber-js features/L1/` 运行所有 scenarios：
 
 泛化模板（如「同意」/「确认」/「OK」/「好的」/「继续」/「通过」/「确认放行」/「yes」）视为空，触发 R2 黑名单违规。完整集合与扩展规则见 [`checkpoint-logic.ts`](../scripts/logic/checkpoint-logic.ts) `ID_PATTERNS` / `TECH_KEYWORDS`（含集合用途、扩展规则、与 R2 关系注释）。
 
-## 返工定位表
+## 返工路径
 
 | 失败场景 | R 定位线索 | 候选影响阶段（仅 R 建议） |
 |---|---|---|

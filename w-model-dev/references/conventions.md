@@ -161,6 +161,11 @@
 - **规范定义**：V/G 任一门禁不通过后的返工链（V/G 失败 → R 根因定位 → V 复审 RootCauseReport → G 根因报告门禁 → S-fix → R3×3 预防性审查 → V/G 复验 → CHECKPOINT），权威全句定义见 [hard-constraints.md](hard-constraints.md)「普通 V/G 失败链」节：`V/G 失败 → R → V 复审 RootCauseReport → G(check-rootcause-report exit 0) → S-fix → R3×3 → G(check-preventive-review exit 0) → V → G → CHECKPOINT`。全包其余文档以短名引用本节：正文用 `普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）`，表格用 `普通 V/G 失败链（hard-constraints）`，不再内联全句（examples/ 教学示例除外）。
 - **_Avoid_**：完整失败链/标准返工链/失败处理链/完整普通失败链/普通失败链/普通失败返工链/普通失败完整链/完整返工链/普通返工链（非规范叫法；统一短名「普通 V/G 失败链」并指向 hard-constraints 权威节）。
 
+### 返工路径（rework path）
+
+- **规范定义**：阶段门 / V / G 未通过后的定位与回退指引。阶段 1-5 为叙述式，阶段 6-8 为表格式，术语统一为「返工路径」；旧称「返工定位表」已废弃（43.4.0 统一）。入链锚点：hard-constraints.md 命中高发阶段表 #4/#18 行、subagent-delegation.md L0-L4 表 L3 行。
+- **_Avoid_**：返工定位表（旧称，已废弃；阶段 6-8 文档节标题与跨文档引用统一为「返工路径」）。
+
 ### 阶段角色集矩阵
 
 - **规范定义**：阶段 1-4 产出前 A-lead 多视角分析的 persona 选择矩阵，权威 = [agent-personas.md](agent-personas.md)「3A. 阶段角色集矩阵」节：阶段 1 六角色，阶段 2/3 与阶段 4 各七角色（集合同、行序不同，顺序=分派顺序，覆盖判定只比集合）；与 R-persona 两键矩阵（服务根因定位）、V-lead 多角度矩阵（服务评审）三分划界互不复用。机器权威副本为 `role-dispatch-logic.ts` 的 `PHASE_ROLE_MATRIX` 常量（与矩阵行逐字一致，权威在 agent-personas 节）。

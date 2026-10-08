@@ -129,7 +129,7 @@ S-test 子代理执行 `npx cucumber-js features/L2/` 运行所有 scenarios：
 | 6 | 把质量门退出码 1/2 当警告忽略 | 退出码 1/2 是 R 定位线索，必须先执行普通 V/G 失败链（hard-constraints），禁止放行 |
 | 7 | 系统测试未覆盖跨模块数据流校验 / 角色越权检测 / 副作用时序一致性检测 | 系统测试用例须包含：(1) **跨模块数据流用例**（验证 store 选择与 schema 一致，详见 [phase-3-outline-design.md](phase-3-outline-design.md)「跨模块数据源选择约束」节）；(2) **角色越权用例**（验证 `reader` 不能调用 `blogger-only` 端点，应返回 403，详见 [phase-5-coding.md](phase-5-coding.md)「角色校验清单」节）；(3) **副作用时序用例**（验证响应体字段反映已生效状态，详见 [phase-5-coding.md](phase-5-coding.md)「副作用时序一致性清单」节）。（预防 P7-001~P7-004 类缺陷） |
 
-## 返工定位表
+## 返工路径
 
 | 失败用例 | R 定位线索 | 候选影响阶段（仅 R 建议） | 修复后真实重跑 |
 |---|---|---|---|
