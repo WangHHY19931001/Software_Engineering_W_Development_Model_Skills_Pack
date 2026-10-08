@@ -212,7 +212,7 @@ git push --no-verify
 **提交流程**：
 
 1. 创建分支（见上文「1. 创建分支」）
-2. 本地验证：`npm run prepush`（19 项主门禁，云端 CI 兜底同源执行；纯文档改动可仅跑 `npm run check:docs-consistency`）
+2. 本地验证：`npm run prepush`（19 项本地门禁，替代云端 CI；纯文档改动可仅跑 `npm run check:docs-consistency`）
 3. 按上述格式提交
 4. 推送分支并创建 PR，使用 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 模板（见下节）
 
@@ -230,7 +230,7 @@ refactor(skill): /wm review 编排指引精简
 - PR 标题遵循 Conventional Commits 格式（同提交信息：`<type>(<scope>): <summary>`）
 - PR 描述使用 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 模板，说明：改了什么、为什么改、如何验证（构造了什么输入、退出码如何）
 - 关联相关 issue（如 `Closes #5`）
-- 本地 `npm run prepush`（19 项门禁）为**主门禁**：模板中的校验要点由它验证，合入前请确保本地已通过；仓库另配置 GitHub Actions workflow（[.github/workflows/ci.yml](./.github/workflows/ci.yml)，D1 / 43.3.0）作云端兜底，CI 首跑待首次推库触发验证（R-B9-11 / R-B9-12，暂未写「已首跑全绿」）
+- 本仓库不集成云端 CI——未开启 GitHub Actions workflow 权限（用户裁定 2026-10-09，R-B9-14）：模板中的校验要点由本地 `npm run prepush`（19 项门禁）验证，合入前请确保本地已通过
 
 ## 文档维护规则
 
