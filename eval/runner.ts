@@ -142,11 +142,18 @@ export function evaluateEvidence(e: Evidence, io: FileSystemAdapter): string | n
     return io.exists(e.target) ? null : `证据文件不存在：${e.target}`;
   }
   try {
-    return io.read('w-model-dev/scripts/cli/self-test.ts').includes(e.substring)
+    // D3（43.3.0，批次 9）：期望数据单源化后，fixture 由 self-test.ts 用例数组或
+    // samples/expectations/<dir>.ts 期望表（self-test 派生源）消费——两类来源都构成
+    // 「self-test 基线消费该 fixture」的行为证据（D3-I verifier / D3-II gate）。
+    const sources = [io.read('w-model-dev/scripts/cli/self-test.ts')];
+    for (const mod of io.list('w-model-dev/scripts/samples/expectations')) {
+      sources.push(io.read(mod));
+    }
+    return sources.some((s) => s.includes(e.substring))
       ? null
-      : `self-test.ts 未包含 fixture「${e.substring}」`;
+      : `self-test.ts / expectations 期望表未包含 fixture「${e.substring}」`;
   } catch {
-    return '无法读取 self-test.ts';
+    return '无法读取 self-test.ts / expectations 期望表';
   }
 }
 
