@@ -46,6 +46,7 @@ import {
   deriveFalsePositiveContext,
   environmentRow,
   mergeDynamicTrace,
+  phase1ScopeHash,
   sha256Hex,
   type DynamicTraceInputScenario,
   type Phase1Scenario,
@@ -215,7 +216,7 @@ function makeCandidate(
   commands: CommandEvidence[],
   guardViolations: string[],
 ): CodeHealthCandidate {
-  const scopeHash = `sha256:${sha256Hex(`P1|${files.join(',')}|${symbols.join(',')}`)}`;
+  const scopeHash = phase1ScopeHash(files, symbols);
   const selector: CandidateSelector = {
     candidateId,
     phase: 'P1',

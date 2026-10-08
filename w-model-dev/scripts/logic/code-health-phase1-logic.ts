@@ -117,6 +117,25 @@ export function sha256Hex(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
+/**
+ * Join a member list with `,` after sorting a defensive copy, so the same set always serializes
+ * identically regardless of arrival order. Scope identities must be order-independent: a candidate
+ * whose file/symbol list arrives in a different order must not produce a different scopeHash
+ * (which the evidence store would reject as a false SCOPE_MISMATCH).
+ */
+export function sortedJoin(values: readonly string[]): string {
+  return [...values].sort().join(',');
+}
+
+/**
+ * Order-independent scope identity for a Phase 1 candidate: `sha256:` over `P1|files|symbols`,
+ * both member lists normalized via {@link sortedJoin}. Consumer shape (`sha256:` + 64 lowercase
+ * hex, enforced by `SCOPE_HASH_PATTERN` in lib/code-health-evidence-store.ts) is unchanged.
+ */
+export function phase1ScopeHash(files: readonly string[], symbols: readonly string[]): string {
+  return `sha256:${sha256Hex(`P1|${sortedJoin(files)}|${sortedJoin(symbols)}`)}`;
+}
+
 export function isCodeFilePath(file: string): boolean {
   return CODE_FILE_PATTERN.test(file);
 }

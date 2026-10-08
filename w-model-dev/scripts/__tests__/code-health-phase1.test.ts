@@ -29,6 +29,8 @@ import {
   checkFalsePositiveGuards,
   deriveFalsePositiveContext,
   mergeDynamicTrace,
+  phase1ScopeHash,
+  sortedJoin,
   type Phase1Scenario,
 } from '../logic/code-health-phase1-logic.js';
 import { runPhase1, PHASE1_USAGE_DETAIL } from '../cli/code-health-phase1.js';
@@ -429,7 +431,10 @@ describe('code-health phase 1 discovery', () => {
   it('command evidence 两个非「已验证执行」形态不算 exercised（2 态：exitCode=null / command observation=unverified）', () => {
     const rows = [
       { label: 'exitCode=null', command: observedCommand(null) },
-      { label: 'command observation=unverified', command: observedCommand(0, 'unverified') },
+      {
+        label: 'command observation=unverified',
+        command: observedCommand(0, 'unverified'),
+      },
     ] as const;
     for (const row of rows) {
       const staticReport = buildStaticInventory({
@@ -538,5 +543,89 @@ describe('code-health-phase1 CLI usage surface', () => {
   it('usage detail states that changedFiles only covers analyzed targets', () => {
     expect(PHASE1_USAGE_DETAIL).toContain('usage: code-health-phase1.ts');
     expect(PHASE1_USAGE_DETAIL).toMatch(/changedFiles covers only analyzed targets/);
+  });
+});
+
+describe('code-health-phase1 scopeHash 集合归一（A10 sortedJoin）', () => {
+  it('sortedJoin 排序等价：同集合异序 → 相同序列化（含排序稳定性断言）', () => {
+    const a = ['src/z.ts', 'src/a.ts', 'src/m.ts'];
+    const b = ['src/m.ts', 'src/z.ts', 'src/a.ts'];
+    expect(sortedJoin(a)).toBe(sortedJoin(b));
+    expect(sortedJoin(a)).toBe('src/a.ts,src/m.ts,src/z.ts');
+    // 排序稳定：再次 sort 不改变结果
+    expect(sortedJoin(a)).toBe(sortedJoin([...a].sort()));
+    expect(sortedJoin([])).toBe('');
+  });
+
+  it('sortedJoin 不同集合 → 不同序列化', () => {
+    expect(sortedJoin(['src/a.ts'])).not.toBe(sortedJoin(['src/a.ts', 'src/b.ts']));
+    expect(sortedJoin(['src/a.ts', 'src/b.ts'])).not.toBe(sortedJoin(['src/c.ts', 'src/d.ts']));
+    expect(sortedJoin(['alpha'])).not.toBe(sortedJoin(['beta']));
+  });
+
+  it('phase1ScopeHash：同集合异序 → 同 hash；异集合 → 不同 hash；形态 sha256: 前缀不变', () => {
+    // 旧实现 `P1|${files.join(',')}|${symbols.join(',')}`（join 前未排序）对同集合异序产出不同 hash：
+    // 本断言在旧实现下失败（RED），sortedJoin 后通过（GREEN）。
+    const fwd = phase1ScopeHash(['src/a.ts', 'src/b.ts'], ['alpha', 'beta']);
+    const rev = phase1ScopeHash(['src/b.ts', 'src/a.ts'], ['beta', 'alpha']);
+    expect(fwd).toBe(rev);
+    // 消费方形态不变（SCOPE_HASH_PATTERN：sha256: + 64 位小写 hex）
+    expect(fwd).toMatch(/^sha256:[0-9a-f]{64}$/);
+    // 异集合 → 不同 hash（files 或 symbols 任一不同）
+    expect(phase1ScopeHash(['src/a.ts'], ['alpha'])).not.toBe(fwd);
+    expect(phase1ScopeHash(['src/a.ts', 'src/b.ts'], ['alpha', 'gamma'])).not.toBe(fwd);
+  });
+
+  it('RED→GREEN：同 target 集合异序 → 候选 scopeHash 集合相同；异集合 → 不同', async () => {
+    // 旧实现 `P1|${files.join(',')}|${symbols.join(',')}` 未排序：同集合异序（a,b vs b,a）产出不同 hash，
+    // 造成消费方假性 SCOPE_MISMATCH。本用例当旧实现存在时失败（RED），sortedJoin 后通过（GREEN）。
+    const root = await fs.mkdtemp(path.join(tmpdir(), 'code-health-p1-scopehash-'));
+    createdRoots.push(root);
+    await git(root, ['init', '--quiet']);
+    await fs.mkdir(path.join(root, 'src'), { recursive: true });
+    await fs.writeFile(path.join(root, '.gitignore'), '.w-model/\n');
+    await fs.writeFile(path.join(root, 'src', 'a.ts'), 'export const alpha = 1;\n');
+    await fs.writeFile(path.join(root, 'src', 'b.ts'), 'export const beta = 2;\n');
+    await git(root, ['add', '--all']);
+    await git(root, ['-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'initial']);
+
+    const output = (tag: string) => path.join(tmpdir(), `code-health-p1-scopehash-${process.pid}-${tag}.json`);
+    const run = async (targets: string[], tag: string) => {
+      const result = await runPhase1({
+        root,
+        output: output(tag),
+        scenarios: [
+          {
+            id: 'smoke',
+            environment: 'local',
+            command: 'node',
+            args: ['--version'],
+            cwd: '.',
+            targets,
+          },
+        ],
+      });
+      expect(result.exitCode).toBe(0);
+      return result.report.candidates.map((c) => c.changeScope.scopeHash).sort();
+    };
+    try {
+      const ab = await run(['src/a.ts', 'src/b.ts'], 'ab');
+      const ba = await run(['src/b.ts', 'src/a.ts'], 'ba');
+      const aOnly = await run(['src/a.ts'], 'a');
+      expect(ab.length).toBeGreaterThan(0);
+      // 同集合异序 → 同一候选集 → 同一 scopeHash 集合（旧实现此处两端不同 hash）
+      expect(ba).toEqual(ab);
+      // 异集合 → 不同 scopeHash 集合
+      expect(aOnly).not.toEqual(ab);
+      expect(aOnly.length).toBe(ab.length - 1);
+      // 形态不变：sha256: 前缀 + 64 位小写 hex（消费方 SCOPE_HASH_PATTERN 不变）
+      expect(ab[0]).toMatch(/^sha256:[0-9a-f]{64}$/);
+    } finally {
+      await Promise.all([
+        fs.rm(output('ab'), { force: true }),
+        fs.rm(output('ba'), { force: true }),
+        fs.rm(output('a'), { force: true }),
+      ]);
+    }
   });
 });
