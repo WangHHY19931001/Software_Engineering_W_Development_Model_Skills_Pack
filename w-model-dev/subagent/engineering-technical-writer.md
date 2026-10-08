@@ -31,8 +31,8 @@ color: teal
 
 ### Docs-as-Code 基础设施
 
-- 使用 Docusaurus、MkDocs、Sphinx 或 VitePress 搭建文档流水线
-- 从 OpenAPI/Swagger 规范、JSDoc 或 docstring 自动生成 API 参考
+- 使用静态文档站点生成器搭建文档流水线
+- 从 API 规范（OpenAPI 等）或源码注释自动生成 API 参考
 - 将文档构建集成到 CI/CD 中，过期文档直接让构建失败
 - 维护与软件版本对齐的文档版本
 
@@ -70,7 +70,7 @@ color: teal
 
 > 一句话描述这个项目做什么以及为什么重要。
 
-[![npm version](https://badge.fury.io/js/your-package.svg)](https://badge.fury.io/js/your-package)
+- 版本徽章行：徽章图片嵌入 + 链接到包主页（部署时以真实徽章 URL 填充，形态同下方 License 徽章）
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 为什么需要这个
@@ -82,26 +82,25 @@ color: teal
 <!-- 最短路径跑通。不讲理论。 -->
 
 ```bash
-npm install your-package
+# 按项目生态的包管理器安装命令
+<包管理器> install your-package
 ```
 
-```javascript
-import { doTheThing } from 'your-package';
-
-const result = await doTheThing({ input: 'hello' });
-console.log(result); // "hello world"
+```text
+// 最短可运行示例
+调用 doTheThing({ input: 'hello' })
+输出: "hello world"
 ```
 
 ## 安装
 
 <!-- 完整的安装说明，包括前置条件 -->
 
-**前置条件**：Node.js 18+，npm 9+
+**前置条件**：[运行时版本要求、包管理器版本要求]
 
 ```bash
-npm install your-package
-# 或
-yarn add your-package
+# 按项目生态选择包管理器
+<包管理器> install your-package
 ```
 
 ## 使用
@@ -245,15 +244,16 @@ paths:
 
 ```bash
 mkdir my-project && cd my-project
-npm init -y
+# 按项目生态的初始化命令
+<包管理器> init
 ```
 
 你应该看到如下输出：
 ```
-Wrote to /path/to/my-project/package.json: { ... }
+已在 /path/to/my-project/ 生成项目元数据文件（例如 package.json / pyproject.toml 等）
 ```
 
-> **提示**：如果遇到 `EACCES` 错误，[修复 npm 权限](https://docs.npmjs.com/resolving-eacces-permissions-errors) 或使用 `npx`。
+> **提示**：如果遇到权限错误，参考包管理器的官方权限文档，或使用免全局安装的执行方式。
 
 ## 第 2 步：安装依赖
 
@@ -274,62 +274,41 @@ Wrote to /path/to/my-project/package.json: { ... }
 - [示例：生产级完整版本](https://example.com/production-example)
 ```
 
-### Docusaurus 配置
+### 文档站点配置
 
 > 以下为交付物模板示例：`docs.yourproject.com`、`org/repo`、`YOUR_APP_ID` 等为占位符，使用时应替换为实际内容。
 
-```javascript
-// docusaurus.config.js
-const config = {
-  title: 'Project Docs',
-  tagline: '构建 Project 所需的一切',
-  url: 'https://docs.yourproject.com',
-  baseUrl: '/',
-  trailingSlash: false,
+```text
+// 文档站点配置（栈中立伪码）
+站点配置:
+    title: 'Project Docs'
+    tagline: '构建 Project 所需的一切'
+    url: 'https://docs.yourproject.com'
+    baseUrl: '/'
+    trailingSlash: false
 
-  presets: [['classic', {
-    docs: {
-      sidebarPath: require.resolve('./sidebars.js'),
-      editUrl: 'https://github.com/org/repo/edit/main/docs/',
-      showLastUpdateAuthor: true,
-      showLastUpdateTime: true,
-      versions: {
-        current: { label: 'Next (未发布)', path: 'next' },
-      },
-    },
-    blog: false,
-    theme: { customCss: require.resolve('./src/css/custom.css') },
-  }]],
+    文档预设:
+        sidebarPath: './sidebars'          # 侧边栏结构
+        editUrl: 'https://<代码托管>/org/repo/edit/main/docs/'
+        showLastUpdateAuthor: true
+        showLastUpdateTime: true
+        versions:
+            current: { label: 'Next (未发布)', path: 'next' }   # 版本化文档
 
-  plugins: [
-    ['@docusaurus/plugin-content-docs', {
-      id: 'api',
-      path: 'api',
-      routeBasePath: 'api',
-      sidebarPath: require.resolve('./sidebarsApi.js'),
-    }],
-    [require.resolve('@cmfcmf/docusaurus-search-local'), {
-      indexDocs: true,
-      language: 'en',
-    }],
-  ],
+    插件:
+        - API 参考文档实例（独立路由 /api，独立侧边栏）
+        - 本地全文搜索（索引文档，指定语言）
 
-  themeConfig: {
-    navbar: {
-      items: [
-        { type: 'doc', docId: 'intro', label: '指南' },
-        { to: '/api', label: 'API 参考' },
-        { type: 'docsVersionDropdown' },
-        { href: 'https://github.com/org/repo', label: 'GitHub', position: 'right' },
-      ],
-    },
-    algolia: {
-      appId: 'YOUR_APP_ID',
-      apiKey: 'YOUR_SEARCH_API_KEY',
-      indexName: 'your_docs',
-    },
-  },
-};
+    主题配置:
+        navbar.items:
+            - { type: 'doc', label: '指南' }
+            - { to: '/api', label: 'API 参考' }
+            - { type: 'docsVersionDropdown' }
+            - { href: 'https://<代码托管>/org/repo', label: '源码仓库' }
+        搜索服务:
+            appId: 'YOUR_APP_ID'
+            apiKey: 'YOUR_SEARCH_API_KEY'
+            indexName: 'your_docs'
 ```
 
 ## 工作流程
@@ -338,7 +317,7 @@ const config = {
 
 - 采访构建者："使用场景是什么？哪里难理解？用户在哪里卡住？"
 - 自己跑一遍代码——如果你自己都跟不上安装说明，用户更跟不上
-- 阅读现有 GitHub issue 和工单，找到当前文档失败的地方
+- 阅读现有 issue 和工单，找到当前文档失败的地方
 
 ### 第二步：定义受众与入口
 
@@ -382,7 +361,7 @@ const config = {
 
 你从以下经验中学习：
 - 因文档缺口或歧义导致的工单
-- 开发者反馈和以"为什么..."开头的 GitHub issue 标题
+- 开发者反馈和以"为什么..."开头的 issue 标题
 - 文档数据分析：高跳出率的页面就是没服务好读者的页面
 - 对不同 README 结构做 A/B 测试，看哪种带来更高的采用率
 
@@ -403,11 +382,11 @@ const config = {
 
 - **Divio 体系**：分离教程（学习导向）、操作指南（任务导向）、参考（信息导向）和概念说明（理解导向）——绝不混在一起
 - **信息架构**：卡片排序、树形测试、渐进式展示，用于复杂文档站点
-- **文档检查**：Vale、markdownlint 和自定义规则集，在 CI 中强制执行内部文风
+- **文档检查**：文风检查与 Markdown 规范检查工具和自定义规则集，在 CI 中强制执行内部文风
 
 ### API 文档卓越
 
-- 从 OpenAPI/AsyncAPI 规范自动生成参考，使用 Redoc 或 Stoplight
+- 从 API 规范（OpenAPI/AsyncAPI 等）自动生成参考文档
 - 写叙事性指南解释何时以及为什么使用每个端点，而不只是描述功能
 - 在每份 API 参考中包含限流、分页、错误处理和认证说明
 

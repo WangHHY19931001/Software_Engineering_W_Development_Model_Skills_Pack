@@ -7,7 +7,8 @@
  *   - R4-A：每轮总 tokens ≤ maxTotalTokensPerRound
  *   - 向后兼容：未配置 rootcauseParallelBudget 时不校验
  *   - R6/R5-b（D-4b）：Σtokens(阶段/总量) 超上限 → blocking；≥ burnRate × maxTokens → killSwitch 告警
- *   - sumTokens：run-log token 累计口径（有限非负数才计入）
+ *   - R7（决策 5，43.2.0）：ΣsubagentSpawns(阶段) 超 perPhase.maxSubagentSpawns → blocking（estimated=true 不计入）
+ *   - sumTokens / sumSubagentSpawns：run-log 累计口径（有限非负数才计入 + R7 的 estimated 排除）
  */
 
 import { promises as fs } from 'node:fs';
@@ -16,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { countReworks, countSuspectedDuplicateGroups, sumTokens } from '../cli/check-budget.js';
+import { countReworks, countSuspectedDuplicateGroups, sumSubagentSpawns, sumTokens } from '../cli/check-budget.js';
 import { checkBudget, checkRootcauseBudget, type BudgetConfig } from '../logic/budget-logic.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -428,12 +429,14 @@ describe('R6 用量实效 + R5-b burnRate 预警（D-4b）', () => {
 });
 
 /**
- * R1 顺序化（43.0.0 A5）+ 三死字段退役
+ * R1 顺序化（43.0.0 A5）+ 两死字段退役 + maxSubagentSpawns 回归（43.2.0）
  *
  * - R1 时效性改为顺序比较：budget.updatedAt 早于 project.updatedAt → 违规（预算未随项目演进复核），
  *   相等合法；时间戳经 Date 解析为毫秒比较（禁字符串比较），任一端不可解析 → 跳过子判定 + 非阻断诊断。
- * - perPhase.maxSubagentSpawns / perPhase.maxReworkRounds / project.maxTokensPerSession 三个
- *   零消费死字段删除（毁弃存量）：旧数据携带这些字段 → additionalProperties:false 拒绝。
+ * - perPhase.maxReworkRounds / project.maxTokensPerSession 两个零消费死字段退役（毁弃存量）：
+ *   旧数据携带这两字段 → additionalProperties:false 拒绝。
+ * - perPhase.maxSubagentSpawns 于 43.2.0 回归（决策 5：A5 删除理由 = 零消费；R7 使其成真）：
+ *   字段重新合法且为可选（缺字段不非法），由下方 R7 组用例钉死消费行为。
  */
 function makeBudget(
   overrides: {
@@ -511,10 +514,9 @@ describe('R1 顺序化（43.0.0 A5）：budget.updatedAt vs project.updatedAt', 
   });
 });
 
-describe('A5：三死字段退役（43.0.0，毁弃存量）', () => {
-  it('三死字段出现于 budget.json → [schema] 违规（additionalProperties 拒绝，3 态）', () => {
+describe('A5：两死字段退役（43.0.0，毁弃存量）+ maxSubagentSpawns 回归（43.2.0）', () => {
+  it('两死字段出现于 budget.json → [schema] 违规（additionalProperties 拒绝，2 态）', () => {
     const rows: readonly [string, Record<string, unknown>, string][] = [
-      ['perPhase.maxSubagentSpawns', { perPhase: { maxTokens: 100, maxSubagentSpawns: 30 } }, 'maxSubagentSpawns'],
       ['perPhase.maxReworkRounds', { perPhase: { maxTokens: 100, maxReworkRounds: 3 } }, 'maxReworkRounds'],
       [
         'project.maxTokensPerSession',
@@ -530,6 +532,95 @@ describe('A5：三死字段退役（43.0.0，毁弃存量）', () => {
         r.violations.some((v) => v.startsWith('[schema]') && v.includes(field)),
         `${name} 应报 [schema] ${field}`,
       ).toBe(true);
+    }
+  });
+
+  it('maxSubagentSpawns 回归（43.2.0）：字段重新合法（不再被 additionalProperties 拒绝），且为可选字段', () => {
+    const legal = checkBudget(makeBudget({ perPhase: { maxTokens: 100, maxSubagentSpawns: 30 } }));
+    expect(
+      legal.violations.some((v) => v.includes('[schema]') && v.includes('maxSubagentSpawns')),
+      '43.2.0 回归后 maxSubagentSpawns 不应再被 schema 拒绝',
+    ).toBe(false);
+    expect(legal.passed, '带 maxSubagentSpawns 的合法 budget 应通过（无 usage 输入时不触发 R7）').toBe(true);
+    // 可选字段包容：不带 maxSubagentSpawns 的 budget 同样合法（legacy 存量不被 schema 拦）
+    expect(checkBudget(makeBudget()).violations.some((v) => v.startsWith('[schema]'))).toBe(false);
+  });
+});
+
+/**
+ * R7 子代理分派数实效校验（决策 5，43.2.0）
+ *
+ * 口径（data-models.md「子代理分派数实效校验（R7）」段）：
+ *   - 按阶段聚合：Σ(subagentSpawns, phase=N) **严格大于** perPhase.maxSubagentSpawns → blocking（`R7：` 前缀）
+ *   - estimated=true 记录不计入聚合（A5 已将该形态在 check-run-log R2 违规化；估算值不占分派额度）
+ *   - perPhase.maxSubagentSpawns 为可选字段：缺字段 → R7 不触发 + 非阻断警告（跳过不等于通过）
+ *   - 未提供 spawnsUsed → R7 整体跳过（向后兼容：与新增前行为一字不变）
+ */
+describe('R7 子代理分派数实效校验（决策 5，43.2.0）', () => {
+  it('四态（超限→blocking / 未超→零违规 / 恰等于上限→不超限 / 上限=0 的严格 > 边界）', () => {
+    const withMax = (max?: number) =>
+      makeBudget({ perPhase: max === undefined ? { maxTokens: 100 } : { maxTokens: 100, maxSubagentSpawns: max } });
+    const rows: readonly [string, number, number | undefined, boolean][] = [
+      ['Σ 超限 → blocking', 12, 10, true],
+      ['Σ 未超 → 零违规', 8, 10, false],
+      ['严格 > 边界：Σ 恰等于上限 → 不算超限（同 R6 口径）', 10, 10, false],
+      ['上限=0：Σ>0 即超限（严格 >，无除零分支）', 1, 0, true],
+    ];
+    for (const [name, phaseSpawns, max, expectBlocking] of rows) {
+      const r = checkBudget(withMax(max), { spawnsUsed: { phase: phaseSpawns } });
+      const r7 = r.violations.filter((v) => v.startsWith('R7'));
+      expect(r7.length, `${name}：R7 违规条数不符`).toBe(expectBlocking ? 1 : 0);
+      expect(r.passed, `${name}：passed 判定不符`).toBe(!expectBlocking);
+      if (expectBlocking) {
+        expect(r7[0], `${name}：应含挑明文案（阶段数 + 上限）`).toContain(
+          `R7：阶段子代理分派数 ${phaseSpawns} > perPhase.maxSubagentSpawns ${max}`,
+        );
+      }
+    }
+  });
+
+  it('estimated=true 记录不计入（纯函数侧：estimated 聚合口径由 CLI 侧 sumSubagentSpawns 承担，此处钉 CLI 传入后的判定）', () => {
+    const b = makeBudget({ perPhase: { maxTokens: 100, maxSubagentSpawns: 10 } });
+    // 传入的 phase 值是 CLI 已按「estimated=true 不计入」聚合后的结果：8 ≤ 10 → 不超限
+    const r = checkBudget(b, { spawnsUsed: { phase: 8 } });
+    expect(r.violations.some((v) => v.startsWith('R7'))).toBe(false);
+    expect(r.passed).toBe(true);
+    // 同一预算，若估算记录被计入（12 > 10）→ blocking：证明判定确实消费该值
+    const counted = checkBudget(b, { spawnsUsed: { phase: 12 } });
+    expect(counted.violations.some((v) => v.startsWith('R7'))).toBe(true);
+  });
+
+  it('四态④：无 perPhase.maxSubagentSpawns（可选字段包容）→ R7 不触发 + 非阻断警告可见（跳过不等于通过）', () => {
+    const r = checkBudget(makeBudget(), { spawnsUsed: { phase: 9999 } });
+    expect(
+      r.violations.some((v) => v.startsWith('R7')),
+      '缺 maxSubagentSpawns 时 R7 不触发（即使 Σ 很大）',
+    ).toBe(false);
+    expect(r.passed, '缺字段应通过（可选字段包容）').toBe(true);
+    expect(
+      r.warnings.some((w) => w.includes('R7') && w.includes('未配置 perPhase.maxSubagentSpawns')),
+      '跳过必须可见：应出「R7 未校验：未配置 perPhase.maxSubagentSpawns」非阻断警告',
+    ).toBe(true);
+  });
+
+  it('未提供 spawnsUsed → R7 整体跳过，行为与新增前一字不变（向后兼容硬线）', () => {
+    const b = makeBudget({ perPhase: { maxTokens: 100, maxSubagentSpawns: 1 } });
+    const r = checkBudget(b, {});
+    expect(r.violations.some((v) => v.startsWith('R7'))).toBe(false);
+    expect(r.warnings.some((w) => w.includes('R7'))).toBe(false);
+    expect(r, '未提供 spawnsUsed 应与完全不传 options 结果逐字段等价').toEqual(checkBudget(b));
+  });
+
+  it('非法 spawnsUsed（NaN/Infinity）视同未提供：不触发且不抛错（非法输入防御，同 R6）', () => {
+    const b = makeBudget({ perPhase: { maxTokens: 100, maxSubagentSpawns: 1 } });
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => checkBudget(b, { spawnsUsed: { phase: bad } }), `spawnsUsed.phase=${bad} 不应抛错`).not.toThrow();
+      const r = checkBudget(b, { spawnsUsed: { phase: bad } });
+      expect(
+        r.violations.some((v) => v.startsWith('R7')),
+        `spawnsUsed.phase=${bad} 不应触发 R7`,
+      ).toBe(false);
+      expect(r).toEqual(checkBudget(b));
     }
   });
 });
@@ -570,6 +661,54 @@ describe('sumTokens token 累计口径（D-4b）', () => {
       { runId: 'b', phase: 2, tokens: 2 },
     ];
     expect(sumTokens(entries, undefined)).toEqual({ phase: 3, total: 3 });
+  });
+});
+
+/**
+ * sumSubagentSpawns（CLI 侧 run-log 分派数聚合口径，R7 / 决策 5，43.2.0）
+ *
+ * 口径：仅 `typeof subagentSpawns === 'number' && Number.isFinite(...) && >= 0` 的记录计入（同 sumTokens
+ * 的坏值剔除理由：Σ 变 NaN 会让 `NaN > max` 恒假 ⇒ R7 静默永不触发）；**`estimated===true` 记录不计入**
+ * （决策 5：A5 已将该形态在 check-run-log R2 违规化，估算值不得占用分派额度）；phase 必传（按阶段口径，
+ * 无「未提供 = 全量」退路）。
+ */
+describe('sumSubagentSpawns 分派数聚合口径（R7，决策 5）', () => {
+  it('按阶段累计（只计 phase===N 的记录；其他阶段与异形 phase 不计入）', () => {
+    const entries = [
+      { runId: 'a', phase: 3, subagentSpawns: 2 },
+      { runId: 'b', phase: 3, subagentSpawns: 3 },
+      { runId: 'c', phase: 4, subagentSpawns: 5 },
+      { runId: 'd', subagentSpawns: 7 }, // 无 phase：不属于任何阶段
+    ];
+    expect(sumSubagentSpawns(entries, 3)).toEqual({ phase: 5 });
+    expect(sumSubagentSpawns(entries, 4)).toEqual({ phase: 5 });
+  });
+
+  it('坏值不计入（NaN / Infinity / 负数 / 非数字 / 缺字段），避免 NaN 传播使判定恒假', () => {
+    const entries = [
+      { runId: 'a', phase: 1, subagentSpawns: 4 },
+      { runId: 'b', phase: 1, subagentSpawns: -3 },
+      { runId: 'c', phase: 1, subagentSpawns: Number.POSITIVE_INFINITY },
+      { runId: 'd', phase: 1, subagentSpawns: Number.NaN },
+      { runId: 'e', phase: 1, subagentSpawns: '9' },
+      { runId: 'f', phase: 1 },
+      { runId: 'g', phase: 1, subagentSpawns: 0 },
+    ];
+    expect(sumSubagentSpawns(entries, 1)).toEqual({ phase: 4 });
+  });
+
+  it('estimated=true 记录不计入（决策 5 裁定）；estimated 缺省（legacy）或 false 照常计入', () => {
+    const entries = [
+      { runId: 'est', phase: 2, subagentSpawns: 100, estimated: true }, // 不计入
+      { runId: 'false', phase: 2, subagentSpawns: 3, estimated: false }, // 计入
+      { runId: 'legacy', phase: 2, subagentSpawns: 4 }, // 缺省 = legacy → 计入
+    ];
+    expect(sumSubagentSpawns(entries, 2)).toEqual({ phase: 7 });
+  });
+
+  it('无本阶段记录 → 0（不抛错；Σ=0 的可见性由预算侧上限判定与 CLI 诊断承担）', () => {
+    expect(sumSubagentSpawns([], 5)).toEqual({ phase: 0 });
+    expect(sumSubagentSpawns([{ phase: 1, subagentSpawns: 3 }], 5)).toEqual({ phase: 0 });
   });
 });
 

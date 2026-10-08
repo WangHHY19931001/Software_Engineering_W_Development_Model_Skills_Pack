@@ -1585,3 +1585,54 @@ describe('决策4：*_token 变体盲区消除 + 防复生（批次 7）', () =>
     expect(redacted['passwordTtlDays']).toBe('[REDACTED]');
   });
 });
+
+describe('批次 8 rider：脱敏文本面（.md/.log/.txt 与 JSON 字符串值）复用 isSensitiveKey', () => {
+  it('文本面 refresh_token / refreshToken / passwordPolicy 赋值行被脱敏（此前整键精确相等漏检）', () => {
+    // sanitizeSensitiveAssignment 路径（字符串值 / .md / .log / .txt 行）：
+    // 批次 8 起与键路径共用 isSensitiveKey（驼峰切分 + 词段精确相等），边界闭合。
+    expect(redact('refresh_token: abc')).toBe('refresh_token: [REDACTED]');
+    expect(redact('refreshToken: abc')).toBe('refreshToken: [REDACTED]');
+    expect(redact('passwordPolicy: {"ttlDays": 90}')).toBe('passwordPolicy: [REDACTED]');
+    // JSON 字符串值内换行同样走行级赋值脱敏
+    const multiLine = redact({ log: 'session_token: st-secret\nplain line' }) as Record<string, unknown>;
+    expect(multiLine['log']).toBe('session_token: [REDACTED]\nplain line');
+  });
+  it('文本面零误伤守卫：mytoken: 保持明文；token_count: 仍保守脱敏（显式代价同步到文本面）', () => {
+    // 零误伤：mytoken（后缀分支 ≥6 守卫，无词段命中）文本形态不得误脱敏
+    expect(redact('mytoken: not-a-secret')).toBe('mytoken: not-a-secret');
+    // 保守代价：token_count（词段 token 精确命中）文本形态与键路径同判——仍脱敏（本就接受的代价）
+    expect(redact('token_count: 42')).toBe('token_count: [REDACTED]');
+    // 中性键文本形态不脱敏
+    expect(redact('retentionPolicy: keep-30d')).toBe('retentionPolicy: keep-30d');
+  });
+  it('markdown 表头/键单元格走 isSensitiveCell：refresh_token 列同步脱敏（端到端 .md 导出）', async () => {
+    // isSensitiveCell 路径（表头列）：`refresh_token`/`refreshToken` 表头此前整键精确相等不命中，
+    // 数据行明文导出；批次 8 起走 isSensitiveKey 词段/驼峰命中。走真实 .md 导出面断言。
+    const project = await createProject('text-surface-md');
+    const markdownPath = path.join(project, '.w-model', 'codegraph-queries', 'query.md');
+    await fs.appendFile(
+      markdownPath,
+      [
+        '| refresh_token | note |',
+        '| --- | --- |',
+        '| leak-one | ok |',
+        '',
+        '| refreshToken | durationMs |',
+        '|---|---|',
+        '| leak-two | 5 |',
+        '',
+      ].join('\n'),
+      'utf8',
+    );
+    const output = path.join(tmpDir, 'text-surface-md-evidence');
+    expect((await produceSourceProvenance(project)).ok).toBe(true);
+    await expect(exportEvidence(project, output)).resolves.toMatchObject({ ok: true });
+    const exported = await fs.readFile(path.join(output, 'codegraph-queries', 'query.md'), 'utf8');
+    expect(exported).not.toContain('leak-one');
+    expect(exported).not.toContain('leak-two');
+    expect(exported).toContain('| refresh_token | note |');
+    expect(exported).toContain('| [REDACTED] | ok |');
+    expect(exported).toContain('| refreshToken | durationMs |');
+    expect(exported).toContain('| [REDACTED] | 5 |');
+  });
+});

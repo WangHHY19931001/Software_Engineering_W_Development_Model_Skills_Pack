@@ -7,6 +7,51 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [43.2.0] - 2026-10-07
+
+### 批次 8：文档与协议一致性（15 实现任务 + 6 审查修复轮 + 1 跨任务回归修复，主规格 §7 全部 15 项销账（C15 纳入，裁定 R-B8-1）+ 增量规格 §3 三项 + 批次 7 执行期登记 10 项 riders；规格 [`2026-10-06-w-model-remediation-design.md`](./docs/superpowers/specs/2026-10-06-w-model-remediation-design.md) §7 + [`2026-10-07-remediation-leftovers-design.md`](./docs/superpowers/specs/2026-10-07-remediation-leftovers-design.md) §3，裁定登记 [`decision-log/rounds-50-docs-consistency.md`](./docs/changes/decision-log/rounds-50-docs-consistency.md)，SSoT 权威摘要 §10T）
+
+> **Breaking（门禁成真）**：`perPhase.maxSubagentSpawns` 回归并成真（增量规格 §3，用户决策 #5）——A5（43.0.0）曾按「零消费死字段」删除该字段（审计证实无任何门禁消费），本版 `check-budget.ts` R7 消费之，删除理由被「约束成真」消解，故字段回归有据。配置了 `maxSubagentSpawns` 且阶段分派数超限的项目在既有输入上可能新增 red；字段为**可选**（缺字段 R7 跳过并出非阻断警告），存量 `budget.json` 不携带该字段时行为零漂移。
+
+### Changed/Breaking（subagentSpawns 门禁成真）
+
+- **`perPhase.maxSubagentSpawns` 回归 + `check-budget.ts` R7 子代理分派数实效校验（T2，决策 #5）**：`budget.schema.json` 的 `perPhase.maxSubagentSpawns`（S+V+G+A 合计，默认 30）回归——判据：`check-budget.ts <budget.json> --run-log=<run-log> --phase=<N>` 按阶段聚合 run-log 的 `subagentSpawns`（记录自报字段，run-log schema 必填；`checkpoint-log` 的同名字段不参与），**Σ 严格大于**上限 → blocking（违规消息以 `R7：` 开头；恰等于上限不算超限，与 R6 严格 `>` 同口径）；**`estimated=true` 记录不计入聚合**（A5 已将 estimated=true 违规化，估算值不得占用分派额度；`estimated` 缺省（legacy）或 false 照常计入）；`--run-log` / `--phase` 缺任一 → R7 整体跳过并出非阻断诊断（按阶段聚合口径无定义）；字段可选——缺字段 R7 不触发并出非阻断警告「R7 未校验：未配置 perPhase.maxSubagentSpawns」（跳过不等于通过；旧数据携带该字段不再被 `additionalProperties:false` 拒绝）。`maxReworkRounds` / `maxTokensPerSession` 两个零消费死字段保持退役。判据细节权威见 `data-models.md`「子代理分派数实效校验（R7）」段；budget 五份 samples / template 同步。
+
+### Changed（文档/协议收敛）
+
+- **SKILL.md 三步五门双副本收敛单点（C3）**：「阶段门放行三步」近乎逐字双副本（SKILL.md 88/99 行）合并为「编排者-子代理边界」节唯一权威，工作流步骤 8 处副本改纯链接（公共串 143→72，副本处零内容复述）。
+- **verifier-spec §4.2.1 编号重排 + §0/速查双表收敛（C8）**：§4.2.1 小节编号重排消除错位引用；§0 与速查表双表收敛为一处（T4）。
+- **R10 contract XML 五处收敛单点（C9，实测扩张）**：规格登记之外实测全仓**五处**全文副本（verifier-spec / root-cause-locator / command-reference / agent-personas / SSoT）——权威 = verifier-spec §7.5 保留全文，其余四处改一行指针（各保留一句消费语境）；**含 `check-docs-consistency.ts` 门禁改造**：R10 指针判定加固（非围栏 + 同段 + 否定拒斥 + 跨行，消费方三向 fail-closed，T4 修复轮 1），防指针被改回复述或被误判。
+- **subagent-delegation §0 三重收敛（C10）**：§0 前置至文件头、加载导引标题收敛唯一 1 处、§2 时序标注「摘要，权威=正文」。
+- **派单预算改产出契约定义（C11）**：原「产出文件 ≤3」与阶段 1 七文件产出形态算术不闭合（S-doc 拆分档自身违规）→ 改为「单一产出类型 + 类型内文件数由产出契约定义」。
+- **S 派单模板指针措辞 + 模型档位字段（C12）**：模板「已附」改指针型 brief 措辞（与指针型派单一致）；S 模板补模型档位字段（原仅 V/R 有）。
+- **最小引用集单点（C13）**：以 SKILL.md「执行前必读」为唯一权威，command-reference 规则 #3 改指针，消除两处定义不一致。
+- **计数披露（C5/C7）**：强制接线率 **20/47（≈43%）** 写入 hard-constraints「与门禁脚本的对应关系」节 + SKILL.md 资源计数（放行链 8 + 阶段专属 12，其余 27 个为工具/元门禁/事件或条件触发，C7，推导边界闭合防 21/47 误读面）；eval/README 陈旧计数（60 条口径）更正为实际值 + `.githooks/pre-push` 第 19 项注释 60→68（C5，后随 C19 更至 101）。
+- **EdgeType 12 类对齐（C15）**：data-models 边类型与图谱实现 12 类逐名对齐（evidence-anchored-tree / SSoT 同步）。
+- **人格去栈化（C17，36 文件全量 sweep 核验，其中 28 文件实改清残留（批一 16 + 批二 12 零交集）+ 修复轮 1（2 文件），其余 8 文件核验无残留）**：`subagent/` persona 文件清除具体技术栈工具链残留（jdeps / EXPLAIN ANALYZE / Lighthouse 等），教训参数级 1:1 改写为跨栈表述；T8 修复轮 1（software-architect 工具链命令残留清零 + database-optimizer 标准 SQL 语义恢复）；36 文件 grep 独立复核零残留。
+- **反模式分级标注（C18，47 通用 / 1 化石）**：hard-constraints 反模式节 48 条按泛化度分级标注（表列行首前缀 `【通用】`/`【项目教训化石】`）——判据 = **条目本体**是否跨项目跨技术栈成立（非例示具体度，裁定 R-B8-4）：唯 #25（PowerShell ConvertTo-Json 写入）为项目教训化石（本体不可去工具名）；表头/锚点零漂移（前缀形态对 docs-consistency 精确锚无影响）。
+- **INSTALL 如实化两条（C20）**：挑明「门禁在仓库检出内跑」（装出的 L1 副本依赖不可解析，须回检出目录验证）+ `cp` 排除 `node_modules` 提示；PowerShell 5.1 逐行执行理由更正（T6 修复轮 1）。
+- **如实化标注（C6 + Loop 3/4 成熟度）**：round23 归档 README「pending」vs checkpoint-summary「exit 0」矛盾登记 decision-log（归档零改写，以 checkpoint-summary 为终态视图，C6）；`event-ingress-guide.md` / `hill-climbing-guide.md` 头部加注「成熟度：文档协议，无运行时执行器」。
+- **本批审查 riders 文档同步**：AGENTS.md §8 `check-budget.ts` 行补 R7 + operational-recovery 校验摘要表补 R5-b/R6/R7（T2 审查 Important）；SKILL.md 步骤 8 指针标签修正（「分派细则」→「阶段门禁脚本分派」，§6.3 实为门禁电池清单，T3 审查）；operational-recovery「SKILL.md 步骤 8」两跳引用改「编排者-子代理边界」节（T3 审查）；loop-engineering-adoption-design.md 加实时语义指针（SSoT §10D.5/§10D.7 与 data-models「R7」段为准，T2 审查）；tla-logic.ts 空转检测注释口径更正（「逐体判定与拼接文本口径等价」→「逐体判定 ⊇ 拼接文本判定」，T15 审查）。
+
+### Feat（eval 机制覆盖 45/45）
+
+- **references 覆盖断言 + 三批补映射（C19）**：`eval/runner.ts` 新增 ⑥ references 覆盖断言（RED 驱动实测 29 缺口）；`mappings.json` **68→101** 条（v2 含 coverageMatrix，routeTotals enable 42 / ask 9 / skip 24），三类易残留锚点（C17 去栈化残留 / 计数漂移 / 版本类承重行）+ `subagentSpawns` 锚点落位；references 机制覆盖 **45/45** 全覆盖（差集精确制导零弱覆盖，映射锚点抽验承重行）。
+
+### Fixed（批次 7 riders + 本批发现）
+
+- **Example 5 公平性强化（T15）**：按动作 WF 单独不足——真机 TLC 反例（v1/v2 exit 13：中途调头公平弹跳）；最小正确形态 = 按动作 WF + ReverseDirection 旅行边界反转守卫（文档守卫一行语义修正，过程注释如实登记）；final 形态逐字提取 sha256 复验 exit 0（6550 states，零违反）；v0 复现批次 7 探针 C。
+- **空转检测析取窗口收口 + 提取器边界（T15 + 修复轮 1）**：直写析取与间接析取（`Next == A; A == Idle \/ Guard`）两窗口 closure 级判定收口——严格覆盖旧 bodies[0] 判定、方向不漏（逐体判定 ⊇ 拼接文本判定）；`extractTlaDefBody` 边界 + 5 单测；Outline 限定语 + combo=1001 / 空 variables 两用例。
+- **脱敏文本面闭合 + `--project` 接线修正（T16 + 修复轮 1）**：`wm-export-evidence` 文本面脱敏复用 `isSensitiveKey` 同一谓词（闭合「JSON 键脱敏、正文明文残留」面）；三处命令形态补 `--project` 接线修正；NEGATIVE 登记过脱敏面。
+- **`--prev-status` 三处接线（T16，批次 7 T9 rider）**：SKILL.md 三步五门段 / operational-recovery 调用表 / command-reference 常驻门禁表三处补 `--prev-status=<上一状态>` 接线（随 `--run-log` 一并传，project.json 无历史可依时省略）；CLI 对 `--rollback-approved` 单独给出（无 `--prev-status`）出非阻断诊断；测试锁定。
+- **persona 样例哈希重登记（跨任务回归修复，`4c451647`）**：persona-test-engineer / persona-performance-auditor 两 fixture 的 `reviewedArtifacts` 哈希随 C8/C9（`b673bdc7`）重排失配——T11 实测暴露 self-test 410/412，按 R19 同算法重登记后恢复 412/412（提交信息误标「随 C17 去栈化」，实为 b673bdc7 重排所致，信息性登记）。
+- **lint:security baseline 失效条目清理（T15）**：BASE 即有的 3 条漂移（docs-consistency-logic 2 条 no-useless-escape + 测试 1 条 no-unused-vars）经权威 `--regenerate` 吸收保绿并登记。
+- **R15b 表补 pending 语义 + 划界表中性命名（T14 riders）**：SSoT §10.7 规则表与 evidence-anchored-tree.md 门禁表两处同构补 `evidenceStatus=pending` 语义（pending 合法但未核验——放行前阻断，须转 `confirmed` 或走 evidence-anchor 豁免）；evidence-anchored-tree.md 划界表（B2 行）与 ai-native-sdlc-adoption.md:134 中性命名。
+
+**计数影响**：零新增 CLI（48 = 47 exit-2 + 1 self-test，不变）/ references（45 不变）/ persona（36 不变）/ schema 34 份不变（`budget.schema.json` 字段级修改 1 份：maxSubagentSpawns 回归）；门禁脚本 48 不变；测试文件数不变（既有文件扩展：budget-logic / budget-cli-wiring / tla-logic / maturity-logic / evidence-export-logic / docs-consistency-logic）；self-test 412/412（不变；T11 期曾因 persona fixture 哈希失配瞬时 410/412，`4c451647` 修复）；eval 语料 68→**101** 条（references 覆盖 45/45；routeTotals 42/9/24）；vitest 收集计数以 prepush 实测为准（T18 回填）。
+
+**验证记录**：prepush 19 项**全绿（实测 1464s，2026-10-08 单次，本机运行）**。任务 17 提交前实测：docs-consistency 0 违规、eval 101/101；T15/T16 提交时点实测：self-test 412/412、lint:security 0、eval 101/101（批次 8 执行账本逐任务留痕）。C6 矛盾消歧裁定（含 round23 归档「间接证据、非逐项直接记录」的如实存疑登记）见 [`decision-log/rounds-50-docs-consistency.md`](./docs/changes/decision-log/rounds-50-docs-consistency.md)。
+
 ## [43.1.0] - 2026-10-07
 
 ### 批次 7：形式化与图谱门禁收严（12 实现任务 + 1 专项收口 + 3 审查修复轮，增量规格 §5 批次 7 的 21 项全部销账；规格 [`docs/superpowers/specs/2026-10-07-remediation-leftovers-design.md`](./docs/superpowers/specs/2026-10-07-remediation-leftovers-design.md) §0 决策 2/3/4 与 §2，裁定登记 [`decision-log/rounds-49-formalization-gates.md`](./docs/changes/decision-log/rounds-49-formalization-gates.md)，SSoT 权威摘要 §10S）

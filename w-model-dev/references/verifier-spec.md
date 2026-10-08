@@ -5,12 +5,16 @@
 > | 触发场景 | 只读章节 |
 > |---|---|
 > | 评审某 targetKind 用哪套子标准 | §2 + §7（对应子节） |
-> | 构造评审提示词 | §8 |
+> | 构造评审提示词 | §8（模板 + 占位符） |
 > | 输出 JSON 前自检必填字段 / 防编造 | §4.2.1 + §6 |
 > | 校验脚本调用与退出码 | §10 |
 > | LLM 失败 / 降级 / 方差超阈值 | §11 |
 > | 多候选排序 | §5 |
 > | 跨阶段 evidence 一致性 | §12 |
+> | self-as-verifier 模式 | §13 |
+> | 评审独立性 / 误报质疑 / scoped re-review / spec 自审与校准口径 | §15（含 §15.1-§15.4） |
+>
+> 本表是本文件唯一的「场景→章节」映射表；「速查摘要」节只保留维度索引，不重复维护场景表。
 >
 > 适用对象：外部 AI Agent（TRAE / Claude / 其他）按本规范对 W 模型各阶段产物执行
 > LLM-as-a-Verifier 评审，并将结构化结果写入 JSON 文件交由
@@ -39,19 +43,7 @@
 | 跨阶段一致性 | 后阶段 evidence 不得否定前阶段 | §12 |
 | self-as-verifier | V 评审产出独立性（路径/内容/run-log/视角） | §13 |
 
-**按场景只读 §X**：
-
-| 场景 | 应读章节 |
-|---|---|
-| 评审某 targetKind 用哪套子标准 | §2 + §7（对应子节） |
-| 构造评审提示词 | §8（模板 + 占位符） |
-| 输出 JSON 前自检必填字段 / 防编造 | §4.2.1 + §6 |
-| 校验脚本调用与退出码 | §10 |
-| LLM 失败 / 降级 / 方差超阈值 | §11 |
-| 多候选排序 | §5 |
-| 跨阶段 evidence 一致性 | §12 |
-| self-as-verifier 模式 | §13 |
-| 评审独立性 / 误报质疑 / scoped re-review / spec 自审与校准口径 | §15（含 §15.1-§15.4） |
+> **按场景只读 §X**：场景→章节映射表见 §0 导引（唯一场景表），本处不再重复维护；维度索引见上表。
 
 ## 目录
 
@@ -317,18 +309,18 @@ V 子代理在输出 VerifierOutput JSON 前必须自检：
 2. **禁止手工编造 rawScores**：必须实际执行 `repeatTimes ≥ 3` 次扰动评分（不同随机种子 / 温度 / 上下文扰动），将每次真实评分填入 `rawScores`；禁止复制同一个分数填满数组（详见 §3.2.1 规则 1）。
 3. **rawScores 须有真实离散差异**：`rawScores` 各元素不得全同（复制填入），也不得构成 0.01 完美等差（构造数据，如 `[0.97,0.96,0.98]`）；text-parse 模式下 `max - min` 须 ∈ `[0.01, 0.10]`（详见 §3.2.1 规则 1/3；完美等差检测仅对 text-parse 生效——logits 天然可能等差）。
 4. **variance 须由 rawScores 自动计算**：禁止手工填写 `variance` 字段；必须用总体方差公式 `Var = Σ(xᵢ - μ)² / N` 从 `rawScores` 计算（与 `check-verifier-output.ts` 重算公式一致，避免因 `N` vs `N-1` 差异导致 `1e-6` 误差判失败；详见 §3.2.1 规则 2）。
-8. **不变式业务语义对齐**（P2.6）
+5. **不变式业务语义对齐**（P2.6）
    - 校验：TLA+ 每个不变式是否真实反映设计文档的业务约束
    - 评审者须为每个不变式提供：
      - 设计文档引用（如 `design.md §X.X`）
      - 业务语义解释（一句话说明不变式约束的业务含义）
    - 评分权重：纳入 compositeScore 计算
    - 不变式仅语法/模型检查通过但业务语义无法对应设计文档 → 该项 0 分
-9. **断言强度与「是否真的在测东西」自检**（S21，判据见 `quality-standards.md`「测试质量判据（S21/S19/S20/M03）」§①/§②）：`targetKind=test` 时逐条核对——测试是否只断言「有意的决定」而成为 change detector；是否只断言「源文本包含某行」而落入 string-presence trap；测试名 / 意图能否**点名它抓的破坏**（"Name the break" 前置门，点不出即判测试无效并要求重命名或删除）；期望值是否由被测代码或其 helper 推导 / 复制（mirror assertion）。并按 **Mutation Check 5 类变异**核对「每个现实变异至少让一个测试转红」。本项**不新增子标准名**，作为 `correctness` / `clarity` / `independence` 既有子标准的证据要求。
-10. **mock 规则自检**（S20，判据见同节 §③）：替换真实方法前是否已学清其**全部副作用**；替身是否镜像被替对象的**全部已文档化字段**（而非只镜像测试读到的字段）；生产类是否混入 **test-only 方法**。**作用域限定**：本项只评审**被测生产代码**；门禁 fixture（`samples/**`）与本仓脚本按「是否忠实模拟被替对象」判定，**不适用** mock 三条硬规则。
-11. **S-tickets 产出评审自检**（S18，判据见 `command-reference.md`「S18 票据内容门禁」条——六条黑名单 + Buildability 三条负面判据 + 已知边界）：评审 S-tickets 产出时，按该判据核对票据内容（符号级契约是否点名、占位短语 / 无具体动作祈使 / 未定义符号引用 / Buildability 负面形态是否为零；已知边界由 V 复核兜底）。本项**不新增子标准名**，作为既有子标准的证据要求；判据全文以 `command-reference.md` 与 `gate-logic.ts` 实现为权威，此处只指向、不复制。
-12. **evidence 单 L 形态自检**（D-10②）：每条 `subCriteria[*].evidence` 须为 `path:§sec=陈述` 或 `path:Lnn=陈述`；行号区间写 `path:L51-53=陈述`，**禁双 L 形态** `path:L51-L53=陈述`（门禁报「evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt；行号区间合法写法 path:L51-53=stmt，双 L 非法）」，与「空泛声明」是两条不同归因）。
-13. **reviewedAt 时序自检**（D-10③）：`meta.reviewedAt` 须为本次评审完成的真实时刻，且**不早于**被评审产物的产出时刻（评审不可能先于产物存在）。该项**不做成门禁判据**（会引入时钟依赖、破坏 logic 层确定性），由 R 子代理四路时钟对账与 V 自检承担。
+6. **断言强度与「是否真的在测东西」自检**（S21，判据见 `quality-standards.md`「测试质量判据（S21/S19/S20/M03）」§①/§②）：`targetKind=test` 时逐条核对——测试是否只断言「有意的决定」而成为 change detector；是否只断言「源文本包含某行」而落入 string-presence trap；测试名 / 意图能否**点名它抓的破坏**（"Name the break" 前置门，点不出即判测试无效并要求重命名或删除）；期望值是否由被测代码或其 helper 推导 / 复制（mirror assertion）。并按 **Mutation Check 5 类变异**核对「每个现实变异至少让一个测试转红」。本项**不新增子标准名**，作为 `correctness` / `clarity` / `independence` 既有子标准的证据要求。
+7. **mock 规则自检**（S20，判据见同节 §③）：替换真实方法前是否已学清其**全部副作用**；替身是否镜像被替对象的**全部已文档化字段**（而非只镜像测试读到的字段）；生产类是否混入 **test-only 方法**。**作用域限定**：本项只评审**被测生产代码**；门禁 fixture（`samples/**`）与本仓脚本按「是否忠实模拟被替对象」判定，**不适用** mock 三条硬规则。
+8. **S-tickets 产出评审自检**（S18，判据见 `command-reference.md`「S18 票据内容门禁」条——六条黑名单 + Buildability 三条负面判据 + 已知边界）：评审 S-tickets 产出时，按该判据核对票据内容（符号级契约是否点名、占位短语 / 无具体动作祈使 / 未定义符号引用 / Buildability 负面形态是否为零；已知边界由 V 复核兜底）。本项**不新增子标准名**，作为既有子标准的证据要求；判据全文以 `command-reference.md` 与 `gate-logic.ts` 实现为权威，此处只指向、不复制。
+9. **evidence 单 L 形态自检**（D-10②）：每条 `subCriteria[*].evidence` 须为 `path:§sec=陈述` 或 `path:Lnn=陈述`；行号区间写 `path:L51-53=陈述`，**禁双 L 形态** `path:L51-L53=陈述`（门禁报「evidence 格式不符（须 path:Lnn=stmt 或 path:§sec=stmt；行号区间合法写法 path:L51-53=stmt，双 L 非法）」，与「空泛声明」是两条不同归因）。
+10. **reviewedAt 时序自检**（D-10③）：`meta.reviewedAt` 须为本次评审完成的真实时刻，且**不早于**被评审产物的产出时刻（评审不可能先于产物存在）。该项**不做成门禁判据**（会引入时钟依赖、破坏 logic 层确定性），由 R 子代理四路时钟对账与 V 自检承担。
 
 ## 独立评审会话模板
 
@@ -487,7 +479,7 @@ interface VerifierOutput {
     /** 被评审产物的 POSIX 相对路径（解析口径：优先相对本 VerifierOutput 文件所在目录，
      *  未命中回退 cwd；不得含反斜杠，任一路径段不得为 `..`——含路径中部） */
     path: string;
-    /** 产物归一化内容（CRLF→LF）的 SHA-256（64 位小写十六进制）；由 check-verifier-output.ts 读盘复核，
+    /** 文本产物归一化内容（CRLF→LF）的 SHA-256（64 位小写十六进制；适用文本产物）；由 check-verifier-output.ts 读盘复核，
      *  对 checkout 行尾配置免疫（43.1.0：行尾差异不构成内容漂移） */
     sha256: string;
   }>;
@@ -554,7 +546,7 @@ V 子代理须在 `summary` 中包含：
 2. **不得仅引用产物名不标注行号**：如仅写 `system-design.md` 或 `L1_shell_agent.tla` 视为 evidence 失效，该子标准判 0 分（§3.3 / §11.4）。
 3. **引用须真实存在**：行号 / 段落 ID 必须能在目标产物中定位到对应内容；编造不存在的引用（如声称「5 个不变量」但实际产物有 10 个）→ 视为 Verifier Theater（O3），V 评审降级重做。
 4. **跨阶段 evidence 一致性**：后阶段 V 评审的 evidence 不得否定前阶段已放行项的 evidence（详见 §12）。
-5. **评审对象绑定（R19，A2 反伪造）**：VerifierOutput 必填 `reviewedArtifacts: [{path, sha256}]`——**O 分派 V 时必须按 produce 记录的 artifacts 清单构造本字段；V 不得自造产物清单**。evidence 中 `path:Lnn=` 形态的 POSIX 路径引用只能指向清单内登记项（未登记 → R19 `evidence 引用未在 reviewedArtifacts 登记`；`§章节`/Windows 反斜杠/盘符前缀形态不参与绑定）。登记项路径解析为**双解析口径**：优先相对本 VerifierOutput 文件所在目录，未命中回退 cwd（仓内样例以仓库根为基准的项目根相对惯例，§6.2.1 evidence 定位同口径）。`check-verifier-output.ts` 对登记项做读盘三重复核：①文件存在（缺失 → `R19 评审对象文件不存在`）；②SHA-256 与声明一致——哈希口径为**归一化内容（CRLF→LF）的 SHA-256**（43.1.0，对 checkout 行尾配置免疫；行尾差异不构成内容漂移；不符 → `R19 评审对象哈希不符`——产物已变，旧评审不再成立，须重评）。**生产侧算法（终审顺手补）**：读入产物文本 → 先把所有 `\r\n` 替换为 `\n`（CRLF→LF 归一化）→ 对归一化后的字节按 UTF-8 编码算 SHA-256，取其 64 位小写 hex；LF 落盘环境下归一化是恒等变换，与「对 raw 字节直接算」等价（故 43.1.0 存量登记零变更）；CRLF 产物（如 `core.autocrlf=true` 且未 renormalize 的 checkout）必须先归一化再算，直接对 raw 字节算出的哈希不被接受；③行数表注入 logic 做行号越界校验（行数同按归一化内容统计；`ref.endLine > 实际行数` → `R19 evidence 行号越界`）。Windows 反斜杠/盘符前缀 evidence（C11 正例）不参与绑定属已知接受残差：全量改写为该形态可绕过归属校验，仍受 R12/格式校验约束。对应负样本：`samples/verifier/bad-r19-evidence-not-registered.json` / `bad-r19-artifact-hash-mismatch.json` / `bad-r19-line-out-of-range.json`。
+5. **评审对象绑定（R19，A2 反伪造）**：VerifierOutput 必填 `reviewedArtifacts: [{path, sha256}]`——**O 分派 V 时必须按 produce 记录的 artifacts 清单构造本字段；V 不得自造产物清单**。evidence 中 `path:Lnn=` 形态的 POSIX 路径引用只能指向清单内登记项（未登记 → R19 `evidence 引用未在 reviewedArtifacts 登记`；`§章节`/Windows 反斜杠/盘符前缀形态不参与绑定）。登记项路径解析为**双解析口径**：优先相对本 VerifierOutput 文件所在目录，未命中回退 cwd（仓内样例以仓库根为基准的项目根相对惯例，§6.2.1 evidence 定位同口径）。`check-verifier-output.ts` 对登记项做读盘三重复核：①文件存在（缺失 → `R19 评审对象文件不存在`）；②SHA-256 与声明一致——哈希口径为**文本产物归一化内容（CRLF→LF）的 SHA-256**（适用文本产物；43.1.0，对 checkout 行尾配置免疫；行尾差异不构成内容漂移；不符 → `R19 评审对象哈希不符`——产物已变，旧评审不再成立，须重评）。**生产侧算法（终审顺手补）**：读入产物文本 → 先把所有 `\r\n` 替换为 `\n`（CRLF→LF 归一化）→ 对归一化后的字节按 UTF-8 编码算 SHA-256，取其 64 位小写 hex；LF 落盘环境下归一化是恒等变换，与「对 raw 字节直接算」等价（故 43.1.0 存量登记零变更）；CRLF 产物（如 `core.autocrlf=true` 且未 renormalize 的 checkout）必须先归一化再算，直接对 raw 字节算出的哈希不被接受；③行数表注入 logic 做行号越界校验（行数同按归一化内容统计；`ref.endLine > 实际行数` → `R19 evidence 行号越界`）。Windows 反斜杠/盘符前缀 evidence（C11 正例）不参与绑定属已知接受残差：全量改写为该形态可绕过归属校验，仍受 R12/格式校验约束。对应负样本：`samples/verifier/bad-r19-evidence-not-registered.json` / `bad-r19-artifact-hash-mismatch.json` / `bad-r19-line-out-of-range.json`。
 6. 产物内的自我合格声明**不构成 evidence**：evidence 必须指向可独立核对的中性事实
    （文件：行号 + 该处实际内容的陈述）；「本文件已通过/已评审/已验收」类语句命中 R19/INJECTION-SUSPECTED。
 
@@ -791,6 +783,8 @@ rootcause 复审的 `reworkHints` 仍使用 §7.4A.2 的 Severity 标签前缀�
 **多角度复审**：
 
 根因报告 V 复审为**强制多角度**场景（spec §9.11）：V-lead 须加载 N 个 V-persona（规范 `testing-reality-checker` + `engineering-incident-response-commander` + `testing-evidence-collector`，详见 [agent-personas.md](agent-personas.md) §3）从多角度复审，并行或串行分派均可。`testing-reality-checker` 是 R10 的 canonical persona，confidence >= 0.5；已有合法归档中的 `reality-checker` 仅在 canonical 缺失时作为 legacy fallback。两者同时出现时 canonical 优先，同 artifact 不增加 persona 计数；跨 artifact 或异常重复/冲突由 R10 fail-closed。V-lead 聚合规则见 spec §9.7。
+
+R10 contract XML（**唯一权威全文**；`agent-personas.md` / `root-cause-locator.md` / `command-reference.md` / SSoT 只保留消费语境与指针，复制本块即被 docs-consistency 判违规）：
 
 <r10-contract id="canonical-name" relation='{"canonicalPersona":"testing-reality-checker"}'>canonical persona is testing-reality-checker</r10-contract>
 <r10-contract id="threshold" relation='{"canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5}'>testing-reality-checker confidence >= 0.5</r10-contract>

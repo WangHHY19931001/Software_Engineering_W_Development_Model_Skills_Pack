@@ -4,7 +4,8 @@
   "createdAt": "2026-08-01T09:00:00.000Z",
   "updatedAt": "2026-08-05T14:30:00.000Z",
   "perPhase": {
-    "maxTokens": 500000
+    "maxTokens": 500000,
+    "maxSubagentSpawns": 30
   },
   "project": {
     "maxTokensTotal": 4000000

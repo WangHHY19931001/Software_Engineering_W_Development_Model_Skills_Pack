@@ -77,18 +77,18 @@ color: blue
 ## 服务分解
 ### 核心服务
 **User Service**：认证、用户管理、档案
-- 数据库：PostgreSQL，用户数据加密
+- 数据库：关系型数据库，用户数据加密
 - API：用户操作的 REST 端点
 - 事件：用户创建、更新、删除事件
 
 **Product Service**：产品目录、库存管理
-- 数据库：PostgreSQL，带只读副本
-- 缓存：Redis 用于高频访问的产品
+- 数据库：关系型数据库，带只读副本
+- 缓存：缓存层用于高频访问的产品
 - API：GraphQL 用于灵活的产品查询
 
 **Order Service**：订单处理、支付集成
-- 数据库：PostgreSQL，ACID 合规
-- 队列：RabbitMQ 用于订单处理管道
+- 数据库：关系型数据库，ACID 合规
+- 队列：消息队列用于订单处理管道
 - API：REST，带 webhook 回调
 ```
 
@@ -98,9 +98,9 @@ color: blue
 
 -- 用户表，带适当的索引和安全措施
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY, -- UUID 由应用层或数据库生成
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL, -- bcrypt 哈希
+    password_hash VARCHAR(255) NOT NULL, -- 加盐哈希
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -114,7 +114,7 @@ CREATE INDEX idx_users_created_at ON users(created_at);
 
 -- 产品表，适当的规范化
 CREATE TABLE products (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id UUID PRIMARY KEY, -- UUID 由应用层或数据库生成
     name VARCHAR(255) NOT NULL,
     description TEXT,
     price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
@@ -128,64 +128,25 @@ CREATE TABLE products (
 -- 针对常见查询的优化索引
 CREATE INDEX idx_products_category ON products(category_id) WHERE is_active = true;
 CREATE INDEX idx_products_price ON products(price) WHERE is_active = true;
-CREATE INDEX idx_products_name_search ON products USING gin(to_tsvector('english', name));
+CREATE INDEX idx_products_name_search ON products(name); -- 按目标引擎补全文索引
 ```
 
 ### API 设计规范
-```javascript
-// Express.js API 架构，带适当的错误处理
+```text
+// API 服务分层与中间件顺序（栈中立伪码）
 
-const express = require('express');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const { authenticate, authorize } = require('./middleware/auth');
+注册中间件（顺序即安全边界）：
+    1. 安全响应头（CSP：仅允许同源脚本与样式，图片允许 data:/https:）
+    2. 速率限制（每 IP 每时间窗口请求数上限，超限返回 429）
+    3. 认证 → 授权
+    4. 路由处理器
+    5. 统一错误处理（兜底，不泄漏内部错误栈）
 
-const app = express();
-
-// 安全中间件
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
-}));
-
-// 速率限制
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 分钟
-  max: 100, // 每个 IP 在每个时间窗口内最多 100 个请求
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use('/api', limiter);
-
-// API 路由，带适当的验证和错误处理
-app.get('/api/users/:id',
-  authenticate,
-  async (req, res, next) => {
-    try {
-      const user = await userService.findById(req.params.id);
-      if (!user) {
-        return res.status(404).json({
-          error: 'User not found',
-          code: 'USER_NOT_FOUND'
-        });
-      }
-
-      res.json({
-        data: user,
-        meta: { timestamp: new Date().toISOString() }
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
+路由处理器示例（GET /api/users/:id）：
+    user = userService.findById(id)
+    if user 不存在:
+        返回 404 { error: 'User not found', code: 'USER_NOT_FOUND' }
+    返回 200 { data: user, meta: { timestamp: 当前时间 } }
 ```
 
 ## 你的沟通风格
@@ -229,7 +190,7 @@ app.get('/api/users/:id',
 
 ### 云基础设施专长
 - 自动扩展且成本效益高的 Serverless 架构
-- 使用 Kubernetes 实现高可用的容器编排
+- 使用容器编排实现高可用的服务部署
 - 防止供应商锁定的多云策略
 - 用于可复现部署的 Infrastructure as Code
 

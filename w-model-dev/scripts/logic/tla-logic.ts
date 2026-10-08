@@ -854,6 +854,11 @@ function normalizeDefBody(body: string): string {
  * 从 .tla 文本提取顶层定义 `Name ==` 的定义体（到下一顶层定义 / 模块终止符 ==== / EOF）。
  * 提取前剥离 `(* *)` 块注释与 `\*` 行注释；找不到该定义返回 null
  * （cfg 声明了 .tla 不存在的名字时由 §11 cfg-tla 集合一致性另行拦截，此处静默跳过）。
+ *
+ * 批次 8 rider 边界修复：顶层边界仅认 **0 起始（无缩进）** 的 `identifier ==` 行——
+ * TLA+ 中缩进的 `Name ==`（LET 体 / WHERE 体内部定义，如 LET 体内缩进的
+ * `H == x > 0`）是外层定义体的续行而非新顶层定义；旧正则允许任意缩进，使多行
+ * LET 体在其首个缩进内层定义处被提前截断（假阴性面：内层定义后的体内容丢失）。
  */
 export function extractTlaDefBody(tlaContent: string, name: string): string | null {
   if (typeof tlaContent !== 'string' || tlaContent === '' || name === '') return null;
@@ -863,7 +868,7 @@ export function extractTlaDefBody(tlaContent: string, name: string): string | nu
   // token），「剥行首空白 → 字面量前缀相等 → 余部匹配 `\s*==(.*)`」与转义名正则逐字节等价
   //（差分验证 0 分歧），且名字中的正则元字符不再参与正则解释。
   const defBodyRe = /^\s*==(.*)$/;
-  const nextDefRe = /^[ \t]*[A-Za-z][A-Za-z0-9_]*\s*==/;
+  const nextDefRe = /^[A-Za-z][A-Za-z0-9_]*\s*==/; // 0 起始（无缩进）才视为下一顶层定义
   // 迭代一律不得复现 checkCfgStructure「cfg 结构：裸 INVARIANT」块的 i 循环头文本：该文本被
   // tla-logic-rule-loadbearing.test.ts 用作剥离锚点并要求源码内唯一，本函数任何行（含注释）都不得
   // 复现它。entries()/slice() 既满足该约束，也消除动态下标取值（object-injection 面）。
@@ -875,7 +880,7 @@ export function extractTlaDefBody(tlaContent: string, name: string): string | nu
     const bodyLines: string[] = [m[1] ?? ''];
     for (const line of lines.slice(defIdx + 1)) {
       if (/^[ \t]*====/.test(line)) break; // 模块终止符 ====
-      if (nextDefRe.test(line)) break; // 下一顶层定义
+      if (nextDefRe.test(line)) break; // 下一顶层定义（仅 0 起始；缩进 `X ==` 属定义体续行）
       bodyLines.push(line);
     }
     return bodyLines.join('\n');
@@ -986,7 +991,53 @@ export function parseCfgNextNames(cfgContent: string): string[] {
 }
 
 /**
- * B10 空转 Next 检测（批次 7 任务 7；修复轮 1 收敛为跨定义体合取聚合 + 多 NEXT 聚合判定）。
+ * 剥离子句首尾成对平衡的外层括号（可多层），用于恒等式判定：
+ * `(x' = x)` / `((x' = x))` → `x' = x`；括号内为复合式（如 `(x' = x /\ y' = 0)`）时
+ * 剥括号后仍不匹配 `var' = var` 整句恒等式，保持「非恒等」分类不变。
+ */
+function stripBalancedOuterParens(clause: string): string {
+  let s = clause.trim();
+  while (s.startsWith('(') && s.endsWith(')')) {
+    let depth = 0;
+    let wrapsWhole = true;
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === '(') depth += 1;
+      else if (s[i] === ')') {
+        depth -= 1;
+        if (depth === 0 && i !== s.length - 1) {
+          wrapsWhole = false;
+          break;
+        }
+      }
+    }
+    if (!wrapsWhole) break;
+    s = s.slice(1, -1).trim();
+  }
+  return s;
+}
+
+/**
+ * 判定定义体（归一化文本）在顶层是否含 `\/` 析取：先逐层剥离「包裹整个表达式」
+ * 的外层括号（整块括号形态 `（Idle \/ Guard）`），再扫括号深度 0 的 `\/` 字面。
+ * 字节序：析取 `\/` = 反斜杠在前、正斜杠在后（合取 `/\` 相反，od -c 实证），
+ * 故命中条件为 `ch === '\\' && s[i + 1] === '/'`。
+ * 子表达式内的析取（如 `A /\ (B \/ C)` 括号内）不算顶层。
+ */
+function hasTopLevelDisjunct(body: string): boolean {
+  const s = stripBalancedOuterParens(body);
+  let depth = 0;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '(') depth += 1;
+    else if (ch === ')') depth -= 1;
+    else if (depth === 0 && ch === '\\' && s[i + 1] === '/') return true;
+  }
+  return false;
+}
+
+/**
+ * B10 空转 Next 检测（批次 7 任务 7；修复轮 1 收敛为跨定义体合取聚合 + 多 NEXT 聚合判定；
+ * 批次 8 rider：顶层析取 + 纯守卫子句的误报窗口收口）。
  *
  * 退化解形态：`Next == x' = x`（全恒等自赋值）或 `Next == TRUE / UNCHANGED x`
  * （无任何状态赋值）——状态永不变化，TLC 永不死锁、不变式恒成立，
@@ -996,9 +1047,19 @@ export function parseCfgNextNames(cfgContent: string): string[] {
  * 以 `/\` 并入闭包文本，分解式 `Next == A /\ B`（A、B 均恒等）与一级/多级间接
  * 引用 `Next == A`（A == x' = x）与单体直写形态判定一致）：
  *   - 闭包无任何 `var' =` 状态赋值 → 该名空转候选；
- *   - 闭包内全部状态赋值均为恒等自赋值（逐顶层合取/析取子句整句匹配 var' = var）
+ *   - 闭包内全部状态赋值均为恒等自赋值（逐顶层合取/析取子句整句匹配 var' = var，
+ *     子句首尾成对平衡外括号先剥再判——`(x' = x) \/ (y' = y)` 析取全恒等仍空转）
  *     → 该名空转候选；
  *   - 存在任一非恒等赋值 → 该名推进。
+ *   - 批次 8 误报窗口收口（修复轮 1 收敛为闭包级判定）：全恒等赋值**并存非赋值子句**
+ *     （纯守卫 / 裸引用；「定义体已并入闭包的纯标识符」为拼接伪影，不计入）且**引用
+ *     闭包任一并入定义体**顶层含 `\/` 析取（或整块括号形态）时不可判定——无赋值的
+ *     析取分支撇号变量不受约束、可真实推进（直写 `Next == Idle \/ Guard` 与间接
+ *     `Next == A; A == Idle \/ Guard`，Idle == x' = x、Guard == x > 0 均为误报形态）→
+ *     保守计为推进，不误报优先。子定义体以 `/\` 并入闭包后其顶层 `\/` 仍处深度 0，
+ *     闭包级判定同时覆盖直写与间接形态；析取**全恒等**（闭包无任何非赋值子句，如
+ *     `Next == (x' = x) \/ (y' = y)` 直写或经 `Next == A; A == (x' = x) \/ (y' = y)`
+ *     间接——裸名 A 是拼接伪影而非真实守卫）仍判空转违规（批次 7 既有语义，零回归）。
  *
  * 多 NEXT 聚合（TLC 对 cfg 多 NEXT 行取合取）：全部可判定名均为空转候选才 violation
  * 「空转规格」；任一名推进 → 合取整体推进，不违规（保守方向，防误报优先）。
@@ -1012,8 +1073,8 @@ export function parseCfgNextNames(cfgContent: string): string[] {
  *   - cfg 无 NEXT 段（SPECIFICATION Spec 形式）→ 本检测不适用，跳过。
  *   - cfg 声明的 Next 名在 .tla 无定义 / 闭包为空 → 该名不可判定（§11 集合一致性 / SANY
  *     另行拦截），聚合时按不违规处理。
- *   - 子句切分按归一化文本的字面 `/\`（合取）与 `\/`（析取）；括号包裹的复合子句不匹配
- *     恒等式 → 计为非恒等，同样走保守不误报方向。
+ *   - 子句切分按归一化文本的字面 `/\`（合取）与 `\/`（析取）；剥外括号后仍不匹配
+ *     恒等式的复合子句计为非恒等，走保守不误报方向。
  *
  * @param tlaContent .tla 文件文本内容（定义体提取来源）
  * @param cfgContent .cfg 文件文本内容（NEXT 段解析来源）
@@ -1029,8 +1090,10 @@ export function checkIdleNext(tlaContent: string, cfgContent: string): { passed:
   let anyProgressing = false;
   let anyUndecidable = false;
   for (const nextName of parseCfgNextNames(cfg)) {
-    // 传递引用闭包（visited 防循环）
+    // 传递引用闭包（visited 防循环）；inlinedNames 记录定义体成功并入闭包的名字，
+    // 用于识别闭包中的「纯标识符拼接伪影」（见下方子句循环）
     const visited = new Set<string>([nextName]);
+    const inlinedNames = new Set<string>();
     const bodies: string[] = [];
     const queue: string[] = [nextName];
     while (queue.length > 0) {
@@ -1038,6 +1101,7 @@ export function checkIdleNext(tlaContent: string, cfgContent: string): { passed:
       if (name === undefined) break;
       const body = extractTlaDefBody(tla, name);
       if (body == null) continue; // 定义缺失：由 §11 集合一致性 / SANY 拦截，此处跳过
+      inlinedNames.add(name);
       bodies.push(normalizeDefBody(body));
       for (const ident of body.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? []) {
         if (!visited.has(ident)) {
@@ -1054,18 +1118,34 @@ export function checkIdleNext(tlaContent: string, cfgContent: string): { passed:
       anyUndecidable = true;
       continue;
     }
+    // 顶层析取判定看闭包（修复轮 1 收口）：子定义体已以 `/\` 并入闭包，间接形态
+    // （`Next == A; A == Idle \/ Guard`）的析取在 Next 自身体（bodies[0]）中不可见，
+    // 只看 bodies[0] 会漏判该误报窗口。判定逐并入定义体执行（任一体顶层含 `\/` 即真）：
+    // 拼接闭包中各体深度 0 的 `\/` 仍处深度 0，逐体判定 ⊇ 拼接文本判定，且整块
+    // 括号形态（bodies[0] == `(Idle \/ Guard)`，体级剥括号后析取在深度 0）不被拼接
+    // 后的前缀括号块掩埋——严格覆盖旧 bodies[0] 判定，方向不漏
 
     // 顶层合取/析取子句切分（归一化文本；`/\` 合取与 `\/` 析取字面）
     const conjuncts = closure
       .split(/\/\\|\\\//g)
-      .map((s) => s.trim())
+      .map((s) => stripBalancedOuterParens(s))
       .filter((s) => s !== '');
 
     let assignmentCount = 0;
     let allIdentity = true;
+    let hasNonAssignmentClause = false;
     for (const c of conjuncts) {
-      // 非赋值子句（UNCHANGED / 纯谓词）不提供推进信息；var' \in 计赋值（非确定性推进）
-      if (!/[A-Za-z_][A-Za-z0-9_]*'\s*(?:=|\\in)/.test(c)) continue;
+      // 非赋值子句（UNCHANGED / 纯谓词 / 裸引用）不提供推进信息；var' \in 计赋值（非确定性推进）
+      if (!/[A-Za-z_][A-Za-z0-9_]*'\s*(?:=|\\in)/.test(c)) {
+        // 「纯标识符且定义体已并入闭包」的子句是拼接伪影而非真实守卫——`Next == A` 的
+        // 闭包既含裸名 A 又含 A 的定义体，A 自身不提供任何约束信息；若计入非赋值子句，
+        // 析取全恒等间接形态（`Next == A; A == (x' = x) \/ (y' = y)`）会被伪影误判入
+        // 析取窗口放掉（与直写形态 violation 不一致）。未成功并入定义体的裸名（状态
+        // 变量守卫等）照旧计入，保守方向不变
+        if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(c) && inlinedNames.has(c)) continue;
+        hasNonAssignmentClause = true;
+        continue;
+      }
       assignmentCount += 1;
       const m = c.match(/^([A-Za-z_][A-Za-z0-9_]*)'\s*=\s*([A-Za-z_][A-Za-z0-9_]*)$/);
       if (!(m && m[1] === m[2])) allIdentity = false;
@@ -1074,6 +1154,12 @@ export function checkIdleNext(tlaContent: string, cfgContent: string): { passed:
       idleCandidates.push(
         `空转规格：NEXT ${nextName} 定义体（含引用闭包）归一化后无任何 var' = 状态赋值（如 Next == TRUE / UNCHANGED x）：状态永不变化，验证不构成行为（反模式 #16）`,
       );
+    } else if (allIdentity && hasNonAssignmentClause && bodies.some((b) => hasTopLevelDisjunct(b))) {
+      // 批次 8 误报窗口收口（修复轮 1 闭包级判定）：闭包任一并入定义体顶层析取下
+      // 「全恒等 + 真实非赋值（纯守卫/裸引用）子句」不可判定——无赋值的析取分支撇号
+      // 变量不受约束、可真实推进；保守计为推进（不误报优先）。析取全恒等（无非赋值
+      // 子句，拼接伪影已剔除）不受此窗口影响，照旧判空转违规
+      anyProgressing = true;
     } else if (allIdentity) {
       idleCandidates.push(
         `空转规格：NEXT ${nextName} 的全部状态赋值均为恒等自赋值 var' = var（如 Next == x' = x）：状态永不变化，验证不构成行为（反模式 #16）`,

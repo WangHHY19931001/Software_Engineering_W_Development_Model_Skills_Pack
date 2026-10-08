@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://w-model-dev/schemas/budget.schema.json",
-  "description": "预算追踪（budget.json）结构 schema，对应 budget-logic.ts R1-R5 时效性/onExceed/killSwitch 校验。43.0.0 A5：perPhase.maxSubagentSpawns / perPhase.maxReworkRounds / project.maxTokensPerSession 三个零消费死字段已删除（审计证实无任何门禁消费）；旧数据携带这些字段被 additionalProperties:false 拒绝（毁弃存量，不兼容）",
+  "description": "预算追踪（budget.json）结构 schema，对应 budget-logic.ts R1-R7 时效性/onExceed/killSwitch/用量实效/子代理分派数校验。43.0.0 A5：perPhase.maxReworkRounds / project.maxTokensPerSession 两个零消费死字段保持退役（审计证实无任何门禁消费）；旧数据携带这两个字段被 additionalProperties:false 拒绝（毁弃存量，不兼容）。43.2.0：perPhase.maxSubagentSpawns 回归并成真（A5 曾按零消费死字段删除（eacc8d6a），本版 check-budget R7 消费之；字段可选，缺字段时 R7 跳过并出非阻断诊断）",
   "title": "BudgetConfig",
   "type": "object",
   "additionalProperties": false,
@@ -31,6 +31,11 @@
       "properties": {
         "maxTokens": {
           "description": "单阶段累计 token 上限（默认 500000），非负整数；超过触发 onExceed",
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxSubagentSpawns": {
+          "description": "单阶段子代理分派次数上限（S+V+G+A 合计，默认 30），非负整数；阶段 ΣsubagentSpawns 严格大于此值 → check-budget R7 blocking（estimated=true 记录不计入聚合，口径见 data-models.md「子代理分派数实效校验（R7）」）。43.2.0 使约束成真：A5 曾按零消费死字段删除（eacc8d6a），本版 check-budget 消费之；字段可选——缺字段时 R7 不触发并出非阻断警告（兼容存量 budget.json）",
           "type": "integer",
           "minimum": 0
         }

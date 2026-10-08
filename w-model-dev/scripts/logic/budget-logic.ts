@@ -6,7 +6,9 @@
  * 校验：时效性（R1，43.0.0 A5 顺序化：budget.updatedAt < project.updatedAt 违规，相等合法）
  *      + onExceed 合法（R3）+ killSwitch 触发检测（R5）+ 多角度 R token 预算（R4-A）
  *      + 用量实效（R6，D-4b：Σtokens(阶段/总量) 超上限 → blocking；≥ budgetBurnRate × maxTokens
- *        → killSwitch 用量告警，文案以 `R5-b：` 开头以区别于 R5 的返工/TLA 触发文案）。
+ *        → killSwitch 用量告警，文案以 `R5-b：` 开头以区别于 R5 的返工/TLA 触发文案）
+ *      + 子代理分派数实效（R7，决策 5，43.2.0：ΣsubagentSpawns(阶段) 超 perPhase.maxSubagentSpawns
+ *        → blocking，文案以 `R7：` 开头；estimated=true 记录的排除口径在 CLI 侧 sumSubagentSpawns）。
  * schema 完整（R2）与 killSwitch.budgetBurnRate 范围（R4）由 budget.schema.json 前置拦截
  * （required / minimum+maximum），逻辑层不再重复校验（audit-fixes task 5，F-G2-05 死分支清理）。
  *
@@ -14,6 +16,11 @@
  * 经 options.tokensUsed 传入（CLI 侧 sumTokens）；未提供时 R6/R5-b 整体跳过，行为与新增前**一字不变**
  * （向后兼容硬线：既有 callers / samples / self-test 不受影响，跳过不等于通过由调用方保证可见）；
  * phase/total 任一非有限数（NaN/Infinity）同样视同未提供（非法输入防御，整体跳过、不抛错）。
+ *
+ * 分派数口径（R7，决策 5）：同理只判定「ΣsubagentSpawns(阶段) vs 上限」，聚合由调用方经
+ * options.spawnsUsed 传入（CLI 侧 sumSubagentSpawns，**estimated=true 记录不计入**）；未提供时
+ * R7 整体跳过、行为与新增前一字不变。可选字段 perPhase.maxSubagentSpawns 缺席时不判定并出
+ * 非阻断警告（跳过不等于通过）——字段 43.2.0 回归，A5 曾按零消费死字段删除（eacc8d6a）。
  *
  * 返工计数口径（D-4a 复审记录，D-4a 文档侧处置）：options.reworkCount 的语义是
  * 「返工事件 + 未过门事件」的**累计**条数——run-log 中 action ∈ {rework, fix, emergency-fix}
@@ -45,6 +52,19 @@ export interface TokenUsage {
   total: number;
 }
 
+/**
+ * 子代理分派数实效校验（R7）的聚合输入
+ *
+ * - `phase`：当前阶段的累计分派数（CLI 按 `--phase` 过滤 run-log 后聚合，`estimated=true`
+ *   记录不计入）
+ *
+ * R7 是「按阶段」口径，不存在全量对照字段（schema 只有 perPhase.maxSubagentSpawns）——
+ * 因此本形状刻意只有一个字段，不引入无消费字段（A5 教训）。
+ */
+export interface SpawnUsage {
+  phase: number;
+}
+
 export interface BudgetConfig {
   schemaVersion: '1.0';
   projectId: string;
@@ -52,8 +72,12 @@ export interface BudgetConfig {
   updatedAt: string;
   perPhase: {
     maxTokens: number;
-    // 43.0.0 A5：maxSubagentSpawns / maxReworkRounds 零消费死字段已删除（审计证实无任何门禁消费）；
-    // 旧数据携带这些字段由 budget.schema.json additionalProperties:false 拒绝（毁弃存量，不兼容）。
+    /**
+     * 单阶段子代理分派次数上限（S+V+G+A 合计，默认 30）；阶段 ΣsubagentSpawns 超此值 → R7 blocking。
+     * 43.2.0 回归：A5（eacc8d6a）曾按零消费死字段删除，本版 check-budget 消费之；字段**可选**
+     * （缺字段时 R7 不判定并出非阻断警告，兼容存量 budget.json）。
+     */
+    maxSubagentSpawns?: number;
   };
   project: {
     maxTokensTotal: number;
@@ -99,6 +123,9 @@ export interface BudgetCheckResult {
  *     本阶段返工/未过门事件累计阈值
  *   - `tokensUsed`：R6 用量实效 / R5-b burnRate 告警。**未提供时 R6/R5-b 不参与判定，
  *     输出与新增前一字不变**（向后兼容硬线，见文件头「用量口径」）
+ *   - `spawnsUsed`：R7 子代理分派数实效（决策 5，43.2.0）。**未提供时 R7 不参与判定，输出与
+ *     新增前一字不变**；可选字段 perPhase.maxSubagentSpawns 缺席 → R7 跳过 + 非阻断警告
+ *     （跳过不等于通过，见文件头「分派数口径」）
  */
 export function checkBudget(
   budget: unknown,
@@ -108,6 +135,7 @@ export function checkBudget(
     reworkCount?: number;
     tlaReworkCount?: number;
     tokensUsed?: TokenUsage;
+    spawnsUsed?: SpawnUsage;
   },
 ): BudgetCheckResult {
   // === Schema 前置校验 ===
@@ -213,6 +241,22 @@ export function checkBudget(
       violations.push(
         `R5-b：killSwitch 应触发（阶段消耗占比 ${(usage.phase / perPhaseMax).toFixed(2)} >= budgetBurnRate ${ks.budgetBurnRate}）`,
       );
+    }
+  }
+
+  // R7 子代理分派数实效（决策 5，43.2.0）：预算配置合法 ≠ 分派次数在预算内。
+  // 口径与 R6 同式：严格 `>`（恰等于上限不算超限）；聚合由 CLI 侧 sumSubagentSpawns 完成
+  // （按 --phase 过滤 + estimated=true 记录不计入），logic 只消费传入值、不读盘。
+  // 可选字段缺席（未启用该预算 / legacy 存量）→ 跳过判定但**不静默**（跳过不等于通过），
+  // 与 R4-A「未配置 rootcauseParallelBudget」同款非阻断警告。
+  const spawns = options?.spawnsUsed;
+  // 非法输入防御（同 R6）：phase 非有限数（NaN/Infinity）视同「未提供」——整体跳过、不抛错。
+  if (spawns && Number.isFinite(spawns.phase)) {
+    const spawnMax = b.perPhase?.maxSubagentSpawns;
+    if (typeof spawnMax === 'number' && spawns.phase > spawnMax) {
+      violations.push(`R7：阶段子代理分派数 ${spawns.phase} > perPhase.maxSubagentSpawns ${spawnMax}`);
+    } else if (typeof spawnMax !== 'number') {
+      warnings.push('R7 未校验：未配置 perPhase.maxSubagentSpawns（跳过不等于通过）');
     }
   }
 

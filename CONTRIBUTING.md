@@ -107,7 +107,7 @@ npm run format
 | 16  | `npx tsx w-model-dev/scripts/cli/check-samples-coverage.ts`（samples 覆盖矩阵门禁，五条规则：fixture 均被 self-test.ts 引用 / 引用路径无悬空 / 子目录均在 samples/README.md 矩阵声明 / exit-2 门禁均在 NEGATIVE-COVERAGE.md 登记会失败的负向案例 / 登记册 4 列（门禁\|fixture\|机制\|所防回归）+ 派生锚（`self-test.ts#<覆盖条目标识>`）+ 规则 4 收紧（fixture 机制行须为真实失败案例且恰一处覆盖）+ 逐门禁真实 exit-2 探针（每探针独立隔离根、有界并发 4 路、零漂移））                                                                                              | 0          |
 | 17  | `npx prettier --config config/prettier.config.cjs --check "w-model-dev/scripts/**/*.ts" "config/**/*.{cjs,ts}" "scripts/*.cjs"`（格式一致性门禁：编辑未跑 `npm run format` 即阻断）                                                    | 0          |
 | 18  | `npx tsc -p config/tsconfig.json`（TypeScript strict 类型检查 0 错误，对齐 SSoT §10H.5）                                                                                                                                               | 0          |
-| 19  | `npx tsx eval/runner.ts`（触发边界语料断言 + coverageMatrix 五项校验）                                                                                                                                                                 | 0          |
+| 19  | `npx tsx eval/runner.ts`（评估语料断言 + coverageMatrix 六项校验）                                                                                                                                                                     | 0          |
 
 **启用方式**：仓库验证期间首次 `npm install` 即自动启用（`postinstall` 运行 `scripts/setup-hooks.cjs`，在当前 checkout 的本地 `.git/config` 设置 `core.hooksPath=.githooks`；失败仅 warn，不阻断 install）。这是仓库验证的本地 Git 配置副作用，不是 Agent Skill 激活必需。如需手动重置 / 确认，执行一次即可（配置写入本地 `.git/config`，不影响仓库内容）：
 

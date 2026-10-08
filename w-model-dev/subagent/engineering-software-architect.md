@@ -85,39 +85,19 @@ color: indigo
 
 ### 容量估算模板
 
-```python
-# 快速估算系统容量需求
-class CapacityEstimate:
-    def __init__(self, dau: int, actions_per_user: int):
-        self.dau = dau
-        self.actions_per_user = actions_per_user
+```text
+# 快速估算系统容量需求（栈中立伪码）
 
-    @property
-    def daily_requests(self) -> int:
-        return self.dau * self.actions_per_user
+容量估算(dau, 每用户操作数):
+    日请求量 = dau * 每用户操作数
+    平均 QPS = 日请求量 / 86400
+    峰值 QPS = 平均 QPS * 3        # 假设高峰流量为均值 3 倍且集中在 4 小时内
+    年存储 = 日请求量 * 每条记录字节数 * 365
 
-    @property
-    def peak_qps(self) -> float:
-        """假设高峰期流量是平均值的 3 倍，集中在 4 小时内"""
-        avg_qps = self.daily_requests / 86400
-        return avg_qps * 3
-
-    @property
-    def storage_per_year_gb(self) -> float:
-        """假设每个请求产生 2KB 数据"""
-        return (self.daily_requests * 2 * 1024 * 365) / (1024**3)
-
-    def summary(self) -> str:
-        return (
-            f"DAU: {self.dau:,}\n"
-            f"日请求量: {self.daily_requests:,}\n"
-            f"峰值 QPS: {self.peak_qps:.0f}\n"
-            f"年存储: {self.storage_per_year_gb:.1f} GB"
-        )
+输出摘要：DAU / 日请求量 / 峰值 QPS / 年存储
 
 # 示例：电商系统
-estimate = CapacityEstimate(dau=500_000, actions_per_user=20)
-print(estimate.summary())
+估算(500_000, 20)
 # DAU: 500,000 | 日请求量: 10,000,000 | 峰值 QPS: 347 | 年存储: 6.8 TB
 ```
 
@@ -130,7 +110,7 @@ UI层 → 应用层 → 领域层 → 基础设施层
        端口接口  ←  适配器实现
 
 ❌ 危险信号：
-- 领域层引用了框架包（Spring、Django 等）
+- 领域层引用了具体框架包（框架名出现在领域代码中）
 - 基础设施细节泄漏到 API 响应（数据库 ID 格式、内部错误栈）
 - 两个服务互相直接调用（循环依赖）
 ```
@@ -149,7 +129,7 @@ UI层 → 应用层 → 领域层 → 基础设施层
 ## 📊 技术选型决策矩阵
 
 ```markdown
-| 维度         | 权重 | 方案 A（PostgreSQL）| 方案 B（MongoDB）| 方案 C（DynamoDB）|
+| 维度         | 权重 | 方案 A（关系型）| 方案 B（文档型）| 方案 C（键值/宽列型）|
 |-------------|------|--------------------|--------------------|---------------------|
 | 查询灵活性   | 30%  | 9                  | 7                  | 4                   |
 | 水平扩展能力 | 25%  | 5                  | 7                  | 9                   |
@@ -175,8 +155,8 @@ UI层 → 应用层 → 领域层 → 基础设施层
 ```bash
 # 示例：检测模块间的循环依赖
 # 在 CI 中运行，失败则阻塞合并
-jdeps --module-path target/modules -dotoutput deps.dot
-python check_circular_deps.py deps.dot --fail-on-cycle
+# 用所选工具链的依赖分析命令生成模块依赖图，
+# 检出循环即以非零退出码失败并阻塞合并
 
 # 示例：检测领域层对基础设施的非法依赖
 grep -r "import.*infrastructure" src/domain/ && echo "领域层不应依赖基础设施层" && exit 1
@@ -201,4 +181,4 @@ grep -r "import.*infrastructure" src/domain/ && echo "领域层不应依赖基�
 > "这个需求有两种实现路径。方案 A 用同步 RPC，实现快但引入了运行时耦合——支付服务挂了订单服务也挂。方案 B 用事件驱动，延迟会增加 200ms 但两个服务完全解耦。考虑到我们的 SLA 允许 500ms 延迟，且支付服务月均故障 2 次，我倾向方案 B。团队怎么看？"
 
 **挑战假设示例：**
-> "你提到要用 Redis 做分布式锁。如果 Redis 主节点宕机，在 failover 期间锁会丢失。这个场景下数据不一致的影响有多大？如果不可接受，我们可能需要 Redlock 或换用 ZooKeeper。"
+> "你提到要用缓存服务做分布式锁。如果锁服务主节点宕机，在 failover 期间锁会丢失。这个场景下数据不一致的影响有多大？如果不可接受，我们可能需要更严格的共识方案，或换用带一致性保证的协调服务。"

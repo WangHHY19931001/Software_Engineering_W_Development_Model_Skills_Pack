@@ -8,7 +8,7 @@
 
 ### 0. 按阶段分节加载导引
 
-> 编排者进入某阶段前，按本导引只加载该阶段所需分节，避免一次性载入全文（反模式 #5）。
+> 编排者进入某阶段前，按本导引只加载该阶段所需分节（约束 #6）：本文件较大，禁止一次性载入全文（反模式 #5）。**本节是本文件唯一的加载导引**（历史「§0 按需分节加载导引」表与「## 加载导引」节已收敛至本节，不再各自维护）。
 > 各阶段对应分节如下：
 
 | 阶段       | 加载分节                                                 | 对应表格                                                          |
@@ -23,6 +23,16 @@
 | 8 验收测试 | §1 + §2 + §3（阶段 8 行）+ §5 编码链 + §6.3（阶段 8 门） | §3 阶段 8 验收测试三行；§5 编码链表；§6.3 阶段 8 门禁             |
 | 返工循环   | §4 返工循环分派 + §1（R 角色）+ §6.2                     | §4 返工循环表 + S-emergency-fix 表                                |
 | 全阶段通用 | §1 角色速查 + §7 反模式→check 映射                       | §1 角色表 + §7 反模式映射表                                       |
+
+按触发场景加载（首次分派 / S 拆分 / 返工根因 / 豁免审批 / 紧急修复；历史「§0 按需分节加载导引」表的等价并入）：
+
+| 触发场景                                   | 只读章节                                                                                                                          |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| 首次分派子代理（谁做 / 何时派 / 禁做什么） | [§角色划分](#角色划分六类核心角色-o--s--v--g--a--r--r-iceberg-变体) + [§每阶段分派时序](#每阶段分派时序) + [§强制约束](#强制约束) |
+| 阶段 1–4 任务过重需拆分 S                  | [S 拆分机制](#s-拆分机制阶段-1-4-任务过重时)                                                                                      |
+| 返工需多角度根因定位                       | [R-lead 子代理分派模板](#r-lead-子代理分派模板多角度变体并行串行均可)                                                             |
+| 覆盖缺失 / 冲突 / 覆盖率不达标需豁免       | [豁免审批角色边界](#豁免审批角色边界)                                                                                             |
+| S 发现既有产物 bug 需紧急修复              | [S 子代理修改既有产物的边界](#s-子代理修改既有产物的边界)（S-emergency-fix 表见 §4）                                              |
 
 > 阶段 1-4 的 A 子代理 ingestion 子流程见 §2 注（A-chunk/A-cross/A-evolve 分别加载 ingestion-chunk/ingestion-cross/graph-guide）。
 > 阶段 5-8 进入 CHECKPOINT 时另跑 `ensure-codegraph.ts`（L1 codegraph CLI 必需 + superpowers 宿主技能目录（≥3 关键技能，只检测不安装）/ L2 技能包 `references/superpowers-adoption.md` / L3 项目 `docs/superpowers/`；codegraph CLI 缺失自动安装、superpowers 只检测不安装；MCP 注册仅可选加速、未注册不出 CHECKPOINT；superpowers 三层缺失 → CHECKPOINT）。详见 §5 依赖引导。
@@ -81,7 +91,7 @@ O: 若通过 → 🔴 CHECKPOINT · 阶段门放行（展示 G 证据 + RTM cove
 O: 用户放行 → 更新 project.status → 进入下一阶段
 ```
 
-> 本图为精简时序，省略两个强制环节：阶段 1-4 的「A-lead 多角色讨论分析」（persona 矩阵见 agent-personas.md「阶段角色集矩阵」节）与阶段门放行前的「ICEBERG-B 冰山扫掠」（见 iceberg-sweep-guide.md）。全量时序（含 V/G 失败链与 ICEBERG-A/B 回路）以本文正文「每阶段分派时序」节的全版图为准。
+> 本图为**摘要（权威=正文）**，省略两个强制环节：阶段 1-4 的「A-lead 多角色讨论分析」（persona 矩阵见 agent-personas.md「阶段角色集矩阵」节）与阶段门放行前的「ICEBERG-B 冰山扫掠」（见 iceberg-sweep-guide.md）。全量时序（含 V/G 失败链与 ICEBERG-A/B 回路）以本文正文「每阶段分派时序」节的全版图为准，本节不作为独立权威。
 
 > 阶段 1-4 ingestion 子流程（A→G 路径）：O 跑 plan-chunks.ts → A-chunk ×N → A-cross/A-evolve → G 跑 check-requirement-graph.ts → 收敛循环（MAX_ROUNDS=5）→ CHECKPOINT 收敛确认 → S 产出。
 
@@ -340,7 +350,7 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------- |
 | `check-budget.ts .w-model/budget.json --project=.w-model/project.json --run-log=.w-model/run-log.jsonl --phase=N`（**必带** `--run-log`；不传时 R6/R5-b 不生效，仅输出非阻断诊断——口径见 `data-models.md`「用量实效校验」段） | 预算检查                                                     | 每阶段门放行前        |
 | check-run-log                                                                                                                                                                                                                 | run-log 完整性 + 字段 schema + R3 记录数                     | 每阶段门放行前        |
-| check-maturity                                                                                                                                                                                                                | 成熟度判定                                                   | 每阶段门放行前        |
+| `check-maturity.ts .w-model/maturity.json --project=.w-model/project.json --run-log=.w-model/run-log.jsonl --prev-status=<上一状态>`（**必带** `--run-log`，缺省时仅出非阻断诊断且仍 exit 0；`--project` 与 `--prev-status` 随 `--run-log` 一并传，project.json 无历史可依时省略 prev——`--prev-status` 须与 `--project` 同时提供否则 exit 2，R7 转移合法性判定仅在 prev+current 同时提供时生效） | 成熟度判定                                                   | 每阶段门放行前        |
 | check-checkpoint                                                                                                                                                                                                              | CHECKPOINT acknowledgedDecisions 关键词                      | 每阶段门放行前        |
 | check-preventive-review                                                                                                                                                                                                       | R3 三份报告完整性（--variant=standard/fix/emergency/ingest） | V 评审前（always-on） |
 
@@ -439,27 +449,9 @@ scoped re-review 只改变「S-fix 之后那次 V 复审的**范围**」（只�
 
 > 数据来源：SKILL.md + subagent-delegation.md + phase-1~8-*.md + hard-constraints.md；本矩阵随版本演进，以当前 SKILL.md 为准。
 
-> **§0 按需分节加载导引**（约束 #6）：本文件较大，按下表只读所需节，禁止整文件载入上下文。
->
-> | 触发场景                                   | 只读章节                             |
-> | ------------------------------------------ | ------------------------------------ |
-> | 首次分派子代理（谁做 / 何时派 / 禁做什么） | 角色划分 + 每阶段分派时序 + 强制约束 |
-> | 阶段 1–4 任务过重需拆分 S                  | S 拆分机制                           |
-> | 返工需多角度根因定位                       | R-lead 子代理分派模板                |
-> | 覆盖缺失 / 冲突 / 覆盖率不达标需豁免       | 豁免审批角色边界                     |
-> | S 发现既有产物 bug 需紧急修复              | S 子代理修改既有产物的边界           |
->
-> 下方「加载导引」节给出更细的锚点加载策略。
+> **按需加载**：唯一加载导引是文首 [§0 按阶段分节加载导引](#0-按阶段分节加载导引)（按阶段表 + 按触发场景表）；历史「## 加载导引」节已并入其中，本锚点处不再重复枚举。
 
-## 加载导引
-
-> 本文件较长，按需分段加载，避免一次性全量载入。加载策略如下：
-
-- **首次分派只读**：编排者首次分派子代理前，只读 [§角色划分](#角色划分六类核心角色-o--s--v--g--a--r--r-iceberg-变体) + [§每阶段分派时序](#每阶段分派时序) + [§强制约束](#强制约束) 三节，建立「谁来做 / 何时派 / 什么不能做」的最小认知，即可开始分派。
-- **§S 拆分机制**：阶段 1–4 首次分派 S 子代理时加载（见 [S 拆分机制（阶段 1–4 任务过重时）](#s-拆分机制阶段-1-4-任务过重时)），判断是否需将 S 拆为 S-doc / S-tla / S-bdd / S-ingest 变体。
-- **§R-lead**：按场景触发——V/G 命中返工且需多角度根因定位时加载（见 [R-lead 子代理分派模板](#r-lead-子代理分派模板多角度变体并行串行均可)）。
-- **§豁免审批**：按场景触发——出现覆盖缺失 / conflicts-with / 覆盖率不达标等需豁免事项时加载（见 [豁免审批角色边界](#豁免审批角色边界)）。
-- **§S-emergency-fix**：按场景触发——S 子代理发现既有产物 bug 且阻塞当前阶段推进、需走紧急修复通道时加载（见 [S 子代理修改既有产物的边界](#s-子代理修改既有产物的边界)）。
+## 文档定位与强制等级
 
 > SSoT §3.4（`docs/skill-design-document_SSoT.md`） 为权威定义，本文件为可执行细则。
 >
@@ -632,13 +624,13 @@ phase: <N - 名称>
 - **单一产出类型**：doc / tla / bdd / code / review / gate / rootcause 之一；混合产出 → 用既有变体拆分（S-doc / S-tla / S-bdd、S-plan / S-coding / S-finalize、R-lead / R-persona）。
 - **单一阶段**：越阶段 → 拆分。
 - **输入文件 ≤ 5 个**：超出 → 用 `brief.md` 聚合路径列表，子代理按需 `Read`，禁止全量塞入 brief。
-- **产出文件 ≤ 3 个**：超出 → 拆分为多次分派。
+- **产出文件数由该产出类型的契约定义**（不设通用条数上限）：类型内文件数按既有产出契约判定，O 不另设数字上限——阶段 1 文档档为主文档 + 7 个独立子文件（固定文件名契约，见 [phase-1-requirements.md](phase-1-requirements.md)「执行方法论」；各阶段子模板清单见对应 phase-N-*.md「执行方法论」）；S-doc / S-tla / S-bdd 的产出清单见本文「S 拆分机制」节。实际产出超出该类型契约 → 按模块 / 层级拆分为多次分派。
 - **预期单次往返**：复杂任务须先拆；子代理 `BLOCKED` / 轮次膨胀 / 产出质量稀释 → O 拆分后重派（**不计入返工 round**，属编排拆分而非质量返工）。
 
 **过重信号**（命中即拆分重派）：
 
 - 子代理返回 `NEEDS_CONTEXT` ≥ 2 次（上下文过大信号）
-- 单次 `output.md` 超过该角色预算（doc ≤ 1 文件、review ≤ 1 JSON、gate ≤ 1 摘要、rootcause ≤ 1 报告）
+- 单次 `output.md` 超过该角色交接预算（`output.md` 每分派恰 1 份：doc 报告 / review JSON / gate 摘要 / rootcause 报告各 ≤ 1；**指 `output.md` 本身，不是产出类型契约定义的真实产物文件数**）
 - 子代理主动报告"任务过大 / 需要拆分"
 
 ### 任务合并与审查面（merge & single review surface）
@@ -682,7 +674,7 @@ V-01: Read handoff/phase1-S-01/output.md → 产出 → Write output.md + status
 ## 每阶段分派时序
 
 ```
-O: 路由 + 读状态 + 检查前置产物 + 加载最小引用集（SKILL.md + 当前阶段 phase-N）
+O: 路由 + 读状态 + 检查前置产物 + 加载最小引用集（内容定义见 SKILL.md「执行工作流」第 3 步，不在此复述）
 O: 🔴 CHECKPOINT · 项目初始化（首次）或阶段进入确认
   ↓ 阶段 1-4：分派 A-lead 多角色讨论分析（并行多轮交叉至收敛，persona 按 agent-personas.md「阶段角色集矩阵」选用；阶段 5-8 跳过本步）
 A-lead: 多视角分析 → 共识纪要（S 唯一落笔）
@@ -783,12 +775,13 @@ O 分派时声明的**任务开始前必须成立的可核验命题**清单。�
 角色：产出子代理（S）
 当前 W 模型阶段：<阶段 N - 名称>
 任务：按 phase-<N>-*.md 产出本阶段开发产物 + 同步测试设计 + 更新 RTM 实体
+模型档位：<显式指定，不得省略（省略即静默继承编排者会话模型）；按阶段产物规模 / 复杂度 / 风险定档 — 判据见 estimation-guide.md「模型档位 × 修复轮次 escalation」>
 前置条件（派单契约，O 派单前逐条自证）：
   - 上游产物路径已落盘且可 Read（O 贴路径清单）
   - 当前 RTM（.w-model/rtm.json）可解析且含上游实体
 上下文：
-  - 项目状态：.w-model/project.json（已附）
-  - 当前 RTM：.w-model/rtm.json（已附）
+  - 项目状态：.w-model/project.json（指针型：只写路径，不附内容，见「交接目录协议」节 brief.md 行）
+  - 当前 RTM：.w-model/rtm.json（同指针型：只写路径，不附内容）
   - 上游产物路径：<列出已放行的上游产物路径>
   - 技术栈：<从 project.json.techStack 读取>
 必读：
@@ -904,7 +897,7 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 任务：读单个 chunk，提取本阶段节点类型实体，产出 <chunk-id>.{md,json}
 前置条件（派单契约，O 派单前逐条自证）：
   - chunk 路径存在且可 Read
-  - 图谱分析上下文材料已附（全局目录树摘要 + 相邻 chunk 标题列表，见下方上下文）
+  - 图谱分析上下文材料见下方上下文节（全局目录树摘要 + 相邻 chunk 标题列表）
 上下文：
   - chunk 路径：<文件路径>
   - chunk-id：<chunk-001>
@@ -1151,7 +1144,7 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 任务：诊断 V/G 命中的返工问题根因，产出 RootCauseReport
 
 前置条件（派单契约，O 派单前逐条自证）：
-  - V/G 的 reworkHints（原文）与失败产物路径已附
+  - V/G 的 reworkHints（原文）与失败产物路径以指针给到（指针型：只写路径，不附内容，见「交接目录协议」节）
   - 失败产物路径已落盘且可 Read
 
 上下文：
@@ -1279,7 +1272,7 @@ superpowers 编码链（S-plan → S-coding → S-finalize）每段须额外产�
 
 前置条件（派单契约，O 派单前逐条自证）：
   - 线索来源齐备：reworkHints 历史 / fixedPoints / 关联 RootCauseReport 路径（icebergRound>1 另加上一轮 IcebergSweepReport 路径）
-  - 全阶段产物路径已附且可 Read
+  - 全阶段产物路径以指针给到且可 Read（指针型：只写路径，不附内容，见「交接目录协议」节）
 
 上下文：
   - 线索来源：
@@ -1343,7 +1336,7 @@ superpowers 编码链（S-plan → S-coding → S-finalize）每段须额外产�
 
 前置条件（派单契约，O 派单前逐条自证）：
   - R 报告 JSON + .md 路径已落盘且可 Read
-  - 失败产物路径与上游产物路径已附且可 Read
+  - 失败产物路径与上游产物路径以指针给到且可 Read（指针型：只写路径，不附内容，见「交接目录协议」节）
 
 上下文：
   - 待复审 R 报告 JSON 路径：<路径>
@@ -1439,7 +1432,7 @@ V 产物三硬约束（D-10，输出 JSON 前逐条自检；违反任一即返�
 任务：分派 N 个 R-persona 子代理（并行或串行均可，依宿主能力）→ 聚合产出最终 RootCauseReport
 
 前置条件（派单契约，O 派单前逐条自证）：
-  - 同 R 模板前置：V/G reworkHints（原文）与失败产物路径已附，失败产物可 Read
+  - 同 R 模板前置：V/G reworkHints（原文）与失败产物路径以指针给到（指针型：只写路径，不附内容，见「交接目录协议」节），失败产物可 Read
   - persona 选择矩阵候选（rootCause.category 初判）与宿主分派方式（parallel | serial | single-session-degraded）已在上下文声明
 
 上下文：
@@ -1861,7 +1854,7 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 角色：产出子代理（S）- 豁免请求变体
 任务：识别需豁免项，产出 exemption-request.json
 前置条件（派单契约，O 派单前逐条自证）：
-  - 豁免申请材料已附且可 Read（V 评审 reworkHints 中的覆盖缺失/conflicts-with/覆盖率不达标项 + 需求规格路径）
+  - 豁免申请材料以指针给到且可 Read（V 评审 reworkHints 中的覆盖缺失/conflicts-with/覆盖率不达标项 + 需求规格路径；指针型：只写路径，不附内容，见「交接目录协议」节）
 上下文：
   - 豁免来源：<V 评审 reworkHints 中的覆盖缺失/conflicts-with/覆盖率不达标项>
   - 需求规格路径：<路径>
@@ -1924,7 +1917,7 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 ## 与现有约束的兼容性
 
 - **约束 4「真实执行」**：G 子代理跑脚本 + 回填退出码 = 真实执行，不冲突。
-- **约束 6「按需加载」**：子代理按需加载对应 `phase-N-*.md`，编排者只加载 `SKILL.md` + 状态文件，加载面更窄。
+- **约束 6「按需加载」**：子代理按需加载对应 `phase-N-*.md`，编排者只加载最小引用集（权威定义见 SKILL.md「执行工作流」第 3 步），加载面更窄。
 - **约束 2「阶段门放行」**：G 子代理返回证据 → 编排者展示给用户 → CHECKPOINT 等待，不冲突。
 - **[`verifier-spec.md`](verifier-spec.md) §7.6「外部 Agent 执行」**：V 子代理即「外部 Agent」，边界一致。
 - **[`agent-personas.md`](agent-personas.md) 4 个 Persona**：V 子代理按 `targetKind` 选用，无改动。

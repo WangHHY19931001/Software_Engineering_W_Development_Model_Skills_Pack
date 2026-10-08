@@ -131,7 +131,7 @@
 | A3 | 设计期迷雾 vs 阶段 1 迷雾 | 分层权威：需求层=templates/requirement-spec.md §8.5「Not yet specified（迷雾登记册）」+ references/phase-1-requirements.md「迷雾登记册（Fog of War）」节；设计层=phase-2/3/4 迷雾节；通道划界四者互斥（ADR/decisions、迷雾册、非目标、Out of Scope） |
 | A4 | 可选能力 vs P2 需求 | 两套「可选」显式划界：P2=范围内照常建图承担全部不变量；可选能力=不建图不产生对账义务（graph-guide.md「可选能力边界」节） |
 | B1 | fixHints vs reworkHints | fixHints=门禁常量表话术（G 产出）；reworkHints=V 评审产出（带 Severity 前缀）——R 是转写者（至多 3 条），两字段不混用（SSoT §10L.8 消费契约） |
-| B2 | sigHash v2 vs evidence provenance | sigHash=签名链条目完整性（篡改声明→R6 重算失败）；provenance=受控本机 source-bound 流程完整性（非密码学签名，command-reference.md「Source-bound provenance 边界」节）——两机制强度如实标注 |
+| B2 | 签名链哈希 vs 证据 provenance | sigHash=签名链条目完整性（篡改声明→R6 重算失败）；provenance=受控本机 source-bound 流程完整性（非密码学签名，command-reference.md「Source-bound provenance 边界」节）——两机制强度如实标注 |
 | B3 | scope 强制 vs 角色禁令 | scope 管「修复能碰什么」；角色禁令管「谁能跑什么」——互不替代 |
 | B4 | 派单契约 vs 角色边界 | 契约管「派什么/怎么验」；同文件角色边界管「谁能做什么」——两节互补不重复 |
 | B5 | L0-L4 视图 vs 既有轮次数值 | 收敛视图零新增数值：每任务 5 轮 / maxReworkRounds（perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载（D-4a 累计口径））/ maxIcebergRounds=5 均既有值引用（subagent-delegation.md L1/L2 行） |

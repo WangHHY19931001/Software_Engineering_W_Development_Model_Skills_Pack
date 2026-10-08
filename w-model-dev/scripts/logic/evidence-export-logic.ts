@@ -440,7 +440,10 @@ function sanitizeSensitiveAssignment(line: string): string {
   const key = match[2];
   const separator = match[3];
   if (leading === undefined || key === undefined || separator === undefined) return line;
-  if (!SENSITIVE_KEYS.has(normalizeSensitiveKey(key.trim()))) return line;
+  // 批次 8 rider：文本面（.md/.log/.txt 与 JSON 字符串值）与键路径共用 `isSensitiveKey`
+  // （含驼峰切分与词段精确相等），闭合 `refresh_token: abc`/`refreshToken: abc` 文本形态
+  // 不脱敏而 `token: abc` 脱敏的边界不一致（此前为整键规范化精确相等）。
+  if (!isSensitiveKey(key.trim())) return line;
   return `${line.slice(0, assignmentStart)}${leading}${key}${separator}${REDACTED}`;
 }
 function sanitizeString(value: string): string {
@@ -482,7 +485,9 @@ function splitMarkdownRow(line: string): MarkdownRow | null {
 }
 
 function isSensitiveCell(cell: MarkdownCell): boolean {
-  return SENSITIVE_KEYS.has(normalizeSensitiveKey(cell.value.trim()));
+  // 批次 8 rider：与 sanitizeSensitiveAssignment 同步改判 `isSensitiveKey`（含驼峰切分与
+  // 词段精确相等）——表头/键单元格 `refresh_token`/`refreshToken` 等驼峰/下划线家族同步脱敏。
+  return isSensitiveKey(cell.value.trim());
 }
 function isMarkdownSeparator(row: MarkdownRow): boolean {
   return row.cells.length > 0 && row.cells.every(({ value }) => value.trim() === '' || /^\s*:?-{3,}:?\s*$/.test(value));

@@ -317,7 +317,7 @@ graph LR
 #### 3.4.3 每阶段分派时序（统一）
 
 ```
-O: 路由 + 读状态 + 检查前置产物 + 加载最小引用集（SKILL.md + 当前阶段 phase-N）
+O: 路由 + 读状态 + 检查前置产物 + 加载最小引用集（定义见 SKILL.md「执行工作流」第 3 步）
 O: 🔴 CHECKPOINT · 项目初始化（首次）或阶段进入确认
   ↓ 分派 S
 S: 产出开发文档 + 同步测试设计 + 更新 RTM 实体 → 返回 {产物路径, RTM diff}
@@ -337,7 +337,7 @@ O: 用户放行 → 编排者更新 project.status → 进入下一阶段
 #### 3.4.4 与现有约束的兼容性
 
 - **约束 4「真实执行」**：G 子代理跑脚本 + 回填退出码 = 真实执行，不冲突。
-- **约束 6「按需加载」**：子代理按需加载对应 `phase-N-*.md`，编排者只加载 `SKILL.md` + 状态文件，加载面更窄。
+- **约束 6「按需加载」**：子代理按需加载对应 `phase-N-*.md`，编排者只加载最小引用集（权威定义见 [`SKILL.md`](../w-model-dev/SKILL.md)「执行工作流」第 3 步），加载面更窄。
 - **约束 2「阶段门放行」**：G 子代理返回证据 → 编排者展示给用户 → CHECKPOINT 等待，不冲突。
 - **`verifier-spec.md` §1 设计原则（外部 Agent 执行）**：V 子代理即「外部 Agent」，边界一致。
 - **`agent-personas.md` 4 个 Persona**：V 子代理按 `targetKind` 选用，无改动。
@@ -439,9 +439,9 @@ L0 文档（`SKILL.md` / `references/` / `templates/` / `examples/` / `subagent/
 
 **三层资产契约**：
 
-- 数据源 = `eval/w-model-dev-test-prompts.json`（60 条，含 category/route 字段）；
+- 数据源 = `eval/w-model-dev-test-prompts.json`（101 条，其中 75 条带 category/route 字段）；
 - 视图 = `w-model-dev/references/activation-guide.md`（13 个 `## <code> <canonical 名>` 节，示例行 `- id=N: <prompt 原文>`，每节另含判定理由与边界说明——何时升级为 ask/enable）；
-- 一致性 = `eval/mappings.json` 顶层 matrix 声明 + `eval/runner.ts` coverageMatrix 五项校验（route 对齐 / 总数符合声明 / 每类别 ≥ minPerCategory / guide 节示例数 == 语料条数 / 每负向类别 ≥1 组 notContains 守卫）。`npm run eval` 已纳入 pre-push 第 19 项门禁（触发边界快追，2026-09-07 纳入时为第 18 项，2026-09-18 插入第 13 项覆盖口径门后顺延）。
+- 一致性 = `eval/mappings.json` 顶层 matrix 声明 + `eval/runner.ts` coverageMatrix 六项校验（route 对齐 / 总数符合声明 / 每类别 ≥ minPerCategory / guide 节示例数 == 语料条数 / 每负向类别 ≥1 组 notContains 守卫 / `w-model-dev/references/*.md` 实况文件集被映射路径并集全覆盖）。`npm run eval` 已纳入 pre-push 第 19 项门禁（触发边界快追，2026-09-07 纳入时为第 18 项，2026-09-18 插入第 13 项覆盖口径门后顺延）。
 
 **触发面分层**：SKILL.md frontmatter description 保留一句英文反例信号（作用于技能加载器的匹配面）；触发决策表"不启用"行含十类速览并链接 activation-guide.md；完整判定细则只在 activation-guide.md 按需加载——常驻面增量 ≤15 行。
 
@@ -1668,14 +1668,7 @@ npx tsx w-model-dev/scripts/cli/check-rootcause-report.ts "<rootcause-report.jso
 
 > **R11 强制面边界（如实陈述）**：门禁只校验 persona 选择的**合法性**（矩阵内）与**第一键交集**。数量约束（默认 3 / 上限 5）与 `incident-response-commander` 必含**不门禁强制**——它们是分派默认，由编排者按 `agent-personas.md` §4 与 token 预算（`budget-logic.ts` R4-A）执行。第二键（风险域信号）因报告未声明信号字段亦不门禁强制，仅作分派指导。
 
-R10 维护契约（docs-consistency source×clause 语义门）：
-<r10-contract id="canonical-name" relation='{"canonicalPersona":"testing-reality-checker"}'>canonical persona is testing-reality-checker</r10-contract>
-<r10-contract id="threshold" relation='{"canonicalPersona":"testing-reality-checker","confidenceMinimum":0.5}'>testing-reality-checker confidence >= 0.5</r10-contract>
-<r10-contract id="legacy-fallback" relation='{"legacyPersona":"reality-checker","fallbackWhen":"canonical-absent"}'>legacy reality-checker is fallback only when canonical is absent</r10-contract>
-<r10-contract id="same-artifact-dedupe" relation='{"artifactRelation":"same","precedence":"canonical-first","duplicateCount":"once"}'>same artifact canonical-first and not counted twice</r10-contract>
-<r10-contract id="cross-artifact-conflict" relation='{"artifactRelation":"different","conflict":"fail-closed"}'>different artifact conflict is fail-closed</r10-contract>
-<r10-contract id="canonical-duplicate" relation='{"persona":"canonical","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>canonical > 1 duplicate is fail-closed</r10-contract>
-<r10-contract id="legacy-duplicate" relation='{"persona":"legacy","duplicateThreshold":1,"duplicatePolicy":"fail-closed"}'>legacy > 1 duplicate is fail-closed</r10-contract>
+> **R10 维护契约（设计语境；XML 不复制）**：R10 的结构化维护契约由 docs-consistency 门禁按「**单一权威全文 + 消费方指针**」复核——R10 contract XML 权威定义见 `verifier-spec.md` §7.5（链接：[verifier-spec §7.5](../w-model-dev/references/verifier-spec.md)）；`agent-personas.md` / `root-cause-locator.md` / `command-reference.md` 与本 SSoT 只保留消费语境与指针，复制 XML 或缺失指针均 fail-closed。语义权威为上表 R10 行（canonical `testing-reality-checker` / confidence ≥ 0.5 / legacy fallback / 去重与冲突 fail-closed）。
 
 **退出码**：`0=通过 / 1=校验失败 / 2=输入错误`（与现有脚本约定一致）。
 
@@ -1823,6 +1816,7 @@ interface BudgetConfig {
   updatedAt: string;
   perPhase: {
     maxTokens: number;
+    maxSubagentSpawns?: number;
   };
   project: {
     maxTokensTotal: number;
@@ -1836,7 +1830,8 @@ interface BudgetConfig {
 }
 ```
 
-> 43.0.0 A5：`perPhase.maxSubagentSpawns` / `perPhase.maxReworkRounds` / `project.maxTokensPerSession` 三个零消费死字段已删除（审计证实无任何门禁脚本消费）；旧数据携带这些字段被 `additionalProperties:false` 拒绝（毁弃存量，不兼容）。阶段返工轮次上限由 `killSwitch.consecutiveReworks`（D-4a 口径）与分层反馈回路（L0-L4）承载。
+> 43.0.0 A5：`perPhase.maxReworkRounds` / `project.maxTokensPerSession` 两个零消费死字段保持退役（审计证实无任何门禁脚本消费）；旧数据携带这两个字段被 `additionalProperties:false` 拒绝（毁弃存量，不兼容）。阶段返工轮次上限由 `killSwitch.consecutiveReworks`（D-4a 口径）与分层反馈回路（L0-L4）承载。
+> 43.2.0（决策 5）：`perPhase.maxSubagentSpawns` **回归**——A5 曾按零消费死字段删除（`eacc8d6a`），本版 `check-budget.ts` R7 消费之（阶段 ΣsubagentSpawns 严格超限 → blocking，`estimated=true` 记录不计入），字段可选（缺字段时 R7 跳过并出非阻断诊断；口径成文见 [`data-models.md`](../w-model-dev/references/data-models.md)「子代理分派数实效校验（R7）」段）。
 
 - `onExceed=pause`：暂停后续子代理分派，🔴 CHECKPOINT · 预算告警，等用户决定（增预算/降范围/取消）
 - `onExceed=notify`：仅在 run-log 记录告警，继续执行（适合 L2+ 自主度）
@@ -1928,10 +1923,11 @@ interface RunLogEntry {
 1. 读取 budget.json
 2. 汇总 run-log.jsonl 中本阶段（phase=N）所有记录的 tokens 总和 = phaseTokensUsed
 3. 汇总 run-log.jsonl 中全项目 tokens 总和 = projectTokensUsed
-4. 判定：超 maxTokens / maxTokensTotal → 触发告警（用量实效 R6/R5-b，D-4b）；killSwitch 任一条件满足 → 触发 kill switch
-5. 按 onExceed 处置：pause（🔴 CHECKPOINT）/ notify（run-log 记录）/ halt（回退阶段起点）
+4. 汇总 run-log.jsonl 中本阶段（phase=N）所有记录的 subagentSpawns 总和 = phaseSpawnsUsed（`estimated=true` 记录不计入，R7，43.2.0 决策 5）
+5. 判定：超 maxTokens / maxTokensTotal → 触发告警（用量实效 R6/R5-b，D-4b）；ΣsubagentSpawns > maxSubagentSpawns → R7 blocking（43.2.0，字段可选：未配置则跳过并出非阻断诊断）；killSwitch 任一条件满足 → 触发 kill switch
+6. 按 onExceed 处置：pause（🔴 CHECKPOINT）/ notify（run-log 记录）/ halt（回退阶段起点）
 
-> 43.0.0 A5：原步骤 3「汇总 subagentSpawns = phaseSpawns」及步骤 5 判定枚举中的 `maxSubagentSpawns` 已随该死字段退役删除——子代理分派次数从未有任何门禁消费（审计证实零消费）。
+> 43.0.0 A5 → 43.2.0（决策 5）：原步骤「汇总 subagentSpawns」曾随 `maxSubagentSpawns` 按零消费死字段退役（A5）；43.2.0 该字段回归（可选）并由 `check-budget.ts` R7 消费，故本表恢复对应步骤（聚合口径 = 按阶段 + `estimated=true` 不计入，成文见 [`data-models.md`](../w-model-dev/references/data-models.md)「子代理分派数实效校验（R7）」段）。
 
 ### 10D.6 关键约束
 
@@ -1950,6 +1946,7 @@ interface RunLogEntry {
 - **killSwitch 告警**：killSwitch 任一触发条件满足（`consecutiveReworks` / `budgetBurnRate` / `tlaReworks`）时须产出告警（run-log 记录 + 🔴 CHECKPOINT 展示消耗明细），不得静默；`check-budget.ts` 校验 killSwitch 触发但 run-log 无对应告警记录 → 退出码 1。
 - **killSwitch 返工计数口径（D-4a，对齐真实事件）**：`check-budget.ts` 的 `reworkCount` 按**真实事件**累计——`action=fix`（批次 6 A15：rework/emergency-fix 死词已删除，返工事件载体为 fix）**或** `outcome ∈ {fail, rework}` 的记录各计 1 条（`countReworks` 已导出以供测试）；它是「返工事件 + 未过门事件」的**累计**条数而非「连续 N 轮返工」的滑动窗口，`consecutiveReworks` 实际约束的是本阶段累计阈值（字段名沿用 schema，语义以本口径为准）；若提供 `--phase=N` 则只统计 `phase===N` 的记录。`tlaReworkCount` 为其中 note/target 含 TLA 的子集（未扩大 tla 判据：非返工记录即使提及 TLA 也不计入）。背景：真实 8 阶段调测的 run-log 中 `action=rework` 一条都没有（返工以 fix/fail 记录），旧口径只数 `action=rework` 会让护栏静默失灵。
 - **用量实效校验 R6 + burnRate 告警 R5-b（D-4b）**：预算配置合法 ≠ 用量在预算内。`check-budget.ts --run-log=<path>` 从 run-log 累计 tokens（只计有限非负数的 `tokens` 字段，坏值剔除否则 Σ 变 NaN 而判定静默永不触发），Σtokens(阶段) 严格大于 `perPhase.maxTokens` 或 Σtokens(全量) 严格大于 `project.maxTokensTotal` → **blocking（退出码 1）**（消息以 `R6：` 开头并附超限占比；恰等于上限不算超限）；Σtokens(阶段) ≥ `budgetBurnRate` × `perPhase.maxTokens` → killSwitch 用量告警（消息以 `R5-b：` 开头，与 R5 既有返工/TLA 文案区分）。**未接线不静默（D-5②/N-6）**：未提供 `--run-log` 时 R5 触发检测与 R6/R5-b 一并跳过（退出码行为与新增前一字不变），但**不再静默**——CLI 输出非阻断诊断（跳过不等于通过）；故**权威调用表必带** `--run-log=.w-model/run-log.jsonl --phase=N`，不带接线属未接线运行。**Σtokens 为上界口径（宁严不松）**：同一分派的多条归账重复累计、判超限不去重——分组键与键守卫、疑似重复归账诊断、R3 三条目归账约定以及 Σtokens=0 / 读取失败两条边界的完整口径，见 `w-model-dev/references/data-models.md`「用量实效校验」段（R6）与其「Σtokens 为上界口径」条。
+- **子代理分派数实效校验 R7（决策 5，43.2.0）**：预算配置合法 ≠ 分派次数在预算内。`check-budget.ts --run-log=<path> --phase=<N>` 按阶段聚合 run-log 的 `subagentSpawns`（只计有限非负数的字段值，`estimated=true` 的记录不计入——该形态本身已被 check-run-log R2 判 blocking，估算值不得占用分派额度），ΣsubagentSpawns(阶段) **严格大于** `perPhase.maxSubagentSpawns` → **blocking（退出码 1）**（消息以 `R7：` 开头；恰等于上限不算超限，与 R6 同口径）。**字段可选 + 跳过不静默**：未配置该字段（legacy/未启用）→ R7 不触发并出非阻断警告；未提供 `--run-log` 或未提供 `--phase`（按阶段聚合口径无定义）→ R7 跳过并出非阻断诊断（跳过不等于通过）。字段来龙去脉：A5 曾按零消费死字段删除（`eacc8d6a`），本版使约束成真故回归；完整口径见 `w-model-dev/references/data-models.md`「子代理分派数实效校验（R7）」段（R6/R5-b 段同址）。
 - **运行日志 4 类动作完备**：每个阶段 run-log.jsonl 须含 `chunk` / `cross` / `gate` / `checkpoint` 4 类动作记录（阶段 1–4 ingestion 含 `chunk`/`cross`；所有阶段含 `gate`/`checkpoint`）；缺类 → `check-run-log.ts` 退出码 1。
 - **返工须有 fix 记录**：任一返工发生后，run-log 须追加 `action=fix` 记录（`note` 填原因；批次 6 A15：原 `rework` 死词已删除，返工事件载体为 fix）；返工发生但无 fix 记录 → R3/R7 配对校验报出。
 - **R8 相对顺序约束（同生命周期段内动作链序）**：`check-run-log.ts` 对 phase 8 按 identity segment 校验 **S-fix → R3×3 → implementation V → implementation G → checkpoint**，rootcause R/V/G 不混入实现链；legacy 缺身份记录不再吸收（批次 6 C14：`LEGACY_UNSCOPED`/deferred 已删除，旧形态 blocking `[schema]`），不用 phase-wide 首索引、最近记录或集合数量补齐。其他阶段保留兼容的阶段级轨迹校验。真实顺序缺失仍返回退出码 1。
@@ -2279,7 +2276,7 @@ interface RunLogEntry {
 | 子项 | 判据                                                                                                  | 依赖                                              |
 | ---- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
 | R15a | `evidenceAnchor` 缺失 / 空串 / 非字符串                                                               | 无（纯逻辑）                                      |
-| R15b | `evidenceStatus` 非法（缺失或不在枚举内）                                                             | 无（纯逻辑）                                      |
+| R15b | `evidenceStatus` 非法（缺失或不在枚举内）；`pending` 合法但未核验——放行前阻断，须转 `confirmed` 或走 evidence-anchor 豁免（`check-exemption` 第 6 类，ruleId=`R15b`） | 无（纯逻辑）                                      |
 | R15c | 锚点 `path` 部分在磁盘不存在                                                                          | CLI 注入真实路径集合                              |
 | R15e | `confirmed` 但签名链中无引用本节点的 V review 环                                                      | CLI 注入 signature-chain 条目                     |
 | R15f | 行号锚点（`path:L42` / `path:L42-58`）区间非法（`start<1` 或 `end<start`），或 `end` 超出文件内容行数 | CLI 注入 `path → 内容行数` 表（仅对行号锚点读盘） |
@@ -2512,6 +2509,28 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 
 ---
 
+## 10T. 批次 8：文档与协议一致性（43.2.0）
+
+**目标**：销账主规格 §7 全部 15 项（单一事实源修复 / 协议口径修正 / 计数与覆盖 / 资产质量 / 如实化标注；C15 纳入，裁定 R-B8-1）+ 增量规格 §3 三项（subagentSpawns 门禁化 / C19 eval 覆盖 / ai-native:134）+ 批次 7 执行期登记的 10 项 riders。文档与协议层收敛为主，唯一门禁行为新增为 `check-budget.ts` R7（见 §10D.7 与 CHANGELOG [43.2.0]）。
+
+**落点表**（完整清单见主规格 [specs/2026-10-06-w-model-remediation-design.md](./superpowers/specs/2026-10-06-w-model-remediation-design.md) §7 与增量规格 [specs/2026-10-07-remediation-leftovers-design.md](./superpowers/specs/2026-10-07-remediation-leftovers-design.md) §3；实施裁定登记见 [decision-log/rounds-50-docs-consistency.md](./changes/decision-log/rounds-50-docs-consistency.md)）：
+
+| 项 | 落点 |
+| --- | --- |
+| subagentSpawns 门禁成真（T2，决策 5，Breaking） | budget.schema.json（`maxSubagentSpawns` 回归，可选字段）/ budget-logic.ts（R7）/ check-budget.ts（ΣsubagentSpawns 按阶段聚合 + 跳过诊断）/ data-models.md「子代理分派数实效校验（R7）」段 |
+| 单一事实源修复（C3/C8/C9/C10） | SKILL.md（三步五门双副本收敛「编排者-子代理边界」节单点，工作流步骤 8 纯链接）/ verifier-spec.md（§4.2.1 编号重排 + §0/速查双表收敛 + §7.5 R10 XML 权威保留）/ root-cause-locator / command-reference / agent-personas / 本文档（R10 四处一行指针）/ subagent-delegation.md（§0 三重收敛）/ docs-consistency-logic.ts（R10 指针判定加固：非围栏 + 同段 + 否定拒斥 + 跨行，消费方三向 fail-closed） |
+| 协议口径修正（C11/C12/C13） | subagent-delegation.md（拆分预算改「单一产出类型 + 产出契约定义」/ S 模板指针措辞 + 模型档位字段）/ command-reference.md 规则 #3 改指针（最小引用集以 SKILL.md 为唯一权威） |
+| 计数与覆盖（C5/C7/C19） | hard-constraints.md「与门禁脚本的对应关系」节 + SKILL.md 资源计数（接线率 20/47 披露）/ eval/README 计数更正 + `.githooks/pre-push` 注释 60→68 / eval/runner.ts ⑥ references 覆盖断言 + mappings.json 68→101（45/45 全覆盖，routeTotals 42/9/24） |
+| 资产质量（C15/C17/C18） | data-models.md（EdgeType 12 类对齐，补 precedes / conflicts-with / cross-cuts 三扩展边）/ subagent/ 36 人格去栈化（参数级 1:1 改写跨栈表述）/ hard-constraints.md 反模式分级标注（47 通用 + 1 项目教训化石，判据=条目本体，R-B8-4） |
+| 如实化标注（C6/C20 + Loop 3/4） | decision-log rounds-50（round23 归档矛盾登记，归档零改写）/ event-ingress-guide.md + hill-climbing-guide.md 头部成熟度标注 / INSTALL.md（「门禁在仓库检出内跑」+ cp 排除 node_modules） |
+| 批次 7 riders（Fixed） | tla-logic.ts（Example 5 公平性按动作 WF + ReverseDirection 旅行边界守卫 / 空转检测直写+间接析取窗口 closure 级收口 / extractTlaDefBody 边界）/ evidence-export-logic.ts（文本面脱敏复用 isSensitiveKey）/ check-maturity.ts（`--rollback-approved` 无 `--prev-status` 非阻断诊断）/ SKILL.md + operational-recovery.md + command-reference.md（`--prev-status` 三处接线，`--project` 形态） |
+
+- **能力分工（不夸大）**：R7 为 run-log **自报字段**的实效校验（`estimated=true` 记录不计入），非外部计量；C19 覆盖断言只锁「映射存在且锚点命中承重行」，锚点语义质量仍由 eval 断言与人工评审承载；C6 为文档级矛盾消歧（归档零改写，登记即消歧位）；C9 指针判定为 fail-closed（文档回改复述会被 docs-consistency 抓获）。
+- **判据披露**：R7 在配置了 `maxSubagentSpawns` 且阶段分派数超限的既有输入上可能新增 red（字段可选、缺字段 R7 跳过并出非阻断警告——跳过不等于通过）。
+- **后续候选（本批不修，登记 rounds-50）**：模型档位全覆盖 20 处缺 / phase-1 表 6/7 张力 /「另读」vs「按需」措辞松紧等，见 [rounds-50「后续候选登记」表](./changes/decision-log/rounds-50-docs-consistency.md)。
+
+---
+
 ## 10.10 系统层级树与多层图谱
 
 > 本节确立系统层级树 + 7 层图谱模型。
@@ -2634,6 +2653,7 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | §10Q 测试系统工程类型学与冒烟准入 | 类型学总登记（层级×方法×策略三维，逐维度映射左右 V 阶段与四级门禁；登记不改变任何既有门禁判定）+ 模块测试显式化（集成的子层，阶段 3 模块维度→阶段 6 前置，D2）+ 冒烟准入（阶段 6/7/8 文档时序机制，零新脚本，D3）+ 测试设计协同绑定（复用 42.11.0 多角色机制，零新角色集，D5） | `w-model-dev/references/quality-standards.md`「测试系统工程类型学」节 + `w-model-dev/references/phase-6-integration-test.md` / `phase-7-system-test.md` / `phase-8-acceptance-test.md`「冒烟准入」节 + `w-model-dev/templates/test-case.md` 冒烟列 + `w-model-dev/references/phase-1-requirements.md` / `phase-2-system-design.md` / `phase-3-outline-design.md` / `phase-4-detailed-design.md`「测试用例设计」承接句 + `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 + `w-model-dev/references/bdd.md` + 本文档 §10Q | 完整（纯文档批次，零新脚本零 schema；D1-D3 推荐采定用户可推翻，见 [设计规格](./superpowers/specs/2026-10-04-test-systems-engineering-design.md)） |
 | §10R 批次 6（43.0.0）信任链关键修复 + legacy 全清除 | sigHash 单一 v3 公式（targetKind/gateExitCode/gateLogPath 入哈希，删 v1/v2 分流）+ VerifierOutput 必填 reviewedArtifacts 与 R19 evidence 归属 + R6 交叉校验默认化（gate-logs 目录约定）+ action enum 32→18 与 legacy 吸收机制全清除 + maturity level 变更 human 审批链与 history 链校验 + budget 死字段删除/estimated 违规化/R1 顺序化 + TLA+ cfg 终止符与 notRun 单一事实 + BDD fail-open 修复 + 脱敏后缀匹配 + 注入三条款与 L0 契约入包 | `w-model-dev/scripts/logic/signature-chain-logic.ts` / `verifier-logic.ts` / `run-log-logic.ts` / `maturity-logic.ts` / `budget-logic.ts` / `tla-logic.ts` + `w-model-dev/schemas/`（signature-chain / verifier-output / run-log / maturity / budget 五份字段级修改）+ `w-model-dev/scripts/cli/check-verifier-output.ts` / `check-run-log.ts` / `check-artifact-gate.ts` / `check-bdd-model.ts` + `w-model-dev/references/verifier-spec.md` / `subagent-delegation.md` / `signature-chain-guide.md` / `operational-recovery.md` / `data-models.md` + 本文档 §10R | 完整（毁弃存量数据不兼容为用户裁定，fixtures 机械重写；伪造成本提升到「须持有产物文件并重算哈希」，不提供密码学认证；见 [修复规格](./superpowers/specs/2026-10-06-w-model-remediation-design.md) §5 与 [裁定登记](./changes/decision-log/rounds-48-trust-chain.md)） |
 | §10S 批次 7（43.1.0）形式化与图谱门禁收严 | 归一化哈希（CRLF→LF 后 SHA-256，对 checkout 行尾配置免疫）+ 恒真不变式防御与 cfg CONSTRAINT 禁用 + tla-plus/bdd 指南修复与 §0 分节导引 + D4 L1 SKIPPED 证据与 variableCombination 推导注记 + 五类退化解负例与空转 Next 检测 + 图谱 depends-on 环检全 phase 与 evidenceStatus=pending violation 化 + RTM coverageStatus enum+必填与 project.status 转移校验（R7）及 8·9 常数统一 + `*_token` 词段命中脱敏 + 降级须 human 授权（R8，downgrade-approve 专属绑定）+ R6 第四判定首条 from==L0 | `w-model-dev/scripts/lib/reviewed-artifacts.ts` / `lib/constants.ts` / `logic/tla-logic.ts` / `bdd-logic.ts` / `graph-logic.ts` / `gate-logic.ts` / `maturity-logic.ts` / `evidence-export-logic.ts` + `w-model-dev/schemas/`（verifier-output / tla-manifest / rtm / project / graph / maturity / signature-chain 七份字段级修改）+ `w-model-dev/scripts/cli/check-bdd-model.ts` / `check-maturity.ts` / `check-run-log.ts` + `w-model-dev/references/tla-plus.md` / `bdd.md` / `graph-guide.md` / `data-models.md` / `operational-recovery.md` + `w-model-dev/scripts/samples/`（TLA/graph/maturity 负例 10 文件）+ `eval/e2e/demo-assets/build_workspace.py`（R6 迁移）+ 本文档 §10S | 完整（判据收紧不留兼容为用户裁定，三处 breaking 的存量迁移见 CHANGELOG 43.1.0「迁移」段；恒真不变式与空转 Next 为启发式防御，pending 违规化保留 check-exemption 豁免出口；见 [增量规格](./superpowers/specs/2026-10-07-remediation-leftovers-design.md) §2 与 [裁定登记](./changes/decision-log/rounds-49-formalization-gates.md)） |
+| §10T 批次 8（43.2.0）文档与协议一致性 | SKILL.md 三步五门双副本收敛单点（C3）+ verifier-spec §4.2.1 编号重排与 §0/速查双表收敛（C8）+ R10 contract XML 五处收敛单点与 docs-consistency 指针判定加固（C9）+ subagent-delegation §0 三重收敛（C10）+ 拆分预算改产出契约定义（C11）+ S 模板指针措辞与模型档位（C12）+ 最小引用集单点（C13）+ 强制接线率 20/47 披露（C7）+ eval/README 计数更正与 pre-push 注释同步（C5）+ EdgeType 12 类对齐（C15）+ 36 人格去栈化（C17）+ 反模式分级 47 通用/1 化石（C18，判据=条目本体）+ INSTALL 如实化两条（C20）+ round23 归档矛盾登记与 Loop 3/4 成熟度标注（C6）+ `perPhase.maxSubagentSpawns` 回归与 check-budget R7 成真（决策 5，Breaking）+ eval references 覆盖 45/45 断言与 mappings 68→101（C19）+ 批次 7 riders（Example 5 公平性 / 空转析取窗口收口 / 脱敏文本面 / `--prev-status` 三处接线） | `w-model-dev/SKILL.md` + `w-model-dev/references/`（verifier-spec / subagent-delegation / root-cause-locator / command-reference / agent-personas / hard-constraints / data-models / evidence-anchored-tree / operational-recovery / event-ingress-guide / hill-climbing-guide）+ `w-model-dev/subagent/`（36 人格）+ `w-model-dev/schemas/budget.schema.json` + `w-model-dev/scripts/logic/`（budget-logic / docs-consistency-logic / tla-logic / evidence-export-logic）+ `w-model-dev/scripts/cli/check-budget.ts` / `check-maturity.ts` + `w-model-dev/scripts/samples/budget/`（5 fixtures 同步）+ `eval/mappings.json` / `eval/runner.ts` + `docs/INSTALL.md` + `.githooks/pre-push`（注释）+ `docs/changes/decision-log/rounds-50-docs-consistency.md` + 本文档 §10T | 完整（R7 字段可选、缺字段跳过并出非阻断警告——跳过不等于通过；C9 指针 fail-closed；round23 归档零改写；见主规格 §7、增量规格 §3 与 [裁定登记](./changes/decision-log/rounds-50-docs-consistency.md)） |
 | 11A 采用路径                                 | greenfield vs brownfield 引入 W 模型                                                                                                                                                                                                                                                                                                                           | `docs/adoption-guide.md`                                                                                                                                                                                                                                                                                                           | 完整（吸收自 addyosmani/agent-skills `docs/adoption-guide.md`）                                                                                                                                     |
 
 ---

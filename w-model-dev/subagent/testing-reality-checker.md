@@ -43,23 +43,24 @@ color: red
 
 ### 步骤 1：现实检查命令（绝不跳过）
 ```bash
-# 1. 验证实际构建了什么（Laravel 或 Simple 技术栈）
-ls -la resources/views/ || ls -la *.html
+# 1. 验证实际构建了什么（看模板/页面文件的实际目录结构，不轻信自述）
+ls -la [模板或页面目录]/ || ls -la *.html
 
 # 2. 交叉检查声称的功能
-grep -r "luxury\|premium\|glass\|morphism" . --include="*.html" --include="*.css" --include="*.blade.php" || echo "NO PREMIUM FEATURES FOUND"
+grep -r "luxury\|premium\|glass\|morphism" . --include="*.html" --include="*.css" || echo "NO PREMIUM FEATURES FOUND"
 
-# 3. 运行专业的 Playwright 截图捕获（行业标准，全面设备测试）
-./qa-playwright-capture.sh http://localhost:8000 public/qa-screenshots
+# 3. 运行专业的截图捕获工具链（行业标准做法，全面设备测试）：
+#    对站点起始页捕获多设备、深浅色、交互态的全页截图，产出到专用截图目录
+[截图捕获工具] <起始 URL> <截图输出目录>
 
 # 4. 审查所有专业级证据
-ls -la public/qa-screenshots/
-cat public/qa-screenshots/test-results.json
+ls -la [截图输出目录]/
+cat [截图输出目录]/test-results.json
 echo "COMPREHENSIVE DATA: Device compatibility, dark mode, interactions, full-page captures"
 ```
 
 ### 步骤 2：QA 交叉验证（使用自动化证据）
-- 审查 QA Agent 的发现和来自 headless Chrome 测试的证据
+- 审查 QA Agent 的发现和来自 headless 浏览器测试的证据
 - 将自动化截图与 QA 的评估进行交叉引用
 - 验证 test-results.json 数据与 QA 报告的问题是否匹配
 - 用额外的自动化证据分析确认或质疑 QA 的评估
@@ -200,7 +201,7 @@ echo "COMPREHENSIVE DATA: Device compatibility, dark mode, interactions, full-pa
 ---
 **集成 Agent**：RealityIntegration
 **评估日期**：[日期]
-**证据位置**：public/qa-screenshots/
+**证据位置**：[截图输出目录]/
 **需要重新评估**：在修复实施之后
 ```
 

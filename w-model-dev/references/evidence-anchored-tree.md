@@ -53,7 +53,7 @@
   | 子项 | 判据 | 依赖 |
   |---|---|---|
   | R15a | `evidenceAnchor` 缺失 / 空串 / 非字符串 | 无（纯逻辑） |
-  | R15b | `evidenceStatus` 非法（缺失或不在枚举内） | 无（纯逻辑） |
+  | R15b | `evidenceStatus` 非法（缺失或不在枚举内）；`pending` 合法但未核验——放行前阻断，须转 `confirmed` 或走 evidence-anchor 豁免（`check-exemption` 第 6 类，ruleId=`R15b`） | 无（纯逻辑） |
   | R15c | 锚点 `path` 部分在磁盘不存在 | CLI 注入真实路径集合 |
   | R15e | `evidenceStatus=confirmed` 但签名链中无引用本节点的 V review 环 | CLI 注入 signature-chain 条目 |
   | R15f | 行号锚点（`path:L42` / `path:L42-58`）区间非法（`start<1` / `end<start`）或 `end` 超出文件内容行数 | CLI 注入 `path → 内容行数` 表 |

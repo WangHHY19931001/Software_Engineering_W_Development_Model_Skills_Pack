@@ -304,7 +304,7 @@ Scenario 路径（非法）：
   Given Unauthenticated + When logout + Then LoggedOut    ✗ 非法（转移表中无此 From+Event 组合）
 ```
 
-> **已知限制（D6 转移匹配口径，2026-10-07 真机验证登记）**：D6 路径校验对 `(From, Event)` 取转移表**声明顺序第一条**命中（`find` 首条，不求解 `guard` 表达式），且取**首个 `Then` 声明**为期望终态。因此：(1) 同一 `(From, Event)` 存在多条 guard 分歧转移时，按首条目标态比对——guard 选中的另一分支会报 end-state mismatch（本指南官方模板中即例：Example 1 登录失败、Example 2 reader 被拒、Example 3 场景 1-2、Example 4 未认证被拒、Example 5 凭据无效、语法速查完整示例 Outline 的 reader 行），终态正确性由 V 评审人工核验（D2）兜底；(2) 多事件 scenario 须按 §3.4.3 链式风格书写（事件在前、单个 Then 终态断言收尾），事件间穿插 Then 的写法会按首个 Then 比对而误报。「按 expectedEndState 存在性在候选分支中判定」的算法增强已登记为后续批次候选。
+> **已知限制（D6 转移匹配口径，2026-10-07 真机验证登记）**：D6 路径校验对 `(From, Event)` 取转移表**声明顺序第一条**命中（`find` 首条，不求解 `guard` 表达式），且取**首个 `Then` 声明**为期望终态。因此：(1) 同一 `(From, Event)` 存在多条 guard 分歧转移时，按首条目标态比对——guard 选中的另一分支会报 end-state mismatch（本指南官方模板中即例：Example 1 登录失败、Example 2 reader 被拒、Example 3 场景 1-2、Example 4 未认证被拒、Example 5 凭据无效、语法速查完整示例 Outline 的 reader 行——Outline 块体当前不被解析，此项为口径说明），终态正确性由 V 评审人工核验（D2）兜底；(2) 多事件 scenario 须按 §3.4.3 链式风格书写（事件在前、单个 Then 终态断言收尾），事件间穿插 Then 的写法会按首个 Then 比对而误报。「按 expectedEndState 存在性在候选分支中判定」的算法增强已登记为后续批次候选。
 
 #### §3.4.3 多事件 scenario 链式处理
 

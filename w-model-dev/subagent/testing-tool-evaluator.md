@@ -68,222 +68,123 @@ color: teal
 
 ### 工具评估框架示例
 
-```python
-# 带量化分析的高级工具评估框架
-import pandas as pd
-import numpy as np
-from dataclasses import dataclass
-from typing import Dict, List, Optional
-import requests
-import time
+```text
+# 带量化分析的高级工具评估框架（栈中立伪码）
+# 依赖：数据分析库（均值/百分位）、HTTP 客户端、表格数据结构
 
-@dataclass
-class EvaluationCriteria:
-    name: str
-    weight: float  # 0-1 权重
-    max_score: int = 10
-    description: str = ""
+评估维度 = {
+    name: 标识, weight: 0-1 权重, max_score: 10, description: 说明
+}
 
-@dataclass
-class ToolScoring:
-    tool_name: str
-    scores: Dict[str, float]
-    total_score: float
-    weighted_score: float
-    notes: Dict[str, str]
+工具评分 = {
+    tool_name: 工具名, scores: 各维度得分, total_score: 总分,
+    weighted_score: 加权分, notes: 各维度备注
+}
 
-class ToolEvaluator:
-    def __init__(self):
-        self.criteria = self._define_evaluation_criteria()
-        self.test_results = {}
-        self.cost_analysis = {}
-        self.risk_assessment = {}
-
-    def _define_evaluation_criteria(self) -> List[EvaluationCriteria]:
-        """定义加权评估维度"""
+ToolEvaluator():
+    criteria = 定义评估维度():
+        # 定义加权评估维度
         return [
-            EvaluationCriteria("functionality", 0.25, description="核心功能完整度"),
-            EvaluationCriteria("usability", 0.20, description="用户体验和易用性"),
-            EvaluationCriteria("performance", 0.15, description="速度、稳定性、可扩展性"),
-            EvaluationCriteria("security", 0.15, description="数据保护和合规性"),
-            EvaluationCriteria("integration", 0.10, description="API 质量和系统兼容性"),
-            EvaluationCriteria("support", 0.08, description="供应商支持质量和文档"),
-            EvaluationCriteria("cost", 0.07, description="总拥有成本和性价比")
+            (functionality, 0.25, "核心功能完整度"),
+            (usability,     0.20, "用户体验和易用性"),
+            (performance,   0.15, "速度、稳定性、可扩展性"),
+            (security,      0.15, "数据保护和合规性"),
+            (integration,   0.10, "API 质量和系统兼容性"),
+            (support,       0.08, "供应商支持质量和文档"),
+            (cost,          0.07, "总拥有成本和性价比"),
         ]
 
-    def evaluate_tool(self, tool_name: str, tool_config: Dict) -> ToolScoring:
+    evaluate_tool(tool_name, tool_config):
         """带量化评分的全面工具评估"""
-        scores = {}
-        notes = {}
+        scores = {}; notes = {}
 
-        # 功能测试
-        functionality_score, func_notes = self._test_functionality(tool_config)
-        scores["functionality"] = functionality_score
-        notes["functionality"] = func_notes
-
-        # 易用性测试
-        usability_score, usability_notes = self._test_usability(tool_config)
-        scores["usability"] = usability_score
-        notes["usability"] = usability_notes
-
-        # 性能测试
-        performance_score, perf_notes = self._test_performance(tool_config)
-        scores["performance"] = performance_score
-        notes["performance"] = perf_notes
-
-        # 安全评估
-        security_score, sec_notes = self._assess_security(tool_config)
-        scores["security"] = security_score
-        notes["security"] = sec_notes
-
-        # 集成测试
-        integration_score, int_notes = self._test_integration(tool_config)
-        scores["integration"] = integration_score
-        notes["integration"] = int_notes
-
-        # 支持评估
-        support_score, support_notes = self._evaluate_support(tool_config)
-        scores["support"] = support_score
-        notes["support"] = support_notes
-
-        # 成本分析
-        cost_score, cost_notes = self._analyze_cost(tool_config)
-        scores["cost"] = cost_score
-        notes["cost"] = cost_notes
+        # 逐维度测试并记录
+        scores.functionality, notes.functionality = 测试功能(tool_config)   # 功能测试
+        scores.usability,     notes.usability     = 测试易用性(tool_config) # 易用性测试
+        scores.performance,   notes.performance   = 测试性能(tool_config)   # 性能测试
+        scores.security,      notes.security      = 评估安全(tool_config)   # 安全评估
+        scores.integration,   notes.integration   = 测试集成(tool_config)   # 集成测试
+        scores.support,       notes.support       = 评估支持(tool_config)   # 支持评估
+        scores.cost,          notes.cost          = 分析成本(tool_config)   # 成本分析
 
         # 计算加权分数
-        total_score = sum(scores.values())
-        weighted_score = sum(
-            scores[criterion.name] * criterion.weight
-            for criterion in self.criteria
-        )
+        total_score = 求和(scores 所有值)
+        weighted_score = 求和(每个维度: scores[维度.name] * 维度.weight)
 
-        return ToolScoring(
-            tool_name=tool_name,
-            scores=scores,
-            total_score=total_score,
-            weighted_score=weighted_score,
-            notes=notes
-        )
+        return 工具评分(tool_name, scores, total_score, weighted_score, notes)
 
-    def _test_functionality(self, tool_config: Dict) -> tuple[float, str]:
+    测试功能(tool_config):
         """按需求清单测试核心功能"""
-        required_features = tool_config.get("required_features", [])
-        optional_features = tool_config.get("optional_features", [])
+        required_features = tool_config.required_features 或 []
+        optional_features = tool_config.optional_features 或 []
 
-        # 测试每个必需功能
-        feature_scores = []
-        test_notes = []
+        # 测试每个必需功能，必需功能占 80% 权重
+        feature_scores = [测试单项功能(f, tool_config) for f in required_features]
+        required_avg = 平均值(feature_scores)（空则 0）
 
-        for feature in required_features:
-            score = self._test_feature(feature, tool_config)
-            feature_scores.append(score)
-            test_notes.append(f"{feature}: {score}/10")
+        # 测试可选功能，占 20% 权重
+        optional_scores = [测试单项功能(f, tool_config) for f in optional_features]
+        optional_avg = 平均值(optional_scores)（空则 0）
 
-        # 必需功能占 80% 权重
-        required_avg = np.mean(feature_scores) if feature_scores else 0
+        final_score = required_avg * 0.8 + optional_avg * 0.2
+        return final_score, 拼接各功能评分备注
 
-        # 测试可选功能
-        optional_scores = []
-        for feature in optional_features:
-            score = self._test_feature(feature, tool_config)
-            optional_scores.append(score)
-            test_notes.append(f"{feature}（可选）: {score}/10")
-
-        optional_avg = np.mean(optional_scores) if optional_scores else 0
-
-        final_score = (required_avg * 0.8) + (optional_avg * 0.2)
-        notes = "; ".join(test_notes)
-
-        return final_score, notes
-
-    def _test_performance(self, tool_config: Dict) -> tuple[float, str]:
+    测试性能(tool_config):
         """带量化指标的性能测试"""
-        api_endpoint = tool_config.get("api_endpoint")
-        if not api_endpoint:
+        api_endpoint = tool_config.api_endpoint
+        if 无 api_endpoint:
             return 5.0, "没有可测试的 API 端点"
 
-        # 响应时间测试
+        # 响应时间测试：采样 10 次，超时记 10s 惩罚
         response_times = []
-        for _ in range(10):
-            start_time = time.time()
+        for _ in 1..10:
             try:
-                response = requests.get(api_endpoint, timeout=10)
-                end_time = time.time()
-                response_times.append(end_time - start_time)
-            except requests.RequestException:
-                response_times.append(10.0)  # 超时惩罚
+                response_times.append(HTTP.GET(api_endpoint, timeout=10) 的耗时)
+            except 请求异常:
+                response_times.append(10.0)
 
-        avg_response_time = np.mean(response_times)
-        p95_response_time = np.percentile(response_times, 95)
+        avg_response_time = 平均值(response_times)
+        p95_response_time = P95(response_times)
 
-        # 根据响应时间评分（越低越好）
-        if avg_response_time < 0.1:
-            speed_score = 10
-        elif avg_response_time < 0.5:
-            speed_score = 8
-        elif avg_response_time < 1.0:
-            speed_score = 6
-        elif avg_response_time < 2.0:
-            speed_score = 4
-        else:
-            speed_score = 2
+        # 根据响应时间评分（越低越好）：<0.1s→10 分、<0.5s→8、<1s→6、<2s→4、其余→2
+        speed_score = 按上表映射(avg_response_time)
 
-        notes = f"平均: {avg_response_time:.2f}s, P95: {p95_response_time:.2f}s"
-        return speed_score, notes
+        return speed_score, "平均: {avg:.2f}s, P95: {p95:.2f}s"
 
-    def calculate_total_cost_ownership(self, tool_config: Dict, years: int = 3) -> Dict:
+    calculate_total_cost_ownership(tool_config, years = 3):
         """全面的总拥有成本分析"""
         costs = {
-            "licensing": tool_config.get("annual_license_cost", 0) * years,
-            "implementation": tool_config.get("implementation_cost", 0),
-            "training": tool_config.get("training_cost", 0),
-            "maintenance": tool_config.get("annual_maintenance_cost", 0) * years,
-            "integration": tool_config.get("integration_cost", 0),
-            "migration": tool_config.get("migration_cost", 0),
-            "support": tool_config.get("annual_support_cost", 0) * years,
+            licensing:     年许可成本 * years,
+            implementation: 实施成本,
+            training:      培训成本,
+            maintenance:   年维护成本 * years,
+            integration:   集成成本,
+            migration:     迁移成本,
+            support:       年支持成本 * years,
         }
-
-        total_cost = sum(costs.values())
+        total_cost = 求和(costs 所有值)
 
         # 算每用户每年成本
-        users = tool_config.get("expected_users", 1)
+        users = tool_config.expected_users 或 1
         cost_per_user_year = total_cost / (users * years)
 
-        return {
-            "cost_breakdown": costs,
-            "total_cost": total_cost,
-            "cost_per_user_year": cost_per_user_year,
-            "years_analyzed": years
-        }
+        return { cost_breakdown: costs, total_cost, cost_per_user_year, years_analyzed: years }
 
-    def generate_comparison_report(self, tool_evaluations: List[ToolScoring]) -> Dict:
+    generate_comparison_report(tool_evaluations):
         """生成全面的对比报告"""
-        # 创建对比矩阵
-        comparison_df = pd.DataFrame([
-            {
-                "Tool": eval.tool_name,
-                **eval.scores,
-                "Weighted Score": eval.weighted_score
-            }
-            for eval in tool_evaluations
-        ])
+        # 创建对比矩阵（行 = 工具，列 = 各维度得分 + 加权分）
+        comparison = 表格(每个评估: { Tool: tool_name, **scores, "Weighted Score": weighted_score })
 
-        # 排名
-        comparison_df["Rank"] = comparison_df["Weighted Score"].rank(ascending=False)
+        # 按加权分降序排名
+        comparison["Rank"] = comparison 按 "Weighted Score" 降序排名
 
         # 找出各维度的优胜者
-        analysis = {
-            "top_performer": comparison_df.loc[comparison_df["Rank"] == 1, "Tool"].iloc[0],
-            "score_comparison": comparison_df.to_dict("records"),
-            "category_leaders": {
-                criterion.name: comparison_df.loc[comparison_df[criterion.name].idxmax(), "Tool"]
-                for criterion in self.criteria
-            },
-            "recommendations": self._generate_recommendations(comparison_df, tool_evaluations)
+        return {
+            top_performer: Rank == 1 的工具,
+            score_comparison: comparison 的记录列表,
+            category_leaders: { 每个维度: 该维度得分最高的工具 },
+            recommendations: 生成选型建议(comparison, tool_evaluations),
         }
-
-        return analysis
 ```
 
 ## 工作流程

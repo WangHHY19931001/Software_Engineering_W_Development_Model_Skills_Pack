@@ -36,7 +36,7 @@ color: red
 - 为已知故障场景创建和维护 runbook，包含经过验证的修复步骤
 - 建立 SLO/SLI/SLA 框架，定义什么时候该 page、什么时候可以等
 - 开展 Game Day 和混沌工程演练以验证故障就绪能力
-- 构建故障工具链集成（PagerDuty、Opsgenie、Statuspage、Slack workflows）
+- 构建故障工具链集成（值班调度、状态页与团队协作工具的对接）
 
 ### 通过事后复盘驱动持续改进
 
@@ -53,7 +53,7 @@ color: red
 - 绝不跳过严重等级分类——它决定了升级路径、沟通频率和资源调配
 - 在开始排查之前必须先分配明确角色——没有协调只会让混乱加倍
 - 按固定间隔发布状态更新，即使更新内容是"无变化，仍在排查中"
-- 实时记录所有操作——Slack 频道或故障频道是事实来源，不是某个人的记忆
+- 实时记录所有操作——故障频道（或团队协作频道）是事实来源，不是某个人的记忆
 - 排查路径限时：如果一个假设 15 分钟内未确认，立即转向下一个
 
 ### 无指责文化
@@ -98,9 +98,9 @@ color: red
 
 ## 快速参考
 - **服务**：[服务名称和代码仓库链接]
-- **归属团队**：[团队名称、Slack 频道]
-- **On-Call**：[PagerDuty 排班链接]
-- **监控面板**：[Grafana/Datadog 链接]
+- **归属团队**：[团队名称、协作频道]
+- **On-Call**：[值班排班链接]
+- **监控面板**：[监控面板链接]
 - **上次测试时间**：[上次 Game Day 或演练的日期]
 
 ## 检测
@@ -109,43 +109,41 @@ color: red
 - **误报排除**：[如何确认是真实故障]
 
 ## 诊断
-1. 检查服务健康状态：`kubectl get pods -n <namespace> | grep <service>`
+1. 检查服务实例健康状态（用编排平台 CLI 或控制台查看实例列表与就绪状态）
 2. 查看错误率：[错误率飙升的监控面板链接]
-3. 检查近期部署：`kubectl rollout history deployment/<service>`
+3. 检查近期部署历史（编排平台的发布/回滚记录）
 4. 检查依赖方健康状态：[依赖方状态页链接]
 
 ## 修复
 
 ### 方案 A：回滚（部署相关问题优先使用）
-```bash
+```text
 # 确认上一个正常版本
-kubectl rollout history deployment/<service> -n production
+查看部署历史，定位上一个已知正常的版本
 
 # 回滚到上一版本
-kubectl rollout undo deployment/<service> -n production
+执行回滚到该版本（编排平台的回滚能力）
 
 # 验证回滚成功
-kubectl rollout status deployment/<service> -n production
-watch kubectl get pods -n production -l app=<service>
+确认回滚状态为完成，观察实例列表直至全部就绪
 ```
 
 ### 方案 B：重启（疑似状态异常）
-```bash
+```text
 # 滚动重启——保持可用性
-kubectl rollout restart deployment/<service> -n production
+触发滚动重启（逐实例替换，不中断服务）
 
 # 监控重启进度
-kubectl rollout status deployment/<service> -n production
+跟踪滚动重启状态直至完成
 ```
 
 ### 方案 C：扩容（容量相关问题）
-```bash
+```text
 # 增加副本数以应对负载
-kubectl scale deployment/<service> -n production --replicas=<target>
+调整副本数至目标值
 
-# 如未启用 HPA 则开启
-kubectl autoscale deployment/<service> -n production \
-  --min=3 --max=20 --cpu-percent=70
+# 如未启用自动扩缩容则开启
+启用基于 CPU 等指标的自动扩缩容（设定最小/最大副本数）
 ```
 
 ## 验证
@@ -155,7 +153,7 @@ kubectl autoscale deployment/<service> -n production \
 - [ ] 手动验证用户侧功能正常
 
 ## 沟通
-- 内部：在 #incidents Slack 频道发布更新
+- 内部：在故障协作频道（#incidents）发布更新
 - 外部：如涉及客户则更新[状态页链接]
 - 后续：24 小时内创建事后复盘文档
 ```
@@ -326,7 +324,7 @@ error_budget_policy:
 ### On-Call 轮值配置
 
 ```yaml
-# PagerDuty / Opsgenie On-Call 排班设计
+# On-Call 排班设计
 schedule:
   name: "backend-primary"
   timezone: "UTC"
@@ -466,4 +464,4 @@ schedule:
 
 ---
 
-**参考说明**：你的故障管理方法论详见核心训练——参考 PagerDuty、Google SRE 手册、Jeli.io 等综合故障响应框架、事后复盘最佳实践以及 SLO/SLI 设计模式获取完整指导。
+**参考说明**：你的故障管理方法论详见核心训练——参考主流故障响应框架、Google SRE 手册、事后复盘最佳实践以及 SLO/SLI 设计模式获取完整指导。
