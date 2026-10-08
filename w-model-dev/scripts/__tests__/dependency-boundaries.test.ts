@@ -65,6 +65,68 @@ const ALLOWED_LOGIC_NODE_BOUNDARY_IMPORTS = new Map([
   ],
 ]);
 
+/**
+ * CLI 分层例外登记（D6，43.3.0）。
+ *
+ * 下列 cli/ 承重文件仍内嵌校验 / 量测逻辑（未下沉 logic/）——这是历史沉淀的过渡形态。
+ * D6 收口口径：check-artifact-gate.ts 的 gate-log 读取（maturity.json / signature-chain.jsonl）
+ * 已下沉 `logic/artifact-gate-logic.ts`（经注入 fs 适配器，CLI 只传路径 + 适配器）；其余仍内嵌
+ * 逻辑的 CLI 大文件在此**显式登记**（文件 + 内嵌逻辑摘要 + 理由 + 期限），由下方强制测试逐条
+ * 断言（在盘 / 行数 / 非空字段 / 已下沉文件不得出现），防登记表与实现漂移。
+ * 每条 `lines` 为登记时实测行数（wc -l 口径 = 换行符计数）——文件瘦身到可低成本下沉时应
+ * **更新条目或下沉**，行数不匹配即测试失败，登记不会因「瘦身后无人更新」而静默失效。
+ */
+interface CliLayeringException {
+  /** cli/ 相对文件名（相对 w-model-dev/scripts/） */
+  file: string;
+  /** 登记时实测行数（wc -l 口径） */
+  lines: number;
+  /** 仍内嵌于 CLI 的逻辑面摘要 */
+  embedded: string;
+  /** 暂不下沉的理由 */
+  reason: string;
+  /** 期限（归并批次 / 触发条件） */
+  deadline: string;
+}
+
+const CLI_LAYERING_EXCEPTIONS: readonly CliLayeringException[] = [
+  {
+    file: 'cli/check-codegraph-queries.ts',
+    lines: 694,
+    embedded:
+      'codegraph 索引探测（codegraphIndexPresent/codegraphIndexAnomaly）、evidence 声明违规（evidenceDeclarationViolations）、' +
+      'legacy 兼容层 checkCodegraphQueries 与 strict 绑定 checkCodegraphQueriesStrict（scope 覆盖绑定 + 索引降级判据）。',
+    reason:
+      '校验判定与 check-artifact-gate 的 aggregateExternalChecks 深度耦合（同文件双形态导出），规则面为史层沉淀；' +
+      'D6 已下沉 gate-log 读取，本文件登记过渡、不重复下沉。',
+    deadline: '未指派归并批次；下次功能性改动本文件时优先下沉（否则保持登记）。',
+  },
+  {
+    file: 'cli/check-samples-coverage.ts',
+    lines: 1182,
+    embedded:
+      'self-test 用例条目词法抽取（collectCaseEntries/sliceArrayObjectLiterals/skipRegexLiteral 等）、' +
+      '引用↔在盘双向闭环（findUncovered/findDanglingRefs/findUndeclaredDirs）、负向覆盖登记册五规则' +
+      '（parseNegativeCoverage/listGateBaseNames）、exit-2 探针（runExit2Probes/runSingleProbe）。',
+    reason:
+      '内嵌大量词法 / 正则解析与文件树探针，判定逻辑与 CLI 输出 / 退出码强粘合，整体下沉成本显著高于收益；' +
+      'D6 登记为过渡形态。',
+    deadline: '未指派归并批次；下次功能性改动本文件时优先下沉（否则保持登记）。',
+  },
+  {
+    file: 'cli/check-docs-consistency.ts',
+    lines: 967,
+    embedded:
+      'vitest 动态 facts 采集（collectVitestMeasurements/readVitestArtifact/readVitestCountFile，受控工件快路径 + --spawn-vitest）、' +
+      'exit-2 探针结果采集（collectExit2ScriptResults）、security baseline 计数、git 变更探测（detectScriptsChanges）；' +
+      '主校验判定已在 logic/docs-consistency-logic.ts（本文件为编排 + I/O + 量测）。',
+    reason:
+      '剩余内嵌为量测采集 / 探针 I/O / 编排，其中 runSync shell 调用（L600 `npx vitest …` 拼接）由任务 13 A18 处理；' +
+      'D6 不重复下沉。',
+    deadline: '未指派归并批次；任务 13 A18 处理 runSync 引号转义时若顺带沉淀则更新本条。',
+  },
+];
+
 async function findTypeScriptFiles(dir: string): Promise<string[]> {
   let entries: import('node:fs').Dirent[];
   try {
@@ -332,6 +394,28 @@ describe('scripts runtime dependency boundaries', () => {
       expect(LOGIC_DIRECT_BOUNDARY_MODULES.has(moduleName)).toBe(true);
       expect(reason.trim()).not.toBe('');
       await expect(fs.access(path.join(scriptsDir, file))).resolves.toBeUndefined();
+    }
+  });
+
+  it('keeps CLI layering exceptions registered, on-disk, and non-stale', async () => {
+    // 登记表非空且不空转：已下沉 gate-log 读取的 check-artifact-gate 不得出现在例外表
+    // （防登记与下沉反向漂移——下沉完成即应移除条目，而非留在表中）
+    expect(CLI_LAYERING_EXCEPTIONS.length).toBeGreaterThan(0);
+    expect(CLI_LAYERING_EXCEPTIONS.some((ex) => ex.file === 'cli/check-artifact-gate.ts')).toBe(false);
+    const seen = new Set<string>();
+    for (const ex of CLI_LAYERING_EXCEPTIONS) {
+      expect(ex.file.startsWith('cli/')).toBe(true);
+      expect(seen.has(ex.file)).toBe(false);
+      seen.add(ex.file);
+      expect(ex.embedded.trim()).not.toBe('');
+      expect(ex.reason.trim()).not.toBe('');
+      expect(ex.deadline.trim()).not.toBe('');
+      // 在盘存在（登记引用了不存在的文件即红）
+      await expect(fs.access(path.join(scriptsDir, ex.file))).resolves.toBeUndefined();
+      // 行数与登记一致（wc -l 口径 = 换行符计数）：文件瘦身后登记失效即红，
+      // 强制「更新条目或下沉」，登记不会因瘦身后无人更新而静默失效
+      const content = await fs.readFile(path.join(scriptsDir, ex.file), 'utf-8');
+      expect((content.match(/\n/g) ?? []).length).toBe(ex.lines);
     }
   });
 
