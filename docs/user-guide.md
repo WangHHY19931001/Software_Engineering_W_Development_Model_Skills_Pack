@@ -111,7 +111,7 @@ violations / `rule` 字段中的编号前缀按门禁归属：
 
 ## 6. 依赖巡检流程（人工 npm audit + npm outdated）
 
-**背景**：仓库不集成云端 CI（GitHub Actions / GitLab CI），且 **Dependabot 已剔除**——无 CI 时其自动依赖更新 PR 价值有限（决策记录见 [`2026-08-11-p0-p2-fixes-design.md`](./superpowers/specs/2026-08-11-p0-p2-fixes-design.md) §6）。依赖安全与版本巡检改为**人工定期执行**，本流程为唯一固化渠道。
+**背景**：仓库此前不集成云端 CI，Dependabot 已剔除；43.3.0 起已配置 GitHub Actions workflow 作 CI 兜底，Dependabot 仍剔除，依赖巡检维持人工定期执行。依赖安全与版本巡检改为**人工定期执行**，本流程为唯一固化渠道。
 
 ### 6.1 巡检命令与使用场景
 

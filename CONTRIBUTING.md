@@ -212,7 +212,7 @@ git push --no-verify
 **提交流程**：
 
 1. 创建分支（见上文「1. 创建分支」）
-2. 本地验证：`npm run prepush`（19 项本地门禁，替代云端 CI；纯文档改动可仅跑 `npm run check:docs-consistency`）
+2. 本地验证：`npm run prepush`（19 项主门禁，云端 CI 兜底同源执行；纯文档改动可仅跑 `npm run check:docs-consistency`）
 3. 按上述格式提交
 4. 推送分支并创建 PR，使用 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 模板（见下节）
 
