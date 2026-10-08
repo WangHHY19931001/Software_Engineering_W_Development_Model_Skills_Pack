@@ -217,6 +217,24 @@ function runCli(runLog: string): {
   };
 }
 
+/** 人类可读通道（不带 --json）：摘要为 `RUN_LOG_JSON <json>` 单行，供 Agent 正则截取。 */
+function runCliHuman(runLog: string): {
+  summary: Record<string, unknown> | null;
+  stdout: string;
+} {
+  const result = runSync(process.execPath, [tsxCli, RUN_LOG_CLI, runLog], {
+    cwd: tmpDir,
+    timeout: 60_000,
+    env: process.env,
+  });
+  const stdout = result.stdout ?? '';
+  const line = stdout.split(/\r?\n/).find((l) => l.startsWith('RUN_LOG_JSON '));
+  return {
+    summary: line === undefined ? null : (JSON.parse(line.slice('RUN_LOG_JSON '.length)) as Record<string, unknown>),
+    stdout,
+  };
+}
+
 describe('check-run-log R6 交叉校验默认化（批次 6 A3 后半，不传 --gate-logs）', () => {
   it('同目录 gate-logs/ 目录整体缺失 + gate 记录带 gateLogPath → exit 1 且一条汇总 R6 违规', async () => {
     await makeTmpDir();
@@ -317,5 +335,31 @@ describe('check-run-log R6 交叉校验默认化（批次 6 A3 后半，不传 -
     const runLog = await writeRunLog(validRunLogLines(absFile));
     const r = runCli(runLog);
     expect(r.code, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+  });
+});
+
+describe('check-run-log A17：durationMs 为非确定尾部字段（43.3.0）', () => {
+  it('人类通道 RUN_LOG_JSON 携带 durationMs（number），且位于 exitCode 之后（摘要尾部）', async () => {
+    await makeTmpDir();
+    const runLog = await writeRunLog(validRunLogLines());
+    const { summary, stdout } = runCliHuman(runLog);
+    expect(summary, stdout).not.toBeNull();
+    expect(typeof summary!.durationMs, stdout).toBe('number');
+    expect(summary!.exitCode, stdout).toBe(0);
+    const keys = Object.keys(summary!);
+    // 非确定运行时字段置于摘要尾部：durationMs 键序在 exitCode 之后
+    expect(keys.indexOf('durationMs')).toBeGreaterThan(keys.indexOf('exitCode'));
+    // 确定字段（exitCode 前的判定字段）仍按原序出现
+    expect(keys.indexOf('passed')).toBeLessThan(keys.indexOf('exitCode'));
+  });
+
+  it('机器通道 --json 仍不携带 durationMs（行为不变守卫）', async () => {
+    await makeTmpDir();
+    const runLog = await writeRunLog(validRunLogLines());
+    const r = runCli(runLog);
+    expect(r.code, `stderr=${r.stderr}\nstdout=${r.stdout}`).toBe(0);
+    const report = JSON.parse(r.stdout) as Record<string, unknown>;
+    expect(report.durationMs).toBeUndefined();
+    expect(report.exitCode).toBe(0);
   });
 });

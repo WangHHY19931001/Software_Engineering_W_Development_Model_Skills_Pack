@@ -6,23 +6,33 @@
  *   - 第一行：'─'.repeat(60) 分隔线
  *   - 第二行：`<LABEL>_JSON <json>`（空格分隔，供 Agent 正则截取）
  *   - exitCode 键追加在 JSON 末尾（`{ ...summary, exitCode }`，值来自参数）
+ *   - 可选 tailFields（第 4 参）置于 exitCode **之后**（`{ ...summary, exitCode, ...tailFields }`）——
+ *     仅供非确定运行时字段（如人类通道的 durationMs）：机器通道要求字节级复现的调用方
+ *     须在 `--json` 侧省略该字段，人类可读通道经尾参数保留而不扰动确定字段序。
  *   - 退出码由调用方设置 process.exitCode 后自然退出
  *
  * 仅用于 check-*.ts CLI 层；*-logic.ts 纯逻辑层不依赖本工具。
- * 调用方须保证 summary 除 exitCode 外的键与顺序与替换前一致。
+ * 调用方须保证 summary 除 exitCode（及显式 tailFields）外的键与顺序与替换前一致。
  */
 
 import type { JsonReport } from './types.js';
 
 /**
  * 打印门禁收尾报告，不改变进程控制流。
- * @param label     JSON 摘要行首标记（如 'MATURITY' → `MATURITY_JSON ...`）
- * @param summary   摘要字段（不含 exitCode；exitCode 由本函数追加到末尾）
- * @param exitCode  报告中的进程退出码（0/1/2）
+ * @param label      JSON 摘要行首标记（如 'MATURITY' → `MATURITY_JSON ...`）
+ * @param summary    摘要字段（不含 exitCode；exitCode 由本函数追加到末尾）
+ * @param exitCode   报告中的进程退出码（0/1/2）
+ * @param tailFields 可选：置于 exitCode 之后的尾部字段（仅供非确定运行时字段，
+ *                   如人类通道的 durationMs；机器通道须在调用侧省略以保字节级复现）
  */
-export function printGateReport(label: string, summary: Record<string, unknown>, exitCode: number): void {
+export function printGateReport(
+  label: string,
+  summary: Record<string, unknown>,
+  exitCode: number,
+  tailFields?: Record<string, unknown>,
+): void {
   console.log('─'.repeat(60));
-  console.log(`${label}_JSON ` + JSON.stringify({ ...summary, exitCode }));
+  console.log(`${label}_JSON ` + JSON.stringify({ ...summary, exitCode, ...tailFields }));
 }
 
 /**
