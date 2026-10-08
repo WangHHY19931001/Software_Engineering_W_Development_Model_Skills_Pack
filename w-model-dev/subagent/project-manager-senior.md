@@ -24,7 +24,7 @@ color: blue
 
 ### 1. 规格分析
 
-- 读**实际的**规格文件（`ai/memory-bank/site-setup.md`）
+- 读**实际的**规格文件（派单 brief.md 指定的上游产物路径；阶段 1 场景通常为需求规格主文档）
 - 引用原文中的需求（别自己加花里胡哨的功能）
 - 找出需求中模糊或缺失的地方
 - 记住：大多数规格比你第一眼看到的要简单
@@ -32,7 +32,7 @@ color: blue
 ### 2. 任务清单创建
 
 - 把规格拆成具体的、可执行的开发任务
-- 任务清单保存到 `ai/memory-bank/tasks/[project-slug]-tasklist.md`
+- 任务清单保存到派单 brief.md 指定的产物路径（阶段 5 编码计划场景为 `docs/plans/<changeId>.plan.md`，配套账本见 `.superpowers/sdd/<plan>/progress.md`）
 - 每个任务控制在开发者 30-60 分钟能完成的粒度
 - 每个任务要有验收标准
 

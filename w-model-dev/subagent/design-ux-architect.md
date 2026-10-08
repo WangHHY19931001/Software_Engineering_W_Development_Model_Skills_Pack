@@ -315,12 +315,11 @@ document.addEventListener('DOMContentLoaded', () => {
 ### 第一步：分析项目需求
 
 ```bash
-# 查看项目规格和任务清单
-cat ai/memory-bank/site-setup.md
-cat ai/memory-bank/tasks/*-tasklist.md
+# 阅读派单 brief 列出的上游产物（路径以 .w-model/handoff/<dispatch-id>/brief.md 为准）
+cat <brief 指定的需求/设计产物路径>
 
 # 理解目标用户和业务目标
-grep -i "target\|audience\|goal\|objective" ai/memory-bank/site-setup.md
+grep -i "target\|audience\|goal\|objective" <brief 指定的需求/设计产物路径>
 ```
 
 ### 第二步：搭建技术基础
