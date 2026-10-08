@@ -14,7 +14,8 @@
  *   target.json             目标状态文件路径（不存在则直接创建）
  *   --stdin                 从 stdin 读入完整 JSON 文本
  *   --from <src.json>       从源文件读入 JSON 文本
- *   --expect-mtime <ms>     乐观锁：期望目标当前 mtimeMs（不符则拒绝写入）
+ *   --expect-mtime <ms>     乐观锁：期望目标当前 mtimeMs（不符则拒绝写入）；须传 stat.mtimeMs 原始浮点值
+ *                           （勿 Math.round/截断），内部按 floor 比对后相等才放行
  *   --no-backup             跳过 .bak 备份（默认生成 <target>.bak.YYYYMMDD-HHMMSS-mmm-<UUID>，保留 5 份）
  *   --lock-timeout <ms>     跨进程锁等待超时（非负整数毫秒）
  *   --recover-stale-lock    显式恢复陈旧锁
@@ -43,11 +44,13 @@ import { DuplicateFlagError } from '../lib/parse-args.js';
 import { writeStateJson } from '../logic/state-write-logic.js';
 
 const USAGE =
-  '用法: wm-write.ts <target.json> (--stdin | --from <src.json>) [--expect-mtime <ms>] [--no-backup] [--lock-timeout <ms>] [--recover-stale-lock] [--allow-untyped]';
+  '用法: wm-write.ts <target.json> (--stdin | --from <src.json>) [--expect-mtime <ms>] [--no-backup] [--lock-timeout <ms>] [--recover-stale-lock] [--allow-untyped]\n' +
+  '--expect-mtime 须传 stat.mtimeMs 原始浮点值（勿 Math.round/截断），内部按 floor 比对后相等才放行';
 
 const REASON_MESSAGES: Record<string, string> = {
   INVALID_JSON: '写入内容不是合法 JSON，已拒绝（目标未修改）',
-  MTIME_CONFLICT: '目标 mtime 与 --expect-mtime 不符（可能被并发修改），写入已拒绝；重读目标后按最新 mtime 重试',
+  MTIME_CONFLICT:
+    '目标 mtime 与 --expect-mtime 不符（可能被并发修改），写入已拒绝；--expect-mtime 须传 stat.mtimeMs 原始浮点值（勿 Math.round/截断），内部按 floor 比对，重读目标后按最新 mtime 重试',
   TARGET_MISSING_FOR_MTIME: '指定了 --expect-mtime 但目标文件不存在',
   WRITE_VERIFY_FAILED: '写后回读校验失败（内容不一致），请检查磁盘/杀软拦截后重试',
   LOCK_TIMEOUT: '等待状态文件跨进程锁超时，写入已拒绝',

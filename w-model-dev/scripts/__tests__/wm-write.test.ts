@@ -553,6 +553,18 @@ describe('wm-write CLI argument boundaries and existing contract', () => {
     }
   });
 
+  it('--expect-mtime 接受 stat.mtimeMs 原始浮点值并按 floor 放行（A16）', async () => {
+    const p = target('mtime-raw-float.json');
+    await fs.writeFile(p, '{"value":"old"}', 'utf-8');
+    const rawMtime = (await fs.stat(p)).mtimeMs; // 原始 mtimeMs（可能为浮点），直接字符串化传入
+
+    const result = run(p, ['--stdin', '--expect-mtime', String(rawMtime)], '{"value":"new"}');
+
+    expect(result.code).toBe(0);
+    expect(wmwriteSummary(result.stdout)).toMatchObject({ ok: true, writtenPath: p });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"value":"new"}');
+  });
+
   it('--expect-mtime accepts a finite fractional value and floors it', async () => {
     const p = target('mtime-fractional.json');
     await fs.writeFile(p, '{"value":"old"}', 'utf-8');
@@ -574,8 +586,20 @@ describe('wm-write CLI argument boundaries and existing contract', () => {
 
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('✗ [WRITE_REJECTED]');
+    // A16：冲突提示须挑明 floor 比对口径——传 Math.round/截断的整数会必然失配
+    expect(result.stderr).toContain('原始浮点');
+    expect(result.stderr).toContain('勿 Math.round/截断');
+    expect(result.stderr).toContain('floor 比对');
     expect(wmwriteSummary(result.stdout)).toMatchObject({ ok: false, reason: 'MTIME_CONFLICT', writtenPath: p });
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"value":"old"}');
+  });
+
+  it('--help 文案同步 --expect-mtime floor 比对提示（A16）', () => {
+    const result = runArgs(['--help']);
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('--expect-mtime 须传 stat.mtimeMs 原始浮点值（勿 Math.round/截断）');
+    expect(result.stdout).toContain('内部按 floor 比对后相等才放行');
   });
 });
 

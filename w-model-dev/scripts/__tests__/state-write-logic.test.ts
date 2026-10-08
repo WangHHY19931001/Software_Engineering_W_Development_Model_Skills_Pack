@@ -103,6 +103,26 @@ describe('writeStateJson', () => {
     await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":2}');
   });
 
+  it('compares by floor: 同 floor 的浮点 expect 放行（浮点 floor+0.9 vs stat floor → 相等）', async () => {
+    const p = target('mtime-floor-same.json');
+    await fs.writeFile(p, '{"v":1}', 'utf-8');
+    const floorMtime = Math.floor((await fs.stat(p)).mtimeMs);
+    // floor(floorMtime + 0.9) === floor(stat.mtimeMs)：小数部分不参与比对，与 stat.mtimeMs 原始浮点同 floor 即放行
+    const result = await writeStateJson(p, '{"v":2}', { expectMtimeMs: floorMtime + 0.9 });
+    expect(result.ok).toBe(true);
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":2}');
+  });
+
+  it('compares by floor: 跨入下一整数的浮点 expect 冲突（浮点 floor+1.1 vs stat floor → 不等）', async () => {
+    const p = target('mtime-floor-cross.json');
+    await fs.writeFile(p, '{"v":1}', 'utf-8');
+    const floorMtime = Math.floor((await fs.stat(p)).mtimeMs);
+    // floor(floorMtime + 1.1) === floorMtime + 1 ≠ floor(stat.mtimeMs)：即使只差 1.1ms 也按 floor 判定冲突
+    const result = await writeStateJson(p, '{"v":2}', { expectMtimeMs: floorMtime + 1.1 });
+    expect(result).toMatchObject({ ok: false, reason: 'MTIME_CONFLICT' });
+    await expect(fs.readFile(p, 'utf-8')).resolves.toBe('{"v":1}');
+  });
+
   it('rotates older uniquely named backups beyond keepBackups', async () => {
     const p = target('rotate.json');
     await fs.writeFile(`${p}.bak.20260101-000000000-old`, '{"stale":true}', 'utf-8');
