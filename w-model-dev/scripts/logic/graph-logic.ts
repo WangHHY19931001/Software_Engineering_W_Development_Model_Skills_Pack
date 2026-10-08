@@ -215,24 +215,39 @@ function detectParentCycle(edges: GraphEdge[], nodeIds: Set<string>, violations:
     }
   }
   let cycleFound = false;
-  const dfs = (u: string): void => {
-    if (cycleFound) return;
-    color.set(u, 1);
-    for (const v of parentAdj.get(u) ?? []) {
-      const c = color.get(v) ?? 0;
-      if (c === 1) {
-        cycleFound = true;
-        return;
-      }
-      if (c === 0) dfs(v);
-      if (cycleFound) return;
-    }
-    color.set(u, 2);
-  };
+  // A19：递归 DFS 改显式栈（enter/exit 双相帧），消除深图栈溢出风险。
+  // 语义等价论证：exit 帧负责收尾置黑（color 2）；enter 帧重演递归入口的时序——
+  //   ① 帧首已访问判（color!==0 跳过）：等价递归对灰/黑兄弟节点不下降。它同时兜住
+  //     兄弟子树先染色的场景（同阶多子节点被一次性入栈、先展开者把后展开者染灰/黑），
+  //     保证每节点恰好入栈展开一次，与递归展开集合一致；
+  //   ② 灰边回边（color===1）→ 置 cycleFound 并终止（等价递归 `if (c===1) cycleFound=true; return;`）；
+  //   ③ 白节点 → 置灰、压 exit 帧、子节点逆序压入（LIFO 弹出即恢复正序，展开顺序同递归）。
+  // 本函数唯一可观测输出是 cycleFound 布尔（parent 边子图是否成环），与遍历顺序无关；
+  // 等价性另有差分对账锁定（见任务 9 报告）。
+  const stack: Array<{ node: string; exit: boolean }> = [];
   for (const id of nodeIds) {
-    if (color.get(id) === 0) {
-      dfs(id);
-      if (cycleFound) break;
+    if (cycleFound) break;
+    if ((color.get(id) ?? 0) !== 0) continue;
+    stack.push({ node: id, exit: false });
+    while (stack.length > 0 && !cycleFound) {
+      const frame = stack.pop()!;
+      if (frame.exit) {
+        color.set(frame.node, 2);
+        continue;
+      }
+      if ((color.get(frame.node) ?? 0) !== 0) continue; // 已由更早子树染黑/置灰 → 跳过
+      color.set(frame.node, 1);
+      stack.push({ node: frame.node, exit: true });
+      const children = parentAdj.get(frame.node) ?? [];
+      for (let i = children.length - 1; i >= 0; i--) {
+        const v = children[i]!;
+        const c = color.get(v) ?? 0;
+        if (c === 1) {
+          cycleFound = true;
+          break;
+        }
+        if (c === 0) stack.push({ node: v, exit: false });
+      }
     }
   }
   if (cycleFound) {
@@ -335,6 +350,26 @@ export function checkEvidenceAnchors(
   const missingPaths: string[] = [];
   const badLineRanges: string[] = [];
   const noSignatureRing: string[] = [];
+  // A19：R15e 签名链对账预建索引——原实现对每个 confirmed 节点对全部签名链条目做
+  // `some(...)` 全表扫描（O(N×M)）；改为一次线性扫描预建「节点 id → 引用它的 role=V/review
+  // 条目」索引（O(N+M)），失败判定语义不变（判定条件逐条保留，只换查找方式）。
+  let reviewIndex: Map<string, SignatureChainEntryLike[]> | undefined;
+  if (signatureChainEntries !== undefined) {
+    reviewIndex = new Map<string, SignatureChainEntryLike[]>();
+    for (const e of signatureChainEntries) {
+      if (e.role !== 'V' || e.action !== 'review') continue;
+      if (!Array.isArray(e.artifacts)) continue;
+      for (const id of e.artifacts) {
+        if (typeof id !== 'string') continue;
+        let list = reviewIndex.get(id);
+        if (!list) {
+          list = [];
+          reviewIndex.set(id, list);
+        }
+        list.push(e);
+      }
+    }
+  }
   for (const n of nodes) {
     const anchor = n.evidenceAnchor;
     // R15a 必填（缺失/空串/non-string 均计缺失）
@@ -381,18 +416,21 @@ export function checkEvidenceAnchors(
       }
     }
     // R15e 签名链对账（仅 confirmed 触发；仅在注入签名链时校验）
-    if (n.evidenceStatus === 'confirmed' && signatureChainEntries !== undefined) {
-      const hasRing = signatureChainEntries.some((e) => {
-        if (e.role !== 'V' || e.action !== 'review') return false;
-        // 须引用该节点 id（artifacts 含节点 id）
-        if (!Array.isArray(e.artifacts) || !e.artifacts.includes(n.id)) return false;
-        // 且其 inputProvenance 指向该锚点 path
-        const sources = e.inputProvenance?.sourceArtifacts;
-        if (!Array.isArray(sources)) return false;
-        return sources.some(
-          (s) => typeof s === 'object' && s !== null && (s as { path?: unknown }).path === anchorPath,
-        );
-      });
+    // A19：判定条件与原 `signatureChainEntries.some(...)` 逐条相同——先由预建 reviewIndex
+    // 取「role=V/review 且 artifacts 引用本节点」的候选集（一次 O(1) 查表），再在候选内
+    // 判定 inputProvenance 是否指向该锚点 path；无候选 = 原 some 全表扫描无命中，语义一致。
+    if (n.evidenceStatus === 'confirmed' && reviewIndex !== undefined) {
+      const ringCandidates = reviewIndex.get(n.id);
+      const hasRing =
+        ringCandidates !== undefined &&
+        ringCandidates.some((e) => {
+          // 其 inputProvenance 指向该锚点 path
+          const sources = e.inputProvenance?.sourceArtifacts;
+          if (!Array.isArray(sources)) return false;
+          return sources.some(
+            (s) => typeof s === 'object' && s !== null && (s as { path?: unknown }).path === anchorPath,
+          );
+        });
       if (!hasRing) noSignatureRing.push(`${n.id}（锚点 ${anchorPath}）`);
     }
   }
@@ -523,10 +561,13 @@ export function checkRequirementGraph(
   for (const start of nodeIds) {
     if (visited.has(start)) continue;
     components++;
+    // A19：`queue.shift()` O(n) 头删改带头指针索引队列 O(1)（FIFO 序不变，出队序逐位相同）。
     const queue = [start];
+    let head = 0;
     visited.add(start);
-    while (queue.length > 0) {
-      const cur = queue.shift()!;
+    while (head < queue.length) {
+      const cur = queue[head]!;
+      head++;
       for (const next of adj.get(cur) ?? []) {
         if (!visited.has(next)) {
           visited.add(next);
@@ -638,9 +679,12 @@ export function checkRequirementGraph(
 
   if (bfsStartNodes.length > 0) {
     const reachable = new Set<string>(bfsStartNodes);
+    // A19：`queue.shift()` O(n) 头删改带头指针索引队列 O(1)（FIFO 序不变，出队序逐位相同）。
     const queue = [...bfsStartNodes];
-    while (queue.length > 0) {
-      const cur = queue.shift()!;
+    let head = 0;
+    while (head < queue.length) {
+      const cur = queue[head]!;
+      head++;
       for (const e of outEdges.get(cur) ?? []) {
         if (e.type === 'parent' && !reachable.has(e.to)) {
           reachable.add(e.to);
@@ -828,23 +872,41 @@ export function checkRequirementGraph(
     }
     const cycles: string[][] = [];
     const visited = new Set<string>();
-    const stack = new Set<string>();
+    const stackSet = new Set<string>();
     const path: string[] = [];
-    const dfs = (node: string): void => {
-      if (stack.has(node)) {
-        const cycleStart = path.indexOf(node);
-        cycles.push([...path.slice(cycleStart), node]);
-        return;
+    // A19：递归 DFS 改显式栈（enter/exit 双相帧），消除深图栈溢出风险，保持原展开顺序。
+    // 语义等价论证：enter 帧重演递归入口判序——① 栈集灰节点（回边）→ 用**当前 path**记录环
+    //   （帧因 LIFO 在兄弟子树全部完成后才 pop，pop 时 path 与递归在调用点记录时完全一致；
+    //   回边不 push 自身 exit 帧，等价递归记录后直接 return，原路径/栈集不动、由其真正
+    //   在栈的 enter 所配 exit 帧收尾）；② 已访问 → 跳过；③ 白节点 → 入栈集、入 path、
+    //   压 exit 帧 + 子节点逆序压入（LIFO 弹出恢复正序，展开与递归逐帧一致）。exit 帧出栈
+    //   时 path.pop + 栈集删除（等价递归尾部的 path.pop/stack.delete）。环记录顺序 = 递归
+    //   DFS 发现顺序，差分对账另行锁定。
+    const frames: Array<{ node: string; exit: boolean }> = [];
+    for (const node of Object.keys(adj)) {
+      if (visited.has(node)) continue;
+      frames.push({ node, exit: false });
+      while (frames.length > 0) {
+        const frame = frames.pop()!;
+        if (frame.exit) {
+          path.pop();
+          stackSet.delete(frame.node);
+          continue;
+        }
+        if (stackSet.has(frame.node)) {
+          const cycleStart = path.indexOf(frame.node);
+          cycles.push([...path.slice(cycleStart), frame.node]);
+          continue;
+        }
+        if (visited.has(frame.node)) continue;
+        visited.add(frame.node);
+        stackSet.add(frame.node);
+        path.push(frame.node);
+        frames.push({ node: frame.node, exit: true });
+        const nexts = adj[frame.node] ?? [];
+        for (let i = nexts.length - 1; i >= 0; i--) frames.push({ node: nexts[i]!, exit: false });
       }
-      if (visited.has(node)) return;
-      visited.add(node);
-      stack.add(node);
-      path.push(node);
-      for (const next of adj[node] ?? []) dfs(next);
-      path.pop();
-      stack.delete(node);
-    };
-    for (const node of Object.keys(adj)) dfs(node);
+    }
     return cycles;
   };
 
@@ -954,8 +1016,10 @@ export function checkRequirementGraph(
         }
       }
       if (e.type === 'precedes') {
-        const sourceNode = g.nodes.find((n) => n.id === e.from);
-        const targetNode = g.nodes.find((n) => n.id === e.to);
+        // A19：O(P×V)→O(P)。原来 `g.nodes.find(...)` 逐边全表扫描节点数组；改为复用上方
+        // nodeMap（R16 已保证 id 全局唯一，find 首命中 = get 唯一命中，无重复歧义）。
+        const sourceNode = nodeMap.get(e.from);
+        const targetNode = nodeMap.get(e.to);
         if (sourceNode && sourceNode.type !== 'REQ') {
           result.violations.push(`R6 precedes 源类型校验失败：${e.from}（${sourceNode.type}）非 REQ`);
         }
