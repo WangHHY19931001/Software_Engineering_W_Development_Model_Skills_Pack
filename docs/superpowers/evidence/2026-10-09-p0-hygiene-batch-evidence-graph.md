@@ -29,4 +29,5 @@
 | 2026-10-09 | L1 | （创建即 🟢） | 两轮分析 + 交叉复核 | — |
 | 2026-10-09 | L1 | 🟢 → 🟢（验证期新发现登记，状态不变） | 任务 1 步骤 1 grep 命中 5 处，全部位于 `docs/superpowers/sources/agency-agents-zh/testing-reality-checker.md`（vendor 上游源料存档，commit dc8c7da2 引入；非脚本/门禁/eval 对旧正文的消费引用） | 按简报步骤 1「若有命中先登记再继续」处置：源料存档不改（非运行时资产），不阻断任务 1 |
 | 2026-10-09 | L1 | 🟢 → 🟢（正文重写完成） | 两条 grep 计数：旧剧本词面残留=0；制品与职责词汇=10（≥10）；frontmatter L1-10 逐字节零变更（diff 全部 hunk 位于 L12 起） | 任务 1 完成，验证产物=两条 grep 计数；正文已对齐 root-cause-locator.md:251 §4.4 第 6 条 canonical persona + confidence<0.5 硬约束 |
+| 2026-10-09 | L1 | 🟢 → 🟢（措辞修正） | 上游裁定两项：①步骤 1 sources 存档词面命中属上游 vendor 存档 `docs/superpowers/sources/agency-agents-zh/` 自身内容、非技能资产，不需处理；②「四字段」意图=persona 标识 + 四个结论字段（confidence/verdict/evidenceGaps/rationale），原文措辞不精确 | 「按产出格式四字段输出」→「按产出格式表输出（persona 标识 + 四个结论字段）」，单行修改，三条验证复跑全过（0 / 10 / frontmatter 零变更） |
 | 2026-10-09 | 规格 §7 L1 | 🟡 → 🟢 | #18/#19/#20 绑定证据核实（见本图 L4） | 脚本对应表补 4 行，非 3 行 |
