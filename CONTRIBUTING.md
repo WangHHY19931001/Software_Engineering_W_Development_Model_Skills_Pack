@@ -312,6 +312,8 @@ LLM 评审逻辑由 `w-model-dev/` 下的提示词 + 校验脚本承载：
 
 > 本仓库版本号以 git tag + 七处一致为准（门禁校验七处，见上「数字一致性」）；`package.json` 不发布到 npm（`private: true`）。
 
+- **版本 tag**：每个版本发布（CHANGELOG 条目 + 版本镜像七处更新）合入后，打 annotated tag `v<版本号>`（如 `v43.4.0`）并随推送（`git push --follow-tags`）。自 43.4.0 起；43.3.0 已回补。
+
 ## 问题反馈
 
 - Bug 报告：通过 GitHub Issues，使用 Bug 模板

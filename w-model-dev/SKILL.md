@@ -1,6 +1,6 @@
 ---
 name: w-model-dev
-version: 43.3.0
+version: 43.4.0
 description: >-
   Use when the user invokes /wm, mentions W-model, W 模型 or W 开发模型, requests
   requirements traceability (RTM), stage gates, quality gates, or development and

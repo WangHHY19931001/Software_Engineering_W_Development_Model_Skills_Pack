@@ -7,6 +7,17 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [43.4.0] - 2026-10-09
+
+### Fixed（P0 卫生批——2026-10-09 两轮分析复核确认项）
+
+- **persona**：重写 `testing-reality-checker` 正文对齐根因置信度核验职责（canonical persona、confidence<0.5 硬约束、`.w-model` 制品词汇）；清除 `design-ux-architect` / `project-manager-senior` 残留的 `ai/memory-bank` 外来路径
+- **references**：hard-constraints 速查表补齐反模式 #48（两张表）与脚本对应表 #18/#19/#20/#48 四行；检测信号表一处「48」补 `#` 前缀（主清单 L281 裸数字形态经裁定合法保留）
+- **docs**：AGENTS.md 导航补全（scripts 五层结构、references 清单 quickstart/evidence-anchored-tree）；术语统一「返工定位表」→「返工路径」；子模板 24 处 DESIGN.md 死指针改指父主模板
+- **chore**：启用 git tag 惯例（`v43.3.0` 回补，自本版起每版本打 tag，规则入 CONTRIBUTING）
+
+证据图：`docs/superpowers/evidence/2026-10-09-p0-hygiene-batch-evidence-graph.md`（8 叶子全 🟢）。
+
 ## [43.3.0] - 2026-10-08
 
 ### 批次 9：工程化卫生（15 实现任务 + 1 审查修复轮 + 版本 43.3.0 收编（T16），主规格 §8 全部十三项销账（D1-D8 工程化卫生 + A10/A16/A17/A18/A19 杂项修正）+ 批次 8 终审建议与账本 10 项 riders；规格 [`2026-10-06-w-model-remediation-design.md`](./docs/superpowers/specs/2026-10-06-w-model-remediation-design.md) §8 + [实现计划](./docs/superpowers/plans/2026-10-08-batch9-engineering-hygiene.md)，裁定登记 [`decision-log/rounds-50-docs-consistency.md`](./docs/changes/decision-log/rounds-50-docs-consistency.md)，T17 全量 prepush 收口见本节「验证记录」回填）
