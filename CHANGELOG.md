@@ -26,9 +26,9 @@
 - **派单预算改产出契约定义（C11）**：原「产出文件 ≤3」与阶段 1 七文件产出形态算术不闭合（S-doc 拆分档自身违规）→ 改为「单一产出类型 + 类型内文件数由产出契约定义」。
 - **S 派单模板指针措辞 + 模型档位字段（C12）**：模板「已附」改指针型 brief 措辞（与指针型派单一致）；S 模板补模型档位字段（原仅 V/R 有）。
 - **最小引用集单点（C13）**：以 SKILL.md「执行前必读」为唯一权威，command-reference 规则 #3 改指针，消除两处定义不一致。
-- **计数披露（C5/C7）**：强制接线率 **20/47（≈43%）** 写入 hard-constraints「与门禁脚本的对应关系」节 + SKILL.md 资源计数（放行链 8 + 阶段专属 12，其余 27 个为工具/元门禁/事件或条件触发，C7，推导边界闭合防 21/47 误读面）；eval/README 陈旧计数（60 条口径）更正为实际值 + `.githooks/pre-push` 第 19 项注释 60→68（C5）。
+- **计数披露（C5/C7）**：强制接线率 **20/47（≈43%）** 写入 hard-constraints「与门禁脚本的对应关系」节 + SKILL.md 资源计数（放行链 8 + 阶段专属 12，其余 27 个为工具/元门禁/事件或条件触发，C7，推导边界闭合防 21/47 误读面）；eval/README 陈旧计数（60 条口径）更正为实际值 + `.githooks/pre-push` 第 19 项注释 60→68（C5，后随 C19 更至 101）。
 - **EdgeType 12 类对齐（C15）**：data-models 边类型与图谱实现 12 类逐名对齐（evidence-anchored-tree / SSoT 同步）。
-- **人格去栈化（C17，36 文件两批 + 修复轮 1）**：`subagent/` 36 个 persona 文件清除具体技术栈工具链残留（jdeps / EXPLAIN ANALYZE / Lighthouse 等），教训参数级 1:1 改写为跨栈表述；T8 修复轮 1（software-architect 工具链命令残留清零 + database-optimizer 标准 SQL 语义恢复）；36 文件 grep 独立复核零残留。
+- **人格去栈化（C17，36 文件全量 sweep 核验，其中 28 文件实改清残留（批一 16 + 批二 12 零交集）+ 修复轮 1（2 文件），其余 8 文件核验无残留）**：`subagent/` persona 文件清除具体技术栈工具链残留（jdeps / EXPLAIN ANALYZE / Lighthouse 等），教训参数级 1:1 改写为跨栈表述；T8 修复轮 1（software-architect 工具链命令残留清零 + database-optimizer 标准 SQL 语义恢复）；36 文件 grep 独立复核零残留。
 - **反模式分级标注（C18，47 通用 / 1 化石）**：hard-constraints 反模式节 48 条按泛化度分级标注（表列行首前缀 `【通用】`/`【项目教训化石】`）——判据 = **条目本体**是否跨项目跨技术栈成立（非例示具体度，裁定 R-B8-4）：唯 #25（PowerShell ConvertTo-Json 写入）为项目教训化石（本体不可去工具名）；表头/锚点零漂移（前缀形态对 docs-consistency 精确锚无影响）。
 - **INSTALL 如实化两条（C20）**：挑明「门禁在仓库检出内跑」（装出的 L1 副本依赖不可解析，须回检出目录验证）+ `cp` 排除 `node_modules` 提示；PowerShell 5.1 逐行执行理由更正（T6 修复轮 1）。
 - **如实化标注（C6 + Loop 3/4 成熟度）**：round23 归档 README「pending」vs checkpoint-summary「exit 0」矛盾登记 decision-log（归档零改写，以 checkpoint-summary 为终态视图，C6）；`event-ingress-guide.md` / `hill-climbing-guide.md` 头部加注「成熟度：文档协议，无运行时执行器」。
@@ -50,8 +50,7 @@
 
 **计数影响**：零新增 CLI（48 = 47 exit-2 + 1 self-test，不变）/ references（45 不变）/ persona（36 不变）/ schema 34 份不变（`budget.schema.json` 字段级修改 1 份：maxSubagentSpawns 回归）；门禁脚本 48 不变；测试文件数不变（既有文件扩展：budget-logic / budget-cli-wiring / tla-logic / maturity-logic / evidence-export-logic / docs-consistency-logic）；self-test 412/412（不变；T11 期曾因 persona fixture 哈希失配瞬时 410/412，`4c451647` 修复）；eval 语料 68→**101** 条（references 覆盖 45/45；routeTotals 42/9/24）；vitest 收集计数以 prepush 实测为准（T18 回填）。
 
-**验证记录**：prepush 19 项**待任务 18 回填**（本节不预写未跑测结论——批次 7 T14 教训；耗时数字不引不存在出处）。任务 17 提交前实测：docs-consistency 0 违规、eval 101/101；T15/T16 提交时点实测：self-test 412/412、lint:security 0、eval 101/101（批次 8 执行账本逐任务留痕）。C6 矛盾消歧裁定（含 round23 归档「间接证据、非逐项直接记录」的如实存疑登记）见 [`decision-log/rounds-50-docs-consistency.md`](./docs/changes/decision-log/rounds-50-docs-consistency.md)。
-
+**验证记录**：prepush 19 项**全绿（实测 1464s，2026-10-08 单次，本机运行）**。任务 17 提交前实测：docs-consistency 0 违规、eval 101/101；T15/T16 提交时点实测：self-test 412/412、lint:security 0、eval 101/101（批次 8 执行账本逐任务留痕）。C6 矛盾消歧裁定（含 round23 归档「间接证据、非逐项直接记录」的如实存疑登记）见 [`decision-log/rounds-50-docs-consistency.md`](./docs/changes/decision-log/rounds-50-docs-consistency.md)。
 
 ## [43.1.0] - 2026-10-07
 
