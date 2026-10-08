@@ -219,6 +219,10 @@
 
 - `.github/workflows/ci.yml`（ubuntu-latest + node 20 + `npm ci` + 主入口 `npm run prepush` + self-test/eval 显式冗余兜底 + 不可移植项 ①-⑥ 登记）已本地验证：YAML node yaml 1.2 解析断言通过（T2 review 实证）+ 与 prepush 等价子集由本批 T17 全量 prepush 19/19 全绿兜底（实测 1641s，2026-10-08，本机运行）。**CI 首跑 = 待用户推库触发 GitHub Actions 的 parked 项**：本机不可真跑 GitHub Actions，**不写「已首跑全绿」**；推库后首跑核对登记为批次 N 候选（用户推库时核对 workflow 绿态与不可移植项处置）。
 
+**R-B9-12 云端 CI 口径同步（终审 B1）——三处导航文档同步登记（首跑待推库）**
+
+- 批次终审阻塞项 B1：D1 已把 `.github/workflows/ci.yml` 提交入盘（被跟踪、`on: [push, pull_request]`），但 README.md:244 / CONTRIBUTING.md:233 / AGENTS.md:59 三处活体导航文档仍断言「仓库无云端 CI / 唯一门禁」，口径矛盾且未登记。S-fix 轮（任务 17-fix-B1）统一口径为：**本地 pre-push 为主门禁 + GitHub Actions workflow（D1，43.3.0）作云端兜底**；**CI 首跑待首次推库触发验证**，按 R-B9-11 parked 口径**不写「已首跑全绿」**。三处文档同步改文 + 本登记落位，计数 / 链接 / 脚本计数面零漂移（docs-consistency 0 + `audit:l0-links` 0 + self-test 412/412 + eval 101/101 + typecheck 0，实测见修复报告）。
+
 **R-B9-5 计数口径说明**
 
 - 批次 8 账本以 `42620669..HEAD` 为计数口径（26 提交，含批 8 收口提交重放差异），本批以 `main..HEAD` 为口径（16 提交 + 未合入收口提交）。**两口径在「批次边界是否含收口提交」上有差**，不影响任何门禁（git 提交计数非门禁面）；为防止跨批对账混淆，本清单固定口径：**主线提交数以 `main..HEAD` 计，批次边界以计划书基线 commit 为准**。
