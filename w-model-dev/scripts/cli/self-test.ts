@@ -128,6 +128,7 @@ import type { ComplexityMeasurement } from '../logic/complexity-logic.js';
 import { main as runComplexityReportCli } from '../cli/wm-complexity-report.js';
 import { main as runComplexityBudgetCli } from '../cli/check-complexity-budget.js';
 import { main as runRuleLifecycleCli } from '../cli/wm-rule-lifecycle.js';
+import { main as runGateEffectivenessCli } from '../cli/wm-gate-effectiveness.js';
 // D3-I（43.3.0）：verifier 期望数据单源化——用例断言（expectedPassed / expectedReasonPatterns / description）
 // 派生自 samples/expectations/verifier.ts 共享表（纯数据模块，不 import 业务逻辑）；
 // self-test 与 vitest（verifier-logic.test.ts 等）同源消费，消除双声明漂移。
@@ -5067,6 +5068,167 @@ async function runRuleLifecycleCases(): Promise<CaseResult[]> {
   return results;
 }
 
+// ==================== M3 门禁效能（wm-gate-effectiveness CLI 进程内调用） ====================
+// tmp 夹具：gate-logs 目录 5 个文件——
+//   · 3 个合成日志（主脚本 synthetic-gate.ts：1 绿 exit 0 + 2 阻断 exit 1）→ 聚合 3 runs / 2 blocked / 0 errors；
+//   · corner ①：1 个坏 JSON → parseErrors=1（不计 corpus）；
+//   · corner ②：1 个无 script 字段文件 → 文件名回退（新式剥 ISO+UUID 后第三段 synthetic-corner.ts，runs=1）。
+// 另断言：目录缺失 → {"gates":[],"corpus":0,"note":"missing"} 且 exit 0（只读诊断语义）。
+
+async function runGateEffectivenessCases(): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-self-gate-effectiveness-'));
+  try {
+    const gateLogsDir = path.join(tmp, 'gate-logs');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture 建在测试拥有的 mkdtemp 根下
+    await fs.mkdir(gateLogsDir, { recursive: true });
+    const writeLog = async (name: string, content: unknown): Promise<void> => {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture 建在测试拥有的 mkdtemp 根下
+      await fs.writeFile(
+        path.join(gateLogsDir, name),
+        typeof content === 'string' ? content : JSON.stringify(content),
+        'utf8',
+      );
+    };
+    // 主脚本 synthetic-gate.ts：1 绿（exit 0）+ 2 阻断（exit 1）——聚合 3 runs / 2 blocked / 0 errors
+    await writeLog('2026-09-01T01-00-00-000Z-11111111-2222-3333-4444-555555555555-synthetic-gate.ts.json', {
+      script: 'synthetic-gate.ts',
+      exitCode: 0,
+      reportSummary: { triggerType: 'ICEBERG-A' },
+    });
+    await writeLog('2026-09-02T02-00-00-000Z-11111111-2222-3333-4444-555555555555-synthetic-gate.ts.json', {
+      script: 'synthetic-gate.ts',
+      exitCode: 1,
+      reportSummary: { triggerType: 'ICEBERG-B' },
+    });
+    await writeLog('2026-09-03T03-00-00-000Z-11111111-2222-3333-4444-555555555555-synthetic-gate.ts.json', {
+      script: 'synthetic-gate.ts',
+      exitCode: 1,
+      reportSummary: {},
+    });
+    // corner ①：坏 JSON → parseErrors 计 1（不计 corpus）
+    await writeLog('2026-09-04T04-00-00-000Z-bad.json', '{ not-json');
+    // corner ②：无 script 字段 → 文件名回退（新式剥 ISO+UUID 段 → synthetic-corner.ts；variant 键走 distinctTriggers）
+    await writeLog('2026-09-05T05-00-00-000Z-11111111-2222-3333-4444-555555555555-synthetic-corner.ts.json', {
+      exitCode: 0,
+      reportSummary: { variant: 'standard' },
+    });
+
+    type EffectivenessPayload = {
+      gates: Array<{
+        script: string;
+        runs: number;
+        blocked: number;
+        errors: number;
+        lastFired?: string;
+        distinctTriggers?: string[];
+      }>;
+      corpus: number;
+      parseErrors?: number;
+      formatFallback?: number;
+      note?: string;
+    };
+
+    // 进程内调用并解析 GATE_EFFECTIVENESS_JSON
+    const invoke = async (args: string[]): Promise<{ exitCode: number; payload: EffectivenessPayload | null }> => {
+      const original = console.log;
+      const captured: string[] = [];
+      console.log = (...chunks: unknown[]) => {
+        captured.push(chunks.map((c) => String(c)).join(' '));
+      };
+      let exitCode = 1;
+      try {
+        await runGateEffectivenessCli(args);
+        exitCode = Number(process.exitCode ?? 0);
+      } catch {
+        exitCode = Number(process.exitCode ?? 0);
+      } finally {
+        console.log = original;
+      }
+      const line = captured.find((l) => l.startsWith('GATE_EFFECTIVENESS_JSON '));
+      return {
+        exitCode,
+        payload:
+          line === undefined
+            ? null
+            : (JSON.parse(line.slice('GATE_EFFECTIVENESS_JSON '.length)) as EffectivenessPayload),
+      };
+    };
+
+    // ① 聚合断言：3 runs / 2 blocked / 0 errors + corner（parseErrors=1 / 文件名回退行）
+    const main = await invoke([tmp, `--gate-logs=${gateLogsDir}`, '--json']);
+    const mainDetails: string[] = [];
+    if (main.exitCode !== 0) mainDetails.push(`  - 主聚合 exitCode=${main.exitCode} 期望 0`);
+    const gates = main.payload?.gates ?? [];
+    const synthetic = gates.find((g) => g.script === 'synthetic-gate.ts');
+    if (synthetic === undefined) {
+      mainDetails.push('  - 缺 synthetic-gate.ts 聚合行');
+    } else {
+      if (synthetic.runs !== 3) mainDetails.push(`  - synthetic-gate.ts runs=${synthetic.runs} 期望 3`);
+      if (synthetic.blocked !== 2) mainDetails.push(`  - synthetic-gate.ts blocked=${synthetic.blocked} 期望 2`);
+      if (synthetic.errors !== 0) mainDetails.push(`  - synthetic-gate.ts errors=${synthetic.errors} 期望 0`);
+      if (synthetic.lastFired !== '2026-09-03T03-00-00-000Z')
+        mainDetails.push(
+          `  - synthetic-gate.ts lastFired=${String(synthetic.lastFired)} 期望 2026-09-03T03-00-00-000Z`,
+        );
+      if (JSON.stringify(synthetic.distinctTriggers) !== JSON.stringify(['ICEBERG-A', 'ICEBERG-B']))
+        mainDetails.push(
+          `  - synthetic-gate.ts distinctTriggers=${JSON.stringify(synthetic.distinctTriggers)} 期望 ["ICEBERG-A","ICEBERG-B"]`,
+        );
+    }
+    if (main.payload?.corpus !== 4)
+      mainDetails.push(`  - corpus=${String(main.payload?.corpus)} 期望 4（3 主 + 1 回退；坏 JSON 不计）`);
+    if (main.payload?.parseErrors !== 1)
+      mainDetails.push(`  - parseErrors=${String(main.payload?.parseErrors)} 期望 1（坏 JSON 标注）`);
+    if (main.payload?.formatFallback !== undefined)
+      mainDetails.push(`  - formatFallback=${String(main.payload?.formatFallback)} 期望省略（回退均成功）`);
+    const corner = gates.find((g) => g.script === 'synthetic-corner.ts');
+    if (corner === undefined) {
+      mainDetails.push('  - 缺 synthetic-corner.ts（文件名回退）聚合行');
+    } else {
+      if (corner.runs !== 1) mainDetails.push(`  - synthetic-corner.ts runs=${corner.runs} 期望 1`);
+      if (corner.blocked !== 0 || corner.errors !== 0)
+        mainDetails.push(`  - synthetic-corner.ts blocked/errors 期望 0/0`);
+      if (JSON.stringify(corner.distinctTriggers) !== JSON.stringify(['standard']))
+        mainDetails.push(
+          `  - synthetic-corner.ts distinctTriggers=${JSON.stringify(corner.distinctTriggers)} 期望 ["standard"]（variant 键）`,
+        );
+    }
+    if (gates.length !== 2) {
+      mainDetails.push(`  - gates 行数=${gates.length} 期望 2`);
+    } else if (gates[0]?.script !== 'synthetic-gate.ts') {
+      mainDetails.push('  - 排序：runs 降序首位应为 synthetic-gate.ts');
+    }
+    results.push({
+      name: 'gate-effectiveness/aggregate-and-corners',
+      passed: mainDetails.length === 0,
+      description:
+        'CLI 进程内：3 合成日志聚合 3 runs/2 blocked/0 errors + 坏 JSON 计 parseErrors=1 + 无 script 文件走文件名回退（corpus=4）',
+      details: mainDetails.length > 0 ? mainDetails : undefined,
+    });
+
+    // ② 目录缺失 → note "missing" 且 exit 0（只读诊断语义；缺省 <root>/.w-model/gate-logs 不存在）
+    const missing = await invoke([tmp, '--json']);
+    const missingDetails: string[] = [];
+    if (missing.exitCode !== 0) missingDetails.push(`  - missing 态 exitCode=${missing.exitCode} 期望 0`);
+    if (missing.payload?.note !== 'missing')
+      missingDetails.push(`  - missing 态 note=${String(missing.payload?.note)} 期望 "missing"`);
+    if (missing.payload?.corpus !== 0)
+      missingDetails.push(`  - missing 态 corpus=${String(missing.payload?.corpus)} 期望 0`);
+    if ((missing.payload?.gates ?? []).length !== 0) missingDetails.push('  - missing 态 gates 应为空数组');
+    if (missing.payload?.parseErrors !== undefined) missingDetails.push('  - missing 态不应有 parseErrors 字段');
+    results.push({
+      name: 'gate-effectiveness/missing-dir',
+      passed: missingDetails.length === 0,
+      description: 'CLI 进程内：gate-logs 目录缺失 → {"gates":[],"corpus":0,"note":"missing"} 且 exit 0',
+      details: missingDetails.length > 0 ? missingDetails : undefined,
+    });
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+  return results;
+}
+
 // ==================== M1 复杂度棘轮预算（check-complexity-budget CLI 进程内调用） ====================
 
 /** 预算用例：default-caps=真实仓库根默认 caps / fixture=负向超限 caps / bad-json=坏 JSON（进程内三态） */
@@ -5881,6 +6043,7 @@ async function main(): Promise<void> {
     complexityReportResults,
     complexityBudgetResults,
     ruleLifecycleResults,
+    gateEffectivenessResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -5928,6 +6091,7 @@ async function main(): Promise<void> {
     runComplexityReportCases(),
     runComplexityBudgetCases(samplesDir),
     runRuleLifecycleCases(),
+    runGateEffectivenessCases(),
   ]);
   const runLogAppendResults = runRunLogAppendCases();
   const codeHealthResults = await runCodeHealthCases(samplesDir);
@@ -5984,6 +6148,7 @@ async function main(): Promise<void> {
     ...complexityReportResults,
     ...complexityBudgetResults,
     ...ruleLifecycleResults,
+    ...gateEffectivenessResults,
     ...codeHealthApplyResults,
     ...codeHealthGapResults,
     ...codeHealthTestResults,

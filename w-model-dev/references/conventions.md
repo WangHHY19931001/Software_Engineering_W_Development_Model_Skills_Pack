@@ -153,7 +153,7 @@
 
 ### exit-2 脚本口径
 
-- **规范定义**：`scripts/cli/` 下全部脚本除 `self-test.ts`（回归基线，exit 0/1）外均为 exit 2 结构化错误脚本：= 50（29 个 check-* + 21 个工具 CLI（含 7 个 code-health 门禁 CLI），不含 self-test；含 review-package.ts / wm-export-evidence.ts / wm-verify-evidence-source.ts / wm-append-runlog.ts / check-pollution.ts / check-coverage-scope.ts / check-design-fog.ts / wm-complexity-report.ts / check-complexity-budget.ts / wm-rule-lifecycle.ts）；计数由 docs-consistency 的真实输入错误契约探针得出（AGENTS.md「50 个脚本」与本句由 checkConventionsExit2Count 双向兜底），不维护固定补数。
+- **规范定义**：`scripts/cli/` 下全部脚本除 `self-test.ts`（回归基线，exit 0/1）外均为 exit 2 结构化错误脚本：= 51（29 个 check-* + 22 个工具 CLI（含 7 个 code-health 门禁 CLI），不含 self-test；含 review-package.ts / wm-export-evidence.ts / wm-verify-evidence-source.ts / wm-append-runlog.ts / check-pollution.ts / check-coverage-scope.ts / check-design-fog.ts / wm-complexity-report.ts / check-complexity-budget.ts / wm-rule-lifecycle.ts / wm-gate-effectiveness.ts）；计数由 docs-consistency 的真实输入错误契约探针得出（AGENTS.md「51 个脚本」与本句由 checkConventionsExit2Count 双向兜底），不维护固定补数。
 - **_Avoid_**：称 self-test 为 exit-2 脚本 / “31 个脚本”之类过期计数（见 [docs-consistency-logic.ts](../scripts/logic/docs-consistency-logic.ts) 的 EXPECTED）。
 
 ### 普通 V/G 失败链

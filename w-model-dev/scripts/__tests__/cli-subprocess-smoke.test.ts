@@ -166,6 +166,39 @@ describe('wm-rule-lifecycle 真实子进程冒烟', () => {
   });
 });
 
+describe('wm-gate-effectiveness 真实子进程冒烟', () => {
+  let tmpDir: string;
+  beforeAll(async () => {
+    // 缺省目录不存在夹具：tmp 根无 .w-model/gate-logs → note "missing" + exit 0（只读诊断语义）
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gate-effectiveness-smoke-'));
+  });
+  afterAll(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+  it('真实仓库根 exit 0 + 单行 GATE_EFFECTIVENESS_JSON', () => {
+    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/wm-gate-effectiveness.ts'), '--json']);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('GATE_EFFECTIVENESS_JSON ');
+  });
+  it('未知 flag → exit 2 + stdout ERROR_JSON 标记', () => {
+    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/wm-gate-effectiveness.ts'), '--bogus']);
+    expect(r.status).toBe(2);
+    expect(r.stdout).toMatch(/^ERROR_JSON \{/);
+  });
+  it('缺省目录不存在 → exit 0 + note:"missing"（corpus=0）', () => {
+    const r = runSync(process.execPath, [
+      tsxCli,
+      path.resolve(TEST_DIR, '../cli/wm-gate-effectiveness.ts'),
+      tmpDir,
+      '--json',
+    ]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('GATE_EFFECTIVENESS_JSON ');
+    expect(r.stdout).toContain('"note":"missing"');
+    expect(r.stdout).toContain('"corpus":0');
+  });
+});
+
 describe('check-artifact-gate 真实子进程冒烟', () => {
   let tmpDir: string;
   beforeAll(async () => {

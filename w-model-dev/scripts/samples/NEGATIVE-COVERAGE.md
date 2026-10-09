@@ -1,7 +1,7 @@
 # 负向覆盖登记册（Negative Coverage Register）
 
 > 本表由 `check-samples-coverage.ts` 的第 4 / 5 条规则强制：`w-model-dev/scripts/cli/*.ts` 减去
-> `self-test.ts` 的**每一个 exit-2 门禁**都必须登记一条**会失败的**负向案例。全表 50 行，每门禁恰一行。
+> `self-test.ts` 的**每一个 exit-2 门禁**都必须登记一条**会失败的**负向案例。全表 51 行，每门禁恰一行。
 >
 > - **第 4 条（登记完整性）**：未登记 → `negative-coverage-missing`（exit 1）。
 > - **第 5 条（严格 + 真实探针）**：四列形态 `| 门禁 | fixture | 机制 | 所防回归 |`。
@@ -36,7 +36,7 @@
 >     半成品」（共享根只能做弱归因）；探针数量以 `lib/exit2-probe-registry.ts` 注册表为准，墙钟随机器与
 >     并发度变化（串行 → 有界并发显著缩短，均不写死数字），断言一字未减。tsx 不可用等探针不可用情形按
 >     失败处理，不静默跳过（→ `negative-coverage-probe-failed`）。
-> - 口径与中心探针一致（50 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
+> - 口径与中心探针一致（51 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
 >   `metrics-report.ts` 使用特殊探针参数，但仍计入集合）。
 > - **所防回归**：若该负向案例被删掉 / 放宽，会漏掉的那一个具体回归；禁止「防止出错」这类空话。
 
@@ -75,7 +75,7 @@
 | check-tla-bdd-sync                | `samples/tla-bdd-sync/bad-transition-mismatch.json`       | fixture | 去掉转移等价断言后 TLA+ 转移在 BDD 中缺对应 When 步骤仍判等价                                                                                                                                                                                               |
 | check-design-fog                  | `samples/design-fog/bad-unresolved-fog.md`                | fixture | 放宽 R4 终结性（处置结果空/待定放行）将让未毕业迷雾项静默通过阶段门，迷雾逃逸设计义务且绕过三选一毕业处置                                                                                                                                                   |
 
-## 二、`invocation` / `mutated-copy` 机制（20 行）
+## 二、`invocation` / `mutated-copy` 机制（21 行）
 
 | 门禁脚本                  | fixture                                                                                                             | 机制         | 所防回归（一句话）                                                                                                                                                                         |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -96,6 +96,7 @@
 | wm-append-runlog          | `w-model-dev/scripts/__tests__/wm-append-runlog-cli.test.ts`（同测试断言零创建 / 时间戳倒退且文件 sha256 不变）     | invocation   | 重复值 flag（--timestamp）不再 exit 2 时，追加器会按 last-wins 静默改写时间戳来源；时间戳倒退不再 exit 1 时，run-log 的严格递增 / append-only 契约退化——即手搓追加脚本静默覆盖时间戳的复现 |
 | wm-export-evidence        | `w-model-dev/scripts/__tests__/evidence-export-logic.test.ts`                                                       | invocation   | 非法参数不再 exit 2 且可能建出输出目录，导出会留下半成品证据包；脱敏 key 变体匹配（A9 / 决策 2026-10-07#4 / I4 终审）放宽将漏掉 `*_token` 与 camelCase 两家族明文导出——`refresh_token` / `session_token` / `jwt_token` 的 `token` 词段、camelCase 家族 `refreshToken` / `sessionToken` / `jwtToken` / `authToken` / `bearerToken` / `idToken` / `apiToken` / `oAuthToken` 与 `secretKey` / `apiKey`（I4 起按 lower/digit→Upper 与大写序列规则切分驼峰边界，撤销决策 #4「不切驼峰」口径）经分隔/驼峰词段精确命中脱敏（词段分支长度守卫取消），`db_password_hash` / `api_key_v2` 同命中；`token_count` 类计数键与 `passwordPolicy` 类「敏感词干+非敏感词尾」驼峰键被保守脱敏（决策 #4 与 I4 显式接受代价），`mytoken` / `tokens` / `prompt_tokens` / `path` / `durationMs` / `retentionPolicy` 零误伤，均由同文件决策4a-4g 锁定；批次 8 rider 闭合文本面（`.md/.log/.txt` 行与 JSON 字符串值）：`sanitizeSensitiveAssignment` / `isSensitiveCell` 放宽回整键精确相等将漏掉 `refresh_token: abc` / `refreshToken: abc` / `passwordPolicy: {...}` 文本形态与 `refresh_token` 表头列明文导出（键路径脱敏、文本面漏检的边界不一致复现），同文件批次 8 rider 三用例锁定（含 `mytoken:` 文本形态零误伤、`token_count:` 文本形态保守代价同步）；批次 8 文本面过脱敏成本显式接受：`.md/.log/.txt` 行与 JSON 字符串值行中首个分隔符前散文文本词段命中敏感词干者同样保守整值脱敏（实跑复现 `password reset note: done` → 整值 REDACTED），该误伤面登记于此不另设守卫 |
 | wm-rule-lifecycle         | `w-model-dev/scripts/__tests__/cli-subprocess-smoke.test.ts`                                                         | invocation   | 未知 flag 不再 exit 2 时，生命周期判定会在非法参数下继续采集并产出半程 RULE_LIFECYCLE_JSON 结论（退役候选误判 / 只读报告在坏参数下仍发 JSON，静默吞掉输入错误）                                                                                       |
+| wm-gate-effectiveness     | `w-model-dev/scripts/__tests__/cli-subprocess-smoke.test.ts`                                                         | invocation   | 未知 flag 不再 exit 2 时，只读效能聚合会在非法参数下继续采集并产出半程 GATE_EFFECTIVENESS_JSON 结论（门禁效能统计失真 / 只读报告在坏参数下仍发 JSON，静默吞掉输入错误）                                                                             |
 | wm-status                 | `w-model-dev/scripts/__tests__/cli-natural-exit.test.ts`                                                            | invocation   | project.json 损坏不再 exit 2，状态快照会以默认值给出假状态                                                                                                                                 |
 | wm-verify-evidence-source | `w-model-dev/scripts/__tests__/exit2-failure-atomicity.test.ts`（同测试逐门禁循环断言 exit 2）                      | invocation   | 非法参数不再 exit 2，provenance 会以 package-only 冒充 source-bound 证据                                                                                                                   |
 | wm-write                  | `w-model-dev/scripts/__tests__/wm-write.test.ts`                                                                    | invocation   | 非法 `--lock-timeout`（负数 / 小数 / 非数字）不再 exit 2，锁超时会以未定义值执行                                                                                                           |
