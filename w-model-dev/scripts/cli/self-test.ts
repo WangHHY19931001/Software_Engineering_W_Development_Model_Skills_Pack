@@ -30,6 +30,7 @@
  */
 
 import { promises as fs, existsSync } from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -122,6 +123,9 @@ import { nodeCodingPlanFs } from '../lib/coding-plan-fs.js';
 import { parseJsonSafe } from '../lib/safe-json.js';
 import { readJsonlOptional } from '../lib/read-json-or-exit.js';
 import { runSync } from '../lib/run-sync.js';
+import { collectComplexityMeasurement } from '../lib/complexity-collect.js';
+import type { ComplexityMeasurement } from '../logic/complexity-logic.js';
+import { main as runComplexityReportCli } from '../cli/wm-complexity-report.js';
 // D3-I（43.3.0）：verifier 期望数据单源化——用例断言（expectedPassed / expectedReasonPatterns / description）
 // 派生自 samples/expectations/verifier.ts 共享表（纯数据模块，不 import 业务逻辑）；
 // self-test 与 vitest（verifier-logic.test.ts 等）同源消费，消除双声明漂移。
@@ -4841,6 +4845,101 @@ async function runDesignFogCases(samplesDir: string): Promise<CaseResult[]> {
   return results;
 }
 
+// ==================== M1 复杂度度量（wm-complexity-report CLI 进程内调用） ====================
+
+async function runComplexityReportCases(): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-self-complexity-'));
+  try {
+    const write = async (rel: string, content: string): Promise<void> => {
+      const file = path.join(tmp, rel);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture 建在测试拥有的 mkdtemp 根下
+      await fs.mkdir(path.dirname(file), { recursive: true });
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture 建在测试拥有的 mkdtemp 根下
+      await fs.writeFile(file, content, 'utf8');
+    };
+    await write('references/a.md', 'line1\nline2\n');
+    await write('references/b.md', '含已删除标记行\n');
+    await write(
+      'references/hard-constraints.md',
+      ['## #1 甲', '## #2 乙', '### 反模式清单', '| # | 反模式 | 危害 | 正确做法 |', '| 1 | 甲 | 坏 | 好 |'].join('\n'),
+    );
+    await write('scripts/cli/one.ts', 'a\nb\n');
+    await write('scripts/logic/two.ts', 'x\n');
+    await write('subagent/p1.md', '含 .w-model 与 RTM 的正文\n');
+    await write('subagent/p2.md', '与制品无关\n');
+
+    // 1) 成功路径：CLI 进程内 --json → exit 0 + COMPLEXITY_REPORT_JSON（捕获 stdout）
+    const original = console.log;
+    const captured: string[] = [];
+    console.log = (...chunks: unknown[]) => {
+      captured.push(chunks.map((c) => String(c)).join(' '));
+    };
+    let successExitCode = 1;
+    try {
+      await runComplexityReportCli([tmp, '--json']);
+      successExitCode = Number(process.exitCode ?? 0);
+    } finally {
+      console.log = original;
+    }
+    const successDetails: string[] = [];
+    if (successExitCode !== 0) successDetails.push(`  - 成功路径 exitCode=${successExitCode} 期望 0`);
+    if (!captured.some((l) => l.startsWith('COMPLEXITY_REPORT_JSON '))) {
+      successDetails.push('  - stdout 未含 COMPLEXITY_REPORT_JSON 标记');
+    }
+    results.push({
+      name: 'complexity-report/process-invocation-success',
+      passed: successDetails.length === 0,
+      description: 'CLI 进程内 --json 成功调用恒 exit 0 且输出 COMPLEXITY_REPORT_JSON',
+      details: successDetails.length > 0 ? successDetails : undefined,
+    });
+
+    // 2) 失败路径：未知 flag → exit 2（exitWithError 后 HandledCliError 中断调用链）
+    let failureExitCode = 0;
+    try {
+      await runComplexityReportCli([tmp, '--d4-invalid-argument']);
+    } catch {
+      failureExitCode = Number(process.exitCode ?? 0);
+    }
+    const failureDetails: string[] = [];
+    if (failureExitCode !== 2) failureDetails.push(`  - 失败路径 exitCode=${failureExitCode} 期望 2`);
+    results.push({
+      name: 'complexity-report/process-invocation-arg-invalid',
+      passed: failureDetails.length === 0,
+      description: '未知 flag 在 CLI 进程内被拒 exit 2（ARG_INVALID）',
+      details: failureDetails.length > 0 ? failureDetails : undefined,
+    });
+
+    // 3) 采集器直连：夹具上全维度实测值 sanity（references/scripts/反模式/硬约束/人格适配/沉积）
+    let m: ComplexityMeasurement | undefined;
+    let collectError: string | undefined;
+    try {
+      m = collectComplexityMeasurement(tmp);
+    } catch (err) {
+      collectError = err instanceof Error ? err.message : String(err);
+    }
+    const mDetails: string[] = [];
+    if (collectError !== undefined) mDetails.push(`  - 采集失败：${collectError}`);
+    if (m !== undefined) {
+      if (m.referencesFiles.length !== 3) mDetails.push(`  - referencesFiles=${m.referencesFiles.length} 期望 3`);
+      if (m.scriptFiles.length !== 2) mDetails.push(`  - scriptFiles=${m.scriptFiles.length} 期望 2`);
+      if (m.antiPatternCount !== 1) mDetails.push(`  - antiPatternCount=${m.antiPatternCount} 期望 1`);
+      if (m.hardConstraintCount !== 2) mDetails.push(`  - hardConstraintCount=${m.hardConstraintCount} 期望 2`);
+      if (m.personaAdaptedCount !== 1) mDetails.push(`  - personaAdaptedCount=${m.personaAdaptedCount} 期望 1`);
+      if (m.sedimentCount !== 1) mDetails.push(`  - sedimentCount=${m.sedimentCount} 期望 1`);
+    }
+    results.push({
+      name: 'complexity-report/collect-measurement',
+      passed: mDetails.length === 0,
+      description: 'collectComplexityMeasurement 在夹具上产出全维度实测值',
+      details: mDetails.length > 0 ? mDetails : undefined,
+    });
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+  return results;
+}
+
 async function runExemptionCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of EXEMPTION_CASES) {
@@ -5490,6 +5589,7 @@ async function main(): Promise<void> {
   console.log(`CodegraphQuery 用例 : ${CODEGRAPH_QUERY_CASES.length}`);
   console.log(`CodingPlan 用例 : ${CODING_PLAN_CASES.length}`);
   console.log(`UatPathMapping 用例 : ${UAT_PATH_MAPPING_CASES.length}`);
+  console.log(`ComplexityReport 用例 : 3（进程内 CLI 成功/失败 + 采集器直连）`);
   console.log('─'.repeat(60));
 
   const [
@@ -5536,6 +5636,7 @@ async function main(): Promise<void> {
     codeHealthPhase1GuardResults,
     codeHealthPhase1DynamicResults,
     designFogResults,
+    complexityReportResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -5580,6 +5681,7 @@ async function main(): Promise<void> {
     runCodeHealthPhase1GuardCases(samplesDir),
     runCodeHealthPhase1DynamicCases(samplesDir),
     runDesignFogCases(samplesDir),
+    runComplexityReportCases(),
   ]);
   const runLogAppendResults = runRunLogAppendCases();
   const codeHealthResults = await runCodeHealthCases(samplesDir);
@@ -5633,6 +5735,7 @@ async function main(): Promise<void> {
     ...codeHealthPhase1GuardResults,
     ...codeHealthPhase1DynamicResults,
     ...designFogResults,
+    ...complexityReportResults,
     ...codeHealthApplyResults,
     ...codeHealthGapResults,
     ...codeHealthTestResults,

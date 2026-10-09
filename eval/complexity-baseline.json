@@ -1,0 +1,787 @@
+{
+  "referencesFiles": [
+    {
+      "path": "references/activation-guide.md",
+      "lines": 119
+    },
+    {
+      "path": "references/agent-personas.md",
+      "lines": 796
+    },
+    {
+      "path": "references/agent-threat-model.md",
+      "lines": 75
+    },
+    {
+      "path": "references/asset-authoring.md",
+      "lines": 192
+    },
+    {
+      "path": "references/bdd.md",
+      "lines": 1874
+    },
+    {
+      "path": "references/code-health-governance.md",
+      "lines": 91
+    },
+    {
+      "path": "references/coding-quality.md",
+      "lines": 415
+    },
+    {
+      "path": "references/command-reference.md",
+      "lines": 611
+    },
+    {
+      "path": "references/concurrency-guide.md",
+      "lines": 66
+    },
+    {
+      "path": "references/context-management-guide.md",
+      "lines": 55
+    },
+    {
+      "path": "references/conventions.md",
+      "lines": 433
+    },
+    {
+      "path": "references/data-models.md",
+      "lines": 1081
+    },
+    {
+      "path": "references/design-philosophy.md",
+      "lines": 36
+    },
+    {
+      "path": "references/estimation-guide.md",
+      "lines": 68
+    },
+    {
+      "path": "references/event-ingress-guide.md",
+      "lines": 179
+    },
+    {
+      "path": "references/evidence-anchored-tree.md",
+      "lines": 82
+    },
+    {
+      "path": "references/graph-guide.md",
+      "lines": 177
+    },
+    {
+      "path": "references/hard-constraints.md",
+      "lines": 1043
+    },
+    {
+      "path": "references/hill-climbing-guide.md",
+      "lines": 257
+    },
+    {
+      "path": "references/iceberg-sweep-guide.md",
+      "lines": 255
+    },
+    {
+      "path": "references/ingestion-chunk.md",
+      "lines": 170
+    },
+    {
+      "path": "references/ingestion-cross.md",
+      "lines": 135
+    },
+    {
+      "path": "references/operation-behaviors.md",
+      "lines": 49
+    },
+    {
+      "path": "references/operational-recovery.md",
+      "lines": 506
+    },
+    {
+      "path": "references/phase-1-requirements.md",
+      "lines": 514
+    },
+    {
+      "path": "references/phase-2-system-design.md",
+      "lines": 312
+    },
+    {
+      "path": "references/phase-3-outline-design.md",
+      "lines": 364
+    },
+    {
+      "path": "references/phase-4-detailed-design.md",
+      "lines": 333
+    },
+    {
+      "path": "references/phase-5-coding.md",
+      "lines": 541
+    },
+    {
+      "path": "references/phase-6-integration-test.md",
+      "lines": 135
+    },
+    {
+      "path": "references/phase-7-system-test.md",
+      "lines": 147
+    },
+    {
+      "path": "references/phase-8-acceptance-test.md",
+      "lines": 288
+    },
+    {
+      "path": "references/quality-standards.md",
+      "lines": 333
+    },
+    {
+      "path": "references/quick-self-check.md",
+      "lines": 131
+    },
+    {
+      "path": "references/quickstart.md",
+      "lines": 45
+    },
+    {
+      "path": "references/root-cause-locator.md",
+      "lines": 305
+    },
+    {
+      "path": "references/rtm-guide.md",
+      "lines": 195
+    },
+    {
+      "path": "references/signature-chain-guide.md",
+      "lines": 216
+    },
+    {
+      "path": "references/skillopt-adoption.md",
+      "lines": 132
+    },
+    {
+      "path": "references/subagent-delegation.md",
+      "lines": 2010
+    },
+    {
+      "path": "references/superpowers-adoption.md",
+      "lines": 131
+    },
+    {
+      "path": "references/tla-plus.md",
+      "lines": 2472
+    },
+    {
+      "path": "references/toolbox.md",
+      "lines": 48
+    },
+    {
+      "path": "references/verifier-spec.md",
+      "lines": 1160
+    },
+    {
+      "path": "references/workflow.md",
+      "lines": 231
+    }
+  ],
+  "scriptFiles": [
+    {
+      "path": "scripts/application/artifact-gate-assets.ts",
+      "lines": 607
+    },
+    {
+      "path": "scripts/application/audit-l0-links.ts",
+      "lines": 54
+    },
+    {
+      "path": "scripts/application/uat-path-mapping.ts",
+      "lines": 94
+    },
+    {
+      "path": "scripts/cli/check-archive-integrity.ts",
+      "lines": 334
+    },
+    {
+      "path": "scripts/cli/check-artifact-gate.ts",
+      "lines": 887
+    },
+    {
+      "path": "scripts/cli/check-bdd-model.ts",
+      "lines": 575
+    },
+    {
+      "path": "scripts/cli/check-budget.ts",
+      "lines": 483
+    },
+    {
+      "path": "scripts/cli/check-checkpoint.ts",
+      "lines": 286
+    },
+    {
+      "path": "scripts/cli/check-code-tla-consistency.ts",
+      "lines": 391
+    },
+    {
+      "path": "scripts/cli/check-codegraph-queries.ts",
+      "lines": 695
+    },
+    {
+      "path": "scripts/cli/check-coding-plan.ts",
+      "lines": 297
+    },
+    {
+      "path": "scripts/cli/check-coverage-scope.ts",
+      "lines": 146
+    },
+    {
+      "path": "scripts/cli/check-design-contract-consistency.ts",
+      "lines": 371
+    },
+    {
+      "path": "scripts/cli/check-design-fog.ts",
+      "lines": 141
+    },
+    {
+      "path": "scripts/cli/check-docs-consistency.ts",
+      "lines": 1028
+    },
+    {
+      "path": "scripts/cli/check-exemption.ts",
+      "lines": 105
+    },
+    {
+      "path": "scripts/cli/check-iceberg-sweep.ts",
+      "lines": 310
+    },
+    {
+      "path": "scripts/cli/check-maturity.ts",
+      "lines": 466
+    },
+    {
+      "path": "scripts/cli/check-pollution.ts",
+      "lines": 174
+    },
+    {
+      "path": "scripts/cli/check-preventive-review.ts",
+      "lines": 336
+    },
+    {
+      "path": "scripts/cli/check-requirement-coverage.ts",
+      "lines": 179
+    },
+    {
+      "path": "scripts/cli/check-requirement-graph.ts",
+      "lines": 576
+    },
+    {
+      "path": "scripts/cli/check-role-dispatch.ts",
+      "lines": 169
+    },
+    {
+      "path": "scripts/cli/check-rootcause-report.ts",
+      "lines": 123
+    },
+    {
+      "path": "scripts/cli/check-run-log.ts",
+      "lines": 448
+    },
+    {
+      "path": "scripts/cli/check-samples-coverage.ts",
+      "lines": 1183
+    },
+    {
+      "path": "scripts/cli/check-signature-chain.ts",
+      "lines": 225
+    },
+    {
+      "path": "scripts/cli/check-state-machine-consistency.ts",
+      "lines": 157
+    },
+    {
+      "path": "scripts/cli/check-tla-bdd-sync.ts",
+      "lines": 171
+    },
+    {
+      "path": "scripts/cli/check-tla-model.ts",
+      "lines": 626
+    },
+    {
+      "path": "scripts/cli/check-verifier-output.ts",
+      "lines": 227
+    },
+    {
+      "path": "scripts/cli/code-health-apply.ts",
+      "lines": 720
+    },
+    {
+      "path": "scripts/cli/code-health-archive.ts",
+      "lines": 330
+    },
+    {
+      "path": "scripts/cli/code-health-duplicates.ts",
+      "lines": 360
+    },
+    {
+      "path": "scripts/cli/code-health-gap.ts",
+      "lines": 202
+    },
+    {
+      "path": "scripts/cli/code-health-ledger.ts",
+      "lines": 312
+    },
+    {
+      "path": "scripts/cli/code-health-phase1.ts",
+      "lines": 654
+    },
+    {
+      "path": "scripts/cli/code-health-tests.ts",
+      "lines": 650
+    },
+    {
+      "path": "scripts/cli/doctor.ts",
+      "lines": 126
+    },
+    {
+      "path": "scripts/cli/ensure-codegraph.ts",
+      "lines": 361
+    },
+    {
+      "path": "scripts/cli/metrics-report.ts",
+      "lines": 275
+    },
+    {
+      "path": "scripts/cli/plan-chunks.ts",
+      "lines": 180
+    },
+    {
+      "path": "scripts/cli/platform-deps-install.ts",
+      "lines": 714
+    },
+    {
+      "path": "scripts/cli/review-package.ts",
+      "lines": 412
+    },
+    {
+      "path": "scripts/cli/security-scan.ts",
+      "lines": 284
+    },
+    {
+      "path": "scripts/cli/self-test.ts",
+      "lines": 5766
+    },
+    {
+      "path": "scripts/cli/wm-append-runlog.ts",
+      "lines": 484
+    },
+    {
+      "path": "scripts/cli/wm-complexity-report.ts",
+      "lines": 205
+    },
+    {
+      "path": "scripts/cli/wm-export-evidence.ts",
+      "lines": 77
+    },
+    {
+      "path": "scripts/cli/wm-status.ts",
+      "lines": 184
+    },
+    {
+      "path": "scripts/cli/wm-verify-evidence-source.ts",
+      "lines": 46
+    },
+    {
+      "path": "scripts/cli/wm-write.ts",
+      "lines": 213
+    },
+    {
+      "path": "scripts/infrastructure/evidence-fs.ts",
+      "lines": 10
+    },
+    {
+      "path": "scripts/infrastructure/schema-fs.ts",
+      "lines": 37
+    },
+    {
+      "path": "scripts/infrastructure/schema-loader.ts",
+      "lines": 118
+    },
+    {
+      "path": "scripts/lib/change-scope.ts",
+      "lines": 496
+    },
+    {
+      "path": "scripts/lib/cli-error.ts",
+      "lines": 75
+    },
+    {
+      "path": "scripts/lib/cli-probe.ts",
+      "lines": 65
+    },
+    {
+      "path": "scripts/lib/code-health-archive-boundary.ts",
+      "lines": 911
+    },
+    {
+      "path": "scripts/lib/code-health-command.ts",
+      "lines": 296
+    },
+    {
+      "path": "scripts/lib/code-health-deletion-authority.ts",
+      "lines": 534
+    },
+    {
+      "path": "scripts/lib/code-health-error.ts",
+      "lines": 41
+    },
+    {
+      "path": "scripts/lib/code-health-evidence-store.ts",
+      "lines": 352
+    },
+    {
+      "path": "scripts/lib/code-health-file-verifier.ts",
+      "lines": 187
+    },
+    {
+      "path": "scripts/lib/code-health-redaction.ts",
+      "lines": 148
+    },
+    {
+      "path": "scripts/lib/code-health-revision-provider.ts",
+      "lines": 179
+    },
+    {
+      "path": "scripts/lib/code-health-tdd-harness.ts",
+      "lines": 533
+    },
+    {
+      "path": "scripts/lib/coding-plan-fs.ts",
+      "lines": 32
+    },
+    {
+      "path": "scripts/lib/complexity-collect.ts",
+      "lines": 210
+    },
+    {
+      "path": "scripts/lib/constants.ts",
+      "lines": 102
+    },
+    {
+      "path": "scripts/lib/exit2-probe-registry.ts",
+      "lines": 123
+    },
+    {
+      "path": "scripts/lib/gate-log-writer.ts",
+      "lines": 114
+    },
+    {
+      "path": "scripts/lib/gate-report.ts",
+      "lines": 76
+    },
+    {
+      "path": "scripts/lib/is-main.ts",
+      "lines": 34
+    },
+    {
+      "path": "scripts/lib/java-version.ts",
+      "lines": 28
+    },
+    {
+      "path": "scripts/lib/load-and-validate.ts",
+      "lines": 111
+    },
+    {
+      "path": "scripts/lib/load-cli-scope.ts",
+      "lines": 70
+    },
+    {
+      "path": "scripts/lib/parse-args.ts",
+      "lines": 26
+    },
+    {
+      "path": "scripts/lib/parse-phase.ts",
+      "lines": 84
+    },
+    {
+      "path": "scripts/lib/phase-doc-map.ts",
+      "lines": 57
+    },
+    {
+      "path": "scripts/lib/platform-deps-installer.ts",
+      "lines": 259
+    },
+    {
+      "path": "scripts/lib/platform-deps-tar.ts",
+      "lines": 336
+    },
+    {
+      "path": "scripts/lib/project-root.ts",
+      "lines": 137
+    },
+    {
+      "path": "scripts/lib/read-json-or-exit.ts",
+      "lines": 174
+    },
+    {
+      "path": "scripts/lib/reviewed-artifacts.ts",
+      "lines": 95
+    },
+    {
+      "path": "scripts/lib/run-log-append-fs.ts",
+      "lines": 116
+    },
+    {
+      "path": "scripts/lib/run-main.ts",
+      "lines": 27
+    },
+    {
+      "path": "scripts/lib/run-sync.ts",
+      "lines": 505
+    },
+    {
+      "path": "scripts/lib/safe-json.ts",
+      "lines": 22
+    },
+    {
+      "path": "scripts/lib/safe-project-path.ts",
+      "lines": 86
+    },
+    {
+      "path": "scripts/lib/state-schema-registry.ts",
+      "lines": 93
+    },
+    {
+      "path": "scripts/lib/superpowers-detect.ts",
+      "lines": 85
+    },
+    {
+      "path": "scripts/lib/tla-clean-trace.ts",
+      "lines": 83
+    },
+    {
+      "path": "scripts/lib/types.ts",
+      "lines": 126
+    },
+    {
+      "path": "scripts/logic/archive-integrity-logic.ts",
+      "lines": 372
+    },
+    {
+      "path": "scripts/logic/artifact-gate-logic.ts",
+      "lines": 88
+    },
+    {
+      "path": "scripts/logic/bdd-logic.ts",
+      "lines": 1151
+    },
+    {
+      "path": "scripts/logic/budget-logic.ts",
+      "lines": 324
+    },
+    {
+      "path": "scripts/logic/checkpoint-logic.ts",
+      "lines": 390
+    },
+    {
+      "path": "scripts/logic/code-health-contract.ts",
+      "lines": 1621
+    },
+    {
+      "path": "scripts/logic/code-health-duplicate-logic.ts",
+      "lines": 789
+    },
+    {
+      "path": "scripts/logic/code-health-gap-logic.ts",
+      "lines": 139
+    },
+    {
+      "path": "scripts/logic/code-health-ledger-logic.ts",
+      "lines": 1756
+    },
+    {
+      "path": "scripts/logic/code-health-phase1-logic.ts",
+      "lines": 723
+    },
+    {
+      "path": "scripts/logic/code-health-test-logic.ts",
+      "lines": 715
+    },
+    {
+      "path": "scripts/logic/code-tla-logic.ts",
+      "lines": 951
+    },
+    {
+      "path": "scripts/logic/coding-plan-logic.ts",
+      "lines": 753
+    },
+    {
+      "path": "scripts/logic/complexity-logic.ts",
+      "lines": 141
+    },
+    {
+      "path": "scripts/logic/coverage-logic.ts",
+      "lines": 280
+    },
+    {
+      "path": "scripts/logic/coverage-scope-logic.ts",
+      "lines": 178
+    },
+    {
+      "path": "scripts/logic/design-contract-logic.ts",
+      "lines": 392
+    },
+    {
+      "path": "scripts/logic/design-fog-logic.ts",
+      "lines": 110
+    },
+    {
+      "path": "scripts/logic/docs-consistency-logic.ts",
+      "lines": 2722
+    },
+    {
+      "path": "scripts/logic/doctor-logic.ts",
+      "lines": 199
+    },
+    {
+      "path": "scripts/logic/evidence-export-logic.ts",
+      "lines": 923
+    },
+    {
+      "path": "scripts/logic/evidence-provenance-logic.ts",
+      "lines": 806
+    },
+    {
+      "path": "scripts/logic/exemption-logic.ts",
+      "lines": 179
+    },
+    {
+      "path": "scripts/logic/gate-logic.ts",
+      "lines": 2049
+    },
+    {
+      "path": "scripts/logic/graph-logic.ts",
+      "lines": 1414
+    },
+    {
+      "path": "scripts/logic/iceberg-sweep-logic.ts",
+      "lines": 406
+    },
+    {
+      "path": "scripts/logic/l0-link-audit-logic.ts",
+      "lines": 480
+    },
+    {
+      "path": "scripts/logic/maturity-logic.ts",
+      "lines": 254
+    },
+    {
+      "path": "scripts/logic/metrics-report-logic.ts",
+      "lines": 375
+    },
+    {
+      "path": "scripts/logic/plan-chunks-logic.ts",
+      "lines": 146
+    },
+    {
+      "path": "scripts/logic/pollution-logic.ts",
+      "lines": 123
+    },
+    {
+      "path": "scripts/logic/preventive-review-logic.ts",
+      "lines": 107
+    },
+    {
+      "path": "scripts/logic/role-dispatch-logic.ts",
+      "lines": 363
+    },
+    {
+      "path": "scripts/logic/root-cause-logic.ts",
+      "lines": 544
+    },
+    {
+      "path": "scripts/logic/run-log-append-logic.ts",
+      "lines": 399
+    },
+    {
+      "path": "scripts/logic/run-log-logic.ts",
+      "lines": 1770
+    },
+    {
+      "path": "scripts/logic/signature-chain-logic.ts",
+      "lines": 619
+    },
+    {
+      "path": "scripts/logic/state-machine-logic.ts",
+      "lines": 145
+    },
+    {
+      "path": "scripts/logic/state-write-logic.ts",
+      "lines": 646
+    },
+    {
+      "path": "scripts/logic/tla-bdd-sync-logic.ts",
+      "lines": 407
+    },
+    {
+      "path": "scripts/logic/tla-logic.ts",
+      "lines": 1616
+    },
+    {
+      "path": "scripts/logic/verifier-logic.ts",
+      "lines": 1176
+    },
+    {
+      "path": "scripts/logic/wm-status-logic.ts",
+      "lines": 178
+    }
+  ],
+  "antiPatternCount": 48,
+  "hardConstraintCount": 14,
+  "personaAdaptedCount": 4,
+  "personaTotal": 36,
+  "sedimentCount": 46,
+  "oversizedReferences": [
+    {
+      "path": "references/bdd.md",
+      "lines": 1874
+    },
+    {
+      "path": "references/subagent-delegation.md",
+      "lines": 2010
+    },
+    {
+      "path": "references/tla-plus.md",
+      "lines": 2472
+    }
+  ],
+  "oversizedScripts": [
+    {
+      "path": "scripts/cli/self-test.ts",
+      "lines": 5766
+    },
+    {
+      "path": "scripts/logic/code-health-contract.ts",
+      "lines": 1621
+    },
+    {
+      "path": "scripts/logic/code-health-ledger-logic.ts",
+      "lines": 1756
+    },
+    {
+      "path": "scripts/logic/docs-consistency-logic.ts",
+      "lines": 2722
+    },
+    {
+      "path": "scripts/logic/gate-logic.ts",
+      "lines": 2049
+    },
+    {
+      "path": "scripts/logic/graph-logic.ts",
+      "lines": 1414
+    },
+    {
+      "path": "scripts/logic/run-log-logic.ts",
+      "lines": 1770
+    },
+    {
+      "path": "scripts/logic/tla-logic.ts",
+      "lines": 1616
+    }
+  ]
+}

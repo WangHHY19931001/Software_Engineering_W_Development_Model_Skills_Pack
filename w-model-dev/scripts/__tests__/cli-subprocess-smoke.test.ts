@@ -76,6 +76,14 @@ describe('metrics-report 真实子进程冒烟', () => {
   });
 });
 
+describe('wm-complexity-report 真实子进程冒烟', () => {
+  it('真实仓库根 exit 0 + COMPLEXITY_REPORT_JSON 标记', () => {
+    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/wm-complexity-report.ts')]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('COMPLEXITY_REPORT_JSON ');
+  });
+});
+
 describe('check-artifact-gate 真实子进程冒烟', () => {
   let tmpDir: string;
   beforeAll(async () => {

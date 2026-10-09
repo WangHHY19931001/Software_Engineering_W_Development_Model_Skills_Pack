@@ -1780,8 +1780,8 @@ describe('runDocConsistencyChecks', () => {
       expect(report.dynamicMeasurements).toMatchObject({
         // 34 = 25 existing schemas + 9 code-health campaign schemas
         schemaCount: 34,
-        cliScriptCount: 48,
-        exit2ScriptCount: 47,
+        cliScriptCount: 49,
+        exit2ScriptCount: 48,
         testFileCount: (coverage.testResults as unknown[]).length,
         vitestTestCount: 1002,
         numPassedTests: 1002,
@@ -1796,7 +1796,7 @@ describe('runDocConsistencyChecks', () => {
       expect(report.dynamicMeasurements.vitestRunId).toMatch(/^[0-9a-f]{16}$/);
       expect(report.dynamicMeasurements.vitestArtifactSha256).toMatch(/^[0-9a-f]{64}$/);
       expect(report.dynamicMeasurements.vitestCommitSha).toMatch(/^[0-9a-f]{40}$/);
-      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(49);
+      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(50);
       expect(
         report.dynamicMeasurements.exit2ProbeResults?.every(
           (probe) =>
@@ -1821,7 +1821,7 @@ describe('runDocConsistencyChecks', () => {
     });
   }, 90_000); // real CLI spawn: can exceed the 30s default under full-suite load
 
-  it('同一 checkout 的无状态与最小合法 run-log 状态使用完全相同的 exit2 probe map，且计数为 47', async () => {
+  it('同一 checkout 的无状态与最小合法 run-log 状态使用完全相同的 exit2 probe map，且计数为 48', async () => {
     await withDocsConsistencyFixture(async (fixtureRoot) => {
       await writeVitestCount(fixtureRoot, 1002);
       const withoutState = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
@@ -1883,8 +1883,8 @@ describe('runDocConsistencyChecks', () => {
           };
         });
       expect(stable(withStateReport)).toEqual(stable(withoutStateReport));
-      expect(withoutStateReport.dynamicMeasurements.exit2ScriptCount).toBe(47);
-      expect(withStateReport.dynamicMeasurements.exit2ScriptCount).toBe(47);
+      expect(withoutStateReport.dynamicMeasurements.exit2ScriptCount).toBe(48);
+      expect(withStateReport.dynamicMeasurements.exit2ScriptCount).toBe(48);
     });
   }, 120_000);
 
@@ -1895,7 +1895,7 @@ describe('runDocConsistencyChecks', () => {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
       const agents = await fs.readFile(agentsPath, 'utf8');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- paths are inside an mkdtemp-owned fixture
-      await fs.writeFile(agentsPath, agents.replace('全仓 47 个脚本 exit 2', '全仓 34 个脚本 exit 2'), 'utf8');
+      await fs.writeFile(agentsPath, agents.replace('全仓 48 个脚本 exit 2', '全仓 34 个脚本 exit 2'), 'utf8');
       // INSTALL 侧的同类半段（原 `install.replace('27 个 check-*.ts', …)`）已随 2026-09-27 门禁瘦身
       // T5 去数字退休：该字面量不再存在，变异恒为 no-op，且无门禁消费该位置声明。
       const result = runDocsConsistencyCli(fixtureRoot, {}, ['--json']);
@@ -2102,8 +2102,8 @@ describe('runDocConsistencyChecks', () => {
         };
       };
       expect(report.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
-      expect(report.dynamicMeasurements.exit2ScriptCount).toBe(47);
-      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(49);
+      expect(report.dynamicMeasurements.exit2ScriptCount).toBe(48);
+      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(50);
       expect(
         report.dynamicMeasurements.exit2ProbeResults?.every((probe) => probe.status === 2 && probe.errorExitCode === 2),
       ).toBe(true);

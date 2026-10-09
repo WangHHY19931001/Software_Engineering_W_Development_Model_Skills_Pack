@@ -1,7 +1,7 @@
 # 负向覆盖登记册（Negative Coverage Register）
 
 > 本表由 `check-samples-coverage.ts` 的第 4 / 5 条规则强制：`w-model-dev/scripts/cli/*.ts` 减去
-> `self-test.ts` 的**每一个 exit-2 门禁**都必须登记一条**会失败的**负向案例。全表 47 行，每门禁恰一行。
+> `self-test.ts` 的**每一个 exit-2 门禁**都必须登记一条**会失败的**负向案例。全表 48 行，每门禁恰一行。
 >
 > - **第 4 条（登记完整性）**：未登记 → `negative-coverage-missing`（exit 1）。
 > - **第 5 条（严格 + 真实探针）**：四列形态 `| 门禁 | fixture | 机制 | 所防回归 |`。
@@ -36,7 +36,7 @@
 >     半成品」（共享根只能做弱归因）；探针数量以 `lib/exit2-probe-registry.ts` 注册表为准，墙钟随机器与
 >     并发度变化（串行 → 有界并发显著缩短，均不写死数字），断言一字未减。tsx 不可用等探针不可用情形按
 >     失败处理，不静默跳过（→ `negative-coverage-probe-failed`）。
-> - 口径与中心探针一致（47 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
+> - 口径与中心探针一致（48 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
 >   `metrics-report.ts` 使用特殊探针参数，但仍计入集合）。
 > - **所防回归**：若该负向案例被删掉 / 放宽，会漏掉的那一个具体回归；禁止「防止出错」这类空话。
 
@@ -74,7 +74,7 @@
 | check-tla-bdd-sync                | `samples/tla-bdd-sync/bad-transition-mismatch.json`       | fixture | 去掉转移等价断言后 TLA+ 转移在 BDD 中缺对应 When 步骤仍判等价                                                                                                                                                                                               |
 | check-design-fog                  | `samples/design-fog/bad-unresolved-fog.md`                | fixture | 放宽 R4 终结性（处置结果空/待定放行）将让未毕业迷雾项静默通过阶段门，迷雾逃逸设计义务且绕过三选一毕业处置                                                                                                                                                   |
 
-## 二、`invocation` / `mutated-copy` 机制（18 行）
+## 二、`invocation` / `mutated-copy` 机制（19 行）
 
 | 门禁脚本                  | fixture                                                                                                             | 机制         | 所防回归（一句话）                                                                                                                                                                         |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -87,6 +87,7 @@
 | doctor                    | `w-model-dev/scripts/__tests__/exit2-failure-atomicity.test.ts`（同测试逐门禁循环对 doctor 断言 exit 2）            | invocation   | doctor 对非法参数返回 0/1 而非 2，环境缺失会被误报为通过                                                                                                                                   |
 | ensure-codegraph          | `w-model-dev/scripts/__tests__/cli-natural-exit.test.ts`                                                            | invocation   | 非法 / 重复 phase 不再 exit 2，「重复值 flag」会以 last-wins 参数静默安装依赖                                                                                                              |
 | metrics-report            | `w-model-dev/scripts/__tests__/cli-natural-exit.test.ts`                                                            | invocation   | 非法 `--phase` 不再 exit 2，度量报告会在错误阶段上给出结论                                                                                                                                 |
+| wm-complexity-report      | `w-model-dev/scripts/__tests__/cli-natural-exit.test.ts`                                                            | invocation   | 未知/重复/缺值 flag 不再 exit 2，复杂度度量会在非法参数下继续采集并给出半程结论（M1 基线失真）                                                                                            |
 | plan-chunks               | `w-model-dev/scripts/__tests__/cli-arg-unification.test.ts`                                                         | invocation   | 重复 `--phase` 返回 0，分块规划会按 first-wins 的静默阶段执行                                                                                                                              |
 | platform-deps-install     | `w-model-dev/scripts/__tests__/platform-deps-install.test.ts`                                                       | invocation   | 缺 `--lockfile` / `--package` 不再 exit 2，平台依赖会在未验证 lockfile 时安装                                                                                                              |
 | review-package            | `w-model-dev/scripts/__tests__/review-package-cli.test.ts`（同测试断言目标 out 路径零文件）                         | invocation   | 未知 flag 不在任何写盘前被拒时，评审包会以残缺参数先写盘再失败，留下半成品或覆盖既有 diff 文件（exit-2 失败原子性失守）                                                                    |

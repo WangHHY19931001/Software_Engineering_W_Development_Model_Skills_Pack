@@ -29,6 +29,7 @@ const SECURITY_SCRIPT = path.join(CLI_ROOT, 'security-scan.ts');
 const SELF_TEST_SCRIPT = path.join(CLI_ROOT, 'self-test.ts');
 const ENSURE_SCRIPT = path.join(CLI_ROOT, 'ensure-codegraph.ts');
 const STATUS_SCRIPT = path.join(CLI_ROOT, 'wm-status.ts');
+const COMPLEXITY_SCRIPT = path.join(CLI_ROOT, 'wm-complexity-report.ts');
 /** 任务 6 落地后的 L2 vendored 副本（落地前缺失 → ensure full 模式 L2 checkpoint 属预期中间态） */
 const VENDORED_ADOPTION = path.resolve(TEST_DIR, '..', '..', 'references', 'superpowers-adoption.md');
 
@@ -176,15 +177,22 @@ describe('production CLI static natural-exit contract', () => {
   });
 
   it('requires migrated runner targets to assign process.exitCode', async () => {
-    for (const file of [METRICS_SCRIPT, ENSURE_SCRIPT, SECURITY_SCRIPT, STATUS_SCRIPT, SELF_TEST_SCRIPT]) {
+    for (const file of [
+      METRICS_SCRIPT,
+      ENSURE_SCRIPT,
+      SECURITY_SCRIPT,
+      STATUS_SCRIPT,
+      COMPLEXITY_SCRIPT,
+      SELF_TEST_SCRIPT,
+    ]) {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- file is a fixed production CLI target
       const source = await fs.readFile(file, 'utf8');
       expect(source, path.basename(file)).toMatch(/process\.exitCode\s*=/);
     }
   });
 
-  it('documents metrics-report and wm-status as 0/2-only result contracts', async () => {
-    for (const file of [METRICS_SCRIPT, STATUS_SCRIPT]) {
+  it('documents metrics-report, wm-status and wm-complexity-report as 0/2-only result contracts', async () => {
+    for (const file of [METRICS_SCRIPT, STATUS_SCRIPT, COMPLEXITY_SCRIPT]) {
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- file is a fixed production CLI target
       const source = await fs.readFile(file, 'utf8');
       expect(source, path.basename(file)).not.toMatch(/process\.exitCode\s*=\s*1/);
@@ -257,6 +265,16 @@ describe('production CLI real subprocess exit semantics', () => {
 
     await writeWModel(directory, 'project.json', '{bad');
     const invalid = runScript(STATUS_SCRIPT, [directory]);
+    expect(invalid.status).toBe(2);
+    expect(invalid.stdout).toContain('ERROR_JSON');
+  });
+
+  it('wm-complexity-report has a 0/2 contract: success and argument validation failure', async () => {
+    const passed = runScript(COMPLEXITY_SCRIPT, ['--json']);
+    expect(passed.status).toBe(0);
+    expect(passed.stdout).toContain('COMPLEXITY_REPORT_JSON ');
+
+    const invalid = runScript(COMPLEXITY_SCRIPT, ['--d4-invalid-argument']);
     expect(invalid.status).toBe(2);
     expect(invalid.stdout).toContain('ERROR_JSON');
   });
