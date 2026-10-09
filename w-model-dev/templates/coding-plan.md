@@ -25,7 +25,7 @@
 
 验证：npx vitest run --config config/vitest.config.ts
 
-> 收口前全量：`npm run prepush`（19 项）；迭代期快速车道边界见 README「验证仓库」节。
+> 收口前全量：`npm run prepush`（20 项）；迭代期快速车道边界见 README「验证仓库」节。
 
 ## 执行账本（R3）
 

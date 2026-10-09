@@ -397,7 +397,7 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 
 - **失败动作**：exit 1 走 code-health 失败链 `gate-failure → blocked → R(root-cause) → V(root-cause-review) → G(root-cause-gate) → S(rework) → evidenced`（顺序不可跳过，见 [code-health-governance.md](code-health-governance.md) §6）；失败的删除/抽象必须回滚（`git apply -R` + `git diff --exit-code`=0）。exit 2 修正参数后重跑，不写任何文件。
 - **CHECKPOINT**：候选进入实现前必须 🔴 CHECKPOINT 由 human 批准（精确 candidate ID / action / files / symbols / scopeHash）；工具或 LLM 输出不能授权。
-- **边界**：Phase 1–4 只读（P1 仅写外部 report + `.w-model/` 独占 raw output；`--guard` 删除仅经 `code-health-apply.ts`）；code-health CLI 不纳入 `.githooks/pre-push`，19 项检查不变。
+- **边界**：Phase 1–4 只读（P1 仅写外部 report + `.w-model/` 独占 raw output；`--guard` 删除仅经 `code-health-apply.ts`）；code-health CLI 不纳入 `.githooks/pre-push`，20 项检查不变。
 - **guide 链接**：[code-health-governance.md](code-health-governance.md)（Phase 1–4 操作参考）与 SSoT §10K（`docs/skill-design-document_SSoT.md`，权威定义）。
 
 ## Artifact Gate 项目阶段证据门
@@ -498,10 +498,38 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 ## 污染源定位 CLI（check-pollution，S24）
 
 - **速查行**：`npx tsx w-model-dev/scripts/cli/check-pollution.ts [--project=<dir>]`（`--project` 仅等号形态，缺省 cwd）
-- **按需工具声明**：S24 **只作按需工具，不得当门禁**（规格 :187/:305）——不进 pre-push 19 项（`prePushCount: 19` 不变）、不进任何阶段门；exit 1 仅供人工二分定位参考。
+- **按需工具声明**：S24 **只作按需工具，不得当门禁**（规格 :187/:305）——不进 pre-push 20 项（`prePushCount: 20` 不变）、不进任何阶段门；exit 1 仅供人工二分定位参考。
 - **检查对象**（规格 :206）：`.w-model/` 残留（`*.lock` 陈旧锁目录/文件）、`*.lock` 锁文件、`coverage/` 残留（含 `coverage/.tmp`）、vitest 语义污染形态（`--outputFile` JSON 残留等，项目根深度 1 名称白名单）；扫描剪除 `node_modules/` 与 `.git/`。判据纯函数在 `logic/pollution-logic.ts`。
 - **「吞掉测试失败只看产物」语义**：逐文件定位「存在测试失败痕迹（锁残留 / 覆盖率产物 / vitest 输出 JSON）但工作区产物却被判通过」的污染形态——失败信号被吞掉、只留下产物；本 CLI 把这些痕迹逐项列出，供污染源二分定位使用。
 - **退出码**：0=干净（stdout 单行 `POLLUTION_JSON {type,passed,project,findings,findingCount,exitCode}`）/ 1=发现污染源（逐项 `✗ [kind] path — reason` 列表 + `POLLUTION_JSON`）/ 2=输入错误（未知/重复 flag、`--project` 空值或不存在、多余位置参数 → `ARG_INVALID`/`FILE_NOT_FOUND`，在任何扫描前拒绝、零副作用）。
+
+## 复杂度棘轮预算门禁 CLI（check-complexity-budget，43.5.0 M1）
+
+- **速查行**：`npx tsx w-model-dev/scripts/cli/check-complexity-budget.ts [skill-root] [--caps=<path>]`（`skill-root` 缺省 = 本脚本所在技能根；`--caps` 支持 `--caps=<path>` 与 `--caps <path>` 两形态，缺省 = 技能根上一级 `eval/complexity-caps.json`（仓库维护入口）；未知/重复/缺值 flag → exit 2）
+- **用途**：复杂度棘轮预算门禁（批次五 M1 收敛侧，pre-push 第 20 项，非项目阶段门）——复用共享采集器 `lib/complexity-collect.ts`（FC-6：禁止两 CLI 复制采集逻辑）度量 references/ 与 scripts/ 各文件行数 + 反模式/硬约束/人格适配/沉积计数，与 `eval/complexity-caps.json` 的棘轮 caps 逐维度比对；**cap 只许下调**，上调唯一通道 = 🔴 CHECKPOINT + decision-log 显式登记（停产要求拆分为小模块）。
+- **`COMPLEXITY_BUDGET_JSON`**：恒输出于 stdout（人类可读违规明细走 stderr `✗ [BUDGET]`）；passed 时无违规条目，违规时含 `violations` 全文（机器/人类双读）。
+- **退出码**：0=全部维度 ≤/≥ cap（passed=true）/ 1=存在违规（`COMPLEXITY_BUDGET_JSON` 含 violations 全文）/ 2=输入错误（caps 缺失 `FILE_NOT_FOUND`、非法 JSON `FILE_PARSE`、结构缺字段/采集输入畸形 `STRUCTURE_INVALID` → stdout 单行 `ERROR_JSON`）。判据纯函数在 `logic/complexity-logic.ts`（零 fs）。
+
+## 复杂度度量报告 CLI（wm-complexity-report，43.5.0 M1）
+
+- **速查行**：`npx tsx w-model-dev/scripts/cli/wm-complexity-report.ts [skill-root] [--json] [--save-baseline=<path>]`（`--json` 为裸 flag 只认精确形态；`--save-baseline` 支持等号与空格两形态；`skill-root` 缺省 = 本脚本所在技能根）
+- **用途**：M1 复杂度度量报告（只读，批次五）——references/ 与 scripts/ 各文件行数 + 反模式/硬约束/人格适配/沉积计数 + 超 1200 行分桶清单；`--save-baseline` 把报告写入指定路径（JSON 缩进 2 空格），是 check-complexity-budget 的 caps 初值来源（O 只读查询 / M4 简化检查点前例行运行，非门禁）。
+- **`COMPLEXITY_REPORT_JSON`**：单行、同字节确定（**不含 `generatedAt`**——基线与门禁共享此确定性形状）；不带 `--json` 时先输出人类可读报表再收尾同一行 JSON。
+- **退出码**：0=度量成功 / 2=输入错误（未知/重复/缺值 flag `ARG_INVALID`、根目录不存在 `FILE_NOT_FOUND`、目录结构缺失/采集输入畸形 `STRUCTURE_INVALID`、基线写入失败 `FILE_READ` → stdout 单行 `ERROR_JSON`）。exit 0/2 契约，无 exit 1。
+
+## 规则生命周期报告 CLI（wm-rule-lifecycle，43.5.0 M2）
+
+- **速查行**：`npx tsx w-model-dev/scripts/cli/wm-rule-lifecycle.ts [root] [--gate-logs=<dir>] [--json]`（`root` 缺省 = 本脚本所在仓库根（含 `w-model-dev/`、README.md、AGENTS.md、docs/）；`--gate-logs` 缺省 `<root>/.w-model/gate-logs`）
+- **用途**：M2 规则生命周期报告（只读，批次五，只报告不裁决——不写登记册、不进阶段门）——对登记册 `w-model-dev/rule-registry.json` 全量规则跑退役候选三判据（① 活文档引用零命中 ② `boundScript` null 或 gate-logs 零出现 ③ 存续 ≥10 个 minor），全满足者列入 candidates。活文档采集范围（缺项可容）：`w-model-dev/references/*.md`（排除定义文档 hard-constraints.md 自身）+ `w-model-dev/SKILL.md` + README.md + AGENTS.md + docs/*.md 顶层。
+- **`RULE_LIFECYCLE_JSON {candidates,checked,corpus}`**：`candidates` 为 `{id,reasons}` 数组；`checked` 为登记册规则总数；`corpus` 为 gate-logs 文件数或字面量 `"missing"`（目录缺失时仍 exit 0，非错误）。
+- **退出码**：0=判定成功 / 2=输入错误（登记册缺失 `FILE_NOT_FOUND`、坏 JSON `FILE_PARSE`、结构畸形 `STRUCTURE_INVALID`、未知/重复/缺值 flag `ARG_INVALID` → stdout 单行 `ERROR_JSON`）。判定逻辑在 `logic/rule-lifecycle-logic.ts`（零 fs）。exit 0/2 契约，无 exit 1。
+
+## 门禁效能报告 CLI（wm-gate-effectiveness，43.5.0 M3）
+
+- **速查行**：`npx tsx w-model-dev/scripts/cli/wm-gate-effectiveness.ts [root] [--gate-logs=<dir>] [--json]`（参数语义与 wm-rule-lifecycle 同型：`root` 缺省仓库根、`--gate-logs` 缺省 `<root>/.w-model/gate-logs`）
+- **用途**：M3 门禁效能报告（只读，批次五，只报告不裁决——零阻断门禁=降级候选的判定由 M4 人类 CHECKPOINT 消费，本 CLI 不自动降级、不进阶段门）——消费既有 `.w-model/gate-logs/*.json` 语料（只读 `*.json`、跳过 `.log`），按门禁聚合 runs（调用数）/ blocked（exitCode=1）/ errors（exitCode=2）/ lastFired（文件名 ISO 段取 max 的原始串）/ distinctTriggers（`reportSummary` 可辨识键尽力而为）。
+- **`GATE_EFFECTIVENESS_JSON`**：单行、同字节确定（不含 `generatedAt`）；坏 JSON 逐文件计 `parseErrors` 并在输出标注（不静默）；目录缺失 → `{"gates":[],"corpus":0,"note":"missing"}` 仍 exit 0。`script` 字段缺失时回退文件名段（新式 `<ISO>-<uuid>-<script>.json` / 旧式 `<ISO>-<script>.json`），回退失败 → `formatFallback`（不计 runs，已解析文件仍计入 corpus）。
+- **退出码**：0=判定成功 / 2=输入错误（未知/重复/缺值 flag `ARG_INVALID` → stdout 单行 `ERROR_JSON`）。聚合逻辑在 `logic/gate-effectiveness-logic.ts`（零 fs）。exit 0/2 契约，无 exit 1。
 
 ## 角色分派完整性门禁 CLI（check-role-dispatch）
 
