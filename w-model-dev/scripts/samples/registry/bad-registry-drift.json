@@ -1,0 +1,581 @@
+{
+  "schemaVersion": "1.0",
+  "rules": [
+    {
+      "id": "ap-1",
+      "kind": "anti-pattern",
+      "title": "【通用】跳过阶段门评审\"直接进入下一阶段\"",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "阶段门评审节 + CHECKPOINT 承载；无守护脚本"
+    },
+    {
+      "id": "ap-2",
+      "kind": "anti-pattern",
+      "title": "【通用】将测试设计后置到编码之后",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "SKILL.md 约束 #1 承载；无守护脚本"
+    },
+    {
+      "id": "ap-3",
+      "kind": "anti-pattern",
+      "title": "【通用】用 LLM 自行\"估算\"质量门结果",
+      "status": "active",
+      "boundScript": "check-artifact-gate.ts",
+      "retiredIn": null,
+      "rationale": "check-artifact-gate.ts 退出码 0 才算通过"
+    },
+    {
+      "id": "ap-4",
+      "kind": "anti-pattern",
+      "title": "【通用】评审未通过时悄悄小修后继续",
+      "status": "active",
+      "boundScript": "check-verifier-output.ts",
+      "retiredIn": null,
+      "rationale": "rework 闭环校验（check-verifier-output）"
+    },
+    {
+      "id": "ap-5",
+      "kind": "anti-pattern",
+      "title": "【通用】一次性载入全部 `references/` 或违反 Bundled Resources 表",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "SKILL.md 约束 #6 承载；无守护脚本"
+    },
+    {
+      "id": "ap-6",
+      "kind": "anti-pattern",
+      "title": "【通用】用 LLM 估算 RTM 覆盖率",
+      "status": "active",
+      "boundScript": "check-artifact-gate.ts",
+      "retiredIn": null,
+      "rationale": "check-artifact-gate.ts 覆盖率校验"
+    },
+    {
+      "id": "ap-7",
+      "kind": "anti-pattern",
+      "title": "【通用】质量门脚本退出码 1/2 时放行发布",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "CHECKPOINT 发布放行承载；无守护脚本"
+    },
+    {
+      "id": "ap-8",
+      "kind": "anti-pattern",
+      "title": "【通用】越过 🔴 CHECKPOINT 自动推进",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "CHECKPOINT 视觉标记承载；无守护脚本"
+    },
+    {
+      "id": "ap-9",
+      "kind": "anti-pattern",
+      "title": "【通用】谎报阶段状态（未完成标为完成）",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "data-models.md status 字段约束；无守护脚本"
+    },
+    {
+      "id": "ap-10",
+      "kind": "anti-pattern",
+      "title": "【通用】编排者越权实施（写代码 / 改文档 / 产出评审 JSON / 改 RTM 实体 / 生成测试用例 / 越权做根因分析）",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "subagent-delegation 角色表承载；无守护脚本"
+    },
+    {
+      "id": "ap-11",
+      "kind": "anti-pattern",
+      "title": "【通用】ingestion 跳过图谱校验",
+      "status": "active",
+      "boundScript": "check-requirement-graph.ts",
+      "retiredIn": null,
+      "rationale": "check-requirement-graph.ts 退出码 0"
+    },
+    {
+      "id": "ap-12",
+      "kind": "anti-pattern",
+      "title": "【通用】A 子代理自评收敛（用 LLM 输出判定收敛）",
+      "status": "active",
+      "boundScript": "check-requirement-graph.ts",
+      "retiredIn": null,
+      "rationale": "check-requirement-graph.ts 退出码（A 自评不替代 G）"
+    },
+    {
+      "id": "ap-13",
+      "kind": "anti-pattern",
+      "title": "【通用】ingestion 图谱信息流黑洞/奇迹/死模块放行",
+      "status": "active",
+      "boundScript": "check-requirement-graph.ts",
+      "retiredIn": null,
+      "rationale": "check-requirement-graph.ts 信息流校验"
+    },
+    {
+      "id": "ap-14",
+      "kind": "anti-pattern",
+      "title": "【通用】TLA+ 语法检查未通过即跑 TLC / 跳过语法检查",
+      "status": "active",
+      "boundScript": "check-tla-model.ts",
+      "retiredIn": null,
+      "rationale": "check-tla-model.ts 步骤 6→7 顺序强制"
+    },
+    {
+      "id": "ap-15",
+      "kind": "anti-pattern",
+      "title": "【通用】TLA+ 死锁/状态爆炸/不变式违反放行",
+      "status": "active",
+      "boundScript": "check-tla-model.ts",
+      "retiredIn": null,
+      "rationale": "check-tla-model.ts 行为门禁"
+    },
+    {
+      "id": "ap-16",
+      "kind": "anti-pattern",
+      "title": "【通用】TLA+ 占位实现/简化实现/错误实现",
+      "status": "active",
+      "boundScript": "check-tla-model.ts",
+      "retiredIn": null,
+      "rationale": "V 评审 + check-tla-model.ts 拆解决策校验"
+    },
+    {
+      "id": "ap-17",
+      "kind": "anti-pattern",
+      "title": "【通用】TLA+ 建模与需求/设计不符未回退",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "S 子代理核查 + 回退机制；无脚本"
+    },
+    {
+      "id": "ap-18",
+      "kind": "anti-pattern",
+      "title": "【通用】跳过 R 直接分派 S 返工（V/G 不通过后直接 S-fix，未经 R 根因定位）",
+      "status": "active",
+      "boundScript": "check-run-log.ts",
+      "retiredIn": null,
+      "rationale": "check-run-log.ts R8 + check-signature-chain.ts R9"
+    },
+    {
+      "id": "ap-19",
+      "kind": "anti-pattern",
+      "title": "【通用】R 报告未经 V 复审直接交 S 修复",
+      "status": "active",
+      "boundScript": "check-rootcause-report.ts",
+      "retiredIn": null,
+      "rationale": "check-rootcause-report.ts 前置 + check-signature-chain.ts 消费链"
+    },
+    {
+      "id": "ap-20",
+      "kind": "anti-pattern",
+      "title": "【通用】只规划不执行（子代理返回规划性内容而未调用任何执行工具）",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "无专用脚本（sig-008 人工核验）"
+    },
+    {
+      "id": "ap-21",
+      "kind": "anti-pattern",
+      "title": "【通用】阶段级门禁跳过（self-as-verifier 模式下跳过阶段 6/7 的 `--phase=N` 直接跑 `--phase=8` 终检）",
+      "status": "active",
+      "boundScript": "check-artifact-gate.ts",
+      "retiredIn": null,
+      "rationale": "check-artifact-gate.ts --phase=N + run-log R5"
+    },
+    {
+      "id": "ap-22",
+      "kind": "anti-pattern",
+      "title": "【通用】角色越权（`authRequired` 仅校验 token 存在未校验角色）",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "V-code 评审 + 系统测试用例；无脚本"
+    },
+    {
+      "id": "ap-23",
+      "kind": "anti-pattern",
+      "title": "【通用】跨模块 store 误用（跨模块调用时 store 选择与 schema 不一致）",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "V-design 评审 + 集成测试用例；无脚本"
+    },
+    {
+      "id": "ap-24",
+      "kind": "anti-pattern",
+      "title": "【通用】副作用时序不一致（响应体字段返回副作用自增前的旧值）",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "V-code 评审 + 系统测试用例；无脚本"
+    },
+    {
+      "id": "ap-25",
+      "kind": "anti-pattern",
+      "title": "【项目教训化石】JSON 文件写入用 PowerShell `ConvertTo-Json` / `Add-Content` / `Out-File` / `Set-Content`",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "run-log note 关键词检测；无脚本"
+    },
+    {
+      "id": "ap-26",
+      "kind": "anti-pattern",
+      "title": "【通用】RunLogEntry 与 EventIngress 字段混用（`run-log.jsonl` 含 `eventId`/`eventType`/`source`/`summary` 等 EventIngress 字段，或误将 RunLogEntry 的 `acknowledgedDecisions` 字段归到 EventIngress）",
+      "status": "active",
+      "boundScript": "check-run-log.ts",
+      "retiredIn": null,
+      "rationale": "check-run-log.ts R1 动作完整性"
+    },
+    {
+      "id": "ap-27",
+      "kind": "anti-pattern",
+      "title": "【通用】调测者简化行为（上下文压缩丢细节 / 追求效率省步骤 / 未对照硬约束核验）",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "run-log R1/R2/R6 交叉检测；无脚本"
+    },
+    {
+      "id": "ap-28",
+      "kind": "anti-pattern",
+      "title": "【通用】schema 前置校验缺失（`*-logic.ts` 校验函数未先调用 `validateBySchema`，结构错误直接进入业务规则校验）",
+      "status": "active",
+      "boundScript": "schema-loader.ts",
+      "retiredIn": null,
+      "rationale": "schema-loader.ts validateBySchema 调用检测"
+    },
+    {
+      "id": "ap-29",
+      "kind": "anti-pattern",
+      "title": "【通用】BDD 建模与需求/设计/TLA+ 不符未回退",
+      "status": "active",
+      "boundScript": "check-bdd-model.ts",
+      "retiredIn": null,
+      "rationale": "check-bdd-model.ts D4 等价性"
+    },
+    {
+      "id": "ap-30",
+      "kind": "anti-pattern",
+      "title": "【通用】豁免审批跳步",
+      "status": "active",
+      "boundScript": "check-exemption.ts",
+      "retiredIn": null,
+      "rationale": "check-exemption E1-E9"
+    },
+    {
+      "id": "ap-31",
+      "kind": "anti-pattern",
+      "title": "【通用】归档完整性缺失（归档未含阶段强制快照清单文件）",
+      "status": "active",
+      "boundScript": "check-archive-integrity.ts",
+      "retiredIn": null,
+      "rationale": "check-archive-integrity.ts 归档清单"
+    },
+    {
+      "id": "ap-32",
+      "kind": "anti-pattern",
+      "title": "【通用】签名链断裂（跳过角色 / 签名不连续 / 代签 checkpoint / 来源缺失）",
+      "status": "active",
+      "boundScript": "check-signature-chain.ts",
+      "retiredIn": null,
+      "rationale": "check-signature-chain.ts R1-R10"
+    },
+    {
+      "id": "ap-33",
+      "kind": "anti-pattern",
+      "title": "【通用】跳过 R3 预防性审查",
+      "status": "active",
+      "boundScript": "check-preventive-review.ts",
+      "retiredIn": null,
+      "rationale": "check-preventive-review.ts（always-on）+ check-run-log.ts R8"
+    },
+    {
+      "id": "ap-34",
+      "kind": "anti-pattern",
+      "title": "【通用】编排者漏派角色（未按约束 #8 分派 S/V/G/R，含 self-as-verifier 兼任未产出独立产物）",
+      "status": "active",
+      "boundScript": "check-role-dispatch.ts",
+      "retiredIn": null,
+      "rationale": "check-role-dispatch.ts S/V/G/R 分派完整性"
+    },
+    {
+      "id": "ap-35",
+      "kind": "anti-pattern",
+      "title": "【通用】self-as-verifier 模式下 V/G/R 产物混合（含 R3 三份报告与 S 产出同路径）",
+      "status": "active",
+      "boundScript": "check-verifier-output.ts",
+      "retiredIn": null,
+      "rationale": "check-verifier-output.ts --self-as-verifier + check-role-dispatch"
+    },
+    {
+      "id": "ap-36",
+      "kind": "anti-pattern",
+      "title": "【通用】路由顺序错误（参数路径先于静态路径注册，如 `/users/:id` 拦截 `/users/me`；鉴权路由在公开路由之后）",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "无自动脚本（V 评审人工核验路由表）"
+    },
+    {
+      "id": "ap-37",
+      "kind": "anti-pattern",
+      "title": "【通用】产物膨胀但核心决策稀疏（文件达标但实体引用密度低、核心决策被扩展点淹没）",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "无自动脚本（V 评审人工校验信息密度）"
+    },
+    {
+      "id": "ap-38",
+      "kind": "anti-pattern",
+      "title": "【通用】修改前未查询 codegraph（阶段 5-8 S-coding 直接修改代码/测试文件）",
+      "status": "active",
+      "boundScript": "check-codegraph-queries.ts",
+      "retiredIn": null,
+      "rationale": "check-codegraph-queries.ts 查询落盘"
+    },
+    {
+      "id": "ap-39",
+      "kind": "anti-pattern",
+      "title": "【通用】跳过编码计划审查（编码链任一 stage 产物未 R3×3 + V，或 plan / 账本 / 三件套缺项即进入下一步）",
+      "status": "active",
+      "boundScript": "check-coding-plan.ts",
+      "retiredIn": null,
+      "rationale": "check-coding-plan.ts R1-R6"
+    },
+    {
+      "id": "ap-40",
+      "kind": "anti-pattern",
+      "title": "【通用】plan 任务与执行账本 / 切片职责混淆（plan 任务节、账本完成行、tickets 切片互相替代或内容错位）",
+      "status": "active",
+      "boundScript": "check-coding-plan.ts",
+      "retiredIn": null,
+      "rationale": "check-coding-plan.ts R2/R3/R4"
+    },
+    {
+      "id": "ap-41",
+      "kind": "anti-pattern",
+      "title": "【通用】加权平均掩盖单轴失败（compositeScore 达标但存在 subCriterion.score < 0.70）",
+      "status": "active",
+      "boundScript": "check-verifier-output.ts",
+      "retiredIn": null,
+      "rationale": "check-verifier-output.ts R13 单轴下限"
+    },
+    {
+      "id": "ap-42",
+      "kind": "anti-pattern",
+      "title": "【通用】S-fix / emergency-fix 后跳过 R3+V",
+      "status": "active",
+      "boundScript": "check-run-log.ts",
+      "retiredIn": null,
+      "rationale": "check-run-log.ts R8 + check-role-dispatch + check-preventive-review --variant"
+    },
+    {
+      "id": "ap-43",
+      "kind": "anti-pattern",
+      "title": "【通用】敏感信息写入状态文件/日志（`.w-model/*.json` / gate-logs / run-log / 模板示例含真实凭据）",
+      "status": "active",
+      "boundScript": "security-scan.ts",
+      "retiredIn": null,
+      "rationale": "V 评审人工核验 + security-scan.ts 源码级扫描"
+    },
+    {
+      "id": "ap-44",
+      "kind": "anti-pattern",
+      "title": "【通用】跳过冰山扫掠直接放行（S-fix 后或阶段门放行前未分派 R-iceberg，或冰山新问题未经 V 复审直接放行）",
+      "status": "active",
+      "boundScript": "check-iceberg-sweep.ts",
+      "retiredIn": null,
+      "rationale": "check-iceberg-sweep.ts R1-R8 三视角对账"
+    },
+    {
+      "id": "ap-45",
+      "kind": "anti-pattern",
+      "title": "【通用】subagent 为通过测试/门禁而修改测试断言、测试期望或验收判据（反指标游戏）",
+      "status": "active",
+      "boundScript": "check-run-log.ts",
+      "retiredIn": null,
+      "rationale": "check-run-log.ts R10 revertEvidence 回滚证伪"
+    },
+    {
+      "id": "ap-46",
+      "kind": "anti-pattern",
+      "title": "【通用】只给审计权不给修正权（全自动流程把用户锁在\"跑完再看\"之外）",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "无专用脚本（CHECKPOINT 介入路径标注）"
+    },
+    {
+      "id": "ap-47",
+      "kind": "anti-pattern",
+      "title": "【通用】大规模重构式改动（单次 diff 重写整个模块）",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "无专用脚本（diff 可审性人工核验）"
+    },
+    {
+      "id": "ap-48",
+      "kind": "anti-pattern",
+      "title": "【通用】子代理越界实施（S/V/G/A/R 执行角色边界外动作：S 跑门禁或改 status、G 改产物或产出评审 JSON、V 跑门禁或改产物、A 写正式阶段产物或改 status、R 实施修复或跑门禁或跨阶段定位）",
+      "status": "candidate",
+      "boundScript": "check-run-log.ts",
+      "retiredIn": null,
+      "rationale": "漂移样例：active 反模式 47 条，触发登记册与 EXPECTED 漂移哨兵"
+    },
+    {
+      "id": "hc-1",
+      "kind": "hard-constraint",
+      "title": "测试设计前置",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "测试设计前置，工作流纪律；无脚本承载"
+    },
+    {
+      "id": "hc-2",
+      "kind": "hard-constraint",
+      "title": "阶段门放行（含豁免审批）",
+      "status": "active",
+      "boundScript": "check-exemption.ts",
+      "retiredIn": null,
+      "rationale": "阶段门放行 + 豁免审批四阶段（check-exemption E1-E9）"
+    },
+    {
+      "id": "hc-3",
+      "kind": "hard-constraint",
+      "title": "RTM 为事实源 + 每阶段回填",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "RTM 为唯一事实源 + 每阶段回填；无脚本承载"
+    },
+    {
+      "id": "hc-4",
+      "kind": "hard-constraint",
+      "title": "真实执行",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "必须真实执行测试/脚本；无脚本承载"
+    },
+    {
+      "id": "hc-5",
+      "kind": "hard-constraint",
+      "title": "失败即回退",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "评审/测试/门禁失败即回退；无脚本承载"
+    },
+    {
+      "id": "hc-6",
+      "kind": "hard-constraint",
+      "title": "按需加载",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "按需加载 references；无脚本承载"
+    },
+    {
+      "id": "hc-7",
+      "kind": "hard-constraint",
+      "title": "如实状态",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "未完成不得标为完成；无脚本承载"
+    },
+    {
+      "id": "hc-8",
+      "kind": "hard-constraint",
+      "title": "编排者最小化 + 角色分派完整性",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "编排者最小化 + 角色分派完整性（守护由反模式 #34 承载）"
+    },
+    {
+      "id": "hc-9",
+      "kind": "hard-constraint",
+      "title": "门禁退出码不可伪",
+      "status": "active",
+      "boundScript": "check-run-log.ts",
+      "retiredIn": null,
+      "rationale": "exitCode 与 process.exit 强一致 + check-run-log 交叉校验"
+    },
+    {
+      "id": "hc-10",
+      "kind": "hard-constraint",
+      "title": "系统层级树 + REQ 层级标注",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "层级树 + REQ level 强制标注；无脚本承载"
+    },
+    {
+      "id": "hc-11",
+      "kind": "hard-constraint",
+      "title": "闭环机制强制校验 + R3 预防性审查",
+      "status": "active",
+      "boundScript": "check-run-log.ts",
+      "retiredIn": null,
+      "rationale": "闭环五门 + R3 预防性审查（R11 闭环五脚本 + R8 轨迹模板）"
+    },
+    {
+      "id": "hc-12",
+      "kind": "hard-constraint",
+      "title": "返工必经根因定位",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "返工必经根因定位（R→V→G→S-fix）；无脚本承载"
+    },
+    {
+      "id": "hc-13",
+      "kind": "hard-constraint",
+      "title": "行为门禁按成熟度分级（TLA+ + BDD）",
+      "status": "active",
+      "boundScript": "check-bdd-model.ts",
+      "retiredIn": null,
+      "rationale": "TLA+/BDD 按成熟度分级（check-bdd-model D4 + check-tla-model）"
+    },
+    {
+      "id": "hc-14",
+      "kind": "hard-constraint",
+      "title": "代码改动前后门禁（codegraph + 回归）",
+      "status": "active",
+      "boundScript": "check-artifact-gate.ts",
+      "retiredIn": null,
+      "rationale": "codegraph 修改前查询 + 回归测试（check-artifact-gate strict 聚合）"
+    },
+    {
+      "id": "C1",
+      "kind": "candidate",
+      "title": "V 评审 summary 模板化",
+      "status": "candidate",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "候选（pending V 复审）：Loop 4 爬坡循环提出——summary 跨阶段 Jaccard>0.8 且 <50 字符；复审前不作为强制反模式"
+    },
+    {
+      "id": "C2",
+      "kind": "candidate",
+      "title": "无限返工循环",
+      "status": "candidate",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "候选（pending V 复审）：批次 4 分层反馈回路提出——同一 finding 反复修复不升级，轮次上限被架空；复审前不作为强制反模式"
+    }
+  ]
+}

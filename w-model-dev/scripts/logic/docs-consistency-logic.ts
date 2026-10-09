@@ -10,6 +10,8 @@ import * as path from 'node:path';
 
 import type * as TsType from 'typescript';
 
+import { crossCheckRegistryAgainstDocs, validateRuleRegistry, type RuleRegistry } from './rule-registry-logic.js';
+
 const ts = createRequire(import.meta.url)('typescript') as typeof TsType;
 
 export interface DocCheckViolation {
@@ -260,6 +262,15 @@ export interface DocConsistencyInput {
    * 可选——缺省（fixture 未注入）时跳过该检查，与 cliScriptFiles 空守卫策略互补。
    */
   agentsNav?: { agents: string; cliScriptFiles: string[] };
+  /**
+   * M2 规则登记册输入（43.5.0，CLI 层 existsSync 守卫 + JSON.parse 读盘注入；**不进 REQUIRED_PATHS**——
+   * 缺失必须表现为 checkRuleRegistry blocking violation 而非 CLI exit 2，规格语义：登记册缺失=计数失去单一事实源）。
+   * - undefined：旧夹具未接线 → 跳过 checkRuleRegistry（无违规，防既有单测 fixture 回归）；
+   * - { registry: null }：登记册文件缺失（CLI 已 existsSync 探测）→ blocking「登记册缺失」；
+   * - { registry: null, parseError }：登记册存在但 JSON.parse 失败 → blocking「登记册坏 JSON」；
+   * - { registry: <parsed> }：成功解析 → validateRuleRegistry + crossCheckRegistryAgainstDocs + 漂移哨兵。
+   */
+  ruleRegistry?: { registry: RuleRegistry | null; parseError?: string };
 }
 
 /**
@@ -1235,8 +1246,14 @@ export function buildDocConsistencyReport(input: DocConsistencyInput): DocConsis
   );
   violations.push(...checkDoDDimensions(input.definitionOfDone, input.readme, input.ssot));
   violations.push(...checkOperatingBehaviors(input.skill, input.readme, input.ssot, input.operationBehaviors));
-  violations.push(...checkHardConstraints(input.skill, input.hardConstraints));
-  violations.push(...checkAntiPatterns(input.antiPatterns));
+  // M2（43.5.0）：登记册注入且合法时，文档计数检查直接引用登记册 active 计数（单一事实源）；
+  // 未注入 / 缺失 / 坏 JSON / 非法登记册时回退字面 EXPECTED（登记册问题由 checkRuleRegistry 另行报 blocking）。
+  const registryCounts = registryActiveCounts(input);
+  violations.push(
+    ...checkHardConstraints(input.skill, input.hardConstraints, registryCounts?.hc ?? EXPECTED.hardConstraintCount),
+  );
+  violations.push(...checkAntiPatterns(input.antiPatterns, registryCounts?.ap ?? EXPECTED.maxAntiPattern));
+  violations.push(...checkRuleRegistry(input));
   violations.push(...checkExit2ScriptCount(input.exit2ScriptCount, input.agents));
   violations.push(...checkConventionsExit2Count(input.glossary, input.exit2ScriptCount));
   violations.push(...checkPrePushCount(input.prePush));
@@ -1773,9 +1790,14 @@ function checkOperatingBehaviors(
 /**
  * 硬约束清单一致性：
  * 14 条硬约束完整版在 references/hard-constraints.md；SKILL.md 只保留单行摘要 + 指针。
- * 要求：SKILL.md 含指针；hard-constraints.md 含 ## #1 ~ ## #N（N=EXPECTED.hardConstraintCount）连续标题。
+ * 要求：SKILL.md 含指针；hard-constraints.md 含 ## #1 ~ ## #N 连续标题。
+ * @param expectedHc 期望硬约束条数（M2 43.5.0：登记册注入且合法时用 active 计数，否则回退 EXPECTED.hardConstraintCount 字面）
  */
-function checkHardConstraints(skill: string, hardConstraints: string): DocCheckViolation[] {
+function checkHardConstraints(
+  skill: string,
+  hardConstraints: string,
+  expectedHc: number = EXPECTED.hardConstraintCount,
+): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   if (!skill.includes('hard-constraints.md')) {
     violations.push({
@@ -1784,24 +1806,28 @@ function checkHardConstraints(skill: string, hardConstraints: string): DocCheckV
     });
   }
   const headingLines = hardConstraints.split('\n').filter((l) => l.startsWith('## #'));
-  for (let i = 1; i <= EXPECTED.hardConstraintCount; i++) {
+  for (let i = 1; i <= expectedHc; i++) {
     if (!headingLines.some((l) => l.startsWith(`## #${i} `))) {
       violations.push({
         check: 'hard-constraints',
-        message: `hard-constraints.md 缺「## #${i}」标题（应有 ${EXPECTED.hardConstraintCount} 条）`,
+        message: `hard-constraints.md 缺「## #${i}」标题（应有 ${expectedHc} 条）`,
       });
     }
   }
-  if (headingLines.some((l) => l.startsWith(`## #${EXPECTED.hardConstraintCount + 1} `))) {
+  if (headingLines.some((l) => l.startsWith(`## #${expectedHc + 1} `))) {
     violations.push({
       check: 'hard-constraints',
-      message: `hard-constraints.md 出现超出 ${EXPECTED.hardConstraintCount} 条的「## #${EXPECTED.hardConstraintCount + 1}」标题`,
+      message: `hard-constraints.md 出现超出 ${expectedHc} 条的「## #${expectedHc + 1}」标题`,
     });
   }
   return violations;
 }
 
-function checkAntiPatterns(antiPatterns: string): DocCheckViolation[] {
+/**
+ * 反模式主清单一致性（含 M2 43.5.0 派生计数）。
+ * @param expectedAp 期望反模式最大编号（M2 43.5.0：登记册注入且合法时用 active 计数，否则回退 EXPECTED.maxAntiPattern 字面）
+ */
+function checkAntiPatterns(antiPatterns: string, expectedAp: number = EXPECTED.maxAntiPattern): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];
   const headerIdx = antiPatterns.indexOf(ANTI_PATTERN_MAIN_TABLE_HEADER);
   // 主清单表区间：表头行 → 其后首个标题行（真实文档为「### 命中高发阶段」）。
@@ -1813,19 +1839,19 @@ function checkAntiPatterns(antiPatterns: string): DocCheckViolation[] {
     const nextHeading = tail.search(/\r?\n#{1,6} /);
     mainTable = nextHeading < 0 ? tail : tail.slice(0, nextHeading);
   }
-  if (!mainTable.includes(`\n| ${EXPECTED.maxAntiPattern} |`)) {
+  if (!mainTable.includes(`\n| ${expectedAp} |`)) {
     violations.push({
       check: 'anti-patterns',
       message:
         headerIdx < 0
-          ? `hard-constraints.md（反模式节）缺反模式清单表头「${ANTI_PATTERN_MAIN_TABLE_HEADER}」（主清单表最大编号应为 ${EXPECTED.maxAntiPattern}）`
-          : `hard-constraints.md（反模式节）反模式清单表内应含最大编号 ${EXPECTED.maxAntiPattern} 行（「| ${EXPECTED.maxAntiPattern} |」出现在主清单表区间之外不计数）`,
+          ? `hard-constraints.md（反模式节）缺反模式清单表头「${ANTI_PATTERN_MAIN_TABLE_HEADER}」（主清单表最大编号应为 ${expectedAp}）`
+          : `hard-constraints.md（反模式节）反模式清单表内应含最大编号 ${expectedAp} 行（「| ${expectedAp} |」出现在主清单表区间之外不计数）`,
     });
   }
-  if (!antiPatterns.includes(`#1~#${EXPECTED.maxAntiPattern}`)) {
+  if (!antiPatterns.includes(`#1~#${expectedAp}`)) {
     violations.push({
       check: 'anti-patterns',
-      message: `hard-constraints.md（反模式节）应含连续区间「#1~#${EXPECTED.maxAntiPattern}」`,
+      message: `hard-constraints.md（反模式节）应含连续区间「#1~#${expectedAp}」`,
     });
   }
   for (const stale of STALE_RANGES) {
@@ -1833,6 +1859,88 @@ function checkAntiPatterns(antiPatterns: string): DocCheckViolation[] {
       violations.push({ check: 'anti-patterns', message: `hard-constraints.md（反模式节）仍含过时区间「${stale}」` });
     }
   }
+  return violations;
+}
+
+/** M2 规则登记册一致性检查的检查标识（43.5.0） */
+const RULE_REGISTRY_CHECK = 'rule-registry';
+
+/** 登记册 active 计数（按 kind+status 过滤，与 rule-registry-logic 同口径） */
+function countActiveRules(registry: RuleRegistry, kind: 'anti-pattern' | 'hard-constraint'): number {
+  return registry.rules.filter((r) => r.kind === kind && r.status === 'active').length;
+}
+
+/**
+ * 登记册派生计数（EXPECTED 的运行时覆盖源）：仅当 input.ruleRegistry 注入且登记册合法
+ * （validateRuleRegistry passed）时返回 active 计数；否则返回 null（调用方回退字面 EXPECTED）。
+ * 设计：派生值只在「登记册是可信单一事实源」时生效——坏/缺失/非法登记册不得反过来把文档计数
+ * 检查的期望值带偏（登记册问题由 checkRuleRegistry 另行报 blocking，派生只服务文档计数检查）。
+ */
+function registryActiveCounts(input: DocConsistencyInput): { ap: number; hc: number } | null {
+  const r = input.ruleRegistry;
+  if (r === undefined || r === null || r.registry === null) return null;
+  if (!validateRuleRegistry(r.registry).passed) return null;
+  return {
+    ap: countActiveRules(r.registry, 'anti-pattern'),
+    hc: countActiveRules(r.registry, 'hard-constraint'),
+  };
+}
+
+/**
+ * M2 规则登记册一致性检查（43.5.0 批次 10，规格 §3 M2；登记册 = 反模式/硬约束计数与状态的单一事实源）。
+ * 五类 blocking：
+ *   1. 登记册缺失（{registry:null} 且无 parseError）→「登记册缺失，计数失去单一事实源」；
+ *   2. 登记册存在但坏 JSON（parseError 注入）→「登记册坏 JSON：<err>」；
+ *   3. validateRuleRegistry violations（含 [schema] 前缀）全部透传为 blocking；
+ *   4. crossCheckRegistryAgainstDocs 与 hard-constraints.md 的任何集合差异 → blocking（带差异明细）；
+ *   5. 漂移哨兵：active ap/hc 计数与 EXPECTED 字面（48/14）漂移 → blocking（第 3/4 道审核之外的双重保险）。
+ * 缺省语义：input.ruleRegistry === undefined（旧夹具未接线）→ 跳过，防既有单测 fixture 回归；
+ * CLI 真实运行时注入 {registry:null} / {registry, parseError} 才触发缺失 / 坏 JSON 报错。
+ */
+function checkRuleRegistry(input: DocConsistencyInput): DocCheckViolation[] {
+  const violations: DocCheckViolation[] = [];
+  const r = input.ruleRegistry;
+  if (r === undefined) return violations;
+
+  // 缺失 / 坏 JSON（registry === null）
+  if (r === null || r.registry === null) {
+    if (r !== null && r.parseError !== undefined) {
+      violations.push({
+        check: RULE_REGISTRY_CHECK,
+        message: `登记册坏 JSON：${r.parseError}`,
+      });
+    } else {
+      violations.push({
+        check: RULE_REGISTRY_CHECK,
+        message: '登记册缺失，计数失去单一事实源（w-model-dev/rule-registry.json 无法读取）',
+      });
+    }
+    return violations;
+  }
+
+  const registry = r.registry;
+
+  // validateRuleRegistry（schema + 业务）violations 透传为 blocking
+  for (const v of validateRuleRegistry(registry).violations) {
+    violations.push({ check: RULE_REGISTRY_CHECK, message: v });
+  }
+
+  // 登记册 ↔ hard-constraints.md 交叉核对（反模式主清单 `| N |` 行 ↔ `## #N` 标题双向精确相等）
+  for (const v of crossCheckRegistryAgainstDocs(registry, input.hardConstraints).violations) {
+    violations.push({ check: RULE_REGISTRY_CHECK, message: v });
+  }
+
+  // 漂移哨兵：active 计数与 EXPECTED 字面对比——validate/crossCheck 之外的第二道防线，
+  // 防两检查被绕过或 EXPECTED 悄然上移后登记册未同步（字面 48/14 保留为哨兵）。
+  const activeAp = countActiveRules(registry, 'anti-pattern');
+  const activeHc = countActiveRules(registry, 'hard-constraint');
+  if (activeAp !== EXPECTED.maxAntiPattern || activeHc !== EXPECTED.hardConstraintCount) {
+    violations.push({
+      check: RULE_REGISTRY_CHECK,
+      message: `登记册与 EXPECTED 漂移：active 反模式 ${activeAp} 条（EXPECTED ${EXPECTED.maxAntiPattern}），active 硬约束 ${activeHc} 条（EXPECTED ${EXPECTED.hardConstraintCount}）`,
+    });
+  }
+
   return violations;
 }
 

@@ -33,6 +33,7 @@ import {
   isCountClaimScannedPath,
   type DocConsistencyInput,
 } from '../logic/docs-consistency-logic.js';
+import { REGISTRY_EXPECTATIONS } from '../samples/expectations/registry.js';
 import { childProcessEnv } from '../lib/run-sync.js';
 
 /** run-log.schema.json action.enum 18 值（与 schema 逐值一致、同序；批次 6 A15：32→18，删 15 死词 + 增 event-route） */
@@ -4331,5 +4332,72 @@ describe('R-persona 矩阵一致性与 persona 能力声明（R11 判据源）',
     const empty = checkPersonaCapabilityDeclarations([]);
     expect(empty).toHaveLength(1);
     expect(empty[0]!.message).toMatch(/人格文件清单为空/);
+  });
+});
+
+describe('M2 规则登记册接线（checkRuleRegistry + EXPECTED 派生，43.5.0）', () => {
+  const samplesRegistry = (name: string): string => path.join(REPO_ROOT, 'w-model-dev/scripts/samples/registry', name);
+
+  it('① 不注入 ruleRegistry → 无 rule-registry 违规（缺省语义：旧夹具未接线跳过，不回归）', () => {
+    const report = buildDocConsistencyReport(baseInput());
+    expect(
+      report.violations.filter((v) => v.check === 'rule-registry'),
+      '未接线应跳过 checkRuleRegistry',
+    ).toEqual([]);
+    // 缺省同时不改变既有文档计数检查：回退字面 EXPECTED（baseInput 反模式主表含 #1~#48）
+    expect(baseInput().antiPatterns).toContain('#1~#48');
+  });
+
+  it('② 注入 {registry:null} → blocking「登记册缺失，计数失去单一事实源」', () => {
+    const report = buildDocConsistencyReport(baseInput({ ruleRegistry: { registry: null } }));
+    const vs = report.violations.filter((v) => v.check === 'rule-registry');
+    expect(vs).toHaveLength(1);
+    expect(vs[0]!.message).toBe('登记册缺失，计数失去单一事实源（w-model-dev/rule-registry.json 无法读取）');
+  });
+
+  it('③ 注入 parseError → blocking「登记册坏 JSON：<err>」', () => {
+    const report = buildDocConsistencyReport(
+      baseInput({ ruleRegistry: { registry: null, parseError: 'Unexpected token } in JSON at position 10' } }),
+    );
+    const vs = report.violations.filter((v) => v.check === 'rule-registry');
+    expect(vs).toHaveLength(1);
+    expect(vs[0]!.message).toBe('登记册坏 JSON：Unexpected token } in JSON at position 10');
+  });
+
+  it('④ 注入漂移登记册 → blocking（validateRuleRegistry 透传 + 漂移哨兵命中）', async () => {
+    const driftSample = REGISTRY_EXPECTATIONS.find((e) => e.expectedDrift);
+    expect(driftSample, 'expectations/registry.ts 应登记 bad-registry-drift 为漂移样例').toBeDefined();
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控 samples/registry fixture（REPO_ROOT 下固定目录），仅只读
+    const raw = await fs.readFile(samplesRegistry(driftSample!.file), 'utf8');
+    const report = buildDocConsistencyReport(baseInput({ ruleRegistry: { registry: JSON.parse(raw) } }));
+    const vs = report.violations.filter((v) => v.check === 'rule-registry');
+    expect(vs.length, JSON.stringify(vs, null, 2)).toBeGreaterThan(0);
+    const messages = vs.map((v) => v.message).join('\n');
+    expect(messages).toMatch(/active 反模式应为 48 条，实测 47 条/); // validateRuleRegistry R2 透传
+    expect(messages).toMatch(/登记册与 EXPECTED 漂移/); // 漂移哨兵命中
+  });
+
+  it('⑤ 真实仓库登记册（全量镜像合法样例）+ 真实 hard-constraints → passed（无 rule-registry 违规）', async () => {
+    const validSample = REGISTRY_EXPECTATIONS.find((e) => !e.expectedDrift);
+    expect(validSample, 'expectations/registry.ts 应登记 valid-registry 为合法样例').toBeDefined();
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控 samples/registry fixture（REPO_ROOT 下固定目录），仅只读
+    const rawRegistry = await fs.readFile(samplesRegistry(validSample!.file), 'utf8');
+    const registry = JSON.parse(rawRegistry) as { rules: Array<{ kind: string; status: string }> };
+    // 合法样例不能随意裁剪——业务校验要求 active ap 恰 48 / active hc 恰 14
+    expect(registry.rules.filter((r) => r.kind === 'anti-pattern' && r.status === 'active')).toHaveLength(48);
+    expect(registry.rules.filter((r) => r.kind === 'hard-constraint' && r.status === 'active')).toHaveLength(14);
+    const realHardConstraints = await fs.readFile(
+      path.join(REPO_ROOT, 'w-model-dev/references/hard-constraints.md'),
+      'utf8',
+    );
+    const report = buildDocConsistencyReport(
+      baseInput({
+        antiPatterns: realHardConstraints,
+        hardConstraints: realHardConstraints,
+        ruleRegistry: { registry: JSON.parse(rawRegistry) },
+      }),
+    );
+    // 真实登记册 ↔ 真实 hard-constraints.md：validate + crossCheck + 漂移哨兵全通过
+    expect(report.violations.filter((v) => v.check === 'rule-registry')).toEqual([]);
   });
 });

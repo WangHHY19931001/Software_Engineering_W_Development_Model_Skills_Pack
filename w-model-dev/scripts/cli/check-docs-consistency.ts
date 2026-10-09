@@ -57,6 +57,7 @@ import {
   isCountClaimScannedPath,
   type DocConsistencyInput,
 } from '../logic/docs-consistency-logic.js';
+import type { RuleRegistry } from '../logic/rule-registry-logic.js';
 
 /**
  * 本门禁所需「活体文档」路径白名单（REQUIRED_PATHS）。
@@ -814,6 +815,27 @@ async function main(): Promise<void> {
     })),
   ];
 
+  // M2 规则登记册（43.5.0）：读盘注入 w-model-dev/rule-registry.json。**不进 REQUIRED_PATHS**——
+  // 缺失必须表现为 checkRuleRegistry blocking violation（登记册缺失 = 计数失去单一事实源）而非 CLI exit 2。
+  // existsSync 守卫仿 testsReadme 模式；缺失 → {registry:null}，坏 JSON → {registry:null,parseError}，
+  // 成功 → {registry:<parsed>}（input 可选字段；单测未注入该字段时 logic 层跳过该检查）。
+  const ruleRegistryPath = join(root, 'w-model-dev/rule-registry.json');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控仓库相对路径（repo-root 下 rule-registry.json），仅作存在性探测与只读
+  const hasRuleRegistry = existsSync(ruleRegistryPath);
+  let ruleRegistry: DocConsistencyInput['ruleRegistry'] = undefined;
+  if (hasRuleRegistry) {
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控仓库相对路径（repo-root 下 rule-registry.json），仅读取
+      ruleRegistry = { registry: JSON.parse(read('w-model-dev/rule-registry.json')) as RuleRegistry };
+    } catch (error) {
+      // 坏 JSON：注入 parseError，checkRuleRegistry 报「登记册坏 JSON」blocking（fail-closed，非 exit 2）
+      ruleRegistry = { registry: null, parseError: error instanceof Error ? error.message : String(error) };
+    }
+  } else {
+    // 登记册缺失：注入 {registry:null}，checkRuleRegistry 报「登记册缺失」blocking（fail-closed，非 exit 2）
+    ruleRegistry = { registry: null };
+  }
+
   const input: DocConsistencyInput = {
     schemaFiles,
     schemas,
@@ -836,6 +858,7 @@ async function main(): Promise<void> {
     agentPersonas: read('w-model-dev/references/agent-personas.md'),
     definitionOfDone: read('w-model-dev/references/quick-self-check.md'),
     antiPatterns: read('w-model-dev/references/hard-constraints.md'),
+    ruleRegistry,
     glossary: read('w-model-dev/references/conventions.md'),
     runLogSchema: read('w-model-dev/schemas/run-log.schema.json'),
     skill: read('w-model-dev/SKILL.md'),
