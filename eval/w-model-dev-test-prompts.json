@@ -709,5 +709,40 @@
     "route": "enable",
     "prompt": "想用 SkillOpt 自动优化这个技能包的 prompt 和工具链，直接对仓库跑可以吗",
     "expected": "skill 按 SkillOpt 方法论吸收边界回答：信号→bounded edit→validation gate 流程——bounded edit 有边界规则，validation gate 以回归测试为标准；技能自演化不在本仓库、由外部工具完成，w-model-dev Loop 4 只产出 HarnessImprovementReport 信号、不自动改 harness、不重写 prompt/工具/验证规则（skillopt-adoption「信号→bounded edit→validation gate 流程」「与 §11「技能自演化不在本仓库」的协调」节）"
+  },
+  {
+    "id": 102,
+    "scenario": "如何度量仓库复杂度与棘轮预算",
+    "route": "enable",
+    "prompt": "怎么度量这个技能包的仓库复杂度，有没有棘轮预算防止复杂度回退",
+    "expected": "skill 指向复杂度棘轮预算机制：check-complexity-budget.ts 复用共享采集器度量 references/ 与 scripts/ 行数及反模式/硬约束/人格适配/沉积计数，与 eval/complexity-caps.json 的棘轮 caps 逐维度比对，结果经 COMPLEXITY_BUDGET_JSON 单行稳定输出；SSoT 定义 complexity-caps 作为棘轮预算上界——cap 只许下调，上调唯一通道是 🔴 CHECKPOINT + decision-log 显式登记（command-reference「COMPLEXITY_BUDGET_JSON」节 + SSoT「complexity-caps」节）"
+  },
+  {
+    "id": 103,
+    "scenario": "反模式何时退役、谁裁决",
+    "route": "enable",
+    "prompt": "反模式或规则什么时候可以退役？由谁裁决",
+    "expected": "skill 指向规则生命周期与退役裁决：wm-rule-lifecycle.ts 对登记册全量规则跑退役候选三判据（① 活文档引用零命中 ② boundScript null 或 gate-logs 零出现 ③ 存续 ≥10 个 minor），全满足者列入 candidates 但只报告不裁决；退役/降级/维持由定期简化检查点 M4 的 🔴 CHECKPOINT 提交用户裁定本批简化配额，裁定后落 decision-log，agent 不得自动推进（command-reference「退役候选三判据」+ CONTRIBUTING「🔴 CHECKPOINT 裁定本批简化配额」节）"
+  },
+  {
+    "id": 104,
+    "scenario": "门禁从未阻断过怎么评估",
+    "route": "enable",
+    "prompt": "某个门禁从来没阻断过任何提交，它还有存在价值吗？怎么评估门禁效能",
+    "expected": "skill 指向门禁效能评估与定期简化检查点：wm-gate-effectiveness.ts 消费既有 .w-model/gate-logs/*.json 按门禁聚合 runs/blocked/errors/lastFired，零阻断门禁 = 降级候选信号（只报告不自动降级）；每个优化批次开工前执行 M4 定期简化检查点，跑三只读脚本取数、刷新证据图、🔴 CHECKPOINT 提交用户裁决，零阻断门禁去留由人类 CHECKPOINT 消费并落 decision-log（CONTRIBUTING「定期简化检查点（M4）」节）"
+  },
+  {
+    "id": 105,
+    "scenario": "无用防御简化：无人读取的校验和要不要生成",
+    "route": "enable",
+    "prompt": "导出文件时顺带生成一个 SHA-256 校验和，但仓库里没有任何地方读取它，要不要生成？",
+    "expected": "skill 走 SHIT H 维度（无用防御）判定：无消费者即省略——防御的价值按是否被读取/消费评判，没人读取的校验和属于无用防御，不生成；按效果评判防御：防御留不留看它是否改变过什么、有无真实消费；该方向经 stop-that-shit 吸收为 C1/C2 裁决辅助框架，落于 absorptions.md（「H 无用防御」「按效果评判防御」）"
+  },
+  {
+    "id": 106,
+    "scenario": "必要防御保留：校验和有真实消费者要不要撤",
+    "route": "enable",
+    "prompt": "发布流程会读取我们生成的校验和、不一致时拒绝使用产物，这个校验和要不要保留？",
+    "expected": "skill 判定必要防御保留：校验和有真实消费者（发布流程读取、不一致即拒绝），属必要防御，保留不撤；Bad/Good 成对概念要求同场景双向断言——有消费者与无消费者的防御结论相反；吸收锚同时记录「不吸收 Guard / 对应物且更强」方向：防御价值取决于真实消费与对应物强弱，无更强替代时不撤（absorptions.md「Bad/Good 成对」「已有对应物且更强」）"
   }
 ]

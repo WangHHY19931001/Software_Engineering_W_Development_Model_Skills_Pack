@@ -2,7 +2,7 @@
   "version": 2,
   "description": "101 条评估提示词 → 技能资产锚点映射。断言分层：L1 触发词断言（正向 enable 与歧义 ask）、L1N 负向触发断言（skip 反例，锚定 activation-guide 类别节 + notContains 守卫 + 「不启用」行锚点；campaign 后批次延展的 L1N 另有权威行锚点形态、不带 category——类别化语料仍以 guide 登记册与 coverageMatrix ④ 为准）、L2 机制存在性断言。顶层 matrix 为覆盖矩阵声明，由 runner coverageMatrix 六项校验强制（⑥ = references/*.md 全覆盖：映射 assertions/evidence 路径并集须覆盖实况文件集，差集非空 exit 1）。每条映射另以 evidence 字段做行为证据映射。",
   "matrix": {
-    "routeTotals": { "enable": 42, "ask": 9, "skip": 24 },
+    "routeTotals": { "enable": 47, "ask": 9, "skip": 24 },
     "minPerCategory": 2,
     "guidePath": "w-model-dev/references/activation-guide.md"
   },
@@ -592,6 +592,35 @@
       "assertions": [
         { "type": "contains", "target": "w-model-dev/references/skillopt-adoption.md", "substring": "信号→bounded edit→validation gate 流程" },
         { "type": "contains", "target": "w-model-dev/references/skillopt-adoption.md", "substring": "与 §11「技能自演化不在本仓库」的协调" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 102, "scenario": "如何度量仓库复杂度与棘轮预算", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/command-reference.md", "substring": "COMPLEXITY_BUDGET_JSON" },
+        { "type": "contains", "target": "docs/skill-design-document_SSoT.md", "substring": "complexity-caps" }
+      ],
+      "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/cli/check-complexity-budget.ts" } },
+    { "id": 103, "scenario": "反模式何时退役、谁裁决", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "w-model-dev/references/command-reference.md", "substring": "退役候选三判据" },
+        { "type": "contains", "target": "CONTRIBUTING.md", "substring": "🔴 CHECKPOINT 裁定本批简化配额" }
+      ],
+      "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/cli/wm-rule-lifecycle.ts" } },
+    { "id": 104, "scenario": "门禁从未阻断过怎么评估", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "CONTRIBUTING.md", "substring": "定期简化检查点" }
+      ],
+      "evidence": { "type": "fileExists", "target": "w-model-dev/scripts/cli/wm-gate-effectiveness.ts" } },
+    { "id": 105, "scenario": "无用防御简化：无人读取的校验和要不要生成", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "docs/changes/decision-log/absorptions.md", "substring": "H 无用防御" },
+        { "type": "contains", "target": "docs/changes/decision-log/absorptions.md", "substring": "按效果评判防御" }
+      ],
+      "evidence": { "type": "assertion" } },
+    { "id": 106, "scenario": "必要防御保留：校验和有真实消费者要不要撤", "layer": "L2", "route": "enable",
+      "assertions": [
+        { "type": "contains", "target": "docs/changes/decision-log/absorptions.md", "substring": "Bad/Good 成对" },
+        { "type": "contains", "target": "docs/changes/decision-log/absorptions.md", "substring": "已有对应物且更强" }
       ],
       "evidence": { "type": "assertion" } }
   ]
