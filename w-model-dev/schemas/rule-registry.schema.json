@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "rule-registry.schema.json",
+  "title": "Rule Registry",
+  "type": "object",
+  "description": "反模式与硬约束的生命周期登记册——计数与状态的单一事实源。43.5.0 批次 10 引入。",
+  "required": ["schemaVersion", "rules"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0", "description": "登记册结构版本。" },
+    "rules": {
+      "type": "array",
+      "minItems": 62,
+      "items": { "$ref": "#/definitions/ruleEntry" }
+    }
+  },
+  "definitions": {
+    "ruleEntry": {
+      "type": "object",
+      "description": "登记册条目：反模式 / 硬约束 / 候选的统一生命周期记录；title 与 hard-constraints.md 主清单行 / ## #N 标题一致。",
+      "required": ["id", "kind", "title", "status", "boundScript"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(ap|hc)-[0-9]+$|^C[12]$",
+          "description": "ap-N=反模式 N；hc-N=硬约束 N；C1/C2=候选。"
+        },
+        "kind": { "enum": ["anti-pattern", "hard-constraint", "candidate"], "description": "条目种类。" },
+        "title": {
+          "type": "string",
+          "minLength": 2,
+          "description": "与 hard-constraints.md 主清单/约束标题一致的中文名。"
+        },
+        "status": {
+          "enum": ["active", "candidate", "retired"],
+          "description": "生命周期状态；retired 须有 retiredIn 与理由。"
+        },
+        "boundScript": { "type": ["string", "null"], "description": "守护脚本文件名或 null（无脚本，人工核验）。" },
+        "retiredIn": { "type": ["string", "null"], "description": "退役版本号，如 43.5.0。" },
+        "rationale": { "type": "string", "description": "状态依据；retired 必填，其余可空串。" }
+      }
+    }
+  }
+}

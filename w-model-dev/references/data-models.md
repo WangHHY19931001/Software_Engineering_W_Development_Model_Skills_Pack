@@ -35,7 +35,7 @@
 | 爬坡报告      | HarnessImprovementReport                                                                                                                               | 「爬坡循环改进报告模型」节                             |
 | TLA+ manifest | tla-manifest.json（TlaManifest/TlaSpec/TlaCheckRound）                                                                                                 | 「TLA+ manifest 模型」节                               |
 | BDD 模型      | BddManifest / BddStateMachine / BddFeature                                                                                                             | 「BDD 数据模型」节                                     |
-| JSON Schema   | 34 份 schema（含 change-scope / codegraph-query / evidence-manifest / evidence-provenance 与 9 份 code-health 契约）+ structural-first + [schema] 前缀 | 「JSON Schema 强约束」节                               |
+| JSON Schema   | 35 份 schema（含 change-scope / codegraph-query / evidence-manifest / evidence-provenance 与 9 份 code-health 契约）+ structural-first + [schema] 前缀 | 「JSON Schema 强约束」节                               |
 
 **按场景只读 §X**：
 
@@ -1003,7 +1003,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 > schema 文件统一存放于 `w-model-dev/schemas/*.schema.json`，由 `scripts/infrastructure/schema-loader.ts` 自动加载并按文件 basename（去 `.schema.json` 后缀）注册。
 > 各 `*-logic.ts` 在校验函数入口调用 `validateBySchema(name, data)`，失败时以 `[schema]` 前缀返回错误，不再触达业务规则校验。
 
-### Schema 清单（34 份）
+### Schema 清单（35 份）
 
 | Schema 名（注册键）             | 文件                                        | 目标类型                   | 关键约束                                                                                                                                                                                                                                                                                                                                                                                              | 对应 logic.ts                                                                                 |
 | ------------------------------- | ------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -1041,6 +1041,7 @@ BDD 状态机的 `states` / `initialState` / `transitions` / `invariants` 与同
 | `code-health-test-inventory`    | `code-health-test-inventory.schema.json`    | CodeHealthTestInventory    | additionalProperties:false；Phase 3 测试清单与受保护删除证明（protected governance facts + 真实 pre/post 结果）                                                                                                                                                                                                                                                                                       | state-write-logic.ts（经 lib/state-schema-registry.ts）                                       |
 | `code-health-duplicate-cluster` | `code-health-duplicate-cluster.schema.json` | CodeHealthDuplicateCluster | additionalProperties:false；Phase 4 结构重复簇与受保护抽象证明                                                                                                                                                                                                                                                                                                                                        | state-write-logic.ts（经 lib/state-schema-registry.ts）                                       |
 | `code-health-ledger-event`      | `code-health-ledger-event.schema.json`      | CodeHealthLedgerEvent      | additionalProperties:false；append-only candidate 生命周期转移，绑定 source-bound evidence 与签名引用                                                                                                                                                                                                                                                                                                 | code-health-ledger-logic.ts / state-write-logic.ts（经 lib/state-schema-registry.ts）         |
+| `rule-registry`                 | `rule-registry.schema.json`                 | RuleRegistry               | additionalProperties:false；rules minItems:62；id pattern（ap-N / hc-N / C1/C2）；kind / status enum（status=retired 须有 retiredIn 与 rationale，schema 层允许空串、业务层强制非空）；boundScript string/null                                                                                                                            | rule-registry-logic.ts                                                                        |
 
 ### 设计原则
 

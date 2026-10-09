@@ -190,7 +190,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 - **代码健康治理（`/wm code-health`）**：Phase 1–4 只读发现 → 七维度 gap → 受保护测试 inventory → 重复簇与抽象 guard；发现不是结论、coverage 仅信号，删除/抽象必须有人类授权 + HEAD-tracked 证据 + 可回滚（见 [code-health-governance.md](./w-model-dev/references/code-health-governance.md)）。
 - **评审人格库**：内置 36 个人格文件（工程 / 测试 / 设计 / 产品 / 项目 5 类），每份含能力 / 输入 / 输出 / 边界四字段声明（frontmatter，由 docs-consistency 门禁强制），按 [agent-personas.md](./w-model-dev/references/agent-personas.md) 选型多角度评审；R-persona 两键选择矩阵与 R11 门禁见同文件「Persona 矩阵」节。
 - **采用路径**：新项目从 Day 0 跑全流程，存量项目增量验证优先（见 [docs/adoption-guide.md](./docs/adoption-guide.md)）。
-- **状态持久化**：`.w-model/*.json` 跨多轮交互保持上下文，34 份 JSON Schema 约束文件保证格式一致。
+- **状态持久化**：`.w-model/*.json` 跨多轮交互保持上下文，35 份 JSON Schema 约束文件保证格式一致。
 - **外部工具集成**：codegraph CLI 修改前影响分析、superpowers 编码链方法论（`references/superpowers-adoption.md`，替代原 OpenSpec opsx）、SkillOpt 方法论吸收（详见 [SSoT](./docs/skill-design-document_SSoT.md)）。
 
 ## 项目结构
@@ -203,7 +203,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 │   ├── subagent/                 # 36 个人格文件（评审视角预设，不调用 LLM；frontmatter 含能力/输入/输出/边界四字段）
 │   ├── templates/                # 各阶段产出文档模板
 │   ├── examples/                 # 交互示例
-│   ├── schemas/                  # 34 份 JSON Schema 约束文件
+│   ├── schemas/                  # 35 份 JSON Schema 约束文件
 │   ├── tools/                    # tla2tools.jar（TLA+ 门禁运行时依赖）
 │   ├── scripts/                  # 门禁脚本（只做校验，不调用 LLM）
 │   │   ├── cli/                  #   命令入口：check-*.ts + self-test / doctor / wm-status 等

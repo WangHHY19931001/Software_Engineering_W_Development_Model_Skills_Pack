@@ -1778,8 +1778,8 @@ describe('runDocConsistencyChecks', () => {
       };
       expect(report.dynamicViolations.some((violation) => violation.check.startsWith('vitest-'))).toBe(false);
       expect(report.dynamicMeasurements).toMatchObject({
-        // 34 = 25 existing schemas + 9 code-health campaign schemas
-        schemaCount: 34,
+        // 35 = 26 existing schemas（43.5.0 新增 rule-registry）+ 9 code-health campaign schemas
+        schemaCount: 35,
         cliScriptCount: 50,
         exit2ScriptCount: 49,
         testFileCount: (coverage.testResults as unknown[]).length,
