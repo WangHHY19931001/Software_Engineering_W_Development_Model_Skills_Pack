@@ -127,6 +127,7 @@ import { collectComplexityMeasurement } from '../lib/complexity-collect.js';
 import type { ComplexityMeasurement } from '../logic/complexity-logic.js';
 import { main as runComplexityReportCli } from '../cli/wm-complexity-report.js';
 import { main as runComplexityBudgetCli } from '../cli/check-complexity-budget.js';
+import { main as runRuleLifecycleCli } from '../cli/wm-rule-lifecycle.js';
 // D3-I（43.3.0）：verifier 期望数据单源化——用例断言（expectedPassed / expectedReasonPatterns / description）
 // 派生自 samples/expectations/verifier.ts 共享表（纯数据模块，不 import 业务逻辑）；
 // self-test 与 vitest（verifier-logic.test.ts 等）同源消费，消除双声明漂移。
@@ -4950,6 +4951,122 @@ async function runComplexityReportCases(): Promise<CaseResult[]> {
   return results;
 }
 
+// ==================== M2 规则生命周期（wm-rule-lifecycle CLI 进程内调用） ====================
+// tmp 夹具两态：① 1 命中态（活文档引用「反模式 #1」→ ap-1 ①命中非候选，ap-2 零引用成候选）；
+// ② 0 命中态（活文档无任何编号引用 → ap-1/ap-2 全成候选）。判据③（存续 ≥10）首版恒过。
+
+async function runRuleLifecycleCases(): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-self-rule-lifecycle-'));
+  try {
+    const registry = {
+      schemaVersion: '1.0',
+      rules: [
+        {
+          id: 'ap-1',
+          kind: 'anti-pattern',
+          title: '甲',
+          status: 'active',
+          boundScript: null,
+          retiredIn: null,
+          rationale: 'x',
+        },
+        {
+          id: 'ap-2',
+          kind: 'anti-pattern',
+          title: '乙',
+          status: 'active',
+          boundScript: null,
+          retiredIn: null,
+          rationale: 'x',
+        },
+      ],
+    };
+    const clone = async (rootDir: string, rel: string, contentOrObj: unknown): Promise<void> => {
+      const file = path.join(rootDir, rel);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture 建在测试拥有的 mkdtemp 根下
+      await fs.mkdir(path.dirname(file), { recursive: true });
+      const content = typeof contentOrObj === 'string' ? contentOrObj : JSON.stringify(contentOrObj);
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture 建在测试拥有的 mkdtemp 根下
+      await fs.writeFile(file, content, 'utf8');
+    };
+    // 辅助：进程内调用并解析 RULE_LIFECYCLE_JSON
+    const runCli = async (
+      rootDir: string,
+    ): Promise<{ exitCode: number; candidates: string[]; checked: number; corpus: unknown }> => {
+      const original = console.log;
+      const captured: string[] = [];
+      console.log = (...chunks: unknown[]) => {
+        captured.push(chunks.map((c) => String(c)).join(' '));
+      };
+      let exitCode = 1;
+      try {
+        await runRuleLifecycleCli([rootDir, '--json']);
+        exitCode = Number(process.exitCode ?? 0);
+      } finally {
+        console.log = original;
+      }
+      const line = captured.find((l) => l.startsWith('RULE_LIFECYCLE_JSON '));
+      const payload =
+        line === undefined
+          ? null
+          : (JSON.parse(line.slice('RULE_LIFECYCLE_JSON '.length)) as {
+              candidates: Array<{ id: string }>;
+              checked: number;
+              corpus: unknown;
+            });
+      return {
+        exitCode,
+        candidates: payload === null ? [] : payload.candidates.map((c) => c.id),
+        checked: payload === null ? -1 : payload.checked,
+        corpus: payload === null ? null : payload.corpus,
+      };
+    };
+
+    // 1 命中态根：references/hit.md 引用「反模式 #1」→ ap-1 ①命中；ap-2 无编号引用
+    const hitRoot = path.join(tmp, 'hit-root-for-cli');
+    await clone(hitRoot, 'w-model-dev/rule-registry.json', registry);
+    await clone(hitRoot, 'w-model-dev/references/hit.md', '本文档命中反模式 #1。\n');
+    await clone(hitRoot, 'w-model-dev/SKILL.md', '无编号引用。\n');
+    const hit = await runCli(hitRoot);
+    const hitDetails: string[] = [];
+    if (hit.exitCode !== 0) hitDetails.push(`  - 1 命中态 exitCode=${hit.exitCode} 期望 0`);
+    if (hit.checked !== 2) hitDetails.push(`  - 1 命中态 checked=${hit.checked} 期望 2`);
+    if (hit.candidates.includes('ap-1')) hitDetails.push('  - ap-1 应因 ① 命中而非候选');
+    if (!hit.candidates.includes('ap-2')) hitDetails.push('  - ap-2 应因 ① 零命中 成为候选');
+    results.push({
+      name: 'rule-lifecycle/hit-1-reference',
+      passed: hitDetails.length === 0,
+      description: 'CLI 进程内：活文档引用「反模式 #1」→ ap-1 非候选、ap-2 零引用成候选（判据锚校准形态）',
+      details: hitDetails.length > 0 ? hitDetails : undefined,
+    });
+
+    // 0 命中态根：活文档无任何 #N / 反模式 令牌 → ap-1/ap-2 全候选；corpus 目录缺失标注 "missing"
+    const nohitRoot = path.join(tmp, 'nohit-root-for-cli');
+    await clone(nohitRoot, 'w-model-dev/rule-registry.json', registry);
+    await clone(nohitRoot, 'w-model-dev/references/nohit.md', '本文档不含任何规则编号令牌。\n');
+    await clone(nohitRoot, 'w-model-dev/SKILL.md', '本文档不含任何规则编号令牌。\n');
+    const nohit = await runCli(nohitRoot);
+    const nohitDetails: string[] = [];
+    if (nohit.exitCode !== 0) nohitDetails.push(`  - 0 命中态 exitCode=${nohit.exitCode} 期望 0`);
+    if (nohit.checked !== 2) nohitDetails.push(`  - 0 命中态 checked=${nohit.checked} 期望 2`);
+    if (!nohit.candidates.includes('ap-1') || !nohit.candidates.includes('ap-2')) {
+      nohitDetails.push('  - 0 命中态 ap-1/ap-2 均应成候选');
+    }
+    if (nohit.corpus !== 'missing')
+      nohitDetails.push(`  - 0 命中态 corpus=${String(nohit.corpus)} 期望 "missing"（无 .w-model/gate-logs）`);
+    results.push({
+      name: 'rule-lifecycle/zero-reference',
+      passed: nohitDetails.length === 0,
+      description: 'CLI 进程内：活文档零编号引用 → ap-1/ap-2 全候选 + corpus "missing" 仍 exit 0',
+      details: nohitDetails.length > 0 ? nohitDetails : undefined,
+    });
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+  return results;
+}
+
 // ==================== M1 复杂度棘轮预算（check-complexity-budget CLI 进程内调用） ====================
 
 /** 预算用例：default-caps=真实仓库根默认 caps / fixture=负向超限 caps / bad-json=坏 JSON（进程内三态） */
@@ -5714,6 +5831,7 @@ async function main(): Promise<void> {
   console.log(
     `ComplexityBudget 用例 : ${COMPLEXITY_BUDGET_CASES.length}（进程内 CLI：默认 caps / 负向 fixture / 坏 JSON）`,
   );
+  console.log(`RuleLifecycle 用例 : 2（进程内 CLI：1 命中→ap-1 非候选 / 0 命中→全候选 + corpus "missing"）`);
   console.log('─'.repeat(60));
 
   const [
@@ -5762,6 +5880,7 @@ async function main(): Promise<void> {
     designFogResults,
     complexityReportResults,
     complexityBudgetResults,
+    ruleLifecycleResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -5808,6 +5927,7 @@ async function main(): Promise<void> {
     runDesignFogCases(samplesDir),
     runComplexityReportCases(),
     runComplexityBudgetCases(samplesDir),
+    runRuleLifecycleCases(),
   ]);
   const runLogAppendResults = runRunLogAppendCases();
   const codeHealthResults = await runCodeHealthCases(samplesDir);
@@ -5863,6 +5983,7 @@ async function main(): Promise<void> {
     ...designFogResults,
     ...complexityReportResults,
     ...complexityBudgetResults,
+    ...ruleLifecycleResults,
     ...codeHealthApplyResults,
     ...codeHealthGapResults,
     ...codeHealthTestResults,

@@ -139,6 +139,33 @@ describe('check-complexity-budget 真实子进程冒烟', () => {
   });
 });
 
+describe('wm-rule-lifecycle 真实子进程冒烟', () => {
+  let tmpDir: string;
+  beforeAll(async () => {
+    // 登记册缺路径夹具：tmp 根无 w-model-dev/rule-registry.json → FILE_NOT_FOUND exit 2
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'rule-lifecycle-smoke-'));
+  });
+  afterAll(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+  it('真实仓库根 exit 0 + RULE_LIFECYCLE_JSON 单行', () => {
+    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/wm-rule-lifecycle.ts')]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('RULE_LIFECYCLE_JSON ');
+  });
+  it('未知 flag → exit 2 + stdout ERROR_JSON 标记', () => {
+    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/wm-rule-lifecycle.ts'), '--bogus']);
+    expect(r.status).toBe(2);
+    expect(r.stdout).toMatch(/^ERROR_JSON \{/);
+  });
+  it('登记册缺路径根 → exit 2 + FILE_NOT_FOUND', () => {
+    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/wm-rule-lifecycle.ts'), tmpDir]);
+    expect(r.status).toBe(2);
+    expect(r.stdout).toMatch(/^ERROR_JSON \{/);
+    expect(r.stdout).toContain('FILE_NOT_FOUND');
+  });
+});
+
 describe('check-artifact-gate 真实子进程冒烟', () => {
   let tmpDir: string;
   beforeAll(async () => {
