@@ -16,7 +16,7 @@ export interface RegistryExpectation {
   file: string;
   /**
    * 期望是否「与 EXPECTED / 文档漂移」（bad-registry-drift 语义）：
-   * false = 合法登记册（active ap 48 / active hc 14，validate + crossCheck + 漂移哨兵全通过）；
+   * false = 合法登记册（active ap 49 / active hc 14，validate + crossCheck + 漂移哨兵全通过）；
    * true = active 计数与 EXPECTED 不符（active ap 47，validate R2 + 漂移哨兵命中）。
    */
   expectedDrift: boolean;
@@ -32,7 +32,7 @@ export const REGISTRY_EXPECTATIONS: readonly RegistryExpectation[] = [
     file: 'valid-registry.json',
     expectedDrift: false,
     description:
-      '合法登记册（全量镜像 w-model-dev/rule-registry.json：active ap 48 / active hc 14），checkRuleRegistry passed',
+      '合法登记册（全量镜像 w-model-dev/rule-registry.json：active ap 49 / active hc 14），checkRuleRegistry passed',
   },
   {
     file: 'bad-registry-drift.json',

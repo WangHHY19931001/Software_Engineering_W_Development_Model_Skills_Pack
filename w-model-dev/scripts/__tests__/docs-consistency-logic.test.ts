@@ -185,7 +185,7 @@ function baseInput(overrides: Partial<DocConsistencyInput> = {}): DocConsistency
     readme:
       '**当前版本**：`41.11.0`\n8 条核心操作行为\n7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性）\n28 个人格文件\n40 files / 530 tests\ncoverage/、.zcode/、.w-model/ 为 Git 忽略的本地生成物；使用 npm run wm:export-evidence -- <project-dir> <output-dir> 导出脱敏 SHA-256 manifest 证据包。docs/changes/archive/ 是受控归档。',
     antiPatterns:
-      '反模式清单（#1~#48；\n## 反模式清单\n| # | 反模式（不要做） | 危害 | 正确做法 |\n| 1 | 跳过阶段门评审 | 缺陷后移 | 走完评审 |\n| 48 | 大规模重构式改动 | 变更量子无穷大 | 小步重构 |',
+      '反模式清单（#1~#49；\n## 反模式清单\n| # | 反模式（不要做） | 危害 | 正确做法 |\n| 1 | 跳过阶段门评审 | 缺陷后移 | 走完评审 |\n| 49 | 大规模重构式改动 | 变更量子无穷大 | 小步重构 |',
     glossary: CONVENTIONS_GLOSSARY,
     runLogSchema: JSON.stringify({
       properties: { action: { enum: ACTION_ENUM_18 } },
@@ -1033,22 +1033,22 @@ describe('runDocConsistencyChecks', () => {
         markers: ['七条核心操作行为'],
       },
       {
-        label: '| 48 | 被错放主清单表外（检测信号表，归属盲区修复）',
+        label: '| 49 | 被错放主清单表外（检测信号表，归属盲区修复）',
         overrides: {
           antiPatterns:
-            '反模式清单（#1~#48；\n## 反模式清单\n| # | 反模式（不要做） | 危害 | 正确做法 |\n| 47 | 大规模重构式改动 | ... |\n### 命中高发阶段\n| 阶段 | 高发反模式编号 |\n### 检测信号与回退命令\n| # | 检测信号 | 命中后回退命令 |\n| 48 | 子代理越界实施 | 回退当前阶段起点 |',
+            '反模式清单（#1~#49；\n## 反模式清单\n| # | 反模式（不要做） | 危害 | 正确做法 |\n| 48 | 大规模重构式改动 | ... |\n### 命中高发阶段\n| 阶段 | 高发反模式编号 |\n### 检测信号与回退命令\n| # | 检测信号 | 命中后回退命令 |\n| 49 | 无限返工循环 | 回退当前阶段起点 |',
         },
         check: 'anti-patterns',
-        markers: ['48', '主清单表区间之外'],
+        markers: ['49', '主清单表区间之外'],
       },
       {
-        label: '| 48 | 缺主清单表头（仅在其他表出现）',
+        label: '| 49 | 缺主清单表头（仅在其他表出现）',
         overrides: {
           antiPatterns:
-            '反模式清单（#1~#48；\n### 检测信号与回退命令\n| # | 检测信号 | 命中后回退命令 |\n| 48 | 子代理越界实施 | 回退当前阶段起点 |',
+            '反模式清单（#1~#49；\n### 检测信号与回退命令\n| # | 检测信号 | 命中后回退命令 |\n| 49 | 无限返工循环 | 回退当前阶段起点 |',
         },
         check: 'anti-patterns',
-        markers: ['主清单表最大编号应为 48'],
+        markers: ['主清单表最大编号应为 49'],
       },
       {
         label: 'pre-push 编号最大值非 20',
@@ -1086,8 +1086,8 @@ describe('runDocConsistencyChecks', () => {
         overrides: { antiPatterns: '反模式清单（#1~#29；\n| 43 | ... |' },
         verify: (v) => {
           expect(
-            v.some((x) => x.check === 'anti-patterns' && x.message.includes('48')),
-            '反模式最大编号应报 48',
+            v.some((x) => x.check === 'anti-patterns' && x.message.includes('49')),
+            '反模式最大编号应报 49',
           ).toBe(true);
           expect(
             v.some((x) => x.check === 'anti-patterns' && x.message.includes('#1~#29')),
@@ -4037,7 +4037,7 @@ describe('count-claim-live-docs（D8 计数声明活体文档登记自省）', (
       },
       {
         label: 'clean：REQUIRED_PATHS 目录项（references/）下文档已登记',
-        doc: { name: 'w-model-dev/references/new-ref.md', content: '含 19 项门禁与 48 条反模式。' },
+        doc: { name: 'w-model-dev/references/new-ref.md', content: '含 19 项门禁与 49 条反模式。' },
         expectHit: false,
       },
     ];
@@ -4102,7 +4102,7 @@ describe('count-claim-live-docs（D8 计数声明活体文档登记自省）', (
     const positive = [
       '收口前全量：`npm run prepush`（19 项）',
       'DoD 清单 ≥ 8 项',
-      '反模式仍 48 条',
+      '反模式仍 49 条',
       '单文件单次 edit 最多 3 处',
       '吸收 claude-tla-plus-plugin 的 4 份 skill 资料',
       '每阶段 6 份子模板',
@@ -4374,8 +4374,8 @@ describe('M2 规则登记册接线（checkRuleRegistry + EXPECTED 派生，43.5.
       report.violations.filter((v) => v.check === 'rule-registry'),
       '未接线应跳过 checkRuleRegistry',
     ).toEqual([]);
-    // 缺省同时不改变既有文档计数检查：回退字面 EXPECTED（baseInput 反模式主表含 #1~#48）
-    expect(baseInput().antiPatterns).toContain('#1~#48');
+    // 缺省同时不改变既有文档计数检查：回退字面 EXPECTED（baseInput 反模式主表含 #1~#49）
+    expect(baseInput().antiPatterns).toContain('#1~#49');
   });
 
   it('② 注入 {registry:null} → blocking「登记册缺失，计数失去单一事实源」', () => {
@@ -4403,7 +4403,7 @@ describe('M2 规则登记册接线（checkRuleRegistry + EXPECTED 派生，43.5.
     const vs = report.violations.filter((v) => v.check === 'rule-registry');
     expect(vs.length, JSON.stringify(vs, null, 2)).toBeGreaterThan(0);
     const messages = vs.map((v) => v.message).join('\n');
-    expect(messages).toMatch(/active 反模式应为 48 条，实测 47 条/); // validateRuleRegistry R2 透传
+    expect(messages).toMatch(/active 反模式应为 49 条，实测 47 条/); // validateRuleRegistry R2 透传
     expect(messages).toMatch(/登记册与 EXPECTED 漂移/); // 漂移哨兵命中
   });
 
@@ -4413,8 +4413,8 @@ describe('M2 规则登记册接线（checkRuleRegistry + EXPECTED 派生，43.5.
     // eslint-disable-next-line security/detect-non-literal-fs-filename -- 受控 samples/registry fixture（REPO_ROOT 下固定目录），仅只读
     const rawRegistry = await fs.readFile(samplesRegistry(validSample!.file), 'utf8');
     const registry = JSON.parse(rawRegistry) as { rules: Array<{ kind: string; status: string }> };
-    // 合法样例不能随意裁剪——业务校验要求 active ap 恰 48 / active hc 恰 14
-    expect(registry.rules.filter((r) => r.kind === 'anti-pattern' && r.status === 'active')).toHaveLength(48);
+    // 合法样例不能随意裁剪——业务校验要求 active ap 恰 49 / active hc 恰 14
+    expect(registry.rules.filter((r) => r.kind === 'anti-pattern' && r.status === 'active')).toHaveLength(49);
     expect(registry.rules.filter((r) => r.kind === 'hard-constraint' && r.status === 'active')).toHaveLength(14);
     const realHardConstraints = await fs.readFile(
       path.join(REPO_ROOT, 'w-model-dev/references/hard-constraints.md'),

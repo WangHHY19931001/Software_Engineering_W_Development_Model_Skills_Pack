@@ -43,7 +43,7 @@ function caps(overrides?: Partial<BudgetCaps>): BudgetCaps {
     referencesExceptions: {},
     scriptsDefaultMaxLines: COMPLEXITY_DEFAULT_MAX_LINES,
     scriptsExceptions: {},
-    antiPatternMaxCount: 48,
+    antiPatternMaxCount: 49,
     hardConstraintMaxCount: 14,
     personaAdaptedMinCount: 0,
     sedimentMaxCount: 0,
@@ -59,7 +59,7 @@ describe('computeComplexityReport', () => {
         { path: 'references/bdd.md', lines: 500 },
       ],
       scriptFiles: [{ path: 'scripts/logic/gate-logic.ts', lines: 900 }],
-      antiPatternCount: 48,
+      antiPatternCount: 49,
       hardConstraintCount: 14,
       personaAdaptedCount: 30,
       personaTotal: 36,
@@ -136,7 +136,7 @@ describe('checkComplexityBudget', () => {
       measurement({
         referencesFiles: [{ path: 'references/a.md', lines: 10 }],
         scriptFiles: [{ path: 'scripts/cli/b.ts', lines: 10 }],
-        antiPatternCount: 48,
+        antiPatternCount: 49,
         hardConstraintCount: 14,
         personaAdaptedCount: 30,
         sedimentCount: 0,
@@ -152,7 +152,7 @@ describe('checkComplexityBudget', () => {
       measurement({
         referencesFiles: [{ path: 'references/a.md', lines: COMPLEXITY_DEFAULT_MAX_LINES }],
         scriptFiles: [{ path: 'scripts/cli/self-test.ts', lines: 6000 }],
-        antiPatternCount: 48,
+        antiPatternCount: 49,
         hardConstraintCount: 14,
         personaAdaptedCount: 4,
         sedimentCount: 10,
@@ -230,8 +230,8 @@ describe('checkComplexityBudget', () => {
   });
 
   it('反模式计数超上限 → violation', () => {
-    const r = checkComplexityBudget(measurement({ antiPatternCount: 49 }), caps({ antiPatternMaxCount: 48 }));
-    expect(r.violations).toContain('antiPatternCount 49 > cap 48');
+    const r = checkComplexityBudget(measurement({ antiPatternCount: 50 }), caps({ antiPatternMaxCount: 49 }));
+    expect(r.violations).toContain('antiPatternCount 50 > cap 49');
     expect(r.passed).toBe(false);
   });
 
@@ -260,7 +260,7 @@ describe('checkComplexityBudget', () => {
         antiPatternCount: 60,
         sedimentCount: 5,
       }),
-      caps({ antiPatternMaxCount: 48, sedimentMaxCount: 0 }),
+      caps({ antiPatternMaxCount: 49, sedimentMaxCount: 0 }),
     );
     expect(r.passed).toBe(false);
     expect(r.violations).toHaveLength(3);
@@ -276,7 +276,7 @@ describe('parseBudgetCaps', () => {
       referencesExceptions: { 'references/tla-plus.md': 2472 },
       scriptsDefaultMaxLines: 1200,
       scriptsExceptions: { 'scripts/cli/self-test.ts': 5766 },
-      antiPatternMaxCount: 48,
+      antiPatternMaxCount: 49,
       hardConstraintMaxCount: 14,
       personaAdaptedMinCount: 4,
       sedimentMaxCount: 46,
@@ -294,7 +294,7 @@ describe('parseBudgetCaps', () => {
       referencesExceptions: {},
       scriptsDefaultMaxLines: 1200,
       scriptsExceptions: {},
-      antiPatternMaxCount: 48,
+      antiPatternMaxCount: 49,
       hardConstraintMaxCount: 14,
       personaAdaptedMinCount: 4,
       sedimentMaxCount: 46,

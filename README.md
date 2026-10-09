@@ -126,7 +126,7 @@ flowchart LR
 
 ### 反模式与红线（负面知识库）
 
-- 48 条流程反模式（命中即回退），见 [hard-constraints.md](./w-model-dev/references/hard-constraints.md)；
+- 49 条流程反模式（命中即回退），见 [hard-constraints.md](./w-model-dev/references/hard-constraints.md)；
 - 8 条核心操作行为 + 失败模式（命中登记不回退），见 [operation-behaviors.md](./w-model-dev/references/operation-behaviors.md)；
 - 项目级完成定义（DoD）7 维度（测试 / 行为 / 文档 / RTM / 状态 / 理解证据 / 签名链完整性），见 [quick-self-check.md](./w-model-dev/references/quick-self-check.md)。
 
@@ -186,7 +186,7 @@ npm run format                                # 按 prettier 格式化脚本代�
 - **返工必先定位根因**：门禁不过 → R 根因定位 → V 复审 → S 返工，禁止直接返工（见 [root-cause-locator.md](./w-model-dev/references/root-cause-locator.md)）。
 - **RTM 自动维护**：需求 ↔ 设计 ↔ 代码 ↔ 四级测试双向追溯，覆盖率 100% 才允许交付。
 - **TLA+ 层次化建模 + BDD 行为建模**：设计阶段用形式化方法把关键行为「讲清楚、可检查」，编码后用一致性回归守住（见 [tla-plus.md](./w-model-dev/references/tla-plus.md)、[bdd.md](./w-model-dev/references/bdd.md)）。
-- **负面知识库**：48 条流程反模式 + 8 条核心操作行为 + 失败模式，把踩过的坑变成纪律。
+- **负面知识库**：49 条流程反模式 + 8 条核心操作行为 + 失败模式，把踩过的坑变成纪律。
 - **代码健康治理（`/wm code-health`）**：Phase 1–4 只读发现 → 七维度 gap → 受保护测试 inventory → 重复簇与抽象 guard；发现不是结论、coverage 仅信号，删除/抽象必须有人类授权 + HEAD-tracked 证据 + 可回滚（见 [code-health-governance.md](./w-model-dev/references/code-health-governance.md)）。
 - **评审人格库**：内置 36 个人格文件（工程 / 测试 / 设计 / 产品 / 项目 5 类），每份含能力 / 输入 / 输出 / 边界四字段声明（frontmatter，由 docs-consistency 门禁强制），按 [agent-personas.md](./w-model-dev/references/agent-personas.md) 选型多角度评审；R-persona 两键选择矩阵与 R11 门禁见同文件「Persona 矩阵」节。
 - **采用路径**：新项目从 Day 0 跑全流程，存量项目增量验证优先（见 [docs/adoption-guide.md](./docs/adoption-guide.md)）。

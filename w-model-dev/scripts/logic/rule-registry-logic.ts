@@ -2,12 +2,12 @@
  * 规则登记册校验纯逻辑（Rule Registry Logic）—— 反模式与硬约束生命周期登记册的单一事实源校验
  *
  * 对应 w-model-dev/rule-registry.json（schema：w-model-dev/schemas/rule-registry.schema.json，43.5.0 批次 10 引入）。
- * 登记册承载：48 条 active 反模式（ap-1..ap-48）+ 14 条 active 硬约束（hc-1..hc-14）+ 候选 C1/C2。
+ * 登记册承载：49 条 active 反模式（ap-1..ap-49）+ 14 条 active 硬约束（hc-1..hc-14）+ 候选 C1。
  *
  * 校验：
  *   - validateRuleRegistry：入口经 validateBySchema('rule-registry', data) 前置拦截（schema 不符即返回
  *     `[schema]` 前缀 violations，仿 budget-logic 范式，零 fs——logic 层经 infrastructure 做 schema 校验）；
- *     通过后再做业务校验：id 唯一 / active ap 恰 48 条 / active hc 恰 14 条 / status=retired 条目
+ *     通过后再做业务校验：id 唯一 / active ap 恰 49 条 / active hc 恰 14 条 / status=retired 条目
  *     必有非空 retiredIn + rationale（防「无理由退役」进入生命周期）。
  *   - crossCheckRegistryAgainstDocs：登记册 active 反模式 id 集合 ↔ hard-constraints.md 主清单
  *     「### 反模式清单」表 `| N |` 行集合双向精确相等；active 硬约束 id 集合 ↔ `## #N` 标题集合
@@ -26,8 +26,8 @@ import { validateBySchema } from '../infrastructure/schema-loader.js';
 
 // ==================== 期望常量（与 hard-constraints.md 现状一致的强制计数） ====================
 
-/** active 反模式条目数（= hard-constraints.md「反模式（48 条）」主清单行数） */
-export const EXPECTED_ACTIVE_AP = 48;
+/** active 反模式条目数（= hard-constraints.md「反模式（49 条）」主清单行数） */
+export const EXPECTED_ACTIVE_AP = 49;
 /** active 硬约束条目数（= hard-constraints.md `## #N` 标题数） */
 export const EXPECTED_ACTIVE_HC = 14;
 
@@ -81,7 +81,7 @@ export interface CrossCheckReport {
  * 登记册校验入口（纯函数）
  *
  * @param data rule-registry.json 的解析结果；先经 schema 前置校验，不符即返回 `[schema]` 前缀 violations
- * @returns RegistryReport —— 业务规则：id 唯一 / active ap 恰 48 / active hc 恰 14 /
+ * @returns RegistryReport —— 业务规则：id 唯一 / active ap 恰 49 / active hc 恰 14 /
  *          retired 条目必有非空 retiredIn + rationale
  */
 export function validateRuleRegistry(data: unknown): RegistryReport {
@@ -107,7 +107,7 @@ export function validateRuleRegistry(data: unknown): RegistryReport {
     seen.add(rule.id);
   }
 
-  // R2：active 反模式恰 48 条（与 hard-constraints.md 主清单行数一致）
+  // R2：active 反模式恰 49 条（与 hard-constraints.md 主清单行数一致）
   const activeAp = rules.filter((r) => r.kind === 'anti-pattern' && r.status === 'active');
   if (activeAp.length !== EXPECTED_ACTIVE_AP) {
     violations.push(`active 反模式应为 ${EXPECTED_ACTIVE_AP} 条，实测 ${activeAp.length} 条`);

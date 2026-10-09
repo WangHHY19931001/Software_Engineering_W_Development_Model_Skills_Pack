@@ -18,6 +18,7 @@
 | [rounds-49-formalization-gates.md](./rounds-49-formalization-gates.md) | 第 49 批（批次 7，43.1.0）形式化与图谱门禁收严：用户七项决策（autocrlf 双修 / 降级授权 / R6 首条 L0 / `*_token` / subagentSpawns / 增量规格 / 连续推进）+ 七项实施裁定（R-B7-1…R-B7-7：词段精确相等 / `!` 标记 / 行号漂移 / riders 并入 / 死锁指引主形态 / R7-R8 让号 / 降级专属绑定） | [43.1.0]（CHANGELOG.md，随批次 7 发布回填） |
 | [rounds-50-docs-consistency.md](./rounds-50-docs-consistency.md) | 第 50 批（批次 8，43.2.0）文档与协议一致性：C6 round23 归档 README「pending」vs checkpoint-summary「exit 0」矛盾登记（归档不改写；以 checkpoint-summary 为终态视图）+ Loop 3/4 成熟度头部标注（文档协议，无运行时执行器）+ 实施裁定 R-B8-1…R-B8-4（计数口径 / 行号基准 / CHANGELOG 样式 / C18 分级判据=条目本体）+ C9 五处收敛扩张 + 后续候选登记（模型档位 20 处缺等）；批次 9（43.3.0）追加 R-B9 裁决段（D5 判据收敛 / D7 baseline 复审 294→219 / A18 去 shell / R-B9-1 demo R7 缺口接受登记 / R-B9-7 微竞态不回退 / R-B9-10 探针矩阵 2 格 + registered-minor 合并清单 46 项含去向列 + R-B9-5 计数口径说明 + T14 收编六项 + T15 N1-N4） | [43.2.0] / [43.3.0]（CHANGELOG.md，随批次发布回填） |
 | [rounds-51-metabolism-batch.md](./rounds-51-metabolism-batch.md) | 第 51 批（批次 5，43.5.0）代谢机制——M1 棘轮预算 cap 上调用户 CHECKPOINT 裁定（2026-10-09，任务 3）：self-test.ts 5766→5893 / subagent-delegation.md 2010→2011，上调全部可归因于任务 3 强制编辑与 prettier 规范化，其余 cap 保持任务 2 基线；含棘轮防复发约束 | [43.5.0]（CHANGELOG.md，随批次 5 发布回填） |
+| [rounds-52-metabolism-batch.md](./rounds-52-metabolism-batch.md) | 第 52 批（批次 5，43.5.0 任务 10）代谢机制 C1/C2 用户 CHECKPOINT 裁定（2026-10-10）：C2「无限返工循环」转正反模式 #49（五处联动）+ C1 维持候选设复审期限 2027-04 + M1 棘轮预算 cap 按实测终值上调（subagent-delegation 2011→2013 / self-test.ts 5893→6179 / docs-consistency-logic.ts 2722→2841 / antiPatternMaxCount 48→49）并追认任务 3 rounds-51 记录 | [43.5.0]（CHANGELOG.md，随批次 5 发布回填） |
 | [absorptions.md](./absorptions.md) | 外部方法论吸收决策记录（四源 / 三源 / 人月神话 / 外部技能，原 references/*-absorption.md） | [40.0.0] ~ [41.2.0] |
 | [legacy-sections.md](./legacy-sections.md) | 历史段落归档（anti-patterns 实现层经验教训 / hard-constraints 编号迁移表 / SSoT §14-15 tombstone 原文 / 迁移指令等） | 各轮 |
 
@@ -57,3 +58,4 @@
 | 第 49 批（批次 7 形式化与图谱门禁收严，[rounds-49-formalization-gates.md](./rounds-49-formalization-gates.md)） | [43.1.0] | CHANGELOG.md（随批次 7 发布回填） |
 | 第 50 批（批次 8 文档与协议一致性，[rounds-50-docs-consistency.md](./rounds-50-docs-consistency.md)） | [43.2.0] | CHANGELOG.md（随批次 8 发布回填） |
 | 第 51 批（批次 5 代谢机制，[rounds-51-metabolism-batch.md](./rounds-51-metabolism-batch.md)） | [43.5.0] | CHANGELOG.md（随批次 5 发布回填） |
+| 第 52 批（批次 5 任务 10 代谢机制 C1/C2 裁定 + caps 终值上调，[rounds-52-metabolism-batch.md](./rounds-52-metabolism-batch.md)） | [43.5.0] | CHANGELOG.md（随批次 5 发布回填） |

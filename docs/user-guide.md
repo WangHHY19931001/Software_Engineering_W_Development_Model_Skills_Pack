@@ -72,7 +72,7 @@
 
 规则依据的权威清单在 [`hard-constraints.md`](../w-model-dev/references/hard-constraints.md)：
 
-- **48 条流程反模式** `#1~#48`（命中即视为流程破坏、必须回退）
+- **49 条流程反模式** `#1~#49`（命中即视为流程破坏、必须回退）
 - **失败模式** `F1~F10`（行为退化，命中不回退但登记，见 [`operation-behaviors.md`](../w-model-dev/references/operation-behaviors.md)）、**运维失败模式** `O1~O6`（见 SSoT §4A.2a）
 
 ### 4.2 规则链编号速查表

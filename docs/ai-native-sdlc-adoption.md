@@ -38,7 +38,7 @@
 | B2 | sigHash v2 + GATE_JSON verifiedArtifacts | 吸收并实现 | 批次 3（42.7.0） |
 | B3 | fixRecommendation scope 强制 | 吸收并实现（R4） | 批次 3（42.7.0） |
 | B4 | 派单契约两段（前置条件+可验证终态） | 吸收并实现（22 分派模板同构携带） | 批次 4（42.9.0） |
-| B5 | 分层反馈回路 L0-L4 | 吸收并实现（收敛视图+候选反模式 C2） | 批次 4（42.9.0） |
+| B5 | 分层反馈回路 L0-L4 | 吸收并实现（收敛视图+候选反模式 C2；C2 于 43.5.0 用户裁定转正反模式 #49） | 批次 4（42.9.0 吸收 / 43.5.0 转正） |
 | C2 | agent 威胁模型 | 吸收并实现（D1 文档叙事形态） | 批次 5（42.10.0） |
 | C4 | 整批否决权/回收路径 | 吸收并实现（D2 纯文档治理规则） | 批次 5（42.10.0） |
 | C1 | Phase 5-8 迁移素材 | 素材形态落地（§10K.7 需求框架先行；**实现未立项**，维持「不得据此执行」） | 批次 5（42.10.0） |
@@ -94,7 +94,7 @@
 | B2 | SSoT §7.9「signature-chain.jsonl schema（角色链式签名产物）」+ §10.11「签名链门禁（check-signature-chain.ts）」 | references/signature-chain-guide.md §6.2「v2 签名与 sha256 抄录（批次 3）」 |
 | B3 | w-model-dev/schemas/rootcause-report.schema.json（fixRecommendation.scope 必填）+ scripts/logic/root-cause-logic.ts R4 | references/subagent-delegation.md §3.4.2「scoped re-review 的范围契约」；references/root-cause-locator.md §3（scope 撰写指引） |
 | B4 | references/subagent-delegation.md「派单契约：前置条件与可验证终态」节 | SSoT §10N；eval/mappings.json id 61/62 |
-| B5 | references/subagent-delegation.md「分层反馈回路（L0-L4）」节 | SSoT §10N；references/hard-constraints.md「C2（候选，pending V 复审）无限返工循环」；references/phase-5-coding.md L0-L4 交叉引用句 |
+| B5 | references/subagent-delegation.md「分层反馈回路（L0-L4）」节 | SSoT §10N；references/hard-constraints.md「#49 无限返工循环」（原候选区 C2，43.5.0 转正）；references/phase-5-coding.md L0-L4 交叉引用句 |
 | C2 | references/agent-threat-model.md「2. 威胁目录（T1-T7）」 | SSoT §10O；references/verifier-spec.md §7.4A（「不构建完整守卫体系」细化句） |
 | C4 | references/quality-standards.md「整批否决权与回收路径（campaign 级，批次 5）」节 | references/code-health-governance.md §6「CHECKPOINT 与失败链」（整批否决与回收操作）；SSoT §10O |
 | C1 | SSoT §10K.7「Phase 5–8 迁移设计锚点（素材，待需求输入）」 | references/code-health-governance.md 头部实现边界指针句 |
@@ -114,7 +114,7 @@
 | B2 | 脚本门禁 | check-signature-chain.ts R6 v3 单公式全量重算（signature-chain-logic.ts；按 sigHashAlgo 分流已删除）+ R11（来源 sha256 必填对全量条目生效） |
 | B3 | 脚本门禁 | check-rootcause-report.ts R4（每条 fixRecommendation 必带合规 scope：{allowed,forbidden} 至少一侧非空） |
 | B4 | 无脚本门禁（知情声明，批次 4 D12 形态） | 执行靠 O/V 遵循 + 既有闭环门禁（check-run-log / check-budget / check-role-dispatch）间接承载 |
-| B5 | 无脚本（收敛视图） | 轮次上限义务由既有 check-budget / check-run-log R11 / ICEBERG maxIcebergRounds=5（hard-constraints.md 反模式 #44）承载；候选反模式 C2 pending V 复审不作为强制反模式执行 |
+| B5 | 无脚本（收敛视图） | 轮次上限义务由既有 check-budget / check-run-log R11 / ICEBERG maxIcebergRounds=5（hard-constraints.md 反模式 #44）承载；候选反模式 C2 pending V 复审不作为强制反模式执行（43.5.0 已由用户裁定转正反模式 #49，转正后为强制） |
 | C2 | 无脚本（三不承诺） | R3 security 与 V security-auditor 叙事层参考消费；不新增检测信号、不改任何 G 门禁判定（agent-threat-model.md 文件头定位 blockquote） |
 | C4 | 无脚本（编组语义） | 全部复用既有 code-health ledger / git apply -R 回滚 / archive produce 原语；零新脚本零 schema（quality-standards.md 回收路径节） |
 | C1 | 无（未实现） | SSoT §10K.7「未实现（不得据此执行）」；实现立项前须用户需求输入 |

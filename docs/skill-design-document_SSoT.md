@@ -639,7 +639,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 
 ### 4A.2 失败模式清单
 
-以下 10 条失败模式是「看似高效实则埋坑」的典型，与 [`hard-constraints.md`](../w-model-dev/references/hard-constraints.md) 的 48 条流程反模式（#1~#48）互补：反模式是「流程破坏」，失败模式是「行为退化」。
+以下 10 条失败模式是「看似高效实则埋坑」的典型，与 [`hard-constraints.md`](../w-model-dev/references/hard-constraints.md) 的 49 条流程反模式（#1~#49）互补：反模式是「流程破坏」，失败模式是「行为退化」。
 
 | #   | 失败模式                                   | 与 W 模型反例的关系                                                |
 | --- | ------------------------------------------ | ------------------------------------------------------------------ |
@@ -659,7 +659,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 ### 4A.2a 运维失败模式清单（O1~O6）
 
 > 吸收自 [cobusgreyling/loop-engineering](https://github.com/cobusgreyling/loop-engineering) `docs/failure-modes.md`，适配 W 模型语境。
-> 与 48 条流程反模式（#1~#48）+ 10 条行为退化（F1~~F10）互补：反模式是流程破坏，失败模式是行为退化，运维失败模式是运行健康问题。
+> 与 49 条流程反模式（#1~#49）+ 10 条行为退化（F1~~F10）互补：反模式是流程破坏，失败模式是行为退化，运维失败模式是运行健康问题。
 > O 系列命中**不触发脚本回退**（与 F1~~F10 同级），但应在 run-log 的 `operationalFailureModes` 字段做**机器可读标注**（取值 `O1`~~`O6`，`check-maturity.ts` R5 的唯一真值通道；`note` 中的 `O1`~~`O6` 字样视为引用、不计入），并在阶段产物「备注」节或评审报告 reworkHints 中记录。未提供 `--run-log` 时 R5 输出「未生效」非阻断诊断（不静默跳过）。
 
 | #   | 失败模式                                             | 症状                                                              | 与现有反模式/失败模式的关系                                         | 缓解措施                                                                                                                       |
@@ -675,7 +675,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 
 ### 4A.2b 返工循环反模式扩展（#18/#19）
 
-> #18/#19 守护返工循环「必经 R 根因定位」与「R 报告必经 V 复审 + G 门禁」两条硬约束（48 条流程反模式 #1~#48 之一族，权威定义见 [`hard-constraints.md`](../w-model-dev/references/hard-constraints.md)）。命中即回退到当前阶段起点。
+> #18/#19 守护返工循环「必经 R 根因定位」与「R 报告必经 V 复审 + G 门禁」两条硬约束（49 条流程反模式 #1~#49 之一族，权威定义见 [`hard-constraints.md`](../w-model-dev/references/hard-constraints.md)）。命中即回退到当前阶段起点。
 > 权威定义见 [`w-model-dev/references/hard-constraints.md`](../w-model-dev/references/hard-constraints.md) + [根因定位者设计 spec](./superpowers/specs/2026-07-24-root-cause-locator-and-fixer-roles-design.md) §7.1。
 
 | #   | 反模式                                                            | 危害                                                                 | 正确做法                                                                                                                                           |
@@ -689,7 +689,7 @@ ingestion 引入两个新 CHECKPOINT（规划确认 / 收敛确认），均不�
 
 - **「不可违反的约束」（[`SKILL.md`](../w-model-dev/SKILL.md)）** 是硬红线，命中即触发阶段回退；由门禁脚本或 CHECKPOINT 强制。
 - **「核心操作行为」（本节 §4A.1）** 是日常准则，违反不立即触发回退但会降低产物质量；由 Agent 自检或 LLM-as-a-Verifier 在评审中标注。
-- **「流程反模式」（[`hard-constraints.md`](../w-model-dev/references/hard-constraints.md) 48 条（#1~#48），含返工循环 #18/#19）** 是流程破坏，命中即回退；与门禁脚本退出码精确对应。
+- **「流程反模式」（[`hard-constraints.md`](../w-model-dev/references/hard-constraints.md) 49 条（#1~#49），含返工循环 #18/#19）** 是流程破坏，命中即回退；与门禁脚本退出码精确对应。
 - **「失败模式」（本节 §4A.2 F1~F10）** 是行为退化，命中不回退但应记录；与反模式互补。
 - **「运维失败模式」（本节 §4A.2a O1~O6）** 是运行健康问题，命中不回退但应标注；由预算检查（O1/O6）/路径存活校验（O2）/V-G 矛盾检测（O3）/理解证据机制（O4/O5）协同检测。
 
@@ -2387,17 +2387,17 @@ V 评审的失效不止"评错"，还包括"评审者漂移"：
 
 ## 10N. 派单契约与分层反馈回路（批次 4，2026-10-02）
 
-**目标**：给派单简报补两段契约——**前置条件**（开工前须成立的可核验命题，O 派单前逐条自证，无法自证的条件不得写入）与**可验证终态**（任务完成的客观判据，第三方可复核、禁 LLM 自评词）；同时把散落五处的返工轮次治理收敛为 **L0-L4 分层反馈回路**权威视图（L0 finding → L1 任务 → L2 阶段 → L3 跨阶段 → L4 用户，信号源全部既有机制与既有数值，不新增轮次数值）；「无限返工循环」登记为候选反模式 **C2**（pending V 复审）。本节为权威层摘要，机制细则按落点表分节承载，不在此重复。
+**目标**：给派单简报补两段契约——**前置条件**（开工前须成立的可核验命题，O 派单前逐条自证，无法自证的条件不得写入）与**可验证终态**（任务完成的客观判据，第三方可复核、禁 LLM 自评词）；同时把散落五处的返工轮次治理收敛为 **L0-L4 分层反馈回路**权威视图（L0 finding → L1 任务 → L2 阶段 → L3 跨阶段 → L4 用户，信号源全部既有机制与既有数值，不新增轮次数值）；「无限返工循环」登记为候选反模式 **C2**（pending V 复审），后经用户 2026-10-10 裁定于 43.5.0 转正为反模式 **#49**。本节为权威层摘要，机制细则按落点表分节承载，不在此重复。
 
 | 面 | 落点与内容 | 实现位置 |
 | --- | --- | --- |
 | 派单契约权威 | 「派单契约：前置条件与可验证终态」节：前置四形态（路径存在性 / 内容结构性判据 / 门禁判据 / 环境判据）/ 终态四形态（gate / 测试 / 产物 / 回填判据）/ 自评词禁则（终态须第三方可复核）/ 角色禁令优先（非 G 角色终态落在产物+回填判据）/ selfCheck.terminalState 与 acceptanceCriteriaMet 分层并存；22 个分派模板同构携带两段 | `w-model-dev/references/subagent-delegation.md` |
 | 分层反馈回路权威 | 「分层反馈回路（L0-L4）」节：L0 finding（scoped re-review 逐条裁决）→ L1 任务（fix 循环每任务 5 轮）→ L2 阶段（`maxReworkRounds` 预算门禁 + R3×3 + ICEBERG-A/B maxIcebergRounds=5）→ L3 跨阶段（R 报告 `upstreamDefect` 唯一合法回退建议源）→ L4 用户（🔴 CHECKPOINT）；信号源全部既有机制与既有数值；升级单调性 | 同文件；`w-model-dev/references/phase-5-coding.md`「任务分配规则」「返工路径」节交叉引用 |
-| C2 候选 | 候选区「C2（候选，pending V 复审）无限返工循环」：症状（达限不 CHECKPOINT / 换 finding 编号重开循环 / 循环中改写 finding 定义）/ 违反原则 / 检测信号 / 修正——复审转正前不作为强制反模式执行；达限 CHECKPOINT 义务是既有强制约束，独立于候选状态 | `w-model-dev/references/hard-constraints.md` 候选区 |
+| #49 转正（43.5.0） | 「无限返工循环」由候选 C2 转正为反模式 #49（登记册 id=ap-49）：原候选区「C2（候选，pending V 复审）」节迁入详情节「#49 无限返工循环」（定义 / 违反原则 / 检测信号 / 回退动作 / 来源与守卫 / 与相邻条目辨析）——转正后为强制反模式执行；达限 CHECKPOINT 义务是既有强制约束，独立于候选状态 | `w-model-dev/references/hard-constraints.md`「#49 无限返工循环」节 |
 | eval 锚定 | L2 语料 id 61-64：派单缺可验证终态 / 前置条件失守硬派 / 无限返工要求继续刷轮 / 返工出口归属询问 | `eval/mappings.json` + `eval/w-model-dev-test-prompts.json` |
 
 - **能力分工（不得夸大）**：派单契约与分层回路为**纯文档机制，无脚本门禁**（D12 知情声明）——执行靠 O/V 遵循与既有闭环门禁（`check-run-log` / `check-budget` / `check-role-dispatch`）间接承载；若实测漂移，后续批次可评估以 run-log 断言补强。
-- **判据披露**：可验证终态 = **第三方可复核**（O/V 只读证据，不读子代理自评心智）；非 G 角色不以 gate 判据为终态（角色禁令优先）；分层回路是**收敛视图**不是新机制（零新增轮次数值——每任务 5 轮 / `maxReworkRounds` / maxIcebergRounds=5 均为既有值引用）；C2 候选在 V 复审转正前**不作为强制反模式执行**，但达上限 CHECKPOINT 义务独立于候选状态。
+- **判据披露**：可验证终态 = **第三方可复核**（O/V 只读证据，不读子代理自评心智）；非 G 角色不以 gate 判据为终态（角色禁令优先）；分层回路是**收敛视图**不是新机制（零新增轮次数值——每任务 5 轮 / `maxReworkRounds` / maxIcebergRounds=5 均为既有值引用）；C2 候选在 V 复审转正前**不作为强制反模式执行**，但达上限 CHECKPOINT 义务独立于候选状态（43.5.0 已转正 #49，转正后为强制反模式执行，见「#49 无限返工循环」节）。
 
 ---
 
@@ -2667,7 +2667,7 @@ npx tsx w-model-dev/scripts/cli/check-signature-chain.ts <signature-chain.jsonl>
 | 10F 事件驱动循环（Loop 3）                   | EventIngress schema + 棕地条件性路由（L2+ 激活，事件→单阶段）+ 高风险路径强制 CHECKPOINT + 编排者路由逻辑                                                                                                                                                                                                                                                      | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §2（权威定义）+ `w-model-dev/references/event-ingress-guide.md` + `w-model-dev/references/data-models.md`（EventIngress schema）+ `w-model-dev/references/operational-recovery.md`「事件驱动与棕地维护」节                                     | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 3 Event-driven；不引入调度基础设施，消费方自行实现触发器；L2+ 激活，L0/L1 不支持；高风险路径强制 CHECKPOINT 不违反约束2）                 |
 | 10G 爬坡循环（Loop 4）                       | HarnessImprovementReport（确定性分析 run-log，无 LLM）+ 信号检测逻辑 + 触发时机 + 与外部工具边界 + 报告消费流程                                                                                                                                                                                                                                                | `docs/superpowers/specs/2026-07-25-langchain-loop-engineering-absorption-design.md` §3（权威定义）+ `w-model-dev/references/hill-climbing-guide.md` + `w-model-dev/references/data-models.md`（HarnessImprovementReport schema）+ `w-model-dev/references/hard-constraints.md`「C1（候选，pending V 复审）」节                     | 完整（吸收自 LangChain "The Art of Loop Engineering" Loop 4 Hill Climbing；只产出改进信号不自动改 harness，保持"技能自演化不在本仓库"原则；外部 SkillOpt/darwin-skill 消费信号；人审后手动应用）    |
 | §10H SkillOpt 方法论吸收                     | SkillOpt「bounded edit + validation gate」方法论吸收（Loop 4 信号消费路径）+ 六段式循环类比映射 + bounded edit 边界 + validation gate 标准 + 人审流程 + 与 §11 协调                                                                                                                                                                                            | `w-model-dev/references/skillopt-adoption.md`（可执行细则）                                                                                                                                                                                                                                                                        | 完整（吸收 SkillOpt 方法论而非工具运行；不引入 Python 依赖/LLM；消费 Loop 4 信号；与 §11「技能自演化不在本仓库」协调——方法论吸收类比 §10.8 TLA+）                                                   |
-| §10N 派单契约与分层反馈回路 | 派单契约两段（前置条件四形态 / 可验证终态四形态 / 自评词禁则 / 角色禁令优先 / selfCheck.terminalState 分层）+ 分层反馈回路 L0-L4 收敛视图（零新增轮次数值）+ 候选反模式 C2（无限返工循环，pending V 复审）+ eval L2 语料 id 61-64 | `w-model-dev/references/subagent-delegation.md`「派单契约：前置条件与可验证终态」节 +「分层反馈回路（L0-L4）」节（22 分派模板同构携带两段）+ `w-model-dev/references/phase-5-coding.md`「任务分配规则」「返工路径」节交叉引用 + `w-model-dev/references/hard-constraints.md` 候选区 C2 + `eval/mappings.json` / `eval/w-model-dev-test-prompts.json` | 完整（纯文档机制，无脚本门禁，D12 知情声明；执行靠 O/V 遵循与既有闭环门禁间接承载；见 [批次 4 设计规格](./superpowers/specs/2026-10-02-batch4-dispatch-contract-design.md)） |
+| §10N 派单契约与分层反馈回路 | 派单契约两段（前置条件四形态 / 可验证终态四形态 / 自评词禁则 / 角色禁令优先 / selfCheck.terminalState 分层）+ 分层反馈回路 L0-L4 收敛视图（零新增轮次数值）+ 候选反模式 C2（无限返工循环，pending V 复审；43.5.0 经用户裁定转正反模式 #49）+ eval L2 语料 id 61-64 | `w-model-dev/references/subagent-delegation.md`「派单契约：前置条件与可验证终态」节 +「分层反馈回路（L0-L4）」节（22 分派模板同构携带两段）+ `w-model-dev/references/phase-5-coding.md`「任务分配规则」「返工路径」节交叉引用 + `w-model-dev/references/hard-constraints.md`「#49 无限返工循环」节 + `eval/mappings.json` / `eval/w-model-dev-test-prompts.json` | 完整（纯文档机制，无脚本门禁，D12 知情声明；执行靠 O/V 遵循与既有闭环门禁间接承载；见 [批次 4 设计规格](./superpowers/specs/2026-10-02-batch4-dispatch-contract-design.md)） |
 | §10O agent 威胁模型、整批否决权与迁移素材 | 威胁目录 T1-T7→既有机制映射（叙事层三不承诺）+ §7.4A 边界细化 + campaign 整批否决权/回收路径（编组语义，零新机制）+ Phase 5–8 迁移设计锚点素材（待需求输入） | `w-model-dev/references/agent-threat-model.md` + `w-model-dev/references/verifier-spec.md` §7.4A + `w-model-dev/references/quality-standards.md`「整批否决权与回收路径」节 + `w-model-dev/references/code-health-governance.md` §6 与头部指针 + 本文档 §10K.7 | 完整（纯文档批次，零新脚本零 schema；D1-D5 已裁定，见 [批次 5 设计规格](./superpowers/specs/2026-10-03-batch5-governance-narrative-design.md)） |
 | §10P 阶段 1-4 多角色讨论分析 | A-lead 按「阶段角色集矩阵」并行分派 N persona 视角分析 + 并行多轮交叉至收敛（收敛判据为主、5 轮安全阀为辅）+ 共识纪要承载（S 唯一落笔）+ run-log perspective/consensus 留痕 + `check-role-dispatch` 三新维度（覆盖 phaseRoleCoverage / 时序 / 互异）+ 研制要求子模板（子模板 10 种→11 种）+ V 覆盖核验参考项 | `w-model-dev/references/agent-personas.md`「阶段角色集矩阵」节 + `w-model-dev/subagent/` 3 新 persona + `w-model-dev/references/subagent-delegation.md`「A-lead」节 + `w-model-dev/scripts/logic/role-dispatch-logic.ts` + `w-model-dev/templates/requirement-spec/development-requirements.md` + `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 + 本文档 §10P | 完整（讨论=分析动作，语义质量归 V；D1-D9 已裁定，见 [设计规格](./superpowers/specs/2026-10-03-phase-multi-role-analysis-design.md)） |
 | §10Q 测试系统工程类型学与冒烟准入 | 类型学总登记（层级×方法×策略三维，逐维度映射左右 V 阶段与四级门禁；登记不改变任何既有门禁判定）+ 模块测试显式化（集成的子层，阶段 3 模块维度→阶段 6 前置，D2）+ 冒烟准入（阶段 6/7/8 文档时序机制，零新脚本，D3）+ 测试设计协同绑定（复用 42.11.0 多角色机制，零新角色集，D5） | `w-model-dev/references/quality-standards.md`「测试系统工程类型学」节 + `w-model-dev/references/phase-6-integration-test.md` / `phase-7-system-test.md` / `phase-8-acceptance-test.md`「冒烟准入」节 + `w-model-dev/templates/test-case.md` 冒烟列 + `w-model-dev/references/phase-1-requirements.md` / `phase-2-system-design.md` / `phase-3-outline-design.md` / `phase-4-detailed-design.md`「测试用例设计」承接句 + `w-model-dev/references/verifier-spec.md` §7.1 / §7.2 + `w-model-dev/references/bdd.md` + 本文档 §10Q | 完整（纯文档批次，零新脚本零 schema；D1-D3 推荐采定用户可推翻，见 [设计规格](./superpowers/specs/2026-10-04-test-systems-engineering-design.md)） |

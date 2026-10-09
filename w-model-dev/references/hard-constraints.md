@@ -20,7 +20,7 @@
 - [#14 代码改动前后门禁（codegraph + 回归）](#14-代码改动前后门禁codegraph--回归)
 - [代码健康治理硬边界（Phase 1–4）](#代码健康治理硬边界phase-14)
 - [普通 V/G 失败链](#普通-vg-失败链)
-- [反模式（48 条）](#反模式48-条)
+- [反模式（49 条）](#反模式49-条)
 
 ## #1 测试设计前置
 
@@ -148,7 +148,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 短名引用形态（两式）：正文 `普通 V/G 失败链（hard-constraints.md「普通 V/G 失败链」节）`；表格 `普通 V/G 失败链（hard-constraints）`；本文件内部 `普通 V/G 失败链（见「普通 V/G 失败链」节）`。
 
-## 反模式（48 条）
+## 反模式（49 条）
 
 
 > W 模型执行中真实高发陷阱。命中任一条即视为流程破坏，必须回退到对应阶段起点。
@@ -159,11 +159,11 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 ### 速查摘要
 
-> 一页速查：48 条反模式（#1~#48）+ 硬约束映射 + 阶段高发 + 门禁脚本对应。命中任一条即流程破坏，必须回退到对应阶段起点。
+> 一页速查：49 条反模式（#1~#49）+ 硬约束映射 + 阶段高发 + 门禁脚本对应。命中任一条即流程破坏，必须回退到对应阶段起点。
 
 | 维度 | 核心锚点 | 详见 |
 |---|---|---|
-| 反模式清单 | #1~#48（不要做 → 危害 → 正确做法） | 「反模式清单」节 |
+| 反模式清单 | #1~#49（不要做 → 危害 → 正确做法） | 「反模式清单」节 |
 | 硬约束映射 | 14 条硬约束 ↔ 相关反模式（互补视图） | 「反模式-硬约束映射」节 |
 | 阶段高发 | 各阶段高发反模式编号 + 一句话检测信号 | 「阶段 N 必读反模式清单」节 |
 | 门禁脚本 | 反模式 ↔ 守护脚本 / 退出码精确对应 | 「与门禁脚本的对应关系」节 + 「门禁脚本退出码精确对应表」 |
@@ -198,12 +198,12 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 ### 目录
 
-- 反模式清单（#1~#48，含 detailed 节与检测信号）
+- 反模式清单（#1~#49，含 detailed 节与检测信号）
 - 命中高发阶段
 - 与门禁脚本的对应关系
 - 检测信号与回退动作
 - 失败模式与运维失败模式导航（F1~F10 见 [operation-behaviors.md](operation-behaviors.md)；O1~O6 见 SSoT §4A.2a）
-- 候选反模式（C1/C2，pending V 复审；C1 来自 Loop 4 爬坡循环，C2 来自批次 4 分层反馈回路）
+- 候选反模式（C1，pending V 复审，复审期限 2027-04；来自 Loop 4 爬坡循环。C2「无限返工循环」已由用户 2026-10-10 裁定转正，43.5.0 起为反模式 #49）
 
 ### 反模式-硬约束映射
 
@@ -279,6 +279,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | 46 | 【通用】只给审计权不给修正权（全自动流程把用户锁在"跑完再看"之外） | 你能诊断无法治疗；判据持有主体缺位，产物只是采样 | 人在回路最低标准=修正权：能在过程中间改产物而不用整体重跑；CHECKPOINT 显式标注介入路径 |
 | 47 | 【通用】大规模重构式改动（单次 diff 重写整个模块） | 变更量子无穷大，"这次改了什么"在结构上不可问 | 小步重构 + 每步保持可编译可测试（增量集成纪律）；一次性 diff 拆分为多个可审 slice |
 | 48 | 【通用】子代理越界实施（S/V/G/A/R 执行角色边界外动作：S 跑门禁或改 status、G 改产物或产出评审 JSON、V 跑门禁或改产物、A 写正式阶段产物或改 status、R 实施修复或跑门禁或跨阶段定位） | 评审/门禁独立性失效，产物来源不可信（signature-chain 断链），CHECKPOINT 证据被污染 | 回到当前阶段起点，越权产物作废重做；`check-run-log.ts` R5 校验 role-action 配对，`check-signature-chain.ts` 校验消费链；与 #10（编排者越权实施）成对；**勿与 #22（目标系统 RBAC 角色越权）混淆** |
+| 49 | 【通用】无限返工循环（同一 finding / 任务在 L0-L1 循环内反复修复不升级：达每任务 5 轮上限不 CHECKPOINT；换 finding 编号 / 改名重开循环绕过轮次计数；循环中改写 finding 定义使 ADDRESSED 裁决永不收敛；以「部分修复」反复刷轮消耗返工预算） | 轮次上限被架空，🔴 CHECKPOINT 不可绕过被实质绕过，返工预算被无效消耗 | 达限强制 🔴 CHECKPOINT 升级（L1→L4，用户裁定：继续修复 / 接受剩余项并放行 / 阶段回退 / 终止）；禁止升级单调性列出的绕过手段——分层出口见 [subagent-delegation.md](subagent-delegation.md)「分层反馈回路（L0-L4）」节 |
 
 ### 反模式表述形式：按失败类型分流
 
@@ -298,7 +299,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 **接地说明：**
 
-- 本仓库 48 条反模式的**主表述本轮不改写**。依据三重且相互加强：① 规则自洽——任一合理分类口径下，全量改写都会对 discipline 型条目用错形式，违反分流判据自身；② 对照臂未复现失败——没有可复现的缺陷可供消除；③ 量化证据缺失。依据文件：`docs/superpowers/specs/2026-09-14-d1-local-ab-evidence.md` §5.3。
+- 本仓库 49 条反模式的**主表述本轮不改写**。依据三重且相互加强：① 规则自洽——任一合理分类口径下，全量改写都会对 discipline 型条目用错形式，违反分流判据自身；② 对照臂未复现失败——没有可复现的缺陷可供消除；③ 量化证据缺失。依据文件：`docs/superpowers/specs/2026-09-14-d1-local-ab-evidence.md` §5.3。
 - 来源文声称「禁令臂产出劣于无指引对照（分布完全分离）」的**量化排序属未验证假设**：该主张无随仓可复核证据，本地 A/B 因 treatment×metric 混淆未能裁定；本仓库**不采纳**该量化排序。
 - 本仓库采纳的是**形状判据**：上表四行与两条硬子规则是**可自证**的判别规则，正常落地，不标为假设。
 - 逐字依据：`docs/superpowers/sources/2026-09-14-superpowers-adopted-excerpts.md` §S01（四行对照表 + 两条硬子规则）；`docs/superpowers/sources/2026-09-14-mattpocock-skills-adopted-excerpts.md` §M02（整体否定式表述会把被禁行为拖入上下文并提高其可用性：应写正面目标，硬护栏保留禁令时须配正面目标）。
@@ -355,6 +356,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #46（只给审计权不给修正权） | 全流程 | CHECKPOINT 显式标注介入路径（外科手术录像回放） |
 | #47（大规模重构式改动） | 阶段 5 | 单次 diff 重写整个模块 → 拆分为可审 slice 逐片提交，保持每片可编译可测试 |
 | #48（子代理越界实施） | 全阶段 | [subagent-delegation.md](subagent-delegation.md) 角色表允许/禁止动作清单 + [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R5 |
+| #49（无限返工循环） | 全阶段（返工） | [subagent-delegation.md](subagent-delegation.md)「分层反馈回路（L0-L4）」节 + 🔴 CHECKPOINT 升级义务（达每任务 5 轮上限 / maxIcebergRounds=5 必须升级，不得绕过） |
 
 ### 与门禁脚本的对应关系
 
@@ -413,6 +415,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #46（只给审计权不给修正权） | 无专用脚本（CHECKPOINT 介入路径标注） |
 | #47（大规模重构式改动） | 无专用脚本（diff 可审性由评审人工核验 + 增量集成纪律约束） |
 | #48（子代理越界实施） | [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R5 role-action 配对 + [`check-signature-chain.ts`](../scripts/cli/check-signature-chain.ts) 消费链闭合（与 #10 成对；勿与 #22 混淆） |
+| #49（无限返工循环） | 无专用脚本（达限 CHECKPOINT 升级由 [subagent-delegation.md](subagent-delegation.md) 分层反馈回路 L0-L4 承载；run-log 轮次记录 + [`check-run-log.ts`](../scripts/cli/check-run-log.ts) R8 间接守护，人工核验轮次单调不重置） |
 
 ### 命中后的处理流程
 
@@ -454,6 +457,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 | #26 | `run-log.jsonl` 含 EventIngress 字段（`eventId` / `eventType` / `source` / `summary` / `affectedArtifacts` / `affectedRequirements` / `evidence` / `routedTo`）；或 `event-ingress.jsonl` 含 RunLogEntry 字段（`runId` / `action` / `role` / `outcome` / `acknowledgedDecisions` / `duration_s` / `tokens` / `estimated` / `subagentSpawns` / `gateExitCode` / `gateLogPath` / `phase` / `phaseName`） | 回到当前阶段起点，分派 S 按正确 schema 重写 run-log.jsonl 或 event-ingress.jsonl；重跑 `check-run-log.ts` R1 动作完整性校验 | `check-run-log.ts` 退出码 0 才算 RunLogEntry schema 闭合；详见 [data-models.md](data-models.md)「RunLogEntry vs EventIngress Schema 边界对照表」节 |
 | #27 | run-log.jsonl 缺 chunk/cross/review/gate 动作（S2 省步骤）；或 checkpoint acknowledgedDecisions 缺硬约束 ID（S1 丢细节）；或 gate JSON exitCode ≠ passed（S3 未核验）；或归档缺 acceptance-test-report §9 用户确认（S3 未核验）；或 V 评审 reworkHints 为空（S2 省步骤）；或门禁脚本未实跑——仅记录 JSON 摘要未真实执行命令（编排者仅引用 JSON 摘要中的 `passed: true`，但未展示 check-*.ts 的 stdout 输出）（S2 省步骤） | 回到当前阶段起点，按 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节自检清单逐条核验：重读硬约束 + 补全 S→V→G 全流程 + 逐条核验硬约束清单 | 无脚本（编排者自检 run-log 动作完整性 + checkpoint R2 + gate exitCode 一致性交叉检测）；详见 [operational-recovery.md](operational-recovery.md)「调测者简化行为预防」节 |
 | #48 | run-log role-action 配对异常（如 role=G 且 action=produce）；signature-chain 产物无对应产出者签名；gate-logs 存档者与 run-log 记录者不一致 | 回退当前阶段起点，越权产物作废重做 | check-run-log.ts R5 配对 + check-signature-chain.ts 退出码 0 才算消费链闭合 |
+| #49 | run-log 中同 target 连续 `action=fix` 记录数超过每任务 5 轮上限（A15：返工事件载体为 `fix`）；同轮次号重复出现（计数被重置）；同 id finding 在循环轮次间定义发生语义改写 | 达限强制 🔴 CHECKPOINT 升级（L1→L4：继续修复 / 接受剩余项并放行 / 阶段回退 / 终止），禁止换 finding 编号 / 改名重开循环与循环中改写 finding 定义 | 无脚本（CHECKPOINT 升级义务由子代理遵循 + run-log 轮次记录人工核验） |
 
 ### 门禁脚本退出码精确对应表
 
@@ -600,19 +604,7 @@ V/G 不通过后，必须先分派 R 子代理产出 RootCauseReport 并经 V �
 
 **修正**：强化 verifier-spec.md §6 summary 三要素要求（sig-001 已应用）；V 子代理重写 summary 含具体决策+结构+风险。
 
-**状态**：候选（pending V 复审）。本候选由 Loop 4 信号驱动提出，需 V 子代理复审转正后正式编号入清单。复审前不作为强制反模式执行。
-
-### C2（候选，pending V 复审）无限返工循环
-
-**症状**：同一 finding / 任务在 L0-L1 循环内反复修复不升级——达每任务 5 轮上限不 CHECKPOINT；换 finding 编号 / 改名重开循环绕过轮次计数；循环中改写 finding 定义使 ADDRESSED 裁决永不收敛；以「部分修复」反复刷轮消耗返工预算。
-
-**违反原则**：真实执行（约束 #4）+ 阶段门放行（约束 #2）——轮次上限被架空，🔴 CHECKPOINT 不可绕过被实质绕过。
-
-**检测信号**：run-log 中同 target 连续 `action=fix` 记录数超过轮次上限（A15：返工事件载体由原 `rework` 死词改为 `fix`）；同轮次号重复出现（计数被重置）；同 id finding 在循环轮次间定义发生语义改写。
-
-**修正**：达限强制 🔴 CHECKPOINT 升级（L1→L4，用户裁定：继续修复 / 接受剩余项并放行 / 阶段回退 / 终止）；禁止升级单调性列出的绕过手段——分层出口与升级路径见 [subagent-delegation.md](subagent-delegation.md)「分层反馈回路（L0-L4）」节。
-
-**状态**：候选（pending V 复审）。复审前不作为强制反模式执行——达上限 CHECKPOINT 义务本身是既有强制约束（subagent-delegation.md scoped re-review 每任务 5 轮上限与 `budget.json.killSwitch.consecutiveReworks` 预算门禁；perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载（D-4a 累计口径）），不受候选状态影响；V 子代理复审转正后正式编号 #49 并同步活体计数。
+**状态**：候选（pending V 复审，**复审期限 2027-04**——用户 2026-10-10 裁定维持候选，43.5.0 L10）。本候选由 Loop 4 信号驱动提出，需 V 子代理复审转正后正式编号入清单；复审期限前不作为强制反模式执行。
 
 ### #28 schema 前置校验缺失（借鉴点 2 — Task 3）
 
@@ -1038,5 +1030,19 @@ S 提出 exemption-request.json（含豁免理由、影响范围、替代方案�
 **回退动作**：回到当前阶段起点，越权产物作废重做，重走 S→R3→V→G。
 
 **与相邻条目的辨析**：#10 是编排者（O）越权实施；#48 是子代理越界（镜像条目）；#22 是**目标系统代码**的 RBAC 角色越权（阶段 5 编码缺陷），与流程角色无关。
+
+### #49 无限返工循环
+
+**定义**：同一 finding / 任务在 L0-L1 循环内反复修复不升级，或以绕过轮次计数的手段让返工循环无限延续——达每任务 5 轮上限不 CHECKPOINT；换 finding 编号 / 改名重开循环绕过轮次计数；循环中改写 finding 定义使 ADDRESSED 裁决永不收敛；以「部分修复」反复刷轮消耗返工预算。
+
+**违反原则**：真实执行（约束 #4）+ 阶段门放行（约束 #2）——轮次上限被架空，🔴 CHECKPOINT 不可绕过被实质绕过。
+
+**检测信号**：run-log 中同 target 连续 `action=fix` 记录数超过轮次上限（A15：返工事件载体由原 `rework` 死词改为 `fix`）；同轮次号重复出现（计数被重置）；同 id finding 在循环轮次间定义发生语义改写。
+
+**回退动作**：回到当前循环起点；达限（每任务 5 轮 / maxIcebergRounds=5）强制 🔴 CHECKPOINT 升级（L1→L4，用户裁定：继续修复 / 接受剩余项并放行 / 阶段回退 / 终止）；禁止升级单调性列出的绕过手段——分层出口与升级路径见 [subagent-delegation.md](subagent-delegation.md)「分层反馈回路（L0-L4）」节。
+
+**来源与守卫**：批次 4（42.9.0）由分层反馈回路提出、以候选 C2 登记于候选区；43.5.0 经用户 2026-10-10 裁定转正为强制反模式（登记册 id=ap-49）。无守护脚本（人工核验）——达上限 CHECKPOINT 义务为既有强制约束（subagent-delegation.md scoped re-review 每任务 5 轮上限与 `budget.json.killSwitch.consecutiveReworks` 预算门禁；perPhase.maxReworkRounds 字段已随 43.0.0 A5 退役，上限由 killSwitch.consecutiveReworks 承载（D-4a 累计口径））。
+
+**与相邻条目的辨析**：#44（跳过冰山扫掠直接放行）是整批放行前的冰山深度扫掠防御；#49 是单 finding / 任务循环内的轮次升级防御；#45（为通过而改断言）是反指标游戏。三者均属 Goodhart 击穿面但攻击点不同。
 
 

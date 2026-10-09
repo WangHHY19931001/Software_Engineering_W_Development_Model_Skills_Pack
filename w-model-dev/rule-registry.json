@@ -560,22 +560,22 @@
       "rationale": "codegraph 修改前查询 + 回归测试（check-artifact-gate strict 聚合）"
     },
     {
+      "id": "ap-49",
+      "kind": "anti-pattern",
+      "title": "无限返工循环",
+      "status": "active",
+      "boundScript": null,
+      "retiredIn": null,
+      "rationale": "批次 4 分层反馈回路提出——同一 finding 反复修复不升级，轮次上限被架空；由 subagent-delegation「分层反馈回路（L0-L4）」五轮安全阀承载（人工核验，无守护脚本）；用户 2026-10-10 裁定转正（43.5.0 L10）"
+    },
+    {
       "id": "C1",
       "kind": "candidate",
       "title": "V 评审 summary 模板化",
       "status": "candidate",
       "boundScript": null,
       "retiredIn": null,
-      "rationale": "候选（pending V 复审）：Loop 4 爬坡循环提出——summary 跨阶段 Jaccard>0.8 且 <50 字符；复审前不作为强制反模式"
-    },
-    {
-      "id": "C2",
-      "kind": "candidate",
-      "title": "无限返工循环",
-      "status": "candidate",
-      "boundScript": null,
-      "retiredIn": null,
-      "rationale": "候选（pending V 复审）：批次 4 分层反馈回路提出——同一 finding 反复修复不升级，轮次上限被架空；复审前不作为强制反模式"
+      "rationale": "候选（pending V 复审）：Loop 4 爬坡循环提出——summary 跨阶段 Jaccard>0.8 且 <50 字符；复审前不作为强制反模式；复审期限 2027-04（用户 2026-10-10 裁定维持候选，43.5.0 L10）"
     }
   ]
 }

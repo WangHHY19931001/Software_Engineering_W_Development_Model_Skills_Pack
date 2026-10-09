@@ -281,7 +281,7 @@ export interface DocConsistencyInput {
 export const EXPECTED = {
   // 2026-10-06 批次 6 A15（run-log action 词表收敛）：32→18——删 15 死词（含 opsx_*）+ 增 event-route
   runLogActionCount: 18,
-  maxAntiPattern: 48,
+  maxAntiPattern: 49,
   prePushCount: 20,
   /** 硬约束条数（14 条） */
   hardConstraintCount: 14,

@@ -21,25 +21,25 @@ import type { RegistryEntry } from './rule-registry-logic.js';
 //
 // 计划原文锚 `[#/]?{N}（{title 前 6 字}` 对真实活文档命中不足/易批量误报（真实主流形态是
 // 「反模式 #N」/「约束 #N」与编号区间，如 conventions.md「反模式 #41」、user-guide.md
-// 「48 条流程反模式 #1~#48」）。实现时按真实引用语法形态重建为以下三种引用的并集：
+// 「49 条流程反模式 #1~#49」）。实现时按真实引用语法形态重建为以下三种引用的并集：
 //
 //   (a) 具名编号引用：`反模式[ :=，、]*#?N`（ap）与 `约束[ :=，、]*#?N`（hc）。
 //       主流形态：AGENTS.md「反模式 #18/#19」、command-reference.md「约束 #14 / 反模式 #38/#39」、
 //       bdd.md「反模式 #45」、iceberg-sweep-guide.md「反模式：#44」。
 //   (b) 裸编号令牌兜底：`#N` 单独成令牌（`(?!#N 更大编号)` 防 #1 命中 #10~）。
 //       捕获真实语料中仅以编号区间/盘点语句引用规则而不用「反模式 N」字样的文档：
-//       user-guide.md「48 条流程反模式 #1~#48」、quick-self-check.md「（#1~#48）」、
-//       subagent-delegation.md「反模式（48 条，#1~#48）完整版」。
+//       user-guide.md「49 条流程反模式 #1~#49」、quick-self-check.md「（#1~#49）」、
+//       subagent-delegation.md「反模式（49 条，#1~#49）完整版」。
 //   (c) boundScript 名（含去 `.ts`，见 boundScriptReferenced）出现在活文档正文——
 //       command-reference.md / toolbox.md / phase-N 对各脚本名的引用。
 //
-// 候选规则（C1/C2）专用锚：候选登记形态 `候选…C[12]` / `C[12]（候选`——
-// 真实形态：AGENTS.md「登记为候选反模式 C2（pending V 复审）」、SSoT「hard-constraints.md「C1（候选，pending V 复审）」节」、
-// subagent-delegation.md「候选区 C2，pending V 复审」。裸 `\bC1\b`/`\bC2\b` 不采用——
+// 候选规则（C1）专用锚：候选登记形态 `候选…C1` / `C1（候选`——
+// 真实形态：SSoT「hard-constraints.md「C1（候选，pending V 复审）」节」。裸 `\bC1\b` 不采用——
 // 会误吸收 C1-C10（需求覆盖门）、C1[AI生成代码]（mermaid 图节点）、ai-native 迁移 C1/C2 表。
+// （C2 已于 43.5.0 转正为反模式 #49，不再是候选；ap-49 由「反模式 #49」具名锚命中。）
 //
 // 校准验收（2026-10-09 真实仓库）：62 条 active 零误报；C1/C2 因活文档候选登记引用判 ① 命中 → 非候选，
-// 结论写入任务报告「C1/C2 有明确非候选理由」。
+// 结论写入任务报告「C1/C2 有明确非候选理由」（43.5.0 转正后 C1 仍候选、ap-49 转 active 由活文档引用守住）。
 
 /** ap-N 具名引用锚（反模式 #N / 反模式：N / 反模式 N） */
 function apNamedAnchor(n: number): RegExp {

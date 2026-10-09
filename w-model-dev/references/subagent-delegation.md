@@ -164,7 +164,7 @@ O: 用户放行 → 更新 project.status → 进入下一阶段
 | evidence-anchored-tree   | 路径不确定 / 需求模糊项目的方法论参照（证据支撑树 × W 模型映射，42.1.0 新增）                                                                               | 1 跳   |
 | event-ingress-guide      | Loop 3 事件接驳；L2+ 成熟度激活时                                                                                                                           | 2 跳   |
 | graph-guide              | 阶段 1-4 图谱门禁与收敛准则（A 子代理 + G）                                                                                                                 | 1 跳   |
-| hard-constraints         | 14 条硬约束 + 反模式（48 条，#1~#48）完整版；执行前必读（O 通用加载；42.0.0 吸收反模式清单）                                                                | 1 跳   |
+| hard-constraints         | 14 条硬约束 + 反模式（49 条，#1~#49）完整版；执行前必读（O 通用加载；42.0.0 吸收反模式清单）                                                                | 1 跳   |
 | hill-climbing-guide      | Loop 4 爬坡循环；run-log 分析伴侣                                                                                                                           | 2 跳   |
 | iceberg-sweep-guide      | 冰山扫掠深度分析（S-fix 后 ICEBERG-A / 阶段门前 ICEBERG-B）                                                                                                 | 2 跳   |
 | ingestion-chunk          | 阶段 1-4 A-chunk 分块细则                                                                                                                                   | 1 跳   |
@@ -1939,7 +1939,7 @@ O: 分派 G 跑 check-exemption E1-E9 全通过 → 豁免生效
 | L3  | 跨阶段       | R 报告 `upstreamDefect` 判定（唯一合法回退建议源，phase-5-coding.md「返工路径」节）             | 用户 🔴 CHECKPOINT 裁定回退                             | 回退执行走对应阶段变更流程；O 不得自行切换阶段                                                                |
 | L4  | 项目级       | 🔴 CHECKPOINT                                                                                   | 用户裁定：继续修复 / 接受剩余项并放行 / 阶段回退 / 终止 | —                                                                                                             |
 
-- **升级单调性（原则表述，不是新机制）**：循环内不得绕过达限升级——换 finding 编号 / 改名重开循环、重置轮次计数、循环中改写 finding 定义使裁决永不收敛，均属架空轮次治理，显名登记为候选反模式（hard-constraints.md 候选区 C2，pending V 复审；复审转正前不作为强制反模式执行）。
+- **升级单调性（原则表述，不是新机制）**：循环内不得绕过达限升级——换 finding 编号 / 改名重开循环、重置轮次计数、循环中改写 finding 定义使裁决永不收敛，均属架空轮次治理，登记为反模式 #49（[hard-constraints.md](hard-constraints.md)「#49 无限返工循环」节；43.5.0 由候选 C2 转正，转正后为强制反模式执行）。
 - **与「普通 V/G 失败链」的关系**：「普通 V/G 失败链」（hard-constraints.md「普通 V/G 失败链」节）是 L1 的具体展开；分层回路不改变失败链的任何步骤顺序。
 - **ChangeClassification 词汇引用约束**：若需登记返工原因分类，引用总纲 §4.1 ChangeClassification 词汇（`semantic` / `topology` / `evidence-only`；总纲 = `2026-09-30-absorption-batches-master-outline.md`），不得另造近义词——本批次不引入 classification 分流（按作用域分层，不按缺陷类型分流，防过度设计）。
 

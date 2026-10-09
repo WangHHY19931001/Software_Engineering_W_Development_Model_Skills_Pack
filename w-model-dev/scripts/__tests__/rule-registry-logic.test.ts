@@ -2,9 +2,9 @@
  * rule-registry-logic.ts 单元测试 —— M2 规则登记册校验（43.5.0 批次 10）
  *
  * 覆盖（任务 4 步骤 3 要求，7 用例）：
- *   - validateRuleRegistry 合法全量：64 条目（48 ap + 14 hc + C1/C2）通过
- *   - 缺 1 条 ap（47 → fail）
- *   - 多 1 条 ap（49 → fail）
+ *   - validateRuleRegistry 合法全量：64 条目（49 ap + 14 hc + C1）通过
+ *   - 缺 1 条 ap（48 → fail）
+ *   - 多 1 条 ap（50 → fail）
  *   - status 非法（schema 前置拦截，[schema] 前缀 violations）
  *   - retired 缺 rationale（业务规则 fail）
  *   - crossCheckRegistryAgainstDocs 一致通过（双向精确相等）
@@ -23,10 +23,10 @@ import {
   type RuleRegistry,
 } from '../logic/rule-registry-logic.js';
 
-/** 构造合法全量登记册：48 ap + 14 hc + C1/C2（64 条，全部过 schema + 业务规则） */
+/** 构造合法全量登记册：49 ap + 14 hc + C1（64 条，全部过 schema + 业务规则） */
 function makeValidRegistry(): RuleRegistry {
   const rules: RegistryEntry[] = [];
-  for (let n = 1; n <= 48; n++) {
+  for (let n = 1; n <= 49; n++) {
     rules.push({
       id: `ap-${n}`,
       kind: 'anti-pattern',
@@ -57,53 +57,44 @@ function makeValidRegistry(): RuleRegistry {
     retiredIn: null,
     rationale: 'fixture',
   });
-  rules.push({
-    id: 'C2',
-    kind: 'candidate',
-    title: '候选二',
-    status: 'candidate',
-    boundScript: null,
-    retiredIn: null,
-    rationale: 'fixture',
-  });
   return { schemaVersion: '1.0', rules };
 }
 
-/** 合成 hard-constraints.md 文本：14 个 ## #N 标题 + 主清单 48 行（与登记册同构） */
+/** 合成 hard-constraints.md 文本：14 个 ## #N 标题 + 主清单 49 行（与登记册同构） */
 function makeValidDocsText(): string {
   let text = '';
   for (let n = 1; n <= 14; n++) {
     text += `## #${n} 硬约束 ${n}\n`;
   }
   text += '\n### 反模式清单\n\n| # | 反模式（不要做） | 危害 | 正确做法 |\n|---|---|---|---|\n';
-  for (let n = 1; n <= 48; n++) {
+  for (let n = 1; n <= 49; n++) {
     text += `| ${n} | 【通用】反模式 ${n} | 危害 ${n} | 正确做法 ${n} |\n`;
   }
   return text;
 }
 
 describe('validateRuleRegistry', () => {
-  it('合法全量 64 条（48 ap + 14 hc + C1/C2）通过', () => {
+  it('合法全量 64 条（49 ap + 14 hc + C1）通过', () => {
     const result = validateRuleRegistry(makeValidRegistry());
     expect(result.passed).toBe(true);
     expect(result.violations).toEqual([]);
   });
 
-  it('缺 1 条 ap（47 → fail）', () => {
+  it('缺 1 条 ap（48 → fail）', () => {
     const registry = makeValidRegistry();
-    registry.rules = registry.rules.filter((r) => r.id !== 'ap-48');
+    registry.rules = registry.rules.filter((r) => r.id !== 'ap-49');
     expect(registry.rules.length).toBe(63);
     const result = validateRuleRegistry(registry);
     expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => v.includes('active 反模式应为 48 条，实测 47 条'))).toBe(true);
+    expect(result.violations.some((v) => v.includes('active 反模式应为 49 条，实测 48 条'))).toBe(true);
   });
 
-  it('多 1 条 ap（49 → fail）', () => {
+  it('多 1 条 ap（50 → fail）', () => {
     const registry = makeValidRegistry();
     registry.rules.push({
-      id: 'ap-49',
+      id: 'ap-50',
       kind: 'anti-pattern',
-      title: '反模式 49',
+      title: '反模式 50',
       status: 'active',
       boundScript: null,
       retiredIn: null,
@@ -112,7 +103,7 @@ describe('validateRuleRegistry', () => {
     expect(registry.rules.length).toBe(65);
     const result = validateRuleRegistry(registry);
     expect(result.passed).toBe(false);
-    expect(result.violations.some((v) => v.includes('active 反模式应为 48 条，实测 49 条'))).toBe(true);
+    expect(result.violations.some((v) => v.includes('active 反模式应为 49 条，实测 50 条'))).toBe(true);
   });
 
   it('status 非法 → schema 前置拦截（[schema] 前缀）', () => {

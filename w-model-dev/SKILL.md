@@ -73,7 +73,7 @@ W 模型将开发与测试设计同步推进：需求分析 ↔ 验收测试设�
 | 13  | 行为门禁按成熟度分级  | 阶段 1-4 TLA+ + BDD 按成熟度强制                                                                                                                            |
 | 14  | 代码改动前后门禁      | 修改前 codegraph 影响分析落盘 + 改动后回归测试                                                                                                              |
 
-完整反模式（48 条）、检测信号和回退动作见 [references/hard-constraints.md](references/hard-constraints.md)「反模式」节。
+完整反模式（49 条）、检测信号和回退动作见 [references/hard-constraints.md](references/hard-constraints.md)「反模式」节。
 
 ## 编排者-子代理边界
 
