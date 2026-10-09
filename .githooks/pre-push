@@ -20,6 +20,10 @@
 #
 # 执行为三车道并行（Wave 4）：L1 并行车道 + L2 主车道同时发起、L3 尾车道复用 L2 产物；
 # 20 项清单与退出码契约不变；首错即停→全量汇总（跑完全部车道再判定，任一不符 exit 1）。
+# M5 快/全双档（43.5.0）：纯仓库元文档变更集（docs/*.md、根 README/CHANGELOG/AGENTS/CONTRIBUTING）
+# 走快车道——跳过第 12/13 项（vitest+coverage，SKIP (fast-lane) 行可见），其余项照跑；
+# 含 package.json 或任何技能资产/配置变更 → 全量；无法证明变更范围（解析失败/空变更集）一律
+# fail-closed 全量；--force / npm run prepush 恒全量（验收语义不受快车道影响）。
 
 set -euo pipefail
 
@@ -286,6 +290,55 @@ fi
 
 log "检测到校验脚本相关变更，启动推送前门禁..."
 
+# ---------- M5 快/全双档车道判定（43.5.0 L9） ----------
+# 语义钉死（fail-closed，任何「无法证明」一律全量，不缩小范围）：
+#   - --force / PREPUSH_FORCE=1（npm run prepush 验收路径）→ 全量；
+#   - stdin 解析失败 / 回退范围判断失败（parse_failed=1）→ 全量；
+#   - 变更集为空（无证据）→ 全量；
+#   - 含 package.json → 全量（依赖与脚本清单变更影响面全局）；
+#   - 变更集非空且全部命中仓库元文档（docs/*.md、根 README.md / CHANGELOG.md / AGENTS.md /
+#     CONTRIBUTING.md——不触技能资产/脚本/schema/eval）→ 快车道（FAST_LANE=1）；
+#   - 其余任一命中（技能资产、config/、.githooks/、eval/、根级脚本配置等）→ 全量。
+# 快车道效果：跳过第 12 项（vitest 全量 + coverage）与第 13 项（coverage-scope，输入是第 12 项的
+# coverage JSON——跳第 12 项必须跳第 13 项）；第 15 项 docs-consistency 照跑（T3 态 3：WM_VITEST_*
+# 未设置 → 动态 facts 通道整体跳过 = 非阻断诊断 + 静态检查全跑 + exit 0，见
+# check-docs-consistency.ts「三态」头注与 docs-consistency-logic.test.ts 快车道钉行为用例）；
+# 其余项（含第 20 项预算）一律照跑。被跳项在汇总输出 `SKIP (fast-lane)` 行，不静默。
+# 逃生口：--force / npm run prepush 走 FORCE 路径全量，验收语义不受本判定影响。
+FAST_LANE=0
+if [ "$FORCE" != "1" ] && [ "${PREPUSH_FORCE:-0}" != "1" ] \
+   && [ "${parse_failed:-0}" != "1" ] && [ -n "${changed_files:-}" ]; then
+  all_meta_docs=1
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    case "$f" in
+      docs/*.md|README.md|CHANGELOG.md|AGENTS.md|CONTRIBUTING.md) : ;;  # 仓库元文档
+      *) all_meta_docs=0; break ;;                                       # 技能资产/配置/其他 → 全量
+    esac
+  done <<EOF
+${changed_files}
+EOF
+  if [ "$all_meta_docs" -eq 1 ]; then
+    FAST_LANE=1
+  fi
+fi
+if [ "$FAST_LANE" = "1" ]; then
+  log "M5 车道判定：FAST_LANE=1（纯元文档变更集：跳过第 12/13 项 vitest+coverage，其余项照跑）"
+else
+  log "M5 车道判定：FAST_LANE=0（全量 20 项）"
+fi
+
+# ---------- GIT_* 环境净化（43.5.0 L9 演练发现） ----------
+# 链接 worktree（.worktrees/*）内真实 git push 时，git 会向本 hook 注入 GIT_DIR（指向 worktree
+# 私有 gitdir，实测探针见任务 9 演练记录）。该变量若随环境继承到门禁子进程（vitest / self-test
+# 内大量以 cwd 隔离的 tmp git fixture：change-scope「base/head」、docs-consistency 与
+# evidence-provenance「fixture」、check-codegraph-queries「CGQ CLI」等），git 会**优先 GIT_DIR
+# 而无视 cwd**，fixture 的 init/add/commit 全部落入真实仓库（实测污染：rogue 提交 + prefix-collision
+# 分支），且 fixture 断言读到真实仓库 sha → 第 12 项 vitest 假红。此处在本 hook 后续 git 调用与
+# 全部门禁子进程范围内 unset 重定向类 GIT_* 变量；后续 git 调用（L3 provenance 的 rev-parse）
+# 经 cwd（仓库根）自行发现 .git，结果不变。stdin 解析段在本净化之前已用完 push 上下文，不受影响。
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_QUARANTINE_PATH || true
+
 # ---------- 依赖检查 ----------
 
 if ! command -v npm >/dev/null 2>&1; then
@@ -385,6 +438,14 @@ par_expect() {
   printf '%s|%s|%s|%s\n' "$idx" "$!" "$expect" "$desc" >>"$lane_dir/order.txt"
 }
 
+# par_skip <序号> <描述>：M5 快车道跳过项登记（不派发子进程）——pid 位记 SKIP 标记写入 order.txt，
+# 汇总循环按同一发起顺序输出 `SKIP (fast-lane)` 行（可观测、不静默）。
+par_skip() {
+  local idx="$1"; shift
+  local desc="$1"
+  printf '%s|SKIP|0|%s\n' "$idx" "$desc" >>"$lane_dir/order.txt"
+}
+
 # 第 14 项 npm audit 的自定义期望封装（0 通过；255/1 + 网络信号 = 0 语义跳过；
 # 跳过判定函数 audit_has_blocking_signal / audit_can_skip 见门禁区之前）。
 # 注意：封装在 par_expect 的 set +e 子壳内执行，末尾不恢复 set -e——
@@ -452,8 +513,13 @@ par_expect 11 "check-signature-chain 有效签名链样本退出 0" 0 \
 # 12. vitest 全量 + coverage 采集（instrumentation 供第 13 项 scope 口径消费；阈值强制在第 13 项——2026-09-28 T1 单口径化）
 #     文件数/用例数以同次 JSON facts 与 provenance 为准
 #     --reporter=json --outputFile 落盘实测用例总数，供第 15 项 check-docs-consistency 复用（避免 vitest 双跑）
-par_expect 12 "vitest 单元测试 + coverage 采集通过" 0 \
-  npx vitest run --coverage --reporter=json --outputFile="$tmp_vitest_json" --config config/vitest.config.ts
+#     （M5：FAST_LANE=1 时跳过本项——第 13 项随之跳过，SKIP 行经 par_skip 进汇总；第 15 项照跑走 T3 态 3）
+if [ "$FAST_LANE" = "1" ]; then
+  par_skip 12 "vitest 单元测试 + coverage 采集通过"
+else
+  par_expect 12 "vitest 单元测试 + coverage 采集通过" 0 \
+    npx vitest run --coverage --reporter=json --outputFile="$tmp_vitest_json" --config config/vitest.config.ts
+fi
 
 # 13. check-coverage-scope：规则层覆盖口径门禁（logic+lib 白名单分母重算；2026-09-28 T1 单口径化后为唯一强制覆盖口径）
 #     阈值 = 2026-09-18 实测（logic+lib）：stmts 84.25 / branch 77.87 / funcs 93.68 / lines 87.01，
@@ -507,6 +573,11 @@ par_expect 20 "复杂度棘轮预算（eval/complexity-caps.json）" 0 \
 # set -e 下中断汇总——退出码以 .code 落盘文件为准，wait 本身只做同步。
 fail_count=0
 while IFS='|' read -r idx pid expect desc; do
+  # M5 快车道跳过项：pid 位为 SKIP 标记——不 wait、不计失败，按发起顺序输出可见 SKIP 行
+  if [ "$pid" = "SKIP" ]; then
+    warn "#$idx $desc —— SKIP (fast-lane)"
+    continue
+  fi
   wait "$pid" 2>/dev/null || true
   code="$(cat "$lane_dir/$idx.code" 2>/dev/null || printf '1')"
   end_ms="$(cat "$lane_dir/$idx.end" 2>/dev/null || true)"
@@ -534,26 +605,37 @@ if [ -n "${PREPUSH_KEEP_VITEST_JSON:-}" ]; then
   cp "$tmp_vitest_json" "$PREPUSH_KEEP_VITEST_JSON" 2>/dev/null || true
 fi
 
+# M5 快车道：第 13 项 SKIP 行在汇总后立即输出（先于失败判定——即使 L1+L2 有失败项提前 exit 1，
+# 被跳项的可见性也不丢；第 12 项 SKIP 行已由 par_skip 经汇总循环按序输出）
+if [ "$FAST_LANE" = "1" ]; then
+  warn "第 13 项 规则层覆盖口径 (logic+lib) 达阈值 —— SKIP (fast-lane)（输入依赖第 12 项 coverage JSON，快车道未采集）"
+fi
+
 if [ "$fail_count" -ne 0 ]; then
   fail "并行车道 $fail_count 项不符预期，中止"
   exit 1
 fi
 
 # ---- L3 尾车道（依赖第 12 项产物，顺序执行；第 13/15 项语义注释已原位保留于上方 # 13. / # 15. 块）----
+# （M5：FAST_LANE=1 时无第 12 项产物——provenance 封装与第 13 项跳过并输出 SKIP 行；第 15 项照跑，
+#   WM_VITEST_* 不导出 → check-docs-consistency T3 态 3 非阻断跳过动态 facts，静态检查全跑。）
 
-# 将第 12 项同次 JSON 封装为受控 provenance，绑定当前 HEAD、运行 ID、相对 artifact 与完整 measurements。
-node -e 'const fs=require("fs"),crypto=require("crypto"),cp=require("child_process"),path=require("path"); const artifact=process.argv[1], provenance=process.argv[2], root=process.cwd(); const raw=fs.readFileSync(artifact,"utf8"), d=JSON.parse(raw), sha=crypto.createHash("sha256").update(raw,"utf8").digest("hex"), head=cp.execFileSync("git",["rev-parse","HEAD"],{cwd:root,encoding:"utf8"}).trim(), runId=crypto.randomBytes(8).toString("hex"); fs.writeFileSync(provenance, JSON.stringify({format:"w-model-vitest-provenance",version:1,commitSha:head,runId,artifactRelativePath:path.basename(artifact),artifactSha256:sha,measurements:d},null,2)+"\n");' "$tmp_vitest_json" "$tmp_vitest_provenance"
+if [ "$FAST_LANE" != "1" ]; then
+  # 将第 12 项同次 JSON 封装为受控 provenance，绑定当前 HEAD、运行 ID、相对 artifact 与完整 measurements。
+  node -e 'const fs=require("fs"),crypto=require("crypto"),cp=require("child_process"),path=require("path"); const artifact=process.argv[1], provenance=process.argv[2], root=process.cwd(); const raw=fs.readFileSync(artifact,"utf8"), d=JSON.parse(raw), sha=crypto.createHash("sha256").update(raw,"utf8").digest("hex"), head=cp.execFileSync("git",["rev-parse","HEAD"],{cwd:root,encoding:"utf8"}).trim(), runId=crypto.randomBytes(8).toString("hex"); fs.writeFileSync(provenance, JSON.stringify({format:"w-model-vitest-provenance",version:1,commitSha:head,runId,artifactRelativePath:path.basename(artifact),artifactSha256:sha,measurements:d},null,2)+"\n");' "$tmp_vitest_json" "$tmp_vitest_provenance"
 
-export WM_VITEST_COUNT_FILE="$(cygpath -w "$tmp_vitest_json" 2>/dev/null || printf '%s' "$tmp_vitest_json")"
-export WM_VITEST_PROVENANCE_FILE="$(cygpath -w "$tmp_vitest_provenance" 2>/dev/null || printf '%s' "$tmp_vitest_provenance")"
-export WM_VITEST_PROVENANCE_ROOT="$(cygpath -w "$tmp_vitest_dir" 2>/dev/null || printf '%s' "$tmp_vitest_dir")"
+  export WM_VITEST_COUNT_FILE="$(cygpath -w "$tmp_vitest_json" 2>/dev/null || printf '%s' "$tmp_vitest_json")"
+  export WM_VITEST_PROVENANCE_FILE="$(cygpath -w "$tmp_vitest_provenance" 2>/dev/null || printf '%s' "$tmp_vitest_provenance")"
+  export WM_VITEST_PROVENANCE_ROOT="$(cygpath -w "$tmp_vitest_dir" 2>/dev/null || printf '%s' "$tmp_vitest_dir")"
 
-# 第 13 项（阈值等语义注释见上方 # 13. 块）
-run_expect "规则层覆盖口径 (logic+lib) 达阈值" 0 \
-  npx tsx w-model-dev/scripts/cli/check-coverage-scope.ts --report=coverage/coverage-final.json \
-  --min-statements=80 --min-branches=75 --min-functions=90 --min-lines=85 || exit 1
+  # 第 13 项（阈值等语义注释见上方 # 13. 块）
+  run_expect "规则层覆盖口径 (logic+lib) 达阈值" 0 \
+    npx tsx w-model-dev/scripts/cli/check-coverage-scope.ts --report=coverage/coverage-final.json \
+    --min-statements=80 --min-branches=75 --min-functions=90 --min-lines=85 || exit 1
+fi
 
-# 第 15 项（复用第 12 项同次 JSON；export 注意事项见上方 # 15. 块）
+# 第 15 项（复用第 12 项同次 JSON；export 注意事项见上方 # 15. 块。M5 快车道下 WM_VITEST_* 未设置
+# → T3 态 3：动态 facts 通道非阻断跳过（诊断可见），静态检查全跑，exit 0 仅由静态违规决定）
 run_expect "docs-consistency 活体文档一致" 0 npm run check:docs-consistency || exit 1
 
 log "全部门禁通过，允许推送 ✓（总耗时 $(( ($(now_ms) - PREPUSH_T0) / 1000 ))s）"

@@ -2211,6 +2211,36 @@ describe('runDocConsistencyChecks', () => {
     );
   }, 120_000);
 
+  // 🟡-a 钉行为（43.5.0 L9，2026-10-09）：pre-push M5 快车道（纯元文档变更集）跳过第 12 项 vitest，
+  // 第 15 项 docs-consistency 在 WM_VITEST_* 三变量**从未 export**（键完全不存在，非空串）下运行——
+  // 上一用例的 NO_VITEST_ENV 传的是空串；本用例用 undefined 让 child_process 剔除键（Node env 语义：
+  // undefined 值不进子进程环境），钉死「键不存在」与「键为空串」同走态 3（readVitestCountFile 对
+  // undefined / '' 双分支同返回 null），#15 在快车道照跑且非阻断：静态检查全跑、诊断可见、exit 0。
+  it('hook 快车道场景（跳 #12）：WM_VITEST_* 三键完全未设置 → 态 3 优雅跳过 exit 0（🟡-a 钉行为）', async () => {
+    await withDocsConsistencyFixture(
+      async (fixtureRoot) => {
+        const unsetVitestEnv: NodeJS.ProcessEnv = {
+          WM_VITEST_COUNT_FILE: undefined,
+          WM_VITEST_PROVENANCE_FILE: undefined,
+          WM_VITEST_PROVENANCE_ROOT: undefined,
+          PATH: '',
+          Path: '',
+        };
+        const json = runDocsConsistencyCli(fixtureRoot, unsetVitestEnv, ['--json'], { timeoutMs: 30_000 });
+        expect(json.code, JSON.stringify(json)).toBe(0);
+        const report = JSON.parse(json.stdout) as {
+          passed: boolean;
+          dynamicMeasurements: unknown;
+          diagnostics: string[];
+        };
+        expect(report.passed).toBe(true);
+        expect(report.dynamicMeasurements).toBeNull();
+        expect(report.diagnostics).toEqual([SKIPPED_DIAGNOSTIC]);
+      },
+      { availablePackages: ['tsx', 'typescript', 'esbuild'] },
+    );
+  }, 120_000);
+
   it('CLI 显式 --spawn-vitest（无工件）→ 仍走自采集 fail-closed，不静默跳过动态 facts', async () => {
     await withDocsConsistencyFixture(
       async (fixtureRoot) => {

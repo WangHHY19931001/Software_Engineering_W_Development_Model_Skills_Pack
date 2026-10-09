@@ -43,21 +43,25 @@ import type { RegistryEntry } from './rule-registry-logic.js';
 
 /** ap-N 具名引用锚（反模式 #N / 反模式：N / 反模式 N） */
 function apNamedAnchor(n: number): RegExp {
+  // eslint-disable-next-line security/detect-non-literal-regexp -- n 为 registryNum 自登记册 id 解析出的纯数字（/^\d+$/），无数值注入面
   return new RegExp(`反模式[\\s:=：，、]*#?${n}(?![0-9])`);
 }
 
 /** hc-N 具名引用锚（约束 #N / 约束：N / 约束 N） */
 function hcNamedAnchor(n: number): RegExp {
+  // eslint-disable-next-line security/detect-non-literal-regexp -- 同上：n 为登记册 id 解析出的纯数字，无数值注入面
   return new RegExp(`约束[\\s:=：，、]*#?${n}(?![0-9])`);
 }
 
 /** 裸编号令牌兜底（#N 成令牌，且 N 后不接数字防 #1 命中 #10~） */
 function bareHashAnchor(n: number): RegExp {
+  // eslint-disable-next-line security/detect-non-literal-regexp -- 同上：n 为登记册 id 解析出的纯数字，无数值注入面
   return new RegExp(`#${n}(?![0-9])`);
 }
 
 /** 候选规则（C1/C2）候选登记形态锚（真实语料校准，见上方说明） */
 function candidateRegistrationAnchor(id: string): RegExp {
+  // eslint-disable-next-line security/detect-non-literal-regexp -- id 为登记册 schema 校验后的规则 id（候选词表 C1/C2），非用户输入
   return new RegExp(`候选[^）)\\n]{0,16}${id}|${id}[\\s:=：，、]*[（(][\\s]*候选`);
 }
 

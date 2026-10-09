@@ -519,14 +519,14 @@ R10 以 `testing-reality-checker` 为 canonical persona，要求其 `confidence 
 
 ## 规则生命周期报告 CLI（wm-rule-lifecycle，43.5.0 M2）
 
-- **速查行**：`npx tsx w-model-dev/scripts/cli/wm-rule-lifecycle.ts [root] [--gate-logs=<dir>] [--json]`（`root` 缺省 = 本脚本所在仓库根（含 `w-model-dev/`、README.md、AGENTS.md、docs/）；`--gate-logs` 缺省 `<root>/.w-model/gate-logs`）
+- **速查行**：`npx tsx w-model-dev/scripts/cli/wm-rule-lifecycle.ts [root] [--gate-logs=<dir>] [--json]`（`root` 缺省 = 本脚本所在仓库根（含 `w-model-dev/`、README.md、AGENTS.md、docs/）；`--gate-logs` 缺省 `<root>/.w-model/gate-logs`；`--gate-logs` 接受等号（`--gate-logs=<dir>`）与分离（`--gate-logs <dir>`）两形态，重复 flag 一律 `ARG_INVALID`）
 - **用途**：M2 规则生命周期报告（只读，批次五，只报告不裁决——不写登记册、不进阶段门）——对登记册 `w-model-dev/rule-registry.json` 全量规则跑退役候选三判据（① 活文档引用零命中 ② `boundScript` null 或 gate-logs 零出现 ③ 存续 ≥10 个 minor），全满足者列入 candidates。活文档采集范围（缺项可容）：`w-model-dev/references/*.md`（排除定义文档 hard-constraints.md 自身）+ `w-model-dev/SKILL.md` + README.md + AGENTS.md + docs/*.md 顶层。
 - **`RULE_LIFECYCLE_JSON {candidates,checked,corpus}`**：`candidates` 为 `{id,reasons}` 数组；`checked` 为登记册规则总数；`corpus` 为 gate-logs 文件数或字面量 `"missing"`（目录缺失时仍 exit 0，非错误）。
 - **退出码**：0=判定成功 / 2=输入错误（登记册缺失 `FILE_NOT_FOUND`、坏 JSON `FILE_PARSE`、结构畸形 `STRUCTURE_INVALID`、未知/重复/缺值 flag `ARG_INVALID` → stdout 单行 `ERROR_JSON`）。判定逻辑在 `logic/rule-lifecycle-logic.ts`（零 fs）。exit 0/2 契约，无 exit 1。
 
 ## 门禁效能报告 CLI（wm-gate-effectiveness，43.5.0 M3）
 
-- **速查行**：`npx tsx w-model-dev/scripts/cli/wm-gate-effectiveness.ts [root] [--gate-logs=<dir>] [--json]`（参数语义与 wm-rule-lifecycle 同型：`root` 缺省仓库根、`--gate-logs` 缺省 `<root>/.w-model/gate-logs`）
+- **速查行**：`npx tsx w-model-dev/scripts/cli/wm-gate-effectiveness.ts [root] [--gate-logs=<dir>] [--json]`（参数语义与 wm-rule-lifecycle 同型：`root` 缺省仓库根、`--gate-logs` 缺省 `<root>/.w-model/gate-logs`、接受等号与分离两形态）
 - **用途**：M3 门禁效能报告（只读，批次五，只报告不裁决——零阻断门禁=降级候选的判定由 M4 人类 CHECKPOINT 消费，本 CLI 不自动降级、不进阶段门）——消费既有 `.w-model/gate-logs/*.json` 语料（只读 `*.json`、跳过 `.log`），按门禁聚合 runs（调用数）/ blocked（exitCode=1）/ errors（exitCode=2）/ lastFired（文件名 ISO 段取 max 的原始串）/ distinctTriggers（`reportSummary` 可辨识键尽力而为）。
 - **`GATE_EFFECTIVENESS_JSON`**：单行、同字节确定（不含 `generatedAt`）；坏 JSON 逐文件计 `parseErrors` 并在输出标注（不静默）；目录缺失 → `{"gates":[],"corpus":0,"note":"missing"}` 仍 exit 0。`script` 字段缺失时回退文件名段（新式 `<ISO>-<uuid>-<script>.json` / 旧式 `<ISO>-<script>.json`），回退失败 → `formatFallback`（不计 runs，已解析文件仍计入 corpus）。
 - **退出码**：0=判定成功 / 2=输入错误（未知/重复/缺值 flag `ARG_INVALID` → stdout 单行 `ERROR_JSON`）。聚合逻辑在 `logic/gate-effectiveness-logic.ts`（零 fs）。exit 0/2 契约，无 exit 1。

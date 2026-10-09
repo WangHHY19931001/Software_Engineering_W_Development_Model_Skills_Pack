@@ -1982,10 +1982,10 @@ function checkExit2ScriptCount(count: number, agents: string): DocCheckViolation
 }
 
 /**
- * pre-push 19 项强校验（F-G7-08，audit-fixes task 6）：解析真实编号检查块并断言连续
+ * pre-push 20 项强校验（F-G7-08，audit-fixes task 6）：解析真实编号检查块并断言连续
  * #1..#20 且恰 20 块——旧实现仅取「最大编号」+「N 项检查」声明文本（N 为当时 prePushCount），伪造 3 块检查的
  * pre-push（`# 1.` `# 2.` `# 19.`）可全绿；重写后中间删除任一块（编号断档）或减少
- * 块数均触发违规，再叠加「19 项检查」声明文本兜底。
+ * 块数均触发违规，再叠加「20 项检查」声明文本兜底。
  */
 export function checkPrePushCount(prePush: string): DocCheckViolation[] {
   const violations: DocCheckViolation[] = [];

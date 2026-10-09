@@ -107,6 +107,7 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
 /** 读取登记册（缺失 → FILE_NOT_FOUND；坏 JSON → FILE_PARSE；结构与字段畸形 → STRUCTURE_INVALID） */
 function loadRegistry(root: string): RegistryEntry[] {
   const registryPath = path.join(root, REGISTRY_REL);
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- registryPath = root + 仓库固定相对路径常量 REGISTRY_REL，受控路径
   if (!existsSync(registryPath)) {
     exitWithError({
       category: 'FILE_NOT_FOUND',
@@ -195,6 +196,7 @@ function readTextSafe(file: string): string {
 function collectLiveDocs(root: string): string[] {
   const texts: string[] = [];
   const refsDir = path.join(root, 'w-model-dev', 'references');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- refsDir = root + 仓库固定相对路径字面量，受控路径
   if (existsSync(refsDir)) {
     let names: string[] = [];
     try {
@@ -211,12 +213,14 @@ function collectLiveDocs(root: string): string[] {
   }
   for (const rel of ['w-model-dev/SKILL.md', 'README.md', 'AGENTS.md']) {
     const file = path.join(root, rel);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- rel 取自本函数字面量白名单数组，受控路径
     if (existsSync(file)) {
       const text = readTextSafe(file);
       if (text !== '') texts.push(text);
     }
   }
   const docsDir = path.join(root, 'docs');
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- docsDir = root + 仓库固定目录字面量，受控路径
   if (existsSync(docsDir)) {
     let names: string[] = [];
     try {
@@ -249,6 +253,7 @@ function collectGateLogs(gateLogsDir: string): {
   segments: string[];
   missing: boolean;
 } {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- gateLogsDir 为调用方显式 --gate-logs 或根下固定 .w-model/gate-logs 路径
   if (!existsSync(gateLogsDir)) {
     return { files: 0, segments: [], missing: true };
   }
