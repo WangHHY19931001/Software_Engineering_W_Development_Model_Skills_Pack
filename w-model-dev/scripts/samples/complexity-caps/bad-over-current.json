@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "description": "NEGATIVE fixture：棘轮预算故意放宽/误匹配会让超限文件静默通过的回归样本——self-test.ts 实测 5893 行，cap 仅 100，真实仓库根跑必违规。",
+  "referencesDefaultMaxLines": 1200,
+  "referencesExceptions": {},
+  "scriptsDefaultMaxLines": 1200,
+  "scriptsExceptions": {
+    "scripts/cli/self-test.ts": 100
+  },
+  "antiPatternMaxCount": 1000,
+  "hardConstraintMaxCount": 1000,
+  "personaAdaptedMinCount": 0,
+  "sedimentMaxCount": 100000
+}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "description": "M1 复杂度棘轮预算（43.5.0）：cap 只许下调、上调唯一通道=🔴 CHECKPOINT+decision-log。初值 = eval/complexity-baseline.json 实测基线（任务 2），豁免按文件实际行数给出，超限即 violation 不允许静默放宽。43.5.0 任务 3 CHECKPOINT 上调（用户裁定 2026-10-09，decision-log rounds-51）：self-test.ts 5766→5893、subagent-delegation.md 2010→2011，上调幅度全部可归因于任务 3 强制编辑（自测三态用例 + §6.4 登记行 + prettier 规范化），此后只许下调。",
+  "referencesDefaultMaxLines": 1200,
+  "referencesExceptions": {
+    "references/bdd.md": 1874,
+    "references/subagent-delegation.md": 2011,
+    "references/tla-plus.md": 2472
+  },
+  "scriptsDefaultMaxLines": 1200,
+  "scriptsExceptions": {
+    "scripts/cli/self-test.ts": 5893,
+    "scripts/logic/docs-consistency-logic.ts": 2722,
+    "scripts/logic/gate-logic.ts": 2049,
+    "scripts/logic/run-log-logic.ts": 1770,
+    "scripts/logic/code-health-ledger-logic.ts": 1756,
+    "scripts/logic/code-health-contract.ts": 1621,
+    "scripts/logic/tla-logic.ts": 1616,
+    "scripts/logic/graph-logic.ts": 1414
+  },
+  "antiPatternMaxCount": 48,
+  "hardConstraintMaxCount": 14,
+  "personaAdaptedMinCount": 4,
+  "sedimentMaxCount": 46
+}

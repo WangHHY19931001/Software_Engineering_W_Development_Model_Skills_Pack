@@ -18,6 +18,7 @@ import {
   ComplexityFormatError,
   computeComplexityReport,
   countPersonaAdaption,
+  parseBudgetCaps,
   PERSONA_ADAPTION_MARKERS,
   type BudgetCaps,
   type ComplexityMeasurement,
@@ -96,7 +97,9 @@ describe('computeComplexityReport', () => {
   });
 
   it('FileLines 条目缺 path 或 lines 抛 ComplexityFormatError', () => {
-    const m = measurement({ referencesFiles: [{ path: 'references/x.md', lines: 1 }] });
+    const m = measurement({
+      referencesFiles: [{ path: 'references/x.md', lines: 1 }],
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 故意注入非 FileLines 条目
     const bad = measurement({ scriptFiles: [{ path: 1, lines: 'x' } as any] });
     expect(() => computeComplexityReport(bad)).toThrow(ComplexityFormatError);
@@ -144,9 +147,44 @@ describe('checkComplexityBudget', () => {
     expect(r.violations).toEqual([]);
   });
 
+  it('恰好等于 cap：行数恰达默认上限 / 异常 cap 均 passed（棘轮边界不越线）', () => {
+    const r = checkComplexityBudget(
+      measurement({
+        referencesFiles: [{ path: 'references/a.md', lines: COMPLEXITY_DEFAULT_MAX_LINES }],
+        scriptFiles: [{ path: 'scripts/cli/self-test.ts', lines: 6000 }],
+        antiPatternCount: 48,
+        hardConstraintCount: 14,
+        personaAdaptedCount: 4,
+        sedimentCount: 10,
+      }),
+      caps({
+        scriptsExceptions: { 'scripts/cli/self-test.ts': 6000 },
+        personaAdaptedMinCount: 4,
+        sedimentMaxCount: 10,
+      }),
+    );
+    expect(r.passed).toBe(true);
+    expect(r.violations).toEqual([]);
+  });
+
+  it('超 1 行：超过 cap 恰一行即 violation，文案同时含实测线与 cap 数值', () => {
+    const r = checkComplexityBudget(
+      measurement({
+        referencesFiles: [{ path: 'references/a.md', lines: COMPLEXITY_DEFAULT_MAX_LINES + 1 }],
+      }),
+      caps(),
+    );
+    expect(r.passed).toBe(false);
+    expect(r.violations).toContain(
+      `references/a.md ${COMPLEXITY_DEFAULT_MAX_LINES + 1} > cap ${COMPLEXITY_DEFAULT_MAX_LINES}`,
+    );
+  });
+
   it('references 文件超默认上限且不在异常表 → violation 带实测值与 cap', () => {
     const r = checkComplexityBudget(
-      measurement({ referencesFiles: [{ path: 'references/tla-plus.md', lines: 2471 }] }),
+      measurement({
+        referencesFiles: [{ path: 'references/tla-plus.md', lines: 2471 }],
+      }),
       caps({ referencesDefaultMaxLines: COMPLEXITY_DEFAULT_MAX_LINES }),
     );
     expect(r.passed).toBe(false);
@@ -173,14 +211,18 @@ describe('checkComplexityBudget', () => {
 
   it('scripts 文件超上限按 scriptsExceptions 生效', () => {
     const r = checkComplexityBudget(
-      measurement({ scriptFiles: [{ path: 'scripts/cli/self-test.ts', lines: 5600 }] }),
+      measurement({
+        scriptFiles: [{ path: 'scripts/cli/self-test.ts', lines: 5600 }],
+      }),
       caps({ scriptsExceptions: { 'scripts/cli/self-test.ts': 6000 } }),
     );
     expect(r.passed).toBe(true);
     expect(r.violations).toEqual([]);
 
     const r2 = checkComplexityBudget(
-      measurement({ scriptFiles: [{ path: 'scripts/cli/self-test.ts', lines: 5600 }] }),
+      measurement({
+        scriptFiles: [{ path: 'scripts/cli/self-test.ts', lines: 5600 }],
+      }),
       caps(),
     );
     expect(r2.passed).toBe(false);
@@ -222,5 +264,46 @@ describe('checkComplexityBudget', () => {
     );
     expect(r.passed).toBe(false);
     expect(r.violations).toHaveLength(3);
+  });
+});
+
+describe('parseBudgetCaps', () => {
+  it('合法 caps（含 schemaVersion/description 额外顶层键）解析为 BudgetCaps', () => {
+    const raw = {
+      schemaVersion: '1.0',
+      description: '棘轮语义',
+      referencesDefaultMaxLines: 1200,
+      referencesExceptions: { 'references/tla-plus.md': 2472 },
+      scriptsDefaultMaxLines: 1200,
+      scriptsExceptions: { 'scripts/cli/self-test.ts': 5766 },
+      antiPatternMaxCount: 48,
+      hardConstraintMaxCount: 14,
+      personaAdaptedMinCount: 4,
+      sedimentMaxCount: 46,
+    };
+    const c = parseBudgetCaps(raw);
+    expect(c.referencesDefaultMaxLines).toBe(1200);
+    expect(c.referencesExceptions['references/tla-plus.md']).toBe(2472);
+    expect(c.scriptsExceptions['scripts/cli/self-test.ts']).toBe(5766);
+    expect(c.personaAdaptedMinCount).toBe(4);
+  });
+
+  it('缺必填数值字段 / 缺异常表 / 非对象输入均抛 ComplexityFormatError', () => {
+    const valid = {
+      referencesDefaultMaxLines: 1200,
+      referencesExceptions: {},
+      scriptsDefaultMaxLines: 1200,
+      scriptsExceptions: {},
+      antiPatternMaxCount: 48,
+      hardConstraintMaxCount: 14,
+      personaAdaptedMinCount: 4,
+      sedimentMaxCount: 46,
+    };
+    const { sedimentMaxCount: _drop, ...missingField } = valid;
+    void _drop;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 故意注入非法 caps 输入测试 fail-closed 守卫
+    for (const bad of [null, undefined, [], 'x', missingField, { ...valid, referencesExceptions: 'nope' }] as any[]) {
+      expect(() => parseBudgetCaps(bad)).toThrow(ComplexityFormatError);
+    }
   });
 });

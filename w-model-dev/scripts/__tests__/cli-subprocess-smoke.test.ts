@@ -84,6 +84,61 @@ describe('wm-complexity-report 真实子进程冒烟', () => {
   });
 });
 
+describe('check-complexity-budget 真实子进程冒烟', () => {
+  let tmpDir: string;
+  beforeAll(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'budget-smoke-'));
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- controlled mkdtemp fixture file
+    await fs.writeFile(
+      path.join(tmpDir, 'over-cap.json'),
+      JSON.stringify({
+        schemaVersion: '1.0',
+        description: 'smoke fixture',
+        referencesDefaultMaxLines: 1200,
+        referencesExceptions: {},
+        scriptsDefaultMaxLines: 1200,
+        scriptsExceptions: { 'scripts/cli/self-test.ts': 100 },
+        antiPatternMaxCount: 1000,
+        hardConstraintMaxCount: 1000,
+        personaAdaptedMinCount: 0,
+        sedimentMaxCount: 100000,
+      }),
+      'utf-8',
+    );
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- controlled mkdtemp fixture file
+    await fs.writeFile(path.join(tmpDir, 'bad.json'), '{ not-json', 'utf-8');
+  });
+  afterAll(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+  it('真实仓库根 + 默认 caps → exit 0 + COMPLEXITY_BUDGET_JSON 标记', () => {
+    const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli/check-complexity-budget.ts')]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('COMPLEXITY_BUDGET_JSON ');
+  });
+  it('超限 caps 夹具（self-test cap=100，实测 5893 行）→ exit 1 + stderr ✗ [BUDGET] + violations', () => {
+    const r = runSync(process.execPath, [
+      tsxCli,
+      path.resolve(TEST_DIR, '../cli/check-complexity-budget.ts'),
+      `--caps=${path.join(tmpDir, 'over-cap.json')}`,
+    ]);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('✗ [BUDGET]');
+    expect(r.stdout).toContain('COMPLEXITY_BUDGET_JSON ');
+    expect(r.stdout).toContain('scripts/cli/self-test.ts');
+    expect(r.stdout).toContain('"violations"');
+  });
+  it('坏 JSON caps → exit 2 + stdout ERROR_JSON 标记', () => {
+    const r = runSync(process.execPath, [
+      tsxCli,
+      path.resolve(TEST_DIR, '../cli/check-complexity-budget.ts'),
+      `--caps=${path.join(tmpDir, 'bad.json')}`,
+    ]);
+    expect(r.status).toBe(2);
+    expect(r.stdout).toMatch(/^ERROR_JSON \{/);
+  });
+});
+
 describe('check-artifact-gate 真实子进程冒烟', () => {
   let tmpDir: string;
   beforeAll(async () => {
@@ -123,10 +178,30 @@ describe('无参 exit-2 真实子进程冒烟（4 CLI：check-coding-plan / chec
   // 冒烟取零夹具的 ARG_INVALID 路径：验证真实子进程边界（argv 解析 → ERROR_JSON + exitCode 2 传递）。
   it('无参 → exit 2 + stdout ERROR_JSON 标记（4 CLI 逐个真实 spawn）', () => {
     for (const { cli, args, stdoutMode, stderrMarker } of [
-      { cli: 'check-coding-plan.ts', args: [], stdoutMode: 'prefix', stderrMarker: '参数缺失' },
-      { cli: 'check-codegraph-queries.ts', args: [], stdoutMode: 'prefix', stderrMarker: '参数缺失' },
-      { cli: 'code-health-apply.ts', args: [], stdoutMode: 'contains', stderrMarker: '--candidate' },
-      { cli: 'review-package.ts', args: [], stdoutMode: 'prefix', stderrMarker: '--base' },
+      {
+        cli: 'check-coding-plan.ts',
+        args: [],
+        stdoutMode: 'prefix',
+        stderrMarker: '参数缺失',
+      },
+      {
+        cli: 'check-codegraph-queries.ts',
+        args: [],
+        stdoutMode: 'prefix',
+        stderrMarker: '参数缺失',
+      },
+      {
+        cli: 'code-health-apply.ts',
+        args: [],
+        stdoutMode: 'contains',
+        stderrMarker: '--candidate',
+      },
+      {
+        cli: 'review-package.ts',
+        args: [],
+        stdoutMode: 'prefix',
+        stderrMarker: '--base',
+      },
     ] as const) {
       const r = runSync(process.execPath, [tsxCli, path.resolve(TEST_DIR, '../cli', cli), ...args]);
       expect(r.status, `${cli}: 应 exit 2`).toBe(2);

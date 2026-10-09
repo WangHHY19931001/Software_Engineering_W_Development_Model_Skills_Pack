@@ -2212,7 +2212,7 @@ interface RunLogEntry {
 
 1. **CommandEvidence**：`command` / `cwd` / `environment` / `platform` / `toolVersions` / `startedAt` / `endedAt` / `exitCode`（真实数字；`null` 永不算 observed）/ `observation`（`observed` / `not_run` / `unavailable` / `unverified`）/ `rawOutputPath` / `rawOutputSha256`。跳过的环境不伪造 evidence，只进 `unexercisedScenarios`。
 2. **RevisionIdentity 与 EvidenceBinding**：candidate / scope / path / hash / revision 绑定；`lib/code-health-evidence-store.ts` 验证存在与 SHA-256，`lib/code-health-file-verifier.ts` 以 canonical 文件校验重算，`lib/code-health-revision-provider.ts` 提供受控 revision；任一不一致即 exit 1。
-3. **tracked repo-owned 事实源**：ledger、`.code-health-governance.json`（19 项 pre-push / self-test 样本数 / docs-consistency 违规数 / fixture reachability）与 suite argv 清单（默认 `.code-health-suite.json`）的工作区字节必须等于 HEAD blob；清单声明的计数与仓库期望冲突且无 `explained:<artifact>` 时拒绝。
+3. **tracked repo-owned 事实源**：ledger、`.code-health-governance.json`（20 项 pre-push / self-test 样本数 / docs-consistency 违规数 / fixture reachability）与 suite argv 清单（默认 `.code-health-suite.json`）的工作区字节必须等于 HEAD blob；清单声明的计数与仓库期望冲突且无 `explained:<artifact>` 时拒绝。
 4. **默认拒绝**：`proveTestRemoval` 把非保护候选一律视作 protected，只有 ledger 记录（candidate action 与精确 test identity 在 scope/tests 内）能正向建立非保护状态；`test-only`、生成代码、死副本、一次性实验、平台/lifecycle/安全/并发差异与「少几行 diff」均不构成删除或抽象依据。
 5. **`lib/code-health-tdd-harness.ts`**：RED-GREEN 证据的断言绑定与测试产物哈希；未绑定断言或未减少测试计数不通过。
 
@@ -2225,7 +2225,7 @@ interface RunLogEntry {
 ### 10K.5 脱敏、门禁与边界
 
 - **脱敏**：`lib/code-health-redaction.ts` 对 campaign artifact 输出 `status`（`not_reviewed` / `clean` / `blocked`）、`rules` 与 `blockedReasons`；`blocked` 的产物不得导出。
-- **19 项 pre-push 不变**：code-health CLI 不纳入 `.githooks/pre-push`，现有 19 项检查、顺序与 exit 语义原样保留。
+- **20 项 pre-push 不变**：code-health CLI 不纳入 `.githooks/pre-push`，现有 20 项检查、顺序与 exit 语义原样保留。
 - **codegraph 前置（约束 #14）**：进入阶段 5–8 的代码修改前须先做 codegraph 影响分析并落盘 `.w-model/codegraph-queries/`；本仓库 checkout 无 `.codegraph/` 索引，code-health Phase 1–4 不消费 codegraph，也不得伪造查询记录。**合法降级与伪造的界线（2026-09-25 D-6）**：无索引时须显式降级、索引在盘时只允许 CLI 形态，此时降级声明或未声明即「伪造查询记录」（门禁探测项目实际索引状态判定，不看记录自述）——**三形态字段与判据枚举**见 [`command-reference.md`](../w-model-dev/references/command-reference.md)「阶段 5-8 codegraph/coding-plan 门禁 CLI」节的 codegraph checker 条目。
 
 ### 10K.6 campaign 归档（已实现）

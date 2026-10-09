@@ -10,7 +10,7 @@ closes #N
 
 > 本仓库不集成云端 CI（未开启 GitHub Actions workflow 权限，用户裁定 2026-10-09，R-B9-14），以下为本地门禁（`.githooks/pre-push`，Git Bash 下执行）。
 
-- [ ] `npm run prepush` 19 项通过（输出摘要附下方「门禁输出」节）
+- [ ] `npm run prepush` 20 项通过（输出摘要附下方「门禁输出」节）
 - [ ] 未新增 `.test.ts`（如新增，已同步 vitest 计数与 `w-model-dev/scripts/__tests__/README.md`）
 - [ ] 涉及规则：（列出的反模式 / 阶段约束，如 R1-R5 / D7）
 

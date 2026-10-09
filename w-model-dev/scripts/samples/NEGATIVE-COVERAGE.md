@@ -1,7 +1,7 @@
 # 负向覆盖登记册（Negative Coverage Register）
 
 > 本表由 `check-samples-coverage.ts` 的第 4 / 5 条规则强制：`w-model-dev/scripts/cli/*.ts` 减去
-> `self-test.ts` 的**每一个 exit-2 门禁**都必须登记一条**会失败的**负向案例。全表 48 行，每门禁恰一行。
+> `self-test.ts` 的**每一个 exit-2 门禁**都必须登记一条**会失败的**负向案例。全表 49 行，每门禁恰一行。
 >
 > - **第 4 条（登记完整性）**：未登记 → `negative-coverage-missing`（exit 1）。
 > - **第 5 条（严格 + 真实探针）**：四列形态 `| 门禁 | fixture | 机制 | 所防回归 |`。
@@ -36,11 +36,11 @@
 >     半成品」（共享根只能做弱归因）；探针数量以 `lib/exit2-probe-registry.ts` 注册表为准，墙钟随机器与
 >     并发度变化（串行 → 有界并发显著缩短，均不写死数字），断言一字未减。tsx 不可用等探针不可用情形按
 >     失败处理，不静默跳过（→ `negative-coverage-probe-failed`）。
-> - 口径与中心探针一致（48 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
+> - 口径与中心探针一致（49 个脚本；`security-scan.ts` / `wm-export-evidence.ts` / `wm-status.ts` /
 >   `metrics-report.ts` 使用特殊探针参数，但仍计入集合）。
 > - **所防回归**：若该负向案例被删掉 / 放宽，会漏掉的那一个具体回归；禁止「防止出错」这类空话。
 
-## 一、`fixture` 机制（29 行）
+## 一、`fixture` 机制（30 行）
 
 | 门禁脚本                          | fixture                                                   | 机制    | 所防回归（一句话）                                                                                                                                                                                                                                          |
 | --------------------------------- | --------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -61,6 +61,7 @@
 | check-state-machine-consistency   | `samples/state-machine/bad-missing-transition.json`       | fixture | 放宽状态集 / 转移集一致将漏掉设计文档缺转移而代码存在该分支                                                                                                                                                                                                 |
 | check-codegraph-queries           | `samples/codegraph-queries/bad-degraded-without-evidence` | fixture | 放宽降级声明判据将漏掉无 `.codegraph/` 索引却缺 degradationReason / alternativeEvidence 的降级声明被当作已查询放行（D-6）                                                                                                                                   |
 | check-coding-plan                 | `samples/coding-plan/bad-review-empty`                    | fixture | 放宽 R5 内容下限（stage 审查产物 0 字节）将漏掉空审查产物被放行                                                                                                                                                                                             |
+| check-complexity-budget           | `samples/complexity-caps/bad-over-current.json`            | fixture | 棘轮预算放宽/异常表误匹配会让超限文件静默通过（self-test 实测 5893 行而 cap=100 仍被放行 / exceptions 键误写命中不到采集器路径即按 default 误报或漏报）                                                                                                                             |
 | check-requirement-coverage        | `samples/coverage/bad-empty-stakeholder.json`             | fixture | 放宽 C1-C10 将漏掉 stakeholder 覆盖率缺口与 metrics 重算不一致                                                                                                                                                                                              |
 | check-exemption                   | `samples/exemption/bad-s-self-approve.json`               | fixture | 放宽 E1-E9 将漏掉 S 自批（缺人类四阶段审批）的豁免被放行                                                                                                                                                                                                    |
 | check-design-contract-consistency | `samples/design-contract/bad-path-mismatch.json`          | fixture | 放宽 D1-D4 将漏掉设计路径 / 参数 / 状态码 / 响应字段与实现不一致                                                                                                                                                                                            |

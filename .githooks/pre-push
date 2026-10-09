@@ -19,7 +19,7 @@
 #     归档——保持历史触发语义，不做收窄）
 #
 # 执行为三车道并行（Wave 4）：L1 并行车道 + L2 主车道同时发起、L3 尾车道复用 L2 产物；
-# 19 项清单与退出码契约不变；首错即停→全量汇总（跑完全部车道再判定，任一不符 exit 1）。
+# 20 项清单与退出码契约不变；首错即停→全量汇总（跑完全部车道再判定，任一不符 exit 1）。
 
 set -euo pipefail
 
@@ -63,8 +63,8 @@ is_pure_windows_shell() {
 
 if is_pure_windows_shell; then
   printf '[pre-push] \033[31m✗\033[0m 检测到纯 Windows cmd/PowerShell 环境（无 bash 解释器）\n' 2>/dev/null || true
-  printf '[pre-push] \033[31m✗\033[0m 本次推送未执行 19 项门禁（exit 0 放行）——推送未经任何校验\n' 2>/dev/null || true
-  printf '[pre-push] \033[31m✗\033[0m 关键门禁：self-test / vitest 全量 / docs-consistency / tsc 类型检查 等 19 项\n' 2>/dev/null || true
+  printf '[pre-push] \033[31m✗\033[0m 本次推送未执行 20 项门禁（exit 0 放行）——推送未经任何校验\n' 2>/dev/null || true
+  printf '[pre-push] \033[31m✗\033[0m 关键门禁：self-test / vitest 全量 / docs-consistency / tsc 类型检查 等 20 项\n' 2>/dev/null || true
   printf '[pre-push] \033[31m✗\033[0m 请安装 Git for Windows 并在 Git Bash 补跑：npm run prepush（全绿后再合入）\n' 2>/dev/null || true
   exit 0
 fi
@@ -326,11 +326,11 @@ audit_can_skip() {
     "$tmp_log"
 }
 
-# ---------- 门禁用例（Wave 4 三车道重组；19 项语义清单不变）----------
+# ---------- 门禁用例（Wave 4 三车道重组；20 项语义清单不变）----------
 # L1 并行车道：静态项 + 独立项，与 L2 同时发起；L2 主车道：vitest 全量 + coverage；
 # L3 尾车道：依赖 L2 产物（provenance 封装 → coverage-scope / docs-consistency）。
-# 全部门禁共 19 项检查（第 14 项 npm audit 为阻断项），任一项退出码不符预期 → 整体 exit 1；
-# 全部 19 项通过才 exit 0 的放行契约不变。
+# 全部门禁共 20 项检查（第 14 项 npm audit 为阻断项），任一项退出码不符预期 → 整体 exit 1；
+# 全部 20 项通过才 exit 0 的放行契约不变。
 # 执行形态差异（如实登记）：重组前首错即停；重组后跑完全部车道再汇总——
 # 换取完整失败画像与并行墙钟。
 # 输出容错：后台 job 相关输出一律 2>/dev/null || true（沿用 fd 兼容模式）。
@@ -406,7 +406,7 @@ item14_audit() {
   return 1
 }
 
-# ---- L1 + L2 同时发起（序号 = 原 19 项编号，语义逐项对应；命令行/描述/期望码与重组前一致）----
+# ---- L1 + L2 同时发起（序号 = 原 20 项编号，语义逐项对应；命令行/描述/期望码与重组前一致）----
 
 # 1. self-test：样本回归基线，用例数以运行输出为准（覆盖全部 check-*.ts 的通过 / 失败 / 输入错误三态，分类明细见 self-test.ts 输出），必须 exit 0
 par_expect 1 "self-test 全部样本匹配期望" 0 npm run self-test
@@ -495,6 +495,12 @@ par_expect 18 "tsc 类型检查 0 错误" 0 \
 # 19. eval 语料断言：101 条评估语料 + coverageMatrix 六项校验全绿（触发边界 campaign 快追；
 #     断言引擎 --self-check 由 eval/ 自身维护，此处跑全量断言）
 par_expect 19 "eval 语料断言与覆盖矩阵全绿" 0 npx tsx eval/runner.ts
+
+# 20. 复杂度棘轮预算：eval/complexity-caps.json 的 M1 棘轮 caps（references/scripts 行数 +
+#     反模式/硬约束/人格适配/沉积计数），超限即 violation exit 1——cap 只许下调，上调须
+#     🔴 CHECKPOINT+decision-log；默认读仓库根 eval/complexity-caps.json
+par_expect 20 "复杂度棘轮预算（eval/complexity-caps.json）" 0 \
+  npx tsx w-model-dev/scripts/cli/check-complexity-budget.ts
 
 # ---- 汇总 L1+L2（按发起顺序等待并判定）----
 # wait 会透传被等待 job 的退出码：期望非 0 的项（第 2/3/5/8 项）若不挂 || true 会在

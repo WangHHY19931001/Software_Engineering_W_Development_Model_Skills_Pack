@@ -77,6 +77,49 @@ export interface BudgetCaps {
   sedimentMaxCount: number;
 }
 
+/**
+ * 解析并校验 caps 文件结构（纯函数，CLI 层把失败映射为 STRUCTURE_INVALID）。
+ * 兼容 `schemaVersion` / `description` 等额外顶层键；8 个必填数值字段 + 2 个异常表
+ * 缺一或非有限数值即抛 ComplexityFormatError（fail-closed：坏 caps 不得静默放宽棘轮）。
+ */
+export function parseBudgetCaps(raw: unknown): BudgetCaps {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new ComplexityFormatError('caps 输入不是对象');
+  }
+  const o = raw as Record<string, unknown>;
+  const num = (key: keyof BudgetCaps): number => {
+    const v = o[key];
+    if (typeof v !== 'number' || !Number.isFinite(v)) {
+      throw new ComplexityFormatError(`caps 字段 ${String(key)} 缺失或非有限数值`);
+    }
+    return v;
+  };
+  const excMap = (key: 'referencesExceptions' | 'scriptsExceptions'): Record<string, number> => {
+    const v = o[key];
+    if (v === null || typeof v !== 'object' || Array.isArray(v)) {
+      throw new ComplexityFormatError(`caps 字段 ${key} 缺失或不是对象`);
+    }
+    const out: Record<string, number> = {};
+    for (const [k, n] of Object.entries(v)) {
+      if (typeof n !== 'number' || !Number.isFinite(n)) {
+        throw new ComplexityFormatError(`caps ${key}.${k} 非有限数值`);
+      }
+      out[k] = n;
+    }
+    return out;
+  };
+  return {
+    referencesDefaultMaxLines: num('referencesDefaultMaxLines'),
+    referencesExceptions: excMap('referencesExceptions'),
+    scriptsDefaultMaxLines: num('scriptsDefaultMaxLines'),
+    scriptsExceptions: excMap('scriptsExceptions'),
+    antiPatternMaxCount: num('antiPatternMaxCount'),
+    hardConstraintMaxCount: num('hardConstraintMaxCount'),
+    personaAdaptedMinCount: num('personaAdaptedMinCount'),
+    sedimentMaxCount: num('sedimentMaxCount'),
+  };
+}
+
 /** 统计正文命中的人格适配 marker 数（每个 marker 至多计一次；命中 ≥2 即视为已适配）——见上方再导出 */
 function isFileLines(v: unknown): v is FileLines {
   return (
@@ -103,7 +146,12 @@ export function computeComplexityReport(m: ComplexityMeasurement): ComplexityRep
   }
   const oversizedReferences = refs.filter((f) => f.lines > COMPLEXITY_DEFAULT_MAX_LINES);
   const oversizedScripts = scripts.filter((f) => f.lines > COMPLEXITY_DEFAULT_MAX_LINES);
-  return { oversizedReferences, oversizedScripts, m, generatedAt: new Date().toISOString() };
+  return {
+    oversizedReferences,
+    oversizedScripts,
+    m,
+    generatedAt: new Date().toISOString(),
+  };
 }
 
 function capFor(exceptions: Record<string, number>, def: number, path: string): number {

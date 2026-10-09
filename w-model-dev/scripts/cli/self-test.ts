@@ -126,6 +126,7 @@ import { runSync } from '../lib/run-sync.js';
 import { collectComplexityMeasurement } from '../lib/complexity-collect.js';
 import type { ComplexityMeasurement } from '../logic/complexity-logic.js';
 import { main as runComplexityReportCli } from '../cli/wm-complexity-report.js';
+import { main as runComplexityBudgetCli } from '../cli/check-complexity-budget.js';
 // D3-I（43.3.0）：verifier 期望数据单源化——用例断言（expectedPassed / expectedReasonPatterns / description）
 // 派生自 samples/expectations/verifier.ts 共享表（纯数据模块，不 import 业务逻辑）；
 // self-test 与 vitest（verifier-logic.test.ts 等）同源消费，消除双声明漂移。
@@ -198,7 +199,9 @@ interface GateCase {
 // 用例集合与行为（expectedPassed / expectedReasonPatterns / description）以 43.3.0 前字面量逐项原样保留，
 // 等价性由 __tests__/verifier-expectations.test.ts 的黄金快照断言测试锁定；
 // 如需 per-case 的 CLI 专属附加字段，在此派生处叠加（本表当前无附加字段，直接透传展开）。
-const VERIFIER_CASES: VerifierCase[] = VERIFIER_EXPECTATIONS.map((e) => ({ ...e }));
+const VERIFIER_CASES: VerifierCase[] = VERIFIER_EXPECTATIONS.map((e) => ({
+  ...e,
+}));
 
 // D3-II（43.3.0）：GATE_CASES 由 samples/expectations/gate.ts 的 GATE_EXPECTATIONS 派生——
 // 用例集合与行为（expectedPassed / expectedReasonPatterns / description）+ per-case 运行字段
@@ -1269,7 +1272,11 @@ interface MaturityCase {
    * 真值由调用方装载 signature-chain.jsonl 后给出。声明 `sampleDir` 的用例**不用手写**本字段：
    * 判定由 `sampleDir` 下的真实链条目派生（见下）。
    */
-  options?: { projectCreatedAt?: string; operationalFailureCount?: number; maturityApprovalOk?: boolean };
+  options?: {
+    projectCreatedAt?: string;
+    operationalFailureCount?: number;
+    maturityApprovalOk?: boolean;
+  };
   /**
    * 可选：`samples/maturity/` 下的样本子目录（如 `with-approval`）。声明即：
    *   1. 本用例真实装载 `<sampleDir>/signature-chain.jsonl`（与 CLI 同径：容错行解析 +
@@ -4039,7 +4046,10 @@ async function runMaturityCases(samplesDir: string): Promise<CaseResult[]> {
     const options =
       c.sampleDir === undefined
         ? c.options
-        : { ...c.options, maturityApprovalOk: await maturityApprovalFromSample(samplesDir, c.sampleDir, parsed) };
+        : {
+            ...c.options,
+            maturityApprovalOk: await maturityApprovalFromSample(samplesDir, c.sampleDir, parsed),
+          };
     const r = checkMaturity(parsed, options);
 
     const details: string[] = [];
@@ -4940,6 +4950,117 @@ async function runComplexityReportCases(): Promise<CaseResult[]> {
   return results;
 }
 
+// ==================== M1 复杂度棘轮预算（check-complexity-budget CLI 进程内调用） ====================
+
+/** 预算用例：default-caps=真实仓库根默认 caps / fixture=负向超限 caps / bad-json=坏 JSON（进程内三态） */
+type ComplexityBudgetCase =
+  | {
+      kind: 'default-caps';
+      expectedExit: 0;
+      description: string;
+    }
+  | {
+      kind: 'fixture';
+      /** 负向 fixture 文件名（相对 samples/complexity-caps/；供 NEGATIVE-COVERAGE 派生锚引用，恰一处） */
+      file: string;
+      expectedExit: 1;
+      /** 负向 fixture 判据（R5 三重判据之三）：期望「违规」而非通过，覆盖条目须为期望失败用例 */
+      expectedPassed: false;
+      description: string;
+    }
+  | {
+      kind: 'bad-json';
+      expectedExit: 2;
+      description: string;
+    };
+
+const COMPLEXITY_BUDGET_CASES: ComplexityBudgetCase[] = [
+  {
+    kind: 'default-caps',
+    expectedExit: 0,
+    description: '真实仓库根默认 caps（无 --caps 自定位 eval/complexity-caps.json）→ 全维度 ≤ cap exit 0',
+  },
+  {
+    kind: 'fixture',
+    file: 'bad-over-current.json',
+    expectedExit: 1,
+    expectedPassed: false,
+    description:
+      '超限 caps（self-test cap=100 < 实测 5893）在真实仓库根必违规 exit 1——棘轮预算放宽/异常表误匹配会让超限文件静默通过',
+  },
+  {
+    kind: 'bad-json',
+    expectedExit: 2,
+    description: '坏 JSON caps → exit 2（FILE_PARSE，stdout ERROR_JSON 摘要）——坏 caps 不得静默放宽棘轮',
+  },
+];
+
+/** 进程内调用 check-complexity-budget CLI：捕获 stdout 标记与退出码（exitWithError 抛 HandledCliError 亦已收口） */
+async function invokeComplexityBudgetCli(args: string[]): Promise<{ exitCode: number; captured: string[] }> {
+  const original = console.log;
+  const captured: string[] = [];
+  console.log = (...chunks: unknown[]) => {
+    captured.push(chunks.map((x) => String(x)).join(' '));
+  };
+  let exitCode = 0;
+  try {
+    await runComplexityBudgetCli(args);
+    exitCode = Number(process.exitCode ?? 0);
+  } catch {
+    // HandledCliError（exit 2）路径：exitWithError 已完成输出并设置 process.exitCode
+    exitCode = Number(process.exitCode ?? 0);
+  } finally {
+    console.log = original;
+  }
+  return { exitCode, captured };
+}
+
+async function runComplexityBudgetCases(samplesDir: string): Promise<CaseResult[]> {
+  const results: CaseResult[] = [];
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'wm-self-budget-'));
+  try {
+    const badJsonPath = path.join(tmp, 'bad.json');
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- fixture 建在测试拥有的 mkdtemp 根下
+    await fs.writeFile(badJsonPath, '{ not-json', 'utf-8');
+
+    for (const c of COMPLEXITY_BUDGET_CASES) {
+      let args: string[];
+      let label: string;
+      if (c.kind === 'default-caps') {
+        args = []; // 无 --caps → 默认技能根 + 仓库根 eval/complexity-caps.json 自定位
+        label = 'default-caps';
+      } else if (c.kind === 'fixture') {
+        args = [`--caps=${path.join(samplesDir, 'complexity-caps', c.file)}`];
+        label = c.file;
+      } else {
+        args = [`--caps=${badJsonPath}`];
+        label = 'bad-json';
+      }
+      const { exitCode, captured } = await invokeComplexityBudgetCli(args);
+      const details: string[] = [];
+      if (exitCode !== c.expectedExit) details.push(`  - exitCode=${exitCode} 期望 ${c.expectedExit}`);
+      if (c.expectedExit !== 2 && !captured.some((l) => l.startsWith('COMPLEXITY_BUDGET_JSON '))) {
+        details.push('  - stdout 未含 COMPLEXITY_BUDGET_JSON 标记');
+      }
+      if (c.expectedExit === 1 && !captured.some((l) => l.includes('scripts/cli/self-test.ts'))) {
+        details.push('  - violations 未含 scripts/cli/self-test.ts');
+      }
+      if (c.expectedExit === 2 && !captured.some((l) => l.startsWith('ERROR_JSON '))) {
+        details.push('  - stdout 未含 ERROR_JSON 标记');
+      }
+      results.push({
+        name: `complexity-budget/${label}`,
+        passed: details.length === 0,
+        description: c.description,
+        details: details.length > 0 ? details : undefined,
+      });
+    }
+  } finally {
+    await fs.rm(tmp, { recursive: true, force: true });
+  }
+  return results;
+}
+
 async function runExemptionCases(samplesDir: string): Promise<CaseResult[]> {
   const results: CaseResult[] = [];
   for (const c of EXEMPTION_CASES) {
@@ -5590,6 +5711,9 @@ async function main(): Promise<void> {
   console.log(`CodingPlan 用例 : ${CODING_PLAN_CASES.length}`);
   console.log(`UatPathMapping 用例 : ${UAT_PATH_MAPPING_CASES.length}`);
   console.log(`ComplexityReport 用例 : 3（进程内 CLI 成功/失败 + 采集器直连）`);
+  console.log(
+    `ComplexityBudget 用例 : ${COMPLEXITY_BUDGET_CASES.length}（进程内 CLI：默认 caps / 负向 fixture / 坏 JSON）`,
+  );
   console.log('─'.repeat(60));
 
   const [
@@ -5637,6 +5761,7 @@ async function main(): Promise<void> {
     codeHealthPhase1DynamicResults,
     designFogResults,
     complexityReportResults,
+    complexityBudgetResults,
   ] = await Promise.all([
     runVerifierCases(samplesDir),
     runGateCases(samplesDir),
@@ -5682,6 +5807,7 @@ async function main(): Promise<void> {
     runCodeHealthPhase1DynamicCases(samplesDir),
     runDesignFogCases(samplesDir),
     runComplexityReportCases(),
+    runComplexityBudgetCases(samplesDir),
   ]);
   const runLogAppendResults = runRunLogAppendCases();
   const codeHealthResults = await runCodeHealthCases(samplesDir);
@@ -5736,6 +5862,7 @@ async function main(): Promise<void> {
     ...codeHealthPhase1DynamicResults,
     ...designFogResults,
     ...complexityReportResults,
+    ...complexityBudgetResults,
     ...codeHealthApplyResults,
     ...codeHealthGapResults,
     ...codeHealthTestResults,
