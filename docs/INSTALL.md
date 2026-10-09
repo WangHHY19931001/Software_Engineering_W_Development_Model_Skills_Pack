@@ -270,7 +270,7 @@ Agent 通过 `SKILL.md` 顶部的 YAML frontmatter 判断何时激活本技能�
 
 ```yaml
 name: w-model-dev
-version: 43.4.0
+version: 43.5.0
 # description 不在此处复制：SKILL.md 的 frontmatter 是其唯一权威来源
 # （本节曾逐字镜像该字段，已发生过一次漂移，故改为指向而非复述）
 ```

@@ -7,6 +7,22 @@
 > 历史决策详情（轮次记录 / 关键决策 / 验证数据 / 吸收决策记录）归档于
 > [`docs/changes/decision-log/`](./docs/changes/decision-log/README.md)（轮次 → 版本 → CHANGELOG 映射见其 README）。
 
+## [43.5.0] - 2026-10-10
+
+### Feat（代谢机制批——五机制落地 + C1/C2 候选裁决 + 计数口径升级，主规格 [`2026-10-09-metabolism-and-repair-design.md`](./docs/superpowers/specs/2026-10-09-metabolism-and-repair-design.md) §3 + [实现计划](./docs/superpowers/plans/2026-10-09-metabolism-mechanism-batch.md)，C1/C2 裁决与 cap 终值上调裁定登记 [`decision-log/rounds-52-metabolism-batch.md`](./docs/changes/decision-log/rounds-52-metabolism-batch.md)，吸收①/②登记 [`decision-log/absorptions.md`](./docs/changes/decision-log/absorptions.md)，计数口径 sweep 见 [`rounds-51-metabolism-batch.md`](./docs/changes/decision-log/rounds-51-metabolism-batch.md)）
+
+- **M1 复杂度棘轮预算**：`check-complexity-budget.ts` 接入 pre-push 第 20 项（`wm-complexity-report.ts` 只读报告六维度 → caps 棘轮门禁），caps 只许下调、机器无上调口，上调唯一通道 = 🔴 CHECKPOINT + decision-log；`eval/complexity-caps.json` 初值 = 落地实测、`eval/complexity-baseline.json` 入库跟踪
+- **M2 规则生命周期**：`rule-registry.json` 登记册 64 条（62 存量迁移 + C2 转正 #49 + C1 维持候选）为反模式/硬约束计数单一事实源，`wm-rule-lifecycle.ts` 只读 CLI 按三判据（活文档引用零命中 + boundScript 零出现 + 存续 ≥10 minor）报告退役候选、候选只报告不裁决
+- **M3 门禁效能反馈**：`wm-gate-effectiveness.ts` 只读聚合（runs/blocked/errors/lastFired/distinctTriggers，按 runs 降序，坏 JSON 入 parseErrors），为 M4 仪式与后续优化提供给据
+- **M4 定期简化检查点成文**：CONTRIBUTING 四步仪式（跑三只读脚本 → 刷新证据图 → 🔴 CHECKPOINT 裁定简化配额 → 决策落 decision-log），每新优化批开工前触发
+- **M5 pre-push 快/全双档**：纯元文档变更集（docs/README/CHANGELOG/AGENTS/CONTRIBUTING）走快车道跳 #12/#13（输出 `SKIP (fast-lane)`）、其余照跑；触及技能资产/package.json 或 FORCE=1 全量；GIT_DIR 等六环境变量净化防 git fixture 污染
+- **C1/C2 候选裁决（2026-10-10 用户裁定，rounds-52）**：C2「无限返工循环」转正反模式 #49（五处联动：登记册 / hard-constraints 主表-速查-检测 / 计数 48→49 / EXPECTED.maxAntiPattern / caps+baseline）；C1「V summary 模板化」维持候选 + 复审期限 2027-04
+- **计数新口径**：52 .ts / 51 exit-2 门禁 / ≈39% 阶段必跑链占比 / pre-push 19→20 项 / dispatch-matrix 登记表 51 行；计数断言自登记册派生（docs-consistency 接线）
+- **caps 终值上调**（🔴 CHECKPOINT 上调通道，rounds-52）：`references/subagent-delegation.md` 2011→**2013**、`scripts/cli/self-test.ts` 5893→**6179**、`scripts/logic/docs-consistency-logic.ts` 2722→**2841**、`antiPatternMaxCount` 48→**49**
+- **eval 语料扩展**：101→106 条映射（复杂度 / 生命周期 / 效能三断言 + 无用防御简化与必要防御保留 Bad/Good 成对，mappings 侧 + 语料侧 prompt 成对）
+
+证据图：`docs/superpowers/evidence/2026-10-09-p1-metabolism-batch-evidence-graph.md`（L1-L12 全 🟢，本批已归档）。
+
 ## [43.4.0] - 2026-10-09
 
 ### Fixed（P0 卫生批——2026-10-09 两轮分析复核确认项）
