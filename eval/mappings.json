@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "description": "101 条评估提示词 → 技能资产锚点映射。断言分层：L1 触发词断言（正向 enable 与歧义 ask）、L1N 负向触发断言（skip 反例，锚定 activation-guide 类别节 + notContains 守卫 + 「不启用」行锚点；campaign 后批次延展的 L1N 另有权威行锚点形态、不带 category——类别化语料仍以 guide 登记册与 coverageMatrix ④ 为准）、L2 机制存在性断言。顶层 matrix 为覆盖矩阵声明，由 runner coverageMatrix 六项校验强制（⑥ = references/*.md 全覆盖：映射 assertions/evidence 路径并集须覆盖实况文件集，差集非空 exit 1）。每条映射另以 evidence 字段做行为证据映射。",
+  "description": "106 条评估提示词 → 技能资产锚点映射。断言分层：L1 触发词断言（正向 enable 与歧义 ask）、L1N 负向触发断言（skip 反例，锚定 activation-guide 类别节 + notContains 守卫 + 「不启用」行锚点；campaign 后批次延展的 L1N 另有权威行锚点形态、不带 category——类别化语料仍以 guide 登记册与 coverageMatrix ④ 为准）、L2 机制存在性断言。顶层 matrix 为覆盖矩阵声明，由 runner coverageMatrix 六项校验强制（⑥ = references/*.md 全覆盖：映射 assertions/evidence 路径并集须覆盖实况文件集，差集非空 exit 1）。每条映射另以 evidence 字段做行为证据映射。",
   "matrix": {
     "routeTotals": { "enable": 47, "ask": 9, "skip": 24 },
     "minPerCategory": 2,
