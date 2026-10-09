@@ -765,8 +765,8 @@ describe('P5 schema-loader 分层修复（去 IO / 去 exit）', () => {
   it('infrastructure/schema-fs.ts 能读取 schemas 目录并返回 basename→schema 映射', async () => {
     const dir = path.resolve(here, '../../schemas');
     const map = await readSchemasDir(dir);
-    // 34 = 25 existing schemas + 9 code-health campaign schemas
-    expect(Object.keys(map).length).toBe(34);
+    // 35 = 25 existing + 9 code-health + rule-registry(43.5.0 batch)
+    expect(Object.keys(map).length).toBe(35);
     expect(map['rtm.schema.json']).toBeDefined();
     expect(map['change-scope.schema.json']).toBeDefined();
     expect(map['codegraph-query.schema.json']).toBeDefined();
