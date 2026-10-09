@@ -4400,4 +4400,12 @@ describe('M2 规则登记册接线（checkRuleRegistry + EXPECTED 派生，43.5.
     // 真实登记册 ↔ 真实 hard-constraints.md：validate + crossCheck + 漂移哨兵全通过
     expect(report.violations.filter((v) => v.check === 'rule-registry')).toEqual([]);
   });
+
+  it('⑥ 注入 schema 非法但 JSON 合法（{registry:{}}）→ [schema] blocking 且不崩溃（审查裁定回归：曾 exit 2 [UNEXPECTED]）', () => {
+    const report = buildDocConsistencyReport(baseInput({ ruleRegistry: { registry: {} as never } }));
+    const vs = report.violations.filter((v) => v.check === 'rule-registry');
+    expect(vs.length, JSON.stringify(vs, null, 2)).toBeGreaterThan(0);
+    const messages = vs.map((v) => v.message).join('\n');
+    expect(messages).toMatch(/\[schema\]/); // validateBySchema 违规透传（不崩溃、不 exit 2）
+  });
 });

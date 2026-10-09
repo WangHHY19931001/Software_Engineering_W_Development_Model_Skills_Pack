@@ -1921,9 +1921,20 @@ function checkRuleRegistry(input: DocConsistencyInput): DocCheckViolation[] {
   const registry = r.registry;
 
   // validateRuleRegistry（schema + 业务）violations 透传为 blocking
-  for (const v of validateRuleRegistry(registry).violations) {
+  const validation = validateRuleRegistry(registry);
+  for (const v of validation.violations) {
     violations.push({ check: RULE_REGISTRY_CHECK, message: v });
   }
+
+  // 形态守卫：交叉核对与漂移哨兵仅对「schema 合法且 rules 可解析」的登记册执行。
+  // schema 非法形态（JSON 合法但结构不合法，如 {} / {"rules":5} / {"rules":[{}]}）下 registry 结构
+  // 不可信——crossCheck 内部 registryNumToDocNum 与 countActiveRules 直接访问 r.id/r.kind，
+  // 对 undefined 调用 .match/.filter 会抛未捕获 TypeError → 曾 exit 2 [UNEXPECTED]（审查裁定 L5-NEEDS_FIX，
+  // 违背「validate violations 全部透传为 blocking」契约，应 exit 1 + [schema] 违规）。
+  // 此处只产出 [schema] blocking violations、绝不崩溃；业务非法但 schema 合法（如漂移样例 active ap 47）
+  // 仍走全链路——漂移哨兵命中保持（单测 ④ 依赖）。
+  const schemaSound = Array.isArray(registry.rules) && !validation.violations.some((v) => v.startsWith('[schema]'));
+  if (!schemaSound) return violations;
 
   // 登记册 ↔ hard-constraints.md 交叉核对（反模式主清单 `| N |` 行 ↔ `## #N` 标题双向精确相等）
   for (const v of crossCheckRegistryAgainstDocs(registry, input.hardConstraints).violations) {
