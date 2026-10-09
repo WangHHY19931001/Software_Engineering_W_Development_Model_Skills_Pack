@@ -1050,10 +1050,10 @@ describe('runDocConsistencyChecks', () => {
         markers: ['主清单表最大编号应为 48'],
       },
       {
-        label: 'pre-push 编号最大值非 19',
+        label: 'pre-push 编号最大值非 20',
         overrides: { prePush: '# 13. npm audit\n# 与原 CI 一致：13 项检查' },
         check: 'pre-push',
-        markers: ['19'],
+        markers: ['20'],
       },
       {
         label: 'glossary 缺逐值列表行（F-G7-05）',
@@ -1103,8 +1103,8 @@ describe('runDocConsistencyChecks', () => {
           const hit = v.filter((x) => x.check === 'pre-push');
           expect(hit.length, 'pre-push 伪造应命中').toBeGreaterThan(0);
           expect(
-            hit.some((x) => x.message.includes('连续 #1..#19') && x.message.includes('实测 3 块')),
-            '伪造连续块应报「连续 #1..#19 + 实测 3 块」',
+            hit.some((x) => x.message.includes('连续 #1..#20') && x.message.includes('实测 3 块')),
+            '伪造连续块应报「连续 #1..#20 + 实测 3 块」',
           ).toBe(true);
         },
       },
@@ -1556,7 +1556,7 @@ describe('runDocConsistencyChecks', () => {
       const troubleshootingPath = path.join(fixtureRoot, 'docs', 'troubleshooting.md');
       // eslint-disable-next-line security/detect-non-literal-fs-filename -- mkdtemp-controlled repository fixture path
       const content = await fs.readFile(troubleshootingPath, 'utf8');
-      const current = '本次推送未执行 19 项门禁';
+      const current = '本次推送未执行 20 项门禁';
       const stale = '本次推送未执行 17 项门禁';
       expect(content).toContain(current);
       const mutated = content.replace(current, stale);
@@ -1796,7 +1796,7 @@ describe('runDocConsistencyChecks', () => {
       expect(report.dynamicMeasurements.vitestRunId).toMatch(/^[0-9a-f]{16}$/);
       expect(report.dynamicMeasurements.vitestArtifactSha256).toMatch(/^[0-9a-f]{64}$/);
       expect(report.dynamicMeasurements.vitestCommitSha).toMatch(/^[0-9a-f]{40}$/);
-      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(50);
+      expect(report.dynamicMeasurements.exit2ProbeResults).toHaveLength(51);
       expect(
         report.dynamicMeasurements.exit2ProbeResults?.every(
           (probe) =>
@@ -3796,7 +3796,7 @@ describe('pre-push hook 源契约（stdin ref 解析与 fail-closed 范围）', 
   // fail-closed 真实断言）；本组是对 hook 源码的文本级补充防线——变量重命名即红属预期，
   // 用于防语义漂移的第二道闸，不承担行为验证职责。
   // 直接读取 .githooks/pre-push 源文本断言契约（hook 是 bash，不由 docs-consistency
-  // logic 校验；此处守住与 19 项门禁并列的触发语义防线，防回归旧「全局 diff 短路 /
+  // logic 校验；此处守住与 20 项门禁并列的触发语义防线，防回归旧「全局 diff 短路 /
   // -n 20 截断 / 空 changed_files 放行」实现）。
   const prePushSource = () => fs.readFile(path.join(REPO_ROOT, '.githooks', 'pre-push'), 'utf8');
 
@@ -3863,7 +3863,7 @@ describe('pre-push hook 源契约（stdin ref 解析与 fail-closed 范围）', 
 });
 
 describe('gate-count-docs（活体文档门禁项数引用扫描，F1 反哺）', () => {
-  it('stale clean/stale 对照（2 态：四份白名单文档全 19 项零违规 / 任一文档「17 项门禁」具名违规）', () => {
+  it(`stale clean/stale 对照（2 态：四份白名单文档全 ${EXPECTED.prePushCount} 项零违规 / 任一文档「17 项门禁」具名违规）`, () => {
     const n = EXPECTED.prePushCount;
     const cases: {
       label: string;
