@@ -4,8 +4,8 @@
 
 | 文件 | 用途 |
 | --- | --- |
-| `w-model-dev-test-prompts.json` | 101 条测试提示词（id 1-101），其中 30 条含 category（N1-N10/A1-A3）、75 条含 route（enable/ask/skip）字段，作为技能回归测试与外部评估的标准化输入 |
-| `mappings.json` | 101 条提示词 → 技能资产锚点映射（version 2），含顶层 matrix 覆盖矩阵声明 |
+| `w-model-dev-test-prompts.json` | 106 条测试提示词（id 1-106），其中 30 条含 category（N1-N10/A1-A3）、80 条含 route（enable/ask/skip）字段，作为技能回归测试与外部评估的标准化输入 |
+| `mappings.json` | 106 条提示词 → 技能资产锚点映射（version 2），含顶层 matrix 覆盖矩阵声明 |
 | `runner.ts` | 断言引擎（`npm run eval`）：L1/L1N/L2 三层断言 + notContains 守卫 + coverageMatrix 六项校验 |
 | `results.json` | 最近一次全量运行结果（含 matrixProblems） |
 | `w-model-dev-results.tsv` | 评估结果表（TSV，逐轮记录） |
@@ -36,9 +36,9 @@
 
 ## 2. 测试提示词集（w-model-dev-test-prompts.json）
 
-**v2（触发边界可度量性 campaign，2026-09-07 起）：语料扩至 68 条**（id 1-68）。每条含 4 个基础字段：`id` / `scenario`（场景名）/ `prompt`（输入提示词）/ `expected`（期望行为断言）；另按条目类型增补 `category`（负向 N1-N10 十类 22 条 / 歧义 A1-A3 三类 8 条，共 30 条）与 `route` 字段。**v2 后多批次延展至 101 条（id 1-101）**：延展条目不带 category（避免 ④ guide 双向锚的级联连锁），route 延展至 `enable` 立即启用 42 条 / `ask` 先询问、确认前不初始化 9 条 / `skip` 不启用 24 条（共 75 条带 route），其余 26 条为不带 category/route 的 L2 机制存在性条目。类别全集与 route 三值语义的权威定义见 SSoT §3.6；逐类判定细则见 `w-model-dev/references/activation-guide.md`。
+**v2（触发边界可度量性 campaign，2026-09-07 起）：语料扩至 68 条**（id 1-68）。每条含 4 个基础字段：`id` / `scenario`（场景名）/ `prompt`（输入提示词）/ `expected`（期望行为断言）；另按条目类型增补 `category`（负向 N1-N10 十类 22 条 / 歧义 A1-A3 三类 8 条，共 30 条）与 `route` 字段。**v2 后多批次延展至 106 条（id 1-106）**：延展条目不带 category（避免 ④ guide 双向锚的级联连锁），route 延展至 `enable` 立即启用 47 条 / `ask` 先询问、确认前不初始化 9 条 / `skip` 不启用 24 条（共 80 条带 route），其余 26 条为不带 category/route 的 L2 机制存在性条目。类别全集与 route 三值语义的权威定义见 SSoT §3.6；逐类判定细则见 `w-model-dev/references/activation-guide.md`。
 
-批次 1 的 25 条测试提示词（id 1-25）按场景字段归为五类。以下五类划分仅覆盖批次 1 的 id 1-25；101 条全量分布见 §6 覆盖矩阵与 `mappings.json`：
+批次 1 的 25 条测试提示词（id 1-25）按场景字段归为五类。以下五类划分仅覆盖批次 1 的 id 1-25；106 条全量分布见 §6 覆盖矩阵与 `mappings.json`：
 
 | 类别 | id | 覆盖点 |
 |---|---|---|
@@ -66,13 +66,13 @@
 
 ## 4. 当前状态
 
-> **评估已恢复（2026-08-28 起）。** 三维度优化批次 1 起重建仓内评估闭环：`eval/mappings.json`（批次 1 为 25 条提示词→资产锚点，触发边界 campaign 起 v2，其后多批次延展至 101 条）+ `eval/runner.ts` 断言引擎 + `npm run eval`（101/101）；e2e 端到端重建恢复并在批次 1（基线）与批次 3（终值）各完整执行一轮。批次 2（可靠性）聚焦红灯清零；触发边界可度量性 campaign 起 v2 矩阵锚定，C19 收口后 references 全覆盖锚点为 45/45、评估断言锚点为 101/101。
+> **评估已恢复（2026-08-28 起）。** 三维度优化批次 1 起重建仓内评估闭环：`eval/mappings.json`（批次 1 为 25 条提示词→资产锚点，触发边界 campaign 起 v2，其后多批次延展至 106 条）+ `eval/runner.ts` 断言引擎 + `npm run eval`（106/106）；e2e 端到端重建恢复并在批次 1（基线）与批次 3（终值）各完整执行一轮。批次 2（可靠性）聚焦红灯清零；触发边界可度量性 campaign 起 v2 矩阵锚定，C19 收口后 references 全覆盖锚点为 45/45、评估断言锚点为 106/106。
 
-- **仓内断言**：`npm run eval` = **101/101**（批次 1 基线 `28da1d1`、批次 3 基线 `6a2d6bd` 各记 1 行 dry_run，均为 baseline/100.0）。
+- **仓内断言**：`npm run eval` = **106/106**（批次 1 基线 `28da1d1`、批次 3 基线 `6a2d6bd` 各记 1 行 dry_run，均为 baseline/100.0）。
 - **e2e 重建记录**：
   - 基线（批次 1）：`eval/e2e/2026-08-28-baseline.md` + TSV `a9808ea`——8 阶段 verifier 全 A、74/74、返工循环 3、偏差 D1-D11（D9=cucumber 证据不可满足已知红灯）；
   - **终值（批次 3）**：`eval/e2e/2026-08-28-final.md` + TSV `6a2d6bd`——**新 SKILL.md（106 非空行）**下 8 阶段 verifier 全 A（0.9295/0.8770/0.886/0.894/0.8757/0.8942/0.9028/0.9057）、四级测试 74/74、返工 8 项（1 完整 R 循环 + 7 R3-Required S-fix）、分派 ≈52（vs 基线 ≈74）、CHECKPOINT 18（判据代行）；**D9 常驻红灯由真实 cucumber 报告通道消除（零常驻红灯收尾）**；偏差登记：UAT-002 验收设计过度收紧（冻结规格权威裁定，D7 谱系）+ 超限体大客户端 ECONNRESET（R3 security Required，src/ 修复 + ≥1MB 用例防回潮）。
-- TSV 最新记录：`2026-09-07T09:48`（commit `9e755b4`，触发边界/反例登记册——语料 25→60，dry_run keep；该值为该 commit 时点的历史记录，现语料 101 条见 §2）。
+- TSV 最新记录：`2026-09-07T09:48`（commit `9e755b4`，触发边界/反例登记册——语料 25→60，dry_run keep；该值为该 commit 时点的历史记录，现语料 106 条见 §2）。
 - v42.0.0 起：wave 合并重链与 SKILL.md 重写已由仓内断言 + e2e 终值双通道覆盖；外部 darwin-skill / SkillOpt 盲评仍可按 §3「补跑流程」可选补跑（非阻塞，本仓库内不伪造评估证据）。
 
 ### e2e 基线的不可变约定（按日冻结）

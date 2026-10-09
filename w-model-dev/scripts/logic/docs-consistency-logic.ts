@@ -2457,7 +2457,7 @@ export const COUNT_CLAIM_EXEMPTIONS: ReadonlyArray<{ doc: string; reason: string
   {
     doc: 'eval/README.md',
     reason:
-      'eval 活体说明：语料 101/101、references 锚点 45/45 由 npm run eval（runner.ts assertions + coverageMatrix）与 mappings.json 自校验锚定；e2e/dry_run/TSV 计数为按日冻结的历史凭证；「共 9 列」等表格形态静态。计数已与本批实际（101）对齐',
+      'eval 活体说明：语料 106/106、references 锚点 45/45 由 npm run eval（runner.ts assertions + coverageMatrix）与 mappings.json 自校验锚定；e2e/dry_run/TSV 计数为按日冻结的历史凭证；「共 9 列」等表格形态静态。计数已与本批实际（106）对齐',
   },
   {
     doc: 'w-model-dev/examples/',
