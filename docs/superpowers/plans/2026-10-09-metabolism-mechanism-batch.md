@@ -265,6 +265,7 @@ log "M5 车道判定：FAST_LANE=$FAST_LANE"
 **文件：** 修改 `hard-constraints.md`（候选区 + 新「已退役」区）、`w-model-dev/rule-registry.json`、（若转正）计数文档
 
 - [ ] **步骤 1：准备裁决简报**——跑 `wm-rule-lifecycle` 取 C1/C2 证据；汇总 C1（:593-604，V summary 模板化，Jaccard>0.8 且 <50 字符）与 C2（:605-615，无限返工循环）的原始提出信号、现行守护面（C2 已由 L0-L4 收敛视图承载——subagent-delegation「分层反馈回路」节；C1 无脚本承载）。
+  - **裁决辅助框架（吸收①，用户 2026-10-09 裁定并入本任务）**：按 [stop-that-shit 吸收评估](../../superpowers/specs/2026-10-09-stop-that-shit-absorption-assessment.md) 折入 SHIT 四类判定（S 范围膨胀 / H 无用防御 / I 意图越界 / T 任务打转）+ Stop Ladder 五步（明确责任→直接方案→补具体缺口→按效果评判防御→验证并结束）作为「C1/C2 是否仍在防止真实失败 / 是否可由既有机置承载」的判定问题集；用到的 S/H/I/T 维度结论写入裁决简报供用户三选一时参考。
 - [ ] **步骤 2：🔴 CHECKPOINT 向用户提交三选一**（各自机械后果写明）：转正（C2→#49：主表/速查表/检测表/登记册/计数 48→49 五处联动；C1 同理→#50）；退役（移入新「已退役」区：原编号+退役版本 43.5.0+理由，登记册 status=retired+retiredIn，计数不变）；维持候选但设定复审期限（登记册 status=candidate + rationale 记期限——**不满足规格「不留 pending」除非用户明示豁免**）。等用户裁定，不得自动推进。
 - [ ] **步骤 3：按裁定落地**——创建 `## 已退役反模式与约束` 区（「反模式（48 条）」节之后）；登记册状态回写；docs-consistency/eval 复跑绿。
 - [ ] **步骤 4：Commit**——`docs(rules): C1/C2 用户裁定落地——<按实际>（43.5.0 L10）`
@@ -279,6 +280,7 @@ log "M5 车道判定：FAST_LANE=$FAST_LANE"
   - 「如何度量仓库复杂度与棘轮预算」→ L2，evidence fileExists `w-model-dev/scripts/cli/check-complexity-budget.ts`，assertions contains（`COMPLEXITY_BUDGET_JSON` 于 command-reference 或 CONTRIBUTING、`complexity-caps` 于 SSoT §10U）；
   - 「反模式何时退役、谁裁决」→ L2，evidence fileExists `w-model-dev/scripts/cli/wm-rule-lifecycle.ts`，assertions contains（「已退役」于 hard-constraints、登记册路径于 SSoT §10U）；
   - 「门禁从未阻断过怎么评估」→ L2，evidence fileExists `w-model-dev/scripts/cli/wm-gate-effectiveness.ts`，assertions contains（CONTRIBUTING M4 节锚点）。
+  - **成对映射（吸收②，用户 2026-10-09 裁定并入本任务）**：追加 2 条 Bad/Good 成对映射（id 接续；同一场景双向断言）——「无用防御简化」（H 维度：省略无人读取校验和等）与「必要防御保留」（发布校验等真实消费者场景），两向 assertions 指向同一吸收锚（[stop-that-shit 吸收评估](../../superpowers/specs/2026-10-09-stop-that-shit-absorption-assessment.md) 或任务 10 落地后的 hard-constraints「已退役/维持」节），断言各自方向的文档化判定存在。
 - [ ] **步骤 2：验证 + Commit**——`npm run eval` exit 0（101→104 条；coverageMatrix 六项不受影响——未新增 references 文件）。Commit：`test(eval): 代谢机制三断言入语料——mappings/语料双向成对（43.5.0 L11）`
 
 ---

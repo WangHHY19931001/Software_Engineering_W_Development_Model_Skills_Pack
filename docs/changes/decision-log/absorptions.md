@@ -695,3 +695,35 @@
 - 不新增 CLI / 不新增 schema / 不新增 samples fixture（新判据用例以 vitest 内联 `mkFs` 表达，self-test 358 不变）/ 不新增 references 文件。
 - 不新增反模式条目（仍 #48）、不新增硬约束（仍 14 条）、不改 pre-push 项数（19）。
 - 不吸收源侧任何**数字阈值**（3–8 子目标、50/100 字符、30% 红灯、3 轮协商、timebox 2 天）——它们要么自相矛盾、要么无本仓库对照证据。
+
+---
+
+# Stop That Shit 吸收（2026-10-09，43.5.0 批次期间用户裁定）
+
+> 来源：[lennney/stop-that-shit](https://github.com/lennney/stop-that-shit)（MIT，v0.2.4）。skill-vetter 深审 ✅ SAFE（🟡 中风险——自带全域工具拦截能力但默认不触发、fail-open、无恶意路径、无数据外发、网络仅 opt-in 版本检查）。评估全文：[specs/2026-10-09-stop-that-shit-absorption-assessment.md](../../superpowers/specs/2026-10-09-stop-that-shit-absorption-assessment.md)。
+
+## 1. 吸收点（用户裁定「同意吸收，合并到已有排期的任务中」，2026-10-09）
+
+| 编号 | 吸收内容 | 落点（合并进既有任务） |
+|---|---|---|
+| STS-① | SHIT 四类判定（S 范围膨胀 / H 无用防御 / I 意图越界 / T 任务打转）+ Stop Ladder 五步（明确责任→直接方案→补具体缺口→按效果评判防御→验证并结束）→ 作 C1/C2 裁决辅助框架 | 任务 10 步骤 1（C1/C2 三选一裁决简报） |
+| STS-② | Bad/Good 成对案例概念 → eval 补 2 条成对映射（同场景双向断言） | 任务 11 步骤 1（eval 语料补充） |
+
+## 2. 明确不吸收（含理由）
+
+- **① Guard 运行时**（src/ 14 决策核心模块 + 6 宿主适配器 + hooks 全域 PreToolUse 拦截/deny + hash-intent / shell-analysis / dependency-intent）：三条理由叠加。(a) **直接违反本项目「三条不承诺」**（agent-threat-model.md:3——不建自动化守卫脚本 / 不新增检测信号 / 不改 G 门禁），吸收即吾之矛攻吾之盾；(b) **形态差异**——本项目是「编排 + 自包含门禁脚本」技能包（SKILL.md 架构定位：不内置 LLM、无 src/、无编程式引擎），Guard 是另一形态（宿主钩子级执行引擎）；(c) 该 Guard 的「agents=N 预算 / hash=allow / files= 锁边界」在本项目已有对应物且更强（`budget.json` perPhase.maxSubagentSpawns / `revertEvidence` / `wm-write` 锁写），无新增价值。
+- **② STSS（散文废话削减）**：与 SDLC 技能包本体无关；仅作文档写作纪律参考（本项目 bdd 1874 / subagent-delegation 2010 / tla-plus 2472 行超 1200 行 cap，确有废话空间，属 44.0.0 结构减负素材而非吸收对象）。
+- **③ 源侧机制名与数字阈值**（agents=N 语义、hash=allow 语义、30% 红灯类数字）：本仓库已有对照更强语义，不逐字照搬。
+
+## 3. 候选（本轮不做）
+
+| 编号 | 候选 | 为何本轮不做 | 验证方法 |
+|---|---|---|---|
+| S1 | 独立 `references/stop-that-shit-adoption.md` 六段吸收文档（判定/映射/落点/门禁/划界/人审锚） | 吸收 ①②已随任务 10/11 落入既有产物，独立文档增量价值低 | 若用户要求按 13 来源吸收对账格式单独成文再做 |
+| S2 | H 象限候选落地（run-log 时间戳②「时钟真倒退」降诊断并三态并两态；反模式 #3/#6/#7 近亲合并评估） | 属 44.0.0 结构减负批范围 | 44.0.0 开工时按 M4 复盘数据裁定 |
+| S3 | 逐脚本「效果陈述」（52 个 cli 脚本里 20 个入必跑链，其余 31 个逐一自述拒绝/诊断改变过什么） | 需 M3 效能数据积累 + 人工对账 | 44.0.0 结合 wm-gate-effectiveness 输出 |
+
+## 4. 不做的事
+
+- 不新增 CLI / 不新增 schema / 不新增门禁 / 不新增反模式条目（48 与 C1/C2 维持原规划）。
+- 不把 Guard 的任何宿主钩子/决策核心代码引入仓库（边界见 §2-①）。
