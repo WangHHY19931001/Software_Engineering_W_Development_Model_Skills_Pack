@@ -157,6 +157,7 @@ function measureFiles(
  * @param wModelRoot w-model-dev 技能根目录（不存在 → FILE_NOT_FOUND；缺 references/scripts/subagent → STRUCTURE_INVALID）
  */
 export function collectComplexityMeasurement(wModelRoot: string): ComplexityMeasurement {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- wModelRoot 为调用方传入的 w-model-dev 根（CLI 默认 = lib 上上级技能根），仅只读探测存在性，fail-closed
   if (!existsSync(wModelRoot)) {
     throw new ComplexityCollectError('FILE_NOT_FOUND', `w-model-dev 根目录不存在：${wModelRoot}`);
   }

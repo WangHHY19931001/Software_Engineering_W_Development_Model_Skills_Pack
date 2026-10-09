@@ -70,7 +70,9 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
   const positional: string[] = [];
   let capsPath: string | undefined;
   for (let i = 0; i < argv.length; i++) {
+    // eslint-disable-next-line security/detect-object-injection -- i 为受控循环下标（0..argv.length-1），非数字键注入
     const token = argv[i]!;
+    // eslint-disable-next-line security/detect-possible-timing-attacks -- 与固定字面量 '--caps' 的相等比较，非秘密比较（无时序侧信道）
     if (token === '--caps') {
       if (capsPath !== undefined) argInvalid('重复的 flag', '--caps');
       const value = argv[++i];

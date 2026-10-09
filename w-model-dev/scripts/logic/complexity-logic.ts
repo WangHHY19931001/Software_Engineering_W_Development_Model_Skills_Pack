@@ -88,6 +88,7 @@ export function parseBudgetCaps(raw: unknown): BudgetCaps {
   }
   const o = raw as Record<string, unknown>;
   const num = (key: keyof BudgetCaps): number => {
+    // eslint-disable-next-line security/detect-object-injection -- key 为 keyof BudgetCaps 字面量联合（接口属性名），受控键
     const v = o[key];
     if (typeof v !== 'number' || !Number.isFinite(v)) {
       throw new ComplexityFormatError(`caps 字段 ${String(key)} 缺失或非有限数值`);
@@ -95,6 +96,7 @@ export function parseBudgetCaps(raw: unknown): BudgetCaps {
     return v;
   };
   const excMap = (key: 'referencesExceptions' | 'scriptsExceptions'): Record<string, number> => {
+    // eslint-disable-next-line security/detect-object-injection -- key 为两字面量联合（异常表字段名），受控键
     const v = o[key];
     if (v === null || typeof v !== 'object' || Array.isArray(v)) {
       throw new ComplexityFormatError(`caps 字段 ${key} 缺失或不是对象`);
@@ -104,6 +106,7 @@ export function parseBudgetCaps(raw: unknown): BudgetCaps {
       if (typeof n !== 'number' || !Number.isFinite(n)) {
         throw new ComplexityFormatError(`caps ${key}.${k} 非有限数值`);
       }
+      // eslint-disable-next-line security/detect-object-injection -- k 来自 caps JSON（仓库受控维护入库文件）对象键，写入本函数新建局部 out，非注入面
       out[k] = n;
     }
     return out;
@@ -155,6 +158,7 @@ export function computeComplexityReport(m: ComplexityMeasurement): ComplexityRep
 }
 
 function capFor(exceptions: Record<string, number>, def: number, path: string): number {
+  // eslint-disable-next-line security/detect-object-injection -- path 来自采集器 FileLines.path（采集自身 readdir 枚举的受控路径），非外部输入
   return Object.prototype.hasOwnProperty.call(exceptions, path) ? exceptions[path]! : def;
 }
 

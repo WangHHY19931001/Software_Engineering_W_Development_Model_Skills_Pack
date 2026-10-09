@@ -87,7 +87,9 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
   let json = false;
   let saveBaseline: string | undefined;
   for (let i = 0; i < argv.length; i++) {
+    // eslint-disable-next-line security/detect-object-injection -- i 为受控循环下标（0..argv.length-1），非数字键注入
     const token = argv[i]!;
+    // eslint-disable-next-line security/detect-possible-timing-attacks -- 与固定字面量 '--json' 的相等比较，非秘密比较（无时序侧信道）
     if (token === '--json') {
       if (json) argInvalid('重复的 flag', '--json');
       json = true;
@@ -100,6 +102,7 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
       saveBaseline = value;
       continue;
     }
+    // eslint-disable-next-line security/detect-possible-timing-attacks -- 与固定字面量 '--save-baseline' 的相等比较，非秘密比较（无时序侧信道）
     if (token === '--save-baseline') {
       if (saveBaseline !== undefined) argInvalid('重复的 flag', '--save-baseline');
       const value = argv[++i];
